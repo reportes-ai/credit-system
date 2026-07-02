@@ -211,11 +211,19 @@ async function buildResumenEjecutivo() {
     `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='OTORGADO'
       AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=DATE_FORMAT(DATE_SUB(?, INTERVAL 1 MONTH),'%Y-%m')
       AND DAY(fecha_otorgado) <= ? AND ejecutivo<>'' GROUP BY ejecutivo`, [ch.fecha, ch.day]);
-  // Flujo del embudo por ejecutivo (mes): ingresadas a análisis y aprobadas sin otorgar
+  // Flujo del embudo por ejecutivo — SOLO mes anterior y mes en curso (la base
+  // histórica migrada distorsiona; el análisis de gestión es de corto plazo).
+  const mesActualDate = mesStr + '-01';
   const [ejIngresadas] = await pool.query(
-    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE DATE_FORMAT(created_at,'%Y-%m')=? AND ejecutivo<>'' GROUP BY ejecutivo`, [mesStr]);
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE mes=? AND ejecutivo<>'' GROUP BY ejecutivo`, [mesActualDate]);
   const [ejAprobSinCerrar] = await pool.query(
-    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='APROBADO' AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY ops DESC LIMIT 10`);
+    `SELECT ejecutivo, COUNT(*) ops FROM creditos WHERE estado_credito='APROBADO'
+      AND mes >= DATE_SUB(?, INTERVAL 1 MONTH) AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY ops DESC LIMIT 10`, [mesActualDate]);
+  // Solo EJECUTIVOS VIGENTES: filtrar contra usuarios activos (ex-ejecutivos fuera)
+  const [usrAct] = await pool.query(
+    `SELECT CONCAT(u.nombre,' ',u.apellido) nombre FROM usuarios u WHERE u.estado='activo'`);
+  const vigentes = new Set(usrAct.map(u => keyEj(u.nombre)));
+  const soloVigentes = rows => rows.filter(r => vigentes.has(keyEj(r.ejecutivo)));
   // Colocaciones por financiera: mes actual vs mes anterior al mismo día
   const [finMes] = await pool.query(
     `SELECT COALESCE(financiera,'—') financiera, COUNT(*) ops, COALESCE(SUM(monto_financiado),0) monto
@@ -233,8 +241,11 @@ async function buildResumenEjecutivo() {
 
   const totAyer = ventasAyer.reduce((s, r) => s + Number(r.ops), 0);
   const montoAyer = ventasAyer.reduce((s, r) => s + Number(r.monto), 0);
-  const mapAnt = new Map(ejMesAntMismoDia.map(r => [keyEj(r.ejecutivo), Number(r.ops)]));
-  const ritmoEj = ejMes.map(r => ({ ejecutivo: titulo(r.ejecutivo), mes_actual: Number(r.ops), mes_anterior_mismo_dia: mapAnt.get(keyEj(r.ejecutivo)) || 0 }))
+  const mapAnt = new Map(soloVigentes(ejMesAntMismoDia).map(r => [keyEj(r.ejecutivo), Number(r.ops)]));
+  const mapAct = new Map(soloVigentes(ejMes).map(r => [keyEj(r.ejecutivo), { nombre: r.ejecutivo, ops: Number(r.ops) }]));
+  // Unión: incluye también a los que colocaron el mes pasado y este mes llevan 0
+  for (const [k, ops] of mapAnt) if (!mapAct.has(k)) { const src = ejMesAntMismoDia.find(r => keyEj(r.ejecutivo) === k); mapAct.set(k, { nombre: src.ejecutivo, ops: 0 }); }
+  const ritmoEj = [...mapAct.entries()].map(([k, v]) => ({ ejecutivo: titulo(v.nombre), mes_actual: v.ops, mes_anterior_mismo_dia: mapAnt.get(k) || 0 }))
     .map(x => ({ ...x, variacion: x.mes_actual - x.mes_anterior_mismo_dia }))
     .sort((a, b) => a.variacion - b.variacion);
   const mapFinAnt = new Map(finMesAnt.map(r => [r.financiera, Number(r.ops)]));
@@ -247,8 +258,8 @@ async function buildResumenEjecutivo() {
     presupuesto_mes: ppto ? { creditos: Number(ppto.ops), monto_mm: Number(ppto.monto) } : null,
     colocaciones_por_financiera: finanzas,
     ritmo_ejecutivos_vs_mes_anterior_mismo_dia: ritmoEj,
-    ingresadas_a_analisis_mes_por_ejecutivo: ejIngresadas.map(r => ({ ejecutivo: titulo(r.ejecutivo), ingresadas: Number(r.ops) })).sort((a, b) => a.ingresadas - b.ingresadas),
-    aprobados_sin_otorgar_por_ejecutivo: ejAprobSinCerrar.map(r => ({ ejecutivo: titulo(r.ejecutivo), pendientes: Number(r.ops) })),
+    ingresadas_a_analisis_mes_por_ejecutivo: soloVigentes(ejIngresadas).map(r => ({ ejecutivo: titulo(r.ejecutivo), ingresadas: Number(r.ops) })).sort((a, b) => a.ingresadas - b.ingresadas),
+    aprobados_sin_otorgar_por_ejecutivo: soloVigentes(ejAprobSinCerrar).map(r => ({ ejecutivo: titulo(r.ejecutivo), pendientes: Number(r.ops) })),
     cartas_aprobacion: { vigentes: Number(cartas.vigentes || 0), por_vencer_hoy_o_manana: Number(cartas.por_vencer || 0), vigencia_dias: vigDias },
     mora_cartera: { creditos_en_mora: Number(mora.ops), monto_vencido: Number(mora.monto) },
     cumpleanos_manana: cumples.map(c => titulo(c.nombre)),
@@ -260,7 +271,7 @@ async function buildResumenEjecutivo() {
     const { analizar } = require('../../../../shared/anthropic');
     const r = await analizar({
       codigo: 'resumen_ejecutivo',
-      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 3 a 5 párrafos cortos en español chileno profesional. Cubre: (1) ventas de ayer, destacando ejecutivos; (2) ritmo del mes por financiera vs mes anterior al mismo día y avance vs presupuesto (presupuesto_mes.monto_mm está en MILLONES de pesos); (3) gestión comercial: qué ejecutivo viene CAÍDO vs el mes pasado al mismo día, quién ha ingresado menos operaciones a análisis y quién acumula aprobados sin otorgar (nómbralos con tino, en tono de gestión, no de funa); (4) alertas accionables (cartas por vencer, mora) solo si ameritan; (5) si hay cumpleaños mañana, ciérralo con una línea amable recordándolo. Montos en pesos chilenos con separador de miles (punto). Sin saludos ni despedidas ni markdown: devuelve HTML simple usando solo <p> y <b>.',
+      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 3 a 5 párrafos cortos en español chileno profesional. Cubre: (1) ventas de ayer, destacando ejecutivos; (2) ritmo del mes por financiera vs mes anterior al mismo día y avance vs presupuesto (presupuesto_mes.monto_mm está en MILLONES de pesos); (3) gestión comercial: qué ejecutivo viene CAÍDO vs el mes pasado al mismo día, quién ha ingresado menos operaciones a análisis y quién acumula aprobados sin otorgar (nómbralos con tino, en tono de gestión, no de funa). Los datos ya vienen acotados al mes pasado y lo que va del mes, y SOLO con ejecutivos vigentes — no menciones a nadie fuera de esas listas; (4) alertas accionables (cartas por vencer, mora) solo si ameritan; (5) si hay cumpleaños mañana, ciérralo con una línea amable recordándolo. Montos en pesos chilenos con separador de miles (punto). Sin saludos ni despedidas ni markdown: devuelve HTML simple usando solo <p> y <b>.',
       prompt: 'Datos del negocio:\n' + JSON.stringify(datos, null, 2),
       max_tokens: 1100,
     });
