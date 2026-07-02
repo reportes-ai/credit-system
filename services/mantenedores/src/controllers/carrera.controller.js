@@ -72,7 +72,7 @@ const popup = async (req, res) => {
     const mesStr = `${ch.year}-${String(ch.month).padStart(2, '0')}`;
     // Carriles: Ejecutivos Comerciales activos; avance: otorgados del mes (mismo criterio del informe diario)
     const [usr] = await pool.query(
-      `SELECT CONCAT(u.nombre,' ',u.apellido) nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
         WHERE p.nombre='Ejecutivo Comercial' AND u.estado='activo' ORDER BY nombre LIMIT 20`);
     const [ops] = await pool.query(
       `SELECT ejecutivo, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos

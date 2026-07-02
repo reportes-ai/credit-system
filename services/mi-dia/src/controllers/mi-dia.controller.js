@@ -22,8 +22,10 @@ function mesChile() {
   return p.slice(0, 7);
 }
 async function nombreEjecutivo(u) {
-  // El nombre con que se guarda al ejecutivo en creditos = "Nombre Apellido"
-  return `${u.nombre || ''} ${u.apellido || ''}`.trim();
+  // Convención: en creditos.ejecutivo se guarda "PRIMER nombre + apellido PATERNO"
+  const n = String(u.nombre || '').trim().split(/\s+/)[0] || '';
+  const a = String(u.apellido || '').trim().split(/\s+/)[0] || '';
+  return `${n} ${a}`.trim();
 }
 const uno = async (sql, params = []) => { try { const [[r]] = await pool.query(sql, params); return Number(r.n) || 0; } catch (e) { return 0; } };
 

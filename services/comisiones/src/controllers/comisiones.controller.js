@@ -435,7 +435,7 @@ const getEjecutivos = async (req, res) => {
       params
     );
     const [usrRows] = await pool.query(
-      `SELECT CONCAT(u.nombre, ' ', u.apellido) AS ejecutivo
+      `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) AS ejecutivo
        FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
        WHERE p.nombre = 'Ejecutivo Comercial' AND u.estado = 'activo'`
     );

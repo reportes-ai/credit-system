@@ -87,7 +87,7 @@ async function buildInformeVentas() {
         AND ejecutivo IS NOT NULL AND ejecutivo <> ''
       GROUP BY ejecutivo, financiera`, [mesStr]);
   const [usr] = await pool.query(
-    `SELECT CONCAT(u.nombre,' ',u.apellido) AS ejecutivo
+    `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) AS ejecutivo
        FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
       WHERE p.nombre='Ejecutivo Comercial' AND u.estado='activo'`);
 
@@ -221,7 +221,7 @@ async function buildResumenEjecutivo() {
       AND mes >= DATE_SUB(?, INTERVAL 1 MONTH) AND ejecutivo<>'' GROUP BY ejecutivo ORDER BY ops DESC LIMIT 10`, [mesActualDate]);
   // Solo EJECUTIVOS VIGENTES: filtrar contra usuarios activos (ex-ejecutivos fuera)
   const [usrAct] = await pool.query(
-    `SELECT CONCAT(u.nombre,' ',u.apellido) nombre FROM usuarios u WHERE u.estado='activo'`);
+    `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) nombre FROM usuarios u WHERE u.estado='activo'`);
   const vigentes = new Set(usrAct.map(u => keyEj(u.nombre)));
   const soloVigentes = rows => rows.filter(r => vigentes.has(keyEj(r.ejecutivo)));
   // Colocaciones por financiera: mes actual vs mes anterior al mismo día

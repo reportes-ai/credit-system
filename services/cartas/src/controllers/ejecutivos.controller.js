@@ -9,7 +9,8 @@ const getAll = async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT u.id_usuario AS id,
-              TRIM(CONCAT(u.nombre, ' ', COALESCE(u.apellido, ''))) AS nombre,
+              -- Convención: PRIMER nombre + apellido PATERNO (nombre completo solo en documentos formales)
+              TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre,
               u.email AS mail, u.telefono AS tel
          FROM usuarios u
          JOIN perfiles p ON p.id_perfil = u.id_perfil
