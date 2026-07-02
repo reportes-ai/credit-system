@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recálculo Programado — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),#0255c5); color:#fff; height:56px; padding:0 22px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:30px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.62rem; font-weight:700; border-radius:6px; padding:2px 7px; }
+    .crumb { color:rgba(255,255,255,.65); font-size:.82rem; }
+    .crumb a { color:rgba(255,255,255,.8); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.8rem; cursor:pointer; }
+    .wrap { max-width:1100px; margin:26px auto; padding:0 20px 60px; }
+    .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 55%,var(--accent)); border-radius:14px; color:#fff; padding:18px 26px; display:flex; align-items:center; gap:16px; margin-bottom:22px; }
+    .banner i { font-size:2.1rem; opacity:.9; }
+    .banner h2 { margin:0; font-weight:800; font-size:1.25rem; }
+    .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .card2 { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:20px 22px; margin-bottom:18px; }
+    .card2 h5 { font-weight:800; color:var(--navy-dark); font-size:1rem; margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+    .switch { position:relative; display:inline-block; width:52px; height:28px; }
+    .switch input { display:none; }
+    .slider { position:absolute; cursor:pointer; inset:0; background:#cbd5e1; border-radius:28px; transition:.2s; }
+    .slider:before { content:''; position:absolute; height:22px; width:22px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+    input:checked + .slider { background:#16a34a; }
+    input:checked + .slider:before { transform:translateX(24px); }
+    table { width:100%; border-collapse:collapse; }
+    th { background:var(--navy-dark); color:#fff; font-size:.75rem; font-weight:700; padding:8px 10px; text-align:left; }
+    td { padding:7px 10px; border-bottom:1px solid #eef2f7; font-size:.85rem; }
+    .dias { display:flex; gap:3px; }
+    .dias label { font-size:.72rem; border:1px solid #cbd5e1; border-radius:6px; padding:2px 6px; cursor:pointer; user-select:none; color:#64748b; }
+    .dias input { display:none; }
+    .dias input:checked + span { color:#fff; }
+    .dias label:has(input:checked) { background:var(--navy); border-color:var(--navy); color:#fff; }
+    input[type=time], input[type=number], input.txt { border:1.5px solid #cbd5e1; border-radius:7px; padding:5px 8px; font-size:.83rem; }
+    input[type=number]{ width:78px; }
+    input.txt{ width:150px; }
+    .btn-primary2 { background:linear-gradient(135deg,var(--navy),var(--accent)); border:none; color:#fff; border-radius:8px; padding:9px 20px; font-weight:700; font-size:.86rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #cbd5e1; color:var(--navy); border-radius:8px; padding:8px 15px; font-weight:600; font-size:.83rem; cursor:pointer; }
+    .btn-run { background:#16a34a; border:none; color:#fff; border-radius:8px; padding:9px 18px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-del { background:transparent; border:none; color:#dc2626; cursor:pointer; font-size:1rem; }
+    .stat { display:inline-block; background:#f1f5f9; border-radius:8px; padding:8px 14px; margin:4px 8px 4px 0; font-size:.83rem; }
+    .stat b { color:var(--navy-dark); }
+    .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 18px; font-size:.82rem; color:#475569; }
+    .foot b { color:var(--navy-dark); }
+    .muted { color:#94a3b8; font-size:.78rem; }
+    #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:10px 18px; border-radius:8px; font-size:.85rem; display:none; z-index:999; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:14px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="verBadge">v77.69</span></a>
+    <span class="crumb"><a href="/mantenedores/">Mantenedores</a> › Recálculo Programado</span>
+  </div>
+  <button class="btn-logout" onclick="sessionStorage.clear();location.href='/login.html'"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-arrow-repeat"></i>
+    <div>
+      <h2>Recálculo Programado</h2>
+      <p>Recalcula automáticamente todos los motores (comisiones, ingresos, comisión dealer/parque, seguros) de los meses abiertos, por día y horario.</p>
+    </div>
+  </div>
+
+  <!-- On/off + estado -->
+  <div class="card2">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <label class="switch"><input type="checkbox" id="activo"><span class="slider"></span></label>
+        <div>
+          <div style="font-weight:800;color:var(--navy-dark)" id="activoLbl">—</div>
+          <div class="muted">Prende para que el recálculo corra solo según los tramos de abajo.</div>
+        </div>
+      </div>
+      <button class="btn-run" onclick="runNow()"><i class="bi bi-play-fill"></i> Recalcular ahora</button>
+    </div>
+    <div style="margin-top:16px" id="estado"></div>
+  </div>
+
+  <!-- Tramos -->
+  <div class="card2">
+    <h5><i class="bi bi-clock-history"></i> Tramos horarios</h5>
+    <div class="muted" style="margin-bottom:10px">Se evalúan de arriba hacia abajo: el primer tramo que coincida (día + hora actual) manda su intervalo. Si ninguno coincide, se usa el intervalo por defecto.</div>
+    <table>
+      <thead><tr><th>Nombre</th><th>Días</th><th>Desde</th><th>Hasta</th><th>Cada (min)</th><th></th></tr></thead>
+      <tbody id="tramos"></tbody>
+    </table>
+    <button class="btn-ghost" style="margin-top:12px" onclick="addTramo()"><i class="bi bi-plus-lg"></i> Agregar tramo</button>
+    <div style="margin-top:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-weight:600;color:#475569;font-size:.85rem">Intervalo por defecto (fuera de tramos):</span>
+      <input type="number" id="intDefault" min="0" max="1440"> <span class="muted">min &nbsp;(0 = no correr)</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:22px">
+    <button class="btn-primary2" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar configuración</button>
+    <button class="btn-ghost" onclick="cargar()">Descartar cambios</button>
+  </div>
+
+  <div class="foot">
+    <div style="font-weight:800;color:var(--navy-dark);margin-bottom:6px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Recálculo de motores</b> → recalcula comisiones, ingresos, comisión dealer/parque y seguros de los <b>meses abiertos</b> (los cerrados no se tocan). Alimenta el <a href="/dashboard/">Dashboard</a>, <a href="/comisiones/revision/">Revisión de Comisiones</a> y <a href="/reporteria/">Reportería</a>.</li>
+      <li><b>On/off y tramos</b> → definen cuándo corre solo. Es una red de seguridad: además, cada carga/edición/digitación ya recalcula su mes automáticamente.</li>
+      <li><b>Recalcular ahora</b> → fuerza una corrida inmediata de todos los meses abiertos.</li>
+    </ul>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/app-version.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
+const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
+const $ = s => document.querySelector(s);
+function toast(m){ const t=$('#toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
+
+function rowTramo(t={nombre:'',dias:[],desde:'09:00',hasta:'19:00',intervalo:30}){
+  const tr=document.createElement('tr');
+  tr.innerHTML =
+    `<td><input class="txt tr-nombre" value="${(t.nombre||'').replace(/"/g,'&quot;')}"></td>`+
+    `<td><div class="dias">`+DIAS.map(([v,l])=>`<label><input type="checkbox" class="tr-dia" value="${v}" ${(t.dias||[]).map(String).includes(v)?'checked':''}><span>${l}</span></label>`).join('')+`</div></td>`+
+    `<td><input type="time" class="tr-desde" value="${t.desde||'09:00'}"></td>`+
+    `<td><input type="time" class="tr-hasta" value="${t.hasta||'19:00'}"></td>`+
+    `<td><input type="number" class="tr-int" min="0" max="1440" value="${t.intervalo??30}"></td>`+
+    `<td><button class="btn-del" title="Eliminar" onclick="this.closest('tr').remove()"><i class="bi bi-trash"></i></button></td>`;
+  return tr;
+}
+function addTramo(){ $('#tramos').appendChild(rowTramo()); }
+function leerTramos(){
+  return [...$('#tramos').querySelectorAll('tr')].map(tr=>({
+    nombre: tr.querySelector('.tr-nombre').value.trim() || 'Tramo',
+    dias: [...tr.querySelectorAll('.tr-dia:checked')].map(c=>+c.value),
+    desde: tr.querySelector('.tr-desde').value || '00:00',
+    hasta: tr.querySelector('.tr-hasta').value || '23:59',
+    intervalo: parseInt(tr.querySelector('.tr-int').value)||0,
+  }));
+}
+
+async function cargar(){
+  const j = await (await fetch('/api/recalculo-programado', {headers:H})).json();
+  if(!j.success){ toast('Error: '+j.error); return; }
+  const d = j.data;
+  $('#activo').checked = d.activo;
+  actualizarLbl();
+  $('#tramos').innerHTML=''; (d.tramos||[]).forEach(t=>$('#tramos').appendChild(rowTramo(t)));
+  $('#intDefault').value = d.intervalo_default;
+  // estado
+  const fmt = s => s ? new Date(s).toLocaleString('es-CL') : '—';
+  const dN = ['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  $('#estado').innerHTML =
+    `<span class="stat">Ahora: <b>${dN[d.ahora.dow]} ${d.ahora.hhmm}</b></span>`+
+    `<span class="stat">Aplica: <b>${d.ahora.intervalo>0?('cada '+d.ahora.intervalo+' min'):'no corre'}</b> (${d.ahora.tramo})</span>`+
+    `<span class="stat">Última corrida: <b>${fmt(d.ultima_corrida)}</b>${d.ultima_ops!=null?` · ${d.ultima_ops} ops · ${d.ultima_duracion_seg||0}s`:''}</span>`+
+    (d.proxima_estimada?`<span class="stat">Próxima estimada: <b>${fmt(d.proxima_estimada)}</b></span>`:'')+
+    (d.corriendo?`<span class="stat" style="background:#fef3c7">⏳ corriendo…</span>`:'')+
+    (d.ultimo_error?`<span class="stat" style="background:#fee2e2;color:#991b1b">último error: ${d.ultimo_error}</span>`:'');
+}
+function actualizarLbl(){ $('#activoLbl').textContent = $('#activo').checked ? 'ACTIVADO — corre automáticamente' : 'Apagado'; }
+$('#activo').addEventListener('change', actualizarLbl);
+
+async function guardar(){
+  const body = { activo: $('#activo').checked, tramos: leerTramos(), intervalo_default: parseInt($('#intDefault').value)||0 };
+  const j = await (await fetch('/api/recalculo-programado', {method:'PUT',headers:H,body:JSON.stringify(body)})).json();
+  if(j.success){ toast('Configuración guardada ✓'); cargar(); } else toast('Error: '+j.error);
+}
+async function runNow(){
+  if(!confirm('¿Recalcular ahora todos los meses abiertos? Puede tardar según el volumen.')) return;
+  toast('Recalculando…');
+  const j = await (await fetch('/api/recalculo-programado/run', {method:'POST',headers:H})).json();
+  if(j.success){ toast(`Listo: ${j.data.ops} ops en ${j.data.dur}s`+(j.data.err?' (con error)':'')); cargar(); }
+  else toast('Error: '+j.error);
+}
+cargar();
+setInterval(cargar, 30000);   // refrescar estado cada 30s
+</script>
+</body>
+</html>
