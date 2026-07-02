@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- v2.0 — historial de pagos lee el calendario congelado (cuotas_credito) -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -383,6 +384,7 @@ const creditId = params.get('id');
 let _credito   = null;
 let _credParams = {};
 let _pagos     = [];
+let _calendario = [];   // calendario congelado (cuotas_credito) — manda sobre el calculado al vuelo
 let _tmc         = null;      // tasa máxima convencional vigente
 let _uf          = null;      // valor UF hoy (fallback)
 let _ufPorFecha  = new Map(); // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
@@ -435,17 +437,19 @@ async function cargarPagina() {
     const rut   = _credito.rut_cliente;
 
     // 2. Antecedentes + info comercial + pagos + tasa + UF en paralelo
-    const [ra, ri, rpg, rt, ru] = await Promise.all([
+    const [ra, ri, rpg, rt, ru, rcal] = await Promise.all([
       fetch('/api/antecedentes-laborales/'+encodeURIComponent(rut), { headers: apiHdr() }),
       fetch('/api/informacion-comercial/'+encodeURIComponent(rut),  { headers: apiHdr() }),
       fetch('/api/pagos-credito/'+creditId,                          { headers: apiHdr() }),
       fetch('/api/tasas/vigente',                                     { headers: apiHdr() }),
       fetch('/api/uf/vigente',                                        { headers: apiHdr() }),
+      fetch('/api/pagos-credito/calendario/'+creditId,                { headers: apiHdr() }),
     ]);
-    const [ja, ji, jpg, jt, ju] = await Promise.all([ra.json(), ri.json(), rpg.json(), rt.json(), ru.json()]);
+    const [ja, ji, jpg, jt, ju, jcal] = await Promise.all([ra.json(), ri.json(), rpg.json(), rt.json(), ru.json(), rcal.json()]);
     const ant = ja.success  ? ja.data  : null;
     const com = ji.success  ? ji.data  : null;
     _pagos    = jpg.success ? (jpg.data||[]) : [];
+    _calendario = (jcal.success && Array.isArray(jcal.data)) ? jcal.data : [];
     _tmc      = jt.success  ? jt.data  : null;
     _uf       = ju.success  ? ju.data  : null;
 
@@ -466,7 +470,7 @@ function getEstadoPago(c) {
   const mora = schedule.filter(row => {
     if (!row.fecha) return false;
     const venc = new Date(row.fecha); venc.setHours(0,0,0,0);
-    return venc < hoy && !pagadasSet.has(row.n);
+    return venc < hoy && !pagadasSet.has(row.n) && !row.pagadaCal;
   });
   if (mora.length === 0) return { label:'AL DÍA', cls:'aldia' };
   const oldest = mora.reduce((a,b) => a.fecha < b.fecha ? a : b);
@@ -856,6 +860,18 @@ async function precargarUFDias21(schedule) {
 
 /* ── Historial de Pagos ── */
 function buildAmortSchedule(c) {
+  // Crédito con calendario congelado (tabla de desarrollo real) → se lee tal cual.
+  // Regla de negocio: los créditos otorgados son inmutables; el cálculo al vuelo
+  // es solo un fallback para créditos sin calendario en cuotas_credito.
+  if (_calendario.length) {
+    return _calendario.map(q => ({
+      n: parseInt(q.numero_cuota,10),
+      fecha: q.fecha_vencimiento ? new Date(q.fecha_vencimiento+'T00:00:00') : null,
+      cuota: parseInt(q.valor_cuota,10)||0,
+      pagadaCal: q.estado_cuota==='PAGADA',
+      fpagoCal: q.fecha_pago || null,
+    }));
+  }
   const mf   = parseFloat(c.monto_financiado)||0;
   const r    = (parseFloat(c.tasa_mensual)||0)/100;
   const pl   = parseInt(c.plazo)||0;
@@ -889,8 +905,9 @@ function renderHistorialPagos(c) {
   let rows='', countPag=0, countVenc=0, countPend=0, montoMoraTotal=0;
   schedule.forEach(s => {
     const pg      = _pagos.find(p=>p.numero_cuota===s.n);
-    const vencida = !finExt && !pg && s.fecha && s.fecha < hoy;
-    if (pg) countPag++; else if (vencida) countVenc++; else countPend++;
+    const pagada  = !!pg || !!s.pagadaCal;   // pago en app ∪ calendario congelado
+    const vencida = !finExt && !pagada && s.fecha && s.fecha < hoy;
+    if (pagada) countPag++; else if (vencida) countVenc++; else countPend++;
 
     // Calcular mora y gastos acumulados si está vencida y sin pagar (solo créditos propios)
     let moraCalc = null, gcCalc = null;
@@ -904,7 +921,7 @@ function renderHistorialPagos(c) {
     if (vencida) {
       totalHoy = s.cuota + (moraCalc?.monto||0) + (gcCalc?.monto||0);
       montoMoraTotal += totalHoy;
-    } else if (!pg && !finExt) {
+    } else if (!pagada && !finExt) {
       totalHoy = s.cuota; // al día: solo la cuota, sin extras
     }
 
@@ -922,22 +939,24 @@ function renderHistorialPagos(c) {
     } else {
       intMoraDisplay = pg
         ? `<span style="color:#dc2626">${fmtP(pg.interes_mora)}</span>`
-        : (moraCalc && moraCalc.dias > 0
-            ? `<span style="color:#dc2626;font-weight:700">${fmtP(moraCalc.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraCalc.dias} días</span>`
-            : '—');
+        : (pagada ? '—'
+            : (moraCalc && moraCalc.dias > 0
+                ? `<span style="color:#dc2626;font-weight:700">${fmtP(moraCalc.monto)}</span><br><span style="font-size:.68rem;color:#b45309">${moraCalc.dias} días</span>`
+                : '—'));
       gtosCobrDisplay = pg
         ? `<span style="color:#dc2626">${fmtP(pg.gastos_cobranza)}</span>`
-        : (gcCalc && gcCalc.aplica
-            ? `<span style="color:#dc2626;font-weight:700">${fmtP(gcCalc.monto)}</span>`
-            : (moraCalc && moraCalc.dias > 0 && moraCalc.dias < 21
-                ? `<span style="font-size:.68rem;color:#b45309">día 21</span>`
-                : '—'));
-      totalHoyDisplay = pg
+        : (pagada ? '—'
+            : (gcCalc && gcCalc.aplica
+                ? `<span style="color:#dc2626;font-weight:700">${fmtP(gcCalc.monto)}</span>`
+                : (moraCalc && moraCalc.dias > 0 && moraCalc.dias < 21
+                    ? `<span style="font-size:.68rem;color:#b45309">día 21</span>`
+                    : '—')));
+      totalHoyDisplay = pagada
         ? '—'
         : (vencida
             ? `<span style="font-weight:900;color:#dc2626">${fmtP(totalHoy)}</span>`
             : `<span style="color:#1d4ed8;font-weight:700">${fmtP(totalHoy)}</span>`);
-      pillHtml = pg
+      pillHtml = pagada
         ? '<span class="pill-pg pagada"><i class="bi bi-check-circle-fill"></i>Pagada</span>'
         : (vencida
             ? '<span class="pill-pg mora"><i class="bi bi-exclamation-triangle-fill"></i>En Mora</span>'
@@ -951,8 +970,8 @@ function renderHistorialPagos(c) {
       <td>${intMoraDisplay}</td>
       <td>${gtosCobrDisplay}</td>
       <td style="text-align:right">${totalHoyDisplay}</td>
-      <td style="font-weight:800;color:#16a34a">${pg ? fmtP(pg.total_pagado) : '—'}</td>
-      <td style="color:var(--muted)">${pg ? fmtDT(pg.fecha_pago) : '—'}</td>
+      <td style="font-weight:800;color:#16a34a">${pg ? fmtP(pg.total_pagado) : (s.pagadaCal ? fmtP(s.cuota) : '—')}</td>
+      <td style="color:var(--muted)">${pg ? fmtDT(pg.fecha_pago) : (s.fpagoCal ? fmtF(s.fpagoCal) : '—')}</td>
       <td style="text-align:center">${pillHtml}</td>
       <td style="text-align:center">
         ${pg ? `<button class="btn-comp-sm" onclick="verComprobanteRevisar(${pg.id_pago})">

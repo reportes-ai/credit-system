@@ -102,6 +102,17 @@
 
   /* ── Amortización francesa ── */
   function buildSchedule(c) {
+    // Calendario congelado (cuotas_credito) manda: créditos otorgados inmutables.
+    // El cálculo francés al vuelo queda como fallback para créditos sin calendario.
+    if (Array.isArray(S.calendario) && S.calendario.length) {
+      return S.calendario.map(q => ({
+        numero: parseInt(q.numero_cuota, 10),
+        fecha: q.fecha_vencimiento,
+        monto: parseInt(q.valor_cuota, 10) || 0,
+        pagadaCal: q.estado_cuota === 'PAGADA',
+        fpagoCal: q.fecha_pago || null,
+      }));
+    }
     const r = (parseFloat(c.tasa_mensual) || 0) / 100, n = parseInt(c.plazo) || 0, mf = parseFloat(c.monto_financiado) || 0;
     if (!n) return [];
     const cuota = r === 0 ? mf / n : (window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(mf, r, n) : mf * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
@@ -142,7 +153,7 @@
       S.creditId = opts.creditId; S.onLoad = opts.onLoad || null;
       S.host.innerHTML = `<div style="text-align:center;padding:60px;color:#64748b"><i class="bi bi-hourglass-split" style="font-size:1.6rem"></i><div style="margin-top:8px">Cargando…</div></div>`;
       try {
-        const [jC, jP, jCaja, jCu, jT, jU, jSaldo] = await Promise.all([
+        const [jC, jP, jCaja, jCu, jT, jU, jSaldo, jCal] = await Promise.all([
           API('/api/creditos/' + S.creditId).then(r => r.json()),
           API('/api/pagos-credito/' + S.creditId).then(r => r.json()),
           API('/api/cajas/mi-caja').then(r => r.json()).catch(() => ({ data: null })),
@@ -150,6 +161,7 @@
           API('/api/tasas/vigente').then(r => r.json()).catch(() => ({ data: null })),
           API('/api/uf/vigente').then(r => r.json()).catch(() => ({ data: null })),
           API('/api/cuentas-transitorias/por-credito/' + S.creditId).then(r => r.json()).catch(() => ({ data: null })),
+          API('/api/pagos-credito/calendario/' + S.creditId).then(r => r.json()).catch(() => ({ data: [] })),
         ]);
         if (!jC.success) throw new Error(jC.error || 'No se pudo cargar el crédito.');
         S.credito = jC.data;
@@ -159,6 +171,7 @@
         S.tmc = jT.data?.tasa_anual_mayor || 0;
         S.ufHoy = jU.data?.valor || 0;
         S.saldoAFavor = (jSaldo.success && jSaldo.data?.saldo_total) || 0;
+        S.calendario = (jCal.success && Array.isArray(jCal.data)) ? jCal.data : [];
         S.schedule = buildSchedule(S.credito);
         await precargarCobranza(S.creditId, S.schedule);
         S.sel.clear();
@@ -182,7 +195,7 @@
     let nPag = 0, nMora = 0, nPend = 0, moraTot = 0;
 
     const filas = S.schedule.map(s => {
-      const esPag = pagadas.has(s.numero);
+      const esPag = pagadas.has(s.numero) || !!s.pagadaCal;   // pago en app ∪ calendario congelado
       const pago = S.pagos.find(p => p.numero_cuota === s.numero && p.estado_pago === 'PAGADO');
       const mora = esPag ? { monto: 0, dias: 0 } : calcMora(s.monto, s.fecha);
       const gastos = esPag ? { monto: 0 } : calcGastos(s.monto, s.fecha);
@@ -205,8 +218,8 @@
         <td class="pcp-r pcp-amt ${enMora && mora.monto ? 'pcp-mora' : ''}">${esPag ? (Number(pago?.interes_mora) > 0 ? clp(pago.interes_mora) : '<span class="pcp-mut">—</span>') : (mora.monto ? clp(mora.monto) : '<span class="pcp-mut">—</span>')}</td>
         <td class="pcp-r pcp-amt ${enMora && gastos.monto ? 'pcp-mora' : ''}">${esPag ? (Number(pago?.gastos_cobranza) > 0 ? clp(pago.gastos_cobranza) : '<span class="pcp-mut">—</span>') : (gastos.monto ? clp(gastos.monto) : '<span class="pcp-mut">—</span>')}</td>
         <td class="pcp-r pcp-amt" style="${enMora ? 'color:#dc2626' : ''}">${esPag ? '<span class="pcp-mut">—</span>' : clp(totalHoy)}</td>
-        <td class="pcp-r pcp-amt" style="color:#15803d">${pago ? clp(pago.total_pagado) : '<span class="pcp-mut">—</span>'}</td>
-        <td>${pago ? fmtFecha(pago.fecha_pago || pago.created_at) : '<span class="pcp-mut">—</span>'}</td>
+        <td class="pcp-r pcp-amt" style="color:#15803d">${pago ? clp(pago.total_pagado) : (s.pagadaCal ? clp(s.monto) : '<span class="pcp-mut">—</span>')}</td>
+        <td>${pago ? fmtFecha(pago.fecha_pago || pago.created_at) : (s.fpagoCal ? fmtFecha(s.fpagoCal) : '<span class="pcp-mut">—</span>')}</td>
         <td>
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             ${pill}

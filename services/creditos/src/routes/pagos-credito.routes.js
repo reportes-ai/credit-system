@@ -8,6 +8,7 @@ router.get('/pago/:id_pago',          verifyToken, ctrl.getById);
 router.post('/batch',                 verifyToken, requireFunc('creditos_pagar_cuotas'), ctrl.createBatch);
 router.post('/reversar/:id_pago',     verifyToken, requireFunc('creditos_reversar_pagos'), ctrl.reversar);
 router.get('/prepago/:num_op',        verifyToken, ctrl.prepagoInfo);
+router.get('/calendario/:id_credito', verifyToken, ctrl.getCalendario);
 router.post('/prepagar',              verifyToken, requireFunc('creditos_pagar_cuotas'), ctrl.prepagar);
 router.delete('/:id_pago',            verifyToken, requireFunc('creditos_reversar_pagos'), ctrl.remove);
 router.post('/',                      verifyToken, requireFunc('creditos_pagar_cuotas'), ctrl.create);

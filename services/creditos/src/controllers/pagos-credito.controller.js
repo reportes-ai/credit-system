@@ -168,6 +168,22 @@ const getByCredito = async (req, res) => {
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
+/* ─── GET calendario congelado (tabla de desarrollo real en cuotas_credito) ──
+   Créditos otorgados son inmutables: si el crédito tiene calendario congelado
+   (migración INDEXA / cartera cargada por Excel), los consumidores deben usarlo
+   en vez de recalcular la cuota francesa al vuelo. Devuelve [] si no hay. */
+const getCalendario = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT numero_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') fecha_vencimiento,
+              interes, amortizacion, valor_cuota, saldo_insoluto, estado_cuota,
+              DATE_FORMAT(fecha_pago,'%Y-%m-%d') fecha_pago
+         FROM cuotas_credito WHERE id_credito = ? ORDER BY numero_cuota ASC`,
+      [req.params.id_credito]);
+    res.json({ success: true, data: rows, error: null });
+  } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
+};
+
 /* ─── GET un pago por ID ─────────────────────────────────────────────────── */
 const getById = async (req, res) => {
   try {
@@ -354,6 +370,16 @@ const createBatch = async (req, res) => {
           imTot, gcTot
         ]
       );
+    }
+
+    // Calendario congelado (cuotas_credito): marcar las cuotas pagadas también ahí,
+    // para que la tabla de desarrollo real y los pagos en app siempre conversen.
+    if (pagos.length) {
+      await conn.query(
+        `UPDATE cuotas_credito SET estado_cuota='PAGADA', fecha_pago=?
+          WHERE id_credito=? AND numero_cuota IN (?) AND estado_cuota<>'PAGADA'`,
+        [fecha_pago || new Date(), id_credito, pagos.map(p => p.numero_cuota)]
+      ).catch(() => {});
     }
 
     // ── 5. Consumir saldo a favor si se necesitó ───────────────────────────
@@ -634,6 +660,18 @@ const reversar = async (req, res) => {
       [comentario.trim(), reversado_por, u.id_usuario || null, id_pago]
     );
 
+    // 3b. Calendario congelado: si esta cuota ya no tiene ningún pago vigente,
+    //     volverla a su estado impago (solo aplica si fue el pago en app el que la marcó)
+    const [[quedan]] = await conn.query(
+      `SELECT COUNT(*) n FROM pagos_credito WHERE id_credito=? AND numero_cuota=? AND estado_pago='PAGADO'`,
+      [pago.id_credito, pago.numero_cuota]);
+    if (!quedan.n) {
+      await conn.query(
+        `UPDATE cuotas_credito SET estado_cuota='VIGENTE', fecha_pago=NULL
+          WHERE id_credito=? AND numero_cuota=? AND estado_cuota='PAGADA'`,
+        [pago.id_credito, pago.numero_cuota]).catch(() => {});
+    }
+
     // 4. Si se usó saldo a favor para pagar esta cuota (via transitoria),
     //    restituir el monto reversado como nuevo abono en cuentas_transitorias
     if (pago.numero_transaccion) {
@@ -698,4 +736,4 @@ const reversar = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar };
+module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar };
