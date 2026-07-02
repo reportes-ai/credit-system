@@ -3,7 +3,7 @@ const audit = require('../../../../shared/auditoria');
 require('../migrations/fix-financieras');   // migración one-time de datos (financiera/estado/automotora) — guard propio
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura, hoyChileDMY } = require('../../../../shared/utils/fecha-futura');
-const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
+const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular-mes');
 const { clasificar: clasificarCartera } = require('../utils/recalcular-estado-cartera');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
@@ -296,6 +296,9 @@ const create = async (req, res) => {
       try { await marcarForzadosCalculo(r.insertId, { campos: ['comdea_real'] }); }
       catch (e) { console.error('[forzados digitacion]', e.message); }
     }
+
+    // Recalcular el mes del crédito nuevo (comisiones/ingresos) — automático. Fire-and-forget.
+    recalcularPorOps(r.insertId).catch(e => console.error('[recalc credito nuevo]', e.message));
 
     res.status(201).json({ success: true, data: { id_credito: r.insertId, numero_credito }, error: null });
   } catch (e) {

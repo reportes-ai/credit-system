@@ -1,7 +1,7 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
-const { marcarForzadosCalculo } = require('../utils/recalcular-mes');
+const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular-mes');
 
 // Migración: tabla log de ediciones
 (async () => {
@@ -237,6 +237,10 @@ const updateCredito = async (req, res) => {
       try { await marcarForzadosCalculo(id, { campos: calcEditados }); }
       catch (e) { console.error('[forzados edicion]', e.message); }
     }
+
+    // Recalcular el mes de la operación (comisiones/ingresos/dealer/parque) — automático
+    // tras cualquier edición. Respeta forzados y meses cerrados. Fire-and-forget.
+    recalcularPorOps(id).catch(e => console.error('[recalc edicion]', e.message));
 
     res.json({ success: true, data: { id, campos_actualizados: sets.length }, error: null });
   } catch (e) {

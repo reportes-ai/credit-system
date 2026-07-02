@@ -397,6 +397,20 @@ async function recalcularMesesAbiertos() {
   return recalcularMeses(meses);
 }
 
+/* ── Recalcular el/los mes(es) de operaciones dadas (por id de crédito) ──
+   Úsese tras CUALQUIER edición/creación/digitación para que comisiones,
+   ingresos y comisión dealer/parque queden al día automáticamente. Respeta
+   campos forzados y meses cerrados (los salta). Pensado para fire-and-forget. */
+async function recalcularPorOps(opIds) {
+  const ids = (Array.isArray(opIds) ? opIds : [opIds]).map(Number).filter(Boolean);
+  if (!ids.length) return { actualizados: 0, log: [] };
+  const [rows] = await pool.query(
+    `SELECT DISTINCT DATE_FORMAT(mes, '%Y-%m') AS m FROM creditos WHERE id IN (?) AND mes IS NOT NULL`, [ids]);
+  const meses = rows.map(r => r.m).filter(Boolean);
+  if (!meses.length) return { actualizados: 0, log: [] };
+  return recalcularMeses(meses);
+}
+
 /* ── Extraer meses únicos de una lista de ops ───────────────────────── */
 function extraerMeses(ops) {
   const set = new Set();
@@ -407,4 +421,4 @@ function extraerMeses(ops) {
   return [...set];
 }
 
-module.exports = { recalcularMeses, recalcularMesesAbiertos, marcarForzadosCalculo, extraerMeses, normalizarEjecutivosMes, cargarTasas, getTasaByFecha };
+module.exports = { recalcularMeses, recalcularMesesAbiertos, recalcularPorOps, marcarForzadosCalculo, extraerMeses, normalizarEjecutivosMes, cargarTasas, getTasaByFecha };

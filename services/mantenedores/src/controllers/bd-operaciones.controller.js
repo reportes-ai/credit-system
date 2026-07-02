@@ -3,6 +3,7 @@ const pool = require('../../../../shared/config/database');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { recalcularPorOps } = require('../../../creditos/src/utils/recalcular-mes');
 
 /* Columnas a excluir de la vista (internas/sensibles) */
 const EXCLUIR = ['datos_json'];
@@ -125,6 +126,9 @@ const update = async (req, res) => {
     EXCLUIR.forEach(f => delete updated[f]);
     auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id,
       detalle: `Editó el crédito #${id} desde BD Operaciones (${sets.length} campo/s)`, meta: { campos: Object.keys(body) } });
+    // Recalcular el mes tras editar en BD Operaciones (comisiones/ingresos) — automático.
+    // Respeta forzados y meses cerrados (si el mes está cerrado, no toca nada).
+    recalcularPorOps(id).catch(e => console.error('[recalc bd-operaciones]', e.message));
     res.json({ success: true, data: updated, error: null });
   } catch (e) {
     console.error('[bd-operaciones update]', e.message);

@@ -7,6 +7,7 @@
  * dos personas no digitan el mismo. Se procesan del más antiguo al más reciente.
  */
 const pool = require('../../../../shared/config/database');
+const { recalcularPorOps } = require('../utils/recalcular-mes');
 
 const LOCK_MIN = 20;
 
@@ -226,6 +227,8 @@ exports.guardar = async (req, res) => {
       [id, antes.num_op, tipo, req.usuario.id_usuario, usuario, llenados, faltAntes.length, seg]).catch(() => {});
 
     await pool.query(`UPDATE creditos SET digit_lock_por=NULL, digit_lock_nombre=NULL, digit_lock_at=NULL WHERE id=?`, [id]);
+    // Recalcular el mes tras completar datos faltantes (comisiones/ingresos) — automático.
+    if (sets.length) recalcularPorOps(id).catch(e => console.error('[recalc digitacion]', e.message));
     res.json({ success:true, data:{ id, cambios: cambios.length, llenados, faltantes: faltAntes.length }, error:null });
   } catch (e) { errSrv(res, e, 'digit guardar'); }
 };
