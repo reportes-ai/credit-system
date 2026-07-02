@@ -85,7 +85,33 @@
     } catch (e) { /* silencioso */ }
   }
 
+  /* Banner a los COMPAÑEROS: mismo banner push de los anuncios ("X acaba de
+     colocar un crédito"), 1 vez al día por cumpleañero y navegador. */
+  function bannerConAnuncio(texto) {
+    let intentos = 0;
+    (function go() { // afMostrarAnuncio lo define app-version.js en DOMContentLoaded
+      if (window.afMostrarAnuncio) return window.afMostrarAnuncio(texto, { bg: '#012d70', fg: '#ffffff', ancho: 38, dur: 9, icon: '🎂' });
+      if (++intentos < 20) setTimeout(go, 500);
+    })();
+  }
+  async function checkCompaneros() {
+    try {
+      const token = sessionStorage.getItem('token'); if (!token) return;
+      const r = await fetch('/api/rrhh/cumple/hoy', { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) return;
+      const j = await r.json(); const avisos = (j && j.data && j.data.avisos) || [];
+      for (const a of avisos) {
+        const k = 'afCumpleAviso_' + a.fecha + '_' + a.id;
+        if (localStorage.getItem(k)) continue;
+        localStorage.setItem(k, '1');
+        bannerConAnuncio(a.texto);
+      }
+    } catch (e) { /* silencioso */ }
+  }
+  window.AF_CUMPLE_BANNER = bannerConAnuncio; // prueba desde el mantenedor
+
   window.AF_CUMPLE = { probar: mostrar, tocar: tocarCumpleanos };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(check, 800));
-  else setTimeout(check, 800);
+  const arrancar = () => { setTimeout(check, 800); setTimeout(checkCompaneros, 1500); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar);
+  else arrancar();
 })();

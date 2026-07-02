@@ -392,47 +392,24 @@ const cumpleEstado = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: { es_cumple: false }, error: 'Error' }); }
 };
 
-// Botón "Probar campana" del mantenedor: se manda el aviso a sí mismo
-const cumpleProbar = async (req, res) => {
+/* Cumpleañeros de HOY (para el banner que ve cada compañero al conectarse).
+   El aviso NO es campana: cumple-popup.js muestra el mismo banner push de los
+   anuncios (afMostrarAnuncio), 1 vez al día por navegador. */
+const cumpleHoy = async (req, res) => {
   try {
-    const u = req.usuario || {};
-    if (!(await esRRHH(u.id_usuario))) return res.status(403).json({ success: false, data: null, error: 'Solo RRHH/Admin' });
-    const cfg = await getConfig();
-    const nombre = nombreDe(u) || 'Juan Pérez';
-    notificar([u.id_usuario], {
-      tipo: 'RH_CUMPLE', clave: 'CUMPLE_TEST_' + Date.now(),
-      titulo: tpl(cfg.cumple_aviso_titulo, { nombre }), mensaje: tpl(cfg.cumple_aviso_msg, { nombre }), href: null,
-    });
-    res.json({ success: true, data: { ok: true }, error: null });
-  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
-};
-
-/* Motor diario: avisa a los compañeros el cumpleaños (dedup por rh_cumple_avisados) */
-let _cumpleBusy = false;
-async function tickCumple() {
-  if (_cumpleBusy) return; _cumpleBusy = true;
-  try {
-    const cfg = await getConfig();
-    if (cfg.cumple_campana_activo !== '1') return;
+    const u = req.usuario || {}; const cfg = await getConfig();
+    if (cfg.cumple_campana_activo !== '1') return res.json({ success: true, data: { avisos: [] }, error: null });
     const hoy = hoyChile();
     const [cumps] = await pool.query(
-      "SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' LIMIT 50", [hoy, hoy]);
-    for (const c of cumps) {
-      const [ins] = await pool.query('INSERT IGNORE INTO rh_cumple_avisados (fecha, id_usuario) VALUES (?,?)', [hoy, c.id_usuario]);
-      if (!ins.affectedRows) continue; // ya avisado hoy
-      const [otros] = await pool.query("SELECT id_usuario FROM usuarios WHERE estado='activo' AND id_usuario<>? AND protegido=0 LIMIT 500", [c.id_usuario]);
-      const ids = otros.map(o => o.id_usuario);
-      if (ids.length) notificar(ids, {
-        tipo: 'RH_CUMPLE', clave: `CUMPLE_${c.id_usuario}_${hoy}`,
-        titulo: tpl(cfg.cumple_aviso_titulo, { nombre: c.nombre }), mensaje: tpl(cfg.cumple_aviso_msg, { nombre: c.nombre }), href: null,
-      });
-      console.log('[rrhh] aviso de cumpleaños enviado:', c.nombre);
-    }
-  } catch (e) { console.error('[rrhh tickCumple]', e.message); }
-  finally { _cumpleBusy = false; }
-}
-setTimeout(tickCumple, 30000);            // al arrancar (tras migraciones)
-setInterval(tickCumple, 10 * 60 * 1000);  // cada 10 min (dedup por día)
+      "SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) AND estado='activo' AND id_usuario<>? LIMIT 20",
+      [hoy, hoy, u.id_usuario || 0]);
+    const avisos = cumps.map(c => ({
+      id: c.id_usuario, fecha: hoy,
+      texto: tpl(cfg.cumple_aviso_titulo, { nombre: c.nombre }) + ' ' + tpl(cfg.cumple_aviso_msg, { nombre: c.nombre }),
+    }));
+    res.json({ success: true, data: { avisos }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: { avisos: [] }, error: 'Error' }); }
+};
 
 const pendientes = async (req, res) => {
   try {
@@ -448,4 +425,4 @@ const pendientes = async (req, res) => {
 };
 
 module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
-  certEstado, certEmitir, listarEmpleados, cumpleEstado, cumpleProbar, getConfigApi, setConfigApi };
+  certEstado, certEmitir, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi };

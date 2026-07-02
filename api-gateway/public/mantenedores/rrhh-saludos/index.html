@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saludos y Certificados RRHH — Mantenedores</title>
-  <!-- v1.0 -->
+  <!-- v1.1 aviso por banner, no campana -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -48,11 +48,11 @@
   </div>
 
   <div class="card-box">
-    <h5><i class="bi bi-bell"></i> Aviso a los compañeros (campana de notificaciones)</h5>
+    <h5><i class="bi bi-megaphone"></i> Aviso a los compañeros (banner superior, como el de créditos nuevos)</h5>
     <div class="switch-row"><input type="checkbox" id="cumple_campana_activo" class="form-check-input"> Aviso activo</div>
     <div class="fld"><label>Título del aviso</label><input id="cumple_aviso_titulo"><div class="hint">Usa {nombre} para el nombre del cumpleañero.</div></div>
     <div class="fld"><label>Mensaje</label><input id="cumple_aviso_msg"></div>
-    <button class="btn-test" onclick="probarCampana()"><i class="bi bi-bell me-1"></i>Probar campana (te llega a ti)</button>
+    <button class="btn-test" onclick="probarBanner()"><i class="bi bi-megaphone me-1"></i>Probar banner</button>
   </div>
 
   <div class="card-box">
@@ -71,7 +71,7 @@
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul>
       <li><b>Popup de cumpleaños</b> → aparece al conectarse el cumpleañero en <b>todas las páginas</b> de la app (según <code>usuarios.fecha_nacimiento</code>, se edita en <a href="/usuarios/">Usuarios</a>).</li>
-      <li><b>Aviso a compañeros</b> → notificación en la <b>campana</b> de todos los usuarios activos, 1 vez al día por cumpleañero.</li>
+      <li><b>Aviso a compañeros</b> → <b>banner superior</b> (mismo formato del anuncio de créditos nuevos) al conectarse cada usuario, 1 vez al día por cumpleañero.</li>
       <li><b>Mínimo de meses y cooldown</b> → regulan el botón "Emitir mi certificado ahora" en <a href="/recursos-humanos/antiguedad/">Solicitudes de Antigüedad</a>.</li>
       <li><b>Cuerpo/cierre del certificado</b> → texto del PDF con QR verificable en <a href="/verificar/">/verificar</a> (fecha de ingreso y cargo se editan en <a href="/usuarios/">Usuarios</a>).</li>
     </ul>
@@ -108,9 +108,12 @@
     if(window.AF_CUMPLE) return window.AF_CUMPLE.probar(d);
     const s=document.createElement('script'); s.src='/js/cumple-popup.js'; s.onload=()=>window.AF_CUMPLE.probar(d); document.head.appendChild(s);
   }
-  async function probarCampana(){
-    const j=await(await fetch('/api/rrhh/cumple/probar',{method:'POST',headers:HJ})).json();
-    alert(j.success?'Aviso enviado: revisa tu campana 🔔 (puede tardar unos segundos)':(j.error||'Error'));
+  function probarBanner(){
+    const nombre='Juan Pérez';
+    const texto=document.getElementById('cumple_aviso_titulo').value.replace(/\{nombre\}/g,nombre)+' '+document.getElementById('cumple_aviso_msg').value.replace(/\{nombre\}/g,nombre);
+    const go=()=>window.AF_CUMPLE_BANNER(texto);
+    if(window.AF_CUMPLE_BANNER) return go();
+    const s=document.createElement('script'); s.src='/js/cumple-popup.js'; s.onload=go; document.head.appendChild(s);
   }
   cargar();
 </script>
