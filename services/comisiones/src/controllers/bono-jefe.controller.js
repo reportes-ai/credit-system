@@ -29,6 +29,7 @@ const { auditar } = require('../../../../shared/audit');
       ['dealers_min', '1'], ['dealers_esperado', '2'], ['pond_dealers', '15'],
       ['score_min', '80'], ['score_max', '100'], ['pct_variable', '55'], ['k', '0.7'],
       ['sueldo_fijo', '1500000'], ['factor_semana', '0.1667'],
+      ['informe_para', ''], ['informe_cc', ''],   // destinatarios del informe mensual por correo
     ];
     for (const [k, v] of defaults)
       await pool.query('INSERT IGNORE INTO bono_jefe_config (clave, valor) VALUES (?,?)', [k, v]);
@@ -79,10 +80,9 @@ function premioDe(score, cfg) {
            total_variable: variable + semana, renta_total: cfg.sueldo_fijo + variable + semana };
 }
 
-/* ── GET /api/bono-jefe/bsc?mes=YYYY-MM ── */
-const getBSC = async (req, res) => {
-  try {
-    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes
+/* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ── */
+async function calcularBSC(mesQ) {
+    const mes = /^\d{4}-\d{2}$/.test(mesQ || '') ? mesQ
       : new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
     const cfg = await getCfg();
 
@@ -159,8 +159,81 @@ const getBSC = async (req, res) => {
       { titulo: 'Premio del mes', detalle: `${clp(cfg.sueldo_fijo)} (fijo) × ${n2(premio.pct_adicional * 100)}% = ${clp(premio.variable)} de premio variable. Semana corrida: ${clp(premio.variable)} × ${n2(cfg.factor_semana * 100)}% = ${clp(premio.semana_corrida)}. Total variable: ${clp(premio.total_variable)} → Renta total del mes: ${clp(premio.renta_total)}.` },
     ];
 
-    res.json({ success: true, data: { mes, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos }, error: null });
+    return { mes, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos };
+}
+
+/* ── GET /api/bono-jefe/bsc?mes=YYYY-MM ── */
+const getBSC = async (req, res) => {
+  try {
+    res.json({ success: true, data: await calcularBSC(req.query.mes), error: null });
   } catch (e) { console.error('[bono-jefe bsc]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── POST /api/bono-jefe/enviar-informe {mes} — correo firmado por el Business Suite ── */
+const enviarInforme = async (req, res) => {
+  try {
+    const { enviarCorreo, mailConfigurado } = require('../../../../shared/mailer');
+    if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado (MAIL_*)' });
+    const [rows] = await pool.query("SELECT clave, valor FROM bono_jefe_config WHERE clave IN ('informe_para','informe_cc')");
+    const cfgMail = {}; rows.forEach(r => { cfgMail[r.clave] = r.valor; });
+    const para = String(cfgMail.informe_para || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    const cc   = String(cfgMail.informe_cc   || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
+    if (!para.length) return res.status(400).json({ success: false, data: null, error: 'Configura los destinatarios (Para) en la pestaña Variables' });
+
+    const d = await calcularBSC(req.body && req.body.mes);
+    const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+    const n2v = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const [yy, mm] = d.mes.split('-');
+    const mesLargo = `${MESES[parseInt(mm,10)-1]} ${yy}`;
+
+    const filasHtml = d.ejecutivos.map((f, i) => `
+      <tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb">${f.ejecutivo}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${f.otorgados}</td>
+        <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${clp(f.monto_aprobado)}</td>
+      </tr>`).join('');
+    const a = d.promedio, pr = d.premio;
+    const html = `
+      <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;color:#1e293b">
+        <div style="background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);border-radius:14px;color:#fff;padding:22px 26px;margin-bottom:18px">
+          <div style="font-size:1.15rem;font-weight:800">🏆 Bono Jefe Comercial — ${mesLargo}</div>
+          <div style="font-size:.85rem;opacity:.85">Balanced Scorecard del equipo comercial · Auto Fácil Crédito Automotriz</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-bottom:16px">
+          <thead><tr style="background:#eff6ff">
+            <th style="padding:8px 12px;text-align:left;color:#0141A2">Ejecutivo Comercial</th>
+            <th style="padding:8px 12px;text-align:right;color:#0141A2">Créditos colocados</th>
+            <th style="padding:8px 12px;text-align:right;color:#0141A2">Monto colocado</th>
+          </tr></thead>
+          <tbody>${filasHtml}
+            <tr style="background:#fffbeb;font-weight:800;border-top:2px solid #f59e0b">
+              <td style="padding:8px 12px">PROMEDIO DEL EQUIPO</td>
+              <td style="padding:8px 12px;text-align:right">${n2v(a.otorgados)}</td>
+              <td style="padding:8px 12px;text-align:right">${clp(a.monto_aprobado)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="background:#0f2d6b;color:#fff;border-radius:12px;padding:18px 22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:18px">
+          <div><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.75">Score del equipo</div>
+            <div style="font-size:1.5rem;font-weight:900">${n2v(a.score)} pts</div></div>
+          <div style="text-align:right"><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.75">Bono bruto del mes (sin semana corrida)</div>
+            <div style="font-size:1.5rem;font-weight:900;color:#7dd3fc">${clp(pr.variable)}</div></div>
+        </div>
+        <div style="font-size:.78rem;color:#64748b;line-height:1.5">
+          Detalle del cálculo disponible en la app: Soporte → Bono Jefe Comercial (informe paso a paso).<br>
+          Pilares: créditos otorgados ${Math.round(d.params.pond_creditos*100)}% · montos aprobados ${Math.round(d.params.pond_montos*100)}% · nuevos dealers ${Math.round(d.params.pond_dealers*100)}%.
+        </div>
+        <div style="margin-top:18px;padding-top:12px;border-top:1px dashed #cbd5e1;font-size:.78rem;color:#64748b">
+          Emitido automáticamente por <b>Auto Fácil Business Suite</b>.
+        </div>
+      </div>`;
+    await enviarCorreo({ to: para.join(','), cc: cc.length ? cc.join(',') : undefined,
+      subject: `Bono Jefe Comercial — ${mesLargo} (score ${n2v(a.score)} · bono bruto ${clp(pr.variable)})`, html });
+    auditar({ req, accion: 'ENVIAR', modulo: 'bono-jefe', entidad: 'informe', entidad_id: d.mes,
+      detalle: `Informe Bono Jefe Comercial ${d.mes} enviado a ${para.join(', ')}${cc.length ? ' (CC: ' + cc.join(', ') + ')' : ''} — bono bruto ${clp(pr.variable)}` });
+    res.json({ success: true, data: { enviado_a: para, cc, mes: d.mes }, error: null });
+  } catch (e) { console.error('[bono-jefe informe]', e); res.status(500).json({ success: false, data: null, error: 'Error enviando el informe' }); }
 };
 
 /* ── GET/PUT /api/bono-jefe/variables (restringido) ── */
@@ -176,8 +249,15 @@ const setVariables = async (req, res) => {
     if (!vars || typeof vars !== 'object') return res.status(400).json({ success: false, data: null, error: 'variables requeridas' });
     const PERMITIDAS = new Set(['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos',
       'dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana']);
+    const TEXTO = new Set(['informe_para', 'informe_cc']);   // correos separados por coma
     const cambios = [];
     for (const [k, v] of Object.entries(vars)) {
+      if (TEXTO.has(k)) {
+        const val = String(v || '').trim().slice(0, 500);
+        await pool.query('INSERT INTO bono_jefe_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, val]);
+        cambios.push(`${k}=${val || '(vacío)'}`);
+        continue;
+      }
       if (!PERMITIDAS.has(k)) continue;
       const num = parseFloat(v);
       if (!Number.isFinite(num) || num < 0) return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${k}` });
@@ -199,4 +279,4 @@ const getCurva = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getBSC, getVariables, setVariables, getCurva };
+module.exports = { getBSC, getVariables, setVariables, getCurva, enviarInforme };

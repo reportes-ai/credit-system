@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.1 — pilar 1 = OTORGADOS; gráfico de la curva; formato $ y % en variables -->
+<!-- v1.2 — informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -97,6 +97,7 @@
       <span style="flex:1"></span>
       <button class="btn btn-line" onclick="toggleInforme()"><i class="bi bi-journal-text"></i> Informe paso a paso</button>
       <button class="btn btn-navy" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+      <button class="btn btn-navy" style="background:#15803d" id="btnMail" onclick="enviarInforme()"><i class="bi bi-envelope-paper"></i> Enviar por correo</button>
     </div>
 
     <div class="umbrales" id="umbrales"></div>
@@ -164,6 +165,12 @@
         <div class="var-item"><label>k (curvatura exponencial)</label><input id="v_k" type="number" step="0.05"><div class="hint">Mayor k = curva más cargada al final</div></div>
         <div class="var-item"><label>Sueldo fijo</label><input id="v_sueldo_fijo" type="text" class="fmt-peso" onblur="fmtPesoIn(this)"></div>
         <div class="var-item"><label>Semana corrida</label><input id="v_factor_semana" type="text" class="fmt-pct" onblur="fmtPctIn(this)"><div class="hint">% sobre el premio variable (Ej. 16,67%)</div></div>
+      </div>
+
+      <div class="var-sec"><i class="bi bi-envelope"></i> Informe mensual por correo</div>
+      <div class="vars-grid">
+        <div class="var-item"><label>Para (destinatarios)</label><input id="v_informe_para" type="text" style="text-align:left" placeholder="correo1@..., correo2@..."><div class="hint">Separados por coma</div></div>
+        <div class="var-item"><label>CC (con copia)</label><input id="v_informe_cc" type="text" style="text-align:left" placeholder="correo3@..."><div class="hint">Separados por coma (opcional)</div></div>
       </div>
 
       <div style="margin-top:16px;display:flex;gap:10px">
@@ -259,6 +266,17 @@ async function cargarBSC(){
   document.getElementById('pasos').innerHTML = DATA.pasos.map((s,i)=>`
     <div class="paso"><div class="num">${i+1}</div><div><h6>${esc(s.titulo)}</h6><p>${esc(s.detalle)}</p></div></div>`).join('');
 }
+async function enviarInforme(){
+  const mes = document.getElementById('mes').value;
+  if (!confirm('¿Enviar el informe de '+mes+' a los destinatarios configurados?')) return;
+  const btn = document.getElementById('btnMail'); btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando…';
+  let j; try { j = await (await fetch('/api/bono-jefe/enviar-informe',{method:'POST',headers:H(),body:JSON.stringify({mes})})).json(); }
+  catch(e){ j = { success:false, error:'Error de red' }; }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-envelope-paper"></i> Enviar por correo';
+  if (!j.success) return alert(j.error||'No se pudo enviar');
+  toast('✓ Informe enviado a '+j.data.enviado_a.join(', ')+(j.data.cc.length?' (CC: '+j.data.cc.join(', ')+')':''));
+}
 function toggleInforme(){
   const el = document.getElementById('informe');
   el.style.display = el.style.display==='block' ? 'none' : 'block';
@@ -266,7 +284,8 @@ function toggleInforme(){
 }
 
 /* ── Variables (restringido) ── */
-const VKEYS = ['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos','dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana'];
+const VKEYS = ['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos','dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana','informe_para','informe_cc'];
+const TXT_KEYS = new Set(['informe_para','informe_cc']);
 const PESO_KEYS = new Set(['monto_por_op','sueldo_fijo']);
 const PCT_KEYS  = new Set(['pond_creditos','pond_montos','pond_dealers','pct_variable','factor_semana']); // factor_semana se guarda como factor (0,1667) pero se muestra en %
 const parsePeso = v => Math.round(Number(String(v??'').replace(/[^\d]/g,''))||0);
@@ -276,9 +295,11 @@ function fmtPctIn(el){ el.value = n2(parsePct(el.value))+'%'; }
 async function cargarVars(){
   const j = await (await fetch('/api/bono-jefe/variables',{headers:H()})).json();
   if (!j.success) return;
+  const raw = {}; j.data.forEach(r=>raw[r.clave]=r.valor);
   const map = {}; j.data.forEach(r=>map[r.clave]=parseFloat(r.valor));
   VKEYS.forEach(k=>{
     const el=document.getElementById('v_'+k); if(!el) return;
+    if (TXT_KEYS.has(k)) { el.value = raw[k] || ''; return; }
     const v = map[k];
     if (v==null || !Number.isFinite(v)) { el.value=''; return; }
     if (PESO_KEYS.has(k)) el.value = clp(v);
@@ -290,7 +311,9 @@ async function cargarVars(){
 async function guardarVars(){
   const variables = {};
   VKEYS.forEach(k=>{
-    const el=document.getElementById('v_'+k); if(!el || el.value==='') return;
+    const el=document.getElementById('v_'+k); if(!el) return;
+    if (TXT_KEYS.has(k)) { variables[k] = el.value.trim(); return; }   // se permite vaciar
+    if (el.value==='') return;
     if (PESO_KEYS.has(k)) variables[k] = parsePeso(el.value);
     else if (k==='factor_semana') variables[k] = parsePct(el.value)/100;   // 16,67% → 0,1667
     else if (PCT_KEYS.has(k)) variables[k] = parsePct(el.value);
