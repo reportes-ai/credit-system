@@ -212,7 +212,16 @@ function mapRow(row, mesOverride) {
     plazo:              i('PLAZO'),
     parque:             s('PARQUE') || 'NO APLICA',
     ingreso_neto_total: n('INGRESO NETO TOTAL AF'),
-    resultado_negocio:  n('RESULTADO NEGOCIO'),
+    resultado_negocio:  s('RESULTADO NEGOCIO'),  // texto GANANCIA/PÉRDIDA (varchar), no número
+    comision_seguro:    i('COMISION SEGURO'),
+    gps:                i('GPS'),
+    // Seguimiento de comisión dealer (se llena en la app a futuro; aquí para el histórico)
+    estado_com_dealer:  s('ESTADO DE COM DEALER'),
+    estado_pago_com:    s('ESTADO PAGO COM'),
+    nro_factura_com_dea:s('N° FACTURA COM DEA.', 'N FACTURA COM DEA', 'N° FACTURA COM DEA'),
+    fecha_estim_pago_comaf: d('FECHA ESTIM. DE PAGO COMAF'),
+    fecha_pago_com_dealer:  d('FECHA DE PAGO COMISION DEALER'),
+    fecha_recep_doc:    d('FECHA RECEPCION DOCUMENTO'),
     mayor_menor:        s('MAYOR/MENOR'),
     monto_capitalizado: i('MONTO CAPITALIZADO'),
     fecha_primera_cuota:d('FECHA PRIMERA CUOTA'),
