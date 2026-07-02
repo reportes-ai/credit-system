@@ -22,7 +22,7 @@ const { auditar } = require('../../../../shared/audit');
       ['hora_desde', '08:00'],      // hora (Chile) desde la que aparece cada día
       ['meta_ops', '15'],           // meta mensual de créditos por ejecutivo (línea de meta)
       ['titulo', '🏃 CARRERA DE COLOCACIONES — {mes}'],
-      ['subtitulo', 'Créditos otorgados del mes · la meta es {meta} por ejecutivo'],
+      ['subtitulo', 'Créditos otorgados del mes al {fecha} · la meta es {meta} por ejecutivo'],
     ];
     for (const [k, v] of defaults) await pool.query('INSERT IGNORE INTO carrera_config (clave, valor) VALUES (?,?)', [k, v]);
   } catch (e) { console.error('[carrera_config migration]', e.message); }
@@ -85,10 +85,11 @@ const popup = async (req, res) => {
     }).sort((a, b) => b.ops - a.ops || b.monto - a.monto || a.nombre.localeCompare(b.nombre));
     if (!corredores.length) return res.json({ success: true, data: { mostrar: false }, error: null });
     const mesLabel = MESES[ch.month - 1] + ' ' + ch.year;
+    const fechaLarga = new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', day: 'numeric', month: 'long' }).format(new Date());
     res.json({ success: true, data: {
       mostrar: true, fecha: ch.fecha, meta,
-      titulo: tpl(cfg.titulo, { mes: mesLabel, meta }),
-      subtitulo: tpl(cfg.subtitulo, { mes: mesLabel, meta }),
+      titulo: tpl(cfg.titulo, { mes: mesLabel, meta, fecha: fechaLarga }),
+      subtitulo: tpl(cfg.subtitulo, { mes: mesLabel, meta, fecha: fechaLarga }),
       corredores,
     }, error: null });
   } catch (e) { console.error('[carrera popup]', e.message); res.status(500).json({ success: false, data: { mostrar: false }, error: 'Error' }); }
