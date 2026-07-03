@@ -93,6 +93,7 @@ app.use('/api/ia',               require('../../services/ia/src/routes/ia.routes
 app.use('/api/dealer-incorporacion', require('../../services/dealers-incorporacion/src/routes/fichas.routes'));
 app.use('/api/dealer-liquidez',      require('../../services/dealers-liquidez/src/routes/liquidez.routes'));
 app.use('/api/tickets',              require('../../services/tickets/src/routes/tickets.routes'));
+app.use('/api/whatsapp',             require('../../services/whatsapp/src/routes/whatsapp.routes'));
 app.use('/api/rrhh',                 require('../../services/rrhh/src/routes/rrhh.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
@@ -376,6 +377,7 @@ const PAGINAS = [
   ['/soporte/compras', 'soporte/compras/index.html'],
   ['/soporte/bono-jefe', 'soporte/bono-jefe/index.html'],
   ['/soporte/tickets-ti', 'soporte/tickets-ti/index.html'],
+  ['/whatsapp', 'whatsapp/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
   ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
   ['/recursos-humanos/vacaciones', 'recursos-humanos/vacaciones/index.html'],

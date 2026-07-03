@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --wsp:#25D366; --wsp-dark:#128C7E; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; color:#fff; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:24px 30px; max-width:1280px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#075E54,#128C7E 55%,#25D366); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.95; }
+    .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.3rem; }
+    .page-banner p { opacity:.9; margin:0; font-size:.85rem; }
+    .conn-pill { margin-left:auto; background:rgba(255,255,255,.18); border-radius:12px; padding:6px 14px; font-size:.78rem; font-weight:700; white-space:nowrap; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; }
+    .tab.active { background:var(--wsp-dark); color:#fff; border-color:var(--wsp-dark); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:20px; }
+    .fld { margin-bottom:13px; } .fld label { display:block; font-size:.76rem; font-weight:700; color:#475569; margin-bottom:5px; }
+    .fld input, .fld select, .fld textarea { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 11px; font-size:.86rem; box-sizing:border-box; }
+    .fld textarea { resize:vertical; min-height:76px; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+    .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:13px; }
+    .btn-w { background:var(--wsp-dark); color:#fff; border:none; border-radius:8px; padding:9px 17px; font-size:.86rem; font-weight:700; cursor:pointer; }
+    .btn-w:hover { background:#0a6e62; }
+    .btn-sec { background:#f1f5f9; color:#374151; border:1px solid #e2e8f0; border-radius:8px; padding:9px 15px; font-size:.84rem; font-weight:600; cursor:pointer; }
+    .btn-red { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.67rem; letter-spacing:.4px; text-align:left; padding:9px 12px; border-bottom:1px solid #e5e7eb; }
+    td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.68rem; font-weight:800; white-space:nowrap; display:inline-block; }
+    .p-BOT { background:#dcfce7; color:#166534; } .p-DERIVADA { background:#fef9c3; color:#854d0e; } .p-CERRADA { background:#e5e7eb; color:#374151; }
+    .p-PROBLEMA { background:#fee2e2; color:#b91c1c; } .p-RIESGO { background:#ffedd5; color:#c2410c; } .p-OPORTUNIDAD { background:#dbeafe; color:#1d4ed8; }
+    .p-BORRADOR { background:#e0f2fe; color:#0369a1; } .p-ENVIANDO { background:#fef9c3; color:#854d0e; } .p-ENVIADA { background:#dcfce7; color:#166534; }
+    .link-act { color:var(--wsp-dark); cursor:pointer; font-weight:700; background:none; border:none; font-size:.8rem; }
+    .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+    .switch { position:relative; width:44px; height:24px; display:inline-block; }
+    .switch input { opacity:0; width:0; height:0; }
+    .slider { position:absolute; inset:0; background:#cbd5e1; border-radius:24px; cursor:pointer; transition:.2s; }
+    .slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .switch input:checked + .slider { background:var(--wsp); }
+    .switch input:checked + .slider:before { transform:translateX(20px); }
+    /* ── Chat (bandeja + simulador) estilo WhatsApp ── */
+    .chat-wrap { display:grid; grid-template-columns:340px 1fr; gap:0; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#fff; min-height:560px; }
+    .conv-list { border-right:1px solid #e5e7eb; overflow-y:auto; max-height:640px; }
+    .conv-item { padding:11px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; }
+    .conv-item:hover { background:#f8fafc; } .conv-item.sel { background:#e7f6ef; }
+    .conv-item .nm { font-weight:700; font-size:.85rem; color:#0f172a; display:flex; justify-content:space-between; gap:6px; align-items:center; }
+    .conv-item .lm { font-size:.76rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .chat-pane { display:flex; flex-direction:column; background:#efeae2; }
+    .chat-head { background:#f0f2f5; padding:10px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #e5e7eb; flex-wrap:wrap; }
+    .chat-body { flex:1; overflow-y:auto; padding:18px 22px; max-height:470px; }
+    .bub { max-width:72%; border-radius:10px; padding:7px 11px; margin-bottom:7px; font-size:.85rem; box-shadow:0 1px 1px rgba(0,0,0,.08); white-space:pre-wrap; word-break:break-word; }
+    .bub .bm { font-size:.64rem; color:#8696a0; text-align:right; margin-top:2px; }
+    .bub.in  { background:#fff; margin-right:auto; }
+    .bub.out { background:#d9fdd3; margin-left:auto; }
+    .bub .who { font-size:.66rem; font-weight:800; margin-bottom:2px; }
+    .who.BOT { color:#128C7E; } .who.AGENTE { color:#0141A2; } .who.CAMPANA { color:#7c3aed; }
+    .chat-input { display:flex; gap:8px; padding:10px 14px; background:#f0f2f5; border-top:1px solid #e5e7eb; }
+    .chat-input input { flex:1; border:1px solid #cbd5e1; border-radius:20px; padding:9px 16px; font-size:.88rem; outline:none; }
+    .sim-badge { background:#ede9fe; color:#5b21b6; border-radius:8px; padding:1px 8px; font-size:.62rem; font-weight:800; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:620px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .dh { background:linear-gradient(135deg,#075E54,#128C7E); color:#fff; padding:15px 22px; display:flex; justify-content:space-between; align-items:center; }
+    .db { padding:18px 22px; max-height:66vh; overflow:auto; }
+    .foot-note { background:#f8fafc; border-left:4px solid var(--wsp-dark); border-radius:8px; padding:12px 16px; font-size:.8rem; color:#475569; margin-top:16px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-whatsapp me-1"></i>WhatsApp</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div><span id="navNombre">—</span></span>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="page-banner">
+    <i class="bi bi-whatsapp"></i>
+    <div><h2>WhatsApp Business</h2><p>Bot de respuestas, bandeja de conversaciones, campañas de salida y triggers de derivación.</p></div>
+    <span class="conn-pill" id="connPill"><i class="bi bi-plug me-1"></i>MODO SIMULADO — sin conexión Meta</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tBandeja" onclick="tab('bandeja')"><i class="bi bi-inbox me-1"></i>Bandeja</div>
+    <div class="tab" id="tCampanas" onclick="tab('campanas')"><i class="bi bi-megaphone me-1"></i>Campañas</div>
+    <div class="tab" id="tRespuestas" onclick="tab('respuestas')"><i class="bi bi-chat-square-text me-1"></i>Respuestas del bot</div>
+    <div class="tab" id="tTriggers" onclick="tab('triggers')"><i class="bi bi-exclamation-diamond me-1"></i>Triggers</div>
+    <div class="tab" id="tConfig" onclick="tab('config')"><i class="bi bi-gear me-1"></i>Configuración</div>
+  </div>
+
+  <!-- ═══ BANDEJA ═══ -->
+  <div id="secBandeja">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="fQ" placeholder="Buscar teléfono, nombre o RUT…" style="flex:1;min-width:200px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:.85rem" onkeydown="if(event.key==='Enter')cargarConvs()">
+      <select id="fEstadoConv" onchange="cargarConvs()" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:.84rem">
+        <option value="">Todas</option><option value="BOT">Atendidas por el bot</option><option value="DERIVADA">Derivadas / con agente</option><option value="CERRADA">Cerradas</option>
+      </select>
+      <button class="btn-sec" onclick="cargarConvs()"><i class="bi bi-arrow-clockwise"></i></button>
+    </div>
+    <div class="chat-wrap">
+      <div class="conv-list" id="convList"><div class="empty">Cargando…</div></div>
+      <div class="chat-pane">
+        <div class="chat-head" id="chatHead"><span style="color:#64748b;font-size:.85rem">Selecciona una conversación</span></div>
+        <div class="chat-body" id="chatBody"></div>
+        <div class="chat-input" id="chatInput" style="display:none">
+          <input id="msgTxt" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter')enviarAgente()">
+          <button class="btn-w" onclick="enviarAgente()"><i class="bi bi-send"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CAMPAÑAS ═══ -->
+  <div id="secCampanas" style="display:none">
+    <div class="card-box" style="margin-bottom:16px">
+      <div style="font-weight:800;color:#0f172a;margin-bottom:12px"><i class="bi bi-megaphone me-1"></i>Nueva campaña</div>
+      <div class="grid2">
+        <div class="fld"><label>Nombre de la campaña</label><input id="cNombre" placeholder="Ej: Recordatorio vencimiento julio"></div>
+        <div class="fld"><label>Audiencia</label>
+          <select id="cAudiencia" onchange="previewAud()">
+            <option value="MANUAL">Lista manual de teléfonos</option>
+            <option value="MORA">Clientes AutoFácil en mora/vencido</option>
+            <option value="VIGENTES">Toda la cartera AutoFácil vigente</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld" id="fldTelefonos"><label>Teléfonos (uno por línea o separados por coma)</label><textarea id="cTelefonos" placeholder="+56 9 1234 5678&#10;+56 9 8765 4321" oninput="previewAud()"></textarea></div>
+      <div class="fld"><label>Mensaje <span style="font-weight:400;color:#94a3b8">(al conectar con Meta debe corresponder a una plantilla HSM aprobada)</span></label><textarea id="cMensaje" placeholder="Hola, te recordamos que…"></textarea></div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="btn-w" onclick="guardarCampana()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
+        <span id="audPreview" style="font-size:.8rem;color:#64748b"></span>
+      </div>
+    </div>
+    <div class="card-box">
+      <div style="font-weight:800;color:#0f172a;margin-bottom:10px">Historial de campañas</div>
+      <table><thead><tr><th>Campaña</th><th>Audiencia</th><th>Estado</th><th style="text-align:right">Total</th><th style="text-align:right">Enviados</th><th style="text-align:right">Simulados</th><th style="text-align:right">Errores</th><th>Creada</th><th></th></tr></thead>
+      <tbody id="tbCampanas"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- ═══ RESPUESTAS ═══ -->
+  <div id="secRespuestas" style="display:none">
+    <div class="card-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:800;color:#0f172a"><i class="bi bi-chat-square-text me-1"></i>Respuestas automáticas del bot</div>
+        <button class="btn-w" onclick="editarResp(null)"><i class="bi bi-plus-lg me-1"></i>Nueva respuesta</button>
+      </div>
+      <p style="font-size:.8rem;color:#64748b">Si el mensaje del cliente contiene alguna de las palabras clave, el bot responde con el texto configurado. Se evalúan en orden; los <b>Triggers</b> tienen prioridad sobre estas respuestas.</p>
+      <table><thead><tr><th style="width:40px">Orden</th><th>Nombre</th><th>Palabras clave</th><th>Respuesta</th><th>Activa</th><th></th></tr></thead>
+      <tbody id="tbResp"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- ═══ TRIGGERS ═══ -->
+  <div id="secTriggers" style="display:none">
+    <div class="card-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:800;color:#0f172a"><i class="bi bi-exclamation-diamond me-1"></i>Palabras trigger — problemas, riesgos y oportunidades</div>
+        <button class="btn-w" onclick="editarTrg(null)"><i class="bi bi-plus-lg me-1"></i>Nuevo trigger</button>
+      </div>
+      <p style="font-size:.8rem;color:#64748b">Cuando el cliente escribe una de estas palabras, se alerta al equipo (campana) y opcionalmente se <b>deriva</b> la conversación a un agente del área indicada. Tienen prioridad sobre las respuestas del bot.</p>
+      <table><thead><tr><th>Categoría</th><th>Nombre</th><th>Palabras clave</th><th>Acción</th><th>Área</th><th>Prioridad</th><th>Activo</th><th></th></tr></thead>
+      <tbody id="tbTrg"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- ═══ CONFIGURACIÓN ═══ -->
+  <div id="secConfig" style="display:none">
+    <div style="display:grid;grid-template-columns:1fr 400px;gap:16px;align-items:start">
+      <div class="card-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div style="font-weight:800;color:#0f172a"><i class="bi bi-gear me-1"></i>Configuración general del bot</div>
+          <label class="switch" title="Bot activo"><input type="checkbox" id="gBotActivo"><span class="slider"></span></label>
+        </div>
+        <div class="grid3">
+          <div class="fld"><label>Horario desde</label><input type="time" id="gHIni"></div>
+          <div class="fld"><label>Horario hasta</label><input type="time" id="gHFin"></div>
+          <div class="fld"><label>Días (1=lun … 7=dom)</label><input id="gDias" placeholder="1,2,3,4,5,6"></div>
+        </div>
+        <div class="fld"><label>Mensaje de bienvenida (primer contacto)</label><textarea id="gBienvenida"></textarea></div>
+        <div class="fld"><label>Mensaje fuera de horario</label><textarea id="gFueraHorario"></textarea></div>
+        <div class="fld"><label>Mensaje "no entiendo"</label><textarea id="gNoEntiendo"></textarea></div>
+        <div class="fld"><label>Mensaje al derivar a un agente</label><textarea id="gDerivacion"></textarea></div>
+        <div style="text-align:right"><button class="btn-w" onclick="guardarConfig()"><i class="bi bi-save me-1"></i>Guardar configuración</button></div>
+        <div class="foot-note">
+          <b><i class="bi bi-plug me-1"></i>Conexión con Meta:</b> el módulo funciona hoy en modo simulado. Para conectar el número real se configuran en Render las variables <code>WSP_TOKEN</code>, <code>WSP_PHONE_ID</code> y <code>WSP_VERIFY</code>, y en Meta se apunta el webhook a <code>/api/whatsapp/webhook</code>. Nada más cambia: respuestas, triggers y campañas quedan operativos al instante.
+        </div>
+      </div>
+      <!-- Simulador -->
+      <div class="card-box" style="padding:0;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#075E54,#128C7E);color:#fff;padding:12px 16px;font-weight:800;font-size:.9rem"><i class="bi bi-phone me-1"></i>Simulador — prueba el bot</div>
+        <div class="chat-body" id="simBody" style="max-height:380px;min-height:380px;background:#efeae2"></div>
+        <div class="chat-input">
+          <input id="simTxt" placeholder="Escribe como si fueras el cliente…" onkeydown="if(event.key==='Enter')simEnviar()">
+          <button class="btn-w" onclick="simEnviar()"><i class="bi bi-send"></i></button>
+        </div>
+        <div style="padding:8px 14px;background:#f8fafc;font-size:.72rem;color:#94a3b8;display:flex;justify-content:space-between">
+          <span>Usa las respuestas y triggers reales configurados</span>
+          <button class="link-act" onclick="simReset()" style="font-size:.72rem">Reiniciar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot-note" style="margin-top:20px">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este módulo:</b>
+    <ul style="margin:6px 0 0;padding-left:20px">
+      <li><b>Respuestas del bot / Triggers / Horario</b> → qué contesta automáticamente el WhatsApp del negocio y cuándo se deriva a un agente.</li>
+      <li><b>Campañas</b> → mensajes de salida masivos a clientes (mora, cartera vigente o lista manual); quedan registrados en la Bandeja.</li>
+      <li><b>Derivaciones</b> → generan alerta de campana a los usuarios con el permiso <i>Atender conversaciones</i> (matriz de <a href="/usuarios/">Perfiles y Permisos</a>).</li>
+      <li><b>Modo Desarrollo</b> → si está activo (<a href="/mantenedores/mantenimiento/">Mantención de Sistema</a>), ningún WhatsApp sale a números reales.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg"></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (!token || !yo) location.href = '/login.html';
+  document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const fdt = s => s ? new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+
+  function tab(t){
+    ['Bandeja','Campanas','Respuestas','Triggers','Config'].forEach(x=>{
+      document.getElementById('sec'+x).style.display='none';
+      document.getElementById('t'+x).classList.remove('active');
+    });
+    const cap = t.charAt(0).toUpperCase()+t.slice(1);
+    document.getElementById('sec'+cap).style.display='';
+    document.getElementById('t'+cap).classList.add('active');
+    if (t==='bandeja') cargarConvs();
+    if (t==='campanas'){ cargarCampanas(); previewAud(); }
+    if (t==='respuestas') cargarResp();
+    if (t==='triggers') cargarTrg();
+    if (t==='config') cargarConfig();
+  }
+
+  /* ═══ BANDEJA ═══ */
+  let CONV_SEL = null, POLL = null;
+  async function cargarConvs(){
+    const q = document.getElementById('fQ').value.trim();
+    const est = document.getElementById('fEstadoConv').value;
+    const p = new URLSearchParams(); if(q)p.set('q',q); if(est)p.set('estado',est);
+    const j = await (await fetch('/api/whatsapp/conversaciones?'+p,{headers:H})).json();
+    const list = document.getElementById('convList');
+    const rows = j.data||[];
+    list.innerHTML = rows.length ? rows.map(c=>`
+      <div class="conv-item ${CONV_SEL===c.id?'sel':''}" onclick="abrirConv(${c.id})">
+        <div class="nm"><span>${esc(c.nombre||c.telefono)} ${c.es_simulada?'<span class="sim-badge">SIM</span>':''}</span>
+          <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span></div>
+        <div class="lm">${c.trigger_cat?`<span class="pill p-${esc(c.trigger_cat)}" style="margin-right:4px">${esc(c.trigger_cat)}</span>`:''}${esc(c.ultimo_msg||'')}</div>
+        <div style="font-size:.66rem;color:#94a3b8;margin-top:2px">${esc(c.telefono)} · ${fdt(c.ultima_actividad)}${c.asignada_nombre?' · '+esc(c.asignada_nombre):''}</div>
+      </div>`).join('') : '<div class="empty">Sin conversaciones aún.<br><span style="font-size:.75rem">Prueba el bot desde Configuración → Simulador</span></div>';
+  }
+
+  async function abrirConv(id){
+    CONV_SEL = id;
+    const j = await (await fetch('/api/whatsapp/conversaciones/'+id,{headers:H})).json();
+    if (!j.success) return;
+    const c = j.data;
+    document.querySelectorAll('.conv-item').forEach(e=>e.classList.remove('sel'));
+    document.getElementById('chatHead').innerHTML = `
+      <b style="font-size:.9rem">${esc(c.nombre||c.telefono)}</b>
+      <span style="font-size:.74rem;color:#64748b">${esc(c.telefono)}${c.rut_cliente?' · '+esc(c.rut_cliente):''}</span>
+      <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span>
+      ${c.area?`<span style="font-size:.72rem;color:#64748b">Área: <b>${esc(c.area)}</b></span>`:''}
+      <span style="margin-left:auto;display:flex;gap:6px">
+        ${c.estado!=='CERRADA'?`<button class="btn-sec" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'TOMAR')"><i class="bi bi-person-check me-1"></i>Tomar</button>`:''}
+        ${c.estado==='DERIVADA'?`<button class="btn-sec" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'BOT')"><i class="bi bi-robot me-1"></i>Volver al bot</button>`:''}
+        ${c.estado!=='CERRADA'?`<button class="btn-red" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'CERRAR')">Cerrar</button>`:''}
+      </span>`;
+    document.getElementById('chatBody').innerHTML = pintarMsgs(c.mensajes);
+    document.getElementById('chatInput').style.display = c.estado!=='CERRADA' ? 'flex' : 'none';
+    const b = document.getElementById('chatBody'); b.scrollTop = b.scrollHeight;
+    cargarConvs();
+  }
+
+  function pintarMsgs(msgs){
+    return (msgs||[]).map(m=>{
+      const out = m.direccion==='OUT';
+      const who = out ? (m.origen==='AGENTE' ? (m.autor_nombre||'Agente') : m.origen==='CAMPANA' ? 'Campaña' : 'Bot') : '';
+      return `<div class="bub ${out?'out':'in'}">
+        ${out?`<div class="who ${esc(m.origen)}">${esc(who)}${m.estado_envio==='SIMULADO'?' · simulado':m.estado_envio==='ERROR'?' · ⚠ error':''}</div>`:''}
+        ${esc(m.mensaje)}<div class="bm">${fdt(m.created_at)}</div></div>`;
+    }).join('') || '<div class="empty">Sin mensajes</div>';
+  }
+
+  async function enviarAgente(){
+    const txt = document.getElementById('msgTxt').value.trim();
+    if (!txt || !CONV_SEL) return;
+    document.getElementById('msgTxt').value='';
+    const j = await (await fetch(`/api/whatsapp/conversaciones/${CONV_SEL}/responder`,{method:'POST',headers:HJ,body:JSON.stringify({texto:txt})})).json();
+    if (!j.success) return alert(j.error||'Error');
+    abrirConv(CONV_SEL);
+  }
+
+  async function accion(id, accion){
+    if (accion==='CERRAR' && !confirm('¿Cerrar esta conversación?')) return;
+    const j = await (await fetch(`/api/whatsapp/conversaciones/${id}/accion`,{method:'POST',headers:HJ,body:JSON.stringify({accion})})).json();
+    if (!j.success) return alert(j.error||'Error');
+    abrirConv(id);
+  }
+
+  /* ═══ CAMPAÑAS ═══ */
+  async function previewAud(){
+    const tipo = document.getElementById('cAudiencia').value;
+    document.getElementById('fldTelefonos').style.display = tipo==='MANUAL' ? '' : 'none';
+    const p = new URLSearchParams({ tipo, telefonos: tipo==='MANUAL' ? document.getElementById('cTelefonos').value : '' });
+    try {
+      const j = await (await fetch('/api/whatsapp/campanas-audiencia?'+p,{headers:H})).json();
+      document.getElementById('audPreview').innerHTML = j.success ? `<i class="bi bi-people me-1"></i>Audiencia: <b>${j.data.total.toLocaleString('es-CL')}</b> destinatarios` : '';
+    } catch(e){}
+  }
+
+  async function guardarCampana(){
+    const body = {
+      nombre: document.getElementById('cNombre').value.trim(),
+      mensaje: document.getElementById('cMensaje').value.trim(),
+      audiencia_tipo: document.getElementById('cAudiencia').value,
+      telefonos: document.getElementById('cTelefonos').value,
+    };
+    if (!body.nombre || !body.mensaje) return alert('Completa nombre y mensaje.');
+    const j = await (await fetch('/api/whatsapp/campanas',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+    if (!j.success) return alert(j.error||'Error');
+    document.getElementById('cNombre').value=''; document.getElementById('cMensaje').value=''; document.getElementById('cTelefonos').value='';
+    cargarCampanas();
+  }
+
+  async function cargarCampanas(){
+    const j = await (await fetch('/api/whatsapp/campanas',{headers:H})).json();
+    const rows = j.data||[];
+    document.getElementById('tbCampanas').innerHTML = rows.length ? rows.map(c=>`
+      <tr><td><b>${esc(c.nombre)}</b><div style="font-size:.72rem;color:#94a3b8">${esc((c.mensaje||'').slice(0,70))}…</div></td>
+        <td>${esc(c.audiencia_tipo)}</td><td><span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span></td>
+        <td style="text-align:right">${c.total.toLocaleString('es-CL')}</td>
+        <td style="text-align:right">${c.enviados.toLocaleString('es-CL')}</td>
+        <td style="text-align:right">${c.simulados.toLocaleString('es-CL')}</td>
+        <td style="text-align:right;color:${c.errores?'#b91c1c':'#94a3b8'}">${c.errores}</td>
+        <td style="font-size:.76rem;color:#64748b">${fdt(c.created_at)}<br>${esc(c.creado_nombre||'')}</td>
+        <td style="white-space:nowrap">
+          ${c.estado==='BORRADOR'?`<button class="link-act" onclick="enviarCampana(${c.id},'${esc(c.nombre)}',${c.total})"><i class="bi bi-send me-1"></i>Enviar</button>
+          <button class="btn-red" style="padding:2px 8px;font-size:.72rem" onclick="eliminarCampana(${c.id})">✕</button>`:''}
+        </td></tr>`).join('') : '<tr><td colspan="9" class="empty">Sin campañas aún</td></tr>';
+  }
+
+  async function enviarCampana(id, nombre, total){
+    if (!confirm(`¿Enviar la campaña "${nombre}" a ${total.toLocaleString('es-CL')} destinatarios?\n(Sin conexión Meta los envíos quedan SIMULADOS y registrados)`)) return;
+    const j = await (await fetch(`/api/whatsapp/campanas/${id}/enviar`,{method:'POST',headers:HJ})).json();
+    if (!j.success) return alert(j.error||'Error');
+    setTimeout(cargarCampanas, 1200); setTimeout(cargarCampanas, 5000);
+  }
+
+  async function eliminarCampana(id){
+    if (!confirm('¿Eliminar este borrador?')) return;
+    await fetch('/api/whatsapp/campanas/'+id,{method:'DELETE',headers:H});
+    cargarCampanas();
+  }
+
+  /* ═══ RESPUESTAS ═══ */
+  let RESP = [];
+  async function cargarResp(){
+    const j = await (await fetch('/api/whatsapp/respuestas',{headers:H})).json();
+    RESP = j.data||[];
+    document.getElementById('tbResp').innerHTML = RESP.length ? RESP.map(r=>`
+      <tr style="${r.activo?'':'opacity:.45'}"><td>${r.orden}</td><td><b>${esc(r.nombre)}</b></td>
+        <td style="font-size:.78rem;color:#64748b">${esc(r.keywords)}</td>
+        <td style="font-size:.78rem;max-width:340px">${esc((r.respuesta||'').slice(0,110))}${(r.respuesta||'').length>110?'…':''}</td>
+        <td>${r.activo?'<i class="bi bi-check-circle-fill" style="color:#16a34a"></i>':'<i class="bi bi-dash-circle" style="color:#94a3b8"></i>'}</td>
+        <td style="white-space:nowrap"><button class="link-act" onclick="editarResp(${r.id})">Editar</button>
+        <button class="btn-red" style="padding:2px 8px;font-size:.72rem" onclick="eliminarResp(${r.id})">✕</button></td></tr>`).join('')
+      : '<tr><td colspan="6" class="empty">Sin respuestas configuradas</td></tr>';
+  }
+
+  function editarResp(id){
+    const r = RESP.find(x=>x.id===id) || { nombre:'', keywords:'', respuesta:'', orden:(Math.max(0,...RESP.map(x=>x.orden))+1), activo:1 };
+    dlgForm(`${id?'Editar':'Nueva'} respuesta del bot`, `
+      <div class="grid2"><div class="fld"><label>Nombre</label><input id="xNombre" value="${esc(r.nombre)}"></div>
+      <div class="fld"><label>Orden</label><input id="xOrden" type="number" value="${r.orden}"></div></div>
+      <div class="fld"><label>Palabras clave (separadas por coma, sin acentos necesarios)</label><input id="xKw" value="${esc(r.keywords)}"></div>
+      <div class="fld"><label>Respuesta del bot</label><textarea id="xResp" style="min-height:110px">${esc(r.respuesta)}</textarea></div>
+      <div class="fld"><label><input type="checkbox" id="xActivo" ${r.activo?'checked':''}> Activa</label></div>`,
+      async ()=>{
+        const body = { nombre:val('xNombre'), keywords:val('xKw'), respuesta:val('xResp'), orden:parseInt(val('xOrden'))||0, activo:document.getElementById('xActivo').checked?1:0 };
+        if (!body.nombre||!body.keywords||!body.respuesta) return alert('Completa todos los campos.');
+        const j = await (await fetch('/api/whatsapp/respuestas'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:HJ,body:JSON.stringify(body)})).json();
+        if (!j.success) return alert(j.error||'Error');
+        document.getElementById('dlg').close(); cargarResp();
+      });
+  }
+
+  async function eliminarResp(id){
+    if (!confirm('¿Eliminar esta respuesta?')) return;
+    await fetch('/api/whatsapp/respuestas/'+id,{method:'DELETE',headers:H});
+    cargarResp();
+  }
+
+  /* ═══ TRIGGERS ═══ */
+  let TRG = [];
+  async function cargarTrg(){
+    const j = await (await fetch('/api/whatsapp/triggers',{headers:H})).json();
+    TRG = j.data||[];
+    document.getElementById('tbTrg').innerHTML = TRG.length ? TRG.map(t=>`
+      <tr style="${t.activo?'':'opacity:.45'}"><td><span class="pill p-${esc(t.categoria)}">${esc(t.categoria)}</span></td>
+        <td><b>${esc(t.nombre)}</b></td><td style="font-size:.78rem;color:#64748b">${esc(t.keywords)}</td>
+        <td>${t.accion==='DERIVAR'?'<i class="bi bi-person-fill-up me-1"></i>Derivar':'<i class="bi bi-bell me-1"></i>Solo alertar'}</td>
+        <td>${esc(t.area)}</td><td>${t.prioridad==='alta'?'<b style="color:#b91c1c">ALTA</b>':'normal'}</td>
+        <td>${t.activo?'<i class="bi bi-check-circle-fill" style="color:#16a34a"></i>':'<i class="bi bi-dash-circle" style="color:#94a3b8"></i>'}</td>
+        <td style="white-space:nowrap"><button class="link-act" onclick="editarTrg(${t.id})">Editar</button>
+        <button class="btn-red" style="padding:2px 8px;font-size:.72rem" onclick="eliminarTrg(${t.id})">✕</button></td></tr>`).join('')
+      : '<tr><td colspan="8" class="empty">Sin triggers configurados</td></tr>';
+  }
+
+  function editarTrg(id){
+    const t = TRG.find(x=>x.id===id) || { categoria:'OPORTUNIDAD', nombre:'', keywords:'', accion:'DERIVAR', area:'COMERCIAL', prioridad:'normal', activo:1 };
+    dlgForm(`${id?'Editar':'Nuevo'} trigger`, `
+      <div class="grid2">
+        <div class="fld"><label>Categoría</label><select id="xCat">${['PROBLEMA','RIESGO','OPORTUNIDAD'].map(c=>`<option ${t.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="fld"><label>Nombre</label><input id="xNombre" value="${esc(t.nombre)}"></div>
+      </div>
+      <div class="fld"><label>Palabras clave (separadas por coma)</label><input id="xKw" value="${esc(t.keywords)}"></div>
+      <div class="grid3">
+        <div class="fld"><label>Acción</label><select id="xAccion"><option value="DERIVAR" ${t.accion==='DERIVAR'?'selected':''}>Derivar a agente</option><option value="ALERTA" ${t.accion==='ALERTA'?'selected':''}>Solo alertar</option></select></div>
+        <div class="fld"><label>Área</label><select id="xArea">${['COMERCIAL','COBRANZA','OPERACIONES'].map(a=>`<option ${t.area===a?'selected':''}>${a}</option>`).join('')}</select></div>
+        <div class="fld"><label>Prioridad alerta</label><select id="xPrio"><option value="normal" ${t.prioridad!=='alta'?'selected':''}>Normal</option><option value="alta" ${t.prioridad==='alta'?'selected':''}>Alta (campana insistente)</option></select></div>
+      </div>
+      <div class="fld"><label><input type="checkbox" id="xActivo" ${t.activo?'checked':''}> Activo</label></div>`,
+      async ()=>{
+        const body = { categoria:val('xCat'), nombre:val('xNombre'), keywords:val('xKw'), accion:val('xAccion'), area:val('xArea'), prioridad:val('xPrio'), activo:document.getElementById('xActivo').checked?1:0 };
+        if (!body.nombre||!body.keywords) return alert('Completa todos los campos.');
+        const j = await (await fetch('/api/whatsapp/triggers'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:HJ,body:JSON.stringify(body)})).json();
+        if (!j.success) return alert(j.error||'Error');
+        document.getElementById('dlg').close(); cargarTrg();
+      });
+  }
+
+  async function eliminarTrg(id){
+    if (!confirm('¿Eliminar este trigger?')) return;
+    await fetch('/api/whatsapp/triggers/'+id,{method:'DELETE',headers:H});
+    cargarTrg();
+  }
+
+  /* ═══ CONFIG ═══ */
+  async function cargarConfig(){
+    const j = await (await fetch('/api/whatsapp/config',{headers:H})).json();
+    const c = j.data||{};
+    document.getElementById('gBotActivo').checked = !!c.bot_activo;
+    document.getElementById('gHIni').value = c.horario_ini||'09:00';
+    document.getElementById('gHFin').value = c.horario_fin||'19:00';
+    document.getElementById('gDias').value = c.dias_habiles||'1,2,3,4,5,6';
+    document.getElementById('gBienvenida').value = c.msg_bienvenida||'';
+    document.getElementById('gFueraHorario').value = c.msg_fuera_horario||'';
+    document.getElementById('gNoEntiendo').value = c.msg_no_entiendo||'';
+    document.getElementById('gDerivacion').value = c.msg_derivacion||'';
+  }
+
+  async function guardarConfig(){
+    const body = {
+      bot_activo: document.getElementById('gBotActivo').checked ? 1 : 0,
+      horario_ini: val('gHIni'), horario_fin: val('gHFin'), dias_habiles: val('gDias'),
+      msg_bienvenida: val('gBienvenida'), msg_fuera_horario: val('gFueraHorario'),
+      msg_no_entiendo: val('gNoEntiendo'), msg_derivacion: val('gDerivacion'),
+    };
+    const j = await (await fetch('/api/whatsapp/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
+    alert(j.success ? 'Configuración guardada ✓' : (j.error||'Error'));
+  }
+
+  /* ═══ SIMULADOR ═══ */
+  let SIM_FONO = '569' + String(Math.floor(10000000 + Math.random()*89999999));
+  function simReset(){
+    SIM_FONO = '569' + String(Math.floor(10000000 + Math.random()*89999999));
+    document.getElementById('simBody').innerHTML = '<div class="empty" style="padding-top:140px">Escribe abajo para probar el bot 👇</div>';
+  }
+  async function simEnviar(){
+    const txt = document.getElementById('simTxt').value.trim();
+    if (!txt) return;
+    document.getElementById('simTxt').value='';
+    const j = await (await fetch('/api/whatsapp/simular',{method:'POST',headers:HJ,body:JSON.stringify({telefono:SIM_FONO, texto:txt})})).json();
+    if (!j.success) return alert(j.error||'Error');
+    // el simulador muestra la conversación al revés: lo que escribe el "cliente" a la derecha
+    document.getElementById('simBody').innerHTML = (j.data.mensajes||[]).map(m=>{
+      const cliente = m.direccion==='IN';
+      const who = m.direccion==='OUT' ? (m.origen==='AGENTE'?(m.autor_nombre||'Agente'):'Bot AutoFácil') : '';
+      return `<div class="bub ${cliente?'out':'in'}">
+        ${who?`<div class="who ${esc(m.origen)}">${esc(who)}</div>`:''}
+        ${esc(m.mensaje)}<div class="bm">${fdt(m.created_at)}</div></div>`;
+    }).join('');
+    const b = document.getElementById('simBody'); b.scrollTop = b.scrollHeight;
+  }
+
+  /* ═══ helpers UI ═══ */
+  const val = id => document.getElementById(id).value.trim();
+  function dlgForm(titulo, html, onSave){
+    const d = document.getElementById('dlg');
+    d.innerHTML = `<div class="dh"><b>${esc(titulo)}</b><button style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer" onclick="document.getElementById('dlg').close()">✕</button></div>
+      <div class="db">${html}<div style="text-align:right;margin-top:8px"><button class="btn-w" id="dlgSave"><i class="bi bi-save me-1"></i>Guardar</button></div></div>`;
+    d.querySelector('#dlgSave').addEventListener('click', onSave);
+    d.showModal();
+  }
+
+  /* init */
+  simReset();
+  cargarConvs();
+  // ¿conectado a Meta? — si el config endpoint responde y hay envíos reales lo sabremos por los estados; el pill es informativo
+  const params = new URLSearchParams(location.search);
+  if (params.get('conv')) { tab('bandeja'); abrirConv(parseInt(params.get('conv'))); }
+  POLL = setInterval(()=>{ if (document.getElementById('secBandeja').style.display!=='none') { cargarConvs(); if (CONV_SEL) abrirConv(CONV_SEL); } }, 20000);
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
