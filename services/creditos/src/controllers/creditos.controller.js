@@ -131,6 +131,7 @@ const SELECT_GESTION = `
       WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
       WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
       WHEN ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
+      WHEN ob.estado_eval = 'ANULADO' OR ob.estado_credito = 'ANULADO' THEN 'ANULADO'
       WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
       ELSE COALESCE(ob.estado_credito, ob.estado_eval)
     END                                                        AS estado,
@@ -193,8 +194,6 @@ const WHERE_GESTION = `
     ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
     OR ob.numero_credito IS NOT NULL
   )
-  AND ob.estado_eval  != 'ANULADO'
-  AND (ob.estado_credito IS NULL OR ob.estado_credito != 'ANULADO')
 `;
 
 /* ─── CREATE ─────────────────────────────────────────────────────────────── */
@@ -367,7 +366,8 @@ const getAll = async (req, res) => {
              END
         WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
         WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
-        WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+        WHEN ob.estado_eval = 'ANULADO' OR ob.estado_credito = 'ANULADO' THEN 'ANULADO'
+      WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
         ELSE COALESCE(ob.estado_credito, ob.estado_eval)
       END`;
 
@@ -542,7 +542,8 @@ const getById = async (req, res) => {
                 WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
                 WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
                 WHEN ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
-                WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
+                WHEN ob.estado_eval = 'ANULADO' OR ob.estado_credito = 'ANULADO' THEN 'ANULADO'
+      WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
                 ELSE COALESCE(ob.estado_credito, ob.estado_eval)
               END                                                  AS estado_etapa,
               COALESCE(ob.estado_cartera,
