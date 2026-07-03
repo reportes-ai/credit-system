@@ -219,6 +219,10 @@
           <div class="fld"><label>Horario hasta</label><input type="time" id="gHFin"></div>
           <div class="fld"><label>Días (1=lun … 7=dom)</label><input id="gDias" placeholder="1,2,3,4,5,6"></div>
         </div>
+        <div class="fld"><label>Ventana de envío (horas desde el último mensaje del cliente)</label>
+          <input type="number" id="gVentana" min="1" max="24" style="max-width:120px">
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Regla de WhatsApp: pasado este plazo la conversación se bloquea — solo reabre si el cliente escribe o con una plantilla vía campaña. Máximo 24; se recomienda 23 para no rozar el límite de Meta.</div>
+        </div>
         <div class="fld"><label>Mensaje de bienvenida (primer contacto)</label><textarea id="gBienvenida"></textarea></div>
         <div class="fld"><label>Mensaje fuera de horario</label><textarea id="gFueraHorario"></textarea></div>
         <div class="fld"><label>Mensaje "no entiendo"</label><textarea id="gNoEntiendo"></textarea></div>
@@ -325,7 +329,14 @@
         ${c.estado!=='CERRADA'?`<button class="btn-red" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'CERRAR')">Cerrar</button>`:''}
       </span>`;
     document.getElementById('chatBody').innerHTML = pintarMsgs(c.mensajes);
-    document.getElementById('chatInput').style.display = c.estado!=='CERRADA' ? 'flex' : 'none';
+    // Ventana de envío (regla Meta): cerrada → no se puede escribir en esta conversación
+    const vAbierta = c.es_simulada || !c.ventana || c.ventana.abierta;
+    document.getElementById('chatInput').style.display = (c.estado!=='CERRADA' && vAbierta) ? 'flex' : 'none';
+    if (c.estado!=='CERRADA' && !vAbierta) {
+      document.getElementById('chatBody').innerHTML += `<div style="text-align:center;margin-top:10px"><span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:6px 14px;font-size:.74rem;font-weight:700"><i class="bi bi-hourglass-bottom me-1"></i>Ventana de ${c.ventana.horas} h cerrada — solo reabre si el cliente escribe, o contáctalo vía campaña con plantilla</span></div>`;
+    } else if (c.estado!=='CERRADA' && !c.es_simulada && c.ventana && c.ventana.abierta && c.ventana.mins_restantes < 180) {
+      document.getElementById('chatBody').innerHTML += `<div style="text-align:center;margin-top:10px"><span style="background:#ffedd5;color:#c2410c;border-radius:10px;padding:4px 12px;font-size:.7rem;font-weight:700"><i class="bi bi-hourglass-split me-1"></i>La ventana cierra en ${Math.floor(c.ventana.mins_restantes/60)}h ${c.ventana.mins_restantes%60}min</span></div>`;
+    }
     const b = document.getElementById('chatBody'); b.scrollTop = b.scrollHeight;
     cargarConvs();
   }
@@ -508,6 +519,7 @@
     document.getElementById('gHIni').value = c.horario_ini||'09:00';
     document.getElementById('gHFin').value = c.horario_fin||'19:00';
     document.getElementById('gDias').value = c.dias_habiles||'1,2,3,4,5,6';
+    document.getElementById('gVentana').value = c.ventana_horas||23;
     document.getElementById('gBienvenida').value = c.msg_bienvenida||'';
     document.getElementById('gFueraHorario').value = c.msg_fuera_horario||'';
     document.getElementById('gNoEntiendo').value = c.msg_no_entiendo||'';
@@ -522,6 +534,7 @@
       msg_bienvenida: val('gBienvenida'), msg_fuera_horario: val('gFueraHorario'),
       msg_no_entiendo: val('gNoEntiendo'), msg_derivacion: val('gDerivacion'),
       prompt_ia: val('gPromptIA'),
+      ventana_horas: val('gVentana'),
     };
     const j = await (await fetch('/api/whatsapp/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
     alert(j.success ? 'Configuración guardada ✓' : (j.error||'Error'));

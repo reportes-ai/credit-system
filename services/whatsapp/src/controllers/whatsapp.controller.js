@@ -40,6 +40,8 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
       'No estoy seguro de haber entendido 🤔. Escribe por ejemplo: *simular*, *requisitos*, *mi crédito* o *ejecutivo* para hablar con una persona.',
       'Te estamos derivando con un ejecutivo, en breve te contactará por este mismo chat. 🙌')`);
     try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS prompt_ia TEXT NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // Ventana de envío (regla Meta: fuera de las 24h desde el último mensaje del cliente solo van plantillas)
+    try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS ventana_horas INT NOT NULL DEFAULT 23'); } catch (e) { if (e.errno !== 1060) throw e; }
     await pool.query("UPDATE wsp_config SET prompt_ia=? WHERE id=1 AND (prompt_ia IS NULL OR prompt_ia='')", [PROMPT_IA_DEF]);
   } catch (e) { console.error('[wsp_config migration]', e.message); }
 
@@ -220,6 +222,16 @@ async function poolAtencion() {
        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
       WHERE f.codigo='wsp_atender' AND pp.habilitado=1 AND u.estado='activo'`);
   return rows.map(r => r.id_usuario);
+}
+
+/* Ventana de envío: minutos restantes desde el último mensaje IN del cliente.
+   null = el cliente nunca ha escrito (solo campaña saliente) → también cerrada. */
+async function ventanaRestante(idConv, cfg) {
+  const horas = Math.max(1, parseInt(cfg.ventana_horas) || 23);
+  const [[r]] = await pool.query("SELECT TIMESTAMPDIFF(MINUTE, MAX(created_at), NOW()) mins FROM wsp_mensajes WHERE id_conversacion=? AND direccion='IN'", [idConv]);
+  if (!r || r.mins == null) return { abierta: false, mins_restantes: 0, horas };
+  const rest = horas * 60 - r.mins;
+  return { abierta: rest > 0, mins_restantes: Math.max(0, rest), horas };
 }
 
 async function guardarMensaje(idConv, { direccion, origen, mensaje, autor_id = null, autor_nombre = null, estado_envio = null, wamid = null }) {
@@ -434,9 +446,10 @@ exports.setConfig = async (req, res) => {
   try {
     const b = req.body || {};
     await pool.query(`UPDATE wsp_config SET bot_activo=?, horario_ini=?, horario_fin=?, dias_habiles=?,
-        msg_bienvenida=?, msg_fuera_horario=?, msg_no_entiendo=?, msg_derivacion=?, prompt_ia=? WHERE id=1`,
+        msg_bienvenida=?, msg_fuera_horario=?, msg_no_entiendo=?, msg_derivacion=?, prompt_ia=?, ventana_horas=? WHERE id=1`,
       [b.bot_activo ? 1 : 0, b.horario_ini || '09:00', b.horario_fin || '19:00', b.dias_habiles || '1,2,3,4,5,6',
-       b.msg_bienvenida || '', b.msg_fuera_horario || '', b.msg_no_entiendo || '', b.msg_derivacion || '', b.prompt_ia || PROMPT_IA_DEF]);
+       b.msg_bienvenida || '', b.msg_fuera_horario || '', b.msg_no_entiendo || '', b.msg_derivacion || '', b.prompt_ia || PROMPT_IA_DEF,
+       Math.min(Math.max(parseInt(b.ventana_horas) || 23, 1), 24)]);
     auditar({ req, accion: 'EDITAR', modulo: 'whatsapp', entidad: 'wsp_config', entidad_id: '1', detalle: 'Configuración del bot WhatsApp actualizada' });
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -507,7 +520,8 @@ exports.conversacion = async (req, res) => {
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
     const [msgs] = await pool.query('SELECT * FROM wsp_mensajes WHERE id_conversacion=? ORDER BY id', [req.params.id]);
-    res.json({ success: true, data: { ...conv, mensajes: msgs }, error: null });
+    const ventana = await ventanaRestante(conv.id, await getCfg());
+    res.json({ success: true, data: { ...conv, mensajes: msgs, ventana }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 
@@ -517,6 +531,11 @@ exports.responderConv = async (req, res) => {
     if (!texto) return res.status(400).json({ success: false, error: 'Falta el texto' });
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    // Ventana Meta: fuera del plazo configurable no se puede escribir en esta conversación
+    if (!conv.es_simulada) {
+      const v = await ventanaRestante(conv.id, await getCfg());
+      if (!v.abierta) return res.status(400).json({ success: false, error: `Ventana de ${v.horas} h cerrada: el cliente debe escribir primero (o contactarlo vía campaña con plantilla).` });
+    }
     // Al responder un agente, la conversación queda tomada por él
     if (conv.estado !== 'CERRADA') await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=? WHERE id=? AND asignada_a IS NULL", [req.user.id_usuario, nombreDe(req.user), req.params.id]);
     const estado = await responder(conv, texto, 'AGENTE', req.user);
