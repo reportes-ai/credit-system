@@ -121,11 +121,7 @@
       <div id="dCreditos"><p class="sub">Cargando…</p></div>
     </div>
     <div class="card">
-      <h5 style="margin-top:0"><i class="bi bi-geo-alt"></i> ¿Dónde y cómo pagar?</h5>
-      <div class="info-box" id="dDondePagar">Cargando…</div>
-      <h5><i class="bi bi-bank"></i> Datos para transferencia</h5>
-      <div class="info-box" id="dTransferencia">Cargando…</div>
-      <h5><i class="bi bi-chat-dots"></i> Contacto</h5>
+      <h5 style="margin-top:0"><i class="bi bi-chat-dots"></i> Contacto</h5>
       <div class="info-box" id="dContacto">Cargando…</div>
     </div>
   </div>
@@ -277,7 +273,7 @@
       }).join('') : '<p class="sub">No encontramos créditos asociados a tu RUT.</p>';
       const ri = await fetch('/api/portal-cliente/info-pago',{headers:HJ()});
       const ji = await ri.json();
-      if (ji.success){ $('dDondePagar').textContent=ji.data.donde_pagar||'—'; $('dTransferencia').textContent=ji.data.datos_transferencia||'—'; $('dContacto').textContent=ji.data.contacto||'—'; }
+      if (ji.success){ $('dContacto').textContent=ji.data.contacto||'—'; }
     } catch(e){ $('dCreditos').innerHTML='<p class="sub">Error cargando tus créditos. Intenta de nuevo.</p>'; }
   }
 
