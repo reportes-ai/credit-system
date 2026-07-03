@@ -152,7 +152,9 @@ const SELECT_GESTION = `
        WHERE cc.id_credito = ob.id AND cc.estado_cuota <> 'PAGADA'
          AND cc.fecha_vencimiento <= CURDATE())), 0)           AS dias_atraso,
     -- Fecha mostrada: otorgamiento; si no se cursó, el MES de la operación (no la fecha de inserción)
-    COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)         AS fecha_otorgamiento,
+    -- Como STRING: COALESCE(DATE, TIMESTAMP) mezclado lo rompe el driver mysql2 (devuelve null);
+    -- 'T12:00:00' sin Z para que el navegador lo parsee en hora local (sin off-by-one de timezone)
+    CONCAT(DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at),'%Y-%m-%d'),'T12:00:00') AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
     ob.monto_financiado,
