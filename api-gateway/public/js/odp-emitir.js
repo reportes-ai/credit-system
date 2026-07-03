@@ -111,8 +111,12 @@
     if (msg) { e.style.display = 'block'; e.textContent = msg; } else { e.style.display = 'none'; }
   }
 
-  /* ── Amortización francesa (consistente con /tesoreria/caja y /pagar-cuotas) ── */
-  function buildSchedule(c) {
+  /* ── Calendario del crédito: el CONGELADO (cuotas_credito) manda; francés de fallback ── */
+  function buildSchedule(c, calendario) {
+    if (Array.isArray(calendario) && calendario.length && window.AF_MORA) {
+      // MOTOR ÚNICO (mora-core): vencimientos/valores reales + PAGADA del calendario
+      return AF_MORA.buildSchedule({ calendario }).map(q => ({ numero: q.n, fecha: q.fecha, monto: q.monto, pagadaCal: q.pagadaCal }));
+    }
     const r = (parseFloat(c.tasa_mensual) || 0) / 100, n = parseInt(c.plazo) || 0, mf = parseFloat(c.monto_financiado) || 0;
     if (!n) return [];
     const cuota = r === 0 ? mf / n : (window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(mf, r, n) : mf * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1));
@@ -218,18 +222,21 @@
       _modalEl.classList.add('open');
 
       try {
-        const [jC, jP, jCu] = await Promise.all([
+        const [jC, jP, jCu, jCal] = await Promise.all([
           API('/api/creditos/' + idCredito).then(r => r.json()),
           API('/api/pagos-credito/' + idCredito).then(r => r.json()),
           API('/api/cuentas-bancarias').then(r => r.json()).catch(() => ({ data: [] })),
+          API('/api/pagos-credito/calendario/' + idCredito).then(r => r.json()).catch(() => ({ data: [] })),
         ]);
         if (!jC.success) throw new Error(jC.error || 'No se pudo cargar el crédito.');
         _state.credito = jC.data;
         _state.cuentas = jCu.data || [];
         const pagados = new Set((jP.data || []).filter(p => p.estado_pago === 'PAGADO').map(p => p.numero_cuota));
 
-        // Cuotas candidatas = pendientes del calendario francés
-        const sched = buildSchedule(_state.credito).filter(s => !pagados.has(s.numero));
+        // Cuotas candidatas = impagas del calendario REAL (pagos en app ∪ PAGADA congelada);
+        // sin calendario congelado, cae al francés sintético
+        const calendario = (jCal.success && Array.isArray(jCal.data)) ? jCal.data : [];
+        const sched = buildSchedule(_state.credito, calendario).filter(s => !pagados.has(s.numero) && !s.pagadaCal);
 
         // Mora + gastos desde el backend (paramétrico). Fallback: 0.
         let cob = new Map();
