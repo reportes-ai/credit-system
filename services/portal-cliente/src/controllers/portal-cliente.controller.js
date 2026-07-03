@@ -169,7 +169,8 @@ exports.resumen = async (req, res) => {
               (SELECT COUNT(*) FROM cuotas_credito q WHERE q.id_credito=c.id AND q.estado_cuota='PAGADA') pagadas_cal,
               (SELECT COUNT(DISTINCT p.numero_cuota) FROM pagos_credito p WHERE p.id_credito=c.id AND (p.estado_pago IS NULL OR p.estado_pago!='REVERSADO')) pagadas_app
          FROM creditos c
-        WHERE c.id_cliente=? AND c.financiera='AUTOFACIL' AND c.estado_credito='OTORGADO'
+        WHERE c.id_cliente=? AND c.estado_credito='OTORGADO'
+          AND c.financiera IN ('AUTOFACIL','AUTOFIN','UNIDAD')
         ORDER BY COALESCE(c.fecha_otorgado, c.fecha_estado, c.mes) DESC LIMIT 20`, [cli.id_cliente]);
     res.json({ success: true, data: { nombre: cli.nombre_completo, creditos: creds }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }

@@ -224,6 +224,30 @@
 
   /* ── dashboard ── */
   const CART = { VIGENTE:['#16a34a','Al día'], MORA:['#d97706','En mora'], 'EN MORA':['#d97706','En mora'], VENCIDO:['#dc2626','Vencido'], TERMINADO:['#0f766e','Terminado'], PREPAGADO:['#7c3aed','Prepagado'], CASTIGADO:['#111827','Castigado'] };
+  // Info por institución brokerage (crédito tomado a través de AutoFácil con otra financiera).
+  const FIN_INFO = {
+    UNIDAD:  { nombre:'Unidad de Crédito', url:'https://www.unidadcreditos.cl/' },
+    AUTOFIN: { nombre:'AutoFin',           url:'https://autofin.cl/' },
+  };
+  const WSP_RENOVAR = '56932469071'; // WhatsApp AutoFácil para renovación
+  function cardBrokerage(c, fin){
+    const info = FIN_INFO[fin] || { nombre: c.financiera||'la financiera', url:null };
+    return `<div class="cred-card" style="cursor:default;border-left:4px solid #0141A2">
+      <div class="top">
+        <span class="op">Operación ${esc(c.num_op)}</span>
+        <span class="pill" style="background:#0141A2">${esc(info.nombre)}</span>
+      </div>
+      <div style="font-size:.85rem;color:#334155;margin-top:8px;line-height:1.5">
+        Tu crédito fue tomado con la financiera <b>${esc(info.nombre)}</b> a través de AutoFácil.
+        ${info.url?`Para más información ingresa a <a href="${info.url}" target="_blank" rel="noopener" style="color:#0141A2;font-weight:600">${esc(info.url.replace(/^https?:\/\//,'').replace(/\/$/,''))}</a>.`:''}
+      </div>
+      <a href="https://wa.me/${WSP_RENOVAR}?text=${encodeURIComponent('Hola, quiero renovar mi auto (Operación '+c.num_op+')')}" target="_blank" rel="noopener"
+         style="display:inline-flex;align-items:center;gap:7px;margin-top:12px;background:#25D366;color:#fff;text-decoration:none;font-weight:600;font-size:.83rem;padding:8px 14px;border-radius:9px">
+        <i class="bi bi-whatsapp"></i> ¿Quieres renovar tu auto? Escríbenos
+      </a>
+    </div>`;
+  }
+
   async function cargarDash(){
     $('dSaludo').textContent = `Hola${NOMBRE?', '+NOMBRE.split(' ')[0].charAt(0)+NOMBRE.split(' ')[0].slice(1).toLowerCase():''} 👋`;
     try {
@@ -232,6 +256,11 @@
       const j = await r.json();
       const creds = j.data.creditos||[];
       $('dCreditos').innerHTML = creds.length ? creds.map(c=>{
+        const fin = (c.financiera||'').toUpperCase();
+        // ── Créditos brokerage (financiados por otra institución a través de AutoFácil):
+        //    NO tenemos sus pagos/mora acá → tarjeta informativa con enlace y WhatsApp.
+        if (fin !== 'AUTOFACIL') return cardBrokerage(c, fin);
+        // ── Cartera propia AutoFácil: detalle completo con tabla de desarrollo.
         const [col,txt] = CART[c.estado_cartera]||['#64748b', c.estado_cartera||c.estado_credito||c.estado||'—'];
         const pagadas = Math.max(c.pagadas_cal||0, c.pagadas_app||0);
         return `<div class="cred-card" onclick="abrirDetalle(${c.id})">
