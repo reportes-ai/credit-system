@@ -765,4 +765,5 @@ const reversar = async (req, res) => {
   }
 };
 
-module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar };
+// cobranzaFullMap exportado: motor único de mora+gastos por cuota (lo usa también el Portal del Cliente)
+module.exports = { getByCredito, getCalendario, getById, create, createBatch, remove, reversar, prepagoInfo, prepagar, cobranzaFullMap };

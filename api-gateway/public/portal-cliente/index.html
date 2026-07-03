@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Créditos — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#f0f4f8; color:#1e293b; min-height:100vh; }
+    .hero { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 55%,var(--accent)); color:#fff; padding:26px 20px 70px; }
+    .hero .brand { display:flex; align-items:center; gap:10px; max-width:960px; margin:0 auto; }
+    .hero .brand img { height:34px; filter:brightness(0) invert(1); }
+    .hero .brand small { opacity:.75; font-size:.72rem; letter-spacing:1px; text-transform:uppercase; font-weight:700; }
+    .wrap { max-width:960px; margin:-48px auto 40px; padding:0 16px; }
+    .card { background:#fff; border-radius:18px; box-shadow:0 4px 24px rgba(1,45,112,.10); padding:26px; margin-bottom:18px; }
+    h1 { font-size:1.25rem; margin:0 0 4px; color:var(--navy-dark); font-weight:800; }
+    .sub { color:#64748b; font-size:.86rem; margin:0 0 18px; }
+    label { display:block; font-size:.78rem; font-weight:700; color:#475569; margin:12px 0 5px; }
+    input { width:100%; border:1.5px solid #cbd5e1; border-radius:10px; padding:12px 14px; font-size:1rem; outline:none; }
+    input:focus { border-color:var(--navy); box-shadow:0 0 0 3px rgba(1,65,162,.12); }
+    .btn { width:100%; background:var(--navy); color:#fff; border:none; border-radius:10px; padding:13px; font-size:.95rem; font-weight:700; cursor:pointer; margin-top:16px; }
+    .btn:hover { background:#0255c5; } .btn:disabled { background:#93c5fd; cursor:wait; }
+    .btn-link { background:none; border:none; color:var(--navy); font-weight:700; font-size:.84rem; cursor:pointer; margin-top:14px; width:100%; }
+    .alert { border-radius:10px; padding:11px 14px; font-size:.84rem; margin-top:14px; display:none; }
+    .alert.err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+    .alert.ok { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+    .otp-row { display:flex; gap:8px; }
+    /* dashboard */
+    .saludo { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .saludo h1 { font-size:1.15rem; }
+    .btn-salir { background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:9px; padding:6px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    .cred-card { border:1.5px solid #e5e7eb; border-radius:14px; padding:16px 18px; margin-bottom:12px; cursor:pointer; transition:.15s; }
+    .cred-card:hover { border-color:var(--navy); box-shadow:0 4px 14px rgba(1,65,162,.10); }
+    .cred-card .top { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+    .cred-card .op { font-weight:800; color:var(--navy-dark); font-size:.95rem; }
+    .cred-card .monto { font-weight:800; color:#059669; font-size:1.05rem; }
+    .pill { border-radius:14px; padding:3px 11px; font-size:.7rem; font-weight:800; color:#fff; display:inline-block; }
+    .deuda-banner { background:linear-gradient(135deg,#7f1d1d,#dc2626); color:#fff; border-radius:14px; padding:16px 20px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .deuda-banner .v { font-size:1.5rem; font-weight:800; }
+    .aldia-banner { background:linear-gradient(135deg,#14532d,#16a34a); color:#fff; border-radius:14px; padding:16px 20px; margin-bottom:16px; display:flex; align-items:center; gap:12px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.62rem; letter-spacing:.4px; text-align:left; padding:9px 10px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    td { padding:8px 10px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+    .num { text-align:right; font-variant-numeric:tabular-nums; }
+    tr.PAGADA td { color:#94a3b8; } tr.PAGADA .st { color:var(--ok); font-weight:800; }
+    tr.VENCIDA { background:#fff7f7; } tr.VENCIDA .st { color:var(--bad); font-weight:800; }
+    tr.PENDIENTE .st { color:#64748b; font-weight:700; }
+    .tbl-scroll { overflow-x:auto; border:1px solid #eef2f7; border-radius:12px; }
+    .kv { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px; }
+    .kv .it { background:#f8fafc; border-radius:12px; padding:12px 14px; }
+    .kv .it b { display:block; font-size:.68rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px; }
+    .kv .it span { font-weight:800; color:#0f172a; font-size:.95rem; }
+    h5 { color:var(--navy-dark); font-weight:800; font-size:.95rem; margin:22px 0 10px; display:flex; align-items:center; gap:8px; }
+    .pago-item { display:flex; justify-content:space-between; align-items:center; border:1px solid #eef2f7; border-radius:12px; padding:11px 15px; margin-bottom:8px; font-size:.84rem; }
+    .info-box { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.86rem; white-space:pre-wrap; line-height:1.6; color:#334155; }
+    .volver { background:none; border:none; color:var(--navy); font-weight:700; cursor:pointer; font-size:.86rem; padding:0; margin-bottom:14px; }
+    .foot { text-align:center; color:#94a3b8; font-size:.72rem; padding:18px; }
+    @media (max-width:600px){ .card { padding:18px; } .wrap { padding:0 10px; } td, th { padding:7px 7px; } }
+  </style>
+</head>
+<body>
+<div class="hero">
+  <div class="brand">
+    <img src="/img/logo.png" alt="AutoFácil">
+    <div><small>Portal Clientes</small></div>
+    <span style="margin-left:auto" id="heroRight"></span>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- ═══ LOGIN ═══ -->
+  <div class="card" id="vLogin" style="max-width:440px;margin-left:auto;margin-right:auto">
+    <h1>Bienvenido 👋</h1>
+    <p class="sub">Consulta el estado de tus créditos, tu calendario de pagos y cómo pagar.</p>
+    <label>RUT</label>
+    <input id="lRut" placeholder="12.345.678-9" autocomplete="username" inputmode="text">
+    <label>Clave</label>
+    <input id="lClave" type="password" placeholder="Tu clave del portal" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()">
+    <div class="alert err" id="lErr"></div>
+    <button class="btn" id="lBtn" onclick="login()">Ingresar</button>
+    <button class="btn-link" onclick="vista('enrolar')">¿Primera vez o olvidaste tu clave? Crear / recuperar clave</button>
+  </div>
+
+  <!-- ═══ ENROLAMIENTO ═══ -->
+  <div class="card" id="vEnrolar" style="display:none;max-width:440px;margin-left:auto;margin-right:auto">
+    <h1>Crear tu clave</h1>
+    <p class="sub">Te enviaremos un código de verificación al correo que registraste con nosotros.</p>
+    <div id="ePaso1">
+      <label>RUT</label>
+      <input id="eRut" placeholder="12.345.678-9" inputmode="text">
+      <div class="alert err" id="eErr1"></div>
+      <button class="btn" id="eBtn1" onclick="solicitarCodigo()">Enviarme el código</button>
+    </div>
+    <div id="ePaso2" style="display:none">
+      <div class="alert ok" id="eOkMsg" style="display:block"></div>
+      <label>Código de verificación (6 dígitos)</label>
+      <input id="eCodigo" inputmode="numeric" maxlength="6" placeholder="••••••" style="letter-spacing:8px;text-align:center;font-size:1.3rem;font-weight:800">
+      <label>Crea tu clave (mínimo 6 caracteres)</label>
+      <input id="eClave" type="password" placeholder="Nueva clave" autocomplete="new-password">
+      <label>Repite tu clave</label>
+      <input id="eClave2" type="password" placeholder="Repite la clave" autocomplete="new-password">
+      <div class="alert err" id="eErr2"></div>
+      <button class="btn" id="eBtn2" onclick="activar()">Activar mi cuenta</button>
+    </div>
+    <button class="btn-link" onclick="vista('login')">← Volver al ingreso</button>
+  </div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="vDash" style="display:none">
+    <div class="card">
+      <div class="saludo">
+        <div><h1 id="dSaludo">Hola 👋</h1><p class="sub" style="margin:0">Este es el estado de tus créditos al día de hoy.</p></div>
+      </div>
+    </div>
+    <div class="card">
+      <h5 style="margin-top:0"><i class="bi bi-credit-card-2-front"></i> Mis créditos</h5>
+      <div id="dCreditos"><p class="sub">Cargando…</p></div>
+    </div>
+    <div class="card">
+      <h5 style="margin-top:0"><i class="bi bi-geo-alt"></i> ¿Dónde y cómo pagar?</h5>
+      <div class="info-box" id="dDondePagar">Cargando…</div>
+      <h5><i class="bi bi-bank"></i> Datos para transferencia</h5>
+      <div class="info-box" id="dTransferencia">Cargando…</div>
+      <h5><i class="bi bi-chat-dots"></i> Contacto</h5>
+      <div class="info-box" id="dContacto">Cargando…</div>
+    </div>
+  </div>
+
+  <!-- ═══ DETALLE CRÉDITO ═══ -->
+  <div id="vDetalle" style="display:none">
+    <div class="card">
+      <button class="volver" onclick="vista('dash')"><i class="bi bi-arrow-left"></i> Volver a mis créditos</button>
+      <div id="detHead"></div>
+      <div id="detBanner"></div>
+      <div class="kv" id="detKV"></div>
+      <h5><i class="bi bi-table"></i> Tabla de desarrollo <span style="font-weight:400;color:#94a3b8;font-size:.72rem" id="detCalcAl"></span></h5>
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>N°</th><th>Vencimiento</th><th class="num">Valor cuota</th><th class="num">Interés</th><th class="num">Amortización</th><th class="num">Saldo</th><th>Estado</th><th class="num">Mora hoy</th><th class="num">Gastos</th><th class="num">Total hoy</th></tr></thead>
+          <tbody id="detTabla"></tbody>
+        </table>
+      </div>
+      <h5><i class="bi bi-receipt"></i> Mis pagos registrados</h5>
+      <div id="detPagos"></div>
+    </div>
+  </div>
+</div>
+<div class="foot">AutoFácil Crédito Automotriz · Portal Clientes · Los valores de mora y gastos están calculados al día de hoy y pueden variar.</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const clp = v => '$' + Math.round(+v||0).toLocaleString('es-CL');
+  const fdmy = s => s ? s.split('-').reverse().join('-') : '—';
+  let TOKEN = sessionStorage.getItem('pc_token') || null;
+  let NOMBRE = sessionStorage.getItem('pc_nombre') || '';
+  const HJ = () => ({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN });
+
+  // formateo RUT en vivo
+  ['lRut','eRut'].forEach(id => $(id).addEventListener('input', e => {
+    let v = e.target.value.replace(/[^0-9kK]/g,'').toUpperCase();
+    if (v.length > 1) v = v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + v.slice(-1);
+    e.target.value = v;
+  }));
+
+  function vista(v){
+    ['vLogin','vEnrolar','vDash','vDetalle'].forEach(x=>$(x).style.display='none');
+    $('heroRight').innerHTML = (v==='dash'||v==='detalle') ? `<button class="btn-salir" onclick="salir()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>` : '';
+    if (v==='login') $('vLogin').style.display='';
+    if (v==='enrolar'){ $('vEnrolar').style.display=''; $('ePaso1').style.display=''; $('ePaso2').style.display='none'; }
+    if (v==='dash'){ $('vDash').style.display=''; cargarDash(); }
+    if (v==='detalle') $('vDetalle').style.display='';
+  }
+  function err(id,msg){ const el=$(id); el.textContent=msg; el.style.display=msg?'block':'none'; }
+  function salir(){ sessionStorage.removeItem('pc_token'); sessionStorage.removeItem('pc_nombre'); TOKEN=null; vista('login'); }
+
+  /* ── auth ── */
+  async function login(){
+    err('lErr','');
+    const b = $('lBtn'); b.disabled=true;
+    try {
+      const r = await fetch('/api/portal-cliente/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rut:$('lRut').value,clave:$('lClave').value})});
+      const j = await r.json();
+      if (!j.success) { err('lErr', j.error||'Error'); return; }
+      TOKEN=j.data.token; NOMBRE=j.data.nombre;
+      sessionStorage.setItem('pc_token',TOKEN); sessionStorage.setItem('pc_nombre',NOMBRE);
+      vista('dash');
+    } catch(e){ err('lErr','Error de conexión'); }
+    finally { b.disabled=false; }
+  }
+
+  async function solicitarCodigo(){
+    err('eErr1','');
+    const b=$('eBtn1'); b.disabled=true; b.textContent='Enviando…';
+    try {
+      const r = await fetch('/api/portal-cliente/solicitar-codigo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rut:$('eRut').value})});
+      const j = await r.json();
+      if (!j.success) { err('eErr1', j.error||'Error'); return; }
+      if (!j.data.enviado){ err('eErr1', j.data.mensaje); return; }
+      $('eOkMsg').textContent = `✓ Te enviamos un código al correo ${j.data.correo||'registrado'}. Revisa también el spam.`;
+      $('ePaso1').style.display='none'; $('ePaso2').style.display='';
+    } catch(e){ err('eErr1','Error de conexión'); }
+    finally { b.disabled=false; b.textContent='Enviarme el código'; }
+  }
+
+  async function activar(){
+    err('eErr2','');
+    if ($('eClave').value !== $('eClave2').value) return err('eErr2','Las claves no coinciden');
+    const b=$('eBtn2'); b.disabled=true;
+    try {
+      const r = await fetch('/api/portal-cliente/activar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rut:$('eRut').value,codigo:$('eCodigo').value,clave:$('eClave').value})});
+      const j = await r.json();
+      if (!j.success) { err('eErr2', j.error||'Error'); return; }
+      TOKEN=j.data.token; NOMBRE=j.data.nombre;
+      sessionStorage.setItem('pc_token',TOKEN); sessionStorage.setItem('pc_nombre',NOMBRE);
+      vista('dash');
+    } catch(e){ err('eErr2','Error de conexión'); }
+    finally { b.disabled=false; }
+  }
+
+  /* ── dashboard ── */
+  const CART = { VIGENTE:['#16a34a','Al día'], MORA:['#d97706','En mora'], 'EN MORA':['#d97706','En mora'], VENCIDO:['#dc2626','Vencido'], TERMINADO:['#0f766e','Terminado'], PREPAGADO:['#7c3aed','Prepagado'], CASTIGADO:['#111827','Castigado'] };
+  async function cargarDash(){
+    $('dSaludo').textContent = `Hola${NOMBRE?', '+NOMBRE.split(' ')[0].charAt(0)+NOMBRE.split(' ')[0].slice(1).toLowerCase():''} 👋`;
+    try {
+      const r = await fetch('/api/portal-cliente/resumen',{headers:HJ()});
+      if (r.status===401) return salir();
+      const j = await r.json();
+      const creds = j.data.creditos||[];
+      $('dCreditos').innerHTML = creds.length ? creds.map(c=>{
+        const [col,txt] = CART[c.estado_cartera]||['#64748b', c.estado_cartera||c.estado_credito||c.estado||'—'];
+        const pagadas = Math.max(c.pagadas_cal||0, c.pagadas_app||0);
+        return `<div class="cred-card" onclick="abrirDetalle(${c.id})">
+          <div class="top">
+            <span class="op">Operación ${esc(c.num_op)}</span>
+            <span class="pill" style="background:${col}">${esc(txt)}</span>
+          </div>
+          <div class="top" style="margin-top:6px">
+            <span style="font-size:.8rem;color:#64748b">${esc(c.financiera||'')} · ${esc(c.fecha||'')}${c.plazo?` · ${pagadas}/${c.plazo} cuotas pagadas`:''}</span>
+            <span class="monto">${clp(c.monto_financiado)}</span>
+          </div>
+          <div style="font-size:.76rem;color:#94a3b8;margin-top:4px">Cuota ${clp(c.cuota)} · toca para ver el detalle <i class="bi bi-chevron-right"></i></div>
+        </div>`;
+      }).join('') : '<p class="sub">No encontramos créditos asociados a tu RUT.</p>';
+      const ri = await fetch('/api/portal-cliente/info-pago',{headers:HJ()});
+      const ji = await ri.json();
+      if (ji.success){ $('dDondePagar').textContent=ji.data.donde_pagar||'—'; $('dTransferencia').textContent=ji.data.datos_transferencia||'—'; $('dContacto').textContent=ji.data.contacto||'—'; }
+    } catch(e){ $('dCreditos').innerHTML='<p class="sub">Error cargando tus créditos. Intenta de nuevo.</p>'; }
+  }
+
+  /* ── detalle ── */
+  async function abrirDetalle(id){
+    vista('detalle');
+    $('detHead').innerHTML = '<p class="sub">Cargando…</p>'; $('detBanner').innerHTML=''; $('detKV').innerHTML=''; $('detTabla').innerHTML=''; $('detPagos').innerHTML='';
+    try {
+      const r = await fetch('/api/portal-cliente/credito/'+id,{headers:HJ()});
+      if (r.status===401) return salir();
+      const j = await r.json();
+      if (!j.success) { $('detHead').innerHTML = `<p class="sub">${esc(j.error)}</p>`; return; }
+      const { credito:c, tabla, pagos, deuda_hoy, calculado_al } = j.data;
+      const [col,txt] = CART[c.estado_cartera]||['#64748b', c.estado_cartera||'—'];
+      $('detHead').innerHTML = `<div class="saludo"><h1>Operación ${esc(c.num_op)}</h1><span class="pill" style="background:${col}">${esc(txt)}</span></div>`;
+      $('detBanner').innerHTML = deuda_hoy > 0
+        ? `<div class="deuda-banner"><div><div style="font-size:.78rem;opacity:.85">Deuda vencida al día de hoy (${fdmy(calculado_al)})</div><div class="v">${clp(deuda_hoy)}</div></div><div style="font-size:.78rem;opacity:.9;max-width:260px">Incluye cuotas vencidas + interés por mora + gastos de cobranza. Regulariza para evitar más cargos.</div></div>`
+        : `<div class="aldia-banner"><i class="bi bi-check-circle-fill" style="font-size:1.6rem"></i><div><b>¡Estás al día!</b><div style="font-size:.8rem;opacity:.9">No tienes cuotas vencidas al ${fdmy(calculado_al)}.</div></div></div>`;
+      $('detKV').innerHTML = `
+        <div class="it"><b>Monto financiado</b><span>${clp(c.monto_financiado)}</span></div>
+        <div class="it"><b>Valor cuota</b><span>${clp(c.cuota)}</span></div>
+        <div class="it"><b>Plazo</b><span>${c.plazo||'—'} meses</span></div>
+        ${c.vehiculo?`<div class="it"><b>Vehículo</b><span>${esc(c.vehiculo)}</span></div>`:''}
+        <div class="it"><b>Otorgado</b><span>${fdmy(c.fecha_otorgado)}</span></div>`;
+      $('detCalcAl').textContent = `— valores al ${fdmy(calculado_al)}`;
+      $('detTabla').innerHTML = (tabla||[]).length ? tabla.map(t=>`
+        <tr class="${t.estado}">
+          <td>${t.numero_cuota}</td><td>${fdmy(t.fecha_vencimiento)}</td>
+          <td class="num">${clp(t.valor_cuota)}</td><td class="num">${clp(t.interes)}</td>
+          <td class="num">${clp(t.amortizacion)}</td><td class="num">${clp(t.saldo_insoluto)}</td>
+          <td class="st">${t.estado==='PAGADA'?'✓ Pagada'+(t.fecha_pago?' '+t.fecha_pago:''):t.estado==='VENCIDA'?'⚠ Vencida':'Pendiente'}</td>
+          <td class="num" style="color:${t.mora_hoy?'#dc2626':'#cbd5e1'}">${t.mora_hoy?clp(t.mora_hoy):'—'}</td>
+          <td class="num" style="color:${t.gastos_hoy?'#dc2626':'#cbd5e1'}">${t.gastos_hoy?clp(t.gastos_hoy):'—'}</td>
+          <td class="num" style="font-weight:800">${t.estado==='PAGADA'?'—':clp(t.total_hoy)}</td>
+        </tr>`).join('') : '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:20px">Este crédito no tiene calendario cargado. Contáctanos para más información.</td></tr>';
+      $('detPagos').innerHTML = (pagos||[]).length ? pagos.map(p=>`
+        <div class="pago-item">
+          <div><b>Cuota N°${p.numero_cuota}</b><div style="font-size:.74rem;color:#64748b">Pagada el ${esc(p.fecha_pago||'—')}</div></div>
+          <div style="text-align:right"><b style="color:#059669">${clp(p.total_pagado||p.monto_cuota)}</b>
+          ${(+p.interes_mora||+p.gastos_cobranza)?`<div style="font-size:.7rem;color:#94a3b8">incluye mora ${clp(p.interes_mora)} · gastos ${clp(p.gastos_cobranza)}</div>`:''}</div>
+        </div>`).join('') : '<p class="sub">Aún no registras pagos por este canal.</p>';
+    } catch(e){ $('detHead').innerHTML = '<p class="sub">Error cargando el detalle.</p>'; }
+  }
+
+  /* init */
+  if (TOKEN) vista('dash'); else vista('login');
+</script>
+</body>
+</html>
