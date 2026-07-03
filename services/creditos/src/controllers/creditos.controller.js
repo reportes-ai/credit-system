@@ -4,6 +4,7 @@ require('../migrations/fix-financieras');   // migración one-time de datos (fin
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura, hoyChileDMY } = require('../../../../shared/utils/fecha-futura');
 const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular-mes');
+require('../utils/desistir-aprobados');   // regla: APROBADO > N días sin cursar → DESISTIDO (paramétrico)
 const AF_MORA = require('../../../../api-gateway/public/js/mora-core');   // MOTOR ÚNICO de mora
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
