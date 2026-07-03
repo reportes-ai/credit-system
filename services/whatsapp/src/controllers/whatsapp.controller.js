@@ -10,6 +10,14 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { enviarWhatsApp, normalizarFono } = require('../../../../shared/whatsapp');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const ia = require('../../../../shared/ia');
+const anthropic = require('../../../../shared/anthropic');
+
+const PROMPT_IA_DEF = `Eres el asistente de WhatsApp de AutoFácil Crédito Automotriz (Chile), empresa de créditos automotrices.
+Tono: cercano, chileno formal, mensajes CORTOS (estilo WhatsApp, máximo 3-4 líneas), un emoji ocasional.
+Puedes: orientar sobre requisitos y documentos, explicar cómo funciona el crédito automotriz, tomar datos para una simulación (monto, pie, plazo) y coordinar el contacto con un ejecutivo.
+NO puedes: prometer aprobaciones, dar tasas o montos de cuota exactos, entregar datos de otros clientes, ni negociar deudas. Ante consultas de saldo o pagos específicos, deriva a un ejecutivo.
+Si el cliente muestra molestia seria, urgencia de pago o intención concreta de compra, deriva.`;
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
 (async () => {
@@ -31,7 +39,16 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
       'Gracias por escribirnos. Nuestro horario de atención es de lunes a sábado de 09:00 a 19:00 hrs. Te responderemos apenas estemos de vuelta. 🕐',
       'No estoy seguro de haber entendido 🤔. Escribe por ejemplo: *simular*, *requisitos*, *mi crédito* o *ejecutivo* para hablar con una persona.',
       'Te estamos derivando con un ejecutivo, en breve te contactará por este mismo chat. 🙌')`);
+    try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS prompt_ia TEXT NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    await pool.query("UPDATE wsp_config SET prompt_ia=? WHERE id=1 AND (prompt_ia IS NULL OR prompt_ia='')", [PROMPT_IA_DEF]);
   } catch (e) { console.error('[wsp_config migration]', e.message); }
+
+  // Funcionalidad IA (arranca desactivada; se prende en el mantenedor IA)
+  ia.registrarFuncionalidad({
+    codigo: 'wsp_bot', nombre: 'Bot WhatsApp (conversación)',
+    descripcion: 'Responde los WhatsApp entrantes conversando con IA (los triggers de derivación siguen mandando); si está apagada, el bot usa solo las respuestas por palabra clave',
+    modelo: 'claude-haiku-4-5',
+  });
 
   try {
     await pool.query(`
@@ -224,6 +241,33 @@ async function responder(conv, texto, origen = 'BOT', autor = null) {
   return estado;
 }
 
+/* ── IA conversacional (Haiku): arma el contexto y pide JSON ───────────────── */
+async function respuestaIA(conv, texto, cfg) {
+  // Base de conocimiento: las respuestas configuradas del bot (paramétricas)
+  const [resps] = await pool.query('SELECT nombre, respuesta FROM wsp_respuestas WHERE activo=1 ORDER BY orden, id');
+  const conocimiento = resps.map(r => `• ${r.nombre}: ${r.respuesta}`).join('\n');
+  // Historial reciente (para conversar con memoria)
+  const [hist] = await pool.query('SELECT direccion, origen, mensaje FROM wsp_mensajes WHERE id_conversacion=? ORDER BY id DESC LIMIT 12', [conv.id]);
+  const historial = hist.reverse().map(m => (m.direccion === 'IN' ? 'CLIENTE' : (m.origen || 'BOT')) + ': ' + m.mensaje).join('\n');
+
+  const system = (cfg.prompt_ia || PROMPT_IA_DEF) + `
+
+INFORMACIÓN OFICIAL (usa SOLO esto como datos duros; si no está aquí, no lo inventes — deriva):
+${conocimiento || '(sin respuestas configuradas)'}
+
+Horario de atención humana: ${cfg.horario_ini}–${cfg.horario_fin}, días ${cfg.dias_habiles} (1=lunes…7=domingo).${conv.nombre ? `\nEl cliente se llama ${conv.nombre}; puedes saludarlo por su primer nombre.` : ''}
+
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)"}`;
+
+  const { datos } = await anthropic.analizar({
+    codigo: 'wsp_bot', json: true, max_tokens: 400,
+    system,
+    prompt: `Conversación hasta ahora:\n${historial}\n\nÚltimo mensaje del CLIENTE: ${texto}`,
+  });
+  if (!datos || typeof datos.respuesta !== 'string') return null;
+  return { respuesta: datos.respuesta.trim().slice(0, 1500), derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo };
+}
+
 /* ── MOTOR del bot: procesa un mensaje entrante ────────────────────────────── */
 async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = false }) {
   const fono = normalizarFono(telefono) || String(telefono);
@@ -281,12 +325,33 @@ async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = f
 
   if (!cfg.bot_activo) return { conv, accion: 'BOT_OFF' };
 
-  // 2) RESPUESTAS configuradas
+  // 2) IA conversacional (Haiku) — si la funcionalidad wsp_bot está activa.
+  //    Los triggers ya corrieron (regla dura); la IA además puede pedir derivar.
+  try {
+    if (anthropic.disponible() && await ia.iaActiva('wsp_bot')) {
+      const out = await respuestaIA(conv, texto, cfg);
+      if (out && out.respuesta) {
+        if (out.derivar) {
+          const area = ['COMERCIAL', 'COBRANZA', 'OPERACIONES'].includes(String(out.area || '').toUpperCase()) ? String(out.area).toUpperCase() : 'COMERCIAL';
+          await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', area=? WHERE id=?", [area, conv.id]);
+          notificar(await poolAtencion(), {
+            tipo: 'whatsapp', titulo: '💬 WhatsApp: la IA derivó una conversación',
+            mensaje: `${conv.nombre || conv.telefono} (${area}): ${String(out.motivo || texto).slice(0, 90)}`,
+            href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
+          }).catch(() => {});
+        }
+        await responder(conv, out.respuesta);
+        return { conv, accion: out.derivar ? 'IA_DERIVA' : 'IA', motivo: out.motivo };
+      }
+    }
+  } catch (e) { console.error('[wsp ia]', e.message); } // cae al matching por keywords
+
+  // 3) RESPUESTAS configuradas
   const [resps] = await pool.query('SELECT * FROM wsp_respuestas WHERE activo=1 ORDER BY orden, id');
   const resp = resps.find(x => matchKeywords(texto, x.keywords));
   if (resp) { await responder(conv, resp.respuesta); return { conv, accion: 'RESPUESTA', respuesta: resp.nombre }; }
 
-  // 3) Fuera de horario / bienvenida / no entiendo
+  // 4) Fuera de horario / bienvenida / no entiendo
   if (!enHorario(cfg)) { await responder(conv, cfg.msg_fuera_horario); return { conv, accion: 'FUERA_HORARIO' }; }
   if (conv._esNueva)   { await responder(conv, cfg.msg_bienvenida);    return { conv, accion: 'BIENVENIDA' }; }
   await responder(conv, cfg.msg_no_entiendo);
@@ -339,9 +404,9 @@ exports.setConfig = async (req, res) => {
   try {
     const b = req.body || {};
     await pool.query(`UPDATE wsp_config SET bot_activo=?, horario_ini=?, horario_fin=?, dias_habiles=?,
-        msg_bienvenida=?, msg_fuera_horario=?, msg_no_entiendo=?, msg_derivacion=? WHERE id=1`,
+        msg_bienvenida=?, msg_fuera_horario=?, msg_no_entiendo=?, msg_derivacion=?, prompt_ia=? WHERE id=1`,
       [b.bot_activo ? 1 : 0, b.horario_ini || '09:00', b.horario_fin || '19:00', b.dias_habiles || '1,2,3,4,5,6',
-       b.msg_bienvenida || '', b.msg_fuera_horario || '', b.msg_no_entiendo || '', b.msg_derivacion || '']);
+       b.msg_bienvenida || '', b.msg_fuera_horario || '', b.msg_no_entiendo || '', b.msg_derivacion || '', b.prompt_ia || PROMPT_IA_DEF]);
     auditar({ req, accion: 'EDITAR', modulo: 'whatsapp', entidad: 'wsp_config', entidad_id: '1', detalle: 'Configuración del bot WhatsApp actualizada' });
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
