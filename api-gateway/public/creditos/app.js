@@ -544,7 +544,7 @@ function renderConsulta(list) {
   const sArrow = col => { const a = _sortColCred===col; return `<span style="color:${a?'#0141A2':'#cbd5e1'};font-size:.72em">${a?(_sortDirCred==='asc'?'▲':'▼'):'⇅'}</span>`; };
   const sTh = (label, col, cls='', st='') => `<th class="${cls}" onclick="toggleSortCred('${col}')" style="cursor:pointer;user-select:none;white-space:nowrap;${st}" title="Ordenar mayor/menor">${label} ${sArrow(col)}</th>`;
   res.innerHTML = `<div class="table-responsive">
-    <table class="cred-table" style="min-width:900px">
+    <table class="cred-table" style="min-width:0;width:100%;table-layout:auto">
       <thead>
         <tr>
           ${sTh('N° Operación','numero_credito')}

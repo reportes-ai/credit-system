@@ -109,13 +109,13 @@
     .search-bar input { flex:1; min-width:200px; }
     .search-bar select { width:160px; }
 
-    .cred-table { width:100%; border-collapse:collapse; font-size:.82rem; }
-    .cred-table th { background:#f1f5f9; color:#374151; font-size:.73rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; padding:10px 12px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
-    .cred-table td { padding:9px 12px; border-bottom:1px solid #f0f2f5; color:#374151; }
+    .cred-table { width:100%; border-collapse:collapse; font-size:.74rem; }
+    .cred-table th { background:#f1f5f9; color:#374151; font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:7px 8px; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    .cred-table td { padding:6px 8px; border-bottom:1px solid #f0f2f5; color:#374151; }
     .cred-table tr:last-child td { border-bottom:none; }
     .cred-table tr:hover td { background:#f8fafd; }
     .cred-table .num { text-align:right; font-weight:600; }
-    .cred-table .mono { font-family:monospace; font-size:.8rem; }
+    .cred-table .mono { font-family:monospace; font-size:.72rem; }
 
     /* Estado badges */
     .badge-estado { display:inline-block; border-radius:20px; padding:2px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
@@ -200,7 +200,7 @@
     .btn-cancelar:hover { background:#f9fafb; }
     .btn-buscar-rut { background:var(--blue); color:#fff; border:none; border-radius:7px; padding:7px 16px; font-size:.88rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     .btn-buscar-rut:hover { background:#0255c5; }
-    .btn-ver-detalle { background:none; border:1.5px solid var(--blue); border-radius:6px; color:var(--blue); font-size:.75rem; font-weight:700; padding:3px 10px; cursor:pointer; white-space:nowrap; }
+    .btn-ver-detalle { background:none; border:1.5px solid var(--blue); border-radius:6px; color:var(--blue); font-size:.7rem; font-weight:700; padding:2px 8px; cursor:pointer; white-space:nowrap; }
     .btn-ver-detalle:hover { background:#eff6ff; }
 
     /* Tasación / Permiso readonly */
