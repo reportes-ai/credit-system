@@ -246,6 +246,17 @@ exports.infoPago = async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT clave, valor FROM portal_cliente_config');
     const out = {}; rows.forEach(r => { out[r.clave] = r.valor; });
+    // Datos de transferencia desde la FUENTE ÚNICA (cuentas_bancarias, mantenedor Cuentas Bancarias),
+    // no duplicados en el config: así el N° de cuenta es siempre el mismo en toda la app.
+    try {
+      const [[cta]] = await pool.query(
+        "SELECT razon_social, rut, banco, tipo_cuenta, numero_cuenta FROM cuentas_bancarias WHERE activo=1 ORDER BY id_cuenta LIMIT 1");
+      if (cta) {
+        out.datos_transferencia =
+          `${cta.razon_social}\n${cta.tipo_cuenta} ${cta.banco}\nN° de cuenta: ${cta.numero_cuenta}\nRUT: ${cta.rut}\n` +
+          `Correo de aviso: contacto@autofacilchile.cl\n\nEnvía el comprobante indicando tu RUT y N° de operación.`;
+      }
+    } catch (_) { /* si no hay cuenta activa, queda el texto del config */ }
     res.json({ success: true, data: out, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
