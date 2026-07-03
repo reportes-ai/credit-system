@@ -241,6 +241,26 @@ async function responder(conv, texto, origen = 'BOT', autor = null) {
   return estado;
 }
 
+/* ── Herramienta simulación: cuota aproximada con el MOTOR ÚNICO (rentabilidad-core)
+      y la tasa vigente del mantenedor Tasas (tramo por 200 UF). La IA NUNCA calcula. */
+async function simularCuota(monto, plazo) {
+  const m = Math.round(+monto || 0), n = parseInt(plazo) || 0;
+  if (!(m >= 500000 && m <= 200000000 && n >= 6 && n <= 60)) return null;
+  const CORE = require('../../../../api-gateway/public/js/rentabilidad-core');
+  const { getUF } = require('../../../../shared/uf');
+  const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const uf = await getUF(hoy);
+  const [[t]] = await pool.query('SELECT tasa_mensual_menor, tasa_mensual_mayor FROM tasas WHERE fecha_desde<=CURDATE() ORDER BY fecha_desde DESC LIMIT 1');
+  if (!t) return null;
+  const esMayor = uf ? m > 200 * uf : false;
+  const tasa = parseFloat(esMayor ? t.tasa_mensual_mayor : t.tasa_mensual_menor);
+  if (!(tasa > 0)) return null;
+  const cuota = Math.round(CORE.cuotaFrancesa(m, tasa / 100, n));
+  return { monto: m, plazo: n, tasa, cuota };
+}
+
+const fmtCLP = v => '$' + Math.round(+v || 0).toLocaleString('es-CL');
+
 /* ── IA conversacional (Haiku): arma el contexto y pide JSON ───────────────── */
 async function respuestaIA(conv, texto, cfg) {
   // Base de conocimiento: las respuestas configuradas del bot (paramétricas)
@@ -257,7 +277,9 @@ ${conocimiento || '(sin respuestas configuradas)'}
 
 Horario de atención humana: ${cfg.horario_ini}–${cfg.horario_fin}, días ${cfg.dias_habiles} (1=lunes…7=domingo).${conv.nombre ? `\nEl cliente se llama ${conv.nombre}; puedes saludarlo por su primer nombre.` : ''}
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)"}`;
+SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Si el cliente quiere saber la cuota y ya tienes MONTO A FINANCIAR (en pesos) y PLAZO (meses), agrega al JSON "simulacion":{"monto":X,"plazo":N} y el sistema calculará el valor exacto con la tasa vigente (tu "respuesta" va antes del cálculo, sin cifras). Si falta el monto o el plazo, pídelos. Si el cliente da presupuesto de cuota (cuánto puede pagar al mes), pide confirmar monto y plazo para simular.
+
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"monto": pesos, "plazo": meses} (solo si corresponde)}`;
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -265,7 +287,15 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
     prompt: `Conversación hasta ahora:\n${historial}\n\nÚltimo mensaje del CLIENTE: ${texto}`,
   });
   if (!datos || typeof datos.respuesta !== 'string') return null;
-  return { respuesta: datos.respuesta.trim().slice(0, 1500), derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo };
+  let respuesta = datos.respuesta.trim().slice(0, 1500);
+  // Cálculo determinístico de la cuota (motor único, tasa del mantenedor)
+  if (datos.simulacion && datos.simulacion.monto && datos.simulacion.plazo) {
+    try {
+      const s = await simularCuota(datos.simulacion.monto, datos.simulacion.plazo);
+      if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses · tasa ${String(s.tasa.toFixed(2)).replace('.', ',')}% mensual\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
+    } catch (e) { console.error('[wsp simulacion]', e.message); }
+  }
+  return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo };
 }
 
 /* ── MOTOR del bot: procesa un mensaje entrante ────────────────────────────── */
