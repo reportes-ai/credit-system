@@ -47,6 +47,20 @@ app.use((req, res, next) => {
   next();
 });
 
+// Enrutamiento por subdominio: la RAÍZ de cada host sirve su portal.
+//   clientes.autofacilchile.cl → Portal del Cliente
+//   dealers.autofacilchile.cl  → Portal del Dealer
+// El dominio principal sigue con el login del Suite. Solo intercepta "/" e "/index.html";
+// el resto de rutas/assets se sirven normal (mismo origen).
+app.get(['/', '/index.html'], (req, res, next) => {
+  const host = (req.hostname || '').toLowerCase();
+  if (host.startsWith('clientes.'))
+    return res.sendFile(path.join(__dirname, '../public/portal-cliente/index.html'));
+  if (host.startsWith('dealers.'))
+    return res.sendFile(path.join(__dirname, '../public/portal-dealer/index.html'));
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html') || filePath.endsWith('sw.js'))
