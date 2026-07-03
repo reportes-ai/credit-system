@@ -81,6 +81,23 @@
     .dh { background:linear-gradient(135deg,#075E54,#128C7E); color:#fff; padding:15px 22px; display:flex; justify-content:space-between; align-items:center; }
     .db { padding:18px 22px; max-height:66vh; overflow:auto; }
     .foot-note { background:#f8fafc; border-left:4px solid var(--wsp-dark); border-radius:8px; padding:12px 16px; font-size:.8rem; color:#475569; margin-top:16px; }
+    .btn-back { display:none; background:none; border:none; font-size:1.1rem; color:var(--wsp-dark); cursor:pointer; padding:0 6px 0 0; }
+    /* ── Teléfono: la bandeja se vuelve app de chat (lista ⇄ conversación) ── */
+    @media (max-width:768px) {
+      .main { padding:14px 10px; }
+      .page-banner { padding:14px 16px; gap:10px; } .page-banner i { font-size:1.6rem; } .conn-pill { display:none; }
+      .grid2, .grid3 { grid-template-columns:1fr; }
+      #secConfig > div { display:block !important; } #secConfig .card-box { margin-bottom:14px; }
+      .chat-wrap { display:block; min-height:0; }
+      .conv-list { max-height:none; border-right:none; }
+      .chat-pane { display:none; }
+      .chat-wrap.en-chat .conv-list { display:none; }
+      .chat-wrap.en-chat .chat-pane { display:flex; min-height:78vh; }
+      .chat-body { max-height:none; flex:1; }
+      .btn-back { display:inline-block; }
+      .bub { max-width:86%; }
+      table { font-size:.76rem; } th, td { padding:7px 8px; }
+    }
   </style>
 </head>
 <body>
@@ -119,7 +136,7 @@
       </select>
       <button class="btn-sec" onclick="cargarConvs()"><i class="bi bi-arrow-clockwise"></i></button>
     </div>
-    <div class="chat-wrap">
+    <div class="chat-wrap" id="chatWrap">
       <div class="conv-list" id="convList"><div class="empty">Cargando…</div></div>
       <div class="chat-pane">
         <div class="chat-head" id="chatHead"><span style="color:#64748b;font-size:.85rem">Selecciona una conversación</span></div>
@@ -292,7 +309,9 @@
     if (!j.success) return;
     const c = j.data;
     document.querySelectorAll('.conv-item').forEach(e=>e.classList.remove('sel'));
+    document.getElementById('chatWrap').classList.add('en-chat');
     document.getElementById('chatHead').innerHTML = `
+      <button class="btn-back" onclick="volverLista()" title="Volver"><i class="bi bi-arrow-left"></i></button>
       <b style="font-size:.9rem">${esc(c.nombre||c.telefono)}</b>
       <span style="font-size:.74rem;color:#64748b">${esc(c.telefono)}${c.rut_cliente?' · '+esc(c.rut_cliente):''}</span>
       <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span>
@@ -330,8 +349,14 @@
   async function accion(id, accion){
     if (accion==='CERRAR' && !confirm('¿Cerrar esta conversación?')) return;
     const j = await (await fetch(`/api/whatsapp/conversaciones/${id}/accion`,{method:'POST',headers:HJ,body:JSON.stringify({accion})})).json();
-    if (!j.success) return alert(j.error||'Error');
+    if (!j.success) { alert(j.error||'Error'); abrirConv(id); return; } // ej: "Ya la tomó X"
     abrirConv(id);
+  }
+
+  function volverLista(){
+    CONV_SEL = null;
+    document.getElementById('chatWrap').classList.remove('en-chat');
+    cargarConvs();
   }
 
   /* ═══ CAMPAÑAS ═══ */

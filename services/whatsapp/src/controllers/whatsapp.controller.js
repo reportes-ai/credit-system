@@ -342,8 +342,8 @@ async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = f
     const ids = await poolAtencion();
     notificar(ids, {
       tipo: 'whatsapp', prioridad: trg.prioridad === 'alta' ? 'alta' : 'normal',
-      titulo: `💬 WhatsApp ${trg.categoria}: ${trg.nombre}`,
-      mensaje: `${conv.nombre || conv.telefono} (${trg.area}): "${String(texto).slice(0, 90)}"`,
+      titulo: deriva ? `📲 Cliente esperando en WhatsApp (${trg.area}) — ¿quién lo toma?` : `💬 WhatsApp ${trg.categoria}: ${trg.nombre}`,
+      mensaje: `${trg.categoria} · ${conv.nombre || conv.telefono}: "${String(texto).slice(0, 90)}"`,
       href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
     }).catch(() => {});
     if (deriva) {
@@ -365,8 +365,8 @@ async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = f
           const area = ['COMERCIAL', 'COBRANZA', 'OPERACIONES'].includes(String(out.area || '').toUpperCase()) ? String(out.area).toUpperCase() : 'COMERCIAL';
           await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', area=? WHERE id=?", [area, conv.id]);
           notificar(await poolAtencion(), {
-            tipo: 'whatsapp', titulo: '💬 WhatsApp: la IA derivó una conversación',
-            mensaje: `${conv.nombre || conv.telefono} (${area}): ${String(out.motivo || texto).slice(0, 90)}`,
+            tipo: 'whatsapp', titulo: `📲 Cliente esperando en WhatsApp (${area}) — ¿quién lo toma?`,
+            mensaje: `${conv.nombre || conv.telefono}: ${String(out.motivo || texto).slice(0, 90)}`,
             href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
           }).catch(() => {});
         }
@@ -529,7 +529,16 @@ exports.accionConv = async (req, res) => {
     const { accion, area } = req.body || {};
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
-    if (accion === 'TOMAR')       await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=? WHERE id=?", [req.user.id_usuario, nombreDe(req.user), req.params.id]);
+    if (accion === 'TOMAR') {
+      // Carrera justa: el PRIMERO que toca "Tomar" se queda con el cliente (update atómico)
+      const [r] = await pool.query(
+        "UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=? WHERE id=? AND (asignada_a IS NULL OR asignada_a=?)",
+        [req.user.id_usuario, nombreDe(req.user), req.params.id, req.user.id_usuario]);
+      if (!r.affectedRows) {
+        const [[c2]] = await pool.query('SELECT asignada_nombre FROM wsp_conversaciones WHERE id=?', [req.params.id]);
+        return res.status(409).json({ success: false, error: `Ya la tomó ${c2?.asignada_nombre || 'otro ejecutivo'}` });
+      }
+    }
     else if (accion === 'CERRAR') await pool.query("UPDATE wsp_conversaciones SET estado='CERRADA' WHERE id=?", [req.params.id]);
     else if (accion === 'BOT')    await pool.query("UPDATE wsp_conversaciones SET estado='BOT', asignada_a=NULL, asignada_nombre=NULL WHERE id=?", [req.params.id]);
     else if (accion === 'DERIVAR') {
