@@ -27,6 +27,7 @@ router.delete('/triggers/:id',   verifyToken, requireFunc('wsp_config'), ctrl.el
 // Bandeja de conversaciones
 router.get('/conversaciones',              verifyToken, requireFunc('wsp_panel'),   ctrl.conversaciones);
 router.get('/conversaciones/:id',          verifyToken, requireFunc('wsp_panel'),   ctrl.conversacion);
+router.get('/conversaciones/:id/ficha',    verifyToken, requireFunc('wsp_panel'),   ctrl.fichaCliente);
 router.post('/conversaciones/:id/responder', verifyToken, requireFunc('wsp_atender'), ctrl.responderConv);
 router.post('/conversaciones/:id/accion',    verifyToken, requireFunc('wsp_atender'), ctrl.accionConv);
 

@@ -115,6 +115,7 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
         created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_fono (telefono), INDEX idx_estado (estado)
       )`);
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS no_leidos INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
   } catch (e) { console.error('[wsp_conversaciones migration]', e.message); }
 
   try {
@@ -237,7 +238,7 @@ async function ventanaRestante(idConv, cfg) {
 async function guardarMensaje(idConv, { direccion, origen, mensaje, autor_id = null, autor_nombre = null, estado_envio = null, wamid = null }) {
   await pool.query('INSERT INTO wsp_mensajes (id_conversacion, direccion, origen, autor_id, autor_nombre, mensaje, estado_envio, wamid) VALUES (?,?,?,?,?,?,?,?)',
     [idConv, direccion, origen, autor_id, autor_nombre, mensaje, estado_envio, wamid]);
-  await pool.query('UPDATE wsp_conversaciones SET ultima_actividad=NOW() WHERE id=?', [idConv]);
+  await pool.query(`UPDATE wsp_conversaciones SET ultima_actividad=NOW()${direccion === 'IN' ? ', no_leidos = no_leidos + 1' : ''} WHERE id=?`, [idConv]);
 }
 
 // Envía por el canal real (o simulado) y registra el mensaje OUT
@@ -502,10 +503,11 @@ exports.eliminarTrigger = async (req, res) => {
 /* ── Bandeja: conversaciones ───────────────────────────────────────────────── */
 exports.conversaciones = async (req, res) => {
   try {
-    const { estado, area, q } = req.query;
+    const { estado, area, q, mias } = req.query;
     const where = ['1=1'], params = [];
     if (estado) { where.push('c.estado=?'); params.push(estado); }
     if (area)   { where.push('c.area=?');   params.push(area); }
+    if (mias === '1') { where.push('c.asignada_a=?'); params.push(req.user.id_usuario); }
     if (q)      { where.push('(c.telefono LIKE ? OR c.nombre LIKE ? OR c.rut_cliente LIKE ?)'); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
     const [rows] = await pool.query(
       `SELECT c.*, (SELECT mensaje FROM wsp_mensajes m WHERE m.id_conversacion=c.id ORDER BY m.id DESC LIMIT 1) ultimo_msg,
@@ -521,7 +523,26 @@ exports.conversacion = async (req, res) => {
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
     const [msgs] = await pool.query('SELECT * FROM wsp_mensajes WHERE id_conversacion=? ORDER BY id', [req.params.id]);
     const ventana = await ventanaRestante(conv.id, await getCfg());
+    if (conv.no_leidos) pool.query('UPDATE wsp_conversaciones SET no_leidos=0 WHERE id=?', [conv.id]).catch(() => {});
     res.json({ success: true, data: { ...conv, mensajes: msgs, ventana }, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+/* Ficha del cliente identificado (fuente única: clientes + creditos por RUT) */
+exports.fichaCliente = async (req, res) => {
+  try {
+    const [[conv]] = await pool.query('SELECT rut_cliente, telefono FROM wsp_conversaciones WHERE id=?', [req.params.id]);
+    if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    if (!conv.rut_cliente) return res.json({ success: true, data: { identificado: false }, error: null });
+    const [[cli]] = await pool.query(
+      `SELECT rut, nombre_completo, telefono_movil, correo, email, ciudad_id, tipo_cliente FROM clientes WHERE rut=? LIMIT 1`, [conv.rut_cliente]);
+    const [creds] = await pool.query(
+      `SELECT c.num_op, c.numero_credito, c.financiera, c.estado, c.estado_credito, c.estado_cartera, c.monto_financiado, c.cuota, c.plazo,
+              DATE_FORMAT(COALESCE(c.fecha_otorgado, c.fecha_estado, c.mes),'%d-%m-%Y') fecha
+         FROM creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
+        WHERE cl.rut = ?
+        ORDER BY COALESCE(c.fecha_otorgado, c.fecha_estado, c.mes) DESC LIMIT 8`, [conv.rut_cliente]);
+    res.json({ success: true, data: { identificado: true, cliente: cli || null, creditos: creds }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 
@@ -580,7 +601,7 @@ async function resolverAudiencia(tipo, telefonosManual) {
   if (tipo === 'MORA') {
     const [rows] = await pool.query(
       `SELECT DISTINCT cl.telefono_movil telefono, cl.nombre_completo nombre, cl.rut
-         FROM creditos c JOIN clientes cl ON cl.rut = c.rut_cliente
+         FROM creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
         WHERE c.financiera='AUTOFACIL' AND c.estado_cartera IN ('MORA','EN MORA','VENCIDO')
           AND COALESCE(cl.telefono_movil,'') != ''`);
     return rows;
@@ -588,7 +609,7 @@ async function resolverAudiencia(tipo, telefonosManual) {
   if (tipo === 'VIGENTES') {
     const [rows] = await pool.query(
       `SELECT DISTINCT cl.telefono_movil telefono, cl.nombre_completo nombre, cl.rut
-         FROM creditos c JOIN clientes cl ON cl.rut = c.rut_cliente
+         FROM creditos c JOIN clientes cl ON cl.id_cliente = c.id_cliente
         WHERE c.financiera='AUTOFACIL' AND c.estado_cartera IN ('VIGENTE','MORA','EN MORA','VENCIDO')
           AND COALESCE(cl.telefono_movil,'') != ''`);
     return rows;

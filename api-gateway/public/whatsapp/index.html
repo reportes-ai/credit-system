@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
   <link rel="manifest" href="/whatsapp/manifest.json">
   <meta name="theme-color" content="#075E54">
@@ -61,12 +61,33 @@
     .switch input:checked + .slider { background:var(--wsp); }
     .switch input:checked + .slider:before { transform:translateX(20px); }
     /* ── Chat (bandeja + simulador) estilo WhatsApp ── */
-    .chat-wrap { display:grid; grid-template-columns:340px 1fr; gap:0; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#fff; min-height:560px; }
+    .chat-wrap { display:grid; grid-template-columns:330px 1fr; gap:0; border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; background:#fff; min-height:560px; }
+    .chat-wrap.con-ficha { grid-template-columns:330px 1fr 290px; }
     .conv-list { border-right:1px solid #e5e7eb; overflow-y:auto; max-height:640px; }
-    .conv-item { padding:11px 14px; border-bottom:1px solid #f1f5f9; cursor:pointer; }
+    .conv-item { padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; gap:10px; align-items:center; }
     .conv-item:hover { background:#f8fafc; } .conv-item.sel { background:#e7f6ef; }
-    .conv-item .nm { font-weight:700; font-size:.85rem; color:#0f172a; display:flex; justify-content:space-between; gap:6px; align-items:center; }
-    .conv-item .lm { font-size:.76rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .conv-item .cbody { flex:1; min-width:0; }
+    .conv-item .nm { font-weight:700; font-size:.84rem; color:#0f172a; display:flex; justify-content:space-between; gap:6px; align-items:center; }
+    .conv-item .lm { font-size:.75rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .cavatar { width:40px; height:40px; border-radius:50%; flex:0 0 40px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:.9rem; }
+    .unread-dot { background:var(--wsp); color:#fff; border-radius:12px; min-width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; font-size:.66rem; font-weight:800; padding:0 6px; }
+    .fecha-sep { text-align:center; margin:12px 0 10px; }
+    .fecha-sep span { background:#fff; color:#54656f; border-radius:8px; padding:4px 12px; font-size:.68rem; font-weight:700; box-shadow:0 1px 1px rgba(0,0,0,.08); text-transform:uppercase; }
+    .fchips { display:flex; gap:6px; flex-wrap:wrap; }
+    .fchip { border:1.5px solid #e2e8f0; background:#fff; color:#64748b; border-radius:16px; padding:5px 13px; font-size:.76rem; font-weight:700; cursor:pointer; }
+    .fchip.on { background:var(--wsp-dark); color:#fff; border-color:var(--wsp-dark); }
+    /* Ficha lateral del cliente */
+    .ficha { border-left:1px solid #e5e7eb; overflow-y:auto; max-height:640px; background:#fafbfc; padding:14px; }
+    .ficha h6 { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#128C7E; font-weight:800; margin:14px 0 8px; }
+    .ficha .dato { font-size:.78rem; color:#334155; margin-bottom:4px; }
+    .ficha .dato b { color:#0f172a; }
+    .fcred { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; margin-bottom:7px; font-size:.74rem; }
+    .fcred .top { display:flex; justify-content:space-between; font-weight:700; color:#0f172a; }
+    /* Respuestas rápidas "/" */
+    #quickBox { position:absolute; bottom:58px; left:12px; right:12px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 -6px 24px rgba(0,0,0,.12); max-height:220px; overflow-y:auto; display:none; z-index:50; }
+    .qitem { padding:9px 14px; cursor:pointer; border-bottom:1px solid #f8fafc; font-size:.8rem; }
+    .qitem:hover, .qitem.hov { background:#e7f6ef; }
+    .qitem b { color:#128C7E; display:block; font-size:.72rem; }
     .chat-pane { display:flex; flex-direction:column; background:#efeae2; }
     .chat-head { background:#f0f2f5; padding:10px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid #e5e7eb; flex-wrap:wrap; }
     .chat-body { flex:1; overflow-y:auto; padding:18px 22px; max-height:470px; }
@@ -91,11 +112,13 @@
       .page-banner { padding:14px 16px; gap:10px; } .page-banner i { font-size:1.6rem; } .conn-pill { display:none; }
       .grid2, .grid3 { grid-template-columns:1fr; }
       #secConfig > div { display:block !important; } #secConfig .card-box { margin-bottom:14px; }
-      .chat-wrap { display:block; min-height:0; }
+      .chat-wrap, .chat-wrap.con-ficha { display:block; min-height:0; }
       .conv-list { max-height:none; border-right:none; }
-      .chat-pane { display:none; }
+      .chat-pane, .ficha { display:none; }
       .chat-wrap.en-chat .conv-list { display:none; }
       .chat-wrap.en-chat .chat-pane { display:flex; min-height:78vh; }
+      .chat-wrap.en-ficha .chat-pane { display:none; }
+      .chat-wrap.en-ficha .ficha { display:block; max-height:none; min-height:78vh; }
       .chat-body { max-height:none; flex:1; }
       .btn-back { display:inline-block; }
       .bub { max-width:86%; }
@@ -132,23 +155,32 @@
 
   <!-- ═══ BANDEJA ═══ -->
   <div id="secBandeja">
-    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <input id="fQ" placeholder="Buscar teléfono, nombre o RUT…" style="flex:1;min-width:200px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:.85rem" onkeydown="if(event.key==='Enter')cargarConvs()">
+    <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+      <input id="fQ" placeholder="Buscar teléfono, nombre o RUT…" style="flex:1;min-width:180px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:.85rem" onkeydown="if(event.key==='Enter')cargarConvs()">
       <select id="fEstadoConv" onchange="cargarConvs()" style="border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:.84rem">
-        <option value="">Todas</option><option value="BOT">Atendidas por el bot</option><option value="DERIVADA">Derivadas / con agente</option><option value="CERRADA">Cerradas</option>
+        <option value="">Todas</option><option value="BOT">Con el bot</option><option value="DERIVADA">Con agente</option><option value="CERRADA">Cerradas</option>
       </select>
       <button class="btn-sec" onclick="cargarConvs()"><i class="bi bi-arrow-clockwise"></i></button>
     </div>
+    <div class="fchips" style="margin-bottom:12px">
+      <button class="fchip on" data-f="" onclick="filtro(this)">Todas</button>
+      <button class="fchip" data-f="mias" onclick="filtro(this)"><i class="bi bi-person me-1"></i>Mías</button>
+      <button class="fchip" data-f="COMERCIAL" onclick="filtro(this)">Comercial</button>
+      <button class="fchip" data-f="COBRANZA" onclick="filtro(this)">Cobranza</button>
+      <button class="fchip" data-f="OPERACIONES" onclick="filtro(this)">Operaciones</button>
+    </div>
     <div class="chat-wrap" id="chatWrap">
       <div class="conv-list" id="convList"><div class="empty">Cargando…</div></div>
-      <div class="chat-pane">
+      <div class="chat-pane" style="position:relative">
         <div class="chat-head" id="chatHead"><span style="color:#64748b;font-size:.85rem">Selecciona una conversación</span></div>
         <div class="chat-body" id="chatBody"></div>
+        <div id="quickBox"></div>
         <div class="chat-input" id="chatInput" style="display:none">
-          <input id="msgTxt" placeholder="Escribe una respuesta…" onkeydown="if(event.key==='Enter')enviarAgente()">
+          <input id="msgTxt" placeholder="Escribe una respuesta…  ( / para respuestas rápidas )" autocomplete="off">
           <button class="btn-w" onclick="enviarAgente()"><i class="bi bi-send"></i></button>
         </div>
       </div>
+      <div class="ficha" id="fichaPane" style="display:none"></div>
     </div>
   </div>
 
@@ -167,7 +199,14 @@
         </div>
       </div>
       <div class="fld" id="fldTelefonos"><label>Teléfonos (uno por línea o separados por coma)</label><textarea id="cTelefonos" placeholder="+56 9 1234 5678&#10;+56 9 8765 4321" oninput="previewAud()"></textarea></div>
-      <div class="fld"><label>Mensaje <span style="font-weight:400;color:#94a3b8">(al conectar con Meta debe corresponder a una plantilla HSM aprobada)</span></label><textarea id="cMensaje" placeholder="Hola, te recordamos que…"></textarea></div>
+      <div class="grid2" style="align-items:start">
+        <div class="fld"><label>Mensaje <span style="font-weight:400;color:#94a3b8">(al conectar con Meta debe corresponder a una plantilla HSM aprobada)</span></label><textarea id="cMensaje" placeholder="Hola, te recordamos que…" style="min-height:120px" oninput="previewMsg()"></textarea></div>
+        <div class="fld"><label>Así lo verá el cliente</label>
+          <div style="background:#efeae2 url() center;border-radius:12px;padding:18px 14px;min-height:120px">
+            <div class="bub out" style="margin-left:auto;max-width:95%"><div class="who CAMPANA">AutoFácil</div><span id="cPreview" style="white-space:pre-wrap;color:#9ca3af">Escribe el mensaje…</span><div class="bm">ahora ✓✓</div></div>
+          </div>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:14px">
         <button class="btn-w" onclick="guardarCampana()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
         <span id="audPreview" style="font-size:.8rem;color:#64748b"></span>
@@ -293,21 +332,43 @@
   }
 
   /* ═══ BANDEJA ═══ */
-  let CONV_SEL = null, POLL = null;
+  let CONV_SEL = null, POLL = null, FILTRO = '', _prevUnread = -1;
+  const AV_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444','#6366f1','#ec4899','#14b8a6','#f97316','#0141A2'];
+  const avColor = s => AV_COLORS[[...String(s||'?')].reduce((a,c)=>a+c.charCodeAt(0),0) % AV_COLORS.length];
+  const avIni = c => { const n=(c.nombre||'').trim(); return n ? n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase() : '#'; };
+
+  function filtro(btn){
+    document.querySelectorAll('.fchip').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on'); FILTRO = btn.dataset.f; cargarConvs();
+  }
+
+  // beep sutil al llegar mensajes nuevos + contador en el título de la pestaña
+  function beep(){ try { const x=new (window.AudioContext||window.webkitAudioContext)(); const o=x.createOscillator(), g=x.createGain();
+    o.type='sine'; o.frequency.value=880; g.gain.setValueAtTime(.25,x.currentTime); g.gain.exponentialRampToValueAtTime(.001,x.currentTime+.35);
+    o.connect(g).connect(x.destination); o.start(); o.stop(x.currentTime+.4); setTimeout(()=>x.close(),600); } catch(e){} }
+
   async function cargarConvs(){
     const q = document.getElementById('fQ').value.trim();
     const est = document.getElementById('fEstadoConv').value;
     const p = new URLSearchParams(); if(q)p.set('q',q); if(est)p.set('estado',est);
+    if (FILTRO==='mias') p.set('mias','1'); else if (FILTRO) p.set('area',FILTRO);
     const j = await (await fetch('/api/whatsapp/conversaciones?'+p,{headers:H})).json();
     const list = document.getElementById('convList');
     const rows = j.data||[];
+    const unread = rows.reduce((a,c)=>a+(c.no_leidos||0),0);
+    document.title = (unread?`(${unread}) `:'') + 'WhatsApp — AutoFácil';
+    if (_prevUnread >= 0 && unread > _prevUnread) beep();
+    _prevUnread = unread;
     list.innerHTML = rows.length ? rows.map(c=>`
       <div class="conv-item ${CONV_SEL===c.id?'sel':''}" onclick="abrirConv(${c.id})">
-        <div class="nm"><span>${esc(c.nombre||c.telefono)} ${c.es_simulada?'<span class="sim-badge">SIM</span>':''}</span>
-          <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span></div>
-        <div class="lm">${c.trigger_cat?`<span class="pill p-${esc(c.trigger_cat)}" style="margin-right:4px">${esc(c.trigger_cat)}</span>`:''}${esc(c.ultimo_msg||'')}</div>
-        <div style="font-size:.66rem;color:#94a3b8;margin-top:2px">${esc(c.telefono)} · ${fdt(c.ultima_actividad)}${c.asignada_nombre?' · '+esc(c.asignada_nombre):''}</div>
-      </div>`).join('') : '<div class="empty">Sin conversaciones aún.<br><span style="font-size:.75rem">Prueba el bot desde Configuración → Simulador</span></div>';
+        <div class="cavatar" style="background:${avColor(c.nombre||c.telefono)}">${avIni(c)}</div>
+        <div class="cbody">
+          <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.nombre||c.telefono)} ${c.es_simulada?'<span class="sim-badge">SIM</span>':''}</span>
+            <span style="display:flex;gap:5px;align-items:center;flex:0 0 auto">${c.no_leidos?`<span class="unread-dot">${c.no_leidos}</span>`:''}<span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span></span></div>
+          <div class="lm">${c.trigger_cat?`<span class="pill p-${esc(c.trigger_cat)}" style="margin-right:4px">${esc(c.trigger_cat)}</span>`:''}${esc(c.ultimo_msg||'')}</div>
+          <div style="font-size:.64rem;color:#94a3b8;margin-top:2px">${fdt(c.ultima_actividad)}${c.area?' · '+esc(c.area):''}${c.asignada_nombre?' · '+esc(c.asignada_nombre):''}</div>
+        </div>
+      </div>`).join('') : '<div class="empty">Sin conversaciones aquí.<br><span style="font-size:.75rem">Prueba el bot desde Configuración → Simulador</span></div>';
   }
 
   async function abrirConv(id){
@@ -317,18 +378,22 @@
     const c = j.data;
     document.querySelectorAll('.conv-item').forEach(e=>e.classList.remove('sel'));
     document.getElementById('chatWrap').classList.add('en-chat');
+    document.getElementById('chatWrap').classList.remove('en-ficha');
     document.getElementById('chatHead').innerHTML = `
       <button class="btn-back" onclick="volverLista()" title="Volver"><i class="bi bi-arrow-left"></i></button>
+      <div class="cavatar" style="background:${avColor(c.nombre||c.telefono)};width:32px;height:32px;flex:0 0 32px;font-size:.76rem">${avIni(c)}</div>
       <b style="font-size:.9rem">${esc(c.nombre||c.telefono)}</b>
       <span style="font-size:.74rem;color:#64748b">${esc(c.telefono)}${c.rut_cliente?' · '+esc(c.rut_cliente):''}</span>
       <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span>
       ${c.area?`<span style="font-size:.72rem;color:#64748b">Área: <b>${esc(c.area)}</b></span>`:''}
       <span style="margin-left:auto;display:flex;gap:6px">
+        ${c.rut_cliente?`<button class="btn-sec" style="padding:4px 10px;font-size:.74rem" onclick="toggleFicha(${c.id})" title="Ficha del cliente"><i class="bi bi-person-vcard"></i></button>`:''}
         ${c.estado!=='CERRADA'?`<button class="btn-sec" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'TOMAR')"><i class="bi bi-person-check me-1"></i>Tomar</button>`:''}
         ${c.estado==='DERIVADA'?`<button class="btn-sec" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'BOT')"><i class="bi bi-robot me-1"></i>Volver al bot</button>`:''}
         ${c.estado!=='CERRADA'?`<button class="btn-red" style="padding:4px 10px;font-size:.74rem" onclick="accion(${c.id},'CERRAR')">Cerrar</button>`:''}
       </span>`;
     document.getElementById('chatBody').innerHTML = pintarMsgs(c.mensajes);
+    if (c.rut_cliente) cargarFicha(c.id); else ocultarFicha();
     // Ventana de envío (regla Meta): cerrada → no se puede escribir en esta conversación
     const vAbierta = c.es_simulada || !c.ventana || c.ventana.abierta;
     document.getElementById('chatInput').style.display = (c.estado!=='CERRADA' && vAbierta) ? 'flex' : 'none';
@@ -341,14 +406,72 @@
     cargarConvs();
   }
 
+  function etiquetaDia(iso){
+    const d = new Date(iso), hoy = new Date();
+    const dS = d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'});
+    const hS = hoy.toLocaleDateString('es-CL',{timeZone:'America/Santiago'});
+    const ayer = new Date(hoy.getTime()-86400000).toLocaleDateString('es-CL',{timeZone:'America/Santiago'});
+    if (dS===hS) return 'Hoy'; if (dS===ayer) return 'Ayer';
+    return d.toLocaleDateString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'long',year:'numeric'});
+  }
+  const fhora = s => s ? new Date(s).toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}) : '';
+
   function pintarMsgs(msgs){
-    return (msgs||[]).map(m=>{
+    let dia = null, html = '';
+    (msgs||[]).forEach(m=>{
+      const d = etiquetaDia(m.created_at);
+      if (d!==dia){ html += `<div class="fecha-sep"><span>${d}</span></div>`; dia = d; }
       const out = m.direccion==='OUT';
       const who = out ? (m.origen==='AGENTE' ? (m.autor_nombre||'Agente') : m.origen==='CAMPANA' ? 'Campaña' : 'Bot') : '';
-      return `<div class="bub ${out?'out':'in'}">
+      html += `<div class="bub ${out?'out':'in'}">
         ${out?`<div class="who ${esc(m.origen)}">${esc(who)}${m.estado_envio==='SIMULADO'?' · simulado':m.estado_envio==='ERROR'?' · ⚠ error':''}</div>`:''}
-        ${esc(m.mensaje)}<div class="bm">${fdt(m.created_at)}</div></div>`;
-    }).join('') || '<div class="empty">Sin mensajes</div>';
+        ${esc(m.mensaje)}<div class="bm">${fhora(m.created_at)}</div></div>`;
+    });
+    return html || '<div class="empty">Sin mensajes</div>';
+  }
+
+  /* ── Ficha lateral del cliente ── */
+  async function cargarFicha(id){
+    try {
+      const j = await (await fetch(`/api/whatsapp/conversaciones/${id}/ficha`,{headers:H})).json();
+      const p = document.getElementById('fichaPane');
+      if (!j.success || !j.data.identificado){ ocultarFicha(); return; }
+      const cli = j.data.cliente||{}, creds = j.data.creditos||[];
+      const CART_COL = { VIGENTE:'#16a34a', MORA:'#d97706', 'EN MORA':'#d97706', VENCIDO:'#dc2626', PREPAGADO:'#7c3aed', CASTIGADO:'#111827' };
+      p.innerHTML = `
+        <button class="btn-back" onclick="document.getElementById('chatWrap').classList.remove('en-ficha')"><i class="bi bi-arrow-left"></i> Volver al chat</button>
+        <div style="text-align:center;padding:8px 0 4px">
+          <div class="cavatar" style="background:${avColor(cli.nombre_completo)};width:56px;height:56px;margin:0 auto 8px;font-size:1.2rem">${(cli.nombre_completo||'?').split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()}</div>
+          <div style="font-weight:800;font-size:.9rem;color:#0f172a">${esc(cli.nombre_completo||'—')}</div>
+          <div style="font-size:.74rem;color:#64748b">${esc(cli.rut||'')}</div>
+        </div>
+        <h6><i class="bi bi-person-lines-fill me-1"></i>Contacto</h6>
+        <div class="dato">📱 <b>${esc(cli.telefono_movil||'—')}</b></div>
+        <div class="dato">✉️ ${esc(cli.correo||cli.email||'—')}</div>
+        <h6><i class="bi bi-credit-card me-1"></i>Créditos (${creds.length})</h6>
+        ${creds.length ? creds.map(c=>`
+          <div class="fcred">
+            <div class="top"><span>OP ${esc(c.num_op)}</span><span style="color:#059669">$${Math.round(c.monto_financiado||0).toLocaleString('es-CL')}</span></div>
+            <div style="color:#64748b;margin-top:2px">${esc(c.financiera||'')} · ${esc(c.fecha||'')} · ${c.plazo?c.plazo+'m':''}</div>
+            <div style="margin-top:3px">
+              <span class="pill" style="background:#f1f5f9;color:#334155">${esc(c.estado_credito||c.estado||'—')}</span>
+              ${c.estado_cartera?`<span class="pill" style="background:${CART_COL[c.estado_cartera]||'#64748b'};color:#fff">${esc(c.estado_cartera)}</span>`:''}
+            </div>
+          </div>`).join('') : '<div style="font-size:.76rem;color:#94a3b8">Sin créditos registrados</div>'}
+        <div style="margin-top:10px;text-align:center"><a href="/creditos/?q=${encodeURIComponent(cli.rut||'')}" target="_blank" style="font-size:.74rem;color:#128C7E;font-weight:700">Ver en Créditos <i class="bi bi-box-arrow-up-right"></i></a></div>`;
+      p.style.display = 'block';
+      document.getElementById('chatWrap').classList.add('con-ficha');
+    } catch(e){ ocultarFicha(); }
+  }
+  function ocultarFicha(){
+    document.getElementById('fichaPane').style.display = 'none';
+    document.getElementById('chatWrap').classList.remove('con-ficha','en-ficha');
+  }
+  function toggleFicha(id){
+    const w = document.getElementById('chatWrap');
+    if (window.innerWidth <= 768){ w.classList.toggle('en-ficha'); if (w.classList.contains('en-ficha')) cargarFicha(id); }
+    else if (w.classList.contains('con-ficha')) ocultarFicha();
+    else cargarFicha(id);
   }
 
   async function enviarAgente(){
@@ -369,11 +492,51 @@
 
   function volverLista(){
     CONV_SEL = null;
-    document.getElementById('chatWrap').classList.remove('en-chat');
+    document.getElementById('chatWrap').classList.remove('en-chat','en-ficha');
     cargarConvs();
   }
 
+  /* ── Respuestas rápidas: escribe "/" para insertar una respuesta configurada ── */
+  let QUICK = [];
+  async function cargarQuick(){
+    try { const j = await (await fetch('/api/whatsapp/respuestas',{headers:H})).json();
+      QUICK = (j.data||[]).filter(r=>r.activo); } catch(e){}
+  }
+  const msgInput = document.getElementById('msgTxt'), quickBox = document.getElementById('quickBox');
+  msgInput.addEventListener('keydown', e=>{
+    if (quickBox.style.display==='block'){
+      const items=[...quickBox.querySelectorAll('.qitem')]; let i=items.findIndex(x=>x.classList.contains('hov'));
+      if (e.key==='ArrowDown'){ e.preventDefault(); items[i]?.classList.remove('hov'); items[Math.min(i+1,items.length-1)]?.classList.add('hov'); return; }
+      if (e.key==='ArrowUp'){ e.preventDefault(); items[i]?.classList.remove('hov'); items[Math.max(i-1,0)]?.classList.add('hov'); return; }
+      if (e.key==='Enter'){ e.preventDefault(); (items[i]||items[0])?.click(); return; }
+      if (e.key==='Escape'){ quickBox.style.display='none'; return; }
+    }
+    if (e.key==='Enter') enviarAgente();
+  });
+  msgInput.addEventListener('input', ()=>{
+    const v = msgInput.value;
+    if (v.startsWith('/')){
+      const q = v.slice(1).toLowerCase();
+      const hits = QUICK.filter(r=>r.nombre.toLowerCase().includes(q) || r.respuesta.toLowerCase().includes(q)).slice(0,6);
+      if (hits.length){
+        quickBox.innerHTML = hits.map((r,i)=>`<div class="qitem ${i===0?'hov':''}" onclick="usarQuick(${r.id})"><b>/${esc(r.nombre)}</b>${esc(r.respuesta.slice(0,90))}${r.respuesta.length>90?'…':''}</div>`).join('');
+        quickBox.style.display='block'; return;
+      }
+    }
+    quickBox.style.display='none';
+  });
+  window.usarQuick = id => {
+    const r = QUICK.find(x=>x.id===id); if (!r) return;
+    msgInput.value = r.respuesta; quickBox.style.display='none'; msgInput.focus();
+  };
+
   /* ═══ CAMPAÑAS ═══ */
+  function previewMsg(){
+    const v = document.getElementById('cMensaje').value;
+    const el = document.getElementById('cPreview');
+    el.textContent = v || 'Escribe el mensaje…';
+    el.style.color = v ? '#111b21' : '#9ca3af';
+  }
   async function previewAud(){
     const tipo = document.getElementById('cAudiencia').value;
     document.getElementById('fldTelefonos').style.display = tipo==='MANUAL' ? '' : 'none';
@@ -576,6 +739,7 @@
   /* init */
   simReset();
   cargarConvs();
+  cargarQuick();
   // ¿conectado a Meta? — si el config endpoint responde y hay envíos reales lo sabremos por los estados; el pill es informativo
   const params = new URLSearchParams(location.search);
   if (params.get('conv')) { tab('bandeja'); abrirConv(parseInt(params.get('conv'))); }
