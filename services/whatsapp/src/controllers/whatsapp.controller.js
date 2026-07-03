@@ -249,6 +249,7 @@ async function responder(conv, texto, origen = 'BOT', autor = null) {
     const r = await enviarWhatsApp({ telefono: conv.telefono, texto });
     estado = r.simulado ? 'SIMULADO' : (r.ok ? 'ENVIADO' : 'ERROR');
     wamid = r.wamid || null;
+    if (!r.ok) console.error(`[whatsapp] envío falló a ${conv.telefono}: ${r.error}`);
   }
   await guardarMensaje(conv.id, { direccion: 'OUT', origen, mensaje: texto, autor_id: autor?.id_usuario || null, autor_nombre: autor ? nombreDe(autor) : null, estado_envio: estado, wamid });
   return estado;
