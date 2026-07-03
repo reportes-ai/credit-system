@@ -168,7 +168,8 @@ exports.resumen = async (req, res) => {
               (SELECT COUNT(*) FROM cuotas_credito q WHERE q.id_credito=c.id) tiene_cal,
               (SELECT COUNT(*) FROM cuotas_credito q WHERE q.id_credito=c.id AND q.estado_cuota='PAGADA') pagadas_cal,
               (SELECT COUNT(DISTINCT p.numero_cuota) FROM pagos_credito p WHERE p.id_credito=c.id AND (p.estado_pago IS NULL OR p.estado_pago!='REVERSADO')) pagadas_app
-         FROM creditos c WHERE c.id_cliente=? AND COALESCE(c.estado_eval,'') != 'ANULADO'
+         FROM creditos c
+        WHERE c.id_cliente=? AND c.financiera='AUTOFACIL' AND c.estado_credito='OTORGADO'
         ORDER BY COALESCE(c.fecha_otorgado, c.fecha_estado, c.mes) DESC LIMIT 20`, [cli.id_cliente]);
     res.json({ success: true, data: { nombre: cli.nombre_completo, creditos: creds }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -179,8 +180,10 @@ exports.detalle = async (req, res) => {
   try {
     const cli = await buscarCliente(req.clienteRut);
     const [[cred]] = await pool.query(
-      `SELECT c.* FROM creditos c WHERE c.id=? AND c.id_cliente=? LIMIT 1`, [req.params.id, cli?.id_cliente || -1]);
-    if (!cred) return res.status(404).json({ success: false, error: 'Crédito no encontrado' }); // o no es tuyo
+      `SELECT c.* FROM creditos c
+        WHERE c.id=? AND c.id_cliente=? AND c.financiera='AUTOFACIL' AND c.estado_credito='OTORGADO' LIMIT 1`,
+      [req.params.id, cli?.id_cliente || -1]);
+    if (!cred) return res.status(404).json({ success: false, error: 'Crédito no encontrado' }); // no es tuyo o no es cartera AutoFácil
 
     // Tabla de desarrollo: calendario CONGELADO (fuente única cuotas_credito)
     const [cal] = await pool.query(
