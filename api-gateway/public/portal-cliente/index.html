@@ -121,7 +121,13 @@
       <div id="dCreditos"><p class="sub">Cargando…</p></div>
     </div>
     <div class="card">
-      <h5 style="margin-top:0"><i class="bi bi-chat-dots"></i> Contacto</h5>
+      <div id="dPagoBlock" style="display:none">
+        <h5 style="margin-top:0"><i class="bi bi-geo-alt"></i> ¿Dónde y cómo pagar?</h5>
+        <div class="info-box" id="dDondePagar">Cargando…</div>
+        <h5><i class="bi bi-bank"></i> Datos para transferencia</h5>
+        <div class="info-box" id="dTransferencia">Cargando…</div>
+      </div>
+      <h5 id="dContactoTit" style="margin-top:0"><i class="bi bi-chat-dots"></i> Contacto</h5>
       <div class="info-box" id="dContacto">Cargando…</div>
     </div>
   </div>
@@ -273,7 +279,17 @@
       }).join('') : '<p class="sub">No encontramos créditos asociados a tu RUT.</p>';
       const ri = await fetch('/api/portal-cliente/info-pago',{headers:HJ()});
       const ji = await ri.json();
-      if (ji.success){ $('dContacto').textContent=ji.data.contacto||'—'; }
+      if (ji.success){
+        $('dContacto').textContent=ji.data.contacto||'—';
+        // "Dónde pagar" y "Datos para transferencia" solo si el cliente tiene cartera AutoFácil
+        const tieneAF = creds.some(c => (c.financiera||'').toUpperCase()==='AUTOFACIL');
+        if (tieneAF){
+          $('dDondePagar').textContent=ji.data.donde_pagar||'—';
+          $('dTransferencia').textContent=ji.data.datos_transferencia||'—';
+          $('dPagoBlock').style.display='';
+          $('dContactoTit').style.marginTop='';
+        }
+      }
     } catch(e){ $('dCreditos').innerHTML='<p class="sub">Error cargando tus créditos. Intenta de nuevo.</p>'; }
   }
 
