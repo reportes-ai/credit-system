@@ -82,12 +82,7 @@
     <p>Operaciones con factura recibida: revisa, copia y emite la orden de pago de comisión.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
-  <a href="/postventa/fundantes-pendientes/" class="module-card" id="cardFund" style="display:none">
-    <div class="card-icon"><i class="bi bi-folder2-open"></i></div>
-    <h5>Fundantes Pendientes</h5>
-    <p>Operaciones con documentos fundantes aún pendientes de recibir o enviar.</p>
-    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
-  </a>
+  <!-- Card 'Fundantes Pendientes' retirada jul-2026: redundante con Seguimiento Fundantes (420001) -->
   <a href="/postventa/consulta-saldos/" class="module-card" id="cardConsSaldo" style="display:none">
     <div class="card-icon"><i class="bi bi-search"></i></div>
     <h5>Consulta Estado Saldos Precio</h5>
@@ -144,7 +139,6 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardPagar').style.display='';     alguna=true; }
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardOrdenPago').style.display=''; alguna=true; }
   if (tiene('postventa_comisiones_pagar'))  { document.getElementById('cardComPagar').style.display='';  document.getElementById('cardOrdenCom').style.display=''; alguna=true; }
-  if (tiene('postventa_fundantes'))         { document.getElementById('cardFund').style.display='';      alguna=true; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_factura'))  { document.getElementById('cardConsFact').style.display='';  alguna=true; }
   if (tiene('aprob_cartolas'))              { document.getElementById('cardCartolas').style.display=''; document.getElementById('cardEnviadas').style.display=''; alguna=true; }

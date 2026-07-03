@@ -1692,7 +1692,8 @@ const getUsuariosByPerfil = async (req, res) => {
       ['Seguimiento Saldos y Comisiones',     'postventa_seguimiento',  null],
       ['Mantenedores Post Venta',             'postventa_mantenedores', null],
       ['Saldos Precios a Pagar',              'postventa_saldos_pagar', null],
-      ['Fundantes Pendientes',                'postventa_fundantes',         null],
+      // 'Fundantes Pendientes' (postventa_fundantes) retirado jul-2026: redundante con el
+      // módulo Seguimiento Fundantes (420001), que ya marca la etapa FUNDANTES RECIBIDOS.
       ['Consulta Estado Saldos Precio',       'postventa_consulta_saldos',   null],
       ['Consulta Estado Factura',             'postventa_consulta_factura',  null],
     ];
