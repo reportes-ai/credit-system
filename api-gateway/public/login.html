@@ -224,8 +224,13 @@
   </div>
 
   <script>
-    // Si ya hay sesión, redirigir al inicio
-    if (sessionStorage.getItem('token')) window.location.href = '/';
+    // Destino post-login: soporta ?next=/ruta (solo rutas locales; lo usa la app dedicada de WhatsApp)
+    const _next = (() => {
+      const n = new URLSearchParams(location.search).get('next') || '/';
+      return (n.startsWith('/') && !n.startsWith('//')) ? n : '/';
+    })();
+    // Si ya hay sesión, redirigir al destino
+    if (sessionStorage.getItem('token')) window.location.href = _next;
 
     // Clave usada al ingresar — sirve como "contraseña actual" en el cambio obligatorio.
     // La sesión NO se persiste hasta cambiar la clave (evita saltarse el paso recargando).
@@ -236,7 +241,7 @@
     function dissolveEntrar() {
       document.querySelector('.login-card').classList.add('dissolving');
       document.getElementById('bgOverlay').classList.add('active');
-      setTimeout(() => { window.location.href = '/'; }, 780);
+      setTimeout(() => { window.location.href = _next; }, 780);
     }
 
     document.getElementById('togglePass').addEventListener('click', () => {

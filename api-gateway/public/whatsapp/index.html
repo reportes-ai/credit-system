@@ -5,7 +5,10 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
+  <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
+  <link rel="manifest" href="/whatsapp/manifest.json">
+  <meta name="theme-color" content="#075E54">
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -262,7 +265,7 @@
 <script>
   const token = sessionStorage.getItem('token');
   const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
-  if (!token || !yo) location.href = '/login.html';
+  if (!token || !yo) location.href = '/login.html?next=' + encodeURIComponent('/whatsapp/');
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
   function logout(){ sessionStorage.clear(); location.href='/login.html'; }
