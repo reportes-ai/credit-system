@@ -154,7 +154,7 @@ const SELECT_GESTION = `
     -- Fecha mostrada: otorgamiento; si no se cursó, el MES de la operación (no la fecha de inserción)
     -- Como STRING: COALESCE(DATE, TIMESTAMP) mezclado lo rompe el driver mysql2 (devuelve null);
     -- 'T12:00:00' sin Z para que el navegador lo parsee en hora local (sin off-by-one de timezone)
-    CONCAT(DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at),'%Y-%m-%d'),'T12:00:00') AS fecha_otorgamiento,
+    CONCAT(DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at),'%Y-%m-%d'),'T12:00:00') AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
     ob.monto_financiado,
@@ -404,8 +404,8 @@ const getAll = async (req, res) => {
     // Rango de fecha (sobre la fecha mostrada: fecha_otorgado con fallback created_at)
     const fd = /^\d{4}-\d{2}-\d{2}$/.test(fecha_desde || '') ? fecha_desde : null;
     const fh = /^\d{4}-\d{2}-\d{2}$/.test(fecha_hasta || '') ? fecha_hasta : null;
-    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)) >= ?`; paramsBase.push(fd); }
-    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)) <= ?`; paramsBase.push(fh); }
+    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at)) >= ?`; paramsBase.push(fd); }
+    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at)) <= ?`; paramsBase.push(fh); }
 
     // ── ESTADO de cartera EN VIVO (reusa carteraLiveRow; los propios son pocos) ──
     // Se calcula UNA vez y se usa para el filtro y los conteos de los chips de cartera,
