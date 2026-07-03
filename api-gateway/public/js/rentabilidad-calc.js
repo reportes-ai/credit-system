@@ -34,7 +34,12 @@
     if (plazo <= 24) return (P['seg_com_' + tipo + '_24'] || 0) / 100;
     return              (P['seg_com_' + tipo + '_36'] || 0) / 100;
   };
+  // Pizarra dealer: delega en el MOTOR ÚNICO /js/comision-dealer.js (AF_COM_DEALER);
+  // copia local solo como fallback si el motor no está cargado en la página.
+  const _CD = (typeof window !== 'undefined' && window.AF_COM_DEALER) ||
+              (typeof module !== 'undefined' ? (() => { try { return require('./comision-dealer'); } catch (_) { return null; } })() : null);
   const dealerPctPizarra = (P, plazo) => {
+    if (_CD) return _CD.pizarraParque(plazo, P);
     if (plazo <= 6)  return (P.dealer_pct_6  || 0) / 100;
     if (plazo <= 12) return (P.dealer_pct_12 || 0) / 100;
     if (plazo <= 24) return (P.dealer_pct_24 || 0) / 100;
@@ -42,6 +47,7 @@
     return (P.dealer_pct_99 || 0) / 100;
   };
   const dealerCallePctPizarra = (P, plazo) => {
+    if (_CD) return _CD.pizarraCalle(plazo, P);
     const patio = (P.patio_pct || 0) / 100;
     const fb = dealerPctPizarra(P, plazo) + patio;
     if (plazo <= 6)  return P.dealer_calle_pct_6  != null ? P.dealer_calle_pct_6  / 100 : fb;

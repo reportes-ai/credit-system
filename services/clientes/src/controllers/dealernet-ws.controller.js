@@ -928,11 +928,11 @@ const auditoria = async (req, res) => {
 
 /* ── Costos en UF + facturación prepago ───────────────────────────────────── */
 async function ufUltimoDiaMes(mes) {
+  const { getUF } = require('../../../../shared/uf');   // MOTOR ÚNICO de UF por fecha
   const [y, m] = mes.split('-').map(Number);
   const lastDay = new Date(y, m, 0).getDate();
   const fstr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-  const [[u]] = await pool.query('SELECT valor FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fstr]);
-  return u ? Number(u.valor) : 0;
+  return (await getUF(fstr)) || 0;
 }
 function mesAnterior() {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1);
