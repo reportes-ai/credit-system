@@ -151,7 +151,8 @@ const SELECT_GESTION = `
       SELECT MIN(cc.fecha_vencimiento) FROM cuotas_credito cc
        WHERE cc.id_credito = ob.id AND cc.estado_cuota <> 'PAGADA'
          AND cc.fecha_vencimiento <= CURDATE())), 0)           AS dias_atraso,
-    ob.fecha_otorgado                                          AS fecha_otorgamiento,
+    -- Fecha mostrada: otorgamiento; si no se cursó, el MES de la operación (no la fecha de inserción)
+    COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)         AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
     ob.monto_financiado,
@@ -401,8 +402,8 @@ const getAll = async (req, res) => {
     // Rango de fecha (sobre la fecha mostrada: fecha_otorgado con fallback created_at)
     const fd = /^\d{4}-\d{2}-\d{2}$/.test(fecha_desde || '') ? fecha_desde : null;
     const fh = /^\d{4}-\d{2}-\d{2}$/.test(fecha_hasta || '') ? fecha_hasta : null;
-    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) >= ?`; paramsBase.push(fd); }
-    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.created_at)) <= ?`; paramsBase.push(fh); }
+    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)) >= ?`; paramsBase.push(fd); }
+    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at)) <= ?`; paramsBase.push(fh); }
 
     // ── ESTADO de cartera EN VIVO (reusa carteraLiveRow; los propios son pocos) ──
     // Se calcula UNA vez y se usa para el filtro y los conteos de los chips de cartera,
