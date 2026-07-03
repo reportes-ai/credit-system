@@ -547,7 +547,7 @@ function renderConsulta(list) {
     <table class="cred-table" style="min-width:0;width:100%;table-layout:auto">
       <thead>
         <tr>
-          ${sTh('N° Operación','numero_credito')}
+          ${sTh('N° OP','numero_credito')}
           ${sTh('RUT','rut_cliente')}
           ${sTh('Cliente','nombre_cliente')}
           ${sTh('Financiera','financiera')}
@@ -566,7 +566,7 @@ function renderConsulta(list) {
         ${list.map(c => `
         <tr>
           <td class="num-cred">${c.numero_credito||'—'}</td>
-          <td class="mono">${c.rut_cliente||'—'}</td>
+          <td class="mono" style="white-space:nowrap">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
           <td>${finTag(c.financiera)}</td>
           <td class="mono" style="font-size:.78rem;color:#6b7280">${c.id_financiera||'—'}</td>
