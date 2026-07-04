@@ -266,7 +266,19 @@
         <div style="font-weight:800;color:#0f172a"><i class="bi bi-file-earmark-text me-1"></i>Plantillas de mensaje (HSM)</div>
         <button class="btn-w" onclick="nuevaPlantilla()"><i class="bi bi-plus-lg me-1"></i>Nueva plantilla</button>
       </div>
-      <p style="font-size:.8rem;color:#64748b">Las plantillas se envían a <b>aprobación de Meta desde aquí</b> (quedan PENDIENTE hasta que Meta las revise, normalmente minutos a horas). Solo con plantilla APROBADA se puede escribir a un cliente fuera de la ventana de 24h (campañas, cobranza). Usa variables <code>{{1}}</code>, <code>{{2}}</code>… para personalizar.</p>
+      <p style="font-size:.8rem;color:#64748b">Las plantillas se envían a <b>aprobación de Meta desde aquí</b> (quedan PENDIENTE hasta que Meta las revise, normalmente minutos a horas; el estado se actualiza solo en esta lista). Solo con plantilla APROBADA se puede escribir a un cliente fuera de la ventana de 24h (campañas, cobranza). Usa variables <code>{{1}}</code>, <code>{{2}}</code>… para personalizar.</p>
+      <details style="background:#f8fafc;border-left:4px solid #128C7E;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.78rem;color:#475569">
+        <summary style="font-weight:800;color:#0f172a;cursor:pointer"><i class="bi bi-question-circle me-1"></i>¿Qué debe cumplir una plantilla para que Meta la apruebe?</summary>
+        <ul style="margin:8px 0 4px;padding-left:18px;line-height:1.6">
+          <li><b>Nombre</b>: solo minúsculas, números y guión bajo (ej: <code>recordatorio_cuota</code>).</li>
+          <li><b>Categoría correcta</b>: <b>UTILITY</b> = transaccional sobre algo que el cliente ya tiene (recordatorio de cuota, aviso de estado). <b>MARKETING</b> = promociones y ofertas. Una promoción disfrazada de UTILITY se rechaza.</li>
+          <li><b>Variables</b> <code>{{1}}, {{2}}…</code>: numeradas en orden y sin saltos; el mensaje <b>no puede empezar ni terminar</b> con una variable, ni tener dos seguidas; cada una necesita un <b>ejemplo</b> realista.</li>
+          <li><b>Contenido</b>: nada engañoso ni amenazante (en cobranza: recordar con respeto, nunca amenazar); no pedir contraseñas ni datos de tarjeta; sin URLs acortadas (bit.ly); prohibido alcohol/armas/apuestas/cripto.</li>
+          <li><b>Calidad</b>: buena ortografía, sin MAYÚSCULAS sostenidas ni "!!!", máximo 1024 caracteres. Formato WhatsApp: *negrita*, _cursiva_.</li>
+          <li><b>Si Meta rechaza</b>: el motivo aparece en esta lista; se corrige y se vuelve a enviar con otro nombre (o editando tras 24 h).</li>
+        </ul>
+        El botón <b>Revisar con IA</b> valida todo esto ANTES de enviar — es obligatorio y evita rechazos que dañan la reputación del número.
+      </details>
       <div id="plantillasList"><div class="empty">Cargando…</div></div>
     </div>
   </div>
@@ -462,16 +474,54 @@
       <textarea id="plCuerpo" rows="4" placeholder="Hola {{1}}, te recordamos que tu cuota de {{2}} vence el {{3}}. Puedes pagar en..." style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0 10px;box-sizing:border-box"></textarea>
       <label style="font-size:.76rem;font-weight:700">Ejemplos de las variables (uno por línea, en orden)</label>
       <textarea id="plEj" rows="3" placeholder="Juan Pérez&#10;$185.000&#10;05-08-2026" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0;box-sizing:border-box"></textarea>
+      <button id="plBtnIA" onclick="revisarPlantillaIA()" style="width:100%;margin-top:10px;background:#7c3aed;color:#fff;border:none;border-radius:9px;padding:10px;font-weight:700;font-size:.86rem;cursor:pointer"><i class="bi bi-stars me-1"></i>Revisar con IA (obligatorio)</button>
+      <div id="plIARes" style="display:none;margin-top:10px;border-radius:9px;padding:10px 14px;font-size:.78rem"></div>
     `, async ()=>{
-      const body = { nombre: val('plNombre'), categoria: document.getElementById('plCat').value,
-        cuerpo: document.getElementById('plCuerpo').value.trim(),
-        ejemplos: document.getElementById('plEj').value.split('\n').map(s=>s.trim()).filter(Boolean) };
+      const body = plPayload();
+      if (JSON.stringify(body) !== window._plOkHash) { alert('La plantilla cambió después de la revisión — revísala con IA de nuevo.'); return; }
       const j = await (await fetch('/api/whatsapp/plantillas',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
       if (!j.success) { alert(j.error||'Error'); return; }
       document.getElementById('dlg').close();
-      alert(`Plantilla "${j.data.nombre}" enviada a aprobación de Meta ✓ (estado: ${j.data.status})`);
+      alert(`Plantilla "${j.data.nombre}" enviada a aprobación de Meta ✓ (estado: ${j.data.status}). El resultado aparecerá en la lista.`);
       cargarPlantillas();
     });
+    // Enviar bloqueado hasta que la revisión IA apruebe (y se invalida si cambia el contenido)
+    window._plOkHash = null;
+    const save = document.getElementById('dlgSave');
+    save.disabled = true; save.style.opacity = .5; save.title = 'Primero revisa con IA';
+    save.innerHTML = '<i class="bi bi-send me-1"></i>Enviar a aprobación de Meta';
+    ['plNombre','plCat','plCuerpo','plEj'].forEach(id => document.getElementById(id).addEventListener('input', () => {
+      window._plOkHash = null; save.disabled = true; save.style.opacity = .5;
+      const r = document.getElementById('plIARes'); if (r) r.style.display = 'none';
+    }));
+  }
+  const plPayload = () => ({ nombre: val('plNombre'), categoria: document.getElementById('plCat').value,
+    cuerpo: document.getElementById('plCuerpo').value.trim(),
+    ejemplos: document.getElementById('plEj').value.split('\n').map(s=>s.trim()).filter(Boolean) });
+  async function revisarPlantillaIA(){
+    const btn = document.getElementById('plBtnIA'), box = document.getElementById('plIARes'), save = document.getElementById('dlgSave');
+    const body = plPayload();
+    if (!body.cuerpo) { alert('Escribe el cuerpo del mensaje primero.'); return; }
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Revisando con IA…';
+    try {
+      const j = await (await fetch('/api/whatsapp/plantillas/revisar',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Revisar con IA (obligatorio)';
+      box.style.display = 'block';
+      if (!j.success) { box.style.background='#fef2f2'; box.style.color='#dc2626'; box.textContent = j.error||'Error'; return; }
+      const d = j.data;
+      if (d.cumple) {
+        window._plOkHash = JSON.stringify(body);
+        save.disabled = false; save.style.opacity = 1; save.title = '';
+        box.style.background='#f0fdf4'; box.style.color='#166534';
+        box.innerHTML = `<b>✅ Cumple las políticas de Meta.</b> Ya puedes enviarla a aprobación.` +
+          (d.categoria_correcta && d.categoria_correcta !== body.categoria ? `<br>⚠️ Ojo: la IA sugiere categoría <b>${esc(d.categoria_correcta)}</b>.` : '') +
+          ((d.sugerencias||[]).length ? `<br><b>Sugerencias:</b><br>• ${d.sugerencias.map(esc).join('<br>• ')}` : '');
+      } else {
+        box.style.background='#fef2f2'; box.style.color='#991b1b';
+        box.innerHTML = `<b>❌ No cumple — corrige antes de enviar:</b><br>• ${(d.problemas||[]).map(esc).join('<br>• ')}` +
+          (d.version_corregida ? `<br><br><b>Propuesta corregida:</b><br><span style="white-space:pre-wrap">${esc(d.version_corregida)}</span><br><button onclick="document.getElementById('plCuerpo').value=this.dataset.v;this.closest('div').style.display='none'" data-v="${esc(d.version_corregida)}" style="margin-top:6px;background:#128C7E;color:#fff;border:none;border-radius:7px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer">Usar esta versión</button>` : '');
+      }
+    } catch(e){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Revisar con IA (obligatorio)'; alert('Error de conexión'); }
   }
   async function delPlantilla(nombre){
     if (!confirm(`¿Eliminar la plantilla "${nombre}" de Meta?`)) return;

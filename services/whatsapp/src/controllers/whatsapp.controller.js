@@ -53,6 +53,12 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
     descripcion: 'Responde los WhatsApp entrantes conversando con IA (los triggers de derivación siguen mandando); si está apagada, el bot usa solo las respuestas por palabra clave',
     modelo: 'claude-haiku-4-5',
   });
+  // Revisor de plantillas HSM: valida contra las políticas de Meta ANTES de enviarlas a aprobación
+  ia.registrarFuncionalidad({
+    codigo: 'wsp_plantillas', nombre: 'Revisor de plantillas HSM (Meta)',
+    descripcion: 'Revisa que una plantilla de WhatsApp cumpla las políticas de Meta (categoría, variables, contenido) antes de enviarla a aprobación — evita rechazos',
+    modelo: 'claude-sonnet-5',
+  });
 
   try {
     await pool.query(`
@@ -374,6 +380,42 @@ exports.crearPlantilla = async (req, res) => {
       detalle: `Envió a aprobación de Meta la plantilla HSM "${nombre}" (${categoria})` });
     res.json({ success: true, data: { id: j.id, status: j.status || 'PENDING', nombre }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+/* Revisión IA obligatoria: valida la plantilla contra las políticas de Meta con
+   Sonnet ANTES de permitir enviarla a aprobación (evita rechazos y strikes). */
+exports.revisarPlantilla = async (req, res) => {
+  try {
+    const { nombre, categoria, cuerpo, ejemplos } = req.body || {};
+    if (!cuerpo || !String(cuerpo).trim()) return res.status(400).json({ success: false, data: null, error: 'Falta el cuerpo del mensaje' });
+    const r = await anthropic.analizar({
+      codigo: 'wsp_plantillas', id_usuario: req.usuario?.id_usuario, json: true, max_tokens: 900,
+      system: `Eres un experto en las políticas de plantillas de mensajes (HSM) de WhatsApp Business / Meta. Revisas plantillas ANTES de enviarlas a aprobación para evitar rechazos. Reglas que verificas:
+1. NOMBRE: solo minúsculas, números y guión bajo.
+2. CATEGORÍA correcta — UTILITY: transaccional, relacionada a una cuenta/pedido/pago existente del cliente (recordatorios de cuota, avisos de estado). MARKETING: promociones, ofertas, invitaciones a comprar. Una plantilla promocional categorizada como UTILITY se RECHAZA.
+3. VARIABLES {{n}}: numeradas secuencialmente desde {{1}} sin saltos; el mensaje NO puede empezar ni terminar con una variable; no puede haber dos variables adyacentes sin texto entre medio; cada variable necesita un ejemplo coherente.
+4. CONTENIDO PROHIBIDO: nada engañoso, amenazante u hostigador (incluso en cobranza: se puede recordar un pago con respeto, no amenazar); sin pedir datos sensibles (contraseñas, número completo de tarjeta); sin alcohol, armas, apuestas, cripto, suplementos; sin URLs acortadas (bit.ly etc.).
+5. CALIDAD: ortografía y gramática correctas (español de Chile), sin MAYÚSCTULAS SOSTENIDAS excesivas ni signos repetidos (!!!), máximo 1024 caracteres, formato WhatsApp válido (*negrita*, _cursiva_).
+6. COHERENCIA: el texto debe tener sentido completo con los ejemplos puestos en las variables.
+Sé estricto: ante la duda, marca el problema.`,
+      prompt: `Revisa esta plantilla y responde EXACTAMENTE este JSON:
+{"cumple": true/false, "problemas": ["cada incumplimiento detectado, específico"], "sugerencias": ["mejoras opcionales aunque cumpla"], "version_corregida": "si NO cumple, propone el cuerpo corregido; si cumple, null", "categoria_correcta": "UTILITY|MARKETING — la que corresponde según el contenido"}
+
+PLANTILLA:
+Nombre: ${nombre || '(sin nombre)'}
+Categoría declarada: ${categoria || '(sin categoría)'}
+Cuerpo: ${cuerpo}
+Ejemplos de variables: ${(Array.isArray(ejemplos) ? ejemplos : []).join(' | ') || '(ninguno)'}`,
+    });
+    if (!r.datos) return res.status(422).json({ success: false, data: null, error: 'La IA no pudo revisar. Intenta de nuevo.' });
+    auditar({ req, accion: 'ANALIZAR', modulo: 'whatsapp', entidad: 'plantilla_revision', entidad_id: nombre || '(sin nombre)',
+      detalle: `Revisó plantilla HSM con IA → ${r.datos.cumple ? 'CUMPLE' : 'NO cumple'} (${(r.datos.problemas || []).length} problema(s))` });
+    res.json({ success: true, data: r.datos, error: null });
+  } catch (e) {
+    if (e.code === 'NO_KEY') return res.status(503).json({ success: false, data: null, error: 'La IA no está configurada (falta ANTHROPIC_API_KEY).' });
+    if (e.code === 'IA_OFF') return res.status(403).json({ success: false, data: null, error: 'Activa "Revisor de plantillas HSM (Meta)" en Mantenedores → Inteligencia Artificial.' });
+    res.status(500).json({ success: false, error: e.message });
+  }
 };
 
 exports.eliminarPlantilla = async (req, res) => {

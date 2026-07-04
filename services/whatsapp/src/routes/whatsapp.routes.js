@@ -34,6 +34,7 @@ router.post('/conversaciones/:id/accion',    verifyToken, requireFunc('wsp_atend
 // Plantillas HSM (gestor contra Meta: crear = enviar a aprobación)
 router.get('/plantillas',            verifyToken, requireFunc('wsp_config'), ctrl.plantillas);
 router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
+router.post('/plantillas/revisar',   verifyToken, requireFunc('wsp_config'), ctrl.revisarPlantilla);
 router.delete('/plantillas/:nombre', verifyToken, requireFunc('wsp_config'), ctrl.eliminarPlantilla);
 
 // Campañas de salida
