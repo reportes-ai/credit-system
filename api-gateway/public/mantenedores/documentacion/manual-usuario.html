@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 -->
+<!-- v1.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -94,13 +94,17 @@
   <h2 id="postventa">5. Post Venta y cartolas</h2>
   <ul>
     <li><b>Seguimiento:</b> cada crédito otorgado avanza por etapas de Saldo Precio y de Comisión. Las etapas se marcan a mano o solas (ej: FUNDANTES RECIBIDOS se marca al aprobar los fundantes).</li>
-    <li><b>Cartolas:</b> se generan acumulativas por estado A PAGAR (cruzan meses). Al enviarlas se estampa el Mes Cartola.</li>
-    <li><b>Pago de saldos:</b> definir fondos → seleccionar saldos → generar nómina → emitir orden de pago. Lo mismo para comisiones, cuadrando la factura del dealer contra la cartola (si no cuadra, se marca en rojo).</li>
+    <li><b>Cartolas:</b> se generan acumulativas por estado A PAGAR (cruzan meses) y se <b>envían automáticamente</b> al dealer, <b>con aviso al ejecutivo comercial</b>. Al enviarlas se estampa el Mes Cartola.</li>
+    <li><b>Facturas de dealers:</b> cada factura queda <b>registrada</b> en el sistema y se cuadra contra el total de la cartola (mismo monto bruto en cada operación); si no cuadra, se marca en rojo.</li>
+    <li><b>Pago de saldos:</b> definir fondos → seleccionar saldos → generar nómina → emitir orden de pago. Al pagarse, el <b>informe de saldos precio pagados</b> se envía a Operaciones y al ejecutivo comercial de cada operación.</li>
   </ul>
   <figure class="shot"><img src="img/postventa.png" alt="Módulo Post Venta" loading="lazy"><figcaption>Post Venta: seguimiento, consultas de estado, emisión de órdenes de pago y cartolas.</figcaption></figure>
 
   <h2 id="fundantes">6. Seguimiento Fundantes</h2>
-  <div class="paso"><b>Ejecutivo:</b> abre tu operación otorgada (AutoFin/Unidad) → sube los documentos fundantes que exige la matriz según financiera y antigüedad → Enviar. <b>Operaciones:</b> revisa y marca CERRADO (aprueba) o RECHAZADO con comentario — el rechazo le avisa al ejecutivo para corregir y reenviar.</div>
+  <div class="paso"><b>Ejecutivo:</b> abre tu operación otorgada (AutoFin/Unidad) → sube los documentos fundantes que exige la matriz según financiera y antigüedad — el sistema <b>renombra cada documento automáticamente</b> (tipo de documento + operación) → Enviar. <b>Operaciones:</b> revisa y marca CERRADO (aprueba) o RECHAZADO con comentario — el rechazo le avisa al ejecutivo para corregir y reenviar.</div>
+  <ul>
+    <li><b>Flujo trazado etapa por etapa:</b> fundantes <b>recibidos</b> → <b>enviados</b> → <b>fondos liberados a pago</b> → <b>fondos recibidos</b>. Cada etapa queda con fecha, alimentando el flujo de caja del negocio y el seguimiento del Post Venta.</li>
+  </ul>
 
   <h2 id="tesoreria">7. Tesorería: caja, cuotas y ODP</h2>
   <ul>
@@ -141,7 +145,7 @@
   <h2 id="portales">11. Portales del Dealer y del Cliente</h2>
   <h3>Portal del Dealer — dealers.autofacilchile.cl</h3>
   <ul>
-    <li>El dealer ve <b>sus</b> operaciones (solo las suyas): estado de cada una, <b>qué documentos le faltan</b> para el pago, sus cartolas/comisiones y el estado del pago.</li>
+    <li>El dealer ve <b>sus</b> operaciones (solo las suyas): estado de cada una, <b>qué documentos le faltan</b> para el pago, sus cartolas/comisiones, el <b>estado de sus saldos precio</b> y la <b>fecha estimada de pago</b> — sin llamar a preguntar.</li>
     <li>Tiene <b>chat con su ejecutivo</b> y un <b>asistente IA</b> que responde preguntas sobre sus operaciones.</li>
     <li>Soporte interno: si un dealer no puede entrar, revisar su cuenta en Atención Remota (activa, email correcto, regenerar link de acceso).</li>
   </ul>
