@@ -321,6 +321,18 @@
           <div class="fld"><label>Horario hasta</label><input type="time" id="gHFin"></div>
           <div class="fld"><label>Días (1=lun … 7=dom)</label><input id="gDias" placeholder="1,2,3,4,5,6"></div>
         </div>
+        <div class="fld" style="display:flex;align-items:center;gap:10px">
+          <label class="switch" style="margin:0"><input type="checkbox" id="g247"><span class="slider"></span></label>
+          <div><b style="font-size:.84rem;color:#0f172a">Bot 24/7</b>
+            <div style="font-size:.72rem;color:#94a3b8">Encendido: Facilito atiende a toda hora (el horario aplica solo a la atención humana — fuera de horario las derivaciones van por mail al ejecutivo). Apagado: fuera de horario el bot solo envía el mensaje "fuera de horario".</div>
+          </div>
+        </div>
+        <div class="grid3">
+          <div class="fld"><label>Preevaluaciones DealerNet máx. por conversación</label><input type="number" id="gDnConv" min="1" style="max-width:120px"></div>
+          <div class="fld"><label>Preevaluaciones DealerNet máx. por día (global)</label><input type="number" id="gDnDia" min="1" style="max-width:120px"></div>
+          <div></div>
+        </div>
+        <div style="font-size:.72rem;color:#94a3b8;margin:-6px 0 12px">Límite anti-abuso: cada preevaluación de un RUT sin informes vigentes es una consulta DealerNet pagada. Superado el límite, Facilito ofrece al Ejecutivo Comercial.</div>
         <div class="fld"><label>Ventana de envío (horas desde el último mensaje del cliente)</label>
           <input type="number" id="gVentana" min="1" max="24" style="max-width:120px">
           <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Regla de WhatsApp: pasado este plazo la conversación se bloquea — solo reabre si el cliente escribe o con una plantilla vía campaña. Máximo 24; se recomienda 23 para no rozar el límite de Meta.</div>
@@ -887,6 +899,9 @@
     document.getElementById('gNoEntiendo').value = c.msg_no_entiendo||'';
     document.getElementById('gDerivacion').value = c.msg_derivacion||'';
     document.getElementById('gPromptIA').value = c.prompt_ia||'';
+    document.getElementById('g247').checked = c.modo_24_7 == null ? true : !!c.modo_24_7;
+    document.getElementById('gDnConv').value = c.dn_max_conv||2;
+    document.getElementById('gDnDia').value = c.dn_max_dia||30;
   }
 
   async function guardarConfig(){
@@ -897,6 +912,8 @@
       msg_no_entiendo: val('gNoEntiendo'), msg_derivacion: val('gDerivacion'),
       prompt_ia: val('gPromptIA'),
       ventana_horas: val('gVentana'),
+      modo_24_7: document.getElementById('g247').checked ? 1 : 0,
+      dn_max_conv: val('gDnConv'), dn_max_dia: val('gDnDia'),
     };
     const j = await (await fetch('/api/whatsapp/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
     alert(j.success ? 'Configuración guardada ✓' : (j.error||'Error'));
