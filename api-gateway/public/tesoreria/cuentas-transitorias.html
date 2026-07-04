@@ -107,7 +107,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.3</span>
+      <span class="version-badge">v1.4</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -406,7 +406,7 @@ function renderCartola(data, id_credito) {
         </div>
         <div>
           <label>Monto cargo ($)</label>
-          <input type="number" id="fix_cargo_monto_${id_credito}" placeholder="Ej: 191285">
+          <input type="text" inputmode="numeric" id="fix_cargo_monto_${id_credito}" placeholder="Ej: $191.285" oninput="fmtPesosCT(this)">
         </div>
         <button class="btn-admin-fix" onclick="aplicarFix(${id_credito})">
           <i class="bi bi-wrench me-1"></i>Aplicar corrección
@@ -453,13 +453,17 @@ async function eliminarTransitoria(id_transitoria, id_credito) {
   cargar();
 }
 
+function fmtPesosCT(input) {
+  const raw = input.value.replace(/[^0-9]/g,'');
+  input.value = raw ? '$' + parseInt(raw,10).toLocaleString('es-CL') : '';
+}
 async function aplicarFix(id_credito) {
   const del   = document.getElementById(`fix_del_${id_credito}`).value;
   const cid   = document.getElementById(`fix_cargo_id_${id_credito}`).value;
   const ctrx  = document.getElementById(`fix_cargo_trx_${id_credito}`).value;
-  const cmonto= document.getElementById(`fix_cargo_monto_${id_credito}`).value;
+  const cmonto= document.getElementById(`fix_cargo_monto_${id_credito}`).value.replace(/[^0-9]/g,'');
   if (!del) return alert('Ingresa el ID de la transitoria a eliminar.');
-  if (!confirm(`Eliminar transitoria ${del} e insertar CARGO de $${cmonto}?\nEsta acción NO se puede deshacer.`)) return;
+  if (!confirm(`Eliminar transitoria ${del} e insertar CARGO de $${Number(cmonto||0).toLocaleString('es-CL')}?\nEsta acción NO se puede deshacer.`)) return;
   const res  = await fetch('/api/cuentas-transitorias/admin/fix-transitoria', {
     method: 'POST', headers: H,
     body: JSON.stringify({

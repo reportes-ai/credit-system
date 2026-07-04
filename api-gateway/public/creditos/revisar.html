@@ -210,7 +210,7 @@
   <a class="nav-brand" href="/">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v3.9</span>
+    <span class="version-badge">v4.0</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -268,16 +268,16 @@
         <label class="eb-field"><span>Fecha Otorgamiento</span><input type="date" id="eb_fecha_otorgado"></label>
         <label class="eb-field"><span>Fecha 1ª Cuota</span><input type="date" id="eb_fecha_primera_cuota"></label>
         <label class="eb-field"><span>ID Financiera</span><input type="text" id="eb_id_financiera" placeholder="Ej: 12345"></label>
-        <label class="eb-field"><span>Valor Vehículo ($)</span><input type="number" id="eb_valor_vehiculo" oninput="calcSaldoBroker()"></label>
-        <label class="eb-field"><span>Pie ($)</span><input type="number" id="eb_pie" oninput="calcSaldoBroker()"></label>
-        <label class="eb-field"><span>Saldo Precio ($)</span><input type="number" id="eb_saldo_precio" readonly></label>
-        <label class="eb-field"><span>Monto Financiado ($)</span><input type="number" id="eb_monto_financiado"></label>
+        <label class="eb-field"><span>Valor Vehículo ($)</span><input type="text" inputmode="numeric" id="eb_valor_vehiculo" oninput="fmtPesosEB(this);calcSaldoBroker()"></label>
+        <label class="eb-field"><span>Pie ($)</span><input type="text" inputmode="numeric" id="eb_pie" oninput="fmtPesosEB(this);calcSaldoBroker()"></label>
+        <label class="eb-field"><span>Saldo Precio ($)</span><input type="text" id="eb_saldo_precio" readonly></label>
+        <label class="eb-field"><span>Monto Financiado ($)</span><input type="text" inputmode="numeric" id="eb_monto_financiado" oninput="fmtPesosEB(this)"></label>
         <label class="eb-field"><span>Plazo (meses)</span><input type="number" id="eb_plazo" min="1" max="120"></label>
         <label class="eb-field"><span>Tasa Mensual (%)</span><input type="number" id="eb_tasa_mensual" step="0.001"></label>
-        <label class="eb-field"><span>Cuota ($)</span><input type="number" id="eb_cuota"></label>
-        <label class="eb-field"><span>Gastos Operativos ($)</span><input type="number" id="eb_gastos"></label>
-        <label class="eb-field"><span>Seguros ($)</span><input type="number" id="eb_seguros"></label>
-        <label class="eb-field"><span>Participación Dealer ($)</span><input type="number" id="eb_comdea_real"></label>
+        <label class="eb-field"><span>Cuota ($)</span><input type="text" inputmode="numeric" id="eb_cuota" oninput="fmtPesosEB(this)"></label>
+        <label class="eb-field"><span>Gastos Operativos ($)</span><input type="text" inputmode="numeric" id="eb_gastos" oninput="fmtPesosEB(this)"></label>
+        <label class="eb-field"><span>Seguros ($)</span><input type="text" inputmode="numeric" id="eb_seguros" oninput="fmtPesosEB(this)"></label>
+        <label class="eb-field"><span>Participación Dealer ($)</span><input type="text" inputmode="numeric" id="eb_comdea_real" oninput="fmtPesosEB(this)"></label>
         <label class="eb-field"><span>Ejecutivo</span><input type="text" id="eb_ejecutivo"></label>
       </div>
 
@@ -1210,6 +1210,7 @@ function abrirEditBroker() {
   if (!c) return;
   document.getElementById('editBrokerNumCred').textContent = c.numero_credito||c.numero_credito_fmt||'—';
   const setV = (id, v) => { const el=document.getElementById(id); if(el) el.value=(v!=null?v:''); };
+  const setP = (id, v) => { const el=document.getElementById(id); if(el) el.value=(v!=null&&v!=='')?('$'+Math.round(Number(v)).toLocaleString('es-CL')):''; };
   const setD = (id, v) => { const el=document.getElementById(id); if(el) el.value=v?(v.split?v.split('T')[0]:v):''; };
   const setS = (id, v) => { const el=document.getElementById(id); if(el && v) el.value=v; };
 
@@ -1217,16 +1218,16 @@ function abrirEditBroker() {
   setD('eb_fecha_otorgado',      c.fecha_otorgamiento||c.fecha_otorgado);
   setD('eb_fecha_primera_cuota', c.fecha_primera_cuota);
   setV('eb_id_financiera',       c.id_financiera);
-  setV('eb_valor_vehiculo',      c.valor_vehiculo);
-  setV('eb_pie',                 c.pie);
-  setV('eb_saldo_precio',        c.saldo_precio);
-  setV('eb_monto_financiado',    c.monto_financiado);
+  setP('eb_valor_vehiculo',      c.valor_vehiculo);
+  setP('eb_pie',                 c.pie);
+  setP('eb_saldo_precio',        c.saldo_precio);
+  setP('eb_monto_financiado',    c.monto_financiado);
   setV('eb_plazo',               c.plazo);
   setV('eb_tasa_mensual',        c.tascli_real||c.tasa_mensual);
-  setV('eb_cuota',               c.cuota);
-  setV('eb_gastos',              c.gastos);
-  setV('eb_seguros',             c.seguros);
-  setV('eb_comdea_real',         c.comdea_real ?? c.comision_dealer);
+  setP('eb_cuota',               c.cuota);
+  setP('eb_gastos',              c.gastos);
+  setP('eb_seguros',             c.seguros);
+  setP('eb_comdea_real',         c.comdea_real ?? c.comision_dealer);
   setV('eb_ejecutivo',           c.ejecutivo);
 
   // Vehículo
@@ -1275,34 +1276,40 @@ function cerrarEditBroker() {
   document.getElementById('editBrokerOverlay').classList.remove('open');
 }
 
+function fmtPesosEB(input) {
+  let raw = input.value.replace(/[^0-9]/g,'');
+  input.value = raw ? '$' + parseInt(raw, 10).toLocaleString('es-CL') : '';
+}
+function parsePesosEB(str) { const v=(str||'').replace(/[^0-9]/g,''); return v ? parseInt(v,10) : 0; }
 function calcSaldoBroker() {
-  const vv  = parseFloat(document.getElementById('eb_valor_vehiculo')?.value)||0;
-  const pie = parseFloat(document.getElementById('eb_pie')?.value)||0;
+  const vv  = parsePesosEB(document.getElementById('eb_valor_vehiculo')?.value);
+  const pie = parsePesosEB(document.getElementById('eb_pie')?.value);
   const el  = document.getElementById('eb_saldo_precio');
-  if (el) el.value = (vv && pie) ? Math.round(vv-pie) : (vv||'');
+  if (el) el.value = (vv && pie) ? '$'+Math.round(vv-pie).toLocaleString('es-CL') : (vv ? '$'+vv.toLocaleString('es-CL') : '');
 }
 
 async function guardarEditBroker() {
   const c = _credito;
   const g  = id => { const el=document.getElementById(id); return (el?.value?.trim()||null); };
   const gn = id => { const v=document.getElementById(id)?.value; return (v!==''&&v!=null) ? (parseFloat(v)||null) : null; };
+  const gp = id => { const v=(document.getElementById(id)?.value||'').replace(/[^0-9]/g,''); return v ? parseInt(v,10) : null; };
   const gi = id => { const v=document.getElementById(id)?.value; return (v!==''&&v!=null) ? (parseInt(v)||null)   : null; };
 
-  const vv  = gn('eb_valor_vehiculo');
-  const pie = gn('eb_pie');
+  const vv  = gp('eb_valor_vehiculo');
+  const pie = gp('eb_pie');
 
   const body = {
     // Financiamiento (triggers esEdicionCompleta on backend)
-    monto_financiado:    gn('eb_monto_financiado'),
+    monto_financiado:    gp('eb_monto_financiado'),
     valor_vehiculo:      vv,
     pie:                 pie,
     saldo_precio:        (vv!=null&&pie!=null) ? Math.round(vv-pie) : null,
     plazo:               gi('eb_plazo'),
     tasa_mensual:        gn('eb_tasa_mensual'),
-    cuota:               gn('eb_cuota'),
-    gastos_operativos:   gn('eb_gastos'),
-    seguros:             gn('eb_seguros'),
-    comision_dealer:     gn('eb_comdea_real'),
+    cuota:               gp('eb_cuota'),
+    gastos_operativos:   gp('eb_gastos'),
+    seguros:             gp('eb_seguros'),
+    comision_dealer:     gp('eb_comdea_real'),
     id_financiera:       g('eb_id_financiera'),
     fecha_otorgamiento:  g('eb_fecha_otorgado'),
     fecha_primera_cuota: g('eb_fecha_primera_cuota'),

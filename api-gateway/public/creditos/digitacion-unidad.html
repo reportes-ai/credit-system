@@ -78,7 +78,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.7</span>
+      <span class="version-badge">v1.8</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -235,11 +235,11 @@
       <div class="form-grid g3">
         <div class="f-group">
           <label class="f-req">Valor Vehículo $</label>
-          <input type="number" id="fValorVeh" placeholder="0" min="0" oninput="calcularSaldo()">
+          <input type="text" inputmode="numeric" id="fValorVeh" placeholder="$0" oninput="fmtPesos(this);calcularSaldo()">
         </div>
         <div class="f-group">
           <label class="f-req">Pie $</label>
-          <input type="number" id="fPie" placeholder="0" min="0" oninput="calcularSaldo()">
+          <input type="text" inputmode="numeric" id="fPie" placeholder="$0" oninput="fmtPesos(this);calcularSaldo()">
         </div>
         <div class="f-group">
           <label>Saldo Precio $ <small style="color:#0369a1;font-weight:600">(calculado)</small></label>
@@ -251,7 +251,7 @@
         </div>
         <div class="f-group">
           <label>Impuesto $</label>
-          <input type="number" id="fImpuesto" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fImpuesto" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <div class="f-group">
           <label>Estado Impuesto</label>
@@ -273,7 +273,7 @@
       <div class="form-grid g3">
         <div class="f-group">
           <label class="f-req">Monto Financiado $</label>
-          <input type="number" id="fMontoFin" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fMontoFin" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <div class="f-group">
           <label class="f-req">Plazo (meses)</label>
@@ -308,13 +308,13 @@
         </div>
         <div class="f-group">
           <label>Comisión Dealer Real $</label>
-          <input type="number" id="fComDea" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fComDea" placeholder="$0" oninput="fmtPesos(this)">
         </div>
       </div>
       <div class="form-grid g2" style="margin-top:14px">
         <div class="f-group">
           <label>Monto Pago Comisión Financiera $</label>
-          <input type="number" id="fMontComFin" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fMontComFin" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <!-- Sin Mayor/Menor UF, sin Monto Capitalizado, sin Limitación para Unidad -->
       </div>
@@ -351,11 +351,11 @@
       <div class="form-grid g3">
         <div class="f-group">
           <label>Gastos Operacionales $</label>
-          <input type="number" id="fGastos" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fGastos" placeholder="$0" oninput="fmtPesos(this)">
         </div>
         <div class="f-group">
           <label>GPS $</label>
-          <input type="number" id="fGps" placeholder="0" min="0">
+          <input type="text" inputmode="numeric" id="fGps" placeholder="$0" oninput="fmtPesos(this)">
           <div style="font-size:.72rem;color:#64748b;margin-top:3px">Costo GPS incluido en el crédito Unidad</div>
         </div>
       </div>
@@ -585,9 +585,18 @@
   });
 
   /* ── Calcular saldo precio ─────────────────────────────────── */
+
+  /* ── Autoformato $ (mismo motor que digitacion-autofin) ─────── */
+  function fmtPesos(input) {
+    let raw = input.value.replace(/[^0-9]/g,'');
+    input.value = raw ? '$' + parseInt(raw, 10).toLocaleString('es-CL') : '';
+  }
+  function parsePesos(str) {
+    return parseInt((str||'').replace(/[^0-9]/g,''), 10) || 0;
+  }
   function calcularSaldo() {
-    const val  = parseFloat(document.getElementById('fValorVeh').value) || 0;
-    const pie  = parseFloat(document.getElementById('fPie').value) || 0;
+    const val  = parsePesos(document.getElementById('fValorVeh').value) || 0;
+    const pie  = parsePesos(document.getElementById('fPie').value) || 0;
     const saldo = val - pie;
     const pct   = val > 0 ? (saldo / val * 100).toFixed(2) : 0;
     document.getElementById('fSaldo').value  = saldo > 0 ? '$' + Math.round(saldo).toLocaleString('es-CL') : '';
@@ -606,7 +615,7 @@
     if (!selVal || selVal === 'NO APLICA') { box.style.display = 'none'; return; }
     const p = parques.find(x => String(x.id) === selVal);
     if (!p) { box.style.display = 'none'; return; }
-    const saldo   = parseFloat(document.getElementById('fValorVeh').value||0) - parseFloat(document.getElementById('fPie').value||0);
+    const saldo   = parsePesos(document.getElementById('fValorVeh').value) - parsePesos(document.getElementById('fPie').value);
     const comPct  = parseFloat(p.comision_pct) || 0;
     const comMonto = Math.round(saldo * comPct);
     document.getElementById('showComParque').textContent = '$' + comMonto.toLocaleString('es-CL');
@@ -649,23 +658,23 @@
       estado_credito:     estado,
       fecha_otorgado:     document.getElementById('fFechaOtorgado').value || null,
       producto:           document.getElementById('fProducto').value,
-      valor_vehiculo:     parseFloat(document.getElementById('fValorVeh').value)||null,
-      pie:                parseFloat(document.getElementById('fPie').value)||null,
-      impuesto:           parseFloat(document.getElementById('fImpuesto').value)||null,
+      valor_vehiculo:     parsePesos(document.getElementById('fValorVeh').value)||null,
+      pie:                parsePesos(document.getElementById('fPie').value)||null,
+      impuesto:           parsePesos(document.getElementById('fImpuesto').value)||null,
       estado_impuesto:    document.getElementById('fEstadoImpto').value,
       limitacion:         0,          // No aplica Unidad
-      gastos:             parseFloat(document.getElementById('fGastos').value)||0,
-      gps:                parseFloat(document.getElementById('fGps').value)||0,
+      gastos:             parsePesos(document.getElementById('fGastos').value)||0,
+      gps:                parsePesos(document.getElementById('fGps').value)||0,
       seguro_rdh:         0,          // No aplica Unidad
       seguro_cesantia:    0,          // No aplica Unidad
       seguro_rep_menor:   0,          // No aplica Unidad
-      monto_financiado:   parseFloat(document.getElementById('fMontoFin').value)||null,
+      monto_financiado:   parsePesos(document.getElementById('fMontoFin').value)||null,
       plazo:              parseInt(document.getElementById('fPlazo').value)||null,
       tascli_real:        parseFloat(document.getElementById('fTasCliReal').value)/100||null,
       tascli_pizarra:     parseFloat(document.getElementById('fTasCliPiz').value)/100||null,
       tasfin_pizarra:     parseFloat(document.getElementById('fTasFinPiz').value)/100||null,
-      comdea_real:        parseFloat(document.getElementById('fComDea').value)||null,
-      monto_comision_fin: parseFloat(document.getElementById('fMontComFin').value)||null,
+      comdea_real:        parsePesos(document.getElementById('fComDea').value)||null,
+      monto_comision_fin: parsePesos(document.getElementById('fMontComFin').value)||null,
       id_financiera:      document.getElementById('fIdFinanciera').value.trim(),
       fecha_primera_cuota: document.getElementById('fFechaCuota').value || null,
       parque:             parqueNombre,

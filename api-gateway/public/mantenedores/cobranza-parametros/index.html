@@ -92,7 +92,7 @@
     <div class="row g-2 mt-1 align-items-end">
       <div class="col-sm-3">
         <label class="fl">Valor cuota ($)</label>
-        <input type="number" min="0" class="form-control" id="testMonto" placeholder="500000">
+        <input type="text" inputmode="numeric" class="form-control" id="testMonto" placeholder="$500.000" oninput="fmtPesosCP(this)">
       </div>
       <div class="col-sm-3">
         <label class="fl">Fecha vencimiento</label>
@@ -234,7 +234,7 @@ async function guardar(){
 
 const peso = n => '$'+Math.round(Number(n)||0).toLocaleString('es-CL');
 async function probar(){
-  const monto_cuota = parseFloat(document.getElementById('testMonto').value)||0;
+  const monto_cuota = parseInt((document.getElementById('testMonto').value||'').replace(/[^0-9]/g,''),10)||0;
   const fecha_vencimiento = document.getElementById('testVenc').value;
   const tramo = document.getElementById('testTramo').value;
   const fecha_calculo = document.getElementById('testHasta').value || undefined;
@@ -260,6 +260,7 @@ async function probar(){
 
 cargar();
 </script>
+<script>function fmtPesosCP(i){const r=i.value.replace(/[^0-9]/g,"");i.value=r?"$"+parseInt(r,10).toLocaleString("es-CL"):"";}</script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
