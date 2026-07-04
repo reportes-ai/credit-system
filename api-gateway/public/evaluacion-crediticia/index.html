@@ -29,7 +29,8 @@
     .cot-row:hover { border-color:#93c5fd; background:#f8fafc; }
     .cot-row.sel { border-color:#2563eb; background:#eff6ff; box-shadow:0 0 0 2px #bfdbfe inset; }
     .cot-row input { margin:0; }
-    .cot-info { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:10px; flex:1; }
+    .cot-info { display:grid; grid-template-columns:1.2fr 1fr 1fr 1fr .8fr 1fr .9fr; gap:10px; flex:1; }
+    @media(max-width:900px){ .cot-info{ grid-template-columns:1fr 1fr 1fr 1fr; } }
     @media(max-width:640px){ .cot-info{ grid-template-columns:1fr 1fr; } }
     .cot-info .k { font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; color:#6b7280; font-weight:700; }
     .cot-info .v { font-size:.95rem; font-weight:700; color:#111827; }
@@ -378,8 +379,11 @@
           <input type="radio" name="cot" value="${q.id}">
           <div class="cot-info">
             <div><div class="k">Auto (valor)</div><div class="v">${fmtPeso(q.valor_vehiculo)}</div></div>
+            <div><div class="k">Pie</div><div class="v">${fmtPeso(q.pie)}</div></div>
             <div><div class="k">Saldo Precio</div><div class="v">${fmtPeso(q.saldo_precio)}</div></div>
             <div><div class="k">Monto Crédito</div><div class="v">${fmtPeso(q.monto_credito)}</div></div>
+            <div><div class="k">Plazo</div><div class="v">${q.plazo ? q.plazo + ' meses' : '—'}</div></div>
+            <div><div class="k">Cuota</div><div class="v">${fmtPeso(q.cuota)}</div></div>
             <div><div class="k">Fecha</div><div class="v" style="font-weight:600">${fmtFecha(q.fecha)}</div></div>
           </div>
         </label>`).join('');

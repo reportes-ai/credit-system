@@ -184,6 +184,7 @@ const ficha = async (req, res) => {
         id: r.id_cotizacion,
         fecha: r.fecha_cotizacion || r.created_at,
         valor_vehiculo: r.valor_vehiculo,
+        pie: r.pie,
         saldo_precio: (Number(r.valor_vehiculo) || 0) - (Number(r.pie) || 0),
         monto_credito: r.monto_financiado,
         cuota: r.cuota,
