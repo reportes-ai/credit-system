@@ -331,7 +331,7 @@ exports.cargarDestinatarios = async (req, res) => {
       return [c.id, ...cols.map(k => (f[k] === '' || f[k] === undefined) ? null : f[k]), decil, grupo];
     });
     await pool.query(`INSERT INTO campanas_destinatarios (id_campana, ${cols.join(',')}, decil, grupo)
-      VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 2).slice(0, -1)})`).join(',')}`, values.flat());
+      VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 3).slice(0, -1)})`).join(',')}`, values.flat());
     const control = values.filter(v => v[v.length - 1] === 'CONTROL').length;
     ok(res, { cargados: values.length, control });
   } catch (e) { fail(res, e.message); }
@@ -384,20 +384,25 @@ exports.generarDesdeBD = async (req, res) => {
                COALESCE(cl.email, cl.correo) email, COALESCE(cl.telefono_movil, cl.telefono) telefono,
                cr.monto_financiado monto_credito, cr.cuota valor_cuota, cr.plazo cuotas, cr.tascli_real tasa,
                TIMESTAMPDIFF(MONTH, CURDATE(), DATE_ADD(cr.fecha_otorgado, INTERVAL cr.plazo MONTH)) meses_para_termino,
-               al.renta_fija_liquida renta
+               al.renta
         FROM creditos cr
         JOIN clientes cl ON cl.id_cliente = cr.id_cliente
-        LEFT JOIN antecedentes_laborales al ON al.rut_cliente = cl.rut
+        LEFT JOIN (
+          SELECT rut_cliente, MAX(renta_fija_liquida) renta
+          FROM antecedentes_laborales GROUP BY rut_cliente
+        ) al ON al.rut_cliente = cl.rut
         WHERE cr.estado_credito='OTORGADO' AND cr.fecha_otorgado IS NOT NULL AND cr.plazo > 0
           AND TIMESTAMPDIFF(MONTH, CURDATE(), DATE_ADD(cr.fecha_otorgado, INTERVAL cr.plazo MONTH)) BETWEEN ? AND ?
-          AND COALESCE(al.renta_fija_liquida, 0) >= ?
+          AND COALESCE(al.renta, 0) >= ?
           ${exRegSQL}
-        GROUP BY cr.id
         LIMIT 10000`, [Number(p.termino_min) || 0, Number(p.termino_max) || 6, Number(p.renta_min) || 0, ...exReg]);
-      rows = r.map(x => ({
-        ...x,
-        esp1: x.meses_para_termino <= 0 ? 'Tu crédito ya está terminando' : `A tu crédito le quedan ${x.meses_para_termino} mes(es)`,
-      }));
+      // un cliente con más de un crédito por terminar recibe UN solo mensaje
+      const vistos = new Set();
+      rows = r.filter(x => { const k = limpiaRut(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
+        .map(x => ({
+          ...x,
+          esp1: x.meses_para_termino <= 0 ? 'Tu crédito ya está terminando' : `A tu crédito le quedan ${x.meses_para_termino} mes(es)`,
+        }));
     }
 
     if (!rows.length) return fail(res, 'La búsqueda no arrojó clientes con esos parámetros', 400);
@@ -410,7 +415,7 @@ exports.generarDesdeBD = async (req, res) => {
       return [c.id, ...cols.map(k => f[k] ?? null), decil, grupo];
     });
     await pool.query(`INSERT INTO campanas_destinatarios (id_campana, ${cols.join(',')}, decil, grupo)
-      VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 2).slice(0, -1)})`).join(',')}`, values.flat());
+      VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 3).slice(0, -1)})`).join(',')}`, values.flat());
     await pool.query('UPDATE campanas_masivas SET parametros=? WHERE id=?', [JSON.stringify(p), c.id]);
     ok(res, { cargados: values.length, control: values.filter(v => v[v.length - 1] === 'CONTROL').length });
   } catch (e) { fail(res, e.message); }
