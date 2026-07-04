@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -89,7 +89,7 @@
     <tr><td>Meta Cloud API (WhatsApp)</td><td><code>shared/whatsapp.js</code> — Graph v21.0. Env: WSP_TOKEN (system user autofacil-bot, portafolio "Auto Facil Chile" — el portafolio "AutoFácil" está restringido para WhatsApp, no usar), WSP_PHONE_ID (16 dígitos), WSP_VERIFY. Webhook público /api/whatsapp/webhook. Sin credenciales → modo SIMULADO. Ventana 24h (config). Plantillas HSM vía /{waba}/message_templates (waba_id en wsp_config).</td></tr>
     <tr><td>DealerNet WS</td><td>SOAP CentralDeInformacion (informes comerciales por RUT, pagado). <code>asegurarInformes</code> con caché (dias_bloqueo). Credenciales por env var.</td></tr>
     <tr><td>Correo</td><td><code>shared/mailer.js</code> (nodemailer SMTP, Brevo). Cuentas remitente sistema/cobranza. Respeta Modo Desarrollo (redirige todo a correos de prueba).</td></tr>
-    <tr><td>Indicadores</td><td>UF/UTM: mindicador.cl (sin key), cada 12h. TMC: API CMF (CMF_API_KEY).</td></tr>
+    <tr><td>Indicadores</td><td>UF, UTM, dólar, IPC y TMC: API oficial CMF (CMF_API_KEY), sincronización cada 12h (services/mantenedores/src/cmf-api.js, fuente única).</td></tr>
     <tr><td>Google</td><td>Maps Geocoding (GOOGLE_MAPS_API_KEY, server-side) para el mapa de dealers; Calendar OAuth para Mi Día (pendiente keys).</td></tr>
     <tr><td>Anthropic</td><td>ANTHROPIC_API_KEY; modelos según mantenedor IA.</td></tr>
     <tr><td>Atención Remota</td><td>Chat dealer↔interno vía <b>WebSocket en el gateway</b> (3 conversaciones paralelas por agente, documentos en el hilo). Video: WebRTC in-house en el navegador (Fase 3). Cuentas de dealer en <code>ar_dealer_cuentas</code> (bcrypt + acceso por link con token hasheado); el middleware <code>verifyDealer</code> es la fuente única del JWT tipo dealer (lo reusa el Portal del Dealer).</td></tr>
