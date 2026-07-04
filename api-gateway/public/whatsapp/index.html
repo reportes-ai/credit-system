@@ -473,6 +473,7 @@
     } catch(e){ box.innerHTML = '<div class="empty">Error de conexión.</div>'; }
   }
   function nuevaPlantilla(){
+  pintarPlVars();
     dlgForm('Nueva plantilla HSM (se envía a aprobación de Meta)', `
       <div style="font-size:.78rem;color:#64748b;margin-bottom:10px">El nombre va en minúsculas con guión bajo (ej: <code>recordatorio_cuota</code>). En el cuerpo usa <code>{{1}}</code>, <code>{{2}}</code>… como variables y entrega un ejemplo de cada una para que Meta entienda el uso.</div>
       <label style="font-size:.76rem;font-weight:700">Nombre</label>
@@ -483,6 +484,10 @@
         <option value="MARKETING">MARKETING — promocional (ofertas, campañas comerciales)</option>
       </select>
       <label style="font-size:.76rem;font-weight:700">Cuerpo del mensaje</label>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 6px">
+        <span style="font-size:.68rem;color:#94a3b8;align-self:center">Insertar variable:</span>
+        <span id="plVars"></span>
+      </div>
       <textarea id="plCuerpo" rows="4" placeholder="Hola {{1}}, te recordamos que tu cuota de {{2}} vence el {{3}}. Puedes pagar en..." style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0 10px;box-sizing:border-box"></textarea>
       <label style="font-size:.76rem;font-weight:700">Ejemplos de las variables (uno por línea, en orden)</label>
       <textarea id="plEj" rows="3" placeholder="Juan Pérez&#10;$185.000&#10;05-08-2026" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0;box-sizing:border-box"></textarea>
@@ -497,6 +502,7 @@
       alert(`Plantilla "${j.data.nombre}" enviada a aprobación de Meta ✓ (estado: ${j.data.status}). El resultado aparecerá en la lista.`);
       cargarPlantillas();
     });
+    pintarPlVars();
     // Enviar bloqueado hasta que la revisión IA apruebe (y se invalida si cambia el contenido)
     window._plOkHash = null;
     const save = document.getElementById('dlgSave');
@@ -510,7 +516,37 @@
   const plPayload = () => ({ nombre: val('plNombre'), categoria: document.getElementById('plCat').value,
     cuerpo: document.getElementById('plCuerpo').value.trim(),
     ejemplos: document.getElementById('plEj').value.split('\n').map(s=>s.trim()).filter(Boolean) });
-  async function revisarPlantillaIA(){
+  /* Variables sugeridas: insertan el {{n}} siguiente en el cuerpo y su ejemplo (Meta exige uno por variable) */
+const PL_VARS = [
+  ['Nombre','Juan'],['Apellido','Pérez'],['RUT','12.345.678-9'],['Saludo','Estimado'],
+  ['Monto crédito $','$8.500.000'],['Valor cuota','$285.000'],['Cuotas','36'],['Pie $','$2.000.000'],
+  ['Tasa %','2,1%'],['Fecha vencimiento','05-08-2026'],['Días de mora','15'],['Sucursal/Dealer','Movicenter'],
+];
+function pintarPlVars(){
+  const el = document.getElementById('plVars');
+  if (el) el.innerHTML = PL_VARS.map(([lbl,ej],i) =>
+    `<button type="button" onclick="insVarPl('${ej.replace(/'/g,"\'")}')" style="background:#ede9fe;color:#5b21b6;border:none;border-radius:7px;padding:2px 9px;font-size:.7rem;font-weight:700;cursor:pointer">${lbl}</button>`).join('');
+}
+function insVarPl(ejemplo){
+  const cuerpo = document.getElementById('plCuerpo');
+  const usados = [...new Set((cuerpo.value.match(/\{\{(\d+)\}\}/g) || []).map(x=>parseInt(x.replace(/\D/g,''),10)))];
+  const n = (usados.length ? Math.max(...usados) : 0) + 1;
+  const tag = '{{'+n+'}}';
+  const pos = cuerpo.selectionStart ?? cuerpo.value.length;
+  cuerpo.value = cuerpo.value.slice(0,pos) + tag + cuerpo.value.slice(cuerpo.selectionEnd ?? pos);
+  cuerpo.focus(); cuerpo.selectionStart = cuerpo.selectionEnd = pos + tag.length;
+  // agregar el ejemplo en la línea n
+  const ej = document.getElementById('plEj');
+  const lineas = ej.value ? ej.value.split(String.fromCharCode(10)) : [];
+  while (lineas.length < n) lineas.push('');
+  lineas[n-1] = lineas[n-1] || ejemplo;
+  ej.value = lineas.join(String.fromCharCode(10));
+  window._plOkHash = null;   // invalida la revisión IA previa (los sets programáticos no disparan 'input')
+  const save = document.getElementById('dlgSave'); if (save) { save.disabled = true; save.style.opacity = .5; }
+  const res = document.getElementById('plIARes'); if (res) res.style.display = 'none';
+}
+
+async function revisarPlantillaIA(){
     const btn = document.getElementById('plBtnIA'), box = document.getElementById('plIARes'), save = document.getElementById('dlgSave');
     const body = plPayload();
     if (!body.cuerpo) { alert('Escribe el cuerpo del mensaje primero.'); return; }
