@@ -319,6 +319,37 @@ async function guardarCotizacionBot(conv) {
   } catch (e) { console.error('[wsp cotizacion]', e.message); }
 }
 
+/* ── Herramienta "dónde pagar": por RUT busca los créditos OTORGADOS del cliente y
+      arma las instrucciones de pago según la(s) financiera(s). AutoFácil sale de la
+      FUENTE ÚNICA cuentas_bancarias; Unidad/AutoFin son datos de cada institución. */
+const PAGO_INFO = {
+  UNIDAD: '🏦 *Unidad de Crédito*\nPuedes pagar tu cuota en línea en https://www.unidadcreditos.cl\n📞 Más información: +56 2 2653 7709\n📍 Av. Apoquindo 3200, Piso 3, Las Condes',
+  AUTOFIN: '🏦 *AutoFin*\nPuedes pagar de forma segura en https://www.autofin.cl/pagos o en https://portal.servipag.com\n📞 Contacto: 600 085 0010\n📍 Casa Matriz: Rosario Norte 532, of. 1503, Las Condes\n🕐 Servicio al Cliente: lunes a jueves 9:00–18:00, viernes 9:00–17:00',
+};
+async function dondePagar(rutRaw) {
+  const rut = String(rutRaw || '').replace(/[.\s]/g, '').toUpperCase();
+  const m = rut.match(/^(\d{7,8})-?([\dK])$/);
+  if (!m || dvRut(parseInt(m[1], 10)) !== m[2]) return { error: 'RUT_INVALIDO' };
+  const rutFmt = m[1] + '-' + m[2];
+  const [rows] = await pool.query(
+    `SELECT DISTINCT c.financiera FROM creditos c JOIN clientes cl ON cl.id_cliente=c.id_cliente
+      WHERE REPLACE(REPLACE(UPPER(cl.rut),'.',''),' ','')=? AND c.estado_credito='OTORGADO'
+        AND c.financiera IN ('AUTOFACIL','AUTOFIN','UNIDAD')`, [rutFmt]);
+  if (!rows.length) return { error: 'SIN_CREDITOS', rut: rutFmt };
+  const partes = [];
+  for (const r of rows) {
+    const fin = String(r.financiera).toUpperCase();
+    if (fin === 'AUTOFACIL') {
+      // Cuenta corriente desde la fuente única (mantenedor Cuentas Bancarias)
+      const [[cta]] = await pool.query('SELECT razon_social, rut, banco, tipo_cuenta, numero_cuenta FROM cuentas_bancarias WHERE activo=1 ORDER BY id_cuenta LIMIT 1');
+      partes.push(cta
+        ? `🏦 *AutoFácil* — paga por transferencia:\n${cta.razon_social}\n${cta.tipo_cuenta} ${cta.banco}\nN° de cuenta: ${cta.numero_cuenta}\nRUT: ${cta.rut}\n✉️ Envía el comprobante a contacto@autofacilchile.cl indicando tu RUT y N° de operación`
+        : '🏦 *AutoFácil*: escríbenos a contacto@autofacilchile.cl y te enviamos los datos de pago.');
+    } else if (PAGO_INFO[fin]) partes.push(PAGO_INFO[fin]);
+  }
+  return { rut: rutFmt, texto: partes.join('\n\n') };
+}
+
 /* ── Herramienta preevaluación: informes DealerNet en vivo por RUT (MOTOR ÚNICO
       asegurarInformes de dealernet-ws: caché de vigencia + clasificación por severidad).
       La IA junta RUT/pie/plazo; el veredicto lo pone el CÓDIGO. */
@@ -552,9 +583,11 @@ SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Cuando tengas VAL
 PREEVALUACIÓN: cuando el cliente entregue su RUT (pregunta 4), agrega al JSON "evaluacion":{"rut":"12345678-9","pie_pct":P} (P = % del pie sobre el valor del auto si lo conoces). El sistema evalúa y AGREGA el veredicto él solo después de tu "respuesta" — tú NO anticipes ningún resultado. NUNCA menciones informes comerciales, Dicom ni centrales de riesgo.
 Si antes el sistema informó "problemas para completar la preevaluación" y el cliente ACEPTA que lo llamen: responde "OK, enviaremos tu requerimiento a un Ejecutivo Comercial, quien te llamará por teléfono 📞" y deriva (derivar:true, area COMERCIAL).
 
+DÓNDE PAGAR LA CUOTA: si el cliente pregunta dónde o cómo pagar su cuota, pídele su RUT para darle la información exacta de su crédito. Cuando lo entregue, agrega al JSON "donde_pagar":{"rut":"12345678-9"} — el sistema identifica su(s) crédito(s) y AGREGA las instrucciones de pago él solo después de tu "respuesta" (tú no des datos de pago por tu cuenta). No confundas con la preevaluación: esta consulta NO evalúa, solo informa dónde pagar.
+
 CONTACTO: al derivar a COMERCIAL indica "contacto":"AHORA" si el cliente quiere hablar de inmediato, o "contacto":"DESPUES" si prefiere que lo llamen/contacten más tarde o no quiere hablar en este momento. Si es DESPUES o es fuera de horario, dile que un Ejecutivo Comercial lo contactará (no prometas que será al instante).
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "contacto": "AHORA"|"DESPUES" (si derivas a COMERCIAL), "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "contacto": "AHORA"|"DESPUES" (si derivas a COMERCIAL), "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo en preevaluación de compra), "donde_pagar": {"rut": "..."} (solo si pregunta dónde pagar y da su RUT)}`;
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -585,6 +618,18 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
       }
     } catch (e) { console.error('[wsp simulacion]', e.message); }
+  }
+  // Dónde pagar: instrucciones exactas según la(s) financiera(s) del cliente
+  if (datos.donde_pagar && datos.donde_pagar.rut) {
+    try {
+      const dp = await dondePagar(datos.donde_pagar.rut);
+      if (dp.error === 'RUT_INVALIDO') respuesta += '\n\nMmm, ese RUT no me cuadra 🤔 ¿Me lo confirmas? (por ejemplo: 12.345.678-9)';
+      else if (dp.error === 'SIN_CREDITOS') respuesta += '\n\nNo encontré créditos vigentes asociados a ese RUT 🤔 Si crees que es un error, escríbenos a contacto@autofacilchile.cl o te conecto con un ejecutivo.';
+      else {
+        respuesta += '\n\n' + dp.texto;
+        await pool.query("UPDATE wsp_conversaciones SET rut_cliente=COALESCE(rut_cliente,?) WHERE id=?", [dp.rut, conv.id]).catch(() => {});
+      }
+    } catch (e) { console.error('[wsp donde_pagar]', e.message); }
   }
   // Preevaluación determinística: DealerNet por RUT; el veredicto lo redacta el código
   if (datos.evaluacion && datos.evaluacion.rut) {
