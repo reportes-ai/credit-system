@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 -->
+<!-- v1.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -109,7 +109,8 @@
           <div><label class="f">Meses para el término — desde</label><input class="f" type="number" id="pTerMin" value="0"></div>
           <div><label class="f">Meses para el término — hasta</label><input class="f" type="number" id="pTerMax" value="6"></div>
           <div><label class="f">Renta registrada mínima $</label><input class="f" type="text" inputmode="numeric" id="pRentaMin" value="0" oninput="fmtCLP(this)"></div>
-          <div><label class="f">Política: carga máx. cuota/renta % <span style="font-weight:400;color:#94a3b8">(0 = no aplicar)</span></label><input class="f" type="number" id="pCargaMax" value="0" min="0" max="100"></div>
+          <div><label class="f">Monto mínimo de crédito $ <span style="font-weight:400;color:#94a3b8">(0 = todos)</span></label><input class="f" type="text" inputmode="numeric" id="pMontoMin" value="0" oninput="fmtCLP(this)"></div>
+          <div><label class="f">Estimar renta desde la cuota % <span style="font-weight:400;color:#94a3b8">(ej: 25 → cuota=25% de la renta; 0 = no estimar)</span></label><input class="f" type="number" id="pRentaEst" value="0" min="0" max="100"></div>
         </div>
         <button class="btn btn-azul" style="margin-top:10px" onclick="generarBD()"><i class="bi bi-database-down me-1"></i>Generar destinatarios desde la BD</button>
         <span id="msgBD" class="okmsg"></span>
@@ -124,13 +125,36 @@
       <label class="f" style="margin-top:12px">Excluir regiones (feriado regional, zona de emergencia…)</label>
       <div class="pills" id="pillsRegiones"><span style="font-size:.75rem;color:#94a3b8">Cargando regiones…</span></div>
       <label class="f" style="margin-top:12px"><input type="checkbox" id="chkIA" style="width:auto;margin-right:6px">Analizar informes comerciales con IA (DealerNet) — <span id="lblIA">riesgo</span></label>
-      <div id="zonaAnalisis" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-robot me-1"></i>Análisis de la audiencia cargada (informes comerciales + política)</div>
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-shield-check me-1"></i>Análisis de CRÉDITO (política) — opcional</div>
+        <div class="row" style="max-width:640px">
+          <div><label class="f">Carga máx. cuota/renta %</label><input class="f" type="number" id="aCargaMax" value="30" min="1" max="100"></div>
+          <div><label class="f">Estimar renta desde cuota % <span style="font-weight:400;color:#94a3b8">(0 = solo renta registrada)</span></label><input class="f" type="number" id="aRentaEst" value="0" min="0" max="100"></div>
+          <div style="align-self:end"><button class="btn btn-azul" type="button" onclick="analizarPolitica()"><i class="bi bi-calculator me-1"></i>Analizar política</button></div>
+        </div>
+        <span id="msgPol" style="font-size:.78rem;color:#6b7280"></span>
+        <div id="distPol" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"></div>
+        <button class="btn btn-rojo" type="button" onclick="excluirPolitica()" id="btnExcluirPol" style="display:none;margin-top:6px"><i class="bi bi-person-dash me-1"></i>Excluir NO CUMPLE del envío</button>
+      </div>
+
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-robot me-1"></i>Análisis de INFORMES comerciales (DealerNet + IA) — opcional</div>
         <button class="btn btn-azul" type="button" onclick="analizarAudiencia()"><i class="bi bi-search me-1"></i>Analizar seleccionados ahora</button>
         <button class="btn btn-rojo" type="button" onclick="excluirAlto()" id="btnExcluir" style="display:none"><i class="bi bi-person-dash me-1"></i>Excluir riesgo ALTO del envío</button>
         <span id="msgIA" style="font-size:.78rem;color:#6b7280;margin-left:6px"></span>
         <div id="distIA" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"></div>
-        <div style="font-size:.7rem;color:#94a3b8;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Consulta los informes DealerNet de cada RUT (caché 15 días, tiene costo). El criterio de política (carga cuota/renta) se aplica al generar la audiencia desde la BD.</div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Consulta los informes DealerNet de cada RUT (caché 15 días, tiene costo por consulta).</div>
+      </div>
+
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-person-lines-fill me-1"></i>Contactos faltantes — buscar en DealerNet y revisar uno a uno</div>
+        <span id="lblNTel" style="display:none;font-size:.78rem;margin-right:8px">Teléfonos por cliente:
+          <select id="selNTel" class="f" style="width:auto;display:inline-block;padding:4px 8px"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select>
+        </span>
+        <button class="btn btn-azul" type="button" onclick="buscarContactosDN()"><i class="bi bi-cloud-download me-1"></i>Buscar contactos en DealerNet</button>
+        <button class="btn btn-gris" type="button" onclick="abrirRevision()"><i class="bi bi-person-check me-1"></i>Revisar uno a uno</button>
+        <span id="msgDN" style="font-size:.78rem;color:#6b7280;margin-left:6px"></span>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Busca correo o teléfonos en Directorio Correo / Directorio Teléfonos / Contactabilidad de DealerNet (tiene costo). Nada se asigna solo: revisas caso a caso comparando el nombre de DealerNet con el nuestro.</div>
       </div>
     </div>
 
@@ -200,6 +224,15 @@
   </div>
 </div>
 
+<dialog id="dlgRev" style="border:none;border-radius:16px;padding:0;max-width:640px;width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.3)">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-person-check"></i><b style="flex:1">Revisión de contactos</b>
+    <span id="revPos" style="font-size:.85rem;opacity:.85"></span>
+    <button onclick="dlgRev.close()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:5px 11px;cursor:pointer"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div style="padding:18px 20px" id="revBody"></div>
+</dialog>
+
 <script src="/js/auth-guard.js"></script>
 <script>
 const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
@@ -233,6 +266,7 @@ async function init(){
 function pintaCanal(){
   document.getElementById('hCanal').innerHTML = CANAL==='MAIL' ? '<i class="bi bi-envelope-paper-fill me-1"></i>MAIL' : '<i class="bi bi-whatsapp me-1"></i>WHATSAPP';
   document.getElementById('zonaMail').style.display = CANAL==='MAIL' ? '' : 'none';
+  const ln = document.getElementById('lblNTel'); if (ln) ln.style.display = CANAL==='WSP' ? '' : 'none';
   document.getElementById('notaWsp').style.display = CANAL==='WSP' ? '' : 'none';
 }
 
@@ -393,13 +427,12 @@ async function generarBD(){
   const o = CAMP.objetivo;
   const p = o==='COBRANZA'
     ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:numCLP(pCapMin.value) }
-    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value), carga_max_pct:+pCargaMax.value||0 };
+    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value), monto_min:numCLP(pMontoMin.value), renta_est_pct:+pRentaEst.value||0 };
   const r = await fetch(`/api/campanas-masivas/${ID}/generar-desde-bd`, { method:'POST', headers: hdrs(1), body: JSON.stringify(p) });
   const j = await r.json();
   document.getElementById('msgBD').textContent = j.success
     ? `✔ ${j.data.cargados} destinatarios desde la BD (${j.data.control} en control)`
-      + (j.data.sin_contacto ? ` — ⚠ ${j.data.sin_contacto} quedaron fuera por no tener ${CANAL==='MAIL'?'email':'teléfono'} en la ficha` : '')
-      + (j.data.por_politica ? ` — 🛡 ${j.data.por_politica} fuera por política (carga cuota/renta)` : '')
+      + (j.data.sin_contacto ? ` — ⚠ ${j.data.sin_contacto} SIN ${CANAL==='MAIL'?'email':'teléfono'}: complétalos con DealerNet en el paso 4 o quedarán con error` : '')
     : ('Error: '+j.error);
   cargarPreview();
 }
@@ -456,6 +489,111 @@ function fmtCLP(el){
   try { el.setSelectionRange(pos, pos); } catch(e) {}
 }
 const numCLP = v => Number(String(v||'').replace(/\./g,'')) || 0;
+
+/* ── Análisis de CRÉDITO (política) ── */
+async function analizarPolitica(){
+  const msg = document.getElementById('msgPol');
+  const r = await fetch(`/api/campanas-masivas/${ID}/analizar-politica`, { method:'POST', headers: hdrs(1),
+    body: JSON.stringify({ carga_max_pct:+aCargaMax.value||30, renta_est_pct:+aRentaEst.value||0 }) });
+  const j = await r.json();
+  if (!j.success) { msg.textContent = 'Error: '+j.error; return; }
+  msg.textContent = `✔ Analizado con carga máxima ${j.data.carga_max_pct}%`;
+  const COL = { CUMPLE:'#dcfce7;color:#166534', NO_CUMPLE:'#fee2e2;color:#b91c1c', 'S/I':'#f1f5f9;color:#475569' };
+  document.getElementById('distPol').innerHTML = (j.data.dist||[]).filter(x=>x.politica).map(x =>
+    `<span style="border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700;background:${COL[x.politica]||COL['S/I']}">${x.politica.replace('_',' ')}: ${Number(x.n).toLocaleString('es-CL')}</span>`).join('');
+  const nc = (j.data.dist||[]).find(x=>x.politica==='NO_CUMPLE');
+  document.getElementById('btnExcluirPol').style.display = (nc && Number(nc.n)>0) ? '' : 'none';
+}
+async function excluirPolitica(){
+  if (!confirm('¿Excluir del envío a quienes NO CUMPLEN la política (carga cuota/renta)?')) return;
+  const r = await fetch(`/api/campanas-masivas/${ID}/excluir-politica`, { method:'POST', headers: hdrs() });
+  const j = await r.json();
+  document.getElementById('msgPol').textContent = j.success ? `✔ ${j.data.excluidos} excluidos por política` : ('Error: '+j.error);
+  cargarPreview();
+}
+
+/* ── Contactos faltantes: DealerNet + revisión uno a uno ── */
+async function buscarContactosDN(){
+  if (!confirm('Buscar correos/teléfonos en DealerNet para los destinatarios sin contacto tiene COSTO por consulta (caché 15 días). ¿Continuar?')) return;
+  const msg = document.getElementById('msgDN');
+  let total = 0;
+  msg.textContent = 'Consultando DealerNet…';
+  while (true) {
+    const r = await fetch(`/api/campanas-masivas/${ID}/enriquecer-contactos`, { method:'POST', headers: hdrs() });
+    const j = await r.json();
+    if (!j.success) { msg.textContent = 'Error: '+j.error; return; }
+    total += j.data.procesados;
+    msg.textContent = `${total} consultados, quedan ${j.data.pendientes}…`;
+    if (j.data.fin) break;
+  }
+  msg.textContent = `✔ Búsqueda lista (${total} consultados). Ahora "Revisar uno a uno".`;
+}
+let REV = [], revI = 0;
+async function abrirRevision(){
+  const r = await fetch(`/api/campanas-masivas/${ID}/contactos-pendientes`, { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  REV = j.data; revI = 0;
+  if (!REV.length) return alert('No hay casos con candidatos para revisar. Primero "Buscar contactos en DealerNet".');
+  pintarRev(); dlgRev.showModal();
+}
+function pintarRev(){
+  const d = REV[revI];
+  document.getElementById('revPos').textContent = `${revI+1} / ${REV.length}`;
+  const cand = safe(d.contactos_dn) || {};
+  const nuestro = [d.nombre, d.ap_paterno, d.ap_materno].filter(Boolean).join(' ').toUpperCase();
+  const dn = (cand.nombre_dn || '').toUpperCase();
+  const apellidoOk = d.ap_paterno && dn.includes(String(d.ap_paterno).toUpperCase());
+  const coincide = dn && (apellidoOk ? '✅ coincide el apellido' : '⚠ REVISAR: nombres distintos');
+  let opciones = '';
+  if (CANAL === 'MAIL') {
+    opciones = (cand.emails||[]).length
+      ? (cand.emails||[]).map((e,i)=>`<label style="display:block;padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="radio" name="revOpt" value="${e}" ${i===0?'checked':''} style="margin-right:8px">${e}</label>`).join('')
+      : '<div style="color:#9ca3af;font-size:.85rem">DealerNet no trae correos para este RUT.</div>';
+  } else {
+    const n = +document.getElementById('selNTel').value || 2;
+    opciones = (cand.telefonos||[]).length
+      ? '<div style="font-size:.72rem;color:#6b7280;margin-bottom:6px">Ordenados por probabilidad de contacto (frecuencia en los informes; móviles primero). Marca hasta '+n+':</div>'
+        + (cand.telefonos||[]).map((t,i)=>`<label style="display:block;padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="checkbox" name="revOpt" value="${t.num}" ${i<n?'checked':''} style="margin-right:8px">${t.num} <span style="color:#94a3b8;font-size:.72rem">score ${t.score}</span></label>`).join('')
+      : '<div style="color:#9ca3af;font-size:.85rem">DealerNet no trae teléfonos para este RUT.</div>';
+  }
+  document.getElementById('revBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:#eff6ff;border-radius:10px;padding:10px 12px"><div style="font-size:.68rem;font-weight:700;color:#6b7280">NUESTRO CLIENTE</div><b>${nuestro||'—'}</b><div style="font-size:.78rem;color:#64748b">${d.rut||''}</div></div>
+      <div style="background:${apellidoOk?'#f0fdf4':'#fffbeb'};border-radius:10px;padding:10px 12px"><div style="font-size:.68rem;font-weight:700;color:#6b7280">SEGÚN DEALERNET</div><b>${dn||'— sin nombre —'}</b><div style="font-size:.78rem;color:#64748b">${coincide||''}</div></div>
+    </div>
+    ${cand.error ? `<div style="color:#dc2626;font-size:.82rem;margin-bottom:8px">Error DealerNet: ${cand.error}</div>` : ''}
+    <div style="max-height:260px;overflow-y:auto">${opciones}</div>
+    ${CANAL==='MAIL' ? '<input class="f" id="revManual" placeholder="…o escribe un correo manualmente" style="margin-top:6px">' : ''}
+    <div style="display:flex;gap:8px;margin-top:14px;align-items:center">
+      <button class="btn btn-gris" onclick="revNav(-1)"><i class="bi bi-chevron-left"></i></button>
+      <button class="btn btn-verde" onclick="asignarRev()"><i class="bi bi-check-lg me-1"></i>Asignar y siguiente</button>
+      <button class="btn btn-gris" onclick="revNav(1)">Omitir <i class="bi bi-chevron-right"></i></button>
+      <span id="msgRev" style="font-size:.78rem;color:#16a34a"></span>
+    </div>`;
+}
+function revNav(dir){ revI = Math.max(0, Math.min(REV.length-1, revI+dir)); pintarRev(); }
+async function asignarRev(){
+  const d = REV[revI];
+  let body = { id_destinatario: d.id };
+  if (CANAL === 'MAIL') {
+    const manual = (document.getElementById('revManual')?.value||'').trim();
+    const sel = document.querySelector('input[name="revOpt"]:checked');
+    body.email = manual || (sel && sel.value);
+    if (!body.email) return alert('Selecciona o escribe un correo');
+  } else {
+    const n = +document.getElementById('selNTel').value || 2;
+    body.telefonos = [...document.querySelectorAll('input[name="revOpt"]:checked')].map(x=>x.value).slice(0, n);
+    if (!body.telefonos.length) return alert('Marca al menos 1 teléfono');
+  }
+  const r = await fetch(`/api/campanas-masivas/${ID}/asignar-contacto`, { method:'POST', headers: hdrs(1), body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  REV.splice(revI, 1);
+  if (!REV.length) { dlgRev.close(); document.getElementById('msgDN').textContent = '✔ Todos los contactos revisados'; cargarPreview(); return; }
+  revI = Math.min(revI, REV.length-1);
+  pintarRev();
+}
 
 /* ── Análisis de audiencia: informes DealerNet por lotes + exclusión de riesgo ── */
 async function analizarAudiencia(){

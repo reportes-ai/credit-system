@@ -26,5 +26,10 @@ router.get('/:id/resultados',        verifyToken, puede, c.resultados);
 router.get('/:id/destinatarios',     verifyToken, puede, c.destinatarios);
 router.post('/:id/analizar-ia',      verifyToken, puede, c.analizarIA);
 router.post('/:id/excluir-riesgo',   verifyToken, puede, c.excluirRiesgo);
+router.post('/:id/analizar-politica',    verifyToken, puede, c.analizarPolitica);
+router.post('/:id/excluir-politica',     verifyToken, puede, c.excluirPolitica);
+router.post('/:id/enriquecer-contactos', verifyToken, puede, c.enriquecerContactos);
+router.get('/:id/contactos-pendientes',  verifyToken, puede, c.contactosPendientes);
+router.post('/:id/asignar-contacto',     verifyToken, puede, c.asignarContacto);
 
 module.exports = router;

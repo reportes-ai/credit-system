@@ -88,8 +88,18 @@ const CAMPO_KEYS = CAMPOS.map(c => c.key);
         convertido TINYINT(1) NOT NULL DEFAULT 0,
         convertido_at DATETIME NULL, dias_a_conversion INT NULL, monto_convertido DECIMAL(15,2) NULL,
         riesgo_ia VARCHAR(10) NULL,                        -- BAJO | MEDIO | ALTO
+        renta DECIMAL(15,2) NULL,                          -- registrada o estimada (para análisis de política)
+        renta_estimada TINYINT(1) NOT NULL DEFAULT 0,
+        politica VARCHAR(12) NULL,                         -- CUMPLE | NO_CUMPLE | S/I
+        contactos_dn JSON NULL,                            -- candidatos de contacto desde DealerNet
+        telefonos_alt JSON NULL,                           -- teléfonos alternativos seleccionados (WSP)
         INDEX idx_camp (id_campana), INDEX idx_camp_estado (id_campana, estado)
       )`);
+
+    for (const col of ["renta DECIMAL(15,2) NULL", "renta_estimada TINYINT(1) NOT NULL DEFAULT 0",
+                       "politica VARCHAR(12) NULL", "contactos_dn JSON NULL", "telefonos_alt JSON NULL"]) {
+      await pool.query(`ALTER TABLE campanas_destinatarios ADD COLUMN IF NOT EXISTS ${col}`);
+    }
 
     // Card en el Home (anti-hardcode: módulo + funcionalidad + permiso Admin)
     await pool.query(
@@ -353,7 +363,6 @@ exports.generarDesdeBD = async (req, res) => {
     const exRegSQL = exReg.length ? `AND (cl.id_region IS NULL OR cl.id_region NOT IN (${exReg.map(() => '?').join(',')}))` : '';
 
     let rows = [];
-    let porPolitica = 0;
     if (c.objetivo === 'COBRANZA') {
       const [r] = await pool.query(`
         SELECT cl.rut, cl.nombres nombre, cl.apellido_paterno ap_paterno, cl.apellido_materno ap_materno,
@@ -394,21 +403,28 @@ exports.generarDesdeBD = async (req, res) => {
         ) al ON al.rut_cliente = cl.rut
         WHERE cr.estado_credito='OTORGADO' AND cr.fecha_otorgado IS NOT NULL AND cr.plazo > 0
           AND TIMESTAMPDIFF(MONTH, CURDATE(), DATE_ADD(cr.fecha_otorgado, INTERVAL cr.plazo MONTH)) BETWEEN ? AND ?
-          AND COALESCE(al.renta, 0) >= ?
           ${exRegSQL}
-        LIMIT 10000`, [Number(p.termino_min) || 0, Number(p.termino_max) || 6, Number(p.renta_min) || 0, ...exReg]);
+        LIMIT 10000`, [Number(p.termino_min) || 0, Number(p.termino_max) || 6, ...exReg]);
       // un cliente con más de un crédito por terminar recibe UN solo mensaje
-      // Criterio de POLITICA opcional: carga financiera cuota/renta <= X% (solo si hay renta registrada)
-      const cargaMax = Number(p.carga_max_pct) || 0;
-      let base = r;
-      if (cargaMax > 0) {
-        base = r.filter(x => {
-          if (!Number(x.renta) || !Number(x.valor_cuota)) return true; // sin data no se castiga
-          const ok2 = (Number(x.valor_cuota) / Number(x.renta)) * 100 <= cargaMax;
-          if (!ok2) porPolitica++;
-          return ok2;
-        });
-      }
+      // Cuota faltante en créditos antiguos → cuota francesa con el MOTOR ÚNICO (rentabilidad-core)
+      const { cuotaFrancesa } = require('../../../../api-gateway/public/js/rentabilidad-core');
+      // Renta estimada desde la cuota (ej: cuota = 25% de la renta → renta = cuota/0,25)
+      const estPct = Number(p.renta_est_pct) || 0;
+      let base = r.map(x => {
+        let vc = Number(x.valor_cuota) || 0;
+        if (!vc && Number(x.monto_credito) && Number(x.cuotas) && Number(x.tasa) > 0) {
+          vc = Math.round(cuotaFrancesa(Number(x.monto_credito), Number(x.tasa) / 100, Number(x.cuotas)));
+        }
+        let renta = Number(x.renta) || null, estimada = 0;
+        if (!renta && estPct > 0 && vc) { renta = Math.round(vc / (estPct / 100)); estimada = 1; }
+        return { ...x, valor_cuota: vc || x.valor_cuota, renta, renta_estimada: estimada };
+      });
+      // Monto mínimo de crédito a ofrecer
+      const montoMin = Number(p.monto_min) || 0;
+      if (montoMin > 0) base = base.filter(x => Number(x.monto_credito) >= montoMin);
+      // Renta mínima (registrada o estimada)
+      const rentaMin = Number(p.renta_min) || 0;
+      if (rentaMin > 0) base = base.filter(x => Number(x.renta) >= rentaMin);
       const vistos = new Set();
       rows = base.filter(x => { const k = limpiaRut(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
         .map(x => ({
@@ -417,16 +433,11 @@ exports.generarDesdeBD = async (req, res) => {
         }));
     }
 
-    // Sin dato de contacto del canal → fuera (una campaña de Mail no puede escribir a quien no tiene email)
-    const totalBruto = rows.length;
-    rows = rows.filter(x => c.canal === 'MAIL' ? (x.email && String(x.email).includes('@')) : !!x.telefono);
-    const sinContacto = totalBruto - rows.length;
-    if (!rows.length) return fail(res, totalBruto
-      ? `Se encontraron ${totalBruto} clientes pero NINGUNO tiene ${c.canal === 'MAIL' ? 'email' : 'teléfono'} registrado — corrige las fichas o usa el otro canal`
-      : 'La búsqueda no arrojó clientes con esos parámetros', 400);
+    // Los sin dato de contacto SE CARGAN igual (se pueden completar desde DealerNet antes de enviar)
+    const sinContacto = rows.filter(x => c.canal === 'MAIL' ? !(x.email && String(x.email).includes('@')) : !x.telefono).length;
     await pool.query('DELETE FROM campanas_destinatarios WHERE id_campana=?', [c.id]);
     const cols = ['rut', 'nombre', 'ap_paterno', 'ap_materno', 'genero', 'saludo', 'email', 'telefono',
-      'monto_credito', 'cuotas', 'tasa', 'valor_cuota', 'esp1', 'esp2'];
+      'monto_credito', 'cuotas', 'tasa', 'valor_cuota', 'esp1', 'esp2', 'renta', 'renta_estimada'];
     const values = rows.map(f => {
       const decil = decilDe(f.rut);
       const grupo = (decil !== null && deciles.includes(decil)) ? 'CONTROL' : 'CAMPANA';
@@ -436,7 +447,7 @@ exports.generarDesdeBD = async (req, res) => {
       VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 3).slice(0, -1)})`).join(',')}`, values.flat());
     await pool.query('UPDATE campanas_masivas SET parametros=? WHERE id=?', [JSON.stringify(p), c.id]);
     ok(res, { cargados: values.length, control: values.filter(v => v[v.length - 1] === 'CONTROL').length,
-              sin_contacto: sinContacto, por_politica: porPolitica });
+              sin_contacto: sinContacto });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -541,17 +552,22 @@ exports.enviar = async (req, res) => {
           if (!token || !phoneId) r = { ok: false, error: 'WhatsApp no configurado (WSP_TOKEN/WSP_PHONE_ID)' };
           else if (!d.telefono) r = { ok: false, error: 'Sin teléfono' };
           else {
-            // Normalización chilena: "9 1234 5678" → 56912345678
-            let to = String(d.telefono).replace(/\D/g, '');
-            if (to.length === 9 && to.startsWith('9')) to = '56' + to;
-            if (to.length === 8) to = '569' + to;
-            const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: merge(c.texto, d) } }),
-            });
-            const j = await resp.json().catch(() => ({}));
-            r = resp.ok ? { ok: true } : { ok: false, error: j.error?.message || `HTTP ${resp.status} (fuera de ventana 24h se requiere plantilla aprobada)` };
+            // Intentar el teléfono principal y luego los alternativos (DealerNet) hasta que uno acepte
+            const lista = [d.telefono, ...(safeJSON(d.telefonos_alt) || [])].filter(Boolean);
+            r = { ok: false, error: 'Sin teléfono' };
+            for (const tel of lista) {
+              let to = String(tel).replace(/\D/g, '');
+              if (to.length === 9 && to.startsWith('9')) to = '56' + to;
+              if (to.length === 8) to = '569' + to;
+              const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: merge(c.texto, d) } }),
+              });
+              const j = await resp.json().catch(() => ({}));
+              r = resp.ok ? { ok: true } : { ok: false, error: j.error?.message || `HTTP ${resp.status} (fuera de ventana 24h se requiere plantilla aprobada)` };
+              if (r.ok) break;
+            }
           }
         }
       } catch (e) { r = { ok: false, error: e.message }; }
@@ -687,6 +703,159 @@ exports.analizarIA = async (req, res) => {
     }
     const [[{ p }]] = await pool.query('SELECT COUNT(*) p FROM campanas_destinatarios WHERE id_campana=? AND riesgo_ia IS NULL AND rut IS NOT NULL', [c.id]);
     ok(res, { procesados: hechos, pendientes: p, fin: p === 0 });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── ANÁLISIS DE CRÉDITO (política) — aparte del de informes, ambos opcionales ──
+   Regla: la cuota no debe superar carga_max% de la renta (registrada o estimada).
+   Sin renta → S/I (no se castiga). Marca la columna politica por destinatario. */
+exports.analizarPolitica = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    const cargaMax = Number(req.body?.carga_max_pct) || 30;
+    const estPct   = Number(req.body?.renta_est_pct) || 0;
+    if (estPct > 0) {
+      await pool.query(`
+        UPDATE campanas_destinatarios
+        SET renta = ROUND(valor_cuota / (? / 100)), renta_estimada = 1
+        WHERE id_campana=? AND (renta IS NULL OR renta = 0) AND valor_cuota IS NOT NULL AND valor_cuota > 0`,
+        [estPct, c.id]);
+    }
+    await pool.query(`
+      UPDATE campanas_destinatarios
+      SET politica = CASE
+        WHEN renta IS NULL OR renta = 0 OR valor_cuota IS NULL OR valor_cuota = 0 THEN 'S/I'
+        WHEN (valor_cuota / renta) * 100 <= ? THEN 'CUMPLE'
+        ELSE 'NO_CUMPLE' END
+      WHERE id_campana=?`, [cargaMax, c.id]);
+    const [dist] = await pool.query(
+      'SELECT politica, COUNT(*) n FROM campanas_destinatarios WHERE id_campana=? GROUP BY politica', [c.id]);
+    ok(res, { carga_max_pct: cargaMax, dist });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Excluir del envío por política (NO_CUMPLE) ── */
+exports.excluirPolitica = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'La campaña ya fue enviada', 400);
+    const [r] = await pool.query(
+      "UPDATE campanas_destinatarios SET grupo='EXCLUIDO' WHERE id_campana=? AND grupo='CAMPANA' AND politica='NO_CUMPLE'",
+      [req.params.id]);
+    ok(res, { excluidos: r.affectedRows });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── ENRIQUECER CONTACTOS desde DealerNet ────────────────────────────────
+   Para destinatarios SIN el dato del canal: consulta Directorio Correo (3411) /
+   Directorio Teléfonos (3410) + Contactabilidad (3407) + Identificación (3440),
+   extrae candidatos del informe (extractor genérico sobre el JSON) y los deja
+   en contactos_dn para REVISIÓN UNO A UNO (nombre DealerNet vs nuestro nombre).
+   Lotes de 5 (cada consulta DealerNet tiene costo; caché 15 días). */
+const PROD_MAIL = ['3411', '3440'];
+const PROD_TEL  = ['3410', '3407', '3440'];
+function extraerContactos(textos) {
+  const todo = textos.join('\n');
+  const emails = [...new Set((todo.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [])
+    .map(e => e.toLowerCase()).filter(e => !e.includes('dealernet')))];
+  // teléfonos chilenos normalizados; puntaje = frecuencia en el informe + bonus móvil
+  const freq = {};
+  for (const m of (todo.match(/(?:\+?56)?\s?(?:9\s?\d{4}\s?\d{4}|\d{8,9})/g) || [])) {
+    let d = m.replace(/\D/g, '');
+    if (d.startsWith('56')) d = d.slice(2);
+    if (d.length === 9 && d.startsWith('9')) d = '56' + d;
+    else if (d.length === 9 && d.startsWith('2')) d = '56' + d;
+    else if (d.length === 8) d = '569' + d;
+    else continue;
+    freq[d] = (freq[d] || 0) + 1;
+  }
+  const telefonos = Object.entries(freq)
+    .map(([num, n]) => ({ num: '+' + num, score: n + (num.startsWith('569') ? 10 : 0) }))
+    .sort((a, b) => b.score - a.score).slice(0, 8);
+  const nf = {};
+  for (const m of (todo.match(/"@_nombre":\s*"([^"]{5,80})"/g) || [])) {
+    const v = m.replace(/^"@_nombre":\s*"/, '').replace(/"$/, '').trim().toUpperCase();
+    if (v && !/EMPRESA|BANCO/.test(v)) nf[v] = (nf[v] || 0) + 1;
+  }
+  const nombre_dn = Object.entries(nf).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  return { nombre_dn, emails: emails.slice(0, 6), telefonos };
+}
+
+exports.enriquecerContactos = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT * FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'La campaña ya fue enviada', 400);
+    const cond = c.canal === 'MAIL' ? "(email IS NULL OR email='' OR email NOT LIKE '%@%')" : "(telefono IS NULL OR telefono='')";
+    const [pend] = await pool.query(`
+      SELECT id, rut FROM campanas_destinatarios
+      WHERE id_campana=? AND grupo IN ('CAMPANA','CONTROL') AND ${cond} AND contactos_dn IS NULL AND rut IS NOT NULL
+      LIMIT 5`, [c.id]);
+    if (!pend.length) {
+      const [[{ q }]] = await pool.query(`SELECT COUNT(*) q FROM campanas_destinatarios WHERE id_campana=? AND ${cond} AND contactos_dn IS NOT NULL`, [c.id]);
+      return ok(res, { procesados: 0, pendientes: 0, revisables: q, fin: true });
+    }
+    const { asegurarInformes } = require('../../../clientes/src/controllers/dealernet-ws.controller');
+    const productos = c.canal === 'MAIL' ? PROD_MAIL : PROD_TEL;
+    let hechos = 0;
+    for (const d of pend) {
+      try {
+        const rut = limpiaRut(d.rut).replace(/^(\d+)([\dK])$/, '$1-$2');
+        await asegurarInformes({ rut, productos, usuario: null });
+        const m = limpiaRut(d.rut).match(/^(\d+)([\dK])$/);
+        const [infs] = await pool.query(
+          `SELECT contenido FROM dealernet_informes WHERE rut=? AND codigo_producto IN (?) AND retcode=0 ORDER BY id DESC LIMIT 6`,
+          [m ? m[1] : d.rut, productos]);
+        const cand = extraerContactos(infs.map(i => String(i.contenido || '')));
+        await pool.query('UPDATE campanas_destinatarios SET contactos_dn=? WHERE id=?', [JSON.stringify(cand), d.id]);
+        hechos++;
+      } catch (e) {
+        await pool.query('UPDATE campanas_destinatarios SET contactos_dn=? WHERE id=?',
+          [JSON.stringify({ error: e.message.slice(0, 120) }), d.id]);
+      }
+    }
+    const [[{ p2 }]] = await pool.query(`
+      SELECT COUNT(*) p2 FROM campanas_destinatarios
+      WHERE id_campana=? AND grupo IN ('CAMPANA','CONTROL') AND ${cond} AND contactos_dn IS NULL AND rut IS NOT NULL`, [c.id]);
+    ok(res, { procesados: hechos, pendientes: p2, fin: p2 === 0 });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Casos a revisar + asignación UNO A UNO ── */
+exports.contactosPendientes = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT canal FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    const cond = c.canal === 'MAIL' ? "(email IS NULL OR email='' OR email NOT LIKE '%@%')" : "(telefono IS NULL OR telefono='')";
+    const [rows] = await pool.query(`
+      SELECT id, rut, nombre, ap_paterno, ap_materno, email, telefono, contactos_dn
+      FROM campanas_destinatarios
+      WHERE id_campana=? AND ${cond} AND contactos_dn IS NOT NULL
+      ORDER BY id LIMIT 500`, [req.params.id]);
+    ok(res, rows);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.asignarContacto = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT estado, canal FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'La campaña ya fue enviada', 400);
+    const { id_destinatario, email, telefonos } = req.body || {};
+    if (!id_destinatario) return fail(res, 'Falta id_destinatario', 400);
+    if (c.canal === 'MAIL') {
+      if (!email || !String(email).includes('@')) return fail(res, 'Email inválido', 400);
+      await pool.query('UPDATE campanas_destinatarios SET email=? WHERE id=? AND id_campana=?',
+        [String(email).trim().toLowerCase(), id_destinatario, req.params.id]);
+    } else {
+      const tels = (Array.isArray(telefonos) ? telefonos : []).map(t => String(t).trim()).filter(Boolean).slice(0, 3);
+      if (!tels.length) return fail(res, 'Selecciona al menos 1 teléfono', 400);
+      await pool.query('UPDATE campanas_destinatarios SET telefono=?, telefonos_alt=? WHERE id=? AND id_campana=?',
+        [tels[0], JSON.stringify(tels.slice(1)), id_destinatario, req.params.id]);
+    }
+    ok(res, { asignado: true });
   } catch (e) { fail(res, e.message); }
 };
 

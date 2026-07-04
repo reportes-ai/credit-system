@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 -->
+<!-- v2.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -200,7 +200,7 @@
   <h3>Cargar la data (paso 3)</h3>
   <ul>
     <li><b>Carga manual (Excel/CSV):</b> para clientes fuera de nuestras bases. Elige primero las variables → <b>Descargar plantilla CSV</b> (trae los encabezados y una fila de ejemplo) → llénala en Excel (una fila por cliente, separador <code>;</code>) → <b>Subir CSV</b>. El sistema calcula el decil de cada RUT e informa cuántos quedaron en campaña y en control.</li>
-    <li><b>Desde nuestras bases, por parámetros:</b> COBRANZA = días de mora (desde/hasta) + capital adeudado mínimo → trae clientes con cuotas vencidas y llena <code>{{esp1}}</code> ("N cuota(s) vencida(s) — X días"). VENTA = meses para el término del crédito (calculado de fecha de otorgamiento + cuotas contratadas) + renta registrada mínima → el momento perfecto para ofrecer renovación; llena <code>{{esp1}}</code> ("A tu crédito le quedan N meses"). Nombres, contacto y cifras salen del crédito real. VENTA acepta además un criterio de <b>política</b>: carga máxima cuota/renta % (excluye a quien la supera; sin renta registrada no se castiga). <b>Importante:</b> quien no tenga el dato de contacto del canal (email para Mail, teléfono para WhatsApp) <b>queda fuera automáticamente</b> y el sistema te dice cuántos fueron.</li>
+    <li><b>Desde nuestras bases, por parámetros:</b> COBRANZA = días de mora (desde/hasta) + capital adeudado mínimo → clientes con cuotas vencidas. VENTA = meses para el término del crédito + <b>monto mínimo de crédito a ofrecer</b> (ej: desde $3.000.000) + renta mínima + <b>estimación de renta desde la cuota</b> (ej: 25 → se asume que la cuota es el 25% de la renta, para clientes sin renta registrada; si el crédito antiguo no trae cuota, se calcula con la cuota francesa del motor único). Los <b>sin dato de contacto se cargan igual</b>: se completan con DealerNet en el paso 4 o quedarán con error al enviar.</li>
   </ul>
   <div class="tip">Volver a generar (o re-subir el CSV) <b>reemplaza</b> la lista completa — no se duplica.</div>
 
@@ -240,7 +240,8 @@
     <li><b>Conversión:</b> VENTA = crédito OTORGADO del RUT en los 30 días post-envío (guarda día y monto); COBRANZA = pago de cuota en los 30 días post-envío. Se corre con <b>Recalcular conversión</b> — hazlo cada 2–3 días para ver la curva crecer.</li>
     <li><b>Champion–Challenger:</b> tres cuadros — tasa de la CAMPAÑA, tasa del CONTROL (conversiones naturales) y el <b>UPLIFT</b>: cuánto mejor lo hizo la campaña vs. no hacer nada. Uplift ~0 = el mensaje no movió la aguja.</li>
     <li><b>Torta 3D de estados</b> (salud del envío: mucho ERROR = data de contacto mala) y <b>curva de conversión acumulada por día</b> (campaña vs. control): muestra cuántos días tarda en reaccionar el cliente y cuándo la curva se aplana.</li>
-    <li><b>Análisis de la audiencia</b> (paso 4, antes de enviar): el botón <b>"Analizar seleccionados ahora"</b> consulta los informes DealerNet de cada RUT (caché 15 días, <b>tiene costo por consulta</b>) y clasifica BAJO / MEDIO / ALTO — en VENTA es riesgo de otorgar; en COBRANZA, probabilidad de no pago. Con el resultado a la vista puedes <b>excluir del envío a los de riesgo ALTO</b> con un clic (quedan como EXCLUIDOS, nunca se les envía). La distribución también aparece en el informe final.</li>
+    <li><b>Análisis de la audiencia</b> (paso 4, antes de enviar — <b>dos análisis separados y ambos opcionales</b>): (a) <b>Análisis de CRÉDITO (política)</b>: verifica que la cuota no supere la carga máxima cuota/renta % que definas (usa la renta registrada o la estimada desde la cuota) y clasifica CUMPLE / NO CUMPLE / S-I, con botón para excluir del envío a los NO CUMPLE; (b) <b>Análisis de INFORMES (DealerNet + IA)</b>: consulta los informes de cada RUT (caché 15 días, tiene costo) y clasifica BAJO / MEDIO / ALTO, con botón para excluir a los de riesgo ALTO. Los excluidos nunca reciben el mensaje y ambas distribuciones quedan a la vista.</li>
+    <li><b>Contactos faltantes desde DealerNet:</b> para los destinatarios sin email (Mail) o sin teléfono (WhatsApp), el botón <b>"Buscar contactos en DealerNet"</b> consulta Directorio Correo / Directorio Teléfonos / Contactabilidad (tiene costo). Nada se asigna solo: en <b>"Revisar uno a uno"</b> ves el nombre según DealerNet junto al nuestro (con aviso si no coincide el apellido) y eliges el correo, o marcas los <b>1, 2 o 3 teléfonos con más probabilidad de contacto</b> (rankeados por frecuencia en los informes, móviles primero). En WhatsApp el envío intenta el primer teléfono y, si falla, sigue con los alternativos.</li>
   </ul>
 
   <h3>Preguntas frecuentes</h3>
