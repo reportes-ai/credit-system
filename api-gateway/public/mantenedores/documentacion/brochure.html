@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,7 +34,7 @@
   <p>Porque ningún software genérico entiende cómo trabaja AutoFácil. El Suite reemplaza planillas dispersas, paneles pagados de terceros y procesos manuales por <b>una sola plataforma donde todo conversa entre sí</b>: el crédito que se digita alimenta las comisiones, la cartola, la cobranza, la reportería y el portal del cliente — sin volver a escribir nada.</p>
 
   <div class="pilares">
-    <div class="pilar"><b>🔧 Paramétrico</b><br>Tasas, comisiones, estados, plantillas, alertas y flujos se cambian desde mantenedores, sin tocar código.</div>
+    <div class="pilar"><b>🔧 Paramétrico</b><br>Tasas, comisiones, estados, plantillas, alertas y flujos se cambian desde mantenedores, sin tocar código. Las aprobaciones y escalamientos se dibujan como <b>flowchart</b>: máquina de estados del crédito y cadenas de aprobación configurables.</div>
     <div class="pilar"><b>🧮 Un solo motor por cálculo</b><br>Cada cifra (cuota, mora, comisión, rentabilidad) se calcula en un único lugar: el mismo número en toda la app.</div>
     <div class="pilar"><b>🗄️ Una sola fuente de datos</b><br>Cada dato vive en un solo hogar; el resto lo referencia. Nada de versiones distintas del mismo cliente.</div>
     <div class="pilar"><b>🤖 IA integrada</b><br>Análisis de documentos, informes crediticios, bot comercial y validaciones — con costo trackeado al centavo.</div>
@@ -44,7 +44,7 @@
   <ul>
     <li><b>Facilito, el bot de WhatsApp</b> — atiende 24/7 en el número del negocio: cotiza con gastos y seguros reales, preevalúa al cliente con informes DealerNet en segundos y le dice exactamente dónde pagar su cuota. Las oportunidades se reparten automáticamente a los ejecutivos con copia al jefe.</li>
     <li><b>Cotizador y simulador</b> — cuota francesa con gastos operacionales, seguros por tramo y tasa vigente; cotizaciones guardadas y visibles en la ficha del cliente.</li>
-    <li><b>Evaluación Crediticia</b> — ficha completa por RUT: antecedentes, cotizaciones, informes comerciales en vivo (DealerNet) y Reporte Crediticio Automático generado por IA.</li>
+    <li><b>Evaluación Crediticia con IA</b> — ficha completa por RUT: antecedentes, cotizaciones e informes comerciales en vivo (DealerNet). La IA evalúa al cliente <b>contra la Política de Crédito de AutoFácil</b> y genera el Reporte Crediticio Automático; la documentación del cliente (liquidaciones, antecedentes, informes) queda <b>guardada en su ficha</b> para siempre.</li>
     <li><b>Cartas de Aprobación</b> — emisión con autofill desde PDFs de la financiera, rentabilidad por carta, vigencia con vencimiento automático y paso a Otorgado con un clic.</li>
     <li><b>Carga masiva y digitación</b> — Excel con validación inteligente, cola de datos faltantes con bloqueo por usuario y recálculo automático de comisiones.</li>
   </ul>
@@ -62,7 +62,7 @@
   <ul>
     <li><b>Atención Remota</b> — el corazón de la relación digital con la red: cada dealer tiene su cuenta propia y chatea en vivo con AutoFácil desde su navegador. El equipo interno atiende <b>hasta 3 conversaciones en paralelo</b>, comparte documentos en el mismo chat y —la joya— puede levantar una <b>videollamada directa en el navegador</b> (tecnología propia, sin Zoom ni apps externas) para acompañar al dealer en el <b>curse del crédito</b>: se revisan juntos los documentos, se resuelven dudas en el momento y la operación sale bien a la primera.</li>
     <li><b>Portal del Dealer</b> (dealers.autofacilchile.cl) — autoconsulta 24/7: sus operaciones y en qué estado van, <b>qué documentos le faltan</b> para que le paguen, sus cartolas y comisiones, y el estado de su pago. Incluye chat con su ejecutivo y un <b>asistente IA</b> que responde sobre SUS operaciones (cada dealer ve solo lo suyo — aislamiento total). Menos llamadas preguntando "¿y mi pago?", más tiempo para vender.</li>
-    <li><b>Incorporación de Dealers</b> — el alta de un dealer nuevo con cadena de aprobación paramétrica (autorizar → imprimir → firmar → cerrar), su propia tabla de comisiones y alertas por etapa.</li>
+    <li><b>Incorporación de Dealers con evaluación automática</b> — el alta de un dealer nuevo corre por un <b>flowchart de aprobación y escalamiento paramétrico</b> (autorizar → imprimir → firmar → cerrar, con visto de Gerencia si la comisión supera la pizarra y alertas por etapa). El Suite <b>evalúa solo al dealer</b>: pide a DealerNet los informes comerciales de la empresa y de sus socios, arma el rating con <b>alerta grave automática</b> (registros judiciales/penales) y deja el reporte IA en la ficha. Su <b>documentación queda guardada y firmada</b> en la ficha del dealer.</li>
     <li><b>Plan Liquidez</b> — anticipo de comisiones para dealers Super Partner, con motor de descuento automático en la orden de pago.</li>
     <li><b>Mapa de la red</b> — todos los dealers georreferenciados para planificar visitas y cobertura.</li>
   </ul>
@@ -79,6 +79,7 @@
     <li><b>CRM</b> — gestiones de contacto, campañas de outbound y estadísticas: cada interacción con el cliente queda registrada y medible.</li>
     <li><b>Campañas por WhatsApp y correo</b> — marketing y cobranza masivos desde el propio Suite: audiencias armadas con los datos del negocio (cartera en mora, créditos vigentes o listas propias), plantillas aprobadas por Meta para WhatsApp y correos automáticos por tramo de mora — con cooldown y tope de envíos para no hostigar al cliente.</li>
     <li><b>"Pregúntale a AutoFácil"</b> — BI conversacional: preguntas de negocio en lenguaje natural sobre los datos del Suite.</li>
+    <li><b>Reportería en línea que compara sola</b> — el Dashboard mide el mes en vivo contra <b>los mismos días del mes anterior</b> (peras con peras), contra el <b>presupuesto</b> y contra la <b>propia historia</b> del negocio; y baja el detalle a cada ejecutivo y cada dealer, marcando en rojo <b>en qué está caído cada uno</b> para actuar hoy, no a fin de mes.</li>
     <li><b>Dashboard y Reportería Tailor Made</b> — colocaciones, resúmenes por institución y reportes a la medida exportables.</li>
     <li><b>Presupuesto y Meses Cerrados</b> — metas contra real, y cierre contable que congela los números del mes.</li>
   </ul>
