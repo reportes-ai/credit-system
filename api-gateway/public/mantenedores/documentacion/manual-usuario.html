@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,6 +19,9 @@
   .tip { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:.88rem; }
   ol, ul { padding-left:22px; } li { margin-bottom:5px; }
   code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
+  figure.shot { margin:16px 0 22px; }
+  figure.shot img { width:100%; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 4px 14px rgba(2,45,112,.10); display:block; }
+  figure.shot figcaption { font-size:.8rem; color:#64748b; margin-top:6px; text-align:center; }
   @media print { .bar { display:none; } .toc { column-count:1; } }
   @media (max-width:640px){ .toc { column-count:1; } }
 </style>
@@ -56,6 +59,8 @@
     <li><b>Ayuda contextual:</b> el botón "?" flotante explica la página donde estás (si tiene ayuda cargada).</li>
     <li><b>Cambiar contraseña:</b> clic en tu nombre (arriba a la derecha) → Cambiar contraseña.</li>
   </ul>
+  <figure class="shot"><img src="img/home.png" alt="Home del Suite" loading="lazy"><figcaption>El Home: solo los módulos que tu perfil puede usar, con indicadores UF/TMC y la campana de alertas arriba.</figcaption></figure>
+  <figure class="shot"><img src="img/mi-dia.png" alt="Panel Mi Día" loading="lazy"><figcaption>Mi Día: tus pendientes reales según tu rol, de un vistazo.</figcaption></figure>
 
   <h2 id="creditos">2. Créditos y carga masiva</h2>
   <h3>Crear o consultar créditos</h3>
@@ -64,6 +69,7 @@
     <li><b>N° OP</b> es nuestro correlativo único; <b>ID Financiera</b> es el número de la institución. No son lo mismo.</li>
     <li><b>Crear crédito:</b> botón Nuevo → completa los datos; las comisiones e ingresos se calculan solos.</li>
   </ul>
+  <figure class="shot"><img src="img/creditos.png" alt="Gestión de Créditos" loading="lazy"><figcaption>Gestión de Créditos: contadores por etapa y estado, filtros por financiera y búsqueda (datos de clientes difuminados).</figcaption></figure>
   <h3>Carga masiva</h3>
   <div class="paso">Créditos → Carga Masiva → sube el Excel → el validador (con IA) marca anomalías (RUT, montos, dealers, fechas) antes de insertar → confirma. Los créditos que quedaron incompletos entran a la cola de <b>Digitación de Datos Faltantes</b>: se toman de a uno (bloqueo de 20 min por usuario), los campos faltantes en rojo.</div>
 
@@ -74,6 +80,7 @@
     <li><b>Vigencia:</b> la carta aprobada vive 5 días corridos (configurable). En <b>Cartas Vigentes</b> se decide: <b>Otorgar</b> (crea el crédito OTORGADO y cartola) o <b>Desistir</b>. Si vence sola, pasa a DESISTIDA y ya no se puede imprimir.</li>
   </ol>
   <div class="tip">La comisión del dealer que rige es la de la carta (negociación especial). Si la carta no la trae, se calcula por parámetros.</div>
+  <figure class="shot"><img src="img/cartas.png" alt="Módulo Cartas de Aprobación" loading="lazy"><figcaption>El módulo de Cartas: generar, revisar (pool de analistas), Cartas Vigentes para Otorgar/Desistir, impresión y carga masiva.</figcaption></figure>
 
   <h2 id="evaluacion">4. Evaluación Crediticia</h2>
   <ol>
@@ -82,6 +89,7 @@
     <li>Si los antecedentes tienen más de 30 días, carga información nueva (ocupación + documentos; las liquidaciones se validan con IA).</li>
     <li><b>Evaluar</b> → la IA cruza todo (incluye informes DealerNet en vivo) y entrega el análisis para tu decisión.</li>
   </ol>
+  <figure class="shot"><img src="img/evaluacion.png" alt="Evaluación Crediticia" loading="lazy"><figcaption>Evaluación Crediticia: todo parte por el RUT del cliente.</figcaption></figure>
 
   <h2 id="postventa">5. Post Venta y cartolas</h2>
   <ul>
@@ -89,6 +97,7 @@
     <li><b>Cartolas:</b> se generan acumulativas por estado A PAGAR (cruzan meses). Al enviarlas se estampa el Mes Cartola.</li>
     <li><b>Pago de saldos:</b> definir fondos → seleccionar saldos → generar nómina → emitir orden de pago. Lo mismo para comisiones, cuadrando la factura del dealer contra la cartola (si no cuadra, se marca en rojo).</li>
   </ul>
+  <figure class="shot"><img src="img/postventa.png" alt="Módulo Post Venta" loading="lazy"><figcaption>Post Venta: seguimiento, consultas de estado, emisión de órdenes de pago y cartolas.</figcaption></figure>
 
   <h2 id="fundantes">6. Seguimiento Fundantes</h2>
   <div class="paso"><b>Ejecutivo:</b> abre tu operación otorgada (AutoFin/Unidad) → sube los documentos fundantes que exige la matriz según financiera y antigüedad → Enviar. <b>Operaciones:</b> revisa y marca CERRADO (aprueba) o RECHAZADO con comentario — el rechazo le avisa al ejecutivo para corregir y reenviar.</div>
@@ -100,6 +109,7 @@
     <li><b>Prepago:</b> desde la caja, botón Prepago — usa el mismo motor del certificado (cuotas + comisión + interés corriente) y permite condonar según atribuciones. El crédito queda PREPAGADO.</li>
     <li><b>Órdenes de pago a proveedores:</b> módulo Órdenes de Pago — emisión con correlativo único OP-, historial y base de proveedores.</li>
   </ul>
+  <figure class="shot"><img src="img/caja.png" alt="Caja de Tesorería" loading="lazy"><figcaption>Resumen de Cajas: cada cajero ve su caja, con pagos, reversiones y los botones Pagar órdenes / Pagar cuotas.</figcaption></figure>
 
   <h2 id="cobranza">8. Cobranza</h2>
   <ul>
@@ -107,6 +117,7 @@
     <li><b>Automatización por mora:</b> el sistema envía correos por tramo de días de atraso con plantillas y cooldown configurados (mantenedor Cobranza Mora).</li>
     <li>Las gestiones se registran en CRM; los compromisos de pago quedan en la bitácora del crédito.</li>
   </ul>
+  <figure class="shot"><img src="img/cobranza.png" alt="Módulo Cobranza" loading="lazy"><figcaption>Cobranza: aviso del día, y la cartera separada en Pre-judicial (Ley del Consumidor) y Judicial.</figcaption></figure>
 
   <h2 id="whatsapp">9. WhatsApp y Facilito</h2>
   <ul>
@@ -116,6 +127,7 @@
     <li><b>Fuera de horario</b> o si el cliente prefiere que lo llamen: la oportunidad llega por <b>correo</b> al ejecutivo de turno (round-robin) con la cotización y copia al Jefe Comercial — hay que reportar el resultado, se revisa en comité.</li>
     <li><b>Campañas:</b> mensajes masivos a cartera en mora, vigentes o lista manual. Para escribir fuera de la ventana 24h se usan <b>plantillas</b> aprobadas por Meta (pestaña Plantillas, con revisión IA obligatoria antes de enviar).</li>
   </ul>
+  <figure class="shot"><img src="img/whatsapp.png" alt="Módulo WhatsApp" loading="lazy"><figcaption>La bandeja WhatsApp: conversaciones a la izquierda (difuminadas), chat a la derecha, y las pestañas Campañas, Plantillas, Respuestas, Triggers y Configuración.</figcaption></figure>
 
   <h2 id="atencion">10. Atención Remota: chat y video con dealers</h2>
   <ul>
@@ -169,6 +181,7 @@
     <li><b>Certificados:</b> módulo Certificados — 5 tipos de certificados para clientes, con firma electrónica y QR verificable en línea.</li>
     <li><b>Informes DealerNet:</b> consulta de antecedentes comerciales por RUT (informe en vivo, con costo por consulta y caché de 15 días).</li>
   </ul>
+  <figure class="shot"><img src="img/dashboard.png" alt="Dashboard de colocaciones" loading="lazy"><figcaption>El Dashboard: KPIs del mes, participación por institución, dealers y ejecutivos (las cifras de la imagen son ficticias).</figcaption></figure>
 
   <div class="tip"><b>Regla de oro:</b> si un número se ve raro, no lo corrijas a mano en una planilla — repórtalo. En el Suite cada cifra tiene un motor único: si se corrige, se corrige una sola vez y para todos.</div>
 </div>
