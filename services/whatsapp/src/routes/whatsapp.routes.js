@@ -31,6 +31,11 @@ router.get('/conversaciones/:id/ficha',    verifyToken, requireFunc('wsp_panel')
 router.post('/conversaciones/:id/responder', verifyToken, requireFunc('wsp_atender'), ctrl.responderConv);
 router.post('/conversaciones/:id/accion',    verifyToken, requireFunc('wsp_atender'), ctrl.accionConv);
 
+// Plantillas HSM (gestor contra Meta: crear = enviar a aprobación)
+router.get('/plantillas',            verifyToken, requireFunc('wsp_config'), ctrl.plantillas);
+router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
+router.delete('/plantillas/:nombre', verifyToken, requireFunc('wsp_config'), ctrl.eliminarPlantilla);
+
 // Campañas de salida
 router.get('/campanas',              verifyToken, requireFunc('wsp_campanas'), ctrl.campanas);
 router.get('/campanas-audiencia',    verifyToken, requireFunc('wsp_campanas'), ctrl.previewAudiencia);

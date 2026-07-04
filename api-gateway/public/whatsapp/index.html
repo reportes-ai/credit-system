@@ -186,6 +186,7 @@
   <div class="tabs">
     <div class="tab active" id="tBandeja" onclick="tab('bandeja')"><i class="bi bi-inbox me-1"></i>Bandeja</div>
     <div class="tab" id="tCampanas" onclick="tab('campanas')"><i class="bi bi-megaphone me-1"></i>Campañas</div>
+    <div class="tab" id="tPlantillas" onclick="tab('plantillas')"><i class="bi bi-file-earmark-text me-1"></i>Plantillas</div>
     <div class="tab" id="tRespuestas" onclick="tab('respuestas')"><i class="bi bi-chat-square-text me-1"></i>Respuestas del bot</div>
     <div class="tab" id="tTriggers" onclick="tab('triggers')"><i class="bi bi-exclamation-diamond me-1"></i>Triggers</div>
     <div class="tab" id="tConfig" onclick="tab('config')"><i class="bi bi-gear me-1"></i>Configuración</div>
@@ -258,6 +259,18 @@
   </div>
 
   <!-- ═══ RESPUESTAS ═══ -->
+  <!-- ═══ PLANTILLAS HSM ═══ -->
+  <div id="secPlantillas" style="display:none">
+    <div class="card-box" style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <div style="font-weight:800;color:#0f172a"><i class="bi bi-file-earmark-text me-1"></i>Plantillas de mensaje (HSM)</div>
+        <button class="btn-w" onclick="nuevaPlantilla()"><i class="bi bi-plus-lg me-1"></i>Nueva plantilla</button>
+      </div>
+      <p style="font-size:.8rem;color:#64748b">Las plantillas se envían a <b>aprobación de Meta desde aquí</b> (quedan PENDIENTE hasta que Meta las revise, normalmente minutos a horas). Solo con plantilla APROBADA se puede escribir a un cliente fuera de la ventana de 24h (campañas, cobranza). Usa variables <code>{{1}}</code>, <code>{{2}}</code>… para personalizar.</p>
+      <div id="plantillasList"><div class="empty">Cargando…</div></div>
+    </div>
+  </div>
+
   <div id="secRespuestas" style="display:none">
     <div class="card-box">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -392,7 +405,7 @@
   const fdt = s => s ? new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
 
   function tab(t){
-    ['Bandeja','Campanas','Respuestas','Triggers','Config'].forEach(x=>{
+    ['Bandeja','Campanas','Plantillas','Respuestas','Triggers','Config'].forEach(x=>{
       document.getElementById('sec'+x).style.display='none';
       document.getElementById('t'+x).classList.remove('active');
     });
@@ -401,9 +414,70 @@
     document.getElementById('t'+cap).classList.add('active');
     if (t==='bandeja') cargarConvs();
     if (t==='campanas'){ cargarCampanas(); previewAud(); }
+    if (t==='plantillas') cargarPlantillas();
     if (t==='respuestas') cargarResp();
     if (t==='triggers') cargarTrg();
     if (t==='config') cargarConfig();
+  }
+
+  /* ═══ PLANTILLAS HSM ═══ */
+  const PL_ST = { APPROVED:['#16a34a','APROBADA'], PENDING:['#d97706','PENDIENTE'], REJECTED:['#dc2626','RECHAZADA'], PAUSED:['#64748b','PAUSADA'], DISABLED:['#64748b','DESHABILITADA'] };
+  async function cargarPlantillas(){
+    const box = document.getElementById('plantillasList');
+    box.innerHTML = '<div class="empty">Cargando…</div>';
+    try {
+      const j = await (await fetch('/api/whatsapp/plantillas',{headers:H})).json();
+      if (!j.success) { box.innerHTML = `<div class="empty">${esc(j.error||'Error')}</div>`; return; }
+      if (j.data.simulado) { box.innerHTML = '<div class="empty">Sin conexión Meta (modo simulado).</div>'; return; }
+      const rows = j.data.plantillas||[];
+      box.innerHTML = rows.length ? rows.map(p=>{
+        const [col,txt] = PL_ST[p.status]||['#64748b',p.status];
+        const cuerpo = (p.components||[]).find(c=>c.type==='BODY')?.text||'';
+        return `<div style="border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <b style="font-size:.86rem;color:#0f172a">${esc(p.name)}</b>
+            <span style="display:flex;gap:6px;align-items:center">
+              <span style="font-size:.62rem;font-weight:800;color:#fff;background:${col};border-radius:8px;padding:2px 9px">${txt}</span>
+              <span style="font-size:.66rem;color:#94a3b8">${esc(p.category||'')} · ${esc(p.language||'')}</span>
+              <button style="background:none;border:none;color:#dc2626;cursor:pointer" title="Eliminar" onclick="delPlantilla('${esc(p.name)}')"><i class="bi bi-trash"></i></button>
+            </span>
+          </div>
+          <div style="font-size:.78rem;color:#475569;margin-top:4px;white-space:pre-wrap">${esc(cuerpo)}</div>
+          ${p.status==='REJECTED'&&p.rejected_reason?`<div style="font-size:.72rem;color:#dc2626;margin-top:4px">Motivo: ${esc(p.rejected_reason)}</div>`:''}
+        </div>`;
+      }).join('') : '<div class="empty">Sin plantillas aún. Crea la primera con "Nueva plantilla".</div>';
+    } catch(e){ box.innerHTML = '<div class="empty">Error de conexión.</div>'; }
+  }
+  function nuevaPlantilla(){
+    dlgForm('Nueva plantilla HSM (se envía a aprobación de Meta)', `
+      <div style="font-size:.78rem;color:#64748b;margin-bottom:10px">El nombre va en minúsculas con guión bajo (ej: <code>recordatorio_cuota</code>). En el cuerpo usa <code>{{1}}</code>, <code>{{2}}</code>… como variables y entrega un ejemplo de cada una para que Meta entienda el uso.</div>
+      <label style="font-size:.76rem;font-weight:700">Nombre</label>
+      <input id="plNombre" placeholder="recordatorio_cuota" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0 10px;box-sizing:border-box">
+      <label style="font-size:.76rem;font-weight:700">Categoría</label>
+      <select id="plCat" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;margin:4px 0 10px">
+        <option value="UTILITY">UTILITY — transaccional (recordatorios, avisos de cuenta; más barata y fácil de aprobar)</option>
+        <option value="MARKETING">MARKETING — promocional (ofertas, campañas comerciales)</option>
+      </select>
+      <label style="font-size:.76rem;font-weight:700">Cuerpo del mensaje</label>
+      <textarea id="plCuerpo" rows="4" placeholder="Hola {{1}}, te recordamos que tu cuota de {{2}} vence el {{3}}. Puedes pagar en..." style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0 10px;box-sizing:border-box"></textarea>
+      <label style="font-size:.76rem;font-weight:700">Ejemplos de las variables (uno por línea, en orden)</label>
+      <textarea id="plEj" rows="3" placeholder="Juan Pérez&#10;$185.000&#10;05-08-2026" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;margin:4px 0;box-sizing:border-box"></textarea>
+    `, async ()=>{
+      const body = { nombre: val('plNombre'), categoria: document.getElementById('plCat').value,
+        cuerpo: document.getElementById('plCuerpo').value.trim(),
+        ejemplos: document.getElementById('plEj').value.split('\n').map(s=>s.trim()).filter(Boolean) };
+      const j = await (await fetch('/api/whatsapp/plantillas',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+      if (!j.success) { alert(j.error||'Error'); return; }
+      document.getElementById('dlg').close();
+      alert(`Plantilla "${j.data.nombre}" enviada a aprobación de Meta ✓ (estado: ${j.data.status})`);
+      cargarPlantillas();
+    });
+  }
+  async function delPlantilla(nombre){
+    if (!confirm(`¿Eliminar la plantilla "${nombre}" de Meta?`)) return;
+    const j = await (await fetch('/api/whatsapp/plantillas/'+encodeURIComponent(nombre),{method:'DELETE',headers:H})).json();
+    if (!j.success) { alert(j.error||'Error'); return; }
+    cargarPlantillas();
   }
 
   /* ═══ BANDEJA ═══ */
@@ -823,7 +897,7 @@
       const admin = yo?.perfil === 'Administrador';
       if (!admin && !funcs.has('wsp_campanas')) document.getElementById('tCampanas').style.display = 'none';
       if (!admin && !funcs.has('wsp_config')) {
-        ['tRespuestas', 'tTriggers', 'tConfig'].forEach(id => document.getElementById(id).style.display = 'none');
+        ['tPlantillas', 'tRespuestas', 'tTriggers', 'tConfig'].forEach(id => document.getElementById(id).style.display = 'none');
         document.querySelector('.page-banner p').textContent = 'Tus conversaciones asignadas y los clientes esperando que alguien los tome.';
       }
     } catch (_) {}

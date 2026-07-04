@@ -42,6 +42,8 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
     try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS prompt_ia TEXT NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Ventana de envío (regla Meta: fuera de las 24h desde el último mensaje del cliente solo van plantillas)
     try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS ventana_horas INT NOT NULL DEFAULT 23'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // WABA id (cuenta WhatsApp Business) para el gestor de plantillas HSM
+    try { await pool.query("ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS waba_id VARCHAR(30) NOT NULL DEFAULT '1044493808034066'"); } catch (e) { if (e.errno !== 1060) throw e; }
     await pool.query("UPDATE wsp_config SET prompt_ia=? WHERE id=1 AND (prompt_ia IS NULL OR prompt_ia='')", [PROMPT_IA_DEF]);
   } catch (e) { console.error('[wsp_config migration]', e.message); }
 
@@ -325,6 +327,68 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   })();
   return { rut: m[1] + '-' + m[2], ok: peor <= 1, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
 }
+
+/* ── Plantillas HSM: gestor in-app contra la Graph API de Meta ────────────────
+   Meta es la FUENTE ÚNICA (no hay tabla local): se listan en vivo, se crean
+   (quedan PENDING hasta que Meta las apruebe) y se eliminan desde acá. */
+const GRAPH = 'https://graph.facebook.com/v21.0';
+async function wabaId() { const cfg = await getCfg(); return cfg.waba_id || '1044493808034066'; }
+
+exports.plantillas = async (req, res) => {
+  try {
+    const token = process.env.WSP_TOKEN;
+    if (!token) return res.json({ success: true, data: { simulado: true, plantillas: [] }, error: null });
+    const r = await fetch(`${GRAPH}/${await wabaId()}/message_templates?fields=name,status,category,language,components,rejected_reason&limit=100`,
+      { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok) return res.status(502).json({ success: false, data: null, error: j?.error?.message || 'Error de Meta' });
+    res.json({ success: true, data: { simulado: false, plantillas: j.data || [] }, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+exports.crearPlantilla = async (req, res) => {
+  try {
+    const token = process.env.WSP_TOKEN;
+    if (!token) return res.status(503).json({ success: false, data: null, error: 'Sin conexión Meta (WSP_TOKEN no configurado)' });
+    let { nombre, categoria, cuerpo, ejemplos } = req.body || {};
+    nombre = String(nombre || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    categoria = ['MARKETING', 'UTILITY'].includes(String(categoria || '').toUpperCase()) ? String(categoria).toUpperCase() : 'MARKETING';
+    cuerpo = String(cuerpo || '').trim();
+    if (!nombre || nombre.length < 3) return res.status(400).json({ success: false, data: null, error: 'Nombre inválido (solo minúsculas, números y _)' });
+    if (!cuerpo) return res.status(400).json({ success: false, data: null, error: 'Falta el cuerpo del mensaje' });
+    // Variables {{1}},{{2}}… → Meta exige ejemplos para cada una
+    const nVars = (cuerpo.match(/\{\{\d+\}\}/g) || []).map(v => parseInt(v.replace(/\D/g, ''))).reduce((a, b) => Math.max(a, b), 0);
+    const ej = Array.isArray(ejemplos) ? ejemplos.map(String) : [];
+    if (nVars && ej.length < nVars) return res.status(400).json({ success: false, data: null, error: `El cuerpo usa ${nVars} variable(s) {{n}} — entrega un ejemplo para cada una` });
+    const body = {
+      name: nombre, language: 'es', category: categoria,
+      components: [{ type: 'BODY', text: cuerpo, ...(nVars ? { example: { body_text: [ej.slice(0, nVars)] } } : {}) }],
+    };
+    const r = await fetch(`${GRAPH}/${await wabaId()}/message_templates`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok) return res.status(502).json({ success: false, data: null, error: j?.error?.error_user_msg || j?.error?.message || 'Meta rechazó la solicitud' });
+    auditar({ req, accion: 'CREAR', modulo: 'whatsapp', entidad: 'plantilla', entidad_id: nombre,
+      detalle: `Envió a aprobación de Meta la plantilla HSM "${nombre}" (${categoria})` });
+    res.json({ success: true, data: { id: j.id, status: j.status || 'PENDING', nombre }, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+exports.eliminarPlantilla = async (req, res) => {
+  try {
+    const token = process.env.WSP_TOKEN;
+    if (!token) return res.status(503).json({ success: false, data: null, error: 'Sin conexión Meta' });
+    const nombre = String(req.params.nombre || '').trim();
+    const r = await fetch(`${GRAPH}/${await wabaId()}/message_templates?name=${encodeURIComponent(nombre)}`,
+      { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!r.ok) return res.status(502).json({ success: false, data: null, error: j?.error?.message || 'No se pudo eliminar' });
+    auditar({ req, accion: 'ELIMINAR', modulo: 'whatsapp', entidad: 'plantilla', entidad_id: nombre, detalle: `Eliminó la plantilla HSM "${nombre}" de Meta` });
+    res.json({ success: true, data: { nombre }, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
 
 /* ── Oportunidades por MAIL a ejecutivos (round-robin equitativo) ─────────────
    Para derivaciones COMERCIAL cuando el cliente no quiere hablar al momento o
