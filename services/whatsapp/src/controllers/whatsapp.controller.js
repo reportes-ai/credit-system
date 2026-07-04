@@ -300,6 +300,25 @@ async function simularCuota(monto, plazo) {
 
 const fmtCLP = v => '$' + Math.round(+v || 0).toLocaleString('es-CL');
 
+/* Guarda la cotización del bot en el repositorio ÚNICO (tabla cotizaciones, la misma
+   del simulador) para que aparezca en Evaluación Crediticia y la ficha del cliente.
+   Requiere RUT conocido; idempotente por conversación+cuota. */
+async function guardarCotizacionBot(conv) {
+  try {
+    let cot = conv.cotizacion; if (typeof cot === 'string') { try { cot = JSON.parse(cot); } catch (_) { cot = null; } }
+    if (!cot || !cot.cuota || !conv.rut_cliente) return;
+    const marca = `wsp:${conv.id}:${cot.cuota}`;
+    const [[dup]] = await pool.query("SELECT id_cotizacion FROM cotizaciones WHERE rut_cliente=? AND JSON_EXTRACT(datos_json,'$.origen_ref')=? LIMIT 1", [conv.rut_cliente, marca]);
+    if (dup) return;
+    await pool.query(
+      `INSERT INTO cotizaciones (rut_cliente, nombre_cliente, valor_vehiculo, pie, plazo, tasa_mensual, monto_financiado, cuota, datos_json)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [conv.rut_cliente, conv.nombre || 'Cliente WhatsApp', cot.valor_auto || null, cot.pie || null, cot.plazo || null,
+       cot.tasa || null, cot.montoFin || null, cot.cuota, JSON.stringify({ origen: 'whatsapp', origen_ref: marca, saldo_precio: cot.saldoPrecio, gastos: cot.gastosOp, seguros: cot.seguros })]);
+    console.log(`[wsp cotizacion] guardada en repositorio para ${conv.rut_cliente} (conv ${conv.id})`);
+  } catch (e) { console.error('[wsp cotizacion]', e.message); }
+}
+
 /* ── Herramienta preevaluación: informes DealerNet en vivo por RUT (MOTOR ÚNICO
       asegurarInformes de dealernet-ws: caché de vigencia + clasificación por severidad).
       La IA junta RUT/pie/plazo; el veredicto lo pone el CÓDIGO. */
@@ -558,6 +577,8 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
           respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_Valor referencial, sujeto a evaluación crediticia._`;
           // Persistir la cotización en la conversación (para el mail de oportunidad al ejecutivo)
           try { await pool.query('UPDATE wsp_conversaciones SET cotizacion=? WHERE id=?', [JSON.stringify({ valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s, fecha: new Date().toISOString().slice(0, 10) }), conv.id]); conv.cotizacion = { valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s }; } catch (_) {}
+          // Si ya conocemos el RUT, la cotización va al repositorio único (tabla cotizaciones)
+          guardarCotizacionBot(conv);
         }
       } else {
         s = await simularCuota(sim.monto, plazo);
@@ -576,6 +597,9 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         respuesta += '\n\nNo pude completar la preevaluación en este momento. ¿Quieres que un Ejecutivo Comercial te llame y lo vemos al tiro? 📞';
       } else {
         await pool.query("UPDATE wsp_conversaciones SET rut_cliente=COALESCE(rut_cliente,?) WHERE id=?", [ev.rut, conv.id]);
+        conv.rut_cliente = conv.rut_cliente || ev.rut;
+        // Con el RUT recién conocido, la cotización previa de la conversación va al repositorio
+        guardarCotizacionBot(conv);
         if (ev.ok && ev.pie_pct >= 40) {
           respuesta += '\n\n🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del ' + Math.round(ev.pie_pct) + '% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?';
         } else if (ev.ok) {
