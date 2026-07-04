@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.9 -->
+<!-- v2.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -44,9 +44,10 @@
     <a href="#atencion">10. Atención Remota: chat y video con dealers</a>
     <a href="#portales">11. Portales del Dealer y del Cliente</a>
     <a href="#crm">12. CRM y campañas</a>
-    <a href="#comercial">13. Gestión comercial</a>
-    <a href="#soporte">14. RRHH, Compras y Tickets</a>
-    <a href="#reporteria">15. Reportería, BI y bitácora</a>
+    <a href="#campanas">13. Campañas Masivas (Mail y WhatsApp)</a>
+    <a href="#comercial">14. Gestión comercial</a>
+    <a href="#soporte">15. RRHH, Compras y Tickets</a>
+    <a href="#reporteria">16. Reportería, BI y bitácora</a>
   </div>
 
   <h2 id="acceso">1. Acceso y navegación</h2>
@@ -161,10 +162,99 @@
     <li><b>Gestiones de contacto:</b> registra cada llamada/gestión con el cliente (resultado, compromiso, próximo paso). Todo alimenta la bitácora del crédito.</li>
     <li><b>Campañas de outbound:</b> arma la lista objetivo y gestiona los contactos de la campaña; las <b>Estadísticas CRM</b> muestran el rendimiento.</li>
     <li>Las campañas <b>por WhatsApp</b> (marketing o cobranza) se hacen desde el módulo WhatsApp: audiencias de cartera en mora, créditos vigentes o lista manual, con plantillas aprobadas por Meta. Los <b>correos automáticos de cobranza</b> por tramo de mora se configuran en el mantenedor Cobranza Mora.</li>
-    <li><b>Campañas Masivas</b> (card del Home): campañas de <b>Mail y WhatsApp</b> para Venta y Cobranza con correlativo CM-####. Eliges hasta 10 <b>campos variables</b> (RUT, nombre, montos, cuotas, seguros, 3 datos especiales…), cargas la data por <b>Excel/CSV</b> (plantilla descargable) o la generas <b>desde nuestras bases por parámetros</b> (mora, capital, término del crédito, renta). El mail es HTML con 3 plantillas (banner azul, solo logo, gran título con color), asunto con <b>emojis</b> y remitente seleccionable; la vista previa recorre los registros <b>estilo correspondencia (mail-merge)</b>. Grupo de <b>control por deciles del RUT</b> (champion–challenger), exclusión de regiones, análisis de riesgo IA opcional, estados por destinatario (enviado/leído/error/no recibido) exportables, <b>conversión medida contra ventas o pagos</b> de los días siguientes con gráficos, y cada envío queda como gestión en el CRM. Incluye 4 campañas TEST para explorar la reportería.</li>
+    <li><b>Campañas Masivas:</b> el módulo dedicado con mail-merge, grupo de control y medición de conversión — ver la <a href="#campanas">sección 13</a> con el manual completo.</li>
   </ul>
 
-  <h2 id="comercial">13. Gestión comercial</h2>
+  <h2 id="campanas">13. Campañas Masivas (Mail y WhatsApp)</h2>
+  <p><b>Qué es:</b> el módulo para enviar <b>mensajes masivos personalizados</b> — por correo o WhatsApp — y luego <b>medir con datos</b> si la campaña funcionó. Sirve para <b>VENTA</b> (marketing: ofrecer créditos, renovación) y <b>COBRANZA</b> (recordar cuotas e invitar a ponerse al día). Cada mensaje se arma a la medida de cada cliente con variables, igual que la correspondencia de Word. Antes de la primera campaña real, abre una <b>campaña TEST</b> de la bandeja y recorre su informe.</p>
+
+  <h3>Conceptos básicos</h3>
+  <table>
+    <tr><th>Término</th><th>Qué significa</th></tr>
+    <tr><td>Correlativo</td><td>Número único de la campaña (<code>CM-0007</code>). Con él se busca, se lee el informe y aparece en las gestiones del CRM.</td></tr>
+    <tr><td>Canal</td><td><b>MAIL</b> (correo HTML) o <b>WSP</b> (texto de WhatsApp). Se define por la card desde la que se crea; no se cambia después.</td></tr>
+    <tr><td>Objetivo</td><td><b>VENTA</b> o <b>COBRANZA</b>. Define los parámetros para armar la audiencia desde la BD y cómo se mide la conversión (ventas vs. pagos).</td></tr>
+    <tr><td>Grupo de control</td><td>Clientes que NO se contactan a propósito, para comparar contra los contactados (champion–challenger).</td></tr>
+    <tr><td>Conversión</td><td>El resultado buscado: en VENTA que el cliente tome un crédito; en COBRANZA que pague su cuota — en los 30 días siguientes al envío.</td></tr>
+    <tr><td>BORRADOR / ENVIADA</td><td>En BORRADOR todo es editable; al enviar queda congelada y solo se consulta el informe.</td></tr>
+  </table>
+
+  <h3>Crear una campaña (los 7 pasos del editor)</h3>
+  <div class="paso">Home → <b>Campañas Masivas</b> → card <b>Mail</b> o <b>WhatsApp</b> → <b>Nueva campaña</b> → objetivo + descripción → <b>Crear</b> (asigna el correlativo). Luego: <b>2</b> variables → <b>3</b> data → <b>4</b> control/exclusiones → <b>5</b> contenido → <b>6</b> vista previa → <b>7</b> envío. Presiona <b>Guardar</b> tras cambiar el contenido.</div>
+
+  <h3>Las variables, una por una (paso 2 — máximo 10)</h3>
+  <p>Definen las columnas de la plantilla de carga y los botones <code>{{variable}}</code> que puedes insertar en asunto y texto:</p>
+  <table>
+    <tr><th>Variable</th><th>Para qué sirve</th><th>Formato en la carga</th><th>Cómo la ve el cliente</th></tr>
+    <tr><td>RUT</td><td>Identificar al cliente; <b>clave para medir conversión</b> y para el decil de control</td><td><code>12345678-9</code> (con o sin puntos)</td><td>Tal cual</td></tr>
+    <tr><td>Nombre / Apellidos</td><td>Personalizar el saludo</td><td>Texto</td><td>Tal cual</td></tr>
+    <tr><td>Género</td><td>Segmentar o personalizar</td><td><code>F</code> / <code>M</code></td><td>Tal cual</td></tr>
+    <tr><td>Saludo</td><td>"Estimada"/"Estimado" ya resuelto — evita errores de género</td><td>Texto</td><td>Tal cual</td></tr>
+    <tr><td>Monto del Crédito $ / Pie $ / Valor Cuota / Seguros (Desgravamen, Cesantía, RDH)</td><td>Cifras de la oferta o de la deuda</td><td>Número sin puntos: <code>8500000</code></td><td><b>$8.500.000</b> (formato pesos automático)</td></tr>
+    <tr><td>Pie % / Tasa %</td><td>Porcentajes</td><td>Número: <code>25</code> · <code>2,1</code></td><td><b>25%</b> · <b>2,1%</b></td></tr>
+    <tr><td>Cuotas del Crédito</td><td>Plazo en meses</td><td>Número: <code>36</code></td><td>Tal cual</td></tr>
+    <tr><td>Dato Especial 1, 2 y 3</td><td>Comodines de texto libre: fecha límite, sucursal, promo…</td><td>Texto libre</td><td>Tal cual</td></tr>
+  </table>
+  <div class="tip">La plantilla de carga siempre incluye además <b>email</b> y <b>telefono</b>: el email es obligatorio para Mail y el teléfono para WhatsApp (<code>+56 9 1234 5678</code> o <code>912345678</code> — se normaliza solo).</div>
+
+  <h3>Cargar la data (paso 3)</h3>
+  <ul>
+    <li><b>Carga manual (Excel/CSV):</b> para clientes fuera de nuestras bases. Elige primero las variables → <b>Descargar plantilla CSV</b> (trae los encabezados y una fila de ejemplo) → llénala en Excel (una fila por cliente, separador <code>;</code>) → <b>Subir CSV</b>. El sistema calcula el decil de cada RUT e informa cuántos quedaron en campaña y en control.</li>
+    <li><b>Desde nuestras bases, por parámetros:</b> COBRANZA = días de mora (desde/hasta) + capital adeudado mínimo → trae clientes con cuotas vencidas y llena <code>{{esp1}}</code> ("N cuota(s) vencida(s) — X días"). VENTA = meses para el término del crédito (calculado de fecha de otorgamiento + cuotas contratadas) + renta registrada mínima → el momento perfecto para ofrecer renovación; llena <code>{{esp1}}</code> ("A tu crédito le quedan N meses"). Nombres, contacto y cifras salen del crédito real.</li>
+  </ul>
+  <div class="tip">Volver a generar (o re-subir el CSV) <b>reemplaza</b> la lista completa — no se duplica.</div>
+
+  <h3>Grupo de control y exclusiones (paso 4)</h3>
+  <p>El <b>decil</b> es el último dígito del RUT <b>antes del guion</b> (12.345.67<b>8</b>-9 → decil 8). Marcar deciles aparta ~10% de la lista por cada uno como grupo <b>CONTROL</b>: no reciben el mensaje, pero el informe mide cuántos convirtieron "solos". Ejemplo: campaña convierte 33% y control 10% → la campaña aportó un <b>uplift</b> real. Con listas chicas (&lt;200) usa 1–2 deciles o ninguno. También puedes <b>excluir regiones</b> (feriado regional, zona de emergencia) cuando la data viene de nuestras bases.</p>
+
+  <h3>El contenido (paso 5)</h3>
+  <ul>
+    <li><b>Mail:</b> 3 plantillas de diseño — <b>Banner AutoFácil azul</b> (formal), <b>Solo logo</b> (sobria) y <b>Gran título</b> (titular grande con color configurable, acepta variables). <b>Asunto</b> con variables y <b>emojis</b> de la biblioteca (😀); <b>remitente</b> seleccionable (Sistema o Cobranza). El pie con los datos de AutoFácil se agrega solo.</li>
+    <li><b>WhatsApp:</b> texto con variables y emojis, sale por el número del negocio. <b>Regla de Meta (24 h):</b> el texto libre solo llega a clientes que nos escribieron en las últimas 24 horas; para contactos fríos usa una <b>plantilla HSM aprobada</b> (módulo WhatsApp → Plantillas) — si no, quedarán CON ERROR.</li>
+    <li><b>Escribir:</b> texto normal + botones <code>{{variable}}</code>. Ej.: <code>{{saludo}} {{nombre}}: tenemos preaprobado {{monto_credito}} en {{cuotas}} cuotas de {{valor_cuota}} 🚗</code> → <i>"Estimada María: tenemos preaprobado $8.500.000 en 36 cuotas de $285.000 🚗"</i>. Si a un cliente le falta un dato, la variable sale vacía — revisa la vista previa.</li>
+  </ul>
+
+  <h3>Vista previa tipo correspondencia (paso 6)</h3>
+  <div class="paso">Con las flechas ◀ ▶ recorres los destinatarios <b>uno a uno</b> viendo exactamente lo que recibirá cada cliente (el correo con su diseño y asunto, o la burbuja de WhatsApp). Si cambiaste el texto: <b>Guardar</b> → <b>Actualizar</b>.</div>
+
+  <h3>El envío (paso 7)</h3>
+  <ul>
+    <li>Envía <b>por lotes</b> con avance en pantalla (enviados / con error / pendientes). El grupo CONTROL se excluye solo.</li>
+    <li>Cada mensaje queda como <b>gestión en el CRM</b> ("Campaña Venta" o "Campaña Cobranza" con el correlativo).</li>
+    <li>La campaña pasa a <b>ENVIADA</b> y se congela. Con <b>Modo Desarrollo</b> activo, los correos se desvían a las casillas de prueba.</li>
+  </ul>
+
+  <h3>Estados de cada destinatario</h3>
+  <table>
+    <tr><th>Estado</th><th>Qué significa</th><th>Cómo se produce</th></tr>
+    <tr><td>PENDIENTE</td><td>Aún no se le envía</td><td>Antes del envío, o grupo CONTROL (nunca se les envía)</td></tr>
+    <tr><td>ENVIADO</td><td>El mensaje salió bien</td><td>El servidor de correo / Meta lo aceptó</td></tr>
+    <tr><td>LEÍDO</td><td>El cliente abrió el correo</td><td>Automático: el mail lleva un píxel de lectura invisible</td></tr>
+    <tr><td>ERROR</td><td>No se pudo enviar</td><td>Sin email/teléfono, casilla inexistente, número sin WhatsApp, fuera de ventana 24 h — el motivo queda anotado</td></tr>
+    <tr><td>NO RECIBIDO</td><td>Salió pero rebotó</td><td>Rebotes posteriores</td></tr>
+  </table>
+  <p>En el informe, cada recuadro de estado es <b>clicable</b>: abre el detalle de esos destinatarios con botón <b>Exportar Excel</b>.</p>
+
+  <h3>Informes: conversión y champion–challenger</h3>
+  <ul>
+    <li><b>Conversión:</b> VENTA = crédito OTORGADO del RUT en los 30 días post-envío (guarda día y monto); COBRANZA = pago de cuota en los 30 días post-envío. Se corre con <b>Recalcular conversión</b> — hazlo cada 2–3 días para ver la curva crecer.</li>
+    <li><b>Champion–Challenger:</b> tres cuadros — tasa de la CAMPAÑA, tasa del CONTROL (conversiones naturales) y el <b>UPLIFT</b>: cuánto mejor lo hizo la campaña vs. no hacer nada. Uplift ~0 = el mensaje no movió la aguja.</li>
+    <li><b>Torta 3D de estados</b> (salud del envío: mucho ERROR = data de contacto mala) y <b>curva de conversión acumulada por día</b> (campaña vs. control): muestra cuántos días tarda en reaccionar el cliente y cuándo la curva se aplana.</li>
+    <li><b>Riesgo IA</b> (opcional, paso 4): consulta los informes DealerNet de cada RUT (caché 15 días, <b>tiene costo por consulta</b>) y clasifica BAJO / MEDIO / ALTO — en VENTA es riesgo de otorgar; en COBRANZA, probabilidad de no pago. Úsalo en listas acotadas.</li>
+  </ul>
+
+  <h3>Preguntas frecuentes</h3>
+  <ul>
+    <li><b>¿Editar una campaña enviada?</b> No: queda congelada para que el informe sea fiel. Crea una nueva.</li>
+    <li><b>¿Por qué WhatsApp marca tantos ERROR?</b> Ventana de 24 h de Meta — para audiencias frías usa plantilla HSM aprobada.</li>
+    <li><b>¿Subí dos veces el CSV?</b> La segunda carga reemplaza a la primera; no se duplica.</li>
+    <li><b>¿Borrar una campaña?</b> Solo en BORRADOR (las enviadas son historial y evidencia).</li>
+    <li><b>¿El control queda "quemado"?</b> No: no se les envió nada; en la próxima campaña puedes usar otros deciles.</li>
+    <li><b>¿Las campañas TEST?</b> Demostración con datos inventados para explorar el informe; no se pueden enviar ni recalcular.</li>
+  </ul>
+  <div class="tip"><b>Receta corta:</b> card Mail → Nueva → objetivo y descripción → 5–6 variables → data desde la BD por parámetros → deciles 8 y 9 de control → plantilla banner + asunto con {{nombre}} y un emoji → recorre 10 registros en la vista previa → Enviar. A los 3 días: Recalcular conversión y lee el uplift.</div>
+
+  <h2 id="comercial">14. Gestión comercial</h2>
   <ul>
     <li><b>Comisiones:</b> Comisiones → Revisión — el cálculo mensual por ejecutivo sale solo (piso, incentivo, ajustes). Los supervisores ven a sus asignados.</li>
     <li><b>Metas y bonos en línea:</b> revisa tu avance de cumplimiento del mes y qué te falta para la meta (colocaciones, mix de financieras, calidad) — así sabes dónde empujar para maximizar tu comisión antes del cierre.</li>
@@ -173,14 +263,14 @@
     <li><b>Informe diario de ventas:</b> llega solo al correo (L-S 8:30). El ranking y la carrera de colocaciones aparecen al entrar al Suite.</li>
   </ul>
 
-  <h2 id="soporte">14. RRHH, Compras y Tickets</h2>
+  <h2 id="soporte">15. RRHH, Compras y Tickets</h2>
   <ul>
     <li><b>Vacaciones:</b> RRHH → Solicitudes → pide tus días; quien aprueba recibe alerta. <b>Certificado de antigüedad:</b> se genera con firma electrónica y QR verificable.</li>
     <li><b>Compras:</b> Soporte → Compras — catálogo según tu perfil, el despacho llega a tu parque o Casa Matriz.</li>
     <li><b>Reportar a TI:</b> Soporte → ticket con motivo; tiene SLA y escalamiento automático.</li>
   </ul>
 
-  <h2 id="reporteria">15. Reportería, BI y bitácora</h2>
+  <h2 id="reporteria">16. Reportería, BI y bitácora</h2>
   <ul>
     <li><b>Reportería Tailor Made:</b> reportes por período, financiera y dimensiones del negocio, exportables a Excel.</li>
     <li><b>Cartera de Créditos:</b> reporte con gráficos 3D — distribución por etapa, monto otorgado por financiera, colocaciones de los últimos 12 meses y ranking por ejecutivo, con filtro por fecha de otorgamiento.</li>
