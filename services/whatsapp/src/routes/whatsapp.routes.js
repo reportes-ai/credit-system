@@ -32,6 +32,11 @@ router.post('/conversaciones/:id/responder', verifyToken, requireFunc('wsp_atend
 router.post('/conversaciones/:id/accion',    verifyToken, requireFunc('wsp_atender'), ctrl.accionConv);
 
 // Plantillas HSM (gestor contra Meta: crear = enviar a aprobación)
+router.get('/aviso-vencimiento',            verifyToken, requireFunc('wsp_config'), ctrl.avisoVencEstado);
+router.put('/aviso-vencimiento/config',     verifyToken, requireFunc('wsp_config'), ctrl.avisoVencConfig);
+router.post('/aviso-vencimiento/probar',    verifyToken, requireFunc('wsp_config'), ctrl.avisoVencProbar);
+router.post('/aviso-vencimiento/correr',    verifyToken, requireFunc('wsp_config'), ctrl.avisoVencCorrer);
+router.post('/aviso-vencimiento/plantillas',verifyToken, requireFunc('wsp_config'), ctrl.avisoVencCrearPlantillas);
 router.get('/plantillas',            verifyToken, requireFunc('wsp_config'), ctrl.plantillas);
 router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
 router.post('/plantillas/revisar',   verifyToken, requireFunc('wsp_config'), ctrl.revisarPlantilla);

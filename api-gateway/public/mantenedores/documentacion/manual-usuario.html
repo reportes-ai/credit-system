@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 -->
+<!-- v2.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -132,6 +132,7 @@
     <li><b>App del teléfono:</b> instala <b>AF WhatsApp</b> (abre /whatsapp/, inicia sesión en la app, "Agregar a pantalla de inicio", campana → Activar push). Los ejecutivos ven solo sus conversaciones.</li>
     <li><b>Fuera de horario</b> o si el cliente prefiere que lo llamen: la oportunidad llega por <b>correo</b> al ejecutivo de turno (round-robin) con la cotización y copia al Jefe Comercial — hay que reportar el resultado, se revisa en comité.</li>
     <li><b>Campañas:</b> mensajes masivos a cartera en mora, vigentes o lista manual. Para escribir fuera de la ventana 24h se usan <b>plantillas</b> aprobadas por Meta (pestaña Plantillas, con revisión IA obligatoria antes de enviar).</li>
+    <li><b>Aviso de vencimiento automático:</b> con el interruptor activado (Configuración), el sistema envía solo — todos los días a las 10:00 — un WhatsApp a cada cliente cuya cuota AutoFácil vence en <b>N días</b> (configurable, default 2), usando la plantilla aprobada <code>aviso_vencimiento</code>; si además tiene cuotas impagas usa <code>aviso_vencimiento_mora</code> con el monto <b>al día de hoy</b> (mora y gastos del motor de cobranza) y la suma total. Los datos bancarios salen de la fuente única, cada envío queda como gestión en el CRM y nunca se avisa dos veces la misma cuota. El botón "Probar ahora" muestra quiénes recibirían el aviso sin enviar nada. Nace desactivado.</li>
   </ul>
   <figure class="shot"><img src="img/whatsapp.png" alt="Módulo WhatsApp" loading="lazy"><figcaption>La bandeja WhatsApp: conversaciones a la izquierda (difuminadas), chat a la derecha, y las pestañas Campañas, Plantillas, Respuestas, Triggers y Configuración.</figcaption></figure>
 

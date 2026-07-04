@@ -333,6 +333,24 @@
           <div></div>
         </div>
         <div style="font-size:.72rem;color:#94a3b8;margin:-6px 0 12px">Límite anti-abuso: cada preevaluación de un RUT sin informes vigentes es una consulta DealerNet pagada. Superado el límite, Facilito ofrece al Ejecutivo Comercial.</div>
+
+        <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin:12px 0">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <label class="switch" style="margin:0"><input type="checkbox" id="gAvisoV" onchange="guardarAvisoVenc()"><span class="slider"></span></label>
+            <div><b style="font-size:.84rem;color:#166534">Aviso de vencimiento automático (WhatsApp)</b>
+              <div style="font-size:.72rem;color:#64748b">Envía la plantilla <code>aviso_vencimiento</code> (o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, valorizadas al día con el motor de cobranza)
+                <b>N días antes</b> del vencimiento de cada cuota AutoFácil. Corre 1 vez al día a las 10:00. Respeta Modo Desarrollo y registra la gestión en el CRM. Nace desactivado.</div>
+            </div>
+            <span style="margin-left:auto;font-size:.76rem">Días antes: <input type="number" id="gAvisoDias" min="1" max="15" value="2" style="width:60px;border:1px solid #cbd5e1;border-radius:7px;padding:4px 8px" onchange="guardarAvisoVenc()"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <span id="avisoTpls" style="font-size:.74rem;color:#64748b">Estado plantillas: …</span>
+            <button onclick="crearPlantillasAviso()" style="background:#16a34a;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer"><i class="bi bi-cloud-upload me-1"></i>Crear plantillas en Meta</button>
+            <button onclick="probarAvisoVenc()" style="background:#eff6ff;color:#0141A2;border:none;border-radius:8px;padding:6px 12px;font-size:.76rem;font-weight:700;cursor:pointer"><i class="bi bi-eye me-1"></i>Probar ahora (no envía)</button>
+            <span id="avisoMsg" style="font-size:.74rem;color:#16a34a"></span>
+          </div>
+          <div id="avisoPreview" style="margin-top:8px"></div>
+        </div>
         <div class="fld"><label>Ventana de envío (horas desde el último mensaje del cliente)</label>
           <input type="number" id="gVentana" min="1" max="24" style="max-width:120px">
           <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Regla de WhatsApp: pasado este plazo la conversación se bloquea — solo reabre si el cliente escribe o con una plantilla vía campaña. Máximo 24; se recomienda 23 para no rozar el límite de Meta.</div>
@@ -441,7 +459,7 @@
     if (t==='plantillas') cargarPlantillas();
     if (t==='respuestas') cargarResp();
     if (t==='triggers') cargarTrg();
-    if (t==='config') cargarConfig();
+    if (t==='config') cargarConfig(); cargarAvisoVenc();
   }
 
   /* ═══ PLANTILLAS HSM ═══ */
@@ -922,7 +940,47 @@ async function revisarPlantillaIA(){
   }
 
   /* ═══ CONFIG ═══ */
-  async function cargarConfig(){
+  async function cargarAvisoVenc(){
+  try {
+    const j = await (await fetch('/api/whatsapp/aviso-vencimiento',{headers:H})).json();
+    if (!j.success) return;
+    const d = j.data;
+    document.getElementById('gAvisoV').checked = !!(d.config && d.config.aviso_venc_activo);
+    document.getElementById('gAvisoDias').value = (d.config && d.config.aviso_venc_dias) || 2;
+    const pl = d.plantillas || {};
+    const chip = v => v==='APPROVED' ? `<b style="color:#16a34a">${v}</b>` : `<b style="color:${v==='NO EXISTE'?'#dc2626':'#d97706'}">${v}</b>`;
+    document.getElementById('avisoTpls').innerHTML = pl.error
+      ? `Plantillas: <b style="color:#dc2626">${pl.error}</b>`
+      : `Plantillas: aviso_vencimiento ${chip(pl.aviso_vencimiento)} · aviso_vencimiento_mora ${chip(pl.aviso_vencimiento_mora)}`;
+  } catch(e){}
+}
+async function guardarAvisoVenc(){
+  const j = await (await fetch('/api/whatsapp/aviso-vencimiento/config',{method:'PUT',headers:HJ,
+    body: JSON.stringify({ activo: document.getElementById('gAvisoV').checked, dias: +document.getElementById('gAvisoDias').value||2 })})).json();
+  document.getElementById('avisoMsg').textContent = j.success ? '✔ Guardado' : ('Error: '+j.error);
+  setTimeout(()=>document.getElementById('avisoMsg').textContent='', 2500);
+}
+async function crearPlantillasAviso(){
+  if (!confirm('Se enviarán a aprobación de Meta las plantillas aviso_vencimiento y aviso_vencimiento_mora (con los datos bancarios de la fuente única). ¿Continuar?')) return;
+  const j = await (await fetch('/api/whatsapp/aviso-vencimiento/plantillas',{method:'POST',headers:H})).json();
+  alert(j.success ? 'Resultado: '+JSON.stringify(j.data) : 'Error: '+j.error);
+  cargarAvisoVenc();
+}
+async function probarAvisoVenc(){
+  const el = document.getElementById('avisoPreview');
+  el.innerHTML = '<span style="font-size:.75rem;color:#64748b">Calculando candidatos…</span>';
+  const j = await (await fetch('/api/whatsapp/aviso-vencimiento/probar',{method:'POST',headers:H})).json();
+  if (!j.success) { el.innerHTML = '<span style="color:#dc2626;font-size:.76rem">'+j.error+'</span>'; return; }
+  const c = j.data.candidatos||[];
+  el.innerHTML = c.length ? `<div style="font-size:.72rem;color:#64748b;margin-bottom:4px">${c.length} aviso(s) saldrían hoy (vencimiento en ${j.data.dias} días):</div>` +
+    c.map(x => `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:5px;font-size:.76rem">
+      <b>${x.nombre}</b> · ${x.rut||''} · ${x.telefono_norm||'⚠ sin teléfono'} — cuota N°${x.numero_cuota} vence ${x.fecha_texto} ($${Number(x.valor_cuota).toLocaleString('es-CL')})
+      ${x.con_mora ? `<span style="color:#b91c1c"> + ${x.cuotas_impagas} impaga(s) $${Number(x.monto_impagas).toLocaleString('es-CL')} → total hoy $${Number(x.total_hoy).toLocaleString('es-CL')}</span>` : ''}
+      <span style="color:#94a3b8">· plantilla ${x.plantilla}</span></div>`).join('')
+    : '<span style="font-size:.76rem;color:#16a34a">✔ No hay cuotas venciendo en '+j.data.dias+' días sin aviso previo.</span>';
+}
+
+async function cargarConfig(){
     const j = await (await fetch('/api/whatsapp/config',{headers:H})).json();
     const c = j.data||{};
     document.getElementById('gBotActivo').checked = !!c.bot_activo;

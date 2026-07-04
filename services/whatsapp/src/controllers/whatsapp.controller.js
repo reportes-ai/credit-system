@@ -1115,3 +1115,40 @@ exports.eliminarCampana = async (req, res) => {
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
+
+/* ═══ AVISO DE VENCIMIENTO automático (motor services/whatsapp/src/aviso-vencimiento.js) ═══ */
+const avisoVenc = require('../aviso-vencimiento');
+
+exports.avisoVencEstado = async (req, res) => {
+  try {
+    const [[cfg]] = await pool.query('SELECT aviso_venc_activo, aviso_venc_dias FROM wsp_config LIMIT 1');
+    let plantillas = null;
+    try { plantillas = await avisoVenc.estadoPlantillas(); } catch (e) { plantillas = { error: e.message }; }
+    const [hist] = await pool.query('SELECT * FROM wsp_avisos_vencimiento ORDER BY id DESC LIMIT 50');
+    res.json({ success: true, data: { config: cfg || {}, plantillas, historial: hist }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.avisoVencConfig = async (req, res) => {
+  try {
+    const activo = req.body?.activo ? 1 : 0;
+    const dias = Math.min(15, Math.max(1, Number(req.body?.dias) || 2));
+    await pool.query('UPDATE wsp_config SET aviso_venc_activo=?, aviso_venc_dias=?', [activo, dias]);
+    res.json({ success: true, data: { activo, dias }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.avisoVencProbar = async (req, res) => {
+  try { res.json({ success: true, data: await avisoVenc.correr({ real: false }), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.avisoVencCorrer = async (req, res) => {
+  try { res.json({ success: true, data: await avisoVenc.correr({ real: true }), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.avisoVencCrearPlantillas = async (req, res) => {
+  try { res.json({ success: true, data: await avisoVenc.crearPlantillas(), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
