@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,8 +8,6 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#f0f2f5; }
-  .topnav { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:14px 26px; display:flex; align-items:center; justify-content:space-between; }
-  .topnav a { color:#fff; text-decoration:none; font-weight:600; }
   .main { max-width:1100px; margin:0 auto; padding:26px 20px 60px; }
   .banner { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:24px; }
   .banner h2 { margin:0 0 6px; } .banner p { margin:0; opacity:.85; font-size:.9rem; }
@@ -23,11 +21,8 @@
 </style>
 </head>
 <body>
-<nav class="topnav">
-  <a href="/mantenedores/"><i class="bi bi-arrow-left me-1"></i> Mantenedores</a>
-  <b><i class="bi bi-journal-richtext me-1"></i> Documentación Business Suite <span class="version-badge" id="versionBadge"></span></b>
-  <span></span>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Documentación Business Suite',icon:'bi-journal-richtext',current:true}]};</script>
 <div class="main">
   <div class="banner">
     <h2><i class="bi bi-journal-richtext me-2"></i>Documentación Business Suite</h2>
@@ -60,6 +55,7 @@
     </a>
   </div>
 </div>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 -->
+<!-- v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,8 +8,6 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
-  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
-  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
   .doc { max-width:900px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; }
   h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:40px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
   h3 { color:#0f172a; margin-top:24px; }
@@ -22,12 +20,13 @@
   figure.shot { margin:16px 0 22px; }
   figure.shot img { width:100%; border-radius:10px; border:1px solid #e2e8f0; box-shadow:0 4px 14px rgba(2,45,112,.10); display:block; }
   figure.shot figcaption { font-size:.8rem; color:#64748b; margin-top:6px; text-align:center; }
-  @media print { .bar { display:none; } .toc { column-count:1; } }
+  @media print { #af-topnav { display:none; } .toc { column-count:1; } }
   @media (max-width:640px){ .toc { column-count:1; } }
 </style>
 </head>
 <body>
-<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Manual de Usuario</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Manual de Usuario",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
 <div class="doc">
   <h1><i class="bi bi-book me-2"></i>Manual de Usuario</h1>
   <p>Cómo hacer el trabajo del día a día en el Business Suite, módulo por módulo. Lo que ves depende de tu perfil: si un módulo no aparece en tu Home, no tienes el permiso (pídelo al Administrador).</p>
@@ -193,6 +192,7 @@
 
   <div class="tip"><b>Regla de oro:</b> si un número se ve raro, no lo corrijas a mano en una planilla — repórtalo. En el Suite cada cifra tiene un motor único: si se corrige, se corrige una sola vez y para todos.</div>
 </div>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

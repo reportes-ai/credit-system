@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 -->
+<!-- v1.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,8 +8,6 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
-  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; }
-  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
   .doc { max-width:860px; margin:0 auto; padding:34px 24px 80px; line-height:1.65; }
   h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
   .hero { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border-radius:18px; padding:36px 34px; margin-bottom:30px; }
@@ -19,11 +17,12 @@
   .pilar b { color:var(--navy); }
   ul { padding-left:22px; } li { margin-bottom:6px; }
   .destacado { background:#eff6ff; border-radius:12px; padding:16px 20px; margin:14px 0; }
-  @media print { .bar { display:none; } }
+  @media print { #af-topnav { display:none; } }
 </style>
 </head>
 <body>
-<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Brochure Business Suite</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Brochure Business Suite",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
 <div class="doc">
   <div class="hero">
     <h1>AutoFácil Business Suite</h1>
@@ -132,6 +131,7 @@
   <h2>El resultado</h2>
   <p>Menos digitación, cero doble registro, números que siempre cuadran, clientes atendidos a toda hora y un negocio que se configura a sí mismo. <b>Ese es tu Business Suite.</b></p>
 </div>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,8 +8,6 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; }
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
-  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
-  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
   .doc { max-width:940px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; font-size:.95rem; }
   h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
   h3 { color:#0f172a; margin-top:22px; }
@@ -20,11 +18,12 @@
   code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:.85em; }
   pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 18px; overflow-x:auto; font-size:.8rem; }
   .max { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
-  @media print { .bar { display:none; } }
+  @media print { #af-topnav { display:none; } }
 </style>
 </head>
 <body>
-<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Documentación Técnica</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Documentación Técnica",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
 <div class="doc">
   <h1><i class="bi bi-cpu me-2"></i>Documentación Técnica</h1>
   <p>Arquitectura, tablas, motores e integraciones del Business Suite. Referencia para desarrollo y para el Administrador técnico.</p>
@@ -132,6 +131,7 @@ creditos PK = id (id_credito solo como alias en SELECT)
 Cambios quirúrgicos: leer antes de tocar, un cambio a la vez, no tocar lo que funciona
 Versionado: subir APP_VERSION en cada cambio frontend (badge = confirmación de deploy)</pre>
 </div>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
