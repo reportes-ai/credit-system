@@ -275,6 +275,25 @@ async function simularCuota(monto, plazo) {
 
 const fmtCLP = v => '$' + Math.round(+v || 0).toLocaleString('es-CL');
 
+/* ── Herramienta preevaluación: informes DealerNet en vivo por RUT (MOTOR ÚNICO
+      asegurarInformes de dealernet-ws: caché de vigencia + clasificación por severidad).
+      La IA junta RUT/pie/plazo; el veredicto lo pone el CÓDIGO. */
+function dvRut(cuerpo) { let s = 1, m = 0; for (; cuerpo; cuerpo = Math.floor(cuerpo / 10)) s = (s + cuerpo % 10 * (9 - m++ % 6)) % 11; return s ? String(s - 1) : 'K'; }
+async function preEvaluar(rutRaw, piePct, plazo) {
+  const rut = String(rutRaw || '').replace(/[.\s]/g, '').toUpperCase();
+  const m = rut.match(/^(\d{7,8})-?([\dK])$/);
+  if (!m || dvRut(parseInt(m[1], 10)) !== m[2]) return { error: 'RUT_INVALIDO' };
+  const [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
+  if (!prods.length) return { error: 'SIN_PRODUCTOS' };
+  const { asegurarInformes } = require('../../../clientes/src/controllers/dealernet-ws.controller');
+  const r = await asegurarInformes({ rut: m[1] + '-' + m[2], productos: prods.map(p => String(p.codigo)), usuario: null });
+  const disponibles = r.items.filter(i => i.disponible);
+  if (!disponibles.length) return { error: r.error || 'SIN_INFORMES' };
+  const SEV = ['bueno', 'regular', 'malo', 'grave'];
+  const peor = disponibles.reduce((a, i) => Math.max(a, SEV.indexOf(i.severidad)), 0);
+  return { rut: m[1] + '-' + m[2], ok: peor <= 1, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
+}
+
 /* ── IA conversacional (Haiku): arma el contexto y pide JSON ───────────────── */
 async function respuestaIA(conv, texto, cfg) {
   // Base de conocimiento: las respuestas configuradas del bot (paramétricas)
@@ -291,9 +310,11 @@ ${conocimiento || '(sin respuestas configuradas)'}
 
 Horario de atención humana: ${cfg.horario_ini}–${cfg.horario_fin}, días ${cfg.dias_habiles} (1=lunes…7=domingo).${conv.nombre ? `\nEl cliente se llama ${conv.nombre}; puedes saludarlo por su primer nombre.` : ''}
 
-SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Si el cliente quiere saber la cuota y ya tienes MONTO A FINANCIAR (en pesos) y PLAZO (meses), agrega al JSON "simulacion":{"monto":X,"plazo":N} y el sistema calculará el valor exacto con la tasa vigente (tu "respuesta" va antes del cálculo, sin cifras). Si falta el monto o el plazo, pídelos. Si el cliente da presupuesto de cuota (cuánto puede pagar al mes), pide confirmar monto y plazo para simular.
+SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Si el cliente quiere saber la cuota y ya tienes MONTO A FINANCIAR (en pesos) y PLAZO (meses), agrega al JSON "simulacion":{"monto":X,"plazo":N} y el sistema calculará el valor exacto con la tasa vigente (tu "respuesta" va antes del cálculo, sin cifras). Si falta el monto o el plazo, pídelos. Si el cliente da presupuesto de cuota (cuánto puede pagar al mes), pide confirmar monto y plazo para simular. El plazo máximo es 48 meses: si piden más, ofrece 48.
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"monto": pesos, "plazo": meses} (solo si corresponde)}`;
+PREEVALUACIÓN AL INSTANTE: cuando el cliente ya está interesado (idealmente después de la cuota), ofrécele preevaluarse al tiro: solo necesitas su RUT. Pídelo explicando que es para una evaluación inmediata y gratuita. Cuando el cliente entregue su RUT, agrega al JSON "evaluacion":{"rut":"12345678-9","pie_pct":P} (P = % de pie sobre el valor del auto si lo conoces, si no omítelo). El sistema evalúa y AGREGA el veredicto él solo después de tu "respuesta" (tú no anticipes ningún resultado, ni positivo ni negativo). NUNCA menciones informes comerciales, Dicom ni centrales de riesgo por tu cuenta.
+
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"monto": pesos, "plazo": meses} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -308,6 +329,27 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
       const s = await simularCuota(datos.simulacion.monto, datos.simulacion.plazo);
       if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses · tasa ${String(s.tasa.toFixed(2)).replace('.', ',')}% mensual\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
     } catch (e) { console.error('[wsp simulacion]', e.message); }
+  }
+  // Preevaluación determinística: DealerNet por RUT; el veredicto lo redacta el código
+  if (datos.evaluacion && datos.evaluacion.rut) {
+    try {
+      const ev = await preEvaluar(datos.evaluacion.rut, datos.evaluacion.pie_pct);
+      if (ev.error === 'RUT_INVALIDO') {
+        respuesta += '\n\nMmm, ese RUT no me cuadra 🤔 ¿Me lo confirmas? (por ejemplo: 12.345.678-9)';
+      } else if (ev.error) {
+        console.error('[wsp preevaluacion]', ev.error);
+        respuesta += '\n\nNo pude completar la preevaluación en este momento. ¿Quieres que un Ejecutivo Comercial te llame y lo vemos al tiro? 📞';
+      } else {
+        await pool.query("UPDATE wsp_conversaciones SET rut_cliente=COALESCE(rut_cliente,?) WHERE id=?", [ev.rut, conv.id]);
+        if (ev.ok && ev.pie_pct >= 40) {
+          respuesta += '\n\n🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del ' + Math.round(ev.pie_pct) + '% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?';
+        } else if (ev.ok) {
+          respuesta += '\n\n🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del 40%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?';
+        } else {
+          respuesta += '\n\nGracias por tu confianza 🙌 Tu caso necesita una revisión más personalizada de nuestro equipo. ¿Quieres que un Ejecutivo Comercial te llame para buscar juntos la mejor alternativa? 📞';
+        }
+      }
+    } catch (e) { console.error('[wsp preevaluacion]', e.message); }
   }
   return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo };
 }
