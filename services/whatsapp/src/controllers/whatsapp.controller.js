@@ -291,6 +291,21 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   if (!disponibles.length) return { error: r.error || 'SIN_INFORMES' };
   const SEV = ['bueno', 'regular', 'malo', 'grave'];
   const peor = disponibles.reduce((a, i) => Math.max(a, SEV.indexOf(i.severidad)), 0);
+  // Reporte Crediticio Automático (Business Suite): genera y persiste el análisis IA
+  // en el repositorio existente ia_informes_dealernet (motor único analizarRut, lee los
+  // informes ya traídos — no re-consulta DealerNet). En segundo plano, no frena el chat.
+  // Se salta si ya hay un reporte de los últimos 15 días (misma vigencia del caché).
+  (async () => {
+    try {
+      const [[prev]] = await pool.query(
+        'SELECT id FROM ia_informes_dealernet WHERE rut=? AND fecha >= DATE_SUB(NOW(), INTERVAL 15 DAY) LIMIT 1', [m[1]]);
+      if (!prev) {
+        const { analizarRut } = require('../../../ia/src/controllers/informe-dealernet.controller');
+        const rep = await analizarRut({ rut: m[1] + '-' + m[2] });
+        if (rep.ok) console.log(`[wsp reporte-ia] RUT ${m[1]} → riesgo ${rep.nivel_riesgo} (reporte #${rep.id})`);
+      }
+    } catch (e) { console.error('[wsp reporte-ia]', e.message); }
+  })();
   return { rut: m[1] + '-' + m[2], ok: peor <= 1, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
 }
 
