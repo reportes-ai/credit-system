@@ -66,6 +66,14 @@
     .report-card.bitacora .card-icon-wrap { background:linear-gradient(135deg,#e0e7ff,#ede9fe); color:#4f46e5; }
     .report-card.bitacora:hover .card-icon-wrap { background:linear-gradient(135deg,#4f46e5,#6366f1); color:#fff; }
     .report-card.bitacora h6 { color:#3730a3; }
+    .report-card.cartera { --card-accent:linear-gradient(90deg,#012d70,#0141A2,#009AFE); background:linear-gradient(145deg,#eff6ff,#fff); }
+    .report-card.cartera .card-icon-wrap { background:linear-gradient(135deg,#dbeafe,#e0f2fe); color:#0141A2; }
+    .report-card.cartera:hover .card-icon-wrap { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+    .report-card.cartera h6 { color:#012d70; }
+    .report-card.mora { --card-accent:linear-gradient(90deg,#7f1d1d,#b91c1c,#f59e0b); background:linear-gradient(145deg,#fef2f2,#fff); }
+    .report-card.mora .card-icon-wrap { background:linear-gradient(135deg,#fee2e2,#ffedd5); color:#b91c1c; }
+    .report-card.mora:hover .card-icon-wrap { background:linear-gradient(135deg,#b91c1c,#f59e0b); color:#fff; }
+    .report-card.mora h6 { color:#7f1d1d; }
   </style>
 </head>
 <body>
@@ -161,17 +169,27 @@
         </button>
       </div>
     </div>
-    <div class="report-card disabled">
-      <div class="card-icon-wrap" style="background:#f0f4f8;color:#94a3b8"><i class="bi bi-file-earmark-bar-graph"></i></div>
-      <h6 style="color:#9ca3af">Cartera de Créditos</h6>
-      <p>Resumen de la cartera activa, estados, montos financiados y distribución por ejecutivo.</p>
-      <div class="card-footer-row"><span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span></div>
+    <div class="report-card cartera" onclick="window.location='/reporteria/cartera-creditos/'">
+      <div class="card-icon-wrap"><i class="bi bi-file-earmark-bar-graph"></i></div>
+      <h6>Cartera de Créditos</h6>
+      <p>Resumen de la cartera con gráficos 3D: etapas, montos financiados, colocaciones por mes y distribución por financiera y ejecutivo.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#0141A2,#009AFE)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
     </div>
-    <div class="report-card disabled">
-      <div class="card-icon-wrap" style="background:#f0f4f8;color:#94a3b8"><i class="bi bi-cash-coin"></i></div>
-      <h6 style="color:#9ca3af">Cobranza y Mora</h6>
-      <p>Detalle de cuotas vencidas, tasas de mora, recuperación y seguimiento de deudores.</p>
-      <div class="card-footer-row"><span class="badge-status pronto"><i class="bi bi-clock"></i>Próximamente</span></div>
+    <div class="report-card mora" onclick="window.location='/reporteria/cobranza-mora/'">
+      <div class="card-icon-wrap"><i class="bi bi-cash-coin"></i></div>
+      <h6>Cobranza y Mora</h6>
+      <p>Cuotas vencidas por tramo, tasa de mora, recuperación mensual y top de deudores con acceso directo a gestionar. Con gráficos 3D.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#b91c1c,#f59e0b)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
     </div>
   </div>
 </div>
