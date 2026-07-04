@@ -619,10 +619,21 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
       }
     } catch (e) { console.error('[wsp simulacion]', e.message); }
   }
-  // Dónde pagar: instrucciones exactas según la(s) financiera(s) del cliente
-  if (datos.donde_pagar && datos.donde_pagar.rut) {
+  // Dónde pagar: instrucciones exactas según la(s) financiera(s) del cliente.
+  // GUARDIA: el RUT solo vale si el CLIENTE lo escribió en sus mensajes recientes
+  // (la IA no puede reusar un RUT viejo del historial — podría ser de otra persona);
+  // si no, se usa el RUT del cliente identificado por teléfono.
+  if (datos.donde_pagar && (datos.donde_pagar.rut || conv.rut_cliente)) {
     try {
-      const dp = await dondePagar(datos.donde_pagar.rut);
+      const norm = s => String(s || '').replace(/[.\s-]/g, '').toUpperCase();
+      let rutDP = null;
+      if (datos.donde_pagar.rut) {
+        const [ins] = await pool.query("SELECT mensaje FROM wsp_mensajes WHERE id_conversacion=? AND direccion='IN' ORDER BY id DESC LIMIT 4", [conv.id]);
+        if (ins.some(x => norm(x.mensaje).includes(norm(datos.donde_pagar.rut)))) rutDP = datos.donde_pagar.rut;
+      }
+      rutDP = rutDP || conv.rut_cliente;
+      if (!rutDP) { respuesta += '\n\nPara darte la información exacta necesito tu RUT 🙂 ¿Me lo compartes?'; return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo, contacto: String(datos.contacto || 'AHORA').toUpperCase() }; }
+      const dp = await dondePagar(rutDP);
       if (dp.error === 'RUT_INVALIDO') respuesta += '\n\nMmm, ese RUT no me cuadra 🤔 ¿Me lo confirmas? (por ejemplo: 12.345.678-9)';
       else if (dp.error === 'SIN_CREDITOS') respuesta += '\n\nNo encontré créditos vigentes asociados a ese RUT 🤔 Si crees que es un error, escríbenos a contacto@autofacilchile.cl o te conecto con un ejecutivo.';
       else {
@@ -631,9 +642,17 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
       }
     } catch (e) { console.error('[wsp donde_pagar]', e.message); }
   }
-  // Preevaluación determinística: DealerNet por RUT; el veredicto lo redacta el código
+  // Preevaluación determinística: DealerNet por RUT; el veredicto lo redacta el código.
+  // GUARDIA: el RUT debe venir escrito por el cliente en sus mensajes recientes (nunca
+  // reusado del historial — consultaría DealerNet, pagado, sobre otra persona).
   if (datos.evaluacion && datos.evaluacion.rut) {
     try {
+      const norm = s => String(s || '').replace(/[.\s-]/g, '').toUpperCase();
+      const [ins] = await pool.query("SELECT mensaje FROM wsp_mensajes WHERE id_conversacion=? AND direccion='IN' ORDER BY id DESC LIMIT 4", [conv.id]);
+      if (!ins.some(x => norm(x.mensaje).includes(norm(datos.evaluacion.rut)))) {
+        respuesta += '\n\nPara preevaluarte necesito que me escribas tu RUT 🙂 ¿Me lo compartes?';
+        return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo, contacto: String(datos.contacto || 'AHORA').toUpperCase() };
+      }
       const ev = await preEvaluar(datos.evaluacion.rut, datos.evaluacion.pie_pct);
       if (ev.error === 'RUT_INVALIDO') {
         respuesta += '\n\nMmm, ese RUT no me cuadra 🤔 ¿Me lo confirmas? (por ejemplo: 12.345.678-9)';
