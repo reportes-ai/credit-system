@@ -754,9 +754,10 @@ exports.excluirPolitica = async (req, res) => {
    extrae candidatos del informe (extractor genérico sobre el JSON) y los deja
    en contactos_dn para REVISIÓN UNO A UNO (nombre DealerNet vs nuestro nombre).
    Lotes de 5 (cada consulta DealerNet tiene costo; caché 15 días). */
-const PROD_MAIL = ['3411', '3440'];
-const PROD_TEL  = ['3410', '3407', '3440'];
-function extraerContactos(textos) {
+// Perfil Comercial (3435) trae nombre, correos y teléfonos — activo en el plan y con caché
+const PROD_MAIL = ['3435'];
+const PROD_TEL  = ['3435'];
+function extraerContactos(textos, rutCuerpo) {
   const todo = textos.join('\n');
   const emails = [...new Set((todo.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) || [])
     .map(e => e.toLowerCase()).filter(e => !e.includes('dealernet')))];
@@ -772,6 +773,7 @@ function extraerContactos(textos) {
     freq[d] = (freq[d] || 0) + 1;
   }
   const telefonos = Object.entries(freq)
+    .filter(([num]) => !rutCuerpo || !num.includes(String(rutCuerpo)))   // el RUT no es un teléfono
     .map(([num, n]) => ({ num: '+' + num, score: n + (num.startsWith('569') ? 10 : 0) }))
     .sort((a, b) => b.score - a.score).slice(0, 8);
   const nf = {};
@@ -808,7 +810,9 @@ exports.enriquecerContactos = async (req, res) => {
         const [infs] = await pool.query(
           `SELECT contenido FROM dealernet_informes WHERE rut=? AND codigo_producto IN (?) AND retcode=0 ORDER BY id DESC LIMIT 6`,
           [m ? m[1] : d.rut, productos]);
-        const cand = extraerContactos(infs.map(i => String(i.contenido || '')));
+        const cand = extraerContactos(
+          infs.map(i => typeof i.contenido === 'string' ? i.contenido : JSON.stringify(i.contenido || {})),
+          m ? m[1] : null);
         await pool.query('UPDATE campanas_destinatarios SET contactos_dn=? WHERE id=?', [JSON.stringify(cand), d.id]);
         hechos++;
       } catch (e) {
