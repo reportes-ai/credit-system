@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -109,6 +109,7 @@
           <div><label class="f">Meses para el término — desde</label><input class="f" type="number" id="pTerMin" value="0"></div>
           <div><label class="f">Meses para el término — hasta</label><input class="f" type="number" id="pTerMax" value="6"></div>
           <div><label class="f">Renta registrada mínima $</label><input class="f" type="text" inputmode="numeric" id="pRentaMin" value="0" oninput="fmtCLP(this)"></div>
+          <div><label class="f">Política: carga máx. cuota/renta % <span style="font-weight:400;color:#94a3b8">(0 = no aplicar)</span></label><input class="f" type="number" id="pCargaMax" value="0" min="0" max="100"></div>
         </div>
         <button class="btn btn-azul" style="margin-top:10px" onclick="generarBD()"><i class="bi bi-database-down me-1"></i>Generar destinatarios desde la BD</button>
         <span id="msgBD" class="okmsg"></span>
@@ -123,6 +124,14 @@
       <label class="f" style="margin-top:12px">Excluir regiones (feriado regional, zona de emergencia…)</label>
       <div class="pills" id="pillsRegiones"><span style="font-size:.75rem;color:#94a3b8">Cargando regiones…</span></div>
       <label class="f" style="margin-top:12px"><input type="checkbox" id="chkIA" style="width:auto;margin-right:6px">Analizar informes comerciales con IA (DealerNet) — <span id="lblIA">riesgo</span></label>
+      <div id="zonaAnalisis" style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 14px;margin-top:10px">
+        <div style="font-size:.78rem;font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-robot me-1"></i>Análisis de la audiencia cargada (informes comerciales + política)</div>
+        <button class="btn btn-azul" type="button" onclick="analizarAudiencia()"><i class="bi bi-search me-1"></i>Analizar seleccionados ahora</button>
+        <button class="btn btn-rojo" type="button" onclick="excluirAlto()" id="btnExcluir" style="display:none"><i class="bi bi-person-dash me-1"></i>Excluir riesgo ALTO del envío</button>
+        <span id="msgIA" style="font-size:.78rem;color:#6b7280;margin-left:6px"></span>
+        <div id="distIA" style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"></div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Consulta los informes DealerNet de cada RUT (caché 15 días, tiene costo). El criterio de política (carga cuota/renta) se aplica al generar la audiencia desde la BD.</div>
+      </div>
     </div>
 
     <!-- PASO 5: contenido -->
@@ -265,7 +274,7 @@ async function cargarCampana(){
   document.querySelectorAll('.pill.decil').forEach(p => p.classList.toggle('on', deciles.includes(Number(p.dataset.d))));
   document.querySelectorAll('[data-reg]').forEach(p => p.classList.toggle('on', regionesEx.includes(Number(p.dataset.reg))));
   if (CAMP.estado !== 'BORRADOR') bloquear();
-  pintarCampos(); cargarPreview();
+  pintarCampos(); cargarPreview(); pintarDistIA();
 }
 function bloquear(){
   document.querySelectorAll('input,select,textarea,.pill').forEach(e => e.disabled = true);
@@ -384,10 +393,14 @@ async function generarBD(){
   const o = CAMP.objetivo;
   const p = o==='COBRANZA'
     ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:numCLP(pCapMin.value) }
-    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value) };
+    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value), carga_max_pct:+pCargaMax.value||0 };
   const r = await fetch(`/api/campanas-masivas/${ID}/generar-desde-bd`, { method:'POST', headers: hdrs(1), body: JSON.stringify(p) });
   const j = await r.json();
-  document.getElementById('msgBD').textContent = j.success ? `✔ ${j.data.cargados} destinatarios desde la BD (${j.data.control} en control)` : ('Error: '+j.error);
+  document.getElementById('msgBD').textContent = j.success
+    ? `✔ ${j.data.cargados} destinatarios desde la BD (${j.data.control} en control)`
+      + (j.data.sin_contacto ? ` — ⚠ ${j.data.sin_contacto} quedaron fuera por no tener ${CANAL==='MAIL'?'email':'teléfono'} en la ficha` : '')
+      + (j.data.por_politica ? ` — 🛡 ${j.data.por_politica} fuera por política (carga cuota/renta)` : '')
+    : ('Error: '+j.error);
   cargarPreview();
 }
 
@@ -443,6 +456,40 @@ function fmtCLP(el){
   try { el.setSelectionRange(pos, pos); } catch(e) {}
 }
 const numCLP = v => Number(String(v||'').replace(/\./g,'')) || 0;
+
+/* ── Análisis de audiencia: informes DealerNet por lotes + exclusión de riesgo ── */
+async function analizarAudiencia(){
+  const msg = document.getElementById('msgIA');
+  let total = 0;
+  msg.textContent = 'Analizando…';
+  while (true) {
+    const r = await fetch(`/api/campanas-masivas/${ID}/analizar-ia`, { method:'POST', headers: hdrs() });
+    const j = await r.json();
+    if (!j.success) { msg.textContent = 'Error: '+j.error; return; }
+    total += j.data.procesados;
+    msg.textContent = `${total} analizados, quedan ${j.data.pendientes}…`;
+    if (j.data.fin) break;
+  }
+  msg.textContent = `✔ Análisis completo (${total} consultados ahora)`;
+  await pintarDistIA();
+}
+async function pintarDistIA(){
+  const r = await fetch(`/api/campanas-masivas/${ID}/resultados`, { headers: hdrs() });
+  const j = await r.json(); if (!j.success) return;
+  const COL = { BAJO:'#dcfce7;color:#166534', MEDIO:'#fef9c3;color:#854d0e', ALTO:'#fee2e2;color:#b91c1c', 'S/I':'#f1f5f9;color:#475569', 'SIN ANALIZAR':'#f1f5f9;color:#94a3b8' };
+  const dist = j.data.riesgo || [];
+  document.getElementById('distIA').innerHTML = dist.map(x =>
+    `<span style="border-radius:8px;padding:4px 12px;font-size:.78rem;font-weight:700;background:${COL[x.riesgo]||COL['S/I']}">${x.riesgo}: ${Number(x.n).toLocaleString('es-CL')}</span>`).join('');
+  const alto = dist.find(x => x.riesgo==='ALTO');
+  document.getElementById('btnExcluir').style.display = (alto && Number(alto.n) > 0 && (!CAMP || CAMP.estado==='BORRADOR')) ? '' : 'none';
+}
+async function excluirAlto(){
+  if (!confirm('¿Excluir del envío a todos los destinatarios con riesgo ALTO? (no se les enviará nada)')) return;
+  const r = await fetch(`/api/campanas-masivas/${ID}/excluir-riesgo`, { method:'POST', headers: hdrs(1), body: JSON.stringify({ niveles:['ALTO'] }) });
+  const j = await r.json();
+  document.getElementById('msgIA').textContent = j.success ? `✔ ${j.data.excluidos} destinatarios de riesgo ALTO excluidos del envío` : ('Error: '+j.error);
+  pintarDistIA(); cargarPreview();
+}
 
 const safe = v => { try { return typeof v==='string' ? JSON.parse(v) : v; } catch { return null; } };
 init();

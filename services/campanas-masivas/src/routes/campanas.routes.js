@@ -25,5 +25,6 @@ router.post('/:id/recalcular',       verifyToken, puede, c.recalcularConversion)
 router.get('/:id/resultados',        verifyToken, puede, c.resultados);
 router.get('/:id/destinatarios',     verifyToken, puede, c.destinatarios);
 router.post('/:id/analizar-ia',      verifyToken, puede, c.analizarIA);
+router.post('/:id/excluir-riesgo',   verifyToken, puede, c.excluirRiesgo);
 
 module.exports = router;

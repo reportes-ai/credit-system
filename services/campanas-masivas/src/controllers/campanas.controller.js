@@ -353,6 +353,7 @@ exports.generarDesdeBD = async (req, res) => {
     const exRegSQL = exReg.length ? `AND (cl.id_region IS NULL OR cl.id_region NOT IN (${exReg.map(() => '?').join(',')}))` : '';
 
     let rows = [];
+    let porPolitica = 0;
     if (c.objetivo === 'COBRANZA') {
       const [r] = await pool.query(`
         SELECT cl.rut, cl.nombres nombre, cl.apellido_paterno ap_paterno, cl.apellido_materno ap_materno,
@@ -397,15 +398,32 @@ exports.generarDesdeBD = async (req, res) => {
           ${exRegSQL}
         LIMIT 10000`, [Number(p.termino_min) || 0, Number(p.termino_max) || 6, Number(p.renta_min) || 0, ...exReg]);
       // un cliente con más de un crédito por terminar recibe UN solo mensaje
+      // Criterio de POLITICA opcional: carga financiera cuota/renta <= X% (solo si hay renta registrada)
+      const cargaMax = Number(p.carga_max_pct) || 0;
+      let base = r;
+      if (cargaMax > 0) {
+        base = r.filter(x => {
+          if (!Number(x.renta) || !Number(x.valor_cuota)) return true; // sin data no se castiga
+          const ok2 = (Number(x.valor_cuota) / Number(x.renta)) * 100 <= cargaMax;
+          if (!ok2) porPolitica++;
+          return ok2;
+        });
+      }
       const vistos = new Set();
-      rows = r.filter(x => { const k = limpiaRut(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
+      rows = base.filter(x => { const k = limpiaRut(x.rut); if (vistos.has(k)) return false; vistos.add(k); return true; })
         .map(x => ({
           ...x,
           esp1: x.meses_para_termino <= 0 ? 'Tu crédito ya está terminando' : `A tu crédito le quedan ${x.meses_para_termino} mes(es)`,
         }));
     }
 
-    if (!rows.length) return fail(res, 'La búsqueda no arrojó clientes con esos parámetros', 400);
+    // Sin dato de contacto del canal → fuera (una campaña de Mail no puede escribir a quien no tiene email)
+    const totalBruto = rows.length;
+    rows = rows.filter(x => c.canal === 'MAIL' ? (x.email && String(x.email).includes('@')) : !!x.telefono);
+    const sinContacto = totalBruto - rows.length;
+    if (!rows.length) return fail(res, totalBruto
+      ? `Se encontraron ${totalBruto} clientes pero NINGUNO tiene ${c.canal === 'MAIL' ? 'email' : 'teléfono'} registrado — corrige las fichas o usa el otro canal`
+      : 'La búsqueda no arrojó clientes con esos parámetros', 400);
     await pool.query('DELETE FROM campanas_destinatarios WHERE id_campana=?', [c.id]);
     const cols = ['rut', 'nombre', 'ap_paterno', 'ap_materno', 'genero', 'saludo', 'email', 'telefono',
       'monto_credito', 'cuotas', 'tasa', 'valor_cuota', 'esp1', 'esp2'];
@@ -417,7 +435,8 @@ exports.generarDesdeBD = async (req, res) => {
     await pool.query(`INSERT INTO campanas_destinatarios (id_campana, ${cols.join(',')}, decil, grupo)
       VALUES ${values.map(() => `(${'?,'.repeat(cols.length + 3).slice(0, -1)})`).join(',')}`, values.flat());
     await pool.query('UPDATE campanas_masivas SET parametros=? WHERE id=?', [JSON.stringify(p), c.id]);
-    ok(res, { cargados: values.length, control: values.filter(v => v[v.length - 1] === 'CONTROL').length });
+    ok(res, { cargados: values.length, control: values.filter(v => v[v.length - 1] === 'CONTROL').length,
+              sin_contacto: sinContacto, por_politica: porPolitica });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -668,6 +687,21 @@ exports.analizarIA = async (req, res) => {
     }
     const [[{ p }]] = await pool.query('SELECT COUNT(*) p FROM campanas_destinatarios WHERE id_campana=? AND riesgo_ia IS NULL AND rut IS NOT NULL', [c.id]);
     ok(res, { procesados: hechos, pendientes: p, fin: p === 0 });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Excluir del envío por riesgo IA (grupo EXCLUIDO — nunca se les envía) ── */
+exports.excluirRiesgo = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
+    if (!c) return fail(res, 'Campaña no existe', 404);
+    if (c.estado !== 'BORRADOR') return fail(res, 'La campaña ya fue enviada', 400);
+    const niveles = (Array.isArray(req.body?.niveles) ? req.body.niveles : ['ALTO']).filter(x => ['ALTO', 'MEDIO', 'S/I'].includes(x));
+    if (!niveles.length) return fail(res, 'Niveles inválidos', 400);
+    const [r] = await pool.query(
+      `UPDATE campanas_destinatarios SET grupo='EXCLUIDO' WHERE id_campana=? AND grupo='CAMPANA' AND riesgo_ia IN (?)`,
+      [req.params.id, niveles]);
+    ok(res, { excluidos: r.affectedRows });
   } catch (e) { fail(res, e.message); }
 };
 
