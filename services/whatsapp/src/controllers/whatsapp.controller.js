@@ -116,7 +116,24 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
         INDEX idx_fono (telefono), INDEX idx_estado (estado)
       )`);
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS no_leidos INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // Última cotización del bot en la conversación (para el mail de oportunidad al ejecutivo)
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS cotizacion JSON NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
   } catch (e) { console.error('[wsp_conversaciones migration]', e.message); }
+
+  // Oportunidades enviadas por mail a ejecutivos (round-robin equitativo)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wsp_oportunidades (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        id_conversacion INT          NOT NULL,
+        id_usuario      INT          NOT NULL,
+        usuario_nombre  VARCHAR(200) NULL,
+        email           VARCHAR(200) NULL,
+        enviado         TINYINT(1)   NOT NULL DEFAULT 0,
+        created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_usr (id_usuario), INDEX idx_conv (id_conversacion)
+      )`);
+  } catch (e) { console.error('[wsp_oportunidades migration]', e.message); }
 
   try {
     await pool.query(`
@@ -309,6 +326,77 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   return { rut: m[1] + '-' + m[2], ok: peor <= 1, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
 }
 
+/* ── Oportunidades por MAIL a ejecutivos (round-robin equitativo) ─────────────
+   Para derivaciones COMERCIAL cuando el cliente no quiere hablar al momento o
+   es fuera de horario: se elige al ejecutivo vigente con MENOS oportunidades
+   recibidas (aleatorio entre empatados → ciclo natural: nadie recibe 2 antes de
+   que todos reciban 1) y se le manda un mail motivador con el detalle de la
+   cotización de Facilito, con copia al Jefe Comercial. Firma: Business Suite. */
+async function enviarOportunidad(conv, texto) {
+  const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
+  // Ejecutivos vigentes (perfil Ejecutivo Comercial / Ejecutivo, activos, con correo)
+  const [ejes] = await pool.query(
+    `SELECT u.id_usuario, u.nombre, u.apellido, u.email,
+            (SELECT COUNT(*) FROM wsp_oportunidades o WHERE o.id_usuario=u.id_usuario) n
+       FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE p.nombre IN ('Ejecutivo Comercial','Ejecutivo') AND u.estado='activo'
+        AND COALESCE(u.email,'')<>'' ORDER BY n ASC`);
+  if (!ejes.length) return null;
+  const minN = ejes[0].n;
+  const candidatos = ejes.filter(e => e.n === minN);
+  const ele = candidatos[Math.floor(Math.random() * candidatos.length)];
+  const nombreEje = `${ele.nombre || ''} ${ele.apellido || ''}`.trim();
+
+  // Jefe Comercial (CC)
+  const [jefes] = await pool.query(
+    `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE p.nombre LIKE '%Jefe%Comercial%' AND u.estado='activo' AND COALESCE(u.email,'')<>''`);
+  const cc = jefes.map(j => j.email);
+
+  let cot = null; try { cot = typeof conv.cotizacion === 'string' ? JSON.parse(conv.cotizacion) : conv.cotizacion; } catch (_) {}
+  const fila = (k, v) => v ? `<tr><td style="padding:4px 10px;color:#64748b">${k}</td><td style="padding:4px 10px;font-weight:700;color:#0f172a">${v}</td></tr>` : '';
+  const detalle = cot ? `
+    <table style="border-collapse:collapse;background:#f8fafc;border-radius:10px;margin:12px 0">
+      ${fila('Valor del auto', fmtCLP(cot.valor_auto))}${fila('Pie', fmtCLP(cot.pie) + (cot.piePct ? ` (${cot.piePct}%)` : ''))}
+      ${fila('Saldo precio', fmtCLP(cot.saldoPrecio))}${fila('Monto del crédito', fmtCLP(cot.montoFin))}
+      ${fila('Plazo', cot.plazo + ' meses')}${fila('Cuota aproximada', fmtCLP(cot.cuota))}
+    </table>` : '<p style="color:#64748b">El cliente no alcanzó a completar la cotización — revisa la conversación para retomarla.</p>';
+
+  const html = `
+    <h2 style="color:#012d70;margin:0 0 6px">🚗 ¡Tienes una nueva oportunidad de negocio!</h2>
+    <p>Hola <b>${nombreEje.split(' ')[0] || 'ejecutivo'}</b>, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
+    <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}</p>
+    ${detalle}
+    ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://credit-system-45em.onrender.com/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}
+    <p>💬 Continúa la conversación desde la <a href="https://credit-system-45em.onrender.com/whatsapp/?conv=${conv.id}">bandeja de WhatsApp</a> — el cliente sigue en el mismo chat.</p>
+    <p style="background:#eff6ff;border-left:4px solid #0141A2;padding:10px 14px;border-radius:8px">
+      <b>Importante:</b> debes reportar el resultado de esta gestión a tu jefe, ya que será revisado en el comité.
+      Y recuerda: <b>en la medida que curses estos créditos, tendrás más oportunidades</b> como esta. 🚀</p>
+    <p style="color:#64748b">— <b>Business Suite</b> · AutoFácil Crédito Automotriz</p>`;
+
+  const [ins] = await pool.query('INSERT INTO wsp_oportunidades (id_conversacion, id_usuario, usuario_nombre, email) VALUES (?,?,?,?)',
+    [conv.id, ele.id_usuario, nombreEje, ele.email]);
+  let enviado = false;
+  if (mailConfigurado()) {
+    try {
+      await enviarCorreo({ to: ele.email, cc: cc.length ? cc : undefined,
+        subject: `🚗 Oportunidad de negocio — cliente cotizó por WhatsApp${cot ? ' (' + fmtCLP(cot.montoFin) + ')' : ''}`,
+        html: envolverHTML ? envolverHTML(html) : html });
+      enviado = true;
+      await pool.query('UPDATE wsp_oportunidades SET enviado=1 WHERE id=?', [ins.insertId]);
+    } catch (e) { console.error('[wsp oportunidad mail]', e.message); }
+  }
+  // La conversación queda asignada al ejecutivo elegido (responde él desde la bandeja)
+  await pool.query('UPDATE wsp_conversaciones SET asignada_a=?, asignada_nombre=? WHERE id=?', [ele.id_usuario, nombreEje, conv.id]);
+  notificar([ele.id_usuario], {
+    tipo: 'whatsapp', titulo: '🚗 Nueva oportunidad de negocio asignada',
+    mensaje: `${conv.nombre || conv.telefono} cotizó por WhatsApp — revisa tu correo y la bandeja`,
+    href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
+  }).catch(() => {});
+  console.log(`[wsp oportunidad] conv ${conv.id} → ${nombreEje} (${ele.email}) mail=${enviado ? 'OK' : 'no'}`);
+  return { id_usuario: ele.id_usuario, nombre: nombreEje, enviado };
+}
+
 /* ── IA conversacional (Haiku): arma el contexto y pide JSON ───────────────── */
 async function respuestaIA(conv, texto, cfg) {
   // Base de conocimiento: las respuestas configuradas del bot (paramétricas)
@@ -339,7 +427,9 @@ SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Cuando tengas VAL
 PREEVALUACIÓN: cuando el cliente entregue su RUT (pregunta 4), agrega al JSON "evaluacion":{"rut":"12345678-9","pie_pct":P} (P = % del pie sobre el valor del auto si lo conoces). El sistema evalúa y AGREGA el veredicto él solo después de tu "respuesta" — tú NO anticipes ningún resultado. NUNCA menciones informes comerciales, Dicom ni centrales de riesgo.
 Si antes el sistema informó "problemas para completar la preevaluación" y el cliente ACEPTA que lo llamen: responde "OK, enviaremos tu requerimiento a un Ejecutivo Comercial, quien te llamará por teléfono 📞" y deriva (derivar:true, area COMERCIAL).
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
+CONTACTO: al derivar a COMERCIAL indica "contacto":"AHORA" si el cliente quiere hablar de inmediato, o "contacto":"DESPUES" si prefiere que lo llamen/contacten más tarde o no quiere hablar en este momento. Si es DESPUES o es fuera de horario, dile que un Ejecutivo Comercial lo contactará (no prometas que será al instante).
+
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "contacto": "AHORA"|"DESPUES" (si derivas a COMERCIAL), "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -358,7 +448,11 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
       if (sim.valor_auto) {
         const { cotizarCuota } = require('../../../../shared/cotizador');
         s = await cotizarCuota(sim.valor_auto, sim.pie || 0, plazo);
-        if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_Valor referencial, sujeto a evaluación crediticia._`;
+        if (s) {
+          respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_Valor referencial, sujeto a evaluación crediticia._`;
+          // Persistir la cotización en la conversación (para el mail de oportunidad al ejecutivo)
+          try { await pool.query('UPDATE wsp_conversaciones SET cotizacion=? WHERE id=?', [JSON.stringify({ valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s, fecha: new Date().toISOString().slice(0, 10) }), conv.id]); conv.cotizacion = { valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s }; } catch (_) {}
+        }
       } else {
         s = await simularCuota(sim.monto, plazo);
         if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
@@ -386,7 +480,7 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
       }
     } catch (e) { console.error('[wsp preevaluacion]', e.message); }
   }
-  return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo };
+  return { respuesta, derivar: !!datos.derivar, area: datos.area, motivo: datos.motivo, contacto: String(datos.contacto || 'AHORA').toUpperCase() };
 }
 
 /* ── MOTOR del bot: procesa un mensaje entrante ────────────────────────────── */
@@ -455,11 +549,19 @@ async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = f
         if (out.derivar) {
           const area = ['COMERCIAL', 'COBRANZA', 'OPERACIONES'].includes(String(out.area || '').toUpperCase()) ? String(out.area).toUpperCase() : 'COMERCIAL';
           await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', area=? WHERE id=?", [area, conv.id]);
-          notificar(await poolAtencion(), {
-            tipo: 'whatsapp', titulo: `📲 Cliente esperando en WhatsApp (${area}) — ¿quién lo toma?`,
-            mensaje: `${conv.nombre || conv.telefono}: ${String(out.motivo || texto).slice(0, 90)}`,
-            href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
-          }).catch(() => {});
+          // COMERCIAL fuera de horario o cliente que prefiere que lo llamen después →
+          // oportunidad por MAIL al ejecutivo (round-robin) con copia al Jefe Comercial.
+          // Dentro de jornada y quiere hablar AHORA → push al pool (quien la toma sigue el chat).
+          if (area === 'COMERCIAL' && (!enHorario(cfg) || out.contacto === 'DESPUES')) {
+            const [[convFull]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [conv.id]);
+            enviarOportunidad(convFull || conv, texto).catch(e => console.error('[wsp oportunidad]', e.message));
+          } else {
+            notificar(await poolAtencion(), {
+              tipo: 'whatsapp', titulo: `📲 Cliente esperando en WhatsApp (${area}) — ¿quién lo toma?`,
+              mensaje: `${conv.nombre || conv.telefono}: ${String(out.motivo || texto).slice(0, 90)}`,
+              href: '/whatsapp/?conv=' + conv.id, clave: 'wsp:' + conv.id,
+            }).catch(() => {});
+          }
         }
         await responder(conv, out.respuesta);
         return { conv, accion: out.derivar ? 'IA_DERIVA' : 'IA', motivo: out.motivo };
