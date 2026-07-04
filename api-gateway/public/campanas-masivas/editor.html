@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 -->
+<!-- v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -103,12 +103,12 @@
         <div class="row" id="paramCob">
           <div><label class="f">Días de mora — desde</label><input class="f" type="number" id="pMoraMin" value="1"></div>
           <div><label class="f">Días de mora — hasta</label><input class="f" type="number" id="pMoraMax" value="90"></div>
-          <div><label class="f">Capital adeudado mínimo $</label><input class="f" type="number" id="pCapMin" value="0"></div>
+          <div><label class="f">Capital adeudado mínimo $</label><input class="f" type="text" inputmode="numeric" id="pCapMin" value="0" oninput="fmtCLP(this)"></div>
         </div>
         <div class="row" id="paramVta">
           <div><label class="f">Meses para el término — desde</label><input class="f" type="number" id="pTerMin" value="0"></div>
           <div><label class="f">Meses para el término — hasta</label><input class="f" type="number" id="pTerMax" value="6"></div>
-          <div><label class="f">Renta registrada mínima $</label><input class="f" type="number" id="pRentaMin" value="0"></div>
+          <div><label class="f">Renta registrada mínima $</label><input class="f" type="text" inputmode="numeric" id="pRentaMin" value="0" oninput="fmtCLP(this)"></div>
         </div>
         <button class="btn btn-azul" style="margin-top:10px" onclick="generarBD()"><i class="bi bi-database-down me-1"></i>Generar destinatarios desde la BD</button>
         <span id="msgBD" class="okmsg"></span>
@@ -383,8 +383,8 @@ async function generarBD(){
   if (sucio) await guardar();
   const o = CAMP.objetivo;
   const p = o==='COBRANZA'
-    ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:+pCapMin.value||0 }
-    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:+pRentaMin.value||0 };
+    ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:numCLP(pCapMin.value) }
+    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:numCLP(pRentaMin.value) };
   const r = await fetch(`/api/campanas-masivas/${ID}/generar-desde-bd`, { method:'POST', headers: hdrs(1), body: JSON.stringify(p) });
   const j = await r.json();
   document.getElementById('msgBD').textContent = j.success ? `✔ ${j.data.cargados} destinatarios desde la BD (${j.data.control} en control)` : ('Error: '+j.error);
@@ -432,6 +432,17 @@ async function enviar(){
     setTimeout(() => location='/campanas-masivas/', 2500);
   } finally { document.getElementById('btnEnviar').disabled = false; }
 }
+
+/* Autoformato $ chileno mientras se escribe (punto = miles) — mismo patrón del resto de la app */
+function fmtCLP(el){
+  const cursor = el.selectionStart, prevLen = el.value.length;
+  const raw = el.value.replace(/\D/g,'');
+  el.value = raw ? Number(raw).toLocaleString('es-CL') : '';
+  const diff = el.value.length - prevLen;
+  const pos = Math.max(0, (cursor||0) + diff);
+  try { el.setSelectionRange(pos, pos); } catch(e) {}
+}
+const numCLP = v => Number(String(v||'').replace(/\./g,'')) || 0;
 
 const safe = v => { try { return typeof v==='string' ? JSON.parse(v) : v; } catch { return null; } };
 init();
