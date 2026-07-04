@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de Usuario — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
+  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  .doc { max-width:900px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:40px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  h3 { color:#0f172a; margin-top:24px; }
+  .toc { background:#f8fafc; border-radius:12px; padding:18px 24px; column-count:2; font-size:.9rem; }
+  .toc a { color:var(--accent); text-decoration:none; display:block; margin-bottom:5px; }
+  .paso { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:10px 0; font-size:.92rem; }
+  .tip { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:.88rem; }
+  ol, ul { padding-left:22px; } li { margin-bottom:5px; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
+  @media print { .bar { display:none; } .toc { column-count:1; } }
+  @media (max-width:640px){ .toc { column-count:1; } }
+</style>
+</head>
+<body>
+<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Manual de Usuario</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div class="doc">
+  <h1><i class="bi bi-book me-2"></i>Manual de Usuario</h1>
+  <p>Cómo hacer el trabajo del día a día en el Business Suite, módulo por módulo. Lo que ves depende de tu perfil: si un módulo no aparece en tu Home, no tienes el permiso (pídelo al Administrador).</p>
+
+  <div class="toc">
+    <a href="#acceso">1. Acceso y navegación</a>
+    <a href="#creditos">2. Créditos y carga masiva</a>
+    <a href="#cartas">3. Cartas de Aprobación</a>
+    <a href="#evaluacion">4. Evaluación Crediticia</a>
+    <a href="#postventa">5. Post Venta y cartolas</a>
+    <a href="#fundantes">6. Seguimiento Fundantes</a>
+    <a href="#tesoreria">7. Tesorería: caja, cuotas y ODP</a>
+    <a href="#cobranza">8. Cobranza</a>
+    <a href="#whatsapp">9. WhatsApp y Facilito</a>
+    <a href="#comercial">10. Gestión comercial</a>
+    <a href="#soporte">11. RRHH, Compras y Tickets</a>
+    <a href="#reporteria">12. Reportería y bitácora</a>
+  </div>
+
+  <h2 id="acceso">1. Acceso y navegación</h2>
+  <div class="paso"><b>Entrar:</b> abre el Suite en tu navegador → correo y contraseña. El primer ingreso pide cambiar la clave. ¿La olvidaste? El Administrador puede resetearla desde Usuarios.</div>
+  <ul>
+    <li><b>Instalar como app:</b> en Chrome/Edge, menú ⋮ → "Instalar AutoFácil". Queda como aplicación con su propio ícono.</li>
+    <li><b>Home:</b> muestra solo los módulos que tu perfil puede usar. La campana 🔔 trae tus alertas (activa el push para recibirlas fuera del Suite).</li>
+    <li><b>Mi Día:</b> tu panel personal — pendientes reales según tu rol, colocaciones del mes y tu calendario.</li>
+    <li><b>Ayuda contextual:</b> el botón "?" flotante explica la página donde estás (si tiene ayuda cargada).</li>
+    <li><b>Cambiar contraseña:</b> clic en tu nombre (arriba a la derecha) → Cambiar contraseña.</li>
+  </ul>
+
+  <h2 id="creditos">2. Créditos y carga masiva</h2>
+  <h3>Crear o consultar créditos</h3>
+  <ul>
+    <li><b>Listado:</b> Créditos → filtros por financiera, estado y búsqueda por OP/RUT/nombre. Paginado de a 100.</li>
+    <li><b>N° OP</b> es nuestro correlativo único; <b>ID Financiera</b> es el número de la institución. No son lo mismo.</li>
+    <li><b>Crear crédito:</b> botón Nuevo → completa los datos; las comisiones e ingresos se calculan solos.</li>
+  </ul>
+  <h3>Carga masiva</h3>
+  <div class="paso">Créditos → Carga Masiva → sube el Excel → el validador (con IA) marca anomalías (RUT, montos, dealers, fechas) antes de insertar → confirma. Los créditos que quedaron incompletos entran a la cola de <b>Digitación de Datos Faltantes</b>: se toman de a uno (bloqueo de 20 min por usuario), los campos faltantes en rojo.</div>
+
+  <h2 id="cartas">3. Cartas de Aprobación</h2>
+  <ol>
+    <li><b>Emitir:</b> Cartas → Nueva. Puedes subir la Carta Compromiso y Cotización (PDF de la financiera) y los campos se autocompletan. El cuadro de <b>Preferencia Financiera</b> indica qué financiera corresponde según cuotas y saldo (bloquea combinaciones no permitidas).</li>
+    <li><b>Rentabilidad:</b> el botón Rentabilidad (permiso especial) compara AutoFin vs UAC antes de decidir.</li>
+    <li><b>Vigencia:</b> la carta aprobada vive 5 días corridos (configurable). En <b>Cartas Vigentes</b> se decide: <b>Otorgar</b> (crea el crédito OTORGADO y cartola) o <b>Desistir</b>. Si vence sola, pasa a DESISTIDA y ya no se puede imprimir.</li>
+  </ol>
+  <div class="tip">La comisión del dealer que rige es la de la carta (negociación especial). Si la carta no la trae, se calcula por parámetros.</div>
+
+  <h2 id="evaluacion">4. Evaluación Crediticia</h2>
+  <ol>
+    <li>Ingresa el <b>RUT</b> → aparece la ficha: datos personales, antigüedad de la información y cotizaciones guardadas (incluye las que hizo Facilito por WhatsApp).</li>
+    <li>Selecciona la <b>cotización</b> del auto que el cliente quiere (define la cuota que se evaluará contra su renta).</li>
+    <li>Si los antecedentes tienen más de 30 días, carga información nueva (ocupación + documentos; las liquidaciones se validan con IA).</li>
+    <li><b>Evaluar</b> → la IA cruza todo (incluye informes DealerNet en vivo) y entrega el análisis para tu decisión.</li>
+  </ol>
+
+  <h2 id="postventa">5. Post Venta y cartolas</h2>
+  <ul>
+    <li><b>Seguimiento:</b> cada crédito otorgado avanza por etapas de Saldo Precio y de Comisión. Las etapas se marcan a mano o solas (ej: FUNDANTES RECIBIDOS se marca al aprobar los fundantes).</li>
+    <li><b>Cartolas:</b> se generan acumulativas por estado A PAGAR (cruzan meses). Al enviarlas se estampa el Mes Cartola.</li>
+    <li><b>Pago de saldos:</b> definir fondos → seleccionar saldos → generar nómina → emitir orden de pago. Lo mismo para comisiones, cuadrando la factura del dealer contra la cartola (si no cuadra, se marca en rojo).</li>
+  </ul>
+
+  <h2 id="fundantes">6. Seguimiento Fundantes</h2>
+  <div class="paso"><b>Ejecutivo:</b> abre tu operación otorgada (AutoFin/Unidad) → sube los documentos fundantes que exige la matriz según financiera y antigüedad → Enviar. <b>Operaciones:</b> revisa y marca CERRADO (aprueba) o RECHAZADO con comentario — el rechazo le avisa al ejecutivo para corregir y reenviar.</div>
+
+  <h2 id="tesoreria">7. Tesorería: caja, cuotas y ODP</h2>
+  <ul>
+    <li><b>Caja:</b> selecciona la caja → busca el crédito → paga cuotas individuales o en lote. El comprobante lleva timbre PAGADO con caja, fecha y hora.</li>
+    <li><b>Orden de pago de cuotas (ODP):</b> si el pago requiere aprobación, se emite ODP desde la caja o la ficha; Tesorería la aprueba y el pago se registra con correo de respaldo automático.</li>
+    <li><b>Prepago:</b> desde la caja, botón Prepago — usa el mismo motor del certificado (cuotas + comisión + interés corriente) y permite condonar según atribuciones. El crédito queda PREPAGADO.</li>
+    <li><b>Órdenes de pago a proveedores:</b> módulo Órdenes de Pago — emisión con correlativo único OP-, historial y base de proveedores.</li>
+  </ul>
+
+  <h2 id="cobranza">8. Cobranza</h2>
+  <ul>
+    <li>La cartera propia muestra <b>días de mora</b> por crédito; la mora y los gastos de cobranza se calculan al día con el motor único (mismos valores en caja, portal y certificados).</li>
+    <li><b>Automatización por mora:</b> el sistema envía correos por tramo de días de atraso con plantillas y cooldown configurados (mantenedor Cobranza Mora).</li>
+    <li>Las gestiones se registran en CRM; los compromisos de pago quedan en la bitácora del crédito.</li>
+  </ul>
+
+  <h2 id="whatsapp">9. WhatsApp y Facilito</h2>
+  <ul>
+    <li><b>Facilito</b> atiende el número del negocio: cotiza, preevalúa por RUT e informa dónde pagar. Deriva cuando el cliente pide una persona o cuando no puede resolver algo importante.</li>
+    <li><b>Bandeja</b> (módulo WhatsApp): las conversaciones derivadas llegan con push "¿quién lo toma?" — el primero que la toma responde por el número del negocio. Escribe <code>/</code> para respuestas rápidas. Pasadas 24h del último mensaje del cliente la conversación queda en solo lectura (regla de Meta).</li>
+    <li><b>App del teléfono:</b> instala <b>AF WhatsApp</b> (abre /whatsapp/, inicia sesión en la app, "Agregar a pantalla de inicio", campana → Activar push). Los ejecutivos ven solo sus conversaciones.</li>
+    <li><b>Fuera de horario</b> o si el cliente prefiere que lo llamen: la oportunidad llega por <b>correo</b> al ejecutivo de turno (round-robin) con la cotización y copia al Jefe Comercial — hay que reportar el resultado, se revisa en comité.</li>
+    <li><b>Campañas:</b> mensajes masivos a cartera en mora, vigentes o lista manual. Para escribir fuera de la ventana 24h se usan <b>plantillas</b> aprobadas por Meta (pestaña Plantillas, con revisión IA obligatoria antes de enviar).</li>
+  </ul>
+
+  <h2 id="comercial">10. Gestión comercial</h2>
+  <ul>
+    <li><b>Comisiones:</b> Comisiones → Revisión — el cálculo mensual por ejecutivo sale solo (piso, incentivo, ajustes). Los supervisores ven a sus asignados.</li>
+    <li><b>Visitas a dealers:</b> agenda tu visita (cupos diarios configurados), registra la gestión Positivo/Negativo y el seguimiento. El mapa de dealers ayuda a planificar la ruta.</li>
+    <li><b>Informe diario de ventas:</b> llega solo al correo (L-S 8:30). El ranking y la carrera de colocaciones aparecen al entrar al Suite.</li>
+  </ul>
+
+  <h2 id="soporte">11. RRHH, Compras y Tickets</h2>
+  <ul>
+    <li><b>Vacaciones:</b> RRHH → Solicitudes → pide tus días; quien aprueba recibe alerta. <b>Certificado de antigüedad:</b> se genera con firma electrónica y QR verificable.</li>
+    <li><b>Compras:</b> Soporte → Compras — catálogo según tu perfil, el despacho llega a tu parque o Casa Matriz.</li>
+    <li><b>Reportar a TI:</b> Soporte → ticket con motivo; tiene SLA y escalamiento automático.</li>
+  </ul>
+
+  <h2 id="reporteria">12. Reportería y bitácora</h2>
+  <ul>
+    <li><b>Reportería Tailor Made:</b> reportes por período, financiera y dimensiones del negocio, exportables a Excel.</li>
+    <li><b>Bitácora de un Crédito:</b> busca por RUT, N° OP o ID Financiera y obtén la línea de tiempo completa: cliente, informes, cartas, pagos, gestiones y cambios.</li>
+    <li><b>Dashboard:</b> resumen ejecutivo de colocaciones con filtros por fecha e institución.</li>
+  </ul>
+
+  <div class="tip"><b>Regla de oro:</b> si un número se ve raro, no lo corrijas a mano en una planilla — repórtalo. En el Suite cada cifra tiene un motor único: si se corrige, se corrige una sola vez y para todos.</div>
+</div>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

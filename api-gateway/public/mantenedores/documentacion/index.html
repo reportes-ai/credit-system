@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentación Business Suite — AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#f0f2f5; }
+  .topnav { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:14px 26px; display:flex; align-items:center; justify-content:space-between; }
+  .topnav a { color:#fff; text-decoration:none; font-weight:600; }
+  .main { max-width:1100px; margin:0 auto; padding:26px 20px 60px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border-radius:16px; padding:26px 30px; margin-bottom:24px; }
+  .banner h2 { margin:0 0 6px; } .banner p { margin:0; opacity:.85; font-size:.9rem; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:16px; }
+  .card { background:#fff; border-radius:14px; padding:24px 22px; text-decoration:none; color:inherit; border:2px solid transparent; transition:.18s; display:flex; flex-direction:column; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); }
+  .card .ic { width:48px; height:48px; border-radius:12px; background:#eff6ff; color:var(--accent); display:flex; align-items:center; justify-content:center; font-size:1.4rem; margin-bottom:14px; }
+  .card h6 { margin:0 0 6px; font-size:.95rem; color:#111827; }
+  .card p { margin:0 0 16px; font-size:.8rem; color:#6b7280; line-height:1.4; flex:1; }
+  .card span { color:var(--accent); font-weight:700; font-size:.8rem; }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="/mantenedores/"><i class="bi bi-arrow-left me-1"></i> Mantenedores</a>
+  <b><i class="bi bi-journal-richtext me-1"></i> Documentación Business Suite <span class="version-badge" id="versionBadge"></span></b>
+  <span></span>
+</nav>
+<div class="main">
+  <div class="banner">
+    <h2><i class="bi bi-journal-richtext me-2"></i>Documentación Business Suite</h2>
+    <p>La biblioteca oficial del sistema: qué es, cómo se usa, cómo se configura y cómo funciona por dentro. Estos documentos se actualizan junto con cada mejora del sistema.</p>
+  </div>
+  <div class="grid">
+    <a class="card" href="brochure.html">
+      <div class="ic"><i class="bi bi-megaphone"></i></div>
+      <h6>Brochure — Conoce tu Business Suite</h6>
+      <p>Presentación de las funcionalidades y ventajas del sistema: qué puede hacer por ti y por qué transforma la operación de AutoFácil.</p>
+      <span>Abrir <i class="bi bi-arrow-right"></i></span>
+    </a>
+    <a class="card" href="manual-usuario.html">
+      <div class="ic"><i class="bi bi-book"></i></div>
+      <h6>Manual de Usuario</h6>
+      <p>Cada funcionalidad explicada: los flujos de trabajo del día a día y cómo hacer las cosas, módulo por módulo.</p>
+      <span>Abrir <i class="bi bi-arrow-right"></i></span>
+    </a>
+    <a class="card" href="config-maestro.html">
+      <div class="ic"><i class="bi bi-sliders"></i></div>
+      <h6>Configuración — Usuario Maestro</h6>
+      <p>Guía de los mantenedores de negocio: todo lo que un Usuario Maestro puede parametrizar sin tocar código ni depender de un programador.</p>
+      <span>Abrir <i class="bi bi-arrow-right"></i></span>
+    </a>
+    <a class="card" href="tecnica.html">
+      <div class="ic"><i class="bi bi-cpu"></i></div>
+      <h6>Documentación Técnica</h6>
+      <p>Arquitectura, tablas, motores de cálculo, integraciones y configuración técnica: qué hace cada pieza y cómo se conectan.</p>
+      <span>Abrir <i class="bi bi-arrow-right"></i></span>
+    </a>
+  </div>
+</div>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentación Técnica — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
+  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  .doc { max-width:940px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; font-size:.95rem; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  h3 { color:#0f172a; margin-top:22px; }
+  table { border-collapse:collapse; width:100%; font-size:.84rem; margin:12px 0; }
+  th { background:#f1f5f9; text-align:left; padding:7px 10px; color:#334155; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  td:first-child { font-family:Consolas,monospace; font-size:.8rem; color:var(--navy); white-space:nowrap; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:.85em; }
+  pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 18px; overflow-x:auto; font-size:.8rem; }
+  .max { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  @media print { .bar { display:none; } }
+</style>
+</head>
+<body>
+<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Documentación Técnica</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div class="doc">
+  <h1><i class="bi bi-cpu me-2"></i>Documentación Técnica</h1>
+  <p>Arquitectura, tablas, motores e integraciones del Business Suite. Referencia para desarrollo y para el Administrador técnico.</p>
+
+  <h2>Stack y arquitectura</h2>
+  <table>
+    <tr><td>Backend</td><td>Express.js + Node.js — microservicios independientes en <code>/services/*/src/{controllers,routes}</code>, montados por el api-gateway.</td></tr>
+    <tr><td>Base de datos</td><td>TiDB Cloud (MySQL-compatible). Pool único compartido: <code>shared/config/database.js</code>. Timezone del pool alineado a Chile (gotcha mysql2: debe coincidir con SET time_zone o las horas se corren 4h).</td></tr>
+    <tr><td>Frontend</td><td>HTML/CSS/JS vanilla en <code>api-gateway/public/</code>. PWA instalable (manifest + sw sin caché). App dedicada AF WhatsApp con manifest propio (scope /whatsapp/).</td></tr>
+    <tr><td>Deploy</td><td>GitHub main → Render auto-deploy (~2-3 min). <code>APP_VERSION</code> en <code>public/js/app-version.js</code> confirma el deploy en el badge de todas las páginas.</td></tr>
+    <tr><td>Auth</td><td>JWT (shared/middleware/auth.js). Tokens separados: interno (usuarios), <code>tipo=dealer</code> (portal dealer), <code>tipo=cliente</code> (portal cliente). Permisos por <code>requireFunc('codigo')</code> contra la matriz en BD (Admin bypass, caché 60s).</td></tr>
+    <tr><td>Migraciones</td><td>IIFE <code>(async () => {...})()</code> al inicio de cada controller: CREATE TABLE IF NOT EXISTS + ALTER ADD COLUMN IF NOT EXISTS + seeds INSERT IGNORE. Pendiente: runner central (capataz) que las serialice.</td></tr>
+  </table>
+
+  <h2>Máximas de diseño (no negociables)</h2>
+  <div class="max"><b>1. Un solo motor por cálculo:</b> cada magnitud se calcula en UNA función compartida que usan todos los consumidores. <b>2. Una sola fuente de datos:</b> cada dato vive en una tabla autoritativa; el resto la referencia por JOIN/FK. Snapshot deliberado (lo congelado al otorgar) ≠ duplicado. <b>3. Anti-hardcode:</b> módulos y cards salen de las tablas <code>modulos</code>/<code>funcionalidades</code>, nunca de listas JS.</div>
+
+  <h2>Tablas clave</h2>
+  <table>
+    <tr><th>Tabla</th><th>Rol</th></tr>
+    <tr><td>creditos</td><td>Operaciones de crédito. PK <code>id</code> (¡no id_credito!), clave de negocio <code>num_op</code> (correlativo único AutoFácil). <code>id_financiera</code> = número de la institución. Estados: <code>estado_credito</code> (originación) + <code>estado_cartera</code> (pago).</td></tr>
+    <tr><td>clientes</td><td>Datos personales, PK id_cliente, UNIQUE rut. Fuente única de nombres/contactos.</td></tr>
+    <tr><td>cuotas_credito</td><td>Calendario REAL congelado por crédito (migración INDEXA: 48.526 cuotas). Al otorgar, capital/vencimientos/valor cuota quedan inmutables.</td></tr>
+    <tr><td>pagos_credito</td><td>Pagos aplicados (cuota, mora, gastos, condonaciones). Sentinela N°0 = comisión/interés de prepago.</td></tr>
+    <tr><td>cartas_aprobacion</td><td>Cartas emitidas con comisión pactada (snapshot al emitir — "la carta manda").</td></tr>
+    <tr><td>cotizaciones</td><td>Repositorio único de cotizaciones (simulador + Facilito, datos_json.origen='whatsapp').</td></tr>
+    <tr><td>estados_credito / estados_transicion</td><td>Máquina de estados paramétrica por ámbito.</td></tr>
+    <tr><td>dealernet_informes / dealernet_consultas</td><td>Repositorio de informes comerciales (caché dias_bloqueo=15) y log de consultas al WS.</td></tr>
+    <tr><td>ia_informes_dealernet</td><td>Reportes Crediticios Automáticos generados por IA (nivel riesgo, causas, alertas, costo).</td></tr>
+    <tr><td>wsp_*</td><td>WhatsApp: config, conversaciones (+cotizacion JSON, preevals), mensajes, respuestas, triggers, campañas, oportunidades (round-robin).</td></tr>
+    <tr><td>usuarios / perfiles / permisos_perfil / funcionalidades / modulos</td><td>Identidad y matriz de permisos. funcionalidades con href = cards; sin href = permisos de acción.</td></tr>
+    <tr><td>auditoria_movimientos</td><td>Bitácora central (shared/audit.js): acción, módulo, entidad, detalle, usuario, IP.</td></tr>
+    <tr><td>documentos_verificables</td><td>Núcleo de certificados + firma electrónica (hash SHA-256, verificación pública /verificar QR).</td></tr>
+    <tr><td>uf / utm / tasas</td><td>Indicadores; UF se carga completa en memoria (getUF(fecha)).</td></tr>
+  </table>
+
+  <h2>Motores de cálculo (un solo hogar cada uno)</h2>
+  <table>
+    <tr><th>Motor</th><th>Qué calcula y quién lo usa</th></tr>
+    <tr><td>rentabilidad-core.js</td><td>Cuota francesa, ingresos por tasa y seguros, rentabilidad. Isomorfo (module.exports + window.AF_RENT). Lo usan cartas, simulador, dashboard (recalcular-mes) y el bot.</td></tr>
+    <tr><td>shared/cotizador.js</td><td>Cuota "con gastos y todo": saldo precio + gastos operacionales (parametros_credito) + seguros por tramo + tasa 200 UF. Réplica server-side del simulador (pendiente unificar máxima #1). Usado por Facilito.</td></tr>
+    <tr><td>cobranzaFullMap (pagos-credito.controller)</td><td>Mora + gastos de cobranza por cuota al día D. Usado por caja, cobranza, certificados, portal cliente y prepago.</td></tr>
+    <tr><td>certificados.calcularPrepago</td><td>Monto de prepago (cuotas + comisión + interés corriente). Usado por certificado y prepago en caja.</td></tr>
+    <tr><td>recalcular-mes.js / recalcularPorOps</td><td>Comisiones e ingresos del negocio; corre solo ante toda vía de cambio; respeta forzados y meses cerrados.</td></tr>
+    <tr><td>penetracion.js</td><td>% de penetración de seguros sobre universo elegible por producto.</td></tr>
+    <tr><td>shared/uf.js</td><td>Lookup UF por fecha (memoria). Tramo mayor/menor 200 UF se recalcula con UF de fecha_otorgado.</td></tr>
+    <tr><td>shared/verificacion.js</td><td>Documentos verificables + FES: hash, firmante, QR público, detección de adulteración.</td></tr>
+    <tr><td>shared/ordenes-pago.js</td><td>Correlativo único global OP- (libro op_correlativos).</td></tr>
+  </table>
+
+  <h2>Subsistema de IA</h2>
+  <table>
+    <tr><td>shared/anthropic.js</td><td><code>analizar({codigo, system, prompt, json, max_tokens})</code> — llama a la API de Anthropic con el modelo asignado a la funcionalidad; gated por <code>ANTHROPIC_API_KEY</code>.</td></tr>
+    <tr><td>shared/ia.js</td><td>Registro de funcionalidades (<code>registrarFuncionalidad</code>, nacen apagadas), on/off (<code>iaActiva</code>), catálogo <code>ia_modelos</code> (precios) y tracking de tokens/costo por uso (<code>registrarUso</code>).</td></tr>
+    <tr><td>Funciones live</td><td>wsp_bot (Haiku, conversación Facilito), informe_crediticio (Sonnet, Reporte Crediticio Automático), liq_sueldo, carga_validador, wsp_plantillas (Sonnet 5, revisor de plantillas HSM), evaluación de consistencia.</td></tr>
+  </table>
+  <p>Patrón de herramientas del bot: la IA devuelve JSON con intención (<code>simulacion</code>, <code>evaluacion</code>, <code>donde_pagar</code>, <code>derivar</code>, <code>finalizar</code>) y <b>el código ejecuta</b> el cálculo/consulta y redacta el resultado — la IA nunca inventa cifras ni ve informes.</p>
+
+  <h2>Integraciones externas</h2>
+  <table>
+    <tr><th>Integración</th><th>Detalle</th></tr>
+    <tr><td>Meta Cloud API (WhatsApp)</td><td><code>shared/whatsapp.js</code> — Graph v21.0. Env: WSP_TOKEN (system user autofacil-bot, portafolio "Auto Facil Chile" — el portafolio "AutoFácil" está restringido para WhatsApp, no usar), WSP_PHONE_ID (16 dígitos), WSP_VERIFY. Webhook público /api/whatsapp/webhook. Sin credenciales → modo SIMULADO. Ventana 24h (config). Plantillas HSM vía /{waba}/message_templates (waba_id en wsp_config).</td></tr>
+    <tr><td>DealerNet WS</td><td>SOAP CentralDeInformacion (informes comerciales por RUT, pagado). <code>asegurarInformes</code> con caché (dias_bloqueo). Credenciales por env var.</td></tr>
+    <tr><td>Correo</td><td><code>shared/mailer.js</code> (nodemailer SMTP, Brevo). Cuentas remitente sistema/cobranza. Respeta Modo Desarrollo (redirige todo a correos de prueba).</td></tr>
+    <tr><td>Indicadores</td><td>UF/UTM: mindicador.cl (sin key), cada 12h. TMC: API CMF (CMF_API_KEY).</td></tr>
+    <tr><td>Google</td><td>Maps Geocoding (GOOGLE_MAPS_API_KEY, server-side) para el mapa de dealers; Calendar OAuth para Mi Día (pendiente keys).</td></tr>
+    <tr><td>Anthropic</td><td>ANTHROPIC_API_KEY; modelos según mantenedor IA.</td></tr>
+  </table>
+
+  <h2>Variables de entorno (Render)</h2>
+  <pre>DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME   → TiDB Cloud
+JWT_SECRET                                            → firma de tokens
+ANTHROPIC_API_KEY                                     → subsistema IA
+WSP_TOKEN / WSP_PHONE_ID / WSP_VERIFY                 → WhatsApp Cloud API
+MAIL_* (host, port, user, pass, from…)                → SMTP Brevo
+CMF_API_KEY                                           → TMC
+GOOGLE_MAPS_API_KEY                                   → geocoding dealers
+DEALERNET_USR / DEALERNET_PWD                         → informes comerciales</pre>
+
+  <h2>Dominios y rutas</h2>
+  <table>
+    <tr><td>afbs.autofacilchile.cl</td><td>Business Suite (login interno).</td></tr>
+    <tr><td>clientes.autofacilchile.cl</td><td>La raíz sirve el Portal del Cliente (enrutamiento por hostname en api-gateway/src/index.js).</td></tr>
+    <tr><td>dealers.autofacilchile.cl</td><td>La raíz sirve el Portal del Dealer.</td></tr>
+    <tr><td>/api/whatsapp/webhook</td><td>Único endpoint público sin JWT (verify token de Meta).</td></tr>
+    <tr><td>/verificar/:codigo</td><td>Verificación pública de documentos (QR).</td></tr>
+  </table>
+
+  <h2>Seguridad y operación</h2>
+  <table>
+    <tr><td>Permisos</td><td><code>requireFunc('codigo')</code> en rutas sensibles; visibilidad server-side (ej: ejecutivos solo ven sus conversaciones WhatsApp). Auditoría: <code>node scripts/audit-permisos.js</code>.</td></tr>
+    <tr><td>Auditoría</td><td><code>shared/audit.js → auditar({req, accion, modulo, entidad, detalle})</code> a auditoria_movimientos + módulo /auditoria/ con export.</td></tr>
+    <tr><td>Modo Desarrollo</td><td><code>shared/dev-mode.js</code>: redirige correo y WhatsApp a destinos de prueba; cinta DESARROLLO en la UI. Todo canal nuevo debe consultar getDevMode().</td></tr>
+    <tr><td>Cuenta break-glass</td><td>admin@admin.cl (flag usuarios.protegido) — intencional, exenta de políticas.</td></tr>
+    <tr><td>Cron</td><td>Correos programados (módulo propio con on/off), sync indicadores 12h, cobranza-mora 1×/día.</td></tr>
+    <tr><td>Consola SQL</td><td>/mantenedores/sql-console/ — SELECT/SHOW/DESCRIBE/EXPLAIN, 1 sentencia, 2000 filas, auditada (Solo Dios).</td></tr>
+  </table>
+
+  <h2>Convenciones de código</h2>
+  <pre>Tablas BD: snake_case · Rutas HTTP: kebab-case · Funciones JS: camelCase · Archivos: kebab-case.js
+Respuesta uniforme: { success, data, error }
+Pool SIEMPRE: require('../../../shared/config/database')
+creditos PK = id (id_credito solo como alias en SELECT)
+Cambios quirúrgicos: leer antes de tocar, un cambio a la vez, no tocar lo que funciona
+Versionado: subir APP_VERSION en cada cambio frontend (badge = confirmación de deploy)</pre>
+</div>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

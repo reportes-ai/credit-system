@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brochure — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; }
+  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  .doc { max-width:860px; margin:0 auto; padding:34px 24px 80px; line-height:1.65; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  .hero { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; border-radius:18px; padding:36px 34px; margin-bottom:30px; }
+  .hero h1 { color:#fff; margin:0 0 10px; } .hero p { margin:0; opacity:.9; font-size:1.05rem; }
+  .pilares { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:22px 0; }
+  .pilar { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:16px 18px; }
+  .pilar b { color:var(--navy); }
+  ul { padding-left:22px; } li { margin-bottom:6px; }
+  .destacado { background:#eff6ff; border-radius:12px; padding:16px 20px; margin:14px 0; }
+  @media print { .bar { display:none; } }
+</style>
+</head>
+<body>
+<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Brochure Business Suite</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div class="doc">
+  <div class="hero">
+    <h1>AutoFácil Business Suite</h1>
+    <p>Toda la operación del crédito automotriz en una sola plataforma: desde el primer WhatsApp del cliente hasta la última cuota pagada. Construida a la medida de AutoFácil, con inteligencia artificial integrada y diseñada para que el negocio la configure sin programadores.</p>
+  </div>
+
+  <h2>¿Por qué un Business Suite propio?</h2>
+  <p>Porque ningún software genérico entiende cómo trabaja AutoFácil. El Suite reemplaza planillas dispersas, paneles pagados de terceros y procesos manuales por <b>una sola plataforma donde todo conversa entre sí</b>: el crédito que se digita alimenta las comisiones, la cartola, la cobranza, la reportería y el portal del cliente — sin volver a escribir nada.</p>
+
+  <div class="pilares">
+    <div class="pilar"><b>🔧 Paramétrico</b><br>Tasas, comisiones, estados, plantillas, alertas y flujos se cambian desde mantenedores, sin tocar código.</div>
+    <div class="pilar"><b>🧮 Un solo motor por cálculo</b><br>Cada cifra (cuota, mora, comisión, rentabilidad) se calcula en un único lugar: el mismo número en toda la app.</div>
+    <div class="pilar"><b>🗄️ Una sola fuente de datos</b><br>Cada dato vive en un solo hogar; el resto lo referencia. Nada de versiones distintas del mismo cliente.</div>
+    <div class="pilar"><b>🤖 IA integrada</b><br>Análisis de documentos, informes crediticios, bot comercial y validaciones — con costo trackeado al centavo.</div>
+  </div>
+
+  <h2>Originación: del interés a la firma</h2>
+  <ul>
+    <li><b>Facilito, el bot de WhatsApp</b> — atiende 24/7 en el número del negocio: cotiza con gastos y seguros reales, preevalúa al cliente con informes DealerNet en segundos y le dice exactamente dónde pagar su cuota. Las oportunidades se reparten automáticamente a los ejecutivos con copia al jefe.</li>
+    <li><b>Cotizador y simulador</b> — cuota francesa con gastos operacionales, seguros por tramo y tasa vigente; cotizaciones guardadas y visibles en la ficha del cliente.</li>
+    <li><b>Evaluación Crediticia</b> — ficha completa por RUT: antecedentes, cotizaciones, informes comerciales en vivo (DealerNet) y Reporte Crediticio Automático generado por IA.</li>
+    <li><b>Cartas de Aprobación</b> — emisión con autofill desde PDFs de la financiera, rentabilidad por carta, vigencia con vencimiento automático y paso a Otorgado con un clic.</li>
+    <li><b>Carga masiva y digitación</b> — Excel con validación inteligente, cola de datos faltantes con bloqueo por usuario y recálculo automático de comisiones.</li>
+  </ul>
+
+  <h2>Operación y Post Venta</h2>
+  <ul>
+    <li><b>Post Venta</b> — seguimiento de saldos precio y comisiones por etapas, cartolas acumulativas, facturas cuadradas contra cartola y alertas por etapa.</li>
+    <li><b>Seguimiento Fundantes</b> — el ejecutivo sube los documentos, Operaciones valida, y la etapa del Post Venta se marca sola.</li>
+    <li><b>Tesorería</b> — cajas, pago de cuotas en lote, órdenes de pago con correlativo único, prepago con el motor del certificado y comprobantes con timbre PAGADO.</li>
+    <li><b>Cobranza</b> — cartera propia con calendario congelado real (48.000+ cuotas migradas), mora y gastos con motor único, y automatización de correos por tramo de mora.</li>
+  </ul>
+
+  <h2>Clientes y Dealers conectados</h2>
+  <ul>
+    <li><b>Portal del Cliente</b> (clientes.autofacilchile.cl) — el cliente ve sus créditos, su tabla de desarrollo, su deuda al día de hoy y dónde pagar. Enrolamiento seguro con código al correo registrado.</li>
+    <li><b>Portal del Dealer</b> (dealers.autofacilchile.cl) — autoconsulta de operaciones, estados y cartolas, chat con su ejecutivo y asistente IA.</li>
+    <li><b>Atención Remota</b> — chat en paralelo con dealers y clientes desde el mismo Suite.</li>
+  </ul>
+
+  <h2>Gestión comercial que empuja resultados</h2>
+  <ul>
+    <li><b>Comisiones de ejecutivos</b> — piso, incentivos y ajustes por calidad calculados solos cada mes; cada ejecutivo ve lo suyo.</li>
+    <li><b>Ranking y carrera de colocaciones</b> — el equipo compite viendo su avance del mes.</li>
+    <li><b>Visitas a dealers</b> — agenda con cupos, bitácora de gestiones y visibilidad para supervisores; mapa georreferenciado de dealers para planificar rutas.</li>
+    <li><b>Informe diario de ventas</b> — cada mañana en el correo del equipo, sin que nadie lo arme.</li>
+  </ul>
+
+  <h2>Una empresa completa dentro del Suite</h2>
+  <ul>
+    <li><b>RRHH</b> — solicitudes de vacaciones y certificados de antigüedad con firma electrónica y código QR verificable.</li>
+    <li><b>Compras</b> — catálogo curado por perfil con despacho al parque correcto.</li>
+    <li><b>Tickets TI</b> — reporte de problemas con SLA y escalamiento configurables.</li>
+    <li><b>Mi Día</b> — panel personal con los pendientes reales de cada perfil.</li>
+  </ul>
+
+  <h2>Seguridad y control</h2>
+  <div class="destacado">
+    Matriz de <b>perfiles y permisos</b> hasta el nivel de botón · <b>auditoría</b> de cada acción crítica (quién, qué, cuándo) · <b>firma electrónica simple</b> (Ley 19.799) con verificación pública QR · <b>bitácora completa por crédito</b> · <b>consola SQL solo-lectura</b> para el administrador · <b>Modo Desarrollo</b> que protege a los clientes reales durante las pruebas.
+  </div>
+
+  <h2>En cualquier dispositivo</h2>
+  <p>El Suite es una <b>app instalable</b> (PWA) en escritorio y teléfono. Los ejecutivos tienen su app dedicada <b>AF WhatsApp</b> para tomar clientes con notificaciones push, y los dominios <b>clientes.autofacilchile.cl</b> y <b>dealers.autofacilchile.cl</b> llevan a cada uno directo a su portal.</p>
+
+  <h2>El resultado</h2>
+  <p>Menos digitación, cero doble registro, números que siempre cuadran, clientes atendidos a toda hora y un negocio que se configura a sí mismo. <b>Ese es tu Business Suite.</b></p>
+</div>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

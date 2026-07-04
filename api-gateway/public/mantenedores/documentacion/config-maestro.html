@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuración Usuario Maestro — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .bar { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:12px 26px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:10; }
+  .bar a { color:#fff; text-decoration:none; font-weight:600; font-size:.9rem; }
+  .doc { max-width:900px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  table { border-collapse:collapse; width:100%; font-size:.86rem; margin:12px 0; }
+  th { background:#f1f5f9; text-align:left; padding:8px 10px; color:#334155; }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  td:first-child { font-weight:700; color:#0f172a; white-space:nowrap; }
+  .nota { background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
+  @media print { .bar { display:none; } }
+</style>
+</head>
+<body>
+<div class="bar"><a href="./"><i class="bi bi-arrow-left me-1"></i> Documentación</a><b>Configuración — Usuario Maestro</b><a href="javascript:print()"><i class="bi bi-printer"></i> Imprimir</a></div>
+<div class="doc">
+  <h1><i class="bi bi-sliders me-2"></i>Configuración del sistema — Usuario Maestro</h1>
+  <p>El Suite se rige por un principio: <b>los datos de negocio se configuran desde mantenedores, sin programador</b>. Esta guía lista qué puede parametrizar un Usuario Maestro (perfil de negocio con permisos de mantenedores, distinto del Administrador técnico) y dónde. Cada mantenedor termina con el recuadro <b>"Qué afecta este mantenedor"</b>, que enlaza los procesos que impacta cada cambio — revísalo antes de modificar.</p>
+
+  <h2>Indicadores y parámetros financieros</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>UF / UTM / Dólar / IPC</td><td>Valores históricos. La UF y UTM se sincronizan solas cada 12 horas (mindicador.cl); se pueden corregir a mano.</td></tr>
+    <tr><td>Tasas</td><td>Tasa mensual menor/mayor 200 UF por período. La TMC se calibra automáticamente desde la CMF. Alimenta cotizador, cartas, bot WhatsApp y recálculos.</td></tr>
+    <tr><td>Parámetros de Crédito</td><td>Gastos operacionales (prenda, inscripción, GPS, gastos admin, etc.), costo de fondo y % ejecutivo. Los usan el simulador y el cotizador de Facilito.</td></tr>
+    <tr><td>Impuestos</td><td>IVA y retención de honorarios; los cálculos de facturas y boletas leen esta tabla.</td></tr>
+    <tr><td>Política de Crédito</td><td>Umbrales de aprobación y reglas de la política vigente.</td></tr>
+  </table>
+
+  <h2>Estados y flujos</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>Estado Créditos</td><td>Máquina de estados por ámbito (brokerage / AutoFácil): estados, colores, orden, iniciales/finales y transiciones permitidas. Aquí se dibuja el Flujo Brokerage.</td></tr>
+    <tr><td>Estado Cartera</td><td>Estados de pago de la cartera propia (vigente, mora, vencido, terminado…), la segunda dimensión del crédito.</td></tr>
+    <tr><td>Etapas Post Venta</td><td>Etapas de Saldo Precio y Comisión, y sus alertas.</td></tr>
+    <tr><td>Workflow / Placement</td><td>En qué pantalla vive cada card (Vista Pantallas). Mover una card no requiere crear módulos.</td></tr>
+  </table>
+
+  <h2>Dealers y red comercial</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>Dealers</td><td>Ficha completa: razón social, contactos, cuentas bancarias, direcciones (con geocodificación para el mapa), tabla de comisiones propia (la pizarra es el umbral) y participación especial con vigencia.</td></tr>
+    <tr><td>Incorporación de Dealers</td><td>Cadena de aprobación paramétrica (autorizar → imprimir → firmar → cerrar) con alertas por etapa.</td></tr>
+    <tr><td>Categoría y Potencial</td><td>Factor de potencial y datos manuales (posiciones, ventas) para clasificar dealers.</td></tr>
+    <tr><td>Parques</td><td>Arriendos y comisiones de parque y calle.</td></tr>
+    <tr><td>Preferencia Financiera</td><td>Grilla cuotas × saldo que define qué financiera se puede usar y cuál es primera opción (bloquea el grabado de cartas fuera de política).</td></tr>
+  </table>
+
+  <h2>Comunicaciones y automatizaciones</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>WhatsApp (módulo)</td><td>Personalidad del bot (prompt), respuestas de conocimiento, triggers de derivación, horario y modo 24/7, límites de preevaluación DealerNet, ventana de envío, plantillas HSM (con revisión IA) y campañas.</td></tr>
+    <tr><td>Cobranza Mora</td><td>Plantillas por tramo de días de mora, cooldown y tope de envíos. Nace desactivado; respeta Modo Desarrollo.</td></tr>
+    <tr><td>Correos Programados</td><td>Qué correos automáticos salen, cuándo y desde qué cuenta (ej: Informe Diario de Ventas).</td></tr>
+    <tr><td>Alertas</td><td>Campana: qué eventos alertan, a quién, con qué prioridad y sonido.</td></tr>
+    <tr><td>Ayuda</td><td>El contenido del botón "?" de cada página (título, pasos, submódulos), editable sin código.</td></tr>
+    <tr><td>Portal Cliente</td><td>Textos de dónde pagar y contacto que ve el cliente final.</td></tr>
+  </table>
+
+  <h2>Personas y comisiones</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>Usuarios</td><td>Altas, perfiles, reseteo de claves, suspensión/reactivación (los ejecutivos del selector salen de aquí) y qué ejecutivos ve cada supervisor.</td></tr>
+    <tr><td>Perfiles y Permisos</td><td>La matriz completa: qué módulos, cards y acciones tiene cada perfil. Los permisos con candado son de acción (crear/editar/eliminar).</td></tr>
+    <tr><td>Comisiones Variables</td><td>Parámetros del cálculo mensual de ejecutivos: piso, incentivos, metas (meta Unidad incluida) y ajustes por calidad.</td></tr>
+    <tr><td>Backups / Suplencias</td><td>Quién hereda funciones, alertas y correos de un titular ausente.</td></tr>
+    <tr><td>Bono Jefe Comercial</td><td>Variables del BSC y curva del premio (restringido).</td></tr>
+  </table>
+
+  <h2>Inteligencia Artificial</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>Inteligencia Artificial</td><td>Interruptor general y por funcionalidad (bot WhatsApp, informes crediticios, liquidaciones, revisor de plantillas…), modelo asignado a cada una y tracking de tokens y costo USD. Cada función IA nace apagada: se enciende aquí.</td></tr>
+  </table>
+
+  <div class="nota"><b>Reglas de oro del Usuario Maestro:</b><br>
+  1) Antes de cambiar un parámetro, lee el recuadro "Qué afecta este mantenedor" al pie de la página.<br>
+  2) Los cambios rigen <b>hacia adelante</b>: lo otorgado queda congelado (capital, cuotas, gastos no se recalculan).<br>
+  3) Valores <b>forzados</b> (rojos) fueron digitados por negociación y el recálculo los respeta; los azules los fija la fórmula.<br>
+  4) Después de cambios de permisos, pide al Administrador correr la auditoría de permisos.<br>
+  5) Si algo del negocio está "duro" en el código y crees que deberías poder cambiarlo tú, pídelo: la filosofía del Suite es que se convierta en mantenedor.</div>
+</div>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
