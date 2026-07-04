@@ -310,11 +310,21 @@ ${conocimiento || '(sin respuestas configuradas)'}
 
 Horario de atención humana: ${cfg.horario_ini}–${cfg.horario_fin}, días ${cfg.dias_habiles} (1=lunes…7=domingo).${conv.nombre ? `\nEl cliente se llama ${conv.nombre}; puedes saludarlo por su primer nombre.` : ''}
 
-SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Si el cliente quiere saber la cuota y ya tienes MONTO A FINANCIAR (en pesos) y PLAZO (meses), agrega al JSON "simulacion":{"monto":X,"plazo":N} y el sistema calculará el valor exacto con la tasa vigente (tu "respuesta" va antes del cálculo, sin cifras). Si falta el monto o el plazo, pídelos. Si el cliente da presupuesto de cuota (cuánto puede pagar al mes), pide confirmar monto y plazo para simular. El plazo máximo es 48 meses: si piden más, ofrece 48.
+GUION DE COTIZACIÓN (cliente interesado en comprar/cotizar — sigue este orden, UNA pregunta por mensaje):
+1. ¿Cuánto cuesta más o menos el auto que quieres comprar?
+2. ¿Cuánto tienes de pie?
+3. ¿En cuántas cuotas lo quieres pagar, o cuánto puedes pagar mensualmente?
+4. ¿Cuál es tu nombre y tu RUT? (explica que es para preevaluarlo al instante, gratis)
+5. ¿Este teléfono desde el que escribes es tu número de contacto?
+Antes de la pregunta 4 dile algo como: "voy a intentar darte valores aproximados para ajustar el crédito a tus necesidades y posibilidades".
+PLAZOS: solo se ofrecen 12, 24, 36 o 48 meses (máximo 48). Si el cliente pide un plazo intermedio o su presupuesto da un número intermedio, ofrece SIEMPRE el tramo superior (34 → 36; 40 → 48). Si da presupuesto mensual, parte probando con 48 meses.
 
-PREEVALUACIÓN AL INSTANTE: cuando el cliente ya está interesado (idealmente después de la cuota), ofrécele preevaluarse al tiro: solo necesitas su RUT. Pídelo explicando que es para una evaluación inmediata y gratuita. Cuando el cliente entregue su RUT, agrega al JSON "evaluacion":{"rut":"12345678-9","pie_pct":P} (P = % de pie sobre el valor del auto si lo conoces, si no omítelo). El sistema evalúa y AGREGA el veredicto él solo después de tu "respuesta" (tú no anticipes ningún resultado, ni positivo ni negativo). NUNCA menciones informes comerciales, Dicom ni centrales de riesgo por tu cuenta.
+SIMULACIÓN DE CUOTA: tú NUNCA calculas cuotas ni das cifras. Cuando tengas VALOR DEL AUTO, PIE y PLAZO (12/24/36/48), agrega al JSON "simulacion":{"valor_auto":V,"pie":P,"plazo":N}: el sistema calcula la cuota real con gastos y seguros incluidos y la agrega después de tu "respuesta" (tú no anticipes cifras). Si el cliente dio presupuesto mensual y la cuota calculada se pasa, sugiere más pie o el tramo de plazo superior y vuelve a simular.
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"monto": pesos, "plazo": meses} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
+PREEVALUACIÓN: cuando el cliente entregue su RUT (pregunta 4), agrega al JSON "evaluacion":{"rut":"12345678-9","pie_pct":P} (P = % del pie sobre el valor del auto si lo conoces). El sistema evalúa y AGREGA el veredicto él solo después de tu "respuesta" — tú NO anticipes ningún resultado. NUNCA menciones informes comerciales, Dicom ni centrales de riesgo.
+Si antes el sistema informó "problemas para completar la preevaluación" y el cliente ACEPTA que lo llamen: responde "OK, enviaremos tu requerimiento a un Ejecutivo Comercial, quien te llamará por teléfono 📞" y deriva (derivar:true, area COMERCIAL).
+
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo cuando el cliente entrega su RUT)}`;
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -323,11 +333,21 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
   });
   if (!datos || typeof datos.respuesta !== 'string') return null;
   let respuesta = datos.respuesta.trim().slice(0, 1500);
-  // Cálculo determinístico de la cuota (motor único, tasa del mantenedor)
-  if (datos.simulacion && datos.simulacion.monto && datos.simulacion.plazo) {
+  // Cálculo determinístico de la cuota (motor del módulo de cotizaciones: gastos + seguros)
+  if (datos.simulacion && (datos.simulacion.valor_auto || datos.simulacion.monto) && datos.simulacion.plazo) {
     try {
-      const s = await simularCuota(datos.simulacion.monto, datos.simulacion.plazo);
-      if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses · tasa ${String(s.tasa.toFixed(2)).replace('.', ',')}% mensual\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
+      const sim = datos.simulacion;
+      // Plazo solo en tramos comerciales 12/24/36/48: redondear SIEMPRE hacia arriba
+      const plazo = [12, 24, 36, 48].find(t => t >= (parseInt(sim.plazo) || 0)) || 48;
+      let s = null;
+      if (sim.valor_auto) {
+        const { cotizarCuota } = require('../../../../shared/cotizador');
+        s = await cotizarCuota(sim.valor_auto, sim.pie || 0, plazo);
+        if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_Valor referencial, sujeto a evaluación crediticia._`;
+      } else {
+        s = await simularCuota(sim.monto, plazo);
+        if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
+      }
     } catch (e) { console.error('[wsp simulacion]', e.message); }
   }
   // Preevaluación determinística: DealerNet por RUT; el veredicto lo redacta el código
@@ -346,7 +366,7 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         } else if (ev.ok) {
           respuesta += '\n\n🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del 40%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?';
         } else {
-          respuesta += '\n\nGracias por tu confianza 🙌 Tu caso necesita una revisión más personalizada de nuestro equipo. ¿Quieres que un Ejecutivo Comercial te llame para buscar juntos la mejor alternativa? 📞';
+          respuesta += '\n\nUy, parece que el sistema presenta problemas para completar la preevaluación en este momento 🙈 ¿Quieres que te contacte un Ejecutivo Comercial?';
         }
       }
     } catch (e) { console.error('[wsp preevaluacion]', e.message); }
