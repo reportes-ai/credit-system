@@ -304,14 +304,50 @@
 
 <dialog id="dlg"></dialog>
 
-<script src="/js/auth-guard.js"></script>
+<!-- Login propio de la app (misma clave del Suite) — sin auth-guard: la sesión vive
+     en localStorage para que la PWA instalada no pida clave en cada apertura -->
+<div id="wspLogin" style="display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,#075E54,#128C7E);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:18px;padding:30px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:2.4rem;color:#075E54"><i class="bi bi-whatsapp"></i></div>
+      <div style="font-weight:800;font-size:1.15rem;color:#0f172a">AutoFácil WhatsApp</div>
+      <div style="font-size:.8rem;color:#64748b">Ingresa con tu cuenta del Business Suite</div>
+    </div>
+    <div id="wspLoginErr" style="display:none;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:8px 12px;font-size:.8rem;margin-bottom:12px"></div>
+    <input id="wspEmail" type="email" placeholder="Correo" autocomplete="username" style="width:100%;border:1.5px solid #d1d5db;border-radius:10px;padding:11px 13px;font-size:.9rem;margin-bottom:10px;box-sizing:border-box">
+    <input id="wspPass" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;border:1.5px solid #d1d5db;border-radius:10px;padding:11px 13px;font-size:.9rem;margin-bottom:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')wspLogin()">
+    <button id="wspBtnLogin" onclick="wspLogin()" style="width:100%;background:#075E54;color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:.95rem;cursor:pointer">Ingresar</button>
+  </div>
+</div>
 <script>
-  const token = sessionStorage.getItem('token');
-  const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
-  if (!token || !yo) location.href = '/login.html?next=' + encodeURIComponent('/whatsapp/');
+  // Sesión persistente de la app: localStorage (la PWA abre sin pedir clave cada vez)
+  const expirado = t => { try { const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); return p.exp && Math.floor(Date.now()/1000) >= p.exp; } catch { return true; } };
+  if (!sessionStorage.getItem('token') && localStorage.getItem('wsp_token') && !expirado(localStorage.getItem('wsp_token'))) {
+    sessionStorage.setItem('token', localStorage.getItem('wsp_token'));
+    sessionStorage.setItem('usuario', localStorage.getItem('wsp_usuario') || 'null');
+  }
+  let token = sessionStorage.getItem('token');
+  let yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+  if (token && expirado(token)) { sessionStorage.clear(); localStorage.removeItem('wsp_token'); token = null; yo = null; }
+  if (!token || !yo) document.getElementById('wspLogin').style.display = 'flex';
   document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
   document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
-  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  function logout(){ sessionStorage.clear(); localStorage.removeItem('wsp_token'); localStorage.removeItem('wsp_usuario'); location.reload(); }
+  async function wspLogin(){
+    const email = document.getElementById('wspEmail').value.trim(), password = document.getElementById('wspPass').value;
+    const err = document.getElementById('wspLoginErr'), btn = document.getElementById('wspBtnLogin');
+    if (!email || !password) { err.textContent = 'Ingresa correo y contraseña.'; err.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Ingresando…';
+    try {
+      const r = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) });
+      const j = await r.json();
+      if (!j.success) { err.textContent = j.error || 'Credenciales inválidas'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Ingresar'; return; }
+      if (j.data.debe_cambiar_clave) { err.textContent = 'Debes cambiar tu contraseña: ingresa primero al Business Suite desde el computador.'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Ingresar'; return; }
+      sessionStorage.setItem('token', j.data.token); sessionStorage.setItem('usuario', JSON.stringify(j.data.usuario));
+      localStorage.setItem('wsp_token', j.data.token); localStorage.setItem('wsp_usuario', JSON.stringify(j.data.usuario));
+      location.reload();
+    } catch (e) { err.textContent = 'Error de conexión.'; err.style.display = 'block'; btn.disabled = false; btn.textContent = 'Ingresar'; }
+  }
   const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
   const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const fdt = s => s ? new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
@@ -735,6 +771,24 @@
     d.querySelector('#dlgSave').addEventListener('click', onSave);
     d.showModal();
   }
+
+  /* Vista por permisos: ejecutivos (solo wsp_atender) ven ÚNICAMENTE la bandeja con
+     sus conversaciones (el server también lo acota); Campañas/Respuestas/Triggers/Config
+     solo con wsp_campanas / wsp_config (Admin ve todo). */
+  (async () => {
+    if (!token) return;
+    try {
+      const r = await fetch('/api/auth/mis-permisos', { headers: H });
+      const j = await r.json();
+      const funcs = new Set(j.funcionalidades || []);
+      const admin = yo?.perfil === 'Administrador';
+      if (!admin && !funcs.has('wsp_campanas')) document.getElementById('tCampanas').style.display = 'none';
+      if (!admin && !funcs.has('wsp_config')) {
+        ['tRespuestas', 'tTriggers', 'tConfig'].forEach(id => document.getElementById(id).style.display = 'none');
+        document.querySelector('.page-banner p').textContent = 'Tus conversaciones asignadas y los clientes esperando que alguien los tome.';
+      }
+    } catch (_) {}
+  })();
 
   /* init */
   simReset();

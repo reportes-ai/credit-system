@@ -681,10 +681,24 @@ exports.eliminarTrigger = async (req, res) => {
 };
 
 /* ── Bandeja: conversaciones ───────────────────────────────────────────────── */
+// Visibilidad: Admin y quienes configuran el bot (wsp_config) ven TODO; el resto
+// (ejecutivos con wsp_atender) solo ve sus conversaciones asignadas + las derivadas
+// sin tomar (para poder tomarlas). Enforcement server-side.
+async function veTodo(req) {
+  try {
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    return await tieneFunc(req.usuario.id_usuario, 'wsp_config');
+  } catch (_) { return false; }
+}
+
 exports.conversaciones = async (req, res) => {
   try {
     const { estado, area, q, mias } = req.query;
     const where = ['1=1'], params = [];
+    if (!(await veTodo(req))) {
+      where.push("(c.asignada_a=? OR (c.estado='DERIVADA' AND c.asignada_a IS NULL))");
+      params.push(req.usuario.id_usuario);
+    }
     if (estado) { where.push('c.estado=?'); params.push(estado); }
     if (area)   { where.push('c.area=?');   params.push(area); }
     if (mias === '1') { where.push('c.asignada_a=?'); params.push(req.user.id_usuario); }
@@ -701,6 +715,9 @@ exports.conversacion = async (req, res) => {
   try {
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    // Mismo enforcement de visibilidad que el listado
+    if (!(await veTodo(req)) && conv.asignada_a !== req.usuario.id_usuario && !(conv.estado === 'DERIVADA' && !conv.asignada_a))
+      return res.status(403).json({ success: false, error: 'Esta conversación está asignada a otro ejecutivo' });
     const [msgs] = await pool.query('SELECT * FROM wsp_mensajes WHERE id_conversacion=? ORDER BY id', [req.params.id]);
     const ventana = await ventanaRestante(conv.id, await getCfg());
     if (conv.no_leidos) pool.query('UPDATE wsp_conversaciones SET no_leidos=0 WHERE id=?', [conv.id]).catch(() => {});
