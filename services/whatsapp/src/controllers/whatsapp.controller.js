@@ -573,7 +573,7 @@ GUION DE COTIZACIÓN (cliente interesado en comprar/cotizar — sigue este orden
 1. ¿Cuánto cuesta más o menos el auto que quieres comprar?
 2. ¿Cuánto tienes de pie?
 3. ¿En cuántas cuotas lo quieres pagar, o cuánto puedes pagar mensualmente?
-4. ¿Cuál es tu nombre y tu RUT? (explica que es para preevaluarlo al instante, gratis)
+4. ¿La cotización es para ti o para otra persona? Si es para OTRA persona, pide el nombre y RUT de ESA persona (la preevaluación y los datos deben ser de quien tomará el crédito, no de quien escribe). Si es para él/ella, pide su nombre y RUT (explica que es para preevaluarlo al instante, gratis). El RUT debe venir escrito en el chat en esta conversación — nunca lo asumas de datos anteriores.
 5. ¿Este teléfono desde el que escribes es tu número de contacto?
 Antes de la pregunta 4 dile algo como: "voy a intentar darte valores aproximados para ajustar el crédito a tus necesidades y posibilidades".
 PLAZOS: solo se ofrecen 12, 24, 36 o 48 meses (máximo 48). Si el cliente pide un plazo intermedio o su presupuesto da un número intermedio, ofrece SIEMPRE el tramo superior (34 → 36; 40 → 48). Si da presupuesto mensual, parte probando con 48 meses.
@@ -607,7 +607,7 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         const { cotizarCuota } = require('../../../../shared/cotizador');
         s = await cotizarCuota(sim.valor_auto, sim.pie || 0, plazo);
         if (s) {
-          respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_Valor referencial, sujeto a evaluación crediticia._`;
+          respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}* en ${s.plazo} meses\nAuto ${fmtCLP(sim.valor_auto)} · pie ${fmtCLP(sim.pie || 0)} (${s.piePct}%) · incluye gastos operacionales y seguros\n_ℹ️ Información automática solo referencial: los valores deben ser confirmados por un Ejecutivo Comercial._`;
           // Persistir la cotización en la conversación (para el mail de oportunidad al ejecutivo)
           try { await pool.query('UPDATE wsp_conversaciones SET cotizacion=? WHERE id=?', [JSON.stringify({ valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s, fecha: new Date().toISOString().slice(0, 10) }), conv.id]); conv.cotizacion = { valor_auto: Math.round(+sim.valor_auto), pie: Math.round(+sim.pie || 0), ...s }; } catch (_) {}
           // Si ya conocemos el RUT, la cotización va al repositorio único (tabla cotizaciones)
@@ -615,7 +615,7 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         }
       } else {
         s = await simularCuota(sim.monto, plazo);
-        if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses\n_Valor referencial, sujeto a evaluación crediticia. No incluye seguros ni gastos._`;
+        if (s) respuesta += `\n\n💰 *Cuota aproximada: ${fmtCLP(s.cuota)}*\nMonto ${fmtCLP(s.monto)} · ${s.plazo} meses · no incluye seguros ni gastos\n_ℹ️ Información automática solo referencial: los valores deben ser confirmados por un Ejecutivo Comercial._`;
       }
     } catch (e) { console.error('[wsp simulacion]', e.message); }
   }
