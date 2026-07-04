@@ -66,6 +66,7 @@
     .conv-list { border-right:1px solid #e5e7eb; overflow-y:auto; max-height:640px; }
     .conv-item { padding:10px 12px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; gap:10px; align-items:center; }
     .conv-item:hover { background:#f8fafc; } .conv-item.sel { background:#e7f6ef; }
+    .conv-item.vencida { opacity:.5; }  /* ventana 24h cerrada: se ve pero no se chatea */
     .conv-item .cbody { flex:1; min-width:0; }
     .conv-item .nm { font-weight:700; font-size:.84rem; color:#0f172a; display:flex; justify-content:space-between; gap:6px; align-items:center; }
     .conv-item .lm { font-size:.75rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
@@ -434,13 +435,13 @@
     if (_prevUnread >= 0 && unread > _prevUnread) beep();
     _prevUnread = unread;
     list.innerHTML = rows.length ? rows.map(c=>`
-      <div class="conv-item ${CONV_SEL===c.id?'sel':''}" onclick="abrirConv(${c.id})">
+      <div class="conv-item ${CONV_SEL===c.id?'sel':''} ${c.ventana_abierta?'':'vencida'}" onclick="abrirConv(${c.id})">
         <div class="cavatar" style="background:${avColor(c.nombre||c.telefono)}">${avIni(c)}</div>
         <div class="cbody">
           <div class="nm"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.nombre||c.telefono)} ${c.es_simulada?'<span class="sim-badge">SIM</span>':''}</span>
             <span style="display:flex;gap:5px;align-items:center;flex:0 0 auto">${c.no_leidos?`<span class="unread-dot">${c.no_leidos}</span>`:''}<span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span></span></div>
           <div class="lm">${c.trigger_cat?`<span class="pill p-${esc(c.trigger_cat)}" style="margin-right:4px">${esc(c.trigger_cat)}</span>`:''}${esc(c.ultimo_msg||'')}</div>
-          <div style="font-size:.64rem;color:#94a3b8;margin-top:2px">${fdt(c.ultima_actividad)}${c.area?' · '+esc(c.area):''}${c.asignada_nombre?' · '+esc(c.asignada_nombre):''}</div>
+          <div style="font-size:.64rem;color:#94a3b8;margin-top:2px">${fdt(c.ultima_actividad)}${c.area?' · '+esc(c.area):''}${c.asignada_nombre?' · '+esc(c.asignada_nombre):''}${c.ventana_abierta?'':' · <i class="bi bi-clock"></i> solo lectura'}</div>
         </div>
       </div>`).join('') : '<div class="empty">Sin conversaciones aquí.<br><span style="font-size:.75rem">Prueba el bot desde Configuración → Simulador</span></div>';
   }

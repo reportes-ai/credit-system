@@ -705,8 +705,14 @@ exports.conversaciones = async (req, res) => {
     if (q)      { where.push('(c.telefono LIKE ? OR c.nombre LIKE ? OR c.rut_cliente LIKE ?)'); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
     const [rows] = await pool.query(
       `SELECT c.*, (SELECT mensaje FROM wsp_mensajes m WHERE m.id_conversacion=c.id ORDER BY m.id DESC LIMIT 1) ultimo_msg,
-              (SELECT COUNT(*) FROM wsp_mensajes m WHERE m.id_conversacion=c.id) n_msgs
+              (SELECT COUNT(*) FROM wsp_mensajes m WHERE m.id_conversacion=c.id) n_msgs,
+              TIMESTAMPDIFF(MINUTE, (SELECT MAX(m2.created_at) FROM wsp_mensajes m2 WHERE m2.id_conversacion=c.id AND m2.direccion='IN'), NOW()) mins_ultimo_in
          FROM wsp_conversaciones c WHERE ${where.join(' AND ')} ORDER BY c.ultima_actividad DESC LIMIT 300`, params);
+    // Ventana 24h: pasada la ventana desde el último mensaje del cliente no se puede
+    // chatear (solo ver) — el flag pinta la conversación "apagada" en la lista.
+    const cfg = await getCfg();
+    const horas = Math.max(1, parseInt(cfg.ventana_horas) || 23);
+    rows.forEach(r => { r.ventana_abierta = r.es_simulada ? 1 : ((r.mins_ultimo_in != null && r.mins_ultimo_in < horas * 60) ? 1 : 0); });
     res.json({ success: true, data: rows, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
