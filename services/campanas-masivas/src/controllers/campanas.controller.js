@@ -59,6 +59,10 @@ const CAMPO_KEYS = CAMPOS.map(c => c.key);
         titulo VARCHAR(200) NULL,
         color_titulo VARCHAR(9) NULL DEFAULT '#0141A2',
         parametros JSON NULL,
+        plantilla_wsp VARCHAR(150) NULL,          -- nombre de la plantilla HSM aprobada (WSP)
+        plantilla_wsp_idioma VARCHAR(10) NULL,
+        plantilla_wsp_body TEXT NULL,             -- snapshot del cuerpo con {{1}}..{{n}}
+        plantilla_wsp_map JSON NULL,              -- mapeo {{n}} → campo de la campaña
         deciles_control JSON NULL,
         excluir_regiones JSON NULL,
         analizar_ia TINYINT(1) NOT NULL DEFAULT 0,
@@ -96,6 +100,10 @@ const CAMPO_KEYS = CAMPOS.map(c => c.key);
         INDEX idx_camp (id_campana), INDEX idx_camp_estado (id_campana, estado)
       )`);
 
+    for (const col of ["plantilla_wsp VARCHAR(150) NULL", "plantilla_wsp_idioma VARCHAR(10) NULL",
+                       "plantilla_wsp_body TEXT NULL", "plantilla_wsp_map JSON NULL"]) {
+      await pool.query(`ALTER TABLE campanas_masivas ADD COLUMN IF NOT EXISTS ${col}`);
+    }
     for (const col of ["renta DECIMAL(15,2) NULL", "renta_estimada TINYINT(1) NOT NULL DEFAULT 0",
                        "politica VARCHAR(12) NULL", "contactos_dn JSON NULL", "telefonos_alt JSON NULL"]) {
       await pool.query(`ALTER TABLE campanas_destinatarios ADD COLUMN IF NOT EXISTS ${col}`);
@@ -237,6 +245,28 @@ exports.catalogo = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Plantillas HSM aprobadas (para campañas WSP de salida) ──────────────
+   Meta es la fuente única. Se listan las APPROVED con su cuerpo {{1}}..{{n}}. */
+exports.plantillasWsp = async (req, res) => {
+  try {
+    const token = process.env.WSP_TOKEN;
+    if (!token) return ok(res, []);   // sin conexión Meta (local/dev): lista vacía, sin error
+    let waba = '1044493808034066';
+    try { const [[w]] = await pool.query("SELECT waba_id FROM wsp_config LIMIT 1"); if (w && w.waba_id) waba = w.waba_id; } catch (e) {}
+    const resp = await fetch(`https://graph.facebook.com/v21.0/${waba}/message_templates?limit=100&fields=name,language,status,category,components`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok) return fail(res, j.error?.message || `Meta HTTP ${resp.status}`, 502);
+    const out = (j.data || []).filter(t => t.status === 'APPROVED').map(t => {
+      const body = (t.components || []).find(c => c.type === 'BODY')?.text || '';
+      const vars = [...new Set((body.match(/\{\{(\d+)\}\}/g) || []).map(x => parseInt(x.replace(/\D/g, ''), 10)))].sort((a, b) => a - b);
+      return { name: t.name, language: t.language, category: t.category, body, n_vars: vars.length };
+    });
+    ok(res, out);
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── CRUD campañas ──────────────────────────────────────────────────────── */
 exports.listar = async (req, res) => {
   try {
@@ -288,7 +318,7 @@ exports.obtener = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia'];
+const EDITABLES = ['descripcion', 'origen_data', 'campos', 'texto', 'asunto', 'remitente', 'plantilla', 'titulo', 'color_titulo', 'parametros', 'deciles_control', 'excluir_regiones', 'analizar_ia', 'plantilla_wsp', 'plantilla_wsp_idioma', 'plantilla_wsp_body', 'plantilla_wsp_map'];
 exports.actualizar = async (req, res) => {
   try {
     const [[c]] = await pool.query('SELECT estado FROM campanas_masivas WHERE id=?', [req.params.id]);
@@ -301,7 +331,7 @@ exports.actualizar = async (req, res) => {
       if (k === 'campos') {
         v = (Array.isArray(v) ? v : []).filter(x => CAMPO_KEYS.includes(x)).slice(0, 10);
         v = JSON.stringify(v);
-      } else if (['parametros', 'deciles_control', 'excluir_regiones'].includes(k)) v = JSON.stringify(v ?? null);
+      } else if (['parametros', 'deciles_control', 'excluir_regiones', 'plantilla_wsp_map'].includes(k)) v = JSON.stringify(v ?? null);
       else if (k === 'analizar_ia') v = v ? 1 : 0;
       sets.push(`${k}=?`); vals.push(v);
     }
@@ -480,6 +510,19 @@ exports.pixel = async (req, res) => {
   res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, private' }).end(gif);
 };
 
+/* Cuerpo HSM con {{n}} reemplazados por los campos mapeados (para preview) */
+function mergeHSM(c, dest) {
+  const map = safeJSON(c.plantilla_wsp_map) || [];
+  return String(c.plantilla_wsp_body || '').replace(/\{\{(\d+)\}\}/g, (_, n) => {
+    const campo = map[parseInt(n, 10) - 1];
+    return campo ? merge('{{' + campo + '}}', dest) : '';
+  });
+}
+function paramsHSM(c, dest) {
+  const map = safeJSON(c.plantilla_wsp_map) || [];
+  return map.map(campo => ({ type: 'text', text: (campo ? merge('{{' + campo + '}}', dest) : '') || '-' }));
+}
+
 function htmlMail(c, dest, opts = {}) {
   const cuerpo = merge(c.texto, dest).replace(/\n/g, '<br>');
   const pixel = (opts.pixel && dest.id)
@@ -515,7 +558,9 @@ exports.preview = async (req, res) => {
     const [[d]] = await pool.query("SELECT * FROM campanas_destinatarios WHERE id_campana=? AND grupo='CAMPANA' ORDER BY id LIMIT 1 OFFSET ?", [c.id, Math.min(idx, n - 1)]);
     ok(res, {
       total: n, i: Math.min(idx, n - 1), destinatario: d,
-      asunto: merge(c.asunto, d), texto: merge(c.texto, d),
+      asunto: merge(c.asunto, d),
+      texto: (c.canal === 'WSP' && c.plantilla_wsp) ? mergeHSM(c, d) : merge(c.texto, d),
+      plantilla_wsp: c.plantilla_wsp || null,
       html: c.canal === 'MAIL' ? htmlMail(c, d) : null,
     });
   } catch (e) { fail(res, e.message); }
@@ -559,13 +604,18 @@ exports.enviar = async (req, res) => {
               let to = String(tel).replace(/\D/g, '');
               if (to.length === 9 && to.startsWith('9')) to = '56' + to;
               if (to.length === 8) to = '569' + to;
+              const payload = c.plantilla_wsp
+                ? { messaging_product: 'whatsapp', to, type: 'template',
+                    template: { name: c.plantilla_wsp, language: { code: c.plantilla_wsp_idioma || 'es' },
+                      components: paramsHSM(c, d).length ? [{ type: 'body', parameters: paramsHSM(c, d) }] : [] } }
+                : { messaging_product: 'whatsapp', to, type: 'text', text: { body: merge(c.texto, d) } };
               const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: merge(c.texto, d) } }),
+                body: JSON.stringify(payload),
               });
               const j = await resp.json().catch(() => ({}));
-              r = resp.ok ? { ok: true } : { ok: false, error: j.error?.message || `HTTP ${resp.status} (fuera de ventana 24h se requiere plantilla aprobada)` };
+              r = resp.ok ? { ok: true } : { ok: false, error: j.error?.message || (c.plantilla_wsp ? `HTTP ${resp.status}` : `HTTP ${resp.status} (texto libre solo llega con conversación activa; usa plantilla aprobada)`) };
               if (r.ok) break;
             }
           }

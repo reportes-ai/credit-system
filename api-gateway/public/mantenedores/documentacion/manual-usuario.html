@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.3 -->
+<!-- v2.4 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -210,7 +210,7 @@
   <h3>El contenido (paso 5)</h3>
   <ul>
     <li><b>Mail:</b> 3 plantillas de diseño — <b>Banner AutoFácil azul</b> (formal), <b>Solo logo</b> (sobria) y <b>Gran título</b> (titular grande con color configurable, acepta variables). <b>Asunto</b> con variables y <b>emojis</b> de la biblioteca (😀); <b>remitente</b> seleccionable (Sistema o Cobranza). El pie con los datos de AutoFácil se agrega solo.</li>
-    <li><b>WhatsApp:</b> texto con variables y emojis, sale por el número del negocio. <b>Regla de Meta (24 h):</b> el texto libre solo llega a clientes que nos escribieron en las últimas 24 horas; para contactos fríos usa una <b>plantilla HSM aprobada</b> (módulo WhatsApp → Plantillas) — si no, quedarán CON ERROR.</li>
+    <li><b>WhatsApp:</b> las campañas de salida van con <b>plantilla HSM aprobada por Meta</b> (modo recomendado y por defecto): eliges la plantilla desde la lista de aprobadas, ves su texto y <b>mapeas cada variable {{1}}, {{2}}… a un campo de la campaña</b> (nombre, monto, cuotas…). Así el mensaje llega a <b>cualquier contacto</b>, frío o no. Si necesitas una plantilla nueva, se crea desde el módulo WhatsApp (con revisión IA) y Meta la aprueba. El modo <b>texto libre</b> (con variables y emojis) queda como alternativa solo para clientes con conversación activa (&lt;24 h, regla de Meta).</li>
     <li><b>Escribir:</b> texto normal + botones <code>{{variable}}</code>. Ej.: <code>{{saludo}} {{nombre}}: tenemos preaprobado {{monto_credito}} en {{cuotas}} cuotas de {{valor_cuota}} 🚗</code> → <i>"Estimada María: tenemos preaprobado $8.500.000 en 36 cuotas de $285.000 🚗"</i>. Si a un cliente le falta un dato, la variable sale vacía — revisa la vista previa.</li>
   </ul>
 

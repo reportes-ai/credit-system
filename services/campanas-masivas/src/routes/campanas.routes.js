@@ -12,6 +12,7 @@ const puede = requireFunc('campanas_masivas');
 router.get('/pixel/:token',          c.pixel);
 
 router.get('/catalogo',              verifyToken, puede, c.catalogo);
+router.get('/plantillas-wsp',        verifyToken, puede, c.plantillasWsp);
 router.get('/',                      verifyToken, puede, c.listar);
 router.post('/',                     verifyToken, puede, c.crear);
 router.get('/:id',                   verifyToken, puede, c.obtener);

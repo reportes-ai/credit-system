@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 -->
+<!-- v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -192,10 +192,28 @@
         </div>
       </div>
 
+      <div id="zonaWspTpl" style="display:none;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:.78rem;font-weight:700;color:#166534;margin-bottom:8px"><i class="bi bi-patch-check-fill me-1"></i>Plantilla HSM aprobada por Meta — así la campaña llega a CUALQUIER contacto (recomendado para campañas de salida)</div>
+        <div class="pills" style="margin-bottom:10px">
+          <span class="pill" id="modoTPL" onclick="setModoWsp('TPL')">✅ Plantilla aprobada (llega a todos)</span>
+          <span class="pill" id="modoTXT" onclick="setModoWsp('TXT')">💬 Texto libre (solo conversaciones activas &lt;24h)</span>
+        </div>
+        <div id="zonaTpl">
+          <div class="row">
+            <div style="grid-column:span 2"><label class="f">Plantilla aprobada</label>
+              <select class="f" id="selTpl" onchange="elegirTpl()"><option value="">Cargando plantillas…</option></select></div>
+            <div style="align-self:end"><a href="/whatsapp/" target="_blank" class="btn btn-gris" style="text-decoration:none;display:inline-block"><i class="bi bi-plus-lg me-1"></i>Crear plantilla nueva</a></div>
+          </div>
+          <div id="tplBody" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:.85rem;white-space:pre-wrap;display:none"></div>
+          <div id="tplMap" style="margin-top:8px"></div>
+        </div>
+      </div>
+      <div id="zonaTexto">
       <label class="f">Texto del mensaje (usa las variables — se reemplazan por la data de cada cliente)</label>
       <div class="varbtns"><span style="font-size:.7rem;color:#94a3b8;align-self:center">Insertar:</span><span id="varsTexto"></span><button class="emobtn" onclick="toggleEmojis('mTexto')">😀 Emojis</button></div>
       <div class="emojis" id="emo_mTexto"></div>
       <textarea class="f" id="mTexto" oninput="marcarSucio()" placeholder="{{saludo}} {{nombre}}: …"></textarea>
+      </div>
       <div style="margin-top:10px"><button class="btn btn-gris" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar</button> <span id="msgGuardar" class="okmsg"></span></div>
     </div>
 
@@ -216,7 +234,7 @@
     <!-- PASO 7: enviar -->
     <div class="sec">
       <h5><span class="num">7</span>Envío</h5>
-      <div class="nota" id="notaWsp" style="display:none"><b>WhatsApp:</b> los mensajes de texto solo llegan a clientes con conversación activa (&lt; 24 h). Para contactos fríos usa una <a href="/whatsapp/">plantilla HSM aprobada por Meta</a>.</div>
+      <div class="nota" id="notaWsp" style="display:none"><b>WhatsApp:</b> con <b>plantilla aprobada</b> (paso 5) la campaña llega a <b>todos</b> los contactos. El modo texto libre queda solo para conversaciones activas.</div>
       <div class="nota">Al enviar, cada contacto queda registrado como <b>gestión en el CRM</b> (Campaña Venta / Campaña Cobranza) y el grupo de CONTROL se deja fuera automáticamente.</div>
       <button class="btn btn-verde" id="btnEnviar" onclick="enviar()"><i class="bi bi-send-fill me-1"></i>Enviar campaña</button>
       <span id="msgEnvio" style="font-size:.85rem;font-weight:700;margin-left:8px"></span>
@@ -262,6 +280,7 @@ async function init(){
 
   if (ID) await cargarCampana(); else pintaCanal();
   pintarCampos();
+  cargarTpls();
 }
 function pintaCanal(){
   document.getElementById('hCanal').innerHTML = CANAL==='MAIL' ? '<i class="bi bi-envelope-paper-fill me-1"></i>MAIL' : '<i class="bi bi-whatsapp me-1"></i>WHATSAPP';
@@ -372,6 +391,17 @@ async function guardar(){
     deciles_control: deciles, excluir_regiones: regionesEx,
     analizar_ia: document.getElementById('chkIA').checked,
   };
+  if (CANAL === 'WSP') {
+    if (modoWsp === 'TPL' && document.getElementById('selTpl').value) {
+      const [name, lang] = document.getElementById('selTpl').value.split('|');
+      const t = TPLS.find(x => x.name === name && x.language === lang) || {};
+      const nVars = [...new Set(((t.body||'').match(/\{\{(\d+)\}\}/g) || []))].length;
+      body.plantilla_wsp = name; body.plantilla_wsp_idioma = lang; body.plantilla_wsp_body = t.body || '';
+      body.plantilla_wsp_map = Array.from({length:nVars}, (_,i) => document.getElementById('map_'+(i+1))?.value || '');
+    } else {
+      body.plantilla_wsp = null; body.plantilla_wsp_idioma = null; body.plantilla_wsp_body = null; body.plantilla_wsp_map = null;
+    }
+  }
   const r = await fetch(`/api/campanas-masivas/${ID}`, { method:'PUT', headers: hdrs(1), body: JSON.stringify(body) });
   const j = await r.json();
   document.getElementById('msgGuardar').textContent = j.success ? '✔ Guardado' : ('Error: '+j.error);
@@ -489,6 +519,56 @@ function fmtCLP(el){
   try { el.setSelectionRange(pos, pos); } catch(e) {}
 }
 const numCLP = v => Number(String(v||'').replace(/\./g,'')) || 0;
+
+/* ── Plantillas HSM aprobadas (campañas WSP de salida) ── */
+let TPLS = [], modoWsp = 'TPL';
+async function cargarTpls(){
+  if (CANAL !== 'WSP') return;
+  document.getElementById('zonaWspTpl').style.display = '';
+  const r = await fetch('/api/campanas-masivas/plantillas-wsp', { headers: hdrs() });
+  const j = await r.json();
+  const sel = document.getElementById('selTpl');
+  if (!j.success) { sel.innerHTML = `<option value="">(${j.error})</option>`; return; }
+  TPLS = j.data;
+  sel.innerHTML = '<option value="">— elige una plantilla aprobada —</option>' +
+    TPLS.map(t => `<option value="${t.name}|${t.language}">${t.name} (${t.language}) · ${t.category} · ${t.n_vars} variable(s)</option>`).join('');
+  if (CAMP && CAMP.plantilla_wsp) {
+    sel.value = CAMP.plantilla_wsp + '|' + (CAMP.plantilla_wsp_idioma || 'es');
+    if (!sel.value) sel.value = '';
+    pintarTpl(CAMP.plantilla_wsp_body || '', safe(CAMP.plantilla_wsp_map) || []);
+  }
+  setModoWsp(CAMP && !CAMP.plantilla_wsp && CAMP.texto ? 'TXT' : 'TPL', true);
+}
+function setModoWsp(m, soloUI){
+  modoWsp = m;
+  document.getElementById('modoTPL').classList.toggle('on', m==='TPL');
+  document.getElementById('modoTXT').classList.toggle('on', m==='TXT');
+  document.getElementById('zonaTpl').style.display = m==='TPL' ? '' : 'none';
+  document.getElementById('zonaTexto').style.display = (CANAL==='WSP' && m==='TPL') ? 'none' : '';
+  if (!soloUI) marcarSucio();
+}
+function elegirTpl(){
+  const v = document.getElementById('selTpl').value;
+  if (!v) { pintarTpl('', []); marcarSucio(); return; }
+  const [name, lang] = v.split('|');
+  const t = TPLS.find(x => x.name === name && x.language === lang);
+  pintarTpl(t ? t.body : '', []);
+  marcarSucio();
+}
+function pintarTpl(body, mapa){
+  const el = document.getElementById('tplBody');
+  el.style.display = body ? '' : 'none';
+  el.textContent = body || '';
+  const nVars = [...new Set((body.match(/\{\{(\d+)\}\}/g) || []))].length;
+  const mapEl = document.getElementById('tplMap');
+  if (!nVars) { mapEl.innerHTML = body ? '<div style="font-size:.75rem;color:#6b7280">Esta plantilla no tiene variables.</div>' : ''; return; }
+  const opts = camposSel.map(k => `<option value="${k}">{{${k}}}</option>`).join('');
+  mapEl.innerHTML = '<div style="font-size:.75rem;font-weight:700;color:#166534;margin-bottom:4px">Mapea cada variable de la plantilla a un campo de la campaña:</div>' +
+    Array.from({length:nVars}, (_,i) =>
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px"><code>{{${i+1}}}</code> →
+        <select class="f" style="max-width:280px" id="map_${i+1}" onchange="marcarSucio()"><option value="">— campo —</option>${opts}</select></div>`).join('');
+  (mapa||[]).forEach((campo,i) => { const e = document.getElementById('map_'+(i+1)); if (e && campo) e.value = campo; });
+}
 
 /* ── Análisis de CRÉDITO (política) ── */
 async function analizarPolitica(){
