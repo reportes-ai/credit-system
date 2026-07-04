@@ -110,7 +110,6 @@
       const t2 = $s('text', { x: lx + 18, y: y + 11, 'font-size': 10, fill: '#94a3b8' });
       t2.textContent = `${fmt(s.value)} · ${s.pct.toFixed(1)}%`;
       svg.appendChild(t1); svg.appendChild(t2);
-      i && null;
     });
 
     el.appendChild(svg);

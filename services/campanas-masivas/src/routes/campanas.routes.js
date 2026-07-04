@@ -7,6 +7,10 @@ const c = require('../controllers/campanas.controller');
 
 const puede = requireFunc('campanas_masivas');
 
+// Píxel de lectura de los mails: PÚBLICO (lo carga el correo del cliente) y
+// declarado ANTES de /:id para no chocar con esa ruta. Solo marca LEIDO con firma válida.
+router.get('/pixel/:token',          c.pixel);
+
 router.get('/catalogo',              verifyToken, puede, c.catalogo);
 router.get('/',                      verifyToken, puede, c.listar);
 router.post('/',                     verifyToken, puede, c.crear);

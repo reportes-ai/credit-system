@@ -427,8 +427,29 @@ function merge(texto, d) {
     return String(v);
   });
 }
-function htmlMail(c, dest) {
+/* Píxel de lectura: token = id + HMAC corto (no expone nada; solo marca LEIDO) */
+const crypto = require('crypto');
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const firmaPixel = id => crypto.createHmac('sha256', process.env.JWT_SECRET || 'af').update('px' + id).digest('hex').slice(0, 12);
+
+exports.pixel = async (req, res) => {
+  // GIF transparente 1x1 SIEMPRE (aunque el token sea inválido, no filtrar nada)
+  const gif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+  try {
+    const m = String(req.params.token || '').match(/^(\d+)-([a-f0-9]{12})/);
+    if (m && firmaPixel(m[1]) === m[2]) {
+      await pool.query(
+        "UPDATE campanas_destinatarios SET estado='LEIDO', leido_at=COALESCE(leido_at, NOW()) WHERE id=? AND estado='ENVIADO'", [m[1]]);
+    }
+  } catch (e) { /* nunca fallar el píxel */ }
+  res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store, private' }).end(gif);
+};
+
+function htmlMail(c, dest, opts = {}) {
   const cuerpo = merge(c.texto, dest).replace(/\n/g, '<br>');
+  const pixel = (opts.pixel && dest.id)
+    ? `<img src="${APP_URL}/api/campanas-masivas/pixel/${dest.id}-${firmaPixel(dest.id)}.gif" width="1" height="1" alt="" style="display:block">`
+    : '';
   const azul = '#0141A2', navy = '#012d70';
   let head = '';
   if (c.plantilla === 'banner') {
@@ -445,7 +466,7 @@ function htmlMail(c, dest) {
     ${head}
     <div style="padding:26px 30px;color:#1e293b;font-size:15px;line-height:1.65">${cuerpo}</div>
     <div style="background:#f8fafc;padding:14px 30px;color:#94a3b8;font-size:11px">AutoFácil Crédito Automotriz · autofacilchile.cl · +56 9 3246 9071</div>
-  </div>`;
+  </div>${pixel}`;
 }
 
 /* ── Vista previa mail-merge (recorre registros) ────────────────────────── */
@@ -489,14 +510,17 @@ exports.enviar = async (req, res) => {
           else {
             const { enviarCorreo, remitentePorClave } = require('../../../../shared/mailer');
             const from = c.remitente ? (remitentePorClave ? remitentePorClave(c.remitente) : undefined) : undefined;
-            r = await enviarCorreo({ to: d.email, subject: merge(c.asunto || c.descripcion, d), html: htmlMail(c, d), from });
+            r = await enviarCorreo({ to: d.email, subject: merge(c.asunto || c.descripcion, d), html: htmlMail(c, d, { pixel: true }), from });
           }
         } else {
           const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
           if (!token || !phoneId) r = { ok: false, error: 'WhatsApp no configurado (WSP_TOKEN/WSP_PHONE_ID)' };
           else if (!d.telefono) r = { ok: false, error: 'Sin teléfono' };
           else {
-            const to = String(d.telefono).replace(/\D/g, '');
+            // Normalización chilena: "9 1234 5678" → 56912345678
+            let to = String(d.telefono).replace(/\D/g, '');
+            if (to.length === 9 && to.startsWith('9')) to = '56' + to;
+            if (to.length === 8) to = '569' + to;
             const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
