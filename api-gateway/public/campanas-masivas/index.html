@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campañas Masivas — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --wsp:#128C7E; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { max-width:1200px; margin:24px auto; padding:0 20px 60px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:24px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+  .banner > i { font-size:2.6rem; opacity:.85; }
+  .banner h2 { margin:0 0 4px; font-size:1.3rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.86rem; }
+  .canales { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:24px; }
+  @media(max-width:800px){ .canales { grid-template-columns:1fr; } }
+  .canal { background:#fff; border-radius:16px; padding:22px; box-shadow:0 1px 6px rgba(0,0,0,.07); border-top:4px solid var(--accent); }
+  .canal.wsp { border-top-color:#25D366; }
+  .canal-head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  .canal-head .ic { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; background:#eff6ff; color:var(--accent); }
+  .canal.wsp .canal-head .ic { background:#dcfce7; color:var(--wsp); }
+  .canal-head h5 { margin:0; font-size:1.02rem; font-weight:700; color:var(--navy); flex:1; }
+  .btn-nueva { border:none; border-radius:9px; padding:8px 16px; font-size:.83rem; font-weight:700; cursor:pointer; color:#fff; background:linear-gradient(135deg,#0141A2,#009AFE); }
+  .canal.wsp .btn-nueva { background:linear-gradient(135deg,#128C7E,#25D366); }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:#f8fafc; text-align:left; padding:7px 9px; font-size:.66rem; text-transform:uppercase; color:#6b7280; letter-spacing:.04em; }
+  td { padding:7px 9px; border-bottom:1px solid #f1f5f9; }
+  td.num { text-align:right; }
+  .corr { color:var(--accent); font-weight:800; cursor:pointer; text-decoration:underline dotted; }
+  .chip { border-radius:8px; padding:2px 9px; font-size:.68rem; font-weight:700; display:inline-block; }
+  .e-BORRADOR { background:#f1f5f9; color:#475569; } .e-ENVIADA { background:#dcfce7; color:#166534; } .e-CERRADA { background:#e0e7ff; color:#3730a3; }
+  .o-VENTA { background:#eff6ff; color:#0141A2; } .o-COBRANZA { background:#fee2e2; color:#b91c1c; }
+  .tst { background:#fef9c3; color:#854d0e; border-radius:6px; padding:1px 6px; font-size:.62rem; font-weight:800; margin-left:4px; }
+  dialog { border:none; border-radius:16px; padding:0; max-width:1020px; width:94vw; box-shadow:0 24px 64px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,13,40,.55); }
+  .dlg-head { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:12px; }
+  .dlg-head h5 { margin:0; font-size:1rem; flex:1; }
+  .dlg-head button { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  .dlg-body { padding:18px 22px; max-height:74vh; overflow-y:auto; }
+  .estados-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px; }
+  .est { background:#f8fafc; border-radius:10px; padding:10px 12px; text-align:center; cursor:pointer; border:1.5px solid transparent; }
+  .est:hover { border-color:var(--accent); }
+  .est .n { font-size:1.25rem; font-weight:800; color:var(--navy); }
+  .est .t { font-size:.66rem; font-weight:700; color:#6b7280; text-transform:uppercase; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:820px){ .grid2 { grid-template-columns:1fr; } }
+  .panelin { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:14px; }
+  .panelin h6 { margin:0 0 8px; font-size:.8rem; font-weight:700; color:var(--navy); }
+  .cc { display:flex; gap:12px; margin:10px 0 14px; flex-wrap:wrap; }
+  .cc .box { flex:1; min-width:180px; border-radius:12px; padding:12px 16px; color:#fff; }
+  .cc .box .big { font-size:1.5rem; font-weight:800; }
+  .cc .box .sm { font-size:.72rem; opacity:.85; }
+  .btnx { border:none; border-radius:8px; padding:7px 14px; font-size:.78rem; font-weight:700; cursor:pointer; }
+  .btn-sec { background:#eff6ff; color:var(--accent); }
+  .btn-verde { background:#16a34a; color:#fff; }
+  .vacio { color:#9ca3af; font-size:.82rem; text-align:center; padding:14px; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Campañas Masivas',icon:'bi-megaphone-fill',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-megaphone-fill"></i>
+    <div>
+      <h2>Campañas Masivas</h2>
+      <p>Campañas de Mail y WhatsApp para Ventas y Cobranza: data manual o desde nuestras bases, grupo de control por deciles, medición de conversión y registro en CRM.</p>
+    </div>
+  </div>
+
+  <div class="canales">
+    <div class="canal" id="cMAIL">
+      <div class="canal-head">
+        <div class="ic"><i class="bi bi-envelope-paper-fill"></i></div>
+        <h5>Campañas de Mail</h5>
+        <button class="btn-nueva" onclick="location='/campanas-masivas/editor?canal=MAIL'"><i class="bi bi-plus-lg me-1"></i>Nueva campaña</button>
+      </div>
+      <div id="listaMAIL" class="vacio">Cargando…</div>
+    </div>
+    <div class="canal wsp" id="cWSP">
+      <div class="canal-head">
+        <div class="ic"><i class="bi bi-whatsapp"></i></div>
+        <h5>Campañas de WhatsApp</h5>
+        <button class="btn-nueva" onclick="location='/campanas-masivas/editor?canal=WSP'"><i class="bi bi-plus-lg me-1"></i>Nueva campaña</button>
+      </div>
+      <div id="listaWSP" class="vacio">Cargando…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Popup RESULTADOS ── -->
+<dialog id="dlgRes">
+  <div class="dlg-head">
+    <i class="bi bi-graph-up-arrow"></i><h5 id="resTitulo">Resultados</h5>
+    <button id="btnRecalc" class="btnx" style="background:rgba(255,255,255,.2);color:#fff" onclick="recalcular()"><i class="bi bi-arrow-repeat me-1"></i>Recalcular conversión</button>
+    <button onclick="dlgRes.close()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="dlg-body" id="resBody"></div>
+</dialog>
+
+<!-- ── Popup DESTINATARIOS ── -->
+<dialog id="dlgDest">
+  <div class="dlg-head" style="background:linear-gradient(135deg,#334155,#64748b)">
+    <i class="bi bi-people-fill"></i><h5 id="destTitulo">Destinatarios</h5>
+    <button class="btnx btn-verde" onclick="exportarDest()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+    <button onclick="dlgDest.close()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="dlg-body" id="destBody"></div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/charts3d.js"></script>
+<script>
+const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
+const CLP = v => '$'+Number(v||0).toLocaleString('es-CL');
+const N = v => Number(v||0).toLocaleString('es-CL');
+const F = d => d ? String(d).slice(0,10).split('-').reverse().join('-') : '—';
+let CAMPS = [], CUR = null, DESTROWS = [];
+
+async function cargar(){
+  const r = await fetch('/api/campanas-masivas', { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('listaMAIL').textContent = j.error; return; }
+  CAMPS = j.data;
+  for (const canal of ['MAIL','WSP']) {
+    const rows = CAMPS.filter(c => c.canal === canal);
+    const el = document.getElementById('lista'+canal);
+    if (!rows.length) { el.innerHTML = '<div class="vacio">Aún no hay campañas — crea la primera.</div>'; continue; }
+    el.classList.remove('vacio');
+    el.innerHTML = `<div style="overflow-x:auto"><table>
+      <thead><tr><th>N°</th><th>Fecha</th><th>Descripción</th><th>Objetivo</th><th>Estado</th><th class="num">Dest.</th><th class="num">Enviados</th><th class="num">Errores</th><th class="num">Conv.</th><th></th></tr></thead>
+      <tbody>${rows.map(c => `
+        <tr>
+          <td><span class="corr" onclick="abrirResultados(${c.id})">${c.correlativo}</span>${c.es_test?'<span class="tst">TEST</span>':''}</td>
+          <td>${F(c.enviada_at || c.created_at)}</td>
+          <td>${c.descripcion}</td>
+          <td><span class="chip o-${c.objetivo}">${c.objetivo}</span></td>
+          <td><span class="chip e-${c.estado}">${c.estado}</span></td>
+          <td class="num">${N(c.destinatarios)}</td>
+          <td class="num">${N(c.enviados)}</td>
+          <td class="num" style="color:${c.errores>0?'#dc2626':'inherit'}">${N(c.errores)}</td>
+          <td class="num"><b>${N(c.conversiones)}</b></td>
+          <td>${c.estado==='BORRADOR' ? `<a href="/campanas-masivas/editor?id=${c.id}" style="color:var(--accent);font-weight:700;font-size:.75rem;text-decoration:none">Editar <i class="bi bi-pencil"></i></a>`
+              : `<span class="corr" style="font-size:.75rem" onclick="abrirResultados(${c.id})">Informe <i class="bi bi-graph-up"></i></span>`}</td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  }
+}
+
+/* ── Resultados: estados clicables + tortas + línea conversión + champion-challenger ── */
+async function abrirResultados(id){
+  CUR = id;
+  const r = await fetch(`/api/campanas-masivas/${id}/resultados`, { headers: hdrs() });
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const { campana:c, estados, grupos, porDia, riesgo } = j.data;
+  document.getElementById('resTitulo').textContent = `${c.correlativo} — ${c.descripcion}`;
+  document.getElementById('btnRecalc').style.display = c.es_test ? 'none' : '';
+  const em = Object.fromEntries(estados.map(e => [e.estado, Number(e.n)]));
+  const gCamp = grupos.find(g=>g.grupo==='CAMPANA') || { n:0, conv:0, monto:0 };
+  const gCtrl = grupos.find(g=>g.grupo==='CONTROL') || { n:0, conv:0, monto:0 };
+  const tasa = g => g.n ? (Number(g.conv)/Number(g.n)*100) : 0;
+  const uplift = tasa(gCtrl) > 0 ? ((tasa(gCamp)-tasa(gCtrl))/tasa(gCtrl)*100) : null;
+  const pct = v => v.toLocaleString('es-CL',{maximumFractionDigits:1})+'%';
+
+  document.getElementById('resBody').innerHTML = `
+    <div class="estados-grid">
+      ${[['ENVIADO','Enviados','#0141A2'],['LEIDO','Leídos','#16a34a'],['ERROR','Con error','#dc2626'],['NO_RECIBIDO','No recibidos','#f59e0b'],['PENDIENTE','Pendientes','#64748b']]
+        .map(([k,t,col]) => `<div class="est" onclick="verDest('${k}')"><div class="n" style="color:${col}">${N(em[k]||0)}</div><div class="t">${t}</div></div>`).join('')}
+      <div class="est" onclick="verDest('','1')"><div class="n" style="color:#7c3aed">${N(gCamp.conv)+ (gCtrl.conv?(' + '+N(gCtrl.conv)):'')}</div><div class="t">Convertidos</div></div>
+    </div>
+
+    <div class="panelin">
+      <h6><i class="bi bi-trophy me-1"></i>Champion – Challenger (grupo de control por deciles ${JSON.stringify(safe(c.deciles_control)||[])})</h6>
+      <div class="cc">
+        <div class="box" style="background:linear-gradient(135deg,#0141A2,#009AFE)">
+          <div class="sm">CAMPAÑA (champion) — ${N(gCamp.n)} clientes</div>
+          <div class="big">${pct(tasa(gCamp))}</div>
+          <div class="sm">${N(gCamp.conv)} conversiones · ${CLP(gCamp.monto)}</div>
+        </div>
+        <div class="box" style="background:linear-gradient(135deg,#475569,#94a3b8)">
+          <div class="sm">CONTROL (challenger) — ${N(gCtrl.n)} clientes sin contactar</div>
+          <div class="big">${pct(tasa(gCtrl))}</div>
+          <div class="sm">${N(gCtrl.conv)} conversiones naturales · ${CLP(gCtrl.monto)}</div>
+        </div>
+        <div class="box" style="background:linear-gradient(135deg,${uplift===null||uplift>=0?'#166534,#22c55e':'#7f1d1d,#ef4444'})">
+          <div class="sm">UPLIFT de la campaña</div>
+          <div class="big">${uplift===null?'—':(uplift>=0?'+':'')+pct(uplift)}</div>
+          <div class="sm">${uplift===null?'sin conversiones en control aún':'vs. no haber hecho nada'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="panelin"><h6><i class="bi bi-pie-chart-fill me-1"></i>Estados del envío (3D)</h6><div id="chEst"></div></div>
+      <div class="panelin"><h6><i class="bi bi-graph-up me-1"></i>Tasa de conversión acumulada por día</h6><div id="chDias"></div></div>
+    </div>
+    ${riesgo.some(x=>x.riesgo!=='SIN ANALIZAR') ? `<div class="panelin"><h6><i class="bi bi-robot me-1"></i>Riesgo IA (informes comerciales)</h6><div id="chRiesgo"></div></div>` : (c.analizar_ia ? `<div class="panelin"><button class="btnx btn-sec" onclick="analizarIA()"><i class="bi bi-robot me-1"></i>Analizar riesgo con IA (DealerNet)</button> <span id="iaProg" style="font-size:.78rem;color:#6b7280"></span></div>` : '')}
+    <div style="font-size:.72rem;color:#94a3b8;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Conversión: ${c.objetivo==='VENTA'?'créditos otorgados':'pagos de cuotas'} en los 30 días siguientes al envío. Las gestiones del envío quedan registradas en el CRM (${c.correlativo}).</div>`;
+
+  AF3D.pie(document.getElementById('chEst'),
+    [['ENVIADO','#0141A2'],['LEIDO','#22c55e'],['ERROR','#ef4444'],['NO_RECIBIDO','#f59e0b'],['PENDIENTE','#94a3b8']]
+      .map(([k,col]) => ({ label:k.replace('_',' '), value: em[k]||0, color: col })),
+    { fmt: v => N(v), width: 430, height: 250 });
+
+  // línea acumulada por día (campaña vs control, en % del grupo)
+  const dias = [...new Set(porDia.map(p=>Number(p.dia)))].sort((a,b)=>a-b);
+  const serie = (grupo, tot) => {
+    let acc = 0; const pts = [{x:0,y:0}];
+    for (const d of dias) {
+      acc += porDia.filter(p=>p.grupo===grupo && Number(p.dia)<=d && Number(p.dia)>(pts.length>1?pts[pts.length-1].x:-1)).reduce((s,p)=>s+Number(p.n),0);
+      pts.push({ x:d, y: tot ? +(acc/tot*100).toFixed(2) : 0 });
+    }
+    return pts;
+  };
+  AF3D.line(document.getElementById('chDias'), [
+    { label:'Campaña', color:'#0141A2', points: serie('CAMPANA', Number(gCamp.n)) },
+    { label:'Control', color:'#94a3b8', points: serie('CONTROL', Number(gCtrl.n)) },
+  ], { fmt: v => v+'%', xPrefix:'día ', width: 460, height: 250 });
+
+  if (document.getElementById('chRiesgo')) {
+    AF3D.bars(document.getElementById('chRiesgo'),
+      riesgo.map(x => ({ label: x.riesgo, value: Number(x.n), color: { BAJO:'#22c55e', MEDIO:'#f59e0b', ALTO:'#ef4444', 'S/I':'#94a3b8', 'SIN ANALIZAR':'#cbd5e1' }[x.riesgo] })),
+      { fmt: v => N(v), width: 860, height: 220 });
+  }
+  dlgRes.showModal();
+}
+const safe = v => { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } };
+
+async function recalcular(){
+  const r = await fetch(`/api/campanas-masivas/${CUR}/recalcular`, { method:'POST', headers: hdrs() });
+  const j = await r.json();
+  alert(j.success ? `Conversión recalculada (${j.data.actualizados ?? 0} registros marcados)` : j.error);
+  abrirResultados(CUR);
+}
+
+async function analizarIA(){
+  const prog = document.getElementById('iaProg');
+  let total = 0;
+  while (true) {
+    const r = await fetch(`/api/campanas-masivas/${CUR}/analizar-ia`, { method:'POST', headers: hdrs() });
+    const j = await r.json();
+    if (!j.success) { prog.textContent = 'Error: '+j.error; return; }
+    total += j.data.procesados;
+    prog.textContent = `${total} analizados, quedan ${j.data.pendientes}…`;
+    if (j.data.fin) break;
+  }
+  abrirResultados(CUR);
+}
+
+/* ── Detalle destinatarios + export ── */
+async function verDest(estado, conv){
+  const q = new URLSearchParams(); if (estado) q.set('estado', estado); if (conv) q.set('convertido','1');
+  const r = await fetch(`/api/campanas-masivas/${CUR}/destinatarios?`+q, { headers: hdrs() });
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  DESTROWS = j.data;
+  document.getElementById('destTitulo').textContent = `Destinatarios ${estado?('— '+estado):''}${conv?'— CONVERTIDOS':''} (${N(DESTROWS.length)})`;
+  document.getElementById('destBody').innerHTML = DESTROWS.length ? `<div style="overflow-x:auto"><table>
+    <thead><tr><th>RUT</th><th>Nombre</th><th>Email</th><th>Teléfono</th><th>Grupo</th><th>Estado</th><th>Error</th><th class="num">Convertido</th><th class="num">Monto</th><th>Riesgo IA</th></tr></thead>
+    <tbody>${DESTROWS.map(d => `<tr>
+      <td>${d.rut||'—'}</td><td>${[d.nombre,d.ap_paterno,d.ap_materno].filter(Boolean).join(' ')}</td>
+      <td>${d.email||'—'}</td><td>${d.telefono||'—'}</td>
+      <td>${d.grupo}</td><td><span class="chip ${d.estado==='ERROR'?'o-COBRANZA':'e-ENVIADA'}">${d.estado}</span></td>
+      <td style="color:#dc2626;font-size:.72rem">${d.error_msg||''}</td>
+      <td class="num">${d.convertido? ('✔ día '+(d.dias_a_conversion??'—')) : '—'}</td>
+      <td class="num">${d.monto_convertido?CLP(d.monto_convertido):'—'}</td>
+      <td>${d.riesgo_ia||'—'}</td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="vacio">Sin registros.</div>';
+  dlgDest.showModal();
+}
+
+function exportarDest(){
+  if (!DESTROWS.length) return;
+  const cols = ['rut','nombre','ap_paterno','ap_materno','email','telefono','grupo','estado','error_msg','convertido','dias_a_conversion','monto_convertido','riesgo_ia'];
+  const csv = '﻿' + [cols.join(';'), ...DESTROWS.map(d => cols.map(k => `"${String(d[k]??'').replace(/"/g,'""')}"`).join(';'))].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = `campana_${CUR}_destinatarios.csv`; a.click();
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

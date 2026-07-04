@@ -137,6 +137,7 @@ app.use('/api/meses-cerrados',            require('../../services/mantenedores/s
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
 app.use('/api/reporteria',                require('../../services/reporteria/src/routes/reportes.routes'));
+app.use('/api/campanas-masivas',          require('../../services/campanas-masivas/src/routes/campanas.routes'));
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
@@ -370,6 +371,8 @@ const PAGINAS = [
   ['/reporteria/bitacora-credito', 'reporteria/bitacora-credito/index.html'],
   ['/reporteria/cartera-creditos', 'reporteria/cartera-creditos/index.html'],
   ['/reporteria/cobranza-mora', 'reporteria/cobranza-mora/index.html'],
+  ['/campanas-masivas', 'campanas-masivas/index.html'],
+  ['/campanas-masivas/editor', 'campanas-masivas/editor.html'],
   ['/politica', 'politica/index.html'],
   ['/dashboard', 'dashboard/index.html'],
   ['/auditoria', 'auditoria/index.html'],

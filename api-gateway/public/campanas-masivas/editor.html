@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor de Campaña — Campañas Masivas</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --wsp:#128C7E; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { max-width:1150px; margin:22px auto; padding:0 20px 70px; }
+  .head { background:linear-gradient(135deg,#012d70,#0141A2); border-radius:14px; color:#fff; padding:16px 24px; margin-bottom:18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .head h4 { margin:0; font-size:1.05rem; font-weight:700; flex:1; }
+  .head .corr { background:rgba(255,255,255,.15); border-radius:8px; padding:4px 12px; font-weight:800; }
+  .sec { background:#fff; border-radius:14px; padding:18px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .sec h5 { margin:0 0 12px; font-size:.9rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .sec h5 .num { background:var(--accent); color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; }
+  label.f { font-size:.72rem; font-weight:700; color:#475569; display:block; margin:8px 0 3px; }
+  input.f, select.f, textarea.f { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:8px 11px; font-size:.86rem; font-family:inherit; }
+  textarea.f { min-height:130px; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
+  .pills { display:flex; flex-wrap:wrap; gap:7px; }
+  .pill { border:1.5px solid #e2e8f0; background:#f8fafc; border-radius:8px; padding:5px 12px; font-size:.78rem; font-weight:600; cursor:pointer; user-select:none; }
+  .pill.on { background:#eff6ff; border-color:var(--accent); color:var(--accent); }
+  .pill.decil.on { background:#fef3c7; border-color:#d97706; color:#92400e; }
+  .btn { border:none; border-radius:9px; padding:9px 18px; font-size:.84rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-verde { background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#334155; }
+  .btn-rojo { background:#fee2e2; color:#b91c1c; }
+  .tpl { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  @media(max-width:760px){ .tpl { grid-template-columns:1fr; } }
+  .tpl .opt { border:2px solid #e2e8f0; border-radius:12px; padding:10px; cursor:pointer; text-align:center; }
+  .tpl .opt.on { border-color:var(--accent); background:#eff6ff; }
+  .tpl .mini { border-radius:8px; height:74px; margin-bottom:8px; overflow:hidden; font-size:.6rem; }
+  .varbtns { display:flex; flex-wrap:wrap; gap:5px; margin:6px 0; }
+  .varbtn { background:#ede9fe; color:#5b21b6; border:none; border-radius:7px; padding:3px 9px; font-size:.72rem; font-weight:700; cursor:pointer; }
+  .emobtn { background:#fef9c3; border:none; border-radius:7px; padding:3px 9px; font-size:.8rem; cursor:pointer; }
+  .emojis { display:none; flex-wrap:wrap; gap:4px; background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px; margin:6px 0; max-width:420px; }
+  .emojis.open { display:flex; }
+  .emojis span { font-size:1.15rem; cursor:pointer; padding:2px 4px; border-radius:6px; }
+  .emojis span:hover { background:#f1f5f9; }
+  .preview-box { border:1.5px solid #e2e8f0; border-radius:12px; background:#f8fafc; padding:16px; min-height:200px; }
+  .wsp-bubble { background:#DCF8C6; border-radius:12px; padding:12px 16px; max-width:480px; white-space:pre-wrap; font-size:.88rem; box-shadow:0 1px 2px rgba(0,0,0,.12); }
+  .nav-merge { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .nav-merge button { border:none; background:#eff6ff; color:var(--accent); border-radius:8px; padding:5px 12px; cursor:pointer; font-weight:800; }
+  .estadobar { position:sticky; bottom:0; background:#fff; border-top:2px solid #e5e7eb; padding:12px 22px; display:flex; gap:10px; align-items:center; margin:0 -22px -18px; border-radius:0 0 14px 14px; }
+  .nota { background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:9px 13px; font-size:.78rem; margin:10px 0; }
+  .okmsg { color:#16a34a; font-weight:700; font-size:.8rem; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Campañas Masivas',href:'/campanas-masivas/'},{label:'Editor de campaña',icon:'bi-pencil-square',current:true}]};</script>
+
+<div class="wrap">
+  <div class="head">
+    <i class="bi bi-megaphone-fill" style="font-size:1.6rem"></i>
+    <h4 id="hTitulo">Nueva campaña</h4>
+    <span class="corr" id="hCorr" style="display:none"></span>
+    <span class="corr" id="hCanal"></span>
+  </div>
+
+  <!-- PASO 1: crear -->
+  <div class="sec" id="secCrear">
+    <h5><span class="num">1</span>Datos de la campaña</h5>
+    <div class="row">
+      <div><label class="f">Objetivo</label>
+        <select class="f" id="cObjetivo"><option value="VENTA">VENTA (marketing)</option><option value="COBRANZA">COBRANZA</option></select></div>
+      <div style="grid-column:span 2"><label class="f">Descripción</label>
+        <input class="f" id="cDesc" placeholder="Ej: Renovación de auto clientes por terminar crédito — julio"></div>
+      <div style="align-self:end"><button class="btn btn-azul" id="btnCrear" onclick="crear()"><i class="bi bi-plus-lg me-1"></i>Crear campaña</button></div>
+    </div>
+  </div>
+
+  <div id="resto" style="display:none">
+
+    <!-- PASO 2: variables -->
+    <div class="sec">
+      <h5><span class="num">2</span>Campos variables (máx. 10) — definen la plantilla de carga y las variables del texto</h5>
+      <div class="pills" id="pillsCampos"></div>
+      <div style="font-size:.72rem;color:#94a3b8;margin-top:8px" id="cntCampos"></div>
+    </div>
+
+    <!-- PASO 3: origen de la data -->
+    <div class="sec">
+      <h5><span class="num">3</span>Origen de la data</h5>
+      <div class="pills" style="margin-bottom:12px">
+        <span class="pill" id="odMANUAL" onclick="setOrigen('MANUAL')">📄 Carga manual (Excel/CSV) — clientes fuera de nuestras bases</span>
+        <span class="pill" id="odPARAMETROS" onclick="setOrigen('PARAMETROS')">🗄️ Desde nuestras bases, por parámetros</span>
+      </div>
+      <div id="zonaManual" style="display:none">
+        <button class="btn btn-gris" onclick="descargarPlantilla()"><i class="bi bi-download me-1"></i>Descargar plantilla CSV</button>
+        <label class="btn btn-azul" style="display:inline-block">
+          <i class="bi bi-upload me-1"></i>Subir CSV con la data
+          <input type="file" accept=".csv,.txt" style="display:none" onchange="subirCSV(this)">
+        </label>
+        <span id="msgCarga" class="okmsg"></span>
+        <div class="nota">La plantilla incluye <b>email</b> y <b>telefono</b> (obligatorio según el canal) más los campos variables elegidos. Separador <b>;</b> — se acepta el CSV que genera Excel.</div>
+      </div>
+      <div id="zonaParam" style="display:none">
+        <div class="row" id="paramCob">
+          <div><label class="f">Días de mora — desde</label><input class="f" type="number" id="pMoraMin" value="1"></div>
+          <div><label class="f">Días de mora — hasta</label><input class="f" type="number" id="pMoraMax" value="90"></div>
+          <div><label class="f">Capital adeudado mínimo $</label><input class="f" type="number" id="pCapMin" value="0"></div>
+        </div>
+        <div class="row" id="paramVta">
+          <div><label class="f">Meses para el término — desde</label><input class="f" type="number" id="pTerMin" value="0"></div>
+          <div><label class="f">Meses para el término — hasta</label><input class="f" type="number" id="pTerMax" value="6"></div>
+          <div><label class="f">Renta registrada mínima $</label><input class="f" type="number" id="pRentaMin" value="0"></div>
+        </div>
+        <button class="btn btn-azul" style="margin-top:10px" onclick="generarBD()"><i class="bi bi-database-down me-1"></i>Generar destinatarios desde la BD</button>
+        <span id="msgBD" class="okmsg"></span>
+      </div>
+    </div>
+
+    <!-- PASO 4: control y exclusiones -->
+    <div class="sec">
+      <h5><span class="num">4</span>Grupo de control y exclusiones</h5>
+      <label class="f">Deciles de CONTROL (último dígito del RUT antes del guion — esos clientes NO se contactan y sirven de comparación champion–challenger)</label>
+      <div class="pills" id="pillsDeciles"></div>
+      <label class="f" style="margin-top:12px">Excluir regiones (feriado regional, zona de emergencia…)</label>
+      <div class="pills" id="pillsRegiones"><span style="font-size:.75rem;color:#94a3b8">Cargando regiones…</span></div>
+      <label class="f" style="margin-top:12px"><input type="checkbox" id="chkIA" style="width:auto;margin-right:6px">Analizar informes comerciales con IA (DealerNet) — <span id="lblIA">riesgo</span></label>
+    </div>
+
+    <!-- PASO 5: contenido -->
+    <div class="sec">
+      <h5><span class="num">5</span>Contenido del mensaje</h5>
+      <div id="zonaMail">
+        <label class="f">Plantilla de diseño</label>
+        <div class="tpl" id="tplSel">
+          <div class="opt" data-t="banner" onclick="setTpl('banner')">
+            <div class="mini" style="background:#fff;border:1px solid #e5e7eb"><div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:8px;font-weight:800;text-align:left">AutoFácil<br><span style="font-size:.5rem;letter-spacing:2px;color:#bfdbfe">CRÉDITO AUTOMOTRIZ</span></div><div style="padding:6px;color:#94a3b8">texto…</div></div>
+            <b style="font-size:.75rem">Banner AutoFácil azul</b>
+          </div>
+          <div class="opt" data-t="logo" onclick="setTpl('logo')">
+            <div class="mini" style="background:#fff;border:1px solid #e5e7eb"><div style="padding:10px;border-bottom:2px solid #0141A2;text-align:left;font-weight:800;color:#012d70">Auto<span style="color:#0141A2">Fácil</span></div><div style="padding:6px;color:#94a3b8">texto…</div></div>
+            <b style="font-size:.75rem">Solo logo</b>
+          </div>
+          <div class="opt" data-t="titulo" onclick="setTpl('titulo')">
+            <div class="mini" style="background:#fff;border:1px solid #e5e7eb"><div style="padding:10px;text-align:left;font-weight:800;font-size:.85rem" id="miniTitulo" >¡Gran título variable!</div><div style="padding:6px;color:#94a3b8">texto…</div></div>
+            <b style="font-size:.75rem">Gran título con color</b>
+          </div>
+        </div>
+        <div class="row" id="rowTitulo" style="margin-top:10px;display:none">
+          <div style="grid-column:span 2"><label class="f">Título (acepta variables)</label><input class="f" id="mTitulo" oninput="marcarSucio()"></div>
+          <div><label class="f">Color del título</label><input class="f" type="color" id="mColor" value="#0141A2" style="height:40px" oninput="marcarSucio()"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div style="grid-column:span 2">
+            <label class="f">Asunto</label>
+            <input class="f" id="mAsunto" placeholder="Ej: 🚗 {{nombre}}, renueva tu auto" oninput="marcarSucio()">
+            <div class="varbtns"><span style="font-size:.7rem;color:#94a3b8;align-self:center">Insertar:</span><span id="varsAsunto"></span><button class="emobtn" onclick="toggleEmojis('mAsunto')">😀 Emojis</button></div>
+            <div class="emojis" id="emo_mAsunto"></div>
+          </div>
+          <div><label class="f">Remitente</label><select class="f" id="mRemitente" onchange="marcarSucio()"></select></div>
+        </div>
+      </div>
+
+      <label class="f">Texto del mensaje (usa las variables — se reemplazan por la data de cada cliente)</label>
+      <div class="varbtns"><span style="font-size:.7rem;color:#94a3b8;align-self:center">Insertar:</span><span id="varsTexto"></span><button class="emobtn" onclick="toggleEmojis('mTexto')">😀 Emojis</button></div>
+      <div class="emojis" id="emo_mTexto"></div>
+      <textarea class="f" id="mTexto" oninput="marcarSucio()" placeholder="{{saludo}} {{nombre}}: …"></textarea>
+      <div style="margin-top:10px"><button class="btn btn-gris" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar</button> <span id="msgGuardar" class="okmsg"></span></div>
+    </div>
+
+    <!-- PASO 6: vista previa mail-merge -->
+    <div class="sec">
+      <h5><span class="num">6</span>Vista previa — correspondencia (mail-merge)</h5>
+      <div class="nav-merge">
+        <button onclick="mergeNav(-1)"><i class="bi bi-chevron-left"></i></button>
+        <b id="mergePos">— / —</b>
+        <button onclick="mergeNav(1)"><i class="bi bi-chevron-right"></i></button>
+        <span id="mergeQuien" style="font-size:.8rem;color:#6b7280"></span>
+        <button class="btn btn-gris" style="margin-left:auto" onclick="cargarPreview()"><i class="bi bi-arrow-repeat me-1"></i>Actualizar</button>
+      </div>
+      <div id="prevAsunto" style="font-weight:700;margin-bottom:8px;display:none"></div>
+      <div class="preview-box" id="prevBox"><span style="color:#9ca3af;font-size:.82rem">Guarda el contenido y carga destinatarios para previsualizar.</span></div>
+    </div>
+
+    <!-- PASO 7: enviar -->
+    <div class="sec">
+      <h5><span class="num">7</span>Envío</h5>
+      <div class="nota" id="notaWsp" style="display:none"><b>WhatsApp:</b> los mensajes de texto solo llegan a clientes con conversación activa (&lt; 24 h). Para contactos fríos usa una <a href="/whatsapp/">plantilla HSM aprobada por Meta</a>.</div>
+      <div class="nota">Al enviar, cada contacto queda registrado como <b>gestión en el CRM</b> (Campaña Venta / Campaña Cobranza) y el grupo de CONTROL se deja fuera automáticamente.</div>
+      <button class="btn btn-verde" id="btnEnviar" onclick="enviar()"><i class="bi bi-send-fill me-1"></i>Enviar campaña</button>
+      <span id="msgEnvio" style="font-size:.85rem;font-weight:700;margin-left:8px"></span>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
+const qs = new URLSearchParams(location.search);
+let ID = qs.get('id') ? Number(qs.get('id')) : null;
+let CANAL = qs.get('canal') || 'MAIL';
+let CAT = { campos:[], cuentas:[], regiones:[] };
+let CAMP = null, camposSel = [], deciles = [], regionesEx = [], mergeI = 0, mergeTotal = 0;
+
+const EMOJIS = ['😀','😃','😄','😁','🙂','😉','😊','🥳','🤩','😎','🙌','👏','👍','💪','🤝','🙏','❤️','💙','🔥','⭐','✨','🎉','🎊','🎁','🚗','🚙','🏎️','🔑','💰','💵','💳','🏦','📈','📉','📊','✅','☑️','⚠️','📌','📅','⏰','🕐','📣','📢','💬','📲','☎️','✉️','🏁','🥇','🏆','😅','🤔','😌','😍','🌟','☀️','🌈'];
+
+async function init(){
+  const r = await fetch('/api/campanas-masivas/catalogo', { headers: hdrs() });
+  const j = await r.json(); if (j.success) CAT = j.data;
+  // remitentes
+  const sel = document.getElementById('mRemitente');
+  sel.innerHTML = (CAT.cuentas||[]).map(c => `<option value="${c.clave||c.key||c.id||c.email||''}">${c.nombre||c.label||c.email||c.clave}</option>`).join('') || '<option value="">(cuenta por defecto)</option>';
+  // regiones
+  document.getElementById('pillsRegiones').innerHTML = (CAT.regiones||[]).length
+    ? CAT.regiones.map(rg => `<span class="pill" data-reg="${rg.id}" onclick="togReg(${rg.id},this)">${rg.nombre}</span>`).join('')
+    : '<span style="font-size:.75rem;color:#94a3b8">Sin catálogo de regiones — exclusión no disponible para esta data</span>';
+  // deciles
+  document.getElementById('pillsDeciles').innerHTML = Array.from({length:10},(_,d) =>
+    `<span class="pill decil" data-d="${d}" onclick="togDecil(${d},this)">${d}</span>`).join('');
+  // emojis
+  for (const t of ['mAsunto','mTexto']) document.getElementById('emo_'+t).innerHTML = EMOJIS.map(e=>`<span onclick="insertar('${t}','${e}')">${e}</span>`).join('');
+
+  if (ID) await cargarCampana(); else pintaCanal();
+  pintarCampos();
+}
+function pintaCanal(){
+  document.getElementById('hCanal').innerHTML = CANAL==='MAIL' ? '<i class="bi bi-envelope-paper-fill me-1"></i>MAIL' : '<i class="bi bi-whatsapp me-1"></i>WHATSAPP';
+  document.getElementById('zonaMail').style.display = CANAL==='MAIL' ? '' : 'none';
+  document.getElementById('notaWsp').style.display = CANAL==='WSP' ? '' : 'none';
+}
+
+async function crear(){
+  const desc = document.getElementById('cDesc').value.trim();
+  if (!desc) return alert('Escribe la descripción');
+  const r = await fetch('/api/campanas-masivas', { method:'POST', headers: hdrs(1),
+    body: JSON.stringify({ canal: CANAL, objetivo: document.getElementById('cObjetivo').value, descripcion: desc }) });
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  ID = j.data.id;
+  history.replaceState(null,'',`/campanas-masivas/editor?id=${ID}`);
+  await cargarCampana();
+}
+
+async function cargarCampana(){
+  const r = await fetch(`/api/campanas-masivas/${ID}`, { headers: hdrs() });
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  CAMP = j.data; CANAL = CAMP.canal;
+  camposSel = safe(CAMP.campos) || [];
+  deciles = safe(CAMP.deciles_control) || [];
+  regionesEx = (safe(CAMP.excluir_regiones) || []).map(Number);
+  document.getElementById('hTitulo').textContent = CAMP.descripcion;
+  document.getElementById('hCorr').textContent = CAMP.correlativo; document.getElementById('hCorr').style.display='';
+  document.getElementById('secCrear').style.display = 'none';
+  document.getElementById('resto').style.display = '';
+  pintaCanal();
+  document.getElementById('lblIA').textContent = CAMP.objetivo==='VENTA' ? 'evaluar riesgo del prospecto' : 'evaluar probabilidad de no pago';
+  document.getElementById('chkIA').checked = !!CAMP.analizar_ia;
+  document.getElementById('mTexto').value = CAMP.texto || '';
+  document.getElementById('mAsunto').value = CAMP.asunto || '';
+  document.getElementById('mTitulo').value = CAMP.titulo || '';
+  document.getElementById('mColor').value = CAMP.color_titulo || '#0141A2';
+  if (CAMP.remitente) document.getElementById('mRemitente').value = CAMP.remitente;
+  setTpl(CAMP.plantilla || 'banner', true);
+  setOrigen(CAMP.origen_data || 'MANUAL', true);
+  document.getElementById('paramCob').style.display = CAMP.objetivo==='COBRANZA' ? '' : 'none';
+  document.getElementById('paramVta').style.display = CAMP.objetivo==='VENTA' ? '' : 'none';
+  // marcar deciles/regiones
+  document.querySelectorAll('.pill.decil').forEach(p => p.classList.toggle('on', deciles.includes(Number(p.dataset.d))));
+  document.querySelectorAll('[data-reg]').forEach(p => p.classList.toggle('on', regionesEx.includes(Number(p.dataset.reg))));
+  if (CAMP.estado !== 'BORRADOR') bloquear();
+  pintarCampos(); cargarPreview();
+}
+function bloquear(){
+  document.querySelectorAll('input,select,textarea,.pill').forEach(e => e.disabled = true);
+  document.getElementById('btnEnviar').textContent = 'Campaña ya enviada — ver resultados en la bandeja';
+  document.getElementById('btnEnviar').onclick = () => location='/campanas-masivas/';
+}
+
+/* campos variables */
+function pintarCampos(){
+  const box = document.getElementById('pillsCampos');
+  box.innerHTML = CAT.campos.map(c =>
+    `<span class="pill ${camposSel.includes(c.key)?'on':''}" onclick="togCampo('${c.key}')">${c.label}</span>`).join('');
+  document.getElementById('cntCampos').textContent = `${camposSel.length} de 10 seleccionados`;
+  const vb = k => camposSel.map(x => `<button class="varbtn" onclick="insertar('${k}','{{${x}}}')">{{${x}}}</button>`).join('');
+  document.getElementById('varsTexto').innerHTML = vb('mTexto');
+  document.getElementById('varsAsunto').innerHTML = vb('mAsunto');
+}
+function togCampo(k){
+  if (CAMP && CAMP.estado!=='BORRADOR') return;
+  const i = camposSel.indexOf(k);
+  if (i>=0) camposSel.splice(i,1);
+  else { if (camposSel.length>=10) return alert('Máximo 10 campos variables'); camposSel.push(k); }
+  pintarCampos(); marcarSucio();
+}
+function togDecil(d, el){ if (CAMP && CAMP.estado!=='BORRADOR') return; const i=deciles.indexOf(d); i>=0?deciles.splice(i,1):deciles.push(d); el.classList.toggle('on'); marcarSucio(); }
+function togReg(id, el){ if (CAMP && CAMP.estado!=='BORRADOR') return; const i=regionesEx.indexOf(id); i>=0?regionesEx.splice(i,1):regionesEx.push(id); el.classList.toggle('on'); marcarSucio(); }
+
+function setTpl(t, soloUI){
+  document.querySelectorAll('.tpl .opt').forEach(o => o.classList.toggle('on', o.dataset.t===t));
+  document.getElementById('rowTitulo').style.display = t==='titulo' ? '' : 'none';
+  if (!soloUI) marcarSucio();
+  window._tpl = t;
+}
+function setOrigen(o, soloUI){
+  window._origen = o;
+  document.getElementById('odMANUAL').classList.toggle('on', o==='MANUAL');
+  document.getElementById('odPARAMETROS').classList.toggle('on', o==='PARAMETROS');
+  document.getElementById('zonaManual').style.display = o==='MANUAL' ? '' : 'none';
+  document.getElementById('zonaParam').style.display = o==='PARAMETROS' ? '' : 'none';
+  if (!soloUI) marcarSucio();
+}
+function insertar(id, txt){
+  const el = document.getElementById(id);
+  const p = el.selectionStart ?? el.value.length;
+  el.value = el.value.slice(0,p) + txt + el.value.slice(el.selectionEnd ?? p);
+  el.focus(); el.selectionStart = el.selectionEnd = p + txt.length;
+  marcarSucio();
+}
+function toggleEmojis(id){ document.getElementById('emo_'+id).classList.toggle('open'); }
+let sucio = false;
+function marcarSucio(){ sucio = true; document.getElementById('msgGuardar').textContent=''; }
+
+async function guardar(){
+  if (!ID) return;
+  const body = {
+    origen_data: window._origen || 'MANUAL',
+    campos: camposSel, texto: document.getElementById('mTexto').value,
+    asunto: document.getElementById('mAsunto').value, remitente: document.getElementById('mRemitente').value,
+    plantilla: window._tpl || 'banner', titulo: document.getElementById('mTitulo').value,
+    color_titulo: document.getElementById('mColor').value,
+    deciles_control: deciles, excluir_regiones: regionesEx,
+    analizar_ia: document.getElementById('chkIA').checked,
+  };
+  const r = await fetch(`/api/campanas-masivas/${ID}`, { method:'PUT', headers: hdrs(1), body: JSON.stringify(body) });
+  const j = await r.json();
+  document.getElementById('msgGuardar').textContent = j.success ? '✔ Guardado' : ('Error: '+j.error);
+  sucio = false;
+  cargarPreview();
+}
+
+/* ── Plantilla y carga CSV ── */
+function headersPlantilla(){
+  const extra = CANAL==='MAIL' ? ['email'] : ['telefono'];
+  return [...new Set([...extra, ...(CANAL==='MAIL'?['telefono']:['email']), ...camposSel])];
+}
+function descargarPlantilla(){
+  const hs = headersPlantilla();
+  const ejemplo = hs.map(h => (CAT.campos.find(c=>c.key===h)||{}).ejemplo || (h==='email'?'cliente@correo.cl':h==='telefono'?'+56 9 1234 5678':''));
+  const csv = '﻿' + hs.join(';') + '\r\n' + ejemplo.join(';');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = `plantilla_${CAMP?CAMP.correlativo:'campana'}.csv`; a.click();
+}
+function subirCSV(inp){
+  const f = inp.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const lineas = String(rd.result).replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim());
+    if (lineas.length < 2) return alert('El archivo no trae filas de datos');
+    const sep = lineas[0].includes(';') ? ';' : ',';
+    const hs = lineas[0].split(sep).map(h => h.trim().toLowerCase().replace(/"/g,''));
+    // acepta key o label
+    const mapa = hs.map(h => {
+      const porKey = CAT.campos.find(c=>c.key===h); if (porKey) return porKey.key;
+      const porLabel = CAT.campos.find(c=>c.label.toLowerCase()===h); if (porLabel) return porLabel.key;
+      if (['email','correo','mail'].includes(h)) return 'email';
+      if (['telefono','teléfono','fono','celular'].includes(h)) return 'telefono';
+      return null;
+    });
+    const filas = lineas.slice(1).map(l => {
+      const vals = l.split(sep).map(v => v.trim().replace(/^"|"$/g,''));
+      const o = {}; mapa.forEach((k,i) => { if (k) o[k] = vals[i] ?? null; });
+      return o;
+    }).filter(o => Object.values(o).some(v=>v));
+    const r = await fetch(`/api/campanas-masivas/${ID}/destinatarios`, { method:'POST', headers: hdrs(1), body: JSON.stringify({ filas }) });
+    const j = await r.json();
+    document.getElementById('msgCarga').textContent = j.success ? `✔ ${j.data.cargados} destinatarios cargados (${j.data.control} en grupo control)` : ('Error: '+j.error);
+    cargarPreview();
+  };
+  rd.readAsText(f, 'utf-8');
+  inp.value = '';
+}
+
+async function generarBD(){
+  if (sucio) await guardar();
+  const o = CAMP.objetivo;
+  const p = o==='COBRANZA'
+    ? { mora_min:+pMoraMin.value||1, mora_max:+pMoraMax.value||90, capital_min:+pCapMin.value||0 }
+    : { termino_min:+pTerMin.value||0, termino_max:+pTerMax.value||6, renta_min:+pRentaMin.value||0 };
+  const r = await fetch(`/api/campanas-masivas/${ID}/generar-desde-bd`, { method:'POST', headers: hdrs(1), body: JSON.stringify(p) });
+  const j = await r.json();
+  document.getElementById('msgBD').textContent = j.success ? `✔ ${j.data.cargados} destinatarios desde la BD (${j.data.control} en control)` : ('Error: '+j.error);
+  cargarPreview();
+}
+
+/* ── Mail merge preview ── */
+async function cargarPreview(){
+  if (!ID) return;
+  const r = await fetch(`/api/campanas-masivas/${ID}/preview?i=${mergeI}`, { headers: hdrs() });
+  const j = await r.json(); if (!j.success) return;
+  const d = j.data;
+  mergeTotal = d.total || 0;
+  if (!mergeTotal) { document.getElementById('mergePos').textContent = '0 / 0'; return; }
+  mergeI = d.i;
+  document.getElementById('mergePos').textContent = `${d.i+1} / ${d.total}`;
+  document.getElementById('mergeQuien').textContent = `${d.destinatario.nombre||''} ${d.destinatario.ap_paterno||''} · ${d.destinatario.rut||''} · ${CANAL==='MAIL'?(d.destinatario.email||'sin email'):(d.destinatario.telefono||'sin teléfono')}`;
+  const pa = document.getElementById('prevAsunto');
+  if (CANAL==='MAIL') { pa.style.display=''; pa.innerHTML = `<i class="bi bi-envelope me-1"></i>Asunto: ${d.asunto||'<i style="color:#9ca3af">sin asunto</i>'}`; }
+  document.getElementById('prevBox').innerHTML = CANAL==='MAIL'
+    ? d.html
+    : `<div class="wsp-bubble">${(d.texto||'').replace(/</g,'&lt;')}</div>`;
+}
+function mergeNav(dir){ mergeI = Math.max(0, Math.min(mergeTotal-1, mergeI+dir)); cargarPreview(); }
+
+/* ── Envío por lotes ── */
+async function enviar(){
+  if (sucio) await guardar();
+  if (!confirm('¿Enviar la campaña ahora a todos los destinatarios del grupo CAMPAÑA?')) return;
+  const msg = document.getElementById('msgEnvio');
+  document.getElementById('btnEnviar').disabled = true;
+  let tot = 0, err = 0;
+  try {
+    while (true) {
+      const r = await fetch(`/api/campanas-masivas/${ID}/enviar`, { method:'POST', headers: hdrs() });
+      const j = await r.json();
+      if (!j.success) { msg.textContent = 'Error: '+j.error; msg.style.color='#dc2626'; return; }
+      tot += j.data.enviados; err += (j.data.errores||0);
+      msg.textContent = `Enviando… ${tot} ok, ${err} con error, quedan ${j.data.pendientes}`;
+      msg.style.color = '#0141A2';
+      if (j.data.fin) break;
+    }
+    msg.textContent = `✔ Campaña enviada: ${tot} mensajes (${err} con error). Revisa los resultados en la bandeja.`;
+    msg.style.color = '#16a34a';
+    setTimeout(() => location='/campanas-masivas/', 2500);
+  } finally { document.getElementById('btnEnviar').disabled = false; }
+}
+
+const safe = v => { try { return typeof v==='string' ? JSON.parse(v) : v; } catch { return null; } };
+init();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

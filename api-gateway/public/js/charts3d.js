@@ -206,6 +206,58 @@
     el.appendChild(svg);
   }
 
+  /* ── Líneas (conversión por día, comparación de series) ───────────── */
+  function line(el, series, opts = {}) {
+    el.innerHTML = '';
+    series = (series || []).filter(s => s.points && s.points.length);
+    if (!series.length) { el.innerHTML = '<div style="color:#9ca3af;font-size:.85rem;text-align:center;padding:30px">Sin datos</div>'; return; }
+    const fmt = opts.fmt || (v => String(v));
+    const W = opts.width || 720, H = opts.height || 280;
+    const padL = 46, padR = 16, padT = 18, padB = 34;
+    const xs = series.flatMap(s => s.points.map(p => p.x));
+    const ys = series.flatMap(s => s.points.map(p => p.y));
+    const xMin = Math.min(...xs), xMax = Math.max(...xs, xMin + 1);
+    const yMax = Math.max(...ys, 1) * 1.12;
+    const X = x => padL + (x - xMin) / (xMax - xMin) * (W - padL - padR);
+    const Y = y => H - padB - (y / yMax) * (H - padT - padB);
+    const svg = $s('svg', { viewBox: `0 0 ${W} ${H}`, style: 'width:100%;height:auto;display:block' });
+    for (let g = 0; g <= 4; g++) {
+      const yv = yMax * g / 4, y = Y(yv);
+      svg.appendChild($s('line', { x1: padL, y1: y, x2: W - padR, y2: y, stroke: g ? '#eef2f7' : '#cbd5e1', 'stroke-width': g ? 1 : 1.5 }));
+      const t = $s('text', { x: padL - 6, y: y + 4, 'text-anchor': 'end', 'font-size': 9.5, fill: '#94a3b8' });
+      t.textContent = fmt(Math.round(yv * 10) / 10);
+      svg.appendChild(t);
+    }
+    for (let x = Math.ceil(xMin); x <= xMax; x += Math.max(1, Math.ceil((xMax - xMin) / 12))) {
+      const t = $s('text', { x: X(x), y: H - padB + 16, 'text-anchor': 'middle', 'font-size': 9.5, fill: '#94a3b8' });
+      t.textContent = (opts.xPrefix || '') + x;
+      svg.appendChild(t);
+    }
+    series.forEach((s, i) => {
+      const color = s.color || PALETTE[i % PALETTE.length];
+      const pts = [...s.points].sort((a, b) => a.x - b.x);
+      const d = pts.map((p, j) => `${j ? 'L' : 'M'} ${X(p.x)} ${Y(p.y)}`).join(' ');
+      if (opts.area !== false) {
+        svg.appendChild($s('path', { d: `${d} L ${X(pts[pts.length - 1].x)} ${Y(0)} L ${X(pts[0].x)} ${Y(0)} Z`, fill: color, opacity: 0.08 }));
+      }
+      svg.appendChild($s('path', { d, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+      for (const p of pts) {
+        const c = $s('circle', { cx: X(p.x), cy: Y(p.y), r: 3.6, fill: '#fff', stroke: color, 'stroke-width': 2.5 });
+        const ti = document.createElementNS(NS, 'title');
+        ti.textContent = `${s.label} · ${(opts.xPrefix || 'día ')}${p.x}: ${fmt(p.y)}`;
+        c.appendChild(ti);
+        svg.appendChild(c);
+      }
+      // leyenda
+      const ly = padT + i * 16;
+      svg.appendChild($s('rect', { x: W - padR - 130, y: ly - 8, width: 10, height: 10, rx: 2, fill: color }));
+      const tl = $s('text', { x: W - padR - 116, y: ly + 1, 'font-size': 10.5, fill: '#334155', 'font-weight': 600 });
+      tl.textContent = s.label;
+      svg.appendChild(tl);
+    });
+    el.appendChild(svg);
+  }
+
   function shortNum(v) {
     v = Number(v || 0);
     if (Math.abs(v) >= 1e9) return (v / 1e9).toLocaleString('es-CL', { maximumFractionDigits: 1 }) + 'MM';
@@ -214,5 +266,5 @@
     return nfmt(v);
   }
 
-  window.AF3D = { pie, bars, hbars, shortNum, PALETTE };
+  window.AF3D = { pie, bars, hbars, line, shortNum, PALETTE };
 })();
