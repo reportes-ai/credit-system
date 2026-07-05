@@ -537,10 +537,130 @@ exports.mensajes = async (req, res) => {
     const emailAsunto = rellenar(cfg.texto_email_asunto, vars);
     const emailCuerpo = rellenar(cfg.texto_email, vars);
 
-    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono, emailCliente: email });
+    // WhatsApp SOLO puede salir con plantillas HSM APROBADAS por Meta (tipo Cobranza),
+    // rendereadas con los datos de este crédito
+    let plantillasWsp = [];
+    try { plantillasWsp = await plantillasWspParaCredito(credito); } catch (e) { plantillasWsp = []; }
+
+    ok(res, { whatsapp, sms, email: { asunto: emailAsunto, cuerpo: emailCuerpo }, telefono, emailCliente: email, plantillasWsp });
   } catch (err) {
     fail(res, err.message, 500);
   }
+};
+
+// ─── Plantillas Meta aprobadas (tipo COBRANZA) rendereadas con los datos del crédito ──
+async function plantillasWspParaCredito(credito) {
+  const token = process.env.WSP_TOKEN;
+  if (!token) return [];
+  const auto = require('../../../whatsapp/src/automatizacion-cobranza');
+  const [[w]] = await pool.query('SELECT waba_id FROM wsp_config LIMIT 1');
+  const r = await fetch(`https://graph.facebook.com/v21.0/${w?.waba_id || '1044493808034066'}/message_templates?limit=100&fields=name,status,components`, {
+    headers: { Authorization: 'Bearer ' + token } });
+  const j = await r.json().catch(() => ({}));
+  const metaByName = {}; (j.data || []).forEach(t => { metaByName[t.name] = t; });
+  const [tipos] = await pool.query("SELECT * FROM wsp_plantillas_tipo WHERE tipo='COBRANZA'");
+  const datos = {
+    nombre: titleCase(credito.nombre_cliente || 'Cliente'), rut: credito.rut_cliente,
+    dias_mora: Number(credito.dias_mora) || 0, cuotas_mora: Number(credito.cuotas_mora) || 0,
+    monto_mora: Math.round(Number(credito.monto_mora) || 0),
+    saldo_insoluto: Math.round(Number(credito.saldo_insoluto) || 0), num_op: credito.num_op,
+  };
+  const out = [];
+  for (const t of tipos) {
+    const m = metaByName[t.nombre_plantilla];
+    if (!m || m.status !== 'APPROVED') continue;
+    let body = (m.components || []).find(c => c.type === 'BODY')?.text || '';
+    const mapa = Array.isArray(t.mapa_variables) ? t.mapa_variables : [];
+    const params = mapa.map(campo => (auto.CAMPOS[campo] ? auto.CAMPOS[campo](datos) : ''));
+    params.forEach((v, i) => { body = body.split(`{{${i + 1}}}`).join(v); });
+    out.push({ nombre: t.nombre_plantilla, orden: t.orden, texto: body, params });
+  }
+  return out.sort((a, b) => (a.orden || 99) - (b.orden || 99));
+}
+
+// ─── enviarMensaje: envío REAL de WhatsApp (plantilla Meta) o Email desde el drawer ──
+// Registra la gestión en la bitácora (canal REMOTA) respetando horario legal y cupo semanal.
+exports.enviarMensaje = async (req, res) => {
+  try {
+    const { id_credito } = req.params;
+    const { canal, plantilla } = req.body || {};
+    const [[credito]] = await pool.query(MORA_CREDITO_SQL, [id_credito, id_credito]);
+    if (!credito) return fail(res, 'Crédito no encontrado', 404);
+
+    // Ley 21.320 (horario) + Ley del Consumidor (cupo remoto semanal)
+    const { motivoFueraHorario, creditosSinCupoRemota } = require('../../../../shared/horario-cobranza');
+    const motivo = motivoFueraHorario();
+    if (motivo) return fail(res, `Horario legal de cobranza (Ley 21.320): ${motivo}. Permitido L-S hábiles 8:00-20:00.`, 400);
+    const sinCupo = await creditosSinCupoRemota([Number(id_credito)]);
+    if (sinCupo.has(Number(id_credito))) return fail(res, 'Este crédito ya usó sus 2 gestiones remotas de la semana, o la última fue hace menos de 2 días (Ley del Consumidor).', 400);
+
+    const u = req.usuario || {};
+    const nombre_usuario = [u.nombre, u.apellido].filter(Boolean).join(' ') || 'Usuario';
+    let mensajeTxt = '', tipo = '', wamid = null, telNorm = null;
+
+    if (canal === 'WHATSAPP') {
+      let devMode = false;
+      try { devMode = !!(await require('../../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
+      if (devMode) return fail(res, 'Modo Desarrollo activo: este WhatsApp saldría al cliente REAL. Para probar usa "Enviar prueba" en el mantenedor.', 400);
+      const auto = require('../../../whatsapp/src/automatizacion-cobranza');
+      telNorm = auto.normTel(credito.telefono_movil);
+      if (!telNorm) return fail(res, 'El cliente no tiene teléfono móvil válido (guárdalo en Contacto)', 400);
+      const pls = await plantillasWspParaCredito(credito);
+      const pl = pls.find(p => p.nombre === plantilla);
+      if (!pl) return fail(res, 'Plantilla no disponible o no APROBADA por Meta', 400);
+      const resp = await fetch(`https://graph.facebook.com/v21.0/${process.env.WSP_PHONE_ID}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.WSP_TOKEN}` },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp', to: telNorm, type: 'template',
+          template: { name: pl.nombre, language: { code: 'es' },
+            ...(pl.params.length ? { components: [{ type: 'body', parameters: pl.params.map(t => ({ type: 'text', text: String(t) })) }] } : {}) },
+        }),
+      });
+      const jw = await resp.json().catch(() => ({}));
+      if (!resp.ok) return fail(res, jw.error?.message || `Error de Meta (HTTP ${resp.status})`, 500);
+      wamid = jw.messages?.[0]?.id || null;
+      mensajeTxt = `[Plantilla ${pl.nombre}] ${pl.texto}`;
+      tipo = 'WHATSAPP';
+    } else if (canal === 'EMAIL') {
+      const email = credito.email_cliente;
+      if (!email) return fail(res, 'El cliente no tiene email registrado (guárdalo en Contacto)', 400);
+      const cfg2 = await getCobranzaConfig();
+      const vars2 = {
+        trato: tratamiento(credito.sexo_cliente), nombre: titleCase(credito.nombre_cliente || 'Cliente'),
+        numero: credito.numero_credito || credito.id_credito, dias: Number(credito.dias_mora) || 0,
+        cuotas: Number(credito.cuotas_mora) || 0,
+        monto: Math.round(Number(credito.monto_mora || 0)).toLocaleString('es-CL'),
+        datos: cfg2.datos_transferencia,
+      };
+      const asunto = rellenar(cfg2.texto_email_asunto, vars2);
+      const cuerpo = rellenar(cfg2.texto_email, vars2);
+      const { enviarCorreo, remitenteCobranza } = require('../../../../shared/mailer');
+      const rMail = await enviarCorreo({ to: email, from: remitenteCobranza(), subject: asunto, text: cuerpo,
+        html: `<pre style="font-family:Segoe UI,Arial,sans-serif;white-space:pre-wrap;font-size:14px;line-height:1.6">${cuerpo.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))}</pre>` });
+      if (!rMail.ok) return fail(res, rMail.error || 'No se pudo enviar el correo', 500);
+      mensajeTxt = asunto + '\n\n' + cuerpo;
+      tipo = 'EMAIL';
+    } else return fail(res, 'Canal inválido (WHATSAPP o EMAIL)', 400);
+
+    const [ins] = await pool.query(`
+      INSERT INTO cobranza_gestiones
+        (id_credito, numero_credito, rut_cliente, nombre_cliente, tipo_gestion, canal,
+         dias_mora, cuotas_mora, monto_mora, mensaje, resultado, confirmado, id_usuario, nombre_usuario)
+      VALUES (?,?,?,?,?,'REMOTA',?,?,?,?,'ENVIADO',1,?,?)`,
+      [id_credito, credito.numero_credito, credito.rut_cliente, credito.nombre_cliente, tipo,
+       Number(credito.dias_mora) || 0, Number(credito.cuotas_mora) || 0, Math.round(Number(credito.monto_mora || 0)),
+       mensajeTxt.slice(0, 4000), u.id_usuario || 0, nombre_usuario]);
+
+    // WhatsApp: registrar el wamid para que el webhook de Meta suba el resultado a ENTREGADO/LEIDO
+    if (wamid) {
+      await pool.query(`
+        INSERT INTO wsp_auto_cobranza_envios (id_credito, rut, nombre, telefono, nombre_plantilla, orden_enviado, wamid, id_crm_gestion, estado)
+        VALUES (?,?,?,?,?,0,?,?,'ENVIADO')`,
+        [id_credito, credito.rut_cliente, credito.nombre_cliente, telNorm, plantilla, wamid, ins.insertId]).catch(() => {});
+    }
+    ok(res, { enviado: true, canal: tipo });
+  } catch (err) { fail(res, err.message, 500); }
 };
 
 // ─── guardarContacto ──────────────────────────────────────────────────────────

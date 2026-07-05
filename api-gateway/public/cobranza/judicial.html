@@ -465,8 +465,12 @@ function renderAcciones() {
         <button class="btn-action btn-email" onclick="mostrarMensaje('email')" ${!puedeRemota?'disabled':''}><i class="bi bi-envelope-fill"></i>Email</button>
       </div>
       <div id="mensajePanel" style="display:none">
+        <div id="msgPlantillas" style="display:none;margin-bottom:8px"></div>
         <div class="msg-box" id="msgTexto"></div>
-        <button class="btn-action" style="background:#e2e8f0;color:#1e293b;margin-top:8px" onclick="copiarMensaje()"><i class="bi bi-clipboard"></i>Copiar y confirmar envío</button>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-action" style="background:#e2e8f0;color:#1e293b;flex:1" onclick="copiarMensaje()"><i class="bi bi-clipboard"></i>Copiar y confirmar envío</button>
+          <button class="btn-action" id="btnEnviarMsg" style="background:#16a34a;color:#fff;flex:1;display:none" onclick="enviarMensajeReal()"><i class="bi bi-send me-1"></i>Enviar</button>
+        </div>
       </div>`;
     if (!puedeRemota && d) {
       html += `<div class="text-muted" style="font-size:0.8rem"><i class="bi bi-clock me-1"></i>Próxima: ${d.proxima_remota_disponible}</div>`;
@@ -476,6 +480,36 @@ function renderAcciones() {
   }
 
   document.getElementById('accionesContent').innerHTML = html;
+}
+
+
+let plantillaWspSel = '';
+function elegirPlantillaWsp(sel){
+  const m = mensajesActual;
+  const pl = (m.plantillasWsp||[]).find(p=>p.nombre===sel.value);
+  plantillaWspSel = pl ? pl.nombre : '';
+  document.getElementById('msgTexto').textContent = pl ? pl.texto : '';
+}
+async function enviarMensajeReal(){
+  if (!creditoActual) return;
+  const canal = tipoMensajeActual.toUpperCase();
+  if (canal === 'WHATSAPP' && !plantillaWspSel) { alert('Elige una plantilla aprobada'); return; }
+  const destino = canal === 'WHATSAPP' ? (mensajesActual.telefono||'') : (mensajesActual.emailCliente||'');
+  if (!confirm(`Enviar ${canal} REAL al cliente (${destino}).\nQuedara registrado como gestion remota de la semana.\n\nContinuar?`)) return;
+  const btn = document.getElementById('btnEnviarMsg');
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Enviando...';
+  try {
+    const r = await fetch(`/api/cobranza/enviar/${creditoActual.id_credito}`, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ canal, plantilla: plantillaWspSel || undefined }),
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Enviado y registrado';
+    btn.style.background = '#15803d';
+    cargarDisponibilidad(creditoActual.id_credito);
+  } catch(e){ alert('Error: '+e.message); btn.disabled=false; btn.innerHTML=orig; }
 }
 
 function copiarVal(id) {
@@ -510,8 +544,34 @@ function mostrarMensaje(tipo) {
   tipoMensajeActual = tipo;
   const m = mensajesActual;
   if (!m) return;
-  let txt = tipo === 'whatsapp' ? m.whatsapp : tipo === 'sms' ? m.sms : m.email.asunto + '\n\n' + m.email.cuerpo;
-  document.getElementById('msgTexto').textContent = txt;
+  const selBox = document.getElementById('msgPlantillas');
+  const btnEnv = document.getElementById('btnEnviarMsg');
+  selBox.style.display = 'none'; selBox.innerHTML = ''; plantillaWspSel = '';
+  if (tipo === 'whatsapp') {
+    const pls = m.plantillasWsp || [];
+    if (pls.length) {
+      // Solo textos APROBADOS por Meta: se elige la plantilla y se puede ENVIAR directo
+      selBox.style.display = '';
+      selBox.innerHTML = `<label style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase">Plantilla aprobada por Meta</label>
+        <select class="form-select" onchange="elegirPlantillaWsp(this)">${pls.map(p=>`<option value="${p.nombre}">${p.orden?('N\u00b0'+p.orden+' \u2014 '):''}${p.nombre}</option>`).join('')}</select>`;
+      plantillaWspSel = pls[0].nombre;
+      document.getElementById('msgTexto').textContent = pls[0].texto;
+      btnEnv.style.display = '';
+    } else {
+      document.getElementById('msgTexto').textContent = m.whatsapp;
+      btnEnv.style.display = 'none';
+      selBox.style.display = '';
+      selBox.innerHTML = '<div style="font-size:.74rem;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:6px 10px">Sin plantillas HSM aprobadas por Meta: solo puedes copiar el texto y enviarlo a mano. Config: Mantenedores \u2192 Automatizaciones de Cobranza.</div>';
+    }
+  } else if (tipo === 'sms') {
+    document.getElementById('msgTexto').textContent = m.sms;
+    btnEnv.style.display = 'none';
+  } else {
+    document.getElementById('msgTexto').textContent = m.email.asunto + '\n\n' + m.email.cuerpo;
+    btnEnv.style.display = '';
+  }
+  btnEnv.disabled = false; btnEnv.style.background = '#16a34a';
+  btnEnv.innerHTML = '<i class="bi bi-send me-1"></i>Enviar';
   document.getElementById('mensajePanel').style.display = '';
 }
 

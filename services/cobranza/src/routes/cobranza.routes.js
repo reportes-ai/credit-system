@@ -24,6 +24,7 @@ router.put('/gestiones/:id/confirmar',verifyToken, ctrl.confirmarGestion);
 // Rutas con parámetro al final
 router.get('/disponibilidad/:id_credito', verifyToken, ctrl.disponibilidad);
 router.get('/mensajes/:id_credito',       verifyToken, ctrl.mensajes);
+router.post('/enviar/:id_credito',        verifyToken, ctrl.enviarMensaje);
 router.put('/contacto/:id_credito',       verifyToken, ctrl.guardarContacto);
 router.get('/bitacora/:id_credito',       verifyToken, ctrl.bitacora);
 
