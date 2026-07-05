@@ -1,5 +1,8 @@
 # Plan: Separación Staging / Producción
 
+> **⏸️ AGENDADO (2026-07-04):** se ejecuta DESPUÉS de terminar las pruebas UAT
+> (docs/qa-plan-produccion.md). Hasta entonces se sigue trabajando directo en producción.
+
 > Objetivo: que `main` deje de ser "producción en vivo" y todo cambio pase por un ambiente
 > de prueba idéntico antes de llegar a los usuarios. Ejecutar en el orden indicado;
 > cada fase deja el sistema funcionando (sin big-bang).
