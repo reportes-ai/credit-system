@@ -23,4 +23,33 @@ function motivoFueraHorario(d = new Date()) {
   return null;
 }
 
-module.exports = { esHorarioLegalCobranza, motivoFueraHorario };
+/* ── Tope SEMANAL de gestiones por crédito (paramétrico) ──────────────────
+   cobranza_config.tope_gestiones_semana (0 = sin tope). Cuenta TODAS las
+   gestiones de la bitácora de cobranzas de los últimos 7 días (manuales +
+   automáticas, excluye SIMULADO porque nada llegó al cliente). Los motores
+   automáticos NO envían a un crédito que ya alcanzó el tope. */
+const pool = require('./config/database');
+let _tope = { valor: null, ts: 0 };
+async function topeSemanal() {
+  if (_tope.valor !== null && Date.now() - _tope.ts < 60000) return _tope.valor;
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM cobranza_config WHERE clave='tope_gestiones_semana' LIMIT 1");
+    _tope = { valor: Math.max(0, parseInt(r?.valor, 10) || 0), ts: Date.now() };
+  } catch (e) { _tope = { valor: 0, ts: Date.now() }; }
+  return _tope.valor;
+}
+
+// De un set de créditos, cuáles YA alcanzaron el tope semanal → Set(id_credito)
+async function creditosConTopeAlcanzado(ids) {
+  const tope = await topeSemanal();
+  if (!tope || !ids || !ids.length) return new Set();
+  try {
+    const [rows] = await pool.query(`
+      SELECT id_credito, COUNT(*) n FROM cobranza_gestiones
+      WHERE id_credito IN (?) AND created_at >= (NOW() - INTERVAL 7 DAY) AND resultado <> 'SIMULADO'
+      GROUP BY id_credito HAVING n >= ?`, [ids, tope]);
+    return new Set(rows.map(r => r.id_credito));
+  } catch (e) { return new Set(); }
+}
+
+module.exports = { esHorarioLegalCobranza, motivoFueraHorario, topeSemanal, creditosConTopeAlcanzado };

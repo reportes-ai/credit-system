@@ -127,10 +127,14 @@ async function candidatos() {
   const desde = Number(cfg.cobranza_auto_mora_desde ?? 1);
   const hasta = cfg.cobranza_auto_mora_hasta == null ? null : Number(cfg.cobranza_auto_mora_hasta);
   const montoMin = Number(cfg.cobranza_auto_monto_min || 0);
-  const universo = (await universoMora()).filter(c =>
+  let universo = (await universoMora()).filter(c =>
     c.dias_mora >= desde &&
     (hasta === null || c.dias_mora <= hasta) &&
     c.monto_mora >= montoMin);
+  // Tope semanal de gestiones por crédito (manuales + automáticas, Ley 21.320)
+  const { creditosConTopeAlcanzado } = require('../../../shared/horario-cobranza');
+  const enTope = await creditosConTopeAlcanzado(universo.map(c => c.id_credito));
+  universo = universo.filter(c => !enTope.has(c.id_credito));
   const hoy = hoyChile();
   const out = [];
   for (const c of universo) {

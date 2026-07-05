@@ -145,9 +145,13 @@ async function candidatos(dias) {
     ORDER BY cu.id_cuota`, [Number(dias) || 2]);
 
   const hoy = hoyChile();
+  // Tope semanal de gestiones por crédito (manuales + automáticas, Ley 21.320)
+  const { creditosConTopeAlcanzado } = require('../../../shared/horario-cobranza');
+  const enTope = await creditosConTopeAlcanzado(rows.map(r => r.id_credito));
   const { cobranzaFullMap } = require('../../creditos/src/controllers/pagos-credito.controller');
   const out = [];
   for (const c of rows) {
+    if (enTope.has(c.id_credito)) continue;
     // cuotas en mora del mismo crédito, valorizadas AL DÍA con el motor único
     const [vencidas] = await pool.query(`
       SELECT numero_cuota, valor_cuota monto_cuota, DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d') fecha_vencimiento
