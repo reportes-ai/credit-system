@@ -335,7 +335,7 @@ function renderTabla(rows) {
     const diasJudicial = Math.max(0, Number(r.dias_mora) - 90);
     return `
     <tr>
-      <td><a href="/reporteria/bitacora-credito/?q=${encodeURIComponent(r.numero_credito || r.rut_cliente || '')}" title="Ver bitácora completa del crédito" style="color:var(--navy);font-weight:600">${r.numero_credito || r.id_credito}</a></td>
+      <td><a href="#" onclick="abrirBitacora(${r.id_credito});return false" title="Ver historial de gestiones de cobranza" style="color:var(--navy);font-weight:600">${r.numero_credito || r.id_credito}</a></td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nombre_cliente || '—'}</td>
       <td>${r.rut_cliente || '—'}</td>
       <td style="text-align:center">${r.cuotas_mora || 0}</td>
@@ -381,6 +381,8 @@ function cerrarDrawer() {
   document.getElementById('drawerOverlay').style.display = 'none';
   creditoActual = null;
 }
+
+async function abrirBitacora(id_credito){ await abrirDrawer(id_credito); showTab('bitacora'); }
 
 function showTab(tab) {
   ['acciones','judicial','bitacora','provisiones'].forEach(t => {
