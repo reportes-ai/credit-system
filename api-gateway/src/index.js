@@ -19,6 +19,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); // HTTPS forzado 1 año
   next();
 });
 app.use(express.json({ limit: '10mb' }));
@@ -72,6 +73,20 @@ app.use(express.static(path.join(__dirname, '../public'), {
 // Favicon
 app.get('/favicon.ico', (req, res) =>
   res.sendFile(path.join(__dirname, '../public/img/favicon.png')));
+
+// Health check (monitoreo + Render): estado del server y ping a la BD
+app.get('/api/health', async (req, res) => {
+  let db = false;
+  try {
+    const pool = require('../../shared/config/database');
+    await Promise.race([
+      pool.query('SELECT 1'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+    ]);
+    db = true;
+  } catch (e) { /* db queda false */ }
+  res.status(db ? 200 : 503).json({ status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()) });
+});
 
 // Auth (login limitado a 10 intentos/min por IP — QA 15.5)
 const rateLimit = require('../../shared/rate-limit');

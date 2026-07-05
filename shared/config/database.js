@@ -18,6 +18,9 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  connectTimeout: 15000,        // conexión nueva: máx 15s (evita colgarse si TiDB no responde)
+  enableKeepAlive: true,        // detecta conexiones muertas tras reinicio de TiDB
+  keepAliveInitialDelay: 10000,
   ...(needsSSL && { ssl: { rejectUnauthorized: false } })
 });
 
