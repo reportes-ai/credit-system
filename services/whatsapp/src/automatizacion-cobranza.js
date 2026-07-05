@@ -51,6 +51,11 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
         INDEX idx_credito (id_credito),
         INDEX idx_wamid (wamid)
       )`);
+    // La bitácora de COBRANZAS acepta los resultados de los envíos automáticos
+    // (Enviado→Entregado→Leído vía webhook Meta) además de los de gestión manual
+    await pool.query(`ALTER TABLE cobranza_gestiones MODIFY resultado
+      ENUM('CONTACTADO','NO_CONTESTA','PROMESA_PAGO','RECHAZA_PAGO','NUMERO_ERRADO','SIN_RESULTADO',
+           'ENVIADO','ENTREGADO','LEIDO','SIMULADO') DEFAULT 'SIN_RESULTADO'`).catch(() => {});
     console.log('[automatizacion-cobranza] listo (nace desactivado)');
   } catch (e) { console.error('[automatizacion-cobranza migration]', e.message); }
 })();
@@ -181,18 +186,21 @@ async function correr({ real = false } = {}) {
         else err = j.error?.message || `HTTP ${resp.status}`;
       } catch (e) { err = e.message; }
     }
+    // Bitácora de COBRANZAS del crédito: la acción cuenta en el recuento semanal de
+    // gestiones permitidas (Ley 21.320), registrando el tipo de mensaje enviado.
     let idCrm = null;
     if (estado === 'ENVIADO' || estado === 'SIMULADO') {
       try {
         const [ins] = await pool.query(`
-          INSERT INTO crm_gestiones (tipo_cliente, rut_cliente, nombre_cliente, telefono, canal, tipo_solicitud,
-            descripcion, resultado, id_usuario, nombre_usuario, estado)
-          VALUES ('PERSONA', ?, ?, ?, 'WHATSAPP', 'AUTOMATIZACION COBRANZA', ?, ?, NULL, 'Business Suite (automático)', 'CERRADA')`,
-          [c.rut, c.nombre, c.telefono_norm,
-           `Mensaje automático N°${c.orden_enviado} (${c.nombre_plantilla}) — ${c.dias_mora} día(s) de mora, ${CLP(c.monto_mora)}`,
+          INSERT INTO cobranza_gestiones (id_credito, numero_credito, rut_cliente, nombre_cliente,
+            tipo_gestion, canal, dias_mora, cuotas_mora, monto_mora, mensaje, resultado, id_usuario, nombre_usuario)
+          VALUES (?, ?, ?, ?, 'WHATSAPP', 'REMOTA', ?, ?, ?, ?, ?, 0, 'Business Suite (automático)')`,
+          [c.id_credito, String(c.num_op || ''), c.rut, c.nombre,
+           c.dias_mora, c.cuotas_mora, c.monto_mora,
+           `Mensaje automático N°${c.orden_enviado} — plantilla "${c.nombre_plantilla}" (${c.dias_mora} día(s) de mora, ${CLP(c.monto_mora)})`,
            estado === 'SIMULADO' ? 'SIMULADO' : 'ENVIADO']);
         idCrm = ins.insertId;
-      } catch (e) { console.error('[auto-cobranza crm]', e.message); }
+      } catch (e) { console.error('[auto-cobranza bitacora]', e.message); }
     }
     await pool.query(`
       INSERT INTO wsp_auto_cobranza_envios (id_credito, rut, nombre, telefono, nombre_plantilla, orden_enviado, wamid, id_crm_gestion, estado, error_msg)
@@ -212,7 +220,7 @@ async function marcarEstado(wamid, status) {
     if (!row) return;
     if (row.estado === 'LEIDO') return; // estado final, no retrocede
     await pool.query('UPDATE wsp_auto_cobranza_envios SET estado=? WHERE id=?', [estado, row.id]);
-    if (row.id_crm_gestion) await pool.query('UPDATE crm_gestiones SET resultado=? WHERE id=?', [estado, row.id_crm_gestion]);
+    if (row.id_crm_gestion) await pool.query('UPDATE cobranza_gestiones SET resultado=? WHERE id_gestion=?', [estado, row.id_crm_gestion]);
   } catch (e) { console.error('[auto-cobranza estado]', e.message); }
 }
 

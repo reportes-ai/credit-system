@@ -229,16 +229,17 @@ async function correr({ real = false } = {}) {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [c.id_cuota, c.id_credito, c.rut, c.nombre, c.telefono_norm || c.telefono, c.numero_cuota, c.fecha_vencimiento,
        c.valor_cuota, c.cuotas_impagas, c.monto_impagas, c.total_hoy, c.plantilla, estado, err && String(err).slice(0, 290)]);
+    // Bitácora de COBRANZAS del crédito (cuenta en el recuento semanal de gestiones,
+    // Ley 21.320) con el tipo de mensaje enviado (aviso simple o con mora).
     if (estado === 'ENVIADO') {
       try {
         await pool.query(`
-          INSERT INTO crm_gestiones (tipo_cliente, rut_cliente, nombre_cliente, telefono, canal, tipo_solicitud,
-            descripcion, resultado, id_usuario, nombre_usuario, estado)
-          VALUES ('PERSONA', ?, ?, ?, 'WHATSAPP', 'AVISO VENCIMIENTO',
-            ?, 'ENVIADO', NULL, 'Business Suite (automático)', 'CERRADA')`,
-          [c.rut, c.nombre, c.telefono_norm,
-           `Aviso automático: cuota N°${c.numero_cuota} vence el ${c.fecha_texto} (${CLP(c.valor_cuota)})${c.con_mora ? ` + ${c.cuotas_impagas} impaga(s) ${CLP(c.monto_impagas)}` : ''}`]);
-      } catch (e) { console.error('[aviso-venc crm]', e.message); }
+          INSERT INTO cobranza_gestiones (id_credito, rut_cliente, nombre_cliente,
+            tipo_gestion, canal, cuotas_mora, monto_mora, mensaje, resultado, id_usuario, nombre_usuario)
+          VALUES (?, ?, ?, 'WHATSAPP', 'REMOTA', ?, ?, ?, 'ENVIADO', 0, 'Business Suite (automático)')`,
+          [c.id_credito, c.rut, c.nombre, c.cuotas_impagas, c.monto_impagas,
+           `Aviso de vencimiento automático — plantilla "${c.plantilla}": cuota N°${c.numero_cuota} vence el ${c.fecha_texto} (${CLP(c.valor_cuota)})${c.con_mora ? ` + ${c.cuotas_impagas} impaga(s) ${CLP(c.monto_impagas)}` : ''}`]);
+      } catch (e) { console.error('[aviso-venc bitacora]', e.message); }
     }
     resultados.push({ id_cuota: c.id_cuota, nombre: c.nombre, estado, error: err });
   }

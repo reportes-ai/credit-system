@@ -79,7 +79,7 @@
     <i class="bi bi-envelope-heart"></i>
     <div>
       <h2>Automatizaciones de Cobranza</h2>
-      <p>Mensajes automáticos al cliente en mora por <b>Correo</b> (plantillas por tramo de días) y por <b>WhatsApp</b> (secuencia numerada de plantillas Meta — nunca repite el mismo mensaje). Toda gestión queda registrada en la <b>bitácora del cliente</b> (CRM) con su resultado.</p>
+      <p>Mensajes automáticos al cliente en mora por <b>Correo</b> (plantillas por tramo de días) y por <b>WhatsApp</b> (secuencia numerada de plantillas Meta — nunca repite el mismo mensaje). Toda gestión queda registrada en la <b>bitácora de cobranzas</b> del crédito con su resultado — y cuenta en el recuento semanal de gestiones permitidas (Ley 21.320).</p>
     </div>
   </div>
 
@@ -109,7 +109,7 @@
       <div><label>Máx. correos por corrida</label><input type="number" id="mMax" min="1" max="2000"></div>
       <div><label>Pausa entre correos (seg)</label><input type="number" id="mPausa" min="0" max="120"></div>
     </div>
-    <p class="muted" style="margin:8px 0 0">La corrida es 1 vez al día (a la hora/días indicados). Los correos salen espaciados según la pausa (ej. 5 s × 200 ≈ 17 min). Cada envío queda en la bitácora del cliente (CRM).</p>
+    <p class="muted" style="margin:8px 0 0">La corrida es 1 vez al día (a la hora/días indicados). Los correos salen espaciados según la pausa (ej. 5 s × 200 ≈ 17 min). Cada envío queda en la bitácora de cobranzas del crédito (cuenta en el recuento semanal de gestiones).</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
       <button class="btn-af" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
       <button class="btn-run" onclick="correr(false)"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
@@ -128,7 +128,7 @@
   <!-- Historial mail -->
   <div class="card-af">
     <h3><i class="bi bi-clock-history"></i> Historial de correos enviados</h3>
-    <p class="muted" style="margin:0 0 10px">Últimos 60. Cada envío exitoso también quedó como gestión en la bitácora del cliente (CRM).</p>
+    <p class="muted" style="margin:0 0 10px">Últimos 60. Cada envío exitoso también quedó como gestión en la bitácora de cobranzas del crédito.</p>
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Fecha</th><th>Cliente</th><th>Tramo</th><th>Días mora</th><th>Email</th><th>Resultado</th></tr></thead>
@@ -150,7 +150,7 @@
       <span id="avActivoLbl" style="font-weight:700">—</span>
       <span class="muted" style="margin-left:auto" id="avPl"></span>
     </div>
-    <p class="muted" style="margin:0 0 12px">Motor distinto al de mora: avisa por WhatsApp a los clientes cuya cuota vence <b>dentro de los próximos N días</b> (plantilla <code>aviso_vencimiento</code>, o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, con el monto al día). Es una <b>ventana, no un día exacto</b>: <b>1 solo aviso por cuota</b> — si el día -3 cayó domingo o feriado, se recupera el siguiente día hábil (-2, -1…), y el que ya recibió su aviso no vuelve a recibirlo. Corre a las <b>10:00</b> (Chile). Cada envío queda en la bitácora del cliente (CRM). Detalle y plantillas en <a href="/whatsapp">módulo WhatsApp</a>.</p>
+    <p class="muted" style="margin:0 0 12px">Motor distinto al de mora: avisa por WhatsApp a los clientes cuya cuota vence <b>dentro de los próximos N días</b> (plantilla <code>aviso_vencimiento</code>, o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, con el monto al día). Es una <b>ventana, no un día exacto</b>: <b>1 solo aviso por cuota</b> — si el día -3 cayó domingo o feriado, se recupera el siguiente día hábil (-2, -1…), y el que ya recibió su aviso no vuelve a recibirlo. Corre a las <b>10:00</b> (Chile). Cada envío queda en la bitácora de cobranzas del crédito (cuenta en el recuento semanal de gestiones). Detalle y plantillas en <a href="/whatsapp">módulo WhatsApp</a>.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <label style="margin:0">Avisar con</label>
       <input type="number" id="avDias" min="1" max="15" style="width:70px" onchange="guardarAvisoVenc()">
@@ -168,7 +168,7 @@
       <span id="wActivoLbl" style="font-weight:700">—</span>
       <span class="muted" style="margin-left:auto" id="wUlt"></span>
     </div>
-    <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a la hora y días configurados (Chile). A cada crédito AutoFácil en mora <b>que cumpla los filtros de abajo</b> le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora del cliente (CRM) y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
+    <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a la hora y días configurados (Chile). A cada crédito AutoFácil en mora <b>que cumpla los filtros de abajo</b> le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora de cobranzas del crédito y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
     <div class="grid" style="margin-bottom:10px">
       <div><label>Hora (Chile)</label><select id="wHora"></select></div>
       <div><label>Días</label><div class="dias" id="wDias"></div></div>
@@ -202,7 +202,7 @@
   <!-- Historial wsp -->
   <div class="card-af">
     <h3 style="color:var(--wsp)"><i class="bi bi-clock-history"></i> Historial de WhatsApp enviados</h3>
-    <p class="muted" style="margin:0 0 10px">Últimos 80. El resultado evoluciona con la confirmación de Meta y se refleja también en la bitácora del cliente (CRM).</p>
+    <p class="muted" style="margin:0 0 10px">Últimos 80. El resultado evoluciona con la confirmación de Meta y se refleja también en la bitácora de cobranzas del crédito.</p>
     <div style="overflow-x:auto">
       <table>
         <thead><tr><th>Fecha</th><th>Cliente</th><th>N°</th><th>Plantilla</th><th>Resultado</th></tr></thead>
@@ -225,7 +225,7 @@
       <li><b>Motor de WhatsApp (encendido/hora/días)</b> → cuándo corre la secuencia numerada por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
       <li><b>A quiénes (mora desde/hasta, monto mínimo)</b> → filtra qué créditos en mora reciben el WhatsApp automático (ej. solo entre 3 y 60 días de mora y sobre $50.000). Verificable con "Correr ahora (prueba)".</li>
       <li><b>Secuencia de plantillas</b> → qué mensaje HSM recibe el cliente en cada paso; el texto y su aprobación viven en <a href="/whatsapp">WhatsApp → Plantillas HSM</a> (Meta).</li>
-      <li><b>Ambos motores</b> → cada envío queda como gestión en la <b>bitácora del cliente</b> (CRM, visible en <a href="/crm/">CRM</a> y en la ficha de <a href="/cobranza/prejudicial">Pre-judicial</a>); en WhatsApp el resultado sube solo a Entregado/Leído.</li>
+      <li><b>Los 3 motores</b> → cada envío queda como gestión en la <b>bitácora de cobranzas</b> del crédito (visible en la ficha de <a href="/cobranza/prejudicial">Pre-judicial</a>/Judicial), con el <b>tipo de mensaje enviado</b>; cuenta en el recuento semanal de gestiones permitidas (Ley 21.320). En WhatsApp el resultado sube solo a Entregado/Leído.</li>
     </ul>
   </div>
 </div>

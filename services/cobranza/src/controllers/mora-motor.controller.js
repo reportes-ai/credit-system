@@ -168,17 +168,18 @@ async function procesar({ dryRun = false } = {}) {
     const r = await enviarCorreo({ to: email, from, subject: asunto, html, text: cuerpoTxt });
     await pool.query('INSERT INTO cobranza_mora_envios (id_credito,codigo_plantilla,dias_mora,email,estado) VALUES (?,?,?,?,?)',
       [c.id_credito, p.codigo, dias, email, r.ok ? 'enviado' : ('error: ' + (r.error || '')).slice(0, 140)]);
-    // Bitácora del cliente: cada correo automático queda como gestión en el CRM
-    // (mismo patrón que las automatizaciones de WhatsApp — el mail no tiene entregado/leído).
+    // Bitácora de COBRANZAS del crédito: la acción cuenta en el recuento semanal de
+    // gestiones permitidas (Ley 21.320), registrando el tipo de mensaje (plantilla/tramo).
     if (r.ok) {
       try {
         await pool.query(`
-          INSERT INTO crm_gestiones (tipo_cliente, rut_cliente, nombre_cliente, email, canal, tipo_solicitud,
-            descripcion, resultado, id_usuario, nombre_usuario, estado)
-          VALUES ('PERSONA', ?, ?, ?, 'EMAIL', 'AUTOMATIZACION COBRANZA', ?, 'ENVIADO', NULL, 'Business Suite (automático)', 'CERRADA')`,
-          [c.rut_cliente || null, titleCase(c.nombre_cliente || 'Cliente'), email,
-           `Correo automático de cobranza (${p.nombre}) — ${dias} día(s) de mora, ${vars.cuotas} cuota(s), $${vars.monto}`]);
-      } catch (e) { console.error('[mora crm]', e.message); }
+          INSERT INTO cobranza_gestiones (id_credito, numero_credito, rut_cliente, nombre_cliente,
+            tipo_gestion, canal, dias_mora, cuotas_mora, monto_mora, mensaje, resultado, id_usuario, nombre_usuario)
+          VALUES (?, ?, ?, ?, 'EMAIL', 'REMOTA', ?, ?, ?, ?, 'ENVIADO', 0, 'Business Suite (automático)')`,
+          [c.id_credito, String(vars.numero || ''), c.rut_cliente || null, titleCase(c.nombre_cliente || 'Cliente'),
+           dias, vars.cuotas, Math.round(Number(c.monto_mora) || 0),
+           `Correo automático de cobranza — plantilla "${p.nombre}" (tramo ${p.dias_desde}-${p.dias_hasta} días): ${dias} día(s) de mora, ${vars.cuotas} cuota(s), $${vars.monto} → ${email}`]);
+      } catch (e) { console.error('[mora bitacora]', e.message); }
     }
     if (r.ok) enviados++; else saltados++;
     if (pausaMs && enviados + saltados < rows.length) await sleep(pausaMs);   // espacia los correos (anti-ráfaga)
