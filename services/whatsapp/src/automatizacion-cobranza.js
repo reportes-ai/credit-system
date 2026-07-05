@@ -60,6 +60,69 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
   } catch (e) { console.error('[automatizacion-cobranza migration]', e.message); }
 })();
 
+/* ── Seed: plantilla "Mora Temprana" (pedida por Pato 2026-07-05) ─────────
+   Se crea UNA VEZ en Meta (queda PENDING hasta que Meta la apruebe) y se
+   registra en wsp_plantillas_tipo como Cobranza N°1 (nace inactiva).
+   Formato WhatsApp: *negrita* y _cursiva_. */
+const MORA_TEMPRANA = {
+  name: 'mora_temprana',
+  body: `Estimado(a) {{1}}:
+
+Le informamos que su crédito N° {{2}} se encuentra en mora hace {{3}} día(s), con {{4}} cuota(s) impaga(s) por un total de {{5}} al día de hoy.
+
+Para mayor información puede acceder a su cuenta en nuestro portal clientes.autofacilchile.cl
+
+El pago lo puede hacer transfiriendo a la siguiente cuenta:
+
+Titular: AutoFácil SpA
+RUT: 76.545.638-K
+Banco: Banco de Chile
+Cuenta Corriente: 8001829208
+Mail: cobranza@autofacilchile.cl
+
+Saludos,
+
+*AutoFácil*
+
+_Mensaje generado automáticamente. Si ya realizó el pago, favor dejar sin efecto este mensaje._`,
+  ejemplos: ['Maikol Ignacio Valenzuela Gallardo', '69999', '2', '1', '$283.316'],
+  mapa: ['nombre', 'numero_operacion', 'dias_mora', 'cuotas_mora', 'monto_mora'],
+};
+
+async function sembrarMoraTemprana() {
+  try {
+    const token = process.env.WSP_TOKEN;
+    if (!token) return; // ambiente sin Meta (local)
+    const waba = await wabaId();
+    const r = await fetch(`${GRAPH}/${waba}/message_templates?limit=100&fields=name,status`, {
+      headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return console.error('[mora_temprana seed] Meta:', j.error?.message);
+    const ya = (j.data || []).find(t => t.name === MORA_TEMPRANA.name);
+    if (!ya) {
+      const rc = await fetch(`${GRAPH}/${waba}/message_templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({
+          name: MORA_TEMPRANA.name, language: 'es', category: 'UTILITY',
+          components: [{ type: 'BODY', text: MORA_TEMPRANA.body, example: { body_text: [MORA_TEMPRANA.ejemplos] } }],
+        }),
+      });
+      const jc = await rc.json().catch(() => ({}));
+      if (!rc.ok) return console.error('[mora_temprana seed] crear:', jc.error?.error_user_msg || jc.error?.message);
+      console.log('[mora_temprana seed] enviada a validación de Meta →', jc.status || 'PENDING');
+    } else {
+      console.log('[mora_temprana seed] ya existe en Meta:', ya.status);
+    }
+    await pool.query(`
+      INSERT INTO wsp_plantillas_tipo (nombre_plantilla, tipo, orden, activo, mapa_variables)
+      VALUES (?, 'COBRANZA', 1, 0, ?)
+      ON DUPLICATE KEY UPDATE tipo='COBRANZA', mapa_variables=VALUES(mapa_variables)`,
+      [MORA_TEMPRANA.name, JSON.stringify(MORA_TEMPRANA.mapa)]);
+  } catch (e) { console.error('[mora_temprana seed]', e.message); }
+}
+setTimeout(sembrarMoraTemprana, 15000); // tras el boot, cuando la migración ya corrió
+
 /* ── Utilidades ── */
 const CLP = v => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');
 function hoyChile() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date()); }
