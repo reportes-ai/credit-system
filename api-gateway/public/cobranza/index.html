@@ -195,15 +195,15 @@
       <div class="card-link blue">Ver reportes <i class="bi bi-arrow-right"></i></div>
     </a>
 
-    <!-- Automatizaciones de Cobranza -->
-    <a href="/cobranza/automatizaciones" class="module-card green" data-id="automatizaciones" style="position:relative">
+    <!-- Automatizaciones de Cobranza (mantenedor unificado: correo por tramo + WhatsApp por secuencia) -->
+    <a href="/mantenedores/cobranza-mora/" class="module-card green" data-id="automatizaciones" style="position:relative">
       <i class="bi bi-grip-vertical drag-handle"></i>
       <div class="card-icon green"><i class="bi bi-whatsapp"></i></div>
       <div class="card-title">Automatizaciones de Cobranza</div>
-      <div class="card-desc">Mensajes de WhatsApp y mail automáticos por mora: parámetros, activación y secuencia numerada (nunca se repite el mismo mensaje).</div>
+      <div class="card-desc">Correo por tramo de mora + WhatsApp por secuencia numerada (nunca repite el mismo mensaje). Toda gestión queda en la bitácora del cliente.</div>
       <div class="card-stats">
         <div class="stat-item">
-          <div class="stat-label">Estado</div>
+          <div class="stat-label">WhatsApp</div>
           <div class="stat-value" id="auto-estado">—</div>
         </div>
         <div class="stat-item">
@@ -250,7 +250,7 @@
   })();
 
   let sortable = null, modoReordenar = false;
-  const HREFS = { prejudicial: '/cobranza/prejudicial', judicial: '/cobranza/judicial', reporteria: '/cobranza/reporteria', automatizaciones: '/cobranza/automatizaciones' };
+  const HREFS = { prejudicial: '/cobranza/prejudicial', judicial: '/cobranza/judicial', reporteria: '/cobranza/reporteria', automatizaciones: '/mantenedores/cobranza-mora/' };
 
   function toggleReordenar() {
     modoReordenar = !modoReordenar;

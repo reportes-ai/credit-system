@@ -4,17 +4,21 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Automatización Cobranza (Mora) — AutoFácil</title>
+  <title>Automatizaciones de Cobranza — AutoFácil</title>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; --wsp:#128C7E; }
     * { box-sizing:border-box; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; color:#1e293b; }
-    .page { max-width:980px; margin:0 auto; padding:24px 22px 80px; }
+    .page { max-width:1060px; margin:0 auto; padding:24px 22px 80px; }
     .page-banner { background:linear-gradient(135deg,#7f1d1d,#b91c1c 60%,#f59e0b); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.1rem; opacity:.9; }
     .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.2rem; }
     .page-banner p { opacity:.9; margin:0; font-size:.85rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab-btn { border:none; border-radius:10px; padding:10px 20px; font-size:.9rem; font-weight:800; cursor:pointer; background:#fff; color:#64748b; box-shadow:0 1px 4px rgba(0,0,0,.07); display:inline-flex; align-items:center; gap:8px; }
+    .tab-btn.on-mail { background:linear-gradient(135deg,#b91c1c,#f59e0b); color:#fff; }
+    .tab-btn.on-wsp  { background:linear-gradient(135deg,#075E54,#25d366); color:#fff; }
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
     .card-af h3 { margin:0 0 12px; font-size:1rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; }
     label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.3px; color:#64748b; display:block; margin-bottom:5px; }
@@ -32,6 +36,7 @@
     .btn-ghost { background:#eef2f7; color:#334155; border:none; border-radius:8px; padding:8px 14px; font-size:.85rem; font-weight:700; cursor:pointer; }
     .btn-run { background:linear-gradient(135deg,#0255c5,#0141A2); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:800; cursor:pointer; }
     .btn-real { background:linear-gradient(135deg,#dc2626,#991b1b); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:800; cursor:pointer; }
+    .btn-wsp { background:linear-gradient(135deg,#075E54,#128C7E); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.85rem; font-weight:800; cursor:pointer; }
     .pl { border:1.5px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:12px; }
     .pl-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
     .pl-head b { color:var(--navy); font-size:.95rem; }
@@ -50,6 +55,12 @@
     .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); padding:11px 24px; border-radius:10px; font-size:.9rem; font-weight:700; z-index:700; display:none; box-shadow:0 8px 24px rgba(0,0,0,.25); }
     .toast.ok { background:#15803d; color:#fff; } .toast.err { background:#991b1b; color:#fff; }
     .warn { background:#fffbeb; border:1px solid #fcd34d; color:#92400e; border-radius:8px; padding:9px 13px; font-size:.82rem; margin-bottom:12px; }
+    .chip { font-size:.62rem; font-weight:800; color:#fff; border-radius:8px; padding:2px 9px; }
+    .seq-num { width:30px; height:30px; border-radius:50%; background:#dcfce7; color:#15803d; font-weight:800; display:inline-flex; align-items:center; justify-content:center; font-size:.85rem; flex-shrink:0; }
+    .tpl-body { font-size:.78rem; color:#475569; white-space:pre-wrap; background:#f8fafc; border:1px solid #eef2f7; border-radius:8px; padding:8px 11px; margin:8px 0; max-height:180px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; color:#64748b; font-size:.68rem; font-weight:700; text-transform:uppercase; padding:8px 10px; text-align:left; border-bottom:1px solid #e2e8f0; }
+    td { padding:8px 10px; font-size:.82rem; color:#334155; border-bottom:1px solid #f1f5f9; }
   </style>
 </head>
 <body>
@@ -59,7 +70,7 @@
   window.AF_TOPNAV = { breadcrumb: [
     { label:'Inicio', href:'/' },
     { label:'Mantenedores', href:'/mantenedores/' },
-    { label:'Automatización Cobranza (Mora)', icon:'bi-envelope-heart', current:true }
+    { label:'Automatizaciones de Cobranza', icon:'bi-envelope-heart', current:true }
   ] };
 </script>
 
@@ -67,16 +78,24 @@
   <div class="page-banner">
     <i class="bi bi-envelope-heart"></i>
     <div>
-      <h2>Automatización de Cobranza por Mora</h2>
-      <p>Correos automáticos al cliente según sus días de mora. Configura el motor y redacta las plantillas por tramo.</p>
+      <h2>Automatizaciones de Cobranza</h2>
+      <p>Mensajes automáticos al cliente en mora por <b>Correo</b> (plantillas por tramo de días) y por <b>WhatsApp</b> (secuencia numerada de plantillas Meta — nunca repite el mismo mensaje). Toda gestión queda registrada en la <b>bitácora del cliente</b> (CRM) con su resultado.</p>
     </div>
   </div>
 
-  <div class="warn" id="devWarn" style="display:none"><b>⚠ Modo Desarrollo activo:</b> aunque esté encendido, los correos se redirigen a los correos de prueba (no salen al cliente).</div>
+  <div class="warn" id="devWarn" style="display:none"><b>⚠ Modo Desarrollo activo:</b> aunque los motores estén encendidos, los correos se redirigen a los correos de prueba y los WhatsApp quedan SIMULADOS (no salen al cliente).</div>
+
+  <div class="tabs">
+    <button class="tab-btn on-mail" id="tabMail" onclick="verTab('mail')"><i class="bi bi-envelope-paper"></i> Correo por tramo</button>
+    <button class="tab-btn" id="tabWsp" onclick="verTab('wsp')"><i class="bi bi-whatsapp"></i> WhatsApp (secuencia)</button>
+  </div>
+
+  <!-- ═══════════════ TAB CORREO ═══════════════ -->
+  <div id="secMail">
 
   <!-- Motor -->
   <div class="card-af">
-    <h3><i class="bi bi-robot"></i> Motor (programación)</h3>
+    <h3><i class="bi bi-robot"></i> Motor de correo (programación)</h3>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
       <label class="sw"><input type="checkbox" id="mActivo"><span class="sl"></span></label>
       <span id="mActivoLbl" style="font-weight:700">—</span>
@@ -90,7 +109,7 @@
       <div><label>Máx. correos por corrida</label><input type="number" id="mMax" min="1" max="2000"></div>
       <div><label>Pausa entre correos (seg)</label><input type="number" id="mPausa" min="0" max="120"></div>
     </div>
-    <p class="muted" style="margin:8px 0 0">La corrida es 1 vez al día (a la hora/días indicados). Los correos salen espaciados según la pausa (ej. 5 s × 200 ≈ 17 min).</p>
+    <p class="muted" style="margin:8px 0 0">La corrida es 1 vez al día (a la hora/días indicados). Los correos salen espaciados según la pausa (ej. 5 s × 200 ≈ 17 min). Cada envío queda en la bitácora del cliente (CRM).</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
       <button class="btn-af" onclick="guardarConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
       <button class="btn-run" onclick="correr(false)"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
@@ -106,14 +125,78 @@
     <div id="plantillas"></div>
   </div>
 
+  <!-- Historial mail -->
+  <div class="card-af">
+    <h3><i class="bi bi-clock-history"></i> Historial de correos enviados</h3>
+    <p class="muted" style="margin:0 0 10px">Últimos 60. Cada envío exitoso también quedó como gestión en la bitácora del cliente (CRM).</p>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Fecha</th><th>Cliente</th><th>Tramo</th><th>Días mora</th><th>Email</th><th>Resultado</th></tr></thead>
+        <tbody id="tbHistMail"><tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  </div><!-- /secMail -->
+
+  <!-- ═══════════════ TAB WHATSAPP ═══════════════ -->
+  <div id="secWsp" style="display:none">
+
+  <!-- Motor WSP -->
+  <div class="card-af" style="border:1.5px solid #bbf7d0">
+    <h3 style="color:var(--wsp)"><i class="bi bi-whatsapp"></i> Motor de WhatsApp (secuencia numerada)</h3>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <label class="sw"><input type="checkbox" id="wActivo" onchange="guardarWspActivo()"><span class="sl"></span></label>
+      <span id="wActivoLbl" style="font-weight:700">—</span>
+      <span class="muted" style="margin-left:auto" id="wUlt"></span>
+    </div>
+    <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a las <b>11:00</b> (Chile). A cada crédito AutoFácil en mora le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora del cliente (CRM) y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn-run" onclick="probarWsp()"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
+      <button class="btn-real" onclick="correrWsp()" title="Envía de verdad (respeta Modo Desarrollo)"><i class="bi bi-send"></i> Correr y enviar</button>
+      <span id="wMsg" style="font-size:.8rem;color:var(--green)"></span>
+    </div>
+    <div class="res" id="wRes"></div>
+  </div>
+
+  <!-- Secuencia -->
+  <div class="card-af">
+    <h3 style="color:var(--wsp)"><i class="bi bi-list-ol"></i> Secuencia de plantillas (textos de Meta y su estatus)</h3>
+    <p class="muted" style="margin:0 0 12px">Estas son las plantillas HSM marcadas como tipo <b>Cobranza</b>. El texto vive en Meta (solo se envía si está <b>APROBADA</b>); acá defines el N° de la secuencia, si está activa, y qué dato del crédito reemplaza cada variable <code>{{n}}</code>. Para redactar una plantilla nueva o corregir un texto → <a href="/whatsapp">módulo WhatsApp → Plantillas HSM</a> (pasa por revisión IA y aprobación de Meta).</p>
+    <div id="wspSeq"><div class="muted" style="text-align:center;padding:18px">Cargando…</div></div>
+    <div style="border-top:1px dashed #e2e8f0;padding-top:12px;margin-top:6px">
+      <label>Agregar una plantilla aprobada a la secuencia</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="wspAgregar" style="max-width:380px"><option value="">— elegir plantilla —</option></select>
+        <button class="btn-wsp" onclick="agregarASecuencia()"><i class="bi bi-plus-lg"></i> Agregar como siguiente N°</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial wsp -->
+  <div class="card-af">
+    <h3 style="color:var(--wsp)"><i class="bi bi-clock-history"></i> Historial de WhatsApp enviados</h3>
+    <p class="muted" style="margin:0 0 10px">Últimos 80. El resultado evoluciona con la confirmación de Meta y se refleja también en la bitácora del cliente (CRM).</p>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Fecha</th><th>Cliente</th><th>N°</th><th>Plantilla</th><th>Resultado</th></tr></thead>
+        <tbody id="tbHistWsp"><tr><td colspan="5" class="muted" style="text-align:center;padding:18px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  </div><!-- /secWsp -->
+
   <div class="foot">
     <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
     <ul>
-      <li><b>Motor (encendido/hora/días)</b> → cuándo corre el envío automático de correos de mora (hora de Chile). Nace <b>desactivado</b>.</li>
-      <li><b>Desde (cuenta)</b> → remitente de estos correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
+      <li><b>Motor de correo (encendido/hora/días)</b> → cuándo corre el envío automático de correos de mora (hora de Chile). Nace <b>desactivado</b>.</li>
+      <li><b>Desde (cuenta)</b> → remitente de los correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
       <li><b>No reenviar mismo tramo</b> → evita repetir el mismo correo al mismo crédito dentro de N días.</li>
-      <li><b>Plantillas por tramo</b> → el texto que recibe el cliente según sus <b>días de mora</b> (cartera AutoFácil). Edita asunto y cuerpo con las variables.</li>
-      <li><b>Correr ahora (prueba)</b> → muestra a qué créditos y con qué tramo iría, <b>sin enviar</b>. Para la cartera ver <a href="/cobranza/">Cobranza</a>.</li>
+      <li><b>Plantillas por tramo</b> → el texto del correo según los <b>días de mora</b> (cartera AutoFácil).</li>
+      <li><b>Motor de WhatsApp (encendido)</b> → secuencia numerada diaria (11:00) por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
+      <li><b>Secuencia de plantillas</b> → qué mensaje HSM recibe el cliente en cada paso; el texto y su aprobación viven en <a href="/whatsapp">WhatsApp → Plantillas HSM</a> (Meta).</li>
+      <li><b>Ambos motores</b> → cada envío queda como gestión en la <b>bitácora del cliente</b> (CRM, visible en <a href="/crm/">CRM</a> y en la ficha de <a href="/cobranza/prejudicial">Pre-judicial</a>); en WhatsApp el resultado sube solo a Entregado/Leído.</li>
     </ul>
   </div>
 </div>
@@ -138,16 +221,25 @@ const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 function toast(m, ok=true){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
 const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
+const fmtF = f => f ? new Date(f).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
 
+function verTab(t){
+  document.getElementById('secMail').style.display = t==='mail' ? '' : 'none';
+  document.getElementById('secWsp').style.display  = t==='wsp'  ? '' : 'none';
+  document.getElementById('tabMail').className = 'tab-btn' + (t==='mail' ? ' on-mail' : '');
+  document.getElementById('tabWsp').className  = 'tab-btn' + (t==='wsp'  ? ' on-wsp'  : '');
+  if (t==='wsp' && !window._wspCargado) cargarWsp();
+}
+
+/* ═══════════ CORREO POR TRAMO ═══════════ */
 let PLANTILLAS = [];
 
 async function cargar(){
   try {
     const j = await (await fetch('/api/cobranza-mora', { headers:H })).json();
     if (!j.success) throw new Error(j.error||'Error');
-    const { plantillas, config, cuentas, ultimos7 } = j.data;
+    const { plantillas, config, cuentas, ultimos7, historial } = j.data;
     PLANTILLAS = plantillas || [];
-    // Motor
     const activo = config.mora_activo === '1';
     document.getElementById('mActivo').checked = activo;
     document.getElementById('mActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
@@ -162,6 +254,12 @@ async function cargar(){
     document.getElementById('mUlt').textContent = ultimos7 && ultimos7.n ? `${ultimos7.n} envíos últimos 7 días` : 'Sin envíos recientes';
     document.getElementById('devWarn').style.display = (window.__DEV_MODE__) ? 'block':'none';
     renderPlantillas();
+    const hist = historial || [];
+    document.getElementById('tbHistMail').innerHTML = hist.length ? hist.map(h=>`
+      <tr><td>${fmtF(h.fecha_envio)}</td><td>${esc(h.nombre_cliente||('Crédito '+h.id_credito))}</td>
+      <td>${esc(h.nombre_plantilla||h.codigo_plantilla)}</td><td>${h.dias_mora??'—'}</td><td>${esc(h.email||'—')}</td>
+      <td>${h.estado==='enviado' ? '<span class="chip" style="background:#15803d">ENVIADO</span>' : `<span class="chip" style="background:#dc2626" title="${esc(h.estado)}">ERROR</span>`}</td></tr>`).join('')
+      : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">Sin envíos todavía.</td></tr>';
   } catch(e){ toast('Error al cargar: '+e.message, false); }
 }
 
@@ -255,6 +353,155 @@ async function correr(real){
     }
     res.textContent = txt;
     if (real) cargar();
+  } catch(e){ res.textContent = 'Error: '+e.message; }
+}
+
+/* ═══════════ WHATSAPP POR SECUENCIA ═══════════ */
+const PL_ST = { APPROVED:['#16a34a','APROBADA'], PENDING:['#d97706','PENDIENTE'], REJECTED:['#dc2626','RECHAZADA'], PAUSED:['#64748b','PAUSADA'], DISABLED:['#64748b','DESHABILITADA'] };
+const ST_COL = { ENVIADO:'#0141A2', ENTREGADO:'#16a34a', LEIDO:'#166534', ERROR:'#dc2626', SIMULADO:'#d97706' };
+const CAMPOS_COBRANZA = [
+  ['nombre','Nombre del cliente'],['rut','RUT'],['dias_mora','Días de mora'],['cuotas_mora','N° cuotas en mora'],
+  ['monto_mora','Monto en mora ($)'],['saldo_insoluto','Saldo insoluto ($)'],['numero_operacion','N° de operación'],
+];
+let WSP_TPLS = [];   // todas las plantillas Meta (con tipo/orden/activo/mapa)
+const bodyOf  = p => (p.components||[]).find(c=>c.type==='BODY')?.text||'';
+const nVarsOf = p => (bodyOf(p).match(/\{\{\d+\}\}/g)||[]).length;
+
+async function cargarWsp(){
+  window._wspCargado = true;
+  try {
+    const [jA, jP] = await Promise.all([
+      (await fetch('/api/whatsapp/automatizacion-cobranza', { headers:H })).json(),
+      (await fetch('/api/whatsapp/plantillas', { headers:H })).json(),
+    ]);
+    if (jA.success) {
+      const activo = !!jA.data.config?.cobranza_auto_activo;
+      document.getElementById('wActivo').checked = activo;
+      document.getElementById('wActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
+      const hist = jA.data.historial || [];
+      const h7 = hist.filter(h => (Date.now()-new Date(h.created_at).getTime()) < 7*86400000 && ['ENVIADO','ENTREGADO','LEIDO'].includes(h.estado)).length;
+      document.getElementById('wUlt').textContent = h7 ? `${h7} envíos últimos 7 días` : 'Sin envíos recientes';
+      document.getElementById('tbHistWsp').innerHTML = hist.length ? hist.map(h=>`
+        <tr><td>${fmtF(h.created_at)}</td><td>${esc(h.nombre||'—')}</td><td>${h.orden_enviado}</td><td>${esc(h.nombre_plantilla||'—')}</td>
+        <td><span class="chip" style="background:${ST_COL[h.estado]||'#64748b'}">${esc(h.estado)}</span>${h.error_msg?`<div style="font-size:.68rem;color:#dc2626;margin-top:2px">${esc(h.error_msg)}</div>`:''}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="muted" style="text-align:center;padding:18px">Sin envíos todavía.</td></tr>';
+    }
+    if (jP.success) {
+      if (jP.data.simulado) {
+        document.getElementById('wspSeq').innerHTML = '<div class="warn">Sin conexión con Meta en este ambiente (WSP_TOKEN). En producción acá se ven las plantillas con su estatus.</div>';
+        return;
+      }
+      WSP_TPLS = jP.data.plantillas || [];
+      renderSeq();
+    } else {
+      document.getElementById('wspSeq').innerHTML = `<div class="warn">${esc(jP.error||'No se pudieron cargar las plantillas de Meta')}</div>`;
+    }
+  } catch(e){ toast('Error al cargar WhatsApp: '+e.message, false); }
+}
+
+function renderSeq(){
+  const enSeq = WSP_TPLS.filter(p=>p.tipo==='COBRANZA').sort((a,b)=>(a.orden||99)-(b.orden||99));
+  const fuera = WSP_TPLS.filter(p=>p.tipo!=='COBRANZA');
+  document.getElementById('wspSeq').innerHTML = enSeq.length ? enSeq.map(p=>{
+    const i = WSP_TPLS.indexOf(p);
+    const [col,txt] = PL_ST[p.status]||['#64748b',p.status];
+    const nVars = nVarsOf(p);
+    const mapa = Array.isArray(p.mapa_variables)&&p.mapa_variables.length===nVars ? p.mapa_variables : Array(nVars).fill('');
+    return `<div class="pl">
+      <div class="pl-head">
+        <b style="display:flex;align-items:center;gap:10px"><span class="seq-num">${p.orden||'—'}</span> ${esc(p.name)}</b>
+        <span style="display:flex;gap:8px;align-items:center">
+          <span class="chip" style="background:${col}">${txt}</span>
+          <label class="sw" title="Activa en la secuencia"><input type="checkbox" id="wa_${i}" ${p.activo_auto?'checked':''}><span class="sl"></span></label>
+        </span>
+      </div>
+      <div class="tpl-body">${esc(bodyOf(p))}</div>
+      ${p.status==='REJECTED'&&p.rejected_reason?`<div style="font-size:.74rem;color:#dc2626;margin-bottom:8px">Motivo del rechazo: ${esc(p.rejected_reason)}</div>`:''}
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+        <div style="width:110px"><label>N° secuencia</label><input type="number" id="wo_${i}" min="1" max="99" value="${p.orden||''}"></div>
+        ${Array.from({length:nVars}).map((_,v)=>`<div style="min-width:170px"><label>{{${v+1}}} =</label>
+          <select id="wm_${i}_${v}"><option value="">— elegir —</option>
+          ${CAMPOS_COBRANZA.map(([k,l])=>`<option value="${k}" ${mapa[v]===k?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}
+        <button class="btn-wsp" onclick="guardarSeq(${i})"><i class="bi bi-check-lg"></i> Guardar</button>
+        <button class="btn-ghost" onclick="quitarDeSeq(${i})" title="La saca de la secuencia (vuelve a tipo General)"><i class="bi bi-x-lg"></i> Quitar</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="muted" style="text-align:center;padding:14px">La secuencia está vacía — agrega una plantilla abajo.</div>';
+  document.getElementById('wspAgregar').innerHTML = '<option value="">— elegir plantilla —</option>' +
+    fuera.map(p=>`<option value="${esc(p.name)}">${esc(p.name)} (${(PL_ST[p.status]||[,p.status])[1]})</option>`).join('');
+}
+
+async function guardarTipoWsp(nombre, body){
+  const j = await (await fetch(`/api/whatsapp/plantillas/${encodeURIComponent(nombre)}/tipo`, { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+  if (!j.success) throw new Error(j.error||'Error');
+  return j.data;
+}
+async function guardarSeq(i){
+  const p = WSP_TPLS[i], nVars = nVarsOf(p);
+  const mapa_variables = Array.from({length:nVars}).map((_,v)=>document.getElementById(`wm_${i}_${v}`)?.value||'');
+  if (nVars && mapa_variables.some(m=>!m)) { toast('Asigna un dato a cada variable {{n}}', false); return; }
+  try {
+    const d = await guardarTipoWsp(p.name, { tipo:'COBRANZA', orden: document.getElementById('wo_'+i).value||null,
+      activo: document.getElementById('wa_'+i).checked, mapa_variables });
+    WSP_TPLS[i] = {...p, tipo:d.tipo, orden:d.orden, activo_auto:d.activo, mapa_variables:d.mapa_variables};
+    toast('✓ Guardado'); renderSeq();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+async function quitarDeSeq(i){
+  const p = WSP_TPLS[i];
+  if (!confirm(`Quitar "${p.name}" de la secuencia de cobranza?`)) return;
+  try {
+    await guardarTipoWsp(p.name, { tipo:'GENERAL' });
+    WSP_TPLS[i] = {...p, tipo:'GENERAL', orden:null, activo_auto:false, mapa_variables:[]};
+    toast('✓ Quitada de la secuencia'); renderSeq();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+async function agregarASecuencia(){
+  const nombre = document.getElementById('wspAgregar').value;
+  if (!nombre) { toast('Elige una plantilla', false); return; }
+  const p = WSP_TPLS.find(x=>x.name===nombre);
+  const maxOrden = Math.max(0, ...WSP_TPLS.filter(x=>x.tipo==='COBRANZA').map(x=>Number(x.orden)||0));
+  try {
+    const d = await guardarTipoWsp(nombre, { tipo:'COBRANZA', orden:maxOrden+1, activo:false, mapa_variables:Array(nVarsOf(p)).fill('') });
+    Object.assign(p, { tipo:d.tipo, orden:d.orden, activo_auto:d.activo, mapa_variables:d.mapa_variables });
+    toast(`✓ Agregada como N°${d.orden} — mapea sus variables y actívala`); renderSeq();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+
+async function guardarWspActivo(){
+  const activo = document.getElementById('wActivo').checked;
+  try {
+    const j = await (await fetch('/api/whatsapp/automatizacion-cobranza/config', { method:'PUT', headers:H, body:JSON.stringify({ activo }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    document.getElementById('wActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
+    document.getElementById('wMsg').textContent = activo ? '✓ Activado — corre 1 vez al día a las 11:00' : '✓ Desactivado';
+  } catch(e){ toast('Error: '+e.message, false); document.getElementById('wActivo').checked = !activo; }
+}
+
+async function probarWsp(){
+  const res = document.getElementById('wRes');
+  res.style.display='block'; res.textContent = 'Calculando (modo prueba)…';
+  try {
+    const j = await (await fetch('/api/whatsapp/automatizacion-cobranza/probar', { method:'POST', headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const c = j.data.candidatos || [];
+    let txt = `PRUEBA (no se envió)\nRecibirían mensaje hoy: ${c.length}\n`;
+    if (c.length) txt += '\n' + c.map(x=>`  ${x.nombre} · ${x.dias_mora}d mora · $${Math.round(x.monto_mora).toLocaleString('es-CL')} · próximo N°${x.orden_enviado} (${x.nombre_plantilla})`).join('\n');
+    else txt += '\n(Nadie: sin secuencia activa, ya recibieron algo hoy, o agotaron la secuencia.)';
+    res.textContent = txt;
+  } catch(e){ res.textContent = 'Error: '+e.message; }
+}
+
+async function correrWsp(){
+  if (!confirm('Esto ENVÍA los WhatsApp de la secuencia de verdad (respeta Modo Desarrollo). ¿Continuar?')) return;
+  const res = document.getElementById('wRes');
+  res.style.display='block'; res.textContent = 'Enviando…';
+  try {
+    const j = await (await fetch('/api/whatsapp/automatizacion-cobranza/correr', { method:'POST', headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const r = j.data.resultados || [];
+    res.textContent = `ENVIADO\nProcesados: ${r.length}\n` + r.map(x=>`  ${x.nombre} · N°${x.orden} (${x.plantilla}) → ${x.estado}${x.error?' — '+x.error:''}`).join('\n');
+    cargarWsp();
   } catch(e){ res.textContent = 'Error: '+e.message; }
 }
 

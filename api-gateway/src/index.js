@@ -360,7 +360,6 @@ const PAGINAS = [
   ['/cobranza/judicial', 'cobranza/judicial.html'],
   ['/cobranza/mis-cobranza', 'cobranza/mis-cobranza.html'],
   ['/cobranza/reporteria', 'cobranza/reporteria.html'],
-  ['/cobranza/automatizaciones', 'cobranza/automatizaciones.html'],
   ['/cobranza/migracion-indexa', 'cobranza/migracion-indexa/index.html'],
   // Página PÚBLICA (la abre el QR): /verificar/<codigo>. El array agrega el path con param.
   [['/verificar', '/verificar/', '/verificar/:codigo'], 'verificar/index.html'],
@@ -428,6 +427,8 @@ for (const [ruta, archivo] of PAGINAS) {
 // - /mantenedores/preferencia-financiera: ahora es una pestaña de Aprobaciones.
 const REDIRECTS = [
   ['/mantenedores/dealers', '/dealers/'],
+  // Automatizaciones de Cobranza: se administra TODO desde el mantenedor unificado (correo + WhatsApp).
+  ['/cobranza/automatizaciones', '/mantenedores/cobranza-mora/'],
   ['/mantenedores/flujo-brokerage', '/mantenedores/estado-creditos/'],
   ['/tesoreria/brokerage', '/tesoreria/'],
   ['/creditos/fundantes', '/fundantes/'],

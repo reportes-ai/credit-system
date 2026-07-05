@@ -86,6 +86,8 @@ function emailHTMLCobranza(cuerpoTxt) {
         const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
         if (admin) await pool.query("INSERT IGNORE INTO permisos_perfil (id_perfil,id_funcionalidad,habilitado) VALUES (?,?,1)", [admin.id_perfil, r.insertId]);
       }
+      // El mantenedor ahora unifica correo + WhatsApp → renombrar la funcionalidad
+      await pool.query("UPDATE funcionalidades SET nombre='Automatizaciones de Cobranza' WHERE codigo='mant_cobranza_mora' AND nombre<>'Automatizaciones de Cobranza'");
     }
     console.log('[cobranza mora-motor] tablas + seed listos');
   } catch (e) { console.error('[cobranza mora-motor migration]', e.message); }
@@ -155,6 +157,18 @@ async function procesar({ dryRun = false } = {}) {
     const r = await enviarCorreo({ to: email, from, subject: asunto, html, text: cuerpoTxt });
     await pool.query('INSERT INTO cobranza_mora_envios (id_credito,codigo_plantilla,dias_mora,email,estado) VALUES (?,?,?,?,?)',
       [c.id_credito, p.codigo, dias, email, r.ok ? 'enviado' : ('error: ' + (r.error || '')).slice(0, 140)]);
+    // Bitácora del cliente: cada correo automático queda como gestión en el CRM
+    // (mismo patrón que las automatizaciones de WhatsApp — el mail no tiene entregado/leído).
+    if (r.ok) {
+      try {
+        await pool.query(`
+          INSERT INTO crm_gestiones (tipo_cliente, rut_cliente, nombre_cliente, email, canal, tipo_solicitud,
+            descripcion, resultado, id_usuario, nombre_usuario, estado)
+          VALUES ('PERSONA', ?, ?, ?, 'EMAIL', 'AUTOMATIZACION COBRANZA', ?, 'ENVIADO', NULL, 'Business Suite (automático)', 'CERRADA')`,
+          [c.rut_cliente || null, titleCase(c.nombre_cliente || 'Cliente'), email,
+           `Correo automático de cobranza (${p.nombre}) — ${dias} día(s) de mora, ${vars.cuotas} cuota(s), $${vars.monto}`]);
+      } catch (e) { console.error('[mora crm]', e.message); }
+    }
     if (r.ok) enviados++; else saltados++;
     if (pausaMs && enviados + saltados < rows.length) await sleep(pausaMs);   // espacia los correos (anti-ráfaga)
   }
@@ -189,7 +203,14 @@ exports.getTodo = async (req, res) => {
     const [plantillas] = await pool.query('SELECT * FROM cobranza_mora_plantillas ORDER BY orden, dias_desde');
     const config = await getMotorCfg();
     const [[ult]] = await pool.query("SELECT MAX(fecha_envio) AS f, COUNT(*) AS n FROM cobranza_mora_envios WHERE fecha_envio >= (NOW() - INTERVAL 7 DAY)");
-    res.json({ success: true, data: { plantillas, config, cuentas: cuentasRemitente().map(c => ({ clave: c.clave, label: c.label })), ultimos7: ult }, error: null });
+    const [historial] = await pool.query(`
+      SELECT e.*, p.nombre nombre_plantilla, cl.nombre_completo nombre_cliente
+      FROM cobranza_mora_envios e
+      LEFT JOIN cobranza_mora_plantillas p ON p.codigo = e.codigo_plantilla
+      LEFT JOIN creditos cr ON cr.id = e.id_credito
+      LEFT JOIN clientes cl ON cl.id_cliente = cr.id_cliente
+      ORDER BY e.id DESC LIMIT 60`);
+    res.json({ success: true, data: { plantillas, config, cuentas: cuentasRemitente().map(c => ({ clave: c.clave, label: c.label })), ultimos7: ult, historial }, error: null });
   } catch (e) { console.error('[mora getTodo]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 exports.guardarPlantilla = async (req, res) => {
