@@ -178,6 +178,12 @@ function fHora(v){ const d=dDate(v); if(!d) return ''; const hh=d.getHours(), mm
 function fDiaLargo(v){ const d=dDate(v); if(!d) return 'Sin fecha'; return d.toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}); }
 function stClass(s){ s=(s||'').toUpperCase(); return ['OTORGADO','APROBADA','RECHAZADA','RECHAZADO','ANULADO','DESISTIDO','DESISTIDA','PENDIENTE','VIGENTE'].includes(s)?('st-'+s):'st-default'; }
 
+/* ── Búsqueda automática si viene ?q= en la URL (links desde Pre-judicial/Judicial) ── */
+window.addEventListener('DOMContentLoaded', () => {
+  const q = new URLSearchParams(location.search).get('q');
+  if (q) { document.getElementById('q').value = q; buscar(); }
+});
+
 /* ── Buscar ───────────────────────────────────────── */
 async function buscar(){
   const valor = document.getElementById('q').value.trim();
