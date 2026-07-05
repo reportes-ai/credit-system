@@ -150,7 +150,7 @@
       <span id="avActivoLbl" style="font-weight:700">—</span>
       <span class="muted" style="margin-left:auto" id="avPl"></span>
     </div>
-    <p class="muted" style="margin:0 0 12px">Motor distinto al de mora: <b>N días antes</b> de que venza una cuota le avisa al cliente por WhatsApp (plantilla <code>aviso_vencimiento</code>, o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, con el monto al día). 1 aviso por cuota, corre a las <b>10:00</b> (Chile). Cada envío queda en la bitácora del cliente (CRM). Detalle y plantillas en <a href="/whatsapp">módulo WhatsApp</a>.</p>
+    <p class="muted" style="margin:0 0 12px">Motor distinto al de mora: avisa por WhatsApp a los clientes cuya cuota vence <b>dentro de los próximos N días</b> (plantilla <code>aviso_vencimiento</code>, o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, con el monto al día). Es una <b>ventana, no un día exacto</b>: <b>1 solo aviso por cuota</b> — si el día -3 cayó domingo o feriado, se recupera el siguiente día hábil (-2, -1…), y el que ya recibió su aviso no vuelve a recibirlo. Corre a las <b>10:00</b> (Chile). Cada envío queda en la bitácora del cliente (CRM). Detalle y plantillas en <a href="/whatsapp">módulo WhatsApp</a>.</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <label style="margin:0">Avisar con</label>
       <input type="number" id="avDias" min="1" max="15" style="width:70px" onchange="guardarAvisoVenc()">
@@ -220,6 +220,7 @@
       <li><b>Desde (cuenta)</b> → remitente de los correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
       <li><b>No reenviar mismo tramo</b> → evita repetir el mismo correo al mismo crédito dentro de N días.</li>
       <li><b>Plantillas por tramo</b> → el texto del correo según los <b>días de mora</b> (cartera AutoFácil).</li>
+      <li><b>⚖️ Horario legal (Ley 21.320)</b> → TODOS los envíos de cobranza (WhatsApp y correo) solo salen <b>lunes a sábado hábiles, 8:00-20:00</b> — nunca domingos ni feriados (tabla del mantenedor <a href="/mantenedores/feriados/">Feriados</a>). El sistema lo bloquea solo, aunque el motor esté configurado fuera de ese horario.</li>
       <li><b>Aviso de Vencimiento (encendido/días antes)</b> → WhatsApp automático ANTES de que venza la cuota (plantillas <code>aviso_vencimiento</code>/<code>_mora</code> de <a href="/whatsapp">Facilito</a>, 10:00). Nace <b>desactivado</b>.</li>
       <li><b>Motor de WhatsApp (encendido/hora/días)</b> → cuándo corre la secuencia numerada por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
       <li><b>A quiénes (mora desde/hasta, monto mínimo)</b> → filtra qué créditos en mora reciben el WhatsApp automático (ej. solo entre 3 y 60 días de mora y sobre $50.000). Verificable con "Correr ahora (prueba)".</li>

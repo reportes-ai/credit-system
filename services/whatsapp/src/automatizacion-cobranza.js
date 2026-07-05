@@ -151,6 +151,13 @@ async function correr({ real = false } = {}) {
 
   let devMode = false;
   try { devMode = !!(await require('../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
+  // Ley 21.320: gestiones de cobranza solo L-S hábiles 8:00-20:00 (en Modo Desarrollo
+  // se permite porque nada sale a clientes — queda SIMULADO)
+  if (!devMode) {
+    const { motivoFueraHorario } = require('../../../shared/horario-cobranza');
+    const motivo = motivoFueraHorario();
+    if (motivo) throw new Error(`Horario legal de cobranza (Ley 21.320): no se puede enviar en ${motivo}. Permitido: lunes a sábado hábiles, 8:00 a 20:00.`);
+  }
   const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
   const resultados = [];
   for (const c of lista) {
@@ -224,6 +231,7 @@ async function tick() {
     const diasCfg = String(cfg.cobranza_auto_dias || '1,2,3,4,5').split(',').map(Number);
     if (!diasCfg.includes(diaChile)) return;
     if (horaChile !== horaCfg || _ultimaCorrida === hoy) return;
+    if (!require('../../../shared/horario-cobranza').esHorarioLegalCobranza()) return; // Ley 21.320: nunca domingo/feriado
     _ultimaCorrida = hoy;
     const r = await correr({ real: true });
     console.log(`[automatizacion-cobranza] corrida ${hoy}: ${r.resultados.length} envíos`, r.resultados.map(x => x.estado).join(','));

@@ -125,7 +125,11 @@ async function crearPlantillas() {
   return out;
 }
 
-/* ── Candidatos del día: cuotas que vencen en N días (impagas, sin aviso previo) ── */
+/* ── Candidatos del día: cuotas que vencen dentro de la VENTANA [hoy .. hoy+N días]
+   (impagas, sin aviso previo). Es un RANGO, no un día exacto: si el día -N cayó
+   domingo/feriado y no se envió, se recupera el siguiente día hábil (-N+1, -N+2…);
+   y como es 1 aviso por cuota (UNIQUE id_cuota), el que ya recibió a -N no vuelve
+   a recibir a -N+1. ── */
 async function candidatos(dias) {
   const [rows] = await pool.query(`
     SELECT cu.id_cuota, cu.numero_cuota, DATE_FORMAT(cu.fecha_vencimiento,'%Y-%m-%d') fecha_vencimiento,
@@ -136,7 +140,7 @@ async function candidatos(dias) {
     JOIN creditos cr ON cr.id = cu.id_credito
     JOIN clientes cl ON cl.id_cliente = cr.id_cliente
     WHERE cu.fecha_pago IS NULL AND COALESCE(cu.estado_cuota,'') NOT IN ('PAGADA','ANULADA')
-      AND cu.fecha_vencimiento = DATE_ADD(CURDATE(), INTERVAL ? DAY)
+      AND cu.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
       AND NOT EXISTS (SELECT 1 FROM wsp_avisos_vencimiento av WHERE av.id_cuota = cu.id_cuota AND av.estado IN ('ENVIADO','SIMULADO'))
     ORDER BY cu.id_cuota`, [Number(dias) || 2]);
 
@@ -186,6 +190,13 @@ async function correr({ real = false } = {}) {
 
   let devMode = false;
   try { devMode = !!(await require('../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
+  // Ley 21.320: gestiones de cobranza solo L-S hábiles 8:00-20:00 (en Modo Desarrollo
+  // se permite porque nada sale a clientes — queda SIMULADO)
+  if (!devMode) {
+    const { motivoFueraHorario } = require('../../../shared/horario-cobranza');
+    const motivo = motivoFueraHorario();
+    if (motivo) throw new Error(`Horario legal de cobranza (Ley 21.320): no se puede enviar en ${motivo}. Permitido: lunes a sábado hábiles, 8:00 a 20:00.`);
+  }
   const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
   const estados = await estadoPlantillas().catch(() => null);
   const resultados = [];
@@ -244,6 +255,7 @@ async function tick() {
     const horaChile = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: 'numeric', hour12: false }).format(ahora));
     const hoy = hoyChile();
     if (horaChile !== 10 || _ultimaCorrida === hoy) return;
+    if (!require('../../../shared/horario-cobranza').esHorarioLegalCobranza()) return; // domingo/feriado: reintenta el próximo día hábil
     _ultimaCorrida = hoy;
     const r = await correr({ real: true });
     console.log(`[aviso-vencimiento] corrida ${hoy}: ${r.resultados.length} avisos`, r.resultados.map(x => x.estado).join(','));

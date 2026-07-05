@@ -132,6 +132,17 @@ async function procesar({ dryRun = false } = {}) {
   const cooldown = Math.max(0, parseInt(cfg.mora_cooldown_dias, 10) || 7);
   const max = Math.min(2000, Math.max(1, parseInt(cfg.mora_max, 10) || 200));
   const pausaMs = Math.max(0, parseInt(cfg.mora_pausa_seg, 10) || 0) * 1000;   // espaciado entre correos
+  // Ley 21.320: gestiones de cobranza solo L-S hábiles 8:00-20:00 (en Modo Desarrollo
+  // se permite porque el mailer redirige todo a las casillas de prueba)
+  if (!dryRun) {
+    let devMode = false;
+    try { devMode = !!(await require('../../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
+    if (!devMode) {
+      const { motivoFueraHorario } = require('../../../../shared/horario-cobranza');
+      const motivo = motivoFueraHorario();
+      if (motivo) return { ok: false, motivo: `horario legal de cobranza (Ley 21.320): ${motivo} — permitido L-S hábiles 8:00-20:00` };
+    }
+  }
   const [rows] = await pool.query(MORA_SQL('', '') + ' ORDER BY dias_mora DESC LIMIT ' + max);
   const tramoDe = d => plantillas.find(p => d >= p.dias_desde && d <= p.dias_hasta);
   let enviados = 0, saltados = 0, sin_email = 0, sin_tramo = 0; const detalle = [];
