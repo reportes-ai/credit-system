@@ -464,6 +464,12 @@
 
   /* ═══ PLANTILLAS HSM ═══ */
   const PL_ST = { APPROVED:['#16a34a','APROBADA'], PENDING:['#d97706','PENDIENTE'], REJECTED:['#dc2626','RECHAZADA'], PAUSED:['#64748b','PAUSADA'], DISABLED:['#64748b','DESHABILITADA'] };
+  let PL_CACHE = [];
+  const CAMPOS_COBRANZA = [
+    ['nombre','Nombre del cliente'],['rut','RUT'],['dias_mora','Días de mora'],['cuotas_mora','N° cuotas en mora'],
+    ['monto_mora','Monto en mora ($)'],['saldo_insoluto','Saldo insoluto ($)'],['numero_operacion','N° de operación'],
+  ];
+  function nVarsOf(p){ const cuerpo=(p.components||[]).find(c=>c.type==='BODY')?.text||''; return (cuerpo.match(/\{\{\d+\}\}/g)||[]).length; }
   async function cargarPlantillas(){
     const box = document.getElementById('plantillasList');
     box.innerHTML = '<div class="empty">Cargando…</div>';
@@ -471,24 +477,83 @@
       const j = await (await fetch('/api/whatsapp/plantillas',{headers:H})).json();
       if (!j.success) { box.innerHTML = `<div class="empty">${esc(j.error||'Error')}</div>`; return; }
       if (j.data.simulado) { box.innerHTML = '<div class="empty">Sin conexión Meta (modo simulado).</div>'; return; }
-      const rows = j.data.plantillas||[];
-      box.innerHTML = rows.length ? rows.map(p=>{
-        const [col,txt] = PL_ST[p.status]||['#64748b',p.status];
-        const cuerpo = (p.components||[]).find(c=>c.type==='BODY')?.text||'';
-        return `<div style="border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;margin-bottom:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-            <b style="font-size:.86rem;color:#0f172a">${esc(p.name)}</b>
-            <span style="display:flex;gap:6px;align-items:center">
-              <span style="font-size:.62rem;font-weight:800;color:#fff;background:${col};border-radius:8px;padding:2px 9px">${txt}</span>
-              <span style="font-size:.66rem;color:#94a3b8">${esc(p.category||'')} · ${esc(p.language||'')}</span>
-              <button style="background:none;border:none;color:#dc2626;cursor:pointer" title="Eliminar" onclick="delPlantilla('${esc(p.name)}')"><i class="bi bi-trash"></i></button>
-            </span>
-          </div>
-          <div style="font-size:.78rem;color:#475569;margin-top:4px;white-space:pre-wrap">${esc(cuerpo)}</div>
-          ${p.status==='REJECTED'&&p.rejected_reason?`<div style="font-size:.72rem;color:#dc2626;margin-top:4px">Motivo: ${esc(p.rejected_reason)}</div>`:''}
-        </div>`;
-      }).join('') : '<div class="empty">Sin plantillas aún. Crea la primera con "Nueva plantilla".</div>';
+      PL_CACHE = j.data.plantillas||[];
+      renderPlantillas();
     } catch(e){ box.innerHTML = '<div class="empty">Error de conexión.</div>'; }
+  }
+  function renderPlantillas(){
+    const box = document.getElementById('plantillasList');
+    const rows = PL_CACHE;
+    box.innerHTML = rows.length ? rows.map((p,i)=>{
+      const [col,txt] = PL_ST[p.status]||['#64748b',p.status];
+      const cuerpo = (p.components||[]).find(c=>c.type==='BODY')?.text||'';
+      return `<div style="border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:.86rem;color:#0f172a">${esc(p.name)}</b>
+          <span style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:.62rem;font-weight:800;color:#fff;background:${col};border-radius:8px;padding:2px 9px">${txt}</span>
+            <span style="font-size:.66rem;color:#94a3b8">${esc(p.category||'')} · ${esc(p.language||'')}</span>
+            <button style="background:none;border:none;color:#dc2626;cursor:pointer" title="Eliminar" onclick="delPlantilla('${esc(p.name)}')"><i class="bi bi-trash"></i></button>
+          </span>
+        </div>
+        <div style="font-size:.78rem;color:#475569;margin-top:4px;white-space:pre-wrap">${esc(cuerpo)}</div>
+        ${p.status==='REJECTED'&&p.rejected_reason?`<div style="font-size:.72rem;color:#dc2626;margin-top:4px">Motivo: ${esc(p.rejected_reason)}</div>`:''}
+        <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.74rem">
+          <span style="color:#64748b;font-weight:700">Tipo de mensaje:</span>
+          <select id="plTipo${i}" onchange="renderTipoPl(${i})" style="border:1px solid #cbd5e1;border-radius:6px;padding:2px 6px;font-size:.74rem">
+            <option value="GENERAL" ${p.tipo==='GENERAL'?'selected':''}>General</option>
+            <option value="VENTA" ${p.tipo==='VENTA'?'selected':''}>Ventas</option>
+            <option value="COBRANZA" ${p.tipo==='COBRANZA'?'selected':''}>Cobranza</option>
+          </select>
+          <span style="font-size:.68rem;color:#94a3b8">Las de tipo Cobranza se ven y activan desde Cobranza → Automatizaciones de Cobranza.</span>
+        </div>
+        <div id="plCobExtra${i}"></div>
+      </div>`;
+    }).join('') : '<div class="empty">Sin plantillas aún. Crea la primera con "Nueva plantilla".</div>';
+    rows.forEach((p,i)=> pintarTipoExtra(i));
+  }
+  function pintarTipoExtra(i){
+    const p = PL_CACHE[i];
+    const el = document.getElementById('plCobExtra'+i);
+    const tipoSel = document.getElementById('plTipo'+i)?.value || p.tipo;
+    if (tipoSel !== 'COBRANZA') { el.innerHTML=''; return; }
+    const nVars = nVarsOf(p);
+    const mapa = Array.isArray(p.mapa_variables) && p.mapa_variables.length===nVars ? p.mapa_variables : Array(nVars).fill('');
+    el.innerHTML = `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px;margin-top:6px;font-size:.74rem">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+        <label style="display:flex;align-items:center;gap:5px"><input type="checkbox" id="plActivo${i}" ${p.activo_auto?'checked':''}> Activa en la secuencia</label>
+        <label>N° en la secuencia: <input type="number" id="plOrden${i}" min="1" max="99" value="${p.orden||''}" style="width:50px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 4px"></label>
+      </div>
+      ${nVars? `<div style="margin-bottom:6px"><b>Variables {{n}}</b> → dato que reemplaza:</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${Array.from({length:nVars}).map((_,v)=>`<div style="display:flex;gap:6px;align-items:center">
+          <span style="width:52px;color:#64748b">{{${v+1}}}</span>
+          <select id="plMapa${i}_${v}" style="border:1px solid #cbd5e1;border-radius:6px;padding:2px 6px;font-size:.72rem">
+            <option value="">— elegir —</option>
+            ${CAMPOS_COBRANZA.map(([k,l])=>`<option value="${k}" ${mapa[v]===k?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>`).join('')}
+      </div>` : ''}
+      <button onclick="guardarTipoPl(${i})" style="margin-top:8px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:4px 12px;font-size:.72rem;font-weight:700;cursor:pointer">Guardar</button>
+      <span id="plTipoMsg${i}" style="margin-left:8px;font-size:.7rem"></span>
+    </div>`;
+  }
+  function renderTipoPl(i){ pintarTipoExtra(i); }
+  async function guardarTipoPl(i){
+    const p = PL_CACHE[i];
+    const nVars = nVarsOf(p);
+    const tipo = document.getElementById('plTipo'+i).value;
+    const activo = document.getElementById('plActivo'+i)?.checked || false;
+    const orden = document.getElementById('plOrden'+i)?.value || null;
+    const mapa_variables = Array.from({length:nVars}).map((_,v)=> document.getElementById(`plMapa${i}_${v}`)?.value || '');
+    const msg = document.getElementById('plTipoMsg'+i);
+    msg.textContent = 'Guardando…'; msg.style.color='#64748b';
+    try {
+      const j = await (await fetch(`/api/whatsapp/plantillas/${encodeURIComponent(p.name)}/tipo`,{method:'PUT',headers:HJ,body:JSON.stringify({tipo,activo,orden,mapa_variables})})).json();
+      if (!j.success) { msg.textContent = j.error||'Error'; msg.style.color='#dc2626'; return; }
+      PL_CACHE[i] = {...p, tipo:j.data.tipo, orden:j.data.orden, activo_auto:j.data.activo, mapa_variables:j.data.mapa_variables};
+      msg.textContent = '✓ Guardado'; msg.style.color='#16a34a';
+    } catch(e){ msg.textContent='Error de conexión'; msg.style.color='#dc2626'; }
   }
   function nuevaPlantilla(){
   pintarPlVars();

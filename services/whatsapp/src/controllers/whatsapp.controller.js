@@ -406,7 +406,36 @@ exports.plantillas = async (req, res) => {
       { headers: { Authorization: 'Bearer ' + token } });
     const j = await r.json();
     if (!r.ok) return res.status(502).json({ success: false, data: null, error: j?.error?.message || 'Error de Meta' });
-    res.json({ success: true, data: { simulado: false, plantillas: j.data || [] }, error: null });
+    const [tipos] = await pool.query('SELECT * FROM wsp_plantillas_tipo');
+    const porNombre = {}; tipos.forEach(t => { porNombre[t.nombre_plantilla] = t; });
+    const plantillas = (j.data || []).map(p => {
+      const t = porNombre[p.name];
+      return { ...p, tipo: t?.tipo || 'GENERAL', orden: t?.orden ?? null, activo_auto: !!t?.activo,
+        mapa_variables: Array.isArray(t?.mapa_variables) ? t.mapa_variables : [] };
+    });
+    res.json({ success: true, data: { simulado: false, plantillas }, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+/* Tipo de mensaje (Cobranza/Venta/General) — SOLO las de Cobranza aparecen y se
+   activan desde el panel de Automatizaciones de Cobranza. No existe en Meta:
+   se guarda en la tabla local `wsp_plantillas_tipo`. */
+exports.setTipoPlantilla = async (req, res) => {
+  try {
+    const nombre = String(req.params.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ success: false, data: null, error: 'Falta el nombre de la plantilla' });
+    let { tipo, orden, activo, mapa_variables } = req.body || {};
+    tipo = ['COBRANZA', 'VENTA', 'GENERAL'].includes(String(tipo || '').toUpperCase()) ? String(tipo).toUpperCase() : 'GENERAL';
+    orden = tipo === 'COBRANZA' && orden ? Math.max(1, Math.min(99, Number(orden) || 0)) : null;
+    activo = tipo === 'COBRANZA' && activo ? 1 : 0;
+    const mapa = tipo === 'COBRANZA' && Array.isArray(mapa_variables) ? mapa_variables.slice(0, 10).map(String) : [];
+    await pool.query(`
+      INSERT INTO wsp_plantillas_tipo (nombre_plantilla, tipo, orden, activo, mapa_variables) VALUES (?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE tipo=VALUES(tipo), orden=VALUES(orden), activo=VALUES(activo), mapa_variables=VALUES(mapa_variables)`,
+      [nombre, tipo, orden, activo, JSON.stringify(mapa)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'whatsapp', entidad: 'plantilla_tipo', entidad_id: nombre,
+      detalle: `Plantilla "${nombre}" → tipo ${tipo}${tipo === 'COBRANZA' ? ` (orden ${orden || 's/n'}, ${activo ? 'activa' : 'inactiva'} en automatización)` : ''}` });
+    res.json({ success: true, data: { nombre, tipo, orden, activo: !!activo, mapa_variables: mapa }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 
@@ -823,6 +852,11 @@ exports.webhookReceive = async (req, res) => {
           if (m.type !== 'text') continue; // fase 1: solo texto
           await procesarEntrante({ telefono: m.from, nombre: contactos[m.from] || null, texto: m.text?.body || '' });
         }
+        // Estados de entrega (sent/delivered/read/failed) de mensajes salientes —
+        // hoy solo actualiza las Automatizaciones de Cobranza (wamid guardado al enviar).
+        for (const st of v.statuses || []) {
+          require('../automatizacion-cobranza').marcarEstado(st.id, st.status).catch(() => {});
+        }
       }
     }
   } catch (e) { console.error('[wsp webhook]', e.message); }
@@ -1150,5 +1184,36 @@ exports.avisoVencCorrer = async (req, res) => {
 
 exports.avisoVencCrearPlantillas = async (req, res) => {
   try { res.json({ success: true, data: await avisoVenc.crearPlantillas(), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+/* ═══ AUTOMATIZACIONES DE COBRANZA (motor services/whatsapp/src/automatizacion-cobranza.js) ═══
+   Secuencia numerada de plantillas HSM tipo=COBRANZA — panel expuesto en /cobranza/automatizaciones. */
+const autoCobranza = require('../automatizacion-cobranza');
+
+exports.autoCobranzaEstado = async (req, res) => {
+  try {
+    const [[cfg]] = await pool.query('SELECT cobranza_auto_activo FROM wsp_config LIMIT 1');
+    const seq = await autoCobranza.secuencia();
+    const [hist] = await pool.query('SELECT * FROM wsp_auto_cobranza_envios ORDER BY id DESC LIMIT 80');
+    res.json({ success: true, data: { config: cfg || {}, secuencia: seq, historial: hist }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.autoCobranzaConfig = async (req, res) => {
+  try {
+    const activo = req.body?.activo ? 1 : 0;
+    await pool.query('UPDATE wsp_config SET cobranza_auto_activo=?', [activo]);
+    res.json({ success: true, data: { activo }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.autoCobranzaProbar = async (req, res) => {
+  try { res.json({ success: true, data: await autoCobranza.correr({ real: false }), error: null }); }
+  catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.autoCobranzaCorrer = async (req, res) => {
+  try { res.json({ success: true, data: await autoCobranza.correr({ real: true }), error: null }); }
   catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };

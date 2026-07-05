@@ -40,7 +40,14 @@ router.post('/aviso-vencimiento/plantillas',verifyToken, requireFunc('wsp_config
 router.get('/plantillas',            verifyToken, requireFunc('wsp_config'), ctrl.plantillas);
 router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
 router.post('/plantillas/revisar',   verifyToken, requireFunc('wsp_config'), ctrl.revisarPlantilla);
+router.put('/plantillas/:nombre/tipo', verifyToken, requireFunc('wsp_config'), ctrl.setTipoPlantilla);
 router.delete('/plantillas/:nombre', verifyToken, requireFunc('wsp_config'), ctrl.eliminarPlantilla);
+
+// Automatizaciones de Cobranza (secuencia numerada de plantillas tipo=COBRANZA)
+router.get('/automatizacion-cobranza',         verifyToken, requireFunc('wsp_config'), ctrl.autoCobranzaEstado);
+router.put('/automatizacion-cobranza/config',  verifyToken, requireFunc('wsp_config'), ctrl.autoCobranzaConfig);
+router.post('/automatizacion-cobranza/probar', verifyToken, requireFunc('wsp_config'), ctrl.autoCobranzaProbar);
+router.post('/automatizacion-cobranza/correr', verifyToken, requireFunc('wsp_config'), ctrl.autoCobranzaCorrer);
 
 // Campañas de salida
 router.get('/campanas',              verifyToken, requireFunc('wsp_campanas'), ctrl.campanas);
