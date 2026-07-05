@@ -142,6 +142,24 @@
   <!-- ═══════════════ TAB WHATSAPP ═══════════════ -->
   <div id="secWsp" style="display:none">
 
+  <!-- Aviso de Vencimiento (ANTES de vencer — motor propio de Facilito) -->
+  <div class="card-af" style="border:1.5px solid #bae6fd">
+    <h3 style="color:#0369a1"><i class="bi bi-bell"></i> Aviso de Vencimiento (antes de vencer)</h3>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <label class="sw"><input type="checkbox" id="avActivo" onchange="guardarAvisoVenc()"><span class="sl"></span></label>
+      <span id="avActivoLbl" style="font-weight:700">—</span>
+      <span class="muted" style="margin-left:auto" id="avPl"></span>
+    </div>
+    <p class="muted" style="margin:0 0 12px">Motor distinto al de mora: <b>N días antes</b> de que venza una cuota le avisa al cliente por WhatsApp (plantilla <code>aviso_vencimiento</code>, o <code>aviso_vencimiento_mora</code> si además tiene cuotas impagas, con el monto al día). 1 aviso por cuota, corre a las <b>10:00</b> (Chile). Cada envío queda en la bitácora del cliente (CRM). Detalle y plantillas en <a href="/whatsapp">módulo WhatsApp</a>.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <label style="margin:0">Avisar con</label>
+      <input type="number" id="avDias" min="1" max="15" style="width:70px" onchange="guardarAvisoVenc()">
+      <span class="muted">día(s) de anticipación</span>
+      <button class="btn-run" onclick="probarAvisoVenc()" style="margin-left:auto"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
+    </div>
+    <div class="res" id="avRes"></div>
+  </div>
+
   <!-- Motor WSP -->
   <div class="card-af" style="border:1.5px solid #bbf7d0">
     <h3 style="color:var(--wsp)"><i class="bi bi-whatsapp"></i> Motor de WhatsApp (secuencia numerada)</h3>
@@ -202,6 +220,7 @@
       <li><b>Desde (cuenta)</b> → remitente de los correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
       <li><b>No reenviar mismo tramo</b> → evita repetir el mismo correo al mismo crédito dentro de N días.</li>
       <li><b>Plantillas por tramo</b> → el texto del correo según los <b>días de mora</b> (cartera AutoFácil).</li>
+      <li><b>Aviso de Vencimiento (encendido/días antes)</b> → WhatsApp automático ANTES de que venza la cuota (plantillas <code>aviso_vencimiento</code>/<code>_mora</code> de <a href="/whatsapp">Facilito</a>, 10:00). Nace <b>desactivado</b>.</li>
       <li><b>Motor de WhatsApp (encendido/hora/días)</b> → cuándo corre la secuencia numerada por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
       <li><b>A quiénes (mora desde/hasta, monto mínimo)</b> → filtra qué créditos en mora reciben el WhatsApp automático (ej. solo entre 3 y 60 días de mora y sobre $50.000). Verificable con "Correr ahora (prueba)".</li>
       <li><b>Secuencia de plantillas</b> → qué mensaje HSM recibe el cliente en cada paso; el texto y su aprobación viven en <a href="/whatsapp">WhatsApp → Plantillas HSM</a> (Meta).</li>
@@ -379,10 +398,21 @@ const nVarsOf = p => (bodyOf(p).match(/\{\{\d+\}\}/g)||[]).length;
 async function cargarWsp(){
   window._wspCargado = true;
   try {
-    const [jA, jP] = await Promise.all([
+    const [jA, jP, jV] = await Promise.all([
       (await fetch('/api/whatsapp/automatizacion-cobranza', { headers:H })).json(),
       (await fetch('/api/whatsapp/plantillas', { headers:H })).json(),
+      (await fetch('/api/whatsapp/aviso-vencimiento', { headers:H })).json(),
     ]);
+    if (jV.success) {
+      const vc = jV.data.config || {};
+      document.getElementById('avActivo').checked = !!vc.aviso_venc_activo;
+      document.getElementById('avActivoLbl').textContent = vc.aviso_venc_activo ? 'ACTIVO' : 'DESACTIVADO';
+      document.getElementById('avDias').value = vc.aviso_venc_dias || 2;
+      const pl = jV.data.plantillas || {};
+      document.getElementById('avPl').textContent = pl.conectado
+        ? `Plantillas Meta: aviso ${pl.aviso_vencimiento||'?'} · con mora ${pl.aviso_vencimiento_mora||'?'}`
+        : 'Sin conexión con Meta en este ambiente';
+    }
     if (jA.success) {
       const cfg = jA.data.config || {};
       const activo = !!cfg.cobranza_auto_activo;
@@ -494,6 +524,31 @@ async function guardarWspActivo(){
     document.getElementById('wActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
     document.getElementById('wMsg').textContent = activo ? '✓ Activado — corre a la hora y días configurados' : '✓ Desactivado';
   } catch(e){ toast('Error: '+e.message, false); document.getElementById('wActivo').checked = !activo; }
+}
+
+async function guardarAvisoVenc(){
+  const activo = document.getElementById('avActivo').checked;
+  const dias = Number(document.getElementById('avDias').value) || 2;
+  try {
+    const j = await (await fetch('/api/whatsapp/aviso-vencimiento/config', { method:'PUT', headers:H, body:JSON.stringify({ activo, dias }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    document.getElementById('avActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
+    toast('✓ Aviso de vencimiento: ' + (activo ? `activo, ${j.data.dias} día(s) antes` : 'desactivado'));
+  } catch(e){ toast('Error: '+e.message, false); document.getElementById('avActivo').checked = !activo; }
+}
+
+async function probarAvisoVenc(){
+  const res = document.getElementById('avRes');
+  res.style.display='block'; res.textContent = 'Calculando (modo prueba)…';
+  try {
+    const j = await (await fetch('/api/whatsapp/aviso-vencimiento/probar', { method:'POST', headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const c = j.data.candidatos || [];
+    let txt = `PRUEBA (no se envió) — cuotas que vencen en ${j.data.dias} día(s): ${c.length}\n`;
+    if (c.length) txt += '\n' + c.map(x=>`  ${x.nombre} · cuota N°${x.numero_cuota} vence ${x.fecha_vencimiento} · $${Math.round(x.valor_cuota).toLocaleString('es-CL')}${x.con_mora?` · +${x.cuotas_impagas} impaga(s)`:''} → ${x.plantilla}`).join('\n');
+    else txt += '\n(Ninguna cuota vence ese día, o ya se les avisó.)';
+    res.textContent = txt;
+  } catch(e){ res.textContent = 'Error: '+e.message; }
 }
 
 async function guardarWspConfig(){
