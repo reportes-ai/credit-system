@@ -201,7 +201,7 @@
 | 15.2 | Webhook WhatsApp con verify token errado | 403 | P1 |
 | 15.3 | Píxel de campañas con token adulterado | No marca nada | P1 |
 | 15.4 | HTTPS forzado + .env fuera del repo + JWT_SECRET rotado si estuvo expuesto | Verificar | P0 |
-| 15.5 | Rate limit en /api/auth/login | Fuerza bruta bloqueada (pendiente de implementar — decidir si bloquea salida) | P1 |
+| 15.5 | Rate limit en /api/auth/login | ✅ Implementado (v89.2): 10 intentos/min por IP → 429; también portal cliente (solicitar-codigo, activar, login). Probar: 11 logins fallidos seguidos → el 11° da 429 | P1 |
 | 15.6 | Query pesada (reportería año completo) | Responde o timeoutea con gracia, no cuelga el server | P1 |
 
 ## 16. Criterios de salida (checklist final)

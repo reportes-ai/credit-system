@@ -8,6 +8,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1); // Render está detrás de proxy: req.ip = IP real del cliente
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'https://credit-system-45em.onrender.com',
@@ -72,7 +73,9 @@ app.use(express.static(path.join(__dirname, '../public'), {
 app.get('/favicon.ico', (req, res) =>
   res.sendFile(path.join(__dirname, '../public/img/favicon.png')));
 
-// Auth
+// Auth (login limitado a 10 intentos/min por IP — QA 15.5)
+const rateLimit = require('../../shared/rate-limit');
+app.use('/api/auth/login', rateLimit({ ventanaMs: 60000, max: 10 }));
 app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 
 // Usuarios y perfiles
