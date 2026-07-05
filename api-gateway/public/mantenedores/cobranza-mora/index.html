@@ -162,6 +162,7 @@
       <input type="number" id="avDias" min="1" max="15" style="width:70px" onchange="guardarAvisoVenc()">
       <span class="muted">día(s) de anticipación</span>
       <button class="btn-run" onclick="probarAvisoVenc()" style="margin-left:auto"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
+      <button class="btn-ghost" onclick="enviarPruebaAviso()" title="Envía ambas plantillas de aviso con datos falsos al teléfono que indiques"><i class="bi bi-send-check"></i> Enviar prueba</button>
     </div>
     <div class="res" id="avRes"></div>
   </div>
@@ -316,8 +317,20 @@ function renderPlantillas(){
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn-af" onclick="guardarPlantilla(${i})"><i class="bi bi-check-lg"></i> Guardar plantilla</button>
         <button class="btn-ghost" onclick="vistaPrevia(${i})"><i class="bi bi-eye"></i> Vista previa</button>
+        <button class="btn-ghost" onclick="enviarPruebaMail(${i})" title="Envía este correo con datos falsos al correo que indiques"><i class="bi bi-send-check"></i> Enviar prueba</button>
       </div>
     </div>`).join('');
+}
+
+async function enviarPruebaMail(i){
+  const p = PLANTILLAS[i];
+  const email = prompt(`Enviar PRUEBA de "${p.nombre}" con datos falsos.\n\nCorreo destino:`);
+  if (!email) return;
+  try {
+    const j = await (await fetch('/api/cobranza-mora/prueba', { method:'POST', headers:H, body:JSON.stringify({ codigo:p.codigo, email:email.trim() }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast(`✓ Prueba enviada a ${j.data.a} (asunto con [PRUEBA])`);
+  } catch(e){ toast('Error: '+e.message, false); }
 }
 
 async function guardarConfig(){
@@ -479,12 +492,23 @@ function renderSeq(){
           <select id="wm_${i}_${v}"><option value="">— elegir —</option>
           ${CAMPOS_COBRANZA.map(([k,l])=>`<option value="${k}" ${mapa[v]===k?'selected':''}>${l}</option>`).join('')}</select></div>`).join('')}
         <button class="btn-wsp" onclick="guardarSeq(${i})"><i class="bi bi-check-lg"></i> Guardar</button>
+        <button class="btn-ghost" onclick="enviarPruebaWsp('${esc(p.name)}')" title="Envía esta plantilla con datos falsos al teléfono que indiques"><i class="bi bi-send-check"></i> Enviar prueba</button>
         <button class="btn-ghost" onclick="quitarDeSeq(${i})" title="La saca de la secuencia (vuelve a tipo General)"><i class="bi bi-x-lg"></i> Quitar</button>
       </div>
     </div>`;
   }).join('') : '<div class="muted" style="text-align:center;padding:14px">La secuencia está vacía — agrega una plantilla abajo.</div>';
   document.getElementById('wspAgregar').innerHTML = '<option value="">— elegir plantilla —</option>' +
     fuera.map(p=>`<option value="${esc(p.name)}">${esc(p.name)} (${(PL_ST[p.status]||[,p.status])[1]})</option>`).join('');
+}
+
+async function enviarPruebaWsp(nombre){
+  const tel = prompt(`Enviar PRUEBA de "${nombre}" con DATOS FALSOS (Juan Prueba Pérez, $250.000, etc.).\n\nTeléfono destino (ej: +56 9 1234 5678):`);
+  if (!tel) return;
+  try {
+    const j = await (await fetch(`/api/whatsapp/plantillas/${encodeURIComponent(nombre)}/prueba`, { method:'POST', headers:H, body:JSON.stringify({ telefono: tel }) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast(`✓ Prueba enviada a +${j.data.a}`);
+  } catch(e){ toast('Error: '+e.message, false); }
 }
 
 async function guardarTipoWsp(nombre, body){
@@ -543,6 +567,21 @@ async function guardarAvisoVenc(){
     document.getElementById('avActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
     toast('✓ Aviso de vencimiento: ' + (activo ? `activo, ${j.data.dias} día(s) antes` : 'desactivado'));
   } catch(e){ toast('Error: '+e.message, false); document.getElementById('avActivo').checked = !activo; }
+}
+
+async function enviarPruebaAviso(){
+  const tel = prompt('Enviar PRUEBA de los avisos de vencimiento con DATOS FALSOS.\n\nTeléfono destino (ej: +56 9 1234 5678):');
+  if (!tel) return;
+  const res = document.getElementById('avRes');
+  res.style.display='block'; res.textContent = 'Enviando pruebas…';
+  const out = [];
+  for (const n of ['aviso_vencimiento','aviso_vencimiento_mora']) {
+    try {
+      const j = await (await fetch(`/api/whatsapp/plantillas/${encodeURIComponent(n)}/prueba`, { method:'POST', headers:H, body:JSON.stringify({ telefono: tel }) })).json();
+      out.push(`  ${n} → ${j.success ? '✓ enviada a +'+j.data.a : 'ERROR: '+(j.error||'')}`);
+    } catch(e){ out.push(`  ${n} → ERROR: ${e.message}`); }
+  }
+  res.textContent = 'PRUEBA con datos falsos:\n' + out.join('\n');
 }
 
 async function probarAvisoVenc(){

@@ -42,6 +42,7 @@ router.get('/plantillas',            verifyToken, requireFunc('wsp_config', 'man
 router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
 router.post('/plantillas/revisar',   verifyToken, requireFunc('wsp_config'), ctrl.revisarPlantilla);
 router.put('/plantillas/:nombre/tipo', verifyToken, requireFunc('wsp_config', 'mant_cobranza_mora'), ctrl.setTipoPlantilla);
+router.post('/plantillas/:nombre/prueba', verifyToken, requireFunc('wsp_config', 'mant_cobranza_mora'), ctrl.probarPlantillaEnvio);
 router.delete('/plantillas/:nombre', verifyToken, requireFunc('wsp_config'), ctrl.eliminarPlantilla);
 
 // Automatizaciones de Cobranza (secuencia numerada de plantillas tipo=COBRANZA).

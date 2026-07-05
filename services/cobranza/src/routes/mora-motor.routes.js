@@ -10,5 +10,6 @@ router.put('/plantilla', verifyToken, requireFunc('mant_cobranza_mora'), c.guard
 router.put('/config',    verifyToken, requireFunc('mant_cobranza_mora'), c.guardarConfig);
 router.post('/preview',  verifyToken, c.preview);
 router.post('/correr',   verifyToken, requireFunc('mant_cobranza_mora'), c.correrAhora);
+router.post('/prueba',   verifyToken, requireFunc('mant_cobranza_mora'), c.enviarPrueba);
 
 module.exports = router;

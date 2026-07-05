@@ -252,4 +252,4 @@ async function tick() {
 }
 setInterval(tick, 10 * 60 * 1000);
 
-module.exports = { correr, candidatos, secuencia, marcarEstado, CAMPOS_LABEL };
+module.exports = { correr, candidatos, secuencia, marcarEstado, CAMPOS, CAMPOS_LABEL, normTel };

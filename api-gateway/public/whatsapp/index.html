@@ -493,6 +493,7 @@
           <span style="display:flex;gap:6px;align-items:center">
             <span style="font-size:.62rem;font-weight:800;color:#fff;background:${col};border-radius:8px;padding:2px 9px">${txt}</span>
             <span style="font-size:.66rem;color:#94a3b8">${esc(p.category||'')} · ${esc(p.language||'')}</span>
+            <button style="background:none;border:none;color:#0141A2;cursor:pointer" title="Enviar prueba con datos falsos" onclick="pruebaPlantilla('${esc(p.name)}')"><i class="bi bi-send-check"></i></button>
             <button style="background:none;border:none;color:#dc2626;cursor:pointer" title="Eliminar" onclick="delPlantilla('${esc(p.name)}')"><i class="bi bi-trash"></i></button>
           </span>
         </div>
@@ -537,6 +538,17 @@
       <button onclick="guardarTipoPl(${i})" style="margin-top:8px;background:#16a34a;color:#fff;border:none;border-radius:7px;padding:4px 12px;font-size:.72rem;font-weight:700;cursor:pointer">Guardar</button>
       <span id="plTipoMsg${i}" style="margin-left:8px;font-size:.7rem"></span>
     </div>`;
+  }
+  async function pruebaPlantilla(nombre){
+    const tel = prompt(`Enviar PRUEBA de "${nombre}" con DATOS FALSOS.
+
+Teléfono destino (ej: +56 9 1234 5678):`);
+    if (!tel) return;
+    try {
+      const j = await (await fetch(`/api/whatsapp/plantillas/${encodeURIComponent(nombre)}/prueba`, { method:'POST', headers:HJ, body:JSON.stringify({ telefono: tel }) })).json();
+      if (!j.success) throw new Error(j.error||'Error');
+      alert('✓ Prueba enviada a +'+j.data.a);
+    } catch(e){ alert('Error: '+e.message); }
   }
   function renderTipoPl(i){ pintarTipoExtra(i); }
   async function guardarTipoPl(i){

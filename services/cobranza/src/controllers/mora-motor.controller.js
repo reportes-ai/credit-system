@@ -254,6 +254,29 @@ exports.preview = async (req, res) => {
     res.json({ success: true, data: { asunto: rellenar(asunto || '', vars), html: emailHTMLCobranza(rellenar(cuerpo || '', vars)) }, error: null });
   } catch (e) { console.error('[mora preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
+// Envía UNA plantilla de PRUEBA con datos falsos al correo indicado (no toca bitácoras ni historial)
+exports.enviarPrueba = async (req, res) => {
+  try {
+    const { codigo, email } = req.body || {};
+    if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email).trim()))
+      return res.status(400).json({ success: false, data: null, error: 'Correo destino inválido' });
+    const [[p]] = await pool.query('SELECT * FROM cobranza_mora_plantillas WHERE codigo=? LIMIT 1', [codigo]);
+    if (!p) return res.status(404).json({ success: false, data: null, error: 'Plantilla no encontrada' });
+    const conf = await getCobranzaConfig();
+    const vars = { trato: 'Estimado', nombre: 'Juan Prueba Pérez', numero: '99999', dias: 15, cuotas: 2, monto: '250.000', datos: conf.datos_transferencia };
+    const cfg = await getMotorCfg();
+    const from = remitentePorClave(cfg.mora_remitente || 'cobranza');
+    const cuerpoTxt = rellenar(p.cuerpo, vars);
+    const r = await enviarCorreo({
+      to: String(email).trim(), from,
+      subject: '[PRUEBA — datos falsos] ' + rellenar(p.asunto, vars),
+      html: emailHTMLCobranza(cuerpoTxt), text: cuerpoTxt,
+    });
+    if (!r.ok) return res.status(500).json({ success: false, data: null, error: r.error || 'No se pudo enviar' });
+    res.json({ success: true, data: { enviado: true, a: String(email).trim() }, error: null });
+  } catch (e) { console.error('[mora prueba]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 // Corre el motor a demanda. Por defecto DRY-RUN (no envía, solo muestra a quién iría). ?real=1 envía.
 exports.correrAhora = async (req, res) => {
   try {

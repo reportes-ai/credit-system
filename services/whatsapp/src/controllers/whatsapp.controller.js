@@ -1228,6 +1228,56 @@ exports.autoCobranzaConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
+// Envía UNA plantilla HSM de PRUEBA con DATOS FALSOS al teléfono indicado
+// (no toca bitácoras ni secuencia). Sirve para cualquier plantilla aprobada.
+exports.probarPlantillaEnvio = async (req, res) => {
+  try {
+    const nombre = req.params.nombre;
+    const tel = autoCobranza.normTel(req.body?.telefono);
+    if (!tel) return res.status(400).json({ success: false, data: null, error: 'Teléfono inválido (usa formato +56 9 XXXX XXXX)' });
+    const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
+    if (!token || !phoneId) return res.status(400).json({ success: false, data: null, error: 'WhatsApp no configurado en este ambiente (WSP_TOKEN)' });
+
+    // Cuántas variables {{n}} tiene el BODY según Meta, y su estatus
+    const [[cfgW]] = await pool.query('SELECT waba_id FROM wsp_config LIMIT 1');
+    const rMeta = await fetch(`https://graph.facebook.com/v21.0/${cfgW?.waba_id || '1044493808034066'}/message_templates?limit=100&fields=name,status,components`, {
+      headers: { Authorization: 'Bearer ' + token } });
+    const jMeta = await rMeta.json().catch(() => ({}));
+    const tpl = (jMeta.data || []).find(t => t.name === nombre);
+    if (!tpl) return res.status(404).json({ success: false, data: null, error: 'Plantilla no existe en Meta' });
+    if (tpl.status !== 'APPROVED') return res.status(400).json({ success: false, data: null, error: `La plantilla está ${tpl.status} en Meta — solo se puede enviar APROBADA` });
+    const body = (tpl.components || []).find(c => c.type === 'BODY')?.text || '';
+    const nVars = (body.match(/\{\{\d+\}\}/g) || []).length;
+
+    // DATOS FALSOS: usa el mapeo de la secuencia si existe; si no, ejemplos genéricos
+    const FAKE = { nombre: 'Juan Prueba Pérez', rut: '11.111.111-1', num_op: '99999',
+      dias_mora: 15, cuotas_mora: 2, monto_mora: 250000, saldo_insoluto: 4500000 };
+    let params = [];
+    const [[tipoRow]] = await pool.query('SELECT mapa_variables FROM wsp_plantillas_tipo WHERE nombre_plantilla=?', [nombre]);
+    const mapa = Array.isArray(tipoRow?.mapa_variables) ? tipoRow.mapa_variables : [];
+    if (mapa.length === nVars && nVars > 0) {
+      params = mapa.map(campo => (autoCobranza.CAMPOS[campo] ? autoCobranza.CAMPOS[campo](FAKE) : 'PRUEBA'));
+    } else if (nVars > 0) {
+      // Genérico (incluye aviso_vencimiento y aviso_vencimiento_mora): ejemplos en orden
+      const ejemplos = ['Juan Prueba Pérez', 'lunes 20 de julio', '12', '$250.000', '2', '$500.000', '$750.000'];
+      params = Array.from({ length: nVars }, (_, i) => ejemplos[i] || 'PRUEBA');
+    }
+
+    const resp = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp', to: tel, type: 'template',
+        template: { name: nombre, language: { code: 'es' },
+          ...(params.length ? { components: [{ type: 'body', parameters: params.map(t => ({ type: 'text', text: String(t) })) }] } : {}) },
+      }),
+    });
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok) return res.status(500).json({ success: false, data: null, error: j.error?.message || `HTTP ${resp.status}` });
+    res.json({ success: true, data: { enviado: true, a: tel, plantilla: nombre, params }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
 exports.autoCobranzaProbar = async (req, res) => {
   try { res.json({ success: true, data: await autoCobranza.correr({ real: false }), error: null }); }
   catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
