@@ -235,7 +235,7 @@ Reglas de diseño que se derivan de este principio:
   - Hacer una prueba de restauración al menos una vez
   - Documentar el procedimiento de recuperación ante desastre
 
-- [ ] **Auditar variables de entorno**
+- [x] ✅ **Auditar variables de entorno** (2026-07-04: solo .env.example con placeholders en el repo, sin secretos hardcodeados, auth.js exige JWT_SECRET al boot; falta solo confirmar rotación si alguna vez estuvo expuesto)
   - Verificar que `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` estén en Render como env vars, NO en el código ni en `.env` commiteado
   - Revisar `.gitignore` para asegurar que ningún `.env` esté en el repositorio
   - Rotar el `JWT_SECRET` si alguna vez estuvo expuesto en GitHub
@@ -251,7 +251,7 @@ Reglas de diseño que se derivan de este principio:
 
 ### 🟡 Importante (estabilidad y operación)
 
-- [ ] **Logs de errores en producción**
+- [x] ✅ **Logs de errores en producción** (v89.4: shared/alerta-errores.js — correo al admin en cada 500, env ALERTA_ERRORES_MAIL, throttle 10min/ruta; sin Sentry, con mailer propio)
   - Integrar **Sentry** (gratuito hasta cierto volumen) o **LogTail** en el api-gateway
   - Objetivo: recibir mail/alerta cuando ocurre un error 500 en producción, antes de que el usuario avise
   - Instalación: `npm install @sentry/node`, 3 líneas en index.js
@@ -261,7 +261,7 @@ Reglas de diseño que se derivan de este principio:
   - Permite a Render detectar si el servicio cayó y reiniciarlo automáticamente
   - También útil para monitoreo manual
 
-- [ ] **Manejo de reconexión de BD**
+- [x] ✅ **Manejo de reconexión de BD** (v89.3: keep-alive + connectTimeout en el pool; /api/health detecta BD caída)
   - Agregar manejo de errores de pool en `shared/config/database.js` (reconexión automática si TiDB Cloud reinicia)
   - Actualmente un corte de BD deja el servidor colgado sin error claro
 
