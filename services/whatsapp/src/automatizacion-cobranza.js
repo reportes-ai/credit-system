@@ -21,6 +21,12 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
 (async () => {
   try {
     await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_activo TINYINT(1) NOT NULL DEFAULT 0`);
+    // Programación y focalización (a quiénes): hora, días de semana, tramo de mora y monto mínimo
+    await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_hora TINYINT NOT NULL DEFAULT 11`);
+    await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_dias VARCHAR(20) NOT NULL DEFAULT '1,2,3,4,5'`); // 1=Lun … 7=Dom
+    await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_mora_desde INT NOT NULL DEFAULT 1`);
+    await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_mora_hasta INT NULL`);
+    await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_monto_min INT NOT NULL DEFAULT 0`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wsp_plantillas_tipo (
         nombre_plantilla VARCHAR(100) PRIMARY KEY,
@@ -111,7 +117,15 @@ async function universoMora() {
 async function candidatos() {
   const seq = await secuencia();
   if (!seq.length) return [];
-  const universo = await universoMora();
+  const cfg = await getCfg();
+  // A QUIÉNES: filtro configurable del universo (tramo de días de mora + monto mínimo)
+  const desde = Number(cfg.cobranza_auto_mora_desde ?? 1);
+  const hasta = cfg.cobranza_auto_mora_hasta == null ? null : Number(cfg.cobranza_auto_mora_hasta);
+  const montoMin = Number(cfg.cobranza_auto_monto_min || 0);
+  const universo = (await universoMora()).filter(c =>
+    c.dias_mora >= desde &&
+    (hasta === null || c.dias_mora <= hasta) &&
+    c.monto_mora >= montoMin);
   const hoy = hoyChile();
   const out = [];
   for (const c of universo) {
@@ -195,7 +209,8 @@ async function marcarEstado(wamid, status) {
   } catch (e) { console.error('[auto-cobranza estado]', e.message); }
 }
 
-/* ── Scheduler: diario a las 11:00 (hora Chile) si está activo ── */
+/* ── Scheduler: corre a la HORA y DÍAS configurados (hora Chile) si está activo ── */
+const DIA_ISO = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
 let _ultimaCorrida = null;
 async function tick() {
   try {
@@ -203,8 +218,12 @@ async function tick() {
     if (!cfg.cobranza_auto_activo) return;
     const ahora = new Date();
     const horaChile = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: 'numeric', hour12: false }).format(ahora));
+    const diaChile = DIA_ISO[new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', weekday: 'short' }).format(ahora)];
     const hoy = hoyChile();
-    if (horaChile !== 11 || _ultimaCorrida === hoy) return;
+    const horaCfg = Number(cfg.cobranza_auto_hora ?? 11);
+    const diasCfg = String(cfg.cobranza_auto_dias || '1,2,3,4,5').split(',').map(Number);
+    if (!diasCfg.includes(diaChile)) return;
+    if (horaChile !== horaCfg || _ultimaCorrida === hoy) return;
     _ultimaCorrida = hoy;
     const r = await correr({ real: true });
     console.log(`[automatizacion-cobranza] corrida ${hoy}: ${r.resultados.length} envíos`, r.resultados.map(x => x.estado).join(','));

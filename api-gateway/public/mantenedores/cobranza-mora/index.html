@@ -150,8 +150,16 @@
       <span id="wActivoLbl" style="font-weight:700">—</span>
       <span class="muted" style="margin-left:auto" id="wUlt"></span>
     </div>
-    <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a las <b>11:00</b> (Chile). A cada crédito AutoFácil en mora le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora del cliente (CRM) y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
+    <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a la hora y días configurados (Chile). A cada crédito AutoFácil en mora <b>que cumpla los filtros de abajo</b> le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora del cliente (CRM) y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
+    <div class="grid" style="margin-bottom:10px">
+      <div><label>Hora (Chile)</label><select id="wHora"></select></div>
+      <div><label>Días</label><div class="dias" id="wDias"></div></div>
+      <div><label>A quiénes: mora desde (días)</label><input type="number" id="wMoraDesde" min="1" max="9999"></div>
+      <div><label>Mora hasta (días, vacío = sin tope)</label><input type="number" id="wMoraHasta" min="1" max="9999" placeholder="sin tope"></div>
+      <div><label>Monto en mora mínimo ($)</label><input type="number" id="wMontoMin" min="0" step="1000"></div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn-af" onclick="guardarWspConfig()"><i class="bi bi-check-lg"></i> Guardar configuración</button>
       <button class="btn-run" onclick="probarWsp()"><i class="bi bi-search"></i> Correr ahora (prueba, no envía)</button>
       <button class="btn-real" onclick="correrWsp()" title="Envía de verdad (respeta Modo Desarrollo)"><i class="bi bi-send"></i> Correr y enviar</button>
       <span id="wMsg" style="font-size:.8rem;color:var(--green)"></span>
@@ -194,7 +202,8 @@
       <li><b>Desde (cuenta)</b> → remitente de los correos (recomendado <b>Cobranza</b>). Ver <a href="/usuarios/">Usuarios → Seguridad</a> para probar las cuentas.</li>
       <li><b>No reenviar mismo tramo</b> → evita repetir el mismo correo al mismo crédito dentro de N días.</li>
       <li><b>Plantillas por tramo</b> → el texto del correo según los <b>días de mora</b> (cartera AutoFácil).</li>
-      <li><b>Motor de WhatsApp (encendido)</b> → secuencia numerada diaria (11:00) por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
+      <li><b>Motor de WhatsApp (encendido/hora/días)</b> → cuándo corre la secuencia numerada por la línea de <a href="/whatsapp">Facilito</a>. Nace <b>desactivado</b>.</li>
+      <li><b>A quiénes (mora desde/hasta, monto mínimo)</b> → filtra qué créditos en mora reciben el WhatsApp automático (ej. solo entre 3 y 60 días de mora y sobre $50.000). Verificable con "Correr ahora (prueba)".</li>
       <li><b>Secuencia de plantillas</b> → qué mensaje HSM recibe el cliente en cada paso; el texto y su aprobación viven en <a href="/whatsapp">WhatsApp → Plantillas HSM</a> (Meta).</li>
       <li><b>Ambos motores</b> → cada envío queda como gestión en la <b>bitácora del cliente</b> (CRM, visible en <a href="/crm/">CRM</a> y en la ficha de <a href="/cobranza/prejudicial">Pre-judicial</a>); en WhatsApp el resultado sube solo a Entregado/Leído.</li>
     </ul>
@@ -375,9 +384,18 @@ async function cargarWsp(){
       (await fetch('/api/whatsapp/plantillas', { headers:H })).json(),
     ]);
     if (jA.success) {
-      const activo = !!jA.data.config?.cobranza_auto_activo;
+      const cfg = jA.data.config || {};
+      const activo = !!cfg.cobranza_auto_activo;
       document.getElementById('wActivo').checked = activo;
       document.getElementById('wActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
+      const horaCfg = Number(cfg.cobranza_auto_hora ?? 11);
+      document.getElementById('wHora').innerHTML = Array.from({length:13},(_,i)=>i+8)
+        .map(h=>`<option value="${h}" ${h===horaCfg?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
+      const selW = String(cfg.cobranza_auto_dias||'1,2,3,4,5').split(',');
+      document.getElementById('wDias').innerHTML = DIAS.map(([v,l])=>`<span class="dchip ${selW.includes(v)?'on':''}" data-v="${v}" onclick="this.classList.toggle('on')">${l}</span>`).join('');
+      document.getElementById('wMoraDesde').value = cfg.cobranza_auto_mora_desde ?? 1;
+      document.getElementById('wMoraHasta').value = cfg.cobranza_auto_mora_hasta ?? '';
+      document.getElementById('wMontoMin').value = cfg.cobranza_auto_monto_min ?? 0;
       const hist = jA.data.historial || [];
       const h7 = hist.filter(h => (Date.now()-new Date(h.created_at).getTime()) < 7*86400000 && ['ENVIADO','ENTREGADO','LEIDO'].includes(h.estado)).length;
       document.getElementById('wUlt').textContent = h7 ? `${h7} envíos últimos 7 días` : 'Sin envíos recientes';
@@ -474,8 +492,26 @@ async function guardarWspActivo(){
     const j = await (await fetch('/api/whatsapp/automatizacion-cobranza/config', { method:'PUT', headers:H, body:JSON.stringify({ activo }) })).json();
     if (!j.success) throw new Error(j.error||'Error');
     document.getElementById('wActivoLbl').textContent = activo ? 'ACTIVO' : 'DESACTIVADO';
-    document.getElementById('wMsg').textContent = activo ? '✓ Activado — corre 1 vez al día a las 11:00' : '✓ Desactivado';
+    document.getElementById('wMsg').textContent = activo ? '✓ Activado — corre a la hora y días configurados' : '✓ Desactivado';
   } catch(e){ toast('Error: '+e.message, false); document.getElementById('wActivo').checked = !activo; }
+}
+
+async function guardarWspConfig(){
+  const dias = [...document.querySelectorAll('#wDias .dchip.on')].map(c=>c.dataset.v).join(',');
+  if (!dias) return toast('Selecciona al menos un día', false);
+  const body = {
+    hora: Number(document.getElementById('wHora').value),
+    dias,
+    mora_desde: document.getElementById('wMoraDesde').value || 1,
+    mora_hasta: document.getElementById('wMoraHasta').value || null,
+    monto_min: document.getElementById('wMontoMin').value || 0,
+  };
+  try {
+    const j = await (await fetch('/api/whatsapp/automatizacion-cobranza/config', { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('✓ Programación guardada');
+    document.getElementById('wMsg').textContent = '✓ Guardado — usa "Correr ahora (prueba)" para ver a quiénes alcanza';
+  } catch(e){ toast('Error: '+e.message, false); }
 }
 
 async function probarWsp(){

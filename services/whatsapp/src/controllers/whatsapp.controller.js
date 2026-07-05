@@ -1193,7 +1193,8 @@ const autoCobranza = require('../automatizacion-cobranza');
 
 exports.autoCobranzaEstado = async (req, res) => {
   try {
-    const [[cfg]] = await pool.query('SELECT cobranza_auto_activo FROM wsp_config LIMIT 1');
+    const [[cfg]] = await pool.query(`SELECT cobranza_auto_activo, cobranza_auto_hora, cobranza_auto_dias,
+      cobranza_auto_mora_desde, cobranza_auto_mora_hasta, cobranza_auto_monto_min FROM wsp_config LIMIT 1`);
     const seq = await autoCobranza.secuencia();
     const [hist] = await pool.query('SELECT * FROM wsp_auto_cobranza_envios ORDER BY id DESC LIMIT 80');
     res.json({ success: true, data: { config: cfg || {}, secuencia: seq, historial: hist }, error: null });
@@ -1202,9 +1203,28 @@ exports.autoCobranzaEstado = async (req, res) => {
 
 exports.autoCobranzaConfig = async (req, res) => {
   try {
-    const activo = req.body?.activo ? 1 : 0;
-    await pool.query('UPDATE wsp_config SET cobranza_auto_activo=?', [activo]);
-    res.json({ success: true, data: { activo }, error: null });
+    const b = req.body || {};
+    const sets = [], vals = [];
+    if ('activo' in b) { sets.push('cobranza_auto_activo=?'); vals.push(b.activo ? 1 : 0); }
+    if ('hora' in b) {
+      const h = Number(b.hora);
+      if (!Number.isInteger(h) || h < 8 || h > 20) return res.status(400).json({ success: false, data: null, error: 'La hora debe ser entera entre 8 y 20 (horario hábil)' });
+      sets.push('cobranza_auto_hora=?'); vals.push(h);
+    }
+    if ('dias' in b) {
+      const dias = [...new Set(String(b.dias || '').split(',').map(Number).filter(d => d >= 1 && d <= 7))];
+      if (!dias.length) return res.status(400).json({ success: false, data: null, error: 'Selecciona al menos un día de la semana' });
+      sets.push('cobranza_auto_dias=?'); vals.push(dias.sort().join(','));
+    }
+    if ('mora_desde' in b) { sets.push('cobranza_auto_mora_desde=?'); vals.push(Math.max(1, Number(b.mora_desde) || 1)); }
+    if ('mora_hasta' in b) {
+      const v = (b.mora_hasta === null || b.mora_hasta === '') ? null : Math.max(1, Number(b.mora_hasta) || 1);
+      sets.push('cobranza_auto_mora_hasta=?'); vals.push(v);
+    }
+    if ('monto_min' in b) { sets.push('cobranza_auto_monto_min=?'); vals.push(Math.max(0, Number(b.monto_min) || 0)); }
+    if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Nada que actualizar' });
+    await pool.query(`UPDATE wsp_config SET ${sets.join(', ')}`, vals);
+    res.json({ success: true, data: { actualizado: sets.length }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
 
