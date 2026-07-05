@@ -145,9 +145,9 @@ async function candidatos(dias) {
     ORDER BY cu.id_cuota`, [Number(dias) || 2]);
 
   const hoy = hoyChile();
-  // Tope semanal de gestiones por crédito (manuales + automáticas, Ley 21.320)
-  const { creditosConTopeAlcanzado } = require('../../../shared/horario-cobranza');
-  const enTope = await creditosConTopeAlcanzado(rows.map(r => r.id_credito));
+  // Cupo semanal Ley del Consumidor: máx 2 remotas/semana calendario, separadas ≥2 días
+  const { creditosSinCupoRemota } = require('../../../shared/horario-cobranza');
+  const enTope = await creditosSinCupoRemota(rows.map(r => r.id_credito));
   const { cobranzaFullMap } = require('../../creditos/src/controllers/pagos-credito.controller');
   const out = [];
   for (const c of rows) {

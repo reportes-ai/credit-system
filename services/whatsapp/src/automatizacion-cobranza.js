@@ -131,10 +131,11 @@ async function candidatos() {
     c.dias_mora >= desde &&
     (hasta === null || c.dias_mora <= hasta) &&
     c.monto_mora >= montoMin);
-  // Tope semanal de gestiones por crédito (manuales + automáticas, Ley 21.320)
-  const { creditosConTopeAlcanzado } = require('../../../shared/horario-cobranza');
-  const enTope = await creditosConTopeAlcanzado(universo.map(c => c.id_credito));
-  universo = universo.filter(c => !enTope.has(c.id_credito));
+  // Cupo semanal Ley del Consumidor: máx 2 remotas/semana calendario, separadas ≥2 días
+  // (misma regla que las gestiones manuales de Pre-judicial)
+  const { creditosSinCupoRemota } = require('../../../shared/horario-cobranza');
+  const sinCupo = await creditosSinCupoRemota(universo.map(c => c.id_credito));
+  universo = universo.filter(c => !sinCupo.has(c.id_credito));
   const hoy = hoyChile();
   const out = [];
   for (const c of universo) {

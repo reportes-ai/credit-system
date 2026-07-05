@@ -94,7 +94,7 @@ function emailHTMLCobranza(cuerpoTxt) {
 })();
 
 /* ── Config del motor (claves en cobranza_config) ── */
-const CFG_KEYS = ['mora_activo', 'mora_hora', 'mora_dias', 'mora_remitente', 'mora_cooldown_dias', 'mora_max', 'mora_pausa_seg', 'tope_gestiones_semana'];
+const CFG_KEYS = ['mora_activo', 'mora_hora', 'mora_dias', 'mora_remitente', 'mora_cooldown_dias', 'mora_max', 'mora_pausa_seg'];
 async function getMotorCfg() {
   const [rows] = await pool.query('SELECT clave,valor FROM cobranza_config WHERE clave IN (?)', [CFG_KEYS.concat(['mora_ultimo_envio_fecha'])]);
   const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
@@ -108,7 +108,6 @@ async function setMotorCfg(obj) {
     if (k === 'mora_hora' && !/^\d{2}:\d{2}$/.test(v)) continue;
     if (k === 'mora_dias') v = v.split(',').map(s => s.trim()).filter(d => /^[1-7]$/.test(d)).join(',');
     if (k === 'mora_remitente' && !cuentasRemitente().some(c => c.clave === v)) continue;
-    if (k === 'tope_gestiones_semana') v = String(Math.min(20, Math.max(0, parseInt(v, 10) || 0)));   // 0 = sin tope
     await pool.query('INSERT INTO cobranza_config (clave,valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, v]);
   }
 }
@@ -146,9 +145,9 @@ async function procesar({ dryRun = false } = {}) {
   }
   const [rows] = await pool.query(MORA_SQL('', '') + ' ORDER BY dias_mora DESC LIMIT ' + max);
   const tramoDe = d => plantillas.find(p => d >= p.dias_desde && d <= p.dias_hasta);
-  // Tope semanal de gestiones por crédito (manuales + automáticas, Ley 21.320)
-  const { creditosConTopeAlcanzado } = require('../../../../shared/horario-cobranza');
-  const enTope = await creditosConTopeAlcanzado(rows.map(r => r.id_credito));
+  // Cupo semanal Ley del Consumidor: máx 2 remotas/semana calendario, separadas ≥2 días
+  const { creditosSinCupoRemota } = require('../../../../shared/horario-cobranza');
+  const enTope = await creditosSinCupoRemota(rows.map(r => r.id_credito));
   let enviados = 0, saltados = 0, sin_email = 0, sin_tramo = 0, tope_semanal = 0; const detalle = [];
   for (const c of rows) {
     if (enTope.has(c.id_credito)) { tope_semanal++; continue; }

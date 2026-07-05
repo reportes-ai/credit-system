@@ -23,33 +23,34 @@ function motivoFueraHorario(d = new Date()) {
   return null;
 }
 
-/* ── Tope SEMANAL de gestiones por crédito (paramétrico) ──────────────────
-   cobranza_config.tope_gestiones_semana (0 = sin tope). Cuenta TODAS las
-   gestiones de la bitácora de cobranzas de los últimos 7 días (manuales +
-   automáticas, excluye SIMULADO porque nada llegó al cliente). Los motores
-   automáticos NO envían a un crédito que ya alcanzó el tope. */
+/* ── Cupo semanal de gestiones REMOTAS (Ley del Consumidor) ────────────────
+   MISMA regla que aplica Pre-judicial a las gestiones manuales
+   (cobranza.controller.js → disponibilidad): por crédito, máx 2 gestiones
+   REMOTAS (WhatsApp/SMS/Email) por SEMANA CALENDARIO (lunes a domingo,
+   YEARWEEK ISO), separadas por al menos 2 días. Cuenta manuales + automáticas
+   de la bitácora de cobranzas (excluye SIMULADO: nada llegó al cliente).
+   Los motores automáticos son canal REMOTA → no envían a un crédito sin cupo. */
 const pool = require('./config/database');
-let _tope = { valor: null, ts: 0 };
-async function topeSemanal() {
-  if (_tope.valor !== null && Date.now() - _tope.ts < 60000) return _tope.valor;
-  try {
-    const [[r]] = await pool.query("SELECT valor FROM cobranza_config WHERE clave='tope_gestiones_semana' LIMIT 1");
-    _tope = { valor: Math.max(0, parseInt(r?.valor, 10) || 0), ts: Date.now() };
-  } catch (e) { _tope = { valor: 0, ts: Date.now() }; }
-  return _tope.valor;
-}
 
-// De un set de créditos, cuáles YA alcanzaron el tope semanal → Set(id_credito)
-async function creditosConTopeAlcanzado(ids) {
-  const tope = await topeSemanal();
-  if (!tope || !ids || !ids.length) return new Set();
+// De un set de créditos, cuáles NO tienen cupo remoto esta semana → Set(id_credito)
+async function creditosSinCupoRemota(ids) {
+  if (!ids || !ids.length) return new Set();
   try {
     const [rows] = await pool.query(`
-      SELECT id_credito, COUNT(*) n FROM cobranza_gestiones
-      WHERE id_credito IN (?) AND created_at >= (NOW() - INTERVAL 7 DAY) AND resultado <> 'SIMULADO'
-      GROUP BY id_credito HAVING n >= ?`, [ids, tope]);
-    return new Set(rows.map(r => r.id_credito));
+      SELECT id_credito, COUNT(*) n, MAX(DATE(created_at)) ultima
+      FROM cobranza_gestiones
+      WHERE id_credito IN (?) AND canal = 'REMOTA' AND resultado <> 'SIMULADO'
+        AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)
+      GROUP BY id_credito`, [ids]);
+    const sin = new Set();
+    for (const r of rows) {
+      if (r.n >= 2) { sin.add(r.id_credito); continue; }                    // agotó las 2 de la semana
+      // separación mínima de 2 días respecto de la última remota
+      const dif = Math.floor((Date.now() - new Date(String(r.ultima).slice(0, 10) + 'T12:00:00').getTime()) / 86400000);
+      if (dif < 2) sin.add(r.id_credito);
+    }
+    return sin;
   } catch (e) { return new Set(); }
 }
 
-module.exports = { esHorarioLegalCobranza, motivoFueraHorario, topeSemanal, creditosConTopeAlcanzado };
+module.exports = { esHorarioLegalCobranza, motivoFueraHorario, creditosSinCupoRemota };
