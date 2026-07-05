@@ -240,12 +240,12 @@ Reglas de diseño que se derivan de este principio:
   - Revisar `.gitignore` para asegurar que ningún `.env` esté en el repositorio
   - Rotar el `JWT_SECRET` si alguna vez estuvo expuesto en GitHub
 
-- [ ] **Rate limiting en el API Gateway**
+- [x] ✅ **Rate limiting en el API Gateway** (v89.2: shared/rate-limit.js — login 10/min por IP + portal cliente)
   - Agregar `express-rate-limit` en `api-gateway/src/index.js` para evitar abuso
   - Límite sugerido: 200 req/min por IP en rutas públicas, 500 req/min en rutas autenticadas
   - Proteger especialmente `/api/auth/login` (máx 10 intentos/min por IP)
 
-- [ ] **HTTPS forzado**
+- [x] ✅ **HTTPS forzado** (v89.3: header HSTS 1 año; Render ya redirige HTTP→HTTPS)
   - Verificar que Render redirige HTTP → HTTPS automáticamente (debería estarlo)
   - Agregar header `Strict-Transport-Security` en respuestas
 
@@ -256,7 +256,7 @@ Reglas de diseño que se derivan de este principio:
   - Objetivo: recibir mail/alerta cuando ocurre un error 500 en producción, antes de que el usuario avise
   - Instalación: `npm install @sentry/node`, 3 líneas en index.js
 
-- [ ] **Health check endpoint**
+- [x] ✅ **Health check endpoint** (v89.3: GET /api/health — ping BD, 200/503, uptime)
   - Crear `GET /api/health` que retorne `{ status:'ok', db: true/false, uptime: X }`
   - Permite a Render detectar si el servicio cayó y reiniciarlo automáticamente
   - También útil para monitoreo manual
@@ -265,7 +265,7 @@ Reglas de diseño que se derivan de este principio:
   - Agregar manejo de errores de pool en `shared/config/database.js` (reconexión automática si TiDB Cloud reinicia)
   - Actualmente un corte de BD deja el servidor colgado sin error claro
 
-- [ ] **Timeout en queries largas**
+- [x] ✅ **Timeout en queries largas** (v89.3: connectTimeout 15s + keep-alive en el pool)
   - Configurar `connectTimeout` y `queryTimeout` en el pool de BD
   - Evita que una query lenta bloquee el servidor indefinidamente
 
