@@ -515,3 +515,208 @@ exports.simulador = async (req, res) => {
     return res.status(500).json({ success: false, data: null, error: 'Error al simular' });
   }
 };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRE-APROBACIÓN — el dealer evalúa a su cliente en línea.
+   Evalúa con las MISMAS fuentes internas (renta líquida de antecedentes,
+   informes comerciales, política por año de vehículo, elegibilidad AutoFin
+   del Cuadro Preferencia Financiera) y el MOTOR ÚNICO de cuota
+   (shared/cotizador.cotizarCuota). Al dealer NUNCA se le exponen los datos
+   del cliente: solo el veredicto y las cuotas. El detalle interno viaja por
+   correo al Jefe Comercial cuando el dealer pide contacto.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const AF_RUT = require('../../../../api-gateway/public/js/rut-core');
+
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS portal_preaprobaciones (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_dealer INT NULL,
+        rut_dealer VARCHAR(15) NULL,
+        dealer_nombre VARCHAR(200) NULL,
+        rut_cliente VARCHAR(15) NOT NULL,
+        precio BIGINT NOT NULL,
+        pie BIGINT NOT NULL,
+        anio SMALLINT NOT NULL,
+        resultado VARCHAR(12) NOT NULL,
+        motivos TEXT NULL,
+        opciones TEXT NULL,
+        contacto TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_dealer (id_dealer), INDEX idx_rut (rut_cliente)
+      )`);
+  } catch (e) { console.error('[preaprobacion migration]', e.message); }
+})();
+
+// Grilla por defecto del Cuadro Preferencia Financiera (misma semilla del
+// mantenedor de Cartas; si existe en cartas_parametros, manda la BD).
+const PREF_DEFAULT = [
+  { cd: 12, ch: 15, sd: '2000000', sh: '3999999', af: 'NO' }, { cd: 12, ch: 15, sd: '4000000', sh: '200 UF', af: 'SI' },
+  { cd: 12, ch: 15, sd: '200 UF', sh: '18000000', af: 'NO' }, { cd: 16, ch: 24, sd: '2000000', sh: '3999999', af: 'NO' },
+  { cd: 16, ch: 24, sd: '4000000', sh: '200 UF', af: 'SI' }, { cd: 16, ch: 24, sd: '200 UF', sh: '18000000', af: 'NO' },
+  { cd: 25, ch: 36, sd: '2000000', sh: '18000000', af: 'SI' }, { cd: 25, ch: 36, sd: '18000001', sh: 'SIN TOPE', af: 'SI' },
+  { cd: 37, ch: 48, sd: '2000000', sh: 'SIN TOPE', af: 'SI' },
+];
+function limitePref(tok, uf, esPiso) {
+  const s = String(tok || '').trim().toUpperCase();
+  if (!s) return esPiso ? 0 : Infinity;
+  if (s === 'SIN TOPE') return Infinity;
+  if (s.endsWith('UF')) { const n = parseFloat(s); return uf ? n * uf : (esPiso ? 0 : Infinity); }
+  const n = parseFloat(s.replace(/\./g, ''));
+  return isNaN(n) ? (esPiso ? 0 : Infinity) : n;
+}
+async function autofinElegible(plazo, saldo, uf) {
+  let grilla = PREF_DEFAULT;
+  try {
+    const [[row]] = await pool.query("SELECT `value` FROM cartas_parametros WHERE `key`='preferencia_financiera' LIMIT 1");
+    if (row) { const g = JSON.parse(row.value); if (Array.isArray(g) && g.length) grilla = g; }
+  } catch (e) { /* grilla default */ }
+  const fila = grilla.find(f => plazo >= f.cd && plazo <= f.ch
+    && saldo >= limitePref(f.sd, uf, true) && saldo <= limitePref(f.sh, uf, false));
+  return fila ? String(fila.af).toUpperCase() === 'SI' : false;
+}
+
+const fmtCLP = n => '$' + Math.round(+n || 0).toLocaleString('es-CL');
+
+// POST /api/portal-dealer/preaprobacion  { rut, precio, pie, anio }
+exports.preaprobar = async (req, res) => {
+  try {
+    const rut = AF_RUT.normalizar(req.body.rut);
+    const precio = Math.round(+req.body.precio || 0);
+    const pie = Math.round(+req.body.pie || 0);
+    const anio = parseInt(req.body.anio) || 0;
+    const hoyAnio = new Date().getFullYear();
+    if (!rut || AF_RUT.validar(rut) !== true) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
+    if (!(precio >= 1000000 && precio <= 300000000)) return res.status(400).json({ success: false, data: null, error: 'Precio inválido' });
+    if (!(pie >= 0 && pie < precio)) return res.status(400).json({ success: false, data: null, error: 'Pie inválido' });
+    if (!(anio >= 1990 && anio <= hoyAnio + 1)) return res.status(400).json({ success: false, data: null, error: 'Año inválido' });
+
+    const motivos = [];
+    const saldo = precio - pie;
+    const rutLimpio = rut.replace(/[.\-\s]/g, '');
+
+    // 1) Antigüedad del vehículo — política de aprobación (sin marca: criterio general USADO)
+    const antig = hoyAnio - anio;
+    let antigMax = 7;
+    try {
+      const [pm] = await pool.query("SELECT MAX(antiguedad_vehiculo_max) mx FROM politica_aprobacion_matriz WHERE condicion='USADO'");
+      if (pm[0] && pm[0].mx != null) antigMax = parseInt(pm[0].mx) || 7;
+    } catch (e) { /* default 7 */ }
+    if (antig > antigMax) motivos.push('Vehículo ' + anio + ' supera la antigüedad máxima (' + antigMax + ' años)');
+
+    // 2) Renta líquida (antecedentes laborales internos)
+    const [[ant]] = await pool.query(
+      "SELECT renta_fija_liquida FROM antecedentes_laborales WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
+    const renta = ant ? +ant.renta_fija_liquida || 0 : 0;
+    if (!renta) motivos.push('Sin renta líquida registrada (no hay antecedentes laborales del cliente)');
+
+    // 3) Informes comerciales limpios
+    const [[ic]] = await pool.query(
+      "SELECT protestos_vigentes_q, deuda_morosa, deuda_vencida, deuda_castigada FROM informacion_comercial WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
+    if (!ic) motivos.push('Sin información comercial del cliente en el sistema');
+    else {
+      if (+ic.protestos_vigentes_q > 0) motivos.push('Protestos vigentes: ' + ic.protestos_vigentes_q);
+      if (+ic.deuda_morosa > 0) motivos.push('Deuda morosa: ' + fmtCLP(ic.deuda_morosa));
+      if (+ic.deuda_vencida > 0) motivos.push('Deuda vencida: ' + fmtCLP(ic.deuda_vencida));
+      if (+ic.deuda_castigada > 0) motivos.push('Deuda castigada: ' + fmtCLP(ic.deuda_castigada));
+    }
+
+    // 4) Cuotas con el MOTOR ÚNICO + elegibilidad AutoFin + carga ≤30% renta
+    const { cotizarCuota } = require('../../../../shared/cotizador');
+    const { getUF } = require('../../../../shared/uf');
+    const uf = await getUF(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }));
+    const opciones = [];
+    if (!motivos.length) {
+      const topeCuota = renta * 0.30;
+      let algunaElegible = false;
+      for (const n of [12, 24, 36, 48]) {
+        const c = await cotizarCuota(precio, pie, n);
+        if (!c) continue;
+        if (!(await autofinElegible(n, saldo, uf))) continue;
+        algunaElegible = true;
+        if (c.cuota <= topeCuota) opciones.push({ plazo: n, cuota: c.cuota });
+      }
+      if (!algunaElegible) motivos.push('Operación fuera del cuadro de elegibilidad AutoFin (saldo ' + fmtCLP(saldo) + ')');
+      else if (!opciones.length) motivos.push('Cuota supera el 30% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(renta * 0.30) + ')');
+    }
+
+    const resultado = (!motivos.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
+    const [ins] = await pool.query(
+      `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [req.dealer && req.dealer.id_dealer || null, req.dealer && req.dealer.rut || null,
+       (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null,
+       rut, precio, pie, anio, resultado, motivos.join(' | ') || null, JSON.stringify(opciones)]);
+
+    // Al dealer: SOLO veredicto y cuotas — nunca el detalle del cliente
+    return res.json({ success: true, data: { id: ins.insertId, resultado, opciones }, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] preaprobar:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No pude evaluar en este momento' });
+  }
+};
+
+// POST /api/portal-dealer/preaprobacion/:id/contactar — pide ejecutivo:
+// responde disponibilidad real y avisa por correo al Jefe Comercial.
+exports.preaprobacionContactar = async (req, res) => {
+  try {
+    const [[pre]] = await pool.query('SELECT * FROM portal_preaprobaciones WHERE id=? LIMIT 1', [parseInt(req.params.id) || 0]);
+    if (!pre) return res.status(404).json({ success: false, data: null, error: 'Evaluación no encontrada' });
+    // Pertenencia: solo el dealer que la creó puede pedir contacto
+    const dj = req.dealer || {};
+    const mia = (pre.id_dealer && dj.id_dealer && Number(pre.id_dealer) === Number(dj.id_dealer))
+             || (pre.rut_dealer && dj.rut && String(pre.rut_dealer) === String(dj.rut));
+    if (!mia) return res.status(403).json({ success: false, data: null, error: 'Evaluación de otro dealer' });
+    await pool.query('UPDATE portal_preaprobaciones SET contacto=1 WHERE id=?', [pre.id]);
+
+    // Disponibilidad real: presencia (heartbeat) + conversaciones de chat activas
+    const { conectadosIds } = require('../../../../shared/presencia');
+    const vivos = conectadosIds();
+    const [ejes] = await pool.query(
+      `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE u.estado='activo' AND p.nombre IN ('Ejecutivo','Ejecutivo Comercial')`);
+    const conectados = ejes.filter(e => vivos.has(Number(e.id_usuario)));
+    let ocupados = new Set();
+    try {
+      const [act] = await pool.query("SELECT id_ejecutivo, COUNT(*) c FROM ar_conversaciones WHERE estado='ACTIVA' GROUP BY id_ejecutivo");
+      ocupados = new Set(act.filter(a => +a.c >= 3).map(a => Number(a.id_ejecutivo)));
+    } catch (e) { /* sin chat activo */ }
+    const desocupados = conectados.filter(e => !ocupados.has(Number(e.id_usuario)));
+
+    // Correo al Jefe Comercial con el DETALLE COMPLETO (uso interno)
+    try {
+      const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+      const [jefes] = await pool.query(
+        `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+         WHERE u.estado='activo' AND p.nombre='Jefe Comercial' AND u.email IS NOT NULL`);
+      if (jefes.length) {
+        const ops = JSON.parse(pre.opciones || '[]');
+        const html = envolverHTML(`
+          <h2 style="margin:0 0 8px">Pre-aprobación desde el Portal del Dealer</h2>
+          <p>El dealer pidió contacto con un ejecutivo. Detalle para seguimiento:</p>
+          <table cellpadding="6" style="border-collapse:collapse;font-size:14px">
+            <tr><td><b>Dealer</b></td><td>${pre.dealer_nombre || pre.rut_dealer || '—'}</td></tr>
+            <tr><td><b>RUT cliente</b></td><td>${pre.rut_cliente}</td></tr>
+            <tr><td><b>Precio vehículo</b></td><td>${fmtCLP(pre.precio)} (año ${pre.anio})</td></tr>
+            <tr><td><b>Pie</b></td><td>${fmtCLP(pre.pie)}</td></tr>
+            <tr><td><b>Saldo a financiar</b></td><td>${fmtCLP(pre.precio - pre.pie)}</td></tr>
+            <tr><td><b>Resultado</b></td><td><b>${pre.resultado}</b></td></tr>
+            ${ops.length ? '<tr><td><b>Cuotas ofrecidas</b></td><td>' + ops.map(o => o.plazo + ' cuotas de ' + fmtCLP(o.cuota)).join(' · ') + '</td></tr>' : ''}
+            ${pre.motivos ? '<tr><td><b>Motivos revisión</b></td><td>' + pre.motivos + '</td></tr>' : ''}
+            <tr><td><b>Ejecutivos conectados</b></td><td>${conectados.length} (${desocupados.length} desocupados)</td></tr>
+          </table>`);
+        await enviarCorreo({
+          to: jefes.map(j => j.email).join(','),
+          subject: 'Pre-aprobación ' + pre.resultado + ' — dealer ' + (pre.dealer_nombre || pre.rut_dealer || '') + ' pide ejecutivo',
+          html,
+        });
+      }
+    } catch (e) { console.error('[preaprobacion mail]', e.message); }
+
+    return res.json({ success: true, data: { conectados: conectados.length, desocupados: desocupados.length }, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] preaprobacionContactar:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No pude gestionar el contacto' });
+  }
+};

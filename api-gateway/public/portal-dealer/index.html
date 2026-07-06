@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.5 — Simulador Rápido de Cuotas (popup, motor único shared/cotizador.js) -->
+  <!-- v2.6 — Pestaña Pre-Aprobación en línea (evaluación AutoFin + contacto ejecutivo) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -153,6 +153,33 @@
     .tour-next { background:var(--navy); color:#fff; border:none; border-radius:7px; padding:6px 14px; font-size:.82rem; font-weight:700; cursor:pointer; }
     .tour-target { outline:3px solid var(--accent); outline-offset:3px; border-radius:10px; }
     .tour-demo-badge { position:fixed; top:66px; left:50%; transform:translateX(-50%); z-index:6000; background:#fde68a; color:#92400e; font-weight:800; font-size:.74rem; padding:4px 14px; border-radius:0 0 10px 10px; display:none; }
+    /* ── Pre-Aprobación ── */
+    .pa-card { background:#fff; border-radius:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:18px; margin-bottom:16px; }
+    .pa-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media(max-width:560px){ .pa-grid { grid-template-columns:1fr; } }
+    .pa-f label { display:block; font-size:.74rem; font-weight:700; color:#334155; margin-bottom:5px; }
+    .pa-f input { width:100%; box-sizing:border-box; border:1.5px solid #d7dfee; border-radius:10px; padding:9px 12px; font-size:.95rem; font-weight:600; outline:none; }
+    .pa-f input:focus { border-color:var(--accent, #0141A2); }
+    .pa-f input.ok  { border-color:#16a34a; }
+    .pa-f input.bad { border-color:#dc2626; }
+    .pa-in { display:flex; align-items:center; border:1.5px solid #d7dfee; border-radius:10px; padding:0 0 0 10px; }
+    .pa-in span { color:#94a3b8; font-weight:700; }
+    .pa-in input { border:none !important; }
+    .pa-btn { width:100%; border:none; border-radius:10px; padding:11px 16px; font-size:.92rem; font-weight:800; cursor:pointer; color:#fff; background:linear-gradient(135deg,#012d70,#0141A2); }
+    .pa-btn:disabled { opacity:.55; cursor:wait; }
+    .pa-res { border-radius:16px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 6px rgba(0,0,0,.08); }
+    .pa-res.si { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
+    .pa-res.no { background:#fff; border-left:5px solid #f59e0b; color:#1e293b; }
+    .pa-res h4 { margin:0 0 8px; font-size:1.05rem; }
+    .pa-res .ops { display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; }
+    .pa-res .op { background:rgba(255,255,255,.2); border-radius:12px; padding:8px 14px; font-weight:800; }
+    .pa-res .op small { display:block; font-weight:600; opacity:.9; }
+    .pa-res .acciones { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    .pa-res .acciones button { border:none; border-radius:10px; padding:9px 16px; font-weight:800; font-size:.85rem; cursor:pointer; }
+    .pa-res.si .b1 { background:#fff; color:#065f46; }
+    .pa-res.si .b2 { background:rgba(255,255,255,.25); color:#fff; }
+    .pa-res.no .b1 { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; }
+    .pa-fine { font-size:.72rem; opacity:.85; margin-top:10px; font-style:italic; }
   </style>
 </head>
 <body>
@@ -244,6 +271,7 @@
     <button class="pn-btn active" data-tab="inicio" onclick="tab('inicio')"><i class="bi bi-grid-1x2-fill"></i> Inicio</button>
     <button class="pn-btn" data-tab="cartolas" onclick="tab('cartolas')"><i class="bi bi-receipt"></i> Cartolas</button>
     <button class="pn-btn" onclick="AF_SIM_RAPIDO.abrir({url:'/api/portal-dealer/simulador',token:()=>dToken})"><i class="bi bi-calculator-fill"></i> Simulador</button>
+    <button class="pn-btn" data-tab="preap" onclick="tab('preap')"><i class="bi bi-patch-check-fill"></i> Pre-Aprobación</button>
     <button class="pn-btn" data-tab="ia" onclick="tab('ia')"><i class="bi bi-robot"></i> Asistente</button>
     <button class="pn-btn" data-tab="chat" onclick="tab('chat')"><i class="bi bi-chat-dots-fill"></i> Chat</button>
   </nav>
@@ -276,6 +304,33 @@
           <div class="port-hello" style="margin-bottom:4px"><b>Mis cartolas</b></div>
           <p style="font-size:.84rem;color:#64748b;margin:0 0 16px">Cartolas enviadas, con el plazo para reparar y para enviar la factura.</p>
           <div id="cartList"><div class="empty">Cargando…</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Pre-Aprobación en línea ── -->
+    <div id="tab-preap" class="tab-pane">
+      <div class="port-scroll">
+        <div id="dashWrap" style="max-width:640px;margin:0 auto">
+          <div class="port-hello" style="margin-bottom:4px"><b>Pre-Aprobación en línea</b> ⚡</div>
+          <p style="font-size:.84rem;color:#64748b;margin:0 0 16px">Evalúa a tu cliente al instante. Ingresa sus datos y te digo de inmediato si podemos pre-aprobarlo.</p>
+
+          <div class="pa-card">
+            <div class="pa-grid">
+              <div class="pa-f" style="grid-column:1/-1"><label>RUT del cliente</label>
+                <input id="paRut" placeholder="12.345.678-9" maxlength="12" autocomplete="off"></div>
+              <div class="pa-f"><label>Precio de venta del auto</label>
+                <div class="pa-in"><span>$</span><input id="paPrecio" inputmode="numeric" placeholder="10.000.000"></div></div>
+              <div class="pa-f"><label>Pie</label>
+                <div class="pa-in"><span>$</span><input id="paPie" inputmode="numeric" placeholder="2.000.000"></div></div>
+              <div class="pa-f"><label>Año del auto</label>
+                <input id="paAnio" inputmode="numeric" maxlength="4" placeholder="2021"></div>
+              <div class="pa-f" style="display:flex;align-items:flex-end">
+                <button class="pa-btn" id="paBtn" onclick="paEvaluar()"><i class="bi bi-lightning-charge-fill"></i> Evaluar</button></div>
+            </div>
+          </div>
+
+          <div id="paResultado"></div>
         </div>
       </div>
     </div>
@@ -887,6 +942,88 @@ function entrarDemo(){
   if(dToken && dInfo && tokenVigente(dToken)){ entrarApp(); return; }
   limpiarSesion();
   if(qs.get('registro')) verRegistro();   // link de registro abre directo el formulario
+})();
+</script>
+<script src="/js/rut-core.js"></script>
+<script>
+/* ── Pre-Aprobación en línea ─────────────────────────────────────────────── */
+(function(){
+  const $ = id => document.getElementById(id);
+  const miles = el => { const raw = el.value.replace(/\D/g,'').slice(0,9); el.value = raw ? Number(raw).toLocaleString('es-CL') : ''; };
+  const num = el => Number(el.value.replace(/\D/g,'')) || 0;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const rut = $('paRut');
+    if (!rut) return;
+    rut.addEventListener('input', () => {
+      const f = AF_RUT.formatear(rut.value);
+      if (f) rut.value = f;
+      const v = AF_RUT.validar(rut.value);
+      rut.classList.toggle('ok', v === true);
+      rut.classList.toggle('bad', v === false);
+    });
+    ['paPrecio','paPie'].forEach(id => $(id).addEventListener('input', () => miles($(id))));
+  });
+
+  const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
+  let paId = null;
+
+  window.paEvaluar = async function(){
+    const out = $('paResultado');
+    if (AF_RUT.validar($('paRut').value) !== true) { out.innerHTML = '<div class="pa-res no"><h4>RUT inválido</h4>Revisa el RUT del cliente.</div>'; return; }
+    const precio = num($('paPrecio')), pie = num($('paPie')), anio = parseInt($('paAnio').value) || 0;
+    $('paBtn').disabled = true;
+    out.innerHTML = '<div class="pa-res no" style="border-left-color:#0141A2"><h4>Evaluando…</h4>Estamos revisando la operación con nuestros modelos. Un momento.</div>';
+    try {
+      const r = await fetch('/api/portal-dealer/preaprobacion', { method:'POST',
+        headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+dToken },
+        body: JSON.stringify({ rut: $('paRut').value, precio, pie, anio }) });
+      const j = await r.json();
+      if (!j.success) { out.innerHTML = `<div class="pa-res no"><h4>No pude evaluar</h4>${j.error||'Inténtalo de nuevo.'}</div>`; return; }
+      paId = j.data.id;
+      if (j.data.resultado === 'PREAPROBADO') {
+        out.innerHTML = `<div class="pa-res si">
+          <h4><i class="bi bi-patch-check-fill"></i> ¡Buenas noticias! No le vemos problema a esta operación 🎉</h4>
+          <div>Podemos ofrecerle a tu cliente:</div>
+          <div class="ops">${j.data.opciones.map(o=>`<div class="op">${o.plazo} cuotas<small>de ${fmt(o.cuota)}</small></div>`).join('')}</div>
+          <div><b>¿Quieres que te contactemos con un ejecutivo para cerrarla?</b></div>
+          <div class="acciones">
+            <button class="b1" onclick="paContactar()"><i class="bi bi-headset"></i> Sí, contáctame</button>
+            <button class="b2" onclick="document.getElementById('paResultado').innerHTML=''">No por ahora</button>
+          </div>
+          <div class="pa-fine">Pre-aprobación referencial sujeta a verificación de antecedentes y aprobación final de crédito.</div>
+        </div>`;
+      } else {
+        out.innerHTML = `<div class="pa-res no">
+          <h4><i class="bi bi-info-circle-fill" style="color:#f59e0b"></i> No lo puedo aprobar automáticamente</h4>
+          <div>Necesitamos más información para evaluar a este cliente. Un ejecutivo puede revisarlo contigo y buscar la mejor alternativa.</div>
+          <div class="acciones"><button class="b1" onclick="paContactar()"><i class="bi bi-headset"></i> Contactar a un ejecutivo</button></div>
+        </div>`;
+      }
+    } catch(e) {
+      out.innerHTML = '<div class="pa-res no"><h4>Error de conexión</h4>Inténtalo de nuevo.</div>';
+    } finally { $('paBtn').disabled = false; }
+  };
+
+  window.paContactar = async function(){
+    if (!paId) return;
+    let info = '';
+    try {
+      const r = await fetch('/api/portal-dealer/preaprobacion/'+paId+'/contactar', { method:'POST', headers:{ Authorization:'Bearer '+dToken } });
+      const j = await r.json();
+      if (j.success) {
+        const d = j.data;
+        info = d.desocupados > 0 ? `Hay ${d.desocupados} ejecutivo${d.desocupados>1?'s':''} disponible${d.desocupados>1?'s':''} ahora mismo — te atenderán al tiro.`
+             : d.conectados > 0 ? `Hay ${d.conectados} ejecutivo${d.conectados>1?'s':''} conectado${d.conectados>1?'s':''} (atendiendo a otros dealers) — te responderán en breve.`
+             : 'No hay ejecutivos conectados en este momento — deja tu mensaje y te contactaremos apenas se conecte uno.';
+      }
+    } catch(e) { /* el chat funciona igual */ }
+    const pre = document.getElementById('preAsunto');
+    if (pre && !pre.value) pre.value = 'Pre-aprobación cliente ' + ($('paRut').value || '');
+    const preMsg = document.getElementById('preMsg');
+    if (preMsg && info) preMsg.textContent = info + ' Cuéntanos brevemente y te conectamos.';
+    tab('chat');
+  };
 })();
 </script>
 <script src="/js/simulador-rapido.js"></script>

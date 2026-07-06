@@ -10,6 +10,8 @@ router.get('/resumen',     verifyDealer, c.resumen);
 router.get('/operaciones', verifyDealer, c.operaciones);
 router.get('/cartolas',    verifyDealer, c.cartolas);
 router.get('/simulador',   verifyDealer, c.simulador);
+router.post('/preaprobacion',               verifyDealer, c.preaprobar);
+router.post('/preaprobacion/:id/contactar', verifyDealer, c.preaprobacionContactar);
 router.get('/operaciones/:id',           verifyDealer, c.detalle);
 router.get('/operaciones/:id/fundantes', verifyDealer, c.fundantes);
 router.get('/operaciones/:id/pago',      verifyDealer, c.pago);
