@@ -5,6 +5,8 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 const FUNC = 'mantenedores_comisiones_seguro';
 
+router.get('/pct-mes',         verifyToken,                    ctrl.getPctMes);
+router.post('/pct-mes',        verifyToken, requireFunc(FUNC), ctrl.setPctMes);
 router.get('/',                verifyToken,                    ctrl.getAll);
 router.put('/:id',             verifyToken, requireFunc(FUNC), ctrl.update);
 router.get('/penetracion',     verifyToken,                    ctrl.getAllPen);

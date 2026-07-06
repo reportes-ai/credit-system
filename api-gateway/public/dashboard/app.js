@@ -3858,15 +3858,37 @@ async function buildVSeg() {
       j.data.map(x => {
         const tot = x.ing_rdh + x.ing_cesantia + x.ing_reparaciones;
         const pctColor = x.pct_comision >= 40 ? '#66bb6a' : x.pct_comision >= 30 ? '#ffd54f' : '#ef5350';
+        const inf = x.pct_fuente === 'INFORMADO';
         return `<tr>
           <td style="font-weight:700">${x.mes}</td>
           <td style="text-align:center">${x.ops}</td>
           ${cell(x.pen_rdh, 92, 95, 98)}${cell(x.pen_cesantia, 30, 40, 50)}${cell(x.pen_reparaciones, 30, 40, 50)}
-          <td style="text-align:center;font-weight:800;color:${pctColor}">${Number(x.pct_comision).toLocaleString('es-CL')}%</td>
+          <td style="text-align:center;font-weight:800;color:${pctColor}" title="${inf ? 'Informado por AutoFin (manda sobre el calculado)' : 'Calculado por tramos — clic en ✏️ para registrar el % informado por AutoFin'}">
+            ${Number(x.pct_comision).toLocaleString('es-CL')}%${inf ? ' 📌' : ''}
+            <span onclick="vsegOverride('${x.mes}', ${x.pct_comision})" style="cursor:pointer;opacity:.6" title="Registrar % informado por AutoFin">✏️</span>
+          </td>
           <td style="text-align:right">${$(x.ing_rdh)}</td><td style="text-align:right">${$(x.ing_cesantia)}</td><td style="text-align:right">${$(x.ing_reparaciones)}</td>
           <td style="text-align:right;font-weight:800;color:#4fc3f7">${$(tot)}</td>
         </tr>`;
-      }).join('');
+      }).join('') +
+      `<tr><td colspan="10" style="padding:8px;color:#7bafd4;font-size:11px">📌 = % informado por AutoFin (manda sobre el calculado). El % calculado usa nuestra BD; el cierre oficial de AutoFin puede diferir (ops/primas re-informadas).</td></tr>`;
     _vsegCargado = true;
   } catch (e) { t.innerHTML = '<tr><td style="padding:14px;color:#ef9a9a">Error de conexión</td></tr>'; }
+}
+
+/* Registrar/quitar el % del mes informado por AutoFin (override del calculado) */
+async function vsegOverride(mes, actual) {
+  const v = prompt('% de comisión INFORMADO por AutoFin para ' + mes + ' (vacío = volver al calculado):', actual);
+  if (v === null) return;
+  try {
+    const r = await fetch('/api/comisiones-seguro/pct-mes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') },
+      body: JSON.stringify({ mes, pct: v.trim() === '' ? '' : parseFloat(v.replace(',', '.')) }),
+    });
+    const j = await r.json();
+    if (!j.success) return alert(j.error || 'Error al guardar');
+    _vsegCargado = false;
+    buildVSeg();
+  } catch (e) { alert('Error de conexión'); }
 }

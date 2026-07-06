@@ -330,6 +330,12 @@ exports.getSegurosHistorico = async (req, res) => {
     const { getPenComision } = require('../../../creditos/src/utils/penetracion');
     const [tramos] = await pool.query(
       'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min');
+    // % informados por AutoFin (mandan sobre el calculado: su cierre puede diferir de nuestra BD)
+    let overrides = {};
+    try {
+      const [ov] = await pool.query('SELECT mes, pct FROM comisiones_seguro_pct_mes');
+      ov.forEach(o => { overrides[String(o.mes).slice(0, 7)] = parseFloat(o.pct) / 100; });
+    } catch (e) { /* tabla puede no existir */ }
     const [rows] = await pool.query(`
       SELECT DATE_FORMAT(mes,'%Y-%m') m, COUNT(*) n,
              SUM(seguro_rdh>0) nrdh, SUM(seguro_cesantia>0) nces, SUM(seguro_rep_menor>0) nrep,
@@ -343,7 +349,8 @@ exports.getSegurosHistorico = async (req, res) => {
         ces: r.n ? 100 * r.nces / r.n : 0,
         rep: r.n ? 100 * r.nrep / r.n : 0,
       };
-      const pct = Math.min(
+      const informado = overrides[r.m] != null;
+      const pct = informado ? overrides[r.m] : Math.min(
         getPenComision('rdh', pen.rdh, tramos),
         getPenComision('cesantia', pen.ces, tramos),
         getPenComision('reparacion', pen.rep, tramos));
@@ -351,6 +358,7 @@ exports.getSegurosHistorico = async (req, res) => {
         mes: r.m, ops: r.n,
         pen_rdh: Math.round(pen.rdh * 10) / 10, pen_cesantia: Math.round(pen.ces * 10) / 10, pen_reparaciones: Math.round(pen.rep * 10) / 10,
         pct_comision: Math.round(pct * 10000) / 100,
+        pct_fuente: informado ? 'INFORMADO' : 'CALCULADO',
         prima_rdh: +r.prdh, prima_cesantia: +r.pces, prima_reparaciones: +r.prep,
         ing_rdh: Math.round(r.prdh * pct), ing_cesantia: Math.round(r.pces * pct), ing_reparaciones: Math.round(r.prep * pct),
       };

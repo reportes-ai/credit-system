@@ -36,14 +36,24 @@ async function cargarPenTramos() {
     const [[p]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='seg_pct_traspaso_autofin' LIMIT 1");
     if (p && parseFloat(p.valor) > 0) _pctTraspaso = parseFloat(p.valor) / 100;
   } catch (e) { /* mantiene default 30% */ }
+  try {
+    const [ov] = await pool.query('SELECT mes, pct FROM comisiones_seguro_pct_mes');
+    _overrides = {};
+    ov.forEach(r => { _overrides[String(r.mes).slice(0, 7)] = parseFloat(r.pct) / 100; });
+  } catch (e) { /* tabla puede no existir aún */ }
   const [rows] = await pool.query(
     'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
   );
   return rows;
 }
 
-/* % de traspaso del MES = mínimo de los tramos alcanzados por los 3 seguros. */
-function pctTraspasoMes(pen, tramos) {
+/* % de traspaso del MES = mínimo de los tramos alcanzados por los 3 seguros.
+   Si existe un % INFORMADO por AutoFin para el mes (comisiones_seguro_pct_mes,
+   cargado en _overrides), ese manda: el cierre oficial de AutoFin puede diferir
+   de nuestra BD (ops/primas re-informadas) y ellos son los que pagan. */
+let _overrides = {}; // 'YYYY-MM' → fracción (0.30)
+function pctTraspasoMes(pen, tramos, mesKey) {
+  if (mesKey && _overrides[mesKey] != null) return _overrides[mesKey];
   if (!tramos || !tramos.length) return _pctTraspaso;
   return Math.min(
     getPenComision('rdh',        pen.pen_rdh,          tramos),
@@ -51,6 +61,11 @@ function pctTraspasoMes(pen, tramos) {
     getPenComision('reparacion', pen.pen_reparaciones, tramos),
   );
 }
+const mesKeyDe = v => {
+  if (!v) return null;
+  if (v instanceof Date) return v.toISOString().slice(0, 7);
+  return String(v).slice(0, 7);
+};
 
 /* Dado el % de penetración (0–100), retorna el pct_comision (fracción) del tramo más alto alcanzado */
 function getPenComision(tipo, pen, tramos) {
@@ -97,9 +112,10 @@ async function calcularPenetracionMes(mes) {
 }
 
 /* ── Comisión de seguros de una op = prima × % traspaso del mes (parejo) ──
-   El % del mes sale del tramo del seguro más débil (pctTraspasoMes). */
+   El % del mes sale del tramo del seguro más débil (pctTraspasoMes), salvo
+   que exista un % informado por AutoFin para ese mes (override). */
 function comisionesSeguro(op, pen, tramos) {
-  const pct = pctTraspasoMes(pen, tramos);
+  const pct = pctTraspasoMes(pen, tramos, mesKeyDe(op.mes || op.fecha_otorgado));
   return {
     com_rdh:          Math.round(num(op.seguro_rdh)       * pct),
     com_cesantia:     Math.round(num(op.seguro_cesantia)  * pct),
@@ -107,4 +123,4 @@ function comisionesSeguro(op, pen, tramos) {
   };
 }
 
-module.exports = { cargarPenTramos, getPenComision, calcularPenetracionMes, comisionesSeguro };
+module.exports = { cargarPenTramos, getPenComision, pctTraspasoMes, calcularPenetracionMes, comisionesSeguro };

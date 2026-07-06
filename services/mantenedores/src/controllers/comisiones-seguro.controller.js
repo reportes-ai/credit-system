@@ -129,3 +129,45 @@ const updatePen = async (req, res) => {
 };
 
 module.exports = { getAll, update, getAllPen, updatePen };
+
+/* ── % del mes INFORMADO por AutoFin (override del calculado) ───────────────
+   El cierre oficial de AutoFin puede diferir de nuestra BD (ops o primas
+   re-informadas); como ellos pagan, su % manda cuando se registra aquí. */
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comisiones_seguro_pct_mes (
+        mes CHAR(7) NOT NULL PRIMARY KEY,
+        pct DECIMAL(6,2) NOT NULL,
+        nota VARCHAR(200) NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+  } catch (e) { console.error('[pct_mes migration]', e.message); }
+})();
+
+const getPctMes = async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT mes, pct, nota, updated_at FROM comisiones_seguro_pct_mes ORDER BY mes DESC');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error al leer % por mes' }); }
+};
+
+const setPctMes = async (req, res) => {
+  try {
+    const mes = String(req.body.mes || '').slice(0, 7);
+    const pct = parseFloat(req.body.pct);
+    if (!/^\d{4}-\d{2}$/.test(mes)) return res.status(400).json({ success: false, data: null, error: 'Mes inválido (YYYY-MM)' });
+    if (req.body.pct === null || req.body.pct === '') {
+      await pool.query('DELETE FROM comisiones_seguro_pct_mes WHERE mes=?', [mes]);
+      return res.json({ success: true, data: { mes, eliminado: true }, error: null });
+    }
+    if (!(pct >= 0 && pct <= 100)) return res.status(400).json({ success: false, data: null, error: '% inválido (0-100)' });
+    await pool.query(
+      'INSERT INTO comisiones_seguro_pct_mes (mes, pct, nota) VALUES (?,?,?) ON DUPLICATE KEY UPDATE pct=VALUES(pct), nota=VALUES(nota)',
+      [mes, pct, (req.body.nota || 'Informado por AutoFin').slice(0, 200)]);
+    res.json({ success: true, data: { mes, pct }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error al guardar % del mes' }); }
+};
+
+module.exports.getPctMes = getPctMes;
+module.exports.setPctMes = setPctMes;
