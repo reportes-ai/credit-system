@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v1.1 — Tramos de penetración quedan como referencia (modelo 30% traspaso) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -82,11 +83,16 @@
     </div>
   </div>
 
+  <div class="info-box" style="border-left:4px solid #f59e0b;background:#fef9c3">
+    <strong>⚠️ Modelo nuevo desde julio 2026:</strong> AutoFin traspasa un <strong>% parejo de la prima</strong> de cada seguro
+    (parámetro <b>% traspaso AutoFin</b> en <a href="/mantenedores/factores-seguro/">Factores de Seguro</a>, hoy 30%).
+    Los tramos por penetración de esta página quedaron como <strong>referencia histórica/KPI</strong>: ya NO determinan la comisión.
+  </div>
   <div class="info-box">
-    <strong>Cómo se calculan las comisiones:</strong><br>
-    • <strong>COM.RDH</strong> = Prima RDH × % Comisión según penetración RDH del mes<br>
-    • <strong>COM.CESANTIA</strong> = Prima Cesantía × % Comisión según penetración Cesantía del mes<br>
-    • <strong>COM.REPARACIONES</strong> = Prima Rep.Menores × % Comisión según penetración Reparaciones del mes<br>
+    <strong>Cómo se calculan las comisiones (desde 2026-07):</strong><br>
+    • <strong>COM.RDH</strong> = Prima RDH × % traspaso AutoFin<br>
+    • <strong>COM.CESANTIA</strong> = Prima Cesantía × % traspaso AutoFin<br>
+    • <strong>COM.REPARACIONES</strong> = Prima Rep.Menores × % traspaso AutoFin<br>
     • <strong>COM.SEGUROS TOTAL</strong> = COM.RDH + COM.CESANTIA + COM.REPARACIONES
   </div>
 

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v2.0 — Modelo seguros AutoFin 2026-07: primas nominales + % traspaso 30% -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -300,15 +301,50 @@
             1. Se toma el factor del <strong>combo seleccionado</strong> (ej. DESG+RDH+CESA = 0.136622 para 48m)<br>
             2. <strong>Monto total seguros</strong> = factor × Sub-Total Sin Seguros<br>
             3. Cada seguro individual = monto total × (tasa individual ÷ suma de tasas individuales seleccionadas)<br>
-            4. <strong>Ingreso por seguros</strong> = Monto DESG × Factor AMBOS del plazo
+            4. <strong>Ingreso por seguros</strong> = suma de primas × <strong>% traspaso AutoFin</strong> (card de abajo — modelo 2026-07)
           </div>
         </div>
       </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TABLA 3 — COMISIÓN AMBOS
+         % TRASPASO DE COMISIÓN AUTOFIN (modelo 2026-07)
     ═══════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+      <div class="card-header-custom">
+        <div class="card-header-left">
+          <i class="bi bi-percent"></i>
+          Comisión AutoFin — % de traspaso sobre la prima
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-edit" id="btnEditT" onclick="editTraspaso()"><i class="bi bi-pencil"></i> Editar</button>
+          <button class="btn-save" id="btnSaveT" onclick="saveTraspaso()" style="display:none"><i class="bi bi-floppy"></i> Guardar</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="note-box">
+          <i class="bi bi-info-circle-fill"></i>
+          <span><strong>Modelo 2026-07:</strong> el desgravamen ya no existe solo (va incluido en el RDH) y AutoFin recibe la
+          <strong>prima</strong> como comisión, traspasándonos este <strong>% parejo</strong> por cada seguro (RDH, Cesantía y
+          Reparaciones Menores). La penetración dejó de determinar el % — sigue midiéndose como KPI.</span>
+        </div>
+        <div style="padding:14px 20px;display:flex;align-items:center;gap:12px">
+          <label style="font-weight:700;font-size:.86rem;color:#374151">% traspaso AutoFin:</label>
+          <input class="rate-input" id="inpTraspaso" disabled style="width:90px"> <span style="font-weight:700">%</span>
+          <span style="font-size:.78rem;color:#6b7280">Comisión nuestra = prima × este % (ej: prima $1.000.000 → $300.000)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Qué afecta este mantenedor ── -->
+    <div style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:10px;padding:14px 18px;margin-top:4px;font-size:.8rem">
+      <div style="font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</div>
+      <ul style="margin:0;padding-left:18px">
+        <li><b>Tasas de prima (RDH/Cesantía)</b> → primas capitalizadas en <a href="/simulador/">Simulador Rentabilidad</a>, <a href="/cotizaciones/">Cotizaciones</a>, cotizador de <a href="/creditos/">Créditos</a> y pestaña Rentabilidad de <a href="/aprobaciones/">Cartas</a>.</li>
+        <li><b>% traspaso AutoFin</b> → comisión de seguros de cada operación AUTOFIN (com_rdh/cesantía/reparaciones) en <a href="/creditos/">Créditos</a>, <a href="/dashboard/">Dashboard (pestaña Penetración)</a> y el recálculo mensual; también el ingreso por seguros de simuladores y cartas.</li>
+        <li><b>Desgravamen</b> → EN DESUSO desde 2026-07 (tasa 0: va incluido en el RDH). El mantenedor <a href="/mantenedores/comisiones-seguro/">Comisiones de Seguro (penetración)</a> quedó como referencia/KPI: sus tramos ya no determinan la comisión.</li>
+      </ul>
+    </div>
 
   </div><!-- /mainContent -->
 </div><!-- /page-content -->
@@ -555,6 +591,7 @@ async function cargar() {
         c: obj[`seg_c_${pz}`] ?? 0,
       };
     });
+    document.getElementById('inpTraspaso').value = obj.seg_pct_traspaso_autofin ?? 30;
 
     // Fecha de última actualización de seguros
     document.getElementById('fechaActualizacion').textContent =
@@ -573,6 +610,29 @@ async function cargar() {
        Error al cargar: ${err.message}. <a href="javascript:cargar()" style="color:var(--navy)">Reintentar</a>`;
     console.error(err);
   }
+}
+
+/* ─── % TRASPASO AUTOFIN ─────────────────────────────────────────────────── */
+function editTraspaso() {
+  document.getElementById('inpTraspaso').disabled = false;
+  document.getElementById('btnEditT').style.display = 'none';
+  document.getElementById('btnSaveT').style.display = 'flex';
+  document.getElementById('inpTraspaso').focus();
+}
+async function saveTraspaso() {
+  const v = parseFloat(document.getElementById('inpTraspaso').value);
+  if (!(v > 0 && v <= 100)) { showToast('El % debe estar entre 0 y 100', 'error'); return; }
+  try {
+    const res = await fetch('/api/parametros-credito', {
+      method: 'PUT', headers: authHdr(), body: JSON.stringify({ seg_pct_traspaso_autofin: v }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Error al guardar');
+    document.getElementById('inpTraspaso').disabled = true;
+    document.getElementById('btnEditT').style.display = 'flex';
+    document.getElementById('btnSaveT').style.display = 'none';
+    showToast('% de traspaso guardado — los meses abiertos se recalculan solos', 'success');
+  } catch (e) { showToast('Error al guardar: ' + e.message, 'error'); }
 }
 
 /* ─── INIT ────────────────────────────────────────────────────────────────── */

@@ -24,8 +24,16 @@ const INDEPENDIENTE = new Set(['independiente', 'honorarios', 'empresario']);
 
 const num = v => parseFloat(v) || 0;
 
-/* ── Tramos de comisión por penetración (mantenedor comisiones_seguro) ── */
+/* ── Tramos de comisión por penetración (mantenedor comisiones_seguro) ──
+   Desde 2026-07 los tramos NO determinan la comisión (quedan como referencia
+   histórica/KPI): AutoFin traspasa un % PAREJO de la prima de cada seguro
+   (parámetro seg_pct_traspaso_autofin, default 30%). */
+let _pctTraspaso = 0.30; // caché del % traspaso (se refresca en cada cargarPenTramos)
 async function cargarPenTramos() {
+  try {
+    const [[p]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='seg_pct_traspaso_autofin' LIMIT 1");
+    if (p && parseFloat(p.valor) > 0) _pctTraspaso = parseFloat(p.valor) / 100;
+  } catch (e) { /* mantiene default 30% */ }
   const [rows] = await pool.query(
     'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
   );
@@ -76,12 +84,16 @@ async function calcularPenetracionMes(mes) {
   };
 }
 
-/* ── Comisión de seguros de una op = prima × pct_comision(tramo penetración) ── */
+/* ── Comisión de seguros de una op = prima × % traspaso AutoFin (parejo) ──
+   Modelo nuevo 2026-07: AutoFin recibe la prima como comisión y nos traspasa
+   el seg_pct_traspaso_autofin (30%) de CADA seguro. La penetración ya no
+   determina el % (sigue calculándose como KPI en pen_*). Los args pen/tramos
+   se conservan por compatibilidad de firma. */
 function comisionesSeguro(op, pen, tramos) {
   return {
-    com_rdh:          Math.round(num(op.seguro_rdh)      * getPenComision('rdh',        pen.pen_rdh,          tramos)),
-    com_cesantia:     Math.round(num(op.seguro_cesantia) * getPenComision('cesantia',   pen.pen_cesantia,     tramos)),
-    com_reparaciones: Math.round(num(op.seguro_rep_menor)* getPenComision('reparacion', pen.pen_reparaciones, tramos)),
+    com_rdh:          Math.round(num(op.seguro_rdh)       * _pctTraspaso),
+    com_cesantia:     Math.round(num(op.seguro_cesantia)  * _pctTraspaso),
+    com_reparaciones: Math.round(num(op.seguro_rep_menor) * _pctTraspaso),
   };
 }
 

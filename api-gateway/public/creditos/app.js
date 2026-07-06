@@ -1117,15 +1117,10 @@ function credCalcFull(p) {
   const base = credCalc(p);
   const costoFondoD = (p.costoFondo || 0) / 100;
   const ingTasa    = costoFondoD > 0 ? credPvf(costoFondoD, p.plazo, base.cuota) - base.montoFin : 0;
-  // Ingreso por seguros = comisión REAL = (factor desg + factor cesa) × prima desgravamen,
-  // igual que AF_RENT (parametros_credito.seg_com_*). Antes usaba ambosFactor fijo (~1,15-1,17)
-  // que sobreestimaba la comisión ~4×.
-  const segComFactor = (tipo) => {
-    const pl = p.plazo;
-    const k = pl <= 6 ? 6 : pl <= 12 ? 12 : pl <= 24 ? 24 : 36;
-    return (credParams['seg_com_' + tipo + '_' + k] || 0) / 100;
-  };
-  const ingSeguros = p.chkD ? Math.round((segComFactor('desg') + segComFactor('cesa')) * base.segDesg) : 0;
+  // Ingreso por seguros = % traspaso AutoFin PAREJO sobre cada prima (modelo 2026-07:
+  // RDH incluye desgravamen; la penetración ya no determina el %). Igual que AF_RENT.
+  const pctTraspaso = ((credParams.seg_pct_traspaso_autofin > 0 ? credParams.seg_pct_traspaso_autofin : 30)) / 100;
+  const ingSeguros = Math.round((base.segDesg + base.segRdh + base.segCesa) * pctTraspaso);
   const totalIngresos = ingTasa + ingSeguros;
   // Comisión ejecutivo = % del MONTO FINANCIADO (no del saldo precio), igual que AF_RENT/backend.
   const comEjecutivo  = base.montoFin * ((p.pctEjec||0) / 100);

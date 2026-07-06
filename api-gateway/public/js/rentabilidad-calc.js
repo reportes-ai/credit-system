@@ -27,13 +27,6 @@
     const k = plazo <= 6 ? 6 : plazo <= 12 ? 12 : plazo <= 24 ? 24 : plazo <= 36 ? 36 : plazo <= 48 ? 48 : 72;
     return (P['seg_' + tipo + '_' + k] || 0);
   };
-  const segComFactor = (P, tipo, plazo) => {
-    // tipo: 'desg' | 'cesa'
-    if (plazo <= 6)  return (P['seg_com_' + tipo + '_6']  || 0) / 100;
-    if (plazo <= 12) return (P['seg_com_' + tipo + '_12'] || 0) / 100;
-    if (plazo <= 24) return (P['seg_com_' + tipo + '_24'] || 0) / 100;
-    return              (P['seg_com_' + tipo + '_36'] || 0) / 100;
-  };
   // Pizarra dealer: delega en el MOTOR ÚNICO /js/comision-dealer.js (AF_COM_DEALER);
   // copia local solo como fallback si el motor no está cargado en la página.
   const _CD = (typeof window !== 'undefined' && window.AF_COM_DEALER) ||
@@ -122,13 +115,17 @@
     const uacPct = (inp.uacPct != null && inp.uacPct > 0) ? inp.uacPct : ((P.uac_pct_tier1 || 14) / 100);
     const ing_tasa_uac = CORE ? CORE.ingresoColocacionUAC({ saldo, pctUAC: uacPct }) : Math.round(saldo * uacPct);
 
-    // ── Ingreso por seguros (detalle por seguro). UAC no paga comisión de seguros ──
-    const factorComDesg = segComFactor(P, 'desg', plazo);
-    const factorComCesa = segComFactor(P, 'cesa', plazo);
-    const ing_seg_desg = primaDesg > 0 ? Math.round(factorComDesg * primaDesg) : 0;
-    const ing_seg_cesa = primaDesg > 0 ? Math.round(factorComCesa * primaDesg) : 0; // base primaDesg (igual que el simulador)
-    const ing_seg_rdh  = 0;
-    const ing_seg_af   = ing_seg_desg + ing_seg_cesa + ing_seg_rdh;
+    // ── Ingreso por seguros: % traspaso AutoFin PAREJO sobre cada prima ──
+    // Modelo 2026-07: AutoFin recibe la prima como comisión y nos traspasa el
+    // seg_pct_traspaso_autofin (30%) de cada seguro (RDH ya incluye desgravamen).
+    // Reparaciones Menores también comisiona (es prima, aunque se digita en gastos).
+    // UAC no paga comisión de seguros.
+    const pctTraspaso = (P.seg_pct_traspaso_autofin > 0 ? P.seg_pct_traspaso_autofin : 30) / 100;
+    const ing_seg_desg = Math.round(primaDesg * pctTraspaso); // legado: hoy prima desg = 0 (va dentro del RDH)
+    const ing_seg_rdh  = Math.round(primaRdh  * pctTraspaso);
+    const ing_seg_cesa = Math.round(primaCesa * pctTraspaso);
+    const ing_seg_rep  = g.rep ? Math.round((P.reparaciones_menores || 0) * pctTraspaso) : 0;
+    const ing_seg_af   = ing_seg_desg + ing_seg_cesa + ing_seg_rdh + ing_seg_rep;
 
     // ── Comisiones (descuentos) ──
     const patioPct = (P.patio_pct || 2.50) / 100;
@@ -160,7 +157,7 @@
       primas: { desg: primaDesg, rdh: primaRdh, cesa: primaCesa, total: totalPrimas },
       uacPct,
       costos: { dealer: com_dealer, patio: com_patio, ejecutivo: com_ej, total: total_cos, esPatio: !!inp.esPatio },
-      af:  { ing_tasa: ing_tasa_af, ing_seg: ing_seg_af, ing_seg_desg, ing_seg_cesa, ing_seg_rdh, com_corfo: com_corfo_af,
+      af:  { ing_tasa: ing_tasa_af, ing_seg: ing_seg_af, ing_seg_desg, ing_seg_cesa, ing_seg_rdh, ing_seg_rep, com_corfo: com_corfo_af,
              total_ing: ing_tasa_af + ing_seg_af + com_corfo_af, rentab: rentab_af,
              pct: monto_fin ? rentab_af / monto_fin * 100 : 0, cuota: cuota_af },
       uac: { ing_tasa: ing_tasa_uac, ing_seg: 0, ing_seg_desg: 0, ing_seg_cesa: 0, ing_seg_rdh: 0, com_corfo: 0,
