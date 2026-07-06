@@ -609,15 +609,20 @@ exports.preaprobar = async (req, res) => {
     } catch (e) { /* default 7 */ }
     if (antig > antigMax) motivosPub.push('El vehículo año ' + anio + ' supera la antigüedad máxima financiable (' + antigMax + ' años)');
 
-    // 2) Renta líquida: manda la interna (antecedentes laborales); si no hay,
-    //    se usa la DECLARADA por el dealer (queda marcado el origen para el Jefe Comercial)
+    // 2) Renta líquida: para el ANÁLISIS manda SIEMPRE la que informa el dealer
+    //    (regla de negocio 2026-07-06); la interna es respaldo si no declara y
+    //    referencia para el Jefe Comercial cuando difieren.
     const rentaDeclarada = Math.round(+req.body.renta || 0);
     const [[ant]] = await pool.query(
       "SELECT renta_fija_liquida FROM antecedentes_laborales WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
     const rentaInterna = ant ? +ant.renta_fija_liquida || 0 : 0;
-    const renta = rentaInterna || rentaDeclarada;
-    const fuenteRenta = rentaInterna ? 'INTERNA' : (rentaDeclarada ? 'DECLARADA' : null);
-    if (!renta) motivos.push('Sin renta líquida (ni antecedentes internos ni renta declarada)');
+    const renta = rentaDeclarada || rentaInterna;
+    const fuenteRenta = rentaDeclarada ? 'DECLARADA' : (rentaInterna ? 'INTERNA' : null);
+    if (!renta) motivos.push('Sin renta líquida (ni declarada por el dealer ni antecedentes internos)');
+    // Nota informativa (NO bloquea): declarada vs interna difieren >20%
+    const notas = [];
+    if (rentaDeclarada && rentaInterna && Math.abs(rentaDeclarada - rentaInterna) > rentaInterna * 0.2)
+      notas.push('Nota: renta declarada (' + fmtCLP(rentaDeclarada) + ') difiere de la interna (' + fmtCLP(rentaInterna) + ') — verificar liquidaciones');
 
     // 3) Informes comerciales limpios
     const [[ic]] = await pool.query(
@@ -650,7 +655,7 @@ exports.preaprobar = async (req, res) => {
     }
 
     const resultado = (!motivos.length && !motivosPub.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
-    const motivosTodos = motivosPub.concat(motivos);
+    const motivosTodos = motivosPub.concat(motivos, notas);
     const [ins] = await pool.query(
       `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
