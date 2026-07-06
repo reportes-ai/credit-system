@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.6 — Pestaña Pre-Aprobación en línea (evaluación AutoFin + contacto ejecutivo) -->
+  <!-- v2.7 — Pre-Aprobación: RUT con formato en vivo + campo Renta líquida (declarada como respaldo) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -325,7 +325,9 @@
                 <div class="pa-in"><span>$</span><input id="paPie" inputmode="numeric" placeholder="2.000.000"></div></div>
               <div class="pa-f"><label>Año del auto</label>
                 <input id="paAnio" inputmode="numeric" maxlength="4" placeholder="2021"></div>
-              <div class="pa-f" style="display:flex;align-items:flex-end">
+              <div class="pa-f"><label>Renta líquida del cliente</label>
+                <div class="pa-in"><span>$</span><input id="paRenta" inputmode="numeric" placeholder="1.500.000"></div></div>
+              <div class="pa-f" style="grid-column:1/-1">
                 <button class="pa-btn" id="paBtn" onclick="paEvaluar()"><i class="bi bi-lightning-charge-fill"></i> Evaluar</button></div>
             </div>
           </div>
@@ -952,18 +954,27 @@ function entrarDemo(){
   const miles = el => { const raw = el.value.replace(/\D/g,'').slice(0,9); el.value = raw ? Number(raw).toLocaleString('es-CL') : ''; };
   const num = el => Number(el.value.replace(/\D/g,'')) || 0;
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const rut = $('paRut');
-    if (!rut) return;
-    rut.addEventListener('input', () => {
-      const f = AF_RUT.formatear(rut.value);
-      if (f) rut.value = f;
-      const v = AF_RUT.validar(rut.value);
-      rut.classList.toggle('ok', v === true);
-      rut.classList.toggle('bad', v === false);
+  // Formato de RUT EN VIVO (snippet canónico: xx.xxx.xxx-y mientras se escribe)
+  function fmtRutVivo(raw){
+    const clean = raw.replace(/[^0-9kK]/g,'').toUpperCase();
+    if (clean.length < 2) return clean;
+    const dv = clean.slice(-1), body = clean.slice(0,-1);
+    let f = '';
+    for (let i = body.length; i > 0; i -= 3) f = body.slice(Math.max(0,i-3),i) + (f ? '.'+f : '');
+    return f + '-' + dv;
+  }
+  // Atar de inmediato (el script vive al final del body, el DOM ya existe)
+  const rutInp = $('paRut');
+  if (rutInp) {
+    rutInp.addEventListener('input', () => {
+      const clean = rutInp.value.replace(/[^0-9kK]/g,'').toUpperCase();
+      rutInp.value = fmtRutVivo(rutInp.value);
+      const v = (clean.length >= 7 && clean.length <= 9) ? AF_RUT.validar(rutInp.value) : null;
+      rutInp.classList.toggle('ok', v === true);
+      rutInp.classList.toggle('bad', v === false);
     });
-    ['paPrecio','paPie'].forEach(id => $(id).addEventListener('input', () => miles($(id))));
-  });
+    ['paPrecio','paPie','paRenta'].forEach(id => $(id).addEventListener('input', () => miles($(id))));
+  }
 
   const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
   let paId = null;
@@ -977,7 +988,7 @@ function entrarDemo(){
     try {
       const r = await fetch('/api/portal-dealer/preaprobacion', { method:'POST',
         headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+dToken },
-        body: JSON.stringify({ rut: $('paRut').value, precio, pie, anio }) });
+        body: JSON.stringify({ rut: $('paRut').value, precio, pie, anio, renta: num($('paRenta')) }) });
       const j = await r.json();
       if (!j.success) { out.innerHTML = `<div class="pa-res no"><h4>No pude evaluar</h4>${j.error||'Inténtalo de nuevo.'}</div>`; return; }
       paId = j.data.id;

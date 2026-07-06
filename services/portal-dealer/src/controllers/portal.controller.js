@@ -543,9 +543,12 @@ const AF_RUT = require('../../../../api-gateway/public/js/rut-core');
         motivos TEXT NULL,
         opciones TEXT NULL,
         contacto TINYINT(1) NOT NULL DEFAULT 0,
+        renta BIGINT NULL,
+        fuente_renta VARCHAR(10) NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_dealer (id_dealer), INDEX idx_rut (rut_cliente)
       )`);
+    await pool.query('ALTER TABLE portal_preaprobaciones ADD COLUMN IF NOT EXISTS renta BIGINT NULL, ADD COLUMN IF NOT EXISTS fuente_renta VARCHAR(10) NULL');
   } catch (e) { console.error('[preaprobacion migration]', e.message); }
 })();
 
@@ -605,11 +608,15 @@ exports.preaprobar = async (req, res) => {
     } catch (e) { /* default 7 */ }
     if (antig > antigMax) motivos.push('Vehículo ' + anio + ' supera la antigüedad máxima (' + antigMax + ' años)');
 
-    // 2) Renta líquida (antecedentes laborales internos)
+    // 2) Renta líquida: manda la interna (antecedentes laborales); si no hay,
+    //    se usa la DECLARADA por el dealer (queda marcado el origen para el Jefe Comercial)
+    const rentaDeclarada = Math.round(+req.body.renta || 0);
     const [[ant]] = await pool.query(
       "SELECT renta_fija_liquida FROM antecedentes_laborales WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
-    const renta = ant ? +ant.renta_fija_liquida || 0 : 0;
-    if (!renta) motivos.push('Sin renta líquida registrada (no hay antecedentes laborales del cliente)');
+    const rentaInterna = ant ? +ant.renta_fija_liquida || 0 : 0;
+    const renta = rentaInterna || rentaDeclarada;
+    const fuenteRenta = rentaInterna ? 'INTERNA' : (rentaDeclarada ? 'DECLARADA' : null);
+    if (!renta) motivos.push('Sin renta líquida (ni antecedentes internos ni renta declarada)');
 
     // 3) Informes comerciales limpios
     const [[ic]] = await pool.query(
@@ -643,11 +650,11 @@ exports.preaprobar = async (req, res) => {
 
     const resultado = (!motivos.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
     const [ins] = await pool.query(
-      `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [req.dealer && req.dealer.id_dealer || null, req.dealer && req.dealer.rut || null,
        (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null,
-       rut, precio, pie, anio, resultado, motivos.join(' | ') || null, JSON.stringify(opciones)]);
+       rut, precio, pie, anio, resultado, motivos.join(' | ') || null, JSON.stringify(opciones), renta || null, fuenteRenta]);
 
     // Al dealer: SOLO veredicto y cuotas — nunca el detalle del cliente
     return res.json({ success: true, data: { id: ins.insertId, resultado, opciones }, error: null });
@@ -701,6 +708,7 @@ exports.preaprobacionContactar = async (req, res) => {
             <tr><td><b>Precio vehículo</b></td><td>${fmtCLP(pre.precio)} (año ${pre.anio})</td></tr>
             <tr><td><b>Pie</b></td><td>${fmtCLP(pre.pie)}</td></tr>
             <tr><td><b>Saldo a financiar</b></td><td>${fmtCLP(pre.precio - pre.pie)}</td></tr>
+            ${pre.renta ? '<tr><td><b>Renta líquida</b></td><td>' + fmtCLP(pre.renta) + ' (' + (pre.fuente_renta === 'INTERNA' ? 'antecedentes internos' : 'DECLARADA por el dealer — verificar') + ')</td></tr>' : ''}
             <tr><td><b>Resultado</b></td><td><b>${pre.resultado}</b></td></tr>
             ${ops.length ? '<tr><td><b>Cuotas ofrecidas</b></td><td>' + ops.map(o => o.plazo + ' cuotas de ' + fmtCLP(o.cuota)).join(' · ') + '</td></tr>' : ''}
             ${pre.motivos ? '<tr><td><b>Motivos revisión</b></td><td>' + pre.motivos + '</td></tr>' : ''}
