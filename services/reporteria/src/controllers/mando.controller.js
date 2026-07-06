@@ -65,14 +65,16 @@ exports.mando = async (req, res) => {
       pool.query("SELECT config_value FROM dashboard_config WHERE config_key='presupuesto'").then(r => r[0][0] || null),
     ]);
 
-    // Stats del MES por ejecutivo (cartas emitidas y créditos otorgados+monto) — match por nombre corto
+    // Stats del MES por ejecutivo, sobre el campo `mes` de la base única:
+    // APROBADOS = APROBADO + OTORGADO (todo otorgado fue aprobado antes) — clave para
+    // la tasa de conversión (otorgados / aprobados)
     const [cartasEj] = await pool.query(`
-      SELECT TRIM(ejecutivo) nombre, COUNT(*) n FROM cartas_aprobacion
-      WHERE fecha_creacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND COALESCE(status,'') NOT IN ('ELIMINADA')
+      SELECT TRIM(ejecutivo) nombre, COUNT(*) n FROM creditos
+      WHERE estado_credito IN ('APROBADO','OTORGADO') AND mes = DATE_FORMAT(CURDATE(),'%Y-%m-01')
       GROUP BY 1`);
     const [otsEj] = await pool.query(`
       SELECT TRIM(ejecutivo) nombre, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto FROM creditos
-      WHERE estado_credito='OTORGADO' AND fecha_otorgado >= DATE_FORMAT(CURDATE(),'%Y-%m-01')
+      WHERE estado_credito='OTORGADO' AND mes = DATE_FORMAT(CURDATE(),'%Y-%m-01')
       GROUP BY 1`);
     // Normaliza (minúsculas, sin tildes/ñ) y matchea con tolerancia: en cartas/creditos
     // el nombre puede venir en MAYÚSCULAS o con variantes ("CATHERINE" vs "Catherinne")
@@ -105,7 +107,7 @@ exports.mando = async (req, res) => {
     const lista = ejecutivos.map(e => {
       const ot = sumOts(e.nombre);
       return { nombre: e.nombre.trim(), conectado: vivos.has(Number(e.id_usuario)),
-               cartas_mes: sumCartas(e.nombre), otorgados_mes: ot.n, monto_mes: ot.monto };
+               aprobados_mes: sumCartas(e.nombre), otorgados_mes: ot.n, monto_mes: ot.monto };
     });
 
     // Presupuesto del mes en curso ({mes:'YYYY-MM', ops, monto} — monto en MM$)

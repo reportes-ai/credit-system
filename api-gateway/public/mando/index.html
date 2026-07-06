@@ -333,18 +333,18 @@ async function cargar(){
     const ej=d.ejecutivos;
     document.getElementById('ejBadge').textContent=`CONECTADOS ${ej.conectados}/${ej.total}`;
     const fila = e => {
-      const conv = e.cartas_mes ? Math.round(e.otorgados_mes/e.cartas_mes*100) : null;
+      const conv = e.aprobados_mes ? Math.round(e.otorgados_mes/e.aprobados_mes*100) : null;
       return `<div class="ej ${e.conectado?'':'off'}">
         <span class="dot ${e.conectado?'on':''}"></span>
         <span class="nm">${e.nombre}</span>
-        <span class="st">${e.cartas_mes||0}</span>
+        <span class="st">${e.aprobados_mes||0}</span>
         <span class="st ${e.otorgados_mes?'hi':''}">${e.otorgados_mes||0}</span>
         <span class="st ${e.monto_mes?'hi':''}">${e.monto_mes?MM(e.monto_mes):'—'}</span>
         <span class="st">${conv==null?'—':conv+'%'}</span>
       </div>`;
     };
     document.getElementById('ejLista').innerHTML =
-      `<div class="ej-head"><span></span><span>Ejecutivo · mes en curso</span><span style="text-align:right">Cartas</span><span style="text-align:right">Otorg.</span><span style="text-align:right">Colocado</span><span style="text-align:right">Conv.</span></div>` +
+      `<div class="ej-head"><span></span><span>Ejecutivo · mes en curso</span><span style="text-align:right">Aprob.</span><span style="text-align:right">Otorg.</span><span style="text-align:right">Colocado</span><span style="text-align:right">Conv.</span></div>` +
       ej.lista
         .sort((a,b)=> (b.conectado-a.conectado) || (b.monto_mes-a.monto_mes) || a.nombre.localeCompare(b.nombre))
         .map(fila).join('');
