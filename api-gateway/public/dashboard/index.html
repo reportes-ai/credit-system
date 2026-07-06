@@ -45,6 +45,7 @@
       <div class="tab" data-viewid="vhist" onclick="showV('vhist',this)">📅 Historia</div>
       <div class="tab" data-viewid="vppto" onclick="showV('vppto',this)">🎯 Presupuesto</div>
       <div class="tab" data-viewid="vevol" onclick="showV('vevol',this)">📊 Evolución</div>
+      <div class="tab" data-viewid="vseg" onclick="showV('vseg',this)">🛡️ Seguros</div>
       <div class="tab" data-viewid="v2pl" onclick="showV('v2pl',this)">📋 P&L Operativo</div>
       <div class="tab" id="tab-admin" onclick="showV('vadmin',this)" style="display:none;border-left:1px solid #2a4070;margin-left:8px">⚙️ Admin</div>
     </div>
@@ -924,6 +925,25 @@
 </div>
 
 <!-- VISTA HISTORIA: ESTADÍSTICAS POR PERÍODO -->
+<div id="vseg" class="view">
+  <div class="dash-header">
+    <div class="dash-title">🛡️ Seguros AutoFin — Cumplimiento e Ingresos por Mes</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
+    </div>
+  </div>
+  <div style="background:#1a2a4a;border-radius:8px;padding:10px 14px;margin-bottom:14px;color:#aac4e8;font-size:12px">
+    Penetración por seguro sobre las <b style="color:#4fc3f7">cursadas</b> del mes (universo del cierre AutoFin).
+    El <b style="color:#4fc3f7">% comisión</b> del mes lo define el tramo alcanzado por el <b style="color:#ffd54f">seguro más débil</b>
+    (RDH 92/95/98% · Cesantía y Reparaciones 30/40/50% → 20/30/40%) y se aplica parejo a las primas de los tres.
+    Ingresos calculados con la tabla vigente del mantenedor <a href="/mantenedores/comisiones-seguro/" style="color:#4fc3f7">Comisiones de Seguro</a>.
+  </div>
+  <div class="card">
+    <div class="card-head">Histórico mensual</div>
+    <div style="overflow-x:auto"><table class="tbl" id="t-seguros"></table></div>
+  </div>
+</div>
+
 <div id="vhist" class="view">
   <div class="dash-header">
     <div class="dash-title">📅 Historia — Estadísticas por Período</div>

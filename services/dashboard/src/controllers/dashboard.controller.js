@@ -319,3 +319,45 @@ exports.getDatos = async (req, res) => {
     return (console.error('[error]', err), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
+
+/* ── GET /api/dashboard/seguros-historico ─────────────────────────────────────
+   Histórico mensual de cumplimiento de seguros AUTOFIN (modelo 2026-07):
+   penetración por seguro sobre CURSADAS, % de comisión del mes (tramo del
+   seguro más débil, tabla comisiones_seguro_penetracion) e ingreso por seguro
+   según la tabla nueva (prima × % del mes). */
+exports.getSegurosHistorico = async (req, res) => {
+  try {
+    const { getPenComision } = require('../../../creditos/src/utils/penetracion');
+    const [tramos] = await pool.query(
+      'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min');
+    const [rows] = await pool.query(`
+      SELECT DATE_FORMAT(mes,'%Y-%m') m, COUNT(*) n,
+             SUM(seguro_rdh>0) nrdh, SUM(seguro_cesantia>0) nces, SUM(seguro_rep_menor>0) nrep,
+             SUM(COALESCE(seguro_rdh,0)) prdh, SUM(COALESCE(seguro_cesantia,0)) pces, SUM(COALESCE(seguro_rep_menor,0)) prep
+      FROM creditos
+      WHERE UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND estado IN ('OTORGADO','APROBADO') AND mes IS NOT NULL
+      GROUP BY 1 ORDER BY 1 DESC LIMIT 24`);
+    const data = rows.map(r => {
+      const pen = {
+        rdh: r.n ? 100 * r.nrdh / r.n : 0,
+        ces: r.n ? 100 * r.nces / r.n : 0,
+        rep: r.n ? 100 * r.nrep / r.n : 0,
+      };
+      const pct = Math.min(
+        getPenComision('rdh', pen.rdh, tramos),
+        getPenComision('cesantia', pen.ces, tramos),
+        getPenComision('reparacion', pen.rep, tramos));
+      return {
+        mes: r.m, ops: r.n,
+        pen_rdh: Math.round(pen.rdh * 10) / 10, pen_cesantia: Math.round(pen.ces * 10) / 10, pen_reparaciones: Math.round(pen.rep * 10) / 10,
+        pct_comision: Math.round(pct * 10000) / 100,
+        prima_rdh: +r.prdh, prima_cesantia: +r.pces, prima_reparaciones: +r.prep,
+        ing_rdh: Math.round(r.prdh * pct), ing_cesantia: Math.round(r.pces * pct), ing_reparaciones: Math.round(r.prep * pct),
+      };
+    });
+    res.json({ success: true, data, error: null });
+  } catch (e) {
+    console.error('[dashboard seguros-historico]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error al calcular el histórico de seguros' });
+  }
+};

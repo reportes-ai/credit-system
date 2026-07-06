@@ -129,6 +129,7 @@ function showV(id, el) {
   if(id==='vhist') { initVHist(); }
   if(id==='vppto') { buildVPpto(); }
   if(id==='vevol') { buildVEvol(); }
+  if(id==='vseg')  { buildVSeg(); }
   if(id==='vadmin') {
     if (!esAdmin()) { alert('Acceso denegado.'); return; }
     buildVAdmin();
@@ -2247,6 +2248,7 @@ const TABS_NAV = [
   { id:'vppto', label:'🎯 Presupuesto' },
   { id:'vevol', label:'📊 Evolución' },
   { id:'v2pl',  label:'📋 P&L Operativo' },
+  { id:'vseg',  label:'🛡️ Seguros' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
@@ -3828,4 +3830,43 @@ window.guardarIncompletos = async function guardarIncompletos() {
   // Recargar alerta
   await cargarAlertaIncompletos();
   alert(err === 0 ? `✓ ${ok} crédito${ok>1?'s':''} actualizados. Comisiones recalculadas.` : `⚠ ${ok} guardados, ${err} con error`);
+}
+
+/* ── 🛡️ Seguros AutoFin: histórico mensual (penetración, % comisión, ingresos) ── */
+let _vsegCargado = false;
+async function buildVSeg() {
+  if (_vsegCargado) return;
+  const t = document.getElementById('t-seguros');
+  t.innerHTML = '<tr><td style="padding:14px;color:#7bafd4">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/dashboard/seguros-historico', { headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+    const j = await r.json();
+    if (!j.success) { t.innerHTML = '<tr><td style="padding:14px;color:#ef9a9a">' + (j.error || 'Error') + '</td></tr>'; return; }
+    const $ = v => '$' + Math.round(v || 0).toLocaleString('es-CL');
+    const pF = v => Number(v || 0).toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+    // color según tramo: verde ≥ tope, amarillo intermedio, rojo bajo el primero
+    const cell = (v, t1, t2, t3) => {
+      const c = v >= t3 ? '#66bb6a' : v >= t1 ? '#ffd54f' : '#ef5350';
+      return `<td style="text-align:center;color:${c};font-weight:700">${pF(v)}</td>`;
+    };
+    t.innerHTML =
+      `<tr><th>Mes</th><th style="text-align:center">Ops</th>
+       <th style="text-align:center">Pen. RDH</th><th style="text-align:center">Pen. Cesantía</th><th style="text-align:center">Pen. Reparaciones</th>
+       <th style="text-align:center">% Comisión</th>
+       <th style="text-align:right">Ingreso RDH</th><th style="text-align:right">Ingreso Cesantía</th><th style="text-align:right">Ingreso Reparac.</th>
+       <th style="text-align:right">Ingreso Total</th></tr>` +
+      j.data.map(x => {
+        const tot = x.ing_rdh + x.ing_cesantia + x.ing_reparaciones;
+        const pctColor = x.pct_comision >= 40 ? '#66bb6a' : x.pct_comision >= 30 ? '#ffd54f' : '#ef5350';
+        return `<tr>
+          <td style="font-weight:700">${x.mes}</td>
+          <td style="text-align:center">${x.ops}</td>
+          ${cell(x.pen_rdh, 92, 95, 98)}${cell(x.pen_cesantia, 30, 40, 50)}${cell(x.pen_reparaciones, 30, 40, 50)}
+          <td style="text-align:center;font-weight:800;color:${pctColor}">${Number(x.pct_comision).toLocaleString('es-CL')}%</td>
+          <td style="text-align:right">${$(x.ing_rdh)}</td><td style="text-align:right">${$(x.ing_cesantia)}</td><td style="text-align:right">${$(x.ing_reparaciones)}</td>
+          <td style="text-align:right;font-weight:800;color:#4fc3f7">${$(tot)}</td>
+        </tr>`;
+      }).join('');
+    _vsegCargado = true;
+  } catch (e) { t.innerHTML = '<tr><td style="padding:14px;color:#ef9a9a">Error de conexión</td></tr>'; }
 }
