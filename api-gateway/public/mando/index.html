@@ -103,10 +103,26 @@
   .led { width:1.2vh; height:1.2vh; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); animation:pulse 2.4s infinite; }
   .led.red { background:var(--red); box-shadow:0 0 10px var(--red); }
   .led-lbl { font-size:1.2vh; letter-spacing:.25em; color:var(--dim); }
+
+  /* ── Alertas LED rojas (letrero grande parpadeante) ── */
+  .alertas { position:fixed; top:9vh; left:50%; transform:translateX(-50%); z-index:50;
+    display:flex; flex-direction:column; gap:1vh; align-items:center; pointer-events:none; }
+  .alerta-led { display:none; background:#2a0208; border:3px solid var(--red); border-radius:14px;
+    padding:1.6vh 3vw; font-family:Consolas,monospace; font-weight:800; font-size:3.4vh; letter-spacing:.08em;
+    color:#ff2a4d; text-align:center; white-space:nowrap;
+    text-shadow:0 0 18px rgba(255,42,77,.95), 0 0 40px rgba(255,42,77,.5);
+    box-shadow:0 0 30px rgba(255,42,77,.55), inset 0 0 24px rgba(255,42,77,.18);
+    animation:ledblink 1s step-end infinite; }
+  .alerta-led.on { display:block; }
+  @keyframes ledblink { 50% { opacity:.25; } }
 </style>
 </head>
 <body>
 <div class="scan"></div>
+<div class="alertas">
+  <div class="alerta-led" id="alSinServicio">⚠ ALERTA — SIN SERVICIO DEL ÁREA DE CRÉDITO ⚠</div>
+  <div class="alerta-led" id="alCarta">—</div>
+</div>
 <div class="wrap">
 
   <!-- HEADER -->
@@ -176,8 +192,8 @@
 
     <div class="panel">
       <div class="p-head">
-        <div class="p-title">◤ Analistas de Crédito</div>
-        <div class="p-badge" id="anaBadge" style="font-size:1.3vh">—</div>
+        <div class="p-title" style="font-size:1.9vh">◤ Analistas de Crédito</div>
+        <div class="p-badge" id="anaBadge" style="font-size:2.2vh;padding:.4vh 1vw">—</div>
       </div>
       <div style="display:flex;gap:.6vw;margin-bottom:.9vh">
         <div class="chip2"><div class="k">T° PROM. APROBACIÓN CARTA</div><div class="v" id="anaTprom">—</div></div>
@@ -386,6 +402,15 @@ async function cargar(){
     gauge(document.getElementById('gaugeCartas'),   d.hoy.cartas/horasJornada,    Math.max(4, Math.ceil(d.hoy.cartas/horasJornada)+2), '#00e5ff', gz);
     gauge(document.getElementById('gaugeCreditos'), d.hoy.otorgados/horasJornada, Math.max(4, Math.ceil(d.hoy.otorgados/horasJornada)+2), '#22ffa0', gz);
 
+    // alertas LED (sin servicio del área + carta esperando atención)
+    if (d.alertas) {
+      document.getElementById('alSinServicio').classList.toggle('on', !!d.alertas.sin_servicio);
+      window._cartaEspera = d.alertas.carta_espera
+        ? { seg: d.alertas.carta_espera.segundos, op: d.alertas.carta_espera.op_carta, desde: Date.now() }
+        : null;
+      tickAlertaCarta();
+    }
+
     // analistas de crédito
     if (d.analistas) {
       const an = d.analistas;
@@ -453,6 +478,19 @@ async function cargar(){
     console.error(e);
   }
 }
+// La alerta de carta cuenta el tiempo EN VIVO (mm:ss) entre refrescos
+function tickAlertaCarta(){
+  const el = document.getElementById('alCarta');
+  const c = window._cartaEspera;
+  if (!c) { el.classList.remove('on'); return; }
+  const seg = c.seg + Math.floor((Date.now() - c.desde) / 1000);
+  const mm = Math.floor(seg / 60), ss = String(seg % 60).padStart(2, '0');
+  const t = mm >= 60 ? `${Math.floor(mm/60)}:${String(mm%60).padStart(2,'0')}:${ss}` : `${mm}:${ss}`;
+  el.textContent = `⚠ ALERTA — Carta de aprobación con ${t} en espera de atención ⚠`;
+  el.classList.add('on');
+}
+setInterval(tickAlertaCarta, 1000);
+
 cargar();
 setInterval(cargar, 45000);          // refresco de datos cada 45 s
 setTimeout(()=>location.reload(), 6*60*60*1000);  // reload duro cada 6 h (TV siempre encendida)

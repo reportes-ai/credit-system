@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Horarios Analistas de Crédito — AutoFácil</title>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; color:#1e293b; }
+    .page { max-width:860px; margin:0 auto; padding:24px 22px 80px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.1rem; opacity:.9; }
+    .banner h2 { font-weight:800; margin:0 0 3px; font-size:1.2rem; }
+    .banner p { opacity:.9; margin:0; font-size:.85rem; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+    .card-af h3 { margin:0 0 12px; font-size:1rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:8px; }
+    label { font-size:.72rem; font-weight:700; text-transform:uppercase; color:#64748b; }
+    input[type=time], input[type=number] { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.9rem; }
+    .dia-row { display:grid; grid-template-columns:120px 70px 130px 130px 1fr; gap:12px; align-items:center; padding:8px 0; border-bottom:1px dashed #eef2f7; }
+    .dia-row b { font-size:.9rem; }
+    .sw { position:relative; display:inline-block; width:46px; height:26px; }
+    .sw input { display:none; } .sl { position:absolute; inset:0; background:#cbd5e1; border-radius:20px; transition:.2s; cursor:pointer; }
+    .sl::before { content:''; position:absolute; width:20px; height:20px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .sw input:checked + .sl { background:var(--green); } .sw input:checked + .sl::before { transform:translateX(20px); }
+    .btn-af { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:.9rem; font-weight:700; cursor:pointer; }
+    .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:14px 16px; font-size:.84rem; color:#475569; }
+    .foot h4 { margin:0 0 8px; font-size:.82rem; color:var(--navy); display:flex; align-items:center; gap:6px; }
+    .foot ul { margin:0; padding-left:18px; } .foot li { margin-bottom:4px; }
+    .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); padding:11px 24px; border-radius:10px; font-size:.9rem; font-weight:700; z-index:700; display:none; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    .toast.ok { background:#15803d; color:#fff; } .toast.err { background:#991b1b; color:#fff; }
+    .muted { color:#94a3b8; font-size:.82rem; }
+  </style>
+</head>
+<body>
+
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Mantenedores', href:'/mantenedores/' },
+    { label:'Horarios Analistas de Crédito', icon:'bi-alarm', current:true }
+  ] };
+</script>
+
+<div class="page">
+  <div class="banner">
+    <i class="bi bi-alarm"></i>
+    <div>
+      <h2>Horarios Analistas de Crédito</h2>
+      <p>Horario de servicio del área de crédito POR DÍA y umbral de la alerta de cartas sin atender. Alimenta las <b>alertas rojas del Cuadro de Mando</b> (TV).</p>
+    </div>
+  </div>
+
+  <div class="card-af">
+    <h3><i class="bi bi-calendar-week"></i> Horario de servicio por día</h3>
+    <p class="muted" style="margin:0 0 10px">Si dentro del horario NO hay ningún Analista de Crédito ni el Supervisor conectado, el Cuadro de Mando muestra <b style="color:var(--red)">ALERTA — SIN SERVICIO DEL ÁREA DE CRÉDITO</b> parpadeando hasta que alguien se conecte.</p>
+    <div id="dias"></div>
+  </div>
+
+  <div class="card-af">
+    <h3><i class="bi bi-envelope-exclamation"></i> Alerta de carta sin atender</h3>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span>Alertar cuando una carta de aprobación lleve más de</span>
+      <input type="number" id="cartaMin" min="1" max="240" style="width:80px">
+      <span>minutos en estatus PENDIENTE sin ser atendida.</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px">
+    <button class="btn-af" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar</button>
+    <span class="muted">Los cambios aplican en el próximo refresco del Cuadro de Mando (45 s).</span>
+  </div>
+
+  <div class="foot">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Horario por día</b> → alerta roja "SIN SERVICIO DEL ÁREA DE CRÉDITO" en el <a href="/mando/">Cuadro de Mando</a> cuando no hay Analista de Crédito/Supervisor conectado dentro del horario.</li>
+      <li><b>Minutos de carta sin atender</b> → alerta roja "Carta de aprobación en espera de atención" en el <a href="/mando/">Cuadro de Mando</a> (cartas en estatus PENDIENTE de <a href="/cartas-aprobacion/">Cartas de Aprobación</a>).</li>
+      <li><b>Quiénes cuentan como área de crédito</b> → usuarios activos con perfil <b>Analista de Crédito</b> o <b>Supervisor de Crédito</b> (se administra en <a href="/usuarios/">Usuarios</a>, no aquí).</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/topnav.js"></script>
+<script>
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+sessionStorage.getItem('token') };
+const DIAS = [[1,'Lunes'],[2,'Martes'],[3,'Miércoles'],[4,'Jueves'],[5,'Viernes'],[6,'Sábado'],[7,'Domingo']];
+function toast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(ok?'ok':'err'); t.style.display='block'; setTimeout(()=>t.style.display='none', 3000); }
+
+async function cargar(){
+  try {
+    const j = await (await fetch('/api/mando/config', { headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    const cfg = j.data;
+    document.getElementById('cartaMin').value = cfg.carta_alerta_min || 5;
+    document.getElementById('dias').innerHTML = DIAS.map(([d,nom])=>{
+      const x = cfg.dias[d] || { on:0, ini:'10:00', fin:'19:00' };
+      return `<div class="dia-row">
+        <b>${nom}</b>
+        <label class="sw"><input type="checkbox" id="on_${d}" ${x.on?'checked':''}><span class="sl"></span></label>
+        <div><label>Desde</label><input type="time" id="ini_${d}" value="${x.ini}"></div>
+        <div><label>Hasta</label><input type="time" id="fin_${d}" value="${x.fin}"></div>
+        <span class="muted">${x.on?'con servicio':'sin servicio (no alerta)'}</span>
+      </div>`;
+    }).join('');
+  } catch(e){ toast('Error al cargar: '+e.message, false); }
+}
+
+async function guardar(){
+  const dias = {};
+  for (const [d] of DIAS) dias[d] = {
+    on: document.getElementById('on_'+d).checked ? 1 : 0,
+    ini: document.getElementById('ini_'+d).value || '10:00',
+    fin: document.getElementById('fin_'+d).value || '19:00',
+  };
+  const body = { dias, carta_alerta_min: document.getElementById('cartaMin').value || 5 };
+  try {
+    const j = await (await fetch('/api/mando/config', { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('✓ Horarios guardados'); cargar();
+  } catch(e){ toast('Error: '+e.message, false); }
+}
+cargar();
+</script>
+</body>
+</html>

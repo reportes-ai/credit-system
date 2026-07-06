@@ -9,6 +9,62 @@ const { conectadosIds } = require('../../../../shared/presencia');
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg) => res.status(500).json({ success: false, data: null, error: msg });
 
+/* ── Config del mando (mantenedor Horarios Analistas de Crédito) ──────────
+   dashboard_config key 'horarios_analistas': horario de servicio POR DÍA del
+   área de crédito + umbral de alerta de carta sin atender (minutos). */
+const MANDO_CFG_KEY = 'horarios_analistas';
+const MANDO_CFG_DEFAULT = {
+  dias: {  // 1=Lun … 7=Dom
+    1: { on: 1, ini: '10:00', fin: '19:00' }, 2: { on: 1, ini: '10:00', fin: '19:00' },
+    3: { on: 1, ini: '10:00', fin: '19:00' }, 4: { on: 1, ini: '10:00', fin: '19:00' },
+    5: { on: 1, ini: '10:00', fin: '19:00' }, 6: { on: 0, ini: '10:00', fin: '14:00' },
+    7: { on: 0, ini: '10:00', fin: '14:00' },
+  },
+  carta_alerta_min: 5,
+};
+
+async function getMandoCfg() {
+  try {
+    const [[r]] = await pool.query('SELECT config_value FROM dashboard_config WHERE config_key = ?', [MANDO_CFG_KEY]);
+    if (r) return { ...MANDO_CFG_DEFAULT, ...JSON.parse(r.config_value), dias: { ...MANDO_CFG_DEFAULT.dias, ...(JSON.parse(r.config_value).dias || {}) } };
+  } catch (e) {}
+  return MANDO_CFG_DEFAULT;
+}
+
+exports.getConfig = async (req, res) => {
+  try { ok(res, await getMandoCfg()); } catch (e) { fail(res, e.message); }
+};
+
+exports.setConfig = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const hhmm = v => /^\d{2}:\d{2}$/.test(String(v || ''));
+    const dias = {};
+    for (let d = 1; d <= 7; d++) {
+      const x = (b.dias || {})[d] || {};
+      dias[d] = { on: x.on ? 1 : 0, ini: hhmm(x.ini) ? x.ini : '10:00', fin: hhmm(x.fin) ? x.fin : '19:00' };
+    }
+    const cfg = { dias, carta_alerta_min: Math.min(240, Math.max(1, parseInt(b.carta_alerta_min, 10) || 5)) };
+    await pool.query(`INSERT INTO dashboard_config (config_key, config_value) VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)`, [MANDO_CFG_KEY, JSON.stringify(cfg)]);
+    ok(res, cfg);
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Seed: funcionalidad del mantenedor (aparece en Mantenedores vía BD) ── */
+(async () => {
+  try {
+    const [[ya]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_horarios_analistas'");
+    if (!ya) {
+      const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' LIMIT 1");
+      if (mod) await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Horarios Analistas de Crédito', 'mant_horarios_analistas', '/mantenedores/horarios-analistas/', 'bi-alarm')",
+        [mod.id_modulo]);
+      console.log('[mando] funcionalidad mant_horarios_analistas sembrada');
+    }
+  } catch (e) { console.error('[mando seed]', e.message); }
+})();
+
 exports.mando = async (req, res) => {
   try {
     const [
@@ -110,7 +166,7 @@ exports.mando = async (req, res) => {
              p.nombre perfil
       FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
       WHERE u.estado = 'activo'
-        AND p.nombre IN ('Analista de Crédito','Analista de Operaciones','Supervisor de Crédito')
+        AND p.nombre IN ('Analista de Crédito','Supervisor de Crédito')
       ORDER BY p.nombre = 'Supervisor de Crédito' DESC, nombre`);
     const idsAna = analistasBase.map(a => a.id_usuario);
 
@@ -178,8 +234,35 @@ exports.mando = async (req, res) => {
       horas_mes: horasMes[a.id_usuario] || 0,
     }));
 
+    /* ── Alertas del área de crédito (config del mantenedor Horarios Analistas) ── */
+    const cfgMando = await getMandoCfg();
+    const ahoraD = new Date();
+    const dowISO = ahoraD.getDay() === 0 ? 7 : ahoraD.getDay();
+    const hhmmAhora = String(ahoraD.getHours()).padStart(2, '0') + ':' + String(ahoraD.getMinutes()).padStart(2, '0');
+    const horarioHoy = cfgMando.dias[dowISO] || { on: 0 };
+    const enHorario = !!horarioHoy.on && hhmmAhora >= horarioHoy.ini && hhmmAhora < horarioHoy.fin;
+    const conectadosAna = analistas.filter(a => a.conectado).length;
+    // Carta PENDIENTE más antigua sin atender (corrige el gotcha tz de fecha_creacion +4h)
+    const [[cartaPend]] = await pool.query(`
+      SELECT id, op_carta, TIMESTAMPDIFF(SECOND, fecha_creacion, NOW()) s
+      FROM cartas_aprobacion WHERE status = 'PENDIENTE'
+      ORDER BY fecha_creacion LIMIT 1`);
+    let cartaEspera = null;
+    if (cartaPend) {
+      let s = Number(cartaPend.s); if (s < 0) s += 14400;
+      if (s >= (cfgMando.carta_alerta_min || 5) * 60 && s < 30 * 86400)
+        cartaEspera = { op_carta: cartaPend.op_carta || cartaPend.id, segundos: s };
+    }
+
     ok(res, {
       ahora: new Date().toISOString(),
+      alertas: {
+        sin_servicio: enHorario && conectadosAna === 0,
+        horario_hoy: horarioHoy,
+        en_horario: enHorario,
+        carta_espera: cartaEspera,          // { op_carta, segundos } o null
+        carta_alerta_min: cfgMando.carta_alerta_min,
+      },
       analistas: {
         lista: analistas,
         total_cartas_aprobadas_mes: Number(totAprob.n) || 0,
