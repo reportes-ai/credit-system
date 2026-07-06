@@ -501,3 +501,17 @@ exports.ia = async (req, res) => {
     return res.status(500).json({ success: false, data: null, error: 'No pude responder en este momento.' });
   }
 };
+
+/* ── GET /api/portal-dealer/simulador?monto=X — simulador rápido de cuotas ──
+   Motor único shared/cotizador.js (mismo cálculo del módulo Cotizaciones). */
+exports.simulador = async (req, res) => {
+  try {
+    const { simuladorRapido } = require('../../../../shared/cotizador');
+    const data = await simuladorRapido(req.query.monto);
+    if (!data) return res.status(400).json({ success: false, data: null, error: 'Monto inválido (entre $1.000.000 y $300.000.000)' });
+    return res.json({ success: true, data, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] simulador:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'Error al simular' });
+  }
+};

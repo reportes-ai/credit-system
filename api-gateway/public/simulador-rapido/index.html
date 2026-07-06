@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador Rápido — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  body { margin:0; background:linear-gradient(160deg,#4f5bd5,#6d5bd0 55%,#7b5fc9); min-height:100vh; font-family:'Segoe UI',system-ui,sans-serif; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Simulador Rápido',icon:'bi-calculator-fill',current:true}]};</script>
+
+<script src="/js/simulador-rapido.js"></script>
+<script>
+  // La página ES el popup: se abre solo; al cerrarlo vuelve a la Home.
+  const t = sessionStorage.getItem('token');
+  if (!t) location.href = '/';
+  else {
+    AF_SIM_RAPIDO.abrir({ url: '/api/cotizaciones/simulador-rapido', token: () => sessionStorage.getItem('token') });
+    document.getElementById('afsim-dlg').addEventListener('close', () => location.href = '/');
+  }
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

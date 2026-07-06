@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.4 — Enlace permanente "Ver demostración" en el login -->
+  <!-- v2.5 — Simulador Rápido de Cuotas (popup, motor único shared/cotizador.js) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -243,6 +243,7 @@
   <nav class="port-nav">
     <button class="pn-btn active" data-tab="inicio" onclick="tab('inicio')"><i class="bi bi-grid-1x2-fill"></i> Inicio</button>
     <button class="pn-btn" data-tab="cartolas" onclick="tab('cartolas')"><i class="bi bi-receipt"></i> Cartolas</button>
+    <button class="pn-btn" onclick="AF_SIM_RAPIDO.abrir({url:'/api/portal-dealer/simulador',token:()=>dToken})"><i class="bi bi-calculator-fill"></i> Simulador</button>
     <button class="pn-btn" data-tab="ia" onclick="tab('ia')"><i class="bi bi-robot"></i> Asistente</button>
     <button class="pn-btn" data-tab="chat" onclick="tab('chat')"><i class="bi bi-chat-dots-fill"></i> Chat</button>
   </nav>
@@ -888,5 +889,6 @@ function entrarDemo(){
   if(qs.get('registro')) verRegistro();   // link de registro abre directo el formulario
 })();
 </script>
+<script src="/js/simulador-rapido.js"></script>
 </body>
 </html>
