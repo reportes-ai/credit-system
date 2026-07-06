@@ -50,8 +50,11 @@ async function loadTZOverride() {
     const [rows] = await pool.query(
       "SELECT valor FROM parametros_credito WHERE clave = 'db_tz_override' LIMIT 1"
     );
-    const val = rows[0]?.valor?.trim();
-    _tzOverride = (val && val !== '') ? val : null;
+    const val = String(rows[0]?.valor ?? '').trim();
+    // Solo aceptar formatos de TZ válidos ('+HH:MM'/'-HH:MM' o 'Region/City') — la columna
+    // valor es DECIMAL y puede traer basura numérica ('0.000000') que rompería el offset
+    const valido = /^[+-]\d{2}:\d{2}$/.test(val) || /^[A-Za-z_]+\/[A-Za-z_]+/.test(val);
+    _tzOverride = valido ? val : null;
     console.log(`✓ TZ BD: ${_tzOverride || 'automático (' + getChileAutoOffset() + ')'}`);
   } catch(e) { _tzOverride = null; }
 }

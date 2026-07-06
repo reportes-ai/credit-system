@@ -53,7 +53,19 @@
   /* ── Paneles ── */
   .row { display:grid; gap:1.1vw; flex:1; min-height:0; }
   .r1 { grid-template-columns:1.05fr 1fr 1fr; }
-  .r2 { grid-template-columns:1.35fr 1fr; }
+  .r2 { grid-template-columns:1.15fr .85fr 1fr; }
+  .chip2 { border:1px solid var(--line); background:rgba(4,20,42,.7); border-radius:9px; padding:.5vh .7vw; text-align:center; flex:1; }
+  .chip2 .k { font-size:1.05vh; letter-spacing:.18em; color:var(--dim); }
+  .chip2 .v { font-family:Consolas,monospace; font-size:2.2vh; font-weight:700; color:var(--cyan); text-shadow:var(--glow); }
+  .ana-head, .ana { display:grid; grid-template-columns:1.35vw 1fr 6.2vw 6.2vw 4.6vw; align-items:center; gap:.4vw; }
+  .ana-head { font-size:1.1vh; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; padding-bottom:.3vh; border-bottom:1px solid var(--line); }
+  .ana { font-size:1.7vh; white-space:nowrap; overflow:hidden; }
+  .ana .nm { overflow:hidden; text-overflow:ellipsis; }
+  .ana .pf { font-size:1.05vh; color:var(--dim); letter-spacing:.06em; }
+  .ana .st { font-family:Consolas,monospace; text-align:right; color:#9fd4ff; }
+  .ana .st small { color:var(--dim); font-size:1.2vh; }
+  .ana.off { color:#3a577c; } .ana.off .st { color:#3a577c; }
+  .ana .st.hi { color:var(--green); text-shadow:0 0 8px rgba(34,255,160,.4); }
   .panel { position:relative; background:linear-gradient(180deg, rgba(6,18,40,.92), rgba(3,10,26,.92));
     border:1px solid var(--line); border-radius:12px; padding:1.4vh 1.1vw; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .panel::before, .panel::after { content:''; position:absolute; width:16px; height:16px; border:2px solid var(--cyan); opacity:.8; }
@@ -160,6 +172,18 @@
         <div class="p-badge" id="mesBadge">—</div>
       </div>
       <div id="chCarrera" style="flex:1;display:flex;align-items:center;justify-content:center"></div>
+    </div>
+
+    <div class="panel">
+      <div class="p-head">
+        <div class="p-title">◤ Analistas de Crédito</div>
+        <div class="p-badge" id="anaBadge" style="font-size:1.3vh">—</div>
+      </div>
+      <div style="display:flex;gap:.6vw;margin-bottom:.9vh">
+        <div class="chip2"><div class="k">T° PROM. APROBACIÓN CARTA</div><div class="v" id="anaTprom">—</div></div>
+        <div class="chip2"><div class="k">SERVICIO HOY</div><div class="v" id="anaServicio">—</div></div>
+      </div>
+      <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:.18vh" id="anaLista"></div>
     </div>
 
     <div class="panel">
@@ -361,6 +385,30 @@ async function cargar(){
     const gz=Math.round(Math.min(window.innerHeight*0.24, 210));
     gauge(document.getElementById('gaugeCartas'),   d.hoy.cartas/horasJornada,    Math.max(4, Math.ceil(d.hoy.cartas/horasJornada)+2), '#00e5ff', gz);
     gauge(document.getElementById('gaugeCreditos'), d.hoy.otorgados/horasJornada, Math.max(4, Math.ceil(d.hoy.otorgados/horasJornada)+2), '#22ffa0', gz);
+
+    // analistas de crédito
+    if (d.analistas) {
+      const an = d.analistas;
+      document.getElementById('anaBadge').textContent =
+        `CONECTADOS ${an.lista.filter(x=>x.conectado).length}/${an.lista.length}`;
+      document.getElementById('anaTprom').textContent = an.t_prom_aprobacion_min == null ? '—'
+        : an.t_prom_aprobacion_min >= 60
+          ? (an.t_prom_aprobacion_min/60).toLocaleString('es-CL',{maximumFractionDigits:1}) + ' h'
+          : an.t_prom_aprobacion_min + ' min';
+      const sv = an.servicio_hoy || {};
+      document.getElementById('anaServicio').textContent =
+        sv.inicio ? `${sv.inicio} → ${sv.cierre || '…'}` : 'SIN ACTIVIDAD';
+      const pctDe = (n, tot) => tot ? ` <small>· ${Math.round(n/tot*100)}%</small>` : '';
+      document.getElementById('anaLista').innerHTML =
+        `<div class="ana-head"><span></span><span>Analista · mes en curso</span><span style="text-align:right">Cartas apr.</span><span style="text-align:right">Digitados</span><span style="text-align:right">Hrs con.</span></div>` +
+        an.lista.map(a=>`<div class="ana ${a.conectado?'':'off'}">
+          <span class="dot ${a.conectado?'on':''}"></span>
+          <span class="nm">${a.nombre} <span class="pf">${a.perfil==='Supervisor de Crédito'?'· SUPERVISOR':''}</span></span>
+          <span class="st ${a.cartas_aprobadas_mes?'hi':''}">${a.cartas_aprobadas_mes}${pctDe(a.cartas_aprobadas_mes, an.total_cartas_aprobadas_mes)}</span>
+          <span class="st ${a.digitados_mes?'hi':''}">${a.digitados_mes}${pctDe(a.digitados_mes, an.total_digitados_mes)}</span>
+          <span class="st">${a.horas_mes ? a.horas_mes.toLocaleString('es-CL',{maximumFractionDigits:1}) : '—'}</span>
+        </div>`).join('');
+    }
 
     // carrera del mes
     const m=d.mes, dia=ahora.getDate();

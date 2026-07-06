@@ -103,6 +103,57 @@ exports.mando = async (req, res) => {
     const sumCartas = nombre => llaves(mapCartas, nombre).reduce((s, k) => s + mapCartas[k], 0);
     const sumOts = nombre => llaves(mapOts, nombre).reduce((s, k) => ({ n: s.n + mapOts[k].n, monto: s.monto + mapOts[k].monto }), { n: 0, monto: 0 });
 
+    /* ── Analistas de Crédito (incluye Supervisor de Crédito) ── */
+    const [analistasBase] = await pool.query(`
+      SELECT u.id_usuario,
+             TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre,
+             p.nombre perfil
+      FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+      WHERE u.estado = 'activo'
+        AND p.nombre IN ('Analista de Crédito','Analista de Operaciones','Supervisor de Crédito')
+      ORDER BY p.nombre = 'Supervisor de Crédito' DESC, nombre`);
+    const idsAna = analistasBase.map(a => a.id_usuario);
+
+    // Cartas aprobadas del mes por aprobador + tiempo creación→aprobación
+    const [cartasAprob] = await pool.query(`
+      SELECT TRIM(aprobado_por_nombre) nombre, COUNT(*) n
+      FROM cartas_aprobacion
+      WHERE fecha_aprobacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND aprobado_por_nombre IS NOT NULL
+      GROUP BY 1`);
+    const [[totAprob]] = await pool.query(`
+      SELECT COUNT(*) n FROM cartas_aprobacion WHERE fecha_aprobacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01')`);
+    const [durs] = await pool.query(`
+      SELECT TIMESTAMPDIFF(MINUTE, fecha_creacion, fecha_aprobacion) m
+      FROM cartas_aprobacion
+      WHERE fecha_aprobacion >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND fecha_creacion IS NOT NULL`);
+    // Corrección tz conocida: algunas fecha_creacion quedaron +4h (gotcha mysql2) → diffs negativos
+    const dursOk = durs.map(r => { let m = Number(r.m); if (m < 0) m += 240; return m; })
+      .filter(m => m >= 0 && m <= 43200); // descarta outliers > 30 días
+    const tPromMin = dursOk.length ? Math.round(dursOk.reduce((s, m) => s + m, 0) / dursOk.length) : null;
+
+    // Créditos digitados del mes por usuario creador
+    const [digit] = await pool.query(`
+      SELECT id_usuario, COUNT(*) n FROM creditos
+      WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND id_usuario IS NOT NULL
+      GROUP BY 1`);
+    const [[totDigit]] = await pool.query(`
+      SELECT COUNT(*) n FROM creditos WHERE created_at >= DATE_FORMAT(CURDATE(),'%Y-%m-01') AND id_usuario IS NOT NULL`);
+    const mapDigit = {}; digit.forEach(r => { mapDigit[r.id_usuario] = Number(r.n); });
+
+    // Horas de conexión del mes (bloques de 5 min) + servicio de HOY (primera/última actividad)
+    let horasMes = {}, servicio = { inicio: null, cierre: null };
+    if (idsAna.length) {
+      const [hb] = await pool.query(`
+        SELECT id_usuario, COUNT(*) b FROM presencia_bloques
+        WHERE id_usuario IN (?) AND bloque >= DATE_FORMAT(CURDATE(),'%Y-%m-01')
+        GROUP BY 1`, [idsAna]);
+      hb.forEach(r => { horasMes[r.id_usuario] = Math.round(Number(r.b) * 5 / 60 * 10) / 10; });
+      const [[svc]] = await pool.query(`
+        SELECT DATE_FORMAT(MIN(bloque),'%H:%i') inicio, DATE_FORMAT(MAX(bloque),'%H:%i') cierre
+        FROM presencia_bloques WHERE id_usuario IN (?) AND DATE(bloque) = CURDATE()`, [idsAna]);
+      servicio = { inicio: svc.inicio, cierre: svc.cierre };
+    }
+
     const vivos = conectadosIds();
     const lista = ejecutivos.map(e => {
       const ot = sumOts(e.nombre);
@@ -118,8 +169,24 @@ exports.mando = async (req, res) => {
       ppto = arr.find(x => x.mes === mesActual) || null;
     } catch (e) { ppto = null; }
 
+    const mapAprob = {}; cartasAprob.forEach(r => { const k = norm(r.nombre); mapAprob[k] = (mapAprob[k] || 0) + Number(r.n); });
+    const sumAprobPor = nombre => llaves(mapAprob, nombre).reduce((s, k) => s + mapAprob[k], 0);
+    const analistas = analistasBase.map(a => ({
+      nombre: a.nombre, perfil: a.perfil, conectado: vivos.has(Number(a.id_usuario)),
+      cartas_aprobadas_mes: sumAprobPor(a.nombre),
+      digitados_mes: mapDigit[a.id_usuario] || 0,
+      horas_mes: horasMes[a.id_usuario] || 0,
+    }));
+
     ok(res, {
       ahora: new Date().toISOString(),
+      analistas: {
+        lista: analistas,
+        total_cartas_aprobadas_mes: Number(totAprob.n) || 0,
+        total_digitados_mes: Number(totDigit.n) || 0,
+        t_prom_aprobacion_min: tPromMin,
+        servicio_hoy: servicio,
+      },
       indicadores: {
         uf: uf ? Number(uf.valor) : null, uf_fecha: uf?.fecha || null,
         tmc_menor: tasa ? Number(tasa.tasa_mensual_menor) : null,
