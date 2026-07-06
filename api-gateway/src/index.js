@@ -23,6 +23,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+app.use(require('../../shared/presencia').middleware); // telemetría "conectados" (Cuadro de Mando)
 
 // ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
 // (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado")
@@ -157,6 +158,7 @@ app.use('/api/meses-cerrados',            require('../../services/mantenedores/s
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
 app.use('/api/reporteria',                require('../../services/reporteria/src/routes/reportes.routes'));
+app.use('/api/mando',                     require('../../services/reporteria/src/routes/mando.routes'));
 app.use('/api/campanas-masivas',          require('../../services/campanas-masivas/src/routes/campanas.routes'));
 
 // Cotizaciones
