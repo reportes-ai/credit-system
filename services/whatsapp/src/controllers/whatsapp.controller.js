@@ -193,6 +193,7 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
   try {
     const MOD_WSP = 660001;
     await pool.query(`INSERT IGNORE INTO modulos (id_modulo, nombre, icono, ruta, orden) VALUES (?, 'WhatsApp', 'bi-whatsapp', '/whatsapp/', 62)`, [MOD_WSP]);
+    await pool.query(`UPDATE modulos SET descripcion='Bot Facilito, conversaciones y campañas de WhatsApp con clientes y dealers' WHERE id_modulo=? AND (descripcion IS NULL OR descripcion='')`, [MOD_WSP]);
     const funcs = [
       ['Panel WhatsApp',           'wsp_panel',    '/whatsapp/', 'bi-whatsapp', MOD_WSP],
       ['Atender conversaciones',   'wsp_atender',  null,         null,          MOD_WSP],
