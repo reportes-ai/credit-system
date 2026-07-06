@@ -75,20 +75,13 @@ exports.mando = async (req, res) => {
     ] = await Promise.all([
       pool.query('SELECT valor, DATE_FORMAT(fecha,"%Y-%m-%d") fecha FROM uf WHERE fecha <= CURDATE() ORDER BY fecha DESC LIMIT 1'),
       pool.query('SELECT tasa_mensual_menor, tasa_mensual_mayor FROM tasas WHERE fecha_desde <= CURDATE() ORDER BY fecha_desde DESC LIMIT 1'),
-      // MISMA fuente que el selector de Ejecutivo (cartas/ejecutivos.controller):
-      // usuarios ACTIVOS con perfil Ejecutivo/Ejecutivo Comercial o permiso de crear carta/crédito
+      // SOLO ejecutivos de verdad: perfil Ejecutivo / Ejecutivo Comercial, activos
+      // (sin el criterio por permiso de crear carta/crédito, que arrastraba analistas)
       pool.query(`
         SELECT u.id_usuario,
                TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre
         FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
-        WHERE u.estado = 'activo' AND p.nombre <> 'Administrador'
-          AND (
-            p.nombre IN ('Ejecutivo','Ejecutivo Comercial')
-            OR EXISTS (SELECT 1 FROM permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
-                       WHERE pp.id_perfil = u.id_perfil AND pp.habilitado = 1 AND f.codigo IN ('aprob_crear','creditos.crear'))
-            OR EXISTS (SELECT 1 FROM permisos_usuario puu JOIN funcionalidades f2 ON f2.id_funcionalidad = puu.id_funcionalidad
-                       WHERE puu.id_usuario = u.id_usuario AND puu.habilitado = 1 AND f2.codigo IN ('aprob_crear','creditos.crear'))
-          )
+        WHERE u.estado = 'activo' AND p.nombre IN ('Ejecutivo','Ejecutivo Comercial')
         ORDER BY nombre`).then(r => r[0]),
       pool.query("SELECT COUNT(*) n FROM cartas_aprobacion WHERE DATE(fecha_creacion)=CURDATE() AND COALESCE(status,'') NOT IN ('ELIMINADA')"),
       pool.query("SELECT HOUR(fecha_creacion) h, COUNT(*) n FROM cartas_aprobacion WHERE DATE(fecha_creacion)=CURDATE() GROUP BY 1 ORDER BY 1").then(r => r[0]),
