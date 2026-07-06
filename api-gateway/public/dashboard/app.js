@@ -3851,10 +3851,10 @@ async function buildVSeg() {
     };
     t.innerHTML =
       `<tr><th>Mes</th><th style="text-align:center">Ops</th>
-       <th style="text-align:center">Pen. RDH</th><th style="text-align:center">Pen. Cesantía</th><th style="text-align:center">Pen. Reparaciones</th>
-       <th style="text-align:center">% Comisión</th>
-       <th style="text-align:right">Ingreso RDH</th><th style="text-align:right">Ingreso Cesantía</th><th style="text-align:right">Ingreso Reparac.</th>
-       <th style="text-align:right">Ingreso Total</th></tr>` +
+       <th style="text-align:center">RDH</th><th style="text-align:center">Cesantía</th><th style="text-align:center">Reparac.</th>
+       <th style="text-align:center">% Com.</th>
+       <th style="text-align:right">Ing. RDH</th><th style="text-align:right">Ing. Cesantía</th><th style="text-align:right">Ing. Reparac.</th>
+       <th style="text-align:right">Total</th></tr>` +
       j.data.map(x => {
         const tot = x.ing_rdh + x.ing_cesantia + x.ing_reparaciones;
         const pctColor = x.pct_comision >= 40 ? '#66bb6a' : x.pct_comision >= 30 ? '#ffd54f' : '#ef5350';
