@@ -278,7 +278,36 @@ async function crearConversacion({ id_dealer, id_cuenta, rut, nombre, asunto, ca
      VALUES (?,?,?,?,?,?,'ESPERA')`,
     [id_dealer || null, id_cuenta || null, rut || null, nombre || null, asunto || null, canal || 'CHAT']);
   const [[conv]] = await pool.query('SELECT * FROM ar_conversaciones WHERE id=?', [r.insertId]);
+  notificarDealerEnEspera(conv); // campana a ejecutivos de Atención Remota + Admin (no bloquea)
   return conv;
+}
+
+/* Aviso campana: dealer esperando atención → pool de Atención Remota + Administradores
+   (patrón de Cartas: usuarios con la funcionalidad + perfil Administrador). */
+function notificarDealerEnEspera(conv) {
+  (async () => {
+    try {
+      const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+      const [rows] = await pool.query(
+        `SELECT u.id_usuario FROM usuarios u
+           JOIN perfiles p ON p.id_perfil = u.id_perfil
+         WHERE p.nombre = 'Administrador' AND u.estado = 'activo'
+         UNION
+         SELECT u.id_usuario FROM usuarios u
+           JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil
+           JOIN funcionalidades f  ON f.id_funcionalidad = pp.id_funcionalidad
+         WHERE f.codigo = 'atencion_remota' AND pp.habilitado = 1 AND u.estado = 'activo'`);
+      const ids = rows.map(x => x.id_usuario);
+      if (!ids.length) return;
+      await notificar(ids, {
+        tipo: 'AR_DEALER_ESPERA',
+        titulo: '🛎️ Dealer esperando atención',
+        mensaje: `${conv.dealer_nombre || 'Un dealer'} inició un chat${conv.asunto ? ': "' + conv.asunto + '"' : ''}`,
+        href: '/atencion-remota/',
+        prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+      });
+    } catch (e) { console.error('[ar notif espera]', e.message); }
+  })();
 }
 async function getConversacion(id) {
   const [[c]] = await pool.query('SELECT * FROM ar_conversaciones WHERE id=?', [id]);
