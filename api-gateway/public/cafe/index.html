@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Café — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(1200px 600px at 50% -10%, #1b2a4a, #0a1226 60%, #060b18); min-height:100vh; font-family:'Segoe UI',system-ui,sans-serif; color:#e8eefb; }
+  .wrap { max-width:760px; margin:0 auto; padding:30px 20px 60px; text-align:center; }
+  h1 { margin:18px 0 6px; font-size:1.6rem; font-weight:800; letter-spacing:.5px; }
+  .sub { color:#9fb3d8; font-size:.92rem; margin-bottom:34px; }
+  .escena { position:relative; width:340px; height:420px; margin:0 auto; }
+
+  /* ── Cafetera ── */
+  .maquina { position:absolute; left:50%; transform:translateX(-50%); bottom:60px; width:260px; height:300px; }
+  .cuerpo { position:absolute; top:0; left:0; right:0; height:110px; background:linear-gradient(180deg,#3b4a66,#232f47); border-radius:16px 16px 8px 8px; box-shadow:inset 0 2px 6px rgba(255,255,255,.15), 0 10px 30px rgba(0,0,0,.5); }
+  .marca { position:absolute; top:38px; width:100%; text-align:center; font-size:.6rem; font-weight:800; letter-spacing:.25em; color:#8fb4ff; text-transform:uppercase; }
+  .luz { position:absolute; top:14px; right:18px; width:10px; height:10px; border-radius:50%; background:#22e06c; box-shadow:0 0 10px #22e06c; animation:luz 1.6s infinite; }
+  @keyframes luz { 50% { opacity:.35; } }
+  .boquilla { position:absolute; top:110px; left:50%; transform:translateX(-50%); width:44px; height:26px; background:linear-gradient(180deg,#2b3852,#1b2438); border-radius:0 0 10px 10px; }
+  .columna { position:absolute; top:0; bottom:0; width:26px; background:linear-gradient(90deg,#2b3852,#1a2338); }
+  .columna.izq { left:0; border-radius:16px 0 0 8px; }
+  .columna.der { right:0; border-radius:0 16px 8px 0; }
+  .base { position:absolute; bottom:-60px; left:-14px; right:-14px; height:60px; background:linear-gradient(180deg,#324160,#1c2740); border-radius:10px 10px 14px 14px; box-shadow:0 14px 34px rgba(0,0,0,.55); }
+
+  /* ── Chorro de café ── */
+  .chorro { position:absolute; top:136px; left:50%; transform:translateX(-50%); width:7px; height:0; background:linear-gradient(180deg,#7a4a21,#4b2c12); border-radius:4px; animation:chorro 6s infinite; }
+  @keyframes chorro { 0%,8% { height:0; opacity:0; } 12% { opacity:1; } 15%,78% { height:118px; opacity:1; } 84%,100% { height:0; opacity:0; } }
+
+  /* ── Taza ── */
+  .taza { position:absolute; bottom:64px; left:50%; transform:translateX(-50%); width:110px; height:78px; }
+  .taza .cuerpo-taza { position:absolute; inset:0; background:linear-gradient(180deg,#f5f7fb,#c9d3e4); border-radius:6px 6px 40px 40px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .cafe-nivel { position:absolute; left:0; right:0; bottom:0; height:0; background:linear-gradient(180deg,#8a5a2b,#3c2410); animation:llenar 6s infinite; }
+  @keyframes llenar { 0%,12% { height:0; } 78% { height:86%; } 100% { height:86%; } }
+  .oreja { position:absolute; right:-24px; top:16px; width:30px; height:34px; border:8px solid #d7dfee; border-radius:50%; border-left-color:transparent; }
+  .logo-taza { position:absolute; top:26px; width:100%; text-align:center; font-size:.5rem; font-weight:800; color:#012d70; letter-spacing:.12em; z-index:2; }
+
+  /* ── Humo ── */
+  .humo { position:absolute; bottom:150px; left:50%; width:12px; height:60px; border-radius:50%; background:rgba(255,255,255,.75); filter:blur(7px); opacity:0; animation:humo 3.4s infinite; }
+  .humo.h1 { margin-left:-26px; animation-delay:2.4s; }
+  .humo.h2 { margin-left:-4px;  animation-delay:3.1s; height:74px; }
+  .humo.h3 { margin-left:18px;  animation-delay:3.8s; }
+  @keyframes humo {
+    0%   { opacity:0; transform:translateY(0) scaleX(1); }
+    25%  { opacity:.85; }
+    100% { opacity:0; transform:translateY(-120px) scaleX(2.4) rotate(8deg); }
+  }
+
+  .frase { margin-top:26px; min-height:26px; color:#ffd98a; font-size:.95rem; font-style:italic; }
+  .btn { margin-top:18px; border:none; border-radius:12px; padding:12px 26px; font-size:.95rem; font-weight:800; cursor:pointer; color:#fff; background:linear-gradient(135deg,#7a4a21,#b97a3c); box-shadow:0 8px 24px rgba(185,122,60,.35); }
+  .btn:active { transform:scale(.97); }
+  .nota { margin-top:30px; color:#64779c; font-size:.72rem; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Café',icon:'bi-cup-hot-fill',current:true}]};</script>
+
+<div class="wrap">
+  <h1><i class="bi bi-cup-hot-fill"></i> Módulo Café</h1>
+  <div class="sub">Esta aplicación hace de todo. Sí, hasta café.</div>
+
+  <div class="escena">
+    <div class="maquina">
+      <div class="cuerpo"><div class="luz"></div><div class="marca">Business Suite Barista 3000</div></div>
+      <div class="columna izq"></div><div class="columna der"></div>
+      <div class="boquilla"></div>
+      <div class="chorro"></div>
+      <div class="base"></div>
+    </div>
+    <div class="humo h1"></div><div class="humo h2"></div><div class="humo h3"></div>
+    <div class="taza">
+      <div class="cuerpo-taza"><div class="cafe-nivel"></div><div class="logo-taza">AUTOFÁCIL</div></div>
+      <div class="oreja"></div>
+    </div>
+  </div>
+
+  <div class="frase" id="frase"></div>
+  <button class="btn" onclick="otro()"><i class="bi bi-arrow-repeat"></i> Preparar otro</button>
+  <div class="nota">Único módulo de la suite que no es paramétrico: el café siempre sale cargado.</div>
+</div>
+
+<script>
+const FRASES = [
+  'Espresso otorgado. Sin garantías, sin aval.',
+  'Café aprobado por el Analista de Crédito en 0,3 segundos.',
+  'Cortado con dos de azúcar: la única mora que aceptamos aquí.',
+  'Grano 100% chileno, tasa 0%.',
+  'Este café cumple la Ley 21.320: solo se sirve en horario hábil.',
+  'Carta de aprobación emitida: 1 café, cuota única.',
+  'Presupuesto de cafeína del mes: 147% de cumplimiento.',
+];
+const f = document.getElementById('frase');
+function frase(){ f.textContent = '“' + FRASES[Math.floor(Math.random()*FRASES.length)] + '”'; }
+function otro(){
+  document.querySelectorAll('.chorro,.cafe-nivel,.humo').forEach(el => { el.style.animation='none'; void el.offsetHeight; el.style.animation=''; });
+  frase();
+}
+frase();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

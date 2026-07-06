@@ -91,6 +91,24 @@ app.get('/api/health', async (req, res) => {
   res.status(db ? 200 : 503).json({ status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()) });
 });
 
+// Easter egg: módulo Café ("la app hace de todo... hasta café") — card para todos los perfiles
+(async () => {
+  try {
+    const pool = require('../../shared/config/database');
+    const MOD = 990001;
+    await pool.query(`INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden) VALUES (?, 'Café', 'La app hace de todo... hasta café. Cortesía de la casa.', 'bi-cup-hot-fill', '/cafe/', 999)`, [MOD]);
+    let [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='cafe' LIMIT 1`);
+    if (!f) {
+      const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Café', 'cafe', '/cafe/', 'bi-cup-hot-fill')`, [MOD]);
+      f = { id_funcionalidad: r.insertId };
+    }
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                      SELECT p.id_perfil, ?, 1 FROM perfiles p
+                      WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                     [f.id_funcionalidad, f.id_funcionalidad]);
+  } catch (e) { console.error('[cafe seed]', e.message); }
+})();
+
 // Auth (login limitado a 10 intentos/min por IP — QA 15.5)
 const rateLimit = require('../../shared/rate-limit');
 app.use('/api/auth/login', rateLimit({ ventanaMs: 60000, max: 10 }));
@@ -284,6 +302,7 @@ app.get('/health', async (req, res) => {
 // verificar). El archivo se mapea explícito porque algunas rutas no lo derivan de
 // la URL (ej. /dealers vive en mantenedores/dealers/). Agregar página = 1 línea.
 const PAGINAS = [
+  ['/cafe', 'cafe/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
