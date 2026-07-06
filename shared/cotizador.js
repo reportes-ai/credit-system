@@ -59,20 +59,8 @@ async function cotizarCuota(valorVehiculo, pie, plazo) {
 }
 
 /* ── Simulador rápido: monto a financiar → opciones 12/24/36/48 meses ─────────
-   CAE según definición AutoFácil (Excel CALCULO CAE): tasa mensual implícita r
-   que iguala PV(cuota, n) = saldoPrecio (monto líquido que recibe el cliente,
-   equivalente a RATE(n, -cuota, saldo) en Excel), anualizada LINEAL: r × 12.
-   Incluye el efecto de gastos y seguros capitalizados. */
-function caeDe(saldoPrecio, cuota, n) {
-  if (!(saldoPrecio > 0 && cuota > 0 && n > 0)) return null;
-  let lo = 0, hi = 1; // tasa mensual entre 0% y 100%
-  for (let i = 0; i < 80; i++) {
-    const r = (lo + hi) / 2;
-    const pv = r < 1e-10 ? cuota * n : cuota * (1 - Math.pow(1 + r, -n)) / r;
-    if (pv > saldoPrecio) lo = r; else hi = r;
-  }
-  return Math.round((lo + hi) / 2 * 12 * 10000) / 100;
-}
+   CAE desde el MOTOR ÚNICO cae-core.js (definición oficial: RATE ×12). */
+const { cae: caeDe } = require('../api-gateway/public/js/cae-core');
 
 /**
  * Simulador rápido para dealers/ejecutivos: un monto → cuotas a 12/24/36/48.

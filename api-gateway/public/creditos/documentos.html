@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — CAE oficial: RATE(n,-cuota,saldo líquido)×12 -->
+<!-- v1.2 — CAE desde motor único /js/cae-core.js -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -194,6 +194,7 @@
 
   <script src="/js/auth-guard.js"></script>
   <script src="/js/rentabilidad-core.js"></script>
+  <script src="/js/cae-core.js"></script>
 <script>
     /* ── Auth ── */
     const token = sessionStorage.getItem('token');
@@ -254,28 +255,10 @@
       </table>`;
     }
 
-    /* ── CAE — definición oficial AutoFácil (Excel CALCULO CAE):
-       tasa mensual implícita RATE(plazo, -cuota, saldoPrecio líquido) × 12.
-       Base = lo que efectivamente recibe el cliente (saldo precio), NO el
-       monto financiado: así el CAE captura gastos y seguros capitalizados. */
+    /* ── CAE → MOTOR ÚNICO /js/cae-core.js (RATE(n,-cuota,saldo líquido) × 12) ── */
     function calcCAE(saldoPrecio, cuota, plazo) {
-      if (!saldoPrecio || !cuota || !plazo) return '____%';
-      let r = 0.03;
-      for (let iter = 0; iter < 150; iter++) {
-        let pv = 0, dpv = 0;
-        for (let k = 1; k <= plazo; k++) {
-          const d = Math.pow(1+r, k);
-          pv  += cuota / d;
-          dpv -= k * cuota / (d * (1+r));
-        }
-        const f = pv - saldoPrecio;
-        if (Math.abs(dpv) < 1e-15) break;
-        const delta = f / dpv;
-        r -= delta;
-        if (Math.abs(delta) < 1e-10) break;
-      }
-      if (!isFinite(r) || isNaN(r) || r <= 0) return '____%';
-      return (r * 12 * 100).toFixed(2) + '%';
+      const v = window.AF_CAE ? AF_CAE.cae(saldoPrecio, cuota, plazo) : null;
+      return v == null ? '____%' : v.toFixed(2) + '%';
     }
 
     /* ── Substitute variables in template HTML ── */

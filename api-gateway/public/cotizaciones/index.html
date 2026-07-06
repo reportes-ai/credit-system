@@ -753,6 +753,7 @@
 
 <script src="/js/bootstrap.bundle.min.js"></script>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/cae-core.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
    AUTH
@@ -908,15 +909,11 @@ function rateNR(nper, pmt, pv, guess = 0.1) {
   }
   return r;
 }
-// CAE = tasa nominal anual  (CMF Chile)
-// PV = saldoPrecio (monto líquido que recibe el cliente, igual que el Excel)
-// PMT = cuota (incluye todos los costos: gastos + seguros + intereses)
-// Así el CAE refleja el verdadero costo total del crédito
+// CAE → MOTOR ÚNICO /js/cae-core.js (RATE(n,-cuota,saldo líquido) × 12).
+// Devuelve fracción (0.3932) para mantener el contrato local (*100 al mostrar).
 function calcularCAE(saldoPrecio, cuota, plazo) {
-  if (!saldoPrecio || !cuota || !plazo) return null;
-  const tasaMensual = rateNR(plazo, -cuota, saldoPrecio);
-  if (!isFinite(tasaMensual) || isNaN(tasaMensual)) return null;
-  return tasaMensual * 12;
+  const v = window.AF_CAE ? AF_CAE.cae(saldoPrecio, cuota, plazo) : null;
+  return v == null ? null : v / 100;
 }
 function getAmbosFactor(plazo) {
   if (plazo <= 12) return 1.15163;
@@ -1837,8 +1834,8 @@ function abrirDetalle(rowData) {
       const spRec = (rowData.valor_vehiculo || 0) - (rowData.pie || 0);
       if (!cae && spRec > 0 && rowData.cuota && rowData.plazo) {
         try {
-          const r2 = rateNR(rowData.plazo, -rowData.cuota, spRec);
-          if (isFinite(r2) && !isNaN(r2)) return `   📊 CAE: ${(r2 * 12 * 100).toFixed(2)}%`;
+          const c2 = calcularCAE(spRec, rowData.cuota, rowData.plazo);
+          if (c2 != null) return `   📊 CAE: ${(c2 * 100).toFixed(2)}%`;
         } catch { return ''; }
       }
       return cae ? `   📊 CAE: ${(cae * 100).toFixed(2)}%` : '';
@@ -1962,8 +1959,8 @@ function abrirVista(rowData) {
     const spRec = saldo;
     if (spRec > 0 && rowData.cuota && rowData.plazo) {
       try {
-        const r2 = rateNR(rowData.plazo, -rowData.cuota, spRec);
-        if (isFinite(r2) && !isNaN(r2)) caeStr = (r2 * 12 * 100).toFixed(2) + '%';
+        const c2 = calcularCAE(spRec, rowData.cuota, rowData.plazo);
+        if (c2 != null) caeStr = (c2 * 100).toFixed(2) + '%';
       } catch {}
     }
   }

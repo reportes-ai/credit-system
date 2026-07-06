@@ -841,10 +841,10 @@ function credRateNR(nper,pmt,pv,guess=0.1) {
     const rn=r-f/df; if(Math.abs(rn-r)<1e-9) return rn; r=rn;
   } return r;
 }
+// CAE → MOTOR ÚNICO /js/cae-core.js. Devuelve fracción (contrato local: *100 al mostrar).
 function credCAE(saldo,cuota,plazo) {
-  if(!saldo||!cuota||!plazo) return null;
-  const r=credRateNR(plazo,-cuota,saldo);
-  return (isFinite(r)&&!isNaN(r)) ? r*12 : null;
+  const v = window.AF_CAE ? AF_CAE.cae(saldo,cuota,plazo) : null;
+  return v==null ? null : v/100;
 }
 function credComboKey(d,r,c) {
   if(d&&r&&c) return 'drc'; if(d&&r) return 'dr'; if(d&&c) return 'dc';
