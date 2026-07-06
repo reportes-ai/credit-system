@@ -9,7 +9,9 @@
 const pool = require('./config/database');
 
 const vivos = new Map(); // id_usuario -> ts última actividad
-const VENTANA_MS = 5 * 60 * 1000;
+// Toda página abierta late cada 60s (heartbeat de app-version.js → /api/desempeno/ping),
+// así que 2,5 min tolera un latido perdido y detecta la desconexión/cierre en ~2 min.
+const VENTANA_MS = 2.5 * 60 * 1000;
 
 /* ── Persistencia: bloques de 5 min por usuario (para "horas de conexión") ──
    Cada request marca el bloque de 5 min en curso; un flush por minuto los
