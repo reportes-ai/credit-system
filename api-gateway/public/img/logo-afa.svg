@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 170">
+  <!-- Logo AFA — Auto Fácil Ahora -->
+  <g font-family="Arial Black, Arial, sans-serif" font-weight="900">
+    <!-- Primera A (gris con cuña naranja) -->
+    <polygon points="10,128 52,10 78,10 60,128 34,128" fill="#f28c00"/>
+    <text x="28" y="128" font-size="118" fill="#b9bcc1">A</text>
+    <!-- FA en negro -->
+    <text x="118" y="128" font-size="118" fill="#0c0c0d">F</text>
+    <text x="196" y="128" font-size="118" fill="#0c0c0d">A</text>
+    <!-- triángulo naranja dentro de la última A -->
+    <polygon points="238,96 252,60 266,96" fill="#f28c00"/>
+  </g>
+  <!-- Barra inferior -->
+  <rect x="118" y="138" width="192" height="26" fill="#0c0c0d"/>
+  <text x="214" y="156" font-family="Arial, sans-serif" font-weight="bold" font-size="15" letter-spacing="2" fill="#f28c00" text-anchor="middle">AUTO FÁCIL AHORA</text>
+</svg>

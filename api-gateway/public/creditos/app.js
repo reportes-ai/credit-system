@@ -231,6 +231,7 @@ function toggleFinanciera(el) {
     if (empresa === 'AUTOFIN')  { window.location.href = '/creditos/digitacion-autofin';  return; }
     if (empresa === 'UNIDAD')   { window.location.href = '/creditos/digitacion-unidad';   return; }
     if (empresa === 'CFC')      { alert('CFC es una financiera de brokerage en preparación. Por ahora está disponible solo como filtro de consulta.'); return; }
+    if (empresa === 'AFA')      { alert('AFA (Auto Fácil Ahora) es una financiera en preparación. Por ahora está disponible solo como filtro de consulta.'); return; }
     // AutoFácil: formulario integrado en esta página
     document.querySelectorAll('.fin-card').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
