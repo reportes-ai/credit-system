@@ -833,14 +833,6 @@ const CRED_SEG_RATES = {
 };
 function credPlazoBracket(n) { for (const b of [6,12,24,36,48,72]) if (n<=b) return b; return 72; }
 function credPmt(r,n,pv) { if(Math.abs(r)<1e-10) return pv/n; return (window.AF_RENT_CORE ? AF_RENT_CORE.cuotaFrancesa(pv,r,n) : pv*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1)); }
-function credRateNR(nper,pmt,pv,guess=0.1) {
-  let r=guess;
-  for(let i=0;i<200;i++){
-    const q=Math.pow(1+r,nper), f=pv*q+pmt*(q-1)/r;
-    const df=nper*pv*Math.pow(1+r,nper-1)+pmt*(nper*Math.pow(1+r,nper-1)*r-(q-1))/(r*r);
-    const rn=r-f/df; if(Math.abs(rn-r)<1e-9) return rn; r=rn;
-  } return r;
-}
 // CAE → MOTOR ÚNICO /js/cae-core.js. Devuelve fracción (contrato local: *100 al mostrar).
 function credCAE(saldo,cuota,plazo) {
   const v = window.AF_CAE ? AF_CAE.cae(saldo,cuota,plazo) : null;

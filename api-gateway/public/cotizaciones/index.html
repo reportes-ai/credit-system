@@ -895,20 +895,6 @@ function pvf(r, n, p) {
   if (Math.abs(r) < 1e-10) return p * n;
   return p * (1 - Math.pow(1 + r, -n)) / r;
 }
-// RATE de Excel — Newton-Raphson: resuelve r en PV = PMT*(1-(1+r)^-n)/r
-function rateNR(nper, pmt, pv, guess = 0.1) {
-  let r = guess;
-  for (let i = 0; i < 200; i++) {
-    const q  = Math.pow(1 + r, nper);
-    const f  = pv * q + pmt * (q - 1) / r;
-    const df = nper * pv * Math.pow(1 + r, nper - 1)
-             + pmt * (nper * Math.pow(1 + r, nper - 1) * r - (q - 1)) / (r * r);
-    const rn = r - f / df;
-    if (Math.abs(rn - r) < 1e-9) return rn;
-    r = rn;
-  }
-  return r;
-}
 // CAE → MOTOR ÚNICO /js/cae-core.js (RATE(n,-cuota,saldo líquido) × 12).
 // Devuelve fracción (0.3932) para mantener el contrato local (*100 al mostrar).
 function calcularCAE(saldoPrecio, cuota, plazo) {
