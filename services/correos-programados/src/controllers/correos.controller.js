@@ -257,6 +257,27 @@ async function buildResumenEjecutivo() {
     .sort((a, b) => a.variacion - b.variacion);
   const mapFinAnt = new Map(finMesAnt.map(r => [r.financiera, Number(r.ops)]));
   const finanzas = finMes.map(r => ({ financiera: r.financiera, ops: Number(r.ops), monto: Number(r.monto), mes_anterior_mismo_dia: mapFinAnt.get(r.financiera) || 0 }));
+  // Seguros AutoFin: tramo del mes y CAMBIO DE TRAMO desde el último resumen
+  let seguros = null;
+  try {
+    const dseg = await datosPenSeguros();
+    const KEYR = 'seg_pen_tramo_resumen';
+    let prevT = null;
+    try { const [[row]] = await pool.query('SELECT config_value FROM dashboard_config WHERE config_key=? LIMIT 1', [KEYR]); if (row) prevT = JSON.parse(row.config_value); } catch (_) {}
+    const pctPct = Math.round(dseg.pctActual * 100);
+    const cambio = (prevT && prevT.mes === dseg.mesStr && prevT.pct !== pctPct) ? { antes_pct: prevT.pct, ahora_pct: pctPct } : null;
+    await pool.query(
+      `INSERT INTO dashboard_config (config_key, config_value) VALUES (?,?)
+       ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=NOW()`,
+      [KEYR, JSON.stringify({ mes: dseg.mesStr, pct: pctPct })]).catch(() => {});
+    seguros = {
+      penetracion_pct: { rdh: dseg.pen.rdh, cesantia: dseg.pen.cesantia, reparaciones: dseg.pen.reparacion },
+      pct_comision_mes: pctPct, pct_maximo: Math.round(dseg.pctTop * 100),
+      dejamos_de_ganar_vs_maximo: dseg.perdida,
+      cambio_de_tramo_desde_ultimo_resumen: cambio,
+    };
+  } catch (e) { /* sin datos de seguros no bloquea el resumen */ }
+
   const datos = {
     fecha_ayer: ayer,
     ventas_ayer: { total_creditos: totAyer, monto: montoAyer, por_ejecutivo: ventasAyer.map(r => ({ ejecutivo: titulo(r.ejecutivo), creditos: Number(r.ops), monto: Number(r.monto) })) },
@@ -269,6 +290,7 @@ async function buildResumenEjecutivo() {
     aprobados_sin_otorgar_por_ejecutivo: soloVigentes(ejAprobSinCerrar).map(r => ({ ejecutivo: titulo(r.ejecutivo), pendientes: Number(r.ops) })),
     cartas_aprobacion: { vigentes: Number(cartas.vigentes || 0), por_vencer_hoy_o_manana: Number(cartas.por_vencer || 0), vigencia_dias: vigDias },
     mora_cartera: { creditos_en_mora: Number(mora.ops), monto_vencido: Number(mora.monto) },
+    seguros_autofin: seguros,
     cumpleanos_manana: cumples.map(c => titulo(c.nombre)),
   };
 
@@ -278,7 +300,7 @@ async function buildResumenEjecutivo() {
     const { analizar } = require('../../../../shared/anthropic');
     const r = await analizar({
       codigo: 'resumen_ejecutivo',
-      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 3 a 5 párrafos cortos en español chileno profesional. Cubre: (1) ventas de ayer, destacando ejecutivos; (2) ritmo del mes por financiera vs mes anterior al mismo día y avance vs presupuesto (presupuesto_mes.monto_mm está en MILLONES de pesos); (3) gestión comercial: qué ejecutivo viene CAÍDO vs el mes pasado al mismo día, quién ha ingresado menos operaciones a análisis y quién acumula aprobados sin otorgar (nómbralos con tino, en tono de gestión, no de funa). Los datos ya vienen acotados al mes pasado y lo que va del mes, y SOLO con ejecutivos vigentes — no menciones a nadie fuera de esas listas; (4) alertas accionables (cartas por vencer, mora) solo si ameritan; (5) si hay cumpleaños mañana, ciérralo con una línea amable recordándolo. Montos en pesos chilenos con separador de miles (punto). Sin saludos ni despedidas ni markdown: devuelve HTML simple usando solo <p> y <b>.',
+      system: 'Eres el analista de gestión de AutoFácil (crédito automotriz, Chile). Redacta un resumen ejecutivo BREVE del día para la gerencia: 3 a 5 párrafos cortos en español chileno profesional. Cubre: (1) ventas de ayer, destacando ejecutivos; (2) ritmo del mes por financiera vs mes anterior al mismo día y avance vs presupuesto (presupuesto_mes.monto_mm está en MILLONES de pesos); (3) gestión comercial: qué ejecutivo viene CAÍDO vs el mes pasado al mismo día, quién ha ingresado menos operaciones a análisis y quién acumula aprobados sin otorgar (nómbralos con tino, en tono de gestión, no de funa). Los datos ya vienen acotados al mes pasado y lo que va del mes, y SOLO con ejecutivos vigentes — no menciones a nadie fuera de esas listas; (4) alertas accionables (cartas por vencer, mora) solo si ameritan; si seguros_autofin.cambio_de_tramo_desde_ultimo_resumen NO es null, destácalo SIEMPRE en un párrafo propio: el % de comisión de seguros AutoFin cambió de tramo (antes_pct → ahora_pct), qué seguro está más débil según penetracion_pct y cuánto dejamos de ganar vs el máximo (dejamos_de_ganar_vs_maximo); si es null no menciones seguros salvo que dejamos_de_ganar_vs_maximo sea relevante; (5) si hay cumpleaños mañana, ciérralo con una línea amable recordándolo. Montos en pesos chilenos con separador de miles (punto). Sin saludos ni despedidas ni markdown: devuelve HTML simple usando solo <p> y <b>.',
       prompt: 'Datos del negocio:\n' + JSON.stringify(datos, null, 2),
       max_tokens: 1100,
     });
