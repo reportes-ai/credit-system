@@ -7,20 +7,22 @@ const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
 
 /* ── Cartera de Créditos ─────────────────────────────────────────────
-   ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD acota los agregados de OTORGADOS
-   por fecha_otorgado (los totales por etapa son de toda la base). */
+   ?desde=YYYY-MM&hasta=YYYY-MM — MESES COMPLETOS por el campo `mes` de
+   creditos (la fecha-mes de la base única, que tienen TODAS las etapas).
+   Con filtro, TODO el informe se acota al rango, incluida la torta por etapa. */
 exports.cartera = async (req, res) => {
   try {
-    const { desde, hasta } = req.query;
+    const { desde, hasta } = req.query;   // 'YYYY-MM'
     const fw = [];
     const fp = [];
-    if (desde) { fw.push('fecha_otorgado >= ?'); fp.push(desde); }
-    if (hasta) { fw.push('fecha_otorgado <= ?'); fp.push(hasta); }
-    const fOtor = "estado_credito = 'OTORGADO'" + (fw.length ? ' AND ' + fw.join(' AND ') : '');
+    if (/^\d{4}-\d{2}$/.test(desde || '')) { fw.push('mes >= ?'); fp.push(desde + '-01'); }
+    if (/^\d{4}-\d{2}$/.test(hasta || '')) { fw.push('mes <= ?'); fp.push(hasta + '-01'); }
+    const fMes  = fw.length ? fw.join(' AND ') : '1=1';
+    const fOtor = "estado_credito = 'OTORGADO' AND " + fMes;
 
     const [porEstado] = await pool.query(`
       SELECT COALESCE(estado_credito,'SIN ESTADO') AS estado, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto
-      FROM creditos GROUP BY estado_credito ORDER BY n DESC`);
+      FROM creditos WHERE ${fMes} GROUP BY estado_credito ORDER BY n DESC`, fp);
 
     const [porFinanciera] = await pool.query(`
       SELECT COALESCE(financiera,'—') AS financiera, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto
@@ -32,24 +34,24 @@ exports.cartera = async (req, res) => {
       FROM creditos WHERE ${fOtor}
       GROUP BY 1 ORDER BY monto DESC LIMIT 12`, fp);
 
-    // Con filtro de fechas usa ese rango; sin filtro, últimos 12 meses
+    // Con filtro usa ese rango; sin filtro, últimos 12 meses
     const [porMes] = await pool.query(`
-      SELECT DATE_FORMAT(fecha_otorgado,'%Y-%m') AS mes, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto
+      SELECT DATE_FORMAT(mes,'%Y-%m') AS mes, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto
       FROM creditos
-      WHERE ${fOtor} AND fecha_otorgado IS NOT NULL
-        ${fw.length ? '' : "AND fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)"}
+      WHERE ${fOtor} AND mes IS NOT NULL
+        ${fw.length ? '' : "AND mes >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)"}
       GROUP BY 1 ORDER BY 1`, fp);
 
     const [carteraPropia] = await pool.query(`
       SELECT COALESCE(estado_cartera,'') AS estado_cartera, COUNT(*) n
       FROM creditos WHERE estado_cartera IS NOT NULL GROUP BY estado_cartera`);
 
-    // KPI: "total en base" es histórico; otorgados y monto respetan el filtro de fechas
+    // KPI: todo respeta el filtro de meses (sin filtro = histórico)
     const [[kpi]] = await pool.query(`
-      SELECT (SELECT COUNT(*) FROM creditos) total,
+      SELECT (SELECT COUNT(*) FROM creditos WHERE ${fMes}) total,
              COUNT(*) otorgados,
              COALESCE(SUM(monto_financiado),0) monto_otorgado
-      FROM creditos WHERE ${fOtor}`, fp);
+      FROM creditos WHERE ${fOtor}`, fp.concat(fp));
 
     ok(res, { kpi, porEstado, porFinanciera, porEjecutivo, porMes, carteraPropia });
   } catch (e) { fail(res, e.message); }
