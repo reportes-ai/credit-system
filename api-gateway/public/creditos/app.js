@@ -500,7 +500,7 @@ function actualizarStats(stats, totalServidor) {
   set('statSinEstado', Math.max(0, (totalServidor || 0) - carteraSum));
   // Resaltar badge ingresados
   const chipRev = document.querySelector('.stat-revision');
-  if (chipRev) chipRev.style.borderColor = ingresados > 0 ? '#854d0e' : '';
+  if (chipRev) chipRev.classList.toggle('con-pendientes', ingresados > 0);
   const chipPro = document.getElementById('chipProceso');
   if (chipPro) chipPro.classList.toggle('activo', _filtroProceso);
 }

@@ -370,8 +370,9 @@
     .stat-chip:hover { box-shadow:0 3px 10px rgba(0,0,0,.13); }
     .stat-chip .sc-label { font-size:.7rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; }
     .stat-chip .sc-val   { font-size:1.3rem; font-weight:900; color:var(--navy); margin-top:2px; }
-    .stat-revision { border-color:#fca5a5; background:#fff5f5; }
-    .stat-revision .sc-label { color:#dc2626; }
+    /* Destacado sólo cuando hay ingresados pendientes de revisión (clase .con-pendientes desde app.js) */
+    .stat-revision.con-pendientes { border-color:#fca5a5; background:#fff5f5; }
+    .stat-revision.con-pendientes .sc-label { color:#dc2626; }
     .stat-proceso  { border-color:#fdba74; background:#fff7ed; }
     .stat-proceso .sc-label  { color:#c2410c; }
     .stat-proceso.activo { border-color:#ea580c !important; box-shadow:0 0 0 3px #ffedd5; }
