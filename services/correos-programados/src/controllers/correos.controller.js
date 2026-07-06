@@ -49,6 +49,13 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
         codigo: 'resumen_ejecutivo', nombre: 'Resumen Ejecutivo Diario',
         descripcion: 'Redacta la narrativa del correo diario de gestión (ventas, cartas, mora)' });
     } catch (_) {}
+    // Alerta de Penetración de Seguros AutoFin (v94.5) — nace desactivado.
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
+       VALUES (?,?,?,?,?,?,0)`,
+      ['alerta_penetracion_seguros', 'Alerta Penetración de Seguros (AutoFin)',
+        'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40%. Se evalúa a diario pero solo se envía al CAMBIAR de estado.',
+        '08:45', '1,2,3,4,5,6', '']);
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -344,14 +351,197 @@ async function buildResumenEjecutivo() {
   return { asunto, html };
 }
 
-const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo };
+/* ── Reporte: Alerta Penetración de Seguros AutoFin ──────────────────────────
+   Se evalúa a diario, pero SOLO se envía al cambiar de estado en el mes:
+   OK→BAJO (algún seguro bajo el tramo 40%) manda la ALERTA; BAJO→OK manda la
+   RECUPERACIÓN. El estado vive en dashboard_config (seg_pen_alerta_estado). */
+async function datosPenSeguros(mesForzado) {
+  const ch = chileParts();
+  const mesStr = mesForzado || `${ch.year}-${String(ch.month).padStart(2, '0')}`;
+  const { getPenComision } = require('../../../creditos/src/utils/penetracion');
+  const [tramos] = await pool.query(
+    'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min');
+  // Umbral del tramo TOP (40%) por seguro, y % top — paramétricos
+  const topDe = tipo => {
+    const filas = tramos.filter(t => t.tipo === tipo);
+    if (!filas.length) return { pen: 100, pct: 0.40 };
+    const best = filas.reduce((a, b) => +a.pct_comision > +b.pct_comision ? a : b);
+    return { pen: +best.pen_min, pct: +best.pct_comision / 100 };
+  };
+  const U = { rdh: topDe('rdh'), cesantia: topDe('cesantia'), reparacion: topDe('reparacion') };
+  const pctTop = Math.max(U.rdh.pct, U.cesantia.pct, U.reparacion.pct);
+
+  const [ops] = await pool.query(`
+    SELECT ejecutivo,
+           (COALESCE(seguro_rdh,0)>0) tr, (COALESCE(seguro_cesantia,0)>0) tc, (COALESCE(seguro_rep_menor,0)>0) tp,
+           COALESCE(seguro_rdh,0) pr, COALESCE(seguro_cesantia,0) pc, COALESCE(seguro_rep_menor,0) pp
+    FROM creditos
+    WHERE DATE_FORMAT(mes,'%Y-%m')=? AND UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND estado IN ('OTORGADO','APROBADO')`, [mesStr]);
+  const n = ops.length;
+  const pct100 = (a, b) => b ? Math.round(1000 * a / b) / 10 : 0;
+  const pen = {
+    rdh: pct100(ops.filter(o => +o.tr).length, n),
+    cesantia: pct100(ops.filter(o => +o.tc).length, n),
+    reparacion: pct100(ops.filter(o => +o.tp).length, n),
+  };
+  const primas = {
+    rdh: ops.reduce((s, o) => s + +o.pr, 0),
+    cesantia: ops.reduce((s, o) => s + +o.pc, 0),
+    reparacion: ops.reduce((s, o) => s + +o.pp, 0),
+  };
+  const pctActual = n ? Math.min(
+    getPenComision('rdh', pen.rdh, tramos),
+    getPenComision('cesantia', pen.cesantia, tramos),
+    getPenComision('reparacion', pen.reparacion, tramos)) : pctTop;
+
+  // Ejecutivos que NO cumplen el umbral 40% en algún seguro (con sus ops del mes)
+  const porEj = new Map();
+  for (const o of ops) {
+    const k = keyEj(o.ejecutivo || 'SIN EJECUTIVO');
+    if (!porEj.has(k)) porEj.set(k, { nombre: o.ejecutivo || 'Sin ejecutivo', n: 0, r: 0, c: 0, p: 0 });
+    const e = porEj.get(k);
+    e.n++; e.r += +o.tr; e.c += +o.tc; e.p += +o.tp;
+  }
+  const incumplen = [...porEj.values()].map(e => ({
+    nombre: titulo(e.nombre), ops: e.n,
+    rdh: pct100(e.r, e.n), cesantia: pct100(e.c, e.n), reparacion: pct100(e.p, e.n),
+  })).filter(e => e.rdh < U.rdh.pen || e.cesantia < U.cesantia.pen || e.reparacion < U.reparacion.pen)
+    .sort((a, b) => (a.rdh + a.cesantia + a.reparacion) - (b.rdh + b.cesantia + b.reparacion));
+
+  const totalPrimas = primas.rdh + primas.cesantia + primas.reparacion;
+  return {
+    mesStr, mesNom: MESES[parseInt(mesStr.slice(5, 7), 10) - 1], n, pen, primas, U, pctTop, pctActual,
+    bajo: n > 0 && pctActual < pctTop,
+    ingActual: Math.round(totalPrimas * pctActual),
+    ingTop: Math.round(totalPrimas * pctTop),
+    perdida: Math.round(totalPrimas * (pctTop - pctActual)),
+    incumplen,
+  };
+}
+
+async function buildAlertaPenetracion(opts = {}) {
+  const d = await datosPenSeguros(opts.mes);
+  const KEY = 'seg_pen_alerta_estado';
+  let prev = null;
+  try {
+    const [[row]] = await pool.query('SELECT config_value FROM dashboard_config WHERE config_key=? LIMIT 1', [KEY]);
+    if (row) prev = JSON.parse(row.config_value);
+  } catch (_) {}
+  const estadoActual = d.bajo ? 'BAJO' : 'OK';
+  const guardar = () => pool.query(
+    `INSERT INTO dashboard_config (config_key, config_value) VALUES (?,?)
+     ON DUPLICATE KEY UPDATE config_value=VALUES(config_value), updated_at=NOW()`,
+    [KEY, JSON.stringify({ estado: estadoActual, mes: d.mesStr })]).catch(() => {});
+
+  let variante = opts.variante; // 'ALERTA' | 'RECUPERACION' (preview/ejemplos)
+  if (!variante) {
+    const mismoMes = prev && prev.mes === d.mesStr;
+    if (!opts.forzar) {
+      if (mismoMes && prev.estado === estadoActual) return { skip: true, estado: 'Sin cambios (' + estadoActual + ')' };
+      if (!mismoMes && estadoActual === 'OK') { await guardar(); return { skip: true, estado: 'Mes parte en OK — sin aviso' }; }
+    }
+    variante = estadoActual === 'BAJO' ? 'ALERTA' : 'RECUPERACION';
+    await guardar();
+  }
+
+  const esAlerta = variante === 'ALERTA';
+  const pF = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  const segRow = (nombre, pv, u, prima) => {
+    const ok = pv >= u.pen;
+    return `<tr>
+      <td style="padding:7px 12px;border-bottom:1px solid #eef2f7;color:#334155;font-weight:700">${nombre}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:800;color:${ok ? '#16a34a' : '#dc2626'}">${pF(pv)} ${ok ? '✅' : '⚠️'}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #eef2f7;text-align:center;color:#64748b">≥ ${pF(u.pen)}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #eef2f7;text-align:right">${fmt(prima)}</td>
+    </tr>`;
+  };
+  const filasEj = d.incumplen.length ? d.incumplen.map(e => `
+    <tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #eef2f7;color:#334155">${esc(e.nombre)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;color:#64748b">${e.ops}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:700;color:${e.rdh >= d.U.rdh.pen ? '#16a34a' : '#dc2626'}">${pF(e.rdh)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:700;color:${e.cesantia >= d.U.cesantia.pen ? '#16a34a' : '#dc2626'}">${pF(e.cesantia)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #eef2f7;text-align:center;font-weight:700;color:${e.reparacion >= d.U.reparacion.pen ? '#16a34a' : '#dc2626'}">${pF(e.reparacion)}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" style="padding:10px 12px;color:#94a3b8;text-align:center">Todos los ejecutivos cumplen el umbral del 40%</td></tr>';
+
+  const headBg = esAlerta ? 'linear-gradient(135deg,#7f1d1d,#b91c1c)' : 'linear-gradient(135deg,#14532d,#16a34a)';
+  const tituloMail = esAlerta ? '⚠️ Penetración de seguros bajo el 40%' : '✅ Penetración de seguros recuperada — volvimos al 40%';
+  const intro = esAlerta
+    ? `La penetración de seguros AutoFin de <b>${d.mesNom}</b> cayó del tramo máximo: este mes AutoFin nos está pagando el <b>${Math.round(d.pctActual * 100)}%</b> de las primas en vez del <b>${Math.round(d.pctTop * 100)}%</b>. Cada operación que salga sin seguros nos cuesta comisión de TODO el mes.`
+    : `Buenas noticias: la penetración de seguros AutoFin de <b>${d.mesNom}</b> volvió al tramo máximo — AutoFin nos paga el <b>${Math.round(d.pctTop * 100)}%</b> de las primas. A mantenerlo hasta el cierre.`;
+
+  const cuadro = `
+    <table style="width:100%;border-collapse:separate;border-spacing:6px;margin:14px 0 4px"><tr>
+      <td style="padding:12px 10px;background:#f8fafc;border-radius:10px;text-align:center">
+        <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;font-weight:700">Como estamos (${Math.round(d.pctActual * 100)}%)</div>
+        <div style="font-size:20px;font-weight:800;color:${esAlerta ? '#b91c1c' : '#166534'};margin-top:2px">${fmt(d.ingActual)}</div>
+      </td>
+      <td style="padding:12px 10px;background:#f8fafc;border-radius:10px;text-align:center">
+        <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;font-weight:700">Ganaríamos al ${Math.round(d.pctTop * 100)}%</div>
+        <div style="font-size:20px;font-weight:800;color:#0f3d8a;margin-top:2px">${fmt(d.ingTop)}</div>
+      </td>
+      <td style="padding:12px 10px;background:${esAlerta ? '#fef2f2' : '#f0fdf4'};border-radius:10px;text-align:center">
+        <div style="font-size:10.5px;color:#64748b;text-transform:uppercase;font-weight:700">${esAlerta ? 'Dejamos de ganar' : 'Diferencia'}</div>
+        <div style="font-size:20px;font-weight:800;color:${esAlerta ? '#b91c1c' : '#166534'};margin-top:2px">${fmt(d.perdida)}</div>
+      </td>
+    </tr></table>`;
+
+  const th = 'color:#fff;padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;background:#2f6fd0';
+  const html = `
+  <div style="background:#eef2f7;padding:24px 12px;font-family:'Segoe UI',Arial,sans-serif">
+    <div style="max-width:620px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+      <div style="padding:18px 28px 12px;background:#fff">
+        <img src="${APP_URL}/img/logo.png" alt="AutoFácil" height="34" style="height:34px;width:auto;display:block">
+      </div>
+      <div style="background:${headBg};color:#fff;padding:18px 28px">
+        <div style="font-size:18px;font-weight:800;letter-spacing:.2px">${tituloMail}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.8);margin-top:4px;text-transform:capitalize">${esc(d.mesNom)} · ${d.n} operaciones cursadas AutoFin</div>
+      </div>
+      <div style="padding:20px 28px">
+        <p style="font-size:13.5px;color:#1e293b;line-height:1.6;margin:0 0 8px">${intro}</p>
+        ${cuadro}
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:14px 0 8px;border-left:4px solid #0141A2;padding-left:10px">Penetración del mes por seguro</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr><th style="${th};text-align:left">Seguro</th><th style="${th};text-align:center">Penetración</th><th style="${th};text-align:center">Meta 40%</th><th style="${th};text-align:right">Primas del mes</th></tr></thead>
+          <tbody>
+            ${segRow('RDH (incl. desgravamen)', d.pen.rdh, d.U.rdh, d.primas.rdh)}
+            ${segRow('Cesantía', d.pen.cesantia, d.U.cesantia, d.primas.cesantia)}
+            ${segRow('Reparaciones Menores', d.pen.reparacion, d.U.reparacion, d.primas.reparacion)}
+          </tbody>
+        </table>
+        <div style="font-weight:800;color:#0f172a;font-size:13px;margin:18px 0 8px;border-left:4px solid ${esAlerta ? '#b91c1c' : '#0141A2'};padding-left:10px">Ejecutivos bajo el umbral del 40% en algún seguro</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr><th style="${th};text-align:left">Ejecutivo</th><th style="${th};text-align:center">Ops</th><th style="${th};text-align:center">RDH</th><th style="${th};text-align:center">Cesantía</th><th style="${th};text-align:center">Reparac.</th></tr></thead>
+          <tbody>${filasEj}</tbody>
+        </table>
+        <p style="font-size:11.5px;color:#94a3b8;margin:14px 0 0">El % del mes lo define el seguro más débil (tramos 20/30/40%). Detalle en Dashboard → 🛡️ Seguros.</p>
+      </div>
+      <div style="padding:14px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">
+        Correo automático de AutoFácil · se envía solo al cambiar el estado del mes. Se suspende en Mantenedores → Correos Programados.
+      </div>
+    </div>
+  </div>`;
+
+  const asunto = esAlerta
+    ? `⚠️ Seguros AutoFin bajo el 40% — dejamos de ganar ${fmt(d.perdida)} en ${d.mesNom}`
+    : `✅ Seguros AutoFin de vuelta al 40% — ${d.mesNom} al máximo tramo`;
+  return { asunto, html };
+}
+
+const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion };
 
 /* ── Ejecuta y envía un reporte. auto=true marca el dedup diario. ── */
 async function ejecutarReporte(r, { auto = false } = {}) {
   const builder = BUILDERS[r.codigo];
   if (!builder) return { ok: false, error: 'Reporte sin generador: ' + r.codigo };
   let built;
-  try { built = await builder(); } catch (e) { return { ok: false, error: 'Error generando: ' + e.message }; }
+  try { built = await builder(auto ? {} : { forzar: true }); } catch (e) { return { ok: false, error: 'Error generando: ' + e.message }; }
+  // Reportes por CAMBIO DE ESTADO (ej. penetración de seguros): si no hay cambio, no se envía.
+  if (built && built.skip) {
+    try { await pool.query('UPDATE correos_programados SET ultimo_estado=? WHERE codigo=?', ['Evaluado, sin envío: ' + (built.estado || 'sin cambios'), r.codigo]); } catch (_) {}
+    return { ok: true, skip: true };
+  }
   const to = String(r.destinatarios || '').split(/[,;]/).map(s => s.trim()).filter(Boolean).join(',');
   if (!to) return { ok: false, error: 'Sin destinatarios configurados' };
   const res = await enviarCorreo({ to, from: remitentePorClave(r.remitente), subject: built.asunto, html: built.html });
@@ -429,7 +619,8 @@ const preview = async (req, res) => {
   try {
     const builder = BUILDERS[req.params.codigo];
     if (!builder) return res.status(404).json({ success: false, data: null, error: 'Reporte sin vista previa' });
-    const built = await builder();
+    // ?variante=ALERTA|RECUPERACION permite previsualizar ambos envíos del reporte de penetración
+    const built = await builder({ forzar: true, variante: req.query.variante || undefined, mes: req.query.mes || undefined });
     res.json({ success: true, data: { asunto: built.asunto, html: built.html }, error: null });
   } catch (e) { console.error('[correos preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
