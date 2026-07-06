@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Punto de Restauración (UAT) — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { max-width:860px; margin:24px auto; padding:0 22px 60px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2); border-radius:16px; color:#fff; padding:22px 26px; margin-bottom:20px; display:flex; gap:16px; align-items:center; }
+  .banner i { font-size:2.2rem; opacity:.85; }
+  .banner h2 { margin:0 0 4px; font-size:1.2rem; } .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+  .card h5 { margin:0 0 10px; color:var(--navy); font-size:.98rem; }
+  .estado { font-size:.88rem; }
+  .estado b { color:var(--navy); }
+  table { width:100%; border-collapse:collapse; font-size:.82rem; margin-top:10px; }
+  th { text-align:left; background:#f8fafc; padding:7px 10px; font-size:.68rem; text-transform:uppercase; color:#6b7280; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+  td.n { text-align:right; font-weight:800; }
+  .btn { border:none; border-radius:10px; padding:10px 18px; font-weight:800; font-size:.88rem; cursor:pointer; }
+  .b-azul { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; }
+  .b-rojo { background:linear-gradient(135deg,#b91c1c,#dc2626); color:#fff; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .aviso { background:#fef9c3; border-left:4px solid #f59e0b; border-radius:8px; padding:10px 14px; font-size:.8rem; margin-top:12px; }
+  .ok { background:#dcfce7; border-left:4px solid #16a34a; border-radius:8px; padding:10px 14px; font-size:.84rem; margin-top:12px; }
+  .conf input { border:1.5px solid #d7dfee; border-radius:8px; padding:8px 12px; font-size:.9rem; margin-right:10px; }
+  .footer-afecta { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin-top:26px; font-size:.8rem; }
+  .footer-afecta h6 { margin:0 0 8px; color:var(--navy); }
+  .footer-afecta ul { margin:0; padding-left:18px; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Punto de Restauración (UAT)',icon:'bi-clock-history',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner"><i class="bi bi-clock-history"></i>
+    <div><h2>Punto de Restauración (UAT)</h2>
+    <p>Fija una marca antes de las pruebas de usuario y borra de una todo lo digitado/cargado después: créditos con todas sus tablas hijas, cartas, cotizaciones y pre-aprobaciones. Clientes, antecedentes e informes NO se tocan.</p></div>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-bookmark-star"></i> Punto actual</h5>
+    <div class="estado" id="estado">Cargando…</div>
+    <div style="margin-top:14px"><button class="btn b-azul" onclick="crear()"><i class="bi bi-bookmark-plus"></i> Crear punto AHORA</button></div>
+    <div class="aviso"><b>Crear un punto nuevo reemplaza el anterior.</b> Hazlo justo antes de comenzar las pruebas.</div>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-trash3"></i> Restaurar (borrar lo posterior al punto)</h5>
+    <div id="pend" class="estado">—</div>
+    <div class="conf" style="margin-top:14px">
+      <input id="conf" placeholder='Escribe RESTAURAR'>
+      <button class="btn b-rojo" id="btnRest" onclick="restaurar()"><i class="bi bi-exclamation-triangle"></i> Restaurar</button>
+    </div>
+    <div id="resultado"></div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul>
+      <li><b>Restaurar</b> → elimina créditos posteriores al punto y sus tablas hijas (cuotas, pagos, gestiones de cobranza, fundantes, documentos, CRM, transitorias) en <a href="/creditos/">Créditos</a>, <a href="/cobranza/">Cobranza</a>, <a href="/tesoreria/cuentas-transitorias/">Tesorería</a>.</li>
+      <li><b>Restaurar</b> → elimina cartas posteriores en <a href="/aprobaciones/">Aprobaciones</a>, cotizaciones en <a href="/cotizaciones/">Cotizaciones</a> y pre-aprobaciones del <a href="/portal-dealer/">Portal del Dealer</a>.</li>
+      <li>NO toca <a href="/mantenedores/bd-clientes/">clientes</a>, antecedentes laborales, informes comerciales ni ningún dato anterior al punto. Todo queda <a href="/auditoria/">auditado</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const fmtN = n => Number(n||0).toLocaleString('es-CL');
+const NOMBRES = { creditos:'Créditos', cartas_aprobacion:'Cartas de aprobación', cotizaciones:'Cotizaciones', portal_preaprobaciones:'Pre-aprobaciones portal' };
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/punto-restauracion', { headers: H });
+    const j = await r.json();
+    if (!j.success) { document.getElementById('estado').textContent = j.error || 'Error'; return; }
+    const p = j.data.punto;
+    if (!p) {
+      document.getElementById('estado').innerHTML = 'No hay punto creado todavía.';
+      document.getElementById('pend').innerHTML = 'Crea primero un punto de restauración.';
+      document.getElementById('btnRest').disabled = true;
+      return;
+    }
+    document.getElementById('btnRest').disabled = false;
+    document.getElementById('estado').innerHTML =
+      `Creado el <b>${new Date(p.creado_at).toLocaleString('es-CL')}</b>${p.creado_por ? ' por <b>'+p.creado_por+'</b>' : ''}.` +
+      `<table><tr><th>Tabla</th><th style="text-align:right">Marca (ID máx.)</th></tr>` +
+      Object.entries(p.marcas).map(([t,v])=>`<tr><td>${NOMBRES[t]||t}</td><td class="n">${fmtN(v)}</td></tr>`).join('') + '</table>';
+    const pend = j.data.pendientes || {};
+    const tot = Object.values(pend).reduce((a,b)=>a+b,0);
+    document.getElementById('pend').innerHTML = tot
+      ? `Se borrarían ahora: <table><tr><th>Tabla</th><th style="text-align:right">Registros nuevos</th></tr>` +
+        Object.entries(pend).map(([t,v])=>`<tr><td>${NOMBRES[t]||t}</td><td class="n">${fmtN(v)}</td></tr>`).join('') + '</table>'
+      : 'No hay registros posteriores al punto — nada que borrar.';
+  } catch(e){ document.getElementById('estado').textContent = 'Error de conexión'; }
+}
+
+async function crear(){
+  if (!confirm('¿Fijar el punto de restauración AHORA? Reemplaza el anterior si existía.')) return;
+  const r = await fetch('/api/punto-restauracion/crear', { method:'POST', headers: H });
+  const j = await r.json();
+  if (!j.success) return alert(j.error || 'Error');
+  document.getElementById('resultado').innerHTML = '';
+  cargar();
+}
+
+async function restaurar(){
+  const conf = document.getElementById('conf').value.trim();
+  if (conf !== 'RESTAURAR') return alert('Escribe RESTAURAR en el campo de confirmación.');
+  if (!confirm('⚠️ Esto BORRA definitivamente todo lo creado después del punto (créditos, cuotas, pagos, cartas, cotizaciones, pre-aprobaciones). ¿Continuar?')) return;
+  document.getElementById('btnRest').disabled = true;
+  try {
+    const r = await fetch('/api/punto-restauracion/restaurar', { method:'POST', headers: H, body: JSON.stringify({ confirmar: 'RESTAURAR' }) });
+    const j = await r.json();
+    if (!j.success) return alert(j.error || 'Error');
+    const b = j.data.borrado || {};
+    const det = Object.keys(b).length ? Object.entries(b).map(([t,v])=>`${NOMBRES[t]||t}: ${fmtN(v)}`).join(' · ') : 'nada que borrar';
+    document.getElementById('resultado').innerHTML = `<div class="ok"><b>✅ Restauración lista.</b> Borrado: ${det}</div>`;
+    document.getElementById('conf').value = '';
+    cargar();
+  } finally { document.getElementById('btnRest').disabled = false; }
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
