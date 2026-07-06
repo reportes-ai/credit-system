@@ -112,9 +112,9 @@
     color:#ff2a4d; text-align:center; white-space:nowrap;
     text-shadow:0 0 18px rgba(255,42,77,.95), 0 0 40px rgba(255,42,77,.5);
     box-shadow:0 0 30px rgba(255,42,77,.55), inset 0 0 24px rgba(255,42,77,.18);
-    animation:ledblink 1s step-end infinite; }
+    animation:ledblink 1.2s step-end infinite; }   /* 3 tiempos encendida, 1 apagada */
   .alerta-led.on { display:block; }
-  @keyframes ledblink { 50% { opacity:.25; } }
+  @keyframes ledblink { 0%,25%,50% { opacity:1; } 75% { opacity:.15; } }
 </style>
 </head>
 <body>
