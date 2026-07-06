@@ -25,10 +25,12 @@ const INDEPENDIENTE = new Set(['independiente', 'honorarios', 'empresario']);
 const num = v => parseFloat(v) || 0;
 
 /* ── Tramos de comisión por penetración (mantenedor comisiones_seguro) ──
-   Desde 2026-07 los tramos NO determinan la comisión (quedan como referencia
-   histórica/KPI): AutoFin traspasa un % PAREJO de la prima de cada seguro
-   (parámetro seg_pct_traspaso_autofin, default 30%). */
-let _pctTraspaso = 0.30; // caché del % traspaso (se refresca en cada cargarPenTramos)
+   Modelo AutoFin 2026-07 (lámina "Cumplimiento Seguros"): el % de traspaso del
+   mes (20/30/40%) lo define el TRAMO ALCANZADO POR EL SEGURO MÁS DÉBIL de los
+   tres (mín. entre RDH, cesantía y reparaciones), y se aplica PAREJO a las
+   primas de todos. Verificado: mayo 98/76/64 → 40%; junio 100/55,8/48,1 → 30%
+   (reparaciones en tramo 40-49 arrastró el mes a 30%). */
+let _pctTraspaso = 0.30; // fallback si la tabla de tramos está vacía
 async function cargarPenTramos() {
   try {
     const [[p]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='seg_pct_traspaso_autofin' LIMIT 1");
@@ -38,6 +40,16 @@ async function cargarPenTramos() {
     'SELECT tipo, pen_min, pct_comision FROM comisiones_seguro_penetracion WHERE estado="activo" ORDER BY tipo, pen_min'
   );
   return rows;
+}
+
+/* % de traspaso del MES = mínimo de los tramos alcanzados por los 3 seguros. */
+function pctTraspasoMes(pen, tramos) {
+  if (!tramos || !tramos.length) return _pctTraspaso;
+  return Math.min(
+    getPenComision('rdh',        pen.pen_rdh,          tramos),
+    getPenComision('cesantia',   pen.pen_cesantia,     tramos),
+    getPenComision('reparacion', pen.pen_reparaciones, tramos),
+  );
 }
 
 /* Dado el % de penetración (0–100), retorna el pct_comision (fracción) del tramo más alto alcanzado */
@@ -60,7 +72,7 @@ async function calcularPenetracionMes(mes) {
     LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
     WHERE DATE_FORMAT(c.mes, '%Y-%m') = ?
       AND UPPER(c.financiera) LIKE '%AUTOFIN%'
-      AND c.estado_eval NOT IN ('RECHAZADO', 'ANULADO')
+      AND c.estado IN ('OTORGADO', 'APROBADO')  -- cursadas: mismo universo del cierre de AutoFin (antes: todas las no rechazadas, diluía la penetración)
   `, [mesStr]);
 
   const esEmpresa = o => String(o.tipo_cliente || '').toUpperCase() === 'EMPRESA';
@@ -84,16 +96,14 @@ async function calcularPenetracionMes(mes) {
   };
 }
 
-/* ── Comisión de seguros de una op = prima × % traspaso AutoFin (parejo) ──
-   Modelo nuevo 2026-07: AutoFin recibe la prima como comisión y nos traspasa
-   el seg_pct_traspaso_autofin (30%) de CADA seguro. La penetración ya no
-   determina el % (sigue calculándose como KPI en pen_*). Los args pen/tramos
-   se conservan por compatibilidad de firma. */
+/* ── Comisión de seguros de una op = prima × % traspaso del mes (parejo) ──
+   El % del mes sale del tramo del seguro más débil (pctTraspasoMes). */
 function comisionesSeguro(op, pen, tramos) {
+  const pct = pctTraspasoMes(pen, tramos);
   return {
-    com_rdh:          Math.round(num(op.seguro_rdh)       * _pctTraspaso),
-    com_cesantia:     Math.round(num(op.seguro_cesantia)  * _pctTraspaso),
-    com_reparaciones: Math.round(num(op.seguro_rep_menor) * _pctTraspaso),
+    com_rdh:          Math.round(num(op.seguro_rdh)       * pct),
+    com_cesantia:     Math.round(num(op.seguro_cesantia)  * pct),
+    com_reparaciones: Math.round(num(op.seguro_rep_menor) * pct),
   };
 }
 

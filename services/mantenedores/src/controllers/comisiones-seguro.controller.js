@@ -79,16 +79,18 @@ const update = async (req, res) => {
     `);
     const [ex] = await pool.query('SELECT COUNT(*) AS n FROM comisiones_seguro_penetracion');
     if (ex[0].n === 0) {
+      // Lámina "Cumplimiento Seguros" AutoFin 2026-07: % de traspaso 20/30/40
+      // según tramo; el % del MES lo define el seguro más débil (penetracion.js).
       const defaults = [
-        ['rdh',       92, 11.60],
-        ['rdh',       95, 17.40],
-        ['rdh',       98, 23.10],
-        ['cesantia',  30, 11.11],
-        ['cesantia',  40, 16.67],
-        ['cesantia',  50, 22.22],
-        ['reparacion',30, 17.04],
-        ['reparacion',40, 25.56],
-        ['reparacion',50, 34.07],
+        ['rdh',       92, 20.00],
+        ['rdh',       95, 30.00],
+        ['rdh',       98, 40.00],
+        ['cesantia',  30, 20.00],
+        ['cesantia',  40, 30.00],
+        ['cesantia',  50, 40.00],
+        ['reparacion',30, 20.00],
+        ['reparacion',40, 30.00],
+        ['reparacion',50, 40.00],
       ];
       for (const [tipo, pen_min, pct] of defaults)
         await pool.query(

@@ -324,14 +324,15 @@
       <div class="card-body">
         <div class="note-box">
           <i class="bi bi-info-circle-fill"></i>
-          <span><strong>Modelo 2026-07:</strong> el desgravamen ya no existe solo (va incluido en el RDH) y AutoFin recibe la
-          <strong>prima</strong> como comisión, traspasándonos este <strong>% parejo</strong> por cada seguro (RDH, Cesantía y
-          Reparaciones Menores). La penetración dejó de determinar el % — sigue midiéndose como KPI.</span>
+          <span><strong>Modelo 2026-07:</strong> el desgravamen ya no existe solo (va incluido en el RDH). El % de traspaso REAL de cada mes
+          es <strong>dinámico</strong>: lo define el tramo de penetración del seguro más débil (20/30/40% — ver
+          <a href="/mantenedores/comisiones-seguro/">Comisiones de Seguro</a>). Este campo es el <strong>% de referencia para los
+          simuladores</strong> (que no conocen la penetración futura) y el respaldo si la tabla de tramos está vacía.</span>
         </div>
         <div style="padding:14px 20px;display:flex;align-items:center;gap:12px">
-          <label style="font-weight:700;font-size:.86rem;color:#374151">% traspaso AutoFin:</label>
+          <label style="font-weight:700;font-size:.86rem;color:#374151">% traspaso de referencia (simuladores):</label>
           <input class="rate-input" id="inpTraspaso" disabled style="width:90px"> <span style="font-weight:700">%</span>
-          <span style="font-size:.78rem;color:#6b7280">Comisión nuestra = prima × este % (ej: prima $1.000.000 → $300.000)</span>
+          <span style="font-size:.78rem;color:#6b7280">Ingreso por seguros simulado = primas × este %</span>
         </div>
       </div>
     </div>
@@ -341,8 +342,8 @@
       <div style="font-weight:700;color:var(--navy);margin-bottom:8px"><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</div>
       <ul style="margin:0;padding-left:18px">
         <li><b>Tasas de prima (RDH/Cesantía)</b> → primas capitalizadas en <a href="/simulador/">Simulador Rentabilidad</a>, <a href="/cotizaciones/">Cotizaciones</a>, cotizador de <a href="/creditos/">Créditos</a> y pestaña Rentabilidad de <a href="/aprobaciones/">Cartas</a>.</li>
-        <li><b>% traspaso AutoFin</b> → comisión de seguros de cada operación AUTOFIN (com_rdh/cesantía/reparaciones) en <a href="/creditos/">Créditos</a>, <a href="/dashboard/">Dashboard (pestaña Penetración)</a> y el recálculo mensual; también el ingreso por seguros de simuladores y cartas.</li>
-        <li><b>Desgravamen</b> → EN DESUSO desde 2026-07 (tasa 0: va incluido en el RDH). El mantenedor <a href="/mantenedores/comisiones-seguro/">Comisiones de Seguro (penetración)</a> quedó como referencia/KPI: sus tramos ya no determinan la comisión.</li>
+        <li><b>% traspaso de referencia</b> → ingreso por seguros en <a href="/simulador/">Simulador</a>, <a href="/cotizaciones/">Cotizaciones</a> y Cartas. El % REAL de cada mes lo definen los tramos de <a href="/mantenedores/comisiones-seguro/">Comisiones de Seguro</a> (seguro más débil → 20/30/40%) y se aplica en el recálculo mensual (com_rdh/cesantía/reparaciones en <a href="/creditos/">Créditos</a> y <a href="/dashboard/">Dashboard</a>).</li>
+        <li><b>Desgravamen</b> → EN DESUSO desde 2026-07 (tasa 0: va incluido en el RDH).</li>
       </ul>
     </div>
 
