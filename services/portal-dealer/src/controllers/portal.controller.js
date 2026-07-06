@@ -595,7 +595,8 @@ exports.preaprobar = async (req, res) => {
     if (!(pie >= 0 && pie < precio)) return res.status(400).json({ success: false, data: null, error: 'Pie inválido' });
     if (!(anio >= 1990 && anio <= hoyAnio + 1)) return res.status(400).json({ success: false, data: null, error: 'Año inválido' });
 
-    const motivos = [];
+    const motivos = [];        // privados (datos del cliente — solo correo interno)
+    const motivosPub = [];     // públicos (condiciones de la operación — se muestran al dealer)
     const saldo = precio - pie;
     const rutLimpio = rut.replace(/[.\-\s]/g, '');
 
@@ -606,7 +607,7 @@ exports.preaprobar = async (req, res) => {
       const [pm] = await pool.query("SELECT MAX(antiguedad_vehiculo_max) mx FROM politica_aprobacion_matriz WHERE condicion='USADO'");
       if (pm[0] && pm[0].mx != null) antigMax = parseInt(pm[0].mx) || 7;
     } catch (e) { /* default 7 */ }
-    if (antig > antigMax) motivos.push('Vehículo ' + anio + ' supera la antigüedad máxima (' + antigMax + ' años)');
+    if (antig > antigMax) motivosPub.push('El vehículo año ' + anio + ' supera la antigüedad máxima financiable (' + antigMax + ' años)');
 
     // 2) Renta líquida: manda la interna (antecedentes laborales); si no hay,
     //    se usa la DECLARADA por el dealer (queda marcado el origen para el Jefe Comercial)
@@ -634,7 +635,7 @@ exports.preaprobar = async (req, res) => {
     const { getUF } = require('../../../../shared/uf');
     const uf = await getUF(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }));
     const opciones = [];
-    if (!motivos.length) {
+    if (!motivos.length && !motivosPub.length) {
       const topeCuota = renta * 0.30;
       let algunaElegible = false;
       for (const n of [12, 24, 36, 48]) {
@@ -644,20 +645,21 @@ exports.preaprobar = async (req, res) => {
         algunaElegible = true;
         if (c.cuota <= topeCuota) opciones.push({ plazo: n, cuota: c.cuota });
       }
-      if (!algunaElegible) motivos.push('Operación fuera del cuadro de elegibilidad AutoFin (saldo ' + fmtCLP(saldo) + ')');
+      if (!algunaElegible) motivosPub.push('El monto a financiar (' + fmtCLP(saldo) + ') está fuera del rango elegible para esta línea');
       else if (!opciones.length) motivos.push('Cuota supera el 30% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(renta * 0.30) + ')');
     }
 
-    const resultado = (!motivos.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
+    const resultado = (!motivos.length && !motivosPub.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
+    const motivosTodos = motivosPub.concat(motivos);
     const [ins] = await pool.query(
       `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [req.dealer && req.dealer.id_dealer || null, req.dealer && req.dealer.rut || null,
        (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null,
-       rut, precio, pie, anio, resultado, motivos.join(' | ') || null, JSON.stringify(opciones), renta || null, fuenteRenta]);
+       rut, precio, pie, anio, resultado, motivosTodos.join(' | ') || null, JSON.stringify(opciones), renta || null, fuenteRenta]);
 
     // Al dealer: SOLO veredicto y cuotas — nunca el detalle del cliente
-    return res.json({ success: true, data: { id: ins.insertId, resultado, opciones }, error: null });
+    return res.json({ success: true, data: { id: ins.insertId, resultado, opciones, motivos: motivosPub }, error: null });
   } catch (err) {
     console.error('[portal-dealer] preaprobar:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No pude evaluar en este momento' });

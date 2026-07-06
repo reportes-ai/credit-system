@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.7 — Pre-Aprobación: RUT con formato en vivo + campo Renta líquida (declarada como respaldo) -->
+  <!-- v2.8 — Pre-Aprobación: motivos públicos visibles al dealer (antigüedad auto / rango monto) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -1005,9 +1005,11 @@ function entrarDemo(){
           <div class="pa-fine">Pre-aprobación referencial sujeta a verificación de antecedentes y aprobación final de crédito.</div>
         </div>`;
       } else {
+        const pub = (j.data.motivos || []).map(m=>`<li>${m}</li>`).join('');
         out.innerHTML = `<div class="pa-res no">
           <h4><i class="bi bi-info-circle-fill" style="color:#f59e0b"></i> No lo puedo aprobar automáticamente</h4>
-          <div>Necesitamos más información para evaluar a este cliente. Un ejecutivo puede revisarlo contigo y buscar la mejor alternativa.</div>
+          ${pub ? `<ul style="margin:6px 0 8px;padding-left:18px">${pub}</ul>` : ''}
+          <div>${pub ? 'Igual un ejecutivo puede revisarlo contigo y buscar una alternativa.' : 'Necesitamos más información para evaluar a este cliente. Un ejecutivo puede revisarlo contigo y buscar la mejor alternativa.'}</div>
           <div class="acciones"><button class="b1" onclick="paContactar()"><i class="bi bi-headset"></i> Contactar a un ejecutivo</button></div>
         </div>`;
       }
