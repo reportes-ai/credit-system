@@ -67,12 +67,17 @@
   .sub { color:var(--dim); font-size:1.4vh; letter-spacing:.14em; }
 
   /* ejecutivos */
-  .ejs { flex:1; overflow:hidden; display:grid; grid-template-columns:1fr 1fr; gap:.35vh .8vw; align-content:start; }
-  .ej { display:flex; align-items:center; gap:.55vw; font-size:1.62vh; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .dot { width:1.05vh; height:1.05vh; border-radius:50%; flex-shrink:0; background:#22304a; }
+  .ejs { flex:1; overflow:hidden; display:flex; flex-direction:column; gap:.14vh; }
+  .ej-head, .ej { display:grid; grid-template-columns:1.35vw 1fr 4.2vw 4.2vw 6vw 4.6vw; align-items:center; gap:.4vw; }
+  .ej-head { font-size:1.15vh; letter-spacing:.14em; color:var(--dim); text-transform:uppercase; padding-bottom:.3vh; border-bottom:1px solid var(--line); }
+  .ej { font-size:1.7vh; white-space:nowrap; overflow:hidden; }
+  .ej .nm { overflow:hidden; text-overflow:ellipsis; }
+  .ej .st { font-family:Consolas,monospace; text-align:right; color:#9fd4ff; }
+  .ej .st.hi { color:var(--green); text-shadow:0 0 8px rgba(34,255,160,.4); }
+  .dot { width:1.15vh; height:1.15vh; border-radius:50%; flex-shrink:0; background:#22304a; }
   .dot.on { background:var(--green); box-shadow:0 0 9px var(--green); animation:pulse 2s infinite; }
   @keyframes pulse { 50% { box-shadow:0 0 3px var(--green); } }
-  .ej.off { color:#2e4666; }
+  .ej.off { color:#3a577c; } .ej.off .st { color:#3a577c; }
 
   .split { display:flex; gap:1vw; align-items:stretch; flex:1; min-height:0; }
   .split > div { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -115,8 +120,8 @@
   <div class="row r1">
     <div class="panel">
       <div class="p-head">
-        <div class="p-title">◤ Ejecutivos en línea</div>
-        <div class="p-badge" id="ejBadge">CONECTADOS —/—</div>
+        <div class="p-title" style="font-size:2.1vh">◤ Ejecutivos en línea</div>
+        <div class="p-badge" id="ejBadge" style="font-size:2.4vh;padding:.4vh 1vw">—/—</div>
       </div>
       <div class="ejs" id="ejLista"></div>
     </div>
@@ -324,12 +329,25 @@ async function cargar(){
     document.getElementById('iTmcMenor').textContent=pc(d.indicadores.tmc_menor);
     document.getElementById('iTmcMayor').textContent=pc(d.indicadores.tmc_mayor);
 
-    // ejecutivos
+    // ejecutivos (una columna, con producción del mes y conversión)
     const ej=d.ejecutivos;
     document.getElementById('ejBadge').textContent=`CONECTADOS ${ej.conectados}/${ej.total}`;
-    document.getElementById('ejLista').innerHTML = ej.lista
-      .sort((a,b)=> (b.conectado-a.conectado) || a.nombre.localeCompare(b.nombre))
-      .map(e=>`<div class="ej ${e.conectado?'':'off'}"><span class="dot ${e.conectado?'on':''}"></span>${e.nombre}</div>`).join('');
+    const fila = e => {
+      const conv = e.cartas_mes ? Math.round(e.otorgados_mes/e.cartas_mes*100) : null;
+      return `<div class="ej ${e.conectado?'':'off'}">
+        <span class="dot ${e.conectado?'on':''}"></span>
+        <span class="nm">${e.nombre}</span>
+        <span class="st">${e.cartas_mes||0}</span>
+        <span class="st ${e.otorgados_mes?'hi':''}">${e.otorgados_mes||0}</span>
+        <span class="st ${e.monto_mes?'hi':''}">${e.monto_mes?MM(e.monto_mes):'—'}</span>
+        <span class="st">${conv==null?'—':conv+'%'}</span>
+      </div>`;
+    };
+    document.getElementById('ejLista').innerHTML =
+      `<div class="ej-head"><span></span><span>Ejecutivo · mes en curso</span><span style="text-align:right">Cartas</span><span style="text-align:right">Otorg.</span><span style="text-align:right">Colocado</span><span style="text-align:right">Conv.</span></div>` +
+      ej.lista
+        .sort((a,b)=> (b.conectado-a.conectado) || (b.monto_mes-a.monto_mes) || a.nombre.localeCompare(b.nombre))
+        .map(fila).join('');
 
     // hoy
     document.getElementById('cartasHoy').textContent=NF(d.hoy.cartas);
