@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.8 — Pre-Aprobación: motivos públicos visibles al dealer (antigüedad auto / rango monto) -->
+  <!-- v2.9 — "Sí, contáctame" abre el chat y envía solo el detalle de la simulación al ejecutivo -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -57,7 +57,7 @@
     #chat.show { display:flex; }
     .msgs { flex:1; overflow-y:auto; padding:18px; background:#eef2f7; display:flex; flex-direction:column; gap:9px; }
     .wrapw { max-width:760px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:9px; }
-    .msg { max-width:80%; padding:9px 13px; border-radius:14px; font-size:.9rem; line-height:1.45; word-wrap:break-word; }
+    .msg { max-width:80%; padding:9px 13px; border-radius:14px; font-size:.9rem; line-height:1.45; word-wrap:break-word; white-space:pre-wrap; }
     .msg .t { font-size:.64rem; opacity:.6; margin-top:3px; text-align:right; }
     .msg.me { align-self:flex-end; background:var(--navy); color:#fff; border-bottom-right-radius:3px; }
     .msg.them { align-self:flex-start; background:#fff; border:1px solid #e6ebf1; color:#1e293b; border-bottom-left-radius:3px; }
@@ -790,7 +790,7 @@ function setEstado(txt, on){ const e=document.getElementById('hdEstado'); e.text
 function onMsg(m){
   switch(m.t){
     case 'ready': break;  // esperamos 'started' (auto-resume) o el botón Iniciar
-    case 'started': conv=m.conversacion; abrirChat(); break;
+    case 'started': conv=m.conversacion; abrirChat(); if(window.paChatMsg){ const t=window.paChatMsg; window.paChatMsg=null; setTimeout(()=>wsSend({ t:'chat', id:conv.id, cuerpo:t }), 400); } break;
     case 'asignada': conv=m.conversacion||conv; document.getElementById('hdEstado2').textContent='Te atiende '+esc(m.conversacion?.ejecutivo_nombre||'un ejecutivo'); break;
     case 'mensaje': addMessage(m.mensaje); break;
     case 'typing': showTyping(m.on); break;
@@ -977,7 +977,7 @@ function entrarDemo(){
   }
 
   const fmt = n => '$' + Math.round(n).toLocaleString('es-CL');
-  let paId = null;
+  let paId = null, paLast = null;
 
   window.paEvaluar = async function(){
     const out = $('paResultado');
@@ -992,6 +992,7 @@ function entrarDemo(){
       const j = await r.json();
       if (!j.success) { out.innerHTML = `<div class="pa-res no"><h4>No pude evaluar</h4>${j.error||'Inténtalo de nuevo.'}</div>`; return; }
       paId = j.data.id;
+      paLast = { rut: $('paRut').value, precio, pie, anio, renta: num($('paRenta')), resultado: j.data.resultado, opciones: j.data.opciones || [], motivos: j.data.motivos || [] };
       if (j.data.resultado === 'PREAPROBADO') {
         out.innerHTML = `<div class="pa-res si">
           <h4><i class="bi bi-patch-check-fill"></i> ¡Buenas noticias! No le vemos problema a esta operación 🎉</h4>
@@ -1031,11 +1032,33 @@ function entrarDemo(){
              : 'No hay ejecutivos conectados en este momento — deja tu mensaje y te contactaremos apenas se conecte uno.';
       }
     } catch(e) { /* el chat funciona igual */ }
+    // Mensaje automático con el detalle de la simulación para el ejecutivo
+    if (paLast) {
+      const L = paLast;
+      const lineas = [
+        'Hice una simulación para este cliente:',
+        '• RUT: ' + L.rut,
+        '• Precio: ' + fmt(L.precio) + ' · Pie: ' + fmt(L.pie) + ' · Año: ' + L.anio,
+        L.renta ? '• Renta líquida informada: ' + fmt(L.renta) : '',
+        '• Resultado: ' + (L.resultado === 'PREAPROBADO' ? 'PRE-APROBADO ✅' : 'Requiere revisión ⚠️'),
+        L.opciones.length ? '• Cuotas ofrecidas: ' + L.opciones.map(o => o.plazo + ' de ' + fmt(o.cuota)).join(' · ') : '',
+        L.motivos.length ? '• Observaciones: ' + L.motivos.join(' / ') : '',
+        L.resultado === 'PREAPROBADO' ? 'Quiero cerrarla con un ejecutivo.' : 'Necesito que lo revisemos juntos.',
+      ].filter(Boolean);
+      window.paChatMsg = lineas.join('\n');
+    }
     const pre = document.getElementById('preAsunto');
     if (pre && !pre.value) pre.value = 'Pre-aprobación cliente ' + ($('paRut').value || '');
     const preMsg = document.getElementById('preMsg');
     if (preMsg && info) preMsg.textContent = info + ' Cuéntanos brevemente y te conectamos.';
     tab('chat');
+    // Si ya hay conversación abierta, el mensaje sale al tiro; si no, se inicia sola
+    if (typeof conv !== 'undefined' && conv && window.paChatMsg) {
+      const t = window.paChatMsg; window.paChatMsg = null;
+      wsSend({ t: 'chat', id: conv.id, cuerpo: t });
+    } else if (window.paChatMsg) {
+      setTimeout(() => { try { iniciar(); } catch (e) {} }, 300);
+    }
   };
 })();
 </script>
