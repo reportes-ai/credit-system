@@ -59,9 +59,10 @@ async function cotizarCuota(valorVehiculo, pie, plazo) {
 }
 
 /* ── Simulador rápido: monto a financiar → opciones 12/24/36/48 meses ─────────
-   CAE = tasa interna anualizada de los flujos reales del cliente: la tasa r que
-   iguala PV(cuota, n) = saldoPrecio (lo que efectivamente recibe), anualizada
-   (1+r)^12 − 1. Incluye el efecto de gastos y seguros capitalizados. */
+   CAE según definición AutoFácil (Excel CALCULO CAE): tasa mensual implícita r
+   que iguala PV(cuota, n) = saldoPrecio (monto líquido que recibe el cliente,
+   equivalente a RATE(n, -cuota, saldo) en Excel), anualizada LINEAL: r × 12.
+   Incluye el efecto de gastos y seguros capitalizados. */
 function caeDe(saldoPrecio, cuota, n) {
   if (!(saldoPrecio > 0 && cuota > 0 && n > 0)) return null;
   let lo = 0, hi = 1; // tasa mensual entre 0% y 100%
@@ -70,7 +71,7 @@ function caeDe(saldoPrecio, cuota, n) {
     const pv = r < 1e-10 ? cuota * n : cuota * (1 - Math.pow(1 + r, -n)) / r;
     if (pv > saldoPrecio) lo = r; else hi = r;
   }
-  return Math.round((Math.pow(1 + (lo + hi) / 2, 12) - 1) * 10000) / 100;
+  return Math.round((lo + hi) / 2 * 12 * 10000) / 100;
 }
 
 /**
