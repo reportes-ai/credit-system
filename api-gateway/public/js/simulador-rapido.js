@@ -15,7 +15,7 @@
   };
 
   const CSS = `
-  #afsim-dlg { border:none; border-radius:20px; padding:0; width:min(640px,96vw); max-height:96vh; box-shadow:0 30px 80px rgba(0,0,0,.45); }
+  #afsim-dlg { border:none; border-radius:20px; padding:0; width:min(760px,96vw); max-height:96vh; box-shadow:0 30px 80px rgba(0,0,0,.45); }
   #afsim-dlg::backdrop { background:rgba(10,18,38,.6); backdrop-filter:blur(3px); }
   .afsim-body { background:linear-gradient(160deg,#4f5bd5,#6d5bd0 55%,#7b5fc9); padding:14px 16px 16px; font-family:'Segoe UI',system-ui,sans-serif; overflow-y:auto; max-height:96vh; box-sizing:border-box; }
   .afsim-body *, .afsim-body *::before { box-sizing:border-box; }
@@ -31,7 +31,7 @@
   .afsim-inp { display:flex; align-items:center; gap:8px; border:2px solid #d7dfee; border-radius:12px; padding:6px 12px; }
   .afsim-inp span { color:#94a3b8; font-size:1.15rem; }
   .afsim-inp input { border:none; outline:none; width:100%; font-size:1.25rem; font-weight:700; color:#111; min-width:0; }
-  .afsim-inc { margin-top:8px; font-size:.72rem; color:#64748b; line-height:1.5; }
+  .afsim-inc { margin-top:8px; font-size:.72rem; color:#64748b; line-height:1.5; overflow-wrap:anywhere; }
   .afsim-inc b { color:#334155; }
   .afsim-inc .it { white-space:nowrap; margin-right:8px; }
   .afsim-inc .it::before { content:'✓ '; color:#94a3b8; }
