@@ -32,22 +32,24 @@ exports.cartera = async (req, res) => {
       FROM creditos WHERE ${fOtor}
       GROUP BY 1 ORDER BY monto DESC LIMIT 12`, fp);
 
+    // Con filtro de fechas usa ese rango; sin filtro, últimos 12 meses
     const [porMes] = await pool.query(`
       SELECT DATE_FORMAT(fecha_otorgado,'%Y-%m') AS mes, COUNT(*) n, COALESCE(SUM(monto_financiado),0) monto
       FROM creditos
-      WHERE estado_credito = 'OTORGADO' AND fecha_otorgado IS NOT NULL
-        AND fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-      GROUP BY 1 ORDER BY 1`);
+      WHERE ${fOtor} AND fecha_otorgado IS NOT NULL
+        ${fw.length ? '' : "AND fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)"}
+      GROUP BY 1 ORDER BY 1`, fp);
 
     const [carteraPropia] = await pool.query(`
       SELECT COALESCE(estado_cartera,'') AS estado_cartera, COUNT(*) n
       FROM creditos WHERE estado_cartera IS NOT NULL GROUP BY estado_cartera`);
 
+    // KPI: "total en base" es histórico; otorgados y monto respetan el filtro de fechas
     const [[kpi]] = await pool.query(`
-      SELECT COUNT(*) total,
-             SUM(estado_credito='OTORGADO') otorgados,
-             COALESCE(SUM(CASE WHEN estado_credito='OTORGADO' THEN monto_financiado END),0) monto_otorgado
-      FROM creditos`);
+      SELECT (SELECT COUNT(*) FROM creditos) total,
+             COUNT(*) otorgados,
+             COALESCE(SUM(monto_financiado),0) monto_otorgado
+      FROM creditos WHERE ${fOtor}`, fp);
 
     ok(res, { kpi, porEstado, porFinanciera, porEjecutivo, porMes, carteraPropia });
   } catch (e) { fail(res, e.message); }
