@@ -93,6 +93,9 @@
     .fld label { display:block; font-size:.76rem; font-weight:700; color:#374151; margin-bottom:5px; }
     .fld input, .fld textarea, .fld select { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 11px; font-size:.88rem; outline:none; box-sizing:border-box; }
     .fld input:focus, .fld textarea:focus, .fld select:focus { border-color:#0e7490; box-shadow:0 0 0 3px rgba(14,116,144,.12); }
+    /* listas de checkboxes (asignación masiva): el cuadro pegado a su texto, a la izquierda */
+    #amEjecs input[type=checkbox], #amComunas input[type=checkbox] { width:auto !important; flex:none; margin:0; }
+    #amEjecs label, #amComunas label { justify-content:flex-start; text-align:left; }
     .res-btns { display:flex; gap:10px; }
     .res-btns button { flex:1; border:2px solid #e2e8f0; background:#fff; border-radius:10px; padding:11px; font-weight:800; cursor:pointer; font-size:.9rem; }
     .res-btns button.sel-pos { border-color:#16a34a; background:#dcfce7; color:#166534; }

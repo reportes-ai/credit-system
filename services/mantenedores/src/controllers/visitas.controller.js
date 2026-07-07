@@ -342,6 +342,7 @@ const ejecutivos = async (req, res) => {
       `SELECT u.id_usuario, CONCAT(u.nombre,' ',u.apellido) nombre, p.nombre perfil
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
         WHERE u.estado='activo'
+          AND (u.protegido IS NULL OR u.protegido=0)   -- fuera cuentas de sistema (BG-ADMIN)
           AND (p.nombre LIKE 'Ejecutivo%' OR p.nombre LIKE 'Comercial%' OR p.nombre LIKE 'Supervisor%'
                OR p.nombre LIKE 'Jefe%' OR p.nombre LIKE 'Gerente%' OR p.nombre='Administrador')
         ORDER BY p.nombre, nombre`);
