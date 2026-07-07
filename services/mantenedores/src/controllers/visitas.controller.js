@@ -343,8 +343,7 @@ const ejecutivos = async (req, res) => {
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
         WHERE u.estado='activo'
           AND (u.protegido IS NULL OR u.protegido=0)   -- fuera cuentas de sistema (BG-ADMIN)
-          AND (p.nombre LIKE 'Ejecutivo%' OR p.nombre LIKE 'Comercial%' OR p.nombre LIKE 'Supervisor%'
-               OR p.nombre LIKE 'Jefe%' OR p.nombre LIKE 'Gerente%' OR p.nombre='Administrador')
+          AND p.nombre LIKE '%Comercial%'              -- solo área comercial: Ejecutivo/Supervisor/Jefe/Gerente Comercial
         ORDER BY p.nombre, nombre`);
     ok(res, rows);
   } catch (e) { console.error('[visitas ejecutivos]', e); err(res, 500, 'Error interno del servidor'); }
