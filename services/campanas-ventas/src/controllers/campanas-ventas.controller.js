@@ -198,9 +198,15 @@ const normFono = t => {
 };
 const toNum = v => {
   if (v === null || v === undefined || v === '') return null;
-  const n = Number(String(v).replace(/\./g, '').replace(',', '.'));
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;   // Excel entrega números crudos: no tocar el punto decimal
+  let s = String(v).trim().replace(/[$\s]/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');    // es-CL: 1.234.567,89
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); // solo separador de miles
+  const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
+// tope defensivo para DECIMAL(15,2)
+const toMonto = v => { const n = toNum(v); return n !== null && Math.abs(n) < 1e13 ? n : null; };
 
 async function getCampana(id) {
   const [[c]] = await pool.query('SELECT * FROM cv_campanas WHERE id=?', [id]);
@@ -411,7 +417,7 @@ exports.cargarRegistros = async (req, res) => {
       const rut = String(datos.rut || '').trim();
       if (!rut) { sinRut++; return; }
       if (!telefonos.length) { sinFono++; return; }
-      const montoRef = toNum(datos.capital_adeudado) ?? toNum(datos.deuda_vigente) ?? toNum(datos.monto_financiado);
+      const montoRef = toMonto(datos.capital_adeudado) ?? toMonto(datos.deuda_vigente) ?? toMonto(datos.monto_financiado);
       values.push([c.id, idx, idx, rut.slice(0, 15), String(datos.nombre || '').slice(0, 200) || null,
         JSON.stringify([...new Set(telefonos)]), JSON.stringify(datos), montoRef]);
       cargados++;
@@ -543,7 +549,7 @@ exports.gestionar = async (req, res) => {
       `INSERT INTO cv_gestiones (id_campana, id_registro, id_usuario, usuario_nombre, telefono, id_termino, termino_nombre, tipo, comentario, rellamado_at, monto_venta)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [c.id, reg.id, uid, unombre, fono, term.id, term.nombre, term.tipo,
-       (comentario || '').slice(0, 500) || null, rellamadoAt, term.es_venta ? toNum(monto_venta) : null]);
+       (comentario || '').slice(0, 500) || null, rellamadoAt, term.es_venta ? toMonto(monto_venta) : null]);
 
     // teléfono inhabilitado → se marca malo (queda al final del orden de contactabilidad)
     let telMalos = safeJSON(reg.tel_malos) || [];
@@ -560,7 +566,7 @@ exports.gestionar = async (req, res) => {
           convertido_via = IF(?=1, 'MANUAL', convertido_via)
          WHERE id=?`,
         [term.nombre, esContacto, JSON.stringify(telMalos),
-         term.es_venta, term.es_venta, term.es_venta, toNum(monto_venta), term.es_venta, reg.id]);
+         term.es_venta, term.es_venta, term.es_venta, toMonto(monto_venta), term.es_venta, reg.id]);
     } else if (rellamadoAt) {
       await pool.query(
         `UPDATE cv_registros SET estado='AGENDADO', intentos=intentos+1, contactado=?, tel_malos=?,
