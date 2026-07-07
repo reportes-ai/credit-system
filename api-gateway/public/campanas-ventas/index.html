@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -78,6 +78,11 @@
   .t-INHABILITADO { border-left:5px solid var(--bad); }
   .gest-item { border-bottom:1px solid #f1f5f9; padding:7px 2px; font-size:.76rem; }
   .gest-item b { color:var(--navy); }
+  .oferta-box { background:#fffbeb; border:1.5px solid #fcd34d; border-left:5px solid #f59e0b; border-radius:10px; padding:8px 11px; margin-top:9px; font-size:.8rem; }
+  .oferta-box .tit { font-size:.6rem; font-weight:800; text-transform:uppercase; color:#b45309; letter-spacing:.04em; margin-bottom:2px; }
+  .script-box { background:#eff6ff; border:1.5px solid #bfdbfe; border-left:5px solid var(--accent); border-radius:10px; padding:8px 11px; margin-top:9px; font-size:.8rem; line-height:1.55; white-space:pre-wrap; }
+  .script-box .tit { font-size:.6rem; font-weight:800; text-transform:uppercase; color:var(--accent); letter-spacing:.04em; margin-bottom:2px; }
+  .script-box mark { background:#dbeafe; color:#0141A2; font-weight:800; border-radius:4px; padding:0 3px; }
   .map-row select { width:100%; }
   .map-row select.dup { border-color:var(--bad); background:#fef2f2; color:#b91c1c; font-weight:700; }
   .map-row.dup td { background:#fff5f5; }
@@ -326,7 +331,12 @@ function pintarDetalle(){
       <div class="panelin" style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px">
         <h6 style="margin:0 0 8px;font-size:.8rem;color:var(--navy)"><i class="bi bi-card-text"></i> Datos de la campaña</h6>
         <label>Nombre</label><input id="edNombre" style="width:100%;margin-bottom:8px" value="${esc(c.nombre)}" ${ES_ADMIN?'':'disabled'}>
-        <label>Descripción</label><textarea id="edDesc" style="width:100%;height:54px" ${ES_ADMIN?'':'disabled'}>${esc(c.descripcion||'')}</textarea>
+        <label>Descripción</label><textarea id="edDesc" style="width:100%;height:44px" ${ES_ADMIN?'':'disabled'}>${esc(c.descripcion||'')}</textarea>
+        <label style="margin-top:8px">Detalle Campaña (oferta general — se muestra al ejecutivo en el discador)</label>
+        <textarea id="edDetalle" style="width:100%;height:64px" placeholder="Ej: Portabilidad con tasa preferente 1,4%, sin gastos operacionales, curse en 48 hrs…" ${ES_ADMIN?'':'disabled'}>${esc(c.detalle||'')}</textarea>
+        <label style="margin-top:8px">Script de llamada (dinámico — usa variables {{campo}} del catálogo, ej: {{nombre}}, {{valor_cuota}}, {{marca}})</label>
+        <textarea id="edScript" style="width:100%;height:96px" placeholder="Ej: Buenos días {{nombre}}, le llamo de AutoFácil por su {{marca}} {{modelo}}. Hoy paga una cuota de {{valor_cuota}} y podemos ofrecerle {{oferta}}…" ${ES_ADMIN?'':'disabled'}>${esc(c.script||'')}</textarea>
+        <div style="font-size:.68rem;color:#94a3b8;margin-top:3px">Variables disponibles: ${CATALOGO.campos.map(x=>'{{'+x.key+'}}').join(' ')}</div>
         <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
           <div style="flex:1;min-width:170px"><label>Orden del discado</label>
             <select id="edOrden" style="width:100%" ${ES_ADMIN?'':'disabled'}>
@@ -377,7 +387,8 @@ function accionesEstado(c){
 async function guardarDatos(){
   const body = { nombre:document.getElementById('edNombre').value, descripcion:document.getElementById('edDesc').value,
     orden_campo:document.getElementById('edOrden').value, orden_dir:document.getElementById('edDir').value,
-    lock_minutos:document.getElementById('edLock').value };
+    lock_minutos:document.getElementById('edLock').value,
+    detalle:document.getElementById('edDetalle').value, script:document.getElementById('edScript').value };
   const r = await fetch('/api/campanas-ventas/'+CUR.campana.id, { method:'PUT', headers:hdrs(1), body:JSON.stringify(body) });
   const j = await r.json();
   if (!j.success) return alert(j.error);
@@ -605,9 +616,26 @@ function pintarDiscador(){
     return numerico(k) && /^-?[\d.,]+$/.test(String(v)) && Number(String(v).replace(/\./g,'').replace(',','.'))>999
       ? CLP(String(v).replace(/\./g,'').replace(',','.')) : esc(v);
   };
-  const ocultos = new Set(['rut','nombre','telefono_1','telefono_2','telefono_3']);
+  const ocultos = new Set(['rut','nombre','telefono_1','telefono_2','telefono_3','oferta']);
   const datosHtml = Object.entries(datos).filter(([k])=>!ocultos.has(k))
     .map(([k,v])=>`<div class="dato"><div class="k">${esc(labelDe(k))}</div><div class="v">${fmtV(k,v)}</div></div>`).join('');
+  // Detalle Campaña: oferta general + oferta especial del cliente (campo homologado "oferta")
+  const camp = DISC.campana || {};
+  const detalleHtml = (camp.detalle || datos.oferta) ? `
+    <div class="oferta-box">
+      <div class="tit"><i class="bi bi-megaphone"></i> Detalle Campaña</div>
+      ${camp.detalle ? `<div>${esc(camp.detalle)}</div>` : ''}
+      ${datos.oferta ? `<div style="margin-top:4px"><b style="color:#b45309">Oferta especial de este cliente:</b> ${esc(datos.oferta)}</div>` : ''}
+    </div>` : '';
+  // Script dinámico: {{campo}} → valor del cliente (destacado)
+  const scriptHtml = camp.script ? `
+    <div class="script-box">
+      <div class="tit"><i class="bi bi-chat-square-quote"></i> Script de llamada</div>
+      ${esc(camp.script).replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (m,k) => {
+        let v = k==='rut' ? reg.rut : k==='nombre' ? reg.nombre : datos[k];
+        return v !== undefined && v !== null && v !== '' ? `<mark>${fmtV(k,v)}</mark>` : `<mark style="background:#fee2e2;color:#b91c1c">${esc(k)}: s/i</mark>`;
+      })}
+    </div>` : '';
   const fonosHtml = reg.telefonos_ordenados.map((t,i)=>{
     const malo = (reg.tel_malos||[]).includes(t);
     return `<div class="fono ${malo?'malo':''}">
@@ -633,6 +661,8 @@ function pintarDiscador(){
         </div>
         <h5><i class="bi bi-person-vcard"></i> Datos del cliente</h5>
         <div class="datos-grid">${datosHtml||'<div class="vacio">Sin datos adicionales</div>'}</div>
+        ${detalleHtml}
+        ${scriptHtml}
       </div>
       <div class="disc-col">
         <h5><i class="bi bi-telephone"></i> Teléfonos (por contactabilidad)</h5>

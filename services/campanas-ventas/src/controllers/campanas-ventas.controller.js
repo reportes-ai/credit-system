@@ -58,6 +58,7 @@ const CAMPOS = [
   { key: 'anio_vehiculo',    label: 'Año Vehículo',           grupo: 'Vehículo', num: true },
   { key: 'patente',          label: 'Patente (PPU)',          grupo: 'Vehículo' },
   { key: 'avaluo',           label: 'Avalúo $',               grupo: 'Vehículo', num: true },
+  { key: 'oferta',           label: 'Oferta Especial Cliente', grupo: 'Otros' },
   { key: 'tramo_renta',      label: 'Tramo Renta',            grupo: 'Otros' },
   { key: 'tramo_deuda',      label: 'Tramo Deuda',            grupo: 'Otros' },
   { key: 'comentario',       label: 'Comentario',             grupo: 'Otros' },
@@ -129,6 +130,8 @@ const TERMINOS_DEFAULT = [
         INDEX idx_camp (id_campana)
       )`);
     await pool.query('ALTER TABLE cv_terminos ADD COLUMN IF NOT EXISTS es_agenda TINYINT(1) NOT NULL DEFAULT 0');
+    await pool.query('ALTER TABLE cv_campanas ADD COLUMN IF NOT EXISTS detalle TEXT NULL');   // oferta general de la campaña
+    await pool.query('ALTER TABLE cv_campanas ADD COLUMN IF NOT EXISTS script TEXT NULL');    // guion dinámico con variables {{campo}}
     // sembrar LLAMAR MÁS TARDE en campañas existentes que no lo tengan
     const [sinAgenda] = await pool.query(
       `SELECT c.id FROM cv_campanas c WHERE NOT EXISTS (SELECT 1 FROM cv_terminos t WHERE t.id_campana=c.id AND t.es_agenda=1)`);
@@ -372,14 +375,16 @@ exports.actualizar = async (req, res) => {
   try {
     const c = await getCampana(req.params.id);
     if (!c) return fail(res, 'Campaña no existe', 404);
-    const { nombre, descripcion, orden_campo, orden_dir, lock_minutos } = req.body || {};
+    const { nombre, descripcion, orden_campo, orden_dir, lock_minutos, detalle, script } = req.body || {};
     const oc = (orden_campo === 'orden_carga' || CAMPO_KEYS.has(orden_campo)) ? orden_campo : c.orden_campo;
     const od = ['ASC', 'DESC'].includes(orden_dir) ? orden_dir : c.orden_dir;
     await pool.query(
-      `UPDATE cv_campanas SET nombre=?, descripcion=?, orden_campo=?, orden_dir=?, lock_minutos=? WHERE id=?`,
+      `UPDATE cv_campanas SET nombre=?, descripcion=?, orden_campo=?, orden_dir=?, lock_minutos=?, detalle=?, script=? WHERE id=?`,
       [nombre ? String(nombre).trim().slice(0, 200) : c.nombre,
        descripcion !== undefined ? (descripcion || '').slice(0, 400) || null : c.descripcion,
-       oc, od, Math.max(5, Math.min(240, parseInt(lock_minutos, 10) || c.lock_minutos)), c.id]);
+       oc, od, Math.max(5, Math.min(240, parseInt(lock_minutos, 10) || c.lock_minutos)),
+       detalle !== undefined ? (detalle || '').slice(0, 4000) || null : c.detalle,
+       script  !== undefined ? (script  || '').slice(0, 8000) || null : c.script, c.id]);
     if (oc !== c.orden_campo || od !== c.orden_dir) await recomputarOrden({ ...c, orden_campo: oc, orden_dir: od });
     ok(res, { actualizado: true });
   } catch (e) { fail(res, e.message); }
@@ -586,7 +591,7 @@ exports.siguiente = async (req, res) => {
     for (const t of reg.tel_malos) score[t] = 9;
     reg.telefonos_ordenados = [...reg.telefonos].sort((a, b) => (score[a] ?? 5) - (score[b] ?? 5));
     const [terminos] = await pool.query('SELECT * FROM cv_terminos WHERE id_campana=? ORDER BY orden, id', [c.id]);
-    ok(res, { registro: reg, gestiones, terminos, cola });
+    ok(res, { registro: reg, gestiones, terminos, cola, campana: { detalle: c.detalle, script: c.script } });
   } catch (e) { fail(res, e.message); }
 };
 
