@@ -471,7 +471,7 @@ function buildV2() {
   });
 
   // Chart ops por mes
-  const last8 = D.tendencia.slice(-8);
+  const last8 = (D.tendencia||[]).slice(-8);
   new Chart(document.getElementById('ch-qmes'),{
     type:'bar',
     data:{labels:last8.map(t=>t.mes),datasets:[{data:last8.map(t=>t.otorgados),backgroundColor:C.yellow+'cc',borderRadius:3}]},
@@ -674,7 +674,7 @@ function buildV2pl() {
     options:{...chOpts(),indexAxis:'y'}
   });
 
-  const last8 = D.tendencia.slice(-8);
+  const last8 = (D.tendencia||[]).slice(-8);
   const ecQ = Chart.getChart(document.getElementById('ch-qmes-pl')); if(ecQ) ecQ.destroy();
   new Chart(document.getElementById('ch-qmes-pl'),{
     type:'bar',
@@ -783,7 +783,7 @@ function buildRentabTablePL() {
 
 // ======== VISTA 3 ========
 function buildV3() {
-  const T = window.DASH.tendencia;
+  const T = window.DASH.tendencia || [];
   const s25 = T.filter(t=>t.mes_key.startsWith('2025'));
   const totOps25 = s25.reduce((a,t)=>a+t.total_ops,0);
   const totOt25  = s25.reduce((a,t)=>a+t.otorgados,0);
@@ -1231,8 +1231,11 @@ async function cargarDatos() {
     // Usar datos embebidos como base y actualizar tendencia y ej_perf
     window.DASH_INLINE = window.DASH_INLINE || {};
 
-    // Actualizar tendencia con datos frescos
+    // Actualizar tendencia con datos frescos (también en window.DASH: es el objeto
+    // que leen buildV2/buildV2pl/buildV3 — sin esto D.tendencia queda undefined y
+    // el render muere antes de pintar el detalle)
     window.DASH_INLINE.tendencia = datos.tendencia || [];
+    window.DASH.tendencia = datos.tendencia || [];
 
     // Actualizar EJ_PERF con datos frescos
     if (datos.ej_perf) {
@@ -1570,7 +1573,7 @@ function buildV4() {
   document.getElementById('t-estado4').innerHTML=`<thead><tr><th>Estado</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${af.ops||0}</td><td>${totOps?((af.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(af.saldo||0)}</td></tr><tr><td>UNIDAD</td><td>${un.ops||0}</td><td>${totOps?((un.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(un.saldo||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${totOps}</td><td>100%</td><td>${fM(totSaldo)}</td></tr></tfoot>`;
 
   const exEv4=Chart.getChart(document.getElementById('ch-evol4')); if(exEv4) exEv4.destroy();
-  const last6=window.DASH.tendencia.slice(-6);
+  const last6=(window.DASH.tendencia||[]).slice(-6);
   new Chart(document.getElementById('ch-evol4'),{type:'bar',data:{labels:last6.map(t=>t.mes),datasets:[{label:'Otorgados',data:last6.map(t=>t.otorgados),backgroundColor:C.green+'bb',borderRadius:4},{label:'Com.Dealer M$',data:last6.map(t=>+(t.com_dealer/1e6).toFixed(1)),backgroundColor:C.blue+'66',borderRadius:4,yAxisID:'y2'}]},options:{...chOpts(),plugins:{...chOpts().plugins,legend:{display:true,labels:{color:'#555',font:{size:9},boxWidth:10}}},scales:{x:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y2:{position:'right',grid:{display:false},ticks:{color:'#888',font:{size:9},callback:v=>v+'M'}}}}});
 }
 // ──────────────────────────────────────────────────────────────
