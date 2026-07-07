@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -76,6 +76,8 @@
   .gest-item { border-bottom:1px solid #f1f5f9; padding:7px 2px; font-size:.76rem; }
   .gest-item b { color:var(--navy); }
   .map-row select { width:100%; }
+  .map-row select.dup { border-color:var(--bad); background:#fef2f2; color:#b91c1c; font-weight:700; }
+  .map-row.dup td { background:#fff5f5; }
   .barra { height:8px; border-radius:6px; background:#e5e7eb; overflow:hidden; }
   .barra > div { height:100%; background:linear-gradient(90deg,#0141A2,#009AFE); }
   .foot { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin-top:26px; font-size:.8rem; }
@@ -408,8 +410,9 @@ function leerExcel(inp){
 }
 function pintarMapeo(){
   const mapeoPrevio = CUR.campana.mapeo || {};
+  const yaUsados = new Set();                 // evita que el auto-mapeo proponga el mismo destino 2 veces
   const auto = col => {                       // sugerencia automática por nombre de columna
-    if (mapeoPrevio[col]) return mapeoPrevio[col];
+    if (mapeoPrevio[col]) { yaUsados.add(mapeoPrevio[col]); return mapeoPrevio[col]; }
     const s = col.toLowerCase().replace(/[\s\r\n_]+/g,'');
     const M = [ [/^rut/, 'rut'], [/cliente|nombre/, 'nombre'], [/mail/, 'email'], [/fono|telefono/, 'telefono_1'],
       [/direccion/, 'direccion'], [/comuna/, 'comuna'], [/ciudad/, 'ciudad'], [/renta/, 'renta'],
@@ -419,7 +422,13 @@ function pintarMapeo(){
       [/mora/, 'dias_mora'], [/estadodepago|estadopago/, 'estado_pago'], [/marca/, 'marca'], [/modelo/, 'modelo'],
       [/a.?ovehiculo|anovehiculo/, 'anio_vehiculo'], [/ppu|patente/, 'patente'], [/avaluo/, 'avaluo'],
       [/tramorenta/, 'tramo_renta'], [/tramodeuda/, 'tramo_deuda'], [/comentario/, 'comentario'], [/producto/, 'producto'] ];
-    for (const [re,k] of M) if (re.test(s)) return k;
+    for (const [re,k] of M) if (re.test(s)) {
+      let kk = k;
+      if (yaUsados.has(kk) && kk.startsWith('telefono_'))            // varias columnas de teléfono → 1, 2, 3
+        kk = ['telefono_1','telefono_2','telefono_3'].find(x=>!yaUsados.has(x)) || 'IGNORAR';
+      if (yaUsados.has(kk) || kk === 'IGNORAR') return 'IGNORAR';
+      yaUsados.add(kk); return kk;
+    }
     return 'IGNORAR';
   };
   const g = {};
@@ -438,17 +447,36 @@ function pintarMapeo(){
           <td style="color:#64748b;font-size:.7rem">${esc(ej(i))}</td>
           <td><select data-col="${esc(col)}">${opts(auto(col))}</select></td></tr>`).join('')}
         </tbody></table></div>
-      <div style="text-align:right;margin-top:12px">
-        <button class="btnx btn-azul" onclick="cargarBase()"><i class="bi bi-cloud-arrow-up"></i> Cargar base con este mapeo</button>
+      <div style="display:flex;align-items:center;gap:12px;justify-content:flex-end;margin-top:12px">
+        <span id="dupAviso" style="display:none;color:#b91c1c;font-size:.76rem;font-weight:700"><i class="bi bi-exclamation-triangle-fill"></i> Hay campos destino repetidos (en rojo) — corrígelos para poder cargar.</span>
+        <button class="btnx btn-azul" id="btnCargarBase" onclick="cargarBase()"><i class="bi bi-cloud-arrow-up"></i> Cargar base con este mapeo</button>
       </div>
     </div>`;
+  document.querySelectorAll('#zonaMapeo select[data-col]').forEach(s => s.addEventListener('change', marcarDuplicados));
+  marcarDuplicados();
+}
+/* Pinta en ROJO los selects cuyo campo destino está repetido y bloquea la carga */
+function marcarDuplicados(){
+  const sels = [...document.querySelectorAll('#zonaMapeo select[data-col]')];
+  const conteo = {};
+  for (const s of sels) if (s.value !== 'IGNORAR') conteo[s.value] = (conteo[s.value]||0) + 1;
+  let hayDup = false;
+  for (const s of sels) {
+    const dup = s.value !== 'IGNORAR' && conteo[s.value] > 1;
+    s.classList.toggle('dup', dup);
+    s.closest('tr').classList.toggle('dup', dup);
+    if (dup) hayDup = true;
+  }
+  const aviso = document.getElementById('dupAviso'), btn = document.getElementById('btnCargarBase');
+  if (aviso) aviso.style.display = hayDup ? '' : 'none';
+  if (btn) btn.disabled = hayDup;
+  return hayDup;
 }
 async function cargarBase(){
   const mapeo = {};
   document.querySelectorAll('#zonaMapeo select[data-col]').forEach(s => { mapeo[s.dataset.col] = s.value; });
+  if (marcarDuplicados()) return alert('Hay campos destino repetidos (marcados en rojo). Corrígelos antes de cargar.');
   const usados = Object.values(mapeo).filter(v=>v!=='IGNORAR');
-  const dup = usados.filter((v,i)=>usados.indexOf(v)!==i);
-  if (dup.length) return alert('Campos destino repetidos: '+[...new Set(dup)].join(', '));
   if (!usados.includes('rut')) return alert('Debes mapear el campo RUT Cliente.');
   if (!usados.some(u=>u.startsWith('telefono_'))) return alert('Debes mapear al menos un Teléfono.');
   if (!confirm(`Se cargarán ${N(EXCEL.filas.length)} filas a la campaña (se reemplaza la base anterior). ¿Continuar?`)) return;
