@@ -73,6 +73,7 @@
     <span class="stat"><i class="bi bi-check2-circle"></i> Revisadas <b id="stRev">0</b></span>
     <div style="flex:1"></div>
     <label class="toggle"><input type="checkbox" id="soloDudas" checked onchange="rebuild()"> Solo dudosas primero</label>
+    <label class="toggle"><input type="checkbox" id="incInactivos" onchange="cargar()"> Incluir inactivos</label>
   </div>
 
   <div id="cont"></div>
@@ -94,7 +95,7 @@ const PREC = { ROOFTOP:'exacta', RANGE_INTERPOLATED:'buena', GEOMETRIC_CENTER:'a
 let TODAS = [], cola = [], i = 0, map, marker, tieneKey = false;
 
 async function cargar(){
-  const j = await (await fetch('/api/dealers/direcciones',{headers:H})).json();
+  const j = await (await fetch('/api/dealers/direcciones'+($('incInactivos').checked?'?todos=1':''),{headers:H})).json();
   if (!j.success) { toast(j.error||'Error', true); return; }
   TODAS = j.data.rows || [];
   tieneKey = j.data.tiene_key;

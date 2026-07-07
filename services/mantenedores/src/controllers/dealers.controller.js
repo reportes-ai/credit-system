@@ -291,18 +291,19 @@ const getMapa = async (req, res) => {
 const DUDA_SQL = "(geo_partial=1 OR geo_precision IN ('APPROXIMATE','GEOMETRIC_CENTER') OR geo_dir IS NULL)";
 const getDirecciones = async (req, res) => {
   try {
+    const fAct = req.query.todos === '1' ? '1=1' : 'activo=1';
     const [rows] = await pool.query(
       `SELECT id_dealer, numero, rut, COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre,
-              comuna, region, direccion, geo_dir, geo_precision, geo_partial, lat, lng,
+              comuna, region, direccion, geo_dir, geo_precision, geo_partial, lat, lng, activo,
               COALESCE(dir_revisada,0) AS dir_revisada, ${DUDA_SQL} AS duda
          FROM dealers
-        WHERE activo=1 AND direccion IS NOT NULL AND direccion<>''
+        WHERE ${fAct} AND direccion IS NOT NULL AND direccion<>''
         ORDER BY COALESCE(dir_revisada,0) ASC, ${DUDA_SQL} DESC, numero ASC`);
     const [[stats]] = await pool.query(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN COALESCE(dir_revisada,0)=1 THEN 1 ELSE 0 END) AS revisadas,
               SUM(CASE WHEN COALESCE(dir_revisada,0)=0 AND ${DUDA_SQL} THEN 1 ELSE 0 END) AS dudas
-         FROM dealers WHERE activo=1 AND direccion IS NOT NULL AND direccion<>''`);
+         FROM dealers WHERE ${fAct} AND direccion IS NOT NULL AND direccion<>''`);
     res.json({ success: true, data: { rows, stats, tiene_key: !!process.env.GOOGLE_MAPS_API_KEY }, error: null });
   } catch (e) { console.error('[getDirecciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
