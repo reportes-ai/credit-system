@@ -413,6 +413,63 @@ function filtrarPorMes() {
   buscarCreditos(1);
 }
 
+/* Exportar a Excel TODOS los casos que cumplen los filtros actuales
+   (misma query que la búsqueda, paginando el servidor hasta traer todo). */
+async function exportarCreditosExcel() {
+  const btn = document.getElementById('btnExpXls');
+  const txt = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    if (!window.XLSX) await new Promise((okL, badL) => {
+      const s = document.createElement('script');
+      s.src = '/js/xlsx.full.min.js'; s.onload = okL; s.onerror = badL;
+      document.head.appendChild(s);
+    });
+    // mismos filtros que buscarCreditos()
+    const base = new URLSearchParams({ limit: 500 });
+    const q = document.getElementById('searchQ').value.trim();
+    if (q) base.set('q', q);
+    if (_empresasFiltro.size === 1) base.set('financiera', [..._empresasFiltro][0]);
+    const fDesde = document.getElementById('searchFDesde')?.value || '';
+    const fHasta = document.getElementById('searchFHasta')?.value || '';
+    if (fDesde) base.set('fecha_desde', fDesde);
+    if (fHasta) base.set('fecha_hasta', fHasta);
+    if (_sortColCred) { base.set('sort', _sortColCred); base.set('dir', _sortDirCred); }
+    const estadoSel = document.getElementById('searchEstado').value;
+    if (_filtroProceso) base.set('estado', '__PROCESO__');
+    else if (_filtroSinEstado) base.set('estado', '__SIN_ESTADO__');
+    else if (estadoSel) base.set('estado', estadoSel);
+
+    let rows = [], page = 1, pages = 1;
+    do {
+      base.set('page', page);
+      btn.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>Exportando… ${rows.length.toLocaleString('es-CL')}`;
+      const r = await fetch('/api/creditos?' + base, { headers: apiHdr() });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error);
+      rows = rows.concat(_filtrarPorEmpresa(j.data || []));
+      pages = j.pagination?.pages || 1;
+      page++;
+    } while (page <= pages && page <= 200);   // tope defensivo 100.000 filas
+
+    const fmtF = s => s ? String(s).slice(0, 10) : '';
+    const out = rows.map(c => ({
+      'N° OP': c.numero_credito || '', 'RUT': c.rut_cliente || '', 'Cliente': c.nombre_cliente || '',
+      'Financiera': c.financiera || '', 'ID Financiera': c.id_financiera || '',
+      'Fecha': fmtF(c.fecha_otorgamiento || c.created_at), 'Monto Financiado': +c.monto_financiado || 0,
+      'Marca': c.marca || '', 'Modelo': c.modelo || '', 'Año': c.anio || '', 'Patente': c.patente || '',
+      'Cuota': +c.cuota || 0, 'Plazo': c.plazo || '', 'Etapa': c.estado || '',
+      'Estado Cartera': c.estado_cartera || '', 'Días Atraso': c.dias_atraso || '',
+      'Dealer': c.dealer || '', 'Ejecutivo': c.ejecutivo || '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(out);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'creditos');
+    XLSX.writeFile(wb, `creditos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (e) { alert('Error al exportar: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = txt;
+}
+
 async function buscarCreditos(page = 1) {
   _paginaActual = page;
   const q = document.getElementById('searchQ').value.trim();
