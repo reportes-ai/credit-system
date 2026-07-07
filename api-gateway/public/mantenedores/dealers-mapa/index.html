@@ -71,6 +71,7 @@
     <div class="fld"><label>Categoría</label><select id="fCat" onchange="render()"><option value="">Todas</option></select></div>
     <div class="fld"><label>Parque</label><select id="fParque" onchange="render()"><option value="">Todos</option></select></div>
     <div class="fld"><label>Tipo</label><select id="fTipo" onchange="render()"><option value="">Todos</option><option value="GENERAL">General (Calle)</option><option value="PARQUE">Parque</option><option value="AMBOS">Ambos</option></select></div>
+    <div class="fld"><label>Estado</label><select id="fEstado" onchange="cargarMapa()"><option value="activos">Activos</option><option value="todos">Todos</option><option value="inactivos">Solo inactivos</option></select></div>
     <div style="flex:1"></div>
     <span class="stat"><i class="bi bi-shop"></i> Total <b id="stTotal">0</b></span>
     <span class="stat"><i class="bi bi-geo-alt-fill"></i> En mapa <b id="stCoord">0</b></span>
@@ -120,9 +121,10 @@ async function cargarCategorias(){
   } catch(e){}
 }
 async function cargarMapa(){
-  const j = await (await fetch('/api/dealers/mapa',{headers:H})).json();
+  const est = document.getElementById('fEstado') ? document.getElementById('fEstado').value : 'activos';
+  const j = await (await fetch('/api/dealers/mapa'+(est!=='activos'?'?todos=1':''),{headers:H})).json();
   if (!j.success) { toast(j.error||'Error al cargar', true); return; }
-  DATA = j.data.rows || [];
+  DATA = (j.data.rows || []).filter(d => est!=='inactivos' || d.activo==0);
   const st = j.data.stats || {};
   $('stTotal').textContent = (st.total||0).toLocaleString('es-CL');
   $('stCoord').textContent = (st.con_coord||0).toLocaleString('es-CL');

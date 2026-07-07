@@ -268,18 +268,19 @@ const geocodificar = async (req, res) => {
 
 const getMapa = async (req, res) => {
   try {
+    const fAct = req.query.todos === '1' ? '1=1' : 'activo=1';
     const [rows] = await pool.query(
       `SELECT id_dealer, numero, rut, COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre,
               nombre_razon, ccs_parque, tipo_ficha, direccion, comuna, region,
               direccion_parque, comuna_parque, categoria_asignada, categoria_propuesta,
-              telefono, lat, lng, lat_parque, lng_parque, geo_estado
-         FROM dealers WHERE activo=1 ORDER BY numero`);
+              telefono, lat, lng, lat_parque, lng_parque, geo_estado, activo
+         FROM dealers WHERE ${fAct} ORDER BY numero`);
     const [[stats]] = await pool.query(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN lat IS NOT NULL THEN 1 ELSE 0 END) AS con_coord,
               SUM(CASE WHEN (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
                          OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL) THEN 1 ELSE 0 END) AS pendientes
-         FROM dealers WHERE activo=1`);
+         FROM dealers WHERE ${fAct}`);
     res.json({ success: true, data: { rows, stats, tiene_key: !!process.env.GOOGLE_MAPS_API_KEY }, error: null });
   } catch (e) { console.error('[getMapa]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
