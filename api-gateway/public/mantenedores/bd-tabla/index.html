@@ -52,6 +52,13 @@
     /* Columna resaltada por búsqueda */
     th.col-highlighted { outline:3px solid #f59e0b !important; outline-offset:-3px; }
     td.col-highlighted { background:#fffbeb !important; }
+    /* Selección múltiple + barra de borrado */
+    th.col-chk, td.col-chk { width:36px; min-width:36px; max-width:36px; text-align:center; padding:4px 6px !important; }
+    #deleteBar { display:none; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px;
+      padding:5px 12px; align-items:center; gap:10px; }
+    #deleteBar.show { display:flex; }
+    .btn-delete-sel { background:#dc2626; color:#fff; border:none; border-radius:7px; padding:5px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    .btn-delete-sel:hover { background:#b91c1c; }
     tbody tr { border-bottom:1px solid #f0f0f0; }
     tbody tr:hover { background:#eff6ff; }
     tbody td { padding:6px 10px; white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; color:#374151; }
@@ -132,6 +139,12 @@
         onkeydown="navColDropdown(event)">
       <div id="colDropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:500;min-width:220px;max-height:260px;overflow-y:auto"></div>
     </div>
+    <div id="deleteBar">
+      <i class="bi bi-trash-fill text-danger"></i>
+      <span id="deleteCount" style="font-size:.82rem;font-weight:700;color:#dc2626"></span>
+      <button class="btn-delete-sel" onclick="eliminarSeleccionados()"><i class="bi bi-trash me-1"></i>Eliminar seleccionados</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">Cancelar</button>
+    </div>
     <div style="flex:1"></div>
     <label style="font-size:.82rem;color:#6b7280;">Filas por página:</label>
     <select class="per-page" id="limitSel" onchange="changeLimit()">
@@ -177,6 +190,7 @@ let PK  = 'id';
 
 let columns = [], filters = {}, sortCol = null, sortDir = 'desc';
 let page = 1, limit = 50, totalRows = 0, editCell = null;
+let selected = new Set();
 
 function toast(msg, type='success') {
   const c = document.getElementById('toastContainer');
@@ -223,6 +237,12 @@ function buildHeaders() {
   const trLetters = document.createElement('tr');
   trLetters.className = 'tr-letters';
   const tr = document.createElement('tr');
+  // columna de checkbox (letras: '#'; header: select-all)
+  const thLChk = document.createElement('th'); thLChk.className = 'col-chk'; thLChk.textContent = '#';
+  trLetters.appendChild(thLChk);
+  const thChk = document.createElement('th'); thChk.className = 'col-chk';
+  thChk.innerHTML = '<input type="checkbox" id="chkAll" onchange="toggleSelectAll(this.checked)">';
+  tr.appendChild(thChk);
   columns.forEach((col, idx) => {
     // Celda de letra Excel (clickeable: salta a la columna)
     const thL = document.createElement('th');
@@ -285,12 +305,12 @@ function irAColumna(field, idx) {
   const lth = document.getElementById('colLetter_' + idx);
   if (lth) lth.classList.add('col-letter-highlight');
   document.querySelectorAll('th.col-highlighted, td.col-highlighted').forEach(el => el.classList.remove('col-highlighted'));
-  const ths = document.querySelectorAll('#thead tr:last-child th');
-  if (ths[idx]) ths[idx].classList.add('col-highlighted');
+  const ths = document.querySelectorAll('#thead tr:last-child th');   // +1 por la columna de checkbox
+  if (ths[idx+1]) ths[idx+1].classList.add('col-highlighted');
   document.querySelectorAll(`#tbody td[data-field="${field}"]`).forEach(td => td.classList.add('col-highlighted'));
   const tableScroll = document.getElementById('tableScroll');
-  if (ths[idx]) {
-    const thRect = ths[idx].getBoundingClientRect();
+  if (ths[idx+1]) {
+    const thRect = ths[idx+1].getBoundingClientRect();
     const wrapRect = tableScroll.getBoundingClientRect();
     tableScroll.scrollTo({ left: tableScroll.scrollLeft + thRect.left - wrapRect.left - 60, behavior: 'smooth' });
   }
@@ -325,6 +345,14 @@ function renderRows(rows) {
   tbody.innerHTML='';
   rows.forEach(row => {
     const tr = document.createElement('tr');
+    if (selected.has(row[PK])) tr.style.background = '#eff6ff';
+    const tdChk = document.createElement('td');
+    tdChk.className = 'col-chk';
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.className = 'row-chk'; chk.dataset.id = row[PK];
+    chk.checked = selected.has(row[PK]);
+    chk.onchange = () => { if (chk.checked) { selected.add(row[PK]); tr.style.background='#eff6ff'; } else { selected.delete(row[PK]); tr.style.background=''; } updateDeleteBar(); };
+    tdChk.appendChild(chk); tr.appendChild(tdChk);
     columns.forEach(col => {
       const td = document.createElement('td');
       const val = row[col.field];
@@ -394,13 +422,54 @@ function renderPagination({page:p, pages, total, limit:lim}) {
   cont.appendChild(mk('›',p+1,p>=pages)); cont.appendChild(mk('»',pages,p>=pages));
 }
 
+/* ── Selección múltiple + eliminar (solo Nivel Dios) ── */
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.row-chk').forEach(chk => {
+    const id = parseInt(chk.dataset.id);
+    chk.checked = checked;
+    const tr = chk.closest('tr');
+    if (checked) { selected.add(id); if (tr) tr.style.background = '#eff6ff'; }
+    else         { selected.delete(id); if (tr) tr.style.background = ''; }
+  });
+  updateDeleteBar();
+}
+function clearSelection() {
+  selected.clear();
+  document.querySelectorAll('.row-chk').forEach(c => c.checked = false);
+  document.querySelectorAll('#tbody tr').forEach(tr => tr.style.background = '');
+  const chkAll = document.getElementById('chkAll');
+  if (chkAll) chkAll.checked = false;
+  updateDeleteBar();
+}
+function updateDeleteBar() {
+  const bar = document.getElementById('deleteBar');
+  const n = selected.size;
+  if (n > 0) { bar.classList.add('show'); document.getElementById('deleteCount').textContent = `${n} registro${n>1?'s':''} seleccionado${n>1?'s':''}`; }
+  else bar.classList.remove('show');
+}
+async function eliminarSeleccionados() {
+  const ids = [...selected];
+  if (!ids.length) return;
+  if (!confirm(`⚠️ ¿Eliminar ${ids.length} registro${ids.length>1?'s':''} de la tabla ${TABLA}?\n\nEsta acción no se puede deshacer.`)) return;
+  showLoading(true);
+  try {
+    const r = await fetch(API, { method:'DELETE', headers:H, body:JSON.stringify({ ids }) });
+    const j = await r.json();
+    if (!r.ok || !j.success) throw new Error(j?.error || `Error ${r.status}`);
+    toast(`✅ ${j.data.deleted} registro${j.data.deleted>1?'s':''} eliminado${j.data.deleted>1?'s':''}`);
+    selected.clear(); updateDeleteBar();
+    await load();
+  } catch(e) { alert('Error al eliminar: ' + e.message); }
+  finally { showLoading(false); }
+}
+
 function clearFilters() { filters={}; page=1; buildHeaders(); load(); }
 function changeLimit() { limit=parseInt(document.getElementById('limitSel').value); page=1; load(); }
 
 function exportCSV() {
   const rows=[columns.map(c=>c.field).join(';')];
   document.querySelectorAll('#tbody tr').forEach(tr=>{
-    rows.push([...tr.querySelectorAll('td')].map(td=>{ const v=td.textContent==='—'?'':td.textContent; return `"${v.replace(/"/g,'""')}"`; }).join(';'));
+    rows.push([...tr.querySelectorAll('td:not(.col-chk)')].map(td=>{ const v=td.textContent==='—'?'':td.textContent; return `"${v.replace(/"/g,'""')}"`; }).join(';'));
   });
   const blob=new Blob(['﻿'+rows.join('\n')],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=TABLA+'.csv'; a.click();

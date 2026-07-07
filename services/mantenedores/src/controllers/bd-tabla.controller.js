@@ -91,3 +91,18 @@ exports.update = async (req, res) => {
     res.json({ success: true, data: fmtDates(updated), error: null });
   } catch (e) { fail(res, e.message); }
 };
+
+exports.deleteMany = async (req, res) => {
+  try {
+    const t = tablaDe(req);
+    if (!t) return fail(res, 'Tabla no permitida', 400);
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(Number).filter(n => Number.isInteger(n) && n > 0) : [];
+    if (!ids.length) return fail(res, 'ids requerido', 400);
+    const [result] = await pool.query(
+      `DELETE FROM ${t.nombre} WHERE ${t.pk} IN (${ids.map(() => '?').join(',')})`, ids);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'mantenedores', entidad: t.nombre,
+      entidad_id: ids.length === 1 ? ids[0] : `${ids.length} registros`,
+      detalle: `Eliminó ${result.affectedRows} registro(s) de ${t.nombre} desde BD Nivel Dios`, meta: { ids, deleted: result.affectedRows } });
+    res.json({ success: true, data: { deleted: result.affectedRows }, error: null });
+  } catch (e) { fail(res, e.message); }
+};
