@@ -210,7 +210,7 @@
   <a class="nav-brand" href="/">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v4.1</span>
+    <span class="version-badge">v4.2</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -1384,7 +1384,9 @@ async function marcarBroker(nuevoEstado) {
 }
 
 /* ── Estados PARAMÉTRICOS desde el mantenedor Estado Créditos ──
-   Brokerage (AUTOFIN/UNIDAD) → ámbito brokerage; propios → ámbito autofacil.
+   Brokerage (AUTOFIN/UNIDAD) → ámbito brokerage; propios en originación → ámbito
+   autofacil; propios CURSADOS → estados de CARTERA (Vigente/En Mora/Vencido/
+   Terminado/Prepagado/Castigado — los mueve el motor, Castigado es manual).
    Si el estado actual no está en el mapa (histórico), se conserva como opción. */
 async function poblarEstadosParametricos(c) {
   const sel = document.getElementById('dEstado');
@@ -1394,10 +1396,15 @@ async function poblarEstadosParametricos(c) {
     const j = await r.json();
     if (!j.success) return;
     const fin = String(c.financiera || '').toUpperCase();
-    const ambito = (fin === 'AUTOFIN' || fin.includes('UNIDAD')) ? 'brokerage' : 'autofacil';
-    const estados = (j.data || []).filter(e => e.ambito === ambito).sort((a, b) => a.orden - b.orden);
-    if (!estados.length) return;
+    const esBroker = fin === 'AUTOFIN' || fin.includes('UNIDAD');
     const actual = sel.dataset.actual || c.estado || '';
+    const CARTERA = ['VIGENTE', 'EN MORA', 'VENCIDO', 'TERMINADO', 'PREPAGADO', 'CASTIGADO'];
+    const cursadoPropio = !esBroker && (CARTERA.includes(actual) || c.estado_cartera ||
+      actual === 'OTORGADO' || c.estado_eval === 'OTORGADO');
+    const estados = cursadoPropio
+      ? CARTERA.map((cod, i) => ({ codigo: cod, nombre: cod.charAt(0) + cod.slice(1).toLowerCase(), orden: i }))
+      : (j.data || []).filter(e => e.ambito === (esBroker ? 'brokerage' : 'autofacil')).sort((a, b) => a.orden - b.orden);
+    if (!estados.length) return;
     sel.innerHTML = estados.map(e =>
       `<option value="${e.codigo}" ${e.codigo === actual ? 'selected' : ''}>${e.nombre}</option>`).join('');
     if (actual && !estados.some(e => e.codigo === actual))
