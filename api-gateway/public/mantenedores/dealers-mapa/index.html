@@ -27,6 +27,11 @@
     .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#fff; border:1px solid #e3e8ef; border-radius:12px; padding:12px 14px; box-shadow:0 2px 8px rgba(1,65,162,.05); margin-bottom:14px; }
     .toolbar .fld { display:flex; flex-direction:column; gap:2px; }
     .toolbar label { font-size:.66rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    /* Checkboxes de la toolbar: texto pegado al cuadro, alineado a la izquierda, sin mayúsculas */
+    .toolbar label.chk { display:inline-flex; align-items:center; justify-content:flex-start; gap:6px;
+      font-size:.8rem; font-weight:600; color:#334155; text-transform:none; letter-spacing:0;
+      cursor:pointer; white-space:nowrap; text-align:left; }
+    .toolbar label.chk input { margin:0; }
     .toolbar select, .toolbar input { border:1px solid #d1d5db; border-radius:8px; padding:6px 9px; font-size:.85rem; min-width:140px; }
     .stat { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:#334155; background:#f8fafc; border:1px solid #e3e8ef; border-radius:20px; padding:5px 12px; font-weight:600; }
     .stat b { color:#0141A2; }
@@ -72,14 +77,14 @@
     <div class="fld"><label>Parque</label><select id="fParque" onchange="render()"><option value="">Todos</option></select></div>
     <div class="fld"><label>Tipo</label><select id="fTipo" onchange="render()"><option value="">Todos</option><option value="GENERAL">General (Calle)</option><option value="PARQUE">Parque</option><option value="AMBOS">Ambos</option></select></div>
     <div class="fld"><label>Estado</label><select id="fEstado" onchange="cargarMapa()"><option value="activos">Activos</option><option value="todos">Todos</option><option value="inactivos">Solo inactivos</option></select></div>
-    <label style="font-size:.78rem;font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="fPantalla" onchange="render(false)"> Filtrar por pantalla</label>
+    <label class="chk"><input type="checkbox" id="fPantalla" onchange="render(false)"> Filtrar por pantalla</label>
     <button class="btn-geo" style="background:#16a34a" onclick="exportarExcel()" title="Exporta lo que se ve: filtros + zoom de pantalla"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
     <div style="flex:1"></div>
     <span class="stat"><i class="bi bi-eye"></i> En pantalla <b id="stVista">0</b></span>
     <span class="stat"><i class="bi bi-shop"></i> Total <b id="stTotal">0</b></span>
     <span class="stat"><i class="bi bi-geo-alt-fill"></i> En mapa <b id="stCoord">0</b></span>
     <span class="stat"><i class="bi bi-hourglass-split"></i> Pendientes <b id="stPend">0</b></span>
-    <label id="lblInact" style="display:none;font-size:.78rem;font-weight:600;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="chkInactivos"> Incluir inactivos</label>
+    <label id="lblInact" class="chk" style="display:none"><input type="checkbox" id="chkInactivos"> Incluir inactivos</label>
     <button class="btn-geo" id="btnGeo" onclick="geocodificar()" style="display:none"><i class="bi bi-pin-map me-1"></i>Geocodificar pendientes</button>
     <button class="btn-geo" id="btnGeoTodo" onclick="geocodificarTodo()" style="display:none;background:#7c3aed"><i class="bi bi-lightning-charge me-1"></i>Geocodificar TODO (auto)</button>
   </div>
