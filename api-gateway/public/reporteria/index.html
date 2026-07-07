@@ -147,6 +147,17 @@
         </button>
       </div>
     </div>
+    <div class="report-card sqlconsole" id="cardSQL" style="display:none" onclick="window.location='/mantenedores/sql-console/'">
+      <div class="card-icon-wrap" style="background:linear-gradient(135deg,#0f172a,#334155);color:#a5f3fc"><i class="bi bi-terminal"></i></div>
+      <h6>Consola SQL</h6>
+      <p>Consultas SQL directas a la base de datos (solo lectura, SELECT). Para usuarios avanzados: resultados al instante con export. Toda ejecución queda auditada.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#0f172a,#334155)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
     <div class="report-card rentab" id="cardRentab" style="display:none" onclick="window.location='/reporteria/rentabilidad-creditos/'">
       <div class="card-icon-wrap"><i class="bi bi-graph-up-arrow"></i></div>
       <h6>Rentabilidad Créditos</h6>
@@ -417,6 +428,9 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     }
     if (esAdmin || perms.has('reporteria_diseno')) {
       const el = document.getElementById('cardDiseno'); if (el) el.style.display = '';
+    }
+    if (esAdmin || perms.has('mantenedores_solo_dios')) {
+      const el = document.getElementById('cardSQL'); if (el) el.style.display = '';
     }
   } catch(e){ /* sin permiso → card oculta */ }
 })();
