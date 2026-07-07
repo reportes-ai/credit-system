@@ -357,26 +357,75 @@ async function ultimaVisitaMap() {
   return new Map(rows.map(r => [r.id_dealer, r.ult]));
 }
 
-/* Candidatos a asignar: activos, sin asignación ACTIVA, filtro comuna +
-   plazo en meses desde la última visita realizada (0 = sin filtro). */
-async function candidatosCartera({ comunas = [], meses = 0 }) {
+/* Zonificación: comunas con muchos dealers se parten en 2/3/4 zonas
+   geográficas (cuadrantes por lat/lng) para que los bloques queden
+   equivalentes al resto de las comunas (~25 dealers por zona). */
+const mediana = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+function zonificar(cands, objetivo = 25) {
+  const porComuna = {};
+  for (const d of cands) (porComuna[d.comuna] = porComuna[d.comuna] || []).push(d);
+  const zonas = [];
+  for (const [com, ds] of Object.entries(porComuna)) {
+    const k = Math.min(4, Math.ceil(ds.length / objetivo));
+    if (k <= 1) { ds.forEach(d => d.zona = com); zonas.push({ zona: com, n: ds.length }); continue; }
+    const conGeo = ds.filter(d => d.lat != null && d.lng != null);
+    const sinGeo = ds.filter(d => d.lat == null || d.lng == null);
+    // partición balanceada recursiva: corta por el eje geográfico más ancho
+    // en proporción al n° de zonas → grupos de tamaño similar y coherentes
+    const partir = (arr, kk) => {
+      if (kk <= 1 || arr.length <= 1) return [arr];
+      const k1 = Math.floor(kk / 2), k2 = kk - k1;
+      const span = eje => { const v = arr.map(d => +d[eje]); return Math.max(...v) - Math.min(...v); };
+      const eje = span('lat') >= span('lng') ? 'lat' : 'lng';
+      const sorted = [...arr].sort((a, b) => +a[eje] - +b[eje]);
+      const corte = Math.round(sorted.length * k1 / kk);
+      return [...partir(sorted.slice(0, corte), k1), ...partir(sorted.slice(corte), k2)];
+    };
+    const grupos = partir(conGeo, k);
+    while (grupos.length < k) grupos.push([]);
+    sinGeo.forEach((d, i) => grupos[i % k].push(d));   // sin coordenadas: repartidos
+    grupos.forEach((g, i) => {
+      const z = `${com} — Zona ${i + 1}`;
+      g.forEach(d => d.zona = z);
+      if (g.length) zonas.push({ zona: z, n: g.length });
+    });
+  }
+  return zonas.sort((a, b) => a.zona.localeCompare(b.zona, 'es'));
+}
+
+/* Candidatos a asignar: sin asignación ACTIVA, filtro estado (todos por
+   defecto) + comuna/zona + plazo en meses desde la última visita (0 = todos). */
+async function candidatosCartera({ comunas = [], meses = 0, estado = 'todos' }) {
+  const fAct = estado === 'activos' ? 'activo=1' : estado === 'inactivos' ? 'activo=0' : '1=1';
   const [dealers] = await pool.query(
     `SELECT id_dealer, rut,
             COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
             comuna, comuna_parque, geo_dir, lat, lng
-       FROM dealers WHERE activo=1`);
+       FROM dealers WHERE ${fAct}`);
   const [asig] = await pool.query("SELECT id_dealer FROM visitas_asignaciones WHERE estado='ACTIVA'");
   const ocupados = new Set(asig.map(a => a.id_dealer));
   const mUlt = await ultimaVisitaMap();
   const limite = meses > 0 ? Date.now() - meses * 30.44 * 86400000 : null;
-  const setCom = new Set((comunas || []).map(c => String(c).trim().toUpperCase()).filter(Boolean));
-  return dealers
+  let cands = dealers
     .map(d => ({ id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d) || 'SIN COMUNA',
-                 ultima_visita: mUlt.get(d.id_dealer) || null }))
+                 lat: d.lat, lng: d.lng, ultima_visita: mUlt.get(d.id_dealer) || null }))
     .filter(d => !ocupados.has(d.id_dealer))
-    .filter(d => !setCom.size || setCom.has(d.comuna.toUpperCase()))
     .filter(d => !limite || !d.ultima_visita || new Date(d.ultima_visita).getTime() < limite);
+  const zonas = zonificar(cands);                      // asigna d.zona a cada candidato
+  const setZona = new Set((comunas || []).map(c => String(c).trim().toUpperCase()).filter(Boolean));
+  if (setZona.size) cands = cands.filter(d => setZona.has(String(d.zona).toUpperCase()));
+  return { cands, zonas };
 }
+
+/* ─── GET /api/visitas/zonas?estado=&meses= — comunas/zonas con conteo ── */
+const zonasCartera = async (req, res) => {
+  try {
+    const { zonas } = await candidatosCartera({
+      meses: Math.max(0, parseInt(req.query.meses, 10) || 0),
+      estado: ['activos', 'inactivos'].includes(req.query.estado) ? req.query.estado : 'todos' });
+    ok(res, zonas);
+  } catch (e) { console.error('[visitas zonas]', e); err(res, 500, 'Error interno del servidor'); }
+};
 
 /* ─── POST /api/visitas/asignacion-masiva (visitas_supervisar) ──────
    body: { nombre, fecha_inicio, fecha_cierre, ejecutivos:[ids], comunas:[],
@@ -390,6 +439,7 @@ const asignacionMasiva = async (req, res) => {
     const ejecIds = [...new Set((b.ejecutivos || []).map(Number).filter(n => n > 0))];
     if (!ejecIds.length) return err(res, 400, 'Selecciona al menos un ejecutivo.');
     const meses = Math.max(0, parseInt(b.meses_ultima_visita, 10) || 0);
+    const estado = ['activos', 'inactivos'].includes(b.estado) ? b.estado : 'todos';
 
     const cfg = await leerConfig();
     const visDia = Math.min(50, Math.max(1, parseInt(b.visitas_dia, 10) || cfg.visitas_dia));
@@ -402,14 +452,14 @@ const asignacionMasiva = async (req, res) => {
     const nomEjec = new Map(us.map(u => [u.id_usuario, u.nombre]));
     if (nomEjec.size !== ejecIds.length) return err(res, 400, 'Hay ejecutivos inexistentes.');
 
-    const cand = await candidatosCartera({ comunas: b.comunas, meses });
+    const { cands: cand } = await candidatosCartera({ comunas: b.comunas, meses, estado });
     if (!cand.length) return err(res, 400, 'No hay dealers candidatos con esos filtros (¿ya están todos asignados?).');
 
-    // Reparto por BLOQUES DE COMUNA (zona coherente): cada bloque al ejecutivo
-    // con menos carga. Bloques más grandes que la cuota justa se parten en
-    // trozos para que una comuna gigante no se vaya entera a uno solo.
+    // Reparto por BLOQUES DE COMUNA/ZONA (coherencia geográfica): cada bloque
+    // al ejecutivo con menos carga. Bloques más grandes que la cuota justa se
+    // parten en trozos para que una zona gigante no se vaya entera a uno solo.
     const porComuna = {};
-    for (const d of cand) (porComuna[d.comuna] = porComuna[d.comuna] || []).push(d);
+    for (const d of cand) (porComuna[d.zona] = porComuna[d.zona] || []).push(d);
     const cuota = Math.ceil(cand.length / ejecIds.length);
     const bloques = [];
     for (const [com, ds] of Object.entries(porComuna))
@@ -433,7 +483,7 @@ const asignacionMasiva = async (req, res) => {
     const resumen = [...carga.entries()].map(([id, ds]) => ({
       id_usuario: id, nombre: nomEjec.get(id), dealers: ds.length,
       agendables: Math.min(ds.length, capacidad), sin_agenda: Math.max(0, ds.length - capacidad),
-      comunas: [...new Set(ds.map(d => d.comuna))],
+      comunas: [...new Set(ds.map(d => d.zona))],
     }));
     if (b.simular) return ok(res, { simulacion: true, candidatos: cand.length, fechas_habiles: fechas.length,
       capacidad_por_ejecutivo: capacidad, por_ejecutivo: resumen });
@@ -443,7 +493,7 @@ const asignacionMasiva = async (req, res) => {
       `INSERT INTO visitas_planes (nombre, fecha_inicio, fecha_cierre, params, created_by, created_nombre)
        VALUES (?,?,?,?,?,?)`,
       [(b.nombre || `Plan ${b.fecha_inicio}`).slice(0, 200), b.fecha_inicio, b.fecha_cierre,
-       JSON.stringify({ comunas: b.comunas || [], meses_ultima_visita: meses, visitas_dia: visDia, dias_semana: dias, ejecutivos: ejecIds }),
+       JSON.stringify({ comunas: b.comunas || [], meses_ultima_visita: meses, estado, visitas_dia: visDia, dias_semana: dias, ejecutivos: ejecIds }),
        req.usuario.id_usuario, nombreUsuario(req.usuario)]);
     const idPlan = rp.insertId;
 
@@ -454,14 +504,14 @@ const asignacionMasiva = async (req, res) => {
         const [ra] = await pool.query(
           `INSERT INTO visitas_asignaciones (id_dealer, rut_dealer, nombre_dealer, comuna, id_usuario, usuario_nombre, id_plan, origen, created_by, created_nombre)
            VALUES (?,?,?,?,?,?,?, 'MASIVA', ?, ?)`,
-          [d.id_dealer, d.rut, d.nombre, d.comuna, idU, nomEjec.get(idU), idPlan, req.usuario.id_usuario, nombreUsuario(req.usuario)]);
+          [d.id_dealer, d.rut, d.nombre, d.zona, idU, nomEjec.get(idU), idPlan, req.usuario.id_usuario, nombreUsuario(req.usuario)]);
         asignadas++;
         const fecha = fechas[Math.floor(slot / visDia)];
         if (fecha) {
           await pool.query(
             `INSERT INTO visitas_dealers (id_dealer, rut_dealer, nombre_dealer, comuna, fecha_programada, id_usuario, usuario_nombre, estado, id_plan, id_asignacion)
              VALUES (?,?,?,?,?,?,?, 'PROGRAMADA', ?, ?)`,
-            [d.id_dealer, d.rut, d.nombre, d.comuna, fecha, idU, nomEjec.get(idU), idPlan, ra.insertId]);
+            [d.id_dealer, d.rut, d.nombre, d.zona, fecha, idU, nomEjec.get(idU), idPlan, ra.insertId]);
           agendadas++; slot++;
         }
       }
@@ -624,5 +674,5 @@ const stats = async (req, res) => {
 };
 
 module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar,
-  ejecutivos, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
+  ejecutivos, zonasCartera, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
   listarPlanes, cerrarPlan, fichaDia, stats };
