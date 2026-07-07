@@ -191,22 +191,78 @@ const TERMINOS_DEFAULT = [
   } catch (e) { console.error('[campanas-ventas migration]', e.message); }
 })();
 
-/* ── Helpers ────────────────────────────────────────────────────────────── */
-const normFono = t => {
-  const d = String(t ?? '').replace(/[^\d]/g, '');
-  return d.length >= 8 ? d : null;
+/* ── Helpers de normalización — las bases vienen de procedencias MUY
+   distintas, así que cada dato clave se normaliza a un formato canónico ── */
+
+/* Teléfonos: acepta +56 9 7765 3059 / 9-7765-3059 / 977653059 / 77653059 /
+   notación científica de Excel (5.6977653059E10) y VARIOS números en una
+   celda separados por ; , / | "y" "·". Canónico: dígitos con prefijo 56. */
+const normFonos = v => {
+  if (v === null || v === undefined || v === '') return [];
+  let s = typeof v === 'number' ? String(Math.round(v)) : String(v);
+  return s.split(/[;,\/|·]|\s{2,}|\s+y\s+/i).map(parte => {
+    let d = parte.replace(/[^\dkK]/gi, '').replace(/[kK]$/, '');   // limpia +, (), -, espacios
+    d = d.replace(/^0+/, '');
+    if (d.length === 8) d = '569' + d;                              // celular viejo sin el 9
+    else if (d.length === 9) d = '56' + d;                          // 9XXXXXXXX o fijo con área
+    else if (d.length === 11 && d.startsWith('56')) { /* ya canónico */ }
+    else if (d.length === 10 && d.startsWith('56')) d = '569' + d.slice(2); // 56 + 8 dígitos
+    return (d.length >= 10 && d.length <= 12) ? d : null;
+  }).filter(Boolean);
 };
+const normFono = v => normFonos(v)[0] || null;
+
+/* RUT: acepta 16.276.572-8 / 16276572-8 / 162765728 / 16276572 (sin DV,
+   lo calcula) / K minúscula. Canónico: CUERPO-DV sin puntos, K mayúscula. */
+const calcDV = cuerpo => {
+  let suma = 0, mul = 2;
+  for (let i = String(cuerpo).length - 1; i >= 0; i--) { suma += Number(String(cuerpo)[i]) * mul; mul = mul === 7 ? 2 : mul + 1; }
+  const r = 11 - (suma % 11);
+  return r === 11 ? '0' : r === 10 ? 'K' : String(r);
+};
+const normRut = v => {
+  if (v === null || v === undefined || v === '') return null;
+  let s = String(typeof v === 'number' ? Math.round(v) : v).toUpperCase().replace(/[^\dK]/g, '');
+  if (s.length < 7 || s.length > 10) return null;
+  const cuerpo9 = s.slice(0, -1), dv9 = s.slice(-1);
+  if (calcDV(cuerpo9) === dv9) return `${cuerpo9}-${dv9}`;          // último carácter era el DV
+  if (/^\d+$/.test(s) && s.length <= 9) return `${s}-${calcDV(s)}`; // venía sin DV: se calcula
+  return `${cuerpo9}-${dv9}`;                                       // DV no cuadra: se conserva igual (se cuenta aparte)
+};
+const rutValido = r => { const [cu, dv] = String(r || '').split('-'); return !!cu && calcDV(cu) === dv; };
+
+/* Números: number nativo de Excel intacto; strings en formato es-CL
+   (1.234.567,89), US (1,234,567.89), con $, %, CLP o espacios. */
 const toNum = v => {
   if (v === null || v === undefined || v === '') return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;   // Excel entrega números crudos: no tocar el punto decimal
-  let s = String(v).trim().replace(/[$\s]/g, '');
-  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');    // es-CL: 1.234.567,89
-  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, ''); // solo separador de miles
+  let s = String(v).trim().replace(/[$\s%]|CLP/gi, '');
+  const uc = s.lastIndexOf(','), ud = s.lastIndexOf('.');
+  if (uc >= 0 && ud >= 0) s = uc > ud ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, ''); // es-CL vs US
+  else if (uc >= 0) s = /^-?\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(',', '.');
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
 // tope defensivo para DECIMAL(15,2)
 const toMonto = v => { const n = toNum(v); return n !== null && Math.abs(n) < 1e13 ? n : null; };
+
+/* Fechas: serial de Excel (44349), dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd.
+   Canónico: aaaa-mm-dd. Texto no reconocible (ej. "jun-21") se conserva. */
+const normFecha = v => {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number' && v > 20000 && v < 80000)               // serial Excel (1900-based)
+    return new Date(Date.UTC(1899, 11, 30) + v * 86400000).toISOString().slice(0, 10);
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);       // dd/mm/aaaa
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);           // aaaa-mm-dd
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  return s;                                                          // texto: se deja tal cual
+};
+const CAMPOS_FECHA = new Set(['fecha_otorgamiento']);
+// expuestos solo para pruebas
+exports._norm = { normRut, rutValido, normFonos, toNum, toMonto, normFecha };
 
 async function getCampana(id) {
   const [[c]] = await pool.query('SELECT * FROM cv_campanas WHERE id=?', [id]);
@@ -403,7 +459,7 @@ exports.cargarRegistros = async (req, res) => {
     await pool.query('DELETE FROM cv_gestiones WHERE id_campana=?', [c.id]);
     await pool.query('DELETE FROM cv_registros WHERE id_campana=?', [c.id]);
 
-    let cargados = 0, sinRut = 0, sinFono = 0;
+    let cargados = 0, sinRut = 0, sinFono = 0, dvMalos = 0;
     const values = [];
     rows.forEach((fila, idx) => {
       const datos = {};
@@ -413,13 +469,17 @@ exports.cargarRegistros = async (req, res) => {
         if (v === undefined || v === null || v === '') continue;
         datos[campo] = typeof v === 'string' ? v.trim() : v;
       }
-      const telefonos = ['telefono_1', 'telefono_2', 'telefono_3'].map(k => normFono(datos[k])).filter(Boolean);
-      const rut = String(datos.rut || '').trim();
+      // normalización a formato canónico (las bases vienen en cualquier formato)
+      const telefonos = [...new Set(['telefono_1', 'telefono_2', 'telefono_3'].flatMap(k => normFonos(datos[k])))];
+      const rut = normRut(datos.rut);
       if (!rut) { sinRut++; return; }
       if (!telefonos.length) { sinFono++; return; }
+      if (!rutValido(rut)) dvMalos++;                    // se carga igual, pero se informa
+      datos.rut = rut;
+      for (const k of CAMPOS_FECHA) if (datos[k] !== undefined) datos[k] = normFecha(datos[k]);
       const montoRef = toMonto(datos.capital_adeudado) ?? toMonto(datos.deuda_vigente) ?? toMonto(datos.monto_financiado);
-      values.push([c.id, idx, idx, rut.slice(0, 15), String(datos.nombre || '').slice(0, 200) || null,
-        JSON.stringify([...new Set(telefonos)]), JSON.stringify(datos), montoRef]);
+      values.push([c.id, idx, idx, rut.slice(0, 15), String(datos.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 200) || null,
+        JSON.stringify(telefonos), JSON.stringify(datos), montoRef]);
       cargados++;
     });
     if (!values.length) return fail(res, 'Ninguna fila válida (todas sin RUT o sin teléfono)', 400);
@@ -432,7 +492,7 @@ exports.cargarRegistros = async (req, res) => {
     await pool.query('UPDATE cv_campanas SET mapeo=?, archivo_nombre=? WHERE id=?',
       [JSON.stringify(mapeo), (archivo_nombre || '').slice(0, 250) || null, c.id]);
     if (c.orden_campo) await recomputarOrden(await getCampana(c.id));
-    ok(res, { cargados, sin_rut: sinRut, sin_telefono: sinFono });
+    ok(res, { cargados, sin_rut: sinRut, sin_telefono: sinFono, rut_dv_invalido: dvMalos });
   } catch (e) { fail(res, e.message); }
 };
 

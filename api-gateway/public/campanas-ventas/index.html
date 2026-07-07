@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -485,7 +485,8 @@ async function cargarBase(){
   const j = await r.json();
   if (!j.success) return alert(j.error);
   alert(`Base cargada: ${N(j.data.cargados)} registros.` +
-    (j.data.sin_rut?` Descartados sin RUT: ${j.data.sin_rut}.`:'') + (j.data.sin_telefono?` Sin teléfono: ${j.data.sin_telefono}.`:''));
+    (j.data.sin_rut?` Descartados sin RUT: ${j.data.sin_rut}.`:'') + (j.data.sin_telefono?` Sin teléfono: ${j.data.sin_telefono}.`:'') +
+    (j.data.rut_dv_invalido?` Con DV de RUT que no cuadra (cargados igual): ${j.data.rut_dv_invalido}.`:''));
   EXCEL = null;
   abrirDetalle(CUR.campana.id);
 }
