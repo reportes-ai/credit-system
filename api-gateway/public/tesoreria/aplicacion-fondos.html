@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aplicación de Fondos — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:1250px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+  .banner > i { font-size:2.3rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { border:none; background:#fff; border-radius:10px; padding:9px 18px; font-size:.85rem; font-weight:700; color:#475569; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .tab.on { background:var(--accent); color:#fff; }
+  .panel { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .panel h5 { margin:0 0 10px; font-size:.95rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  label { font-size:.7rem; font-weight:700; color:#374151; display:block; margin-bottom:3px; }
+  input, select, textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.84rem; font-family:inherit; outline:none; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:#f8fafc; text-align:left; padding:7px 8px; font-size:.62rem; text-transform:uppercase; color:#6b7280; }
+  td { padding:6px 8px; border-bottom:1px solid #f1f5f9; }
+  td.num, th.num { text-align:right; }
+  .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.8rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-verde { background:var(--ok); color:#fff; }
+  .btn-rojo { background:#fee2e2; color:#b91c1c; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .btnx:disabled { opacity:.5; cursor:not-allowed; }
+  .chip { border-radius:8px; padding:2px 8px; font-size:.64rem; font-weight:700; display:inline-block; }
+  .e-HECHO { background:#f1f5f9; color:#475569; } .e-REVISADO { background:#fef9c3; color:#854d0e; }
+  .e-APROBADO { background:#dbeafe; color:#1d4ed8; } .e-PROCESADO { background:#dcfce7; color:#166534; }
+  .e-ANULADA { background:#fee2e2; color:#b91c1c; }
+  .corr { color:var(--accent); font-weight:800; cursor:pointer; text-decoration:underline dotted; }
+  .vacio { color:#9ca3af; font-size:.83rem; text-align:center; padding:18px; }
+  .it-in { width:110px; text-align:right; }
+  .res-row { display:flex; justify-content:space-between; padding:5px 2px; font-size:.84rem; border-bottom:1px dashed #e5e7eb; }
+  .res-row b.money { color:var(--navy); }
+  .firmas { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:16px; }
+  .firma { border:1.5px solid #e2e8f0; border-radius:10px; padding:10px; text-align:center; min-height:74px; }
+  .firma .t { font-size:.62rem; font-weight:800; text-transform:uppercase; color:#64748b; }
+  .firma .n { font-size:.78rem; font-weight:700; color:#0f172a; margin-top:6px; }
+  .firma .f { font-size:.66rem; color:#94a3b8; }
+  dialog { border:none; border-radius:16px; padding:0; max-width:980px; width:95vw; box-shadow:0 24px 64px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,13,40,.55); }
+  .dlg-head { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:14px 20px; display:flex; align-items:center; gap:12px; }
+  .dlg-head h5 { margin:0; font-size:.95rem; flex:1; }
+  .dlg-head button { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  .dlg-body { padding:16px 20px; max-height:78vh; overflow-y:auto; }
+  @media print {
+    body * { visibility:hidden; }
+    #printArea, #printArea * { visibility:visible; }
+    #printArea { position:absolute; inset:0; padding:20px; }
+    dialog { box-shadow:none; max-width:none; width:auto; }
+  }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Tesorería',href:'/tesoreria'},{label:'Aplicación de Fondos',icon:'bi-cash-coin',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-cash-coin"></i>
+    <div>
+      <h2>Aplicación de Fondos</h2>
+      <p>Formulario de aplicación por avenimiento judicial, renegociación o prepago negociado: deuda por ítem desde el motor de prepago, descuentos por ítem (% o $) y flujo de firmas Hecho → Revisado → Aprobado → Procesado.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-t="nuevo" onclick="verTab('nuevo')"><i class="bi bi-plus-circle"></i> Nuevo formulario</button>
+    <button class="tab" data-t="hist" onclick="verTab('hist')"><i class="bi bi-clock-history"></i> Historial</button>
+  </div>
+
+  <!-- ══ NUEVO ══ -->
+  <div id="tab-nuevo">
+    <div class="panel" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div><label>N° Operación</label><input id="bOp" placeholder="Ej: 68276" style="width:160px" onkeydown="if(event.key==='Enter')buscarOp()"></div>
+      <button class="btnx btn-azul" onclick="buscarOp()"><i class="bi bi-search"></i> Traer deuda</button>
+      <span id="bMsg" style="font-size:.8rem;color:#64748b"></span>
+    </div>
+    <div id="formZona" style="display:none">
+      <div class="panel">
+        <h5><i class="bi bi-person-vcard"></i> Antecedentes</h5>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end">
+          <div><label>RUT</label><input id="fRut" disabled style="width:100%"></div>
+          <div><label>Nombre</label><input id="fNombre" disabled style="width:100%"></div>
+          <div><label>Operación</label><input id="fOp" disabled style="width:100%"></div>
+          <div><label>Días de mora</label><input id="fMora" disabled style="width:100%"></div>
+          <div><label>Motivo</label><select id="fMotivo" style="width:100%"></select></div>
+          <div><label>Abogado</label><input id="fAbogado" placeholder="NO ASIGNADO" style="width:100%"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h5><i class="bi bi-table"></i> Ítems de la deuda y descuentos</h5>
+        <div style="overflow-x:auto"><table id="tblItems"><thead><tr>
+          <th>Ítem</th><th class="num">Deuda $</th><th class="num">Dcto %</th><th class="num">Dcto $</th><th class="num">IVA $</th><th class="num">A pagar $</th></tr></thead>
+          <tbody></tbody>
+          <tfoot><tr style="font-weight:800;background:#f8fafc">
+            <td>TOTALES</td><td class="num" id="tDeuda">—</td><td class="num" id="tPct">—</td>
+            <td class="num" id="tDcto">—</td><td class="num" id="tIva">—</td><td class="num" id="tPagar">—</td></tr></tfoot>
+        </table></div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:6px"><i class="bi bi-info-circle"></i> % y $ son bidireccionales: al escribir uno se calcula el otro. Los ítems del motor de prepago traen la deuda real al día de hoy; Honorarios y Gastos Procesales se digitan a mano.</div>
+      </div>
+      <div class="panel">
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:16px">
+          <div>
+            <label>Glosa / justificación (va impresa en el formulario)</label>
+            <textarea id="fGlosa" style="width:100%;height:74px" placeholder="Ej: Por avenimiento judicial se aplican los fondos condonando $…, por …"></textarea>
+          </div>
+          <div>
+            <div class="res-row"><span>Monto total prepago</span><b class="money" id="rDeuda">—</b></div>
+            <div class="res-row"><span>Monto total recibido</span><b class="money" id="rRecibido">—</b></div>
+            <div class="res-row"><span>Total descuentos</span><b class="money" id="rDcto">—</b></div>
+            <div class="res-row"><span>Devolución cliente $</span><input id="fDevol" class="it-in" value="0" oninput="recalc()"></div>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:12px">
+          <button class="btnx btn-verde" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar formulario (HECHO)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HISTORIAL ══ -->
+  <div id="tab-hist" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-clock-history"></i> Formularios
+        <input id="hQ" placeholder="Buscar OP / RUT / nombre…" style="margin-left:12px;width:240px" oninput="cargarHist()">
+        <select id="hEstado" style="margin-left:8px" onchange="cargarHist()">
+          <option value="">Todos</option><option>HECHO</option><option>REVISADO</option><option>APROBADO</option><option>PROCESADO</option><option>ANULADA</option>
+        </select>
+      </h5>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>N°</th><th>Fecha</th><th>OP</th><th>RUT</th><th>Nombre</th><th>Motivo</th>
+        <th class="num">Deuda</th><th class="num">Recibido</th><th class="num">Descuento</th><th>Estado</th><th>Hecho por</th></tr></thead>
+        <tbody id="histBody"><tr><td class="vacio" colspan="11">Cargando…</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Dialog VER / FIRMAR / IMPRIMIR ── -->
+<dialog id="dlgVer">
+  <div class="dlg-head"><i class="bi bi-file-earmark-text"></i><h5 id="vTitulo">Formulario</h5>
+    <button class="btnx" style="background:rgba(255,255,255,.2);color:#fff" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+    <button onclick="dlgVer.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body">
+    <div id="printArea"></div>
+    <div id="vAcciones" style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px"></div>
+  </div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
+const CLP = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+const PCT = v => (Number(v)*100).toLocaleString('es-CL',{maximumFractionDigits:1})+'%';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const F = d => { if(!d) return '—'; const s=String(d).slice(0,10).split('-'); return `${s[2]}-${s[1]}-${s[0]}`; };
+const num = v => Number(String(v).replace(/\./g,'').replace(',','.'))||0;
+
+let CAT = { items:[], motivos:[], flujo:[] }, OP = null, CUR = null, PUEDE_APROBAR = false;
+
+(async () => {
+  try {
+    const rp = await fetch('/api/auth/mis-permisos', { headers: hdrs() });
+    const jp = await rp.json();
+    const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+    PUEDE_APROBAR = yo?.perfil==='Administrador' || (jp.funcionalidades||[]).includes('aplic_fondos_aprobar');
+  } catch(e) {}
+  const j = await (await fetch('/api/aplicacion-fondos/catalogo', { headers: hdrs() })).json();
+  if (j.success) CAT = j.data;
+  document.getElementById('fMotivo').innerHTML = CAT.motivos.map(m=>`<option>${m}</option>`).join('');
+})();
+
+function verTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  document.getElementById('tab-nuevo').style.display = t==='nuevo'?'':'none';
+  document.getElementById('tab-hist').style.display = t==='hist'?'':'none';
+  if (t==='hist') cargarHist();
+}
+
+/* ══ Nuevo ══ */
+async function buscarOp(){
+  const op = document.getElementById('bOp').value.trim();
+  if (!op) return;
+  document.getElementById('bMsg').textContent = 'Calculando deuda…';
+  const r = await fetch('/api/aplicacion-fondos/op/'+encodeURIComponent(op), { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('bMsg').textContent = j.error; document.getElementById('formZona').style.display='none'; return; }
+  OP = j.data;
+  document.getElementById('bMsg').textContent = '';
+  document.getElementById('fRut').value = OP.rut||'';
+  document.getElementById('fNombre').value = OP.nombre||'';
+  document.getElementById('fOp').value = OP.num_op;
+  document.getElementById('fMora').value = OP.dias_mora;
+  document.getElementById('tblItems').querySelector('tbody').innerHTML = CAT.items.map(it=>{
+    const monto = OP.items[it.key]||0;
+    return `<tr data-key="${it.key}" data-manual="${it.manual?1:0}" data-iva="${it.iva?1:0}">
+      <td><b>${it.label}</b></td>
+      <td class="num">${it.manual?`<input class="it-in iMonto" value="0" oninput="recalc()">`:`<span class="iMontoFix" data-v="${monto}">${CLP(monto)}</span>`}</td>
+      <td class="num"><input class="it-in iPct" value="0" oninput="desdePct(this)" style="width:80px"></td>
+      <td class="num"><input class="it-in iDcto" value="0" oninput="desdeMonto(this)"></td>
+      <td class="num">${it.iva?`<input class="it-in iIva" value="0" oninput="recalc()">`:'—'}</td>
+      <td class="num"><b class="iPagar">—</b></td></tr>`;
+  }).join('');
+  document.getElementById('formZona').style.display='';
+  recalc();
+}
+const montoDe = tr => tr.dataset.manual==='1' ? num(tr.querySelector('.iMonto').value) : Number(tr.querySelector('.iMontoFix').dataset.v);
+function desdePct(inp){
+  const tr = inp.closest('tr');
+  const pct = Math.min(100, Math.max(0, num(inp.value)));
+  tr.querySelector('.iDcto').value = Math.round(montoDe(tr)*pct/100).toLocaleString('es-CL');
+  recalc();
+}
+function desdeMonto(inp){
+  const tr = inp.closest('tr');
+  const monto = montoDe(tr);
+  let d = Math.min(monto, Math.max(0, num(inp.value)));
+  tr.querySelector('.iPct').value = monto>0 ? (d/monto*100).toLocaleString('es-CL',{maximumFractionDigits:1}) : 0;
+  recalc();
+}
+function recalc(){
+  let tD=0,tDc=0,tI=0,tP=0;
+  document.querySelectorAll('#tblItems tbody tr').forEach(tr=>{
+    const monto = montoDe(tr);
+    const dcto = Math.min(monto, num(tr.querySelector('.iDcto').value));
+    const iva = tr.dataset.iva==='1' ? num(tr.querySelector('.iIva').value) : 0;
+    const pagar = Math.max(0, monto - dcto + iva);
+    tr.querySelector('.iPagar').textContent = CLP(pagar);
+    tD+=monto; tDc+=dcto; tI+=iva; tP+=pagar;
+  });
+  document.getElementById('tDeuda').textContent = CLP(tD);
+  document.getElementById('tDcto').textContent = CLP(tDc);
+  document.getElementById('tPct').textContent = tD>0 ? PCT(tDc/tD) : '—';
+  document.getElementById('tIva').textContent = CLP(tI);
+  document.getElementById('tPagar').textContent = CLP(tP);
+  document.getElementById('rDeuda').textContent = CLP(tD);
+  document.getElementById('rRecibido').textContent = CLP(tP);
+  document.getElementById('rDcto').textContent = `${CLP(tDc)} (${tD>0?PCT(tDc/tD):'—'})`;
+}
+async function guardar(){
+  if (!OP) return;
+  const items = {};
+  document.querySelectorAll('#tblItems tbody tr').forEach(tr=>{
+    items[tr.dataset.key] = { monto: montoDe(tr), dcto_monto: num(tr.querySelector('.iDcto').value),
+      iva_monto: tr.dataset.iva==='1' ? num(tr.querySelector('.iIva').value) : 0 };
+  });
+  const body = { num_op: OP.num_op, rut: OP.rut, nombre: OP.nombre, dias_mora: OP.dias_mora,
+    motivo: document.getElementById('fMotivo').value, abogado: document.getElementById('fAbogado').value.trim(),
+    glosa: document.getElementById('fGlosa').value.trim(), devolucion_cliente: num(document.getElementById('fDevol').value), items };
+  if (!confirm('¿Guardar el formulario de aplicación de fondos (queda en estado HECHO)?')) return;
+  const r = await fetch('/api/aplicacion-fondos', { method:'POST', headers:hdrs(1), body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  alert('Formulario '+j.data.correlativo+' guardado.');
+  document.getElementById('formZona').style.display='none'; document.getElementById('bOp').value='';
+  verTab('hist');
+}
+
+/* ══ Historial ══ */
+async function cargarHist(){
+  const qs = new URLSearchParams();
+  const q = document.getElementById('hQ').value.trim(); if (q) qs.set('q', q);
+  const e = document.getElementById('hEstado').value; if (e) qs.set('estado', e);
+  const j = await (await fetch('/api/aplicacion-fondos?'+qs, { headers: hdrs() })).json();
+  const body = document.getElementById('histBody');
+  if (!j.success) { body.innerHTML = `<tr><td class="vacio" colspan="11">${esc(j.error)}</td></tr>`; return; }
+  body.innerHTML = j.data.length ? j.data.map(a=>`<tr>
+    <td><span class="corr" onclick="abrir(${a.id})">${esc(a.correlativo)}</span></td>
+    <td>${F(a.fecha)}</td><td>${esc(a.num_op)}</td><td>${esc(a.rut||'—')}</td><td>${esc(a.nombre||'—')}</td>
+    <td style="font-size:.7rem">${esc(a.motivo)}</td>
+    <td class="num">${CLP(a.total_deuda)}</td><td class="num"><b>${CLP(a.total_recibido)}</b></td>
+    <td class="num" style="color:#b45309">${CLP(a.total_descuento)}</td>
+    <td><span class="chip e-${a.estado}">${a.estado}</span></td><td style="font-size:.72rem">${esc(a.created_nombre||'')}</td>
+  </tr>`).join('') : '<tr><td class="vacio" colspan="11">Sin formularios.</td></tr>';
+}
+
+/* ══ Ver / firmar / imprimir ══ */
+async function abrir(id){
+  const j = await (await fetch('/api/aplicacion-fondos/'+id, { headers: hdrs() })).json();
+  if (!j.success) return alert(j.error);
+  CUR = j.data;
+  document.getElementById('vTitulo').textContent = CUR.correlativo+' — OP '+CUR.num_op;
+  const it = CUR.items, fir = CUR.firmas||{};
+  document.getElementById('printArea').innerHTML = `
+    <div style="text-align:center;font-weight:800;font-size:1.05rem;color:#012d70;margin-bottom:4px">APLICACIÓN DE FONDOS POR ${esc(CUR.motivo)}</div>
+    <div style="text-align:center;font-size:.78rem;color:#64748b;margin-bottom:12px">${esc(CUR.correlativo)} · AutoFácil Crédito Automotriz</div>
+    <table style="margin-bottom:12px"><tbody>
+      <tr><td style="width:150px"><b>FECHA</b></td><td>${F(CUR.fecha)}</td><td style="width:150px"><b>OPERACIÓN</b></td><td>${esc(CUR.num_op)}</td></tr>
+      <tr><td><b>RUT</b></td><td>${esc(CUR.rut||'—')}</td><td><b>DÍAS MORA</b></td><td>${CUR.dias_mora??'—'}</td></tr>
+      <tr><td><b>NOMBRE</b></td><td>${esc(CUR.nombre||'—')}</td><td><b>ABOGADO</b></td><td>${esc(CUR.abogado||'NO ASIGNADO')}</td></tr>
+    </tbody></table>
+    <table><thead><tr><th>ÍTEM</th><th class="num">DEUDA $</th><th class="num">DCTO %</th><th class="num">DCTO $</th><th class="num">IVA</th><th class="num">A PAGAR</th></tr></thead>
+    <tbody>${it.map(x=>`<tr><td>${esc(x.label)}</td><td class="num">${CLP(x.monto)}</td>
+      <td class="num">${x.monto>0?PCT(x.dcto_pct):'—'}</td><td class="num">${CLP(x.dcto_monto)}</td>
+      <td class="num">${x.iva_monto?CLP(x.iva_monto):'—'}</td><td class="num"><b>${CLP(x.a_pagar)}</b></td></tr>`).join('')}
+      <tr style="font-weight:800;background:#f8fafc"><td>TOTALES</td><td class="num">${CLP(CUR.total_deuda)}</td>
+        <td class="num">${CUR.total_deuda>0?PCT(CUR.total_descuento/CUR.total_deuda):'—'}</td>
+        <td class="num">${CLP(CUR.total_descuento)}</td><td></td><td class="num">${CLP(CUR.total_recibido)}</td></tr>
+    </tbody></table>
+    <table style="margin-top:12px;max-width:520px"><tbody>
+      <tr><td><b>MONTO TOTAL PREPAGO</b></td><td class="num">${CLP(CUR.total_deuda)}</td></tr>
+      <tr><td><b>MONTO TOTAL RECIBIDO</b></td><td class="num">${CLP(CUR.total_recibido)}</td></tr>
+      <tr><td><b>MONTO TOTAL DESCUENTOS</b></td><td class="num">${CLP(CUR.total_descuento)} (${CUR.total_deuda>0?PCT(CUR.total_descuento/CUR.total_deuda):'—'})</td></tr>
+      <tr><td><b>DEVOLUCIÓN CLIENTE</b></td><td class="num">${CLP(CUR.devolucion_cliente)}</td></tr>
+    </tbody></table>
+    ${CUR.glosa?`<div style="border:1.5px solid #e2e8f0;border-left:5px solid #0141A2;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:.82rem">${esc(CUR.glosa)}</div>`:''}
+    <div class="firmas">${CAT.flujo.map(f=>`<div class="firma"><div class="t">${f}</div>
+      ${fir[f]?`<div class="n">${esc(fir[f].usuario)}</div><div class="f">${esc(fir[f].fecha)}</div>`:'<div class="f" style="margin-top:14px">________________</div>'}</div>`).join('')}
+    </div>`;
+  const acc = [];
+  const idx = CAT.flujo.indexOf(CUR.estado);
+  if (PUEDE_APROBAR && CUR.estado!=='ANULADA' && idx>=0 && idx<CAT.flujo.length-1)
+    acc.push(`<button class="btnx btn-verde" onclick="avanzar()"><i class="bi bi-check2-circle"></i> Marcar ${CAT.flujo[idx+1]}</button>`);
+  if (PUEDE_APROBAR && !['PROCESADO','ANULADA'].includes(CUR.estado))
+    acc.push(`<button class="btnx btn-rojo" onclick="anular()"><i class="bi bi-x-circle"></i> Anular</button>`);
+  document.getElementById('vAcciones').innerHTML = acc.join('');
+  dlgVer.showModal();
+}
+async function avanzar(){
+  const r = await fetch(`/api/aplicacion-fondos/${CUR.id}/avanzar`, { method:'PUT', headers:hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  abrir(CUR.id); cargarHist();
+}
+async function anular(){
+  if (!confirm('¿Anular este formulario?')) return;
+  const r = await fetch(`/api/aplicacion-fondos/${CUR.id}/anular`, { method:'PUT', headers:hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  dlgVer.close(); cargarHist();
+}
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
