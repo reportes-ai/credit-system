@@ -197,6 +197,7 @@ app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
 app.use('/api/reporteria',                require('../../services/reporteria/src/routes/reportes.routes'));
 app.use('/api/mando',                     require('../../services/reporteria/src/routes/mando.routes'));
+app.use('/api/diseno-consulta',           require('../../services/reporteria/src/routes/diseno-consulta.routes'));
 app.use('/api/campanas-masivas',          require('../../services/campanas-masivas/src/routes/campanas.routes'));
 app.use('/api/campanas-ventas',           require('../../services/campanas-ventas/src/routes/campanas-ventas.routes'));
 
