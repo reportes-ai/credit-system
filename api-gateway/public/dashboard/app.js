@@ -130,6 +130,8 @@ function showV(id, el) {
   if(id==='vppto') { buildVPpto(); }
   if(id==='vevol') { buildVEvol(); }
   if(id==='vseg')  { buildVSeg(); }
+  if(id==='vdealers') { buildColocMensual('vdealers'); }
+  if(id==='vparques') { buildColocMensual('vparques'); }
   if(id==='vadmin') {
     if (!esAdmin()) { alert('Acceso denegado.'); return; }
     buildVAdmin();
@@ -2252,6 +2254,8 @@ const TABS_NAV = [
   { id:'vevol', label:'📊 Evolución' },
   { id:'v2pl',  label:'📋 P&L Operativo' },
   { id:'vseg',  label:'🛡️ Seguros' },
+  { id:'vdealers', label:'🏪 Dealers' },
+  { id:'vparques', label:'🅿️ Parques' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
@@ -3894,4 +3898,73 @@ async function vsegOverride(mes, actual) {
     _vsegCargado = false;
     buildVSeg();
   } catch (e) { alert('Error de conexión'); }
+}
+
+/* ═══ VISTAS DEALERS / PARQUES: colocaciones mensuales (cantidad + monto) ═══
+   Filas = dealer (automotora) o parque; columnas = meses descendentes desde el
+   más reciente. Orden: mayor cantidad de ventas del último mes, luego total. */
+function buildColocMensual(vista) {
+  const esDealers = vista === 'vdealers';
+  const cont = document.getElementById(esDealers ? 'tbl-dealers-mes' : 'tbl-parques-mes');
+  if (!cont) return;
+  const rows = (window.RAW_DATA || []).filter(r => r.estado_eval === 'OTORGADO');
+  const key = r => esDealers ? (r.automotora || '(sin dealer)') : (r.parque || '');
+  const meses = [...new Set(rows.map(r => r.mes))].filter(Boolean).sort().reverse();
+  const M = {};   // nombre → { mes: {n, monto} }
+  for (const r of rows) {
+    const k = key(r);
+    if (!k) continue;                       // parques: solo ops con parque
+    (M[k] = M[k] || {});
+    const c = (M[k][r.mes] = M[k][r.mes] || { n: 0, monto: 0 });
+    c.n++; c.monto += (+r.monto_financiado || 0);
+  }
+  const ult = meses[0];
+  const tot = (m, campo) => Object.values(m).reduce((a, x) => a + x[campo], 0);
+  const lista = Object.entries(M).sort((a, b) =>
+    ((b[1][ult]?.n || 0) - (a[1][ult]?.n || 0)) || (tot(b[1], 'n') - tot(a[1], 'n')));
+
+  const fMes = m => { const [a, mm] = m.split('-'); return mm + '-' + a; };   // 2026-06 → 06-2026
+  const f$ = v => '$' + Math.round(v).toLocaleString('es-CL');
+  const totMes = {};   // totales por mes para el footer
+  meses.forEach(m => { totMes[m] = { n: 0, monto: 0 }; });
+  lista.forEach(([, mm]) => meses.forEach(m => { if (mm[m]) { totMes[m].n += mm[m].n; totMes[m].monto += mm[m].monto; } }));
+
+  cont.innerHTML = `<table id="t-coloc-${vista}" style="width:max-content;min-width:100%;border-collapse:collapse;font-size:11.5px">
+    <thead>
+      <tr>
+        <th rowspan="2" style="position:sticky;left:0;background:#12213f;color:#fff;padding:6px 10px;text-align:left;z-index:2">${esDealers ? 'Dealer' : 'Parque'}</th>
+        <th rowspan="2" style="background:#12213f;color:#4fc3f7;padding:6px 8px;text-align:right">Total<br>Cant.</th>
+        <th rowspan="2" style="background:#12213f;color:#4fc3f7;padding:6px 8px;text-align:right;border-right:2px solid #2a4070">Total<br>Monto</th>
+        ${meses.map(m => `<th colspan="2" style="background:#1a2a4a;color:#fff;padding:5px 8px;text-align:center;border-left:1px solid #2a4070">${fMes(m)}</th>`).join('')}
+      </tr>
+      <tr>${meses.map(() => `<th style="background:#1a2a4a;color:#8fb4dd;padding:3px 8px;text-align:right">Cant.</th>
+        <th style="background:#1a2a4a;color:#8fb4dd;padding:3px 8px;text-align:right">Monto</th>`).join('')}</tr>
+    </thead>
+    <tbody>
+      ${lista.map(([nombre, mm], i) => `<tr style="background:${i % 2 ? '#f6f9ff' : '#fff'}">
+        <td style="position:sticky;left:0;background:${i % 2 ? '#eef3fb' : '#fff'};padding:4px 10px;font-weight:600;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #e8eef7">${nombre}</td>
+        <td style="text-align:right;padding:4px 8px;font-weight:800;color:#0d2f6b;border-bottom:1px solid #e8eef7">${tot(mm, 'n')}</td>
+        <td style="text-align:right;padding:4px 8px;font-weight:700;color:#0d2f6b;border-right:2px solid #dbe3ee;border-bottom:1px solid #e8eef7">${f$(tot(mm, 'monto'))}</td>
+        ${meses.map(m => mm[m]
+          ? `<td style="text-align:right;padding:4px 8px;font-weight:700;color:#1a3a6a;border-left:1px solid #eef2f8;border-bottom:1px solid #e8eef7">${mm[m].n}</td>
+             <td style="text-align:right;padding:4px 8px;color:#059669;border-bottom:1px solid #e8eef7">${f$(mm[m].monto)}</td>`
+          : `<td style="text-align:right;padding:4px 8px;color:#cbd5e1;border-left:1px solid #eef2f8;border-bottom:1px solid #e8eef7">—</td>
+             <td style="text-align:right;padding:4px 8px;color:#cbd5e1;border-bottom:1px solid #e8eef7">—</td>`).join('')}
+      </tr>`).join('')}
+    </tbody>
+    <tfoot><tr style="background:#12213f;color:#fff;font-weight:800">
+      <td style="position:sticky;left:0;background:#12213f;padding:5px 10px">Total (${lista.length})</td>
+      <td style="text-align:right;padding:5px 8px">${lista.reduce((a, [, mm]) => a + tot(mm, 'n'), 0)}</td>
+      <td style="text-align:right;padding:5px 8px;border-right:2px solid #2a4070">${f$(lista.reduce((a, [, mm]) => a + tot(mm, 'monto'), 0))}</td>
+      ${meses.map(m => `<td style="text-align:right;padding:5px 8px;border-left:1px solid #2a4070">${totMes[m].n}</td>
+        <td style="text-align:right;padding:5px 8px">${f$(totMes[m].monto)}</td>`).join('')}
+    </tr></tfoot>
+  </table>`;
+}
+
+function exportColocMensual(vista) {
+  const t = document.getElementById('t-coloc-' + vista);
+  if (!t || !window.XLSX) return;
+  const wb = XLSX.utils.table_to_book(t, { sheet: vista === 'vdealers' ? 'dealers' : 'parques' });
+  XLSX.writeFile(wb, `colocaciones_${vista === 'vdealers' ? 'dealers' : 'parques'}.xlsx`);
 }

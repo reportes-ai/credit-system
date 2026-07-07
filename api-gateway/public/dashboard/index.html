@@ -9,6 +9,7 @@
 <link href="/css/bootstrap-icons.css" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="/js/chart.umd.min.js"></script>
+<script src="/js/xlsx.full.min.js" defer></script>
 </head>
 <body>
 
@@ -19,7 +20,7 @@
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.13</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.14</span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -47,6 +48,8 @@
       <div class="tab" data-viewid="vevol" onclick="showV('vevol',this)">📊 Evolución</div>
       <div class="tab" data-viewid="vseg" onclick="showV('vseg',this)">🛡️ Seguros</div>
       <div class="tab" data-viewid="v2pl" onclick="showV('v2pl',this)">📋 P&L Operativo</div>
+      <div class="tab" data-viewid="vdealers" onclick="showV('vdealers',this)">🏪 Dealers</div>
+      <div class="tab" data-viewid="vparques" onclick="showV('vparques',this)">🅿️ Parques</div>
       <div class="tab" id="tab-admin" onclick="showV('vadmin',this)" style="display:none;border-left:1px solid #2a4070;margin-left:8px">⚙️ Admin</div>
     </div>
   </div>
@@ -753,6 +756,36 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- VISTA DEALERS: colocaciones mensuales por dealer -->
+<div id="vdealers" class="view">
+  <div class="dash-header">
+    <div class="dash-title">🏪 Dealers — Colocaciones Mensuales (Cantidad y Monto)</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="exportColocMensual('vdealers')" style="border:none;background:#16a34a;color:#fff;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:12px">📥 Excel</button>
+      <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">Otorgados por dealer y mes — orden: ventas del último mes ↓</div>
+    <div id="tbl-dealers-mes" style="overflow:auto;max-height:calc(100vh - 220px)"></div>
+  </div>
+</div>
+
+<!-- VISTA PARQUES: colocaciones mensuales por parque -->
+<div id="vparques" class="view">
+  <div class="dash-header">
+    <div class="dash-title">🅿️ Parques — Colocaciones Mensuales (Cantidad y Monto)</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="exportColocMensual('vparques')" style="border:none;background:#16a34a;color:#fff;border-radius:8px;padding:6px 14px;font-weight:700;cursor:pointer;font-size:12px">📥 Excel</button>
+      <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">Otorgados por parque y mes — orden: ventas del último mes ↓</div>
+    <div id="tbl-parques-mes" style="overflow:auto;max-height:calc(100vh - 220px)"></div>
   </div>
 </div>
 
