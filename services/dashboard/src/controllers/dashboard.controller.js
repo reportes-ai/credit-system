@@ -239,7 +239,9 @@ exports.getDatos = async (req, res) => {
         DATE_FORMAT(mes, '%Y-%m')                              AS mes,
         COALESCE(ejecutivo, '')                                AS ejecutivo,
         COALESCE(financiera, '')                               AS financiera,
-        COALESCE(automotora, '')                               AS automotora,
+        -- FUENTE ÚNICA de nombres de dealers: tabla dealers (via id_dealer);
+        -- el texto libre de creditos.automotora es solo fallback
+        COALESCE(NULLIF(dl.nombre_razon,''), NULLIF(dl.nombre_indexa,''), automotora, '') AS automotora,
         COALESCE(nombre_local, '')                             AS nombre_local,
         COALESCE(estado_eval, '')                              AS estado_eval,
         COALESCE(estado_credito, '')                           AS estado_credito,
@@ -277,6 +279,7 @@ exports.getDatos = async (req, res) => {
           AND mes >= '2025-01-01'
           AND COALESCE(origen,'') <> 'CARTERA_AFA'
       ) ob
+      LEFT JOIN dealers dl ON dl.id_dealer = ob.id_dealer
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
       WHERE ob._rn = 1
       ORDER BY ob.mes ASC, ob.num_op ASC
