@@ -429,7 +429,7 @@ async function exportarCreditosExcel() {
     const base = new URLSearchParams({ limit: 500 });
     const q = document.getElementById('searchQ').value.trim();
     if (q) base.set('q', q);
-    if (_empresasFiltro.size === 1) base.set('financiera', [..._empresasFiltro][0]);
+    if (_empresasFiltro.size) base.set('financiera', [..._empresasFiltro].join(','));
     const fDesde = document.getElementById('searchFDesde')?.value || '';
     const fHasta = document.getElementById('searchFHasta')?.value || '';
     if (fDesde) base.set('fecha_desde', fDesde);
@@ -479,7 +479,7 @@ async function buscarCreditos(page = 1) {
     const estadoSel = document.getElementById('searchEstado').value;
     const params = new URLSearchParams({ page, limit: _LIMIT_PAG });
     if (q) params.set('q', q);
-    if (_empresasFiltro.size === 1) params.set('financiera', [..._empresasFiltro][0]);
+    if (_empresasFiltro.size) params.set('financiera', [..._empresasFiltro].join(','));
     const fDesde = document.getElementById('searchFDesde')?.value || '';
     const fHasta = document.getElementById('searchFHasta')?.value || '';
     if (fDesde) params.set('fecha_desde', fDesde);

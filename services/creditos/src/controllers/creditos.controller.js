@@ -391,16 +391,20 @@ const getAll = async (req, res) => {
     }
 
     if (financiera && financiera !== 'TODAS') {
-      const fin = financiera.toUpperCase();
-      if (fin === 'AUTOFACIL') {
-        // AFA es cartera propia ANTIGUA con su propia card — no cuenta como AutoFácil
-        whereBase += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO','AFA'))`;
-      } else if (fin === 'UNIDAD') {
-        whereBase += ` AND ob.financiera = 'UNIDAD DE CREDITO'`;
-      } else {
-        whereBase += ` AND ob.financiera = ?`;
-        paramsBase.push(fin);
+      // Acepta una o varias empresas separadas por coma (multi-select de cards)
+      const conds = [];
+      for (const f of financiera.toUpperCase().split(',').map(s => s.trim()).filter(Boolean)) {
+        if (f === 'AUTOFACIL') {
+          // AFA es cartera propia ANTIGUA con su propia card — no cuenta como AutoFácil
+          conds.push(`(ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO','AFA'))`);
+        } else if (f === 'UNIDAD') {
+          conds.push(`ob.financiera = 'UNIDAD DE CREDITO'`);
+        } else {
+          conds.push(`ob.financiera = ?`);
+          paramsBase.push(f);
+        }
       }
+      if (conds.length) whereBase += ` AND (${conds.join(' OR ')})`;
     }
 
     // Rango de fecha (sobre la fecha mostrada: fecha_otorgado con fallback created_at)
