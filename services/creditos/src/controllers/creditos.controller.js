@@ -393,7 +393,8 @@ const getAll = async (req, res) => {
     if (financiera && financiera !== 'TODAS') {
       const fin = financiera.toUpperCase();
       if (fin === 'AUTOFACIL') {
-        whereBase += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))`;
+        // AFA es cartera propia ANTIGUA con su propia card — no cuenta como AutoFácil
+        whereBase += ` AND (ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO','AFA'))`;
       } else if (fin === 'UNIDAD') {
         whereBase += ` AND ob.financiera = 'UNIDAD DE CREDITO'`;
       } else {
