@@ -179,8 +179,10 @@ function popupHTML(d, esParque, lat, lng){
 function enPantalla(d){
   if (!map) return true;
   const b = map.getBounds();
-  return (d.lat != null && d.lng != null && b.contains([d.lat, d.lng]))
-      || (d.lat_parque != null && d.lng_parque != null && b.contains([d.lat_parque, d.lng_parque]));
+  // lat/lng llegan como string desde la BD: convertir SIEMPRE a número
+  // (con strings, Leaflet interpreta el array como bounds y contains() da false)
+  return (d.lat != null && d.lng != null && b.contains(L.latLng(+d.lat, +d.lng)))
+      || (d.lat_parque != null && d.lng_parque != null && b.contains(L.latLng(+d.lat_parque, +d.lng_parque)));
 }
 /* Lo que se ve: filtros desplegables + (si está activo) el zoom de pantalla */
 function visibles(){
