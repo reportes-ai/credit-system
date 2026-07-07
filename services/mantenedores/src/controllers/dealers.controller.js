@@ -205,24 +205,43 @@ async function geocodeDireccion(dir) {
 }
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 // Arma "calle, comuna, región, Chile" para mejorar la precisión del geocoder.
-const dirCompleta = (d, parque) => [
-  parque ? d.direccion_parque : d.direccion,
-  parque ? (d.comuna_parque || d.comuna) : d.comuna,
-  d.region, 'Chile'
-].filter(x => x && String(x).trim()).join(', ');
+// Pre-normalización: si la comuna ya viene pegada al final de la calle
+// ("PADRE HURTADO 1321 LAS CONDES"), se quita de la calle para no duplicarla.
+const _normTxt = s => String(s || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-ZN0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const sinComunaAlFinal = (calle, comuna) => {
+  if (!calle || !comuna) return calle;
+  const nc = _normTxt(comuna);
+  const words = String(calle).trim().split(/\s+/);
+  const k = nc.split(' ').length;                       // n° de palabras de la comuna
+  if (words.length > k && _normTxt(words.slice(-k).join(' ')) === nc)
+    return words.slice(0, -k).join(' ').replace(/[,\s]+$/, '');
+  return calle;
+};
+const dirCompleta = (d, parque) => {
+  const comuna = parque ? (d.comuna_parque || d.comuna) : d.comuna;
+  const calle  = sinComunaAlFinal(parque ? d.direccion_parque : d.direccion, comuna) || '';
+  const ncalle = _normTxt(calle);
+  const partes = [calle];
+  if (comuna && !ncalle.includes(_normTxt(comuna))) partes.push(comuna);   // ya viene en el texto → no duplicar
+  if (d.region && !ncalle.includes(_normTxt(d.region))) partes.push(d.region);
+  if (!ncalle.endsWith('CHILE')) partes.push('Chile');
+  return partes.filter(x => x && String(x).trim()).join(', ');
+};
 
 const geocodificar = async (req, res) => {
   try {
     if (!process.env.GOOGLE_MAPS_API_KEY)
       return res.status(400).json({ success: false, data: null, error: 'Falta GOOGLE_MAPS_API_KEY en el servidor (Render → Environment).' });
     const limite = Math.min(parseInt(req.body && req.body.limite) || 40, 100);
+    const incInactivos = !!(req.body && req.body.incluir_inactivos);
+    const fAct = incInactivos ? '1=1' : 'activo=1';
     const [rows] = await pool.query(
       `SELECT id_dealer, numero, direccion, comuna, region, direccion_parque, comuna_parque, lat, lat_parque
          FROM dealers
-        WHERE activo=1 AND (
+        WHERE ${fAct} AND (
               (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
            OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL))
-        ORDER BY numero LIMIT ?`, [limite]);
+        ORDER BY activo DESC, numero LIMIT ?`, [limite]);
     let ok = 0, fail = 0;
     for (const d of rows) {
       if (d.direccion && d.lat == null) {
@@ -239,7 +258,7 @@ const geocodificar = async (req, res) => {
       }
     }
     const [[{ pend }]] = await pool.query(
-      `SELECT COUNT(*) AS pend FROM dealers WHERE activo=1 AND (
+      `SELECT COUNT(*) AS pend FROM dealers WHERE ${fAct} AND (
             (direccion IS NOT NULL AND direccion<>'' AND lat IS NULL)
          OR (direccion_parque IS NOT NULL AND direccion_parque<>'' AND lat_parque IS NULL))`);
     auditar({ req, accion: 'GEOCODIFICAR', modulo: 'mantenedores', entidad: 'dealer', detalle: `Geocodificó ${ok} dirección(es) de dealers (${fail} fallida(s))` });

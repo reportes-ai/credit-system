@@ -75,7 +75,9 @@
     <span class="stat"><i class="bi bi-shop"></i> Total <b id="stTotal">0</b></span>
     <span class="stat"><i class="bi bi-geo-alt-fill"></i> En mapa <b id="stCoord">0</b></span>
     <span class="stat"><i class="bi bi-hourglass-split"></i> Pendientes <b id="stPend">0</b></span>
+    <label id="lblInact" style="display:none;font-size:.78rem;font-weight:600;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="chkInactivos"> Incluir inactivos</label>
     <button class="btn-geo" id="btnGeo" onclick="geocodificar()" style="display:none"><i class="bi bi-pin-map me-1"></i>Geocodificar pendientes</button>
+    <button class="btn-geo" id="btnGeoTodo" onclick="geocodificarTodo()" style="display:none;background:#7c3aed"><i class="bi bi-lightning-charge me-1"></i>Geocodificar TODO (auto)</button>
   </div>
 
   <div id="map"></div>
@@ -126,7 +128,10 @@ async function cargarMapa(){
   $('stCoord').textContent = (st.con_coord||0).toLocaleString('es-CL');
   $('stPend').textContent  = (st.pendientes||0).toLocaleString('es-CL');
   $('noKey').style.display = j.data.tiene_key ? 'none' : 'block';
-  $('btnGeo').style.display = (puedeGeo && j.data.tiene_key && (st.pendientes||0) > 0) ? '' : 'none';
+  const verGeo = puedeGeo && j.data.tiene_key;
+  $('btnGeo').style.display = (verGeo && (st.pendientes||0) > 0) ? '' : 'none';
+  $('btnGeoTodo').style.display = verGeo ? '' : 'none';
+  $('lblInact').style.display = verGeo ? 'inline-flex' : 'none';
   $('btnGeo').innerHTML = `<i class="bi bi-pin-map me-1"></i>Geocodificar pendientes (${st.pendientes||0})`;
   llenarFiltros();
   render();
@@ -183,13 +188,31 @@ function render(){
 async function geocodificar(){
   const b=$('btnGeo'); b.disabled=true; const orig=b.innerHTML; b.innerHTML='<i class="bi bi-arrow-repeat me-1"></i>Geocodificando…';
   try {
-    const j = await (await fetch('/api/dealers/geocodificar',{method:'POST',headers:H,body:JSON.stringify({limite:60})})).json();
+    const j = await (await fetch('/api/dealers/geocodificar',{method:'POST',headers:H,
+      body:JSON.stringify({limite:60, incluir_inactivos: $('chkInactivos').checked})})).json();
     if (!j.success) throw new Error(j.error||'Error');
     toast(`Geocodificadas ${j.data.ok} · fallidas ${j.data.fallidos} · quedan ${j.data.pendientes}`);
     await cargarMapa();
     if (j.data.pendientes > 0) toast(`Quedan ${j.data.pendientes} pendientes — vuelve a pulsar para seguir.`);
   } catch(e){ toast(e.message, true); }
   b.disabled=false; b.innerHTML=orig;
+}
+
+/* Corre lotes de 60 automáticamente hasta terminar (o hasta 20 lotes) */
+async function geocodificarTodo(){
+  const b=$('btnGeoTodo'); b.disabled=true; $('btnGeo').disabled=true;
+  try {
+    for (let i=0; i<20; i++){
+      b.innerHTML=`<i class="bi bi-arrow-repeat me-1"></i>Lote ${i+1}…`;
+      const j = await (await fetch('/api/dealers/geocodificar',{method:'POST',headers:H,
+        body:JSON.stringify({limite:60, incluir_inactivos: $('chkInactivos').checked})})).json();
+      if (!j.success) throw new Error(j.error||'Error');
+      toast(`Lote ${i+1}: ${j.data.ok} ok · ${j.data.fallidos} fallidas · quedan ${j.data.pendientes}`);
+      if (!j.data.pendientes || (!j.data.ok && !j.data.fallidos)) break;
+    }
+    await cargarMapa();
+  } catch(e){ toast(e.message, true); }
+  b.disabled=false; $('btnGeo').disabled=false; b.innerHTML='<i class="bi bi-lightning-charge me-1"></i>Geocodificar TODO (auto)';
 }
 
 (async function init(){
