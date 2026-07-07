@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campañas de Venta (CRM) — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:24px auto; padding:0 26px 60px; max-width:1500px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+  .banner > i { font-size:2.5rem; opacity:.85; }
+  .banner h2 { margin:0 0 4px; font-size:1.25rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .tabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  .tab { border:none; background:#fff; border-radius:10px; padding:9px 18px; font-size:.85rem; font-weight:700; color:#475569; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .tab.on { background:var(--accent); color:#fff; }
+  .panel { background:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .panel h5 { margin:0 0 12px; font-size:.98rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:#f8fafc; text-align:left; padding:7px 8px; font-size:.63rem; text-transform:uppercase; color:#6b7280; letter-spacing:.02em; white-space:nowrap; }
+  td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  td.num, th.num { text-align:right; }
+  .chip { border-radius:8px; padding:2px 8px; font-size:.65rem; font-weight:700; display:inline-block; white-space:nowrap; }
+  .e-BORRADOR { background:#f1f5f9; color:#475569; } .e-ACTIVA { background:#dcfce7; color:#166534; }
+  .e-PAUSADA { background:#fef9c3; color:#854d0e; } .e-CERRADA { background:#e0e7ff; color:#3730a3; }
+  .e-PENDIENTE { background:#f1f5f9; color:#475569; } .e-AGENDADO { background:#fef9c3; color:#854d0e; } .e-CERRADO { background:#e0e7ff; color:#3730a3; }
+  .corr { color:var(--accent); font-weight:800; cursor:pointer; text-decoration:underline dotted; }
+  .btnx { border:none; border-radius:9px; padding:8px 15px; font-size:.8rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-sec { background:#eff6ff; color:var(--accent); }
+  .btn-verde { background:var(--ok); color:#fff; }
+  .btn-rojo { background:#fee2e2; color:#b91c1c; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .btnx:disabled { opacity:.5; cursor:not-allowed; }
+  .vacio { color:#9ca3af; font-size:.84rem; text-align:center; padding:22px; }
+  input, select, textarea { border:1.5px solid #d1d5db; border-radius:8px; padding:8px 10px; font-size:.84rem; font-family:inherit; outline:none; }
+  input:focus, select:focus, textarea:focus { border-color:var(--accent); }
+  label { font-size:.72rem; font-weight:700; color:#374151; display:block; margin-bottom:4px; }
+  dialog { border:none; border-radius:16px; padding:0; max-width:1100px; width:95vw; box-shadow:0 24px 64px rgba(0,0,0,.3); }
+  dialog::backdrop { background:rgba(2,13,40,.55); }
+  .dlg-head { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; padding:15px 22px; display:flex; align-items:center; gap:12px; }
+  .dlg-head h5 { margin:0; font-size:.98rem; flex:1; }
+  .dlg-head button { background:rgba(255,255,255,.15); border:none; color:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
+  .dlg-body { padding:18px 22px; max-height:76vh; overflow-y:auto; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+  .kpi { border-radius:12px; padding:12px 14px; color:#fff; }
+  .kpi .big { font-size:1.4rem; font-weight:800; }
+  .kpi .sm { font-size:.68rem; opacity:.9; text-transform:uppercase; letter-spacing:.03em; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:900px){ .grid2 { grid-template-columns:1fr; } }
+  /* Discador */
+  .disc-grid { display:grid; grid-template-columns:1.35fr 1fr; gap:16px; }
+  @media(max-width:1000px){ .disc-grid { grid-template-columns:1fr; } }
+  .cli-head { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+  .cli-head .avatar { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:800; }
+  .cli-head h4 { margin:0; font-size:1.1rem; color:var(--navy); }
+  .cli-head .rut { font-size:.8rem; color:#64748b; }
+  .datos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; }
+  .dato { background:#f8fafc; border-radius:9px; padding:7px 10px; }
+  .dato .k { font-size:.6rem; text-transform:uppercase; color:#94a3b8; font-weight:700; letter-spacing:.03em; }
+  .dato .v { font-size:.83rem; font-weight:600; color:#0f172a; word-break:break-word; }
+  .fono { display:flex; align-items:center; gap:10px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; padding:9px 12px; margin-bottom:7px; }
+  .fono.malo { background:#fef2f2; border-color:#fecaca; opacity:.7; }
+  .fono .n { font-size:1rem; font-weight:800; color:#0f172a; flex:1; letter-spacing:.03em; }
+  .fono .tag { font-size:.6rem; font-weight:800; border-radius:6px; padding:1px 7px; }
+  .term-btn { display:block; width:100%; text-align:left; border:1.5px solid #e5e7eb; background:#fff; border-radius:10px; padding:9px 12px; margin-bottom:6px; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .term-btn:hover { border-color:var(--accent); background:#eff6ff; }
+  .term-btn small { display:block; font-weight:500; color:#64748b; font-size:.68rem; }
+  .t-CONTACTO_DIRECTO { border-left:5px solid var(--ok); }
+  .t-CONTACTO_INDIRECTO { border-left:5px solid #f59e0b; }
+  .t-NO_CONTACTO { border-left:5px solid #94a3b8; }
+  .t-INHABILITADO { border-left:5px solid var(--bad); }
+  .gest-item { border-bottom:1px solid #f1f5f9; padding:7px 2px; font-size:.76rem; }
+  .gest-item b { color:var(--navy); }
+  .map-row select { width:100%; }
+  .barra { height:8px; border-radius:6px; background:#e5e7eb; overflow:hidden; }
+  .barra > div { height:100%; background:linear-gradient(90deg,#0141A2,#009AFE); }
+  .foot { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin-top:26px; font-size:.8rem; }
+  .foot h6 { margin:0 0 8px; color:var(--navy); display:flex; gap:7px; align-items:center; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Campañas de Venta (CRM)',icon:'bi-telephone-outbound-fill',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-telephone-outbound-fill"></i>
+    <div>
+      <h2>Campañas de Venta (CRM Telefónico)</h2>
+      <p>Bases externas homologadas a mano (nunca tocan las tablas normales), discador con términos de gestión y rellamados, y estadísticas de penetración, contactabilidad y conversión.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-t="campanas" onclick="verTab('campanas')"><i class="bi bi-collection"></i> Campañas</button>
+    <button class="tab" data-t="discador" onclick="verTab('discador')"><i class="bi bi-headset"></i> Discador</button>
+    <button class="tab" data-t="stats" onclick="verTab('stats')"><i class="bi bi-graph-up-arrow"></i> Estadísticas</button>
+    <button class="tab" data-t="historicas" onclick="verTab('historicas')"><i class="bi bi-archive"></i> Históricas</button>
+  </div>
+
+  <!-- ══ TAB CAMPAÑAS ══ -->
+  <div id="tab-campanas">
+    <div class="panel">
+      <h5><i class="bi bi-collection"></i> Campañas vigentes
+        <button class="btnx btn-azul" id="btnNueva" style="margin-left:auto" onclick="nuevaCampana()"><i class="bi bi-plus-lg"></i> Nueva campaña</button>
+      </h5>
+      <div id="listaCampanas" class="vacio">Cargando…</div>
+    </div>
+  </div>
+
+  <!-- ══ TAB DISCADOR ══ -->
+  <div id="tab-discador" style="display:none">
+    <div class="panel" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="margin:0">Campaña activa</label>
+      <select id="selDiscCamp" style="min-width:280px"></select>
+      <button class="btnx btn-verde" onclick="tomarSiguiente()"><i class="bi bi-telephone-forward"></i> Tomar siguiente</button>
+      <span id="colaInfo" style="font-size:.78rem;color:#64748b"></span>
+    </div>
+    <div id="discBody"><div class="panel vacio">Selecciona una campaña y presiona «Tomar siguiente».</div></div>
+  </div>
+
+  <!-- ══ TAB ESTADÍSTICAS ══ -->
+  <div id="tab-stats" style="display:none">
+    <div class="panel" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label style="margin:0">Campaña</label>
+      <select id="selStatCamp" style="min-width:280px" onchange="verStats()"></select>
+      <button class="btnx btn-sec" onclick="recalcularConv()"><i class="bi bi-arrow-repeat"></i> Recalcular conversión (cruce con otorgados)</button>
+    </div>
+    <div id="statsBody"><div class="panel vacio">Selecciona una campaña.</div></div>
+  </div>
+
+  <!-- ══ TAB HISTÓRICAS ══ -->
+  <div id="tab-historicas" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-archive"></i> Campañas históricas (cerradas)</h5>
+      <div id="listaHistoricas" class="vacio">Cargando…</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este módulo</h6>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Bases importadas</b> → viven SOLO en tablas de campaña (cv_registros); nunca se cargan a <a href="/creditos/">Créditos</a> ni a Clientes.</li>
+      <li><b>Términos de gestión y rellamados</b> → definen la cola del Discador de esta misma página.</li>
+      <li><b>Conversión (cruce)</b> → lee créditos OTORGADOS por RUT desde <a href="/creditos/">Créditos</a> posteriores a la activación.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Dialog NUEVA CAMPAÑA ── -->
+<dialog id="dlgNueva" style="max-width:520px">
+  <div class="dlg-head"><i class="bi bi-plus-circle"></i><h5>Nueva campaña de venta</h5><button onclick="dlgNueva.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body">
+    <label>Nombre de la campaña</label>
+    <input id="nvNombre" style="width:100%;margin-bottom:12px" placeholder="Ej: Portabilidad Cartera AUTEM Julio 2026">
+    <label>Descripción</label>
+    <textarea id="nvDesc" style="width:100%;height:70px" placeholder="Objetivo, origen de la base, observaciones…"></textarea>
+    <div style="text-align:right;margin-top:14px"><button class="btnx btn-azul" onclick="crearCampana()">Crear y configurar</button></div>
+  </div>
+</dialog>
+
+<!-- ── Dialog DETALLE / CONFIGURACIÓN ── -->
+<dialog id="dlgDet">
+  <div class="dlg-head"><i class="bi bi-gear"></i><h5 id="detTitulo">Campaña</h5>
+    <span id="detEstado" class="chip" style="font-size:.7rem"></span>
+    <button onclick="dlgDet.close();cargarCampanas()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body" id="detBody"></div>
+</dialog>
+
+<!-- ── Dialog GESTIÓN (término elegido) ── -->
+<dialog id="dlgGest" style="max-width:480px">
+  <div class="dlg-head"><i class="bi bi-check2-circle"></i><h5 id="gestTitulo">Registrar gestión</h5><button onclick="dlgGest.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body">
+    <div id="gestVentaWrap" style="display:none;margin-bottom:12px">
+      <label>Monto de la venta / crédito colocado $</label>
+      <input id="gestMonto" type="text" style="width:100%" placeholder="Ej: 8.500.000">
+    </div>
+    <label>Comentario de la gestión</label>
+    <textarea id="gestComent" style="width:100%;height:70px" placeholder="Qué conversaste, acuerdos, próximos pasos…"></textarea>
+    <div id="gestRellInfo" style="font-size:.76rem;color:#64748b;margin-top:8px"></div>
+    <div style="text-align:right;margin-top:12px"><button class="btnx btn-verde" id="btnGestOk" onclick="confirmarGestion()">Registrar y continuar</button></div>
+  </div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
+<script src="/js/charts3d.js"></script>
+<script>
+const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
+const CLP = v => '$'+Math.round(Number(v||0)).toLocaleString('es-CL');
+const N = v => Number(v||0).toLocaleString('es-CL');
+const PCT = v => Number(v||0).toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const FH = d => d ? new Date(d).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+const fmtFono = t => { const s=String(t||''); return s.length===11&&s.startsWith('56') ? '+56 '+s.slice(2,3)+' '+s.slice(3,7)+' '+s.slice(7) : s; };
+
+let CATALOGO = { campos:[], tipos_termino:[] }, CAMPS = [], HIST = [], ES_ADMIN = false;
+let CUR = null;            // campaña abierta en detalle
+let EXCEL = null;          // { columnas, filas, nombre } del archivo subido
+let DISC = null;           // paquete actual del discador
+let GEST_TERM = null;      // término elegido en el popup de gestión
+
+/* ══ Init ══ */
+(async () => {
+  try {
+    const rp = await fetch('/api/auth/mis-permisos', { headers: hdrs() });
+    const jp = await rp.json();
+    const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+    ES_ADMIN = yo?.perfil === 'Administrador' || (jp.funcionalidades||[]).includes('campanas_ventas_admin');
+    if (!ES_ADMIN) document.getElementById('btnNueva').style.display = 'none';
+  } catch(e) {}
+  const r = await fetch('/api/campanas-ventas/catalogo', { headers: hdrs() });
+  const j = await r.json();
+  if (j.success) CATALOGO = j.data;
+  cargarCampanas();
+})();
+
+function verTab(t){
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.t===t));
+  for (const x of ['campanas','discador','stats','historicas']) document.getElementById('tab-'+x).style.display = x===t?'':'none';
+  if (t==='campanas') cargarCampanas();
+  if (t==='historicas') cargarHistoricas();
+  if (t==='discador' || t==='stats') llenarSelects();
+}
+
+/* ══ Listado de campañas ══ */
+async function cargarCampanas(){
+  const r = await fetch('/api/campanas-ventas', { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('listaCampanas').textContent = j.error; return; }
+  CAMPS = j.data;
+  document.getElementById('listaCampanas').innerHTML = CAMPS.length ? tablaCampanas(CAMPS, false) : '<div class="vacio">Aún no hay campañas. Crea la primera con «Nueva campaña».</div>';
+  llenarSelects();
+}
+async function cargarHistoricas(){
+  const r = await fetch('/api/campanas-ventas?historicas=1', { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('listaHistoricas').textContent = j.error; return; }
+  HIST = j.data;
+  document.getElementById('listaHistoricas').innerHTML = HIST.length ? tablaCampanas(HIST, true) : '<div class="vacio">Sin campañas cerradas todavía.</div>';
+}
+function tablaCampanas(arr, hist){
+  return `<div style="overflow-x:auto"><table><thead><tr>
+    <th>Correlativo</th><th>Nombre</th><th>Estado</th><th class="num">Base</th><th class="num">Gestionados</th>
+    <th class="num">Contactados</th><th class="num">Ventas</th><th class="num">Monto vendido</th><th>Creada</th><th></th></tr></thead><tbody>
+    ${arr.map(c => `<tr>
+      <td><span class="corr" onclick="abrirDetalle(${c.id})">${esc(c.correlativo)}</span></td>
+      <td>${esc(c.nombre)}</td>
+      <td><span class="chip e-${c.estado}">${c.estado}</span></td>
+      <td class="num">${N(c.total)}</td><td class="num">${N(c.gestionados)}</td>
+      <td class="num">${N(c.contactados)}</td><td class="num"><b>${N(c.ventas)}</b></td>
+      <td class="num">${CLP(c.monto_vendido)}</td>
+      <td style="white-space:nowrap">${FH(c.created_at).slice(0,8)}</td>
+      <td style="white-space:nowrap">
+        <button class="btnx btn-sec" style="padding:4px 10px" onclick="verStatsDe(${c.id})" title="Estadísticas"><i class="bi bi-graph-up"></i></button>
+        ${!hist && ES_ADMIN ? `<button class="btnx btn-gris" style="padding:4px 10px" onclick="abrirDetalle(${c.id})" title="Configurar"><i class="bi bi-gear"></i></button>`:''}
+      </td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function llenarSelects(){
+  const activas = CAMPS.filter(c => c.estado==='ACTIVA');
+  document.getElementById('selDiscCamp').innerHTML = activas.length
+    ? activas.map(c=>`<option value="${c.id}">${esc(c.correlativo+' — '+c.nombre)}</option>`).join('')
+    : '<option value="">(no hay campañas activas)</option>';
+  const todas = [...CAMPS, ...HIST];
+  document.getElementById('selStatCamp').innerHTML = '<option value="">— elegir —</option>' +
+    todas.map(c=>`<option value="${c.id}">${esc(c.correlativo+' — '+c.nombre)}</option>`).join('');
+}
+
+/* ══ Crear campaña ══ */
+function nuevaCampana(){ document.getElementById('nvNombre').value=''; document.getElementById('nvDesc').value=''; dlgNueva.showModal(); }
+async function crearCampana(){
+  const nombre = document.getElementById('nvNombre').value.trim();
+  if (!nombre) return alert('Ponle nombre a la campaña.');
+  const r = await fetch('/api/campanas-ventas', { method:'POST', headers:hdrs(1), body:JSON.stringify({ nombre, descripcion:document.getElementById('nvDesc').value.trim() }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  dlgNueva.close();
+  await cargarCampanas();
+  abrirDetalle(j.data.id);
+}
+
+/* ══ Detalle / configuración ══ */
+async function abrirDetalle(id){
+  const r = await fetch('/api/campanas-ventas/'+id, { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  CUR = j.data; EXCEL = null;
+  pintarDetalle();
+  dlgDet.showModal();
+}
+function pintarDetalle(){
+  const c = CUR.campana, cnt = CUR.contadores || {};
+  document.getElementById('detTitulo').textContent = c.correlativo + ' — ' + c.nombre;
+  const chipEst = document.getElementById('detEstado');
+  chipEst.textContent = c.estado; chipEst.className = 'chip e-'+c.estado;
+  const editable = c.estado === 'BORRADOR';
+  const camposOpts = grupo => CATALOGO.campos.filter(x=>!grupo||x.grupo===grupo);
+  const optionsCampos = sel => {
+    const g = {};
+    for (const x of CATALOGO.campos) (g[x.grupo]=g[x.grupo]||[]).push(x);
+    return `<option value="IGNORAR">— No importar —</option>` + Object.entries(g).map(([gr,items]) =>
+      `<optgroup label="${esc(gr)}">${items.map(i=>`<option value="${i.key}" ${sel===i.key?'selected':''}>${esc(i.label)}</option>`).join('')}</optgroup>`).join('');
+  };
+
+  document.getElementById('detBody').innerHTML = `
+    <div class="grid2">
+      <div class="panelin" style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px">
+        <h6 style="margin:0 0 8px;font-size:.8rem;color:var(--navy)"><i class="bi bi-card-text"></i> Datos de la campaña</h6>
+        <label>Nombre</label><input id="edNombre" style="width:100%;margin-bottom:8px" value="${esc(c.nombre)}" ${ES_ADMIN?'':'disabled'}>
+        <label>Descripción</label><textarea id="edDesc" style="width:100%;height:54px" ${ES_ADMIN?'':'disabled'}>${esc(c.descripcion||'')}</textarea>
+        <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:170px"><label>Orden del discado</label>
+            <select id="edOrden" style="width:100%" ${ES_ADMIN?'':'disabled'}>
+              <option value="orden_carga" ${!c.orden_campo||c.orden_campo==='orden_carga'?'selected':''}>Orden del archivo</option>
+              ${CATALOGO.campos.map(x=>`<option value="${x.key}" ${c.orden_campo===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}
+            </select></div>
+          <div><label>Dirección</label>
+            <select id="edDir" ${ES_ADMIN?'':'disabled'}><option value="ASC" ${c.orden_dir!=='DESC'?'selected':''}>Ascendente</option><option value="DESC" ${c.orden_dir==='DESC'?'selected':''}>Descendente</option></select></div>
+          <div><label>Lock (min)</label><input id="edLock" type="number" min="5" max="240" style="width:80px" value="${c.lock_minutos}" ${ES_ADMIN?'':'disabled'}></div>
+        </div>
+        ${ES_ADMIN?`<div style="text-align:right;margin-top:10px"><button class="btnx btn-sec" onclick="guardarDatos()">Guardar datos</button></div>`:''}
+      </div>
+      <div class="panelin" style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px">
+        <h6 style="margin:0 0 8px;font-size:.8rem;color:var(--navy)"><i class="bi bi-database"></i> Base cargada</h6>
+        <div class="kpis" style="margin-bottom:8px">
+          <div class="kpi" style="background:#0141A2"><div class="big">${N(cnt.total)}</div><div class="sm">Registros</div></div>
+          <div class="kpi" style="background:#f59e0b"><div class="big">${N(cnt.agendados)}</div><div class="sm">Agendados</div></div>
+          <div class="kpi" style="background:#16a34a"><div class="big">${N(cnt.ventas)}</div><div class="sm">Ventas</div></div>
+        </div>
+        <div style="font-size:.75rem;color:#64748b;margin-bottom:8px">Archivo: <b>${esc(c.archivo_nombre||'—')}</b></div>
+        ${editable && ES_ADMIN ? `<input type="file" id="fileBase" accept=".xlsx,.xlsm,.xls,.csv" onchange="leerExcel(this)">
+          <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Al subir se reemplaza la base completa. La base NO se carga a las tablas normales del sistema.</div>`
+          : `<div style="font-size:.74rem;color:#94a3b8">La base solo se puede reemplazar con la campaña en BORRADOR.</div>`}
+        <div style="margin-top:8px"><button class="btnx btn-gris" onclick="verRegistros(1)">Ver registros</button></div>
+      </div>
+    </div>
+    <div id="zonaMapeo"></div>
+    <div class="panelin" style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-top:14px">
+      <h6 style="margin:0 0 8px;font-size:.8rem;color:var(--navy)"><i class="bi bi-sliders"></i> Términos de gestión (paramétricos)</h6>
+      <div id="zonaTerminos"></div>
+    </div>
+    <div id="zonaRegistros"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;justify-content:flex-end">
+      ${ES_ADMIN ? accionesEstado(c) : ''}
+    </div>`;
+  pintarTerminos();
+}
+function accionesEstado(c){
+  const b = [];
+  if (c.estado==='BORRADOR') b.push(`<button class="btnx btn-verde" onclick="cambiarEstado('ACTIVA')"><i class="bi bi-play-fill"></i> Activar campaña</button>`,
+    `<button class="btnx btn-rojo" onclick="eliminarCampana()"><i class="bi bi-trash"></i> Eliminar</button>`);
+  if (c.estado==='ACTIVA') b.push(`<button class="btnx btn-gris" onclick="cambiarEstado('PAUSADA')"><i class="bi bi-pause-fill"></i> Pausar</button>`,
+    `<button class="btnx btn-rojo" onclick="if(confirm('¿Cerrar la campaña? Pasará a Históricas.'))cambiarEstado('CERRADA')"><i class="bi bi-stop-fill"></i> Cerrar</button>`);
+  if (c.estado==='PAUSADA') b.push(`<button class="btnx btn-verde" onclick="cambiarEstado('ACTIVA')"><i class="bi bi-play-fill"></i> Reanudar</button>`,
+    `<button class="btnx btn-rojo" onclick="if(confirm('¿Cerrar la campaña?'))cambiarEstado('CERRADA')"><i class="bi bi-stop-fill"></i> Cerrar</button>`);
+  return b.join('');
+}
+async function guardarDatos(){
+  const body = { nombre:document.getElementById('edNombre').value, descripcion:document.getElementById('edDesc').value,
+    orden_campo:document.getElementById('edOrden').value, orden_dir:document.getElementById('edDir').value,
+    lock_minutos:document.getElementById('edLock').value };
+  const r = await fetch('/api/campanas-ventas/'+CUR.campana.id, { method:'PUT', headers:hdrs(1), body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  abrirDetalle(CUR.campana.id);
+}
+async function cambiarEstado(estado){
+  const r = await fetch(`/api/campanas-ventas/${CUR.campana.id}/estado`, { method:'PUT', headers:hdrs(1), body:JSON.stringify({estado}) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  abrirDetalle(CUR.campana.id);
+  cargarCampanas();
+}
+async function eliminarCampana(){
+  if (!confirm('¿Eliminar esta campaña en borrador y toda su base importada?')) return;
+  const r = await fetch('/api/campanas-ventas/'+CUR.campana.id, { method:'DELETE', headers:hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  dlgDet.close(); cargarCampanas();
+}
+
+/* ══ Homologación: leer Excel y mapear columnas ══ */
+function leerExcel(inp){
+  const f = inp.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+      // hoja con más filas = la base
+      let best = wb.SheetNames[0], bestN = 0;
+      for (const n of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header:1 });
+        if (rows.length > bestN) { bestN = rows.length; best = n; }
+      }
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[best], { defval:'' });
+      if (!filas.length) return alert('La hoja está vacía.');
+      const columnas = Object.keys(filas[0]);
+      EXCEL = { columnas, filas, nombre: f.name, hoja: best };
+      pintarMapeo();
+    } catch(err){ alert('No se pudo leer el archivo: '+err.message); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+function pintarMapeo(){
+  const mapeoPrevio = CUR.campana.mapeo || {};
+  const auto = col => {                       // sugerencia automática por nombre de columna
+    if (mapeoPrevio[col]) return mapeoPrevio[col];
+    const s = col.toLowerCase().replace(/[\s\r\n_]+/g,'');
+    const M = [ [/^rut/, 'rut'], [/cliente|nombre/, 'nombre'], [/mail/, 'email'], [/fono|telefono/, 'telefono_1'],
+      [/direccion/, 'direccion'], [/comuna/, 'comuna'], [/ciudad/, 'ciudad'], [/renta/, 'renta'],
+      [/operacion/, 'num_operacion'], [/otorga/, 'fecha_otorgamiento'], [/plazo/, 'plazo'], [/cuotaspag/, 'cuotas_pagadas'],
+      [/avance/, 'avance_pct'], [/financiado|pagare/, 'monto_financiado'], [/capital/, 'capital_adeudado'],
+      [/deudavigente/, 'deuda_vigente'], [/valorcuota/, 'valor_cuota'], [/^tasa/, 'tasa'], [/%pie/, 'pct_pie'], [/^pie/, 'pie'],
+      [/mora/, 'dias_mora'], [/estadodepago|estadopago/, 'estado_pago'], [/marca/, 'marca'], [/modelo/, 'modelo'],
+      [/a.?ovehiculo|anovehiculo/, 'anio_vehiculo'], [/ppu|patente/, 'patente'], [/avaluo/, 'avaluo'],
+      [/tramorenta/, 'tramo_renta'], [/tramodeuda/, 'tramo_deuda'], [/comentario/, 'comentario'], [/producto/, 'producto'] ];
+    for (const [re,k] of M) if (re.test(s)) return k;
+    return 'IGNORAR';
+  };
+  const g = {};
+  for (const x of CATALOGO.campos) (g[x.grupo]=g[x.grupo]||[]).push(x);
+  const opts = sel => `<option value="IGNORAR">— No importar —</option>` + Object.entries(g).map(([gr,items]) =>
+    `<optgroup label="${esc(gr)}">${items.map(i=>`<option value="${i.key}" ${sel===i.key?'selected':''}>${esc(i.label)}</option>`).join('')}</optgroup>`).join('');
+  const ej = i => EXCEL.filas.slice(0,3).map(f => String(f[EXCEL.columnas[i]]).slice(0,28)).filter(Boolean).join(' · ');
+  document.getElementById('zonaMapeo').innerHTML = `
+    <div class="panelin" style="border:2px solid var(--accent);border-radius:12px;padding:12px 14px;margin-top:14px">
+      <h6 style="margin:0 0 4px;font-size:.85rem;color:var(--navy)"><i class="bi bi-arrow-left-right"></i> Homologación de campos — ${esc(EXCEL.nombre)} (hoja «${esc(EXCEL.hoja)}», ${N(EXCEL.filas.length)} filas)</h6>
+      <div style="font-size:.72rem;color:#64748b;margin-bottom:10px">A la izquierda las columnas de TU base; a la derecha elige a qué campo homologado corresponde cada una. Obligatorio: RUT y al menos un Teléfono.</div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:32%">Columna del archivo</th><th style="width:38%">Ejemplos</th><th>Campo homologado</th></tr></thead>
+        <tbody>${EXCEL.columnas.map((col,i)=>`<tr class="map-row">
+          <td><b>${esc(col)}</b></td>
+          <td style="color:#64748b;font-size:.7rem">${esc(ej(i))}</td>
+          <td><select data-col="${esc(col)}">${opts(auto(col))}</select></td></tr>`).join('')}
+        </tbody></table></div>
+      <div style="text-align:right;margin-top:12px">
+        <button class="btnx btn-azul" onclick="cargarBase()"><i class="bi bi-cloud-arrow-up"></i> Cargar base con este mapeo</button>
+      </div>
+    </div>`;
+}
+async function cargarBase(){
+  const mapeo = {};
+  document.querySelectorAll('#zonaMapeo select[data-col]').forEach(s => { mapeo[s.dataset.col] = s.value; });
+  const usados = Object.values(mapeo).filter(v=>v!=='IGNORAR');
+  const dup = usados.filter((v,i)=>usados.indexOf(v)!==i);
+  if (dup.length) return alert('Campos destino repetidos: '+[...new Set(dup)].join(', '));
+  if (!usados.includes('rut')) return alert('Debes mapear el campo RUT Cliente.');
+  if (!usados.some(u=>u.startsWith('telefono_'))) return alert('Debes mapear al menos un Teléfono.');
+  if (!confirm(`Se cargarán ${N(EXCEL.filas.length)} filas a la campaña (se reemplaza la base anterior). ¿Continuar?`)) return;
+  const r = await fetch(`/api/campanas-ventas/${CUR.campana.id}/registros`, { method:'POST', headers:hdrs(1),
+    body: JSON.stringify({ mapeo, filas: EXCEL.filas, archivo_nombre: EXCEL.nombre }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  alert(`Base cargada: ${N(j.data.cargados)} registros.` +
+    (j.data.sin_rut?` Descartados sin RUT: ${j.data.sin_rut}.`:'') + (j.data.sin_telefono?` Sin teléfono: ${j.data.sin_telefono}.`:''));
+  EXCEL = null;
+  abrirDetalle(CUR.campana.id);
+}
+
+/* ══ Términos de gestión ══ */
+function pintarTerminos(){
+  const tipos = CATALOGO.tipos_termino;
+  const filas = CUR.terminos.map((t,i) => filaTermino(t,i)).join('');
+  document.getElementById('zonaTerminos').innerHTML = `
+    <div style="overflow-x:auto"><table id="tblTerm">
+      <thead><tr><th>Término</th><th>Tipo</th><th>Cierra registro</th><th>Es venta</th><th>Rellamar (min)</th><th>Rellamado para</th><th></th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    ${ES_ADMIN?`<div style="display:flex;justify-content:space-between;margin-top:10px">
+      <button class="btnx btn-gris" onclick="agregarTermino()"><i class="bi bi-plus"></i> Agregar término</button>
+      <button class="btnx btn-sec" onclick="guardarTerminos()"><i class="bi bi-save"></i> Guardar términos</button></div>`:''}`;
+}
+function filaTermino(t){
+  const dis = ES_ADMIN ? '' : 'disabled';
+  return `<tr data-id="${t.id||''}">
+    <td><input class="tNom" style="width:100%;min-width:180px" value="${esc(t.nombre)}" ${dis}></td>
+    <td><select class="tTipo" ${dis}>${CATALOGO.tipos_termino.map(x=>`<option value="${x.key}" ${t.tipo===x.key?'selected':''}>${x.label}</option>`).join('')}</select></td>
+    <td style="text-align:center"><input type="checkbox" class="tCierre" ${t.es_cierre?'checked':''} ${dis}></td>
+    <td style="text-align:center"><input type="checkbox" class="tVenta" ${t.es_venta?'checked':''} ${dis}></td>
+    <td><input type="number" class="tRell" style="width:90px" min="1" value="${t.rellamar_min||''}" placeholder="—" ${dis}></td>
+    <td><select class="tDest" ${dis}><option value="">—</option><option value="POOL" ${t.destino==='POOL'?'selected':''}>Pool</option><option value="EJECUTIVO" ${t.destino==='EJECUTIVO'?'selected':''}>Mismo ejecutivo</option></select></td>
+    <td>${ES_ADMIN?`<button class="btnx btn-rojo" style="padding:3px 9px" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button>`:''}</td></tr>`;
+}
+function agregarTermino(){
+  document.querySelector('#tblTerm tbody').insertAdjacentHTML('beforeend',
+    filaTermino({ nombre:'', tipo:'NO_CONTACTO', es_cierre:0, es_venta:0, rellamar_min:null, destino:'POOL' }));
+}
+async function guardarTerminos(){
+  const terminos = [...document.querySelectorAll('#tblTerm tbody tr')].map(tr => ({
+    id: tr.dataset.id || null,
+    nombre: tr.querySelector('.tNom').value.trim(),
+    tipo: tr.querySelector('.tTipo').value,
+    es_cierre: tr.querySelector('.tCierre').checked ? 1 : 0,
+    es_venta: tr.querySelector('.tVenta').checked ? 1 : 0,
+    rellamar_min: tr.querySelector('.tRell').value || null,
+    destino: tr.querySelector('.tDest').value || null,
+  })).filter(t => t.nombre);
+  if (!terminos.length) return alert('Debe quedar al menos un término.');
+  const r = await fetch(`/api/campanas-ventas/${CUR.campana.id}/terminos`, { method:'PUT', headers:hdrs(1), body:JSON.stringify({terminos}) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  abrirDetalle(CUR.campana.id);
+}
+
+/* ══ Registros (preview paginado) ══ */
+async function verRegistros(pag){
+  const r = await fetch(`/api/campanas-ventas/${CUR.campana.id}/registros?pagina=${pag}`, { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const d = j.data;
+  const pags = Math.max(1, Math.ceil(d.total/d.por_pagina));
+  document.getElementById('zonaRegistros').innerHTML = `
+    <div class="panelin" style="border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-top:14px">
+      <h6 style="margin:0 0 8px;font-size:.8rem;color:var(--navy)"><i class="bi bi-list-ul"></i> Registros (${N(d.total)}) — página ${d.pagina}/${pags}</h6>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>#</th><th>RUT</th><th>Nombre</th><th>Teléfonos</th><th>Estado</th><th>Resultado</th><th class="num">Intentos</th><th>Rellamado</th><th class="num">Monto ref.</th></tr></thead>
+        <tbody>${d.rows.map(x=>`<tr>
+          <td>${x.orden_carga+1}</td><td style="white-space:nowrap">${esc(x.rut)}</td><td>${esc(x.nombre||'')}</td>
+          <td style="font-size:.7rem">${(JSON.parse(x.telefonos||'[]')).map(fmtFono).join('<br>')}</td>
+          <td><span class="chip e-${x.estado}">${x.estado}</span>${x.convertido?' <span class="chip" style="background:#dcfce7;color:#166534">VENTA</span>':''}</td>
+          <td style="font-size:.7rem">${esc(x.resultado||'—')}</td><td class="num">${x.intentos}</td>
+          <td style="font-size:.7rem">${FH(x.rellamado_at)}</td><td class="num">${x.monto_referencia?CLP(x.monto_referencia):'—'}</td></tr>`).join('')}
+        </tbody></table></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        ${d.pagina>1?`<button class="btnx btn-gris" onclick="verRegistros(${d.pagina-1})">« Anterior</button>`:''}
+        ${d.pagina<pags?`<button class="btnx btn-gris" onclick="verRegistros(${d.pagina+1})">Siguiente »</button>`:''}
+      </div></div>`;
+}
+
+/* ══ DISCADOR ══ */
+async function tomarSiguiente(){
+  const idc = document.getElementById('selDiscCamp').value;
+  if (!idc) return alert('No hay campañas activas.');
+  const r = await fetch(`/api/campanas-ventas/${idc}/siguiente`, { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  DISC = { ...j.data, id_campana: idc };
+  const cola = j.data.cola || {};
+  document.getElementById('colaInfo').innerHTML =
+    `Cola: <b>${N(cola.pendientes)}</b> pendientes · <b>${N(cola.rellamados_listos)}</b> rellamados listos · <b>${N(cola.agendados_futuros)}</b> agendados a futuro`;
+  if (!j.data.registro) {
+    document.getElementById('discBody').innerHTML = '<div class="panel vacio"><i class="bi bi-cup-hot" style="font-size:2rem"></i><br>No hay registros disponibles por ahora (cola vacía o rellamados aún no vencen).</div>';
+    return;
+  }
+  pintarDiscador();
+}
+function pintarDiscador(){
+  const reg = DISC.registro, datos = reg.datos || {};
+  const iniciales = (reg.nombre||'?').split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
+  const labelDe = k => (CATALOGO.campos.find(c=>c.key===k)||{}).label || k;
+  const numerico = k => (CATALOGO.campos.find(c=>c.key===k)||{}).num;
+  const fmtV = (k,v) => numerico(k) && /^-?[\d.,]+$/.test(String(v)) && Number(String(v).replace(/\./g,'').replace(',','.'))>999
+    ? CLP(String(v).replace(/\./g,'').replace(',','.')) : esc(v);
+  const ocultos = new Set(['rut','nombre','telefono_1','telefono_2','telefono_3']);
+  const datosHtml = Object.entries(datos).filter(([k])=>!ocultos.has(k))
+    .map(([k,v])=>`<div class="dato"><div class="k">${esc(labelDe(k))}</div><div class="v">${fmtV(k,v)}</div></div>`).join('');
+  const fonosHtml = reg.telefonos_ordenados.map((t,i)=>{
+    const malo = (reg.tel_malos||[]).includes(t);
+    return `<div class="fono ${malo?'malo':''}">
+      <span class="tag" style="background:${i===0&&!malo?'#dcfce7':'#f1f5f9'};color:${i===0&&!malo?'#166534':'#64748b'}">${malo?'INHABILITADO':(i===0?'MEJOR OPCIÓN':'ALTERNATIVA')}</span>
+      <span class="n">${fmtFono(t)}</span>
+      <a class="btnx btn-verde" style="text-decoration:none" href="tel:+${t.startsWith('56')?t:'56'+t}" title="Llamar"><i class="bi bi-telephone-fill"></i></a>
+      <button class="btnx btn-gris" onclick="navigator.clipboard.writeText('${t}')" title="Copiar"><i class="bi bi-clipboard"></i></button>
+      <input type="radio" name="fonoSel" value="${t}" ${i===0&&!malo?'checked':''} title="Teléfono usado en la gestión">
+    </div>`;
+  }).join('');
+  const gestHtml = DISC.gestiones.length ? DISC.gestiones.map(g=>`
+    <div class="gest-item"><b>${esc(g.termino_nombre)}</b> — ${esc(g.usuario_nombre||'')} · ${FH(g.created_at)}
+      ${g.telefono?` · ${fmtFono(g.telefono)}`:''}${g.rellamado_at?` · <i class="bi bi-alarm"></i> rellamar ${FH(g.rellamado_at)}`:''}
+      ${g.comentario?`<div style="color:#475569">${esc(g.comentario)}</div>`:''}</div>`).join('')
+    : '<div class="vacio" style="padding:8px">Sin gestiones previas — primer llamado.</div>';
+  document.getElementById('discBody').innerHTML = `
+    <div class="disc-grid">
+      <div>
+        <div class="panel">
+          <div class="cli-head">
+            <div class="avatar">${iniciales}</div>
+            <div><h4>${esc(reg.nombre||'(sin nombre)')}</h4><div class="rut">${esc(reg.rut)} · intento N° ${reg.intentos+1} ${reg.estado==='AGENDADO'?'· <b style="color:#b45309">RELLAMADO</b>':''}</div></div>
+            <button class="btnx btn-gris" style="margin-left:auto" onclick="saltarRegistro()" title="Devolver a la cola sin gestionar"><i class="bi bi-skip-forward"></i> Saltar</button>
+          </div>
+          <h5 style="font-size:.8rem"><i class="bi bi-telephone"></i> Teléfonos (por contactabilidad)</h5>
+          ${fonosHtml}
+          <h5 style="font-size:.8rem;margin-top:14px"><i class="bi bi-person-vcard"></i> Datos del cliente</h5>
+          <div class="datos-grid">${datosHtml||'<div class="vacio">Sin datos adicionales</div>'}</div>
+        </div>
+        <div class="panel">
+          <h5 style="font-size:.85rem"><i class="bi bi-clock-history"></i> Historial de gestiones</h5>
+          ${gestHtml}
+        </div>
+      </div>
+      <div class="panel">
+        <h5><i class="bi bi-check2-square"></i> Resultado del llamado</h5>
+        <div style="font-size:.72rem;color:#64748b;margin-bottom:10px">Elige el término de gestión. Si programa rellamado, el registro vuelve a la cola a la hora indicada.</div>
+        ${DISC.terminos.map(t=>`<button class="term-btn t-${t.tipo}" onclick="elegirTermino(${t.id})">${esc(t.nombre)}
+          <small>${(CATALOGO.tipos_termino.find(x=>x.key===t.tipo)||{}).label||t.tipo}${t.es_venta?' · registra VENTA':''}${t.es_cierre?' · cierra el registro':''}${t.rellamar_min?` · rellama en ${t.rellamar_min} min (${t.destino==='EJECUTIVO'?'mismo ejecutivo':'pool'})`:''}</small>
+        </button>`).join('')}
+      </div>
+    </div>`;
+}
+function elegirTermino(id){
+  GEST_TERM = DISC.terminos.find(t=>t.id===id);
+  document.getElementById('gestTitulo').textContent = GEST_TERM.nombre;
+  document.getElementById('gestVentaWrap').style.display = GEST_TERM.es_venta ? '' : 'none';
+  document.getElementById('gestMonto').value = '';
+  document.getElementById('gestComent').value = '';
+  document.getElementById('gestRellInfo').innerHTML = GEST_TERM.rellamar_min
+    ? `<i class="bi bi-alarm"></i> Se reagendará en <b>${GEST_TERM.rellamar_min} min</b> para ${GEST_TERM.destino==='EJECUTIVO'?'<b>ti</b> (mismo ejecutivo)':'el <b>pool</b>'}.`
+    : (GEST_TERM.es_cierre ? '<i class="bi bi-flag"></i> Este término CIERRA el registro (sale de la cola).'
+      : (GEST_TERM.tipo==='INHABILITADO' ? '<i class="bi bi-telephone-x"></i> El teléfono seleccionado quedará marcado como inhabilitado.' : ''));
+  dlgGest.showModal();
+}
+async function confirmarGestion(){
+  const fono = document.querySelector('input[name=fonoSel]:checked')?.value || null;
+  const monto = document.getElementById('gestMonto').value.replace(/\./g,'');
+  if (GEST_TERM.es_venta && (!monto || !Number(monto))) return alert('Ingresa el monto de la venta.');
+  const btn = document.getElementById('btnGestOk'); btn.disabled = true;
+  const r = await fetch(`/api/campanas-ventas/${DISC.id_campana}/gestion`, { method:'POST', headers:hdrs(1),
+    body: JSON.stringify({ id_registro: DISC.registro.id, id_termino: GEST_TERM.id, telefono: fono,
+      comentario: document.getElementById('gestComent').value.trim(), monto_venta: monto || null }) });
+  const j = await r.json(); btn.disabled = false;
+  if (!j.success) return alert(j.error);
+  dlgGest.close();
+  tomarSiguiente();   // siguiente registro de inmediato
+}
+async function saltarRegistro(){
+  await fetch(`/api/campanas-ventas/${DISC.id_campana}/liberar`, { method:'POST', headers:hdrs() });
+  document.getElementById('discBody').innerHTML = '<div class="panel vacio">Registro devuelto a la cola. Presiona «Tomar siguiente».</div>';
+}
+
+/* ══ ESTADÍSTICAS ══ */
+function verStatsDe(id){ verTab('stats'); document.getElementById('selStatCamp').value = id; verStats(); }
+async function verStats(){
+  const id = document.getElementById('selStatCamp').value;
+  if (!id) return;
+  const r = await fetch(`/api/campanas-ventas/${id}/stats`, { headers: hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const d = j.data, b = d.base, k = d.indicadores;
+  const bar = (v) => `<div class="barra"><div style="width:${Math.min(100,v)}%"></div></div>`;
+  document.getElementById('statsBody').innerHTML = `
+    <div class="kpis">
+      <div class="kpi" style="background:#0141A2"><div class="big">${N(b.total)}</div><div class="sm">Base total</div></div>
+      <div class="kpi" style="background:#0e7490"><div class="big">${PCT(k.penetracion_pct)}</div><div class="sm">Penetración (gestionados/base)</div>${bar(k.penetracion_pct)}</div>
+      <div class="kpi" style="background:#7c3aed"><div class="big">${PCT(k.contactabilidad_pct)}</div><div class="sm">Contactabilidad (contactados/gestionados)</div>${bar(k.contactabilidad_pct)}</div>
+      <div class="kpi" style="background:#16a34a"><div class="big">${PCT(k.conversion_pct)}</div><div class="sm">Conversión (ventas/contactados)</div>${bar(k.conversion_pct)}</div>
+      <div class="kpi" style="background:#b45309"><div class="big">${PCT(k.tasa_conversion_base)}</div><div class="sm">Tasa conversión s/ base</div></div>
+      <div class="kpi" style="background:#334155"><div class="big">${CLP(b.monto_vendido)}</div><div class="sm">Monto colocado</div></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi" style="background:#64748b"><div class="big">${N(b.gestionados)}</div><div class="sm">Gestionados</div></div>
+      <div class="kpi" style="background:#64748b"><div class="big">${N(b.contactados)}</div><div class="sm">Contactados</div></div>
+      <div class="kpi" style="background:#64748b"><div class="big">${N(b.ventas)}</div><div class="sm">Ventas</div></div>
+      <div class="kpi" style="background:#64748b"><div class="big">${N(b.intentos_totales)}</div><div class="sm">Llamados totales</div></div>
+      <div class="kpi" style="background:#64748b"><div class="big">${N(k.intentos_promedio)}</div><div class="sm">Intentos promedio</div></div>
+      <div class="kpi" style="background:#64748b"><div class="big">${N(b.pendientes)} / ${N(b.agendados)}</div><div class="sm">Pendientes / Agendados</div></div>
+    </div>
+    <div class="grid2">
+      <div class="panel"><h5><i class="bi bi-list-check"></i> Gestiones por término</h5>
+        <table><thead><tr><th>Término</th><th>Tipo</th><th class="num">Gestiones</th></tr></thead>
+        <tbody>${d.por_termino.map(t=>`<tr><td>${esc(t.termino_nombre)}</td><td style="font-size:.68rem">${esc(t.tipo)}</td><td class="num"><b>${N(t.n)}</b></td></tr>`).join('')||'<tr><td colspan="3" class="vacio">Sin gestiones</td></tr>'}</tbody></table></div>
+      <div class="panel"><h5><i class="bi bi-person-badge"></i> Por ejecutivo</h5>
+        <table><thead><tr><th>Ejecutivo</th><th class="num">Gestiones</th><th class="num">Contactos</th><th class="num">Ventas</th><th class="num">Monto</th></tr></thead>
+        <tbody>${d.por_ejecutivo.map(e=>`<tr><td>${esc(e.usuario_nombre||'—')}</td><td class="num">${N(e.gestiones)}</td><td class="num">${N(e.contactos)}</td><td class="num"><b>${N(e.ventas)}</b></td><td class="num">${CLP(e.monto)}</td></tr>`).join('')||'<tr><td colspan="5" class="vacio">Sin gestiones</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="panel"><h5><i class="bi bi-calendar3"></i> Gestiones por día</h5>
+      <table><thead><tr><th>Día</th><th class="num">Gestiones</th><th class="num">Contactos directos</th></tr></thead>
+      <tbody>${d.por_dia.map(x=>`<tr><td>${String(x.dia).slice(0,10)}</td><td class="num">${N(x.gestiones)}</td><td class="num">${N(x.contactos)}</td></tr>`).join('')||'<tr><td colspan="3" class="vacio">Sin gestiones</td></tr>'}</tbody></table></div>`;
+}
+async function recalcularConv(){
+  const id = document.getElementById('selStatCamp').value;
+  if (!id) return alert('Elige una campaña.');
+  const r = await fetch(`/api/campanas-ventas/${id}/recalcular`, { method:'POST', headers:hdrs() });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  alert(`Cruce listo: ${j.data.nuevos_convertidos} conversiones nuevas detectadas contra créditos otorgados.`);
+  verStats();
+}
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
