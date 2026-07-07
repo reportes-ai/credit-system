@@ -72,7 +72,10 @@
     <div class="fld"><label>Parque</label><select id="fParque" onchange="render()"><option value="">Todos</option></select></div>
     <div class="fld"><label>Tipo</label><select id="fTipo" onchange="render()"><option value="">Todos</option><option value="GENERAL">General (Calle)</option><option value="PARQUE">Parque</option><option value="AMBOS">Ambos</option></select></div>
     <div class="fld"><label>Estado</label><select id="fEstado" onchange="cargarMapa()"><option value="activos">Activos</option><option value="todos">Todos</option><option value="inactivos">Solo inactivos</option></select></div>
+    <label style="font-size:.78rem;font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap"><input type="checkbox" id="fPantalla" onchange="render(false)"> Filtrar por pantalla</label>
+    <button class="btn-geo" style="background:#16a34a" onclick="exportarExcel()" title="Exporta lo que se ve: filtros + zoom de pantalla"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
     <div style="flex:1"></div>
+    <span class="stat"><i class="bi bi-eye"></i> En pantalla <b id="stVista">0</b></span>
     <span class="stat"><i class="bi bi-shop"></i> Total <b id="stTotal">0</b></span>
     <span class="stat"><i class="bi bi-geo-alt-fill"></i> En mapa <b id="stCoord">0</b></span>
     <span class="stat"><i class="bi bi-hourglass-split"></i> Pendientes <b id="stPend">0</b></span>
@@ -92,6 +95,7 @@
 <div id="toast" class="toast-af"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
@@ -171,11 +175,25 @@ function popupHTML(d, esParque, lat, lng){
     <a class="lp-a" target="_blank" href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"><i class="bi bi-signpost-2"></i> Cómo llegar</a>
     <a class="lp-a alt" target="_blank" href="/mantenedores/dealers/"><i class="bi bi-eye"></i> Ver dealer</a>`;
 }
-function render(){
+/* ¿El dealer tiene algún punto dentro de la vista actual del mapa? */
+function enPantalla(d){
+  if (!map) return true;
+  const b = map.getBounds();
+  return (d.lat != null && d.lng != null && b.contains([d.lat, d.lng]))
+      || (d.lat_parque != null && d.lng_parque != null && b.contains([d.lat_parque, d.lng_parque]));
+}
+/* Lo que se ve: filtros desplegables + (si está activo) el zoom de pantalla */
+function visibles(){
+  const porPantalla = $('fPantalla').checked;
+  return DATA.filter(pasa).filter(d => !porPantalla || enPantalla(d));
+}
+function render(fit = true){
   if (!cluster) return;
   cluster.clearLayers();
+  const porPantalla = $('fPantalla').checked;
+  const lista = visibles();
   const bounds = [];
-  DATA.filter(pasa).forEach(d => {
+  lista.forEach(d => {
     if (d.lat != null && d.lng != null) {
       const m = L.marker([d.lat, d.lng], { icon: PIN_SUC }).bindPopup(popupHTML(d, false, d.lat, d.lng));
       cluster.addLayer(m); bounds.push([d.lat, d.lng]);
@@ -185,7 +203,29 @@ function render(){
       cluster.addLayer(m); bounds.push([d.lat_parque, d.lng_parque]);
     }
   });
-  if (bounds.length) map.fitBounds(bounds, { padding:[40,40], maxZoom:14 });
+  $('stVista').textContent = lista.length.toLocaleString('es-CL');
+  if (fit && !porPantalla && bounds.length) map.fitBounds(bounds, { padding:[40,40], maxZoom:14 });
+}
+/* Exportar a Excel lo visible (filtros + zoom) */
+function exportarExcel(){
+  const lista = visibles();
+  if (!lista.length) return toast('No hay dealers visibles para exportar.', true);
+  const filas = lista.map(d => ({
+    numero: d.numero, rut: d.rut, nombre: d.nombre, razon_social: d.nombre_razon,
+    activo: d.activo == 1 ? 'SÍ' : 'NO', tipo: d.tipo_ficha || '', parque: d.ccs_parque || '',
+    categoria: d.categoria_asignada || d.categoria_propuesta || '',
+    comuna: d.comuna || '', region: d.region || '',
+    direccion: d.direccion || '', direccion_google: d.geo_dir || '',
+    telefono: d.telefono || '', lat: d.lat, lng: d.lng,
+    direccion_parque: d.direccion_parque || '', comuna_parque: d.comuna_parque || '',
+    lat_parque: d.lat_parque, lng_parque: d.lng_parque,
+  }));
+  const ws = XLSX.utils.json_to_sheet(filas);
+  ws['!cols'] = Object.keys(filas[0]).map(k => ({ wch: Math.min(42, Math.max(k.length, ...filas.slice(0,150).map(f => String(f[k]??'').length)) + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Dealers');
+  XLSX.writeFile(wb, `dealers_mapa_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast(`Exportados ${lista.length} dealers visibles.`);
 }
 async function geocodificar(){
   const b=$('btnGeo'); b.disabled=true; const orig=b.innerHTML; b.innerHTML='<i class="bi bi-arrow-repeat me-1"></i>Geocodificando…';
@@ -219,6 +259,7 @@ async function geocodificarTodo(){
 
 (async function init(){
   map = L.map('map', { zoomControl:true }).setView([-33.45, -70.66], 11); // Santiago por defecto
+  map.on('moveend', () => { if ($('fPantalla').checked) render(false); });   // zoom/arrastre re-filtra lo visible
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '© OpenStreetMap'
   }).addTo(map);
