@@ -82,6 +82,38 @@ const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
       await ensure('Visitas de Dealers — supervisar', 'visitas_supervisar',
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%'");
     }
+    /* ── Cartera de dealers: planes de asignación + asignaciones ──
+       Un dealer solo puede tener UNA asignación ACTIVA (se valida en código). */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS visitas_planes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        nombre VARCHAR(200) NOT NULL,
+        fecha_inicio DATE NOT NULL,
+        fecha_cierre DATE NOT NULL,
+        params JSON NULL,
+        estado VARCHAR(10) NOT NULL DEFAULT 'ACTIVO',    -- ACTIVO | CERRADO
+        created_by INT NULL, created_nombre VARCHAR(150) NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS visitas_asignaciones (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_dealer INT NOT NULL,
+        rut_dealer VARCHAR(20) NULL,
+        nombre_dealer VARCHAR(200) NULL,
+        comuna VARCHAR(120) NULL,
+        id_usuario INT NOT NULL,
+        usuario_nombre VARCHAR(200) NULL,
+        id_plan INT NULL,
+        origen VARCHAR(12) NOT NULL DEFAULT 'INDIVIDUAL', -- MASIVA | INDIVIDUAL
+        estado VARCHAR(10) NOT NULL DEFAULT 'ACTIVA',     -- ACTIVA | CERRADA
+        created_by INT NULL, created_nombre VARCHAR(150) NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        cerrada_at DATETIME NULL,
+        INDEX idx_dealer (id_dealer, estado), INDEX idx_usuario (id_usuario, estado), INDEX idx_plan (id_plan)
+      )`);
+    await pool.query('ALTER TABLE visitas_dealers ADD COLUMN IF NOT EXISTS id_plan INT NULL').catch(() => {});
+    await pool.query('ALTER TABLE visitas_dealers ADD COLUMN IF NOT EXISTS id_asignacion INT NULL').catch(() => {});
     console.log('✓ módulo visitas-dealers: tablas + permisos listos');
   } catch (e) { console.error('[visitas migration]', e.message); }
 })();
@@ -300,4 +332,297 @@ const eliminar = async (req, res) => {
   } catch (e) { console.error('[visitas eliminar]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
-module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar };
+/* ═══════════════════ ASIGNACIÓN DE CARTERA ═══════════════════ */
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+
+/* ─── GET /api/visitas/ejecutivos — comerciales asignables (supervisar) ── */
+const ejecutivos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, CONCAT(u.nombre,' ',u.apellido) nombre, p.nombre perfil
+         FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+        WHERE u.estado='activo'
+          AND (p.nombre LIKE 'Ejecutivo%' OR p.nombre LIKE 'Comercial%' OR p.nombre LIKE 'Supervisor%'
+               OR p.nombre LIKE 'Jefe%' OR p.nombre LIKE 'Gerente%' OR p.nombre='Administrador')
+        ORDER BY p.nombre, nombre`);
+    ok(res, rows);
+  } catch (e) { console.error('[visitas ejecutivos]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* Última visita REALIZADA por dealer (Map id_dealer → fecha) */
+async function ultimaVisitaMap() {
+  const [rows] = await pool.query(
+    `SELECT id_dealer, MAX(COALESCE(fecha_realizada, fecha_programada)) ult
+       FROM visitas_dealers WHERE estado='REALIZADA' AND id_dealer IS NOT NULL GROUP BY id_dealer`);
+  return new Map(rows.map(r => [r.id_dealer, r.ult]));
+}
+
+/* Candidatos a asignar: activos, sin asignación ACTIVA, filtro comuna +
+   plazo en meses desde la última visita realizada (0 = sin filtro). */
+async function candidatosCartera({ comunas = [], meses = 0 }) {
+  const [dealers] = await pool.query(
+    `SELECT id_dealer, rut,
+            COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
+            comuna, comuna_parque, geo_dir, lat, lng
+       FROM dealers WHERE activo=1`);
+  const [asig] = await pool.query("SELECT id_dealer FROM visitas_asignaciones WHERE estado='ACTIVA'");
+  const ocupados = new Set(asig.map(a => a.id_dealer));
+  const mUlt = await ultimaVisitaMap();
+  const limite = meses > 0 ? Date.now() - meses * 30.44 * 86400000 : null;
+  const setCom = new Set((comunas || []).map(c => String(c).trim().toUpperCase()).filter(Boolean));
+  return dealers
+    .map(d => ({ id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d) || 'SIN COMUNA',
+                 ultima_visita: mUlt.get(d.id_dealer) || null }))
+    .filter(d => !ocupados.has(d.id_dealer))
+    .filter(d => !setCom.size || setCom.has(d.comuna.toUpperCase()))
+    .filter(d => !limite || !d.ultima_visita || new Date(d.ultima_visita).getTime() < limite);
+}
+
+/* ─── POST /api/visitas/asignacion-masiva (visitas_supervisar) ──────
+   body: { nombre, fecha_inicio, fecha_cierre, ejecutivos:[ids], comunas:[],
+           meses_ultima_visita, visitas_dia, dias_semana:[], simular } ── */
+const asignacionMasiva = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const ymd = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+    if (!ymd(b.fecha_inicio) || !ymd(b.fecha_cierre)) return err(res, 400, 'Fechas de inicio y cierre del plan requeridas.');
+    if (b.fecha_cierre < b.fecha_inicio) return err(res, 400, 'La fecha de cierre debe ser posterior al inicio.');
+    const ejecIds = [...new Set((b.ejecutivos || []).map(Number).filter(n => n > 0))];
+    if (!ejecIds.length) return err(res, 400, 'Selecciona al menos un ejecutivo.');
+    const meses = Math.max(0, parseInt(b.meses_ultima_visita, 10) || 0);
+
+    const cfg = await leerConfig();
+    const visDia = Math.min(50, Math.max(1, parseInt(b.visitas_dia, 10) || cfg.visitas_dia));
+    const dias = (Array.isArray(b.dias_semana) && b.dias_semana.length ? b.dias_semana : cfg.dias_semana)
+      .map(Number).filter(n => n >= 1 && n <= 7);
+
+    // nombres de los ejecutivos
+    const [us] = await pool.query(
+      `SELECT id_usuario, CONCAT(nombre,' ',apellido) nombre FROM usuarios WHERE id_usuario IN (${ejecIds.map(() => '?').join(',')})`, ejecIds);
+    const nomEjec = new Map(us.map(u => [u.id_usuario, u.nombre]));
+    if (nomEjec.size !== ejecIds.length) return err(res, 400, 'Hay ejecutivos inexistentes.');
+
+    const cand = await candidatosCartera({ comunas: b.comunas, meses });
+    if (!cand.length) return err(res, 400, 'No hay dealers candidatos con esos filtros (¿ya están todos asignados?).');
+
+    // Reparto por BLOQUES DE COMUNA (zona coherente): cada bloque al ejecutivo
+    // con menos carga. Bloques más grandes que la cuota justa se parten en
+    // trozos para que una comuna gigante no se vaya entera a uno solo.
+    const porComuna = {};
+    for (const d of cand) (porComuna[d.comuna] = porComuna[d.comuna] || []).push(d);
+    const cuota = Math.ceil(cand.length / ejecIds.length);
+    const bloques = [];
+    for (const [com, ds] of Object.entries(porComuna))
+      for (let i = 0; i < ds.length; i += cuota) bloques.push([com, ds.slice(i, i + cuota)]);
+    bloques.sort((a, b2) => b2[1].length - a[1].length);
+    const carga = new Map(ejecIds.map(id => [id, []]));
+    for (const [, ds] of bloques) {
+      const idMin = [...carga.entries()].sort((a, b2) => a[1].length - b2[1].length)[0][0];
+      carga.get(idMin).push(...ds);
+    }
+
+    // Fechas hábiles del plan
+    const fechas = [];
+    for (let t = new Date(b.fecha_inicio + 'T12:00:00'); ; t.setDate(t.getDate() + 1)) {
+      const f = t.toISOString().slice(0, 10);
+      if (f > b.fecha_cierre) break;
+      if (dias.includes(isoDow(f))) fechas.push(f);
+    }
+    const capacidad = fechas.length * visDia;
+
+    const resumen = [...carga.entries()].map(([id, ds]) => ({
+      id_usuario: id, nombre: nomEjec.get(id), dealers: ds.length,
+      agendables: Math.min(ds.length, capacidad), sin_agenda: Math.max(0, ds.length - capacidad),
+      comunas: [...new Set(ds.map(d => d.comuna))],
+    }));
+    if (b.simular) return ok(res, { simulacion: true, candidatos: cand.length, fechas_habiles: fechas.length,
+      capacidad_por_ejecutivo: capacidad, por_ejecutivo: resumen });
+
+    // ── Ejecutar: plan + asignaciones + agenda ──
+    const [rp] = await pool.query(
+      `INSERT INTO visitas_planes (nombre, fecha_inicio, fecha_cierre, params, created_by, created_nombre)
+       VALUES (?,?,?,?,?,?)`,
+      [(b.nombre || `Plan ${b.fecha_inicio}`).slice(0, 200), b.fecha_inicio, b.fecha_cierre,
+       JSON.stringify({ comunas: b.comunas || [], meses_ultima_visita: meses, visitas_dia: visDia, dias_semana: dias, ejecutivos: ejecIds }),
+       req.usuario.id_usuario, nombreUsuario(req.usuario)]);
+    const idPlan = rp.insertId;
+
+    let asignadas = 0, agendadas = 0;
+    for (const [idU, ds] of carga.entries()) {
+      let slot = 0;
+      for (const d of ds) {
+        const [ra] = await pool.query(
+          `INSERT INTO visitas_asignaciones (id_dealer, rut_dealer, nombre_dealer, comuna, id_usuario, usuario_nombre, id_plan, origen, created_by, created_nombre)
+           VALUES (?,?,?,?,?,?,?, 'MASIVA', ?, ?)`,
+          [d.id_dealer, d.rut, d.nombre, d.comuna, idU, nomEjec.get(idU), idPlan, req.usuario.id_usuario, nombreUsuario(req.usuario)]);
+        asignadas++;
+        const fecha = fechas[Math.floor(slot / visDia)];
+        if (fecha) {
+          await pool.query(
+            `INSERT INTO visitas_dealers (id_dealer, rut_dealer, nombre_dealer, comuna, fecha_programada, id_usuario, usuario_nombre, estado, id_plan, id_asignacion)
+             VALUES (?,?,?,?,?,?,?, 'PROGRAMADA', ?, ?)`,
+            [d.id_dealer, d.rut, d.nombre, d.comuna, fecha, idU, nomEjec.get(idU), idPlan, ra.insertId]);
+          agendadas++; slot++;
+        }
+      }
+      notificar([idU], { tipo: 'visitas', titulo: '📋 Cartera de dealers asignada',
+        mensaje: `Se te asignaron ${ds.length} dealers (plan «${b.nombre || b.fecha_inicio}»). Revisa tu calendario de visitas.`,
+        href: '/dealers-visitas/' }).catch(() => {});
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'visitas', entidad: 'plan', entidad_id: idPlan,
+      detalle: `Asignación masiva «${b.nombre || ''}»: ${asignadas} dealers a ${ejecIds.length} ejecutivos (${agendadas} visitas agendadas)` });
+    ok(res, { id_plan: idPlan, asignadas, agendadas, por_ejecutivo: resumen });
+  } catch (e) { console.error('[visitas asignacionMasiva]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/asignaciones ─────────────────────────────────── */
+const listarAsignaciones = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const esRevisor = await tieneFunc(uid, 'visitas_supervisar');
+    const where = [], pars = [];
+    if (!esRevisor) { where.push('a.id_usuario=?'); pars.push(uid); }
+    else if (req.query.usuario) { where.push('a.id_usuario=?'); pars.push(parseInt(req.query.usuario) || 0); }
+    if (req.query.plan) { where.push('a.id_plan=?'); pars.push(parseInt(req.query.plan) || 0); }
+    where.push('a.estado=?'); pars.push(req.query.estado === 'CERRADA' ? 'CERRADA' : 'ACTIVA');
+    const [rows] = await pool.query(
+      `SELECT a.*, p.nombre plan_nombre, p.fecha_inicio, p.fecha_cierre
+         FROM visitas_asignaciones a LEFT JOIN visitas_planes p ON p.id=a.id_plan
+        WHERE ${where.join(' AND ')} ORDER BY a.usuario_nombre, a.comuna, a.nombre_dealer LIMIT 3000`, pars);
+    const mUlt = await ultimaVisitaMap();
+    rows.forEach(r => r.ultima_visita = mUlt.get(r.id_dealer) || null);
+    ok(res, { rows, esRevisor });
+  } catch (e) { console.error('[visitas listarAsignaciones]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── POST /api/visitas/asignaciones — individual (supervisar) ─────── */
+const crearAsignacion = async (req, res) => {
+  try {
+    const { id_dealer, id_usuario } = req.body || {};
+    if (!id_dealer || !id_usuario) return err(res, 400, 'Dealer y ejecutivo son obligatorios.');
+    const [[ya]] = await pool.query(
+      "SELECT usuario_nombre FROM visitas_asignaciones WHERE id_dealer=? AND estado='ACTIVA'", [id_dealer]);
+    if (ya) return err(res, 400, `Ese dealer ya está asignado a ${ya.usuario_nombre}. Cierra esa asignación primero.`);
+    const [[d]] = await pool.query(
+      `SELECT id_dealer, rut, COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) nombre,
+              comuna, comuna_parque, geo_dir FROM dealers WHERE id_dealer=?`, [id_dealer]);
+    if (!d) return err(res, 404, 'Dealer no existe.');
+    const [[u]] = await pool.query("SELECT CONCAT(nombre,' ',apellido) nombre FROM usuarios WHERE id_usuario=?", [id_usuario]);
+    if (!u) return err(res, 404, 'Ejecutivo no existe.');
+    const [r] = await pool.query(
+      `INSERT INTO visitas_asignaciones (id_dealer, rut_dealer, nombre_dealer, comuna, id_usuario, usuario_nombre, origen, created_by, created_nombre)
+       VALUES (?,?,?,?,?,?, 'INDIVIDUAL', ?, ?)`,
+      [d.id_dealer, d.rut, d.nombre, comunaDe(d) || null, id_usuario, u.nombre, req.usuario.id_usuario, nombreUsuario(req.usuario)]);
+    notificar([id_usuario], { tipo: 'visitas', titulo: '📋 Dealer asignado a tu cartera',
+      mensaje: `Se te asignó ${d.nombre}. Agéndalo en tu calendario de visitas.`, href: '/dealers-visitas/' }).catch(() => {});
+    auditar({ req, accion: 'CREAR', modulo: 'visitas', entidad: 'asignacion', entidad_id: r.insertId,
+      detalle: `Asignó ${d.nombre} a ${u.nombre}`, rut: d.rut });
+    ok(res, { id: r.insertId });
+  } catch (e) { console.error('[visitas crearAsignacion]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── DELETE /api/visitas/asignaciones/:id — cerrar (supervisar) ────── */
+const cerrarAsignacion = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [[a]] = await pool.query("SELECT * FROM visitas_asignaciones WHERE id=? AND estado='ACTIVA'", [id]);
+    if (!a) return err(res, 404, 'Asignación no encontrada o ya cerrada.');
+    await pool.query("UPDATE visitas_asignaciones SET estado='CERRADA', cerrada_at=NOW() WHERE id=?", [id]);
+    // borrar visitas futuras aún no realizadas de esa asignación
+    const [rd] = await pool.query(
+      "DELETE FROM visitas_dealers WHERE id_asignacion=? AND estado='PROGRAMADA' AND fecha_programada>=CURDATE()", [id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'visitas', entidad: 'asignacion', entidad_id: id,
+      detalle: `Cerró asignación de ${a.nombre_dealer} (${a.usuario_nombre}); ${rd.affectedRows} visitas futuras borradas` });
+    ok(res, { cerrada: true, visitas_borradas: rd.affectedRows });
+  } catch (e) { console.error('[visitas cerrarAsignacion]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/planes + PUT /planes/:id/cerrar (supervisar) ── */
+const listarPlanes = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT p.*,
+        (SELECT COUNT(*) FROM visitas_asignaciones a WHERE a.id_plan=p.id) asignaciones,
+        (SELECT COUNT(*) FROM visitas_dealers v WHERE v.id_plan=p.id) visitas,
+        (SELECT COUNT(*) FROM visitas_dealers v WHERE v.id_plan=p.id AND v.estado='REALIZADA') realizadas
+       FROM visitas_planes p ORDER BY p.id DESC LIMIT 200`);
+    ok(res, rows);
+  } catch (e) { console.error('[visitas listarPlanes]', e); err(res, 500, 'Error interno del servidor'); }
+};
+const cerrarPlan = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [[p]] = await pool.query("SELECT * FROM visitas_planes WHERE id=? AND estado='ACTIVO'", [id]);
+    if (!p) return err(res, 404, 'Plan no encontrado o ya cerrado.');
+    await pool.query("UPDATE visitas_planes SET estado='CERRADO' WHERE id=?", [id]);
+    await pool.query("UPDATE visitas_asignaciones SET estado='CERRADA', cerrada_at=NOW() WHERE id_plan=? AND estado='ACTIVA'", [id]);
+    const [rd] = await pool.query(
+      "DELETE FROM visitas_dealers WHERE id_plan=? AND estado='PROGRAMADA' AND fecha_programada>=CURDATE()", [id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'visitas', entidad: 'plan', entidad_id: id,
+      detalle: `Cerró plan «${p.nombre}» (${rd.affectedRows} visitas futuras borradas)` });
+    ok(res, { cerrado: true, visitas_borradas: rd.affectedRows });
+  } catch (e) { console.error('[visitas cerrarPlan]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/ficha-dia?fecha=&usuario= — ficha imprimible ── */
+const fichaDia = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const esRevisor = await tieneFunc(uid, 'visitas_supervisar');
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.fecha || '')) ? req.query.fecha : null;
+    if (!fecha) return err(res, 400, 'Fecha requerida.');
+    const idU = esRevisor && req.query.usuario ? (parseInt(req.query.usuario) || uid) : uid;
+    const [rows] = await pool.query(
+      `SELECT v.*, d.direccion, d.direccion_parque, d.geo_dir, d.contacto, d.telefono, d.correo,
+              d.cf_nombre, d.cf_telefono, d.categoria_asignada, d.lat, d.lng, d.ccs_parque, d.tipo_ficha,
+              d.com_6_12, d.com_13_24, d.com_25_36, d.com_37
+         FROM visitas_dealers v LEFT JOIN dealers d ON d.id_dealer=v.id_dealer
+        WHERE v.fecha_programada=? AND v.id_usuario=? ORDER BY v.id`, [fecha, idU]);
+    // última venta por dealer
+    let ult = [];
+    try {
+      [ult] = await pool.query(
+        `SELECT rut_dealer, MAX(fecha_otorgado) ultima, COUNT(*) n FROM creditos
+          WHERE rut_dealer IS NOT NULL AND fecha_otorgado IS NOT NULL GROUP BY rut_dealer`);
+    } catch (_) {}
+    const norm = s => String(s || '').replace(/[.\-\s]/g, '').toUpperCase();
+    const mU = new Map(ult.map(r => [norm(r.rut_dealer), r]));
+    const data = rows.map(v => ({ ...v, direccion_visita: (v.geo_dir || v.direccion || v.direccion_parque || '').trim(),
+      ultima_venta: mU.get(norm(v.rut_dealer))?.ultima || null, creditos_total: mU.get(norm(v.rut_dealer))?.n || 0 }));
+    const [[u]] = await pool.query("SELECT CONCAT(nombre,' ',apellido) nombre FROM usuarios WHERE id_usuario=?", [idU]);
+    ok(res, { fecha, usuario: u?.nombre || '', visitas: data });
+  } catch (e) { console.error('[visitas fichaDia]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/stats?plan=&desde=&hasta= (supervisar: grupal) ── */
+const stats = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const esRevisor = await tieneFunc(uid, 'visitas_supervisar');
+    const where = [], pars = [];
+    if (!esRevisor) { where.push('v.id_usuario=?'); pars.push(uid); }
+    if (req.query.plan) { where.push('v.id_plan=?'); pars.push(parseInt(req.query.plan) || 0); }
+    if (req.query.desde) { where.push('v.fecha_programada>=?'); pars.push(req.query.desde); }
+    if (req.query.hasta) { where.push('v.fecha_programada<=?'); pars.push(req.query.hasta); }
+    const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
+    const [[tot]] = await pool.query(
+      `SELECT COUNT(*) programadas, SUM(estado='REALIZADA') realizadas,
+              SUM(resultado='POSITIVO') positivas, SUM(resultado='NEGATIVO') negativas,
+              COUNT(DISTINCT id_dealer) dealers, COUNT(DISTINCT id_usuario) ejecutivos
+         FROM visitas_dealers v ${W}`, pars);
+    const [porEjec] = await pool.query(
+      `SELECT v.id_usuario, v.usuario_nombre,
+              COUNT(*) programadas, SUM(v.estado='REALIZADA') realizadas,
+              SUM(v.resultado='POSITIVO') positivas, SUM(v.resultado='NEGATIVO') negativas,
+              COUNT(DISTINCT v.id_dealer) dealers,
+              (SELECT COUNT(*) FROM visitas_asignaciones a WHERE a.id_usuario=v.id_usuario AND a.estado='ACTIVA') cartera
+         FROM visitas_dealers v ${W} GROUP BY v.id_usuario, v.usuario_nombre ORDER BY realizadas DESC`, pars);
+    const [planes] = await pool.query(
+      `SELECT id, nombre, fecha_inicio, fecha_cierre, estado FROM visitas_planes ORDER BY fecha_inicio DESC LIMIT 100`);
+    ok(res, { totales: tot, por_ejecutivo: porEjec, planes, esRevisor });
+  } catch (e) { console.error('[visitas stats]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar,
+  ejecutivos, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
+  listarPlanes, cerrarPlan, fichaDia, stats };

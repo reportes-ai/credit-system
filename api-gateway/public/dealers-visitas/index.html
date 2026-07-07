@@ -116,7 +116,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.12</span>
+      <span class="version-badge" id="versionBadge">v2.0</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -150,6 +150,8 @@
     <button class="tab" id="tabPlan" onclick="setTab('plan')"><i class="bi bi-signpost-split"></i> Planificador de rutas</button>
     <button class="tab on" id="tabCal" onclick="setTab('cal')"><i class="bi bi-calendar3"></i> Calendario</button>
     <button class="tab" id="tabBit" onclick="setTab('bit')"><i class="bi bi-journal-text"></i> Gestiones</button>
+    <button class="tab hide" id="tabAsig" onclick="setTab('asig')"><i class="bi bi-diagram-3"></i> Asignación de Cartera</button>
+    <button class="tab" id="tabStats" onclick="setTab('stats')"><i class="bi bi-graph-up-arrow"></i> Estadísticas</button>
     <button class="tab hide" id="tabCfg" onclick="setTab('cfg')"><i class="bi bi-sliders"></i> Configuración</button>
   </div>
 
@@ -216,7 +218,11 @@
       <div class="cal-title" id="calTitle">—</div>
       <button class="btn btn-soft" onclick="navMes(1)"><i class="bi bi-chevron-right"></i></button>
       <button class="btn btn-ghost" onclick="hoyMes()"><i class="bi bi-dot"></i> Hoy</button>
-      <span class="stat" style="margin-left:auto" id="calInfo">—</span>
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
+        <input type="date" id="fichaFecha" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:.8rem">
+        <button class="btn btn-soft" onclick="imprimirFicha()" title="Ficha diaria de visitas con datos de los dealers y mapa"><i class="bi bi-printer"></i> Ficha del día</button>
+      </span>
+      <span class="stat" id="calInfo">—</span>
     </div>
     <div class="cal-grid" id="calDows"></div>
     <div class="cal-grid" id="calGrid" style="margin-top:6px"></div>
@@ -240,6 +246,69 @@
         <tbody id="bitBody"><tr><td class="empty">Cargando…</td></tr></tbody>
       </table>
     </div>
+  </div>
+
+  <!-- ── Asignación de Cartera (supervisores/jefe/gerente) ── -->
+  <div id="viewAsig" class="panel hide">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-diagram-3 me-1" style="color:#0e7490"></i>Asignación masiva de cartera</h5>
+    <p style="font-size:.83rem;color:#64748b;margin-bottom:14px">Reparte los dealers entre los ejecutivos seleccionados por zona/comuna y el sistema les genera el calendario de visitas del plan. Un dealer solo puede estar asignado a UN ejecutivo.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px">
+      <div class="fld" style="margin:0"><label>Nombre del plan</label><input id="amNombre" placeholder="Ej: Cartera RM Julio"></div>
+      <div class="fld" style="margin:0"><label>Inicio del plan</label><input type="date" id="amInicio"></div>
+      <div class="fld" style="margin:0"><label>Cierre del plan</label><input type="date" id="amCierre"></div>
+      <div class="fld" style="margin:0"><label>Meses desde última visita (0 = todos)</label><input type="number" id="amMeses" min="0" max="36" value="3"></div>
+      <div class="fld" style="margin:0"><label>Visitas por día</label><input type="number" id="amVisDia" min="1" max="50" value="4"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+      <div class="fld" style="margin:0"><label>Ejecutivos incluidos (checkbox)</label>
+        <div id="amEjecs" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 10px;max-height:180px;overflow-y:auto;font-size:.82rem">Cargando…</div></div>
+      <div class="fld" style="margin:0"><label>Comunas / zona (vacío = todas)</label>
+        <div id="amComunas" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 10px;max-height:180px;overflow-y:auto;font-size:.82rem">Cargando…</div></div>
+    </div>
+    <div class="fld"><label>Días de la semana</label><div class="dow-pick" id="amDias"></div></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-soft" onclick="masiva(true)"><i class="bi bi-eye"></i> Simular reparto</button>
+      <button class="btn btn-primary" onclick="masiva(false)"><i class="bi bi-check2-all"></i> Asignar y agendar</button>
+      <span id="amMsg" style="font-size:.84rem"></span>
+    </div>
+    <div id="amResultado" style="margin-top:12px"></div>
+
+    <hr style="margin:20px 0">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-person-plus me-1" style="color:#0e7490"></i>Asignación individual</h5>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div class="fld" style="margin:0;min-width:280px"><label>Dealer</label><select id="aiDealer"></select></div>
+      <div class="fld" style="margin:0;min-width:240px"><label>Ejecutivo</label><select id="aiEjec"></select></div>
+      <button class="btn btn-primary" onclick="asignarIndividual()"><i class="bi bi-plus-lg"></i> Asignar</button>
+    </div>
+
+    <hr style="margin:20px 0">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-clipboard-data me-1" style="color:#0e7490"></i>Cartera actual
+      <select id="asigFiltroEjec" style="margin-left:10px;font-size:.8rem;border:1.5px solid #e2e8f0;border-radius:8px;padding:4px 8px" onchange="cargarAsignaciones()"><option value="">Todos los ejecutivos</option></select>
+      <label style="font-size:.78rem;font-weight:600;margin-left:10px"><input type="checkbox" id="asigVerCerradas" onchange="cargarAsignaciones()"> Ver cerradas</label>
+    </h5>
+    <div style="overflow:auto"><table class="bt"><thead><tr>
+      <th>Ejecutivo</th><th>Dealer</th><th>Comuna</th><th>Origen</th><th>Plan</th><th>Última visita</th><th></th></tr></thead>
+      <tbody id="asigBody"><tr><td class="empty" colspan="7">Cargando…</td></tr></tbody></table></div>
+
+    <hr style="margin:20px 0">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-kanban me-1" style="color:#0e7490"></i>Planes de asignación</h5>
+    <div style="overflow:auto"><table class="bt"><thead><tr>
+      <th>Plan</th><th>Inicio</th><th>Cierre</th><th>Estado</th><th>Asignaciones</th><th>Visitas</th><th>Realizadas</th><th></th></tr></thead>
+      <tbody id="planesBody"><tr><td class="empty" colspan="8">Cargando…</td></tr></tbody></table></div>
+  </div>
+
+  <!-- ── Estadísticas ── -->
+  <div id="viewStats" class="panel hide">
+    <div class="toolbar" style="margin-bottom:14px">
+      <label>Plan</label><select id="stPlan" onchange="cargarStatsVisitas()"><option value="">Todos</option></select>
+      <label>Desde</label><input type="date" id="stDesde" onchange="cargarStatsVisitas()">
+      <label>Hasta</label><input type="date" id="stHasta" onchange="cargarStatsVisitas()">
+    </div>
+    <div id="stKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-person-badge me-1" style="color:#0e7490"></i>Por ejecutivo</h5>
+    <div style="overflow:auto"><table class="bt"><thead><tr>
+      <th>Ejecutivo</th><th>Cartera activa</th><th>Programadas</th><th>Realizadas</th><th>% Cumplimiento</th><th>Positivas</th><th>Negativas</th><th>% Positividad</th></tr></thead>
+      <tbody id="stBody"><tr><td class="empty" colspan="8">Cargando…</td></tr></tbody></table></div>
   </div>
 
   <!-- ── Configuración ── -->
@@ -366,13 +435,14 @@ async function cargarPermisos(){
   }catch(e){ ES_REVISOR=ES_ADMIN; PUEDE_GESTIONAR=ES_ADMIN; }
   if(ES_REVISOR){
     document.getElementById('tabCfg').classList.remove('hide');
+    document.getElementById('tabAsig').classList.remove('hide');
     document.getElementById('scopeBar').classList.remove('hide');
   }
 }
 
 /* ── Tabs ── */
 function setTab(t){
-  ['plan','cal','bit','cfg'].forEach(x=>{
+  ['plan','cal','bit','asig','stats','cfg'].forEach(x=>{
     document.getElementById('tab'+x[0].toUpperCase()+x.slice(1)).classList.toggle('on',t===x);
     document.getElementById('view'+x[0].toUpperCase()+x.slice(1)).classList.toggle('hide',t!==x);
   });
@@ -380,6 +450,8 @@ function setTab(t){
   if(t==='bit') cargarBitacora();
   if(t==='cfg') pintarConfig();
   if(t==='plan') initPlan();
+  if(t==='asig') initAsig();
+  if(t==='stats') cargarStatsVisitas();
 }
 function setScope(s){
   SCOPE=s;
@@ -983,11 +1055,210 @@ function abrir(id){ document.getElementById(id).classList.add('show'); document.
 function cerrar(id){ document.getElementById(id).classList.remove('show'); document.body.style.overflow=''; }
 function flash(id,txt,color){ const e=document.getElementById(id); e.textContent=txt; e.style.color=color||'#475569'; }
 
+/* ═════════ ASIGNACIÓN DE CARTERA ═════════ */
+let EJECUTIVOS = [], ASIG_INIT = false;
+
+async function initAsig(){
+  if (ASIG_INIT) { cargarAsignaciones(); cargarPlanes(); return; }
+  ASIG_INIT = true;
+  document.getElementById('amInicio').value = proxDiaHabil();
+  const cierre = new Date(); cierre.setMonth(cierre.getMonth()+1);
+  document.getElementById('amCierre').value = ymd(cierre);
+  document.getElementById('amVisDia').value = CFG.visitas_dia;
+  document.getElementById('amDias').innerHTML = DOWS.map(([n,lbl])=>
+    `<label><input type="checkbox" value="${n}" ${CFG.dias_semana.includes(+n)?'checked':''}> ${lbl.slice(0,3)}</label>`).join('');
+  // ejecutivos
+  try{
+    const r = await fetch('/api/visitas/ejecutivos',{headers:hdr()}); const j = await r.json();
+    EJECUTIVOS = j.data||[];
+    document.getElementById('amEjecs').innerHTML = EJECUTIVOS.map(e=>
+      `<label style="display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer">
+        <input type="checkbox" class="amEj" value="${e.id_usuario}"> ${esc(e.nombre)} <span style="color:#94a3b8;font-size:.7rem">${esc(e.perfil)}</span></label>`).join('');
+    document.getElementById('aiEjec').innerHTML = EJECUTIVOS.map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)} (${esc(e.perfil)})</option>`).join('');
+    document.getElementById('asigFiltroEjec').innerHTML = '<option value="">Todos los ejecutivos</option>' +
+      EJECUTIVOS.map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)}</option>`).join('');
+  }catch(e){}
+  // comunas + dealers para individual (desde el selector de dealers)
+  const comunas = [...new Set(DEALERS.map(d=>d.comuna).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  document.getElementById('amComunas').innerHTML = comunas.map(c=>
+    `<label style="display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer"><input type="checkbox" class="amCom" value="${esc(c)}"> ${esc(c)}</label>`).join('') || 'Sin comunas';
+  document.getElementById('aiDealer').innerHTML = DEALERS.map(d=>
+    `<option value="${d.id_dealer}">${esc(d.nombre)}${d.comuna?' — '+esc(d.comuna):''}</option>`).join('');
+  cargarAsignaciones(); cargarPlanes();
+}
+
+function paramsMasiva(simular){
+  return {
+    nombre: document.getElementById('amNombre').value.trim(),
+    fecha_inicio: document.getElementById('amInicio').value,
+    fecha_cierre: document.getElementById('amCierre').value,
+    meses_ultima_visita: +document.getElementById('amMeses').value || 0,
+    visitas_dia: +document.getElementById('amVisDia').value || CFG.visitas_dia,
+    dias_semana: [...document.querySelectorAll('#amDias input:checked')].map(i=>+i.value),
+    ejecutivos: [...document.querySelectorAll('.amEj:checked')].map(i=>+i.value),
+    comunas: [...document.querySelectorAll('.amCom:checked')].map(i=>i.value),
+    simular,
+  };
+}
+async function masiva(simular){
+  const b = paramsMasiva(simular);
+  if (!b.ejecutivos.length) return flash('amMsg','Selecciona al menos un ejecutivo.','#dc2626');
+  if (!simular && !confirm(`¿Asignar y agendar el plan «${b.nombre||b.fecha_inicio}» (${b.fecha_inicio} → ${b.fecha_cierre}) para ${b.ejecutivos.length} ejecutivo(s)?`)) return;
+  flash('amMsg', simular?'Simulando…':'Asignando…');
+  const r = await fetch('/api/visitas/asignacion-masiva',{method:'POST',headers:hdr(),body:JSON.stringify(b)});
+  const j = await r.json();
+  if (!j.success) return flash('amMsg', j.error, '#dc2626');
+  const d = j.data;
+  flash('amMsg', simular ? `Simulación: ${d.candidatos} dealers candidatos, ${d.fechas_habiles} días hábiles.` :
+    `✅ Plan creado: ${d.asignadas} dealers asignados, ${d.agendadas} visitas agendadas.`, simular?'#0e7490':'#16a34a');
+  document.getElementById('amResultado').innerHTML = `
+    <div style="overflow:auto"><table class="bt"><thead><tr><th>Ejecutivo</th><th>Dealers</th><th>Comunas</th><th>Agendables</th><th>Sin agenda</th></tr></thead>
+    <tbody>${d.por_ejecutivo.map(e=>`<tr><td>${esc(e.nombre)}</td><td><b>${e.dealers}</b></td>
+      <td style="font-size:.72rem;max-width:380px">${e.comunas.map(esc).join(', ')}</td>
+      <td>${e.agendables}</td><td style="color:${e.sin_agenda?'#dc2626':'#94a3b8'}">${e.sin_agenda}</td></tr>`).join('')}</tbody></table></div>
+    ${d.por_ejecutivo.some(e=>e.sin_agenda) ? '<div style="font-size:.76rem;color:#b45309;margin-top:6px"><i class="bi bi-exclamation-triangle"></i> Los «sin agenda» quedan asignados a la cartera pero no caben en el rango de fechas: amplía el cierre o sube las visitas/día.</div>' : ''}`;
+  if (!simular) { cargarAsignaciones(); cargarPlanes(); }
+}
+
+async function asignarIndividual(){
+  const id_dealer = +document.getElementById('aiDealer').value;
+  const id_usuario = +document.getElementById('aiEjec').value;
+  if (!id_dealer || !id_usuario) return;
+  const r = await fetch('/api/visitas/asignaciones',{method:'POST',headers:hdr(),body:JSON.stringify({id_dealer,id_usuario})});
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarAsignaciones();
+}
+
+async function cargarAsignaciones(){
+  const u = document.getElementById('asigFiltroEjec').value;
+  const cerradas = document.getElementById('asigVerCerradas').checked;
+  const r = await fetch(`/api/visitas/asignaciones?${u?'usuario='+u+'&':''}estado=${cerradas?'CERRADA':'ACTIVA'}`,{headers:hdr()});
+  const j = await r.json();
+  const body = document.getElementById('asigBody');
+  if (!j.success) { body.innerHTML = `<tr><td class="empty" colspan="7">${esc(j.error)}</td></tr>`; return; }
+  body.innerHTML = j.data.rows.length ? j.data.rows.map(a=>`<tr>
+    <td>${esc(a.usuario_nombre)}</td><td>${esc(a.nombre_dealer)}</td><td>${esc(a.comuna||'—')}</td>
+    <td><span style="font-size:.68rem;font-weight:700;border-radius:6px;padding:1px 7px;background:${a.origen==='MASIVA'?'#cffafe':'#f1f5f9'}">${a.origen}</span></td>
+    <td style="font-size:.74rem">${esc(a.plan_nombre||'—')}</td>
+    <td>${a.ultima_visita?fFecha(a.ultima_visita):'<span style="color:#b45309;font-weight:700">nunca</span>'}</td>
+    <td>${!cerradas?`<button class="btn btn-ghost" style="color:#dc2626" onclick="cerrarAsig(${a.id},'${esc(a.nombre_dealer)}')" title="Cerrar asignación"><i class="bi bi-x-circle"></i></button>`:''}</td>
+  </tr>`).join('') : '<tr><td class="empty" colspan="7">Sin asignaciones.</td></tr>';
+}
+async function cerrarAsig(id, nombre){
+  if (!confirm(`¿Cerrar la asignación de ${nombre}? Sus visitas futuras programadas se eliminarán.`)) return;
+  const r = await fetch('/api/visitas/asignaciones/'+id,{method:'DELETE',headers:hdr()});
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarAsignaciones();
+}
+
+async function cargarPlanes(){
+  const r = await fetch('/api/visitas/planes',{headers:hdr()});
+  const j = await r.json();
+  const body = document.getElementById('planesBody');
+  if (!j.success) { body.innerHTML = `<tr><td class="empty" colspan="8">${esc(j.error)}</td></tr>`; return; }
+  body.innerHTML = j.data.length ? j.data.map(p=>`<tr>
+    <td><b>${esc(p.nombre)}</b></td><td>${fFecha(p.fecha_inicio)}</td><td>${fFecha(p.fecha_cierre)}</td>
+    <td><span style="font-size:.68rem;font-weight:700;border-radius:6px;padding:1px 7px;background:${p.estado==='ACTIVO'?'#dcfce7':'#e0e7ff'}">${p.estado}</span></td>
+    <td>${p.asignaciones}</td><td>${p.visitas}</td><td>${p.realizadas}</td>
+    <td>${p.estado==='ACTIVO'?`<button class="btn btn-ghost" style="color:#dc2626" onclick="cerrarPlanUI(${p.id},'${esc(p.nombre)}')"><i class="bi bi-stop-circle"></i> Cerrar</button>`:''}</td>
+  </tr>`).join('') : '<tr><td class="empty" colspan="8">Sin planes.</td></tr>';
+}
+async function cerrarPlanUI(id, nombre){
+  if (!confirm(`¿Cerrar el plan «${nombre}»? Se cierran sus asignaciones y se borran las visitas futuras programadas.`)) return;
+  const r = await fetch(`/api/visitas/planes/${id}/cerrar`,{method:'PUT',headers:hdr()});
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarAsignaciones(); cargarPlanes();
+}
+
+/* ═════════ ESTADÍSTICAS ═════════ */
+async function cargarStatsVisitas(){
+  const plan = document.getElementById('stPlan').value;
+  const desde = document.getElementById('stDesde').value, hasta = document.getElementById('stHasta').value;
+  const qs = new URLSearchParams(); if(plan) qs.set('plan',plan); if(desde) qs.set('desde',desde); if(hasta) qs.set('hasta',hasta);
+  const r = await fetch('/api/visitas/stats?'+qs,{headers:hdr()});
+  const j = await r.json();
+  if (!j.success) return;
+  const t = j.data.totales, N = v=>Number(v||0).toLocaleString('es-CL');
+  const pct = (a,b)=> b>0 ? (a/b*100).toLocaleString('es-CL',{maximumFractionDigits:1})+'%' : '—';
+  const kpi = (v,l,bg)=>`<div style="border-radius:12px;padding:11px 13px;color:#fff;background:${bg}"><div style="font-size:1.3rem;font-weight:800">${v}</div><div style="font-size:.66rem;text-transform:uppercase;opacity:.9">${l}</div></div>`;
+  document.getElementById('stKpis').innerHTML =
+    kpi(N(t.programadas),'Programadas','#0e7490') + kpi(N(t.realizadas),'Realizadas','#0141A2') +
+    kpi(pct(t.realizadas,t.programadas),'% Cumplimiento','#7c3aed') +
+    kpi(N(t.positivas),'Positivas','#16a34a') + kpi(N(t.negativas),'Negativas','#dc2626') +
+    kpi(pct(t.positivas, Number(t.positivas||0)+Number(t.negativas||0)),'% Positividad','#b45309') +
+    kpi(N(t.dealers),'Dealers','#334155') + kpi(N(t.ejecutivos),'Ejecutivos','#64748b');
+  document.getElementById('stBody').innerHTML = j.data.por_ejecutivo.length ? j.data.por_ejecutivo.map(e=>`<tr>
+    <td>${esc(e.usuario_nombre||'—')}</td><td>${N(e.cartera)}</td><td>${N(e.programadas)}</td><td><b>${N(e.realizadas)}</b></td>
+    <td>${pct(e.realizadas,e.programadas)}</td><td style="color:#16a34a">${N(e.positivas)}</td>
+    <td style="color:#dc2626">${N(e.negativas)}</td><td>${pct(e.positivas, Number(e.positivas||0)+Number(e.negativas||0))}</td>
+  </tr>`).join('') : '<tr><td class="empty" colspan="8">Sin gestiones en el rango.</td></tr>';
+  // llenar select de planes (por fecha de inicio)
+  const sel = document.getElementById('stPlan');
+  if (sel.options.length <= 1 && j.data.planes)
+    sel.innerHTML = '<option value="">Todos</option>' + j.data.planes.map(p=>
+      `<option value="${p.id}">${esc(p.nombre)} (inicio ${fFecha(p.fecha_inicio)})</option>`).join('');
+}
+
+/* ═════════ FICHA DIARIA IMPRIMIBLE (datos + mapa) ═════════ */
+async function imprimirFicha(){
+  const fecha = document.getElementById('fichaFecha').value || hoyYmd();
+  const usuario = (ES_REVISOR && SCOPE==='todos') ? document.getElementById('scUser').value : '';
+  const r = await fetch(`/api/visitas/ficha-dia?fecha=${fecha}${usuario?'&usuario='+usuario:''}`,{headers:hdr()});
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const vs = j.data.visitas;
+  if (!vs.length) return alert('No hay visitas programadas ese día para ese ejecutivo.');
+  const conGeo = vs.filter(v=>v.lat!=null&&v.lng!=null);
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ficha de visitas ${fecha}</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+      body{font-family:'Segoe UI',sans-serif;margin:24px;color:#1e293b}
+      h2{margin:0 0 2px;color:#012d70} .sub{color:#64748b;font-size:.9rem;margin-bottom:14px}
+      #mapa{height:340px;border-radius:12px;margin-bottom:16px}
+      .card{border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:10px;page-break-inside:avoid}
+      .card h4{margin:0 0 6px;color:#0141A2} .g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:.85rem}
+      .g b{color:#012d70} .obs{border-top:1px dashed #cbd5e1;margin-top:8px;padding-top:6px;font-size:.8rem;color:#64748b;min-height:44px}
+      @media print{ #btnP{display:none} }
+    </style></head><body>
+    <button id="btnP" onclick="print()" style="float:right;padding:8px 18px;border:none;border-radius:8px;background:#0141A2;color:#fff;font-weight:700;cursor:pointer">🖨 Imprimir</button>
+    <h2>Ficha diaria de visitas — ${fFecha(fecha)}</h2>
+    <div class="sub">Ejecutivo: <b>${esc(j.data.usuario)}</b> · ${vs.length} visita(s)</div>
+    ${conGeo.length?'<div id="mapa"></div>':''}
+    ${vs.map((v,i)=>`<div class="card"><h4>${i+1}. ${esc(v.nombre_dealer||'—')} ${v.categoria_asignada?'· Cat. '+esc(v.categoria_asignada):''}</h4>
+      <div class="g">
+        <div><b>RUT:</b> ${esc(v.rut_dealer||'—')}</div>
+        <div><b>Comuna:</b> ${esc(v.comuna||'—')}</div>
+        <div><b>Teléfono:</b> ${esc(v.telefono||v.cf_telefono||'—')}</div>
+        <div style="grid-column:span 2"><b>Dirección:</b> ${esc(v.direccion_visita||'—')}</div>
+        <div><b>Contacto:</b> ${esc(v.contacto||v.cf_nombre||'—')}</div>
+        <div><b>Última venta:</b> ${v.ultima_venta?fFecha(v.ultima_venta):'nunca'}</div>
+        <div><b>Créditos históricos:</b> ${v.creditos_total||0}</div>
+        <div><b>Comisiones:</b> ${[v.com_6_12,v.com_13_24,v.com_25_36,v.com_37].map(x=>x==null?'—':Number(x).toLocaleString('es-CL')+'%').join(' / ')}</div>
+      </div>
+      <div class="obs"><b>Resultado / observaciones:</b></div>
+    </div>`).join('')}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+    <script>
+      const pts=${JSON.stringify(conGeo.map(v=>({lat:+v.lat,lng:+v.lng,n:v.nombre_dealer})))};
+      if(pts.length){
+        const m=L.map('mapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(m);
+        pts.forEach((p,i)=>L.marker([p.lat,p.lng]).addTo(m).bindTooltip((i+1)+'. '+p.n,{permanent:true,direction:'top',offset:[-14,-8]}));
+        m.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(0.25));
+      }
+    <\/script></body></html>`);
+  w.document.close();
+}
+
 /* ── Init ── */
 (async function init(){
   await cargarPermisos();
   try{ const r=await fetch('/api/visitas/config',{headers:hdr()}); const j=await r.json(); if(j.success) CFG=j.data; }catch(e){}
   await cargarDealers();
+  document.getElementById('fichaFecha').value = hoyYmd();
   cargarMes();
 })();
 </script>

@@ -8,7 +8,18 @@ const c = require('../controllers/visitas.controller');
 const verVisitas = requireFunc('visitas_dealers', 'visitas_supervisar');
 const gestionar  = requireFunc('visitas_dealers', 'visitas_supervisar');
 
+const supervisar = requireFunc('visitas_supervisar');
+
 router.get('/config',          verifyToken, verVisitas, c.getConfig);
+router.get('/ejecutivos',      verifyToken, supervisar, c.ejecutivos);
+router.post('/asignacion-masiva', verifyToken, supervisar, c.asignacionMasiva);
+router.get('/asignaciones',    verifyToken, verVisitas, c.listarAsignaciones);
+router.post('/asignaciones',   verifyToken, supervisar, c.crearAsignacion);
+router.delete('/asignaciones/:id', verifyToken, supervisar, c.cerrarAsignacion);
+router.get('/planes',          verifyToken, supervisar, c.listarPlanes);
+router.put('/planes/:id/cerrar', verifyToken, supervisar, c.cerrarPlan);
+router.get('/ficha-dia',       verifyToken, verVisitas, c.fichaDia);
+router.get('/stats',           verifyToken, verVisitas, c.stats);
 router.put('/config',          verifyToken, requireFunc('visitas_supervisar'), c.putConfig);
 router.get('/dealers',         verifyToken, verVisitas, c.getDealers);
 router.get('/planificador',    verifyToken, verVisitas, c.planificador);
