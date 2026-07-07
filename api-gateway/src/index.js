@@ -226,6 +226,7 @@ app.use('/api/cierre-caja',          require('../../services/tesoreria/src/route
 app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/routes/cuentas-transitorias.routes'));
 app.use('/api/brokerage',            require('../../services/tesoreria/src/routes/brokerage.routes'));
 app.use('/api/aplicacion-fondos',    require('../../services/tesoreria/src/routes/aplicacion-fondos.routes'));
+app.use('/api/cierre-contable',      require('../../services/tesoreria/src/routes/cierre-contable.routes'));
 
 // Cartas de Aprobación
 app.use('/api/cartas',            require('../../services/cartas/src/routes/cartas.routes'));
@@ -414,6 +415,7 @@ const PAGINAS = [
   ['/tesoreria', 'tesoreria/index.html'],
   ['/tesoreria/caja', 'tesoreria/caja.html'],
   ['/tesoreria/aplicacion-fondos', 'tesoreria/aplicacion-fondos.html'],
+  ['/tesoreria/cierre-contable', 'tesoreria/cierre-contable.html'],
   ['/tesoreria/cajas', 'tesoreria/cajas.html'],
   ['/tesoreria/cierre-caja', 'tesoreria/cierre-caja.html'],
   ['/tesoreria/cuentas-transitorias', 'tesoreria/cuentas-transitorias.html'],

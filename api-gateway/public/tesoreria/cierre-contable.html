@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cierre Contable — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:1350px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+  .banner > i { font-size:2.3rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .banner .der { margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+  .tab { border:none; background:#fff; border-radius:10px; padding:9px 18px; font-size:.85rem; font-weight:700; color:#475569; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .tab.on { background:var(--accent); color:#fff; }
+  .panel { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .panel h5 { margin:0 0 10px; font-size:.95rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  label { font-size:.7rem; font-weight:700; color:#374151; display:block; margin-bottom:3px; }
+  input, select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.84rem; font-family:inherit; outline:none; }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:#f8fafc; text-align:left; padding:6px 8px; font-size:.6rem; text-transform:uppercase; color:#6b7280; position:sticky; top:0; }
+  td { padding:5px 8px; border-bottom:1px solid #f1f5f9; }
+  td.num, th.num { text-align:right; white-space:nowrap; }
+  tfoot td { font-weight:800; background:#f8fafc; border-top:2px solid #e2e8f0; }
+  .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.8rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-verde { background:var(--ok); color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:#fff; border-radius:12px; padding:12px 14px; box-shadow:0 1px 5px rgba(0,0,0,.06); }
+  .kpi .l { font-size:.62rem; font-weight:800; text-transform:uppercase; color:#64748b; }
+  .kpi .v { font-size:1.15rem; font-weight:800; color:var(--navy); margin-top:2px; }
+  .kpi .s { font-size:.66rem; color:#94a3b8; }
+  .chip { border-radius:8px; padding:2px 8px; font-size:.64rem; font-weight:700; display:inline-block; }
+  .c-venc { background:#fee2e2; color:#b91c1c; } .c-vig { background:#dcfce7; color:#166534; }
+  .vacio { color:#9ca3af; font-size:.83rem; text-align:center; padding:18px; }
+  .scroll { max-height:520px; overflow:auto; }
+  .nota { background:#fffbeb; border:1.5px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:.78rem; color:#92400e; margin-bottom:12px; }
+  @media print {
+    body { background:#fff; } .tabs, .banner .der, .no-print, #af-topnav { display:none !important; }
+    .panel, .kpi { box-shadow:none; border:1px solid #e2e8f0; }
+    .tab-body { display:block !important; } .scroll { max-height:none; overflow:visible; }
+  }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-journal-check"></i>
+    <div>
+      <h2>Cierre Contable <span class="chip" style="background:#ffffff33;color:#fff" id="badgeV">v1.0</span></h2>
+      <p>Informe mensual para Contabilidad → Casa Matriz (Ecuador): negociaciones, cartera vigente, producción, saldos precio, recompra y tablas de desarrollo.</p>
+    </div>
+    <div class="der no-print">
+      <label style="color:#dbeafe;margin:0">Mes</label>
+      <input type="month" id="mes" style="border:none">
+      <button class="btnx btn-gris" onclick="cargar()">Generar</button>
+      <button class="btnx btn-gris" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="tabs no-print" id="tabs">
+    <button class="tab on" data-t="cartera" onclick="showTab('cartera',this)">1· Cartera Vigente</button>
+    <button class="tab" data-t="produccion" onclick="showTab('produccion',this)">2· Producción</button>
+    <button class="tab" data-t="saldos" onclick="showTab('saldos',this)">3· Saldos Precio</button>
+    <button class="tab" data-t="negoc" onclick="showTab('negoc',this)">4· Negociaciones</button>
+    <button class="tab" data-t="recompra" onclick="showTab('recompra',this)">5· Recompra</button>
+  </div>
+
+  <!-- 1 CARTERA VIGENTE -->
+  <div class="tab-body" id="tb-cartera">
+    <div class="panel">
+      <h5><i class="bi bi-collection"></i> Cartera Vigente al cierre (AFA + AutoFácil antigua, sin lo pagado)
+        <span style="margin-left:auto" class="no-print">
+          <button class="btnx btn-verde" onclick="xlsCartera()"><i class="bi bi-file-earmark-excel"></i> Excel</button>
+          <button class="btnx btn-gris" onclick="xlsTablaDes()"><i class="bi bi-table"></i> Tablas de desarrollo</button>
+        </span>
+      </h5>
+      <div class="scroll"><table id="t-cartera"></table></div>
+    </div>
+  </div>
+
+  <!-- 2 PRODUCCION -->
+  <div class="tab-body" id="tb-produccion" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-graph-up-arrow"></i> Producción del mes (colocaciones + comisiones)
+        <span style="margin-left:auto" class="no-print"><button class="btnx btn-verde" onclick="xlsProduccion()"><i class="bi bi-file-earmark-excel"></i> Excel</button></span>
+      </h5>
+      <div class="scroll"><table id="t-prod"></table></div>
+    </div>
+  </div>
+
+  <!-- 3 SALDOS PRECIO -->
+  <div class="tab-body" id="tb-saldos" style="display:none">
+    <div class="nota no-print"><i class="bi bi-info-circle"></i> El pago del saldo precio al concesionario aún no se registra en el sistema: marca aquí los ya pagados (checkbox) y quedan fuera del informe. La marca es permanente entre meses.</div>
+    <div class="panel">
+      <h5><i class="bi bi-cash-stack"></i> Saldos precio pendientes de pago al cierre
+        <span style="margin-left:auto" class="no-print"><button class="btnx btn-verde" onclick="xlsSaldos()"><i class="bi bi-file-earmark-excel"></i> Excel</button></span>
+      </h5>
+      <div class="scroll"><table id="t-saldos"></table></div>
+    </div>
+  </div>
+
+  <!-- 4 NEGOCIACIONES -->
+  <div class="tab-body" id="tb-negoc" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-arrow-left-right"></i> Negociaciones del mes (venta de cartera)</h5>
+      <div class="nota">Se llena solo cuando hay venta de cartera en el mes. Sin filas = reporte en cero (lo habitual).</div>
+      <table id="t-negoc"></table>
+      <div class="no-print" style="margin-top:10px;display:flex;gap:8px;align-items:end">
+        <div><label>Fecha</label><input type="date" id="ng-fecha"></div>
+        <div><label>Institución</label><input id="ng-inst" placeholder="Comprador"></div>
+        <div><label>N° Ops</label><input type="number" id="ng-ops" style="width:80px"></div>
+        <div><label>Capital negociado $</label><input type="number" id="ng-capital" style="width:140px"></div>
+        <div><label>Spread $</label><input type="number" id="ng-spread" style="width:120px"></div>
+        <div><label>Valor acreditado $</label><input type="number" id="ng-acreditado" style="width:140px"></div>
+        <button class="btnx btn-azul" onclick="agregarNegoc()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 RECOMPRA -->
+  <div class="tab-body" id="tb-recompra" style="display:none">
+    <div class="panel">
+      <h5><i class="bi bi-arrow-counterclockwise"></i> Re-compra de cartera del mes (por mora de cartera vendida)</h5>
+      <div class="nota">Se llena solo cuando hay recompra en el mes. Sin filas = reporte en cero (lo habitual).</div>
+      <table id="t-recompra"></table>
+      <div class="no-print" style="margin-top:10px;display:flex;gap:8px;align-items:end">
+        <div><label>Fecha</label><input type="date" id="rc-fecha"></div>
+        <div><label>N° Ops</label><input type="number" id="rc-ops" style="width:80px"></div>
+        <div><label>Saldo recomprado $</label><input type="number" id="rc-saldo" style="width:140px"></div>
+        <div><label>Devolución spread $</label><input type="number" id="rc-spread" style="width:140px"></div>
+        <button class="btnx btn-azul" onclick="agregarRecompra()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel no-print">
+    <h5><i class="bi bi-currency-dollar"></i> Parámetros del cierre</h5>
+    <div style="display:flex;gap:14px;align-items:end;flex-wrap:wrap">
+      <div><label>Tipo de cambio USD (cierre)</label><input type="number" step="0.01" id="tc" style="width:130px"></div>
+      <div style="flex:1"><label>Notas</label><input id="notas" style="width:100%"></div>
+      <button class="btnx btn-verde" onclick="guardarManual()"><i class="bi bi-save"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/xlsx.full.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const fN = v => Math.round(+v || 0).toLocaleString('es-CL');
+let DATA = null;
+
+function showTab(t, el) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('on'));
+  if (el) el.classList.add('on');
+  document.querySelectorAll('.tab-body').forEach(d => d.style.display = 'none');
+  $('tb-' + t).style.display = '';
+}
+
+async function cargar() {
+  const mes = $('mes').value;
+  if (!mes) return;
+  const r = await fetch('/api/cierre-contable?mes=' + mes, { headers: H });
+  const j = await r.json();
+  if (!j.success) { alert(j.error || 'Error'); return; }
+  DATA = j.data;
+  render();
+}
+
+function render() {
+  const d = DATA, tc = d.manual.tc_usd || null;
+  const usd = v => tc ? ' <span class="s">US$ ' + Math.round(v / tc).toLocaleString('es-CL') + '</span>' : '';
+  $('tc').value = tc || '';
+  $('notas').value = d.manual.notas || '';
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Cartera vigente — capital</div><div class="v">$${fN(d.cartera.totales.capital)}</div><div class="s">${d.cartera.totales.n} ops · ${d.cartera.totales.vencidos} vencidas / ${d.cartera.totales.vigentes} vigentes${usd(d.cartera.totales.capital)}</div></div>
+    <div class="kpi"><div class="l">Capital vencido</div><div class="v">$${fN(d.cartera.totales.capital_vencido)}</div><div class="s">por vencer $${fN(d.cartera.totales.capital_x_vencer)}</div></div>
+    <div class="kpi"><div class="l">Interés pendiente</div><div class="v">$${fN(d.cartera.totales.interes_pend)}</div></div>
+    <div class="kpi"><div class="l">Producción ${d.mes}</div><div class="v">${d.produccion.totales.n} ops</div><div class="s">$${fN(d.produccion.totales.financiado)} financiado</div></div>
+    <div class="kpi"><div class="l">Com. concesionario (c/IVA)</div><div class="v">$${fN(d.produccion.totales.com_dealer_iva)}</div><div class="s">neta $${fN(d.produccion.totales.com_dealer_neta)} · parque $${fN(d.produccion.totales.com_parque)}</div></div>
+    <div class="kpi"><div class="l">Saldos precio pendientes</div><div class="v">$${fN(d.saldos.totales.saldo)}</div><div class="s">${d.saldos.totales.n} ops</div></div>`;
+
+  // 1 cartera
+  $('t-cartera').innerHTML = `<thead><tr><th>OP</th><th>RUT</th><th>Cliente</th><th>Cartera</th>
+    <th class="num">Tasa</th><th class="num">Capital</th><th class="num">Cap. vencido</th><th class="num">Cap. x vencer</th>
+    <th class="num">Interés pend.</th><th class="num">Días venc.</th><th>Estatus</th></tr></thead><tbody>` +
+    d.cartera.ops.map(o => `<tr><td>${o.num_op}</td><td>${o.rut}</td><td>${o.nombre}</td><td>${o.cartera}</td>
+      <td class="num">${o.tasa ?? '—'}</td><td class="num">${fN(o.capital)}</td><td class="num">${fN(o.capital_vencido)}</td>
+      <td class="num">${fN(o.capital_x_vencer)}</td><td class="num">${fN(o.interes_pend)}</td><td class="num">${o.dias_vencidos}</td>
+      <td><span class="chip ${o.estatus === 'vencido' ? 'c-venc' : 'c-vig'}">${o.estatus}</span></td></tr>`).join('') +
+    `</tbody><tfoot><tr><td colspan="5">Total (${d.cartera.totales.n} ops)</td>
+      <td class="num">${fN(d.cartera.totales.capital)}</td><td class="num">${fN(d.cartera.totales.capital_vencido)}</td>
+      <td class="num">${fN(d.cartera.totales.capital_x_vencer)}</td><td class="num">${fN(d.cartera.totales.interes_pend)}</td><td colspan="2"></td></tr></tfoot>`;
+
+  // 2 producción
+  $('t-prod').innerHTML = `<thead><tr><th>Fecha</th><th>OP</th><th>Concesionario</th><th>RUT dealer</th><th>Cliente</th>
+    <th class="num">Financiado</th><th class="num">Com. neta</th><th class="num">Com. c/IVA</th><th class="num">Com. parque</th></tr></thead><tbody>` +
+    d.produccion.ops.map(o => `<tr><td>${o.fecha_otorgado || ''}</td><td>${o.num_op}</td><td>${o.automotora || ''}</td>
+      <td>${o.rut_dealer || ''}</td><td>${o.cliente}</td><td class="num">${fN(o.monto_financiado)}</td>
+      <td class="num">${fN(o.com_dealer_neta)}</td><td class="num">${fN(o.com_dealer_iva)}</td><td class="num">${fN(o.com_parque)}</td></tr>`).join('') +
+    `</tbody><tfoot><tr><td colspan="5">Total (${d.produccion.totales.n} ops)</td>
+      <td class="num">${fN(d.produccion.totales.financiado)}</td><td class="num">${fN(d.produccion.totales.com_dealer_neta)}</td>
+      <td class="num">${fN(d.produccion.totales.com_dealer_iva)}</td><td class="num">${fN(d.produccion.totales.com_parque)}</td></tr></tfoot>`;
+
+  // 3 saldos
+  $('t-saldos').innerHTML = `<thead><tr><th class="no-print">Pagado</th><th>Mes</th><th>OP</th><th>Concesionario</th>
+    <th>RUT dealer</th><th>Cliente</th><th>RUT cliente</th><th class="num">Saldo precio</th></tr></thead><tbody>` +
+    d.saldos.ops.map(o => `<tr><td class="no-print"><input type="checkbox" onchange="marcarSaldo('${o.num_op}', this)"></td>
+      <td>${o.mes_op}</td><td>${o.num_op}</td><td>${o.automotora || ''}</td><td>${o.rut_dealer || ''}</td>
+      <td>${o.cliente}</td><td>${o.rut_cliente}</td><td class="num">${fN(o.saldo_precio)}</td></tr>`).join('') +
+    `</tbody><tfoot><tr><td colspan="7">Total (${d.saldos.totales.n} ops)</td><td class="num">${fN(d.saldos.totales.saldo)}</td></tr></tfoot>`;
+
+  renderNegoc(); renderRecompra();
+}
+
+function renderNegoc() {
+  const n = DATA.manual.negociaciones || [];
+  $('t-negoc').innerHTML = `<thead><tr><th>Fecha</th><th>Institución</th><th class="num">N° Ops</th>
+    <th class="num">Capital negociado</th><th class="num">Spread</th><th class="num">Valor acreditado</th><th class="no-print"></th></tr></thead><tbody>` +
+    (n.length ? n.map((x, i) => `<tr><td>${x.fecha || ''}</td><td>${x.institucion || ''}</td><td class="num">${fN(x.ops)}</td>
+      <td class="num">${fN(x.capital)}</td><td class="num">${fN(x.spread)}</td><td class="num">${fN(x.acreditado)}</td>
+      <td class="no-print"><button class="btnx btn-gris" onclick="DATA.manual.negociaciones.splice(${i},1);renderNegoc()">✕</button></td></tr>`).join('')
+      : '<tr><td colspan="7" class="vacio">Sin negociaciones este mes — reporte en $0</td></tr>') + '</tbody>';
+}
+function agregarNegoc() {
+  (DATA.manual.negociaciones = DATA.manual.negociaciones || []).push({
+    fecha: $('ng-fecha').value, institucion: $('ng-inst').value, ops: +$('ng-ops').value || 0,
+    capital: +$('ng-capital').value || 0, spread: +$('ng-spread').value || 0, acreditado: +$('ng-acreditado').value || 0 });
+  renderNegoc();
+}
+function renderRecompra() {
+  const n = DATA.manual.recompras || [];
+  $('t-recompra').innerHTML = `<thead><tr><th>Fecha</th><th class="num">N° Ops</th><th class="num">Saldo recomprado</th>
+    <th class="num">Dev. spread</th><th class="num">Total</th><th class="no-print"></th></tr></thead><tbody>` +
+    (n.length ? n.map((x, i) => `<tr><td>${x.fecha || ''}</td><td class="num">${fN(x.ops)}</td><td class="num">${fN(x.saldo)}</td>
+      <td class="num">${fN(x.spread)}</td><td class="num">${fN((+x.saldo||0)+(+x.spread||0))}</td>
+      <td class="no-print"><button class="btnx btn-gris" onclick="DATA.manual.recompras.splice(${i},1);renderRecompra()">✕</button></td></tr>`).join('')
+      : '<tr><td colspan="6" class="vacio">Sin recompras este mes — reporte en $0</td></tr>') + '</tbody>';
+}
+function agregarRecompra() {
+  (DATA.manual.recompras = DATA.manual.recompras || []).push({
+    fecha: $('rc-fecha').value, ops: +$('rc-ops').value || 0, saldo: +$('rc-saldo').value || 0, spread: +$('rc-spread').value || 0 });
+  renderRecompra();
+}
+
+async function guardarManual() {
+  const body = { tc_usd: +$('tc').value || null, notas: $('notas').value,
+    negociaciones: DATA?.manual?.negociaciones || [], recompras: DATA?.manual?.recompras || [] };
+  const r = await fetch('/api/cierre-contable/' + $('mes').value, { method: 'PUT', headers: H, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (j.success) { if (DATA) DATA.manual = { ...DATA.manual, ...body }; render(); }
+  else alert(j.error || 'Error');
+}
+
+async function marcarSaldo(op, chk) {
+  const r = await fetch('/api/cierre-contable/saldo-pagado/' + op, { method: 'PUT', headers: H,
+    body: JSON.stringify({ pagado: chk.checked }) });
+  const j = await r.json();
+  if (!j.success) { chk.checked = !chk.checked; alert(j.error || 'Error'); return; }
+  if (chk.checked) chk.closest('tr').style.opacity = .35;
+  else chk.closest('tr').style.opacity = 1;
+}
+
+// ── exports Excel ──
+function xls(nombre, rows) {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, nombre.slice(0, 30));
+  XLSX.writeFile(wb, `${DATA.mes} ${nombre}.xlsx`);
+}
+function xlsCartera() { xls('cartera vigente', DATA.cartera.ops); }
+function xlsProduccion() { xls('produccion comision', DATA.produccion.ops); }
+function xlsSaldos() { xls('saldos precios pendientes', DATA.saldos.ops); }
+async function xlsTablaDes() {
+  const r = await fetch('/api/cierre-contable/tabla-desarrollo?mes=' + $('mes').value, { headers: H });
+  const j = await r.json();
+  if (!j.success) { alert(j.error || 'Error'); return; }
+  xls('tablas de desarrollo', j.data.rows);
+}
+
+// init: mes anterior por defecto
+(() => {
+  const d = new Date(); d.setMonth(d.getMonth() - 1);
+  $('mes').value = d.toISOString().slice(0, 7);
+  cargar();
+})();
+</script>
+</body>
+</html>
