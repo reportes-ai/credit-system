@@ -210,7 +210,7 @@
   <a class="nav-brand" href="/">
     <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
     <span>Revisión de Crédito</span>
-    <span class="version-badge">v4.0</span>
+    <span class="version-badge">v4.1</span>
   </a>
   <div class="breadcrumb-nav">
   <a href="/">Inicio</a><span class="sep">›</span>
@@ -458,6 +458,7 @@ async function cargarPagina() {
       await precargarUFDias21(buildAmortSchedule(_credito));
     }
     renderPagina(_credito, ant, com);
+    poblarEstadosParametricos(_credito);
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
@@ -699,24 +700,10 @@ function renderPagina(c, ant, com) {
         <div class="row" style="display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start">
           <div>
             <div class="fi-label" style="margin-bottom:6px">Estado del Crédito</div>
-            <select id="dEstado" class="estado-select">
-              <option value="INGRESO"            ${(c.estado==='INGRESO'||c.estado==='REVISION') ?'selected':''}>Ingresado</option>
-              <option value="CARGA_RESPALDOS"    ${c.estado==='CARGA_RESPALDOS'    ?'selected':''}>Carga Respaldos</option>
-              <option value="EN_ANALISIS"        ${c.estado==='EN_ANALISIS'        ?'selected':''}>En Análisis</option>
-              <option value="EMISION_DOCUMENTOS" ${c.estado==='EMISION_DOCUMENTOS' ?'selected':''}>Emisión Documentos</option>
-              <option value="CARGA_DOCUMENTOS_AF"${c.estado==='CARGA_DOCUMENTOS_AF'?'selected':''}>Carga Docs. AF</option>
-              <option value="VALIDACION_FIRMA"   ${c.estado==='VALIDACION_FIRMA'   ?'selected':''}>Validación Firma</option>
-              <option value="VIGENTE"            ${c.estado==='VIGENTE'            ?'selected':''}>Vigente</option>
-              <option value="EN MORA"            ${c.estado==='EN MORA'            ?'selected':''}>En Mora</option>
-              <option value="CANCELADO"          ${c.estado==='CANCELADO'          ?'selected':''}>Cancelado</option>
-              <option value="PREPAGADO"          ${c.estado==='PREPAGADO'          ?'selected':''}>Prepagado</option>
-              <option value="CASTIGADO"          ${c.estado==='CASTIGADO'          ?'selected':''}>Castigado</option>
-              <optgroup label="── Broker (AUTOFIN / UNIDAD) ──">
-              <option value="CARTA_APROBACION"   ${c.estado==='CARTA_APROBACION'   ?'selected':''}>Carta Aprobación</option>
-              <option value="OTORGADO"           ${c.estado==='OTORGADO'           ?'selected':''}>Otorgado</option>
-              <option value="CURSADO"            ${c.estado==='CURSADO'            ?'selected':''}>Cursado</option>
-              <option value="DESISTIDO"          ${c.estado==='DESISTIDO'          ?'selected':''}>Desistido</option>
-              </optgroup>
+            <!-- Estados PARAMÉTRICOS: se cargan desde el mantenedor Estado Créditos
+                 (/api/estado-creditos) según el ámbito del crédito. -->
+            <select id="dEstado" class="estado-select" data-actual="${c.estado||''}">
+              <option value="${c.estado||''}" selected>${c.estado||'—'}</option>
             </select>
           </div>
           <div>
@@ -1394,6 +1381,28 @@ async function marcarBroker(nuevoEstado) {
     showToast(`Crédito marcado como ${label}`, true);
     setTimeout(() => location.reload(), 1200);
   } catch(e) { showToast('Error: '+e.message, false); }
+}
+
+/* ── Estados PARAMÉTRICOS desde el mantenedor Estado Créditos ──
+   Brokerage (AUTOFIN/UNIDAD) → ámbito brokerage; propios → ámbito autofacil.
+   Si el estado actual no está en el mapa (histórico), se conserva como opción. */
+async function poblarEstadosParametricos(c) {
+  const sel = document.getElementById('dEstado');
+  if (!sel) return;
+  try {
+    const r = await fetch('/api/estado-creditos', { headers: apiHdr() });
+    const j = await r.json();
+    if (!j.success) return;
+    const fin = String(c.financiera || '').toUpperCase();
+    const ambito = (fin === 'AUTOFIN' || fin.includes('UNIDAD')) ? 'brokerage' : 'autofacil';
+    const estados = (j.data || []).filter(e => e.ambito === ambito).sort((a, b) => a.orden - b.orden);
+    if (!estados.length) return;
+    const actual = sel.dataset.actual || c.estado || '';
+    sel.innerHTML = estados.map(e =>
+      `<option value="${e.codigo}" ${e.codigo === actual ? 'selected' : ''}>${e.nombre}</option>`).join('');
+    if (actual && !estados.some(e => e.codigo === actual))
+      sel.insertAdjacentHTML('afterbegin', `<option value="${actual}" selected>${actual} (histórico)</option>`);
+  } catch (_) { /* si falla, queda el estado actual como única opción */ }
 }
 
 /* ── Botones Aprobar / Rechazar ── */
