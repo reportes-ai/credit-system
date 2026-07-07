@@ -272,8 +272,9 @@ exports.getDatos = async (req, res) => {
                  PARTITION BY COALESCE(NULLIF(num_op,''), NULLIF(numero_credito,''), CONCAT('__id', id))
                  ORDER BY id DESC) AS _rn
         FROM creditos WHERE mes IS NOT NULL
-          -- Cartera migrada AFA (2016-2022) NO es colocación del negocio: vive en
-          -- cobranza/judicial, no en el dashboard de ventas
+          -- Dashboard de ventas: SOLO cartera desde enero 2025 (definición Pato).
+          -- Deja fuera la cartera migrada (AFA 2016-2022 y XLSX 2024) y meses viejos.
+          AND mes >= '2025-01-01'
           AND COALESCE(origen,'') <> 'CARTERA_AFA'
       ) ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
