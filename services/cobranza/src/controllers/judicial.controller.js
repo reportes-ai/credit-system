@@ -152,6 +152,23 @@ exports.listar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* Expediente judicial de UN crédito (read-only, para la ficha del CRM de
+   cobranza — cualquier usuario de cobranza, no requiere el permiso del
+   mantenedor). Sin `raw`. */
+exports.expediente = async (req, res) => {
+  try {
+    const [[cr]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [req.params.id_credito]);
+    if (!cr) return fail(res, 'Crédito no existe', 404);
+    const [[j]] = await pool.query(
+      `SELECT id, num_op, rut, cartera_original, status_credito, abogado, status_legal,
+              juzgado, rol, fecha_ultimo_status, comentario, gastos_procesales, pagare,
+              garantia_sistema, saldo_deuda, provision, dias_mora, fecha_ingreso_mora,
+              fecha_ultimo_pago
+         FROM cobranza_judicial WHERE num_op=?`, [cr.num_op]);
+    ok(res, j || null);
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.actualizar = async (req, res) => {
   try {
     const [[j]] = await pool.query('SELECT * FROM cobranza_judicial WHERE id=?', [req.params.id]);

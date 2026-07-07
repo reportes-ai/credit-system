@@ -223,7 +223,7 @@ const MORA_SQL = (whereExtra = '', havingExtra = '') => `
     GROUP BY id_credito
   ) pp ON pp.id_credito = c.id
   WHERE c.estado IN ('VIGENTE','EN MORA','OTORGADO')
-    AND (c.financiera = 'AUTOFACIL' OR c.financiera IS NULL)
+    AND (c.financiera IN ('AUTOFACIL','AFA') OR c.financiera IS NULL)
     AND COALESCE(c.estado_cartera,'') <> 'PREPAGADO'
     AND c.plazo IS NOT NULL
     AND c.plazo > 0
@@ -857,7 +857,7 @@ exports.diagnostico = async (req, res) => {
       `SELECT COUNT(*) AS autofacil_con_fecha
        FROM creditos
        WHERE estado = 'VIGENTE'
-         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+         AND (financiera IN ('AUTOFACIL','AFA') OR financiera IS NULL)
          AND fecha_primera_cuota IS NOT NULL`
     );
 
@@ -866,7 +866,7 @@ exports.diagnostico = async (req, res) => {
       `SELECT COUNT(*) AS con_fecha_pasada
        FROM creditos
        WHERE estado = 'VIGENTE'
-         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+         AND (financiera IN ('AUTOFACIL','AFA') OR financiera IS NULL)
          AND plazo IS NOT NULL AND plazo > 0
          AND fecha_primera_cuota IS NOT NULL
          AND fecha_primera_cuota <= CURDATE()`
@@ -890,7 +890,7 @@ exports.diagnostico = async (req, res) => {
               fecha_primera_cuota, plazo, cuota, estado
        FROM creditos
        WHERE estado = 'VIGENTE'
-         AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+         AND (financiera IN ('AUTOFACIL','AFA') OR financiera IS NULL)
        LIMIT 10`
     );
 
@@ -915,7 +915,7 @@ exports.provisiones = async (req, res) => {
       SELECT COALESCE(SUM(monto_financiado), 0) AS deuda_total
       FROM creditos
       WHERE estado IN ('VIGENTE','EN MORA','OTORGADO')
-        AND (financiera = 'AUTOFACIL' OR financiera IS NULL)
+        AND (financiera IN ('AUTOFACIL','AFA') OR financiera IS NULL)
     `);
 
     // Mora por crédito usando el cálculo correcto

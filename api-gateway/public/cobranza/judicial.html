@@ -93,7 +93,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v5.0</span>
+      <span class="version-badge" id="versionBadge">v5.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -228,6 +228,12 @@
     </div>
 
     <div id="tab-judicial" class="tab-content" style="display:none">
+      <!-- Expediente judicial migrado (cobranza_judicial) — read-only; se edita en el mantenedor -->
+      <div id="expJudicial" style="display:none;background:#fef2f2;border:1.5px solid #fecaca;border-radius:10px;padding:14px 16px;margin-bottom:14px;font-size:0.83rem">
+        <h6 style="font-size:0.9rem;font-weight:700;color:#991b1b;margin-bottom:10px"><i class="bi bi-bank me-1"></i>Expediente Judicial (cartera migrada)</h6>
+        <div class="row g-2" id="expJudicialCampos"></div>
+        <div id="expJudicialComentario" style="margin-top:10px;padding-top:10px;border-top:1px dashed #fecaca;white-space:pre-wrap"></div>
+      </div>
       <div class="form-gestion">
         <h6 style="font-size:0.9rem;font-weight:700;color:#dc2626;margin-bottom:14px"><i class="bi bi-file-earmark-text me-1"></i>Registro de acción judicial</h6>
         <div class="mb-2">
@@ -374,6 +380,32 @@ async function abrirDrawer(id_credito) {
 
   cargarDisponibilidad(id_credito);
   cargarMensajes(id_credito);
+  cargarExpediente(id_credito);
+}
+
+// Expediente judicial migrado (cartera AFA) — read-only desde cobranza_judicial
+async function cargarExpediente(id_credito) {
+  const box = document.getElementById('expJudicial');
+  box.style.display = 'none';
+  try {
+    const r = await fetch(`/api/cobranza-judicial/expediente/${id_credito}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await r.json();
+    const e = j.data;
+    if (!j.success || !e) return;
+    const fd = v => v ? String(v).slice(0, 10).split('-').reverse().join('-') : '—';
+    const campos = [
+      ['Abogado', e.abogado], ['Status legal', e.status_legal], ['Status crédito', e.status_credito],
+      ['Juzgado', e.juzgado], ['ROL', e.rol], ['Último status', fd(e.fecha_ultimo_status)],
+      ['Cartera original', e.cartera_original], ['Gastos procesales', fmt(e.gastos_procesales)],
+      ['Pagaré', e.pagare], ['Garantía', e.garantia_sistema],
+      ['Ingreso a mora', fd(e.fecha_ingreso_mora)], ['Último pago', fd(e.fecha_ultimo_pago)],
+    ].filter(([, v]) => v && v !== '—');
+    document.getElementById('expJudicialCampos').innerHTML = campos.map(([k, v]) =>
+      `<div class="col-6 col-md-4"><div style="color:#991b1b;font-size:0.7rem;font-weight:700">${k}</div><div style="color:#0f172a">${v}</div></div>`).join('');
+    document.getElementById('expJudicialComentario').innerHTML = e.comentario
+      ? `<b style="color:#991b1b">Comentario:</b> ${String(e.comentario).replace(/</g, '&lt;')}` : '';
+    box.style.display = '';
+  } catch {}
 }
 
 function cerrarDrawer() {
