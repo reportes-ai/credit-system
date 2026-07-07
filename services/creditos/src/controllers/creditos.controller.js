@@ -450,6 +450,11 @@ const getAll = async (req, res) => {
       }
     } catch (e) { console.error('[creditos carteraLive]', e.message); }
 
+    // Condición de "propio cursado" (misma del cálculo de cartera): su columna
+    // ETAPA muestra OTORGADO, así que también cuentan en la etapa OTORGADO.
+    const PROPIO_CURSADO = `((ob.financiera IS NULL OR ob.financiera NOT IN ('AUTOFIN','UNIDAD DE CREDITO'))
+        AND (ob.estado_cartera IS NOT NULL OR ob.estado = 'OTORGADO' OR ob.estado IN ('VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO')))`;
+
     // whereData = whereBase + estado → para la lista paginada y su total
     let whereData = whereBase;
     const paramsData = [...paramsBase];
@@ -463,6 +468,9 @@ const getAll = async (req, res) => {
       const ids = carteraIds[String(estado).toUpperCase()] || [];
       whereData += ` AND ob.id IN (${ids.length ? ids.map(() => '?').join(',') : 'NULL'})`;
       paramsData.push(...ids);
+    } else if (String(estado || '').toUpperCase() === 'OTORGADO') {
+      // etapa OTORGADO = brokerage otorgado + propios cursados (columna ETAPA = OTORGADO)
+      whereData += ` AND (${estadoExpr} = 'OTORGADO' OR ${PROPIO_CURSADO})`;
     } else if (estado && estado !== 'todos') {
       whereData += ` AND ${estadoExpr} = ?`;
       paramsData.push(estado.toUpperCase());
@@ -491,6 +499,9 @@ const getAll = async (req, res) => {
     for (const r of statsRows) { stats[r.estado || 'SIN_ESTADO'] = r.cnt; statsTotal += r.cnt; }
     // Conteos de cartera = cálculo EN VIVO (coinciden con la columna ESTADO del detalle).
     for (const e of CARTERA_ESTADOS) stats[e] = carteraCount[e] || 0;
+    // Etapa OTORGADO: sumar los propios cursados (su columna ETAPA muestra OTORGADO;
+    // antes solo contaban en la fila Estados y el chip Otorgados quedaba en 0).
+    stats['OTORGADO'] = (stats['OTORGADO'] || 0) + Object.values(carteraCount).reduce((a, b) => a + b, 0);
 
     // Orden por columna (whitelist) — default: mes/id desc
     const SORT_MAP = {
