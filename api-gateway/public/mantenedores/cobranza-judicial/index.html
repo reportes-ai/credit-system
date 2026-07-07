@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cobranza Judicial — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { margin:20px auto; padding:0 26px 60px; max-width:1450px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+  .banner > i { font-size:2.3rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.2rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .panel { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .panel h5 { margin:0 0 10px; font-size:.92rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  @media(max-width:1000px){ .grid3 { grid-template-columns:1fr; } }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:#f8fafc; text-align:left; padding:6px 8px; font-size:.6rem; text-transform:uppercase; color:#6b7280; white-space:nowrap; }
+  td { padding:5px 8px; border-bottom:1px solid #f1f5f9; }
+  td.num, th.num { text-align:right; }
+  input, select { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 9px; font-size:.8rem; outline:none; }
+  input:focus, select:focus { border-color:var(--accent); }
+  .btnx { border:none; border-radius:8px; padding:6px 13px; font-size:.76rem; font-weight:700; cursor:pointer; }
+  .btn-azul { background:var(--accent); color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .chip { border-radius:8px; padding:1px 8px; font-size:.62rem; font-weight:700; display:inline-block; white-space:nowrap; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { border-radius:12px; padding:11px 14px; color:#fff; }
+  .kpi .big { font-size:1.25rem; font-weight:800; }
+  .kpi .sm { font-size:.64rem; text-transform:uppercase; opacity:.9; }
+  .vacio { color:#9ca3af; font-size:.82rem; text-align:center; padding:16px; }
+  .inact { opacity:.45; }
+  .foot { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin-top:24px; font-size:.8rem; }
+  .foot h6 { margin:0 0 8px; color:var(--navy); display:flex; gap:7px; align-items:center; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Cobranza Judicial',icon:'bi-bank',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-bank"></i>
+    <div>
+      <h2>Cobranza Judicial — Cartera AFA</h2>
+      <p>Catálogos paramétricos (abogados, status legal, status del crédito) y ficha judicial de cada operación demandada: juzgado, rol, embargos, comentarios y snapshot financiero del corte.</p>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid3" id="catalogos"></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-list-ul"></i> Cartera judicial
+      <input id="fQ" placeholder="OP / RUT / nombre / rol…" style="margin-left:12px;width:220px" oninput="deb()">
+      <select id="fStatus" onchange="cargarCartera()"><option value="">Status crédito: todos</option></select>
+      <select id="fAbogado" onchange="cargarCartera()"><option value="">Abogado: todos</option></select>
+      <select id="fLegal" onchange="cargarCartera()"><option value="">Status legal: todos</option></select>
+    </h5>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>OP</th><th>RUT</th><th>Nombre</th><th>Cartera orig.</th><th>Status crédito</th><th>Abogado</th>
+      <th>Status legal</th><th>Juzgado</th><th>Rol</th><th class="num">Saldo deuda</th><th class="num">Provisión</th>
+      <th class="num">Días mora</th><th>Últ. status</th><th></th></tr></thead>
+      <tbody id="cartBody"><tr><td class="vacio" colspan="14">Cargando…</td></tr></tbody></table></div>
+  </div>
+
+  <div class="foot">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Abogados / Status Legal / Status Crédito</b> → opciones de los selectores de la ficha judicial de esta misma página (y futuros módulos de gestión judicial).</li>
+      <li><b>Status crédito de una operación</b> → se espeja en <code>creditos.status_cobranza</code> y se ve en <a href="/creditos/">Créditos</a>.</li>
+      <li><b>Saldos/provisiones</b> son el snapshot de la migración CARTERA AFA (solo lectura aquí; edición fina en <a href="/mantenedores/solo-dios/">Solo Dios</a>).</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const hdrs = (json) => ({ 'Authorization':'Bearer '+sessionStorage.getItem('token'), ...(json?{'Content-Type':'application/json'}:{}) });
+const CLP = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const F = d => { if(!d) return '—'; const s=String(d).slice(0,10).split('-'); return `${s[2]}-${s[1]}-${s[0]}`; };
+let CAT = {}, tDeb;
+const TIPOS = [['ABOGADO','Abogados','bi-person-badge'],['STATUS_LEGAL','Status Legal','bi-hammer'],['STATUS_CREDITO','Status del Crédito','bi-flag']];
+function deb(){ clearTimeout(tDeb); tDeb=setTimeout(cargarCartera, 350); }
+
+async function cargarCatalogos(){
+  const j = await (await fetch('/api/cobranza-judicial/catalogos', { headers: hdrs() })).json();
+  if (!j.success) return alert(j.error);
+  CAT = j.data;
+  document.getElementById('catalogos').innerHTML = TIPOS.map(([t,lbl,ic])=>`
+    <div class="panel" style="margin:0">
+      <h5><i class="bi ${ic}"></i> ${lbl}</h5>
+      <table><thead><tr><th>Nombre</th><th>Activo</th><th></th></tr></thead><tbody>
+        ${CAT[t].map(c=>`<tr class="${c.activo?'':'inact'}">
+          <td><input value="${esc(c.nombre)}" style="width:100%" onchange="editarCat(${c.id}, this.value, ${c.activo})"></td>
+          <td style="text-align:center"><input type="checkbox" ${c.activo?'checked':''} onchange="editarCat(${c.id}, null, this.checked)"></td>
+          <td></td></tr>`).join('')}
+      </tbody></table>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="nv_${t}" placeholder="Nuevo…" style="flex:1" onkeydown="if(event.key==='Enter')crearCat('${t}')">
+        <button class="btnx btn-azul" onclick="crearCat('${t}')"><i class="bi bi-plus"></i></button>
+      </div>
+    </div>`).join('');
+  // llenar filtros y selects
+  const fill = (id, tipo, lbl) => document.getElementById(id).innerHTML =
+    `<option value="">${lbl}</option>` + CAT[tipo].filter(c=>c.activo).map(c=>`<option>${esc(c.nombre)}</option>`).join('');
+  fill('fStatus','STATUS_CREDITO','Status crédito: todos');
+  fill('fAbogado','ABOGADO','Abogado: todos');
+  fill('fLegal','STATUS_LEGAL','Status legal: todos');
+}
+async function crearCat(tipo){
+  const inp = document.getElementById('nv_'+tipo);
+  if (!inp.value.trim()) return;
+  const r = await fetch('/api/cobranza-judicial/catalogos', { method:'POST', headers:hdrs(1), body:JSON.stringify({ tipo, nombre: inp.value }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  inp.value=''; cargarCatalogos();
+}
+async function editarCat(id, nombre, activo){
+  const body = {}; if (nombre!==null) body.nombre = nombre; body.activo = activo;
+  const r = await fetch('/api/cobranza-judicial/catalogos/'+id, { method:'PUT', headers:hdrs(1), body:JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) { alert(j.error); } cargarCatalogos();
+}
+
+async function cargarCartera(){
+  const qs = new URLSearchParams();
+  const q = document.getElementById('fQ').value.trim(); if (q) qs.set('q', q);
+  if (document.getElementById('fStatus').value) qs.set('status', document.getElementById('fStatus').value);
+  if (document.getElementById('fAbogado').value) qs.set('abogado', document.getElementById('fAbogado').value);
+  if (document.getElementById('fLegal').value) qs.set('legal', document.getElementById('fLegal').value);
+  const j = await (await fetch('/api/cobranza-judicial?'+qs, { headers: hdrs() })).json();
+  if (!j.success) return;
+  const t = j.data.totales;
+  document.getElementById('kpis').innerHTML =
+    `<div class="kpi" style="background:#0141A2"><div class="big">${Number(t.n).toLocaleString('es-CL')}</div><div class="sm">Operaciones</div></div>
+     <div class="kpi" style="background:#b91c1c"><div class="big">${CLP(t.saldo)}</div><div class="sm">Saldo deuda</div></div>
+     <div class="kpi" style="background:#b45309"><div class="big">${CLP(t.provision)}</div><div class="sm">Provisión</div></div>
+     <div class="kpi" style="background:#334155"><div class="big">${CLP(t.gastos)}</div><div class="sm">Gastos procesales</div></div>`;
+  const selOpts = (tipo, cur) => CAT[tipo].filter(c=>c.activo||c.nombre===cur).map(c=>`<option ${c.nombre===cur?'selected':''}>${esc(c.nombre)}</option>`).join('');
+  document.getElementById('cartBody').innerHTML = j.data.rows.length ? j.data.rows.map(x=>`<tr>
+    <td><b>${esc(x.num_op)}</b></td><td style="white-space:nowrap">${esc(x.rut||'—')}</td>
+    <td style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.nombre_completo||'')}">${esc(x.nombre_completo||'—')}</td>
+    <td><span class="chip" style="background:#e0e7ff;color:#3730a3">${esc(x.cartera_original||'—')}</span></td>
+    <td><select onchange="editarJud(${x.id},'status_credito',this.value)"><option value="">—</option>${selOpts('STATUS_CREDITO', x.status_credito)}</select></td>
+    <td><select onchange="editarJud(${x.id},'abogado',this.value)"><option value="">—</option>${selOpts('ABOGADO', x.abogado)}</select></td>
+    <td><select onchange="editarJud(${x.id},'status_legal',this.value)"><option value="">—</option>${selOpts('STATUS_LEGAL', x.status_legal)}</select></td>
+    <td><input value="${esc(x.juzgado||'')}" style="width:56px" onchange="editarJud(${x.id},'juzgado',this.value)"></td>
+    <td><input value="${esc(x.rol||'')}" style="width:100px" onchange="editarJud(${x.id},'rol',this.value)"></td>
+    <td class="num" style="font-weight:700;color:#b91c1c">${CLP(x.saldo_deuda)}</td>
+    <td class="num">${CLP(x.provision)}</td><td class="num">${Number(x.dias_mora||0).toLocaleString('es-CL')}</td>
+    <td style="white-space:nowrap">${F(x.fecha_ultimo_status)}</td>
+    <td><button class="btnx btn-gris" title="${esc(x.comentario||'Sin comentario')}" onclick="verComentario(${x.id}, this)"><i class="bi bi-chat-left-text"></i></button></td>
+  </tr>`).join('') : '<tr><td class="vacio" colspan="14">Sin resultados.</td></tr>';
+  window._ROWS = j.data.rows;
+}
+async function editarJud(id, campo, valor){
+  const r = await fetch('/api/cobranza-judicial/'+id, { method:'PUT', headers:hdrs(1), body:JSON.stringify({ [campo]: valor }) });
+  const j = await r.json();
+  if (!j.success) alert(j.error);
+}
+function verComentario(id){
+  const x = (window._ROWS||[]).find(r=>r.id===id);
+  const nuevo = prompt('Comentario judicial (OP '+x.num_op+'):', x.comentario||'');
+  if (nuevo === null) return;
+  editarJud(id, 'comentario', nuevo);
+  x.comentario = nuevo;
+}
+(async()=>{ await cargarCatalogos(); cargarCartera(); })();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

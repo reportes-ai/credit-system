@@ -268,6 +268,7 @@ app.use('/api/crm', require('../../services/crm/src/routes/gestiones.routes'));
 
 // Cobranza
 app.use('/api/cobranza', require('../../services/cobranza/src/routes/cobranza.routes'));
+app.use('/api/cobranza-judicial', require('../../services/cobranza/src/routes/judicial.routes'));
 app.use('/api/cobranza-mora', require('../../services/cobranza/src/routes/mora-motor.routes'));
 app.use('/api/migracion-indexa', require('../../services/cobranza/src/routes/migracion-indexa.routes'));
 app.use('/api/odp-cuotas', require('../../services/cobranza/src/routes/odp-cuotas.routes'));
@@ -371,6 +372,7 @@ const PAGINAS = [
   ['/mantenedores/financieras', 'mantenedores/financieras/index.html'],
   ['/mantenedores/solo-dios', 'mantenedores/solo-dios/index.html'],
   ['/mantenedores/bd-tabla', 'mantenedores/bd-tabla/index.html'],
+  ['/mantenedores/cobranza-judicial', 'mantenedores/cobranza-judicial/index.html'],
   ['/mantenedores/sql-console', 'mantenedores/sql-console/index.html'],
   ['/mantenedores/punto-restauracion', 'mantenedores/punto-restauracion/index.html'],
   ['/mantenedores/recalculo-programado', 'mantenedores/recalculo-programado/index.html'],

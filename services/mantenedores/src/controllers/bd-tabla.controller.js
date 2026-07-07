@@ -10,6 +10,7 @@ const TABLAS = {
   cv_terminos:  { pk: 'id', label: 'Términos de Gestión (cv_terminos)',    icono: 'bi-sliders',             grupo: 'campanas_ventas' },
   cv_registros: { pk: 'id', label: 'Registros de Campaña (cv_registros)',  icono: 'bi-list-ul',             grupo: 'campanas_ventas' },
   cv_gestiones: { pk: 'id', label: 'Gestiones de Campaña (cv_gestiones)',  icono: 'bi-headset',             grupo: 'campanas_ventas' },
+  cobranza_judicial: { pk: 'id', label: 'Cobranza Judicial (cartera AFA)', icono: 'bi-bank',                grupo: 'cobranza_judicial' },
 };
 
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
