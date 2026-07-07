@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros Cobranza — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -86,6 +86,13 @@
     </div>
   </div>
 
+  <!-- Tramos de provisión -->
+  <div class="card-af">
+    <div class="lbl">Provisiones (sobre el capital insoluto, por días de mora)</div>
+    <div class="form-text mb-2">Cada crédito se clasifica por los <b>días de mora de su cuota impaga más antigua</b> y se provisiona el <b>%</b> del tramo sobre su capital insoluto. Define el <b>límite superior (días)</b> y el <b>%</b>; el último tramo es el resto (desde 181 días → 100%).</div>
+    <div id="tramosProv"></div>
+  </div>
+
   <!-- Probar cálculo -->
   <div class="card-af">
     <div class="lbl">Probar cálculo (gasto + interés por mora)</div>
@@ -149,6 +156,7 @@
       <li><b>Textos Email / SMS / WhatsApp y datos de transferencia</b> → los mensajes que se generan en <a href="/cobranza/">Cobranza</a> → ficha del deudor → <i>Mensajes</i> (botón Email/SMS/WhatsApp).</li>
       <li><b>Días y Tramos UF de gastos de cobranza</b> → cálculo del <b>gasto de cobranza</b> (Ley 19.496, tramos marginales sobre la deuda en UF; UF fija del día 21). Se expone vía <code>POST /api/cobranza/calcular-gasto</code> y, junto al interés, en <code>POST /api/cobranza/calcular-cobranza</code> para <a href="/cobranza/">Cobranza</a> y <b>Caja</b>.</li>
       <li><b>Interés por mora</b> → usa las <a href="/mantenedores/tasas/">Tasas (TMC)</a> por mes y tramo; tasa diaria = TMC mensual/30 sobre la cuota original. No se edita aquí: depende del mantenedor de Tasas.</li>
+      <li><b>Tramos de provisión</b> → la pestaña <b>Provisiones</b> del CRM de <a href="/cobranza/">Cobranza</a> (<code>GET /api/cobranza/provisiones</code>): % por tramo de días de mora sobre el capital insoluto de la cartera propia (AutoFácil + AFA). Desde 181 días se provisiona el 100%.</li>
     </ul>
   </div>
 </div>
@@ -188,6 +196,28 @@ function pintarTramos(){
   }).join('');
 }
 
+let TRAMOS_PROV = [];
+function pintarTramosProv(){
+  document.getElementById('tramosProv').innerHTML = TRAMOS_PROV.map((t,i) => {
+    const ultimo = i === TRAMOS_PROV.length - 1;
+    return `
+    <div class="tramo-row">
+      <span class="tnum">Tramo ${i+1}</span>
+      <div class="input-group" style="max-width:210px">
+        <span class="input-group-text">Hasta</span>
+        <input type="number" step="1" class="form-control" data-tramop="${i}" data-k="hasta_dias"
+          value="${t.hasta_dias??''}" placeholder="${ultimo?'resto':''}" ${ultimo?'disabled':''}>
+        <span class="input-group-text">días</span>
+      </div>
+      <div class="input-group" style="max-width:130px">
+        <input type="number" step="0.01" class="form-control" data-tramop="${i}" data-k="pct" value="${t.pct??''}">
+        <span class="input-group-text">%</span>
+      </div>
+      ${ultimo?'<span class="form-text" style="margin-left:4px">(resto sin límite)</span>':''}
+    </div>`;
+  }).join('');
+}
+
 async function cargar(){
   try {
     const r = await fetch('/api/cobranza/parametros', { headers:H });
@@ -201,6 +231,9 @@ async function cargar(){
     document.getElementById('txtEmail').value      = d.texto_email || '';
     TRAMOS = Array.isArray(d.tramos_uf) && d.tramos_uf.length ? d.tramos_uf : [{hasta_uf:10,pct:9},{hasta_uf:50,pct:6},{hasta_uf:null,pct:3}];
     pintarTramos();
+    TRAMOS_PROV = Array.isArray(d.tramos_provision) && d.tramos_provision.length ? d.tramos_provision
+      : [{hasta_dias:15,pct:1},{hasta_dias:30,pct:5},{hasta_dias:60,pct:20},{hasta_dias:90,pct:40},{hasta_dias:180,pct:80},{hasta_dias:null,pct:100}];
+    pintarTramosProv();
   } catch(e){ toast('Error al cargar: '+e.message, true); }
 }
 
@@ -212,8 +245,15 @@ async function guardar(){
     if (k === 'hasta_uf') TRAMOS[i].hasta_uf = (inp.disabled || inp.value === '') ? null : parseFloat(inp.value);
     else TRAMOS[i][k] = parseFloat(inp.value)||0;
   });
+  document.querySelectorAll('#tramosProv input').forEach(inp => {
+    const i = +inp.dataset.tramop, k = inp.dataset.k;
+    TRAMOS_PROV[i] = TRAMOS_PROV[i] || {};
+    if (k === 'hasta_dias') TRAMOS_PROV[i].hasta_dias = (inp.disabled || inp.value === '') ? null : parseInt(inp.value,10);
+    else TRAMOS_PROV[i][k] = parseFloat(inp.value)||0;
+  });
   const payload = {
     gastos_dias: document.getElementById('gastosDias').value || '0',
+    tramos_provision: TRAMOS_PROV,
     datos_transferencia: document.getElementById('datosTransf').value,
     texto_whatsapp: document.getElementById('txtWhatsapp').value,
     texto_sms: document.getElementById('txtSms').value,

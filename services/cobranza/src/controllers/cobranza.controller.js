@@ -56,6 +56,12 @@ const COB_DEFAULTS = {
   //   hasta 10 UF → 9% · entre 10 y 50 UF → 6% · sobre 50 UF → 3% (hasta_uf null = resto)
   gastos_dias: '21',
   tramos_uf: JSON.stringify([{ hasta_uf: 10, pct: 9 }, { hasta_uf: 50, pct: 6 }, { hasta_uf: null, pct: 3 }]),
+  // Provisión por tramo de días de mora, % sobre el CAPITAL insoluto
+  // (hasta_dias null = resto; desde 181 días se provisiona el 100%)
+  tramos_provision: JSON.stringify([
+    { hasta_dias: 15, pct: 1 }, { hasta_dias: 30, pct: 5 }, { hasta_dias: 60, pct: 20 },
+    { hasta_dias: 90, pct: 40 }, { hasta_dias: 180, pct: 80 }, { hasta_dias: null, pct: 100 },
+  ]),
 };
 (async () => {
   try {
@@ -921,13 +927,19 @@ exports.provisiones = async (req, res) => {
     // Mora por crédito usando el cálculo correcto
     const [moraRows] = await pool.query(MORA_SQL());
 
-    const tramos = [
-      { tramo: '1-15',  min: 1,  max: 15,  pct_provision: 1  },
-      { tramo: '16-30', min: 16, max: 30,  pct_provision: 5  },
-      { tramo: '31-60', min: 31, max: 60,  pct_provision: 20 },
-      { tramo: '61-90', min: 61, max: 90,  pct_provision: 40 },
-      { tramo: '91+',   min: 91, max: Infinity, pct_provision: 80 }
-    ];
+    // Tramos de provisión PARAMÉTRICOS (mantenedor Parámetros Cobranza).
+    // [{hasta_dias,pct}] → [{tramo,min,max,pct_provision}]; último hasta_dias null = resto.
+    const cfg = await getCobranzaConfig();
+    let tp = [];
+    try { tp = JSON.parse(cfg.tramos_provision); } catch (_) {}
+    if (!Array.isArray(tp) || !tp.length) tp = JSON.parse(COB_DEFAULTS.tramos_provision);
+    let prev = 0;
+    const tramos = tp.map(t => {
+      const max = (t.hasta_dias == null || t.hasta_dias === '') ? Infinity : Number(t.hasta_dias);
+      const r = { tramo: max === Infinity ? `${prev + 1}+` : `${prev + 1}-${max}`, min: prev + 1, max, pct_provision: Number(t.pct) || 0 };
+      prev = max;
+      return r;
+    });
 
     // La provisión se calcula sobre el CAPITAL ADEUDADO (saldo insoluto), no sobre
     // las cuotas morosas. Se informan ambos (monto en mora y capital) por tramo.
@@ -967,10 +979,11 @@ exports.provisiones = async (req, res) => {
 exports.getParametros = async (req, res) => {
   try {
     const cfg = await getCobranzaConfig();
-    // tramos_uf se entrega ya parseado para el front
-    let tramos = [];
+    // tramos_uf y tramos_provision se entregan ya parseados para el front
+    let tramos = [], tramosProv = [];
     try { tramos = JSON.parse(cfg.tramos_uf); } catch (_) {}
-    ok(res, { ...cfg, tramos_uf: tramos });
+    try { tramosProv = JSON.parse(cfg.tramos_provision); } catch (_) {}
+    ok(res, { ...cfg, tramos_uf: tramos, tramos_provision: tramosProv });
   } catch (err) {
     fail(res, err.message, 500);
   }
@@ -979,11 +992,11 @@ exports.getParametros = async (req, res) => {
 exports.setParametros = async (req, res) => {
   try {
     const body = req.body || {};
-    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf'];
+    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf', 'tramos_provision'];
     for (const clave of permitidas) {
       if (body[clave] === undefined) continue;
       let valor = body[clave];
-      if (clave === 'tramos_uf' && typeof valor !== 'string') valor = JSON.stringify(valor);
+      if ((clave === 'tramos_uf' || clave === 'tramos_provision') && typeof valor !== 'string') valor = JSON.stringify(valor);
       await pool.query(
         `INSERT INTO cobranza_config (clave, valor) VALUES (?, ?)
          ON DUPLICATE KEY UPDATE valor = VALUES(valor)`, [clave, String(valor)]);
