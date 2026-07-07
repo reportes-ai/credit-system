@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 -->
+<!-- v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,7 @@
 <style>
   :root { --navy:#012d70; --accent:#0141A2; --ok:#16a34a; --bad:#dc2626; }
   * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
-  .wrap { margin:24px auto; padding:0 26px 60px; max-width:1500px; }
+  .wrap { margin:18px auto; padding:0 26px 60px; max-width:none; }
   .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
   .banner > i { font-size:2.5rem; opacity:.85; }
   .banner h2 { margin:0 0 4px; font-size:1.25rem; font-weight:700; }
@@ -51,24 +51,27 @@
   .kpi .sm { font-size:.68rem; opacity:.9; text-transform:uppercase; letter-spacing:.03em; }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media(max-width:900px){ .grid2 { grid-template-columns:1fr; } }
-  /* Discador */
-  .disc-grid { display:grid; grid-template-columns:1.35fr 1fr; gap:16px; }
-  @media(max-width:1000px){ .disc-grid { grid-template-columns:1fr; } }
-  .cli-head { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
-  .cli-head .avatar { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.4rem; font-weight:800; }
-  .cli-head h4 { margin:0; font-size:1.1rem; color:var(--navy); }
-  .cli-head .rut { font-size:.8rem; color:#64748b; }
-  .datos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; }
-  .dato { background:#f8fafc; border-radius:9px; padding:7px 10px; }
-  .dato .k { font-size:.6rem; text-transform:uppercase; color:#94a3b8; font-weight:700; letter-spacing:.03em; }
-  .dato .v { font-size:.83rem; font-weight:600; color:#0f172a; word-break:break-word; }
-  .fono { display:flex; align-items:center; gap:10px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; padding:9px 12px; margin-bottom:7px; }
+  /* Discador — 3 columnas, todo en UNA pantalla (scroll interno por panel) */
+  .disc-grid { display:grid; grid-template-columns:1.15fr .85fr 1fr; gap:12px; }
+  @media(max-width:1100px){ .disc-grid { grid-template-columns:1fr; } }
+  .disc-col { background:#fff; border-radius:14px; padding:12px 14px; box-shadow:0 1px 6px rgba(0,0,0,.07);
+    max-height:calc(100vh - 235px); overflow-y:auto; }
+  .disc-col h5 { margin:0 0 8px; font-size:.8rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:7px; }
+  .cli-head { display:flex; align-items:center; gap:11px; margin-bottom:9px; }
+  .cli-head .avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.1rem; font-weight:800; flex:none; }
+  .cli-head h4 { margin:0; font-size:.98rem; color:var(--navy); }
+  .cli-head .rut { font-size:.74rem; color:#64748b; }
+  .datos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px; }
+  .dato { background:#f8fafc; border-radius:8px; padding:5px 8px; }
+  .dato .k { font-size:.56rem; text-transform:uppercase; color:#94a3b8; font-weight:700; letter-spacing:.03em; }
+  .dato .v { font-size:.77rem; font-weight:600; color:#0f172a; word-break:break-word; }
+  .fono { display:flex; align-items:center; gap:8px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:9px; padding:6px 10px; margin-bottom:6px; }
   .fono.malo { background:#fef2f2; border-color:#fecaca; opacity:.7; }
-  .fono .n { font-size:1rem; font-weight:800; color:#0f172a; flex:1; letter-spacing:.03em; }
-  .fono .tag { font-size:.6rem; font-weight:800; border-radius:6px; padding:1px 7px; }
-  .term-btn { display:block; width:100%; text-align:left; border:1.5px solid #e5e7eb; background:#fff; border-radius:10px; padding:9px 12px; margin-bottom:6px; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .fono .n { font-size:.92rem; font-weight:800; color:#0f172a; flex:1; letter-spacing:.03em; white-space:nowrap; }
+  .fono .tag { font-size:.56rem; font-weight:800; border-radius:6px; padding:1px 6px; }
+  .term-btn { display:block; width:100%; text-align:left; border:1.5px solid #e5e7eb; background:#fff; border-radius:9px; padding:6px 10px; margin-bottom:5px; font-size:.78rem; font-weight:700; cursor:pointer; }
   .term-btn:hover { border-color:var(--accent); background:#eff6ff; }
-  .term-btn small { display:block; font-weight:500; color:#64748b; font-size:.68rem; }
+  .term-btn small { display:block; font-weight:500; color:#64748b; font-size:.62rem; }
   .t-CONTACTO_DIRECTO { border-left:5px solid var(--ok); }
   .t-CONTACTO_INDIRECTO { border-left:5px solid #f59e0b; }
   .t-NO_CONTACTO { border-left:5px solid #94a3b8; }
@@ -173,7 +176,7 @@
   <div class="dlg-body" id="detBody"></div>
 </dialog>
 
-<!-- ── Dialog GESTIÓN (término elegido) ── -->
+<!-- ── Dialog GESTIÓN (solo venta o agenda día/hora) ── -->
 <dialog id="dlgGest" style="max-width:480px">
   <div class="dlg-head"><i class="bi bi-check2-circle"></i><h5 id="gestTitulo">Registrar gestión</h5><button onclick="dlgGest.close()"><i class="bi bi-x-lg"></i></button></div>
   <div class="dlg-body">
@@ -181,9 +184,18 @@
       <label>Monto de la venta / crédito colocado $</label>
       <input id="gestMonto" type="text" style="width:100%" placeholder="Ej: 8.500.000">
     </div>
-    <label>Comentario de la gestión</label>
-    <textarea id="gestComent" style="width:100%;height:70px" placeholder="Qué conversaste, acuerdos, próximos pasos…"></textarea>
-    <div id="gestRellInfo" style="font-size:.76rem;color:#64748b;margin-top:8px"></div>
+    <div id="gestAgendaWrap" style="display:none;margin-bottom:12px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div><label>Día del rellamado</label><input id="agDia" type="date" onchange="llenarTramos()"></div>
+        <div><label>Hora (tramos de 30 min)</label><select id="agHora" style="min-width:110px"></select></div>
+      </div>
+      <label style="margin-top:10px">¿Quién lo rellama?</label>
+      <div style="display:flex;gap:16px;font-size:.82rem">
+        <label style="font-weight:600;display:flex;align-items:center;gap:6px;margin:0"><input type="radio" name="agDest" value="EJECUTIVO" checked> Cautivo (me lo agendo yo)</label>
+        <label style="font-weight:600;display:flex;align-items:center;gap:6px;margin:0"><input type="radio" name="agDest" value="POOL"> Pool (cualquier ejecutivo)</label>
+      </div>
+    </div>
+    <div id="gestRellInfo" style="font-size:.76rem;color:#64748b;margin-top:4px"></div>
     <div style="text-align:right;margin-top:12px"><button class="btnx btn-verde" id="btnGestOk" onclick="confirmarGestion()">Registrar y continuar</button></div>
   </div>
 </dialog>
@@ -497,7 +509,7 @@ function pintarTerminos(){
   const filas = CUR.terminos.map((t,i) => filaTermino(t,i)).join('');
   document.getElementById('zonaTerminos').innerHTML = `
     <div style="overflow-x:auto"><table id="tblTerm">
-      <thead><tr><th>Término</th><th>Tipo</th><th>Cierra registro</th><th>Es venta</th><th>Rellamar (min)</th><th>Rellamado para</th><th></th></tr></thead>
+      <thead><tr><th>Término</th><th>Tipo</th><th>Cierra registro</th><th>Es venta</th><th>Agenda día/hora</th><th>Rellamar (min)</th><th>Rellamado para</th><th></th></tr></thead>
       <tbody>${filas}</tbody></table></div>
     ${ES_ADMIN?`<div style="display:flex;justify-content:space-between;margin-top:10px">
       <button class="btnx btn-gris" onclick="agregarTermino()"><i class="bi bi-plus"></i> Agregar término</button>
@@ -510,13 +522,14 @@ function filaTermino(t){
     <td><select class="tTipo" ${dis}>${CATALOGO.tipos_termino.map(x=>`<option value="${x.key}" ${t.tipo===x.key?'selected':''}>${x.label}</option>`).join('')}</select></td>
     <td style="text-align:center"><input type="checkbox" class="tCierre" ${t.es_cierre?'checked':''} ${dis}></td>
     <td style="text-align:center"><input type="checkbox" class="tVenta" ${t.es_venta?'checked':''} ${dis}></td>
+    <td style="text-align:center"><input type="checkbox" class="tAgenda" ${t.es_agenda?'checked':''} ${dis} title="El ejecutivo elige día, tramo de media hora y cautivo/pool al gestionar"></td>
     <td><input type="number" class="tRell" style="width:90px" min="1" value="${t.rellamar_min||''}" placeholder="—" ${dis}></td>
     <td><select class="tDest" ${dis}><option value="">—</option><option value="POOL" ${t.destino==='POOL'?'selected':''}>Pool</option><option value="EJECUTIVO" ${t.destino==='EJECUTIVO'?'selected':''}>Mismo ejecutivo</option></select></td>
     <td>${ES_ADMIN?`<button class="btnx btn-rojo" style="padding:3px 9px" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button>`:''}</td></tr>`;
 }
 function agregarTermino(){
   document.querySelector('#tblTerm tbody').insertAdjacentHTML('beforeend',
-    filaTermino({ nombre:'', tipo:'NO_CONTACTO', es_cierre:0, es_venta:0, rellamar_min:null, destino:'POOL' }));
+    filaTermino({ nombre:'', tipo:'NO_CONTACTO', es_cierre:0, es_venta:0, es_agenda:0, rellamar_min:null, destino:'POOL' }));
 }
 async function guardarTerminos(){
   const terminos = [...document.querySelectorAll('#tblTerm tbody tr')].map(tr => ({
@@ -525,6 +538,7 @@ async function guardarTerminos(){
     tipo: tr.querySelector('.tTipo').value,
     es_cierre: tr.querySelector('.tCierre').checked ? 1 : 0,
     es_venta: tr.querySelector('.tVenta').checked ? 1 : 0,
+    es_agenda: tr.querySelector('.tAgenda').checked ? 1 : 0,
     rellamar_min: tr.querySelector('.tRell').value || null,
     destino: tr.querySelector('.tDest').value || null,
   })).filter(t => t.nombre);
@@ -582,8 +596,15 @@ function pintarDiscador(){
   const iniciales = (reg.nombre||'?').split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase();
   const labelDe = k => (CATALOGO.campos.find(c=>c.key===k)||{}).label || k;
   const numerico = k => (CATALOGO.campos.find(c=>c.key===k)||{}).num;
-  const fmtV = (k,v) => numerico(k) && /^-?[\d.,]+$/.test(String(v)) && Number(String(v).replace(/\./g,'').replace(',','.'))>999
-    ? CLP(String(v).replace(/\./g,'').replace(',','.')) : esc(v);
+  const fmtV = (k,v) => {
+    if (k==='fecha_otorgamiento') {                               // fechas: serial Excel o ISO → dd-mm-aaaa
+      if (typeof v==='number' && v>20000 && v<80000) v = new Date(Date.UTC(1899,11,30)+v*86400000).toISOString().slice(0,10);
+      const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+    }
+    return numerico(k) && /^-?[\d.,]+$/.test(String(v)) && Number(String(v).replace(/\./g,'').replace(',','.'))>999
+      ? CLP(String(v).replace(/\./g,'').replace(',','.')) : esc(v);
+  };
   const ocultos = new Set(['rut','nombre','telefono_1','telefono_2','telefono_3']);
   const datosHtml = Object.entries(datos).filter(([k])=>!ocultos.has(k))
     .map(([k,v])=>`<div class="dato"><div class="k">${esc(labelDe(k))}</div><div class="v">${fmtV(k,v)}</div></div>`).join('');
@@ -592,8 +613,8 @@ function pintarDiscador(){
     return `<div class="fono ${malo?'malo':''}">
       <span class="tag" style="background:${i===0&&!malo?'#dcfce7':'#f1f5f9'};color:${i===0&&!malo?'#166534':'#64748b'}">${malo?'INHABILITADO':(i===0?'MEJOR OPCIÓN':'ALTERNATIVA')}</span>
       <span class="n">${fmtFono(t)}</span>
-      <a class="btnx btn-verde" style="text-decoration:none" href="tel:+${t.startsWith('56')?t:'56'+t}" title="Llamar"><i class="bi bi-telephone-fill"></i></a>
-      <button class="btnx btn-gris" onclick="navigator.clipboard.writeText('${t}')" title="Copiar"><i class="bi bi-clipboard"></i></button>
+      <a class="btnx btn-verde" style="text-decoration:none;padding:4px 10px" href="tel:+${t.startsWith('56')?t:'56'+t}" title="Llamar"><i class="bi bi-telephone-fill"></i></a>
+      <button class="btnx btn-gris" style="padding:4px 10px" onclick="navigator.clipboard.writeText('${t}')" title="Copiar"><i class="bi bi-clipboard"></i></button>
       <input type="radio" name="fonoSel" value="${t}" ${i===0&&!malo?'checked':''} title="Teléfono usado en la gestión">
     </div>`;
   }).join('');
@@ -601,63 +622,95 @@ function pintarDiscador(){
     <div class="gest-item"><b>${esc(g.termino_nombre)}</b> — ${esc(g.usuario_nombre||'')} · ${FH(g.created_at)}
       ${g.telefono?` · ${fmtFono(g.telefono)}`:''}${g.rellamado_at?` · <i class="bi bi-alarm"></i> rellamar ${FH(g.rellamado_at)}`:''}
       ${g.comentario?`<div style="color:#475569">${esc(g.comentario)}</div>`:''}</div>`).join('')
-    : '<div class="vacio" style="padding:8px">Sin gestiones previas — primer llamado.</div>';
+    : '<div class="vacio" style="padding:6px">Sin gestiones previas — primer llamado.</div>';
   document.getElementById('discBody').innerHTML = `
     <div class="disc-grid">
-      <div>
-        <div class="panel">
-          <div class="cli-head">
-            <div class="avatar">${iniciales}</div>
-            <div><h4>${esc(reg.nombre||'(sin nombre)')}</h4><div class="rut">${esc(reg.rut)} · intento N° ${reg.intentos+1} ${reg.estado==='AGENDADO'?'· <b style="color:#b45309">RELLAMADO</b>':''}</div></div>
-            <button class="btnx btn-gris" style="margin-left:auto" onclick="saltarRegistro()" title="Devolver a la cola sin gestionar"><i class="bi bi-skip-forward"></i> Saltar</button>
-          </div>
-          <h5 style="font-size:.8rem"><i class="bi bi-telephone"></i> Teléfonos (por contactabilidad)</h5>
-          ${fonosHtml}
-          <h5 style="font-size:.8rem;margin-top:14px"><i class="bi bi-person-vcard"></i> Datos del cliente</h5>
-          <div class="datos-grid">${datosHtml||'<div class="vacio">Sin datos adicionales</div>'}</div>
+      <div class="disc-col">
+        <div class="cli-head">
+          <div class="avatar">${iniciales}</div>
+          <div><h4>${esc(reg.nombre||'(sin nombre)')}</h4><div class="rut">${esc(reg.rut)} · intento N° ${reg.intentos+1} ${reg.estado==='AGENDADO'?'· <b style="color:#b45309">RELLAMADO</b>':''}</div></div>
+          <button class="btnx btn-gris" style="margin-left:auto;padding:5px 11px" onclick="saltarRegistro()" title="Se va al final de la cola y toma el siguiente"><i class="bi bi-skip-forward"></i> Saltar</button>
         </div>
-        <div class="panel">
-          <h5 style="font-size:.85rem"><i class="bi bi-clock-history"></i> Historial de gestiones</h5>
-          ${gestHtml}
-        </div>
+        <h5><i class="bi bi-person-vcard"></i> Datos del cliente</h5>
+        <div class="datos-grid">${datosHtml||'<div class="vacio">Sin datos adicionales</div>'}</div>
       </div>
-      <div class="panel">
+      <div class="disc-col">
+        <h5><i class="bi bi-telephone"></i> Teléfonos (por contactabilidad)</h5>
+        ${fonosHtml}
+        <h5 style="margin-top:10px"><i class="bi bi-clock-history"></i> Historial de gestiones</h5>
+        ${gestHtml}
+      </div>
+      <div class="disc-col">
+        <h5><i class="bi bi-chat-left-text"></i> Comentario de la gestión</h5>
+        <textarea id="discComent" maxlength="500" style="width:100%;height:64px;font-size:.8rem;resize:none" placeholder="Qué conversaste, acuerdos, próximos pasos… (máx. 500)" oninput="document.getElementById('cCnt').textContent=this.value.length+'/500'"></textarea>
+        <div id="cCnt" style="text-align:right;font-size:.62rem;color:#94a3b8;margin:2px 0 6px">0/500</div>
         <h5><i class="bi bi-check2-square"></i> Resultado del llamado</h5>
-        <div style="font-size:.72rem;color:#64748b;margin-bottom:10px">Elige el término de gestión. Si programa rellamado, el registro vuelve a la cola a la hora indicada.</div>
         ${DISC.terminos.map(t=>`<button class="term-btn t-${t.tipo}" onclick="elegirTermino(${t.id})">${esc(t.nombre)}
-          <small>${(CATALOGO.tipos_termino.find(x=>x.key===t.tipo)||{}).label||t.tipo}${t.es_venta?' · registra VENTA':''}${t.es_cierre?' · cierra el registro':''}${t.rellamar_min?` · rellama en ${t.rellamar_min} min (${t.destino==='EJECUTIVO'?'mismo ejecutivo':'pool'})`:''}</small>
+          <small>${(CATALOGO.tipos_termino.find(x=>x.key===t.tipo)||{}).label||t.tipo}${t.es_venta?' · registra VENTA':''}${t.es_agenda?' · agenda día y hora':''}${t.es_cierre?' · cierra el registro':''}${t.rellamar_min?` · rellama en ${t.rellamar_min} min (${t.destino==='EJECUTIVO'?'mismo ejecutivo':'pool'})`:''}</small>
         </button>`).join('')}
       </div>
     </div>`;
 }
+/* Tramos de media hora 08:00–21:00; si el día es hoy, parte del próximo tramo */
+const hoyLocal = () => new Date().toLocaleDateString('sv');   // YYYY-MM-DD en hora local
+function llenarTramos(){
+  const dia = document.getElementById('agDia').value;
+  const hoy = new Date(); const esHoy = dia === hoyLocal();
+  const desdeMin = esHoy ? (hoy.getHours()*60 + hoy.getMinutes()) : -1;
+  const sel = document.getElementById('agHora'); sel.innerHTML = '';
+  for (let m = 8*60; m <= 21*60; m += 30) {
+    if (m <= desdeMin) continue;
+    const h = String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+    sel.insertAdjacentHTML('beforeend', `<option value="${h}">${h}</option>`);
+  }
+  if (!sel.options.length) sel.innerHTML = '<option value="">(sin tramos hoy — elige otro día)</option>';
+}
 function elegirTermino(id){
   GEST_TERM = DISC.terminos.find(t=>t.id===id);
+  if (!GEST_TERM.es_venta && !GEST_TERM.es_agenda) return registrarGestion({});   // directo, sin popup
   document.getElementById('gestTitulo').textContent = GEST_TERM.nombre;
   document.getElementById('gestVentaWrap').style.display = GEST_TERM.es_venta ? '' : 'none';
+  document.getElementById('gestAgendaWrap').style.display = GEST_TERM.es_agenda ? '' : 'none';
   document.getElementById('gestMonto').value = '';
-  document.getElementById('gestComent').value = '';
-  document.getElementById('gestRellInfo').innerHTML = GEST_TERM.rellamar_min
-    ? `<i class="bi bi-alarm"></i> Se reagendará en <b>${GEST_TERM.rellamar_min} min</b> para ${GEST_TERM.destino==='EJECUTIVO'?'<b>ti</b> (mismo ejecutivo)':'el <b>pool</b>'}.`
-    : (GEST_TERM.es_cierre ? '<i class="bi bi-flag"></i> Este término CIERRA el registro (sale de la cola).'
-      : (GEST_TERM.tipo==='INHABILITADO' ? '<i class="bi bi-telephone-x"></i> El teléfono seleccionado quedará marcado como inhabilitado.' : ''));
+  if (GEST_TERM.es_agenda) {
+    const d = document.getElementById('agDia');
+    d.min = hoyLocal();
+    d.value = hoyLocal();
+    llenarTramos();
+  }
+  document.getElementById('gestRellInfo').innerHTML = GEST_TERM.es_cierre ? '<i class="bi bi-flag"></i> Este término CIERRA el registro (sale de la cola).' : '';
   dlgGest.showModal();
 }
 async function confirmarGestion(){
+  const extra = {};
+  if (GEST_TERM.es_venta) {
+    const monto = document.getElementById('gestMonto').value.replace(/\./g,'');
+    if (!monto || !Number(monto)) return alert('Ingresa el monto de la venta.');
+    extra.monto_venta = monto;
+  }
+  if (GEST_TERM.es_agenda) {
+    const dia = document.getElementById('agDia').value, hora = document.getElementById('agHora').value;
+    if (!dia || !hora) return alert('Elige día y hora del rellamado.');
+    extra.rellamado_en = `${dia} ${hora}`;
+    extra.destino_agenda = document.querySelector('input[name=agDest]:checked').value;
+  }
+  registrarGestion(extra, document.getElementById('btnGestOk'));
+}
+async function registrarGestion(extra, btn){
   const fono = document.querySelector('input[name=fonoSel]:checked')?.value || null;
-  const monto = document.getElementById('gestMonto').value.replace(/\./g,'');
-  if (GEST_TERM.es_venta && (!monto || !Number(monto))) return alert('Ingresa el monto de la venta.');
-  const btn = document.getElementById('btnGestOk'); btn.disabled = true;
+  if (btn) btn.disabled = true;
   const r = await fetch(`/api/campanas-ventas/${DISC.id_campana}/gestion`, { method:'POST', headers:hdrs(1),
     body: JSON.stringify({ id_registro: DISC.registro.id, id_termino: GEST_TERM.id, telefono: fono,
-      comentario: document.getElementById('gestComent').value.trim(), monto_venta: monto || null }) });
-  const j = await r.json(); btn.disabled = false;
+      comentario: (document.getElementById('discComent')?.value || '').trim().slice(0,500), ...extra }) });
+  const j = await r.json(); if (btn) btn.disabled = false;
   if (!j.success) return alert(j.error);
-  dlgGest.close();
+  try { dlgGest.close(); } catch(e) {}
   tomarSiguiente();   // siguiente registro de inmediato
 }
 async function saltarRegistro(){
-  await fetch(`/api/campanas-ventas/${DISC.id_campana}/liberar`, { method:'POST', headers:hdrs() });
-  document.getElementById('discBody').innerHTML = '<div class="panel vacio">Registro devuelto a la cola. Presiona «Tomar siguiente».</div>';
+  await fetch(`/api/campanas-ventas/${DISC.id_campana}/saltar`, { method:'POST', headers:hdrs(1),
+    body: JSON.stringify({ id_registro: DISC.registro.id }) });
+  tomarSiguiente();   // el saltado se fue al final de la cola: viene otro
 }
 
 /* ══ ESTADÍSTICAS ══ */

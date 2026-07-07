@@ -82,6 +82,7 @@ const TIPO_KEYS = new Set(TIPOS_TERMINO.map(t => t.key));
 const TERMINOS_DEFAULT = [
   { nombre: 'VENTA CERRADA',            tipo: 'CONTACTO_DIRECTO',   es_cierre: 1, es_venta: 1, rellamar_min: null, destino: null },
   { nombre: 'INTERESADO — VOLVER A LLAMAR', tipo: 'CONTACTO_DIRECTO', es_cierre: 0, es_venta: 0, rellamar_min: 1440, destino: 'EJECUTIVO' },
+  { nombre: 'LLAMAR MÁS TARDE',             tipo: 'CONTACTO_DIRECTO', es_cierre: 0, es_venta: 0, rellamar_min: null, destino: null, es_agenda: 1 },
   { nombre: 'NO LE INTERESA',           tipo: 'CONTACTO_DIRECTO',   es_cierre: 1, es_venta: 0, rellamar_min: null, destino: null },
   { nombre: 'NO CUMPLE REQUISITOS',     tipo: 'CONTACTO_DIRECTO',   es_cierre: 1, es_venta: 0, rellamar_min: null, destino: null },
   { nombre: 'RECADO CON TERCERO',       tipo: 'CONTACTO_INDIRECTO', es_cierre: 0, es_venta: 0, rellamar_min: 240,  destino: 'POOL' },
@@ -123,9 +124,19 @@ const TERMINOS_DEFAULT = [
         es_venta TINYINT(1) NOT NULL DEFAULT 0,           -- marca conversión (pide monto)
         rellamar_min INT NULL,                            -- reencolar en X minutos
         destino VARCHAR(10) NULL,                         -- POOL | EJECUTIVO (dueño del rellamado)
+        es_agenda TINYINT(1) NOT NULL DEFAULT 0,          -- pide día + tramo horario + cautivo/pool al gestionar
         orden INT NOT NULL DEFAULT 0,
         INDEX idx_camp (id_campana)
       )`);
+    await pool.query('ALTER TABLE cv_terminos ADD COLUMN IF NOT EXISTS es_agenda TINYINT(1) NOT NULL DEFAULT 0');
+    // sembrar LLAMAR MÁS TARDE en campañas existentes que no lo tengan
+    const [sinAgenda] = await pool.query(
+      `SELECT c.id FROM cv_campanas c WHERE NOT EXISTS (SELECT 1 FROM cv_terminos t WHERE t.id_campana=c.id AND t.es_agenda=1)`);
+    for (const cA of sinAgenda) {
+      await pool.query(
+        `INSERT INTO cv_terminos (id_campana, nombre, tipo, es_cierre, es_venta, rellamar_min, destino, es_agenda, orden)
+         VALUES (?, 'LLAMAR MÁS TARDE', 'CONTACTO_DIRECTO', 0, 0, NULL, NULL, 1, 2)`, [cA.id]);
+    }
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cv_registros (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -271,10 +282,10 @@ async function getCampana(id) {
 
 async function seedTerminos(idCampana) {
   const values = TERMINOS_DEFAULT.map((t, i) =>
-    [idCampana, t.nombre, t.tipo, t.es_cierre, t.es_venta, t.rellamar_min, t.destino, i]);
+    [idCampana, t.nombre, t.tipo, t.es_cierre, t.es_venta, t.rellamar_min, t.destino, t.es_agenda ? 1 : 0, i]);
   await pool.query(
-    `INSERT INTO cv_terminos (id_campana, nombre, tipo, es_cierre, es_venta, rellamar_min, destino, orden)
-     VALUES ${values.map(() => '(?,?,?,?,?,?,?,?)').join(',')}`, values.flat());
+    `INSERT INTO cv_terminos (id_campana, nombre, tipo, es_cierre, es_venta, rellamar_min, destino, es_agenda, orden)
+     VALUES ${values.map(() => '(?,?,?,?,?,?,?,?,?)').join(',')}`, values.flat());
 }
 
 /* Recalcula orden_valor de todos los registros según orden_campo/orden_dir */
@@ -424,13 +435,13 @@ exports.guardarTerminos = async (req, res) => {
     for (const t of terminos) {
       const row = [String(t.nombre).trim().slice(0, 120), t.tipo, t.es_cierre ? 1 : 0, t.es_venta ? 1 : 0,
         t.rellamar_min ? Math.max(1, parseInt(t.rellamar_min, 10)) : null,
-        ['POOL', 'EJECUTIVO'].includes(t.destino) ? t.destino : null, orden++];
+        ['POOL', 'EJECUTIVO'].includes(t.destino) ? t.destino : null, t.es_agenda ? 1 : 0, orden++];
       if (t.id && actuales.some(a => a.id === Number(t.id))) {
-        await pool.query('UPDATE cv_terminos SET nombre=?, tipo=?, es_cierre=?, es_venta=?, rellamar_min=?, destino=?, orden=? WHERE id=? AND id_campana=?',
+        await pool.query('UPDATE cv_terminos SET nombre=?, tipo=?, es_cierre=?, es_venta=?, rellamar_min=?, destino=?, es_agenda=?, orden=? WHERE id=? AND id_campana=?',
           [...row, t.id, c.id]);
         vivos.add(Number(t.id));
       } else {
-        const [r] = await pool.query('INSERT INTO cv_terminos (nombre, tipo, es_cierre, es_venta, rellamar_min, destino, orden, id_campana) VALUES (?,?,?,?,?,?,?,?)',
+        const [r] = await pool.query('INSERT INTO cv_terminos (nombre, tipo, es_cierre, es_venta, rellamar_min, destino, es_agenda, orden, id_campana) VALUES (?,?,?,?,?,?,?,?,?)',
           [...row, c.id]);
         vivos.add(r.insertId);
       }
@@ -587,11 +598,27 @@ exports.liberar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* Saltar: libera el registro y lo manda al FINAL de la cola de pendientes
+   (si no, «tomar siguiente» devolvería el mismo cliente de inmediato). */
+exports.saltar = async (req, res) => {
+  try {
+    const uid = req.user?.id_usuario || 0;
+    const idReg = parseInt(req.body?.id_registro, 10);
+    if (!idReg) return fail(res, 'Falta id_registro', 400);
+    const [[mx]] = await pool.query('SELECT IFNULL(MAX(orden_valor),0) mx FROM cv_registros WHERE id_campana=?', [req.params.id]);
+    await pool.query(
+      `UPDATE cv_registros SET lock_por=NULL, lock_at=NULL, orden_valor=?
+       WHERE id=? AND id_campana=? AND (lock_por=? OR lock_por IS NULL)`,
+      [Number(mx.mx) + 1, idReg, req.params.id, uid]);
+    ok(res, { saltado: true });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.gestionar = async (req, res) => {
   try {
     const c = await getCampana(req.params.id);
     if (!c) return fail(res, 'Campaña no existe', 404);
-    const { id_registro, id_termino, telefono, comentario, monto_venta } = req.body || {};
+    const { id_registro, id_termino, telefono, comentario, monto_venta, rellamado_en, destino_agenda } = req.body || {};
     const [[reg]] = await pool.query('SELECT * FROM cv_registros WHERE id=? AND id_campana=?', [id_registro, c.id]);
     if (!reg) return fail(res, 'Registro no existe', 404);
     const [[term]] = await pool.query('SELECT * FROM cv_terminos WHERE id=? AND id_campana=?', [id_termino, c.id]);
@@ -600,8 +627,13 @@ exports.gestionar = async (req, res) => {
     const unombre = req.user?.nombre_completo || req.user?.nombre || null;
     const fono = normFono(telefono);
 
-    let rellamadoAt = null;
-    if (!term.es_cierre && term.rellamar_min) {
+    let rellamadoAt = null, destinoRell = term.destino;
+    if (term.es_agenda) {
+      // agenda con día + hora elegidos por el ejecutivo (LLAMAR MÁS TARDE)
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(String(rellamado_en || ''))) return fail(res, 'Falta el día y la hora del rellamado', 400);
+      rellamadoAt = rellamado_en + ':00';
+      destinoRell = destino_agenda === 'POOL' ? 'POOL' : 'EJECUTIVO';     // cautivo por defecto
+    } else if (!term.es_cierre && term.rellamar_min) {
       const [[f]] = await pool.query('SELECT DATE_ADD(NOW(), INTERVAL ? MINUTE) f', [term.rellamar_min]);
       rellamadoAt = f.f;
     }
@@ -631,7 +663,7 @@ exports.gestionar = async (req, res) => {
       await pool.query(
         `UPDATE cv_registros SET estado='AGENDADO', intentos=intentos+1, contactado=?, tel_malos=?,
           rellamado_at=?, asignado_a=?, lock_por=NULL, lock_at=NULL WHERE id=?`,
-        [esContacto, JSON.stringify(telMalos), rellamadoAt, term.destino === 'EJECUTIVO' ? uid : null, reg.id]);
+        [esContacto, JSON.stringify(telMalos), rellamadoAt, destinoRell === 'EJECUTIVO' ? uid : null, reg.id]);
     } else {
       // sin rellamado programado (p.ej. teléfono inhabilitado): vuelve a la cola normal
       await pool.query(

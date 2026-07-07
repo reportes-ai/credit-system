@@ -20,6 +20,7 @@ router.post('/:id/registros',      verifyToken, admin, c.cargarRegistros);
 router.get('/:id/registros',       verifyToken, puede, c.registros);
 router.get('/:id/siguiente',       verifyToken, puede, c.siguiente);
 router.post('/:id/liberar',        verifyToken, puede, c.liberar);
+router.post('/:id/saltar',         verifyToken, puede, c.saltar);
 router.post('/:id/gestion',        verifyToken, puede, c.gestionar);
 router.get('/:id/stats',           verifyToken, puede, c.stats);
 router.post('/:id/recalcular',     verifyToken, puede, c.recalcularConversion);
