@@ -3908,7 +3908,9 @@ function buildColocMensual(vista) {
   const cont = document.getElementById(esDealers ? 'tbl-dealers-mes' : 'tbl-parques-mes');
   if (!cont) return;
   const rows = (window.RAW_DATA || []).filter(r => r.estado_eval === 'OTORGADO');
-  const key = r => esDealers ? (r.automotora || '(sin dealer)') : (r.parque || '');
+  // Parques: lo que no está en un parque es venta de CALLE
+  const key = r => esDealers ? (r.automotora || '(sin dealer)')
+    : (!r.parque || /^NO APLICA$/i.test(r.parque) ? 'CALLE' : r.parque);
   const meses = [...new Set(rows.map(r => r.mes))].filter(Boolean).sort().reverse();
   const M = {};   // nombre → { mes: {n, monto} }
   for (const r of rows) {
@@ -3960,6 +3962,29 @@ function buildColocMensual(vista) {
         <td style="text-align:right;padding:5px 8px">${f$(totMes[m].monto)}</td>`).join('')}
     </tr></tfoot>
   </table>`;
+
+  // ── Solo Parques: curva mensual de colocaciones por parque (incluye CALLE) ──
+  if (!esDealers) {
+    const box = document.getElementById('chart-parques-mes');
+    if (box) {
+      const asc = [...meses].reverse();
+      const PAL = ['#4fc3f7', '#ffd54f', '#ef5350', '#66bb6a', '#ab47bc', '#ffa726', '#26c6da', '#ec407a', '#9ccc65', '#7e57c2', '#8d6e63', '#78909c'];
+      const ex = Chart.getChart(document.getElementById('ch-parques-mes')); if (ex) ex.destroy();
+      new Chart(document.getElementById('ch-parques-mes'), {
+        type: 'line',
+        data: { labels: asc.map(fMes), datasets: lista.map(([nombre, mm], i) => ({
+          label: nombre, data: asc.map(m => mm[m]?.n || 0),
+          borderColor: PAL[i % PAL.length], backgroundColor: PAL[i % PAL.length],
+          borderWidth: nombre === 'CALLE' ? 3 : 2, tension: .3, pointRadius: 2.5, fill: false,
+        })) },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { color: '#555', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: { mode: 'index', intersect: false } },
+          scales: { x: { ticks: { color: '#666', font: { size: 10 } } },
+            y: { beginAtZero: true, ticks: { color: '#666', font: { size: 10 } }, title: { display: true, text: 'Colocaciones (cant.)', color: '#888', font: { size: 10 } } } } }
+      });
+    }
+  }
 }
 
 function exportColocMensual(vista) {

@@ -20,7 +20,7 @@
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.14</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.15</span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -785,7 +785,11 @@
   </div>
   <div class="card">
     <div class="card-head">Otorgados por parque y mes — orden: ventas del último mes ↓</div>
-    <div id="tbl-parques-mes" style="overflow:auto;max-height:calc(100vh - 220px)"></div>
+    <div id="tbl-parques-mes" style="overflow:auto;max-height:56vh"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-head">Curva mensual de colocaciones por parque (incluye CALLE)</div>
+    <div id="chart-parques-mes" style="height:340px;position:relative"><canvas id="ch-parques-mes"></canvas></div>
   </div>
 </div>
 
