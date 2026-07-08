@@ -345,7 +345,8 @@
 
     const fmtFecha = d => new Date(d).toLocaleDateString('es-CL', { timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric' });
     const fmtP2   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 2) + '%' : '—';
-    const fmtP4   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 4) + '%' : '—';
+    // Vista con 3 decimales (los inputs de edición conservan 4 para no perder precisión)
+    const fmtP4   = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? formatCL(parseFloat(v), 3) + '%' : '—';
 
     // CF = mensual_mayor - spread_mayor  (único para ambos tramos)
     const calcCF = (mensual_mayor, spread_mayor) => {
