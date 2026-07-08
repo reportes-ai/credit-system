@@ -78,7 +78,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v4.8</span>
+        <span class="version-badge" id="versionBadge">v4.9</span>
       </a>
         <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><a href="/mantenedores">Mantenedores</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-percent me-1"></i>Tasas</span></div></div>
     <div class="topnav-right">
@@ -321,7 +321,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       setupCLInput(document.getElementById('fAnualMenor'), 2);
       setupCLInput(document.getElementById('fAnualMayor'), 2);
-      setupCLInput(document.getElementById('fSpreadMayor'), 4);
+      setupCLInput(document.getElementById('fSpreadMayor'), 3);
     });
     const token = sessionStorage.getItem('token');
     const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
@@ -441,16 +441,16 @@
       const mA = isNaN(a) ? NaN : Math.round(a / 12 * 10000) / 10000;
       const mB = isNaN(b) ? NaN : Math.round(b / 12 * 10000) / 10000;
 
-      document.getElementById('fMensualMenor').value = isNaN(mA) ? '' : formatCL(mA, 4);
-      document.getElementById('fMensualMayor').value = isNaN(mB) ? '' : formatCL(mB, 4);
+      document.getElementById('fMensualMenor').value = isNaN(mA) ? '' : formatCL(mA, 3);
+      document.getElementById('fMensualMayor').value = isNaN(mB) ? '' : formatCL(mB, 3);
 
       // CF = mensual_mayor - spread
       const cf = (!isNaN(mB) && !isNaN(sp)) ? Math.round((mB - sp) * 10000) / 10000 : NaN;
-      document.getElementById('fCF').value = isNaN(cf) ? '' : formatCL(cf, 4);
+      document.getElementById('fCF').value = isNaN(cf) ? '' : formatCL(cf, 3);
 
       // Spread implícito ≤200 = mensual_menor - CF
       const spMenor = (!isNaN(mA) && !isNaN(cf)) ? Math.round((mA - cf) * 10000) / 10000 : NaN;
-      document.getElementById('fSpreadMenor').value = isNaN(spMenor) ? '' : formatCL(spMenor, 4);
+      document.getElementById('fSpreadMenor').value = isNaN(spMenor) ? '' : formatCL(spMenor, 3);
     }
 
     function abrirModal() {
@@ -461,7 +461,7 @@
       // Pre-cargar el spread del último registro (editable) → CF y spread implícito se calculan al tiro
       const ult = datos && datos.length ? datos[0] : null;
       if (ult && ult.spread_mayor != null)
-        document.getElementById('fSpreadMayor').value = formatCL(ult.spread_mayor, 4);
+        document.getElementById('fSpreadMayor').value = formatCL(ult.spread_mayor, 3);
       calcMensual();
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
@@ -477,7 +477,7 @@
       document.getElementById('fHasta').value       = t.fecha_hasta?.split('T')[0] || '';
       document.getElementById('fAnualMenor').value  = formatCL(t.tasa_anual_menor, 2);
       document.getElementById('fAnualMayor').value  = formatCL(t.tasa_anual_mayor, 2);
-      document.getElementById('fSpreadMayor').value = t.spread_mayor != null ? formatCL(t.spread_mayor, 4) : '';
+      document.getElementById('fSpreadMayor').value = t.spread_mayor != null ? formatCL(t.spread_mayor, 3) : '';
       calcMensual();
       document.getElementById('modalError').classList.add('d-none');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show();
