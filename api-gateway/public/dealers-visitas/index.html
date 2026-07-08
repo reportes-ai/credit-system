@@ -278,7 +278,8 @@
       <div style="font-size:.74rem;color:#64748b;margin-top:4px">
         <span style="color:#16a34a;font-weight:700">●</span> zona completa &nbsp;
         <span style="color:#f59e0b;font-weight:700">●</span> parcialmente asignada &nbsp;
-        <span style="color:#0255c5;font-weight:700">●</span> sin asignar — la etiqueta muestra ASIGNADOS n/total
+        <span style="color:#0255c5;font-weight:700">●</span> sin asignar — la etiqueta muestra ASIGNADOS n/total.
+        Los bordes dibujan el área de cada zona (color por comuna; Zona 1 trazo sólido, Zona 2 punteado, …).
       </div>
     </div>
     <div class="fld"><label>Días de la semana</label><div class="dow-pick" id="amDias"></div></div>
@@ -1128,6 +1129,23 @@ function initAmMapa(){
     { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(AM_MAP);
   AM_CAPA = L.layerGroup().addTo(AM_MAP);
 }
+/* Envolvente convexa (Andrew monotone chain) para dibujar el borde de la zona */
+function hullZona(pts){
+  if (pts.length < 3) return null;
+  const p = [...pts].sort((a,b)=>a[1]-b[1] || a[0]-b[0]);   // por lng, luego lat
+  const cross = (o,a,b)=>(a[1]-o[1])*(b[0]-o[0])-(a[0]-o[0])*(b[1]-o[1]);
+  const lo=[], hi=[];
+  for (const pt of p){ while(lo.length>=2 && cross(lo[lo.length-2],lo[lo.length-1],pt)<=0) lo.pop(); lo.push(pt); }
+  for (const pt of [...p].reverse()){ while(hi.length>=2 && cross(hi[hi.length-2],hi[hi.length-1],pt)<=0) hi.pop(); hi.push(pt); }
+  return lo.slice(0,-1).concat(hi.slice(0,-1));
+}
+/* Color estable por comuna (hash del nombre → paleta) */
+const AM_PALETA = ['#e11d48','#0255c5','#16a34a','#f59e0b','#7c3aed','#0e7490','#db2777','#65a30d','#dc2626','#4f46e5','#b45309','#059669'];
+function colorComuna(zona){
+  const com = String(zona).split(' — ')[0];
+  let h = 0; for (let i=0;i<com.length;i++) h = (h*31 + com.charCodeAt(i)) >>> 0;
+  return AM_PALETA[h % AM_PALETA.length];
+}
 async function cargarZonasMapa(){
   if (!document.getElementById('amMapa')) return;
   initAmMapa();
@@ -1139,6 +1157,15 @@ async function cargarZonasMapa(){
   AM_CAPA.clearLayers();
   const bounds = [];
   j.data.forEach(z=>{
+    // borde de la zona: color por comuna; zonas de la misma comuna se
+    // distinguen por el trazo (Zona 1 sólido, Zona 2 punteado, …)
+    const cBorde = colorComuna(z.zona);
+    const mZona = String(z.zona).match(/Zona (\d+)/);
+    const dash = mZona ? ['', '8 6', '2 6', '14 6 2 6'][(+mZona[1]-1) % 4] : '';
+    const hull = hullZona(z.puntos || []);
+    let capa = null;
+    if (hull) capa = L.polygon(hull, { color:cBorde, weight:2.5, dashArray:dash, fillColor:cBorde, fillOpacity:.07 });
+    else if ((z.puntos||[]).length) capa = L.circle(z.puntos[0], { radius:400, color:cBorde, weight:2.5, dashArray:dash, fillColor:cBorde, fillOpacity:.07 });
     const color = z.asignados >= z.total ? '#16a34a' : z.asignados > 0 ? '#f59e0b' : '#0255c5';
     const icon = L.divIcon({ className:'', iconAnchor:[55,14], html:
       `<div style="background:${color};color:#fff;border-radius:14px;padding:3px 10px;font-size:.68rem;font-weight:800;
@@ -1153,6 +1180,7 @@ async function cargarZonasMapa(){
         ${z.ejecutivos.map(e=>`<div style="display:flex;justify-content:space-between;gap:10px">
            <span>${esc(e.nombre)}</span><b>${e.n}</b></div>`).join('')}` : '<hr style="margin:6px 0"><i>Aún sin ejecutivos asignados</i>'}
     </div>`;
+    if (capa) { capa.bindPopup(pop); capa.addTo(AM_CAPA); (hull || z.puntos).forEach(p=>bounds.push(p)); }
     L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
     bounds.push([z.lat, z.lng]);
   });

@@ -470,16 +470,16 @@ const zonasMapa = async (req, res) => {
     const mAsig = new Map(asig.map(a => [a.id_dealer, a.ejecutivo || `Usuario ${a.id_usuario}`]));
     const porZona = {};
     for (const d of uni) {
-      const z = (porZona[d.zona] = porZona[d.zona] || { zona: d.zona, total: 0, asignados: 0, lats: [], lngs: [], ejecutivos: {} });
+      const z = (porZona[d.zona] = porZona[d.zona] || { zona: d.zona, total: 0, asignados: 0, lats: [], lngs: [], puntos: [], ejecutivos: {} });
       z.total++;
-      if (d.lat != null && d.lng != null) { z.lats.push(+d.lat); z.lngs.push(+d.lng); }
+      if (d.lat != null && d.lng != null) { z.lats.push(+d.lat); z.lngs.push(+d.lng); z.puntos.push([+d.lat, +d.lng]); }
       const ej = mAsig.get(d.id_dealer);
       if (ej) { z.asignados++; z.ejecutivos[ej] = (z.ejecutivos[ej] || 0) + 1; }
     }
     const out = Object.values(porZona)
       .filter(z => z.lats.length)   // sin coordenadas no se puede dibujar
       .map(z => ({ zona: z.zona, total: z.total, asignados: z.asignados,
-                   lat: mediana(z.lats), lng: mediana(z.lngs),
+                   lat: mediana(z.lats), lng: mediana(z.lngs), puntos: z.puntos,
                    ejecutivos: Object.entries(z.ejecutivos).map(([nombre, n]) => ({ nombre, n }))
                      .sort((a, b) => b.n - a.n) }))
       .sort((a, b) => a.zona.localeCompare(b.zona, 'es'));
