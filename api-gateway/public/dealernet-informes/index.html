@@ -411,7 +411,7 @@ function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled
 
 /* ── Ver / Descargar ─────────────────────────────────────────────────────── */
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
-const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
+const FTE = { '16':'Digitación', '110':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
 const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
 const LOGO_DN = (location && location.origin ? location.origin : '') + '/img/logo-dealernet.png';
 const REPORT_CSS = `
@@ -547,6 +547,43 @@ function bodyComportamiento(prd){
     '<div class="rep-h">Historial de Documentos M$</div>'+
     '<table class="rep-tb"><thead>'+head+'</thead><tbody>'+bd+'</tbody></table>';
 }
+// Comportamiento Extendido (110): mismo formato del PDF DealerNet — Resumen +
+// "Historial de Documentos MM$" con las variables por período, en bloques de 9 columnas.
+function bodyComportamientoExt(prd, d){
+  const r = prd.r11001 || {}; const cab = r.r110001 || {}; const periodos = arr(r.r110012);
+  if(!periodos.length && cab['@_anomes']==null) return noinfo();
+  const fmtMM = v => { const n=parseFloat(v); return isNaN(n) ? esc(String(v??'')) : n.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  const rows = [
+    ['Al día e Impagos < 30 días','deuda_direct_vig'],['Impagos 30 y 90 días','deuda_morosa_30_90'],
+    ['Impagos 90 y 180 días','deuda_direct_venc'],['Impagos 180 días y 3 años','deuda_dir_venc_180d_3anos'],
+    ['Impagos >= 3 años','saldo_deud_cast_direct'],['Créditos de consumo','deuda_credito_consumo'],
+    ['Nro. Entidades Cred.Consumo','nro_inst_cred_consumo','int'],['Créditos comerciales','deuda_comercial'],
+    ['Créditos para vivienda','deuda_cred_hipotecario'],['Linea Crédito Disponible','mto_linea_disponible'],
+    ['Indirecta Impagos < 30 días','deuda_indirec_vig'],['Indirecta Impagos 30 días y 3 años','deuda_indirec_vencida'],
+    ['Indirecta Impagos >= 3 años','saldo_deud_cast_indirect'],['Nro. Entidades.Cred.Comer.','nro_inst_cred_com','int'],
+    ['Créditos Leasing al día','deuda_leasing'],['Créditos Leasing Impago','deuda_morosa_leasing'],
+    ['Créditos Contingentes','deuda_cred_contingentes'],['Operaciones financieras','deuda_ope_pacto'],
+    ['Instrum. deudas adquiridos','deuda_inv_financieras'],
+  ];
+  const titular = deepFind(prd,['nombre']) || '';
+  let h = '<div class="rep-h">Resumen</div>'+
+    '<div class="rep-kv"><b>Nombre:</b> '+esc(titular||'—')+'</div>'+
+    '<div class="rep-kv"><b>RUT:</b> '+esc(d ? rutFmt(d.rut,d.dv) : '')+'</div>'+
+    '<div class="rep-kv"><b>Mes/Año:</b> '+anomes(cab['@_anomes'])+'</div>'+
+    '<div class="rep-kv"><b>Monto:</b> MM$ '+fmtMM(cab['@_deuda_total'])+'</div>';
+  // bloques de 9 períodos, como el PDF
+  for(let i=0; i<periodos.length; i+=9){
+    const blk = periodos.slice(i, i+9);
+    h += (i===0 ? '<div class="rep-h">Historial de Documentos MM$</div>' : '')+
+      '<table class="rep-tb" style="margin-bottom:10px"><thead><tr><th>Variables/Periodos</th>'+
+      blk.map(p=>'<th style="text-align:right">'+anomes(p['@_periodo'])+'</th>').join('')+'</tr></thead><tbody>'+
+      rows.map(([lbl,key,tipo])=>'<tr><td>'+lbl+'</td>'+blk.map(p=>{
+        const v = p['@_'+key];
+        return '<td style="text-align:right">'+(tipo==='int' ? esc(String(v??'0')) : fmtMM(v))+'</td>';
+      }).join('')+'</tr>').join('')+'</tbody></table>';
+  }
+  return h;
+}
 function bodyPerfilComercial(prd){
   const colect = gp(prd,'DLNTPERCOMDLNTWS','ROOT','D','result','colect');
   if(!colect) return noinfo();
@@ -644,6 +681,7 @@ function renderInforme(d){
   let body;
   if(cod==='2101') body = bodyPension(d, prd);
   else if(cod==='16') body = bodyComportamiento(prd);
+  else if(cod==='110') body = bodyComportamientoExt(prd, d);
   else if(cod==='3435') body = bodyPerfilComercial(prd);
   else if(cod==='3425') body = bodyBoletinImpagos(prd);
   else body = '<div class="rep-note">Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(prd)+'</div>';
