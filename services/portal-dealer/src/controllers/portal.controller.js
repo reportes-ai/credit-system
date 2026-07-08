@@ -549,6 +549,28 @@ const AF_RUT = require('../../../../api-gateway/public/js/rut-core');
         INDEX idx_dealer (id_dealer), INDEX idx_rut (rut_cliente)
       )`);
     await pool.query('ALTER TABLE portal_preaprobaciones ADD COLUMN IF NOT EXISTS renta BIGINT NULL, ADD COLUMN IF NOT EXISTS fuente_renta VARCHAR(10) NULL');
+    // Repositorio único de preaprobaciones (v100.9): correlativo PREaammxxx + canal +
+    // checklist de parámetros + informe IA + informes DealerNet usados
+    await pool.query(`ALTER TABLE portal_preaprobaciones
+      ADD COLUMN IF NOT EXISTS codigo VARCHAR(12) NULL,
+      ADD COLUMN IF NOT EXISTS canal VARCHAR(10) NOT NULL DEFAULT 'PORTAL',
+      ADD COLUMN IF NOT EXISTS checklist JSON NULL,
+      ADD COLUMN IF NOT EXISTS ia_informe_id INT NULL,
+      ADD COLUMN IF NOT EXISTS ia_nivel_riesgo VARCHAR(10) NULL,
+      ADD COLUMN IF NOT EXISTS informes JSON NULL`);
+    await pool.query('ALTER TABLE portal_preaprobaciones ADD UNIQUE INDEX idx_codigo (codigo)').catch(() => {});
+    // WhatsApp puede no traer precio/pie/año (preevaluación por RUT)
+    await pool.query('ALTER TABLE portal_preaprobaciones MODIFY precio BIGINT NULL, MODIFY pie BIGINT NULL, MODIFY anio SMALLINT NULL').catch(() => {});
+    // Funcionalidad del repositorio (página interna /preaprobaciones/, bajo Evaluación Crediticia)
+    const [[exF]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='preaprob_repo' LIMIT 1");
+    let idF = exF?.id_funcionalidad;
+    if (!idF) {
+      const [insF] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (390001,'Repositorio de Preaprobaciones','preaprob_repo','/preaprobaciones/','bi-journal-check')");
+      idF = insF.insertId;
+    }
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
+    if (adm) await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [adm.id_perfil, idF]);
   } catch (e) { console.error('[preaprobacion migration]', e.message); }
 })();
 
@@ -657,17 +679,43 @@ exports.preaprobar = async (req, res) => {
       else if (!opciones.length) motivos.push('Cuota supera el ' + POL.carga_max_pct + '% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(topeCuota) + ')');
     }
 
+    // 5) Informes DealerNet + REPORTE IA (regla: SIN INFORME IA NO HAY APROBACIÓN)
+    //    + severidad DealerNet contra el umbral — mismos criterios que WhatsApp.
+    const { guardarPreaprobacion, informesEIA } = require('../../../../shared/preaprobacion-repo');
+    const SEV = ['bueno', 'regular', 'malo', 'grave'];
+    const dn = await informesEIA(rut, POL);
+    if (!dn.ia_informe_id) motivos.push('Sin informe IA: ' + (dn.error || 'no disponible') + ' — no hay aprobación sin análisis crediticio');
+    if (dn.peorSeveridad && SEV.indexOf(dn.peorSeveridad) > Math.max(0, SEV.indexOf(POL.wsp_severidad_max)))
+      motivos.push('Severidad DealerNet ' + dn.peorSeveridad + ' supera el máximo permitido (' + POL.wsp_severidad_max + ')');
+
     const resultado = (!motivos.length && !motivosPub.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';
     const motivosTodos = motivosPub.concat(motivos, notas);
-    const [ins] = await pool.query(
-      `INSERT INTO portal_preaprobaciones (id_dealer, rut_dealer, dealer_nombre, rut_cliente, precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [req.dealer && req.dealer.id_dealer || null, req.dealer && req.dealer.rut || null,
-       (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null,
-       rut, precio, pie, anio, resultado, motivosTodos.join(' | ') || null, JSON.stringify(opciones), renta || null, fuenteRenta]);
 
-    // Al dealer: SOLO veredicto y cuotas — nunca el detalle del cliente
-    return res.json({ success: true, data: { id: ins.insertId, resultado, opciones, motivos: motivosPub }, error: null });
+    // Checklist de cumplimiento de CADA parámetro (queda en el repositorio)
+    const checklist = [
+      { criterio: 'Precio dentro de rango', valor: precio, limite: POL.precio_min + '–' + POL.precio_max, cumple: precio >= POL.precio_min && precio <= POL.precio_max },
+      { criterio: 'Antigüedad del vehículo', valor: antig + ' años', limite: antigMax + ' años', cumple: antig <= antigMax },
+      { criterio: 'Renta líquida disponible', valor: renta || 0, limite: '> 0 (' + (fuenteRenta || 'sin fuente') + ')', cumple: !!renta },
+      { criterio: 'Protestos vigentes', valor: ic ? +ic.protestos_vigentes_q : null, limite: '≤ ' + POL.max_protestos, cumple: !!ic && +ic.protestos_vigentes_q <= POL.max_protestos },
+      { criterio: 'Deuda morosa', valor: ic ? +ic.deuda_morosa : null, limite: '≤ ' + POL.max_deuda_morosa, cumple: !!ic && +ic.deuda_morosa <= POL.max_deuda_morosa },
+      { criterio: 'Deuda vencida', valor: ic ? +ic.deuda_vencida : null, limite: '≤ ' + POL.max_deuda_vencida, cumple: !!ic && +ic.deuda_vencida <= POL.max_deuda_vencida },
+      { criterio: 'Deuda castigada', valor: ic ? +ic.deuda_castigada : null, limite: '≤ ' + POL.max_deuda_castigada, cumple: !!ic && +ic.deuda_castigada <= POL.max_deuda_castigada },
+      { criterio: 'Cuota ≤ ' + POL.carga_max_pct + '% de la renta', valor: opciones.length + ' plazos caben', limite: 'al menos 1', cumple: opciones.length > 0 },
+      { criterio: 'Severidad DealerNet', valor: dn.peorSeveridad, limite: '≤ ' + POL.wsp_severidad_max, cumple: !!dn.peorSeveridad && SEV.indexOf(dn.peorSeveridad) <= Math.max(0, SEV.indexOf(POL.wsp_severidad_max)) },
+      { criterio: 'Informe IA generado', valor: dn.ia_nivel_riesgo || null, limite: 'obligatorio', cumple: !!dn.ia_informe_id },
+    ];
+
+    const { id, codigo } = await guardarPreaprobacion({
+      canal: 'PORTAL',
+      id_dealer: req.dealer && req.dealer.id_dealer || null, rut_dealer: req.dealer && req.dealer.rut || null,
+      dealer_nombre: (req.dealer && (req.dealer.nombre || req.dealer.dealer)) || null,
+      rut_cliente: rut, precio, pie, anio, resultado,
+      motivos: motivosTodos.join(' | ') || null, opciones, renta: renta || null, fuente_renta: fuenteRenta,
+      checklist, ia_informe_id: dn.ia_informe_id, ia_nivel_riesgo: dn.ia_nivel_riesgo, informes: dn.informes,
+    });
+
+    // Al dealer: SOLO veredicto, cuotas y correlativo — nunca el detalle del cliente
+    return res.json({ success: true, data: { id, codigo, resultado, opciones, motivos: motivosPub }, error: null });
   } catch (err) {
     console.error('[portal-dealer] preaprobar:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No pude evaluar en este momento' });
@@ -736,5 +784,30 @@ exports.preaprobacionContactar = async (req, res) => {
   } catch (err) {
     console.error('[portal-dealer] preaprobacionContactar:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No pude gestionar el contacto' });
+  }
+};
+
+/* ── GET /api/portal-dealer/preaprobaciones?q= — repositorio (uso interno) ──
+   Busca por correlativo PREaammxxx, RUT del cliente o nombre del dealer. */
+exports.listarPreaprobaciones = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().toUpperCase().replace(/\./g, '');
+    let where = '1=1'; const params = [];
+    if (q) {
+      where = `(UPPER(COALESCE(codigo,'')) LIKE ? OR REPLACE(UPPER(rut_cliente),'.','') LIKE ?
+                OR UPPER(COALESCE(dealer_nombre,'')) LIKE ? OR REPLACE(UPPER(COALESCE(rut_dealer,'')),'.','') LIKE ?)`;
+      const like = '%' + q + '%';
+      params.push(like, like, like, like);
+    }
+    const [rows] = await pool.query(
+      `SELECT id, codigo, canal, created_at, id_dealer, rut_dealer, dealer_nombre, rut_cliente,
+              precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta, contacto,
+              checklist, ia_informe_id, ia_nivel_riesgo, informes
+         FROM portal_preaprobaciones WHERE ${where}
+        ORDER BY id DESC LIMIT 300`, params);
+    res.json({ success: true, data: rows, error: null });
+  } catch (err) {
+    console.error('[portal-dealer] listarPreaprobaciones:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };

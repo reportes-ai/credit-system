@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!-- v100.9 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repositorio de Preaprobaciones — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:1200px; margin:22px auto; padding:0 20px 70px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0255c5); border-radius:14px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; }
+    .banner h2 { font-weight:700; margin:0; font-size:1.15rem; }
+    .banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .card-x { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:14px; }
+    .buscar { display:flex; gap:10px; }
+    .buscar input { flex:1; border:1.5px solid #d1d5db; border-radius:10px; padding:10px 14px; font-size:.95rem; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; padding:7px 8px; border-bottom:2px solid #eef2f7; }
+    td { padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr.row-pre { cursor:pointer; } tr.row-pre:hover td { background:#f0f7ff; }
+    .pill { font-weight:800; border-radius:10px; padding:2px 10px; font-size:.72rem; }
+    .pill.ok { background:#dcfce7; color:#166534; } .pill.rev { background:#fef3c7; color:#92400e; }
+    .pill.canal { background:#e0e7ff; color:#3730a3; }
+    .det { background:#f8fafc; }
+    .det h6 { font-size:.78rem; font-weight:800; color:#012d70; margin:10px 0 4px; text-transform:uppercase; }
+    .chk-ok { color:#16a34a; } .chk-no { color:#dc2626; }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Repositorio de Preaprobaciones',icon:'bi-journal-check',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-journal-check"></i>
+    <div>
+      <h2>Repositorio de Preaprobaciones</h2>
+      <p>Todas las preaprobaciones de todos los canales (Portal Dealer y WhatsApp), con su correlativo PREaammxxx, checklist de parámetros, informe IA, informes DealerNet y condiciones ofrecidas.</p>
+    </div>
+  </div>
+
+  <div class="card-x">
+    <div class="buscar">
+      <input id="q" placeholder="Buscar por N° (PRE2607001), RUT del cliente o dealer…" onkeydown="if(event.key==='Enter')buscar()">
+      <button class="btn btn-primary" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
+    </div>
+  </div>
+
+  <div class="card-x" style="overflow:auto">
+    <table>
+      <thead><tr><th>N°</th><th>Canal</th><th>Fecha</th><th>Dealer</th><th>RUT Cliente</th><th>Precio</th><th>Pie</th><th>Resultado</th><th>Riesgo IA</th><th>Condiciones</th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="10" class="muted">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
+const fmt = n => (n==null||n==='') ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const asJ = v => { if(v==null) return null; if(typeof v==='object') return v; try{return JSON.parse(v);}catch(_){return null;} };
+let ROWS = [];
+async function buscar(){
+  const q = document.getElementById('q').value.trim();
+  const r = await fetch('/api/portal-dealer/preaprobaciones'+(q?('?q='+encodeURIComponent(q)):''), { headers:H });
+  const j = await r.json();
+  const tb = document.getElementById('tbody');
+  if (!j.success) { tb.innerHTML = '<tr><td colspan="10">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  ROWS = j.data;
+  tb.innerHTML = ROWS.length ? ROWS.map((p,i)=>{
+    const ops = asJ(p.opciones)||[];
+    return `<tr class="row-pre" onclick="toggleDet(${i})">
+      <td><b>${esc(p.codigo||('#'+p.id))}</b></td>
+      <td><span class="pill canal">${esc(p.canal||'PORTAL')}</span></td>
+      <td style="white-space:nowrap">${new Date(p.created_at).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td>${esc(p.dealer_nombre||'—')}</td>
+      <td style="white-space:nowrap">${esc(p.rut_cliente)}</td>
+      <td>${fmt(p.precio)}</td><td>${fmt(p.pie)}</td>
+      <td><span class="pill ${p.resultado==='PREAPROBADO'?'ok':'rev'}">${esc(p.resultado)}</span></td>
+      <td>${esc(p.ia_nivel_riesgo||'—')}</td>
+      <td style="font-size:.74rem">${ops.map(o=>o.plazo+'×'+fmt(o.cuota)).join(' · ')||'—'}</td>
+    </tr><tr id="det${i}" class="det" style="display:none"><td colspan="10" id="detBody${i}"></td></tr>`;
+  }).join('') : '<tr><td colspan="10" class="muted">Sin resultados.</td></tr>';
+}
+function toggleDet(i){
+  const tr = document.getElementById('det'+i);
+  if (tr.style.display !== 'none') { tr.style.display='none'; return; }
+  const p = ROWS[i];
+  const chk = asJ(p.checklist)||[], infs = asJ(p.informes)||[];
+  let h = '';
+  if (p.motivos) h += '<h6>Observaciones</h6><div style="font-size:.8rem">'+esc(p.motivos)+'</div>';
+  h += '<h6>Checklist de parámetros</h6><table><thead><tr><th>Criterio</th><th>Valor</th><th>Límite</th><th>Cumple</th></tr></thead><tbody>'+
+    (chk.map(c=>'<tr><td>'+esc(c.criterio)+'</td><td>'+esc(c.valor??'—')+'</td><td>'+esc(c.limite??'—')+'</td><td>'+
+      (c.cumple?'<i class="bi bi-check-circle-fill chk-ok"></i>':'<i class="bi bi-x-circle-fill chk-no"></i>')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">Sin checklist (registro antiguo)</td></tr>')+'</tbody></table>';
+  h += '<h6>Informes DealerNet usados</h6><table><thead><tr><th>Producto</th><th>Disponible</th><th>Severidad</th><th>Fecha</th></tr></thead><tbody>'+
+    (infs.map(x=>'<tr><td>'+esc(x.nombre||x.codigo)+'</td><td>'+(x.disponible?'Sí':'No')+'</td><td>'+esc(x.severidad||'—')+'</td><td>'+(x.fecha?new Date(x.fecha).toLocaleDateString('es-CL'):'—')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">Sin informes registrados</td></tr>')+'</tbody></table>';
+  h += '<h6>Informe IA</h6><div style="font-size:.8rem">'+(p.ia_informe_id
+    ? 'Riesgo <b>'+esc(p.ia_nivel_riesgo||'—')+'</b> · <a href="/ia/informe-dealernet/?rut='+encodeURIComponent(p.rut_cliente)+'" target="_blank">ver reporte crediticio IA</a>'
+    : '<span class="chk-no">Sin informe IA — no hubo aprobación</span>')+'</div>';
+  h += '<h6>Renta</h6><div style="font-size:.8rem">'+fmt(p.renta)+(p.fuente_renta?' ('+esc(p.fuente_renta)+')':'')+'</div>';
+  document.getElementById('detBody'+i).innerHTML = h;
+  tr.style.display='';
+}
+buscar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

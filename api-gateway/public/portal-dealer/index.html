@@ -992,7 +992,7 @@ function entrarDemo(){
       const j = await r.json();
       if (!j.success) { out.innerHTML = `<div class="pa-res no"><h4>No pude evaluar</h4>${j.error||'Inténtalo de nuevo.'}</div>`; return; }
       paId = j.data.id;
-      paLast = { rut: $('paRut').value, precio, pie, anio, renta: num($('paRenta')), resultado: j.data.resultado, opciones: j.data.opciones || [], motivos: j.data.motivos || [] };
+      paLast = { rut: $('paRut').value, precio, pie, anio, renta: num($('paRenta')), resultado: j.data.resultado, opciones: j.data.opciones || [], motivos: j.data.motivos || [], codigo: j.data.codigo || null };
       if (j.data.resultado === 'PREAPROBADO') {
         out.innerHTML = `<div class="pa-res si">
           <h4><i class="bi bi-patch-check-fill"></i> ¡Buenas noticias! No le vemos problema a esta operación 🎉</h4>
@@ -1037,6 +1037,7 @@ function entrarDemo(){
       const L = paLast;
       const lineas = [
         'Hice una simulación para este cliente:',
+        L.codigo ? '• N° Preaprobación: ' + L.codigo : '',
         '• RUT: ' + L.rut,
         '• Precio: ' + fmt(L.precio) + ' · Pie: ' + fmt(L.pie) + ' · Año: ' + L.anio,
         L.renta ? '• Renta líquida informada: ' + fmt(L.renta) : '',

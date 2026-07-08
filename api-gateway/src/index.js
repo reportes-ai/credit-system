@@ -443,6 +443,7 @@ const PAGINAS = [
   ['/certificados', 'certificados/index.html'],
   ['/mantenedores/certificados-textos', 'mantenedores/certificados-textos/index.html'],
   ['/mantenedores/preaprobacion', 'mantenedores/preaprobacion/index.html'],
+  ['/preaprobaciones', 'preaprobaciones/index.html'],
   ['/tesoreria/odp-cuotas', 'tesoreria/odp-cuotas.html'],
   ['/reporteria', 'reporteria/index.html'],
   ['/old-base-unica', 'old-base-unica/index.html'],

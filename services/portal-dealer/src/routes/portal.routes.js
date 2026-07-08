@@ -17,4 +17,10 @@ router.get('/operaciones/:id/fundantes', verifyDealer, c.fundantes);
 router.get('/operaciones/:id/pago',      verifyDealer, c.pago);
 router.post('/ia',                       verifyDealer, c.ia);
 
+// Repositorio de preaprobaciones (uso INTERNO del suite, no del dealer):
+// búsqueda por correlativo PREaammxxx, RUT o dealer.
+const { verifyToken } = require('../../../../shared/middleware/auth');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
+router.get('/preaprobaciones', verifyToken, requireFunc('preaprob_repo'), c.listarPreaprobaciones);
+
 module.exports = router;

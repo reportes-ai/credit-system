@@ -132,6 +132,8 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS no_leidos INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Última cotización del bot en la conversación (para el mail de oportunidad al ejecutivo)
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS cotizacion JSON NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // Correlativo del repositorio de preaprobaciones (PREaammxxx) de esta conversación
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS preaprob_codigo VARCHAR(12) NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Contador de preevaluaciones DealerNet de la conversación (límite anti-abuso)
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS preevals INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
   } catch (e) { console.error('[wsp_conversaciones migration]', e.message); }
@@ -367,46 +369,19 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   const rut = String(rutRaw || '').replace(/[.\s]/g, '').toUpperCase();
   const m = rut.match(/^(\d{7,8})-?([\dK])$/);
   if (!m || dvRut(parseInt(m[1], 10)) !== m[2]) return { error: 'RUT_INVALIDO' };
-  let [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
-  // Políticas paramétricas: qué informes consultar y con qué modelo IA analizar
-  let POL = null;
-  try { const { getPoliticas } = require('../../../../shared/preaprobacion-politicas'); POL = await getPoliticas(); } catch (_) {}
-  if (POL && POL.informes_codigos) {
-    const set = new Set(POL.informes_codigos.split(',').map(s => s.trim()));
-    const filtrados = prods.filter(p => set.has(String(p.codigo)));
-    if (filtrados.length) prods = filtrados;
-  }
-  if (!prods.length) return { error: 'SIN_PRODUCTOS' };
-  const { asegurarInformes } = require('../../../clientes/src/controllers/dealernet-ws.controller');
-  const r = await asegurarInformes({ rut: m[1] + '-' + m[2], productos: prods.map(p => String(p.codigo)), usuario: null });
-  const disponibles = r.items.filter(i => i.disponible);
-  if (!disponibles.length) return { error: r.error || 'SIN_INFORMES' };
+  // MOTOR UNICO (shared/preaprobacion-repo): mismos informes, mismo reporte IA y
+  // mismos criterios que el Portal del Dealer. Regla: SIN INFORME IA NO HAY APROBACION.
+  const { getPoliticas } = require('../../../../shared/preaprobacion-politicas');
+  const { informesEIA } = require('../../../../shared/preaprobacion-repo');
+  const POL = await getPoliticas();
+  const dn = await informesEIA(m[1] + '-' + m[2], POL);
+  if (!dn.informes.some(i => i.disponible)) return { error: dn.error || 'SIN_INFORMES' };
   const SEV = ['bueno', 'regular', 'malo', 'grave'];
-  const peor = disponibles.reduce((a, i) => Math.max(a, SEV.indexOf(i.severidad)), 0);
-  // Umbral paramétrico (mantenedor Políticas de Preaprobación): peor severidad que aún preaprueba
-  let sevMax = 1;
-  try {
-    const { getPoliticas } = require('../../../../shared/preaprobacion-politicas');
-    const idx = SEV.indexOf((await getPoliticas()).wsp_severidad_max);
-    if (idx >= 0) sevMax = idx;
-  } catch (_) {}
-  // Reporte Crediticio Automático (Business Suite): genera y persiste el análisis IA
-  // en el repositorio existente ia_informes_dealernet (motor único analizarRut, lee los
-  // informes ya traídos — no re-consulta DealerNet). En segundo plano, no frena el chat.
-  // Se salta si ya hay un reporte de los últimos 15 días (misma vigencia del caché).
-  (async () => {
-    try {
-      const [[prev]] = await pool.query(
-        'SELECT id FROM ia_informes_dealernet WHERE rut=? AND fecha >= DATE_SUB(NOW(), INTERVAL 15 DAY) LIMIT 1', [m[1]]);
-      if (!prev) {
-        const { analizarRut } = require('../../../ia/src/controllers/informe-dealernet.controller');
-        const rep = await analizarRut({ rut: m[1] + '-' + m[2],
-          modelo: POL && POL.ia_modelo !== 'auto' ? POL.ia_modelo : undefined });
-        if (rep.ok) console.log(`[wsp reporte-ia] RUT ${m[1]} → riesgo ${rep.nivel_riesgo} (reporte #${rep.id})`);
-      }
-    } catch (e) { console.error('[wsp reporte-ia]', e.message); }
-  })();
-  return { rut: m[1] + '-' + m[2], ok: peor <= sevMax, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
+  const peor = Math.max(0, SEV.indexOf(dn.peorSeveridad));
+  const sevMax = Math.max(0, SEV.indexOf(POL.wsp_severidad_max));
+  const ok = !!dn.ia_informe_id && peor <= sevMax;
+  return { rut: m[1] + '-' + m[2], ok, severidad: dn.peorSeveridad, sin_ia: !dn.ia_informe_id,
+    pie_pct: +piePct || null, plazo: +plazo || null, POL, dn };
 }
 
 /* ── Plantillas HSM: gestor in-app contra la Graph API de Meta ────────────────
@@ -575,7 +550,7 @@ async function enviarOportunidad(conv, texto) {
   const html = `
     <h2 style="color:#012d70;margin:0 0 6px">🚗 ¡Tienes una nueva oportunidad de negocio!</h2>
     <p>Hola <b>${nombreEje.split(' ')[0] || 'ejecutivo'}</b>, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
-    <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}</p>
+    <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}${conv.preaprob_codigo ? ` · <b>N° Preaprobación:</b> ${conv.preaprob_codigo}` : ''}</p>
     ${detalle}
     ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://credit-system-45em.onrender.com/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}
     <p>💬 Continúa la conversación desde la <a href="https://credit-system-45em.onrender.com/whatsapp/?conv=${conv.id}">bandeja de WhatsApp</a> — el cliente sigue en el mismo chat.</p>
@@ -739,10 +714,34 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
           .replace(/\{pie_expres\}/g, String(P.wsp_pie_expres_pct));
         let msg;
         if (ev.ok && ev.pie_pct >= P.wsp_pie_expres_pct) msg = P.msg_aprobado_expres;
-        else if (ev.severidad === 'bueno')               msg = P.msg_sev_bueno;
+        else if (ev.severidad === 'bueno' && ev.ok)      msg = P.msg_sev_bueno;
         else if (ev.severidad === 'regular' && ev.ok)    msg = P.msg_sev_regular;
-        else                                             msg = P.msg_sev_malo;   // rechazo (malo/grave o sobre el umbral)
+        else                                             msg = P.msg_sev_malo;   // rechazo (sin IA, o severidad sobre el umbral)
         respuesta += '\n\n' + rell(msg);
+        // Guardar en el REPOSITORIO ÚNICO de preaprobaciones (correlativo PREaammxxx):
+        // checklist de criterios, informe IA, informes DealerNet y condiciones ofrecidas.
+        try {
+          const { guardarPreaprobacion } = require('../../../../shared/preaprobacion-repo');
+          const SEVQ = ['bueno', 'regular', 'malo', 'grave'];
+          const cot = conv.cotizacion || null;
+          const checklist = [
+            { criterio: 'Informes DealerNet disponibles', valor: (ev.dn.informes || []).filter(d => d.disponible).length, limite: '≥ 1', cumple: true },
+            { criterio: 'Severidad DealerNet', valor: ev.severidad, limite: '≤ ' + ev.POL.wsp_severidad_max, cumple: SEVQ.indexOf(ev.severidad) <= Math.max(0, SEVQ.indexOf(ev.POL.wsp_severidad_max)) },
+            { criterio: 'Informe IA generado', valor: ev.dn.ia_nivel_riesgo || null, limite: 'obligatorio', cumple: !ev.sin_ia },
+            { criterio: 'Pie informado', valor: ev.pie_pct != null ? Math.round(ev.pie_pct) + '%' : null, limite: 'exprés ≥ ' + ev.POL.wsp_pie_expres_pct + '%', cumple: ev.pie_pct != null },
+          ];
+          const { codigo } = await guardarPreaprobacion({
+            canal: 'WHATSAPP', rut_cliente: ev.rut,
+            precio: cot ? Math.round(+cot.valor_auto) || null : null, pie: cot ? Math.round(+cot.pie) || null : null,
+            resultado: ev.ok ? 'PREAPROBADO' : 'REVISION',
+            motivos: ev.ok ? null : (ev.sin_ia ? 'Sin informe IA — no hay aprobación sin análisis crediticio' : 'Severidad DealerNet ' + ev.severidad + ' sobre el umbral'),
+            opciones: cot && cot.plazo ? [{ plazo: cot.plazo, cuota: cot.cuota }] : [],
+            checklist, ia_informe_id: ev.dn.ia_informe_id, ia_nivel_riesgo: ev.dn.ia_nivel_riesgo, informes: ev.dn.informes,
+          });
+          await pool.query('UPDATE wsp_conversaciones SET preaprob_codigo=? WHERE id=?', [codigo, conv.id]);
+          conv.preaprob_codigo = codigo;
+          respuesta += '\n\n🧾 N° de preevaluación: *' + codigo + '*';
+        } catch (e) { console.error('[wsp preaprob repo]', e.message); }
       }
     } catch (e) { console.error('[wsp preevaluacion]', e.message); }
   }
