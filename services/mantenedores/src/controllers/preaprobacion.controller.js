@@ -21,7 +21,10 @@ const DESCS = {
   max_deuda_castigada:    'Deuda castigada permitida en $ (sobre esto → revisión)',
   wsp_severidad_max:      'WhatsApp: peor severidad DealerNet que aún preaprueba (bueno | regular | malo)',
   wsp_pie_expres_pct:     'WhatsApp: % de pie desde el cual el bot ofrece trámite exprés',
+  informes_codigos:       'Informes DealerNet que consulta la preevaluación de WhatsApp (vacío = todos los activos)',
+  ia_modelo:              'Modelo de IA del reporte crediticio de la preevaluación (auto = el configurado en el Subsistema IA)',
 };
+const IA_MODELOS = ['auto', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-4-8'];
 
 /* ─── Migración + seed (funcionalidad bajo módulo Mantenedores) ────── */
 (async () => {
@@ -63,7 +66,10 @@ const getAll = async (_req, res) => {
     // orden estable = orden de DEFAULTS; completa las claves que falten
     const data = Object.keys(DEFAULTS).map(k => porClave[k] ||
       ({ clave: k, valor: String(DEFAULTS[k]), descripcion: DESCS[k] || null, updated_at: null, updated_by: null }));
-    res.json({ success: true, data, error: null });
+    // catálogo de productos DealerNet (para los checkboxes de informes) + modelos IA
+    let productos = [];
+    try { const [p] = await pool.query('SELECT codigo, nombre, activo FROM dealernet_productos ORDER BY orden'); productos = p; } catch (_) {}
+    res.json({ success: true, data, productos, ia_modelos: IA_MODELOS, error: null });
   } catch (e) {
     console.error('[preaprobacion getAll]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -82,6 +88,10 @@ const update = async (req, res) => {
         if (!['bueno', 'regular', 'malo'].includes(val.toLowerCase()))
           return res.status(400).json({ success: false, data: null, error: 'Severidad debe ser bueno, regular o malo' });
         val = val.toLowerCase();
+      } else if (k === 'ia_modelo') {
+        if (!IA_MODELOS.includes(val)) return res.status(400).json({ success: false, data: null, error: 'Modelo IA inválido' });
+      } else if (k === 'informes_codigos') {
+        val = val.split(',').map(s => s.trim()).filter(s => /^\d+$/.test(s)).join(',');   // CSV de códigos; vacío = todos
       } else if (k === 'plazos') {
         const arr = val.split(',').map(n => parseInt(n, 10)).filter(n => n >= 6 && n <= 96);
         if (!arr.length) return res.status(400).json({ success: false, data: null, error: 'Plazos inválidos (meses separados por coma)' });

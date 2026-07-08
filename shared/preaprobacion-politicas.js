@@ -24,6 +24,8 @@ const DEFAULTS = {
   max_deuda_castigada:    0,           // $ de deuda castigada permitida
   wsp_severidad_max:      'regular',   // peor severidad DealerNet que igual preaprueba (bueno|regular|malo)
   wsp_pie_expres_pct:     40,          // % de pie desde el cual el trámite es exprés (mensaje del bot)
+  informes_codigos:       '',          // códigos DealerNet a consultar en la preevaluación WSP (CSV; vacío = todos los activos)
+  ia_modelo:              'auto',      // modelo IA del reporte crediticio de la preevaluación ('auto' = el del Subsistema IA)
 };
 
 let _cache = null, _cacheAt = 0;

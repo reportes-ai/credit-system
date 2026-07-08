@@ -104,7 +104,7 @@ ${datos}`;
 /* Núcleo reutilizable: analiza con IA los informes DealerNet de un RUT, persiste el
    análisis y CREA/actualiza el cliente + su información comercial. Lo usa el endpoint
    HTTP y el flujo de la Ficha de Dealer (al enviar a autorización). Propaga NO_KEY/IA_OFF. */
-async function analizarRut({ rut, nombre, id_usuario = null } = {}) {
+async function analizarRut({ rut, nombre, id_usuario = null, modelo } = {}) {
   const rutN = rutNum(rut);
   if (!rutN) return { ok: false, motivo: 'RUT requerido.' };
 
@@ -123,7 +123,7 @@ async function analizarRut({ rut, nombre, id_usuario = null } = {}) {
     return `### ${i.nombre_producto || i.codigo_producto}\n${s}`;
   }).join('\n\n');
 
-  const r = await analizar({ codigo: CODIGO, id_usuario, system: SYSTEM, prompt: promptDe(datos), json: true, max_tokens: 1500 });
+  const r = await analizar({ codigo: CODIGO, id_usuario, system: SYSTEM, prompt: promptDe(datos), json: true, max_tokens: 1500, modelo });
   const x = r.datos;
   if (!x) return { ok: false, motivo: 'sin_analisis', texto: r.texto };
 

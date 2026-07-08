@@ -367,7 +367,15 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   const rut = String(rutRaw || '').replace(/[.\s]/g, '').toUpperCase();
   const m = rut.match(/^(\d{7,8})-?([\dK])$/);
   if (!m || dvRut(parseInt(m[1], 10)) !== m[2]) return { error: 'RUT_INVALIDO' };
-  const [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
+  let [prods] = await pool.query('SELECT codigo FROM dealernet_productos WHERE activo=1');
+  // Políticas paramétricas: qué informes consultar y con qué modelo IA analizar
+  let POL = null;
+  try { const { getPoliticas } = require('../../../../shared/preaprobacion-politicas'); POL = await getPoliticas(); } catch (_) {}
+  if (POL && POL.informes_codigos) {
+    const set = new Set(POL.informes_codigos.split(',').map(s => s.trim()));
+    const filtrados = prods.filter(p => set.has(String(p.codigo)));
+    if (filtrados.length) prods = filtrados;
+  }
   if (!prods.length) return { error: 'SIN_PRODUCTOS' };
   const { asegurarInformes } = require('../../../clientes/src/controllers/dealernet-ws.controller');
   const r = await asegurarInformes({ rut: m[1] + '-' + m[2], productos: prods.map(p => String(p.codigo)), usuario: null });
@@ -392,7 +400,8 @@ async function preEvaluar(rutRaw, piePct, plazo) {
         'SELECT id FROM ia_informes_dealernet WHERE rut=? AND fecha >= DATE_SUB(NOW(), INTERVAL 15 DAY) LIMIT 1', [m[1]]);
       if (!prev) {
         const { analizarRut } = require('../../../ia/src/controllers/informe-dealernet.controller');
-        const rep = await analizarRut({ rut: m[1] + '-' + m[2] });
+        const rep = await analizarRut({ rut: m[1] + '-' + m[2],
+          modelo: POL && POL.ia_modelo !== 'auto' ? POL.ia_modelo : undefined });
         if (rep.ok) console.log(`[wsp reporte-ia] RUT ${m[1]} → riesgo ${rep.nivel_riesgo} (reporte #${rep.id})`);
       }
     } catch (e) { console.error('[wsp reporte-ia]', e.message); }

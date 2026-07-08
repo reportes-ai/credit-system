@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v100.6 -->
+<!-- v100.7 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -46,6 +46,11 @@
   <div class="card-x"><h5><i class="bi bi-cash-stack me-1"></i>Renta y carga financiera</h5><div id="grpRenta"></div></div>
   <div class="card-x"><h5><i class="bi bi-clipboard-data me-1"></i>Información comercial (umbrales de bloqueo)</h5><div id="grpInfo"></div></div>
   <div class="card-x"><h5><i class="bi bi-whatsapp me-1"></i>WhatsApp — Facilito</h5><div id="grpWsp"></div></div>
+  <div class="card-x"><h5><i class="bi bi-robot me-1"></i>Informes e IA de la preevaluación (WhatsApp)</h5>
+    <div class="fila"><label>Informes DealerNet a consultar<small>Marca cuáles se piden en la preevaluación; ninguno marcado = todos los productos activos. Solo se pueden marcar productos ACTIVOS del mantenedor DealerNet.</small></label>
+      <div id="chkInformes" style="font-size:.84rem"></div></div>
+    <div class="fila" id="filaIA"></div>
+  </div>
 
   <button class="btn-save" onclick="guardar()"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button><span id="msg"></span>
 
@@ -56,6 +61,8 @@
       <li><b>Plazos</b> → plazos que se cotizan en la preaprobación del portal (el bot de WhatsApp usa sus tramos del guion).</li>
       <li><b>WhatsApp — severidad máxima y pie exprés</b> → preevaluación del bot <a href="/whatsapp/" target="_blank">Facilito</a> (veredicto de la preevaluación DealerNet y mensaje de trámite exprés).</li>
       <li><b>Antigüedad máx. default</b> → solo aplica si la <a href="/politica/" target="_blank">matriz de Política de Crédito</a> no define antigüedad para USADO; si la define, manda la matriz.</li>
+      <li><b>Informes DealerNet a consultar</b> → qué productos pide la preevaluación del bot (gasto de saldo DealerNet); vacío = todos los activos del <a href="/mantenedores/dealernet/" target="_blank">mantenedor DealerNet</a>.</li>
+      <li><b>Modelo de IA</b> → reporte crediticio automático de la preevaluación; "auto" usa el configurado en el <a href="/mantenedores/ia/" target="_blank">Subsistema IA</a>.</li>
     </ul>
   </div>
 </div>
@@ -78,6 +85,10 @@ const LBL = {
   max_deuda_vencida:'Deuda vencida permitida ($)', max_deuda_castigada:'Deuda castigada permitida ($)',
   wsp_severidad_max:'Severidad DealerNet máxima que preaprueba', wsp_pie_expres_pct:'Pie exprés (%)',
 };
+const MONTO = new Set(['precio_min','precio_max','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada']);
+const PCT   = new Set(['carga_max_pct','tolerancia_renta_pct','wsp_pie_expres_pct']);
+const fmtMil = v => { const n = parseInt(String(v).replace(/\D/g,''),10); return isNaN(n) ? '' : n.toLocaleString('es-CL'); };
+function fmtMonto(el){ const p = el.selectionStart, len0 = el.value.length; el.value = fmtMil(el.value); el.setSelectionRange(p + (el.value.length - len0), p + (el.value.length - len0)); }
 let DATA = [];
 async function cargar(){
   const r = await fetch('/api/preaprobacion-politicas', { headers: H });
@@ -88,16 +99,36 @@ async function cargar(){
   for (const [grp, claves] of Object.entries(GRUPOS)) {
     document.getElementById(grp).innerHTML = claves.map(k => {
       const p = byKey[k] || { valor:'' };
-      const input = k === 'wsp_severidad_max'
-        ? `<select id="v_${k}">${['bueno','regular','malo'].map(s=>`<option ${p.valor===s?'selected':''}>${s}</option>`).join('')}</select>`
-        : `<input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}">`;
+      let input;
+      if (k === 'wsp_severidad_max')
+        input = `<select id="v_${k}">${['bueno','regular','malo'].map(s=>`<option ${p.valor===s?'selected':''}>${s}</option>`).join('')}</select>`;
+      else if (MONTO.has(k))
+        input = `<div style="display:flex;align-items:center;gap:6px"><span style="color:#64748b;font-weight:700">$</span><input id="v_${k}" value="${fmtMil(p.valor)}" oninput="fmtMonto(this)" style="text-align:right"></div>`;
+      else if (PCT.has(k))
+        input = `<div style="display:flex;align-items:center;gap:6px"><input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}" style="text-align:right"><span style="color:#64748b;font-weight:700">%</span></div>`;
+      else
+        input = `<input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}">`;
       return `<div class="fila"><label>${LBL[k]||k}<small>${p.descripcion||''}</small></label>${input}</div>`;
     }).join('');
   }
+  // Informes DealerNet (checkboxes de productos ACTIVOS) + selector de modelo IA
+  const marcados = new Set(String(byKey.informes_codigos?.valor||'').split(',').map(s=>s.trim()).filter(Boolean));
+  document.getElementById('chkInformes').innerHTML = (j.productos||[]).filter(p=>p.activo).map(p =>
+    `<label style="display:flex;align-items:center;gap:7px;margin:2px 0;cursor:pointer">
+       <input type="checkbox" class="chkInf" value="${p.codigo}" ${marcados.has(String(p.codigo))?'checked':''}> ${p.nombre} <span style="color:#94a3b8;font-size:.72rem">${p.codigo}</span></label>`).join('')
+    || '<span class="text-muted">Sin productos activos en el mantenedor DealerNet</span>';
+  const pIA = byKey.ia_modelo || { valor:'auto' };
+  document.getElementById('filaIA').innerHTML =
+    `<label>Modelo de IA<small>${pIA.descripcion||''}</small></label>
+     <select id="v_ia_modelo">${(j.ia_modelos||['auto']).map(m=>`<option ${pIA.valor===m?'selected':''}>${m}</option>`).join('')}</select>`;
 }
 async function guardar(){
   const valores = {};
-  DATA.forEach(p => { const el = document.getElementById('v_'+p.clave); if (el) valores[p.clave] = el.value; });
+  DATA.forEach(p => {
+    const el = document.getElementById('v_'+p.clave); if (!el) return;
+    valores[p.clave] = MONTO.has(p.clave) ? String(el.value).replace(/\D/g,'') : el.value;
+  });
+  valores.informes_codigos = [...document.querySelectorAll('.chkInf:checked')].map(c=>c.value).join(',');
   const msg = document.getElementById('msg');
   msg.textContent = 'Guardando…'; msg.style.color = '#64748b';
   const r = await fetch('/api/preaprobacion-politicas', { method:'PUT', headers:H, body: JSON.stringify({ valores }) });
