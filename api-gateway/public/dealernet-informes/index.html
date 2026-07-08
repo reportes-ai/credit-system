@@ -105,6 +105,7 @@
     <button class="tabbtn active" data-t="consultar" onclick="tab('consultar')"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="tabbtn" id="tabAudBtn" data-t="auditoria" onclick="tab('auditoria')" style="display:none"><i class="bi bi-graph-up me-1"></i>Auditoría de uso</button>
     <button class="tabbtn" id="tabFacBtn" data-t="facturacion" onclick="tab('facturacion')" style="display:none"><i class="bi bi-receipt me-1"></i>Facturación</button>
+    <button class="tabbtn" id="tabRepoBtn" data-t="repositorio" onclick="tab('repositorio')" style="display:none"><i class="bi bi-archive me-1"></i>Repositorio</button>
   </div>
 
   <div id="tab-consultar">
@@ -152,6 +153,19 @@
     <div id="audBody"><div class="muted">Cargando…</div></div>
   </div>
   </div><!-- /tab-auditoria -->
+
+  <!-- Repositorio completo (solo Administrador) -->
+  <div id="tab-repositorio" style="display:none">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <h3 style="margin:0"><i class="bi bi-archive"></i> Repositorio de informes</h3>
+        <span class="muted" id="repoCount"></span>
+      </div>
+      <input type="text" id="repoQ" placeholder="Buscar por RUT o nombre…" oninput="filtrarRepo()"
+             style="width:100%;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:.95rem;margin-bottom:12px">
+      <div style="overflow:auto" id="repoBody"><div class="muted">Cargando…</div></div>
+    </div>
+  </div><!-- /tab-repositorio -->
 
   <!-- Facturación (pestaña con permiso) -->
   <div id="tab-facturacion" style="display:none">
@@ -766,14 +780,15 @@ function renderAuditoria(d){
 }
 
 /* ── Pestañas ────────────────────────────────────────────────────────────── */
-let _audCargada = false, _facCargada = false;
+let _audCargada = false, _facCargada = false, _repoCargado = false;
 function tab(t){
-  ['consultar','auditoria','facturacion'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.style.display = x===t ? '' : 'none'; });
+  ['consultar','auditoria','facturacion','repositorio'].forEach(x=>{ const el=document.getElementById('tab-'+x); if(el) el.style.display = x===t ? '' : 'none'; });
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
   if(t==='auditoria' && !_audCargada){ _audCargada = true; cargarAuditoria(30); }
   if(t==='facturacion' && !_facCargada){ _facCargada = true; cargarFacturacion(); }
+  if(t==='repositorio' && !_repoCargado){ _repoCargado = true; cargarRepositorio(); }
 }
-// Pestañas Auditoría/Facturación: solo con permiso (Admin siempre).
+// Pestañas Auditoría/Facturación/Repositorio: solo con permiso (Admin siempre; Repositorio SOLO Admin).
 (async () => {
   const esAdmin = (yo?.perfil === 'Administrador');
   let pAud = esAdmin, pFac = esAdmin;
@@ -787,7 +802,49 @@ function tab(t){
   } catch(_){}
   document.getElementById('tabAudBtn').style.display = pAud ? '' : 'none';
   document.getElementById('tabFacBtn').style.display = pFac ? '' : 'none';
+  document.getElementById('tabRepoBtn').style.display = esAdmin ? '' : 'none';
 })();
+
+/* ── Repositorio completo (solo Admin): RUTs con informes + buscador ── */
+let REPO = [];
+async function cargarRepositorio(){
+  const body = document.getElementById('repoBody');
+  try {
+    const r = await fetch('/api/dealernet/informes/repositorio', { headers:H });
+    if (r.status === 403){ document.getElementById('tabRepoBtn').style.display='none'; tab('consultar'); return; }
+    const j = await r.json();
+    if (!j.success){ body.innerHTML = '<div class="alertbox block">'+esc(j.error||'Error')+'</div>'; return; }
+    REPO = j.data;
+    filtrarRepo();
+  } catch(_){ body.innerHTML = '<div class="alertbox block">Error de conexión</div>'; }
+}
+function filtrarRepo(){
+  const q = (document.getElementById('repoQ').value||'').trim().toUpperCase().replace(/\./g,'');
+  const rows = REPO.filter(r => !q
+    || (String(r.rut)+'-'+r.dv).toUpperCase().includes(q)
+    || String(r.nombre||'').toUpperCase().includes(q));
+  document.getElementById('repoCount').textContent =
+    rows.length.toLocaleString('es-CL') + ' de ' + REPO.length.toLocaleString('es-CL') + ' RUT con informes';
+  document.getElementById('repoBody').innerHTML = rows.length ? '<table class="tb"><thead><tr>'+
+    '<th>RUT</th><th>Nombre</th><th>Informes</th><th>Último informe</th><th>Productos</th><th>Último solicitante</th><th></th>'+
+    '</tr></thead><tbody>'+rows.map(r=>{
+      const rutF = rutFmt(r.rut, r.dv);
+      return '<tr><td style="white-space:nowrap"><b>'+esc(rutF)+'</b></td>'+
+        '<td>'+esc(r.nombre||'—')+'</td>'+
+        '<td><b>'+r.informes+'</b>'+(r.ok<r.informes?' <span class="muted">('+r.ok+' OK)</span>':'')+'</td>'+
+        '<td style="white-space:nowrap">'+new Date(r.ultimo).toLocaleDateString('es-CL')+'</td>'+
+        '<td style="font-size:.76rem;max-width:340px">'+esc(r.productos||'')+'</td>'+
+        '<td>'+esc(r.ultimo_usuario||'—')+'</td>'+
+        '<td><button class="btn-ghost" onclick="verDesdeRepo(\''+rutF+'\')"><i class="bi bi-eye me-1"></i>Ver</button></td></tr>';
+    }).join('')+'</tbody></table>'
+    : '<div class="muted">Sin resultados para «'+esc(q)+'».</div>';
+}
+function verDesdeRepo(rutF){
+  tab('consultar');
+  const inp = document.getElementById('rut');
+  inp.value = rutF; onRutInput(inp);
+  cargarHistoricos(rutF);
+}
 
 /* ── Facturación prepago ─────────────────────────────────────────────────── */
 const fmtCLP = n => '$'+Math.round(Number(n||0)).toLocaleString('es-CL');

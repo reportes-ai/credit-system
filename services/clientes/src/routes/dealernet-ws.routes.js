@@ -34,6 +34,8 @@ router.get('/informes/:id(\\d+)/pdf', verifyToken, requireFunc('dealernet_inform
 /* ── Auditoría de uso + clasificación de RUT (pop-up de advertencia) ──────── */
 router.post('/informes/clasificar-rut', verifyToken, requireFunc('dealernet_consultar'), C.clasificarRut);
 router.get('/informes/auditoria',       verifyToken, requireFunc('dealernet_auditoria', 'usuarios_gestionar'), C.auditoria);
+// Repositorio completo (todos los RUT con informes) — SOLO Administrador
+router.get('/informes/repositorio',     verifyToken, requireFunc('dealernet_repositorio'), C.repositorio);
 
 /* ── Costo DealerNet (mantenedor) ────────────────────────────────────────── */
 router.get('/costos', verifyToken, requireFunc('mant_dealernet_costos'), C.getCostos);

@@ -1041,6 +1041,51 @@ const historialFacturacion = async (req, res) => {
   } catch (e) { errSrv(res, e, 'historialFacturacion'); }
 };
 
+/* ── GET /api/dealernet/informes/repositorio — todos los RUT con informes ──
+   Solo Administrador (funcionalidad dealernet_repositorio). Nombre del titular
+   desde clientes (si es cliente) o desde el propio informe (perfil comercial). */
+const repositorio = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT i.rut, i.dv,
+             COUNT(*) AS informes,
+             SUM(i.retcode='0') AS ok,
+             MAX(i.created_at) AS ultimo,
+             GROUP_CONCAT(DISTINCT i.nombre_producto ORDER BY i.nombre_producto SEPARATOR ', ') AS productos,
+             SUBSTRING_INDEX(GROUP_CONCAT(i.usuario_nombre ORDER BY i.created_at DESC SEPARATOR '||'), '||', 1) AS ultimo_usuario
+        FROM dealernet_informes i
+       GROUP BY i.rut, i.dv`);
+    // nombre del titular desde clientes (match por rut normalizado sin DV)
+    const [clis] = await pool.query(`
+      SELECT REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') AS rutn,
+             COALESCE(NULLIF(TRIM(nombre_completo),''),
+                      TRIM(CONCAT(IFNULL(nombres,''),' ',IFNULL(apellido_paterno,''),' ',IFNULL(apellido_materno,'')))) AS nombre
+        FROM clientes`);
+    // clientes.rut incluye DV → indexar por cuerpo sin DV
+    const mCuerpo = new Map();
+    clis.forEach(c => { const s = String(c.rutn || ''); if (s.length > 1) mCuerpo.set(s.slice(0, -1), c.nombre); });
+    const data = rows.map(r => ({
+      rut: r.rut, dv: r.dv, informes: Number(r.informes), ok: Number(r.ok),
+      ultimo: r.ultimo, productos: r.productos, ultimo_usuario: r.ultimo_usuario,
+      nombre: mCuerpo.get(String(r.rut)) || null,
+    })).sort((a, b) => new Date(b.ultimo) - new Date(a.ultimo));
+    res.json({ success: true, data, error: null });
+  } catch (e) { errSrv(res, e, 'repositorio'); }
+};
+
+/* Seed: funcionalidad dealernet_repositorio (solo Administrador, id_perfil=1) */
+(async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_repositorio' LIMIT 1");
+    let idf = ex && ex.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (380001,'Repositorio de Informes','dealernet_repositorio',NULL,'bi-archive')");
+      idf = r.insertId;
+    }
+    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+  } catch (e) { console.error('[dealernet-repositorio migration]', e.message); }
+})();
+
 module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,
-  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion };
+  clasificarRut, auditoria, getCostos, updateCostos, facturacion, guardarFacturacion, historialFacturacion, repositorio };
