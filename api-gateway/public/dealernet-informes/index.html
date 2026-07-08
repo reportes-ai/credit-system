@@ -663,9 +663,19 @@ function bodyPerfilComercial(prd){
   h += sec('Correos electrónicos más probables', tblContactos(gp(colect,'correos','correo_contacto_probable')));
   h += sec('Correos electrónicos alternativos', tblContactos(gp(colect,'correos','correo_contacto_alternativo')));
   h += sec('Situación tributaria', bodyTributaria(trib));
+  // Boletines (mismo orden del PDF DealerNet)
+  const causas = gp(titular,'causas') || {};
+  h += sec('Boletín de Alertas', secBoletinPC(causas.alert));
+  h += sec('Boletín de Impagos Vigente', secBoletinPC(causas.bolvig, { totalLabel:'Total impagos vigentes' }));
+  h += sec('Boletín de Impagos Histórico', secBoletinPC(causas.bolhst, { conAclaracion:true }));
+  h += sec('Boletín Laboral y previsional Vigente', secBoletinPC(causas.labvig));
+  h += sec('Boletín Laboral y Previsional Histórico', secBoletinPC(causas.labhst, { conAclaracion:true }));
+  h += sec('Boletín de Procesos Penales', (gp(causas,'penal','PRODUCTO') && typeof gp(causas,'penal','PRODUCTO')==='object') ? htmlBoletinPenal(gp(causas,'penal','PRODUCTO')) : secEmpty());
+  h += sec('Boletín Concursal', (gp(causas,'bolconc','enc','glscod') ? esc(gp(causas,'bolconc','enc','glscod')) : secEmpty()));
   h += sec('Participaciones en sociedades', tblSociedades(gp(titular,'sociedades','empresa')));
   h += sec('Relacionados', tblRelacionados(titular.relacionados));
   h += sec('Fuentes', (arr(gp(titular,'fuentes','fuente')).map(esc).join(', ')||secEmpty()));
+  h += sec('Certificados', (titular.certificados ? '<div class="rep-tree">'+renderTree(titular.certificados)+'</div>' : secEmpty()));
   return h;
 }
 function bodyBoletinSimple(prd){
@@ -681,10 +691,18 @@ function bodyBoletinImpagos(prd){
   const wsTag = Object.keys(prd).filter(k=>!k.startsWith('@_'))[0];
   const P = gp(prd, wsTag, 'ROOT','D','result','PRODUCTO');
   if(!P) return bodyBoletinSimple(prd);                 // estructura inesperada → árbol crudo
+  return htmlBoletinImpagos(P, { totalLabel: 'Total impagos vigentes' });
+}
+// Resumen + Detalle de un boletín de causas (impagos vigente/histórico, laboral).
+// Misma estructura PRODUCTO{indice,totalano,total,detalle} del WS; el histórico
+// agrega la columna Fecha Aclaración (fechaacl).
+function htmlBoletinImpagos(P, opts){
+  opts = opts || {};
   const detalle  = arr(gp(P,'detalle','d'));
   const indice   = arr(gp(P,'indice','d'));
   const totalano = arr(gp(P,'totalano','d'));
   if(!detalle.length && !indice.length) return noinfo();
+  const conAcl = opts.conAclaracion || detalle.some(x=>x.fechaacl);
 
   // Años (columnas) de mayor a menor
   let anos = totalano.map(x=>String(x['@_a'])).filter(Boolean);
@@ -707,13 +725,14 @@ function bodyBoletinImpagos(prd){
   const granTotal = arr(gp(P,'total','d')).reduce((s,x)=>s+(Number(x['@_c'])||0),0);
   h += '<tr style="font-weight:700"><td>Total</td>'+anos.map(a=>'<td style="text-align:right">'+cell(totPorAno[a])+'</td>').join('')+'</tr>';
   h += '</tbody></table>';
-  if(granTotal) h += '<div class="rep-kv" style="margin-top:4px"><b>Total impagos vigentes:</b> '+granTotal+'</div>';
+  if(granTotal && opts.totalLabel) h += '<div class="rep-kv" style="margin-top:4px"><b>'+opts.totalLabel+':</b> '+granTotal+'</div>';
 
   // ── Detalle ──
   h += '<div class="rep-h">Detalle</div>';
   if(!detalle.length){ h += noinfo(); return h; }
   h += '<table class="rep-tb"><thead><tr>'+
-    ['Identificación','Tipo Acreedor','Acreedor','Fecha Publicación','Documento / Fuente','Días en Cobranza','RUT','Clasificación','Referencia']
+    ['Identificación','Tipo Acreedor','Acreedor','Fecha Publicación','Documento / Fuente','Días en Cobranza','RUT','Clasificación']
+      .concat(conAcl?['Fecha Aclaración']:[]).concat(['Referencia'])
       .map(t=>'<th>'+t+'</th>').join('')+'</tr></thead><tbody>'+
     detalle.map(x=>{
       const ref = x.referencia||x.url;
@@ -721,9 +740,41 @@ function bodyBoletinImpagos(prd){
       const fuente = esc(x.fuente||'') + (x.proceso?'<div class="muted" style="font-size:.68rem">'+esc(x.proceso)+'</div>':'');
       return '<tr><td>'+esc(x.identificacion||'')+'</td><td>'+esc(x.glscodacteco||'')+'</td><td>'+esc(x.acreedor||'')+'</td>'+
         '<td>'+esc(x.fecha||'')+'</td><td>'+fuente+'</td><td style="text-align:right">'+fmtMiles(x.diamora)+'</td>'+
-        '<td>'+esc(rutFmt(x.rutacreedor,x.digacreedor)||'')+'</td><td>'+esc(x.clasificacion||'')+'</td><td>'+refLink+'</td></tr>';
+        '<td>'+esc(rutFmt(x.rutacreedor,x.digacreedor)||'')+'</td><td>'+esc(x.clasificacion||'')+'</td>'+
+        (conAcl?'<td>'+esc(x.fechaacl||'—')+'</td>':'')+'<td>'+refLink+'</td></tr>';
     }).join('')+'</tbody></table>';
   return h;
+}
+// Boletín de Procesos Penales (dentro del Perfil Comercial): Resumen por delito × año + Detalle.
+function htmlBoletinPenal(P){
+  const detalle  = arr(gp(P,'detalle','d'));
+  const indice   = arr(gp(P,'indice','d'));
+  const totalano = arr(gp(P,'totalano','d'));
+  if(!detalle.length && !indice.length) return secEmpty();
+  let anos = [...new Set(totalano.map(x=>String(x['@_a'])).filter(Boolean))].sort((a,b)=>Number(b)-Number(a));
+  const cell = v => (v==null||v===''||Number(v)===0) ? '--' : esc(String(v));
+  let h = '<table class="rep-tb"><thead><tr><th rowspan="2">Índice</th><th colspan="'+(anos.length||1)+'" style="text-align:center">Cantidad</th></tr>'+
+    '<tr>'+(anos.length?anos:['']).map(a=>'<th style="text-align:right">'+esc(a)+'</th>').join('')+'</tr></thead><tbody>';
+  indice.forEach(r=>{
+    const byYear={}; arr(r.a).forEach(a=>byYear[String(a['@_n'])]=a['@_valor']);
+    h += '<tr><td>'+esc(r['@_nombre']||'')+'</td>'+anos.map(a=>'<td style="text-align:right">'+cell(byYear[a])+'</td>').join('')+'</tr>';
+  });
+  h += '</tbody></table>';
+  h += '<div class="rep-h" style="margin-top:8px">Detalle</div>'+
+    '<table class="rep-tb"><thead><tr>'+['Identificación','Forma','Situación','Fecha Publicación','Fuente','Rol','Tipo','Clasificación de Delitos'].map(t=>'<th>'+t+'</th>').join('')+
+    '</tr></thead><tbody>'+detalle.map(x=>{
+      const fuente = arr(x.fuente).map(esc).join(' · ');
+      return '<tr><td>'+esc(x.identificacion||'')+'</td><td>'+esc(x.forma||'')+'</td><td>'+esc(x.situacion||'')+'</td>'+
+        '<td>'+esc(x.fecha||'')+'</td><td>'+fuente+'</td><td>'+esc(x.rol||'')+'</td><td>'+esc(x.tipo||'')+'</td>'+
+        '<td>'+esc(gp(x,'clasificacion','delito')||'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  return h;
+}
+// Sección boletín dentro del Perfil Comercial: PRODUCTO vacío/'' = sin información
+function secBoletinPC(nodo, opts){
+  const P = gp(nodo,'PRODUCTO');
+  if(!P || typeof P!=='object') return secEmpty();
+  return htmlBoletinImpagos(P, opts||{});
 }
 
 function renderInforme(d){
