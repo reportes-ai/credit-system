@@ -195,6 +195,7 @@ app.use('/api/alertas-vencimiento',       require('../../services/mantenedores/s
 app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
+app.use('/api/old-base-unica',            require('../../services/reporteria/src/routes/old-base-unica.routes'));
 app.use('/api/reporteria',                require('../../services/reporteria/src/routes/reportes.routes'));
 app.use('/api/mando',                     require('../../services/reporteria/src/routes/mando.routes'));
 app.use('/api/diseno-consulta',           require('../../services/reporteria/src/routes/diseno-consulta.routes'));
@@ -439,6 +440,7 @@ const PAGINAS = [
   ['/mantenedores/certificados-textos', 'mantenedores/certificados-textos/index.html'],
   ['/tesoreria/odp-cuotas', 'tesoreria/odp-cuotas.html'],
   ['/reporteria', 'reporteria/index.html'],
+  ['/old-base-unica', 'old-base-unica/index.html'],
   ['/reporteria/tablas-dinamicas', 'reporteria/tablas-dinamicas/index.html'],
   ['/reporteria/bitacora-credito', 'reporteria/bitacora-credito/index.html'],
   ['/reporteria/cartera-creditos', 'reporteria/cartera-creditos/index.html'],

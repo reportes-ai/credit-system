@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!-- v99.4 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Old Base Única — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:98vw; margin:20px auto; padding:0 18px 60px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0255c5); border-radius:14px; color:#fff; padding:18px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; }
+    .banner h2 { font-weight:700; margin:0; font-size:1.15rem; }
+    .banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+    .count-pill { background:#fff; border:1.5px solid #c7d7ee; border-radius:10px; padding:8px 16px; font-size:.9rem; color:#1e293b; }
+    .count-pill b { color:#0141A2; }
+    .btn-xls { background:#1d6f42; color:#fff; border:none; border-radius:10px; padding:9px 18px; font-size:.85rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; margin-left:auto; }
+    .btn-xls:disabled { opacity:.6; }
+    .btn-clear { background:#fff; color:#b91c1c; border:1.5px solid #fecaca; border-radius:10px; padding:9px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .grid-card { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); overflow:auto; max-height:calc(100vh - 240px); }
+    table { border-collapse:separate; border-spacing:0; font-size:.74rem; white-space:nowrap; width:max-content; min-width:100%; }
+    thead { position:sticky; top:0; z-index:5; }
+    thead tr.titles th { background:#1F3864; color:#fff; padding:7px 8px; font-weight:700; font-size:.7rem; cursor:pointer; user-select:none; border-right:1px solid rgba(255,255,255,.12); position:relative; }
+    thead tr.titles th .funnel { margin-left:5px; opacity:.55; cursor:pointer; }
+    thead tr.titles th .funnel.on { opacity:1; color:#7dd3fc; }
+    thead tr.filters th { background:#e8eef7; padding:3px 4px; border-right:1px solid #d5deec; }
+    thead tr.filters input { width:100%; min-width:70px; border:1px solid #c3cfe0; border-radius:5px; font-size:.72rem; padding:2px 6px; outline:none; }
+    thead tr.filters input:focus { border-color:#0255c5; }
+    tbody td { padding:4px 8px; border-bottom:1px solid #eef2f7; border-right:1px solid #f3f6fa; color:#1e293b; }
+    tbody tr:hover td { background:#f0f7ff; }
+    td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .col-op { position:sticky; left:0; background:#fff; z-index:2; box-shadow:2px 0 0 #e2e8f0; font-weight:700; }
+    thead .col-op { z-index:6; }
+    tbody tr:hover .col-op { background:#f0f7ff; }
+    .more-note { padding:10px 16px; font-size:.8rem; color:#64748b; background:#f8fafc; border-top:1px solid #e2e8f0; }
+    /* Dropdown filtro estilo Excel */
+    .xdrop { position:fixed; background:#fff; border:1px solid #cbd5e1; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.2); z-index:1000; width:250px; display:none; font-size:.78rem; }
+    .xdrop .xd-head { padding:8px 10px 4px; }
+    .xdrop .xd-head input { width:100%; border:1px solid #cbd5e1; border-radius:6px; padding:4px 8px; font-size:.76rem; outline:none; }
+    .xdrop .xd-list { max-height:240px; overflow:auto; padding:4px 10px; }
+    .xdrop label { display:flex; align-items:center; gap:6px; padding:2px 0; cursor:pointer; margin:0; }
+    .xdrop label span { overflow:hidden; text-overflow:ellipsis; }
+    .xdrop .xd-foot { display:flex; gap:6px; padding:8px 10px; border-top:1px solid #e2e8f0; }
+    .xdrop .xd-foot button { flex:1; border:none; border-radius:7px; padding:5px 0; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .xd-ok { background:#0255c5; color:#fff; } .xd-no { background:#f1f5f9; color:#334155; }
+    .spinner-wrap { padding:60px; text-align:center; color:#64748b; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Old Base Única',icon:'bi-table',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-table"></i>
+    <div>
+      <h2>Old Base Única</h2>
+      <p>Réplica de la hoja DETALLE de la antigua base única Excel, alimentada desde la BD (desde la op 77130). Filtros por columna estilo Excel.</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="count-pill"><i class="bi bi-funnel me-1"></i><b id="nFilt">—</b> de <span id="nTot">—</span> operaciones cumplen el criterio</div>
+    <button class="btn-clear" id="btnClear" onclick="limpiarFiltros()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
+    <button class="btn-xls" id="btnXls" onclick="exportarExcel()"><i class="bi bi-file-earmark-excel"></i> Exportar lo filtrado</button>
+  </div>
+
+  <div class="grid-card">
+    <div class="spinner-wrap" id="loading"><div class="spinner-border text-primary"></div><div class="mt-2">Cargando base…</div></div>
+    <table id="tabla" style="display:none">
+      <thead>
+        <tr class="titles" id="rowTitles"></tr>
+        <tr class="filters" id="rowFilters"></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="more-note" id="moreNote" style="display:none"></div>
+  </div>
+</div>
+
+<div class="xdrop" id="xdrop">
+  <div class="xd-head"><input id="xdSearch" placeholder="Buscar valor…"></div>
+  <div class="xd-list" id="xdList"></div>
+  <div class="xd-foot">
+    <button class="xd-no" onclick="xdLimpiar()">Limpiar</button>
+    <button class="xd-ok" onclick="xdAplicar()">Aplicar</button>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const MAX_RENDER = 500;
+let HEADERS = [], KEYS = [], ROWS = [], MONTOS = new Set(), PCTS = new Set();
+let fTexto = {};   // idx col → texto (contiene)
+let fSets  = {};   // idx col → Set de valores permitidos (filtro Excel)
+let sortCol = null, sortDir = 1;
+let FILTRADAS = [];
+
+const fmtCL = n => Number(n).toLocaleString('es-CL', { maximumFractionDigits: 0 });
+const fmtPct = n => Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function celda(v, i) {
+  if (v == null || v === '') return '';
+  const k = KEYS[i];
+  if (MONTOS.has(k)) return isNaN(v) ? esc(v) : '$' + fmtCL(v);
+  if (PCTS.has(k))   return isNaN(v) ? esc(v) : fmtPct(v);
+  return esc(v);
+}
+const rawStr = v => v == null ? '' : String(v);
+
+async function cargar() {
+  const r = await fetch('/api/old-base-unica', { headers: { Authorization: 'Bearer ' + sessionStorage.getItem('token') } });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('loading').innerHTML = 'Error: ' + esc(j.error || 'sin acceso'); return; }
+  HEADERS = j.data.headers; KEYS = j.data.keys; ROWS = j.data.rows;
+  MONTOS = new Set(j.data.montos); PCTS = new Set(j.data.pcts);
+  document.getElementById('nTot').textContent = fmtCL(ROWS.length);
+  pintarCabecera();
+  aplicar();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('tabla').style.display = '';
+}
+
+function pintarCabecera() {
+  document.getElementById('rowTitles').innerHTML = HEADERS.map((h, i) =>
+    `<th class="${i===0?'col-op':''}" onclick="ordenar(${i})">${esc(h)}
+       <i class="bi bi-funnel-fill funnel" id="fun${i}" onclick="event.stopPropagation();abrirXd(${i}, this)"></i>
+       <span id="sort${i}"></span></th>`).join('');
+  document.getElementById('rowFilters').innerHTML = HEADERS.map((_, i) =>
+    `<th class="${i===0?'col-op':''}"><input id="ft${i}" placeholder="filtrar…" oninput="fTexto[${i}]=this.value;aplicarDebounce()"></th>`).join('');
+}
+
+let _deb = null;
+function aplicarDebounce() { clearTimeout(_deb); _deb = setTimeout(aplicar, 250); }
+
+function pasa(row) {
+  for (const i in fTexto) {
+    const t = fTexto[i].trim().toUpperCase();
+    if (t && !rawStr(row[i]).toUpperCase().includes(t)) return false;
+  }
+  for (const i in fSets) {
+    if (fSets[i] && !fSets[i].has(rawStr(row[i]))) return false;
+  }
+  return true;
+}
+
+function aplicar() {
+  FILTRADAS = ROWS.filter(pasa);
+  if (sortCol != null) {
+    const c = sortCol, d = sortDir;
+    FILTRADAS.sort((a, b) => {
+      const x = a[c], y = b[c];
+      if (x == null) return 1; if (y == null) return -1;
+      const nx = parseFloat(x), ny = parseFloat(y);
+      if (!isNaN(nx) && !isNaN(ny) && String(nx).length >= String(x).length - 1) return (nx - ny) * d;
+      return String(x).localeCompare(String(y), 'es') * d;
+    });
+  }
+  document.getElementById('nFilt').textContent = fmtCL(FILTRADAS.length);
+  // marca visual de filtros Excel activos
+  HEADERS.forEach((_, i) => {
+    const f = document.getElementById('fun' + i);
+    if (f) f.classList.toggle('on', !!fSets[i]);
+    const s = document.getElementById('sort' + i);
+    if (s) s.textContent = sortCol === i ? (sortDir === 1 ? ' ▲' : ' ▼') : '';
+  });
+  pintarFilas();
+}
+
+function pintarFilas() {
+  const vis = FILTRADAS.slice(0, MAX_RENDER);
+  document.getElementById('tbody').innerHTML = vis.map(r =>
+    '<tr>' + r.map((v, i) => {
+      const num = (MONTOS.has(KEYS[i]) || PCTS.has(KEYS[i])) && !isNaN(v) && v !== null && v !== '';
+      return `<td class="${i===0?'col-op':''}${num?' num':''}">${celda(v, i)}</td>`;
+    }).join('') + '</tr>').join('');
+  const note = document.getElementById('moreNote');
+  if (FILTRADAS.length > MAX_RENDER) {
+    note.style.display = '';
+    note.innerHTML = `<i class="bi bi-info-circle me-1"></i>Mostrando las primeras ${fmtCL(MAX_RENDER)} de ${fmtCL(FILTRADAS.length)} filas — el export a Excel incluye TODO lo filtrado.`;
+  } else note.style.display = 'none';
+}
+
+function ordenar(i) {
+  if (sortCol === i) sortDir = -sortDir; else { sortCol = i; sortDir = 1; }
+  aplicar();
+}
+
+/* ── Filtro estilo Excel (dropdown de valores únicos) ── */
+let xdCol = null;
+function abrirXd(i, el) {
+  xdCol = i;
+  // valores únicos considerando los demás filtros (como Excel)
+  const otros = ROWS.filter(r => {
+    for (const j in fTexto) { const t = fTexto[j].trim().toUpperCase(); if (t && !rawStr(r[j]).toUpperCase().includes(t)) return false; }
+    for (const j in fSets) { if (Number(j) !== i && fSets[j] && !fSets[j].has(rawStr(r[j]))) return false; }
+    return true;
+  });
+  const counts = new Map();
+  otros.forEach(r => { const v = rawStr(r[i]); counts.set(v, (counts.get(v) || 0) + 1); });
+  const vals = [...counts.keys()].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+  const sel = fSets[i];
+  document.getElementById('xdList').innerHTML =
+    `<label><input type="checkbox" id="xdAll" checked onclick="document.querySelectorAll('#xdList .xdv').forEach(c=>c.checked=this.checked)"><span><b>(Seleccionar todo)</b></span></label>` +
+    vals.map(v => `<label><input type="checkbox" class="xdv" value="${esc(v)}" ${(!sel || sel.has(v)) ? 'checked' : ''}><span>${v === '' ? '<i>(vacío)</i>' : esc(v)} <small class="text-muted">(${counts.get(v)})</small></span></label>`).join('');
+  const d = document.getElementById('xdrop');
+  const r = el.getBoundingClientRect();
+  d.style.display = 'block';
+  d.style.top = (r.bottom + 4) + 'px';
+  d.style.left = Math.min(r.left, window.innerWidth - 270) + 'px';
+  const si = document.getElementById('xdSearch');
+  si.value = ''; si.focus();
+  si.oninput = () => {
+    const q = si.value.trim().toUpperCase();
+    document.querySelectorAll('#xdList label').forEach((l, idx) => {
+      if (idx === 0) return;
+      l.style.display = l.textContent.toUpperCase().includes(q) ? '' : 'none';
+    });
+  };
+}
+function xdAplicar() {
+  const checks = [...document.querySelectorAll('#xdList .xdv')];
+  const sel = new Set(checks.filter(c => c.checked).map(c => c.value));
+  if (sel.size === checks.length) delete fSets[xdCol]; else fSets[xdCol] = sel;
+  cerrarXd(); aplicar();
+}
+function xdLimpiar() { delete fSets[xdCol]; cerrarXd(); aplicar(); }
+function cerrarXd() { document.getElementById('xdrop').style.display = 'none'; xdCol = null; }
+document.addEventListener('click', e => {
+  const d = document.getElementById('xdrop');
+  if (d.style.display === 'block' && !d.contains(e.target) && !e.target.classList.contains('funnel')) cerrarXd();
+});
+
+function limpiarFiltros() {
+  fTexto = {}; fSets = {}; sortCol = null;
+  HEADERS.forEach((_, i) => { const el = document.getElementById('ft' + i); if (el) el.value = ''; });
+  aplicar();
+}
+
+/* ── Export: TODO lo filtrado, valores crudos ── */
+async function exportarExcel() {
+  const btn = document.getElementById('btnXls');
+  btn.disabled = true;
+  try {
+    if (!window.XLSX) await new Promise((ok, bad) => {
+      const s = document.createElement('script');
+      s.src = '/js/xlsx.full.min.js'; s.onload = ok; s.onerror = bad;
+      document.head.appendChild(s);
+    });
+    const aoa = [HEADERS, ...FILTRADAS.map(r => r.map((v, i) => {
+      if (v == null) return null;
+      return (MONTOS.has(KEYS[i]) || PCTS.has(KEYS[i])) && !isNaN(v) ? Number(v) : v;
+    }))];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Old Base Unica');
+    XLSX.writeFile(wb, `old-base-unica-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  } catch (e) { alert('Error al exportar: ' + e.message); }
+  btn.disabled = false;
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
