@@ -407,11 +407,12 @@ const getAll = async (req, res) => {
       if (conds.length) whereBase += ` AND (${conds.join(' OR ')})`;
     }
 
-    // Rango de fecha (sobre la fecha mostrada: fecha_otorgado con fallback created_at)
+    // Rango de fecha: manda el MES de cierre (ob.mes) — mismo universo que el
+    // dashboard/penetración; fallback a fecha_otorgado/estado/created_at si no hay mes.
     const fd = /^\d{4}-\d{2}-\d{2}$/.test(fecha_desde || '') ? fecha_desde : null;
     const fh = /^\d{4}-\d{2}-\d{2}$/.test(fecha_hasta || '') ? fecha_hasta : null;
-    if (fd) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at)) >= ?`; paramsBase.push(fd); }
-    if (fh) { whereBase += ` AND DATE(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at)) <= ?`; paramsBase.push(fh); }
+    if (fd) { whereBase += ` AND DATE(COALESCE(ob.mes, ob.fecha_otorgado, ob.fecha_estado, ob.created_at)) >= ?`; paramsBase.push(fd); }
+    if (fh) { whereBase += ` AND DATE(COALESCE(ob.mes, ob.fecha_otorgado, ob.fecha_estado, ob.created_at)) <= ?`; paramsBase.push(fh); }
 
     // ── ESTADO de cartera EN VIVO (reusa carteraLiveRow; los propios son pocos) ──
     // Se calcula UNA vez y se usa para el filtro y los conteos de los chips de cartera,
