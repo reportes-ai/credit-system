@@ -9,7 +9,7 @@
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
-    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --teal:#0e7490; }
+    :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; --teal:#0141A2; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
     .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
     .topnav-left { display:flex; align-items:center; gap:16px; }
@@ -26,20 +26,20 @@
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .btn-logout:hover { background:rgba(255,255,255,.22); }
     .page-wrap { max-width:1180px; margin:22px auto; padding:0 22px 70px; }
-    .page-banner { background:linear-gradient(135deg,#0c4a6e,#0e7490 55%,#0891b2); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#0255c5); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
     .page-banner > i { font-size:2.5rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.22rem; }
     .page-banner p { opacity:.85; margin:0; font-size:.85rem; }
 
     .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
     .tab { background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:10px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
-    .tab.on { background:var(--teal); border-color:var(--teal); color:#fff; box-shadow:0 2px 8px rgba(14,116,144,.3); }
+    .tab.on { background:var(--teal); border-color:var(--teal); color:#fff; box-shadow:0 2px 8px rgba(1,65,162,.3); }
 
     .panel { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 20px; }
     .toolbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
     .toolbar label { font-size:.74rem; font-weight:700; color:#475569; margin:0; }
     .toolbar input, .toolbar select { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 10px; font-size:.84rem; color:#1e293b; outline:none; }
-    .toolbar input:focus, .toolbar select:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(14,116,144,.12); }
+    .toolbar input:focus, .toolbar select:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(1,65,162,.12); }
     .btn { border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .btn-primary { background:var(--teal); color:#fff; } .btn-primary:hover{ filter:brightness(1.08); }
     .btn-soft { background:#f1f5f9; color:#334155; } .btn-soft:hover{ background:#e2e8f0; }
@@ -54,11 +54,11 @@
     .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
     .cal-dow { font-size:.68rem; font-weight:800; color:#64748b; text-transform:uppercase; text-align:center; padding:4px 0; letter-spacing:.04em; }
     .cal-cell { min-height:104px; border:1.5px solid #eef2f7; border-radius:10px; padding:5px 6px; background:#fff; cursor:pointer; transition:.12s; position:relative; overflow:hidden; }
-    .cal-cell:hover { border-color:#0e7490; background:#f0fdff; }
+    .cal-cell:hover { border-color:#0141A2; background:#f0f7ff; }
     .cal-cell.off { background:#f8fafc; cursor:default; opacity:.6; background-image:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 6px,#fff 6px,#fff 12px); }
     .cal-cell.off:hover { border-color:#eef2f7; }
     .cal-cell.empty { background:transparent; border:none; cursor:default; }
-    .cal-cell.today { border-color:#0891b2; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
+    .cal-cell.today { border-color:#0255c5; box-shadow:0 0 0 2px rgba(8,145,178,.25); }
     .cal-d { font-size:.78rem; font-weight:800; color:#334155; display:flex; justify-content:space-between; align-items:center; }
     .cal-cap { font-size:.6rem; font-weight:800; border-radius:6px; padding:1px 5px; }
     .cap-ok { background:#e0f2fe; color:#075985; } .cap-full { background:#fee2e2; color:#b91c1c; }
@@ -85,14 +85,14 @@
     .modal-bg { display:none; position:fixed; inset:0; background:rgba(2,12,40,.55); z-index:600; overflow-y:auto; padding:30px 14px; }
     .modal-bg.show { display:block; }
     .modal-card { background:#fff; border-radius:16px; max-width:560px; margin:0 auto; box-shadow:0 24px 64px rgba(0,0,0,.28); overflow:hidden; }
-    .modal-head { background:linear-gradient(135deg,#0c4a6e,#0e7490,#0891b2); color:#fff; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .modal-head { background:linear-gradient(135deg,#012d70,#0141A2,#0255c5); color:#fff; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .modal-head h3 { margin:0; font-size:1.05rem; font-weight:800; }
     .modal-head .x { background:rgba(255,255,255,.16); border:none; color:#fff; border-radius:8px; padding:6px 12px; cursor:pointer; }
     .modal-body { padding:20px 22px; }
     .fld { margin-bottom:14px; }
     .fld label { display:block; font-size:.76rem; font-weight:700; color:#374151; margin-bottom:5px; }
     .fld input, .fld textarea, .fld select { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:9px 11px; font-size:.88rem; outline:none; box-sizing:border-box; }
-    .fld input:focus, .fld textarea:focus, .fld select:focus { border-color:#0e7490; box-shadow:0 0 0 3px rgba(14,116,144,.12); }
+    .fld input:focus, .fld textarea:focus, .fld select:focus { border-color:#0141A2; box-shadow:0 0 0 3px rgba(1,65,162,.12); }
     /* listas de checkboxes (asignación masiva): el cuadro pegado a su texto, a la izquierda */
     #amEjecs input[type=checkbox], #amComunas input[type=checkbox] { width:auto !important; flex:none; margin:0; }
     #amEjecs label, #amComunas label { justify-content:flex-start; text-align:left; }
@@ -107,9 +107,9 @@
     .footer-box b { color:#0f172a; }
     .dow-pick { display:flex; gap:6px; flex-wrap:wrap; }
     .dow-pick label { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #e2e8f0; border-radius:9px; padding:7px 12px; font-size:.82rem; font-weight:600; cursor:pointer; user-select:none; }
-    .dow-pick label:has(input:checked) { background:#cffafe; border-color:#0891b2; color:#0c4a6e; }
+    .dow-pick label:has(input:checked) { background:#cffafe; border-color:#0255c5; color:#012d70; }
     .hide { display:none !important; }
-    .rt-tip { background:#0c4a6e; color:#fff; border:none; box-shadow:0 1px 4px rgba(0,0,0,.35); font-weight:700; font-size:.7rem; padding:2px 7px; border-radius:7px; }
+    .rt-tip { background:#012d70; color:#fff; border:none; box-shadow:0 1px 4px rgba(0,0,0,.35); font-weight:700; font-size:.7rem; padding:2px 7px; border-radius:7px; }
     .rt-tip::before { display:none; }
   </style>
 </head>
@@ -155,12 +155,13 @@
     <button class="tab" id="tabBit" onclick="setTab('bit')"><i class="bi bi-journal-text"></i> Gestiones</button>
     <button class="tab hide" id="tabAsig" onclick="setTab('asig')"><i class="bi bi-diagram-3"></i> Asignación de Dealers</button>
     <button class="tab" id="tabStats" onclick="setTab('stats')"><i class="bi bi-graph-up-arrow"></i> Estadísticas</button>
+    <button class="tab hide" id="tabInf" onclick="setTab('inf')"><i class="bi bi-file-earmark-bar-graph"></i> Informes de Visitas</button>
     <button class="tab hide" id="tabCfg" onclick="setTab('cfg')"><i class="bi bi-sliders"></i> Configuración</button>
   </div>
 
   <!-- Selector de alcance (solo revisores) -->
   <div id="scopeBar" class="toolbar hide" style="margin-bottom:14px">
-    <label><i class="bi bi-people me-1" style="color:#0e7490"></i>Ver:</label>
+    <label><i class="bi bi-people me-1" style="color:#0141A2"></i>Ver:</label>
     <div class="seg2"><button id="scMios" class="on" onclick="setScope('mios')">Mis visitas</button><button id="scTodos" onclick="setScope('todos')">Todo el equipo</button></div>
     <span id="scUserWrap" class="hide"><label>Ejecutivo:</label>
       <select id="scUser" onchange="recargar()"><option value="">Todos</option></select></span>
@@ -168,7 +169,7 @@
 
   <!-- ── Planificador de rutas ── -->
   <div id="viewPlan" class="panel hide">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-signpost-split me-1" style="color:#0e7490"></i>Planificador de rutas</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-signpost-split me-1" style="color:#0141A2"></i>Planificador de rutas</h5>
     <p style="font-size:.83rem;color:#64748b;margin-bottom:16px">Define tus rangos y la app arma el calendario óptimo (ruta más corta), te dice por quién partir y qué % de dealers alcanzas a recorrer.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px">
       <div class="fld" style="margin:0"><label>Visitas por día (máx)</label><input type="number" id="pVis" min="1" max="50" value="4"></div>
@@ -253,7 +254,7 @@
 
   <!-- ── Asignación de Cartera (supervisores/jefe/gerente) ── -->
   <div id="viewAsig" class="panel hide">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-diagram-3 me-1" style="color:#0e7490"></i>Asignación Masiva de Dealers</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-diagram-3 me-1" style="color:#0141A2"></i>Asignación Masiva de Dealers</h5>
     <p style="font-size:.83rem;color:#64748b;margin-bottom:14px">Reparte los dealers entre los ejecutivos seleccionados por zona/comuna y el sistema les genera el calendario de visitas del plan. Un dealer solo puede estar asignado a UN ejecutivo.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px;align-items:end">
       <div class="fld" style="margin:0"><label>Nombre del plan</label><input id="amNombre" placeholder="Ej: Cartera RM Julio"></div>
@@ -291,7 +292,7 @@
     <div id="amResultado" style="margin-top:12px"></div>
 
     <hr style="margin:20px 0">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-person-plus me-1" style="color:#0e7490"></i>Asignación individual</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-person-plus me-1" style="color:#0141A2"></i>Asignación individual</h5>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
       <div class="fld" style="margin:0;min-width:280px"><label>Dealer</label><select id="aiDealer"></select></div>
       <div class="fld" style="margin:0;min-width:240px"><label>Ejecutivo</label><select id="aiEjec"></select></div>
@@ -299,7 +300,7 @@
     </div>
 
     <hr style="margin:20px 0">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-clipboard-data me-1" style="color:#0e7490"></i>Cartera actual
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-clipboard-data me-1" style="color:#0141A2"></i>Cartera actual
       <select id="asigFiltroEjec" style="margin-left:10px;font-size:.8rem;border:1.5px solid #e2e8f0;border-radius:8px;padding:4px 8px" onchange="cargarAsignaciones()"><option value="">Todos los ejecutivos</option></select>
       <label style="font-size:.78rem;font-weight:600;margin-left:10px"><input type="checkbox" id="asigVerCerradas" onchange="cargarAsignaciones()"> Ver cerradas</label>
     </h5>
@@ -308,7 +309,7 @@
       <tbody id="asigBody"><tr><td class="empty" colspan="7">Cargando…</td></tr></tbody></table></div>
 
     <hr style="margin:20px 0">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-kanban me-1" style="color:#0e7490"></i>Planes de asignación</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-kanban me-1" style="color:#0141A2"></i>Planes de asignación</h5>
     <div style="overflow:auto"><table class="bt"><thead><tr>
       <th>Plan</th><th>Inicio</th><th>Cierre</th><th>Estado</th><th>Asignaciones</th><th>Visitas</th><th>Realizadas</th><th></th></tr></thead>
       <tbody id="planesBody"><tr><td class="empty" colspan="8">Cargando…</td></tr></tbody></table></div>
@@ -322,15 +323,36 @@
       <label>Hasta</label><input type="date" id="stHasta" onchange="cargarStatsVisitas()">
     </div>
     <div id="stKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-person-badge me-1" style="color:#0e7490"></i>Por ejecutivo</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-person-badge me-1" style="color:#0141A2"></i>Por ejecutivo</h5>
     <div style="overflow:auto"><table class="bt"><thead><tr>
       <th>Ejecutivo</th><th>Cartera activa</th><th>Programadas</th><th>Realizadas</th><th>% Cumplimiento</th><th>Positivas</th><th>Negativas</th><th>% Positividad</th></tr></thead>
       <tbody id="stBody"><tr><td class="empty" colspan="8">Cargando…</td></tr></tbody></table></div>
   </div>
 
   <!-- ── Configuración ── -->
+  <!-- ── Informes de Visitas (Jefe Comercial / Gerentes / Admin — paramétrico) ── -->
+  <div id="viewInf" class="panel hide">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-file-earmark-bar-graph me-1" style="color:#0141A2"></i>Informes de Visitas Realizadas</h5>
+    <p style="font-size:.83rem;color:#64748b;margin-bottom:12px">Busca las gestiones realizadas y mide el resultado (positivas/negativas) por PLAN y FECHAS, del grupo y de cada ejecutivo.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;align-items:end">
+      <div class="fld" style="margin:0"><label>Plan</label><select id="infPlan" onchange="cargarInformes()"><option value="">Todos</option></select></div>
+      <div class="fld" style="margin:0"><label>Desde</label><input type="date" id="infDesde" onchange="cargarInformes()"></div>
+      <div class="fld" style="margin:0"><label>Hasta</label><input type="date" id="infHasta" onchange="cargarInformes()"></div>
+      <div class="fld" style="margin:0"><label>Ejecutivo</label><select id="infEjec" onchange="cargarInformes()"><option value="">Todos</option></select></div>
+      <div class="fld" style="margin:0"><label>Resultado</label><select id="infRes" onchange="cargarInformes()"><option value="">Todos</option><option value="POSITIVO">Positivas</option><option value="NEGATIVO">Negativas</option></select></div>
+      <div class="fld" style="margin:0"><label>Buscar</label><input id="infQ" placeholder="dealer, comuna o comentario…" oninput="clearTimeout(window._infDeb);window._infDeb=setTimeout(cargarInformes,350)"></div>
+    </div>
+    <div id="infKpis" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <h5 style="font-weight:800;color:#0f172a;margin:14px 0 8px;font-size:.9rem"><i class="bi bi-people me-1" style="color:#0141A2"></i>Resultado por ejecutivo</h5>
+    <div style="overflow:auto"><table class="bt"><thead><tr><th>Ejecutivo</th><th>Realizadas</th><th>Positivas</th><th>Negativas</th><th>% Positividad</th></tr></thead>
+      <tbody id="infEjecBody"><tr><td class="empty" colspan="5">—</td></tr></tbody></table></div>
+    <h5 style="font-weight:800;color:#0f172a;margin:16px 0 8px;font-size:.9rem"><i class="bi bi-journal-text me-1" style="color:#0141A2"></i>Detalle de visitas realizadas</h5>
+    <div style="overflow:auto"><table class="bt"><thead><tr><th>Fecha</th><th>Dealer</th><th>Comuna</th><th>Ejecutivo</th><th>Resultado</th><th>Comentarios</th><th>Seguimiento</th></tr></thead>
+      <tbody id="infBody"><tr><td class="empty" colspan="7">Cargando…</td></tr></tbody></table></div>
+  </div>
+
   <div id="viewCfg" class="panel hide">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-sliders me-1" style="color:#0e7490"></i>Parámetros del calendario</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-sliders me-1" style="color:#0141A2"></i>Parámetros del calendario</h5>
     <p style="font-size:.83rem;color:#64748b;margin-bottom:18px">Define cuántas visitas puede agendar cada ejecutivo por día y en qué días de la semana.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;max-width:620px">
       <div class="fld"><label>Visitas por día (por ejecutivo)</label><input type="number" id="cfgDia" min="1" max="50" value="4"></div>
@@ -426,7 +448,7 @@ const ES_ADMIN = YO && YO.perfil === 'Administrador';
 
 /* ── Estado ── */
 let CFG = { visitas_dia:4, dias_semana:[1,2,3,4,5] };
-let ES_REVISOR = false, PUEDE_GESTIONAR = false;
+let ES_REVISOR = false, PUEDE_GESTIONAR = false, VE_INFORMES = false;
 let SCOPE = 'mios';
 let CUR = new Date(); CUR.setDate(1);
 let MES_VISITAS = [];          // visitas del mes (calendario)
@@ -449,17 +471,19 @@ async function cargarPermisos(){
     const j = await r.json(); const fs = new Set(j.funcionalidades||[]);
     ES_REVISOR = ES_ADMIN || fs.has('visitas_supervisar');
     PUEDE_GESTIONAR = ES_ADMIN || fs.has('visitas_dealers') || fs.has('visitas_supervisar');
-  }catch(e){ ES_REVISOR=ES_ADMIN; PUEDE_GESTIONAR=ES_ADMIN; }
+    VE_INFORMES = ES_ADMIN || fs.has('visitas_informes');
+  }catch(e){ ES_REVISOR=ES_ADMIN; PUEDE_GESTIONAR=ES_ADMIN; VE_INFORMES=ES_ADMIN; }
   if(ES_REVISOR){
     document.getElementById('tabCfg').classList.remove('hide');
     document.getElementById('tabAsig').classList.remove('hide');
     document.getElementById('scopeBar').classList.remove('hide');
   }
+  if(VE_INFORMES) document.getElementById('tabInf').classList.remove('hide');
 }
 
 /* ── Tabs ── */
 function setTab(t){
-  ['plan','cal','bit','asig','stats','cfg'].forEach(x=>{
+  ['plan','cal','bit','asig','stats','inf','cfg'].forEach(x=>{
     document.getElementById('tab'+x[0].toUpperCase()+x.slice(1)).classList.toggle('on',t===x);
     document.getElementById('view'+x[0].toUpperCase()+x.slice(1)).classList.toggle('hide',t!==x);
   });
@@ -469,6 +493,7 @@ function setTab(t){
   if(t==='plan') initPlan();
   if(t==='asig') initAsig();
   if(t==='stats') cargarStatsVisitas();
+  if(t==='inf') initInformes();
 }
 function setScope(s){
   SCOPE=s;
@@ -502,9 +527,25 @@ async function cargarMes(){
   }catch(e){ MES_VISITAS=[]; }
   pintarCal();
 }
+let CARTERAS = null;   // id_usuario → n dealers asignados (para el selector)
+async function cargarCarteras(){
+  if (CARTERAS) return;
+  try { const j = await (await fetch('/api/visitas/asignados',{headers:hdr()})).json();
+    CARTERAS = {}; (j.data||[]).forEach(a=>CARTERAS[a.id_usuario]=a.cartera);
+  } catch(_) { CARTERAS = {}; }
+}
+let _ultUsuarios = [];
 function pintarUsuarios(us){
+  _ultUsuarios = us;
+  if (CARTERAS === null) { cargarCarteras().then(()=>pintarUsuarios(_ultUsuarios)); }
   const sel=document.getElementById('scUser'); const cur=sel.value;
-  sel.innerHTML='<option value="">Todos</option>'+us.map(u=>`<option value="${u.id_usuario}">${esc(u.usuario_nombre||('Usuario '+u.id_usuario))}</option>`).join('');
+  // primero los que tienen dealers asignados (con su cartera), luego el resto
+  const conA = us.filter(u=>CARTERAS&&CARTERAS[u.id_usuario]);
+  const sinA = us.filter(u=>!(CARTERAS&&CARTERAS[u.id_usuario]));
+  const opt = u => `<option value="${u.id_usuario}">${esc(u.usuario_nombre||('Usuario '+u.id_usuario))}${CARTERAS&&CARTERAS[u.id_usuario]?' — '+CARTERAS[u.id_usuario]+' dealers asignados':''}</option>`;
+  sel.innerHTML='<option value="">Todos</option>'+
+    (conA.length?'<optgroup label="Con asignación">'+conA.map(opt).join('')+'</optgroup>':'')+
+    (sinA.length?'<optgroup label="Sin asignación vigente">'+sinA.map(opt).join('')+'</optgroup>':'');
   sel.value=cur;
 }
 function visitasDe(fecha){ return MES_VISITAS.filter(v=>String(v.fecha_programada).slice(0,10)===fecha); }
@@ -564,6 +605,14 @@ function abrirDia(fecha){
     </div>`;
   }).join('') : '<div style="color:#94a3b8;font-size:.85rem;padding:6px 0">Sin visitas este día.</div>';
 
+  // Botón para borrar TODAS las programadas del día (las realizadas no se tocan)
+  const nProg = vs.filter(v=>v.estado==='PROGRAMADA').length;
+  if (PUEDE_GESTIONAR && nProg) {
+    document.getElementById('mDiaList').innerHTML +=
+      `<div style="margin-top:10px;text-align:right"><button class="btn btn-ghost" style="color:#b91c1c;border-color:#fecaca" onclick="borrarDia()">
+         <i class="bi bi-trash"></i> Borrar las ${nProg} programada(s) del día</button></div>`;
+  }
+
   // Form agendar: solo si puede gestionar, alcance propio, y no superó el tope
   const puedeAgendar = PUEDE_GESTIONAR && SCOPE!=='todos';
   const tope = visitasDe(fecha).filter(()=>true).length;   // en alcance "mios" todas son del usuario
@@ -588,6 +637,64 @@ function agendar(){
       if(!j.success){ flash('addMsg', j.error||'Error', '#b91c1c'); return; }
       cerrar('mDia'); cargarMes();
     }).catch(()=>flash('addMsg','Error de conexión','#b91c1c'));
+}
+/* ── Informes de Visitas (visitas_informes) ── */
+let _infInit = false;
+function initInformes(){ if(_infInit){ cargarInformes(); return; } _infInit = true; cargarInformes(); }
+async function cargarInformes(){
+  const qs = new URLSearchParams();
+  const v = id => document.getElementById(id).value;
+  if (v('infPlan'))  qs.set('plan', v('infPlan'));
+  if (v('infDesde')) qs.set('desde', v('infDesde'));
+  if (v('infHasta')) qs.set('hasta', v('infHasta'));
+  if (v('infEjec'))  qs.set('usuario', v('infEjec'));
+  if (v('infRes'))   qs.set('resultado', v('infRes'));
+  if (v('infQ').trim()) qs.set('q', v('infQ').trim());
+  const r = await fetch('/api/visitas/informes?'+qs, { headers:hdr() });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('infBody').innerHTML = '<tr><td class="empty" colspan="7">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  const d = j.data;
+  // selects de plan/ejecutivo (conservan selección)
+  const selP = document.getElementById('infPlan'), curP = selP.value;
+  selP.innerHTML = '<option value="">Todos</option>'+(d.planes||[]).map(p=>`<option value="${p.id}">${esc(p.nombre)} (${fFecha(p.fecha_inicio)}–${fFecha(p.fecha_cierre)})</option>`).join('');
+  selP.value = curP;
+  const selE = document.getElementById('infEjec'), curE = selE.value;
+  selE.innerHTML = '<option value="">Todos</option>'+(d.por_ejecutivo||[]).map(e=>`<option value="${e.id_usuario}">${esc(e.usuario_nombre||('Usuario '+e.id_usuario))}</option>`).join('');
+  selE.value = curE;
+  // KPIs del grupo
+  const g = d.grupo||{}; const N = x => Number(x)||0;
+  const pctG = N(g.realizadas) ? Math.round(N(g.positivas)*100/N(g.realizadas)) : 0;
+  const kpiHtml = (val,lbl,color) => `<div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 18px;min-width:130px">
+    <div style="font-size:1.4rem;font-weight:800;color:${color}">${val}</div><div style="font-size:.72rem;color:#64748b;text-transform:uppercase">${lbl}</div></div>`;
+  document.getElementById('infKpis').innerHTML =
+    kpiHtml(N(g.realizadas),'Realizadas (grupo)','#0141A2') + kpiHtml(N(g.positivas),'Positivas','#16a34a') +
+    kpiHtml(N(g.negativas),'Negativas','#dc2626') + kpiHtml(pctG+'%','% Positividad','#012d70');
+  // por ejecutivo
+  document.getElementById('infEjecBody').innerHTML = (d.por_ejecutivo||[]).length ? d.por_ejecutivo.map(e=>{
+    const pct = N(e.realizadas) ? Math.round(N(e.positivas)*100/N(e.realizadas)) : 0;
+    return `<tr><td>${esc(e.usuario_nombre||('Usuario '+e.id_usuario))}</td><td><b>${N(e.realizadas)}</b></td>
+      <td style="color:#16a34a">${N(e.positivas)}</td><td style="color:#dc2626">${N(e.negativas)}</td><td><b>${pct}%</b></td></tr>`;
+  }).join('') : '<tr><td class="empty" colspan="5">Sin visitas realizadas con estos filtros.</td></tr>';
+  // detalle
+  document.getElementById('infBody').innerHTML = (d.rows||[]).length ? d.rows.map(x=>`<tr>
+    <td style="white-space:nowrap">${fFecha(x.fecha_realizada||x.fecha_programada)}</td>
+    <td>${esc(x.nombre_dealer||x.rut_dealer||'—')}</td><td>${esc(x.comuna||'')}</td>
+    <td>${esc(x.usuario_nombre||'')}</td>
+    <td><span class="${x.resultado==='POSITIVO'?'res-pos':'res-neg'}">${esc(x.resultado||'—')}</span></td>
+    <td style="font-size:.78rem;max-width:340px">${esc(x.comentarios||'')}</td>
+    <td style="font-size:.76rem">${x.seguimiento_fecha?fFecha(x.seguimiento_fecha)+(x.seguimiento_nota?' — '+esc(x.seguimiento_nota):''):'—'}</td>
+  </tr>`).join('') : '<tr><td class="empty" colspan="7">Sin visitas realizadas con estos filtros.</td></tr>';
+}
+
+function borrarDia(){
+  const u = (ES_REVISOR && SCOPE==='todos') ? document.getElementById('scUser').value : '';
+  if (ES_REVISOR && SCOPE==='todos' && !u) { alert('Selecciona un ejecutivo para borrar su día (o cambia a "Mis visitas").'); return; }
+  if (!confirm('¿Borrar TODAS las visitas programadas del '+fFecha(DIA_SEL)+'? Las realizadas no se tocan.')) return;
+  fetch('/api/visitas/dia?fecha='+DIA_SEL+(u?('&usuario='+u):''), { method:'DELETE', headers:hdr() })
+    .then(r=>r.json()).then(j=>{
+      if(!j.success){ alert(j.error||'Error'); return; }
+      cerrar('mDia'); cargarMes();
+    }).catch(()=>alert('Error de conexión'));
 }
 function elimVisita(id){
   if(!confirm('¿Eliminar esta visita?')) return;
@@ -837,7 +944,7 @@ async function generarPlan(){
   if(!plan.length){ flash('pMsg','No se pudo armar el plan con esos parámetros.','#b91c1c'); limpiar(); return; }
 
   const notas=[]; if(excluir&&excluidosVis) notas.push(`${excluidosVis} ya visitado(s)`); if(fueraRadio) notas.push(`${fueraRadio} fuera de radio`);
-  flash('pMsg', notas.length?('Excluidos: '+notas.join(' · ')):'', '#0e7490');
+  flash('pMsg', notas.length?('Excluidos: '+notas.join(' · ')):'', '#0141A2');
 
   const startMs=new Date(fechaIni+'T12:00:00').getTime();
   let vMes=0,vAno=0,kmTot=0,tot=0,lastMs=startMs;
@@ -862,8 +969,8 @@ function renderCobertura(c){
     <span style="font-size:1.3rem;font-weight:800;color:#0f172a">${val}</span>${sub?`<span style="font-size:.72rem;color:#94a3b8">${sub}</span>`:''}</div>`;
   const excl=[]; if(c.sinCoord)excl.push(c.sinCoord+' sin geo'); if(c.fueraRadio)excl.push(c.fueraRadio+' fuera radio'); if(c.excluidosVis)excl.push(c.excluidosVis+' visitados');
   document.getElementById('planCobertura').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px">
-    ${card('Dealers a recorrer', total, excl.length?('excluidos: '+excl.join(' · ')):'geocodificados','#0e7490')}
-    ${card('Visitas por día', (Math.round(c.avgDia*10)/10), 'promedio efectivo','#0891b2')}
+    ${card('Dealers a recorrer', total, excl.length?('excluidos: '+excl.join(' · ')):'geocodificados','#0141A2')}
+    ${card('Visitas por día', (Math.round(c.avgDia*10)/10), 'promedio efectivo','#0255c5')}
     ${card('Cobertura 30 días', Math.round(c.vMes/total*100)+'%', c.vMes+' visitas','#16a34a')}
     ${card('Cubrir el 100%', '≈ '+c.mesesCubrir+(c.mesesCubrir===1?' mes':' meses'), c.nDias+' días hábiles','#2563eb')}
     ${card('Distancia total', Math.round(c.kmTot)+' km', 'aprox. (línea recta)','#ea580c')}
@@ -880,13 +987,13 @@ function renderPlanLista(plan){
   if(!plan.length){ document.getElementById('planLista').innerHTML='<div class="empty"><i class="bi bi-geo"></i>Sin dealers para planificar.</div>'; return; }
   const verLim=20; let html=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 6px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0e7490"></i>Ruta sugerida (orden óptimo)</h6>
+      <h6 style="font-weight:800;color:#0f172a;margin:0"><i class="bi bi-list-ol me-1" style="color:#0141A2"></i>Ruta sugerida (orden óptimo)</h6>
       <button class="btn btn-ghost" style="padding:4px 11px" onclick="imprimirDirecciones()"><i class="bi bi-printer"></i> Imprimir direcciones</button>
     </div>
     <button class="btn btn-primary" onclick="agendarPlan()"><i class="bi bi-calendar-plus"></i> Agendar este plan</button></div>`;
   plan.slice(0,verLim).forEach((d,di)=>{
     html+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:12px 0 4px">
-      <div style="font-weight:800;color:#0c4a6e;font-size:.84rem;text-transform:capitalize"><i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>
+      <div style="font-weight:800;color:#012d70;font-size:.84rem;text-transform:capitalize"><i class="bi bi-calendar-event me-1"></i>${esc(new Date(d.fecha+'T12:00:00').toLocaleDateString('es-CL',{weekday:'long',day:'2-digit',month:'long'}))} · ${d.visitas.length} visita(s)</div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-soft" style="padding:4px 11px" onclick="verRutaMapa(${di})"><i class="bi bi-map"></i> Ver ruta en mapa</button>
         <button class="btn btn-ghost" style="padding:4px 11px" onclick="imprimirDirecciones(${di})"><i class="bi bi-printer"></i> Imprimir</button>
@@ -945,7 +1052,7 @@ function imprimirDirecciones(di){
     const json=JSON.stringify(pts).replace(/</g,'\\u003c');
     mapaCSS=`<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
       <style>#mapa{height:480px;width:100%;border:1px solid #cbd5e1;border-radius:8px;margin-top:14px}
-      .rt-tip{background:#0c4a6e;color:#fff;border:none;font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px}
+      .rt-tip{background:#012d70;color:#fff;border:none;font-weight:700;font-size:11px;padding:1px 6px;border-radius:6px}
       .rt-tip::before{display:none}
       *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }</style>`;
     mapaDiv=`<div id="mapa"></div>`;
@@ -963,12 +1070,12 @@ function imprimirDirecciones(di){
         var tl=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
         var lls=[];
         PTS.forEach(function(v,i){var ll=disp[i]; lls.push(ll);
-          var ic=L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],html:'<div style="background:#0e7490;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid #fff">'+(i+1)+'</div>'});
+          var ic=L.divIcon({className:'',iconSize:[26,26],iconAnchor:[13,13],html:'<div style="background:#0141A2;color:#fff;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid #fff">'+(i+1)+'</div>'});
           var m=L.marker(ll,{icon:ic}).addTo(map);
           if(v.hora) m.bindTooltip(v.hora,{permanent:true,direction:'top',offset:[0,-14],className:'rt-tip'});
         });
         var bounds = lls.length>1 ? L.latLngBounds(lls) : null;
-        if(bounds){ L.polyline(lls,{color:'#0e7490',weight:3,opacity:.8,dashArray:'7,7'}).addTo(map); }
+        if(bounds){ L.polyline(lls,{color:'#0141A2',weight:3,opacity:.8,dashArray:'7,7'}).addTo(map); }
         function fit(){ map.invalidateSize(); if(bounds){ map.fitBounds(bounds,{padding:[55,55]}); } else { map.setView(lls[0],14); } }
         fit();
         var done=false; function go(){ if(done)return; done=true; fit(); setTimeout(function(){window.print();},650); }
@@ -987,7 +1094,7 @@ function imprimirDirecciones(di){
       table{width:100%;border-collapse:collapse;font-size:12px}
       th,td{border:1px solid #cbd5e1;padding:6px 9px;text-align:left;vertical-align:top}
       th{background:#eef2f7;text-transform:uppercase;font-size:10px;letter-spacing:.03em}
-      td.n{text-align:center;font-weight:bold;width:28px} tr.dia td{background:#0e7490;color:#fff;font-weight:bold;font-size:12.5px}
+      td.n{text-align:center;font-weight:bold;width:28px} tr.dia td{background:#0141A2;color:#fff;font-weight:bold;font-size:12.5px}
       @page{size:portrait;margin:12mm} @media print{body{margin:0}}
     </style></head><body>
     <div class="wrap">
@@ -1054,14 +1161,14 @@ function dibujarRuta(dia){
   pts.forEach((v,i)=>{
     const ll=disp[i]; latlngs.push(ll);
     const icon=L.divIcon({className:'',iconSize:[28,28],iconAnchor:[14,14],
-      html:`<div style="background:#0e7490;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.82rem;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)">${i+1}</div>`});
+      html:`<div style="background:#0141A2;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.82rem;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)">${i+1}</div>`});
     const m=L.marker(ll,{icon}).addTo(MAPA);
     m.bindPopup(`<b>${i+1}. ${esc(v.nombre||'—')}</b><br>${v.hora?('🕘 '+v.hora+' hrs<br>'):''}${esc(v.comuna||'')}${v.distKm?('<br>'+Math.round(v.distKm*10)/10+' km del anterior'):(colocados.has(i)?'<br><span style="color:#64748b">misma ubicación (parque)</span>':'')}`);
     if(v.hora) m.bindTooltip(v.hora,{permanent:true,direction:'top',offset:[0,-15],className:'rt-tip'});
     MAPA_LAYERS.push(m);
   });
   if(latlngs.length>1){
-    const line=L.polyline(latlngs,{color:'#0e7490',weight:3,opacity:.75,dashArray:'7,7'}).addTo(MAPA);
+    const line=L.polyline(latlngs,{color:'#0141A2',weight:3,opacity:.75,dashArray:'7,7'}).addTo(MAPA);
     MAPA_LAYERS.push(line);
     MAPA.fitBounds(L.latLngBounds(latlngs).pad(0.25));
   } else { MAPA.setView(latlngs[0],14); }
@@ -1115,7 +1222,7 @@ async function cargarZonas(){
   cont.innerHTML = j.data.length ? j.data.map(z=>
     `<label style="display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer">
       <input type="checkbox" class="amCom" value="${esc(z.zona)}" ${marcadas.has(z.zona)?'checked':''}>
-      ${esc(z.zona)} <b style="margin-left:auto;color:#0e7490">${z.n}</b></label>`).join('')
+      ${esc(z.zona)} <b style="margin-left:auto;color:#0141A2">${z.n}</b></label>`).join('')
     : 'Sin dealers candidatos con estos filtros';
   cargarZonasMapa();
 }
@@ -1130,7 +1237,7 @@ function initAmMapa(){
   AM_CAPA = L.layerGroup().addTo(AM_MAP);
 }
 /* Color estable por nombre (hash → paleta) */
-const AM_PALETA = ['#e11d48','#0255c5','#16a34a','#f59e0b','#7c3aed','#0e7490','#db2777','#65a30d','#dc2626','#4f46e5','#b45309','#059669'];
+const AM_PALETA = ['#e11d48','#0255c5','#16a34a','#f59e0b','#7c3aed','#0141A2','#db2777','#65a30d','#dc2626','#4f46e5','#b45309','#059669'];
 function colorDe(nombre){
   let h = 0; const s = String(nombre);
   for (let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) >>> 0;
@@ -1228,7 +1335,7 @@ async function masiva(simular){
   if (!j.success) return flash('amMsg', j.error, '#dc2626');
   const d = j.data;
   flash('amMsg', simular ? `Simulación: ${d.candidatos} dealers candidatos, ${d.fechas_habiles} días hábiles.` :
-    `✅ Plan creado: ${d.asignadas} dealers asignados, ${d.agendadas} visitas agendadas.`, simular?'#0e7490':'#16a34a');
+    `✅ Plan creado: ${d.asignadas} dealers asignados, ${d.agendadas} visitas agendadas.`, simular?'#0141A2':'#16a34a');
   document.getElementById('amResultado').innerHTML = `
     <div style="overflow:auto"><table class="bt"><thead><tr><th>Ejecutivo</th><th>Dealers</th><th>Comunas</th><th>Agendables</th><th>Sin agenda</th></tr></thead>
     <tbody>${d.por_ejecutivo.map(e=>`<tr><td>${esc(e.nombre)}</td><td><b>${e.dealers}</b></td>
@@ -1303,7 +1410,7 @@ async function cargarStatsVisitas(){
   const pct = (a,b)=> b>0 ? (a/b*100).toLocaleString('es-CL',{maximumFractionDigits:1})+'%' : '—';
   const kpi = (v,l,bg)=>`<div style="border-radius:12px;padding:11px 13px;color:#fff;background:${bg}"><div style="font-size:1.3rem;font-weight:800">${v}</div><div style="font-size:.66rem;text-transform:uppercase;opacity:.9">${l}</div></div>`;
   document.getElementById('stKpis').innerHTML =
-    kpi(N(t.programadas),'Programadas','#0e7490') + kpi(N(t.realizadas),'Realizadas','#0141A2') +
+    kpi(N(t.programadas),'Programadas','#0141A2') + kpi(N(t.realizadas),'Realizadas','#0141A2') +
     kpi(pct(t.realizadas,t.programadas),'% Cumplimiento','#7c3aed') +
     kpi(N(t.positivas),'Positivas','#16a34a') + kpi(N(t.negativas),'Negativas','#dc2626') +
     kpi(pct(t.positivas, Number(t.positivas||0)+Number(t.negativas||0)),'% Positividad','#b45309') +

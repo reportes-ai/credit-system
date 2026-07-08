@@ -81,6 +81,9 @@ const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%' OR nombre LIKE 'Ejecutivo%' OR nombre LIKE 'Comercial%'");
       await ensure('Ruta AutoFácil — supervisar', 'visitas_supervisar',
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%'");
+      // Informes de Visitas: Jefe Comercial, Gerentes y Administrador (paramétrico por matriz)
+      await ensure('Ruta AutoFácil — informes de visitas', 'visitas_informes',
+        "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Jefe Comercial%'");
       // Renombre v99.6: "Visitas de Dealers" → "Ruta AutoFácil" (mismos códigos/permisos)
       await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — gestionar' WHERE codigo='visitas_dealers' AND nombre<>'Ruta AutoFácil — gestionar'");
       await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — supervisar' WHERE codigo='visitas_supervisar' AND nombre<>'Ruta AutoFácil — supervisar'");
@@ -734,6 +737,70 @@ const stats = async (req, res) => {
   } catch (e) { console.error('[visitas stats]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
+/* ─── GET /api/visitas/informes (visitas_informes) — buscador de informes de
+   visitas REALIZADAS + resumen positivas/negativas por ejecutivo y del grupo,
+   filtrable por PLAN, FECHAS, ejecutivo, resultado y texto (dealer/comentario). ── */
+const informes = async (req, res) => {
+  try {
+    const where = ["v.estado='REALIZADA'"], pars = [];
+    if (req.query.plan)    { where.push('v.id_plan=?'); pars.push(parseInt(req.query.plan) || 0); }
+    if (req.query.desde)   { where.push('v.fecha_realizada>=?'); pars.push(req.query.desde); }
+    if (req.query.hasta)   { where.push('v.fecha_realizada<=DATE_ADD(?, INTERVAL 1 DAY)'); pars.push(req.query.hasta); }
+    if (req.query.usuario) { where.push('v.id_usuario=?'); pars.push(parseInt(req.query.usuario) || 0); }
+    if (req.query.resultado) { where.push('v.resultado=?'); pars.push(String(req.query.resultado).toUpperCase()); }
+    if (req.query.q) {
+      where.push('(UPPER(COALESCE(v.nombre_dealer,"")) LIKE ? OR UPPER(COALESCE(v.comentarios,"")) LIKE ? OR UPPER(COALESCE(v.comuna,"")) LIKE ?)');
+      const like = '%' + String(req.query.q).toUpperCase() + '%';
+      pars.push(like, like, like);
+    }
+    const W = 'WHERE ' + where.join(' AND ');
+    const [rows] = await pool.query(
+      `SELECT v.id, v.nombre_dealer, v.rut_dealer, v.comuna, v.fecha_programada, v.fecha_realizada,
+              v.usuario_nombre, v.id_usuario, v.resultado, v.comentarios, v.seguimiento_fecha, v.seguimiento_nota, v.id_plan
+         FROM visitas_dealers v ${W}
+        ORDER BY v.fecha_realizada DESC LIMIT 1000`, pars);
+    const [porEjec] = await pool.query(
+      `SELECT v.id_usuario, v.usuario_nombre, COUNT(*) realizadas,
+              SUM(v.resultado='POSITIVO') positivas, SUM(v.resultado='NEGATIVO') negativas
+         FROM visitas_dealers v ${W} GROUP BY v.id_usuario, v.usuario_nombre ORDER BY realizadas DESC`, pars);
+    const [[grupo]] = await pool.query(
+      `SELECT COUNT(*) realizadas, SUM(v.resultado='POSITIVO') positivas, SUM(v.resultado='NEGATIVO') negativas
+         FROM visitas_dealers v ${W}`, pars);
+    const [planes] = await pool.query('SELECT id, nombre, fecha_inicio, fecha_cierre, estado FROM visitas_planes ORDER BY fecha_inicio DESC LIMIT 100');
+    ok(res, { rows, por_ejecutivo: porEjec, grupo, planes });
+  } catch (e) { console.error('[visitas informes]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── DELETE /api/visitas/dia?fecha=&usuario= — borra las PROGRAMADAS del día.
+   Sin visitas_supervisar solo borra las propias; el revisor puede indicar usuario. ── */
+const borrarDia = async (req, res) => {
+  try {
+    const fecha = String(req.query.fecha || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return err(res, 400, 'Fecha inválida.');
+    const uid = req.usuario.id_usuario;
+    const esRevisor = await tieneFunc(uid, 'visitas_supervisar');
+    const objetivo = esRevisor && req.query.usuario ? (parseInt(req.query.usuario) || 0) : uid;
+    if (!esRevisor && objetivo !== uid) return err(res, 403, 'Solo puedes borrar tus propias visitas.');
+    const [r] = await pool.query(
+      "DELETE FROM visitas_dealers WHERE fecha_programada=? AND estado='PROGRAMADA' AND id_usuario=?",
+      [fecha, objetivo]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'visitas', entidad: 'dia',
+      detalle: `Borró ${r.affectedRows} visita(s) programada(s) del ${fecha} (usuario ${objetivo})` });
+    ok(res, { eliminadas: r.affectedRows });
+  } catch (e) { console.error('[visitas borrarDia]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
+/* ─── GET /api/visitas/asignados — ejecutivos con asignación ACTIVA (selector) ── */
+const asignados = async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_usuario, usuario_nombre, COUNT(*) cartera
+         FROM visitas_asignaciones WHERE estado='ACTIVA'
+        GROUP BY id_usuario, usuario_nombre ORDER BY usuario_nombre`);
+    ok(res, rows);
+  } catch (e) { console.error('[visitas asignados]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
 module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar,
   ejecutivos, zonasCartera, zonasMapa, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
-  listarPlanes, cerrarPlan, fichaDia, stats };
+  listarPlanes, cerrarPlan, fichaDia, stats, informes, borrarDia, asignados };
