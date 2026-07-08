@@ -1325,12 +1325,23 @@ async function cargarZonasMapa(){
         ${z.ejecutivos.map(e=>`<div style="display:flex;justify-content:space-between;gap:10px">
            <span>${esc(e.nombre)}</span><b>${e.n}</b></div>`).join('')}` : '<hr style="margin:6px 0"><i>Aún sin ejecutivos asignados</i>'}
     </div>`;
-    // dealers de la zona como puntos (color por zona — sin polígonos que se traslapen)
+    // dealers de la zona como puntos: cada punto muestra la ficha del DEALER
+    // (la tarjeta de la zona queda en la etiqueta/punto central)
     const cZona = colorZona(z.zona);
     (z.puntos || []).forEach(p => {
-      L.circleMarker(p, { radius: 5, color: '#fff', weight: 1.5, fillColor: cZona, fillOpacity: .95 })
-        .bindPopup(pop).addTo(AM_CAPA);
-      bounds.push(p);
+      const ll = Array.isArray(p) ? p : [p.la, p.ln];
+      const popDealer = Array.isArray(p) ? pop : `<div style="font-size:.83rem;min-width:190px">
+        <b>${esc(p.n || 'Dealer')}</b><br>
+        ${p.r ? 'RUT ' + esc(p.r) + '<br>' : ''}
+        ${esc(p.c || '')}${p.p && String(p.p).toUpperCase() !== 'CALLE' ? ' · ' + esc(p.p) : ''}<br>
+        Zona: <b>${esc(z.zona)}</b><br>
+        ${p.e ? 'Asignado a: <b>' + esc(p.e) + '</b>' : '<span style="color:#b45309">Sin ejecutivo asignado</span>'}
+        <div style="margin-top:6px"><a href="/mantenedores/dealers/" target="_blank">ver en Base Dealer</a></div>
+      </div>`;
+      L.circleMarker(ll, { radius: 5, color: '#fff', weight: 1.5, fillColor: cZona, fillOpacity: .95 })
+        .bindTooltip(esc(Array.isArray(p) ? z.zona : (p.n || '')), { direction: 'top' })
+        .bindPopup(popDealer).addTo(AM_CAPA);
+      bounds.push(ll);
     });
     const mk = L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
     mk._zTotal = z.total;   // prioridad anticolisión: gana la zona con más dealers

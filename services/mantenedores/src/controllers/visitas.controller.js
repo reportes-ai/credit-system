@@ -511,8 +511,8 @@ const zonasMapa = async (req, res) => {
          FROM dealers WHERE ${fAct}`);
     const uni = dealers
       .filter(d => fTipo === 'AMBOS' || tipoDealer(d) === fTipo || tipoDealer(d) === 'AMBOS')
-      .map(d => ({ id_dealer: d.id_dealer, nombre: d.nombre, lat: d.lat, lng: d.lng,
-                   comuna: comunaDe(d) || 'SIN COMUNA' }));
+      .map(d => ({ id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, lat: d.lat, lng: d.lng,
+                   ccs_parque: d.ccs_parque, comuna: comunaDe(d) || 'SIN COMUNA' }));
     zonificar(uni);   // asigna d.zona con el MISMO motor de los checkboxes
     const [asig] = await pool.query(
       `SELECT a.id_dealer, a.id_usuario, CONCAT(u.nombre,' ',u.apellido) AS ejecutivo
@@ -524,8 +524,13 @@ const zonasMapa = async (req, res) => {
     for (const d of uni) {
       const z = (porZona[d.zona] = porZona[d.zona] || { zona: d.zona, total: 0, asignados: 0, lats: [], lngs: [], puntos: [], ejecutivos: {} });
       z.total++;
-      if (d.lat != null && d.lng != null) { z.lats.push(+d.lat); z.lngs.push(+d.lng); z.puntos.push([+d.lat, +d.lng]); }
       const ej = mAsig.get(d.id_dealer);
+      if (d.lat != null && d.lng != null) {
+        z.lats.push(+d.lat); z.lngs.push(+d.lng);
+        // punto con la ficha del dealer (para el popup individual del mapa)
+        z.puntos.push({ la: +d.lat, ln: +d.lng, id: d.id_dealer, n: d.nombre, r: d.rut,
+                        c: d.comuna, p: d.ccs_parque || null, e: ej || null });
+      }
       if (ej) { z.asignados++; z.ejecutivos[ej] = (z.ejecutivos[ej] || 0) + 1; }
     }
     const out = Object.values(porZona)
