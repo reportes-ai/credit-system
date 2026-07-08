@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calendario de Visitas — AutoFácil</title>
+  <title>Ruta AutoFácil — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -124,7 +124,7 @@
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/dealers/">Dealers</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600"><i class="bi bi-calendar-check me-1"></i>Calendario de Visitas</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-calendar-check me-1"></i>Ruta AutoFácil</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -144,7 +144,7 @@
   <div class="page-banner">
     <i class="bi bi-calendar-check"></i>
     <div>
-      <h2>Calendario de Visitas de Concesionarios</h2>
+      <h2>Ruta AutoFácil — Visitas a Concesionarios</h2>
       <p>Agenda tus visitas respetando el cupo diario, registra el resultado de cada gestión y haz seguimiento.</p>
     </div>
   </div>
@@ -153,7 +153,7 @@
     <button class="tab" id="tabPlan" onclick="setTab('plan')"><i class="bi bi-signpost-split"></i> Planificador de rutas</button>
     <button class="tab on" id="tabCal" onclick="setTab('cal')"><i class="bi bi-calendar3"></i> Calendario</button>
     <button class="tab" id="tabBit" onclick="setTab('bit')"><i class="bi bi-journal-text"></i> Gestiones</button>
-    <button class="tab hide" id="tabAsig" onclick="setTab('asig')"><i class="bi bi-diagram-3"></i> Asignación de Cartera</button>
+    <button class="tab hide" id="tabAsig" onclick="setTab('asig')"><i class="bi bi-diagram-3"></i> Asignación de Dealers</button>
     <button class="tab" id="tabStats" onclick="setTab('stats')"><i class="bi bi-graph-up-arrow"></i> Estadísticas</button>
     <button class="tab hide" id="tabCfg" onclick="setTab('cfg')"><i class="bi bi-sliders"></i> Configuración</button>
   </div>
@@ -253,7 +253,7 @@
 
   <!-- ── Asignación de Cartera (supervisores/jefe/gerente) ── -->
   <div id="viewAsig" class="panel hide">
-    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-diagram-3 me-1" style="color:#0e7490"></i>Asignación masiva de cartera</h5>
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:4px"><i class="bi bi-diagram-3 me-1" style="color:#0e7490"></i>Asignación Masiva de Dealers</h5>
     <p style="font-size:.83rem;color:#64748b;margin-bottom:14px">Reparte los dealers entre los ejecutivos seleccionados por zona/comuna y el sistema les genera el calendario de visitas del plan. Un dealer solo puede estar asignado a UN ejecutivo.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px;align-items:end">
       <div class="fld" style="margin:0"><label>Nombre del plan</label><input id="amNombre" placeholder="Ej: Cartera RM Julio"></div>
@@ -263,6 +263,8 @@
       <div class="fld" style="margin:0"><label>Visitas por día</label><input type="number" id="amVisDia" min="1" max="50" value="4"></div>
       <div class="fld" style="margin:0"><label>Dealers</label>
         <select id="amEstado" onchange="cargarZonas()"><option value="todos">Todos</option><option value="activos">Solo activos</option><option value="inactivos">Solo inactivos</option></select></div>
+      <div class="fld" style="margin:0"><label>Tipo</label>
+        <select id="amTipo" onchange="cargarZonas()"><option value="ambos">Ambos</option><option value="calle">Calle</option><option value="parque">Parques</option></select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
       <div class="fld" style="margin:0"><label>Ejecutivos incluidos (checkbox)</label>
@@ -1095,7 +1097,8 @@ async function cargarZonas(){
   const marcadas = new Set([...document.querySelectorAll('.amCom:checked')].map(i=>i.value));
   cont.innerHTML = 'Cargando…';
   const qs = new URLSearchParams({ estado: document.getElementById('amEstado').value,
-    meses: document.getElementById('amMeses').value || 0 });
+    meses: document.getElementById('amMeses').value || 0,
+    tipo: document.getElementById('amTipo').value });
   const r = await fetch('/api/visitas/zonas?'+qs, { headers: hdr() });
   const j = await r.json();
   if (!j.success) { cont.textContent = j.error; return; }
@@ -1113,6 +1116,7 @@ function paramsMasiva(simular){
     fecha_cierre: document.getElementById('amCierre').value,
     meses_ultima_visita: +document.getElementById('amMeses').value || 0,
     estado: document.getElementById('amEstado').value,
+    tipo: document.getElementById('amTipo').value,
     visitas_dia: +document.getElementById('amVisDia').value || CFG.visitas_dia,
     dias_semana: [...document.querySelectorAll('#amDias input:checked')].map(i=>+i.value),
     ejecutivos: [...document.querySelectorAll('.amEj:checked')].map(i=>+i.value),

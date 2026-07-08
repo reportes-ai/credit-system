@@ -164,8 +164,20 @@ function pasa(d){
   const cat = d.categoria_asignada||d.categoria_propuesta||'';
   if ($('fCat').value && cat !== $('fCat').value) return false;
   if ($('fParque').value && d.ccs_parque !== $('fParque').value) return false;
-  if ($('fTipo').value && String(d.tipo_ficha||'').toUpperCase() !== $('fTipo').value) return false;
+  if ($('fTipo').value) {
+    const t = tipoDealer(d), f = $('fTipo').value;
+    // GENERAL/PARQUE incluyen a los AMBOS; el filtro AMBOS es exacto
+    if (f === 'AMBOS' ? t !== 'AMBOS' : (t !== f && t !== 'AMBOS')) return false;
+  }
   return true;
+}
+/* Tipo efectivo del dealer: la ficha manda; sin ficha se deriva del CCS/Parque
+   (misma regla de Base Dealer y del dashboard: sin parque / CALLE / NO APLICA = calle). */
+function tipoDealer(d){
+  const tf = String(d.tipo_ficha||'').trim().toUpperCase();
+  if (tf) return tf;
+  const p = String(d.ccs_parque||'').trim().toUpperCase();
+  return (!p || p === 'CALLE' || p === 'NO APLICA' || p === 'PARTICULAR') ? 'GENERAL' : 'PARQUE';
 }
 function popupHTML(d, esParque, lat, lng){
   const cat = d.categoria_asignada||d.categoria_propuesta;

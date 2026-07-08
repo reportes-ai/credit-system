@@ -187,7 +187,7 @@
       <i class="bi bi-graph-up-arrow"></i><div><b>POTENCIAL PARQUE/DEALER</b><span>Cuánto más podría crecer AutoFácil con cada dealer. Abre un parque para ver sus dealers.</span></div>
     </button>
     <button class="vtab" id="tabVisitas" style="display:none" onclick="location.href='/dealers-visitas/'">
-      <i class="bi bi-calendar-check"></i><div><b>CALENDARIO DE VISITAS</b><span>Agenda visitas a concesionarios, registra el resultado de cada gestión y haz seguimiento.</span></div>
+      <i class="bi bi-calendar-check"></i><div><b>RUTA AUTOFACIL</b><span>Agenda visitas a concesionarios, registra el resultado de cada gestión y haz seguimiento.</span></div>
     </button>
   </div>
 
@@ -484,7 +484,7 @@ let pag = 1, totalRows = 0, debTimer, dealerActual = null;
 const esAdmin = yo?.perfil === 'Administrador';
 let puedeEditarDealer = esAdmin;
 async function cargarPermisos(){
-  // Card Calendario de Visitas: visible para Admin o quien tenga permiso de visitas.
+  // Card Ruta AutoFácil (ex Calendario de Visitas): visible para Admin o quien tenga permiso de visitas.
   try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
     const fs = j.funcionalidades||[];
     if (esAdmin || fs.includes('dealer_ficha_revisar')) puedeEditarDealer = true;

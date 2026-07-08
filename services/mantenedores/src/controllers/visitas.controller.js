@@ -77,10 +77,13 @@ const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
              SELECT id_perfil, ?, 1 FROM perfiles WHERE ${filtroPerfiles}`, [idF]);
         return idF;
       };
-      await ensure('Visitas de Dealers — gestionar', 'visitas_dealers',
+      await ensure('Ruta AutoFácil — gestionar', 'visitas_dealers',
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%' OR nombre LIKE 'Ejecutivo%' OR nombre LIKE 'Comercial%'");
-      await ensure('Visitas de Dealers — supervisar', 'visitas_supervisar',
+      await ensure('Ruta AutoFácil — supervisar', 'visitas_supervisar',
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%'");
+      // Renombre v99.6: "Visitas de Dealers" → "Ruta AutoFácil" (mismos códigos/permisos)
+      await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — gestionar' WHERE codigo='visitas_dealers' AND nombre<>'Ruta AutoFácil — gestionar'");
+      await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — supervisar' WHERE codigo='visitas_supervisar' AND nombre<>'Ruta AutoFácil — supervisar'");
     }
     /* ── Cartera de dealers: planes de asignación + asignaciones ──
        Un dealer solo puede tener UNA asignación ACTIVA (se valida en código). */
@@ -395,18 +398,29 @@ function zonificar(cands, objetivo = 25) {
 
 /* Candidatos a asignar: sin asignación ACTIVA, filtro estado (todos por
    defecto) + comuna/zona + plazo en meses desde la última visita (0 = todos). */
-async function candidatosCartera({ comunas = [], meses = 0, estado = 'todos' }) {
+/* Tipo efectivo del dealer: la ficha manda; sin ficha se deriva del CCS/Parque
+   (misma regla de Base Dealer, mapa y dashboard: sin parque / CALLE / NO APLICA = calle). */
+function tipoDealer(d) {
+  const tf = String(d.tipo_ficha || '').trim().toUpperCase();
+  if (tf) return tf === 'GENERAL' ? 'CALLE' : tf;
+  const p = String(d.ccs_parque || '').trim().toUpperCase();
+  return (!p || p === 'CALLE' || p === 'NO APLICA' || p === 'PARTICULAR') ? 'CALLE' : 'PARQUE';
+}
+
+async function candidatosCartera({ comunas = [], meses = 0, estado = 'todos', tipo = 'ambos' }) {
   const fAct = estado === 'activos' ? 'activo=1' : estado === 'inactivos' ? 'activo=0' : '1=1';
   const [dealers] = await pool.query(
     `SELECT id_dealer, rut,
             COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
-            comuna, comuna_parque, geo_dir, lat, lng
+            comuna, comuna_parque, geo_dir, lat, lng, ccs_parque, tipo_ficha
        FROM dealers WHERE ${fAct}`);
   const [asig] = await pool.query("SELECT id_dealer FROM visitas_asignaciones WHERE estado='ACTIVA'");
   const ocupados = new Set(asig.map(a => a.id_dealer));
   const mUlt = await ultimaVisitaMap();
   const limite = meses > 0 ? Date.now() - meses * 30.44 * 86400000 : null;
+  const fTipo = String(tipo || 'ambos').toUpperCase();   // CALLE | PARQUE | AMBOS(=todos)
   let cands = dealers
+    .filter(d => fTipo === 'AMBOS' || tipoDealer(d) === fTipo || tipoDealer(d) === 'AMBOS')
     .map(d => ({ id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre, comuna: comunaDe(d) || 'SIN COMUNA',
                  lat: d.lat, lng: d.lng, ultima_visita: mUlt.get(d.id_dealer) || null }))
     .filter(d => !ocupados.has(d.id_dealer))
@@ -422,7 +436,8 @@ const zonasCartera = async (req, res) => {
   try {
     const { zonas } = await candidatosCartera({
       meses: Math.max(0, parseInt(req.query.meses, 10) || 0),
-      estado: ['activos', 'inactivos'].includes(req.query.estado) ? req.query.estado : 'todos' });
+      estado: ['activos', 'inactivos'].includes(req.query.estado) ? req.query.estado : 'todos',
+      tipo: ['calle', 'parque'].includes(String(req.query.tipo || '').toLowerCase()) ? req.query.tipo : 'ambos' });
     ok(res, zonas);
   } catch (e) { console.error('[visitas zonas]', e); err(res, 500, 'Error interno del servidor'); }
 };
@@ -452,7 +467,8 @@ const asignacionMasiva = async (req, res) => {
     const nomEjec = new Map(us.map(u => [u.id_usuario, u.nombre]));
     if (nomEjec.size !== ejecIds.length) return err(res, 400, 'Hay ejecutivos inexistentes.');
 
-    const { cands: cand } = await candidatosCartera({ comunas: b.comunas, meses, estado });
+    const tipoAsig = ['calle', 'parque'].includes(String(b.tipo || '').toLowerCase()) ? b.tipo : 'ambos';
+    const { cands: cand } = await candidatosCartera({ comunas: b.comunas, meses, estado, tipo: tipoAsig });
     if (!cand.length) return err(res, 400, 'No hay dealers candidatos con esos filtros (¿ya están todos asignados?).');
 
     // Reparto por BLOQUES DE COMUNA/ZONA (coherencia geográfica): cada bloque
