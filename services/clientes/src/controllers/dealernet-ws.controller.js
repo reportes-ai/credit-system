@@ -356,10 +356,21 @@ async function consultarCentral({ ruts, productos, tipocns = TIPOCNS_DEF }) {
   const usr = process.env.DEALERNET_USER, pwd = process.env.DEALERNET_PASS;
   if (!usr || !pwd) { const e = new Error('Credenciales DealerNet no configuradas (env DEALERNET_USER/DEALERNET_PASS)'); e.code = 'NOCREDS'; throw e; }
   const envelope = buildEnvelope({ usr, pwd, ruts, productos, tipocns });
-  const resp = await axios.post(ENDPOINT, envelope, {
-    headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': SOAP_ACTION },
-    timeout: 30000, responseType: 'text', transformResponse: x => x,
-  });
+  let resp;
+  try {
+    resp = await axios.post(ENDPOINT, envelope, {
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': SOAP_ACTION },
+      timeout: 30000, responseType: 'text', transformResponse: x => x,
+    });
+  } catch (e) {
+    // Error legible para el usuario: timeout, HTTP o SOAP fault (sin filtrar internals)
+    if (e.code === 'ECONNABORTED') throw new Error('DealerNet no respondió dentro de 30 segundos (timeout)');
+    if (e.response) {
+      const fault = String(e.response.data || '').match(/<faultstring>([\s\S]*?)<\/faultstring>/i);
+      throw new Error(`DealerNet respondió HTTP ${e.response.status}${fault ? ': ' + fault[1].trim().slice(0, 200) : ''}`);
+    }
+    throw new Error('Sin conexión con DealerNet: ' + e.message);
+  }
   const raw = String(resp.data || '');
   let retcode = null, retmsg = null, output = null, parsed = null;
   try {

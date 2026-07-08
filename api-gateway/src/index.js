@@ -26,15 +26,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(require('../../shared/presencia').middleware); // telemetría "conectados" (Cuadro de Mando)
 
 // ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
-// (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado")
+// (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado".
+//  Los 502/503 también pasan: describen un servicio EXTERNO caído —
+//  p.ej. "No se pudo contactar a DealerNet" — y el usuario necesita saberlo)
 const alertar500 = require('../../shared/alerta-errores');
 app.use((req, res, next) => {
   const _json = res.json.bind(res);
   res.json = (body) => {
     if (res.statusCode >= 500 && body && body.error) {
-      console.error(`[500] ${req.method} ${req.originalUrl} →`, body.error);
+      console.error(`[${res.statusCode}] ${req.method} ${req.originalUrl} →`, body.error);
       alertar500(req, body.error); // correo al admin (throttled), no bloquea la respuesta
-      body = { ...body, error: 'Error interno del servidor. Si persiste, contacta al administrador.' };
+      if (res.statusCode === 500)
+        body = { ...body, error: 'Error interno del servidor. Si persiste, contacta al administrador.' };
     }
     return _json(body);
   };
