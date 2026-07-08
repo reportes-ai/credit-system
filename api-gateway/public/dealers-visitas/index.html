@@ -1222,13 +1222,24 @@ async function cargarZonas(){
   cont.innerHTML = j.data.length ? j.data.map(z=>
     `<label style="display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer">
       <input type="checkbox" class="amCom" value="${esc(z.zona)}" ${marcadas.has(z.zona)?'checked':''}>
-      ${esc(z.zona)} <b style="margin-left:auto;color:#0141A2">${z.n}</b></label>`).join('')
+      ${esc(z.zona)}
+      <i class="bi bi-geo-alt-fill" title="Ver en el mapa" style="color:#0255c5;cursor:pointer"
+         onclick="event.preventDefault();event.stopPropagation();verZonaEnMapa('${esc(z.zona).replace(/'/g,"\\'")}')"></i>
+      <b style="margin-left:auto;color:#0141A2">${z.n}</b></label>`).join('')
     : 'Sin dealers candidatos con estos filtros';
   cargarZonasMapa();
 }
 
 /* ── Asignación por mapa: zonas con etiqueta ASIGNADOS n/total ── */
-let AM_MAP = null, AM_CAPA = null, AM_LABELS = [];
+let AM_MAP = null, AM_CAPA = null, AM_LABELS = [], AM_POR_NOMBRE = {};
+/* Centra el mapa en una zona de la lista y abre su tarjeta */
+function verZonaEnMapa(zona){
+  const mk = AM_POR_NOMBRE[zona];
+  if (!AM_MAP || !mk) { alert('Esa zona no tiene dealers geocodificados para mostrar.'); return; }
+  document.getElementById('amMapa').scrollIntoView({ behavior:'smooth', block:'center' });
+  AM_MAP.flyTo(mk.getLatLng(), Math.max(AM_MAP.getZoom(), 13), { duration: .8 });
+  setTimeout(()=>{ const el = mk.getElement && mk.getElement(); if (el) el.style.display=''; mk.openPopup(); }, 900);
+}
 /* Anticolisión de etiquetas: se muestran solo las que NO chocan con otra ya
    visible (prioridad: zonas con más dealers). Las tapadas quedan como punto
    de color con tooltip — al acercar el zoom van apareciendo solas. */
@@ -1279,7 +1290,7 @@ async function cargarZonasMapa(){
   const r = await fetch('/api/visitas/zonas-mapa?'+qs, { headers: hdr() });
   const j = await r.json();
   if (!j.success) return;
-  AM_CAPA.clearLayers(); AM_LABELS = [];
+  AM_CAPA.clearLayers(); AM_LABELS = []; AM_POR_NOMBRE = {};
   const bounds = [];
   // Bordes oficiales de las comunas presentes en las zonas (GeoJSON local).
   // El GeoJSON trae '�' en las letras acentuadas → se compara tratándolo
@@ -1324,6 +1335,7 @@ async function cargarZonasMapa(){
     const mk = L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
     mk._zTotal = z.total;   // prioridad anticolisión: gana la zona con más dealers
     AM_LABELS.push(mk);
+    AM_POR_NOMBRE[z.zona] = mk;
     // punto pequeño siempre visible: representa la zona cuando su etiqueta está tapada
     L.circleMarker([z.lat, z.lng], { radius: 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1 })
       .bindTooltip(`${z.zona} — ASIGNADOS ${z.asignados}/${z.total}`, { direction: 'top' })
