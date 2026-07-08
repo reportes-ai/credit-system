@@ -411,7 +411,7 @@ function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled
 
 /* ── Ver / Descargar ─────────────────────────────────────────────────────── */
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
-const FTE = { '16':'Digitación', '107':'DealerNET', '110':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
+const FTE = { '16':'Digitación', '107':'Digitación', '110':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
 const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
 const LOGO_DN = (location && location.origin ? location.origin : '') + '/img/logo-dealernet.png';
 const REPORT_CSS = `
@@ -497,6 +497,36 @@ function tblVehiculos(nodo){
   return '<table class="rep-tb"><thead><tr><th>Patente</th><th>Marca / Modelo</th><th>Año</th></tr></thead><tbody>'+
     ds.map(v=>'<tr><td>'+esc(v.patente)+'</td><td>'+esc((v.marca||'')+' / '+(v.modelo||''))+'</td><td>'+esc(v.agno)+'</td></tr>').join('')+'</tbody></table>';
 }
+const dinero = v => (v==null||v===''||isNaN(v)) ? '--' : '$ '+Number(v).toLocaleString('es-CL');
+// Resumen activos (formato DealerNet): filas Propiedades / Vehículos + Total
+function tblResumenActivos(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const by = {}; ds.forEach(x=>by[String(x.tipo).toUpperCase()]=x);
+  const dirs = by['DIRECCION'], autos = by['AUTO'];
+  const totCant = ds.reduce((s,x)=>s+(Number(x.cantidad)||0),0);
+  const totMonto = ds.reduce((s,x)=>s+(Number(x.monto)||0),0);
+  const row = (lbl,x)=>'<tr><td>'+lbl+'</td><td style="text-align:right">'+(x?esc(String(x.cantidad)):'--')+'</td><td style="text-align:right">'+(x?dinero(x.monto):'--')+'</td></tr>';
+  return '<table class="rep-tb"><thead><tr><th></th><th style="text-align:right">Cantidad</th><th style="text-align:right">Avalúo Fiscal</th></tr></thead><tbody>'+
+    row('PROPIEDADES',dirs)+row('VEHÍCULOS MOTORIZADOS',autos)+
+    '<tr><td><b>Total Activos</b></td><td style="text-align:right"><b>'+totCant+'</b></td><td style="text-align:right"><b>'+dinero(totMonto)+'</b></td></tr></tbody></table>';
+}
+// Propiedades (vigentes/históricas): dirección, ubicación, rol, avalúo, relación
+function tblPropiedades(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const tot = ds.reduce((s,x)=>s+(Number(x.avaluo_fiscal)||0),0);
+  return '<table class="rep-tb"><thead><tr><th>Dirección</th><th>Ubicación</th><th>Rol</th><th style="text-align:right">Avalúo Fiscal</th><th>Relación</th></tr></thead><tbody>'+
+    ds.map(p=>'<tr><td>'+esc(p.direccion||'')+'</td><td>'+esc(p.ubicacion||'')+'</td><td>'+esc(p.rol||'')+'</td>'+
+      '<td style="text-align:right">'+dinero(p.avaluo_fiscal)+'</td><td>'+relList(p.relacionados)+'</td></tr>').join('')+
+    (tot?'<tr><td colspan="3"><b>Total Avalúo</b></td><td style="text-align:right"><b>'+dinero(tot)+'</b></td><td></td></tr>':'')+'</tbody></table>';
+}
+// Vehículos vigentes: con avalúo fiscal + total (los históricos van sin avalúo)
+function tblVehiculosVig(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const tot = ds.reduce((s,x)=>s+(Number(x.avaluo)||0),0);
+  return '<table class="rep-tb"><thead><tr><th>Patente</th><th>Marca / Modelo</th><th>Año</th><th style="text-align:right">Avalúo Fiscal</th></tr></thead><tbody>'+
+    ds.map(v=>'<tr><td>'+esc(v.patente)+'</td><td>'+esc((v.marca||'')+' / '+(v.modelo||''))+'</td><td>'+esc(v.agno)+'</td><td style="text-align:right">'+dinero(v.avaluo)+'</td></tr>').join('')+
+    (tot?'<tr><td colspan="3"><b>Total Avalúo</b></td><td style="text-align:right"><b>'+dinero(tot)+'</b></td></tr>':'')+'</tbody></table>';
+}
 function tblRelacionados(nodo){
   const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
   return '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>Relación</th></tr></thead><tbody>'+
@@ -578,16 +608,18 @@ function bodyComportamientoExt(prd, d, cod){
   const cfg = CE_CFG[cod]; if(!cfg) return noinfo();
   const r = prd[cfg.root] || {}; const cab = r[cfg.cab] || {}; const periodos = arr(r[cfg.det]);
   if(!periodos.length && cab['@_anomes']==null) return noinfo();
-  const fmtMM = v => { const n=parseFloat(v); return isNaN(n) ? esc(String(v??'')) : n.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+  // Igual que el PDF DealerNet: el 0 se imprime "0", el resto con 2 decimales
+  const fmtMM = v => { const n=parseFloat(v); return isNaN(n) ? esc(String(v??'')) : (n===0 ? '0' : n.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})); };
   const titular = deepFind(prd,['nombre']) || '';
   let h = '<div class="rep-h">Resumen</div>'+
-    '<div class="rep-kv"><b>Nombre:</b> '+esc(titular||'—')+'</div>'+
-    '<div class="rep-kv"><b>RUT:</b> '+esc(d ? rutFmt(d.rut,d.dv) : '')+'</div>'+
+    (cod==='110' ? '<div class="rep-kv"><b>Nombre:</b> '+esc(titular||'—')+'</div>'+
+                   '<div class="rep-kv"><b>RUT:</b> '+esc(d ? rutFmt(d.rut,d.dv) : '')+'</div>' : '')+
     '<div class="rep-kv"><b>Mes/Año:</b> '+anomes(cab['@_anomes'])+'</div>'+
     '<div class="rep-kv"><b>Monto:</b> MM$ '+fmtMM(cab['@_deuda_total'])+'</div>';
-  // bloques de 9 períodos, como el PDF
-  for(let i=0; i<periodos.length; i+=9){
-    const blk = periodos.slice(i, i+9);
+  // bloques de períodos por página, como el PDF (Consolidado 12, Extendido 9)
+  const COLS = cod==='107' ? 12 : 9;
+  for(let i=0; i<periodos.length; i+=COLS){
+    const blk = periodos.slice(i, i+COLS);
     h += (i===0 ? '<div class="rep-h">Historial de Documentos MM$</div>' : '')+
       '<table class="rep-tb" style="margin-bottom:10px"><thead><tr><th>Variables/Periodos</th>'+
       blk.map(p=>'<th style="text-align:right">'+anomes(p['@_periodo'])+'</th>').join('')+'</tr></thead><tbody>'+
@@ -611,10 +643,17 @@ function bodyPerfilComercial(prd){
     ['EDAD', civ.edad!=null?civ.edad+' Años':''],['OCUPACIÓN', gp(civ,'ocupacion','profesion')],
     ['PERFIL SOCIO ECONÓMICO', civ.perfil_socioeconomico],['ESTADO CIVIL', civ.matrimonio_estado_civil],
     ['HIJOS', gp(civ,'asignacion_familiar','hijos')],['CÓNYUGE', gp(civ,'asignacion_familiar','conyuge')],
+    ['EX-CÓNYUGE', gp(civ,'asignacion_familiar','exconyuge')],
   ];
   const idHtml = '<table class="rep-tb"><tbody>'+idRows.map(([k,v])=>'<tr><th style="width:42%">'+k+'</th><td>'+esc(v!=null&&v!==''?v:'—')+'</td></tr>').join('')+'</tbody></table>';
   let h = sec('Identificación', idHtml);
-  h += sec('Vehículos Motorizados Históricos', tblVehiculos(gp(titular,'activos','activo_detalle_vehiculo_historico')));
+  h += sec('Observaciones', (titular.observaciones ? '<div class="rep-tree">'+renderTree(titular.observaciones)+'</div>' : secEmpty()));
+  const act = gp(titular,'activos') || {};
+  h += sec('Resumen activos', tblResumenActivos(act.activos_resumen));
+  h += sec('Propiedades Vigentes', tblPropiedades(act.activo_detalle_direccion));
+  h += sec('Propiedades Históricas', tblPropiedades(act.activo_detalle_direccion_historico));
+  h += sec('Vehículos Motorizados Vigentes', tblVehiculosVig(act.activo_detalle_vehiculo));
+  h += sec('Vehículos Motorizados Históricos', tblVehiculos(act.activo_detalle_vehiculo_historico));
   h += sec('Teléfonos más probables de contacto', tblContactos(gp(colect,'telefonos','telefono_contacto_probable')));
   h += sec('Teléfonos alternativos', tblContactos(gp(colect,'telefonos','telefono_contacto_alternativo')));
   h += sec('Teléfonos laborales', tblContactos(gp(colect,'telefonos','telefono_contacto_laboral')));
