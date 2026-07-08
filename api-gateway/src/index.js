@@ -196,6 +196,7 @@ app.use('/api/servidor-hora',             require('../../services/mantenedores/s
 app.use('/api/db-maintenance',            require('../../services/mantenedores/src/routes/db-maintenance.routes'));
 app.use('/api/alertas-vencimiento',       require('../../services/mantenedores/src/routes/alertas.routes'));
 app.use('/api/meses-cerrados',            require('../../services/mantenedores/src/routes/meses-cerrados.routes'));
+app.use('/api/preaprobacion-politicas',   require('../../services/mantenedores/src/routes/preaprobacion.routes'));
 app.use('/api/tablas-dinamicas',          require('../../services/reporteria/src/routes/tablas-dinamicas.routes'));
 app.use('/api/bitacora',                  require('../../services/reporteria/src/routes/bitacora.routes'));
 app.use('/api/old-base-unica',            require('../../services/reporteria/src/routes/old-base-unica.routes'));
@@ -441,6 +442,7 @@ const PAGINAS = [
   [['/verificar', '/verificar/', '/verificar/:codigo'], 'verificar/index.html'],
   ['/certificados', 'certificados/index.html'],
   ['/mantenedores/certificados-textos', 'mantenedores/certificados-textos/index.html'],
+  ['/mantenedores/preaprobacion', 'mantenedores/preaprobacion/index.html'],
   ['/tesoreria/odp-cuotas', 'tesoreria/odp-cuotas.html'],
   ['/reporteria', 'reporteria/index.html'],
   ['/old-base-unica', 'old-base-unica/index.html'],

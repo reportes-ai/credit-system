@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!-- v100.6 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Políticas de Preaprobación — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:960px; margin:22px auto; padding:0 20px 70px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0255c5); border-radius:14px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; }
+    .banner h2 { font-weight:700; margin:0; font-size:1.15rem; }
+    .banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .card-x { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:16px; }
+    .card-x h5 { font-weight:800; color:#0f172a; font-size:.95rem; margin-bottom:12px; }
+    .fila { display:grid; grid-template-columns: 1fr 180px; gap:12px; align-items:center; padding:8px 0; border-bottom:1px dashed #eef2f7; }
+    .fila:last-child { border-bottom:none; }
+    .fila label { margin:0; font-size:.86rem; color:#1e293b; font-weight:600; }
+    .fila small { display:block; color:#94a3b8; font-weight:400; font-size:.74rem; }
+    .fila input, .fila select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.9rem; width:100%; }
+    .btn-save { background:#0255c5; color:#fff; border:none; border-radius:10px; padding:11px 26px; font-size:.92rem; font-weight:700; cursor:pointer; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid #0255c5; border-radius:8px; padding:14px 18px; margin-top:8px; font-size:.82rem; }
+    .footer-afecta ul { margin:8px 0 0; padding-left:18px; }
+    .footer-afecta li { margin-bottom:4px; }
+    #msg { font-size:.85rem; margin-left:12px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Políticas de Preaprobación',icon:'bi-patch-check',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-patch-check"></i>
+    <div>
+      <h2>Políticas de Preaprobación</h2>
+      <p>Variables de la preaprobación automática de créditos — un solo set de reglas para el Portal del Dealer y para el bot de WhatsApp (Facilito).</p>
+    </div>
+  </div>
+
+  <div class="card-x"><h5><i class="bi bi-sliders me-1"></i>Condiciones de la operación</h5><div id="grpOper"></div></div>
+  <div class="card-x"><h5><i class="bi bi-cash-stack me-1"></i>Renta y carga financiera</h5><div id="grpRenta"></div></div>
+  <div class="card-x"><h5><i class="bi bi-clipboard-data me-1"></i>Información comercial (umbrales de bloqueo)</h5><div id="grpInfo"></div></div>
+  <div class="card-x"><h5><i class="bi bi-whatsapp me-1"></i>WhatsApp — Facilito</h5><div id="grpWsp"></div></div>
+
+  <button class="btn-save" onclick="guardar()"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button><span id="msg"></span>
+
+  <div class="footer-afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Condiciones de la operación / Renta / Info comercial</b> → preaprobación automática del <a href="/portal-dealer/" target="_blank">Portal del Dealer</a> (botón "Pre-aprobar cliente": veredicto PREAPROBADO/REVISIÓN y cuotas ofrecidas).</li>
+      <li><b>Plazos</b> → plazos que se cotizan en la preaprobación del portal (el bot de WhatsApp usa sus tramos del guion).</li>
+      <li><b>WhatsApp — severidad máxima y pie exprés</b> → preevaluación del bot <a href="/whatsapp/" target="_blank">Facilito</a> (veredicto de la preevaluación DealerNet y mensaje de trámite exprés).</li>
+      <li><b>Antigüedad máx. default</b> → solo aplica si la <a href="/politica/" target="_blank">matriz de Política de Crédito</a> no define antigüedad para USADO; si la define, manda la matriz.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const H = { 'Content-Type':'application/json', Authorization: 'Bearer ' + sessionStorage.getItem('token') };
+const GRUPOS = {
+  grpOper:  ['precio_min','precio_max','antiguedad_max_default','plazos'],
+  grpRenta: ['carga_max_pct','tolerancia_renta_pct'],
+  grpInfo:  ['max_protestos','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada'],
+  grpWsp:   ['wsp_severidad_max','wsp_pie_expres_pct'],
+};
+const LBL = {
+  carga_max_pct:'Carga máxima (% de la renta)', plazos:'Plazos evaluados (meses, separados por coma)',
+  tolerancia_renta_pct:'Tolerancia renta declarada vs interna (%)', precio_min:'Precio mínimo del vehículo ($)',
+  precio_max:'Precio máximo del vehículo ($)', antiguedad_max_default:'Antigüedad máx. del vehículo (años, default)',
+  max_protestos:'Protestos vigentes permitidos', max_deuda_morosa:'Deuda morosa permitida ($)',
+  max_deuda_vencida:'Deuda vencida permitida ($)', max_deuda_castigada:'Deuda castigada permitida ($)',
+  wsp_severidad_max:'Severidad DealerNet máxima que preaprueba', wsp_pie_expres_pct:'Pie exprés (%)',
+};
+let DATA = [];
+async function cargar(){
+  const r = await fetch('/api/preaprobacion-politicas', { headers: H });
+  const j = await r.json();
+  if (!j.success) { document.getElementById('msg').textContent = j.error || 'Sin acceso'; return; }
+  DATA = j.data;
+  const byKey = {}; DATA.forEach(p => byKey[p.clave] = p);
+  for (const [grp, claves] of Object.entries(GRUPOS)) {
+    document.getElementById(grp).innerHTML = claves.map(k => {
+      const p = byKey[k] || { valor:'' };
+      const input = k === 'wsp_severidad_max'
+        ? `<select id="v_${k}">${['bueno','regular','malo'].map(s=>`<option ${p.valor===s?'selected':''}>${s}</option>`).join('')}</select>`
+        : `<input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}">`;
+      return `<div class="fila"><label>${LBL[k]||k}<small>${p.descripcion||''}</small></label>${input}</div>`;
+    }).join('');
+  }
+}
+async function guardar(){
+  const valores = {};
+  DATA.forEach(p => { const el = document.getElementById('v_'+p.clave); if (el) valores[p.clave] = el.value; });
+  const msg = document.getElementById('msg');
+  msg.textContent = 'Guardando…'; msg.style.color = '#64748b';
+  const r = await fetch('/api/preaprobacion-politicas', { method:'PUT', headers:H, body: JSON.stringify({ valores }) });
+  const j = await r.json();
+  if (j.success) { msg.textContent = '✓ Guardado (' + j.data.actualizados + ' parámetros). Rige en máx. 1 minuto.'; msg.style.color = '#16a34a'; }
+  else { msg.textContent = j.error || 'Error al guardar'; msg.style.color = '#dc2626'; }
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

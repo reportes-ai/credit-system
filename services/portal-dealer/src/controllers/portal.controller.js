@@ -585,13 +585,16 @@ const fmtCLP = n => '$' + Math.round(+n || 0).toLocaleString('es-CL');
 // POST /api/portal-dealer/preaprobacion  { rut, precio, pie, anio }
 exports.preaprobar = async (req, res) => {
   try {
+    // Políticas paramétricas (mantenedor Políticas de Preaprobación) — motor único
+    const { getPoliticas } = require('../../../../shared/preaprobacion-politicas');
+    const POL = await getPoliticas();
     const rut = AF_RUT.normalizar(req.body.rut);
     const precio = Math.round(+req.body.precio || 0);
     const pie = Math.round(+req.body.pie || 0);
     const anio = parseInt(req.body.anio) || 0;
     const hoyAnio = new Date().getFullYear();
     if (!rut || AF_RUT.validar(rut) !== true) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
-    if (!(precio >= 1000000 && precio <= 300000000)) return res.status(400).json({ success: false, data: null, error: 'Precio inválido' });
+    if (!(precio >= POL.precio_min && precio <= POL.precio_max)) return res.status(400).json({ success: false, data: null, error: 'Precio inválido' });
     if (!(pie >= 0 && pie < precio)) return res.status(400).json({ success: false, data: null, error: 'Pie inválido' });
     if (!(anio >= 1990 && anio <= hoyAnio + 1)) return res.status(400).json({ success: false, data: null, error: 'Año inválido' });
 
@@ -602,11 +605,11 @@ exports.preaprobar = async (req, res) => {
 
     // 1) Antigüedad del vehículo — política de aprobación (sin marca: criterio general USADO)
     const antig = hoyAnio - anio;
-    let antigMax = 7;
+    let antigMax = POL.antiguedad_max_default;
     try {
       const [pm] = await pool.query("SELECT MAX(antiguedad_vehiculo_max) mx FROM politica_aprobacion_matriz WHERE condicion='USADO'");
-      if (pm[0] && pm[0].mx != null) antigMax = parseInt(pm[0].mx) || 7;
-    } catch (e) { /* default 7 */ }
+      if (pm[0] && pm[0].mx != null) antigMax = parseInt(pm[0].mx) || POL.antiguedad_max_default;
+    } catch (e) { /* default del mantenedor */ }
     if (antig > antigMax) motivosPub.push('El vehículo año ' + anio + ' supera la antigüedad máxima financiable (' + antigMax + ' años)');
 
     // 2) Renta líquida: para el ANÁLISIS manda SIEMPRE la que informa el dealer
@@ -621,7 +624,7 @@ exports.preaprobar = async (req, res) => {
     if (!renta) motivos.push('Sin renta líquida (ni declarada por el dealer ni antecedentes internos)');
     // Nota informativa (NO bloquea): declarada vs interna difieren >20%
     const notas = [];
-    if (rentaDeclarada && rentaInterna && Math.abs(rentaDeclarada - rentaInterna) > rentaInterna * 0.2)
+    if (rentaDeclarada && rentaInterna && Math.abs(rentaDeclarada - rentaInterna) > rentaInterna * (POL.tolerancia_renta_pct / 100))
       notas.push('Nota: renta declarada (' + fmtCLP(rentaDeclarada) + ') difiere de la interna (' + fmtCLP(rentaInterna) + ') — verificar liquidaciones');
 
     // 3) Informes comerciales limpios
@@ -629,10 +632,10 @@ exports.preaprobar = async (req, res) => {
       "SELECT protestos_vigentes_q, deuda_morosa, deuda_vencida, deuda_castigada FROM informacion_comercial WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
     if (!ic) motivos.push('Sin información comercial del cliente en el sistema');
     else {
-      if (+ic.protestos_vigentes_q > 0) motivos.push('Protestos vigentes: ' + ic.protestos_vigentes_q);
-      if (+ic.deuda_morosa > 0) motivos.push('Deuda morosa: ' + fmtCLP(ic.deuda_morosa));
-      if (+ic.deuda_vencida > 0) motivos.push('Deuda vencida: ' + fmtCLP(ic.deuda_vencida));
-      if (+ic.deuda_castigada > 0) motivos.push('Deuda castigada: ' + fmtCLP(ic.deuda_castigada));
+      if (+ic.protestos_vigentes_q > POL.max_protestos) motivos.push('Protestos vigentes: ' + ic.protestos_vigentes_q);
+      if (+ic.deuda_morosa > POL.max_deuda_morosa) motivos.push('Deuda morosa: ' + fmtCLP(ic.deuda_morosa));
+      if (+ic.deuda_vencida > POL.max_deuda_vencida) motivos.push('Deuda vencida: ' + fmtCLP(ic.deuda_vencida));
+      if (+ic.deuda_castigada > POL.max_deuda_castigada) motivos.push('Deuda castigada: ' + fmtCLP(ic.deuda_castigada));
     }
 
     // 4) Cuotas con el MOTOR ÚNICO + elegibilidad AutoFin + carga ≤30% renta
@@ -641,9 +644,9 @@ exports.preaprobar = async (req, res) => {
     const uf = await getUF(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }));
     const opciones = [];
     if (!motivos.length && !motivosPub.length) {
-      const topeCuota = renta * 0.30;
+      const topeCuota = renta * (POL.carga_max_pct / 100);
       let algunaElegible = false;
-      for (const n of [12, 24, 36, 48]) {
+      for (const n of POL.plazosArr) {
         const c = await cotizarCuota(precio, pie, n);
         if (!c) continue;
         if (!(await autofinElegible(n, saldo, uf))) continue;
@@ -651,7 +654,7 @@ exports.preaprobar = async (req, res) => {
         if (c.cuota <= topeCuota) opciones.push({ plazo: n, cuota: c.cuota });
       }
       if (!algunaElegible) motivosPub.push('El monto a financiar (' + fmtCLP(saldo) + ') está fuera del rango elegible para esta línea');
-      else if (!opciones.length) motivos.push('Cuota supera el 30% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(renta * 0.30) + ')');
+      else if (!opciones.length) motivos.push('Cuota supera el ' + POL.carga_max_pct + '% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(topeCuota) + ')');
     }
 
     const resultado = (!motivos.length && !motivosPub.length && opciones.length) ? 'PREAPROBADO' : 'REVISION';

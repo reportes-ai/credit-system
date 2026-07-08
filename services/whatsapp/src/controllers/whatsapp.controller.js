@@ -375,6 +375,13 @@ async function preEvaluar(rutRaw, piePct, plazo) {
   if (!disponibles.length) return { error: r.error || 'SIN_INFORMES' };
   const SEV = ['bueno', 'regular', 'malo', 'grave'];
   const peor = disponibles.reduce((a, i) => Math.max(a, SEV.indexOf(i.severidad)), 0);
+  // Umbral paramétrico (mantenedor Políticas de Preaprobación): peor severidad que aún preaprueba
+  let sevMax = 1;
+  try {
+    const { getPoliticas } = require('../../../../shared/preaprobacion-politicas');
+    const idx = SEV.indexOf((await getPoliticas()).wsp_severidad_max);
+    if (idx >= 0) sevMax = idx;
+  } catch (_) {}
   // Reporte Crediticio Automático (Business Suite): genera y persiste el análisis IA
   // en el repositorio existente ia_informes_dealernet (motor único analizarRut, lee los
   // informes ya traídos — no re-consulta DealerNet). En segundo plano, no frena el chat.
@@ -390,7 +397,7 @@ async function preEvaluar(rutRaw, piePct, plazo) {
       }
     } catch (e) { console.error('[wsp reporte-ia]', e.message); }
   })();
-  return { rut: m[1] + '-' + m[2], ok: peor <= 1, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
+  return { rut: m[1] + '-' + m[2], ok: peor <= sevMax, severidad: SEV[peor], pie_pct: +piePct || null, plazo: +plazo || null };
 }
 
 /* ── Plantillas HSM: gestor in-app contra la Graph API de Meta ────────────────
@@ -714,10 +721,12 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         conv.rut_cliente = conv.rut_cliente || ev.rut;
         // Con el RUT recién conocido, la cotización previa de la conversación va al repositorio
         guardarCotizacionBot(conv);
-        if (ev.ok && ev.pie_pct >= 40) {
+        let pieExpres = 40;
+        try { const { getPoliticas } = require('../../../../shared/preaprobacion-politicas'); pieExpres = (await getPoliticas()).wsp_pie_expres_pct; } catch (_) {}
+        if (ev.ok && ev.pie_pct >= pieExpres) {
           respuesta += '\n\n🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del ' + Math.round(ev.pie_pct) + '% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?';
         } else if (ev.ok) {
-          respuesta += '\n\n🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del 40%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?';
+          respuesta += '\n\n🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del ' + pieExpres + '%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?';
         } else {
           respuesta += '\n\nUy, parece que el sistema presenta problemas para completar la preevaluación en este momento 🙈 ¿Quieres que te contacte un Ejecutivo Comercial?';
         }
