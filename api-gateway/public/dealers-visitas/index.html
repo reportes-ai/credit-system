@@ -1229,10 +1229,20 @@ async function cargarZonas(){
 
 /* ── Asignación por mapa: zonas con etiqueta ASIGNADOS n/total ── */
 let AM_MAP = null, AM_CAPA = null, AM_LABELS = [];
+/* Anticolisión de etiquetas: se muestran solo las que NO chocan con otra ya
+   visible (prioridad: zonas con más dealers). Las tapadas quedan como punto
+   de color con tooltip — al acercar el zoom van apareciendo solas. */
 function toggleEtiquetasZona(){
   if (!AM_MAP) return;
-  const show = AM_MAP.getZoom() >= 9;   // en zoom país las etiquetas se amontonan → solo el punto
-  AM_LABELS.forEach(m => { const el = m.getElement && m.getElement(); if (el) el.style.display = show ? '' : 'none'; });
+  const W = 125, H = 42;   // caja aproximada de una etiqueta en px
+  const puestas = [];
+  [...AM_LABELS].sort((a,b)=>(b._zTotal||0)-(a._zTotal||0)).forEach(m=>{
+    const el = m.getElement && m.getElement(); if (!el) return;
+    const p = AM_MAP.latLngToContainerPoint(m.getLatLng());
+    const choca = puestas.some(q => Math.abs(q.x-p.x) < W && Math.abs(q.y-p.y) < H);
+    el.style.display = choca ? 'none' : '';
+    if (!choca) puestas.push(p);
+  });
 }
 function initAmMapa(){
   if (AM_MAP) { setTimeout(()=>AM_MAP.invalidateSize(), 150); return; }
@@ -1241,6 +1251,7 @@ function initAmMapa(){
     { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(AM_MAP);
   AM_CAPA = L.layerGroup().addTo(AM_MAP);
   AM_MAP.on('zoomend', toggleEtiquetasZona);
+  AM_MAP.on('moveend', toggleEtiquetasZona);
 }
 /* Color estable por nombre (hash → paleta) */
 const AM_PALETA = ['#e11d48','#0255c5','#16a34a','#f59e0b','#7c3aed','#0141A2','#db2777','#65a30d','#dc2626','#4f46e5','#b45309','#059669'];
@@ -1311,9 +1322,11 @@ async function cargarZonasMapa(){
       bounds.push(p);
     });
     const mk = L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
+    mk._zTotal = z.total;   // prioridad anticolisión: gana la zona con más dealers
     AM_LABELS.push(mk);
-    // punto pequeño siempre visible: representa la zona cuando la etiqueta se oculta (zoom lejano)
+    // punto pequeño siempre visible: representa la zona cuando su etiqueta está tapada
     L.circleMarker([z.lat, z.lng], { radius: 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1 })
+      .bindTooltip(`${z.zona} — ASIGNADOS ${z.asignados}/${z.total}`, { direction: 'top' })
       .bindPopup(pop).addTo(AM_CAPA);
     bounds.push([z.lat, z.lng]);
   });
