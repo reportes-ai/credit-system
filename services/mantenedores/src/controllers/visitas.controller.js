@@ -374,8 +374,22 @@ function zonificar(cands, objetivo = 25) {
   for (const [com, ds] of Object.entries(porComuna)) {
     const k = Math.min(4, Math.ceil(ds.length / objetivo));
     if (k <= 1) { ds.forEach(d => d.zona = com); zonas.push({ zona: com, n: ds.length }); continue; }
-    const conGeo = ds.filter(d => d.lat != null && d.lng != null);
+    let conGeo = ds.filter(d => d.lat != null && d.lng != null);
     const sinGeo = ds.filter(d => d.lat == null || d.lng == null);
+    // OUTLIERS: dealer con comuna X pero coordenadas a >12 km del centro de la
+    // comuna = geocodificación o comuna mal informada. Se separan en su propia
+    // zona "Revisar ubicación" para no deformar los territorios reales.
+    if (conGeo.length >= 3) {
+      const cLat = mediana(conGeo.map(d => +d.lat)), cLng = mediana(conGeo.map(d => +d.lng));
+      const kmDe = d => Math.hypot((+d.lat - cLat) * 111, (+d.lng - cLng) * 111 * Math.cos(cLat * Math.PI / 180));
+      const lejos = conGeo.filter(d => kmDe(d) > 12);
+      if (lejos.length && lejos.length < conGeo.length) {
+        conGeo = conGeo.filter(d => kmDe(d) <= 12);
+        const z = `${com} — Revisar ubicación`;
+        lejos.forEach(d => d.zona = z);
+        zonas.push({ zona: z, n: lejos.length });
+      }
+    }
     // Partición TERRITORIAL (k-means balanceado): cada zona es un territorio
     // compacto alrededor de un centro — como países vecinos, las zonas limitan
     // entre sí y no se sobreponen (frontera implícita = punto medio entre centros),
@@ -420,9 +434,11 @@ function zonificar(cands, objetivo = 25) {
       const idx = cents.map((c, i) => ({ c, i })).sort((a, b) => a.c.x - b.c.x).map(z => z.i);
       return idx.map(i => grupos[i].map(p => p.d));
     };
-    const grupos = partir(conGeo, k);
-    while (grupos.length < k) grupos.push([]);
-    sinGeo.forEach((d, i) => grupos[i % k].push(d));   // sin coordenadas: repartidos
+    // k recalculado tras sacar outliers (una comuna puede ya no necesitar tantas zonas)
+    const k2 = Math.max(1, Math.min(k, Math.ceil((conGeo.length + sinGeo.length) / objetivo)));
+    const grupos = partir(conGeo, k2);
+    while (grupos.length < k2) grupos.push([]);
+    sinGeo.forEach((d, i) => grupos[i % k2].push(d));   // sin coordenadas: repartidos
     grupos.forEach((g, i) => {
       const z = `${com} — Zona ${i + 1}`;
       g.forEach(d => d.zona = z);
