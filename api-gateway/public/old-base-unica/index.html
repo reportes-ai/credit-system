@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v99.4 -->
+<!-- v99.5 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -21,6 +21,10 @@
     .btn-xls { background:#1d6f42; color:#fff; border:none; border-radius:10px; padding:9px 18px; font-size:.85rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; margin-left:auto; }
     .btn-xls:disabled { opacity:.6; }
     .btn-clear { background:#fff; color:#b91c1c; border:1.5px solid #fecaca; border-radius:10px; padding:9px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-quick { background:#fff; color:#0141A2; border:1.5px solid #c7d7ee; border-radius:10px; padding:9px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    .btn-quick.on { background:#0255c5; color:#fff; border-color:#0255c5; }
+    .qk-mes { background:#fff; color:#0141A2; border:1.5px solid #c7d7ee; border-radius:10px; padding:8px 10px; font-size:.8rem; font-weight:700; cursor:pointer; outline:none; }
+    .qk-mes.on { background:#0255c5; color:#fff; border-color:#0255c5; }
     .grid-card { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.08); overflow:auto; max-height:calc(100vh - 240px); }
     table { border-collapse:separate; border-spacing:0; font-size:.74rem; white-space:nowrap; width:max-content; min-width:100%; }
     thead { position:sticky; top:0; z-index:5; }
@@ -66,6 +70,11 @@
   <div class="toolbar">
     <div class="count-pill"><i class="bi bi-funnel me-1"></i><b id="nFilt">—</b> de <span id="nTot">—</span> operaciones cumplen el criterio</div>
     <button class="btn-clear" id="btnClear" onclick="limpiarFiltros()"><i class="bi bi-x-circle me-1"></i>Limpiar filtros</button>
+    <button class="btn-quick" id="qkAUTOFIN" onclick="qkEmpresa('AUTOFIN')">AUTOFIN</button>
+    <button class="btn-quick" id="qkUNIDAD" onclick="qkEmpresa('UNIDAD')">UNIDAD</button>
+    <button class="btn-quick" id="qkAUTOFACIL" onclick="qkEmpresa('AUTOFACIL')">AUTOFÁCIL</button>
+    <button class="btn-quick" id="qkOTORGADOS" onclick="qkOtorgados()">OTORGADOS</button>
+    <select class="qk-mes" id="qkMes" onchange="qkPeriodo(this.value)"><option value="">PERIODO (MES)</option></select>
     <button class="btn-xls" id="btnXls" onclick="exportarExcel()"><i class="bi bi-file-earmark-excel"></i> Exportar lo filtrado</button>
   </div>
 
@@ -122,6 +131,7 @@ async function cargar() {
   MONTOS = new Set(j.data.montos); PCTS = new Set(j.data.pcts);
   document.getElementById('nTot').textContent = fmtCL(ROWS.length);
   pintarCabecera();
+  llenarPeriodos();
   aplicar();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('tabla').style.display = '';
@@ -238,9 +248,64 @@ document.addEventListener('click', e => {
 });
 
 function limpiarFiltros() {
-  fTexto = {}; fSets = {}; sortCol = null;
+  fTexto = {}; fSets = {}; sortCol = null; qEmp.clear(); qOtor = false;
   HEADERS.forEach((_, i) => { const el = document.getElementById('ft' + i); if (el) el.value = ''; });
+  const m = document.getElementById('qkMes'); if (m) m.value = '';
+  pintarQuick(); aplicar();
+}
+
+/* ── Botones rápidos: empresa, otorgados y periodo (escriben en fSets/fTexto,
+      así conviven con los filtros Excel y el Limpiar los borra también) ── */
+const qEmp = new Set();  // 'AUTOFIN' | 'UNIDAD' | 'AUTOFACIL' (multi, como las cards de créditos)
+let qOtor = false;
+const idxFin  = () => KEYS.indexOf('financiera');
+const idxEst  = () => KEYS.indexOf('estado_credito');
+const idxMes  = () => KEYS.indexOf('mes');
+
+function qkEmpresa(e) {
+  qEmp.has(e) ? qEmp.delete(e) : qEmp.add(e);
+  const i = idxFin();
+  if (!qEmp.size) { delete fSets[i]; }
+  else {
+    const vals = new Set();
+    const finRow = r => rawStr(r[i]);
+    const distinct = new Set(ROWS.map(finRow));
+    if (qEmp.has('AUTOFIN')) vals.add('AUTOFIN');
+    if (qEmp.has('UNIDAD'))  vals.add('UNIDAD DE CREDITO');
+    if (qEmp.has('AUTOFACIL')) // propios: todo lo que no es brokerage ni AFA (misma regla de la card de créditos)
+      distinct.forEach(v => { if (!['AUTOFIN', 'UNIDAD DE CREDITO', 'AFA'].includes(v)) vals.add(v); });
+    fSets[i] = vals;
+  }
+  pintarQuick(); aplicar();
+}
+
+function qkOtorgados() {
+  qOtor = !qOtor;
+  const i = idxEst();
+  if (qOtor) fSets[i] = new Set(['OTORGADO']); else delete fSets[i];
+  pintarQuick(); aplicar();
+}
+
+function qkPeriodo(v) {
+  const i = idxMes();
+  fTexto[i] = v || '';
+  const el = document.getElementById('ft' + i); if (el) el.value = fTexto[i];
+  document.getElementById('qkMes').classList.toggle('on', !!v);
   aplicar();
+}
+
+function llenarPeriodos() {
+  const i = idxMes();
+  const meses = [...new Set(ROWS.map(r => rawStr(r[i]).slice(0, 7)).filter(Boolean))].sort().reverse();
+  const NOM = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('qkMes').innerHTML = '<option value="">PERIODO (MES)</option>' +
+    meses.map(m => `<option value="${m}">${NOM[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}</option>`).join('');
+}
+
+function pintarQuick() {
+  ['AUTOFIN', 'UNIDAD', 'AUTOFACIL'].forEach(e =>
+    document.getElementById('qk' + e).classList.toggle('on', qEmp.has(e)));
+  document.getElementById('qkOTORGADOS').classList.toggle('on', qOtor);
 }
 
 /* ── Export: TODO lo filtrado, valores crudos ── */
