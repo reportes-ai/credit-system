@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v100.7 -->
+<!-- v100.8 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -45,12 +45,13 @@
   <div class="card-x"><h5><i class="bi bi-sliders me-1"></i>Condiciones de la operación</h5><div id="grpOper"></div></div>
   <div class="card-x"><h5><i class="bi bi-cash-stack me-1"></i>Renta y carga financiera</h5><div id="grpRenta"></div></div>
   <div class="card-x"><h5><i class="bi bi-clipboard-data me-1"></i>Información comercial (umbrales de bloqueo)</h5><div id="grpInfo"></div></div>
-  <div class="card-x"><h5><i class="bi bi-whatsapp me-1"></i>WhatsApp — Facilito</h5><div id="grpWsp"></div></div>
-  <div class="card-x"><h5><i class="bi bi-robot me-1"></i>Informes e IA de la preevaluación (WhatsApp)</h5>
+  <div class="card-x"><h5><i class="bi bi-clipboard-pulse me-1"></i>Criterios DealerNet de la preevaluación (todos los canales)</h5><div id="grpWsp"></div></div>
+  <div class="card-x"><h5><i class="bi bi-robot me-1"></i>Informes e IA de la preevaluación</h5>
     <div class="fila"><label>Informes DealerNet a consultar<small>Marca cuáles se piden en la preevaluación; ninguno marcado = todos los productos activos. Solo se pueden marcar productos ACTIVOS del mantenedor DealerNet.</small></label>
       <div id="chkInformes" style="font-size:.84rem"></div></div>
     <div class="fila" id="filaIA"></div>
   </div>
+  <div class="card-x"><h5><i class="bi bi-chat-square-text me-1"></i>Mensajes al cliente según resultado</h5><div id="grpMsg"></div></div>
 
   <button class="btn-save" onclick="guardar()"><i class="bi bi-check2-circle me-1"></i>Guardar cambios</button><span id="msg"></span>
 
@@ -59,7 +60,8 @@
     <ul>
       <li><b>Condiciones de la operación / Renta / Info comercial</b> → preaprobación automática del <a href="/portal-dealer/" target="_blank">Portal del Dealer</a> (botón "Pre-aprobar cliente": veredicto PREAPROBADO/REVISIÓN y cuotas ofrecidas).</li>
       <li><b>Plazos</b> → plazos que se cotizan en la preaprobación del portal (el bot de WhatsApp usa sus tramos del guion).</li>
-      <li><b>WhatsApp — severidad máxima y pie exprés</b> → preevaluación del bot <a href="/whatsapp/" target="_blank">Facilito</a> (veredicto de la preevaluación DealerNet y mensaje de trámite exprés).</li>
+      <li><b>Criterios DealerNet (severidad máxima y pie exprés)</b> → veredicto de la preevaluación en TODOS los canales que la usan — hoy el bot <a href="/whatsapp/" target="_blank">Facilito</a>; los canales que se sumen leen las mismas variables.</li>
+      <li><b>Mensajes al cliente</b> → texto que recibe el cliente según resultado (aprobación instantánea/exprés, aprobación por severidad buena o regular, rechazo); placeholders {pie} y {pie_expres}.</li>
       <li><b>Antigüedad máx. default</b> → solo aplica si la <a href="/politica/" target="_blank">matriz de Política de Crédito</a> no define antigüedad para USADO; si la define, manda la matriz.</li>
       <li><b>Informes DealerNet a consultar</b> → qué productos pide la preevaluación del bot (gasto de saldo DealerNet); vacío = todos los activos del <a href="/mantenedores/dealernet/" target="_blank">mantenedor DealerNet</a>.</li>
       <li><b>Modelo de IA</b> → reporte crediticio automático de la preevaluación; "auto" usa el configurado en el <a href="/mantenedores/ia/" target="_blank">Subsistema IA</a>.</li>
@@ -76,14 +78,18 @@ const GRUPOS = {
   grpRenta: ['carga_max_pct','tolerancia_renta_pct'],
   grpInfo:  ['max_protestos','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada'],
   grpWsp:   ['wsp_severidad_max','wsp_pie_expres_pct'],
+  grpMsg:   ['msg_aprobado_expres','msg_sev_bueno','msg_sev_regular','msg_sev_malo'],
 };
+const TXTAREA = new Set(GRUPOS.grpMsg);
 const LBL = {
   carga_max_pct:'Carga máxima (% de la renta)', plazos:'Plazos evaluados (meses, separados por coma)',
   tolerancia_renta_pct:'Tolerancia renta declarada vs interna (%)', precio_min:'Precio mínimo del vehículo ($)',
   precio_max:'Precio máximo del vehículo ($)', antiguedad_max_default:'Antigüedad máx. del vehículo (años, default)',
   max_protestos:'Protestos vigentes permitidos', max_deuda_morosa:'Deuda morosa permitida ($)',
   max_deuda_vencida:'Deuda vencida permitida ($)', max_deuda_castigada:'Deuda castigada permitida ($)',
-  wsp_severidad_max:'Severidad DealerNet máxima que preaprueba', wsp_pie_expres_pct:'Pie exprés (%)',
+  wsp_severidad_max:'Severidad DealerNet máxima que preaprueba', wsp_pie_expres_pct:'Pie exprés / aprobación instantánea (%)',
+  msg_aprobado_expres:'Mensaje APROBACIÓN INSTANTÁNEA (exprés)', msg_sev_bueno:'Mensaje APROBACIÓN — severidad BUENA',
+  msg_sev_regular:'Mensaje APROBACIÓN — severidad REGULAR', msg_sev_malo:'Mensaje RECHAZO — severidad MALA',
 };
 const MONTO = new Set(['precio_min','precio_max','max_deuda_morosa','max_deuda_vencida','max_deuda_castigada']);
 const PCT   = new Set(['carga_max_pct','tolerancia_renta_pct','wsp_pie_expres_pct']);
@@ -100,7 +106,9 @@ async function cargar(){
     document.getElementById(grp).innerHTML = claves.map(k => {
       const p = byKey[k] || { valor:'' };
       let input;
-      if (k === 'wsp_severidad_max')
+      if (TXTAREA.has(k))
+        input = `<textarea id="v_${k}" rows="4" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:.85rem;width:100%">${String(p.valor).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</textarea>`;
+      else if (k === 'wsp_severidad_max')
         input = `<select id="v_${k}">${['bueno','regular','malo'].map(s=>`<option ${p.valor===s?'selected':''}>${s}</option>`).join('')}</select>`;
       else if (MONTO.has(k))
         input = `<div style="display:flex;align-items:center;gap:6px"><span style="color:#64748b;font-weight:700">$</span><input id="v_${k}" value="${fmtMil(p.valor)}" oninput="fmtMonto(this)" style="text-align:right"></div>`;
@@ -108,6 +116,8 @@ async function cargar(){
         input = `<div style="display:flex;align-items:center;gap:6px"><input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}" style="text-align:right"><span style="color:#64748b;font-weight:700">%</span></div>`;
       else
         input = `<input id="v_${k}" value="${String(p.valor).replace(/"/g,'&quot;')}">`;
+      if (TXTAREA.has(k))
+        return `<div class="fila" style="grid-template-columns:1fr"><label>${LBL[k]||k}<small>${p.descripcion||''}</small></label>${input}</div>`;
       return `<div class="fila"><label>${LBL[k]||k}<small>${p.descripcion||''}</small></label>${input}</div>`;
     }).join('');
   }

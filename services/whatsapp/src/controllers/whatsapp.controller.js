@@ -730,15 +730,19 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
         conv.rut_cliente = conv.rut_cliente || ev.rut;
         // Con el RUT recién conocido, la cotización previa de la conversación va al repositorio
         guardarCotizacionBot(conv);
-        let pieExpres = 40;
-        try { const { getPoliticas } = require('../../../../shared/preaprobacion-politicas'); pieExpres = (await getPoliticas()).wsp_pie_expres_pct; } catch (_) {}
-        if (ev.ok && ev.pie_pct >= pieExpres) {
-          respuesta += '\n\n🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del ' + Math.round(ev.pie_pct) + '% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?';
-        } else if (ev.ok) {
-          respuesta += '\n\n🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del ' + pieExpres + '%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?';
-        } else {
-          respuesta += '\n\nUy, parece que el sistema presenta problemas para completar la preevaluación en este momento 🙈 ¿Quieres que te contacte un Ejecutivo Comercial?';
-        }
+        // Mensajes y umbrales paramétricos (mantenedor Políticas de Preaprobación) —
+        // mismo set para todos los canales; {pie}/{pie_expres} se reemplazan acá.
+        const { getPoliticas } = require('../../../../shared/preaprobacion-politicas');
+        const P = await getPoliticas();
+        const rell = s => String(s || '')
+          .replace(/\{pie\}/g, String(Math.round(ev.pie_pct || 0)))
+          .replace(/\{pie_expres\}/g, String(P.wsp_pie_expres_pct));
+        let msg;
+        if (ev.ok && ev.pie_pct >= P.wsp_pie_expres_pct) msg = P.msg_aprobado_expres;
+        else if (ev.severidad === 'bueno')               msg = P.msg_sev_bueno;
+        else if (ev.severidad === 'regular' && ev.ok)    msg = P.msg_sev_regular;
+        else                                             msg = P.msg_sev_malo;   // rechazo (malo/grave o sobre el umbral)
+        respuesta += '\n\n' + rell(msg);
       }
     } catch (e) { console.error('[wsp preevaluacion]', e.message); }
   }

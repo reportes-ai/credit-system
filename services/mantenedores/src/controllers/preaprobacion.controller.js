@@ -19,12 +19,17 @@ const DESCS = {
   max_deuda_morosa:       'Deuda morosa permitida en $ (sobre esto → revisión)',
   max_deuda_vencida:      'Deuda vencida permitida en $ (sobre esto → revisión)',
   max_deuda_castigada:    'Deuda castigada permitida en $ (sobre esto → revisión)',
-  wsp_severidad_max:      'WhatsApp: peor severidad DealerNet que aún preaprueba (bueno | regular | malo)',
-  wsp_pie_expres_pct:     'WhatsApp: % de pie desde el cual el bot ofrece trámite exprés',
-  informes_codigos:       'Informes DealerNet que consulta la preevaluación de WhatsApp (vacío = todos los activos)',
+  wsp_severidad_max:      'Peor severidad DealerNet que aún preaprueba (bueno | regular | malo) — todos los canales',
+  wsp_pie_expres_pct:     '% de pie desde el cual la aprobación es instantánea/exprés — todos los canales',
+  informes_codigos:       'Informes DealerNet que consulta la preevaluación (vacío = todos los activos)',
   ia_modelo:              'Modelo de IA del reporte crediticio de la preevaluación (auto = el configurado en el Subsistema IA)',
+  msg_aprobado_expres:    'Mensaje de aprobación INSTANTÁNEA/exprés (pie ≥ % exprés). {pie} = pie informado',
+  msg_sev_bueno:          'Mensaje cuando la severidad DealerNet es BUENA. {pie_expres} = % de pie exprés',
+  msg_sev_regular:        'Mensaje cuando la severidad DealerNet es REGULAR. {pie_expres} = % de pie exprés',
+  msg_sev_malo:           'Mensaje de rechazo (severidad MALA o grave)',
 };
 const IA_MODELOS = ['auto', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-4-8'];
+const MSG_KEYS = ['msg_aprobado_expres', 'msg_sev_bueno', 'msg_sev_regular', 'msg_sev_malo'];
 
 /* ─── Migración + seed (funcionalidad bajo módulo Mantenedores) ────── */
 (async () => {
@@ -32,11 +37,12 @@ const IA_MODELOS = ['auto', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-
     await pool.query(`
       CREATE TABLE IF NOT EXISTS preaprobacion_parametros (
         clave       VARCHAR(50) PRIMARY KEY,
-        valor       VARCHAR(100) NOT NULL,
+        valor       VARCHAR(600) NOT NULL,
         descripcion VARCHAR(255) NULL,
         updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         updated_by  VARCHAR(150) NULL
       )`);
+    await pool.query('ALTER TABLE preaprobacion_parametros MODIFY valor VARCHAR(600) NOT NULL').catch(() => {});
     for (const [k, v] of Object.entries(DEFAULTS))
       await pool.query('INSERT IGNORE INTO preaprobacion_parametros (clave, valor, descripcion) VALUES (?,?,?)',
         [k, String(v), DESCS[k] || null]);
@@ -88,6 +94,9 @@ const update = async (req, res) => {
         if (!['bueno', 'regular', 'malo'].includes(val.toLowerCase()))
           return res.status(400).json({ success: false, data: null, error: 'Severidad debe ser bueno, regular o malo' });
         val = val.toLowerCase();
+      } else if (MSG_KEYS.includes(k)) {
+        if (!val) return res.status(400).json({ success: false, data: null, error: `El mensaje ${k} no puede quedar vacío` });
+        val = val.slice(0, 600);
       } else if (k === 'ia_modelo') {
         if (!IA_MODELOS.includes(val)) return res.status(400).json({ success: false, data: null, error: 'Modelo IA inválido' });
       } else if (k === 'informes_codigos') {

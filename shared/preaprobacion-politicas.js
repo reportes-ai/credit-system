@@ -22,10 +22,15 @@ const DEFAULTS = {
   max_deuda_morosa:       0,           // $ de deuda morosa permitida
   max_deuda_vencida:      0,           // $ de deuda vencida permitida
   max_deuda_castigada:    0,           // $ de deuda castigada permitida
-  wsp_severidad_max:      'regular',   // peor severidad DealerNet que igual preaprueba (bueno|regular|malo)
-  wsp_pie_expres_pct:     40,          // % de pie desde el cual el trámite es exprés (mensaje del bot)
-  informes_codigos:       '',          // códigos DealerNet a consultar en la preevaluación WSP (CSV; vacío = todos los activos)
+  wsp_severidad_max:      'regular',   // peor severidad DealerNet que igual preaprueba (bueno|regular|malo) — TODOS los canales
+  wsp_pie_expres_pct:     40,          // % de pie desde el cual la aprobación es instantánea/exprés — TODOS los canales
+  informes_codigos:       '',          // códigos DealerNet a consultar en la preevaluación (CSV; vacío = todos los activos)
   ia_modelo:              'auto',      // modelo IA del reporte crediticio de la preevaluación ('auto' = el del Subsistema IA)
+  // Mensajes al cliente según resultado ({pie} = % de pie informado). Un solo set para todos los canales.
+  msg_aprobado_expres:    '🎉 *¡Excelente! Tu preevaluación salió muy bien.*\nCon tu pie del {pie}% solo necesitas:\n📇 Cédula de identidad vigente\n🏠 Una cuenta que acredite tu domicilio\n👥 3 referencias personales\n\n¡Y te puedes llevar el auto para la casa *el mismo día*! 🚗💨 ¿Coordinamos con un ejecutivo?',
+  msg_sev_bueno:          '🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del {pie_expres}%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?',
+  msg_sev_regular:        '🎉 *¡Buenas noticias! Tu preevaluación salió bien.*\nDato: si llegas a un pie del {pie_expres}%, el trámite es exprés (solo cédula, acreditar domicilio y 3 referencias) y te llevas el auto el mismo día 🚗. ¿Te conecto con un ejecutivo para armar tu crédito?',
+  msg_sev_malo:           'Uy, parece que el sistema presenta problemas para completar la preevaluación en este momento 🙈 ¿Quieres que te contacte un Ejecutivo Comercial?',
 };
 
 let _cache = null, _cacheAt = 0;
