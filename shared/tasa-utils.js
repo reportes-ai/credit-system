@@ -12,8 +12,8 @@
  *   - services/mantenedores/src/tmc-sync.js                       (sincronización CMF)
  */
 
-// Redondeo a 3 decimales (formato % de la tabla tasas).
-const round3 = n => Math.round(n * 1000) / 1000;
+// Redondeo a 3 decimales HACIA ABAJO (regla de negocio: nunca redondear la tasa hacia arriba).
+const round3 = n => Math.floor(n * 1000) / 1000;
 
 // Tasa ANUAL (%) → tasa MENSUAL (%) = anual / 12, a 3 decimales. Acepta string o número.
 const anualAMensual = anual => round3(parseFloat(anual) / 12);
