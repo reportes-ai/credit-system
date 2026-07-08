@@ -376,16 +376,49 @@ function zonificar(cands, objetivo = 25) {
     if (k <= 1) { ds.forEach(d => d.zona = com); zonas.push({ zona: com, n: ds.length }); continue; }
     const conGeo = ds.filter(d => d.lat != null && d.lng != null);
     const sinGeo = ds.filter(d => d.lat == null || d.lng == null);
-    // partición balanceada recursiva: corta por el eje geográfico más ancho
-    // en proporción al n° de zonas → grupos de tamaño similar y coherentes
+    // Partición TERRITORIAL (k-means balanceado): cada zona es un territorio
+    // compacto alrededor de un centro — como países vecinos, las zonas limitan
+    // entre sí y no se sobreponen (frontera implícita = punto medio entre centros),
+    // con tamaños parejos (cupo n/k por zona).
     const partir = (arr, kk) => {
       if (kk <= 1 || arr.length <= 1) return [arr];
-      const k1 = Math.floor(kk / 2), k2 = kk - k1;
-      const span = eje => { const v = arr.map(d => +d[eje]); return Math.max(...v) - Math.min(...v); };
-      const eje = span('lat') >= span('lng') ? 'lat' : 'lng';
-      const sorted = [...arr].sort((a, b) => +a[eje] - +b[eje]);
-      const corte = Math.round(sorted.length * k1 / kk);
-      return [...partir(sorted.slice(0, corte), k1), ...partir(sorted.slice(corte), k2)];
+      const pts = arr.map(d => ({ d, x: +d.lng, y: +d.lat }));
+      // semillas separadas: primera = más lejana del centro, siguientes = k-means++ (más lejos de las ya elegidas)
+      const cx = mediana(pts.map(p => p.x)), cy = mediana(pts.map(p => p.y));
+      const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+      const cents = [pts.reduce((m, p) => dist2(p, { x: cx, y: cy }) > dist2(m, { x: cx, y: cy }) ? p : m, pts[0])].map(p => ({ x: p.x, y: p.y }));
+      while (cents.length < kk) {
+        let best = pts[0], bd = -1;
+        for (const p of pts) { const d = Math.min(...cents.map(c => dist2(p, c))); if (d > bd) { bd = d; best = p; } }
+        cents.push({ x: best.x, y: best.y });
+      }
+      let grupos = [];
+      for (let iter = 0; iter < 12; iter++) {
+        const cap = Math.ceil(pts.length / kk);
+        grupos = Array.from({ length: kk }, () => []);
+        // asignación balanceada: los puntos con preferencia más marcada eligen primero;
+        // si su zona más cercana está llena, van a la siguiente más cercana con cupo
+        const orden = pts.map(p => {
+          const ds2 = cents.map((c, i) => ({ i, d: dist2(p, c) })).sort((a, b) => a.d - b.d);
+          return { p, ds2, margen: (ds2[1] ? ds2[1].d - ds2[0].d : Infinity) };
+        }).sort((a, b) => b.margen - a.margen);
+        for (const o of orden) {
+          const dest = o.ds2.find(z => grupos[z.i].length < cap) || o.ds2[0];
+          grupos[dest.i].push(o.p);
+        }
+        // recentrar; si ningún centro se movió, converge
+        let movio = false;
+        grupos.forEach((g, i) => {
+          if (!g.length) return;
+          const nx = g.reduce((s, p) => s + p.x, 0) / g.length, ny = g.reduce((s, p) => s + p.y, 0) / g.length;
+          if (Math.abs(nx - cents[i].x) > 1e-7 || Math.abs(ny - cents[i].y) > 1e-7) movio = true;
+          cents[i] = { x: nx, y: ny };
+        });
+        if (!movio) break;
+      }
+      // orden estable de zonas: oeste→este por centro (nombres consistentes entre corridas)
+      const idx = cents.map((c, i) => ({ c, i })).sort((a, b) => a.c.x - b.c.x).map(z => z.i);
+      return idx.map(i => grupos[i].map(p => p.d));
     };
     const grupos = partir(conGeo, k);
     while (grupos.length < k) grupos.push([]);

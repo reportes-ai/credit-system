@@ -1228,13 +1228,19 @@ async function cargarZonas(){
 }
 
 /* ── Asignación por mapa: zonas con etiqueta ASIGNADOS n/total ── */
-let AM_MAP = null, AM_CAPA = null;
+let AM_MAP = null, AM_CAPA = null, AM_LABELS = [];
+function toggleEtiquetasZona(){
+  if (!AM_MAP) return;
+  const show = AM_MAP.getZoom() >= 9;   // en zoom país las etiquetas se amontonan → solo el punto
+  AM_LABELS.forEach(m => { const el = m.getElement && m.getElement(); if (el) el.style.display = show ? '' : 'none'; });
+}
 function initAmMapa(){
   if (AM_MAP) { setTimeout(()=>AM_MAP.invalidateSize(), 150); return; }
   AM_MAP = L.map('amMapa').setView([-33.45, -70.66], 9);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(AM_MAP);
   AM_CAPA = L.layerGroup().addTo(AM_MAP);
+  AM_MAP.on('zoomend', toggleEtiquetasZona);
 }
 /* Color estable por nombre (hash → paleta) */
 const AM_PALETA = ['#e11d48','#0255c5','#16a34a','#f59e0b','#7c3aed','#0141A2','#db2777','#65a30d','#dc2626','#4f46e5','#b45309','#059669'];
@@ -1262,7 +1268,7 @@ async function cargarZonasMapa(){
   const r = await fetch('/api/visitas/zonas-mapa?'+qs, { headers: hdr() });
   const j = await r.json();
   if (!j.success) return;
-  AM_CAPA.clearLayers();
+  AM_CAPA.clearLayers(); AM_LABELS = [];
   const bounds = [];
   // Bordes oficiales de las comunas presentes en las zonas (GeoJSON local).
   // El GeoJSON trae '�' en las letras acentuadas → se compara tratándolo
@@ -1304,10 +1310,15 @@ async function cargarZonasMapa(){
         .bindPopup(pop).addTo(AM_CAPA);
       bounds.push(p);
     });
-    L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
+    const mk = L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
+    AM_LABELS.push(mk);
+    // punto pequeño siempre visible: representa la zona cuando la etiqueta se oculta (zoom lejano)
+    L.circleMarker([z.lat, z.lng], { radius: 6, color: '#fff', weight: 1.5, fillColor: color, fillOpacity: 1 })
+      .bindPopup(pop).addTo(AM_CAPA);
     bounds.push([z.lat, z.lng]);
   });
   if (bounds.length) AM_MAP.fitBounds(bounds, { padding:[30,30], maxZoom:12 });
+  toggleEtiquetasZona();
 }
 
 function paramsMasiva(simular){
