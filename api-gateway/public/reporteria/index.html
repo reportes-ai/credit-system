@@ -169,6 +169,17 @@
         </button>
       </div>
     </div>
+    <div class="report-card" id="cardOldBase" style="display:none" onclick="window.location='/old-base-unica/'">
+      <div class="card-icon-wrap" style="background:#eef4fb;color:#1F3864"><i class="bi bi-table"></i></div>
+      <h6>Old Base Única</h6>
+      <p>Réplica de la hoja DETALLE de la antigua base única Excel, con los datos de la BD desde la op 77130. Filtros por columna estilo Excel, botones rápidos por empresa/estado/período y export de lo filtrado.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#1F3864,#0255c5)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
     <div class="report-card bitacora" id="cardBitacora" style="display:none" onclick="window.location='/reporteria/bitacora-credito/'">
       <div class="card-icon-wrap"><i class="bi bi-clock-history"></i></div>
       <h6>Bitácora de un Crédito</h6>
@@ -419,6 +430,9 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     const j = await r.json(); (j.funcionalidades||[]).forEach(c=>perms.add(c));
     if (esAdmin || perms.has('aprob_rentabilidad')) {
       const el = document.getElementById('cardRentab'); if (el) el.style.display = '';
+    }
+    if (esAdmin || perms.has('old_base_unica_ver')) {
+      const el = document.getElementById('cardOldBase'); if (el) el.style.display = '';
     }
     if (esAdmin || perms.has('rep_bitacora')) {
       const el = document.getElementById('cardBitacora'); if (el) el.style.display = '';

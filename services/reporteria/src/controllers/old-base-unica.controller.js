@@ -7,29 +7,29 @@
    ─────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 
-/* ─── Seed paramétrico: módulo propio en frontpage + funcionalidad ── */
+/* ─── Seed paramétrico: card DENTRO de Reportería (v101.0; antes módulo propio,
+       retirado — la funcionalidad se re-cuelga del módulo Reportería) ── */
 (async () => {
   try {
-    let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/old-base-unica/' LIMIT 1");
-    if (!mod) {
-      const [ins] = await pool.query(
-        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
-         VALUES ('Old Base Única','Réplica de la hoja DETALLE de la antigua base única Excel, con los datos de la BD: filtros por columna estilo Excel y export','bi-table','/old-base-unica/',118,'activo')`);
-      mod = { id_modulo: ins.insertId };
-    }
+    const [[rep]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/reporteria/' LIMIT 1");
+    if (!rep) return;
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='old_base_unica_ver'");
     let idF = ex?.id_funcionalidad;
     if (!idF) {
       const [insF] = await pool.query(
-        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,?)',
-        [mod.id_modulo, 'Ver Old Base Única', 'old_base_unica_ver', null]);
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [rep.id_modulo, 'Old Base Única', 'old_base_unica_ver', '/old-base-unica/', 'bi-table']);
       idF = insF.insertId;
+    } else {
+      await pool.query("UPDATE funcionalidades SET id_modulo=?, nombre='Old Base Única', href='/old-base-unica/', icono='bi-table' WHERE id_funcionalidad=?", [rep.id_modulo, idF]);
     }
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     if (adm) await pool.query(
       'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
       [adm.id_perfil, idF]);
-    console.log('✓ módulo Old Base Única registrado');
+    // Retirar el módulo propio de la frontpage (queda inactivo, no se borra)
+    await pool.query("UPDATE modulos SET estado='inactivo' WHERE ruta='/old-base-unica/'");
+    console.log('✓ Old Base Única colgada de Reportería');
   } catch (e) { console.error('[old-base-unica seed]', e.message); }
 })();
 
