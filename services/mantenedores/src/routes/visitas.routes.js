@@ -13,6 +13,7 @@ const supervisar = requireFunc('visitas_supervisar');
 router.get('/config',          verifyToken, verVisitas, c.getConfig);
 router.get('/ejecutivos',      verifyToken, supervisar, c.ejecutivos);
 router.get('/zonas',           verifyToken, supervisar, c.zonasCartera);
+router.get('/zonas-mapa',      verifyToken, supervisar, c.zonasMapa);
 router.post('/asignacion-masiva', verifyToken, supervisar, c.asignacionMasiva);
 router.get('/asignaciones',    verifyToken, verVisitas, c.listarAsignaciones);
 router.post('/asignaciones',   verifyToken, supervisar, c.crearAsignacion);

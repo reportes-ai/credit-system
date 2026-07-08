@@ -442,6 +442,51 @@ const zonasCartera = async (req, res) => {
   } catch (e) { console.error('[visitas zonas]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
+/* ─── GET /api/visitas/zonas-mapa?estado=&tipo= — zonas para el mapa de
+   asignación: TODOS los dealers del universo (asignados incluidos) zonificados
+   con el mismo motor; por zona: total, asignados, centroide (mediana lat/lng),
+   dealers con coordenadas y ejecutivos con n° asignado en la zona. ── */
+const zonasMapa = async (req, res) => {
+  try {
+    const estado = ['activos', 'inactivos'].includes(req.query.estado) ? req.query.estado : 'todos';
+    const fTipo = ['calle', 'parque'].includes(String(req.query.tipo || '').toLowerCase())
+      ? req.query.tipo.toUpperCase() : 'AMBOS';
+    const fAct = estado === 'activos' ? 'activo=1' : estado === 'inactivos' ? 'activo=0' : '1=1';
+    const [dealers] = await pool.query(
+      `SELECT id_dealer, rut,
+              COALESCE(NULLIF(TRIM(nombre_indexa),''), NULLIF(TRIM(nombre_razon),''), rut) AS nombre,
+              comuna, comuna_parque, geo_dir, lat, lng, ccs_parque, tipo_ficha
+         FROM dealers WHERE ${fAct}`);
+    const uni = dealers
+      .filter(d => fTipo === 'AMBOS' || tipoDealer(d) === fTipo || tipoDealer(d) === 'AMBOS')
+      .map(d => ({ id_dealer: d.id_dealer, nombre: d.nombre, lat: d.lat, lng: d.lng,
+                   comuna: comunaDe(d) || 'SIN COMUNA' }));
+    zonificar(uni);   // asigna d.zona con el MISMO motor de los checkboxes
+    const [asig] = await pool.query(
+      `SELECT a.id_dealer, a.id_usuario, CONCAT(u.nombre,' ',u.apellido) AS ejecutivo
+         FROM visitas_asignaciones a
+         LEFT JOIN usuarios u ON u.id_usuario = a.id_usuario
+        WHERE a.estado='ACTIVA'`);
+    const mAsig = new Map(asig.map(a => [a.id_dealer, a.ejecutivo || `Usuario ${a.id_usuario}`]));
+    const porZona = {};
+    for (const d of uni) {
+      const z = (porZona[d.zona] = porZona[d.zona] || { zona: d.zona, total: 0, asignados: 0, lats: [], lngs: [], ejecutivos: {} });
+      z.total++;
+      if (d.lat != null && d.lng != null) { z.lats.push(+d.lat); z.lngs.push(+d.lng); }
+      const ej = mAsig.get(d.id_dealer);
+      if (ej) { z.asignados++; z.ejecutivos[ej] = (z.ejecutivos[ej] || 0) + 1; }
+    }
+    const out = Object.values(porZona)
+      .filter(z => z.lats.length)   // sin coordenadas no se puede dibujar
+      .map(z => ({ zona: z.zona, total: z.total, asignados: z.asignados,
+                   lat: mediana(z.lats), lng: mediana(z.lngs),
+                   ejecutivos: Object.entries(z.ejecutivos).map(([nombre, n]) => ({ nombre, n }))
+                     .sort((a, b) => b.n - a.n) }))
+      .sort((a, b) => a.zona.localeCompare(b.zona, 'es'));
+    ok(res, out);
+  } catch (e) { console.error('[visitas zonasMapa]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
 /* ─── POST /api/visitas/asignacion-masiva (visitas_supervisar) ──────
    body: { nombre, fecha_inicio, fecha_cierre, ejecutivos:[ids], comunas:[],
            meses_ultima_visita, visitas_dia, dias_semana:[], simular } ── */
@@ -690,5 +735,5 @@ const stats = async (req, res) => {
 };
 
 module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar,
-  ejecutivos, zonasCartera, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
+  ejecutivos, zonasCartera, zonasMapa, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
   listarPlanes, cerrarPlan, fichaDia, stats };

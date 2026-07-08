@@ -272,6 +272,15 @@
       <div class="fld" style="margin:0"><label>Comunas / zonas con N° de dealers (vacío = todas; las comunas grandes vienen divididas en cuadrantes)</label>
         <div id="amComunas" style="border:1.5px solid #e2e8f0;border-radius:10px;padding:8px 10px;max-height:180px;overflow-y:auto;font-size:.82rem">Cargando…</div></div>
     </div>
+    <div class="fld" style="margin:0 0 12px">
+      <label><i class="bi bi-geo-alt me-1"></i>Asignación por mapa — comunas y zonas (pincha una zona para ver sus dealers y ejecutivos asignados)</label>
+      <div id="amMapa" style="border:1.5px solid #e2e8f0;border-radius:10px;height:420px"></div>
+      <div style="font-size:.74rem;color:#64748b;margin-top:4px">
+        <span style="color:#16a34a;font-weight:700">●</span> zona completa &nbsp;
+        <span style="color:#f59e0b;font-weight:700">●</span> parcialmente asignada &nbsp;
+        <span style="color:#0255c5;font-weight:700">●</span> sin asignar — la etiqueta muestra ASIGNADOS n/total
+      </div>
+    </div>
     <div class="fld"><label>Días de la semana</label><div class="dow-pick" id="amDias"></div></div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn btn-soft" onclick="masiva(true)"><i class="bi bi-eye"></i> Simular reparto</button>
@@ -1107,6 +1116,47 @@ async function cargarZonas(){
       <input type="checkbox" class="amCom" value="${esc(z.zona)}" ${marcadas.has(z.zona)?'checked':''}>
       ${esc(z.zona)} <b style="margin-left:auto;color:#0e7490">${z.n}</b></label>`).join('')
     : 'Sin dealers candidatos con estos filtros';
+  cargarZonasMapa();
+}
+
+/* ── Asignación por mapa: zonas con etiqueta ASIGNADOS n/total ── */
+let AM_MAP = null, AM_CAPA = null;
+function initAmMapa(){
+  if (AM_MAP) { setTimeout(()=>AM_MAP.invalidateSize(), 150); return; }
+  AM_MAP = L.map('amMapa').setView([-33.45, -70.66], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(AM_MAP);
+  AM_CAPA = L.layerGroup().addTo(AM_MAP);
+}
+async function cargarZonasMapa(){
+  if (!document.getElementById('amMapa')) return;
+  initAmMapa();
+  const qs = new URLSearchParams({ estado: document.getElementById('amEstado').value,
+    tipo: document.getElementById('amTipo').value });
+  const r = await fetch('/api/visitas/zonas-mapa?'+qs, { headers: hdr() });
+  const j = await r.json();
+  if (!j.success) return;
+  AM_CAPA.clearLayers();
+  const bounds = [];
+  j.data.forEach(z=>{
+    const color = z.asignados >= z.total ? '#16a34a' : z.asignados > 0 ? '#f59e0b' : '#0255c5';
+    const icon = L.divIcon({ className:'', iconAnchor:[55,14], html:
+      `<div style="background:${color};color:#fff;border-radius:14px;padding:3px 10px;font-size:.68rem;font-weight:800;
+                   white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid #fff;text-align:center;width:max-content">
+         ${esc(z.zona)}<br>ASIGNADOS ${z.asignados}/${z.total}</div>` });
+    const pop = `<div style="font-size:.83rem;min-width:200px">
+      <b>${esc(z.zona)}</b><br>
+      Dealers en la zona: <b>${z.total}</b><br>
+      Asignados: <b style="color:${color}">${z.asignados}</b> · Sin asignar: <b>${z.total - z.asignados}</b>
+      ${z.ejecutivos.length ? `<hr style="margin:6px 0">
+        <div style="font-weight:700;margin-bottom:2px">Ejecutivos con cartera aquí:</div>
+        ${z.ejecutivos.map(e=>`<div style="display:flex;justify-content:space-between;gap:10px">
+           <span>${esc(e.nombre)}</span><b>${e.n}</b></div>`).join('')}` : '<hr style="margin:6px 0"><i>Aún sin ejecutivos asignados</i>'}
+    </div>`;
+    L.marker([z.lat, z.lng], { icon }).bindPopup(pop).addTo(AM_CAPA);
+    bounds.push([z.lat, z.lng]);
+  });
+  if (bounds.length) AM_MAP.fitBounds(bounds, { padding:[30,30], maxZoom:12 });
 }
 
 function paramsMasiva(simular){
@@ -1141,7 +1191,7 @@ async function masiva(simular){
       <td style="font-size:.72rem;max-width:380px">${e.comunas.map(esc).join(', ')}</td>
       <td>${e.agendables}</td><td style="color:${e.sin_agenda?'#dc2626':'#94a3b8'}">${e.sin_agenda}</td></tr>`).join('')}</tbody></table></div>
     ${d.por_ejecutivo.some(e=>e.sin_agenda) ? '<div style="font-size:.76rem;color:#b45309;margin-top:6px"><i class="bi bi-exclamation-triangle"></i> Los «sin agenda» quedan asignados a la cartera pero no caben en el rango de fechas: amplía el cierre o sube las visitas/día.</div>' : ''}`;
-  if (!simular) { cargarAsignaciones(); cargarPlanes(); }
+  if (!simular) { cargarAsignaciones(); cargarPlanes(); cargarZonas(); }
 }
 
 async function asignarIndividual(){
