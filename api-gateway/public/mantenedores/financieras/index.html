@@ -61,7 +61,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v2.0</span>
+      <span class="version-badge">v2.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -409,7 +409,9 @@ function cambioUAC(payload) {
 }
 
 async function preguntarRecalculo() {
-  // Popup nativo <dialog> con los meses abiertos. Devuelve true/false (recalcular).
+  // Popup nativo <dialog>: muestra TODOS los meses (abiertos seleccionables,
+  // cerrados marcados con candado). Devuelve false (no recalcular) o un
+  // array con los meses YYYY-MM elegidos.
   let meses = [];
   try {
     const r = await fetch('/api/parametros-credito/meses-abiertos', { headers: hdr() });
@@ -421,26 +423,45 @@ async function preguntarRecalculo() {
     if (dlg) dlg.remove();
     dlg = document.createElement('dialog');
     dlg.id = 'dlgRecalc';
-    dlg.style.cssText = 'border:none;border-radius:14px;padding:0;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.3)';
+    dlg.style.cssText = 'border:none;border-radius:14px;padding:0;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)';
+    const chips = meses.length ? meses.map(m => m.cerrado
+      ? `<span style="background:#f1f5f9;color:#94a3b8;border-radius:8px;padding:3px 10px;font-weight:700;font-size:.78rem;cursor:not-allowed" title="Mes cerrado — no se puede recalcular"><i class="bi bi-lock-fill me-1"></i>${m.mes}</span>`
+      : `<span class="chip-mes" data-mes="${m.mes}" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid transparent;border-radius:8px;padding:3px 10px;font-weight:700;font-size:.78rem;cursor:pointer;user-select:none">${m.mes}</span>`
+    ).join('') : '<i>No hay meses con operaciones.</i>';
     dlg.innerHTML = `
       <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:16px 22px;font-weight:800">
-        <i class="bi bi-arrow-repeat me-2"></i>¿Recalcular los meses abiertos?
+        <i class="bi bi-arrow-repeat me-2"></i>¿Recalcular meses?
       </div>
       <div style="padding:18px 22px;font-size:.88rem;color:#374151">
         Cambiaste parámetros del cálculo UAC. Puedes aplicarlos <b>solo a las operaciones nuevas</b>
-        o además <b>recalcular</b> las operaciones ya digitadas de los meses <b>no cerrados</b>:
-        <div style="margin:10px 0;display:flex;flex-wrap:wrap;gap:6px">
-          ${meses.length ? meses.map(m => '<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:2px 10px;font-weight:700;font-size:.78rem">'+m+'</span>').join('') : '<i>No hay meses abiertos con operaciones.</i>'}
-        </div>
-        Los meses cerrados y los campos forzados <b>no se tocan</b> en ningún caso.
+        o además recalcular las ya digitadas. <b>Selecciona los meses a recalcular</b>
+        (azul = abierto, pinchable; gris con candado = cerrado, no se toca):
+        <div style="margin:12px 0;display:flex;flex-wrap:wrap;gap:6px" id="dlgChips">${chips}</div>
+        <div style="font-size:.8rem;color:#64748b">Seleccionados: <b id="dlgCount">0</b>. Los campos forzados no se tocan en ningún caso.</div>
       </div>
       <div style="padding:14px 22px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #f1f5f9">
         <button id="dlgNoRecalc" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:800;cursor:pointer">No recalcular (solo hacia adelante)</button>
-        <button id="dlgSiRecalc" style="background:#fff;color:#c2410c;border:1.5px solid #c2410c;border-radius:8px;padding:8px 18px;font-weight:800;cursor:pointer">Recalcular meses abiertos</button>
+        <button id="dlgSiRecalc" disabled style="background:#fff;color:#c2410c;border:1.5px solid #c2410c;border-radius:8px;padding:8px 18px;font-weight:800;cursor:pointer;opacity:.45">Recalcular seleccionados</button>
       </div>`;
     document.body.appendChild(dlg);
+    const sel = new Set();
+    const btnSi = dlg.querySelector('#dlgSiRecalc');
+    const refresh = () => {
+      dlg.querySelector('#dlgCount').textContent = sel.size;
+      btnSi.disabled = !sel.size;
+      btnSi.style.opacity = sel.size ? '1' : '.45';
+      btnSi.textContent = sel.size ? `Recalcular ${sel.size} mes${sel.size>1?'es':''}` : 'Recalcular seleccionados';
+    };
+    dlg.querySelectorAll('.chip-mes').forEach(ch => {
+      ch.onclick = () => {
+        const m = ch.dataset.mes;
+        if (sel.has(m)) { sel.delete(m); ch.style.background='#eff6ff'; ch.style.color='#1d4ed8'; ch.style.borderColor='transparent'; }
+        else { sel.add(m); ch.style.background='#0141A2'; ch.style.color='#fff'; ch.style.borderColor='#0141A2'; }
+        refresh();
+      };
+    });
     dlg.querySelector('#dlgNoRecalc').onclick = () => { dlg.close(); dlg.remove(); resolve(false); };
-    dlg.querySelector('#dlgSiRecalc').onclick = () => { dlg.close(); dlg.remove(); resolve(true); };
+    btnSi.onclick = () => { if (!sel.size) return; dlg.close(); dlg.remove(); resolve([...sel]); };
     dlg.addEventListener('cancel', () => { dlg.remove(); resolve(false); });  // Esc = default No
     dlg.showModal();
     dlg.querySelector('#dlgNoRecalc').focus();   // default: No recalcular
@@ -460,10 +481,13 @@ async function guardarTodo() {
   });
   payload.uac_modelo = UAC_MODELO_SEL;
 
-  // Popup de recálculo SOLO si cambió el cálculo UAC (modelo o parámetros)
-  let recalc = true;   // comportamiento histórico para el resto de parámetros
-  if (cambioUAC(payload)) recalc = await preguntarRecalculo();
-  payload._recalc = recalc;
+  // Popup de recálculo SOLO si cambió el cálculo UAC (modelo o parámetros).
+  // Devuelve false (no recalcular) o el array de meses elegidos.
+  if (cambioUAC(payload)) {
+    const eleccion = await preguntarRecalculo();
+    if (eleccion === false) payload._recalc = false;
+    else { payload._recalc = true; payload._recalc_meses = eleccion; }
+  }
 
   btn.disabled = true;
   try {
@@ -475,7 +499,9 @@ async function guardarTodo() {
     const j = await r.json();
     if (j.success) {
       ok.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Parámetros guardados correctamente.' +
-        (payload._recalc ? ' Recalculando meses abiertos…' : ' Sin recálculo: aplican solo hacia adelante.');
+        (payload._recalc === false ? ' Sin recálculo: aplican solo hacia adelante.'
+         : payload._recalc_meses ? ` Recalculando ${payload._recalc_meses.length} mes(es): ${payload._recalc_meses.join(', ')}…`
+         : '');
       ok.style.display = 'block';
       document.querySelectorAll('.changed').forEach(e => e.classList.remove('changed'));
       UAC_MODELO = UAC_MODELO_SEL;

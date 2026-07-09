@@ -1,6 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
-const { recalcularMesesAbiertos } = require('../../../creditos/src/utils/recalcular-mes');
+const { recalcularMesesAbiertos, recalcularMeses } = require('../../../creditos/src/utils/recalcular-mes');
 // Cambiar un parámetro que afecta el cálculo dispara el recálculo de los meses
 // abiertos (fire-and-forget, respeta los campos forzados).
 const dispararRecalc = () => recalcularMesesAbiertos()
@@ -154,11 +154,16 @@ const getAll = async (req, res) => {
 const updateAll = async (req, res) => {
   try {
     const params = { ...req.body };
-    // _recalc: el front decide si recalcular los meses abiertos (popup al guardar).
-    // Sin el flag se mantiene el comportamiento histórico (recalcula) para no
-    // romper a los demás consumidores del endpoint.
+    // _recalc: el front decide si recalcular (popup al guardar). _recalc_meses:
+    // meses YYYY-MM elegidos por el usuario (solo se recalculan esos; se
+    // filtran server-side a los realmente abiertos). Sin flags se mantiene el
+    // comportamiento histórico (recalcula todos los abiertos) para no romper
+    // a los demás consumidores del endpoint.
     const recalc = params._recalc;
+    const recalcMeses = Array.isArray(params._recalc_meses)
+      ? params._recalc_meses.filter(m => /^\d{4}-\d{2}$/.test(String(m))) : null;
     delete params._recalc;
+    delete params._recalc_meses;
     for (const [clave, valor] of Object.entries(params)) {
       await pool.query(
         `INSERT INTO parametros_credito (clave, valor) VALUES (?, ?)
@@ -166,24 +171,40 @@ const updateAll = async (req, res) => {
         [clave, parseFloat(valor)]
       );
     }
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)${recalc === false ? ' — SIN recálculo (elección del usuario)' : ''}`, meta: params });
-    if (recalc !== false) dispararRecalc();
-    res.json({ success: true, data: { mensaje: 'Parámetros actualizados', recalculo: recalc !== false }, error: null });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)${recalc === false ? ' — SIN recálculo (elección del usuario)' : (recalcMeses ? ` — recálculo de ${recalcMeses.join(', ')}` : '')}`, meta: params });
+    if (recalc !== false) {
+      if (recalcMeses && recalcMeses.length) {
+        // Solo los meses elegidos, y de ellos solo los ABIERTOS (doble seguro:
+        // recalcularMeses igual salta los cerrados, pero filtramos aquí también).
+        pool.query('SELECT mes FROM meses_cerrados WHERE cerrado=1')
+          .then(([cerr]) => {
+            const setCerr = new Set(cerr.map(r => r.mes));
+            const abiertos = recalcMeses.filter(m => !setCerr.has(m));
+            if (abiertos.length) return recalcularMeses(abiertos);
+          })
+          .then(r => { if (r && r.actualizados) console.log(`[recalc meses] ${r.actualizados} ops recalculadas`); })
+          .catch(e => console.error('[recalc meses]', e.message));
+      } else {
+        dispararRecalc();
+      }
+    }
+    res.json({ success: true, data: { mensaje: 'Parámetros actualizados', recalculo: recalc !== false, meses: recalcMeses || null }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
 /* ── GET /api/parametros-credito/meses-abiertos — para el popup de recálculo ──
-   Meses con créditos que NO están cerrados (meses_cerrados.cerrado=1). */
+   TODOS los meses con créditos, marcando cuáles están cerrados
+   (meses_cerrados.cerrado=1). El front deja elegir solo los abiertos. */
 const getMesesAbiertos = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT DISTINCT DATE_FORMAT(mes,'%Y-%m') m FROM creditos
-      WHERE mes IS NOT NULL
-        AND DATE_FORMAT(mes,'%Y-%m') NOT IN (SELECT mes FROM meses_cerrados WHERE cerrado=1)
-      ORDER BY m DESC LIMIT 12`);
-    res.json({ success: true, data: rows.map(r => r.m), error: null });
+      WHERE mes IS NOT NULL ORDER BY m DESC LIMIT 24`);
+    const [cerr] = await pool.query('SELECT mes FROM meses_cerrados WHERE cerrado=1');
+    const setCerr = new Set(cerr.map(r => r.mes));
+    res.json({ success: true, data: rows.map(r => ({ mes: r.m, cerrado: setCerr.has(r.m) })), error: null });
   } catch (e) {
     (console.error('[meses-abiertos]', e.message), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
