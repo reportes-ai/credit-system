@@ -50,7 +50,7 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 
 /* ---- TABLES ---- */
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
-.tbl thead tr{background:linear-gradient(90deg,#012d70,#0255c5)}
+.tbl thead tr{background:#012d70}
 .tbl thead th{color:#fff;padding:5px 6px;text-align:right;font-weight:500;font-size:10px;white-space:nowrap}
 .tbl thead th:first-child{text-align:left}
 .tbl tbody td{padding:4px 6px;border-bottom:1px solid #f0f2f5;text-align:right;white-space:nowrap;color:#333}
@@ -76,7 +76,7 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 
 /* ---- SUMMARY TABLE (estado comercial) ---- */
 .sumtbl{width:100%;border-collapse:collapse;font-size:11px}
-.sumtbl thead tr{background:linear-gradient(90deg,#012d70,#0255c5)}
+.sumtbl thead tr{background:#012d70}
 .sumtbl th{color:#fff;background:transparent;padding:5px 8px;text-align:left;font-weight:500;font-size:10px}
 .sumtbl th:not(:first-child){text-align:right}
 .sumtbl td{padding:4px 8px;border-bottom:1px solid #f0f2f5;text-align:right}
@@ -96,8 +96,8 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 
 /* ---- SCROLL TABLE ---- */
 .scroll-t{overflow-y:auto;max-height:340px}
-.scroll-t thead th{position:sticky;top:0;z-index:1;background:linear-gradient(90deg,#012d70,#0255c5);color:#fff}
-#t-modal-ops thead th{position:sticky;top:0;z-index:2;background:linear-gradient(90deg,#012d70,#0255c5)}
+.scroll-t thead th{position:sticky;top:0;z-index:1;background:#012d70;color:#fff}
+#t-modal-ops thead th{position:sticky;top:0;z-index:2;background:#012d70}
 .scroll-t::-webkit-scrollbar{width:4px}
 .scroll-t::-webkit-scrollbar-track{background:#f0f2f5}
 .scroll-t::-webkit-scrollbar-thumb{background:#cdd5df;border-radius:2px}
@@ -123,7 +123,7 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 .mekpi-val{font-size:14px;font-weight:700;color:#1a3a6a}
 #modal-ejec-body{overflow:auto;flex:1;padding:8px 12px}
 #t-modal-ops{width:100%;border-collapse:collapse;font-size:11px}
-#t-modal-ops thead th{background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:6px 8px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0}
+#t-modal-ops thead th{background:#012d70;color:#fff;padding:6px 8px;text-align:right;white-space:nowrap;font-size:10px;position:sticky;top:0}
 #t-modal-ops thead th:first-child,#t-modal-ops thead th:nth-child(2){text-align:left}
 #t-modal-ops tbody td{padding:5px 8px;border-bottom:1px solid #f0f2f5;text-align:right;white-space:nowrap}
 #t-modal-ops tbody td:first-child,#t-modal-ops tbody td:nth-child(2){text-align:left;color:#444}
