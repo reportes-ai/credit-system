@@ -23,6 +23,24 @@ const TABLAS_BI = [
 ];
 const ALLOW = new Set(TABLAS_BI);
 
+// Glosario de negocio: mapea conceptos del usuario a columnas/consultas reales y
+// evita que la IA responda "no existe" ante métricas que se CALCULAN (no son columnas).
+const GLOSARIO = [
+  'GLOSARIO DE NEGOCIO (usa esto para mapear lo que pide el usuario a columnas reales):',
+  '- "Otorgado / colocado / cursado" = creditos con estado=\'OTORGADO\'. El MES CONTABLE es la columna creditos.mes (NUNCA fecha_otorgado). Ej. otorgados de este mes: WHERE estado=\'OTORGADO\' AND DATE_FORMAT(mes,\'%Y-%m\')=DATE_FORMAT(CURDATE(),\'%Y-%m\').',
+  '- "Aprobado" = estado=\'APROBADO\'; "Rechazado" = \'RECHAZADO\'; "Otorgado" = \'OTORGADO\'; clave del negocio = creditos.num_op.',
+  '- "Financiera / institución" = creditos.financiera (valores: AUTOFIN, UNIDAD, AUTOFACIL/AFA).',
+  '- "Saldo precio" = creditos.saldo_precio. "Monto financiado" = creditos.monto_financiado. "Plazo (cuotas)" = creditos.plazo. "Tasa" = creditos.tasa.',
+  '- "Comisión dealer" = creditos.com_dealer. "Comisión parque" = creditos.com_parque. "Arriendo parque" = creditos.arriendo_parque. "Ingreso por colocación / UAC" = creditos.monto_comision_fin.',
+  '- "Dealer / patio" = creditos.rut_dealer → dealers (dealers.nombre, dealers.ccs_parque = parque). "Ejecutivo" = creditos.ejecutivo. "Cliente" = clientes por rut.',
+  '- "Cartas de aprobación por vencer" = cartas_aprobacion vigentes cuya fecha de vencimiento se acerca.',
+  '- "Cobranza / gestiones" = cobranza_gestiones (canal, resultado, monto_promesa, confirmado, created_at). "Promesa de pago" = resultado=\'PROMESA_PAGO\'. "Recuperación / recaudación" = promesas y gestiones confirmadas de cobranza_gestiones.',
+  '',
+  'MÉTRICAS QUE SE CALCULAN EN EL MÓDULO COBRANZA (NO son columnas de estas tablas; NO inventes SQL ni digas que "no existen"):',
+  '- "Mora / días de mora / cuotas en mora / monto en mora / cartera en mora", "saldo insoluto / capital adeudado", y "provisión / castigo" (capital insoluto × % por tramo de días de mora; 181+ días = 100%).',
+  'Para CUALQUIERA de estas: marca no_aplica=true y en "motivo" explica brevemente el concepto y remite al reporte correcto: provisión y stock por tramo → reporte "Mora Histórica" (/cobranza/reportes/mora-historica); listado de morosos → "Cartera en Mora" (/cobranza/reportes/cartera); recaudación → "Recuperación de Cartera" (/cobranza/reportes/recuperacion). Nunca afirmes que el dato no existe.',
+].join('\n');
+
 (async () => {
   try {
     await ia.registrarFuncionalidad({
@@ -152,6 +170,7 @@ async function generarSQL(pregunta, esquema, errPrevio, id_usuario, historial) {
     'Eres un analista de datos experto en SQL (MySQL/TiDB) para AutoFácil, una automotora de crédito en Chile. ' +
     'Genera UNA sola consulta SELECT (sin punto y coma) que responda la pregunta, usando SOLO estas tablas y columnas:\n' +
     esquema +
+    '\n\n' + GLOSARIO +
     '\n\nReglas: solo SELECT (jamás modificar datos); usa JOIN/agregaciones según convenga; agrega LIMIT cuando devuelvas listas; ' +
     'montos en pesos; las fechas son tipo DATE/DATETIME. Si la pregunta NO se puede responder con estas tablas (ej. pide una simulación o un escenario "qué pasaría si"), marca no_aplica=true y explica en motivo. ' +
     'Devuelve JSON: {"sql": "...", "intencion": "...", "grafico": {"tipo":"bar|line|pie", "etiqueta":"<columna categórica>", "valor":"<columna numérica>", "titulo":"..."} | null, "no_aplica": false, "motivo": ""}.';
