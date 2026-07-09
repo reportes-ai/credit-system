@@ -249,6 +249,7 @@ app.use('/api/portal-dealer', require('../../services/portal-dealer/src/routes/p
 
 // Post Venta
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
+app.use('/api/comisiones-parques', require('../../services/postventa/src/routes/comisiones-parques.routes'));
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/backups', require('../../services/backups/src/routes/backups.routes'));
 app.use('/api/ordenes-pago', require('../../services/ordenes-pago/src/routes/ordenes-pago.routes'));
@@ -466,6 +467,7 @@ const PAGINAS = [
   ['/postventa/seguimiento', 'postventa/seguimiento/index.html'],
   ['/postventa/mantenedores', 'postventa/mantenedores/index.html'],
   ['/postventa/saldos-a-pagar', 'postventa/saldos-a-pagar/index.html'],
+  ['/postventa/comisiones-parques', 'postventa/comisiones-parques/index.html'],
   ['/postventa/orden-pago', 'postventa/orden-pago/index.html'],
   ['/postventa/fundantes-pendientes', 'postventa/fundantes-pendientes/index.html'],
   ['/postventa/consulta-saldos', 'postventa/consulta-saldos/index.html'],

@@ -72,8 +72,14 @@
   </a>
   <a href="/postventa/comisiones-a-pagar/" class="module-card" id="cardComPagar" style="display:none">
     <div class="card-icon"><i class="bi bi-percent"></i></div>
-    <h5>Comisiones a Pagar</h5>
+    <h5>Comisiones Dealer a Pagar</h5>
     <p>Comisiones con orden de pago emitida: selecciona las que se cargarán al banco y márcalas como pagadas.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
+  <a href="/postventa/comisiones-parques/" class="module-card" id="cardComParques" style="display:none">
+    <div class="card-icon"><i class="bi bi-signpost-2"></i></div>
+    <h5>Comisiones Parques a Pagar</h5>
+    <p>Pago mensual a cada parque: arriendo + comisión por créditos, con aprobación, orden de pago y confirmación.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
   <a href="/postventa/orden-pago-comision/" class="module-card" id="cardOrdenCom" style="display:none">
@@ -139,6 +145,7 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardPagar').style.display='';     alguna=true; }
   if (tiene('postventa_saldos_pagar'))      { document.getElementById('cardOrdenPago').style.display=''; alguna=true; }
   if (tiene('postventa_comisiones_pagar'))  { document.getElementById('cardComPagar').style.display='';  document.getElementById('cardOrdenCom').style.display=''; alguna=true; }
+  if (tiene('postventa_comisiones_parques')){ document.getElementById('cardComParques').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_factura'))  { document.getElementById('cardConsFact').style.display='';  alguna=true; }
   if (tiene('aprob_cartolas'))              { document.getElementById('cardCartolas').style.display=''; document.getElementById('cardEnviadas').style.display=''; alguna=true; }

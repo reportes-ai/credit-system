@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comisiones Parques a Pagar — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .wrap { max-width:1400px; margin:0 auto; padding:20px 24px; }
+    .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+    .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+    .stat { flex:1 1 200px; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; border-left:5px solid #cbd5e1; box-sizing:border-box; }
+    .stat .lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
+    .stat .val { font-size:1.4rem; font-weight:800; color:var(--navy); margin-top:2px; }
+    .stat.arr  { border-left-color:#0ea5e9; }
+    .stat.com  { border-left-color:#7c3aed; }
+    .stat.tot  { border-left-color:#0141A2; }
+    .stat.pag  { border-left-color:#16a34a; } .stat.pag .val { color:#15803d; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { position:sticky; top:0; z-index:2; background:#0f2a52; color:#fff; font-size:.68rem; text-transform:uppercase; letter-spacing:.3px; padding:9px 12px; text-align:left; white-space:nowrap; }
+    thead th.num { text-align:right; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; vertical-align:middle; }
+    tbody td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    tbody tr.rowp { cursor:pointer; }
+    tbody tr.rowp:hover { background:#f8fafc; }
+    tfoot td { background:#f1f5f9; font-weight:800; color:var(--navy); padding:10px 12px; border-top:2px solid #cbd5e1; }
+    tfoot td.num { text-align:right; font-variant-numeric:tabular-nums; }
+    .etapa { display:inline-block; border-radius:9px; padding:3px 11px; font-size:.73rem; font-weight:800; letter-spacing:.2px; }
+    .et-apro { background:#f1f5f9; color:#475569; }
+    .et-ok   { background:#dbeafe; color:#1d4ed8; }
+    .et-op   { background:#ffedd5; color:#c2410c; }
+    .et-pag  { background:#dcfce7; color:#15803d; }
+    .btn-a { border:none; border-radius:8px; padding:6px 13px; font-weight:800; font-size:.78rem; cursor:pointer; color:#fff; }
+    .btn-a:disabled { opacity:.4; cursor:default; }
+    .b-aprobar { background:#0141A2; }
+    .b-emitir  { background:#c2410c; }
+    .b-pagar   { background:#16a34a; }
+    .odp-tag { font-weight:800; color:#c2410c; font-size:.8rem; }
+    .hito { display:block; font-size:.68rem; color:#94a3b8; }
+    .det-row td { background:#f8fafc; padding:0 12px 14px; }
+    .det-box { background:#fff; border:1px solid #e2e8f0; border-radius:10px; margin-top:8px; overflow:hidden; }
+    .det-box table { font-size:.79rem; }
+    .det-box thead th { background:#e2e8f0; color:#334155; position:static; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px; font-size:.9rem; }
+    #mes { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.9rem; font-weight:700; color:var(--navy); }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+    .toast.err { background:#dc2626; }
+    .foot-note { background:#f8fafc; border-left:4px solid #0141A2; border-radius:10px; padding:14px 18px; margin-top:18px; font-size:.82rem; color:#475569; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><a href="/postventa/">Post Venta</a><span>›</span><span style="color:#fff;font-weight:600">Comisiones Parques a Pagar</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="user-chip"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="head-row">
+    <div>
+      <h5 style="font-weight:800;color:var(--navy);margin:0"><i class="bi bi-signpost-2 me-2"></i>Comisiones Parques a Pagar</h5>
+      <span style="font-size:.82rem;color:#64748b">Pago mensual a cada parque: <b>arriendo</b> + <b>comisión por créditos</b> (según el mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>). Pincha un parque para ver sus operaciones. Flujo: <b>Aprobar → Emitir Orden de Pago (correo a Contabilidad) → Confirmar Pago</b> (avisa a los ejecutivos del parque).</span>
+    </div>
+    <div><input type="month" id="mes"></div>
+  </div>
+
+  <div class="resumen">
+    <div class="stat arr"><div class="lbl">Arriendos del mes</div><div class="val" id="stArr">—</div></div>
+    <div class="stat com"><div class="lbl">Comisión por créditos</div><div class="val" id="stCom">—</div></div>
+    <div class="stat tot"><div class="lbl">Total a pagar</div><div class="val" id="stTot">—</div></div>
+    <div class="stat pag"><div class="lbl">Pagado</div><div class="val" id="stPag">—</div></div>
+  </div>
+
+  <div class="card-af">
+    <table>
+      <thead><tr>
+        <th></th><th>Parque</th><th class="num">Ops</th><th class="num">Arriendo</th><th class="num">Comisión créditos</th><th class="num">Total</th><th>Etapa</th><th>Orden de Pago</th><th style="text-align:center">Acciones</th>
+      </tr></thead>
+      <tbody id="tb"><tr><td colspan="9" class="vacio">Selecciona un mes…</td></tr></tbody>
+      <tfoot id="tf" style="display:none"><tr>
+        <td colspan="2">TOTAL</td><td class="num" id="fOps"></td><td class="num" id="fArr"></td><td class="num" id="fCom"></td><td class="num" id="fTot"></td><td colspan="3"></td>
+      </tr></tfoot>
+    </table>
+  </div>
+
+  <div class="foot-note">
+    <b><i class="bi bi-diagram-3 me-1"></i>Cómo se calcula:</b> el arriendo y el % de comisión salen del mantenedor
+    <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>; la comisión por créditos es la suma de
+    <code>com_parque</code> de cada operación OTORGADA del mes (motor único de comisión dealer). Al <b>aprobar</b>, los montos
+    quedan congelados. La Orden de Pago queda visible para Contabilidad en <a href="/ordenes-pago/">Órdenes de Pago</a>.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const yo = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+document.getElementById('navNombre').textContent = (yo.nombre||'') + ' ' + (yo.apellido||'');
+document.getElementById('navPerfil').textContent = yo.perfil||'';
+document.getElementById('avatarInicial').textContent = (yo.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const CLP = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 3500); }
+
+let FUNCS = new Set();
+const puede = c => yo.perfil==='Administrador' || FUNCS.has(c);
+
+const ETAPAS = {
+  EN_APROBACION:  ['En Aprobación','et-apro'],
+  APROBADA:       ['Aprobada','et-ok'],
+  OP_EMITIDA:     ['Orden de Pago emitida','et-op'],
+  PAGO_REALIZADO: ['Pago realizado','et-pag'],
+};
+
+const elMes = document.getElementById('mes');
+(function initMes(){
+  const d = new Date(); d.setMonth(d.getMonth()-1);          // por defecto: mes anterior cerrado
+  elMes.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+})();
+elMes.addEventListener('change', cargar);
+
+let ROWS = [];
+async function cargar(){
+  const mes = elMes.value; if(!mes) return;
+  document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">Cargando…</td></tr>';
+  try {
+    const r = await fetch('/api/comisiones-parques?mes='+mes, { headers:H });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    ROWS = j.data.rows||[];
+    pintar();
+  } catch(e){ document.getElementById('tb').innerHTML = '<tr><td colspan="9" class="vacio">'+esc(e.message)+'</td></tr>'; }
+}
+
+function pintar(){
+  const tb = document.getElementById('tb');
+  if(!ROWS.length){ tb.innerHTML='<tr><td colspan="9" class="vacio">Sin parques activos en el mantenedor</td></tr>'; document.getElementById('tf').style.display='none'; return; }
+  let tArr=0,tCom=0,tOps=0,tPag=0;
+  tb.innerHTML = ROWS.map((r,i)=>{
+    tArr+=r.arriendo; tCom+=r.comision_creditos; tOps+=r.ops;
+    if(r.etapa==='PAGO_REALIZADO') tPag+=r.total;
+    const [etTxt,etCls] = ETAPAS[r.etapa]||ETAPAS.EN_APROBACION;
+    const hitos = r.hitos ? ['aprobada','emitida','pagada'].map(k=>{
+      const h=r.hitos[k]; return h? `<span class="hito">${k}: ${esc(h.por||'')} ${new Date(h.fecha).toLocaleDateString('es-CL')}</span>`:'' ;
+    }).join('') : '';
+    let btn='';
+    if(r.etapa==='EN_APROBACION' && puede('pv_parques_aprobar'))
+      btn = `<button class="btn-a b-aprobar" onclick="accion(event,'aprobar','${esc(r.parque)}')"><i class="bi bi-check-lg me-1"></i>Aprobar</button>`;
+    else if(r.etapa==='APROBADA' && puede('pv_parques_emitir'))
+      btn = `<button class="btn-a b-emitir" onclick="accion(event,'emitir','${esc(r.parque)}')"><i class="bi bi-receipt me-1"></i>Emitir Orden de Pago</button>`;
+    else if(r.etapa==='OP_EMITIDA' && puede('pv_parques_pagar'))
+      btn = `<button class="btn-a b-pagar" onclick="accion(event,'pagar','${esc(r.parque)}')"><i class="bi bi-cash-coin me-1"></i>Confirmar Pago</button>`;
+    return `<tr class="rowp" onclick="toggleDet(${i})">
+      <td><i class="bi bi-chevron-right" id="chev${i}"></i></td>
+      <td style="font-weight:700;color:var(--navy)">${esc(r.parque)}</td>
+      <td class="num">${r.ops.toLocaleString('es-CL')}</td>
+      <td class="num">${CLP(r.arriendo)}</td>
+      <td class="num">${CLP(r.comision_creditos)}</td>
+      <td class="num" style="font-weight:800">${CLP(r.total)}</td>
+      <td><span class="etapa ${etCls}">${etTxt}</span>${hitos}</td>
+      <td>${r.odp_numero? '<span class="odp-tag">'+esc(r.odp_numero)+'</span>':'—'}</td>
+      <td style="text-align:center" onclick="event.stopPropagation()">${btn||'—'}</td>
+    </tr>
+    <tr class="det-row" id="det${i}" style="display:none"><td colspan="9"><div class="det-box" id="detbox${i}">Cargando…</div></td></tr>`;
+  }).join('');
+  document.getElementById('stArr').textContent = CLP(tArr);
+  document.getElementById('stCom').textContent = CLP(tCom);
+  document.getElementById('stTot').textContent = CLP(tArr+tCom);
+  document.getElementById('stPag').textContent = CLP(tPag);
+  document.getElementById('fOps').textContent = tOps.toLocaleString('es-CL');
+  document.getElementById('fArr').textContent = CLP(tArr);
+  document.getElementById('fCom').textContent = CLP(tCom);
+  document.getElementById('fTot').textContent = CLP(tArr+tCom);
+  document.getElementById('tf').style.display='';
+}
+
+async function toggleDet(i){
+  const row = document.getElementById('det'+i), chev = document.getElementById('chev'+i);
+  const abierto = row.style.display !== 'none';
+  row.style.display = abierto? 'none':'';
+  chev.className = 'bi ' + (abierto? 'bi-chevron-right':'bi-chevron-down');
+  if(abierto) return;
+  const box = document.getElementById('detbox'+i);
+  try {
+    const r = await fetch('/api/comisiones-parques/detalle?mes='+elMes.value+'&parque='+encodeURIComponent(ROWS[i].parque), { headers:H });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    const ops = j.data.ops||[];
+    box.innerHTML = ops.length? `<table>
+      <thead><tr><th>N° Operación</th><th>Dealer</th><th>Ejecutivo</th><th class="num">Saldo Precio</th><th class="num">Comisión Parque</th></tr></thead>
+      <tbody>${ops.map(o=>`<tr>
+        <td style="font-weight:700">${esc(o.num_op)}</td><td>${esc(o.dealer)}</td><td>${esc(o.ejecutivo)}</td>
+        <td class="num">${CLP(o.saldo_precio)}</td><td class="num" style="font-weight:700">${CLP(o.com_parque)}</td></tr>`).join('')}
+      </tbody>
+      <tfoot><tr><td colspan="4">TOTAL COMISIÓN (${ops.length} ops)</td><td class="num">${CLP(j.data.comision_creditos)}</td></tr></tfoot>
+    </table>` : '<div class="vacio">Sin operaciones otorgadas este mes</div>';
+  } catch(e){ box.innerHTML = '<div class="vacio">'+esc(e.message)+'</div>'; }
+}
+
+const CONFIRM = {
+  aprobar: p => `¿Aprobar la comisión del parque ${p}? Los montos quedarán congelados.`,
+  emitir:  p => `¿Emitir la Orden de Pago del parque ${p}? Se asignará correlativo y se enviará correo y alerta a Contabilidad.`,
+  pagar:   p => `¿Confirmar el PAGO del parque ${p}? Se avisará a los ejecutivos del parque.`,
+};
+async function accion(ev, acc, parque){
+  ev.stopPropagation();
+  if(!confirm(CONFIRM[acc](parque))) return;
+  try {
+    const r = await fetch('/api/comisiones-parques/'+acc, { method:'POST', headers:H, body: JSON.stringify({ mes: elMes.value, parque }) });
+    const j = await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    toast(acc==='aprobar'? 'Comisión aprobada' : acc==='emitir'? ('Orden de Pago '+(j.data.odp_numero||'')+' emitida — correo y alerta enviados') : 'Pago confirmado — ejecutivos notificados');
+    cargar();
+  } catch(e){ toast(e.message, true); }
+}
+
+(async () => {
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    (j.funcionalidades||[]).forEach(c=>FUNCS.add(c));
+  } catch(e) {}
+  cargar();
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -1990,7 +1990,7 @@ const getUsuariosByPerfil = async (req, res) => {
     if (!mod) return;
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const funcs = [
-      ['Comisiones a Pagar',                       'postventa_comisiones_pagar', null],
+      ['Comisiones Dealer a Pagar',                'postventa_comisiones_pagar', null],
       ['Definir Fondos Disponibles (Comisión)',    'pv_com_fondos_definir',  null],
       ['Seleccionar Comisiones a Pagar',           'pv_com_seleccionar',     null],
       ['Confirmar Pago de Comisión',               'pv_com_pagar',           null],
