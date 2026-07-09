@@ -210,4 +210,21 @@ const getMesesAbiertos = async (req, res) => {
   }
 };
 
-module.exports = { getAll, updateAll, getMesesAbiertos };
+// UAC — ops OTORGADAS/APROBADAS del mes EN CURSO (para el tier vigente del día en el
+// simulador). Mismo conteo que services/creditos/src/utils/calcular-operacion.js.
+const getUacOpsVigente = async (_req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT COUNT(*) cnt FROM creditos
+      WHERE DATE_FORMAT(mes,'%Y-%m') = DATE_FORMAT(CURDATE(),'%Y-%m')
+        AND (financiera LIKE '%UNIDAD%' OR financiera LIKE '%UAC%')
+        AND estado_credito IN ('OTORGADO','APROBADO')`);
+    const [[{ m }]] = await pool.query("SELECT DATE_FORMAT(CURDATE(),'%Y-%m') m");
+    res.json({ success: true, data: { mes: m, ops: parseInt(rows[0]?.cnt) || 0 }, error: null });
+  } catch (e) {
+    console.error('[uac-ops-vigente]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAll, updateAll, getMesesAbiertos, getUacOpsVigente };

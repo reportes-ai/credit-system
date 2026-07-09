@@ -421,7 +421,7 @@
   <div class="alert-inline" id="paramsAlert" style="max-width:860px"></div>
   <div class="card-af" style="max-width:760px;display:none" id="cardFactores">
     <h5 style="font-weight:800;color:var(--navy)"><i class="bi bi-sliders me-2"></i>Factores Alta Gama</h5>
-    <p style="font-size:.8rem;color:#64748b">Solo para cartas Alta Gama. Dealer Parque/Calle se calculan desde el mantenedor Parámetros Financieras.</p>
+    <p style="font-size:.8rem;color:#64748b">Solo para cartas Alta Gama. Dealer Parque/Calle se calculan desde el mantenedor Fórmulas Comisiones Financieras.</p>
     <table class="tbl" id="tblFactores">
       <thead><tr><th>Plazo desde</th><th>Plazo hasta</th><th>Dealer Parque</th><th>Dealer Calle</th><th>AG Calle</th><th>AG Parque</th></tr></thead>
       <tbody id="bodyFactores"></tbody>
@@ -1427,7 +1427,7 @@ function tope2(n){ return (n==null || isNaN(n)) ? n : Math.floor(n*100 + 1e-6)/1
 function getFactor(plazo, tipo){
   const p = parseInt(plazo)||0;
   if (!p) return 0;
-  // Dealer Parque/Calle: desde mantenedor Parámetros Financieras
+  // Dealer Parque/Calle: desde mantenedor Fórmulas Comisiones Financieras
   // (claves dealer_pct_* y dealer_calle_pct_* en parametros_credito, valores en %)
   if (PARAMS_CRED && (tipo==='DEALER PARQUE' || tipo==='DEALER CALLE')) {
     const tramo = p<=6?'6' : p<=12?'12' : p<=24?'24' : p<=36?'36' : '99';

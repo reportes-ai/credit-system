@@ -2,7 +2,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    MOTOR ÚNICO — Tier UAC (% de ingreso por colocación UNIDAD DE CRÉDITO).
 
-   Dos MODELOS parametrizables (mantenedor Parámetros Financieras,
+   Dos MODELOS parametrizables (mantenedor Fórmulas Comisiones Financieras,
    parametros_credito.uac_modelo = 1|2). Solo UNO está activo a la vez:
 
    · Modelo 1 (clásico): % por tramo según N° de ops UAC del mes

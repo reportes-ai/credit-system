@@ -1043,7 +1043,7 @@ const getUsuariosByPerfil = async (req, res) => {
       // Mantenedores
       ['mantenedores_parques',             'Arriendo y Comisión Parques'],
       ['mantenedores_broker_validaciones', 'Documentos a Validar Brokers'],
-      ['mantenedores_financieras',         'Fórmulas Financieras'],
+      ['mantenedores_financieras',         'Fórmulas Comisiones Financieras'],
       ['mantenedores_comisiones_seguro',   'Comisiones de Seguro'],
       ['mantenedores_solo_dios',           'SOLO DIOS'],
       ['mantenedores_pagares',             'Pagarés Autofacil'],

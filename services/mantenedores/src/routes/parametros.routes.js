@@ -5,6 +5,7 @@ const ctrl = require('../controllers/parametros.controller');
 
 router.get('/',  verifyToken, ctrl.getAll);
 router.get('/meses-abiertos', verifyToken, ctrl.getMesesAbiertos);
+router.get('/uac-ops-vigente', verifyToken, ctrl.getUacOpsVigente);
 router.put('/',  verifyToken, requireFunc('mantenedores_parametros'), ctrl.updateAll);
 
 module.exports = router;

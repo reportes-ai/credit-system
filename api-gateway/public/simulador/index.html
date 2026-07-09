@@ -279,6 +279,41 @@ function hdr() { return { Authorization: 'Bearer ' + token }; }
 let P = {};    // parámetros del sistema
 let T = {};    // tasas vigentes (CF / spreads, módulo de tasas)
 let UF = 0;   // valor UF hoy
+let OPS_UAC = 0;   // ops UAC otorgadas/aprobadas del mes en curso (tier vigente)
+let MES_UAC = '';  // mes en curso 'YYYY-MM'
+
+/* ── Tier UAC vigente — espejo del motor autoritativo
+   services/creditos/src/utils/uac-tier.js (mismo cálculo, para el simulador).
+   Soporta Modelo 1 (tramos por N° ops) y Modelo 2 (corte por plazo). ── */
+function uacParam(key, def) {
+  if (Math.round(Number(P.uac_modelo)) === 2) {
+    const v2 = P['uac2_' + key];
+    if (v2 !== undefined && v2 !== null && !isNaN(v2)) return Number(v2);
+  }
+  const v1 = P['uac_' + key];
+  return (v1 !== undefined && v1 !== null && !isNaN(v1)) ? Number(v1) : def;
+}
+function pctUACMes(cnt) {
+  if (cnt >= uacParam('ops_tier3_max', 15)) return uacParam('pct_tier4', uacParam('pct_tier3', 18)) / 100;
+  if (cnt >= uacParam('ops_tier2_max', 10)) return uacParam('pct_tier3', 18) / 100;
+  if (cnt >= uacParam('ops_tier1_max',  5)) return uacParam('pct_tier2', 16) / 100;
+  return uacParam('pct_tier1', 14) / 100;
+}
+function tierUACpct(ops, plazo) {
+  let pct = pctUACMes(ops);
+  if (Math.round(Number(P.uac_modelo)) === 2) {
+    const corte = Math.round(Number(P.uac2_plazo_corte)) || 36;
+    if (plazo && Number(plazo) >= corte) {
+      const tope = (P.uac2_pct_largo !== undefined && P.uac2_pct_largo !== null && !isNaN(P.uac2_pct_largo) ? Number(P.uac2_pct_largo) : 16) / 100;
+      pct = Math.min(pct, tope);
+    }
+  }
+  return pct;
+}
+function tierUACn(ops) {
+  const t1 = uacParam('ops_tier1_max', 5), t2 = uacParam('ops_tier2_max', 10), t3 = uacParam('ops_tier3_max', 15);
+  return ops <= t1 ? 1 : ops <= t2 ? 2 : ops <= t3 ? 3 : 4;
+}
 
 /* ── Helpers formato ──────────────────────────────────────────────── */
 function fmtMiles(inp) {
@@ -349,6 +384,13 @@ async function cargarDatos() {
     const jt = await rt.json();
     if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
   } catch(e) { console.warn('[simulador] tasas/vigente:', e.message); }
+
+  // ── UAC: ops OTORGADAS/APROBADAS del mes en curso → tier vigente del día ──
+  try {
+    const ru = await fetch('/api/parametros-credito/uac-ops-vigente', { headers: hdr() });
+    const ju = await ru.json();
+    if (ju.success) { OPS_UAC = ju.data.ops; MES_UAC = ju.data.mes; }
+  } catch(e) { console.warn('[simulador] uac-ops-vigente:', e.message); }
 
   // ── UF: primero vigente (más confiable), sin depender de fecha ──
   try {
@@ -490,8 +532,10 @@ function simular() {
   }
 
   // ── UAC ────────────────────────────────────────────────────────────
-  // Usar tier 1 (14%) para simulación base — nota al usuario
-  const uacPct = (P.uac_pct_tier1 || 14) / 100;
+  // Tier VIGENTE del día: según ops UAC otorgadas/aprobadas del mes en curso
+  // (OPS_UAC) + parámetros del mantenedor Fórmulas Comisiones Financieras.
+  const uacPct = tierUACpct(OPS_UAC, plazo);
+  const uacTierN = tierUACn(OPS_UAC);
   const ing_tasa_uac = Math.round(saldo * uacPct);
 
   // ── Seguros: % traspaso AutoFin PAREJO sobre cada prima (modelo 2026-07:
@@ -554,7 +598,7 @@ function simular() {
     com_dealer, com_patio, com_ej,
     rentab: rentab_uac, pct: pct_uac,
     cuota: cuota_uac, esPatio, esCorfo: false,
-    tier_note: `Ingreso calculado con Tier 1 (${P.uac_pct_tier1||14}% sobre saldo precio). El % real depende del total de operaciones otorgadas en el mes.`
+    tier_note: `Tier vigente <b>Tier ${uacTierN}</b> (${(uacPct*100).toFixed(1).replace('.',',')}% sobre saldo precio) — ${OPS_UAC} op${OPS_UAC===1?'':'s'} UAC otorgadas/aprobadas en ${MES_UAC||'el mes'}${Math.round(Number(P.uac_modelo))===2 && plazo>=(Math.round(Number(P.uac2_plazo_corte))||36)?` · corte por plazo ≥${Math.round(Number(P.uac2_plazo_corte))||36} aplicado`:''}.`
   });
 
   marcarMejor(rentab_af, rentab_uac);
