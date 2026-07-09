@@ -68,6 +68,7 @@
   <div style="display:inline-flex;background:#e8eef6;border-radius:10px;padding:4px;margin-bottom:16px">
     <button class="tab-trk" data-trk="saldo" onclick="setTrack('saldo')" style="border:none;background:#fff;color:#0141A2;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.85rem;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1)">Saldos Precio</button>
     <button class="tab-trk" data-trk="comision" onclick="setTrack('comision')" style="border:none;background:transparent;color:#64748b;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.85rem;cursor:pointer">Comisiones</button>
+    <button class="tab-trk" data-trk="parque" onclick="setTrack('parque')" style="border:none;background:transparent;color:#64748b;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.85rem;cursor:pointer">Parques</button>
   </div>
 
   <div id="eventos"></div>
@@ -76,7 +77,8 @@
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
       <li><b>Saldos Precio</b> → alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a>) en cada transición: Fondos Recibidos → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
-      <li><b>Comisiones</b> → alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a>) en cada transición: Factura Recibida → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
+      <li><b>Comisiones</b> → alerta de campana (<a href="/postventa/seguimiento/">Post Venta</a> / <a href="/postventa/comisiones-a-pagar/">Comisiones Dealer a Pagar</a>) en cada transición: Factura Recibida → Orden Emitida → Montos Cargados → Enviado a Pago → Pago Realizado.</li>
+      <li><b>Parques</b> → alertas y correo de <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>: Orden de Pago emitida (aviso y correo a quien paga) y Pago realizado (además avisa siempre a los ejecutivos del parque).</li>
       <li><b>Incluir ejecutivo</b> → usa el ejecutivo que cursó la operación (vía asignación de ejecutivos del usuario).</li>
     </ul>
   </div>
@@ -115,6 +117,8 @@ const SUB = {
   com_fondos_cargados:  'Al cargar los montos disponibles → avisar al Gerente Comercial (u otro) para decidir qué comisiones pagar.',
   com_enviado_pago:     'Al Enviar a Pago → avisar a Tesorería para confirmar el pago de la comisión.',
   com_pago_realizado:   'Al confirmar el pago → avisar a Gerente/Jefe Comercial, ejecutivo de la operación y persona adicional.',
+  parque_orden_emitida:  'Al emitir la Orden de Pago de un parque → avisar a quien paga (Tesorería) que quedó POR PAGAR en Órdenes de Pago.',
+  parque_pago_realizado: 'Al confirmar el pago del parque → además de estos perfiles, avisa SIEMPRE a los ejecutivos del parque (parte del flujo).',
 };
 
 let TRACK = 'saldo';
@@ -132,7 +136,7 @@ function setTrack(t){
 
 async function cargar(){
   try {
-    const qs = TRACK === 'comision' ? '?track=comision' : '';
+    const qs = TRACK !== 'saldo' ? ('?track=' + TRACK) : '';
     const [jE, jP, jU] = await Promise.all([
       fetch('/api/postventa/alertas-config'+qs, { headers:H }).then(r=>r.json()),
       fetch('/api/postventa/perfiles-lista', { headers:H }).then(r=>r.json()),
@@ -213,7 +217,7 @@ async function guardar(){
   const btn = document.getElementById('btnGuardar');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…';
   try {
-    const qs = TRACK === 'comision' ? '?track=comision' : '';
+    const qs = TRACK !== 'saldo' ? ('?track=' + TRACK) : '';
     const r = await fetch('/api/postventa/alertas-config'+qs, { method:'PUT', headers:H, body: JSON.stringify({ config }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'Error');

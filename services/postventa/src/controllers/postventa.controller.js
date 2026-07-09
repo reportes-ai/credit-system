@@ -248,6 +248,16 @@ const EVENTOS_COMISION = [
   { evento: 'com_pago_realizado', titulo: 'Comisión pagada',
     mensaje: 'Se registró el pago de la comisión de {op}.', href: '/postventa/seguimiento/' },
 ];
+/* ── Alertas de proceso Comisión de PARQUES (paramétricas, event-driven) ────
+   Flujo de /postventa/comisiones-parques/: al emitir la Orden de Pago se avisa
+   a quien paga (default Tesorero), y al pagar se avisa además SIEMPRE a los
+   ejecutivos del parque (eso es del flujo, no configurable). */
+const EVENTOS_PARQUE = [
+  { evento: 'parque_orden_emitida', titulo: 'Orden de Pago de Parque emitida — por pagar',
+    mensaje: 'Se emitió la Orden de Pago de comisión de parque. Queda por pagar en Órdenes de Pago.', href: '/ordenes-pago/' },
+  { evento: 'parque_pago_realizado', titulo: 'Comisión de parque pagada',
+    mensaje: 'Se registró el pago de la comisión de un parque.', href: '/postventa/comisiones-parques/' },
+];
 const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
 (async () => {
   try {
@@ -269,11 +279,13 @@ const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_tipo VARCHAR(20) NOT NULL DEFAULT 'campana'`).catch(()=>{});
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_cada_seg INT NOT NULL DEFAULT 30`).catch(()=>{});
     await pool.query(`ALTER TABLE postventa_alertas_config ADD COLUMN IF NOT EXISTS sonido_max_min INT NOT NULL DEFAULT 5`).catch(()=>{});
-    for (const e of [...EVENTOS_SALDO, ...EVENTOS_COMISION])
+    for (const e of [...EVENTOS_SALDO, ...EVENTOS_COMISION, ...EVENTOS_PARQUE])
       await pool.query(
         `INSERT IGNORE INTO postventa_alertas_config (evento, perfiles, incluir_ejecutivo, usuarios_extra, activo)
          VALUES (?,?,?,?,1)`,
-        [e.evento, 'Administrador', (e.evento === 'pago_realizado' || e.evento === 'com_pago_realizado') ? 1 : 0, '']);
+        [e.evento,
+         e.evento === 'parque_orden_emitida' ? 'Administrador,Tesorero' : 'Administrador',
+         (e.evento === 'pago_realizado' || e.evento === 'com_pago_realizado') ? 1 : 0, '']);
     console.log('[postventa] alertas_config OK');
   } catch (e) { console.error('[postventa alertas migration]', e.message); }
 })();
@@ -563,7 +575,8 @@ const getAtribucionesComision = async (req, res) => {
 // ── Config de alertas del proceso Saldo Precio (mantenedor) ──
 const getAlertasConfig = async (req, res) => {
   try {
-    const lista = req.query.track === 'comision' ? EVENTOS_COMISION : EVENTOS_SALDO;
+    const lista = req.query.track === 'parque' ? EVENTOS_PARQUE
+                : req.query.track === 'comision' ? EVENTOS_COMISION : EVENTOS_SALDO;
     const [rows] = await pool.query('SELECT * FROM postventa_alertas_config');
     const map = {}; rows.forEach(r => { map[r.evento] = r; });
     // Devuelve en el orden del workflow, con título/descripción del evento
@@ -584,7 +597,7 @@ const getAlertasConfig = async (req, res) => {
 const setAlertasConfig = async (req, res) => {
   try {
     const lista = Array.isArray(req.body?.config) ? req.body.config : [];
-    const EVENTOS_TODOS = [...EVENTOS_SALDO, ...EVENTOS_COMISION];
+    const EVENTOS_TODOS = [...EVENTOS_SALDO, ...EVENTOS_COMISION, ...EVENTOS_PARQUE];
     for (const c of lista) {
       if (!EVENTOS_TODOS.find(e => e.evento === c.evento)) continue;
       const sonTipo = SONIDOS_SALDO.includes(c.sonido_tipo) ? c.sonido_tipo : 'campana';

@@ -171,12 +171,28 @@ const detalle = async (req, res) => {
   } catch (e) { console.error('[comisiones-parques detalle]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-/* ── Helpers de notificación ─────────────────────────────────────────────── */
-async function idsPorPerfil(like) {
-  const [us] = await pool.query(
-    `SELECT u.id_usuario, u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-     WHERE p.nombre LIKE ? AND (u.estado IS NULL OR u.estado <> 'inactivo')`, [like]);
-  return us;
+/* ── Helpers de notificación ──────────────────────────────────────────────
+   Destinatarios PARAMÉTRICOS: se leen del mantenedor Alertas Post Venta
+   (postventa_alertas_config), pestaña Parques — igual que los flujos de
+   Saldo Precio y Comisión Dealer. Default sembrado: parque_orden_emitida →
+   Administrador,Tesorero (quien paga las OP hoy). */
+async function destinatariosEvento(evento) {
+  const [[cfg]] = await pool.query('SELECT * FROM postventa_alertas_config WHERE evento=?', [evento]);
+  if (cfg && !cfg.activo) return [];
+  const perfiles = String(cfg?.perfiles || 'Administrador').split(',').map(s => s.trim()).filter(Boolean);
+  const out = [];
+  if (perfiles.length) {
+    const [us] = await pool.query(
+      `SELECT u.id_usuario, u.email FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado <> 'inactivo')`, [perfiles]);
+    out.push(...us);
+  }
+  const extras = String(cfg?.usuarios_extra || '').split(',').map(s => parseInt(s.trim())).filter(Boolean);
+  if (extras.length) {
+    const [us] = await pool.query('SELECT id_usuario, email FROM usuarios WHERE id_usuario IN (?)', [extras]);
+    out.push(...us);
+  }
+  return out;
 }
 async function notificarUsuarios(ids, { titulo, mensaje, href, clave }) {
   let dest = [...new Set(ids)].filter(Boolean);
@@ -239,10 +255,9 @@ const emitir = async (req, res) => {
     await pool.query("UPDATE parques_pagos_mes SET etapa='OP_EMITIDA', odp_id=?, odp_numero=?, emitida_por=?, fecha_emitida=NOW() WHERE id=?",
       [odp.id, odp.numero, quien, e.id]);
 
-    // Alerta in-app a Contabilidad (y respaldo Tesorería) — la OP queda "por pagar" en el ledger
-    const contab = await idsPorPerfil('%ontab%');
-    const tesor = contab.length ? [] : await idsPorPerfil('%esorer%');
-    const destinatarios = contab.length ? contab : tesor;
+    // Alerta in-app según el mantenedor Alertas Post Venta (default Administrador,Tesorero)
+    // — la OP queda "por pagar" en el ledger de Órdenes de Pago
+    const destinatarios = await destinatariosEvento('parque_orden_emitida');
     await notificarUsuarios(destinatarios.map(u => u.id_usuario), {
       titulo: `Orden de Pago ${odp.numero} — Comisión Parque por pagar`,
       mensaje: `${parque} (${mes}): arriendo ${CLP(arriendo)} + comisión créditos ${CLP(comision)} = ${CLP(total)}.`,
@@ -287,11 +302,12 @@ const pagar = async (req, res) => {
     await pagarCorrelativo({ numero: e.odp_numero, id_usuario: req.user?.id_usuario, usuario_nombre: quien });
     await pool.query("UPDATE parques_pagos_mes SET etapa='PAGO_REALIZADO', pagada_por=?, fecha_pagada=NOW() WHERE id=?", [quien, e.id]);
 
-    // Alerta a los ejecutivos del parque (los de las operaciones del mes)
+    // Alerta a los ejecutivos del parque (siempre, es parte del flujo) + perfiles
+    // configurados en el mantenedor Alertas Post Venta (parque_pago_realizado)
     const calc = await calcularMes(mes);
     const row = calc.find(r => r.parque === parque);
     const ejecutivos = [...new Set((row?.detalle || []).map(o => o.ejecutivo).filter(x => x && x !== '—'))];
-    const ids = [];
+    const ids = (await destinatariosEvento('parque_pago_realizado')).map(u => u.id_usuario);
     for (const ej of ejecutivos) {
       try {
         const [us] = await pool.query('SELECT id_usuario FROM usuario_ejecutivos WHERE ejecutivo = ?', [ej]);
