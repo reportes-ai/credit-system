@@ -20,7 +20,7 @@
   <div class="topbar-row1">
     <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
       <a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:32px;display:block;filter:brightness(0) invert(1)"></a>
-      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span style="color:#4fc3f7;font-weight:600">V3.15</span></span>
+      <span style="font-size:9px;font-weight:300;color:#7bafd4;margin-left:1px">Dashboard <span id="dash-ver" style="color:#4fc3f7;font-weight:600"></span></span>
     </div>
     <div id="ultima-act" style="font-size:10px;color:#4fc3f7;margin-left:8px"></div>
     <div id="date-selector" style="display:flex;align-items:center;gap:8px;background:#0f1e38;padding:4px 12px;border-radius:6px;border:1px solid #2a4070;margin-left:8px">
@@ -1160,5 +1160,6 @@
 <script src="app.js" defer></script>
 <script src="/js/alertas-vencimiento.js" defer></script>
 <script src="/js/app-version.js"></script>
+<script>try{var _dv=document.getElementById('dash-ver');if(_dv&&typeof APP_VERSION!=='undefined')_dv.textContent=APP_VERSION;}catch(e){}</script>
 </body>
 </html>
