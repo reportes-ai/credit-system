@@ -87,12 +87,15 @@ function mesesUltimos3() {
    total real de créditos colocados (antes se perdían los que no traían rut_dealer).
    Devuelve { byDealer: {rutNorm:{mes:n}}, orphanByParque: {parqueDisplay:{mes:n}} }. */
 async function contarCreditos(activeRut, parqueCanon) {
+  // Créditos OTORGADOS por el campo `mes` de cierre (fuente única con dashboard/colocaciones
+  // y con el recálculo de categorías). Antes se contaba por fecha_otorgado, que subestima
+  // porque una op se cierra en un mes distinto al de su fecha_otorgado.
   const [creds] = await pool.query(`
-    SELECT rut_dealer, parque, DATE_FORMAT(fecha_otorgado,'%Y-%m') AS mes
+    SELECT rut_dealer, parque, DATE_FORMAT(mes,'%Y-%m') AS mes
     FROM creditos
-    WHERE fecha_otorgado IS NOT NULL
-      AND fecha_otorgado >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH),'%Y-%m-01')
-      AND fecha_otorgado <  DATE_FORMAT(CURDATE(),'%Y-%m-01')`);
+    WHERE estado = 'OTORGADO' AND mes IS NOT NULL
+      AND mes >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 3 MONTH),'%Y-%m-01')
+      AND mes <  DATE_FORMAT(CURDATE(),'%Y-%m-01')`);
   const byDealer = {}, orphanByParque = {};
   const bump = (obj, key, mes) => { (obj[key] = obj[key] || {})[mes] = (obj[key][mes] || 0) + 1; };
   creds.forEach(c => {

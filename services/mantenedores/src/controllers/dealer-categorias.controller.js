@@ -122,12 +122,14 @@ const recalcular = async (req, res) => {
     const [cats] = await pool.query('SELECT codigo, meta_min_unidades FROM dealer_categorias ORDER BY meta_min_unidades DESC');
     if (!cats.length) return res.status(400).json({ success: false, data: null, error: 'No hay categorías definidas' });
 
-    // Unidades (créditos otorgados) por dealer el mes pasado.
+    // Unidades = créditos OTORGADOS del mes anterior CERRADO, contados por el campo `mes`
+    // (mes de cierre) — misma fuente que el reporte de colocaciones por dealer y el dashboard.
+    // Antes se contaba por fecha_otorgado, que subestima (una op se cierra en un mes distinto
+    // al de su fecha_otorgado) y dejaba a casi todos en SOCIO. Regla de negocio confirmada por Pato.
     const [ventas] = await pool.query(`
       SELECT rut_dealer, COUNT(*) AS unidades FROM creditos
-      WHERE rut_dealer IS NOT NULL AND fecha_otorgado IS NOT NULL
-        AND fecha_otorgado >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
-        AND fecha_otorgado <  DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      WHERE rut_dealer IS NOT NULL AND estado = 'OTORGADO'
+        AND DATE_FORMAT(mes, '%Y-%m') = DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m')
       GROUP BY rut_dealer`);
     const ventasPorRut = new Map();
     ventas.forEach(v => ventasPorRut.set(normRut(v.rut_dealer), Number(v.unidades) || 0));
