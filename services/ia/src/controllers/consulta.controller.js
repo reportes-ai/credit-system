@@ -40,6 +40,9 @@ const GLOSARIO = [
   '- "Mora / cartera en mora / monto en mora", "saldo insoluto / capital adeudado", "provisión / castigo" → usa la herramienta mora_provision (stock vivo por tramo con % paramétricos).',
   '- "Listado de morosos / peores deudores" → herramienta cartera_mora. "Recuperación / recaudación / promesas" → herramienta recuperacion_cartera. "Rendimiento / productividad de ejecutivos de cobranza" → herramienta rendimiento_ejecutivos.',
   'Nunca afirmes que estos datos no existen: existen vía herramientas.',
+  '',
+  'BÚSQUEDA POR NOMBRES DE PERSONAS (ejecutivos, clientes, dealers): NUNCA compares con = exacto. La BD es CASE-SENSITIVE (utf8mb4_bin) y los nombres están en MAYÚSCULAS SIN TILDES: usa siempre UPPER(columna) LIKE \'%PALABRA%\' por cada palabra, con el patrón en mayúsculas y sin tildes (ej. UPPER(ejecutivo) LIKE \'%ALVARO%\' AND UPPER(ejecutivo) LIKE \'%VARGAS%\'). Si no hay match, intenta con solo el apellido antes de concluir que no existe.',
+  '- "Comisión / cuánto gana un EJECUTIVO" = las comisiones de venta se calculan en el módulo Comisiones; en creditos están los insumos por operación (com_dealer, com_parque, monto_comision_fin son comisiones del DEALER/parque/financiera, NO el sueldo del ejecutivo). Si preguntan la comisión ganada por un ejecutivo, entrega sus operaciones del período (conteo y montos) y aclara que la liquidación exacta está en Comisiones → Revisión (/comisiones/revision/).',
 ].join('\n');
 
 (async () => {
@@ -258,9 +261,12 @@ const preguntar = async (req, res) => {
       tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 6,
     });
 
+    // El modelo a veces antepone prosa al JSON final: extraer el ÚLTIMO bloque {...}
     let fin = null;
-    try { fin = JSON.parse(String(texto || '').replace(/```json/gi, '').replace(/```/g, '').trim()); } catch (_) {}
-    const respuesta = (fin && fin.respuesta) || texto || 'No pude interpretar la pregunta. ¿Puedes reformularla?';
+    const limpio = String(texto || '').replace(/```json/gi, '').replace(/```/g, '');
+    const m = limpio.match(/\{[\s\S]*\}/);
+    if (m) { try { fin = JSON.parse(m[0]); } catch (_) {} }
+    const respuesta = (fin && fin.respuesta) || limpio.replace(/\{[\s\S]*\}/, '').trim() || 'No pude interpretar la pregunta. ¿Puedes reformularla?';
 
     auditar({ req, accion: 'CONSULTA', modulo: 'ia', entidad: 'bi_consulta', detalle: `Pregunta: ${pregunta}`, meta: { sql: ultimo.sql, filas: ultimo.rows.length } });
     res.json({ success: true, data: { pregunta, respuesta, sql: ultimo.sql, columns: ultimo.columns, rows: ultimo.rows, grafico: (fin && fin.grafico) || null, cuota: await cuotaDe(uid, idp) }, error: null });
