@@ -1576,8 +1576,7 @@ function buildV4() {
 
   const exEv4=Chart.getChart(document.getElementById('ch-evol4')); if(exEv4) exEv4.destroy();
   const last6=(window.DASH.tendencia||[]).slice(-6);
-  const gradOt=(ctx)=>{const ch=ctx.chart,{ctx:cc,chartArea}=ch;if(!chartArea)return C.blue;const g=cc.createLinearGradient(0,chartArea.bottom,0,chartArea.top);g.addColorStop(0,'#1a3a6a');g.addColorStop(1,'#64b5f6');return g;};
-  new Chart(document.getElementById('ch-evol4'),{type:'bar',data:{labels:last6.map(t=>t.mes),datasets:[{label:'Otorgados',data:last6.map(t=>t.otorgados),backgroundColor:gradOt,borderRadius:4},{label:'Com.Dealer M$',data:last6.map(t=>+(t.com_dealer/1e6).toFixed(1)),backgroundColor:C.orange+'88',borderRadius:4,yAxisID:'y2'}]},options:{...chOpts(),plugins:{...chOpts().plugins,legend:{display:true,labels:{color:'#555',font:{size:9},boxWidth:10}}},scales:{x:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y2:{position:'right',grid:{display:false},ticks:{color:'#888',font:{size:9},callback:v=>v+'M'}}}}});
+  new Chart(document.getElementById('ch-evol4'),{type:'bar',data:{labels:last6.map(t=>t.mes),datasets:[{label:'Otorgados',data:last6.map(t=>t.otorgados),backgroundColor:C.green+'bb',borderRadius:4},{label:'Com.Dealer M$',data:last6.map(t=>+(t.com_dealer/1e6).toFixed(1)),backgroundColor:C.blue+'66',borderRadius:4,yAxisID:'y2'}]},options:{...chOpts(),plugins:{...chOpts().plugins,legend:{display:true,labels:{color:'#555',font:{size:9},boxWidth:10}}},scales:{x:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y:{grid:{color:'#f0f2f5'},ticks:{color:'#888',font:{size:9}}},y2:{position:'right',grid:{display:false},ticks:{color:'#888',font:{size:9},callback:v=>v+'M'}}}}});
 }
 // ──────────────────────────────────────────────────────────────
 // BLOQUE ORIGINAL línea 2203
