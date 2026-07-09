@@ -59,7 +59,16 @@ function diasDesdeFinMes(mes) {
  * 2. Re-cierra meses que fueron abiertos manualmente hace más de 24h
  */
 async function ejecutarCierreAutomatico(diasCierre) {
+  // Ventana móvil de 24 meses + TODOS los meses históricos con créditos
+  // (migraciones cargan meses antiguos que quedaban "abiertos por omisión"
+  // porque la ventana nunca los revisaba).
   const meses = generarMeses(24);
+  try {
+    const [hist] = await pool.query(
+      "SELECT DISTINCT DATE_FORMAT(mes,'%Y-%m') m FROM creditos WHERE mes IS NOT NULL");
+    const hoyYm = new Date().toISOString().slice(0, 7);
+    hist.forEach(r => { if (r.m && r.m < hoyYm && !meses.includes(r.m)) meses.push(r.m); });
+  } catch (e) { /* sin tabla creditos aún → solo ventana móvil */ }
   const [rows] = await pool.query('SELECT * FROM meses_cerrados');
   const map = {};
   rows.forEach(r => { map[r.mes] = r; });
