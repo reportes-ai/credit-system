@@ -177,12 +177,121 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
     .filter(Boolean);
 }
 
+/* ── Parseo del Informe Canal AFA (hoja "Base Resultante") ──────────
+   Complementa por ID Trinidad: seguros, GPS, tipo vehículo, RUT, marca/modelo. */
+function parseCanal(buffer) {
+  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+  const ws = wb.Sheets['Base Resultante'] || wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  let hIdx = raw.findIndex(r => Array.isArray(r) && r.some(c => String(c || '').trim().toUpperCase() === 'ID'));
+  if (hIdx < 0) return {};
+  const headers = (raw[hIdx] || []).map(h => String(h || '').trim().toUpperCase());
+  const col = n => headers.indexOf(n.toUpperCase());
+  const iId = col('ID'), iCes = col('SEGUROCESANTIA'), iRdh = col('SEGURORDH'),
+        iRep = col('SEGUROREPARACIONMENOR'), iGps = col('GPS'), iTipo = col('TIPOVEHICULO'),
+        iRut = col('RUTCLIENTE'), iMarca = col('MARCA'), iModelo = col('MODELO');
+  if (iId < 0) return {};
+  const mapa = {};
+  for (const row of raw.slice(hIdx + 1)) {
+    if (!row || row[iId] == null) continue;
+    const id = parseInt(row[iId]); if (!id || isNaN(id)) continue;
+    mapa[id] = {
+      seguro_cesantia:  iCes  >= 0 ? normInt(row[iCes])  : null,
+      seguro_rdh:       iRdh  >= 0 ? normInt(row[iRdh])  : null,
+      seguro_rep_menor: iRep  >= 0 ? normInt(row[iRep])  : null,
+      gps:              iGps  >= 0 ? normInt(row[iGps])  : null,
+      tipo_vehiculo:    iTipo >= 0 ? normStr(row[iTipo]) : null,
+      rut_cliente:      iRut  >= 0 ? normRut(row[iRut])  : null,
+      marca:            iMarca >= 0 ? normStr(row[iMarca]) : null,
+      modelo:           iModelo >= 0 ? normStr(row[iModelo]) : null,
+    };
+  }
+  return mapa;
+}
+
+/* ── ¿Es un Informe Canal (y no un export de Solicitudes)? ─────── */
+function esArchivoCanal(buffer) {
+  try {
+    const wb = XLSX.read(buffer, { type: 'buffer', sheetRows: 1 });
+    return wb.SheetNames.includes('Base Resultante');
+  } catch { return false; }
+}
+
+/* ── Complementa creditos con datos del Informe Canal (fill-only) ──
+   Solo RELLENA lo vacío (montos 0/NULL, strings NULL); nunca pisa datos
+   existentes ni toca meses cerrados. Match por num_op o id_financiera. */
+async function aplicarCanal(mapaCanal, log) {
+  const ids = Object.keys(mapaCanal).map(Number);
+  const idsSet = new Set(ids);
+  let complementados = 0, sinMatch = 0, omitidosCerrado = 0;
+  const cerradoCache = {};
+  const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
+  const TEXTOS = ['tipo_vehiculo', 'rut_cliente', 'marca', 'modelo'];
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const [rows] = await pool.query(
+      `SELECT id, num_op, id_financiera, mes, seguro_cesantia, seguro_rdh, seguro_rep_menor,
+              gps, tipo_vehiculo, rut_cliente, marca, modelo
+       FROM creditos WHERE num_op IN (?) OR id_financiera IN (?)`,
+      [chunk, chunk.map(String)]);
+    const vistos = new Set();
+    for (const r of rows) {
+      const key = idsSet.has(Number(r.num_op)) ? Number(r.num_op) : parseInt(r.id_financiera);
+      const f = mapaCanal[key];
+      if (!f) continue;
+      vistos.add(key);
+      // mes cerrado → no tocar
+      const mesStr = r.mes ? String(r.mes).slice(0, 7) : null;
+      if (mesStr) {
+        if (cerradoCache[mesStr] === undefined) cerradoCache[mesStr] = await isMesCerrado(mesStr);
+        if (cerradoCache[mesStr]) { omitidosCerrado++; continue; }
+      }
+      const sets = [], vals = [];
+      for (const c of MONTOS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      for (const c of TEXTOS) if (f[c] && !normStr(r[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      if (!sets.length) continue;
+      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, r.id]);
+      complementados++;
+    }
+    sinMatch += chunk.filter(k => !vistos.has(k)).length;
+  }
+  if (complementados) log.push(`📎 Informe Canal: ${complementados} créditos complementados (seguros/GPS/tipo vehículo/RUT)`);
+  if (omitidosCerrado) log.push(`⏭ Informe Canal: ${omitidosCerrado} omitidos por mes cerrado`);
+  return { complementados, sinMatch, omitidosCerrado };
+}
+
+/* ── Helper: archivos de la request (fields o single, retrocompatible) ── */
+function archivosDe(req) {
+  const f = req.files || {};
+  let solicitudes = f.archivo?.[0] || req.file || null;
+  let canal       = f.archivo_canal?.[0] || null;
+  // Si el usuario cruzó los archivos, corregir por contenido
+  if (solicitudes && !canal && esArchivoCanal(solicitudes.buffer)) { canal = solicitudes; solicitudes = null; }
+  if (canal && !esArchivoCanal(canal.buffer) && solicitudes && esArchivoCanal(solicitudes.buffer)) {
+    const t = canal; canal = solicitudes; solicitudes = t;
+  }
+  return { solicitudes, canal };
+}
+
 /* ── POST /api/carga-trinidad/preview ──────────────────────────── */
 exports.preview = async (req, res) => {
   try {
-    if (!req.file) return res.json({ success: false, error: 'Archivo requerido' });
+    const { solicitudes, canal } = archivosDe(req);
+    if (!solicitudes && !canal) return res.json({ success: false, error: 'Archivo requerido' });
+
+    // Solo Informe Canal (sin solicitudes): resumen del complemento
+    let infoCanal = null;
+    if (canal) {
+      const mapaCanal = parseCanal(canal.buffer);
+      infoCanal = { total: Object.keys(mapaCanal).length };
+    }
+    if (!solicitudes) {
+      if (!infoCanal || !infoCanal.total) return res.json({ success: false, error: 'El Informe Canal no tiene registros con ID válido' });
+      return res.json({ success: true, data: { total: 0, nuevos: 0, actualizados: 0, porEstado: {}, preview: [], canal: infoCanal } });
+    }
+
     const [mapaEstados, mapaEjecutivos] = await Promise.all([cargarMapaEstados(), cargarMapaEjecutivos()]);
-    const filas = parseExcel(req.file.buffer, mapaEstados, mapaEjecutivos);
+    const filas = parseExcel(solicitudes.buffer, mapaEstados, mapaEjecutivos);
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
@@ -208,7 +317,7 @@ exports.preview = async (req, res) => {
       porEstado[e] = (porEstado[e] || 0) + 1;
     }
 
-    return res.json({ success: true, data: { total: filas.length, nuevos, actualizados, porEstado, preview } });
+    return res.json({ success: true, data: { total: filas.length, nuevos, actualizados, porEstado, preview, canal: infoCanal } });
   } catch (e) {
     console.error('[carga-trinidad preview]', e);
     return res.json({ success: false, error: e.message });
@@ -218,9 +327,21 @@ exports.preview = async (req, res) => {
 /* ── POST /api/carga-trinidad/importar ─────────────────────────── */
 exports.importar = async (req, res) => {
   try {
-    if (!req.file) return res.json({ success: false, error: 'Archivo requerido' });
+    const { solicitudes, canal } = archivosDe(req);
+    if (!solicitudes && !canal) return res.json({ success: false, error: 'Archivo requerido' });
+    const mapaCanal = canal ? parseCanal(canal.buffer) : null;
+
+    // Solo Informe Canal: complementar créditos existentes y terminar
+    if (!solicitudes) {
+      if (!mapaCanal || !Object.keys(mapaCanal).length) return res.json({ success: false, error: 'El Informe Canal no tiene registros con ID válido' });
+      const log = [];
+      const rc = await aplicarCanal(mapaCanal, log);
+      return res.json({ success: true, data: { total: Object.keys(mapaCanal).length, insertados: 0, actualizados: 0,
+        omitidos_futuro: 0, errores: 0, canal: rc, log, cursados: [] } });
+    }
+
     const [mapaEstados, mapaEjecutivos] = await Promise.all([cargarMapaEstados(), cargarMapaEjecutivos()]);
-    const filas = parseExcel(req.file.buffer, mapaEstados, mapaEjecutivos);
+    const filas = parseExcel(solicitudes.buffer, mapaEstados, mapaEjecutivos);
     if (!filas.length) return res.json({ success: false, error: 'No se encontraron registros con ID válido' });
 
     const numOps = filas.map(f => f.num_op);
@@ -357,12 +478,19 @@ exports.importar = async (req, res) => {
       }
     }
 
+    // ── Complemento desde Informe Canal AFA (seguros/GPS/tipo vehículo/RUT) ──
+    let resCanal = null;
+    if (mapaCanal && Object.keys(mapaCanal).length) {
+      try { resCanal = await aplicarCanal(mapaCanal, log); }
+      catch (e) { log.push(`⚠ Informe Canal: ${e.message}`); }
+    }
+
     // ── Guardar en historial ──────────────────────────────────────
     if (insertados > 0 || actualizados > 0) {
       historial.crearSesion({
         fuente:      'trinidad',
         usuario:     req.user?.nombre || req.user?.email || null,
-        archivo:     req.file?.originalname || null,
+        archivo:     [solicitudes?.originalname, canal?.originalname].filter(Boolean).join(' + ') || null,
         insertados, actualizados, errores,
         total:       filas.length,
       }).then(sesionId => {
@@ -409,7 +537,7 @@ exports.importar = async (req, res) => {
 
     return res.json({
       success: true,
-      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, log, cursados },
+      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, canal: resCanal, log, cursados },
     });
   } catch (e) {
     console.error('[carga-trinidad importar]', e);

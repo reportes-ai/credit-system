@@ -68,7 +68,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.0</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v7.0</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -92,18 +92,34 @@
     <i class="bi bi-diagram-3-fill"></i>
     <div>
       <h2>Carga Trinidad</h2>
-      <p>Importa el Excel exportado desde Trinidad. Registros nuevos se <strong>insertan</strong>; existentes se <strong>actualizan</strong> (estado). Llave: ID Trinidad = N° Operación AutoFácil.</p>
+      <p>Importa los Excel exportados desde Trinidad. <strong>Solicitudes</strong>: nuevos se insertan, existentes se actualizan (estado). <strong>Informe Canal AFA</strong>: complementa seguros, GPS, tipo vehículo y RUT (solo rellena lo vacío). Llave: ID Trinidad = N° Operación AutoFácil.</p>
     </div>
   </div>
 
   <div class="card">
-    <div class="drop-zone" id="triDropZone" onclick="document.getElementById('triFileInput').click()"
-         ondragover="triOnDrag(event,true)" ondragleave="triOnDrag(event,false)" ondrop="triOnDrop(event)">
-      <i class="bi bi-file-earmark-spreadsheet"></i>
-      <div class="label" id="triDropLabel">Arrastra el Excel de Trinidad aquí o haz clic para seleccionar</div>
-      <div class="sub">Solo archivos .xlsx exportados desde Trinidad — máx. 10 MB</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-weight:700;font-size:.82rem;color:#0141A2;margin-bottom:8px"><i class="bi bi-1-circle-fill me-1"></i>Solicitudes Trinidad</div>
+        <div class="drop-zone" id="triDropZone" onclick="document.getElementById('triFileInput').click()"
+             ondragover="triOnDrag(event,true,'triDropZone')" ondragleave="triOnDrag(event,false,'triDropZone')" ondrop="triOnDrop(event,'sol')">
+          <i class="bi bi-file-earmark-spreadsheet"></i>
+          <div class="label" id="triDropLabel">TRISolicitudWWExport…xlsx</div>
+          <div class="sub">Export de solicitudes — inserta y actualiza estados</div>
+        </div>
+        <input type="file" id="triFileInput" accept=".xlsx" onchange="triArchivoSeleccionado(event,'sol')">
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:.82rem;color:#0141A2;margin-bottom:8px"><i class="bi bi-2-circle-fill me-1"></i>Informe Canal AFA</div>
+        <div class="drop-zone" id="canalDropZone" onclick="document.getElementById('canalFileInput').click()"
+             ondragover="triOnDrag(event,true,'canalDropZone')" ondragleave="triOnDrag(event,false,'canalDropZone')" ondrop="triOnDrop(event,'canal')">
+          <i class="bi bi-file-earmark-bar-graph"></i>
+          <div class="label" id="canalDropLabel">Informe_Canal_AFA…xlsx</div>
+          <div class="sub">Complementa seguros, GPS, tipo vehículo y RUT</div>
+        </div>
+        <input type="file" id="canalFileInput" accept=".xlsx" onchange="triArchivoSeleccionado(event,'canal')">
+      </div>
     </div>
-    <input type="file" id="triFileInput" accept=".xlsx" onchange="triArchivoSeleccionado(event)">
+    <div style="font-size:.75rem;color:#9ca3af;margin-top:8px">Puedes subir uno o ambos (.xlsx, máx. 10 MB c/u). Si arrastras el archivo a la zona equivocada, se reubica solo por su nombre.</div>
     <div style="margin-top:16px">
       <button class="btn-main" id="btnTriPreview" onclick="triEjecutarPreview()" disabled>
         <i class="bi bi-eye"></i>Vista previa
@@ -149,7 +165,7 @@ document.getElementById('navPerfil').textContent  = yo?.perfil || '';
 document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
-let triFile = null, toastTimer;
+let triFile = null, canalFile = null, toastTimer;
 
 function toast(msg, ok=true) {
   const t = document.getElementById('toast');
@@ -160,31 +176,44 @@ function toast(msg, ok=true) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
-function triOnDrag(e, over) { e.preventDefault(); document.getElementById('triDropZone').classList.toggle('drag-over', over); }
-function triOnDrop(e) { e.preventDefault(); triOnDrag(e,false); const f=e.dataTransfer.files[0]; if(f) triSetFile(f); }
-function triArchivoSeleccionado(e) { const f=e.target.files[0]; if(f) triSetFile(f); }
-function triSetFile(f) {
-  triFile = f;
-  document.getElementById('triDropLabel').textContent = '📄 ' + f.name;
-  document.getElementById('btnTriPreview').disabled = false;
+function triOnDrag(e, over, zona) { e.preventDefault(); document.getElementById(zona||'triDropZone').classList.toggle('drag-over', over); }
+function triOnDrop(e, tipo) { e.preventDefault(); triOnDrag(e,false,tipo==='canal'?'canalDropZone':'triDropZone'); for (const f of e.dataTransfer.files) triSetFile(f, tipo); }
+function triArchivoSeleccionado(e, tipo) { const f=e.target.files[0]; if(f) triSetFile(f, tipo); }
+function detectarTipo(f, tipoZona) {
+  const n = (f.name||'').toLowerCase();
+  if (n.includes('canal')) return 'canal';                 // Informe_Canal_AFA...
+  if (n.includes('solicitud') || n.includes('trisolicitud')) return 'sol';
+  return tipoZona;                                          // sin pista en el nombre: respetar la zona
+}
+function triSetFile(f, tipoZona) {
+  const tipo = detectarTipo(f, tipoZona);
+  if (tipo !== tipoZona) toast('Archivo reubicado a "' + (tipo==='canal'?'Informe Canal AFA':'Solicitudes Trinidad') + '" por su nombre', true);
+  if (tipo === 'canal') { canalFile = f; document.getElementById('canalDropLabel').textContent = '📄 ' + f.name; }
+  else                  { triFile   = f; document.getElementById('triDropLabel').textContent   = '📄 ' + f.name; }
+  document.getElementById('btnTriPreview').disabled = !(triFile || canalFile);
   document.getElementById('triPaso2').style.display = 'none';
   document.getElementById('triPaso3').style.display = 'none';
 }
+function armarFD() {
+  const fd = new FormData();
+  if (triFile)   fd.append('archivo', triFile);
+  if (canalFile) fd.append('archivo_canal', canalFile);
+  return fd;
+}
 
 async function triEjecutarPreview() {
-  if (!triFile) return;
+  if (!triFile && !canalFile) return;
   const btn = document.getElementById('btnTriPreview');
   btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Analizando...';
   try {
-    const fd = new FormData(); fd.append('archivo', triFile);
-    const r = await fetch('/api/carga-trinidad/preview', { method:'POST', headers:H, body:fd }).then(x=>x.json());
+    const r = await fetch('/api/carga-trinidad/preview', { method:'POST', headers:H, body:armarFD() }).then(x=>x.json());
     if (!r.success) { toast('Error: ' + r.error, false); return; }
     const d = r.data;
     document.getElementById('triStatsRow').innerHTML = `
-      <div class="stat-item blue"><div class="lbl">Total en archivo</div><div class="val">${d.total}</div></div>
+      <div class="stat-item blue"><div class="lbl">Solicitudes en archivo</div><div class="val">${d.total}</div></div>
       <div class="stat-item green"><div class="lbl">Registros nuevos</div><div class="val">${d.nuevos}</div></div>
       <div class="stat-item amber"><div class="lbl">A actualizar</div><div class="val">${d.actualizados}</div></div>
-      <div class="stat-item" style="border-left-color:#6366f1"><div class="lbl">Tipos de estado</div><div class="val">${Object.keys(d.porEstado).length}</div></div>`;
+      <div class="stat-item" style="border-left-color:#6366f1"><div class="lbl">Informe Canal</div><div class="val">${d.canal ? d.canal.total.toLocaleString('es-CL') : '—'}</div></div>`;
     const estHtml = Object.entries(d.porEstado).map(([e,c]) =>
       `<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 4px;background:#f1f5f9;border-radius:8px;padding:3px 10px;font-size:.78rem"><strong style="color:#0141A2">${c}</strong> ${e}</span>`).join('');
     document.getElementById('triEstadosDist').innerHTML = `<div style="font-size:.78rem;color:#6b7280;font-weight:600;margin-bottom:6px">Distribución de estados Trinidad:</div>${estHtml}`;
@@ -203,12 +232,11 @@ async function triEjecutarPreview() {
 }
 
 async function triEjecutarImport() {
-  if (!triFile) return;
+  if (!triFile && !canalFile) return;
   const btn = document.getElementById('btnTriImportar');
   btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span>Importando...';
   try {
-    const fd = new FormData(); fd.append('archivo', triFile);
-    const r = await fetch('/api/carga-trinidad/importar', { method:'POST', headers:H, body:fd }).then(x=>x.json());
+    const r = await fetch('/api/carga-trinidad/importar', { method:'POST', headers:H, body:armarFD() }).then(x=>x.json());
     if (!r.success) { toast('Error: '+r.error, false); return; }
     const d = r.data;
     const logHtml = d.log.slice(0,50).map(l=>`<div class="log-line ${l.startsWith('✗')?'err':''}">${l}</div>`).join('');
@@ -220,6 +248,7 @@ async function triEjecutarImport() {
         <div class="log-line">📋 Total procesados: <strong>${d.total}</strong></div>
         <div class="log-line" style="color:#166534">➕ Insertados: <strong>${d.insertados}</strong></div>
         <div class="log-line" style="color:#d97706">🔄 Actualizados: <strong>${d.actualizados}</strong></div>
+        ${d.canal?`<div class="log-line" style="color:#0141A2">📎 Complementados con Informe Canal: <strong>${d.canal.complementados.toLocaleString('es-CL')}</strong>${d.canal.omitidosCerrado?` · omitidos mes cerrado: ${d.canal.omitidosCerrado}`:''}</div>`:''}
         ${d.errores>0?`<div class="log-line err">✗ Errores: <strong>${d.errores}</strong></div>`:''}
         <details style="margin-top:12px"><summary style="cursor:pointer;font-size:.8rem;color:#6b7280">Ver log completo</summary>
           <div style="max-height:200px;overflow-y:auto;margin-top:8px;background:#f9fafb;border-radius:8px;padding:10px">${logHtml}</div>
