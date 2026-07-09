@@ -7,7 +7,7 @@
  */
 const pool = require('../../../../shared/config/database');
 const ia = require('../../../../shared/ia');
-const { analizar } = require('../../../../shared/anthropic');
+const { analizarTools } = require('../../../../shared/anthropic');
 const { auditar } = require('../../../../shared/audit');
 
 const CODIGO_IA = 'bi_consulta';           // feature IA (on/off + modelo + costo)
@@ -36,9 +36,10 @@ const GLOSARIO = [
   '- "Cartas de aprobación por vencer" = cartas_aprobacion vigentes cuya fecha de vencimiento se acerca.',
   '- "Cobranza / gestiones" = cobranza_gestiones (canal, resultado, monto_promesa, confirmado, created_at). "Promesa de pago" = resultado=\'PROMESA_PAGO\'. "Recuperación / recaudación" = promesas y gestiones confirmadas de cobranza_gestiones.',
   '',
-  'MÉTRICAS QUE SE CALCULAN EN EL MÓDULO COBRANZA (NO son columnas de estas tablas; NO inventes SQL ni digas que "no existen"):',
-  '- "Mora / días de mora / cuotas en mora / monto en mora / cartera en mora", "saldo insoluto / capital adeudado", y "provisión / castigo" (capital insoluto × % por tramo de días de mora; 181+ días = 100%).',
-  'Para CUALQUIERA de estas: marca no_aplica=true y en "motivo" explica brevemente el concepto y remite al reporte correcto: provisión y stock por tramo → reporte "Mora Histórica" (/cobranza/reportes/mora-historica); listado de morosos → "Cartera en Mora" (/cobranza/reportes/cartera); recaudación → "Recuperación de Cartera" (/cobranza/reportes/recuperacion). Nunca afirmes que el dato no existe.',
+  'MÉTRICAS QUE SE CALCULAN EN EL MÓDULO COBRANZA (NO son columnas de estas tablas; NO inventes SQL para ellas):',
+  '- "Mora / cartera en mora / monto en mora", "saldo insoluto / capital adeudado", "provisión / castigo" → usa la herramienta mora_provision (stock vivo por tramo con % paramétricos).',
+  '- "Listado de morosos / peores deudores" → herramienta cartera_mora. "Recuperación / recaudación / promesas" → herramienta recuperacion_cartera. "Rendimiento / productividad de ejecutivos de cobranza" → herramienta rendimiento_ejecutivos.',
+  'Nunca afirmes que estos datos no existen: existen vía herramientas.',
 ].join('\n');
 
 (async () => {
@@ -164,25 +165,57 @@ async function ejecutarSeguro(sqlRaw) {
   } finally { conn.release(); }
 }
 
-/* ── IA: generar SQL desde la pregunta ── */
-async function generarSQL(pregunta, esquema, errPrevio, id_usuario, historial) {
-  const system =
-    'Eres un analista de datos experto en SQL (MySQL/TiDB) para AutoFácil, una automotora de crédito en Chile. ' +
-    'Genera UNA sola consulta SELECT (sin punto y coma) que responda la pregunta, usando SOLO estas tablas y columnas:\n' +
-    esquema +
-    '\n\n' + GLOSARIO +
-    '\n\nReglas: solo SELECT (jamás modificar datos); usa JOIN/agregaciones según convenga; agrega LIMIT cuando devuelvas listas; ' +
-    'montos en pesos; las fechas son tipo DATE/DATETIME. Si la pregunta NO se puede responder con estas tablas (ej. pide una simulación o un escenario "qué pasaría si"), marca no_aplica=true y explica en motivo. ' +
-    'Devuelve JSON: {"sql": "...", "intencion": "...", "grafico": {"tipo":"bar|line|pie", "etiqueta":"<columna categórica>", "valor":"<columna numérica>", "titulo":"..."} | null, "no_aplica": false, "motivo": ""}.';
-  let prompt = '';
-  if (historial && historial.length) {
-    prompt += 'Contexto de la conversación (preguntas previas y el SQL usado). La nueva pregunta puede ser una REPREGUNTA que se apoya en estas (ej. "y por dealer", "pero solo los morosos", "ahora del mes pasado"); reescribe la consulta COMPLETA considerando ese contexto:\n' +
-      historial.map((h, i) => `${i + 1}) Pregunta: ${h.pregunta}\n   SQL: ${h.sql}`).join('\n') + '\n\n';
-  }
-  prompt += `Pregunta del usuario: "${pregunta}"`;
-  if (errPrevio) prompt += `\n\nTu consulta SQL anterior falló con este error: ${errPrevio}\nCorrígela.`;
-  const { datos } = await analizar({ codigo: CODIGO_IA, system, prompt, json: true, id_usuario, max_tokens: 1000 });
-  return datos;
+/* ── IA con herramientas: SQL libre + motores de cobranza (mora/provisión/etc.) ── */
+const TOOLS = [
+  { name: 'consulta_sql',
+    description: 'Ejecuta UNA consulta SELECT (MySQL/TiDB) de SOLO LECTURA sobre las tablas del esquema permitido. Úsala para preguntas generales de datos (créditos, clientes, dealers, comisiones, etc.). Sin punto y coma; agrega LIMIT en listas.',
+    input_schema: { type: 'object', properties: { sql: { type: 'string', description: 'La consulta SELECT' } }, required: ['sql'] } },
+  { name: 'mora_provision',
+    description: 'Stock de cartera en mora HOY, agrupado por tramo de días de mora: casos, monto en mora, capital insoluto y PROVISIÓN calculada con los % paramétricos del mantenedor (181+ días = castigo). Incluye totales y split prejudicial/judicial. Úsala para: mora, provisión, castigo, cartera morosa por tramo.',
+    input_schema: { type: 'object', properties: {} } },
+  { name: 'recuperacion_cartera',
+    description: 'Recuperación/recaudación de cobranza por mes: promesas de pago, montos prometidos y montos confirmados. Fechas formato YYYY-MM-DD; por defecto últimos 6 meses.',
+    input_schema: { type: 'object', properties: { desde: { type: 'string' }, hasta: { type: 'string' } } } },
+  { name: 'rendimiento_ejecutivos',
+    description: 'Rendimiento de los ejecutivos de COBRANZA en un rango de fechas: gestiones, contactos, tasa de contacto, promesas y montos. Fechas YYYY-MM-DD; por defecto últimos 6 meses.',
+    input_schema: { type: 'object', properties: { desde: { type: 'string' }, hasta: { type: 'string' } } } },
+  { name: 'cartera_mora',
+    description: 'Listado de créditos en mora (peores primero): número de crédito, cliente, cuotas y días de mora, monto en mora y saldo insoluto. Filtros opcionales.',
+    input_schema: { type: 'object', properties: {
+      tipo: { type: 'string', enum: ['prejudicial', 'judicial'] },
+      tramo: { type: 'string', enum: ['1-15', '16-30', '31-60', '61-90', '91+'] },
+      limit: { type: 'number' } } } },
+];
+
+const fechaOk = s => (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) ? s : null;
+function rangoDef(input) {
+  const hasta = fechaOk(input.hasta) || new Date().toISOString().slice(0, 10);
+  let desde = fechaOk(input.desde);
+  if (!desde) { const x = new Date(hasta); x.setMonth(x.getMonth() - 6); desde = x.toISOString().slice(0, 10); }
+  return { desde, hasta };
+}
+
+// Despachador: resuelve cada herramienta y va guardando el último resultado tabular
+// (para pintar la tabla en el frontend igual que antes).
+function crearDispatcher(ultimo) {
+  // Motor de datos de Reportería Cobranzas (un solo motor: mismos números que los reportes)
+  const rep = require('../../../cobranza/src/controllers/reportes.controller')._datos;
+  const tabla = (rows) => {
+    ultimo.rows = Array.isArray(rows) ? rows.slice(0, 500) : [];
+    ultimo.columns = ultimo.rows.length ? Object.keys(ultimo.rows[0]) : [];
+  };
+  return async (name, input) => {
+    if (name === 'consulta_sql') {
+      const r = await ejecutarSeguro(input.sql);
+      ultimo.sql = r.sql; ultimo.rows = r.rows; ultimo.columns = r.columns;
+      return { filas: r.rows.length, columnas: r.columns, muestra: r.rows.slice(0, 50) };
+    }
+    if (name === 'mora_provision')       { const d = await rep.datosMoraStock(); tabla(d.tramos); return d; }
+    if (name === 'recuperacion_cartera') { const { desde, hasta } = rangoDef(input); const d = await rep.datosRecuperacion(desde, hasta); tabla(d.serie); return d; }
+    if (name === 'rendimiento_ejecutivos') { const { desde, hasta } = rangoDef(input); const d = await rep.datosRendimiento(desde, hasta); tabla(d.ejecutivos); return d; }
+    if (name === 'cartera_mora')         { const d = await rep.datosCartera({ tipo: input.tipo, tramo: input.tramo, limit: Math.min(Number(input.limit) || 200, 500) }); tabla(d.rows); return { total: d.total, rows: d.rows.slice(0, 100) }; }
+    throw new Error('Herramienta desconocida: ' + name);
+  };
 }
 
 // POST /api/ia/consulta { pregunta }
@@ -202,28 +235,35 @@ const preguntar = async (req, res) => {
       .slice(-3)
       .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), sql: String(h.sql).slice(0, 1500) }));
 
-    let gen = await generarSQL(pregunta, esquema, null, uid, historial);
-    if (!gen || (!gen.sql && !gen.no_aplica)) return res.json({ success: true, data: { pregunta, respuesta: 'No pude interpretar la pregunta. ¿Puedes reformularla?', sql: null, columns: [], rows: [], grafico: null, cuota: await cuotaDe(uid, idp) }, error: null });
-    if (gen.no_aplica) return res.json({ success: true, data: { pregunta, respuesta: gen.motivo || 'No puedo responder eso con los datos disponibles.', sql: null, columns: [], rows: [], grafico: null, cuota: await cuotaDe(uid, idp) }, error: null });
+    const system =
+      'Eres un analista de datos de AutoFácil, una automotora de crédito en Chile. Respondes preguntas de negocio ' +
+      'usando las HERRAMIENTAS disponibles: consulta_sql para SQL libre (SOLO SELECT) y las herramientas de cobranza ' +
+      'para mora/provisión/recuperación/rendimiento (usa SIEMPRE esas para dichas métricas, jamás SQL propio). ' +
+      'Los datos son la BASE INTERNA de AutoFácil (sus propias operaciones), no el mercado.\n\n' +
+      'Esquema disponible para consulta_sql:\n' + esquema + '\n\n' + GLOSARIO + '\n\n' +
+      'Al terminar, responde SOLO con JSON: {"respuesta":"1 a 3 frases en español, breve y claro para un gerente, montos en pesos chilenos con separador de miles", ' +
+      '"grafico": {"tipo":"bar|line|pie","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
+      'El gráfico debe referirse a columnas de la última tabla obtenida. Si la pregunta no se puede responder (ej. simulaciones "qué pasaría si"), dilo en "respuesta" sin inventar datos.';
 
-    let resultado;
-    try { resultado = await ejecutarSeguro(gen.sql); }
-    catch (e1) {
-      // Un reintento: le devolvemos el error a la IA para que corrija
-      gen = await generarSQL(pregunta, esquema, e1.message || String(e1), uid, historial);
-      if (!gen || !gen.sql) throw e1;
-      resultado = await ejecutarSeguro(gen.sql);
+    let prompt = '';
+    if (historial.length) {
+      prompt += 'Contexto de la conversación (preguntas previas y el SQL usado). La nueva pregunta puede ser una REPREGUNTA que se apoya en estas (ej. "y por dealer", "ahora del mes pasado"):\n' +
+        historial.map((h, i) => `${i + 1}) Pregunta: ${h.pregunta}\n   SQL: ${h.sql}`).join('\n') + '\n\n';
     }
+    prompt += `Pregunta del usuario: "${pregunta}"`;
 
-    const muestra = resultado.rows.slice(0, 50);
-    const { texto } = await analizar({
-      codigo: CODIGO_IA, id_usuario: uid, max_tokens: 600,
-      system: 'Eres un analista que explica resultados a un gerente de AutoFácil, en español, breve y claro (1 a 3 frases). Los datos provienen de la BASE DE DATOS INTERNA de AutoFácil (sus propias operaciones de crédito), NO del mercado: redacta en ese marco (ej. "según los datos de AutoFácil…"). Usa SOLO los datos entregados; no inventes. Formatea montos en pesos chilenos.',
-      prompt: `Pregunta: ${pregunta}\nColumnas: ${resultado.columns.join(', ')}\nResultado (JSON, máx 50 filas): ${JSON.stringify(muestra)}`,
+    const ultimo = { sql: null, rows: [], columns: [] };
+    const { texto } = await analizarTools({
+      codigo: CODIGO_IA, id_usuario: uid, system, prompt,
+      tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 6,
     });
 
-    auditar({ req, accion: 'CONSULTA', modulo: 'ia', entidad: 'bi_consulta', detalle: `Pregunta: ${pregunta}`, meta: { sql: resultado.sql, filas: resultado.rows.length } });
-    res.json({ success: true, data: { pregunta, respuesta: texto, sql: resultado.sql, columns: resultado.columns, rows: resultado.rows, grafico: gen.grafico || null, cuota: await cuotaDe(uid, idp) }, error: null });
+    let fin = null;
+    try { fin = JSON.parse(String(texto || '').replace(/```json/gi, '').replace(/```/g, '').trim()); } catch (_) {}
+    const respuesta = (fin && fin.respuesta) || texto || 'No pude interpretar la pregunta. ¿Puedes reformularla?';
+
+    auditar({ req, accion: 'CONSULTA', modulo: 'ia', entidad: 'bi_consulta', detalle: `Pregunta: ${pregunta}`, meta: { sql: ultimo.sql, filas: ultimo.rows.length } });
+    res.json({ success: true, data: { pregunta, respuesta, sql: ultimo.sql, columns: ultimo.columns, rows: ultimo.rows, grafico: (fin && fin.grafico) || null, cuota: await cuotaDe(uid, idp) }, error: null });
   } catch (e) {
     if (e.code === 'IA_OFF') return res.status(400).json({ success: false, data: null, error: 'La IA para esta función está desactivada. Actívala en Mantenedores → Inteligencia Artificial.' });
     if (e.code === 'NO_KEY') return res.status(400).json({ success: false, data: null, error: 'Falta configurar la IA en el servidor.' });

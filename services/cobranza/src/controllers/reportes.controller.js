@@ -48,11 +48,9 @@ exports.ejecutivos = async (_req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-/* ── GET /reportes/rendimiento?desde&hasta ─ por ejecutivo ──────────────────── */
-exports.rendimiento = async (req, res) => {
-  try {
-    const { desde, hasta } = rango(req);
-    const [rows] = await pool.query(`
+/* ── Funciones de datos (reusables por la IA — un solo motor por informe) ───── */
+async function datosRendimiento(desde, hasta) {
+  const [rows] = await pool.query(`
       SELECT nombre_usuario AS ejecutivo,
              COUNT(*)                                                       AS gestiones,
              SUM(canal IN ('TELEFONICA','PRESENCIAL'))                      AS telefonicas,
@@ -65,13 +63,18 @@ exports.rendimiento = async (req, res) => {
       WHERE DATE(created_at) BETWEEN ? AND ?
       GROUP BY nombre_usuario
       ORDER BY gestiones DESC`, [desde, hasta]);
-    rows.forEach(r => {
-      r.gestiones = Number(r.gestiones); r.contactos = Number(r.contactos);
-      r.tasa_contacto = r.gestiones ? +(r.contactos / r.gestiones * 100).toFixed(1) : 0;
-      ['telefonicas','remotas','promesas','confirmadas','monto_promesas'].forEach(k => r[k] = Number(r[k]));
-    });
-    ok(res, { desde, hasta, ejecutivos: rows });
-  } catch (e) { fail(res, e.message); }
+  rows.forEach(r => {
+    r.gestiones = Number(r.gestiones); r.contactos = Number(r.contactos);
+    r.tasa_contacto = r.gestiones ? +(r.contactos / r.gestiones * 100).toFixed(1) : 0;
+    ['telefonicas','remotas','promesas','confirmadas','monto_promesas'].forEach(k => r[k] = Number(r[k]));
+  });
+  return { desde, hasta, ejecutivos: rows };
+}
+
+/* ── GET /reportes/rendimiento?desde&hasta ─ por ejecutivo ──────────────────── */
+exports.rendimiento = async (req, res) => {
+  try { const { desde, hasta } = rango(req); ok(res, await datosRendimiento(desde, hasta)); }
+  catch (e) { fail(res, e.message); }
 };
 
 /* ── GET /reportes/gestiones?desde&hasta&ejecutivo&resultado&limit ──────────── */
@@ -104,11 +107,8 @@ exports.gestiones = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-/* ── GET /reportes/recuperacion?desde&hasta ─ promesas y cumplimiento por mes ─ */
-exports.recuperacion = async (req, res) => {
-  try {
-    const { desde, hasta } = rango(req);
-    const [rows] = await pool.query(`
+async function datosRecuperacion(desde, hasta) {
+  const [rows] = await pool.query(`
       SELECT DATE_FORMAT(created_at,'%Y-%m')                                            AS mes,
              SUM(resultado='PROMESA_PAGO')                                              AS promesas,
              COALESCE(SUM(CASE WHEN resultado='PROMESA_PAGO' THEN monto_promesa END),0) AS monto_prometido,
@@ -117,58 +117,72 @@ exports.recuperacion = async (req, res) => {
       FROM cobranza_gestiones
       WHERE DATE(created_at) BETWEEN ? AND ?
       GROUP BY mes ORDER BY mes`, [desde, hasta]);
-    rows.forEach(r => ['promesas','monto_prometido','gestiones_confirmadas','monto_confirmado'].forEach(k => r[k] = Number(r[k])));
-    const tot = rows.reduce((a, r) => ({ promesas: a.promesas + r.promesas, monto_prometido: a.monto_prometido + r.monto_prometido,
-      confirmadas: a.confirmadas + r.gestiones_confirmadas, monto_confirmado: a.monto_confirmado + r.monto_confirmado }),
-      { promesas: 0, monto_prometido: 0, confirmadas: 0, monto_confirmado: 0 });
-    ok(res, { desde, hasta, serie: rows, total: tot });
-  } catch (e) { fail(res, e.message); }
+  rows.forEach(r => ['promesas','monto_prometido','gestiones_confirmadas','monto_confirmado'].forEach(k => r[k] = Number(r[k])));
+  const tot = rows.reduce((a, r) => ({ promesas: a.promesas + r.promesas, monto_prometido: a.monto_prometido + r.monto_prometido,
+    confirmadas: a.confirmadas + r.gestiones_confirmadas, monto_confirmado: a.monto_confirmado + r.monto_confirmado }),
+    { promesas: 0, monto_prometido: 0, confirmadas: 0, monto_confirmado: 0 });
+  return { desde, hasta, serie: rows, total: tot };
+}
+
+/* ── GET /reportes/recuperacion?desde&hasta ─ promesas y cumplimiento por mes ─ */
+exports.recuperacion = async (req, res) => {
+  try { const { desde, hasta } = rango(req); ok(res, await datosRecuperacion(desde, hasta)); }
+  catch (e) { fail(res, e.message); }
 };
+
+async function datosMoraStock() {
+  const [rows] = await pool.query(
+    `SELECT dias_mora, monto_mora, saldo_insoluto FROM ( ${MORA_SQL()} ) _m`);
+  const T = await tramos();
+  const buckets = T.map(t => ({ tramo: t.label, pct: t.pct, casos: 0, monto_mora: 0, capital: 0, provision: 0 }));
+  let totCasos = 0, totMonto = 0, totCapital = 0, totProv = 0;
+  let prejudicial = { casos: 0, monto: 0 }, judicial = { casos: 0, monto: 0 };
+  for (const r of rows) {
+    const d = Number(r.dias_mora), mm = Number(r.monto_mora) || 0, cap = Number(r.saldo_insoluto) || 0;
+    const i = T.findIndex(t => d >= t.min && d <= t.max);
+    if (i >= 0) {
+      buckets[i].casos++; buckets[i].monto_mora += mm; buckets[i].capital += cap;
+      buckets[i].provision += cap * T[i].pct / 100;
+    }
+    totCasos++; totMonto += mm; totCapital += cap; totProv += (i >= 0 ? cap * T[i].pct / 100 : 0);
+    if (d <= 90) { prejudicial.casos++; prejudicial.monto += mm; } else { judicial.casos++; judicial.monto += mm; }
+  }
+  buckets.forEach(b => { b.monto_mora = Math.round(b.monto_mora); b.capital = Math.round(b.capital); b.provision = Math.round(b.provision); });
+  return {
+    tramos: buckets,
+    total: { casos: totCasos, monto_mora: Math.round(totMonto), capital: Math.round(totCapital), provision: Math.round(totProv) },
+    prejudicial: { casos: prejudicial.casos, monto: Math.round(prejudicial.monto) },
+    judicial:    { casos: judicial.casos,    monto: Math.round(judicial.monto) }
+  };
+}
 
 /* ── GET /reportes/mora-stock ─ stock moroso vivo por tramo y por cartera ────── */
 exports.moraStock = async (_req, res) => {
-  try {
-    const [rows] = await pool.query(
-      `SELECT dias_mora, monto_mora, saldo_insoluto FROM ( ${MORA_SQL()} ) _m`);
-    const T = await tramos();
-    const buckets = T.map(t => ({ tramo: t.label, pct: t.pct, casos: 0, monto_mora: 0, capital: 0, provision: 0 }));
-    let totCasos = 0, totMonto = 0, totCapital = 0, totProv = 0;
-    let prejudicial = { casos: 0, monto: 0 }, judicial = { casos: 0, monto: 0 };
-    for (const r of rows) {
-      const d = Number(r.dias_mora), mm = Number(r.monto_mora) || 0, cap = Number(r.saldo_insoluto) || 0;
-      const i = T.findIndex(t => d >= t.min && d <= t.max);
-      if (i >= 0) {
-        buckets[i].casos++; buckets[i].monto_mora += mm; buckets[i].capital += cap;
-        buckets[i].provision += cap * T[i].pct / 100;
-      }
-      totCasos++; totMonto += mm; totCapital += cap; totProv += (i >= 0 ? cap * T[i].pct / 100 : 0);
-      if (d <= 90) { prejudicial.casos++; prejudicial.monto += mm; } else { judicial.casos++; judicial.monto += mm; }
-    }
-    buckets.forEach(b => { b.monto_mora = Math.round(b.monto_mora); b.capital = Math.round(b.capital); b.provision = Math.round(b.provision); });
-    ok(res, {
-      tramos: buckets,
-      total: { casos: totCasos, monto_mora: Math.round(totMonto), capital: Math.round(totCapital), provision: Math.round(totProv) },
-      prejudicial: { casos: prejudicial.casos, monto: Math.round(prejudicial.monto) },
-      judicial:    { casos: judicial.casos,    monto: Math.round(judicial.monto) }
-    });
-  } catch (e) { fail(res, e.message); }
+  try { ok(res, await datosMoraStock()); } catch (e) { fail(res, e.message); }
 };
+
+async function datosCartera({ tipo, tramo, limit } = {}) {
+  const having = [];
+  if (tipo === 'prejudicial') having.push('dias_mora BETWEEN 1 AND 90');
+  else if (tipo === 'judicial') having.push('dias_mora > 90');
+  const map = { '1-15': 'dias_mora BETWEEN 1 AND 15', '16-30': 'dias_mora BETWEEN 16 AND 30',
+    '31-60': 'dias_mora BETWEEN 31 AND 60', '61-90': 'dias_mora BETWEEN 61 AND 90', '91+': 'dias_mora > 90' };
+  if (map[tramo]) having.push(map[tramo]);
+  const havingExtra = having.length ? 'AND ' + having.join(' AND ') : '';
+  const lim = Math.min(Number(limit) || 3000, 3000);
+  const [rows] = await pool.query(`
+    SELECT numero_credito, rut_cliente, nombre_cliente, cuotas_mora, dias_mora,
+           ROUND(monto_mora) AS monto_mora, ROUND(saldo_insoluto) AS saldo_insoluto
+    FROM ( ${MORA_SQL('', havingExtra)} ) _m
+    ORDER BY dias_mora DESC LIMIT ?`, [lim]);
+  return { total: rows.length, rows };
+}
 
 /* ── GET /reportes/cartera?tipo&tramo ─ listado de créditos en mora ──────────── */
 exports.cartera = async (req, res) => {
-  try {
-    const having = [];
-    if (req.query.tipo === 'prejudicial') having.push('dias_mora BETWEEN 1 AND 90');
-    else if (req.query.tipo === 'judicial') having.push('dias_mora > 90');
-    const map = { '1-15': 'dias_mora BETWEEN 1 AND 15', '16-30': 'dias_mora BETWEEN 16 AND 30',
-      '31-60': 'dias_mora BETWEEN 31 AND 60', '61-90': 'dias_mora BETWEEN 61 AND 90', '91+': 'dias_mora > 90' };
-    if (map[req.query.tramo]) having.push(map[req.query.tramo]);
-    const havingExtra = having.length ? 'AND ' + having.join(' AND ') : '';
-    const [rows] = await pool.query(`
-      SELECT numero_credito, rut_cliente, nombre_cliente, cuotas_mora, dias_mora,
-             ROUND(monto_mora) AS monto_mora, ROUND(saldo_insoluto) AS saldo_insoluto
-      FROM ( ${MORA_SQL('', havingExtra)} ) _m
-      ORDER BY dias_mora DESC LIMIT 3000`);
-    ok(res, { total: rows.length, rows });
-  } catch (e) { fail(res, e.message); }
+  try { ok(res, await datosCartera({ tipo: req.query.tipo, tramo: req.query.tramo })); }
+  catch (e) { fail(res, e.message); }
 };
+
+// Motor de datos expuesto para otros consumidores (ej. IA "Pregúntale a AutoFácil")
+exports._datos = { datosRendimiento, datosRecuperacion, datosMoraStock, datosCartera };

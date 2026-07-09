@@ -80,4 +80,46 @@ async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 
   return { texto, datos, modelo: model, tokens_in, tokens_out, costo };
 }
 
-module.exports = { analizar, client, disponible };
+/**
+ * Ejecuta un análisis con IA usando HERRAMIENTAS (tool use / function calling).
+ * Claude decide qué herramientas llamar; `ejecutarTool(nombre, input)` las resuelve
+ * en el servidor y el loop continúa hasta la respuesta final (o max_iter).
+ * Mismo gating/registro de consumo que analizar().
+ * @param {object} o  { codigo, system, prompt, tools, ejecutarTool, max_tokens, id_usuario, modelo, max_iter }
+ * @returns {Promise<{texto, iteraciones, tokens_in, tokens_out, costo}>}
+ */
+async function analizarTools({ codigo, system, prompt, tools = [], ejecutarTool, max_tokens = 2048, id_usuario = null, modelo, max_iter = 6 } = {}) {
+  if (codigo && !(await ia.iaActiva(codigo))) {
+    const e = new Error('La IA para esta funcionalidad está desactivada.'); e.code = 'IA_OFF'; throw e;
+  }
+  const model = modelo || (codigo ? await ia.modeloDe(codigo) : 'claude-haiku-4-5');
+  const messages = [{ role: 'user', content: prompt }];
+  let tokens_in = 0, tokens_out = 0, costo = 0, texto = '', it = 0;
+
+  for (; it < max_iter; it++) {
+    const req = { model, max_tokens, messages, tools };
+    if (system) req.system = system;
+    const resp = await client().messages.create(req);
+    tokens_in  += resp.usage?.input_tokens  || 0;
+    tokens_out += resp.usage?.output_tokens || 0;
+    try { costo += await ia.registrarUso({ codigo, modelo: model, tokens_in: resp.usage?.input_tokens || 0, tokens_out: resp.usage?.output_tokens || 0, id_usuario }); } catch (_) {}
+
+    const toolUses = (resp.content || []).filter(b => b.type === 'tool_use');
+    texto = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (resp.stop_reason !== 'tool_use' || !toolUses.length) break;   // respuesta final
+
+    messages.push({ role: 'assistant', content: resp.content });
+    const results = [];
+    for (const tu of toolUses) {
+      let out, isErr = false;
+      try { out = await ejecutarTool(tu.name, tu.input || {}); }
+      catch (e) { out = 'Error: ' + String(e.message || e).slice(0, 300); isErr = true; }
+      results.push({ type: 'tool_result', tool_use_id: tu.id, is_error: isErr,
+        content: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 60000) });
+    }
+    messages.push({ role: 'user', content: results });
+  }
+  return { texto, iteraciones: it + 1, modelo: model, tokens_in, tokens_out, costo };
+}
+
+module.exports = { analizar, analizarTools, client, disponible };
