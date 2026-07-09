@@ -438,6 +438,12 @@ const PAGINAS = [
   ['/cobranza/judicial', 'cobranza/judicial.html'],
   ['/cobranza/mis-cobranza', 'cobranza/mis-cobranza.html'],
   ['/cobranza/reporteria', 'cobranza/reporteria.html'],
+  ['/cobranza/reportes/rendimiento',  'cobranza/reportes/rendimiento.html'],
+  ['/cobranza/reportes/mora-historica','cobranza/reportes/mora-historica.html'],
+  ['/cobranza/reportes/recuperacion', 'cobranza/reportes/recuperacion.html'],
+  ['/cobranza/reportes/gestiones',    'cobranza/reportes/gestiones.html'],
+  ['/cobranza/reportes/cartera',      'cobranza/reportes/cartera.html'],
+  ['/cobranza/reportes/exportaciones','cobranza/reportes/exportaciones.html'],
   ['/cobranza/migracion-indexa', 'cobranza/migracion-indexa/index.html'],
   // Página PÚBLICA (la abre el QR): /verificar/<codigo>. El array agrega el path con param.
   [['/verificar', '/verificar/', '/verificar/:codigo'], 'verificar/index.html'],

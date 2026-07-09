@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Mora Histórica — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="card"><h3><i class="bi bi-bar-chart-steps"></i>Casos por tramo de días</h3><div style="height:300px"><canvas id="chCasos"></canvas></div></div>
+    <div class="card"><h3><i class="bi bi-cash-stack"></i>Monto en mora por tramo</h3><div style="height:300px"><canvas id="chMonto"></canvas></div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3><i class="bi bi-pie-chart"></i>Prejudicial vs Judicial (monto)</h3><div style="height:280px"><canvas id="chCartera"></canvas></div></div>
+    <div class="card"><h3><i class="bi bi-shield-check"></i>Provisión estimada por tramo</h3><div style="height:280px"><canvas id="chProv"></canvas></div></div>
+  </div>
+  <div class="card"><h3><i class="bi bi-table"></i>Detalle por tramo</h3>
+    <div class="scroll"><table class="rep"><thead><tr>
+      <th class="l">Tramo (días)</th><th>Casos</th><th>Monto en mora</th><th>Capital insoluto</th><th>% Provisión</th><th>Provisión estimada</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table></div>
+    <p style="font-size:.76rem;color:#64748b;margin:12px 2px 0"><i class="bi bi-info-circle me-1"></i>Fotografía del stock moroso <b>vivo</b> a hoy. Los % de provisión salen del mantenedor <b>Parámetros Cobranza</b> (181+ días = castigo 100%).</p>
+  </div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Mora Histórica', icono:'bi-graph-up-arrow', subtitulo:'Stock moroso vivo por tramo de días de atraso, monto y provisión estimada.' });
+async function cargar(){
+  try {
+    const d = await REP.api('/reportes/mora-stock');
+    const T = d.tramos;
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi"><div class="l">Casos en mora</div><div class="v">${REP.fmtN(d.total.casos)}</div></div>
+      <div class="kpi"><div class="l">Monto en mora</div><div class="v">${REP.fmt(d.total.monto_mora)}</div></div>
+      <div class="kpi"><div class="l">Capital insoluto</div><div class="v">${REP.fmt(d.total.capital)}</div></div>
+      <div class="kpi" style="border-left-color:#dc2626"><div class="l">Provisión estimada</div><div class="v" style="color:#dc2626">${REP.fmt(d.total.provision)}</div></div>`;
+    const labels = T.map(t=>t.tramo);
+    REP.chart('chCasos',{type:'bar',data:{labels,datasets:[{label:'Casos',data:T.map(t=>t.casos),backgroundColor:'#0141A2'}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}});
+    REP.chart('chMonto',{type:'bar',data:{labels,datasets:[{label:'Monto en mora',data:T.map(t=>t.monto_mora),backgroundColor:'#009AFE'}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},plugins:{legend:{display:false}}}});
+    REP.chart('chCartera',{type:'doughnut',data:{labels:['Prejudicial (≤90d)','Judicial (>90d)'],datasets:[{data:[d.prejudicial.monto,d.judicial.monto],backgroundColor:['#f59e0b','#dc2626']}]},
+      options:{maintainAspectRatio:false,responsive:true,plugins:{legend:{position:'bottom'}}}});
+    REP.chart('chProv',{type:'bar',data:{labels,datasets:[{label:'Provisión',data:T.map(t=>t.provision),backgroundColor:T.map((_,i)=>REP.COLORS[i%REP.COLORS.length])}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},plugins:{legend:{display:false}}}});
+    document.getElementById('tbody').innerHTML = T.map(t=>`<tr>
+      <td class="l">${t.tramo}</td><td>${REP.fmtN(t.casos)}</td><td>${REP.fmt(t.monto_mora)}</td>
+      <td>${REP.fmt(t.capital)}</td><td>${t.pct}%</td><td style="color:#dc2626;font-weight:600">${REP.fmt(t.provision)}</td></tr>`).join('');
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="6" class="empty">Error: ${e.message}</td></tr>`; }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>

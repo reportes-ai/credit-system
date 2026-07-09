@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Gestiones por Período — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="filtros">
+    <div><label>Desde</label><input type="date" id="fDesde"></div>
+    <div><label>Hasta</label><input type="date" id="fHasta"></div>
+    <div><label>Ejecutivo</label><select id="fEjec"><option value="">Todos</option></select></div>
+    <div><label>Resultado</label><select id="fResultado"><option value="">Todos</option>
+      <option>CONTACTADO</option><option>NO_CONTESTA</option><option>PROMESA_PAGO</option>
+      <option>RECHAZA_PAGO</option><option>NUMERO_ERRADO</option><option>SIN_RESULTADO</option></select></div>
+    <div><label>Canal</label><select id="fCanal"><option value="">Todos</option>
+      <option>TELEFONICA</option><option>PRESENCIAL</option><option>REMOTA</option></select></div>
+    <button class="btn-p" onclick="cargar()"><i class="bi bi-search me-1"></i>Aplicar</button>
+    <button class="btn-g" onclick="exportar()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="card"><h3><i class="bi bi-activity"></i>Gestiones por día</h3><div style="height:290px"><canvas id="chSerie"></canvas></div></div>
+    <div class="card"><h3><i class="bi bi-pie-chart"></i>Por resultado</h3><div style="height:290px"><canvas id="chRes"></canvas></div></div>
+  </div>
+  <div class="card"><h3><i class="bi bi-table"></i>Detalle de gestiones <span id="cnt" style="color:#64748b;font-weight:400"></span></h3>
+    <div class="scroll"><table class="rep"><thead><tr>
+      <th class="l">Fecha</th><th class="l">Ejecutivo</th><th class="l">Crédito</th><th class="l">Cliente</th>
+      <th class="l">Tipo</th><th class="l">Canal</th><th class="l">Resultado</th><th>Días mora</th><th>Monto promesa</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody></table></div>
+  </div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Gestiones por Período', icono:'bi-clock-history', subtitulo:'Detalle de gestiones de cobranza filtradas por fecha, ejecutivo, resultado y canal.' });
+let ROWS = [];
+const r0 = REP.rangoDefault();
+document.getElementById('fDesde').value = r0.desde;
+document.getElementById('fHasta').value = r0.hasta;
+const RES_COL = {CONTACTADO:'#16a34a',PROMESA_PAGO:'#0141A2',NO_CONTESTA:'#f59e0b',RECHAZA_PAGO:'#dc2626',NUMERO_ERRADO:'#8b5cf6',SIN_RESULTADO:'#64748b'};
+
+(async()=>{ try { const ej = await REP.api('/reportes/ejecutivos');
+  document.getElementById('fEjec').innerHTML = '<option value="">Todos</option>' + ej.map(e=>`<option>${e}</option>`).join(''); } catch(e){} cargar(); })();
+
+async function cargar(){
+  const p = new URLSearchParams({ desde:fDesde.value, hasta:fHasta.value });
+  if (fEjec.value) p.set('ejecutivo', fEjec.value);
+  if (fResultado.value) p.set('resultado', fResultado.value);
+  if (fCanal.value) p.set('canal', fCanal.value);
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="9" class="empty">Cargando…</td></tr>';
+  try {
+    const d = await REP.api('/reportes/gestiones?' + p);
+    ROWS = d.gestiones || [];
+    document.getElementById('cnt').textContent = `(${d.total})`;
+    const canales = d.porCanal || {};
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi"><div class="l">Gestiones</div><div class="v">${REP.fmtN(d.total)}</div></div>
+      <div class="kpi"><div class="l">Telefónicas</div><div class="v">${REP.fmtN(canales.TELEFONICA||0)}</div></div>
+      <div class="kpi"><div class="l">Presenciales</div><div class="v">${REP.fmtN(canales.PRESENCIAL||0)}</div></div>
+      <div class="kpi"><div class="l">Remotas</div><div class="v">${REP.fmtN(canales.REMOTA||0)}</div></div>`;
+    REP.chart('chSerie',{type:'line',data:{labels:(d.serie||[]).map(s=>s.fecha),datasets:[{label:'Gestiones',data:(d.serie||[]).map(s=>s.n),borderColor:'#0141A2',backgroundColor:'rgba(1,65,162,.12)',fill:true,tension:.3}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}});
+    const rk = Object.keys(d.porResultado||{});
+    REP.chart('chRes',{type:'doughnut',data:{labels:rk,datasets:[{data:rk.map(k=>d.porResultado[k]),backgroundColor:rk.map(k=>RES_COL[k]||'#94a3b8')}]},
+      options:{maintainAspectRatio:false,responsive:true,plugins:{legend:{position:'right'}}}});
+    document.getElementById('tbody').innerHTML = ROWS.length ? ROWS.map(g=>`<tr>
+      <td class="l">${new Date(g.created_at).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td class="l">${g.nombre_usuario||'—'}</td><td class="l">${g.numero_credito||'—'}</td>
+      <td class="l">${(g.nombre_cliente||'—').slice(0,28)}</td><td class="l">${g.tipo_gestion}</td><td class="l">${g.canal}</td>
+      <td class="l"><span class="badge" style="background:${(RES_COL[g.resultado]||'#94a3b8')}22;color:${RES_COL[g.resultado]||'#64748b'}">${g.resultado}</span></td>
+      <td>${REP.fmtN(g.dias_mora)}</td><td>${g.monto_promesa?REP.fmt(g.monto_promesa):'—'}</td></tr>`).join('')
+      : '<tr><td colspan="9" class="empty">Sin gestiones para el filtro</td></tr>';
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="9" class="empty">Error: ${e.message}</td></tr>`; }
+}
+function exportar(){
+  REP.exportCSV('gestiones_cobranza', ['Fecha','Ejecutivo','Credito','Cliente','RUT','Tipo','Canal','Resultado','Dias mora','Monto mora','Fecha promesa','Monto promesa','Confirmado'],
+    ROWS.map(g=>[new Date(g.created_at).toLocaleString('es-CL'),g.nombre_usuario,g.numero_credito,g.nombre_cliente,g.rut_cliente,g.tipo_gestion,g.canal,g.resultado,g.dias_mora,g.monto_mora,g.fecha_promesa||'',g.monto_promesa||'',g.confirmado?'Sí':'No']));
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>

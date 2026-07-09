@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Cartera en Mora — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="filtros">
+    <div><label>Cartera</label><select id="fTipo"><option value="">Toda</option><option value="prejudicial">Prejudicial (≤90d)</option><option value="judicial">Judicial (&gt;90d)</option></select></div>
+    <div><label>Tramo</label><select id="fTramo"><option value="">Todos</option><option>1-15</option><option>16-30</option><option>31-60</option><option>61-90</option><option>91+</option></select></div>
+    <div><label>Buscar</label><input type="text" id="fQ" placeholder="Nombre, RUT o crédito" oninput="filtrar()"></div>
+    <button class="btn-p" onclick="cargar()"><i class="bi bi-search me-1"></i>Aplicar</button>
+    <button class="btn-g" onclick="exportar()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card"><h3><i class="bi bi-pie-chart"></i>Distribución de casos por tramo</h3><div style="height:260px"><canvas id="chTramo"></canvas></div></div>
+  <div class="card"><h3><i class="bi bi-table"></i>Créditos en mora <span id="cnt" style="color:#64748b;font-weight:400"></span></h3>
+    <div class="scroll"><table class="rep"><thead><tr>
+      <th class="l">Crédito</th><th class="l">RUT</th><th class="l">Cliente</th><th>Cuotas mora</th><th>Días mora</th><th>Monto mora</th><th>Capital insoluto</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table></div>
+  </div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Cartera en Mora', icono:'bi-file-earmark-ruled-fill', subtitulo:'Listado de créditos en mora con días de atraso, monto adeudado y capital insoluto.' });
+let ROWS = [];
+function tramoDe(d){ d=Number(d); return d<=15?'1-15':d<=30?'16-30':d<=60?'31-60':d<=90?'61-90':'91+'; }
+async function cargar(){
+  const p = new URLSearchParams();
+  if (fTipo.value) p.set('tipo', fTipo.value);
+  if (fTramo.value) p.set('tramo', fTramo.value);
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="7" class="empty">Cargando…</td></tr>';
+  try {
+    const d = await REP.api('/reportes/cartera?' + p);
+    ROWS = d.rows || [];
+    const tot = ROWS.reduce((a,r)=>({mm:a.mm+Number(r.monto_mora),cap:a.cap+Number(r.saldo_insoluto)}),{mm:0,cap:0});
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi"><div class="l">Créditos en mora</div><div class="v">${REP.fmtN(ROWS.length)}</div></div>
+      <div class="kpi"><div class="l">Monto total en mora</div><div class="v">${REP.fmt(tot.mm)}</div></div>
+      <div class="kpi"><div class="l">Capital insoluto</div><div class="v">${REP.fmt(tot.cap)}</div></div>`;
+    const tramos = ['1-15','16-30','31-60','61-90','91+']; const cnt = {};
+    tramos.forEach(t=>cnt[t]=0); ROWS.forEach(r=>cnt[tramoDe(r.dias_mora)]++);
+    REP.chart('chTramo',{type:'bar',data:{labels:tramos,datasets:[{label:'Casos',data:tramos.map(t=>cnt[t]),backgroundColor:['#16a34a','#84cc16','#f59e0b','#f97316','#dc2626']}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}});
+    filtrar();
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="empty">Error: ${e.message}</td></tr>`; }
+}
+function filtrar(){
+  const q = (document.getElementById('fQ').value||'').toLowerCase();
+  const f = q ? ROWS.filter(r=>`${r.nombre_cliente} ${r.rut_cliente} ${r.numero_credito}`.toLowerCase().includes(q)) : ROWS;
+  document.getElementById('cnt').textContent = `(${f.length})`;
+  document.getElementById('tbody').innerHTML = f.length ? f.slice(0,1500).map(r=>`<tr>
+    <td class="l">${r.numero_credito||'—'}</td><td class="l">${r.rut_cliente||'—'}</td><td class="l">${(r.nombre_cliente||'—').slice(0,30)}</td>
+    <td>${REP.fmtN(r.cuotas_mora)}</td><td style="color:#dc2626;font-weight:600">${REP.fmtN(r.dias_mora)}</td>
+    <td>${REP.fmt(r.monto_mora)}</td><td>${REP.fmt(r.saldo_insoluto)}</td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Sin resultados</td></tr>';
+}
+function exportar(){
+  REP.exportCSV('cartera_mora', ['Credito','RUT','Cliente','Cuotas mora','Dias mora','Monto mora','Capital insoluto'],
+    ROWS.map(r=>[r.numero_credito,r.rut_cliente,r.nombre_cliente,r.cuotas_mora,r.dias_mora,r.monto_mora,r.saldo_insoluto]));
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>

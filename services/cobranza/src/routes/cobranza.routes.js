@@ -28,4 +28,13 @@ router.post('/enviar/:id_credito',        verifyToken, ctrl.enviarMensaje);
 router.put('/contacto/:id_credito',       verifyToken, ctrl.guardarContacto);
 router.get('/bitacora/:id_credito',       verifyToken, ctrl.bitacora);
 
+// Reportería Cobranzas (informes agregados, read-only)
+const rep = require('../controllers/reportes.controller');
+router.get('/reportes/ejecutivos',   verifyToken, rep.ejecutivos);
+router.get('/reportes/rendimiento',  verifyToken, rep.rendimiento);
+router.get('/reportes/gestiones',    verifyToken, rep.gestiones);
+router.get('/reportes/recuperacion', verifyToken, rep.recuperacion);
+router.get('/reportes/mora-stock',   verifyToken, rep.moraStock);
+router.get('/reportes/cartera',      verifyToken, rep.cartera);
+
 module.exports = router;

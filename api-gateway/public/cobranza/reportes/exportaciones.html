@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Exportaciones — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="filtros">
+    <div><label>Desde</label><input type="date" id="fDesde"></div>
+    <div><label>Hasta</label><input type="date" id="fHasta"></div>
+    <span style="font-size:.78rem;color:#64748b;align-self:center">El rango aplica a Gestiones, Rendimiento y Recuperación.</span>
+  </div>
+  <div class="kpis" id="exp"></div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Exportaciones', icono:'bi-file-earmark-arrow-down-fill', subtitulo:'Descarga los reportes de cobranza en CSV (compatible con Excel).' });
+const r0 = REP.rangoDefault();
+document.getElementById('fDesde').value = r0.desde;
+document.getElementById('fHasta').value = r0.hasta;
+
+const EXPORTS = [
+  { t:'Cartera en Mora', i:'bi-file-earmark-ruled', d:'Todos los créditos en mora con días, monto y capital insoluto.', fn:expCartera },
+  { t:'Gestiones por Período', i:'bi-clock-history', d:'Todas las gestiones del rango con ejecutivo, canal y resultado.', fn:expGestiones },
+  { t:'Rendimiento por Ejecutivo', i:'bi-bar-chart-line', d:'Resumen del rango por ejecutivo: gestiones, contacto, promesas.', fn:expRendimiento },
+  { t:'Recuperación de Cartera', i:'bi-cash-coin', d:'Promesas y confirmaciones mes a mes del rango.', fn:expRecuperacion },
+  { t:'Mora por Tramo', i:'bi-shield-check', d:'Stock moroso vivo por tramo con provisión estimada.', fn:expMora },
+];
+document.getElementById('exp').innerHTML = EXPORTS.map((e,i)=>`
+  <div class="kpi" style="border-left-color:#166534">
+    <div style="display:flex;align-items:center;gap:8px"><i class="bi ${e.i}" style="font-size:1.3rem;color:#166534"></i><b style="font-size:.92rem">${e.t}</b></div>
+    <div style="font-size:.8rem;color:#64748b;margin:8px 0 12px">${e.d}</div>
+    <button class="btn-g" id="b${i}" onclick="EXPORTS[${i}].fn(${i})"><i class="bi bi-download me-1"></i>Descargar CSV</button>
+  </div>`).join('');
+window.EXPORTS = EXPORTS;
+
+function rango(){ return `desde=${document.getElementById('fDesde').value}&hasta=${document.getElementById('fHasta').value}`; }
+async function run(i, fn){ const b=document.getElementById('b'+i); const o=b.innerHTML; b.disabled=true; b.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Generando…'; try{ await fn(); }catch(e){ alert('Error: '+e.message); } b.disabled=false; b.innerHTML=o; }
+
+function expCartera(i){ return run(i, async()=>{ const d=await REP.api('/reportes/cartera'); REP.exportCSV('cartera_mora',
+  ['Credito','RUT','Cliente','Cuotas mora','Dias mora','Monto mora','Capital insoluto'],
+  d.rows.map(r=>[r.numero_credito,r.rut_cliente,r.nombre_cliente,r.cuotas_mora,r.dias_mora,r.monto_mora,r.saldo_insoluto])); }); }
+function expGestiones(i){ return run(i, async()=>{ const d=await REP.api('/reportes/gestiones?'+rango()+'&limit=2000'); REP.exportCSV('gestiones_cobranza',
+  ['Fecha','Ejecutivo','Credito','Cliente','RUT','Tipo','Canal','Resultado','Dias mora','Monto mora','Fecha promesa','Monto promesa','Confirmado'],
+  d.gestiones.map(g=>[new Date(g.created_at).toLocaleString('es-CL'),g.nombre_usuario,g.numero_credito,g.nombre_cliente,g.rut_cliente,g.tipo_gestion,g.canal,g.resultado,g.dias_mora,g.monto_mora,g.fecha_promesa||'',g.monto_promesa||'',g.confirmado?'Sí':'No'])); }); }
+function expRendimiento(i){ return run(i, async()=>{ const d=await REP.api('/reportes/rendimiento?'+rango()); REP.exportCSV('rendimiento_cobranza',
+  ['Ejecutivo','Gestiones','Telef/Pres','Remotas','Contactos','Tasa contacto %','Promesas','Monto prometido','Confirmadas'],
+  d.ejecutivos.map(r=>[r.ejecutivo,r.gestiones,r.telefonicas,r.remotas,r.contactos,r.tasa_contacto,r.promesas,r.monto_promesas,r.confirmadas])); }); }
+function expRecuperacion(i){ return run(i, async()=>{ const d=await REP.api('/reportes/recuperacion?'+rango()); REP.exportCSV('recuperacion_cobranza',
+  ['Mes','Promesas','Monto prometido','Gestiones confirmadas','Monto confirmado'],
+  d.serie.map(s=>[s.mes,s.promesas,s.monto_prometido,s.gestiones_confirmadas,s.monto_confirmado])); }); }
+function expMora(i){ return run(i, async()=>{ const d=await REP.api('/reportes/mora-stock'); REP.exportCSV('mora_por_tramo',
+  ['Tramo','Casos','Monto en mora','Capital insoluto','% Provision','Provision estimada'],
+  d.tramos.map(t=>[t.tramo,t.casos,t.monto_mora,t.capital,t.pct,t.provision])); }); }
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>

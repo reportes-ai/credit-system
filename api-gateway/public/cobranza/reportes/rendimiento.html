@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Rendimiento por Ejecutivo — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="filtros">
+    <div><label>Desde</label><input type="date" id="fDesde"></div>
+    <div><label>Hasta</label><input type="date" id="fHasta"></div>
+    <button class="btn-p" onclick="cargar()"><i class="bi bi-search me-1"></i>Aplicar</button>
+    <button class="btn-g" onclick="exportar()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="card"><h3><i class="bi bi-bar-chart-line"></i>Gestiones por ejecutivo</h3><div style="height:300px"><canvas id="chGest"></canvas></div></div>
+    <div class="card"><h3><i class="bi bi-telephone"></i>Tasa de contacto (%)</h3><div style="height:300px"><canvas id="chTasa"></canvas></div></div>
+  </div>
+  <div class="card"><h3><i class="bi bi-table"></i>Detalle por ejecutivo</h3>
+    <div class="scroll"><table class="rep"><thead><tr>
+      <th class="l">Ejecutivo</th><th>Gestiones</th><th>Telef./Pres.</th><th>Remotas</th>
+      <th>Contactos</th><th>Tasa contacto</th><th>Promesas</th><th>Monto prometido</th><th>Confirmadas</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody></table></div>
+  </div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Rendimiento por Ejecutivo', icono:'bi-bar-chart-line-fill', subtitulo:'Gestiones, promesas de pago y tasa de contacto por ejecutivo en el período.' });
+let DATA = [];
+const r0 = REP.rangoDefault();
+document.getElementById('fDesde').value = r0.desde;
+document.getElementById('fHasta').value = r0.hasta;
+
+async function cargar(){
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="9" class="empty">Cargando…</td></tr>';
+  try {
+    const d = await REP.api(`/reportes/rendimiento?desde=${desde}&hasta=${hasta}`);
+    DATA = d.ejecutivos || [];
+    pintar();
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="9" class="empty">Error: ${e.message}</td></tr>`; }
+}
+function pintar(){
+  const tot = DATA.reduce((a,r)=>({g:a.g+r.gestiones,c:a.c+r.contactos,p:a.p+r.promesas,m:a.m+r.monto_promesas}),{g:0,c:0,p:0,m:0});
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Ejecutivos activos</div><div class="v">${DATA.length}</div></div>
+    <div class="kpi"><div class="l">Gestiones totales</div><div class="v">${REP.fmtN(tot.g)}</div></div>
+    <div class="kpi"><div class="l">Tasa contacto global</div><div class="v">${tot.g?(tot.c/tot.g*100).toFixed(1):0}%</div></div>
+    <div class="kpi"><div class="l">Promesas de pago</div><div class="v">${REP.fmtN(tot.p)}</div></div>
+    <div class="kpi"><div class="l">Monto prometido</div><div class="v">${REP.fmt(tot.m)}</div></div>`;
+  const labels = DATA.map(r=>r.ejecutivo);
+  REP.chart('chGest',{type:'bar',data:{labels,datasets:[
+    {label:'Telef./Pres.',data:DATA.map(r=>r.telefonicas),backgroundColor:'#0141A2'},
+    {label:'Remotas',data:DATA.map(r=>r.remotas),backgroundColor:'#009AFE'}]},
+    options:{maintainAspectRatio:false,responsive:true,scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}},plugins:{legend:{position:'bottom'}}}});
+  REP.chart('chTasa',{type:'bar',data:{labels,datasets:[{label:'Tasa contacto %',data:DATA.map(r=>r.tasa_contacto),backgroundColor:DATA.map((_,i)=>REP.COLORS[i%REP.COLORS.length])}]},
+    options:{maintainAspectRatio:false,responsive:true,indexAxis:'y',scales:{x:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
+  document.getElementById('tbody').innerHTML = DATA.length ? DATA.map(r=>`<tr>
+    <td class="l">${r.ejecutivo||'—'}</td><td>${REP.fmtN(r.gestiones)}</td><td>${REP.fmtN(r.telefonicas)}</td>
+    <td>${REP.fmtN(r.remotas)}</td><td>${REP.fmtN(r.contactos)}</td><td>${r.tasa_contacto}%</td>
+    <td>${REP.fmtN(r.promesas)}</td><td>${REP.fmt(r.monto_promesas)}</td><td>${REP.fmtN(r.confirmadas)}</td></tr>`).join('')
+    : '<tr><td colspan="9" class="empty">Sin gestiones en el período</td></tr>';
+}
+function exportar(){
+  REP.exportCSV('rendimiento_cobranza', ['Ejecutivo','Gestiones','Telef/Pres','Remotas','Contactos','Tasa contacto %','Promesas','Monto prometido','Confirmadas'],
+    DATA.map(r=>[r.ejecutivo,r.gestiones,r.telefonicas,r.remotas,r.contactos,r.tasa_contacto,r.promesas,r.monto_promesas,r.confirmadas]));
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>

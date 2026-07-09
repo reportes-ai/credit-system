@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<title>Recuperación de Cartera — Reportería Cobranzas</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="banner"></div>
+<div class="wrap">
+  <div class="filtros">
+    <div><label>Desde</label><input type="date" id="fDesde"></div>
+    <div><label>Hasta</label><input type="date" id="fHasta"></div>
+    <button class="btn-p" onclick="cargar()"><i class="bi bi-search me-1"></i>Aplicar</button>
+    <button class="btn-g" onclick="exportar()"><i class="bi bi-download me-1"></i>Exportar CSV</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="card"><h3><i class="bi bi-cash-coin"></i>Monto prometido por mes</h3><div style="height:300px"><canvas id="chMonto"></canvas></div></div>
+    <div class="card"><h3><i class="bi bi-check2-circle"></i>Promesas vs confirmadas</h3><div style="height:300px"><canvas id="chProm"></canvas></div></div>
+  </div>
+  <div class="card"><h3><i class="bi bi-table"></i>Detalle mensual</h3>
+    <div class="scroll"><table class="rep"><thead><tr>
+      <th class="l">Mes</th><th>Promesas de pago</th><th>Monto prometido</th><th>Gestiones confirmadas</th><th>Monto confirmado</th>
+    </tr></thead><tbody id="tbody"><tr><td colspan="5" class="empty">Cargando…</td></tr></tbody></table></div>
+    <p style="font-size:.76rem;color:#64748b;margin:12px 2px 0"><i class="bi bi-info-circle me-1"></i>"Confirmado" = gestión marcada como confirmada por el ejecutivo (compromiso verificado).</p>
+  </div>
+</div>
+<script src="/js/rep-cobranza.js"></script>
+<script>
+REP.init({ titulo:'Recuperación de Cartera', icono:'bi-cash-coin', subtitulo:'Promesas de pago, monto prometido y gestiones confirmadas por mes.' });
+let SERIE = [];
+const r0 = REP.rangoDefault();
+document.getElementById('fDesde').value = r0.desde;
+document.getElementById('fHasta').value = r0.hasta;
+async function cargar(){
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="5" class="empty">Cargando…</td></tr>';
+  try {
+    const d = await REP.api(`/reportes/recuperacion?desde=${desde}&hasta=${hasta}`);
+    SERIE = d.serie || [];
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi"><div class="l">Promesas de pago</div><div class="v">${REP.fmtN(d.total.promesas)}</div></div>
+      <div class="kpi"><div class="l">Monto prometido</div><div class="v">${REP.fmt(d.total.monto_prometido)}</div></div>
+      <div class="kpi" style="border-left-color:#16a34a"><div class="l">Gestiones confirmadas</div><div class="v" style="color:#16a34a">${REP.fmtN(d.total.confirmadas)}</div></div>
+      <div class="kpi" style="border-left-color:#16a34a"><div class="l">Monto confirmado</div><div class="v" style="color:#16a34a">${REP.fmt(d.total.monto_confirmado)}</div></div>`;
+    const labels = SERIE.map(s=>s.mes);
+    REP.chart('chMonto',{type:'line',data:{labels,datasets:[
+      {label:'Monto prometido',data:SERIE.map(s=>s.monto_prometido),borderColor:'#0141A2',backgroundColor:'rgba(1,65,162,.12)',fill:true,tension:.3},
+      {label:'Monto confirmado',data:SERIE.map(s=>s.monto_confirmado),borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.12)',fill:true,tension:.3}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true,ticks:{callback:v=>'$'+(v/1e6).toFixed(0)+'M'}}},plugins:{legend:{position:'bottom'}}}});
+    REP.chart('chProm',{type:'bar',data:{labels,datasets:[
+      {label:'Promesas',data:SERIE.map(s=>s.promesas),backgroundColor:'#009AFE'},
+      {label:'Confirmadas',data:SERIE.map(s=>s.gestiones_confirmadas),backgroundColor:'#16a34a'}]},
+      options:{maintainAspectRatio:false,responsive:true,scales:{y:{beginAtZero:true}},plugins:{legend:{position:'bottom'}}}});
+    document.getElementById('tbody').innerHTML = SERIE.length ? SERIE.map(s=>`<tr>
+      <td class="l">${s.mes}</td><td>${REP.fmtN(s.promesas)}</td><td>${REP.fmt(s.monto_prometido)}</td>
+      <td>${REP.fmtN(s.gestiones_confirmadas)}</td><td>${REP.fmt(s.monto_confirmado)}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="empty">Sin datos en el período</td></tr>';
+  } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="5" class="empty">Error: ${e.message}</td></tr>`; }
+}
+function exportar(){
+  REP.exportCSV('recuperacion_cobranza', ['Mes','Promesas','Monto prometido','Gestiones confirmadas','Monto confirmado'],
+    SERIE.map(s=>[s.mes,s.promesas,s.monto_prometido,s.gestiones_confirmadas,s.monto_confirmado]));
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body></html>
