@@ -705,12 +705,22 @@ async function cargarProvisiones() {
     if (!success) return;
     const c = creditoActual;
     const saldo_c = c ? Number(c.saldo_insoluto || 0) : 0;
-    const prov_pct = 80;
+    const dias_c  = c ? Number(c.dias_mora || 0) : 0;
+    // Tramo paramétrico según días de mora (mantenedor Parámetros Cobranza).
+    // data.tramos: [{tramo:'1-15'|'181+', pct_provision}]. Se parsea el tope de cada tramo.
+    const tramos = Array.isArray(data.tramos) ? data.tramos : [];
+    let tramoSel = null;
+    for (const t of tramos) {
+      const max = /\+$/.test(t.tramo) ? Infinity : Number(String(t.tramo).split('-').pop());
+      if (dias_c <= max) { tramoSel = t; break; }
+    }
+    const prov_pct = tramoSel ? Number(tramoSel.pct_provision) : 0;
+    const tramoLbl = tramoSel ? `${tramoSel.tramo} días · ${prov_pct}% del capital` : `${dias_c} días`;
     // Panel por crédito → SOLO la provisión de ESTE crédito (no la cartera global).
     document.getElementById('provisionesContent').innerHTML = `
       ${c ? `<div class="mora-box mb-2"><div class="mora-box-label">Saldo insoluto (capital adeudado)</div><div class="mora-box-value" style="color:#0f172a">${fmt(saldo_c)}</div></div>
-             <div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada crédito (91+ días · 80% del capital)</div><div class="mora-box-value" style="color:#dc2626">${fmt(saldo_c * prov_pct / 100)}</div></div>` : ''}
-      <div style="font-size:0.78rem;color:#64748b">La provisión se calcula sobre el <b>capital adeudado</b> (saldo insoluto) de este crédito, no sobre las cuotas morosas.</div>`;
+             <div class="mora-box mb-3"><div class="mora-box-label">Provisión estimada crédito (${tramoLbl})</div><div class="mora-box-value" style="color:#dc2626">${fmt(saldo_c * prov_pct / 100)}</div></div>` : ''}
+      <div style="font-size:0.78rem;color:#64748b">La provisión se calcula sobre el <b>capital adeudado</b> (saldo insoluto) de este crédito, aplicando el <b>tramo por días de mora</b> del mantenedor de Parámetros Cobranza (${prov_pct}% para este caso). No se calcula sobre las cuotas morosas.</div>`;
   } catch(e) {}
 }
 
