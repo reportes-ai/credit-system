@@ -61,7 +61,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.8</span>
+      <span class="version-badge">v2.0</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -139,13 +139,18 @@
     </div>
   </div>
 
-  <!-- ── UAC ──────────────────────────────────────────────────────────── -->
-  <div class="card">
+  <!-- ── UAC — MODELO 1 (clásico) ─────────────────────────────────────── -->
+  <div class="card" id="cardUac1">
     <div class="card-hdr">
-      <div class="card-hdr-left"><i class="bi bi-building"></i> UAC (Unidad de Crédito) — Fórmula de Ingreso por Colocación</div>
-      <span class="tag-fin tag-uac">UNIDAD</span>
+      <div class="card-hdr-left"><i class="bi bi-building"></i> UAC — Modelo 1: Ingreso por Colocación (tramos por N° de ops)
+        <span id="badgeM1" style="display:none;background:#dcfce7;color:#15803d;border-radius:8px;padding:2px 10px;font-size:.7rem;font-weight:800;margin-left:8px">EN USO</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="btnUsarM1" onclick="usarModelo(1)" style="border:1.5px solid #0141A2;background:#fff;color:#0141A2;border-radius:8px;padding:5px 14px;font-weight:800;font-size:.78rem;cursor:pointer">Usar este modelo</button>
+        <span class="tag-fin tag-uac">UNIDAD</span>
+      </div>
     </div>
-    <div class="card-bd">
+    <div class="card-bd" id="bodyUac1">
       <div class="formula-box">
         Ingreso = Saldo Precio × % UAC<br>
         % UAC varía según N° de operaciones otorgadas/aprobadas en el mismo mes
@@ -194,6 +199,77 @@
     </div>
   </div>
 
+  <!-- ── UAC — MODELO 2 (corte por plazo) ─────────────────────────────── -->
+  <div class="card" id="cardUac2">
+    <div class="card-hdr">
+      <div class="card-hdr-left"><i class="bi bi-building"></i> UAC — Modelo 2: con corte por plazo
+        <span id="badgeM2" style="display:none;background:#dcfce7;color:#15803d;border-radius:8px;padding:2px 10px;font-size:.7rem;font-weight:800;margin-left:8px">EN USO</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="btnUsarM2" onclick="usarModelo(2)" style="border:1.5px solid #0141A2;background:#fff;color:#0141A2;border-radius:8px;padding:5px 14px;font-weight:800;font-size:.78rem;cursor:pointer">Usar este modelo</button>
+        <span class="tag-fin tag-uac">UNIDAD</span>
+      </div>
+    </div>
+    <div class="card-bd" id="bodyUac2">
+      <div class="formula-box">
+        Ingreso = Saldo Precio × % UAC (tramos por N° de ops del mes)<br>
+        PERO las operaciones con plazo ≥ <b><span id="lbl2_corte">36</span> cuotas</b> NO reciben el tier alto:
+        su % queda topado en el <b>% tope plazo largo</b>
+      </div>
+      <!-- Fila 1: % por Tier -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">
+        <div class="param-row">
+          <label>% Tier 1 (1–<span id="lbl2_tier1_max">5</span> ops)</label>
+          <input type="number" step="0.01" id="p_uac2_pct_tier1" oninput="markChanged(this);updateTierLabels2()" style="width:100%">
+          <span class="desc">tramo bajo</span>
+        </div>
+        <div class="param-row">
+          <label>% Tier 2 (<span id="lbl2_tier2_min">6</span>–<span id="lbl2_tier2_max">10</span> ops)</label>
+          <input type="number" step="0.01" id="p_uac2_pct_tier2" oninput="markChanged(this)" style="width:100%">
+          <span class="desc">tramo medio</span>
+        </div>
+        <div class="param-row">
+          <label>% Tier 3 (<span id="lbl2_tier3_min">11</span>–<span id="lbl2_tier3_max">15</span> ops)</label>
+          <input type="number" step="0.01" id="p_uac2_pct_tier3" oninput="markChanged(this)" style="width:100%">
+          <span class="desc">tramo alto</span>
+        </div>
+        <div class="param-row">
+          <label>% Tier 4 (<span id="lbl2_tier4_min">16</span>+ ops)</label>
+          <input type="number" step="0.01" id="p_uac2_pct_tier4" oninput="markChanged(this)" style="width:100%">
+          <span class="desc">tramo élite</span>
+        </div>
+      </div>
+      <!-- Fila 2: Máximos + corte por plazo -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">
+        <div class="param-row">
+          <label>Máx ops Tier 1</label>
+          <input type="number" step="1" id="p_uac2_ops_tier1_max" oninput="markChanged(this);updateTierLabels2()" style="width:100%">
+          <span class="desc">hasta aquí aplica Tier 1</span>
+        </div>
+        <div class="param-row">
+          <label>Máx ops Tier 2</label>
+          <input type="number" step="1" id="p_uac2_ops_tier2_max" oninput="markChanged(this);updateTierLabels2()" style="width:100%">
+          <span class="desc">hasta aquí aplica Tier 2</span>
+        </div>
+        <div class="param-row">
+          <label>Máx ops Tier 3</label>
+          <input type="number" step="1" id="p_uac2_ops_tier3_max" oninput="markChanged(this);updateTierLabels2()" style="width:100%">
+          <span class="desc">hasta aquí aplica Tier 3</span>
+        </div>
+        <div class="param-row" style="border-left:3px solid #c2410c;padding-left:10px">
+          <label>Plazo de corte (cuotas)</label>
+          <input type="number" step="1" id="p_uac2_plazo_corte" oninput="markChanged(this);updateTierLabels2()" style="width:100%">
+          <span class="desc">desde este plazo NO pagan el tier alto</span>
+        </div>
+        <div class="param-row" style="border-left:3px solid #c2410c;padding-left:10px">
+          <label>% tope plazo largo</label>
+          <input type="number" step="0.01" id="p_uac2_pct_largo" oninput="markChanged(this)" style="width:100%">
+          <span class="desc">% máximo para ops de plazo ≥ corte</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 
   <!-- ── Ejecutivo ─────────────────────────────────────────────────────── -->
   <div class="card">
@@ -210,6 +286,17 @@
       </div>
     </div>
   </div>
+
+  <!-- ── Qué afecta este mantenedor ───────────────────────────────────── -->
+  <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:10px;padding:16px 20px;margin-top:6px;font-size:.84rem;color:#475569">
+    <div style="font-weight:800;color:#012d70;margin-bottom:8px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>AutoFin (spread, inscripción, limitación)</b> → ingreso por colocación y orden de pago saldo precio en <a href="/creditos/">Créditos</a>, <a href="/dashboard/">Dashboard</a> y <a href="/reporteria/rentabilidad-creditos/">Rentabilidad</a>.</li>
+      <li><b>UAC Modelo 1 / Modelo 2 (selector "Usar este modelo")</b> → ingreso por colocación de operaciones UNIDAD en <a href="/creditos/">Créditos</a> (guardado y recálculo), snapshot de tier en <a href="/cartas-aprobacion/">Cartas de Aprobación</a> y <a href="/dashboard/">Dashboard</a>. Solo un modelo rige a la vez; el Modelo 2 topa el % de las ops con plazo ≥ corte (no pagan el tier alto).</li>
+      <li><b>Al guardar cambios UAC</b> → popup para elegir si recalcular los <b>meses no cerrados</b> (default: NO recalcular, aplica solo hacia adelante). Respeta campos forzados y meses cerrados.</li>
+      <li><b>% Comisión Ejecutivo</b> → cálculo de comisión en <a href="/comisiones/revision/">Revisión de Comisiones</a>.</li>
+    </ul>
+  </div>
 </div>
 
 <script>
@@ -225,8 +312,30 @@ const CLAVES = [
   'autofin_spread_fondo','autofin_inscripcion','autofin_limitacion',
   'uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4',
   'uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max',
+  'uac2_pct_tier1','uac2_pct_tier2','uac2_pct_tier3','uac2_pct_tier4',
+  'uac2_ops_tier1_max','uac2_ops_tier2_max','uac2_ops_tier3_max',
+  'uac2_plazo_corte','uac2_pct_largo',
   'pct_ejecutivo_fin'
 ];
+// Claves cuyo cambio afecta el cálculo UAC → gatillan el popup de recálculo
+const CLAVES_UAC = CLAVES.filter(k => k.startsWith('uac'));
+let UAC_MODELO = 1;          // modelo activo guardado en BD
+let UAC_MODELO_SEL = 1;      // modelo seleccionado en pantalla
+let SNAPSHOT = {};           // valores al cargar (para detectar cambios UAC)
+
+function usarModelo(m) {
+  UAC_MODELO_SEL = m;
+  pintarModelo();
+}
+function pintarModelo() {
+  [[1,'M1','cardUac1','bodyUac1'],[2,'M2','cardUac2','bodyUac2']].forEach(([m, suf, cardId, bodyId]) => {
+    const on = UAC_MODELO_SEL === m;
+    document.getElementById('badge' + suf).style.display = on ? '' : 'none';
+    document.getElementById('btnUsar' + suf).style.display = on ? 'none' : '';
+    document.getElementById(cardId).style.opacity = on ? '1' : '.55';
+    document.getElementById(cardId).style.borderLeft = on ? '4px solid #16a34a' : '';
+  });
+}
 
 async function cargar() {
   // Parámetros editables
@@ -238,6 +347,11 @@ async function cargar() {
     const el = document.getElementById('p_' + k);
     if (el && obj[k] !== undefined) el.value = obj[k];
   });
+  UAC_MODELO = Math.round(obj.uac_modelo) === 2 ? 2 : 1;
+  UAC_MODELO_SEL = UAC_MODELO;
+  SNAPSHOT = {}; CLAVES_UAC.forEach(k => { SNAPSHOT[k] = obj[k]; });
+  pintarModelo();
+  updateTierLabels2();
 
   // TMC desde Tasas vigentes (sólo lectura)
   try {
@@ -270,20 +384,88 @@ function updateTierLabels() {
   set('lbl_tier4_min', t3max + 1);
 }
 
+function updateTierLabels2() {
+  const t1max = parseInt(document.getElementById('p_uac2_ops_tier1_max')?.value) || 5;
+  const t2max = parseInt(document.getElementById('p_uac2_ops_tier2_max')?.value) || 10;
+  const t3max = parseInt(document.getElementById('p_uac2_ops_tier3_max')?.value) || 15;
+  const corte = parseInt(document.getElementById('p_uac2_plazo_corte')?.value) || 36;
+  const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  set('lbl2_tier1_max', t1max);
+  set('lbl2_tier2_min', t1max + 1);
+  set('lbl2_tier2_max', t2max);
+  set('lbl2_tier3_min', t2max + 1);
+  set('lbl2_tier3_max', t3max);
+  set('lbl2_tier4_min', t3max + 1);
+  set('lbl2_corte', corte);
+}
+
 // ── Guardar ─────────────────────────────────────────────────────────
+// Si cambió algo del cálculo UAC (modelo o parámetros) se pregunta si
+// recalcular los meses NO cerrados. Default: NO recalcular.
+function cambioUAC(payload) {
+  if (UAC_MODELO_SEL !== UAC_MODELO) return true;
+  return CLAVES_UAC.some(k => payload[k] !== undefined && SNAPSHOT[k] !== undefined
+    && Math.abs((payload[k] || 0) - (SNAPSHOT[k] || 0)) > 1e-9);
+}
+
+async function preguntarRecalculo() {
+  // Popup nativo <dialog> con los meses abiertos. Devuelve true/false (recalcular).
+  let meses = [];
+  try {
+    const r = await fetch('/api/parametros-credito/meses-abiertos', { headers: hdr() });
+    const j = await r.json();
+    if (j.success) meses = j.data || [];
+  } catch(e) {}
+  return new Promise(resolve => {
+    let dlg = document.getElementById('dlgRecalc');
+    if (dlg) dlg.remove();
+    dlg = document.createElement('dialog');
+    dlg.id = 'dlgRecalc';
+    dlg.style.cssText = 'border:none;border-radius:14px;padding:0;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.3)';
+    dlg.innerHTML = `
+      <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:16px 22px;font-weight:800">
+        <i class="bi bi-arrow-repeat me-2"></i>¿Recalcular los meses abiertos?
+      </div>
+      <div style="padding:18px 22px;font-size:.88rem;color:#374151">
+        Cambiaste parámetros del cálculo UAC. Puedes aplicarlos <b>solo a las operaciones nuevas</b>
+        o además <b>recalcular</b> las operaciones ya digitadas de los meses <b>no cerrados</b>:
+        <div style="margin:10px 0;display:flex;flex-wrap:wrap;gap:6px">
+          ${meses.length ? meses.map(m => '<span style="background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:2px 10px;font-weight:700;font-size:.78rem">'+m+'</span>').join('') : '<i>No hay meses abiertos con operaciones.</i>'}
+        </div>
+        Los meses cerrados y los campos forzados <b>no se tocan</b> en ningún caso.
+      </div>
+      <div style="padding:14px 22px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #f1f5f9">
+        <button id="dlgNoRecalc" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:800;cursor:pointer">No recalcular (solo hacia adelante)</button>
+        <button id="dlgSiRecalc" style="background:#fff;color:#c2410c;border:1.5px solid #c2410c;border-radius:8px;padding:8px 18px;font-weight:800;cursor:pointer">Recalcular meses abiertos</button>
+      </div>`;
+    document.body.appendChild(dlg);
+    dlg.querySelector('#dlgNoRecalc').onclick = () => { dlg.close(); dlg.remove(); resolve(false); };
+    dlg.querySelector('#dlgSiRecalc').onclick = () => { dlg.close(); dlg.remove(); resolve(true); };
+    dlg.addEventListener('cancel', () => { dlg.remove(); resolve(false); });  // Esc = default No
+    dlg.showModal();
+    dlg.querySelector('#dlgNoRecalc').focus();   // default: No recalcular
+  });
+}
+
 async function guardarTodo() {
   const ok  = document.getElementById('alertaOk');
   const err = document.getElementById('alertaErr');
   ok.style.display='none'; err.style.display='none';
   const btn = document.getElementById('btnGuardar');
-  btn.disabled = true;
 
   const payload = {};
   CLAVES.forEach(k => {
     const el = document.getElementById('p_' + k);
     if (el) payload[k] = parseFloat(el.value);
   });
+  payload.uac_modelo = UAC_MODELO_SEL;
 
+  // Popup de recálculo SOLO si cambió el cálculo UAC (modelo o parámetros)
+  let recalc = true;   // comportamiento histórico para el resto de parámetros
+  if (cambioUAC(payload)) recalc = await preguntarRecalculo();
+  payload._recalc = recalc;
+
+  btn.disabled = true;
   try {
     const r = await fetch('/api/parametros-credito', {
       method: 'PUT',
@@ -292,9 +474,12 @@ async function guardarTodo() {
     });
     const j = await r.json();
     if (j.success) {
-      ok.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Parámetros guardados correctamente.';
+      ok.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i>Parámetros guardados correctamente.' +
+        (payload._recalc ? ' Recalculando meses abiertos…' : ' Sin recálculo: aplican solo hacia adelante.');
       ok.style.display = 'block';
       document.querySelectorAll('.changed').forEach(e => e.classList.remove('changed'));
+      UAC_MODELO = UAC_MODELO_SEL;
+      CLAVES_UAC.forEach(k => { if (payload[k] !== undefined) SNAPSHOT[k] = payload[k]; });
       window.scrollTo(0,0);
     } else {
       err.textContent = j.error || 'Error al guardar.';

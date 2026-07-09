@@ -109,11 +109,10 @@ async function calcularOperacion(op) {
         monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap: monto_cap, plazo, tasaCli, costoFondo });
       }
     } else if (financiera.includes('UNIDAD') || financiera.includes('UAC')) {
-      // UAC: % del saldo precio según volumen del mes
+      // UAC: % del saldo precio según volumen del mes — motor único uac-tier.js
+      // (modelo 1 clásico o modelo 2 con corte por plazo, según uac_modelo).
       const ops = await contarOpsUAC(op.mes);
-      let pct = p.uac_pct_tier1 / 100;
-      if (ops >= p.uac_ops_tier2_max) pct = p.uac_pct_tier3 / 100;
-      else if (ops >= p.uac_ops_tier1_max) pct = p.uac_pct_tier2 / 100;
+      const pct = require('./uac-tier').pctUACOperacion({ ops, plazo }, p);
       monto_comision_fin = core.ingresoColocacionUAC({ saldo: saldo_precio, pctUAC: pct });
     }
   }

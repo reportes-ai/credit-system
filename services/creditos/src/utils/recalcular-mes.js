@@ -106,13 +106,9 @@ async function cargarDealers() {
 }
 // dealerTablePct vive en ./comision-dealer.js (motor único).
 
-/* ── Tier UNIDAD ────────────────────────────────────────────────────── */
-function getTierUAC(cnt, p) {
-  if (cnt >= (p.uac_ops_tier3_max || 15)) return (p.uac_pct_tier4 || p.uac_pct_tier3) / 100;
-  if (cnt >= (p.uac_ops_tier2_max || 10)) return (p.uac_pct_tier3 || 18) / 100;
-  if (cnt >= (p.uac_ops_tier1_max ||  5)) return (p.uac_pct_tier2 || 16) / 100;
-  return (p.uac_pct_tier1 || 14) / 100;
-}
+/* ── Tier UNIDAD — motor único uac-tier.js (modelo 1 o 2 según uac_modelo) ── */
+const { pctUACMes, aplicarCortePlazoUAC } = require('./uac-tier');
+const getTierUAC = (cnt, p) => pctUACMes(cnt, p);
 
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -136,8 +132,9 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
   let monto_comision_fin = 0;
   if (esUAC) {
     // UAC: % del saldo precio según el tier DINÁMICO del mes (proyecta el cierre).
+    // Modelo 2: la op con plazo >= corte no recibe el tier alto (tope uac2_pct_largo).
     // El snapshot de la decisión se congela aparte en la carta (cartas_aprobacion.tier_uac_*).
-    monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC });
+    monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC: aplicarCortePlazoUAC(pctUAC, plazo, p) });
   } else if (plazo > 0 && montoCap > 0) {
     const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
     if (tasa) {

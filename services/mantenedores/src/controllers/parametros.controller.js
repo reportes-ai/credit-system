@@ -94,6 +94,20 @@ const ensureTable = async () => {
     // ── UAC Tier 4 y Tier 3 max ───────────────────────────────────────────
     ['uac_pct_tier4',       20.00, 'UAC — % sobre saldo precio tramo élite'],
     ['uac_ops_tier3_max',   15,    'UAC — N° máximo de ops para tier 3'],
+    // ── UAC MODELO 2 (corte por plazo) — solo aplica si uac_modelo=2 ──────
+    // Mismos tramos que el modelo 1 con sus propios parámetros, pero las ops
+    // con plazo >= uac2_plazo_corte no reciben el tier alto: quedan topadas
+    // en uac2_pct_largo. Selector de modelo en Parámetros Financieras.
+    ['uac_modelo',          1,     'UAC — modelo activo (1=tramos por N° ops, 2=con corte por plazo)'],
+    ['uac2_pct_tier1',      14.00, 'UAC M2 — % sobre saldo precio tier 1'],
+    ['uac2_pct_tier2',      16.00, 'UAC M2 — % sobre saldo precio tier 2'],
+    ['uac2_pct_tier3',      18.00, 'UAC M2 — % sobre saldo precio tier 3'],
+    ['uac2_pct_tier4',      18.00, 'UAC M2 — % sobre saldo precio tramo élite'],
+    ['uac2_ops_tier1_max',  5,     'UAC M2 — N° máximo de ops para tier 1'],
+    ['uac2_ops_tier2_max',  10,    'UAC M2 — N° máximo de ops para tier 2'],
+    ['uac2_ops_tier3_max',  15,    'UAC M2 — N° máximo de ops para tier 3'],
+    ['uac2_plazo_corte',    36,    'UAC M2 — plazo (cuotas) desde el cual la op NO recibe el tier alto'],
+    ['uac2_pct_largo',      16.00, 'UAC M2 — % tope para ops con plazo >= corte (no pagan el tier alto)'],
     // ── Factores de comisión AutoFácil por seguros (% de prima desg) ─────
     ['seg_com_desg_6',  62.525, 'Factor comisión desgravamen plazo ≤6m'],
     ['seg_com_cesa_6',  52.636, 'Factor comisión cesantía plazo ≤6m'],
@@ -139,7 +153,12 @@ const getAll = async (req, res) => {
 
 const updateAll = async (req, res) => {
   try {
-    const params = req.body;
+    const params = { ...req.body };
+    // _recalc: el front decide si recalcular los meses abiertos (popup al guardar).
+    // Sin el flag se mantiene el comportamiento histórico (recalcula) para no
+    // romper a los demás consumidores del endpoint.
+    const recalc = params._recalc;
+    delete params._recalc;
     for (const [clave, valor] of Object.entries(params)) {
       await pool.query(
         `INSERT INTO parametros_credito (clave, valor) VALUES (?, ?)
@@ -147,12 +166,27 @@ const updateAll = async (req, res) => {
         [clave, parseFloat(valor)]
       );
     }
-    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)`, meta: params });
-    dispararRecalc();
-    res.json({ success: true, data: { mensaje: 'Parámetros actualizados' }, error: null });
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'parametros_credito', entidad_id: 'parametros', detalle: `Actualizó parámetros de crédito (${Object.keys(params).length} parámetro/s)${recalc === false ? ' — SIN recálculo (elección del usuario)' : ''}`, meta: params });
+    if (recalc !== false) dispararRecalc();
+    res.json({ success: true, data: { mensaje: 'Parámetros actualizados', recalculo: recalc !== false }, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
 
-module.exports = { getAll, updateAll };
+/* ── GET /api/parametros-credito/meses-abiertos — para el popup de recálculo ──
+   Meses con créditos que NO están cerrados (meses_cerrados.cerrado=1). */
+const getMesesAbiertos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT DISTINCT DATE_FORMAT(mes,'%Y-%m') m FROM creditos
+      WHERE mes IS NOT NULL
+        AND DATE_FORMAT(mes,'%Y-%m') NOT IN (SELECT mes FROM meses_cerrados WHERE cerrado=1)
+      ORDER BY m DESC LIMIT 12`);
+    res.json({ success: true, data: rows.map(r => r.m), error: null });
+  } catch (e) {
+    (console.error('[meses-abiertos]', e.message), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
+  }
+};
+
+module.exports = { getAll, updateAll, getMesesAbiertos };

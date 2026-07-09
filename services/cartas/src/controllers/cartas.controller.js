@@ -404,10 +404,10 @@ async function puedeVerTodas(usuario) {
 // (tramos uac_ops_tier*_max). Devuelve { n, pct(%), count }.
 async function tierUAC(fechaRef) {
   try {
+    // Parámetros de AMBOS modelos + cuál está activo — motor único uac-tier.js
     const [pr] = await pool.query(
-      "SELECT clave, valor FROM parametros_credito WHERE clave IN ('uac_ops_tier1_max','uac_ops_tier2_max','uac_ops_tier3_max','uac_pct_tier1','uac_pct_tier2','uac_pct_tier3','uac_pct_tier4')");
+      "SELECT clave, valor FROM parametros_credito WHERE clave LIKE 'uac%'");
     const P = {}; pr.forEach(r => { P[r.clave] = parseFloat(r.valor); });
-    const t1 = P.uac_ops_tier1_max || 5, t2 = P.uac_ops_tier2_max || 10, t3 = P.uac_ops_tier3_max || 15;
     const ref = fechaRef ? new Date(fechaRef) : new Date();
     const ym = isNaN(ref) ? null : `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
     let count = 0;
@@ -416,11 +416,8 @@ async function tierUAC(fechaRef) {
         "SELECT COUNT(*) n FROM creditos WHERE financiera='UNIDAD DE CREDITO' AND fecha_otorgado IS NOT NULL AND DATE_FORMAT(fecha_otorgado,'%Y-%m')=?", [ym]);
       count = c.n || 0;
     }
-    let n, pct;
-    if (count <= t1)      { n = 1; pct = P.uac_pct_tier1 || 14; }
-    else if (count <= t2) { n = 2; pct = P.uac_pct_tier2 || 16; }
-    else if (count <= t3) { n = 3; pct = P.uac_pct_tier3 || 18; }
-    else                  { n = 4; pct = P.uac_pct_tier4 || 20; }
+    const { tierUACInfo } = require('../../../creditos/src/utils/uac-tier');
+    const { n, pct } = tierUACInfo(count, P);
     return { n, pct, count };
   } catch (e) { console.error('[tierUAC]', e.message); return { n: 1, pct: 14, count: 0 }; }
 }
