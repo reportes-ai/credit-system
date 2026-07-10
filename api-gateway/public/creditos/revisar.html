@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.3 — cuota mensual calculada (fórmula francesa) refleja la tasa vigente aunque c.cuota sea nula -->
+<!-- v2.4 — resumen de la tabla de amortización usa la cuota calculada (no la guardada en 0) -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -1549,7 +1549,7 @@ function mostrarAmortizacion() {
   const mf = parseFloat(monto_financiado)||0;
   const t  = parseFloat(tasa_mensual)||0;
   const pl = parseInt(plazo)||0;
-  const cu = parseFloat(cuota)||0;
+  const cu = cuotaFrancesa(_credito) || parseFloat(cuota)||0;   // calculada (no la guardada, que puede ser 0)
   if (!mf||!t||!pl) { showToast('Datos insuficientes (monto, tasa y plazo son requeridos)', false); return; }
   document.getElementById('amortNumCred').textContent = numero_credito||'—';
   const fp = v => '$'+Math.round(v).toLocaleString('es-CL');
