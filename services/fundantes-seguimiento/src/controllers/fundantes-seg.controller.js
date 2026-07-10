@@ -180,8 +180,10 @@ const listar = async (req, res) => {
     if (!vis.all) {
       if (!vis.lista.length)
         return res.json({ success: true, data: [], resumen: matrizVacia(), ejecutivos: [], puede_validar: false, es_ejecutivo: true, nombre: nombreUsuario(req), error: null });
-      filt.push('c.ejecutivo IN (?)'); fp.push(vis.lista);
-    } else if (fEjec) { filt.push('c.ejecutivo = ?'); fp.push(fEjec); }
+      // Comparación case-insensitive: los nombres asignados van en MAYÚSCULAS pero el crédito
+      // puede guardar el ejecutivo con otra caja (ej. "Katherin Trillo" desde la carta).
+      filt.push('UPPER(c.ejecutivo) IN (?)'); fp.push(vis.lista.map(x => String(x).toUpperCase()));
+    } else if (fEjec) { filt.push('UPPER(c.ejecutivo) = ?'); fp.push(String(fEjec).toUpperCase()); }
     if (fFin && FINANCIERAS.includes(fFin)) { filt.push('UPPER(c.financiera) = ?'); fp.push(fFin); }
     const where = 'WHERE ' + filt.join(' AND ');
 

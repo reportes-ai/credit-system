@@ -54,7 +54,13 @@ async function ejecutivosVisibles(usuario) {
   const amb = m[usuario.perfil_nombre] || 'todos';
   if (amb !== 'asignados') return { all: true, lista: null };
   const [asg] = await pool.query('SELECT ejecutivo FROM usuario_ejecutivos WHERE id_usuario = ?', [usuario.id_usuario]);
-  return { all: false, lista: asg.map(r => r.ejecutivo) };
+  const lista = asg.map(r => r.ejecutivo);
+  // Un ejecutivo SIEMPRE ve sus propias operaciones: se incluye su nombre (nombre + apellido)
+  // aunque no se le haya asignado explícitamente en usuario_ejecutivos. Así un Ejecutivo
+  // Comercial nuevo ve lo suyo sin configuración previa. (El match final es case-insensitive.)
+  const propio = `${usuario.nombre || ''} ${usuario.apellido || ''}`.trim();
+  if (propio && !lista.some(x => String(x).toUpperCase() === propio.toUpperCase())) lista.push(propio);
+  return { all: false, lista };
 }
 
 // Invalida la caché de ámbitos (llamar al guardar el ámbito de un perfil para efecto inmediato).
