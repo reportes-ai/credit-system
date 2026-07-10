@@ -481,7 +481,9 @@ async function barrerVencidas() {
         SET status='DESISTIDA', desistido_auto=1, fecha_desistimiento=NOW(),
             motivo_desistimiento=CONCAT('Vencida automáticamente (', ?, ' días corridos desde la fecha de la carta).')
       WHERE status='APROBADA' AND otorgado=0 AND fecha IS NOT NULL
-        AND DATE_ADD(fecha, INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
+        -- El plazo corre desde la fecha MÁS TARDÍA entre la fecha de la carta y su creación:
+        -- una carta creada hoy pero con fecha retroactiva NO debe nacer vencida.
+        AND DATE_ADD(GREATEST(DATE(fecha), DATE(fecha_creacion)), INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
   if (r.affectedRows) {
     await pool.query(
       `UPDATE creditos cr JOIN cartas_aprobacion ca ON ca.id_credito_creado = cr.id
