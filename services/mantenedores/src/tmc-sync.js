@@ -88,13 +88,16 @@ async function backfillTMC(desde = '2017-01') {
   const tipoMayor = await getParam('tmc_tipo_mayor');
   if (!tipoMenor || !tipoMayor) return { ok: false, motivo: 'sin tipos TMC calibrados (corre primero una sincronización normal)' };
 
-  const [[min]] = await pool.query('SELECT DATE_FORMAT(MIN(fecha_desde),"%Y-%m") mn FROM tasas');
-  const fin = (min && min.mn) || new Date().toISOString().slice(0, 7);
-  if (fin <= desde) return { ok: true, sin_cambios: true };   // ya hay cobertura desde `desde`
+  // Meses que ya tienen vigencia (por mes de fecha_desde): solo se piden a la CMF los FALTANTES.
+  // Así también se rellenan huecos intermedios (ej. un mes en que la CMF falló) sin re-pedir todo.
+  const [ex] = await pool.query('SELECT DISTINCT DATE_FORMAT(fecha_desde,"%Y-%m") m FROM tasas');
+  const existentes = new Set(ex.map(r => r.m));
+  const fin = new Date().toISOString().slice(0, 7);
 
   let insertados = 0; const errores = [];
   let [yy, mm] = desde.split('-').map(Number);
-  while (`${yy}-${String(mm).padStart(2, '0')}` <= fin) {
+  while (`${yy}-${String(mm).padStart(2, '0')}` < fin) {
+    if (existentes.has(`${yy}-${String(mm).padStart(2, '0')}`)) { mm++; if (mm > 12) { mm = 1; yy++; } continue; }
     try {
       const tmcs = await cmfGet('tmc', yy, mm);
       const eMenor = tmcs.find(x => mismoTipo(x.tipo, tipoMenor));
