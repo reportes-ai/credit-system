@@ -8,7 +8,7 @@
  */
 const pool = require('../../../shared/config/database');
 const { cmfGet } = require('./cmf-api');
-const { sincronizarTMC } = require('./tmc-sync');
+const { sincronizarTMC, backfillTMC } = require('./tmc-sync');
 
 // Estado de la última sincronización por indicador ('' = OK) → lo usan Alertas y el sello de la
 // página. Tabla propia con valor TEXT: parametros_credito.valor es DECIMAL y NO admite las
@@ -95,6 +95,13 @@ async function sincronizar(opts = {}) {
     out.tmc = e.code === 'NOCMF' ? { ok: false, motivo: 'falta CMF_API_KEY' } : { error: e.message };
     await setEstado('sync_tmc', eMsg('TMC', e));
     if (e.code !== 'NOCMF') console.error('[indicadores] TMC', e.message);
+  }
+
+  // Backfill de TMC histórica (una vez que exista cobertura, sale al tiro con sin_cambios).
+  // Necesaria para el interés por mora de cuotas antiguas (día a día con la TMC de SU fecha).
+  if (force) {
+    try { out.tmc_backfill = await backfillTMC('2024-01'); }
+    catch (e) { out.tmc_backfill = { error: e.message }; if (e.code !== 'NOCMF') console.error('[indicadores] tmc backfill', e.message); }
   }
 
   await setEstado('sync_ultima', new Date().toISOString());
