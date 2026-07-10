@@ -4116,7 +4116,13 @@ async function renderImpTable(){
   const filt = document.getElementById('impFilter').value;
   let list = cartas.filter(c => {
     if(filt && c.status!==filt) return false;
-    if(search && !c.opCarta.toLowerCase().includes(search) && !c.cliente.toLowerCase().includes(search)) return false;
+    // Búsqueda por N° Op Carta, N° Operación (crédito creado) o cliente. String() null-safe:
+    // si algún campo viene null, .toLowerCase() rompía TODO el listado (no aparecía ninguna).
+    if(search){
+      const campos = [c.opCarta, c.numeroCreditoCreado, c.opOrigen, c.cliente]
+        .map(v => String(v==null?'':v).toLowerCase());
+      if(!campos.some(v => v.includes(search))) return false;
+    }
     return true;
   });
   if(!list.length){
