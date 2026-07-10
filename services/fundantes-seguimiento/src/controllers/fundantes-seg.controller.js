@@ -290,7 +290,8 @@ async function puedeOperar(req, id_credito) {
   const vis = await ejecutivosVisibles(req);
   if (vis.all) return true;                                                         // ámbito 'todos'
   const [[c]] = await pool.query('SELECT ejecutivo FROM creditos WHERE id=?', [id_credito]);
-  return !!c && vis.lista.includes(c.ejecutivo);
+  // Comparación case-insensitive (el ejecutivo del crédito puede venir en otra caja que el nombre del usuario).
+  return !!c && vis.lista.some(x => String(x).toUpperCase() === String(c.ejecutivo || '').toUpperCase());
 }
 
 /* ─── POST /api/fundantes-seguimiento/:id/doc — sube (o reemplaza) un documento ── */
