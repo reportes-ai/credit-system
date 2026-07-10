@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.1 — botón Prepagar Crédito con condonación por atribuciones (gastos→mora→corriente→capital) -->
+<!-- v2.2 — botón Castigar Saldo (castigo contable con doble firma gerencial) en cartera propia -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -132,6 +132,9 @@
   .action-bar-right { display:flex; gap:10px; align-items:center; }
   .btn-accion { border:none; border-radius:9px; padding:10px 20px; font-size:.88rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:7px; transition:opacity .15s; }
   .btn-accion:hover { opacity:.88; }
+  .btn-mini-ok, .btn-mini-no { border:none; border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:700; cursor:pointer; margin-left:2px; }
+  .btn-mini-ok { background:#dcfce7; color:#15803d; }
+  .btn-mini-no { background:#fee2e2; color:#991b1b; }
   .btn-aprobar   { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
   .btn-rechazar  { background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; }
   .btn-guardar   { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; }
@@ -459,9 +462,101 @@ async function cargarPagina() {
     }
     renderPagina(_credito, ant, com);
     poblarEstadosParametricos(_credito);
+    renderCastigo(_credito);
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
+}
+
+/* ── Castigo contable de saldo (cartera propia) ─────────────────────────────── */
+let _MIS_FUNCS = null;
+async function misFuncs() {
+  if (_MIS_FUNCS) return _MIS_FUNCS;
+  try {
+    const j = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers: apiHdr() }).then(r=>r.json());
+    _MIS_FUNCS = new Set(j.funcionalidades || []);
+    if ((JSON.parse(sessionStorage.getItem('usuario')||'{}').perfil) === 'Administrador') _MIS_FUNCS.add('*');
+  } catch(_) { _MIS_FUNCS = new Set(); }
+  return _MIS_FUNCS;
+}
+const _puede = (f, fs) => fs.has('*') || fs.has(f);
+
+async function renderCastigo(c) {
+  const slot = document.getElementById('castigoSlot');
+  if (!slot || !enCartera(c) || !c.num_op) return;
+  const fs = await misFuncs();
+  let cas = null;
+  try { cas = await fetch('/api/castigos/operacion/'+encodeURIComponent(c.num_op), { headers: apiHdr() }).then(r=>r.json()).then(j=>j.data); } catch(_){}
+
+  if (!cas) {
+    if (_ec(c) === 'CASTIGADO') { slot.innerHTML = '<span style="font-size:.8rem;color:#b91c1c;align-self:center"><i class="bi bi-slash-circle me-1"></i>Saldo castigado</span>'; return; }
+    if (_puede('castigo_solicitar', fs))
+      slot.innerHTML = `<button class="btn-accion" style="background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff" onclick="abrirCastigo()"><i class="bi bi-file-earmark-minus"></i>Castigar Saldo</button>`;
+    return;
+  }
+  // Hay un castigo PENDIENTE → banner con las dos firmas
+  const firmas = cas.aprobaciones || [];
+  const firmaDe = rol => firmas.find(a => a.rol === rol);
+  const slotFirma = (rol, funcRol, label) => {
+    const f = firmaDe(rol);
+    if (f) return `<div style="font-size:.78rem"><b>${label}:</b> ${f.decision==='APROBADO'?'✔ Aprobó':'✗ Rechazó'} ${_ppEsc(f.aprobado_por_nombre||'')} <span style="color:#94a3b8">${fmtDT(f.aprobado_at)}</span></div>`;
+    const puedo = _puede(funcRol, fs);
+    return `<div style="font-size:.78rem"><b>${label}:</b> <span style="color:#b45309">pendiente</span> ${puedo?`
+      <button class="btn-mini-ok" onclick="firmarCastigo(${cas.id},'${rol}','APROBADO')">Aprobar</button>
+      <button class="btn-mini-no" onclick="firmarCastigo(${cas.id},'${rol}','RECHAZADO')">Rechazar</button>`:''}</div>`;
+  };
+  slot.innerHTML = `<div style="width:100%;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-top:8px">
+    <div style="font-weight:700;color:#9a3412;font-size:.85rem"><i class="bi bi-hourglass-split me-1"></i>Castigo de saldo PENDIENTE — ${_ppEsc(cas.motivo)} · ${fmtP(cas.saldo_castigado)}</div>
+    ${cas.comentario?`<div style="font-size:.78rem;color:#7c2d12;margin:3px 0 6px">${_ppEsc(cas.comentario)}</div>`:''}
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:4px">
+      ${slotFirma('FINANZAS','castigo_aprobar_finanzas','Finanzas')}
+      ${slotFirma('OPERACIONES','castigo_aprobar_operaciones','Operaciones y Riesgo')}
+    </div>
+    ${_puede('castigo_solicitar', fs)?`<button class="btn-mini-no" style="margin-top:8px" onclick="anularCastigo(${cas.id})">Anular solicitud</button>`:''}
+  </div>`;
+}
+
+function abrirCastigo() {
+  const c = _credito; if (!c || !c.num_op) return alert('No se pudo obtener el N° de operación.');
+  let dlg = document.getElementById('dlgCastigo');
+  if (!dlg) { dlg = document.createElement('dialog'); dlg.id='dlgCastigo'; dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:460px;width:92%'; document.body.appendChild(dlg); }
+  dlg.innerHTML = `
+    <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;font-weight:700;color:#b91c1c"><i class="bi bi-file-earmark-minus me-1"></i>Castigar saldo — op N° ${_ppEsc(c.num_op)}</div>
+    <div style="padding:20px 22px">
+      <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#7f1d1d;margin-bottom:14px">
+        Genera un <b>castigo contable</b> que da de baja la operación. Requiere la aprobación de <b>Gerencia de Finanzas</b> y de <b>Operaciones y Riesgo</b> (o el Gerente General en reemplazo de cualquiera).</div>
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Motivo</label>
+      <select id="casMotivo" class="form-select"><option value="INCOBRABLE">Incobrable</option><option value="NEGOCIACION">Negociación</option><option value="OTROS">Otros</option></select>
+      <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin:14px 0 4px">Comentario</label>
+      <textarea id="casComent" class="form-control" rows="3" placeholder="Detalle del castigo…"></textarea>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:10px">
+      <button class="btn-accion btn-volver" onclick="document.getElementById('dlgCastigo').close()">Cancelar</button>
+      <button class="btn-accion" style="background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff" onclick="enviarCastigo()">Solicitar castigo</button>
+    </div>`;
+  dlg.showModal();
+}
+async function enviarCastigo() {
+  const c = _credito;
+  const motivo = document.getElementById('casMotivo').value;
+  const comentario = document.getElementById('casComent').value.trim();
+  const j = await fetch('/api/castigos', { method:'POST', headers: apiHdr(), body: JSON.stringify({ num_op: c.num_op, motivo, comentario }) }).then(r=>r.json());
+  if (!j.success) return alert(j.error || 'No se pudo solicitar el castigo');
+  document.getElementById('dlgCastigo').close();
+  renderCastigo(c);
+}
+async function firmarCastigo(id, rol, decision) {
+  const comentario = decision==='RECHAZADO' ? (prompt('Motivo del rechazo (opcional):')||'') : (prompt('Comentario de la aprobación (opcional):')||'');
+  const j = await fetch('/api/castigos/'+id+'/aprobar', { method:'POST', headers: apiHdr(), body: JSON.stringify({ rol, decision, comentario }) }).then(r=>r.json());
+  if (!j.success) return alert(j.error || 'No se pudo registrar la firma');
+  if (j.data && j.data.estado === 'APROBADO') { alert('Castigo aprobado y aplicado: la operación quedó dada de baja (CASTIGADO).'); location.reload(); return; }
+  renderCastigo(_credito);
+}
+async function anularCastigo(id) {
+  if (!confirm('¿Anular esta solicitud de castigo?')) return;
+  const j = await fetch('/api/castigos/'+id+'/anular', { method:'POST', headers: apiHdr() }).then(r=>r.json());
+  if (!j.success) return alert(j.error || 'No se pudo anular');
+  renderCastigo(_credito);
 }
 
 function getEstadoPago(c) {
@@ -740,6 +835,7 @@ function renderPagina(c, ant, com) {
         onclick="abrirPrepagoFicha()">
         <i class="bi bi-cash-stack"></i>Prepagar Crédito
       </button>` : ''}
+      <span id="castigoSlot"></span>
       ` : ['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera) ? `
       ${!ESTADOS_BROKER_FINALES.has(c.estado) ? `
       <button class="btn-accion" style="background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff"

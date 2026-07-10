@@ -225,6 +225,7 @@ app.use('/api/broker-validation-items', require('../../services/creditos/src/rou
 app.use('/api/broker-validaciones',     require('../../services/creditos/src/routes/broker-validaciones.routes'));
 app.use('/api/fundantes',               require('../../services/creditos/src/routes/fundantes.routes'));
 app.use('/api/comision-dealer',         require('../../services/creditos/src/routes/comision-dealer.routes'));
+app.use('/api/castigos',                require('../../services/creditos/src/routes/castigos.routes'));
 
 // Tesorería
 app.use('/api/cajas',                require('../../services/tesoreria/src/routes/cajas.routes'));
@@ -428,6 +429,7 @@ const PAGINAS = [
   ['/tesoreria/cierre-caja', 'tesoreria/cierre-caja.html'],
   ['/tesoreria/cuentas-transitorias', 'tesoreria/cuentas-transitorias.html'],
   ['/tesoreria/banco-conexiones', 'tesoreria/banco-conexiones.html'],
+  ['/tesoreria/castigos', 'tesoreria/castigos.html'],
   ['/crm', 'crm/index.html'],
   ['/crm/gestiones', 'crm/gestiones.html'],
   ['/crm/estadisticas', 'crm/estadisticas.html'],
