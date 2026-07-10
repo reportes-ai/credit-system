@@ -107,7 +107,9 @@ async function upsertClienteDesdeCartaSilente(rut, nombres, apellidoPaterno, ape
   } catch(e){ /* silencioso */ }
 }
 
+let _lastUpsertError = '';
 async function dbUpsertCarta(c){
+  _lastUpsertError = '';
   try {
     const r = await fetch('/api/cartas', {
       method: 'POST',
@@ -118,6 +120,8 @@ async function dbUpsertCarta(c){
       const j = await r.json();
       // Si era nueva carta, actualizar el id con el insertId devuelto
       if(!c.id && j.data && j.data.id) c.id = j.data.id;
+    } else {
+      try { const j = await r.json(); _lastUpsertError = j.error || ''; } catch(_){}
     }
     return r.ok;
   } catch(e){ console.error('upsertCarta:', e); return false; }
@@ -3991,7 +3995,12 @@ async function ejecutarAprobacion(id, comentarios){
   c.fechaAprobacion=new Date().toISOString();
   if(comentarios) c.excepcionesComentarios = comentarios;
   const ok = await dbUpsertCarta(c);
-  if(!ok){ showModal('Error','No se pudo guardar la aprobación. Intenta nuevamente.'); return; }
+  if(!ok){
+    c.status='PENDIENTE'; c.aprobadoPor=null; c.aprobadoPorNombre=null; c.aprobadoPorInitials=null; c.fechaAprobacion=null;
+    showModal('No se pudo aprobar', _lastUpsertError || 'No se pudo guardar la aprobación. Intenta nuevamente.');
+    renderRevTable();
+    return;
+  }
 
   // ── Crear crédito en el sistema principal ────────────────────────────────
   let numCredito = null;
@@ -4137,12 +4146,12 @@ async function renderImpTable(){
       <td style="font-size:11px">${c.tipo}</td>
       <td style="font-size:12px">${c.cliente}</td>
       <td style="font-size:12px">${c.concesionario}</td>
-      <td><span class="badge-status ${c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':'badge-pendiente'}">${c.status}</span></td>
+      <td><span class="badge-status ${c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':c.status==='VENCIDA'?'badge-vencida':'badge-pendiente'}">${c.status}</span></td>
       <td style="font-size:12px">${c.aprobadoPorNombre||'-'}</td>
       <td style="font-size:12px;font-family:monospace;font-weight:700;color:#1565C0">${c.numeroCreditoCreado||'-'}</td>
       <td>
         <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="verCarta(${c.id},false)">Ver</button>
-        ${c.status==='APROBADA' ? `<button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:4px" onclick="imprimirCarta(${c.id})">🖨 Imprimir</button>` : `<span style="font-size:11px;color:#E65100;margin-left:6px">Pendiente Revisión</span>`}
+        ${c.status==='APROBADA' ? `<button class="btn btn-primary" style="font-size:11px;padding:4px 10px;margin-left:4px" onclick="imprimirCarta(${c.id})">🖨 Imprimir</button>` : `<span style="font-size:11px;color:${c.status==='VENCIDA'?'#BF360C':'#E65100'};margin-left:6px">${c.status==='VENCIDA'?'Vencida — no imprimible':'Pendiente Revisión'}</span>`}
       </td>
     </tr>
   `).join('');
@@ -4201,7 +4210,7 @@ async function renderInformes(){
   }
   
   tbody.innerHTML = list.map(c=>{
-    const badgeClass = c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':'badge-pendiente';
+    const badgeClass = c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':c.status==='VENCIDA'?'badge-vencida':'badge-pendiente';
     const deleteBtn = isAdmin ? `<td><button class="btn btn-danger" style="font-size:10px;padding:2px 7px" onclick="deleteCarta(${c.id})" title="Eliminar carta">🗑</button></td>` : '';
     return `<tr id="infrow_${c.id}">
       <td><input type="checkbox" class="inf-chk" value="${c.id}" onchange="updateInfBulkBar()"></td>

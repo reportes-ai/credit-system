@@ -476,19 +476,19 @@ async function _ligarCreditoEstado(carta, nuevoEstado, estadosOrigen) {
 // (fecha de la carta + N días corridos) ya venció. Quedan no imprimibles.
 async function barrerVencidas() {
   const dias = await vigenciaDias();
+  // Estado propio VENCIDA (distinto de DESISTIDA, que es baja manual). El plazo corre desde la
+  // FECHA de la carta (dato de negocio). Aplica a pendientes y aprobadas aún no otorgadas.
   const [r] = await pool.query(
     `UPDATE cartas_aprobacion
-        SET status='DESISTIDA', desistido_auto=1, fecha_desistimiento=NOW(),
+        SET status='VENCIDA', desistido_auto=1, fecha_desistimiento=NOW(),
             motivo_desistimiento=CONCAT('Vencida automáticamente (', ?, ' días corridos desde la fecha de la carta).')
-      WHERE status='APROBADA' AND otorgado=0 AND fecha IS NOT NULL
-        -- El plazo corre desde la fecha MÁS TARDÍA entre la fecha de la carta y su creación:
-        -- una carta creada hoy pero con fecha retroactiva NO debe nacer vencida.
-        AND DATE_ADD(GREATEST(DATE(fecha), DATE(fecha_creacion)), INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
+      WHERE status IN ('PENDIENTE','APROBADA') AND otorgado=0 AND fecha IS NOT NULL
+        AND DATE_ADD(DATE(fecha), INTERVAL ? DAY) < CURDATE()`, [dias, dias]);
   if (r.affectedRows) {
     await pool.query(
       `UPDATE creditos cr JOIN cartas_aprobacion ca ON ca.id_credito_creado = cr.id
           SET cr.estado='DESISTIDO', cr.updated_at=NOW()
-        WHERE ca.status='DESISTIDA' AND ca.desistido_auto=1 AND cr.estado='CARTA_APROBACION'`).catch(()=>{});
+        WHERE ca.status='VENCIDA' AND ca.desistido_auto=1 AND cr.estado='CARTA_APROBACION'`).catch(()=>{});
   }
   return r.affectedRows;
 }
@@ -663,6 +663,15 @@ const upsert = async (req, res) => {
     if (c.id) {
       const [[prev]] = await pool.query('SELECT status FROM cartas_aprobacion WHERE id = ?', [c.id]);
       prevStatus = prev?.status || null;
+    }
+    // No se puede aprobar una carta ya vencida (fecha + vigencia < hoy).
+    if (c.status === 'APROBADA' && prevStatus !== 'APROBADA' && c.fecha) {
+      const dias = await vigenciaDias();
+      const vence = new Date(c.fecha + 'T00:00:00'); vence.setDate(vence.getDate() + dias);
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0); vence.setHours(0, 0, 0, 0);
+      if (vence < hoy)
+        return res.status(400).json({ success: false, data: null,
+          error: `La carta está vencida (${dias} días corridos desde su fecha) y no puede aprobarse.` });
     }
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,

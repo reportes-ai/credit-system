@@ -113,6 +113,7 @@ body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--gray-bg); c
 .badge-rechazada { background: #FFEBEE; color: #C62828; }
 .badge-anulada { background: #ECEFF1; color: #607D8B; text-decoration: line-through; }
 .badge-eliminada { background: #212121; color: #BDBDBD; text-decoration: line-through; font-style: italic; }
+.badge-vencida { background: #FBE9E7; color: #BF360C; }
 
 /* Modal */
 .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
