@@ -79,7 +79,7 @@ async function sincronizarTMC() {
  * sin historia, los días antiguos suman 0. Fill-only: nunca pisa vigencias existentes.
  * No recalcula comisiones (los períodos históricos pertenecen a meses cerrados).
  */
-async function backfillTMC(desde = '2024-01') {
+async function backfillTMC(desde = '2017-01') {
   const tipoMenor = await getParam('tmc_tipo_menor');
   const tipoMayor = await getParam('tmc_tipo_mayor');
   if (!tipoMenor || !tipoMayor) return { ok: false, motivo: 'sin tipos TMC calibrados (corre primero una sincronización normal)' };

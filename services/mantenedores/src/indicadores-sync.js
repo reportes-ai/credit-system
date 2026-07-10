@@ -100,7 +100,7 @@ async function sincronizar(opts = {}) {
   // Backfill de TMC histórica (una vez que exista cobertura, sale al tiro con sin_cambios).
   // Necesaria para el interés por mora de cuotas antiguas (día a día con la TMC de SU fecha).
   if (force) {
-    try { out.tmc_backfill = await backfillTMC('2024-01'); }
+    try { out.tmc_backfill = await backfillTMC('2017-01'); }   // cartera más antigua en mora: feb-2017
     catch (e) { out.tmc_backfill = { error: e.message }; if (e.code !== 'NOCMF') console.error('[indicadores] tmc backfill', e.message); }
   }
 
