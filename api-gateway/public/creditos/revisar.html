@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.2 — botón Castigar Saldo (castigo contable con doble firma gerencial) en cartera propia -->
+<!-- v2.3 — cuota mensual calculada (fórmula francesa) refleja la tasa vigente aunque c.cuota sea nula -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -398,6 +398,16 @@ const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','
 const _ec = c => String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
 const enCartera = c => !!_ec(c);
 const pagableCartera = c => enCartera(c) && !['TERMINADO','PREPAGADO','CASTIGADO'].includes(_ec(c));
+// Cuota francesa a partir de monto financiado, tasa mensual y plazo (refleja la tasa vigente,
+// no depende de c.cuota guardado que puede venir nulo). Fallback a c.cuota si faltan datos.
+function cuotaFrancesa(c) {
+  const mf = parseFloat(c.monto_financiado) || 0;         // tasa_mensual = mismo % que muestra el header (ej. 2.55)
+  const t  = (parseFloat(c.tasa_mensual) || 0) / 100;
+  const n  = parseInt(c.plazo) || 0;
+  if (!mf || !n || !t) return parseFloat(c.cuota) || 0;   // datos insuficientes → cuota guardada
+  const p = Math.pow(1 + t, n);
+  return Math.round(mf * t * p / (p - 1));
+}
 // Broker: estados finales de créditos AUTOFIN/UNIDAD (no se puede trackear pagos)
 const ESTADOS_BROKER    = new Set(['OTORGADO','CARTA_APROBACION','CURSADO','DESISTIDO']);
 const esBroker = () => _credito && ['AUTOFIN','UNIDAD DE CREDITO'].includes(_credito.financiera);
@@ -590,7 +600,7 @@ function renderPagina(c, ant, com) {
     + (parseFloat(com.deuda_consumo_carga)||0)
     + (parseFloat(com.arriendo)||0)
     : 0;
-  const cuota       = parseFloat(c.cuota) || 0;
+  const cuota       = cuotaFrancesa(c);
   const cargaNueva  = cargaActual + cuota;
   const pctActual   = rentaTotal > 0 ? (cargaActual / rentaTotal * 100) : null;
   const pctNueva    = rentaTotal > 0 ? (cargaNueva  / rentaTotal * 100) : null;
@@ -659,7 +669,7 @@ function renderPagina(c, ant, com) {
       <div class="sec-title"><i class="bi bi-bank2"></i>Financiamiento</div>
       <div class="sec-body">
         <div class="cuota-box">
-          <div><div class="cb-label">Cuota Mensual</div><div class="cb-val">${fmtP(c.cuota)}</div></div>
+          <div><div class="cb-label">Cuota Mensual</div><div class="cb-val">${fmtP(cuotaFrancesa(c))}</div></div>
           <div class="cb-right">
             <div><span style="opacity:.7;font-size:.72rem">Plazo</span> ${c.plazo||'—'} meses</div>
             <div><span style="opacity:.7;font-size:.72rem">Tasa mensual</span> ${c.tasa_mensual?Number(c.tasa_mensual).toFixed(2)+'%':'—'}</div>
