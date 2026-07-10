@@ -186,10 +186,18 @@ function parseCanal(buffer) {
   let hIdx = raw.findIndex(r => Array.isArray(r) && r.some(c => String(c || '').trim().toUpperCase() === 'ID'));
   if (hIdx < 0) return {};
   const headers = (raw[hIdx] || []).map(h => String(h || '').trim().toUpperCase());
-  const col = n => headers.indexOf(n.toUpperCase());
+  const col = n => headers.indexOf(String(n).toUpperCase());
+  // Match tolerante: normaliza (quita espacios/guiones) y busca la columna que CONTENGA todos
+  // los términos. Marca/Modelo/TipoVehículo del Informe Canal traen el header con otra caja/espacios
+  // que no calzaba con el indexOf exacto (los seguros sí, por venir concatenados).
+  const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const headersN = headers.map(norm);
+  const colLike = (...terms) => { const t = terms.map(norm); return headersN.findIndex(h => t.every(x => h.includes(x))); };
+  const pick = (exact, ...like) => { const e = col(exact); return e >= 0 ? e : colLike(...(like.length ? like : [exact])); };
   const iId = col('ID'), iCes = col('SEGUROCESANTIA'), iRdh = col('SEGURORDH'),
-        iRep = col('SEGUROREPARACIONMENOR'), iGps = col('GPS'), iTipo = col('TIPOVEHICULO'),
-        iRut = col('RUTCLIENTE'), iMarca = col('MARCA'), iModelo = col('MODELO');
+        iRep = col('SEGUROREPARACIONMENOR'), iGps = pick('GPS'),
+        iTipo = pick('TIPOVEHICULO', 'TIPO', 'VEHICULO'),
+        iRut = pick('RUTCLIENTE', 'RUT', 'CLIENTE'), iMarca = pick('MARCA'), iModelo = pick('MODELO');
   if (iId < 0) return {};
   const mapa = {};
   for (const row of raw.slice(hIdx + 1)) {
