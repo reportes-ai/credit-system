@@ -438,33 +438,8 @@
           <input type="number" id="fComDea" placeholder="0" min="0">
         </div>
         <div class="f-group">
-          <label>Monto Pago Comisión Fin. $</label>
-          <input type="number" id="fMontComFin" placeholder="0" min="0">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── 7. DOCUMENTOS ─────────────────────────────────────────── -->
-  <div class="sec">
-    <div class="sec-header"><i class="bi bi-file-earmark-check-fill"></i><span>Documentos</span></div>
-    <div class="sec-body">
-      <div class="form-grid g4">
-        <div class="f-group">
-          <label>Boleta / Factura N°</label>
-          <input type="text" id="fBoleta" placeholder="N° de boleta o factura">
-        </div>
-        <div class="f-group">
-          <label>Cantidad de Documentos</label>
-          <input type="number" id="fCantDoc" placeholder="0" min="0" value="0">
-        </div>
-        <div class="f-group">
-          <label>Documentos Autorizados</label>
-          <input type="number" id="fDocAuth" placeholder="0" min="0" value="0">
-        </div>
-        <div class="f-group">
-          <label>Fecha Recepción Documento</label>
-          <input type="date" id="fFechaDoc">
+          <label>Ingreso AutoFácil $ <span style="font-weight:400;color:#94a3b8">(se calcula automáticamente)</span></label>
+          <input type="number" id="fMontComFin" placeholder="Se calcula al guardar" readonly style="background:#f1f5f9;color:#64748b">
         </div>
       </div>
     </div>
@@ -955,16 +930,12 @@
       tascli_pizarra:      parseFloat(document.getElementById('fTasCliPiz').value)/100||null,
       tasfin_pizarra:      parseFloat(document.getElementById('fTasFinPiz').value)/100||null,
       comdea_real:         parseFloat(document.getElementById('fComDea').value)||null,
-      monto_comision_fin:  parseFloat(document.getElementById('fMontComFin').value)||null,
+      // monto_comision_fin (ingreso AutoFácil) lo calcula el backend con el motor único — no se envía.
       id_financiera:       document.getElementById('fIdFinanciera').value.trim(),
       fecha_primera_cuota: document.getElementById('fFechaCuota').value || null,
       parque:              parqueNombre,
       mayor_menor:         document.getElementById('fMayorMenorHidden').value,
       monto_capitalizado:  parsePesos(document.getElementById('fMontoCap').value)||0,
-      boleta_factura:      document.getElementById('fBoleta').value.trim(),
-      cantidad_docs:       parseInt(document.getElementById('fCantDoc').value)||0,
-      docs_autorizados:    parseInt(document.getElementById('fDocAuth').value)||0,
-      fecha_recep_doc:     document.getElementById('fFechaDoc').value || null,
     };
 
     const btn = document.getElementById('btnGuardar');

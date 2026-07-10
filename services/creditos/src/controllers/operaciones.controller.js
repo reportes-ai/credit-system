@@ -228,9 +228,17 @@ const create = async (req, res) => {
     if (!b.rut_cliente) return res.status(400).json({ success: false, data: null, error: 'RUT cliente requerido' });
     b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
 
-    // Resolver id_cliente desde tabla clientes
+    // Resolver id_cliente desde tabla clientes; si no existe, crearlo (rut + nombre).
     const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ?', [b.rut_cliente]);
     b.id_cliente = cliRow?.id_cliente || null;
+    if (!b.id_cliente) {
+      try {
+        const [ins] = await pool.query(
+          'INSERT INTO clientes (rut, nombre_completo) VALUES (?, ?) ON DUPLICATE KEY UPDATE id_cliente=LAST_INSERT_ID(id_cliente)',
+          [b.rut_cliente, (b.nombre_cliente || '').trim() || null]);
+        b.id_cliente = ins.insertId;
+      } catch (e) { console.error('[operaciones→cliente]', e.message); }
+    }
 
     // Auto-asignar numero_credito si no viene del formulario
     if (!b.numero_credito) {
@@ -241,7 +249,7 @@ const create = async (req, res) => {
 
     const fields = [
       'numero_credito',
-      'num_op','mes','financiera','rut_cliente','nombre_cliente','comentarios',
+      'num_op','mes','financiera','comentarios',
       'ejecutivo','id_ejecutivo','automotora','nombre_local','estado_eval','estado_credito',
       'fecha_otorgado','producto','marca','modelo','anio_vehiculo','tasacion','permiso_circulacion',
       'valor_vehiculo','pie','saldo_precio','pct_financiado',
@@ -271,8 +279,10 @@ const create = async (req, res) => {
       values
     );
 
-    // Auto-calcular ingresos y comisiones (solo si es crédito otorgado/aprobado)
-    if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
+    // Auto-calcular ingresos y comisiones (incluye la digitación: el ingreso AutoFácil se
+    // calcula solo, no se ingresa a mano). Corre si el crédito está digitado/aprobado/otorgado.
+    const _estC = (b.estado_credito||'').toUpperCase(), _estE = (b.estado_eval||'').toUpperCase();
+    if (['OTORGADO','APROBADO','DIGITADO'].includes(_estC) || ['OTORGADO','APROBADO'].includes(_estE)) {
       try {
         const calc = await calcularOperacion({ ...b, saldo_precio, id: r.insertId });
         await pool.query(`
