@@ -561,7 +561,8 @@ const otorgar = async (req, res) => {
       const partB = Number(ca.part_bruto) || 0;
       if (cond.length) {
         await pool.query(
-          `UPDATE creditos SET estado='OTORGADO', fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
+          `UPDATE creditos SET estado='OTORGADO', estado_credito='OTORGADO',
+                  fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`,
           [partB, partB, ...args]
