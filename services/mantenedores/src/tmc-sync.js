@@ -27,6 +27,11 @@ async function setParam(clave, valor, desc) {
 // entrega "44" → comparar numéricamente (la comparación de texto exacto nunca matchea).
 const mismoTipo = (a, b) => Number(a) === Number(b) && isFinite(Number(a));
 
+// La CMF entrega los períodos HISTÓRICOS con punto decimal ("29.68") y los recientes con coma
+// chilena ("30,92"): parseCLNum lee el punto como miles → 2968. La TMC anual real siempre está
+// bajo 80%: se corrige la escala dividiendo por 10 hasta entrar al rango. Idempotente para valores sanos.
+const normAnual = v => { let n = Number(v) || 0; while (n > 80) n /= 10; return n; };
+
 // Identifica los tipos de TMC que coinciden con los valores ya cargados (verificación "idéntico al cargado").
 async function calibrar(tmcs) {
   const [[t]] = await pool.query('SELECT tasa_anual_menor, tasa_anual_mayor FROM tasas ORDER BY fecha_desde DESC LIMIT 1');
@@ -64,13 +69,14 @@ async function sincronizarTMC() {
   const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [desde]);
   if (ya) return { ok: true, sin_cambios: true, desde, menor: eMenor.valor, mayor: eMayor.valor };
 
-  const mensual_menor = tasaUtils.anualAMensual(eMenor.valor);
-  const mensual_mayor = tasaUtils.anualAMensual(eMayor.valor);
+  const anual_menor = normAnual(eMenor.valor), anual_mayor = normAnual(eMayor.valor);
+  const mensual_menor = tasaUtils.anualAMensual(anual_menor);
+  const mensual_mayor = tasaUtils.anualAMensual(anual_mayor);
   const sp_mayor = 0.67;                                   // spread por defecto (igual que el mantenedor)
   const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
   await pool.query(
     'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?,?,?,?,?,?,?,?)',
-    [desde, hasta, eMenor.valor, mensual_menor, eMayor.valor, mensual_mayor, sp_menor, sp_mayor]);
+    [desde, hasta, anual_menor, mensual_menor, anual_mayor, mensual_mayor, sp_menor, sp_mayor]);
   recalcularMesesAbiertos().then(r => { if (r && r.actualizados) console.log(`[tmc recalc] ${r.actualizados} ops`); }).catch(e => console.error('[tmc recalc]', e.message));
 
   return { ok: true, insertado: true, desde, hasta, menor: eMenor.valor, mayor: eMayor.valor };
@@ -105,13 +111,14 @@ async function backfillTMC(desde = '2017-01') {
       if (eMenor && eMayor && eMenor.fecha && eMenor.hasta) {
         const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [eMenor.fecha]);
         if (!ya) {
-          const mensual_menor = tasaUtils.anualAMensual(eMenor.valor);
-          const mensual_mayor = tasaUtils.anualAMensual(eMayor.valor);
+          const anual_menor = normAnual(eMenor.valor), anual_mayor = normAnual(eMayor.valor);
+          const mensual_menor = tasaUtils.anualAMensual(anual_menor);
+          const mensual_mayor = tasaUtils.anualAMensual(anual_mayor);
           const sp_mayor = 0.67;
           const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
           await pool.query(
             'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?,?,?,?,?,?,?,?)',
-            [eMenor.fecha, eMenor.hasta, eMenor.valor, mensual_menor, eMayor.valor, mensual_mayor, sp_menor, sp_mayor]);
+            [eMenor.fecha, eMenor.hasta, anual_menor, mensual_menor, anual_mayor, mensual_mayor, sp_menor, sp_mayor]);
           insertados++;
         }
       }
