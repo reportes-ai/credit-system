@@ -4,7 +4,8 @@ const { sincronizar } = require('../indicadores-sync');   // sync automático de
 
 const getAll = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM uf ORDER BY fecha DESC LIMIT 400');
+    // Historia completa (2017→hoy ≈ 3.500 filas): el LIMIT es solo defensivo
+    const [rows] = await pool.query('SELECT * FROM uf ORDER BY fecha DESC LIMIT 5000');
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
