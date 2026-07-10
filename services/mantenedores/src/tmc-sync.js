@@ -23,6 +23,10 @@ async function setParam(clave, valor, desc) {
   await pool.query('INSERT INTO parametros_credito (clave, valor, descripcion) VALUES (?,?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [clave, String(valor), desc || '']);
 }
 
+// parametros_credito.valor es DECIMAL: el tipo queda guardado como "44.000000" mientras la CMF
+// entrega "44" → comparar numéricamente (la comparación de texto exacto nunca matchea).
+const mismoTipo = (a, b) => Number(a) === Number(b) && isFinite(Number(a));
+
 // Identifica los tipos de TMC que coinciden con los valores ya cargados (verificación "idéntico al cargado").
 async function calibrar(tmcs) {
   const [[t]] = await pool.query('SELECT tasa_anual_menor, tasa_anual_mayor FROM tasas ORDER BY fecha_desde DESC LIMIT 1');
@@ -49,8 +53,8 @@ async function sincronizarTMC() {
   if (!tipoMenor || !tipoMayor)
     return { ok: false, motivo: 'No se pudo calibrar: ningún tipo de TMC de la CMF coincide con la tasa cargada. Verifica/carga la TMC manual una vez y reintenta.' };
 
-  const eMenor = tmcs.find(x => x.tipo === String(tipoMenor));
-  const eMayor = tmcs.find(x => x.tipo === String(tipoMayor));
+  const eMenor = tmcs.find(x => mismoTipo(x.tipo, tipoMenor));
+  const eMayor = tmcs.find(x => mismoTipo(x.tipo, tipoMayor));
   if (!eMenor || !eMayor) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica los TMC calibrados de este mes.' };
 
   const desde = eMenor.fecha || eMayor.fecha;
@@ -93,8 +97,8 @@ async function backfillTMC(desde = '2017-01') {
   while (`${yy}-${String(mm).padStart(2, '0')}` <= fin) {
     try {
       const tmcs = await cmfGet('tmc', yy, mm);
-      const eMenor = tmcs.find(x => x.tipo === String(tipoMenor));
-      const eMayor = tmcs.find(x => x.tipo === String(tipoMayor));
+      const eMenor = tmcs.find(x => mismoTipo(x.tipo, tipoMenor));
+      const eMayor = tmcs.find(x => mismoTipo(x.tipo, tipoMayor));
       if (eMenor && eMayor && eMenor.fecha && eMenor.hasta) {
         const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [eMenor.fecha]);
         if (!ya) {
