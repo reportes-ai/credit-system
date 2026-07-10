@@ -547,6 +547,16 @@ const resumen = async (req, res) => {
   } catch (e) { console.error('[fundantes-seguimiento resumen]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ─── GET /:id/docs — lista (metadata) de documentos cargados de una operación ──── */
+const listarDocs = async (req, res) => {
+  try {
+    const [docs] = await pool.query(
+      'SELECT id, codigo, archivo_nombre, mime_type, DATE_FORMAT(created_at,"%Y-%m-%d %H:%i") subido, subido_por FROM fundantes_seg_docs WHERE id_credito=? AND archivo_data IS NOT NULL ORDER BY codigo',
+      [Number(req.params.id)]);
+    res.json({ success: true, data: docs, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
+};
+
 /* ─── GET /historial — bitácora de envíos/validaciones por operación ──────────────
    Se reconstruye desde la auditoría (ENVIAR/APROBAR/RECHAZAR_FUNDANTES): primer envío,
    primer resultado, reenvío (si se corrigió) y resultado final — siempre con fecha y persona. */
@@ -566,7 +576,7 @@ const historial = async (req, res) => {
     if (!porCred.size) return res.json({ success: true, data: [], error: null });
 
     const [creds] = await pool.query(
-      `SELECT c.num_op, c.id_financiera, c.ejecutivo, COALESCE(c.automotora,'') dealer,
+      `SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.ejecutivo, COALESCE(c.automotora,'') dealer,
               COALESCE(cl.rut,'') rut, COALESCE(cl.nombre_completo,'') cliente
          FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
         WHERE c.num_op IN (?)`, [[...porCred.keys()]]);
@@ -587,6 +597,7 @@ const historial = async (req, res) => {
       const ultimo = evs[evs.length - 1];
       const estadoDe = e => e.accion === 'APROBAR_FUNDANTES' ? 'APROBADO' : e.accion === 'RECHAZAR_FUNDANTES' ? 'RECHAZADO' : 'ENVIADO';
       rows.push({
+        id_credito: c.id_credito,
         num_op: c.num_op, id_financiera: c.id_financiera, rut: c.rut, cliente: c.cliente,
         ejecutivo: c.ejecutivo, dealer: c.dealer,
         envio1: P(envios[0]),
@@ -601,4 +612,4 @@ const historial = async (req, res) => {
   } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial };
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs };

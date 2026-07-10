@@ -55,7 +55,7 @@
       <table>
         <thead><tr>
           <th>N° OP</th><th>ID Fin.</th><th>RUT</th><th>Cliente</th><th>Ejecutivo</th><th>Dealer</th>
-          <th>1er envío</th><th>1er resultado</th><th>Reenvío</th><th>Resultado final</th>
+          <th>1er envío</th><th>1er resultado</th><th>Reenvío</th><th>Resultado final</th><th>Documentos</th>
         </tr></thead>
         <tbody id="tb"></tbody>
       </table>
@@ -102,8 +102,30 @@ function render(){
       <td>${resultado(r.resultado1)}</td>
       <td>${r.reenvio ? persona(r.reenvio) + (r.reenvios_n>1?`<div class="re">+${r.reenvios_n} reenvíos</div>`:'') : '<span class="sub">—</span>'}</td>
       <td>${resultado(r.final)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:3px 8px" onclick="verDocs(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-eye"></i> Ver</button>
+        <a class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:3px 8px" href="/api/fundantes-seguimiento/${r.id_credito}/zip?token=${encodeURIComponent(token)}"><i class="bi bi-download"></i> ZIP</a>
+      </td>
     </tr>`).join('');
 }
+const DOC_LABEL = { CONTRATO_CV:'Contrato Compraventa', SOL_TRANSFERENCIA:'Sol. Transferencia', SOL_LIMITACION:'Sol. Limitación', INFORME_GPS:'Informe GPS' };
+async function verDocs(id, numop){
+  let dlg = document.getElementById('dlgDocs');
+  if(!dlg){ dlg = document.createElement('dialog'); dlg.id='dlgDocs'; dlg.style.cssText='border:none;border-radius:14px;padding:0;max-width:520px;width:92%'; document.body.appendChild(dlg); }
+  dlg.innerHTML = '<div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;font-weight:700">Documentos — OP '+esc(numop)+'</div><div style="padding:16px 20px" id="docsBody">Cargando…</div><div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:10px"><a class="btn btn-success btn-sm" href="/api/fundantes-seguimiento/'+id+'/zip?token='+encodeURIComponent(token)+'"><i class="bi bi-download"></i> Descargar todo (ZIP)</a><button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'dlgDocs\').close()">Cerrar</button></div>';
+  dlg.showModal();
+  const j = await fetch('/api/fundantes-seguimiento/'+id+'/docs', { headers:H }).then(r=>r.json()).catch(()=>null);
+  const docs = (j && j.success) ? j.data : [];
+  document.getElementById('docsBody').innerHTML = docs.length ? docs.map(d=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9">
+      <div><div style="font-weight:600;font-size:.85rem">${esc(DOC_LABEL[d.codigo]||d.codigo)}</div>
+        <div class="sub">${esc(d.archivo_nombre||'')} · ${esc(d.subido||'')} · ${esc(d.subido_por||'')}</div></div>
+      <div style="white-space:nowrap">
+        <a class="btn btn-sm btn-outline-primary" style="font-size:.72rem" target="_blank" href="/api/fundantes-seguimiento/doc/${d.id}/download?token=${encodeURIComponent(token)}"><i class="bi bi-eye"></i> Ver</a>
+      </div>
+    </div>`).join('') : '<div class="text-muted small">Esta operación no tiene documentos cargados.</div>';
+}
+
 cargar();
 </script>
 <script src="/js/topnav.js"></script>
