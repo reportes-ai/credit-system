@@ -113,8 +113,17 @@
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:16px;">
+      <button class="btn btn-outline-info btn-sm" onclick="verTiposCMF()"><i class="bi bi-list-check me-1"></i>Ver tipos TMC (CMF)</button>
       <button class="btn btn-outline-secondary btn-sm" onclick="abrirUmbrales()"><i class="bi bi-sliders me-1"></i>Modificar Umbrales</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModal()"><i class="bi bi-plus-lg me-1"></i>Nueva Tasa</button>
+    </div>
+    <div id="cmfTiposBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <b style="color:#1e40af"><i class="bi bi-list-check me-1"></i>Tipos de TMC publicados por la CMF <span id="cmfTiposMes" style="font-weight:400;color:#64748b"></span></b>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('cmfTiposBox').style.display='none'">Cerrar</button>
+      </div>
+      <div style="font-size:.8rem;color:#475569;margin-bottom:8px">El tramo &gt;200 UF tiene dos tipos (plazo &lt;1 año y ≥1 año). El de <b>≥1 año</b> es el de menor tasa. Como todos los créditos son ≥1 año, ese es el que corresponde.</div>
+      <div id="cmfTiposTabla" style="overflow-x:auto"></div>
     </div>
 
     <!-- TARJETA VIGENTE -->
@@ -336,6 +345,21 @@
       if (r.status === 401) { logout(); return null; }
       return r.json();
     };
+    async function verTiposCMF() {
+      const box = document.getElementById('cmfTiposBox');
+      const tabla = document.getElementById('cmfTiposTabla');
+      box.style.display = '';
+      tabla.innerHTML = '<div class="text-muted small">Consultando CMF…</div>';
+      const j = await api('GET', '/api/tasas/cmf-tipos');
+      if (!j || !j.success) { tabla.innerHTML = '<div class="text-danger small">'+((j&&j.error)||'No se pudo consultar la CMF (¿key configurada en el servidor?)')+'</div>'; return; }
+      document.getElementById('cmfTiposMes').textContent = '· '+String(j.data.mes).padStart(2,'0')+'/'+j.data.anio;
+      const rows = (j.data.tipos||[]).map(t => `<tr${t.calibrado?' style="background:#dbeafe;font-weight:600"':''}>
+        <td>${t.tipo}</td><td class="text-end">${t.anual.toFixed(2)}%</td><td class="text-end">${t.mensual.toFixed(4)}%</td>
+        <td class="small text-muted">${t.vigencia_desde||''} → ${t.vigencia_hasta||''}</td><td class="small">${t.calibrado||''}</td></tr>`).join('');
+      tabla.innerHTML = `<table class="table table-sm table-hover" style="font-size:.82rem">
+        <thead><tr><th>Tipo</th><th class="text-end">Anual</th><th class="text-end">Mensual</th><th>Vigencia</th><th>Calibrado</th></tr></thead>
+        <tbody>${rows}</tbody></table>`;
+    }
     const showToast = (msg, tipo='success') => {
       const el = document.getElementById('toast');
       el.className = `toast align-items-center text-white border-0 bg-${tipo}`;

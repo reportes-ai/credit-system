@@ -129,4 +129,22 @@ async function backfillTMC(desde = '2017-01') {
   return { ok: true, insertados, errores: errores.length ? errores : undefined };
 }
 
-module.exports = { sincronizarTMC, backfillTMC };
+/**
+ * Diagnóstico: lista TODOS los tipos de TMC que publica la CMF para un mes, con su valor
+ * normalizado. Sirve para identificar el tipo ">200 UF ≥1 año" (más bajo que el <1 año que
+ * hoy tenemos calibrado en tmc_tipo_mayor). Requiere CMF_API_KEY (Render).
+ */
+async function listarTiposCMF(anio, mes) {
+  const tmcs = await cmfGet('tmc', anio, mes);
+  const tipoMayor = await getParam('tmc_tipo_mayor');
+  const tipoMenor = await getParam('tmc_tipo_menor');
+  return tmcs.map(x => ({
+    tipo: x.tipo,
+    anual: Number(normAnual(x.valor).toFixed(4)),
+    mensual: Number(tasaUtils.anualAMensual(normAnual(x.valor)).toFixed(4)),
+    vigencia_desde: x.fecha, vigencia_hasta: x.hasta,
+    calibrado: mismoTipo(x.tipo, tipoMayor) ? 'MAYOR (>200 UF, actual)' : mismoTipo(x.tipo, tipoMenor) ? 'MENOR (≤200 UF, actual)' : '',
+  })).sort((a, b) => a.anual - b.anual);
+}
+
+module.exports = { sincronizarTMC, backfillTMC, listarTiposCMF };

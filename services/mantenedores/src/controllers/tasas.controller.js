@@ -145,4 +145,18 @@ const remove = async (req, res) => {
   }
 };
 
-module.exports = { getAll, getVigente, getEnFecha, getById, create, update, remove };
+// Diagnóstico CMF: lista los tipos de TMC de un mes (para identificar el tramo ">200 UF ≥1 año").
+const cmfTipos = async (req, res) => {
+  try {
+    const { listarTiposCMF } = require('../tmc-sync');
+    const now = new Date();
+    const anio = parseInt(req.query.anio) || now.getFullYear();
+    const mes = parseInt(req.query.mes) || (now.getMonth() + 1);
+    const tipos = await listarTiposCMF(anio, mes);
+    res.json({ success: true, data: { anio, mes, tipos }, error: null });
+  } catch (e) {
+    res.status(e.code === 'NOCMF' ? 503 : 500).json({ success: false, data: null, error: e.message || 'Error consultando la CMF' });
+  }
+};
+
+module.exports = { getAll, getVigente, getEnFecha, getById, create, update, remove, cmfTipos };

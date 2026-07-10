@@ -3,6 +3,7 @@ const ctrl = require('../controllers/tasas.controller');
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
+router.get('/cmf-tipos', verifyToken, requireFunc('mantenedores_tasas'), ctrl.cmfTipos);   // diagnóstico: catálogo de tipos TMC de la CMF
 router.get('/vigente', verifyToken, ctrl.getVigente);
 router.get('/en/:fecha', verifyToken, ctrl.getEnFecha);
 router.get('/', verifyToken, ctrl.getAll);
