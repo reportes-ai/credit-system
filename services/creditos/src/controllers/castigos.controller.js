@@ -247,41 +247,50 @@ async function snapshot(mes, cuenta) {
   return r ? Number(r.saldo) : null;
 }
 
+const ultimoDiaMes = mes => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${new Date(y, m, 0).getDate()}`; };
+
 const contable = async (req, res) => {
   try {
-    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
-    const mesActual = new Date().toISOString().slice(0, 7);
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const mesActual = hoyISO.slice(0, 7);
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : mesActual;
+    const esMesActual = mes === mesActual;
     const mesAnt = mesAnterior(mes);
+    const inicioMes = mes + '-01';
+    const finMesPasado = ultimoDiaMes(mesAnt);             // cierre del mes pasado
+    const corte = esMesActual ? hoyISO : ultimoDiaMes(mes); // "al día de hoy" (mes en curso) o cierre del mes elegido
 
-    // Castigos aplicados en el mes
+    // ── CASTIGOS: acumulados por fecha (no requieren snapshot) ──
+    // Saldo inicial = todo lo castigado hasta el cierre del mes pasado; período = lo del mes hasta el corte.
+    const [[ci]] = await pool.query(
+      "SELECT COALESCE(SUM(saldo_castigado),0) s FROM castigos_contables WHERE estado='APROBADO' AND DATE(aplicado_at) < ?", [inicioMes]);
     const [[cm]] = await pool.query(
-      "SELECT COALESCE(SUM(saldo_castigado),0) s, COUNT(*) n FROM castigos_contables WHERE estado='APROBADO' AND DATE_FORMAT(aplicado_at,'%Y-%m')=?", [mes]);
+      "SELECT COALESCE(SUM(saldo_castigado),0) s, COUNT(*) n FROM castigos_contables WHERE estado='APROBADO' AND DATE(aplicado_at) BETWEEN ? AND ?", [inicioMes, corte]);
+    const SI_cast = Number(ci.s) || 0;
     const castigos_mes = Number(cm.s) || 0;
-
-    // Saldo final de provisiones: mes en curso → stock actual del motor; mes pasado → snapshot (o stock como aprox.)
-    let provStock = null;
-    try { const REP = require('../../../cobranza/src/controllers/reportes.controller'); provStock = (await REP._datos.datosMoraStock()).total.provision; } catch (_) {}
-    const snapProvFin = await snapshot(mes, 'PROVISIONES');
-    const aprox = (mes !== mesActual && snapProvFin == null);
-    const SF_prov = snapProvFin != null ? snapProvFin : (provStock || 0);
-
-    const SI_prov = (await snapshot(mesAnt, 'PROVISIONES')) || 0;
-    const SI_cast = (await snapshot(mesAnt, 'CASTIGOS')) || 0;
     const SF_cast = SI_cast + castigos_mes;
 
-    const debe_prov = castigos_mes;                       // uso de la provisión por el castigo
+    // ── PROVISIONES: saldo inicial = cierre del mes pasado (snapshot); saldo final = stock de hoy (mes en curso). ──
+    let provStock = null;
+    try { const REP = require('../../../cobranza/src/controllers/reportes.controller'); provStock = (await REP._datos.datosMoraStock()).total.provision; } catch (_) {}
+    const SI_prov = (await snapshot(mesAnt, 'PROVISIONES')) || 0;   // cierre del mes pasado (0 si aún no se ha guardado)
+    const snapProvFin = await snapshot(mes, 'PROVISIONES');
+    const aprox = !esMesActual && snapProvFin == null;              // mes pasado sin cierre → aproxima con stock actual
+    const SF_prov = esMesActual ? (provStock || 0) : (snapProvFin != null ? snapProvFin : (provStock || 0));
+
+    const debe_prov = castigos_mes;                        // el castigo va contra provisiones
     const haber_prov = (SF_prov - SI_prov) + castigos_mes; // constitución del período
-    const cargo_resultado = haber_prov;                   // provisión (neta) + castigo
+    const cargo_resultado = haber_prov;                    // provisión (variación neta) + castigo
 
     const [rows] = await pool.query(
       `SELECT c.num_op, c.saldo_castigado, c.motivo, c.aplicado_at,
               COALESCE(cl.nombre_completo, cl.nombre) AS cliente
          FROM castigos_contables c
          LEFT JOIN creditos cr ON cr.id=c.id_credito LEFT JOIN clientes cl ON cl.id_cliente=cr.id_cliente
-        WHERE c.estado='APROBADO' AND DATE_FORMAT(c.aplicado_at,'%Y-%m')=? ORDER BY c.aplicado_at`, [mes]);
+        WHERE c.estado='APROBADO' AND DATE(c.aplicado_at) BETWEEN ? AND ? ORDER BY c.aplicado_at`, [inicioMes, corte]);
 
     ok(res, {
-      mes, aprox,
+      mes, aprox, corte, cierre_mes_pasado: finMesPasado, es_mes_actual: esMesActual,
       provisiones: { saldo_inicial: Math.round(SI_prov), debe: Math.round(debe_prov), haber: Math.round(haber_prov), saldo_final: Math.round(SF_prov) },
       castigos:    { saldo_inicial: Math.round(SI_cast), debe: Math.round(castigos_mes), haber: 0, saldo_final: Math.round(SF_cast) },
       cargo_resultado: Math.round(cargo_resultado),

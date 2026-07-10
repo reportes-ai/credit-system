@@ -7,7 +7,7 @@
   <title>Castigos de Saldo — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.1 — cuadro contable debe/haber Provisiones/Castigos con saldos inicial/final -->
+  <!-- v1.2 — cuadro contable: inicial = cierre mes pasado, final = al día de hoy -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -91,7 +91,7 @@
     <div style="padding:18px 20px">
       <div id="cAprox" style="display:none;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 14px;font-size:.8rem;color:#92400e;margin-bottom:14px"></div>
       <!-- Saldos iniciales -->
-      <div style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos iniciales</div>
+      <div id="cTitIni" style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos iniciales</div>
       <div id="cTop" class="cxt-strip"></div>
       <!-- Movimientos debe/haber -->
       <div style="overflow-x:auto;margin:16px 0">
@@ -101,7 +101,7 @@
         </table>
       </div>
       <!-- Saldos finales -->
-      <div style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos finales</div>
+      <div id="cTitFin" style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos finales</div>
       <div id="cBot" class="cxt-strip"></div>
     </div>
   </div>
@@ -196,8 +196,11 @@ async function cargarContable() {
   const j = await fetch('/api/castigos/contable?mes='+mes, { headers: H }).then(r=>r.json());
   if (!j.success) return;
   const d = j.data, P = d.provisiones, C = d.castigos;
+  const fD = s => s ? new Date(s+'T00:00:00').toLocaleDateString('es-CL') : '';
   document.getElementById('cAprox').style.display = d.aprox ? '' : 'none';
   if (d.aprox) document.getElementById('cAprox').textContent = 'Mes sin cierre guardado: el saldo de provisiones usa el stock actual como aproximación. Guarda el cierre para fijarlo.';
+  document.getElementById('cTitIni').textContent = 'Saldos iniciales — cierre del mes pasado ('+fD(d.cierre_mes_pasado)+')';
+  document.getElementById('cTitFin').textContent = 'Saldos finales — ' + (d.es_mes_actual ? 'al día de hoy ('+fD(d.corte)+')' : 'cierre del mes ('+fD(d.corte)+')');
   document.getElementById('cTop').innerHTML =
     card('Provisiones (saldo inicial)', P.saldo_inicial) +
     card('Castigos (saldo inicial)', C.saldo_inicial) +
