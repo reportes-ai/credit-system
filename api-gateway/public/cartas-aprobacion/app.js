@@ -4125,6 +4125,8 @@ async function renderImpTable(){
     }
     return true;
   });
+  // Las últimas primero (por fecha de creación; fallback a fecha de la carta).
+  list.sort((a,b) => new Date(b.fechaCreacion||b.fecha||0) - new Date(a.fechaCreacion||a.fecha||0));
   if(!list.length){
     tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">No hay cartas</td></tr>';
     return;
