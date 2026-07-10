@@ -24,7 +24,18 @@ async function generarNumeroCreditoDesdeCartas() {
 /* Crea registro en creditos a partir de una carta y devuelve { id, numero_credito } */
 async function crearCreditoDesdeCartas(c) {
   const rutNorm = RUT.normalizar(c.rut_cliente || c.rutCliente) || (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
-  const [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ? LIMIT 1', [rutNorm]).catch(() => [[null]]);
+  let [[cliRow]] = await pool.query('SELECT id_cliente FROM clientes WHERE rut = ? LIMIT 1', [rutNorm]).catch(() => [[null]]);
+  // Cliente nuevo de la carta: si aún no existe en `clientes`, se crea (rut + nombre) para que
+  // el crédito quede vinculado y muestre RUT/nombre (antes id_cliente quedaba NULL → fila en blanco).
+  if (!cliRow && rutNorm) {
+    const nombre = (c.cliente || c.nombre_cliente || c.nombreCliente || '').trim();
+    try {
+      const [ins] = await pool.query(
+        'INSERT INTO clientes (rut, nombre_completo) VALUES (?, ?) ON DUPLICATE KEY UPDATE id_cliente = LAST_INSERT_ID(id_cliente)',
+        [rutNorm, nombre || null]);
+      cliRow = { id_cliente: ins.insertId };
+    } catch (e) { console.error('[carta→cliente]', e.message); }
+  }
   const numero_credito = await generarNumeroCreditoDesdeCartas();
   // Mapear acreedor → financiera
   const finMap = { 'AUTOFIN': 'AUTOFIN', 'AUTOFACIL': 'AUTOFACIL', 'UNIDAD': 'UNIDAD DE CREDITO', 'UNIDAD DE CREDITO': 'UNIDAD DE CREDITO' };
@@ -36,14 +47,14 @@ async function crearCreditoDesdeCartas(c) {
 
   const [r] = await pool.query(`
     INSERT INTO creditos
-      (numero_credito, num_op, financiera, estado_eval, estado,
+      (numero_credito, num_op, financiera, id_financiera, estado_eval, estado,
        id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
        tipo_vehiculo, marca, modelo, anio, patente,
        automotora, ejecutivo, comdea_real,
        created_at, updated_at)
-    VALUES (?,?,?,
+    VALUES (?,?,?,?,
             'OTORGADO','INGRESO',
             ?,?,?,
             NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
@@ -53,6 +64,7 @@ async function crearCreditoDesdeCartas(c) {
             NOW(),NOW())
   `, [
     numero_credito, (/^\d+$/.test(String(numero_credito)) ? parseInt(numero_credito, 10) : null), financiera,
+    (c.id_financiera ?? c.idFinanciera ?? null),
     cliRow?.id_cliente || null,
     (c.rut_conc || c.rutConc || null),
     (c.vendedor || null),
