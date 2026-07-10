@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conexiones Bancarias — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav a:hover { color:#fff; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .btn-logout:hover { background:rgba(255,255,255,.2); }
+    .main-content { padding:32px 40px; max-width:1300px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; display:flex; align-items:center; gap:8px; }
+    .panel-body { padding:20px 22px; }
+
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-ghost:hover { background:#f9fafb; }
+    .btn-danger2 { background:#fee2e2; color:#991b1b; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    .btn-danger2:hover { background:#fecaca; }
+
+    .cta-cuentas { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+    .cuenta-card { border:1px solid #e5e7eb; border-radius:12px; padding:18px; position:relative; }
+    .cuenta-card .banco { font-weight:800; color:var(--navy); font-size:.95rem; }
+    .cuenta-card .num { font-family:monospace; color:#6b7280; font-size:.82rem; margin-top:2px; }
+    .cuenta-card .saldo { font-size:1.5rem; font-weight:800; color:#111827; margin:12px 0 2px; }
+    .cuenta-card .saldo-lbl { font-size:.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; }
+    .cuenta-card .contable { font-size:.8rem; color:#6b7280; margin-top:6px; }
+    .cuenta-card .ts { font-size:.72rem; color:#9ca3af; margin-top:8px; }
+    .cuenta-card .acciones { display:flex; gap:8px; margin-top:14px; }
+
+    label.f { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .form-control, .form-select { font-size:.88rem; }
+    .badge-modo { font-size:.72rem; font-weight:700; border-radius:6px; padding:3px 9px; }
+    .modo-sandbox { background:#fef3c7; color:#92400e; }
+    .modo-live { background:#dcfce7; color:#15803d; }
+    .badge-abono { background:#dcfce7; color:#15803d; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; }
+    .badge-cargo { background:#fee2e2; color:#991b1b; font-weight:700; font-size:.72rem; border-radius:6px; padding:2px 8px; }
+
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:9px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; }
+    .text-right { text-align:right; }
+    .amt-neg { color:#dc2626; font-weight:700; }
+    .amt-pos { color:#15803d; font-weight:700; }
+    .empty-state { text-align:center; color:#9ca3af; padding:40px 0; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; font-size:.83rem; color:#1e3a5f; margin-bottom:18px; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; color:#111827; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:480px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog .dlg-head { padding:16px 22px; border-bottom:1px solid #e5e7eb; font-weight:700; }
+    dialog .dlg-body { padding:20px 22px; }
+    dialog .dlg-foot { padding:14px 22px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+    @media(max-width:640px){ .main-content{padding:16px;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-bank2 me-1"></i>Conexiones Bancarias</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <a href="/dashboard" title="Dashboard Analytics" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
+      <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
+    </a>
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-bank2"></i>
+    <div>
+      <h2>Conexiones Bancarias</h2>
+      <p>Saldos y cartolas de Banco de Chile y Santander vía Fintoc</p>
+    </div>
+  </div>
+
+  <!-- Configuración Fintoc -->
+  <div class="panel">
+    <div class="panel-header">
+      <h5><i class="bi bi-key"></i> Configuración Fintoc <span id="modoBadge"></span></h5>
+      <button class="btn-ghost" onclick="abrirConfig()"><i class="bi bi-gear"></i> Configurar API key</button>
+    </div>
+    <div class="panel-body">
+      <div id="cfgEstado" style="font-size:.88rem;color:#374151;">Cargando…</div>
+    </div>
+  </div>
+
+  <!-- Cuentas conectadas -->
+  <div class="panel">
+    <div class="panel-header">
+      <h5><i class="bi bi-wallet2"></i> Cuentas conectadas</h5>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-ghost" onclick="syncTodo()" id="btnSyncTodo"><i class="bi bi-arrow-repeat"></i> Sincronizar todas</button>
+        <button class="btn-primary2" onclick="abrirEnlazar()"><i class="bi bi-plus-lg"></i> Enlazar cuenta</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div id="cuentasWrap"><div class="empty-state">Cargando…</div></div>
+    </div>
+  </div>
+
+  <!-- Cartola -->
+  <div class="panel" id="cartolaPanel" style="display:none;">
+    <div class="panel-header">
+      <h5><i class="bi bi-receipt"></i> Cartola — <span id="cartolaTitulo"></span></h5>
+      <div style="display:flex;gap:10px;align-items:flex-end;">
+        <div><label class="f">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
+        <div><label class="f">Hasta</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
+        <button class="btn-ghost" onclick="cargarCartola()"><i class="bi bi-search"></i> Filtrar</button>
+      </div>
+    </div>
+    <div class="panel-body" style="padding:0;">
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Fecha</th><th>Descripción</th><th>Contraparte</th><th>Tipo</th><th class="text-right">Monto</th></tr></thead>
+          <tbody id="cartolaBody"></tbody>
+        </table>
+      </div>
+      <div id="cartolaEmpty" class="empty-state" style="display:none;">Sin movimientos en el rango.</div>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul style="margin:0;padding-left:20px;">
+      <li><b>API key / modo Fintoc</b> → habilita la lectura de saldos y cartolas. Sandbox usa datos ficticios; producción (sk_live) trae las cuentas reales.</li>
+      <li><b>Cuentas conectadas</b> → cada enlace trae saldo disponible/contable y alimenta la tabla <code>banco_movimientos</code>.</li>
+      <li><b>Sincronización</b> → refresca saldos y hace UPSERT de movimientos (idempotente). Base para la futura conciliación de pagos en <a href="/tesoreria/aplicacion-fondos">Aplicación de Fondos</a> y <a href="/cobranza/">Cobranza</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Modal config -->
+<dialog id="dlgConfig">
+  <div class="dlg-head">Configuración de Fintoc</div>
+  <div class="dlg-body">
+    <div class="info-box">La API key vive solo aquí (mantenedor), nunca en el código. Sandbox: <code>sk_test_…</code> · Producción: <code>sk_live_…</code></div>
+    <div id="envAviso" style="display:none;" class="info-box" style="background:#fef3c7;border-color:#f59e0b;color:#92400e;">La key está fijada por variable de entorno y no se edita desde aquí.</div>
+    <label class="f">API key (secret key)</label>
+    <input type="password" id="inKey" class="form-control" placeholder="sk_test_… o sk_live_…" autocomplete="off">
+    <label class="f" style="margin-top:14px;">Modo</label>
+    <select id="inModo" class="form-select">
+      <option value="sandbox">Sandbox (pruebas)</option>
+      <option value="live">Producción</option>
+    </select>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgConfig.close()">Cancelar</button>
+    <button class="btn-primary2" onclick="guardarConfig()">Guardar</button>
+  </div>
+</dialog>
+
+<!-- Modal enlazar -->
+<dialog id="dlgEnlazar">
+  <div class="dlg-head">Enlazar cuenta bancaria</div>
+  <div class="dlg-body">
+    <div class="info-box">El <b>link_token</b> se genera al autorizar la cuenta con las credenciales del banco (widget de Fintoc). Pégalo aquí para traer sus cuentas.</div>
+    <label class="f">Banco</label>
+    <select id="enBanco" class="form-select">
+      <option>Banco de Chile</option>
+      <option>Santander</option>
+      <option>BCI</option>
+      <option>Banco Estado</option>
+      <option>Itaú</option>
+      <option>Scotiabank</option>
+      <option>Otro</option>
+    </select>
+    <label class="f" style="margin-top:14px;">Alias (opcional)</label>
+    <input type="text" id="enAlias" class="form-control" placeholder="Cuenta corriente operaciones">
+    <label class="f" style="margin-top:14px;">link_token</label>
+    <input type="text" id="enToken" class="form-control" placeholder="link_token_…" autocomplete="off">
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgEnlazar.close()">Cancelar</button>
+    <button class="btn-primary2" onclick="enlazar()" id="btnEnlazar">Enlazar</button>
+  </div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+if (!token || !yo) window.location.href = '/login.html';
+(async () => {
+  if (yo?.perfil === 'Administrador') return;
+  let ok = false;
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
+    const j = await r.json();
+    ok = (j.funcionalidades||[]).includes('banco_conexiones');
+  } catch(e){}
+  if (!ok) { alert('Acceso restringido'); window.location.href = '/tesoreria'; }
+})();
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+document.getElementById('navPerfil').textContent  = yo?.perfil || '';
+document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
+function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href='/login.html'; }
+
+const API = (path, opts={}) => fetch(path, { headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, ...opts });
+const clp = v => '$' + Math.round(v||0).toLocaleString('es-CL');
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fechaCL = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
+let CUENTAS = [], SEL = null;
+
+/* ── Config ── */
+async function cargarConfig() {
+  try {
+    const j = await API('/api/banco/config').then(r=>r.json());
+    const d = j.data || {};
+    const badge = document.getElementById('modoBadge');
+    badge.className = 'badge-modo ' + (d.modo==='live'?'modo-live':'modo-sandbox');
+    badge.textContent = d.modo==='live' ? 'PRODUCCIÓN' : 'SANDBOX';
+    document.getElementById('cfgEstado').innerHTML = d.configurado
+      ? `<i class="bi bi-check-circle-fill" style="color:#15803d"></i> API key configurada (<code>${esc(d.pista)}</code>)${d.via_env?' · fijada por variable de entorno':''}`
+      : `<i class="bi bi-exclamation-triangle-fill" style="color:#d97706"></i> Sin API key. Configúrala para traer saldos y cartolas.`;
+    document.getElementById('envAviso').style.display = d.via_env ? '' : 'none';
+    document.getElementById('inModo').value = d.modo || 'sandbox';
+  } catch(e){ document.getElementById('cfgEstado').textContent = 'Error cargando configuración.'; }
+}
+function abrirConfig(){ document.getElementById('inKey').value=''; dlgConfig.showModal(); }
+async function guardarConfig() {
+  const secret_key = document.getElementById('inKey').value.trim();
+  const modo = document.getElementById('inModo').value;
+  const body = { modo };
+  if (secret_key) body.secret_key = secret_key;
+  const j = await API('/api/banco/config', { method:'PUT', body:JSON.stringify(body) }).then(r=>r.json());
+  if (!j.success) return alert(j.error||'No se pudo guardar');
+  dlgConfig.close(); cargarConfig();
+}
+
+/* ── Cuentas ── */
+async function cargarCuentas() {
+  try {
+    const j = await API('/api/banco/conexiones').then(r=>r.json());
+    CUENTAS = j.data || [];
+    const w = document.getElementById('cuentasWrap');
+    if (!CUENTAS.length) { w.innerHTML = '<div class="empty-state">Aún no hay cuentas enlazadas.</div>'; return; }
+    w.innerHTML = '<div class="cta-cuentas">' + CUENTAS.map(c => `
+      <div class="cuenta-card">
+        <div class="banco">${esc(c.banco)}</div>
+        <div class="num">${esc(c.alias||'')} ${c.numero?('· '+esc(c.numero)):''}</div>
+        <div class="saldo-lbl" style="margin-top:12px;">Saldo disponible</div>
+        <div class="saldo">${clp(c.saldo_disponible)}</div>
+        <div class="contable">Contable: ${clp(c.saldo_contable)}</div>
+        <div class="ts">Actualizado: ${c.saldo_actualizado?new Date(c.saldo_actualizado).toLocaleString('es-CL'):'—'}</div>
+        <div class="acciones">
+          <button class="btn-ghost" onclick="verCartola(${c.id})"><i class="bi bi-receipt"></i> Cartola</button>
+          <button class="btn-ghost" onclick="syncUna(${c.id}, this)"><i class="bi bi-arrow-repeat"></i> Sincronizar</button>
+          <button class="btn-danger2" onclick="eliminar(${c.id})"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>`).join('') + '</div>';
+  } catch(e){ document.getElementById('cuentasWrap').innerHTML = '<div class="empty-state">Error cargando cuentas.</div>'; }
+}
+
+function abrirEnlazar(){ document.getElementById('enToken').value=''; document.getElementById('enAlias').value=''; dlgEnlazar.showModal(); }
+async function enlazar() {
+  const banco = document.getElementById('enBanco').value;
+  const alias = document.getElementById('enAlias').value.trim();
+  const link_token = document.getElementById('enToken').value.trim();
+  if (!link_token) return alert('Falta el link_token');
+  const btn = document.getElementById('btnEnlazar'); btn.disabled = true; btn.textContent = 'Enlazando…';
+  try {
+    const j = await API('/api/banco/conexiones', { method:'POST', body:JSON.stringify({ banco, alias, link_token }) }).then(r=>r.json());
+    if (!j.success) { alert(j.error||'No se pudo enlazar'); return; }
+    dlgEnlazar.close(); cargarCuentas();
+  } finally { btn.disabled=false; btn.textContent='Enlazar'; }
+}
+
+async function syncUna(id, btn) {
+  const t = btn.innerHTML; btn.disabled=true; btn.innerHTML='<i class="bi bi-arrow-repeat"></i> …';
+  try {
+    const j = await API('/api/banco/conexiones/'+id+'/sync', { method:'POST' }).then(r=>r.json());
+    if (!j.success) alert(j.error||'Error al sincronizar');
+    else { await cargarCuentas(); if (SEL===id) cargarCartola(); }
+  } finally { btn.disabled=false; btn.innerHTML=t; }
+}
+async function syncTodo() {
+  const btn = document.getElementById('btnSyncTodo'); btn.disabled=true; const t=btn.innerHTML; btn.innerHTML='<i class="bi bi-arrow-repeat"></i> …';
+  try {
+    const j = await API('/api/banco/sync-todo', { method:'POST' }).then(r=>r.json());
+    if (!j.success) alert(j.error||'Error');
+    else { const errs=(j.data.detalle||[]).filter(x=>x.error); if(errs.length) alert('Algunas fallaron:\n'+errs.map(e=>e.banco+': '+e.error).join('\n')); await cargarCuentas(); }
+  } finally { btn.disabled=false; btn.innerHTML=t; }
+}
+async function eliminar(id) {
+  if (!confirm('¿Eliminar esta conexión y sus movimientos guardados?')) return;
+  const j = await API('/api/banco/conexiones/'+id, { method:'DELETE' }).then(r=>r.json());
+  if (!j.success) return alert(j.error||'Error');
+  if (SEL===id) document.getElementById('cartolaPanel').style.display='none';
+  cargarCuentas();
+}
+
+/* ── Cartola ── */
+function verCartola(id){ SEL=id; const c=CUENTAS.find(x=>x.id===id); document.getElementById('cartolaTitulo').textContent=(c?.banco||'')+' '+(c?.alias||''); document.getElementById('cartolaPanel').style.display=''; document.getElementById('cartolaPanel').scrollIntoView({behavior:'smooth'}); cargarCartola(); }
+async function cargarCartola() {
+  if (!SEL) return;
+  const desde = document.getElementById('fDesde').value, hasta = document.getElementById('fHasta').value;
+  const qs = new URLSearchParams(); if(desde) qs.set('desde',desde); if(hasta) qs.set('hasta',hasta);
+  const j = await API('/api/banco/conexiones/'+SEL+'/movimientos?'+qs).then(r=>r.json());
+  const rows = j.data || [];
+  const body = document.getElementById('cartolaBody');
+  document.getElementById('cartolaEmpty').style.display = rows.length? 'none':'';
+  body.innerHTML = rows.map(m => `
+    <tr>
+      <td>${fechaCL(m.fecha)}</td>
+      <td>${esc(m.descripcion)}${m.pendiente?' <span class="badge-cargo">pendiente</span>':''}</td>
+      <td>${esc(m.contraparte||'')}${m.contraparte_rut?(' <span style="color:#9ca3af">'+esc(m.contraparte_rut)+'</span>'):''}</td>
+      <td>${m.monto>=0?'<span class="badge-abono">Abono</span>':'<span class="badge-cargo">Cargo</span>'}</td>
+      <td class="text-right ${m.monto>=0?'amt-pos':'amt-neg'}">${clp(m.monto)}</td>
+    </tr>`).join('');
+}
+
+cargarConfig(); cargarCuentas();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
