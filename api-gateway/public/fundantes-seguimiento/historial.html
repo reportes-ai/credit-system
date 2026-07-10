@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial de Fundantes — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:26px 32px; max-width:1600px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; }
+    .banner h2 { font-weight:800; margin:0; font-size:1.25rem; }
+    .banner p { opacity:.85; margin:2px 0 0; font-size:.86rem; }
+    .toolbar { display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+    .toolbar input { max-width:340px; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; position:sticky; top:0; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:top; }
+    .sub { color:#94a3b8; font-size:.72rem; }
+    .b { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 7px; display:inline-block; }
+    .b-APROBADO { background:#dcfce7; color:#15803d; }
+    .b-RECHAZADO { background:#fee2e2; color:#991b1b; }
+    .b-ENVIADO { background:#fef3c7; color:#92400e; }
+    .motivo { color:#b91c1c; font-size:.72rem; }
+    .empty { text-align:center; color:#9ca3af; padding:44px 0; }
+    .re { color:#0369a1; font-weight:600; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { self: { key:'fundantes_historial', title:'Historial de Fundantes', icon:'bi-clock-history', selfHref:'/fundantes-seguimiento/historial', defaultSection:'home',
+    extra:[{ label:'Seguimiento Fundantes', href:'/fundantes/' }, { label:'Historial', icon:'bi-clock-history' }] } };
+</script>
+
+<div class="main">
+  <div class="banner">
+    <i class="bi bi-clock-history"></i>
+    <div><h2>Historial de Fundantes</h2><p>Bitácora por operación: primer envío, resultado, reenvío y resultado final — con fechas y responsables.</p></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="q" class="form-control form-control-sm" placeholder="Buscar por OP, ID, RUT, cliente, ejecutivo o dealer…" oninput="render()">
+    <span id="cnt" class="text-muted small"></span>
+  </div>
+
+  <div class="panel">
+    <div style="overflow-x:auto;max-height:72vh">
+      <table>
+        <thead><tr>
+          <th>N° OP</th><th>ID Fin.</th><th>RUT</th><th>Cliente</th><th>Ejecutivo</th><th>Dealer</th>
+          <th>1er envío</th><th>1er resultado</th><th>Reenvío</th><th>Resultado final</th>
+        </tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+    <div id="vacio" class="empty" style="display:none">Sin historial de fundantes.</div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fDT = s => s ? new Date(s).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+let DATA = [];
+
+function persona(p){ return p ? `<div>${fDT(p.fecha)}</div><div class="sub">${esc(p.persona||'')}</div>` : '<span class="sub">—</span>'; }
+function resultado(r){
+  if(!r) return '<span class="sub">pendiente</span>';
+  return `<span class="b b-${r.estado}">${r.estado}</span><div class="sub" style="margin-top:2px">${fDT(r.fecha)} · ${esc(r.persona||'')}</div>${r.motivo?`<div class="motivo">${esc(r.motivo)}</div>`:''}`;
+}
+
+async function cargar(){
+  const j = await fetch('/api/fundantes-seguimiento/historial', { headers:H }).then(r=>r.json()).catch(()=>null);
+  DATA = (j && j.success) ? j.data : [];
+  render();
+}
+function render(){
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  const list = !q ? DATA : DATA.filter(r =>
+    [r.num_op, r.id_financiera, r.rut, r.cliente, r.ejecutivo, r.dealer].some(v => String(v==null?'':v).toLowerCase().includes(q)));
+  document.getElementById('cnt').textContent = list.length + ' operación(es)';
+  document.getElementById('vacio').style.display = list.length ? 'none' : '';
+  document.getElementById('tb').innerHTML = list.map(r => `
+    <tr>
+      <td><b>${esc(r.num_op)}</b></td>
+      <td>${esc(r.id_financiera||'—')}</td>
+      <td>${esc(r.rut||'—')}</td>
+      <td>${esc(r.cliente||'—')}</td>
+      <td>${esc(r.ejecutivo||'—')}</td>
+      <td>${esc(r.dealer||'—')}</td>
+      <td>${persona(r.envio1)}</td>
+      <td>${resultado(r.resultado1)}</td>
+      <td>${r.reenvio ? persona(r.reenvio) + (r.reenvios_n>1?`<div class="re">+${r.reenvios_n} reenvíos</div>`:'') : '<span class="sub">—</span>'}</td>
+      <td>${resultado(r.final)}</td>
+    </tr>`).join('');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -93,6 +93,7 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
       ['Seguimiento Fundantes - Ejecutivo Comercial', 'fundantes_seguimiento', '/fundantes-seguimiento/', 'bi-folder-check'],
       ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
       ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
+      ['Historial de Fundantes', 'fundantes_historial', '/fundantes-seguimiento/historial', 'bi-clock-history'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -111,6 +112,13 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
       const idf = idFunc[codigo];
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+    }
+    // El Historial hereda el mismo acceso que Operaciones (además del Admin ya sembrado).
+    if (idFunc['fundantes_historial'] && idFunc['fundantes_operaciones']) {
+      await pool.query(
+        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT id_perfil, ?, 1 FROM permisos_perfil WHERE id_funcionalidad=? AND habilitado=1`,
+        [idFunc['fundantes_historial'], idFunc['fundantes_operaciones']]);
     }
     console.log('[fundantes-seguimiento] módulo registrado');
   } catch (e) { console.error('[fundantes-seguimiento migration]', e.message); }
@@ -539,4 +547,58 @@ const resumen = async (req, res) => {
   } catch (e) { console.error('[fundantes-seguimiento resumen]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar };
+/* ─── GET /historial — bitácora de envíos/validaciones por operación ──────────────
+   Se reconstruye desde la auditoría (ENVIAR/APROBAR/RECHAZAR_FUNDANTES): primer envío,
+   primer resultado, reenvío (si se corrigió) y resultado final — siempre con fecha y persona. */
+const historial = async (req, res) => {
+  try {
+    const [ev] = await pool.query(
+      `SELECT entidad_id, accion, usuario, fecha, detalle
+         FROM auditoria_movimientos
+        WHERE modulo='fundantes-seguimiento'
+          AND accion IN ('ENVIAR_FUNDANTES','APROBAR_FUNDANTES','RECHAZAR_FUNDANTES')
+        ORDER BY entidad_id, fecha ASC`);
+    // Se agrupa por N° OP (extraído del detalle) y no por entidad_id: los créditos pueden
+    // recrearse con otro id en re-importaciones, pero el num_op es estable.
+    const opDe = d => { const m = String(d || '').match(/OP\s+(\d+)/); return m ? m[1] : null; };
+    const porCred = new Map();
+    for (const e of ev) { const k = opDe(e.detalle); if (!k) continue; (porCred.get(k) || porCred.set(k, []).get(k)).push(e); }
+    if (!porCred.size) return res.json({ success: true, data: [], error: null });
+
+    const [creds] = await pool.query(
+      `SELECT c.num_op, c.id_financiera, c.ejecutivo, COALESCE(c.automotora,'') dealer,
+              COALESCE(cl.rut,'') rut, COALESCE(cl.nombre_completo,'') cliente
+         FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+        WHERE c.num_op IN (?)`, [[...porCred.keys()]]);
+    const cmap = new Map(creds.map(c => [String(c.num_op), c]));
+    const vis = await ejecutivosVisibles(req);
+    const visible = ej => vis.all || (vis.lista || []).some(x => String(x).toUpperCase() === String(ej || '').toUpperCase());
+    const motivoDe = d => { const i = String(d || '').indexOf('—'); return i >= 0 ? String(d).slice(i + 1).trim() : ''; };
+    const P = e => e ? { fecha: e.fecha, persona: e.usuario } : null;
+
+    const rows = [];
+    for (const [id, evs] of porCred) {
+      const c = cmap.get(id); if (!c || !visible(c.ejecutivo)) continue;
+      const envios = evs.filter(e => e.accion === 'ENVIAR_FUNDANTES');
+      const valids = evs.filter(e => e.accion !== 'ENVIAR_FUNDANTES');
+      const primerRechazo = evs.find(e => e.accion === 'RECHAZAR_FUNDANTES');
+      const reenvio = primerRechazo ? envios.find(e => e.fecha > primerRechazo.fecha) : null;
+      const primerRes = valids[0] || null;
+      const ultimo = evs[evs.length - 1];
+      const estadoDe = e => e.accion === 'APROBAR_FUNDANTES' ? 'APROBADO' : e.accion === 'RECHAZAR_FUNDANTES' ? 'RECHAZADO' : 'ENVIADO';
+      rows.push({
+        num_op: c.num_op, id_financiera: c.id_financiera, rut: c.rut, cliente: c.cliente,
+        ejecutivo: c.ejecutivo, dealer: c.dealer,
+        envio1: P(envios[0]),
+        resultado1: primerRes ? { estado: estadoDe(primerRes), ...P(primerRes), motivo: primerRes.accion === 'RECHAZAR_FUNDANTES' ? motivoDe(primerRes.detalle) : '' } : null,
+        reenvio: P(reenvio), reenvios_n: Math.max(0, envios.length - 1),
+        final: { estado: estadoDe(ultimo), ...P(ultimo), motivo: ultimo.accion === 'RECHAZAR_FUNDANTES' ? motivoDe(ultimo.detalle) : '' },
+        _orden: (envios[0] || ultimo).fecha,
+      });
+    }
+    rows.sort((a, b) => new Date(b._orden) - new Date(a._orden));
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
+};
+
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial };

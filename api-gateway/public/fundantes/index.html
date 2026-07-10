@@ -58,6 +58,12 @@
       <p>Revisa los fundantes enviados 1 a 1, descárgalos y apruébalos o recházalos.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
     </a>
+    <a href="/fundantes-seguimiento/historial" class="module-card" id="cardHist" style="display:none">
+      <div class="card-icon"><i class="bi bi-clock-history"></i></div>
+      <h6>Historial de Fundantes</h6>
+      <p>Bitácora por operación: envíos, aprobaciones y rechazos con fechas y responsables.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle"></i> Acceder</span>
+    </a>
   </div>
   <div class="empty" id="vacio" style="display:none">No tienes acceso a submódulos de Seguimiento Fundantes.</div>
 </div>
@@ -78,6 +84,7 @@ if (!token || !yo) location.href = '/login.html';
   let alguna = false;
   if (tiene('fundantes_seguimiento')) { document.getElementById('cardEjec').style.display = ''; alguna = true; }
   if (tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardOps').style.display = ''; alguna = true; }
+  if (tiene('fundantes_historial') || tiene('fundantes_operaciones') || tiene('fundantes_validar')) { document.getElementById('cardHist').style.display = ''; alguna = true; }
   if (!alguna) document.getElementById('vacio').style.display = '';
 })();
 </script>
