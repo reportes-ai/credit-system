@@ -225,13 +225,15 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil">
-        <span class="version-badge">v6.0</span>
+        <span class="version-badge">v6.1</span>
       </a>
       <!-- Indicadores del día (UF y TMC, desde sus mantenedores) -->
       <div class="econ-widget" id="econWidget" title="Indicadores del día" style="display:none">
         <span><span class="econ-lbl">UF</span><span class="econ-val" id="econUf">—</span></span>
         <span class="econ-sep">·</span>
         <span><span class="econ-lbl">TMC</span><span class="econ-val" id="econTmc">—</span></span>
+        <span class="econ-sep" id="econDolarSep" style="display:none">·</span>
+        <span id="econDolarWrap" style="display:none"><span class="econ-lbl">USD</span><span class="econ-val" id="econDolar">—</span></span>
       </div>
     </div>
 
@@ -915,9 +917,10 @@ async function initIndicadores() {
     const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
     const clp = n => '$' + Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pct = n => Number(n).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-    const [uf, tasas] = await Promise.all([
+    const [uf, tasas, dolar] = await Promise.all([
       fetch('/api/uf/vigente', { headers: H }).then(r => r.json()).catch(() => null),
       fetch('/api/tasas/vigente', { headers: H }).then(r => r.json()).catch(() => null),
+      fetch('/api/dolar/', { headers: H }).then(r => r.json()).catch(() => null),   // serie DESC: [0]=hoy, [1]=día anterior (para la flecha)
     ]);
     let algo = false;
     if (uf && uf.data && uf.data.valor) { document.getElementById('econUf').textContent = clp(uf.data.valor); algo = true; }
@@ -925,6 +928,20 @@ async function initIndicadores() {
       const t = tasas.data;
       document.getElementById('econTmc').innerHTML = pct(t.tasa_mensual_menor) + ' <span class="econ-sep">·</span> ' + pct(t.tasa_mensual_mayor);
       document.getElementById('econWidget').title = `UF de hoy · TMC mensual < 200 UF: ${pct(t.tasa_mensual_menor)} · TMC mensual ≥ 200 UF: ${pct(t.tasa_mensual_mayor)}`;
+      algo = true;
+    }
+    if (dolar && Array.isArray(dolar.data) && dolar.data.length) {
+      const hoy = Number(dolar.data[0].valor);
+      const ayer = dolar.data.length > 1 ? Number(dolar.data[1].valor) : null;
+      let flecha = '';
+      if (ayer != null && hoy !== ayer) flecha = hoy > ayer
+        ? ' <span style="color:#4ade80">▲</span>'
+        : ' <span style="color:#f87171">▼</span>';
+      document.getElementById('econDolar').innerHTML = clp(hoy) + flecha;
+      if (ayer != null) document.getElementById('econDolarWrap').title =
+        `Dólar observado · hoy ${clp(hoy)} · día anterior ${clp(ayer)}`;
+      document.getElementById('econDolarSep').style.display = '';
+      document.getElementById('econDolarWrap').style.display = '';
       algo = true;
     }
     if (algo) document.getElementById('econWidget').style.display = '';
