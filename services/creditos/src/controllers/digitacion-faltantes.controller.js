@@ -47,11 +47,14 @@ const CAMPOS = [
 ];
 
 // Campos obligatorios que definen si un crédito está "incompleto" (entra a la cola).
+// NO se piden: 'cuota' (se calcula sola con la fórmula francesa desde monto/tasa/plazo) ni
+// 'seguros' (opcional — 0 es válido; además el agregado suele venir nulo aunque los seguros
+// individuales estén cargados, lo que generaba un falso "primas falta").
 const REQUERIDOS = {
-  otorgados: ['fecha_otorgado','fecha_primera_cuota','tascli_real','plazo','cuota','seguros',
+  otorgados: ['fecha_otorgado','fecha_primera_cuota','tascli_real','plazo',
               'automotora','rut_dealer','vendedor','id_financiera',
               'tipo_vehiculo','marca','modelo','anio','patente'],
-  otros:     ['tascli_real','plazo','cuota','automotora','rut_dealer'],
+  otros:     ['tascli_real','plazo','automotora','rut_dealer'],
 };
 const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
 
