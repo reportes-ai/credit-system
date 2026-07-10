@@ -7,6 +7,8 @@ const ctrl = require('../controllers/castigos.controller');
 router.get('/operacion/:numop', verifyToken, ctrl.porOperacion);
 router.get('/resolver/:numop',  verifyToken, ctrl.resolver);
 router.get('/',                 verifyToken, ctrl.historial);
+router.get('/contable',         verifyToken, ctrl.contable);
+router.post('/contable/cierre', verifyToken, requireFunc('castigos_historial'), ctrl.cerrarMesContable);
 
 // Escritura
 router.post('/',            verifyToken, requireFunc('castigo_solicitar'), ctrl.solicitar);

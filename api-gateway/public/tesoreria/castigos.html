@@ -7,7 +7,7 @@
   <title>Castigos de Saldo — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.0 -->
+  <!-- v1.1 — cuadro contable debe/haber Provisiones/Castigos con saldos inicial/final -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -46,6 +46,13 @@
     .firma { font-size:.76rem; color:#374151; }
     .firma.pend { color:#b45309; }
     .empty-state { text-align:center; color:#9ca3af; padding:44px 0; }
+    .cxt-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .cxt-card { border:1px solid #e5e7eb; border-radius:10px; padding:12px 16px; }
+    .cxt-card .lbl { font-size:.73rem; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+    .cxt-card .val { font-size:1.25rem; font-weight:800; color:#111827; margin-top:3px; }
+    .cxt-card.res { background:#fef2f2; border-color:#fecaca; }
+    .cxt-card.res .val { color:#b91c1c; }
+    @media(max-width:640px){ .cxt-strip{grid-template-columns:1fr;} }
     @media(max-width:640px){ .main-content{padding:16px;} }
   </style>
 </head>
@@ -71,6 +78,32 @@
   <div class="page-banner">
     <i class="bi bi-file-earmark-minus"></i>
     <div><h2>Castigos de Saldo</h2><p>Operaciones dadas de baja contablemente · motivo, comentario y firmas de aprobación</p></div>
+  </div>
+
+  <!-- ── Cuadro contable Provisiones / Castigos ── -->
+  <div class="panel" style="margin-bottom:22px">
+    <div style="padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <h5 style="margin:0;font-weight:700;font-size:.97rem;color:#111827"><i class="bi bi-journal-text me-1"></i>Movimiento Contable — Provisiones y Castigos</h5>
+      <label style="font-size:.78rem;font-weight:600;color:#374151;margin:0 0 0 auto">Mes
+        <input type="month" id="cMes" class="form-control form-control-sm" style="display:inline-block;width:auto;margin-left:6px" onchange="cargarContable()"></label>
+      <button class="btn-ghost" style="background:#fff;border:1.5px solid #d1d5db;color:#374151;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:600;cursor:pointer" onclick="cerrarMes()"><i class="bi bi-save me-1"></i>Guardar cierre del mes</button>
+    </div>
+    <div style="padding:18px 20px">
+      <div id="cAprox" style="display:none;background:#fef3c7;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 14px;font-size:.8rem;color:#92400e;margin-bottom:14px"></div>
+      <!-- Saldos iniciales -->
+      <div style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos iniciales</div>
+      <div id="cTop" class="cxt-strip"></div>
+      <!-- Movimientos debe/haber -->
+      <div style="overflow-x:auto;margin:16px 0">
+        <table style="font-size:.82rem">
+          <thead><tr><th>Glosa</th><th>N° Op / Detalle</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr></thead>
+          <tbody id="cMovs"></tbody>
+        </table>
+      </div>
+      <!-- Saldos finales -->
+      <div style="font-size:.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Saldos finales</div>
+      <div id="cBot" class="cxt-strip"></div>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -156,6 +189,45 @@ async function castigarSaldo() {
   window.location.href = '/creditos/revisar?id=' + j.data.id_credito;
 }
 
+/* ── Cuadro contable ── */
+function card(lbl, val, cls) { return `<div class="cxt-card ${cls||''}"><div class="lbl">${lbl}</div><div class="val">${fmtP(val)}</div></div>`; }
+async function cargarContable() {
+  const mes = document.getElementById('cMes').value || new Date().toISOString().slice(0,7);
+  const j = await fetch('/api/castigos/contable?mes='+mes, { headers: H }).then(r=>r.json());
+  if (!j.success) return;
+  const d = j.data, P = d.provisiones, C = d.castigos;
+  document.getElementById('cAprox').style.display = d.aprox ? '' : 'none';
+  if (d.aprox) document.getElementById('cAprox').textContent = 'Mes sin cierre guardado: el saldo de provisiones usa el stock actual como aproximación. Guarda el cierre para fijarlo.';
+  document.getElementById('cTop').innerHTML =
+    card('Provisiones (saldo inicial)', P.saldo_inicial) +
+    card('Castigos (saldo inicial)', C.saldo_inicial) +
+    card('Cargo a Resultado (provisión + castigo)', d.cargo_resultado, 'res');
+  document.getElementById('cBot').innerHTML =
+    card('Provisiones (saldo final)', P.saldo_final) +
+    card('Castigos (saldo final)', C.saldo_final) +
+    card('Total cuentas', P.saldo_final + C.saldo_final, 'res');
+  // Movimientos: constitución de provisión + cada castigo (Debe Provisiones / Haber Cartera)
+  const filas = [];
+  filas.push(`<tr style="background:#f0fdf4"><td><b>Constitución de provisión del período</b><br><span style="color:#94a3b8;font-size:.75rem">Debe Resultado / Haber Provisiones</span></td><td>—</td><td class="text-right">${fmtP(P.haber)}</td><td class="text-right">${fmtP(P.haber)}</td></tr>`);
+  (d.movimientos||[]).forEach(m => {
+    filas.push(`<tr><td>Castigo de saldo<br><span style="color:#94a3b8;font-size:.75rem">Debe Provisiones / Haber Cartera</span></td>
+      <td><b>${esc(m.num_op)}</b> · ${esc(m.cliente||'')}<br><span style="color:#94a3b8;font-size:.75rem">${esc(m.motivo)} · ${fmtDT(m.aplicado_at)}</span></td>
+      <td class="text-right">${fmtP(m.saldo_castigado)}</td><td class="text-right">${fmtP(m.saldo_castigado)}</td></tr>`);
+  });
+  if (!d.movimientos || !d.movimientos.length) filas.push(`<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:16px">Sin castigos aplicados en el mes.</td></tr>`);
+  document.getElementById('cMovs').innerHTML = filas.join('');
+}
+async function cerrarMes() {
+  const mes = document.getElementById('cMes').value || new Date().toISOString().slice(0,7);
+  if (!confirm('¿Guardar los saldos finales de '+mes+' como cierre? Serán el saldo inicial del mes siguiente.')) return;
+  const j = await fetch('/api/castigos/contable/cierre', { method:'POST', headers: H, body: JSON.stringify({ mes }) }).then(r=>r.json());
+  if (!j.success) return alert(j.error || 'No se pudo guardar el cierre');
+  alert('Cierre guardado: Provisiones '+fmtP(j.data.provisiones)+' · Castigos '+fmtP(j.data.castigos));
+  cargarContable();
+}
+document.getElementById('cMes').value = new Date().toISOString().slice(0,7);
+
+cargarContable();
 cargar();
 </script>
 <script src="/js/app-version.js"></script>

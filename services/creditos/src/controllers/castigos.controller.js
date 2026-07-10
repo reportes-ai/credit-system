@@ -58,6 +58,16 @@ const ROLES = { FINANZAS: 'castigo_aprobar_finanzas', OPERACIONES: 'castigo_apro
         UNIQUE KEY uq_castigo_rol (id_castigo, rol)   -- un slot por rol
       )`);
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS contab_saldos_mensuales (
+        mes    CHAR(7) NOT NULL,                          -- '2026-07'
+        cuenta VARCHAR(20) NOT NULL,                      -- 'PROVISIONES' | 'CASTIGOS'
+        saldo  DECIMAL(16,2) NOT NULL,                    -- saldo final del mes (snapshot al cierre)
+        guardado_por INT NULL, guardado_por_nombre VARCHAR(160) NULL,
+        guardado_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (mes, cuenta)
+      )`);
+
     // Funcionalidades (menú + permisos). Historial vive en Tesorería.
     const seedFunc = async (idMod, nombre, codigo, href, icono) => {
       const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
@@ -94,8 +104,8 @@ const ORIGENES_PROPIA = ['CARTERA_AFA', 'CARTERA_XLSX'];
 async function creditoPropio(num_op) {
   const [[c]] = await pool.query(
     `SELECT c.id, c.num_op, c.origen, c.estado_cartera,
-            COALESCE(cl.nombre_completo, CONCAT_WS(' ', cl.nombres, cl.apellido_paterno), '') AS nombre, cl.rut
-       FROM creditos c LEFT JOIN clientes cl ON cl.rut = c.rut_cliente
+            COALESCE(cl.nombre_completo, cl.nombre, '') AS nombre, cl.rut
+       FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE c.num_op = ? LIMIT 1`, [num_op]);
   return c || null;
 }
@@ -208,12 +218,97 @@ const historial = async (req, res) => {
     if (estado) { cond.push('c.estado=?'); args.push(estado); }
     if (motivo) { cond.push('c.motivo=?'); args.push(motivo); }
     const [rows] = await pool.query(
-      `SELECT c.*, COALESCE(cl.nombre_completo, CONCAT_WS(' ', cl.nombres, cl.apellido_paterno)) AS cliente, cl.rut
+      `SELECT c.*, COALESCE(cl.nombre_completo, cl.nombre) AS cliente, cl.rut
          FROM castigos_contables c
          LEFT JOIN creditos cr ON cr.id = c.id_credito
-         LEFT JOIN clientes cl ON cl.rut = cr.rut_cliente
+         LEFT JOIN clientes cl ON cl.id_cliente = cr.id_cliente
         WHERE ${cond.join(' AND ')} ORDER BY c.solicitado_at DESC LIMIT 1000`, args);
     ok(res, await conAprobaciones(rows));
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Movimiento contable: Provisiones y Castigos (debe/haber) ───────────────────
+   Modelo (mensual):
+     Cuenta PROVISIONES (saldo acreedor):
+       saldo_inicial  + Haber(constitución del período)  − Debe(uso por castigos)  = saldo_final
+       · saldo_final = stock de provisión actual (motor cobranza) para el mes en curso,
+         o el snapshot guardado al cierre para meses pasados.
+       · Debe (uso por castigos)  = Σ castigos aplicados en el mes (el castigo va contra provisiones).
+       · Haber (constitución)     = (saldo_final − saldo_inicial) + castigos_mes  ⇒ = Cargo a Resultado.
+     Cuenta CASTIGOS (acumulada): saldo_inicial + Debe(castigos_mes) = saldo_final.
+     Cargo a Resultado = constitución de provisión del período (= variación neta + castigo).
+   El saldo_inicial sale del snapshot del mes anterior (0 si aún no se ha guardado ninguno).
+   ───────────────────────────────────────────────────────────────────────────── */
+const CUENTAS = ['PROVISIONES', 'CASTIGOS'];
+const mesAnterior = mes => { let [y, m] = mes.split('-').map(Number); m--; if (m < 1) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
+
+async function snapshot(mes, cuenta) {
+  const [[r]] = await pool.query('SELECT saldo FROM contab_saldos_mensuales WHERE mes=? AND cuenta=? LIMIT 1', [mes, cuenta]);
+  return r ? Number(r.saldo) : null;
+}
+
+const contable = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const mesActual = new Date().toISOString().slice(0, 7);
+    const mesAnt = mesAnterior(mes);
+
+    // Castigos aplicados en el mes
+    const [[cm]] = await pool.query(
+      "SELECT COALESCE(SUM(saldo_castigado),0) s, COUNT(*) n FROM castigos_contables WHERE estado='APROBADO' AND DATE_FORMAT(aplicado_at,'%Y-%m')=?", [mes]);
+    const castigos_mes = Number(cm.s) || 0;
+
+    // Saldo final de provisiones: mes en curso → stock actual del motor; mes pasado → snapshot (o stock como aprox.)
+    let provStock = null;
+    try { const REP = require('../../../cobranza/src/controllers/reportes.controller'); provStock = (await REP._datos.datosMoraStock()).total.provision; } catch (_) {}
+    const snapProvFin = await snapshot(mes, 'PROVISIONES');
+    const aprox = (mes !== mesActual && snapProvFin == null);
+    const SF_prov = snapProvFin != null ? snapProvFin : (provStock || 0);
+
+    const SI_prov = (await snapshot(mesAnt, 'PROVISIONES')) || 0;
+    const SI_cast = (await snapshot(mesAnt, 'CASTIGOS')) || 0;
+    const SF_cast = SI_cast + castigos_mes;
+
+    const debe_prov = castigos_mes;                       // uso de la provisión por el castigo
+    const haber_prov = (SF_prov - SI_prov) + castigos_mes; // constitución del período
+    const cargo_resultado = haber_prov;                   // provisión (neta) + castigo
+
+    const [rows] = await pool.query(
+      `SELECT c.num_op, c.saldo_castigado, c.motivo, c.aplicado_at,
+              COALESCE(cl.nombre_completo, cl.nombre) AS cliente
+         FROM castigos_contables c
+         LEFT JOIN creditos cr ON cr.id=c.id_credito LEFT JOIN clientes cl ON cl.id_cliente=cr.id_cliente
+        WHERE c.estado='APROBADO' AND DATE_FORMAT(c.aplicado_at,'%Y-%m')=? ORDER BY c.aplicado_at`, [mes]);
+
+    ok(res, {
+      mes, aprox,
+      provisiones: { saldo_inicial: Math.round(SI_prov), debe: Math.round(debe_prov), haber: Math.round(haber_prov), saldo_final: Math.round(SF_prov) },
+      castigos:    { saldo_inicial: Math.round(SI_cast), debe: Math.round(castigos_mes), haber: 0, saldo_final: Math.round(SF_cast) },
+      cargo_resultado: Math.round(cargo_resultado),
+      castigos_mes: Math.round(castigos_mes), n_castigos: cm.n,
+      movimientos: rows.map(r => ({ ...r, saldo_castigado: Math.round(Number(r.saldo_castigado) || 0) })),
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
+// Guarda el snapshot de saldos finales del mes (para que el mes siguiente tenga saldo inicial).
+const cerrarMesContable = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.body.mes || '') ? req.body.mes : new Date().toISOString().slice(0, 7);
+    // Recalcula los saldos finales del mes con la misma lógica del cuadro
+    req.query = { mes };
+    let payload = null;
+    await contable(req, { json: d => { payload = d.data; }, status: () => ({ json: () => {} }) });
+    if (!payload) return fail(res, 'No se pudo calcular el cuadro para cerrar.');
+    for (const cuenta of CUENTAS) {
+      const saldo = cuenta === 'PROVISIONES' ? payload.provisiones.saldo_final : payload.castigos.saldo_final;
+      await pool.query(
+        `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre)
+         VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_por=VALUES(guardado_por), guardado_por_nombre=VALUES(guardado_por_nombre), guardado_at=NOW()`,
+        [mes, cuenta, saldo, req.usuario.id_usuario, nombreUsuario(req)]);
+    }
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${payload.provisiones.saldo_final}, castigo ${payload.castigos.saldo_final})` });
+    ok(res, { mes, guardado: true, provisiones: payload.provisiones.saldo_final, castigos: payload.castigos.saldo_final });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -231,4 +326,4 @@ function nombreUsuario(req) {
   return `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email || ('Usuario ' + u.id_usuario);
 }
 
-module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver };
+module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable };
