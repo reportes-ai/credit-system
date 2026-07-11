@@ -748,16 +748,37 @@ const PENAL_CODIGOS = ['3403', '3433', '3439'];   // Comportamiento Penal, Índi
 function analizarInforme(codigo, contenido) {
   const esPenal = PENAL_CODIGOS.includes(String(codigo));
   if (contenido == null) return { tieneRegistros: false, grave: false, severidad: 'sin_datos', nota: 'sin datos' };
-  let txt; try { txt = JSON.stringify(contenido).toLowerCase(); } catch { txt = String(contenido).toLowerCase(); }
-  const numMatch = txt.match(/"(?:cantidad|registros|total|nreg|num|count)"\s*:\s*"?(\d+)"?/);
-  const nreg = numMatch ? parseInt(numMatch[1], 10) : null;
-  const negativo = /(moroso|protesto|impago|deuda|quiebra|demanda|juicio|causa|condena|delito|aliment)/.test(txt);
-  const hallazgo = /(moroso|protesto|impago|deuda|juicio|causa|demanda|proceso|delito|quiebra|aliment|condena|penal)/.test(txt);
-  const tieneRegistros = (nreg != null ? nreg > 0 : hallazgo);
-  const grave = esPenal && tieneRegistros;
-  // Clasificación: grave (penal con registros) > malo (deudas/morosidades/juicios) > regular (otros registros) > bueno (limpio).
-  const severidad = tieneRegistros ? (grave ? 'grave' : (negativo ? 'malo' : 'regular')) : 'bueno';
-  const nota = tieneRegistros ? (esPenal ? 'registros penales/judiciales' : 'con observaciones') : 'sin observaciones';
+
+  // Los informes DealerNet son DATOS ESTRUCTURADOS (campos @_...): se clasifica por los MONTOS
+  // e INDICADORES reales, no buscando palabras sueltas — antes "sin deuda" o una deuda vigente
+  // (normal, al día) marcaban "malo" por contener la palabra "deuda". Ahora solo penaliza lo que
+  // de verdad es negativo: mora / vencida / castigada / protestos / impagos > 0, o el indicador
+  // textual del boletín dice explícitamente "con deuda / moroso / vencida".
+  const flat = [];
+  (function walk(o) { if (o && typeof o === 'object') for (const k in o) { const v = o[k]; if (v && typeof v === 'object') walk(v); else flat.push([String(k).toLowerCase(), v]); } })(contenido);
+  const numD = v => { const n = parseFloat(String(v == null ? '' : v)); return isFinite(n) ? n : 0; };
+
+  let montoNeg = 0, cantAnot = 0, indNeg = false, indLimpio = false;
+  for (const [k, v] of flat) {
+    // Montos negativos por nombre de campo (deuda vencida / castigada / morosa / mora_xx / impaga / protesto).
+    if (/(vencid|castig|moros|mora_?\d|impag|protest)/.test(k)) montoNeg += numD(v);
+    // Conteo explícito de anotaciones/protestos/registros negativos.
+    if (/(cant.*(anot|protest|moros)|nro_?(anot|protest)|num_?(anot|protest)|total_?(anot|protest))/.test(k) && numD(v) > 0) cantAnot += numD(v);
+    // Indicador textual del boletín (ej. inddeu: "Sin deuda" | "Con deuda").
+    if (/inddeu|indicador|estado|glosa|situacion/.test(k)) {
+      const vl = String(v).toLowerCase();
+      if (/sin deuda|no registra|sin registro|sin anotac|sin observ|al d[ií]a/.test(vl)) indLimpio = true;
+      else if (/con deuda|moros|vencid|castig|impag|protest/.test(vl)) indNeg = true;
+    }
+  }
+
+  const negativo = montoNeg > 0 || cantAnot > 0 || indNeg;
+  const tieneRegistros = negativo;                 // solo lo NEGATIVO penaliza (deuda vigente/al día = sano)
+  const grave = esPenal && negativo;
+  const severidad = grave ? 'grave' : (negativo ? 'malo' : 'bueno');
+  const nota = grave ? 'registros penales/judiciales'
+    : (negativo ? 'con observaciones (mora/vencida/castigada/protestos)'
+    : (indLimpio ? 'sin deuda / al día' : 'sin observaciones negativas'));
   return { tieneRegistros, grave, severidad, nota };
 }
 
