@@ -91,7 +91,7 @@ require('../../../../shared/migrate').enFila('castigos', async () => {
       await grant(fOps, 'Gerente de Operaciones y Crédito', 'Gerente General');
     }
     if (modT) {
-      const fHist = await seedFunc(modT.id_modulo, 'Castigos de Saldo (Historial)', 'castigos_historial', '/tesoreria/castigos', 'bi-file-earmark-minus');
+      const fHist = await seedFunc(modT.id_modulo, 'Provisiones + Castigos', 'castigos_historial', '/tesoreria/castigos', 'bi-file-earmark-minus');
       await grant(fHist, 'Gerente General', 'Gerente de Finanzas', 'Gerente de Operaciones y Crédito', 'Tesorero', 'Auditor');
     }
     console.log('[castigos] módulo listo');
