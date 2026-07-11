@@ -41,8 +41,8 @@ require('../../../../shared/migrate').enFila('venta-cartera', async () => {
         "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (60001,'Venta de Cartera','venta_cartera','/tesoreria/venta-cartera.html','bi-bag-check')");
       const [[nf]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='venta_cartera' LIMIT 1");
       // Solo Administrador por defecto (la matriz de Perfiles decide el resto)
-      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-                        SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [nf.id_funcionalidad]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                        SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [nf.id_funcionalidad]);
     }
   } catch (e) { console.error('[venta-cartera migration]', e.message); }
 });

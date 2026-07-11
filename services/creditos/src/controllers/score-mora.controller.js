@@ -28,8 +28,8 @@ require('../../../../shared/migrate').enFila('score-mora', async () => {
       await pool.query(
         "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (390001,'Score de Mora (histórico)','score_mora','/score-mora/','bi-speedometer2')");
       const [[nf]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='score_mora' LIMIT 1");
-      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-                        SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [nf.id_funcionalidad]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                        SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [nf.id_funcionalidad]);
     }
   } catch (e) { console.error('[score-mora migration]', e.message); }
 });
