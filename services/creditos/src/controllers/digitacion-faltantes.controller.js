@@ -54,7 +54,9 @@ const REQUERIDOS = {
   otorgados: ['fecha_otorgado','fecha_primera_cuota','tascli_real','plazo',
               'automotora','rut_dealer','vendedor','id_financiera',
               'tipo_vehiculo','marca','modelo','anio','patente'],
-  otros:     ['tascli_real','plazo','automotora','rut_dealer'],
+  // 'otros' (no otorgados): tasa y plazo NO son requeridos — un rechazado/desistido sin
+  // tasa no participa en ningún cálculo de ingresos (decisión 2026-07-11, equivale a "S/I").
+  otros:     ['automotora','rut_dealer'],
 };
 const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
 
