@@ -212,6 +212,9 @@ exports.guardar = async (req, res) => {
     for (const [col, raw] of Object.entries(campos)) {
       if (!valid.has(col)) continue;
       const v = (raw === '' || raw === undefined) ? null : raw;
+      // No pisar un dato existente con vacío: si el form llegó con el campo en blanco
+      // pero la BD ya tiene valor (ej. lo llenó una carga posterior), se conserva.
+      if (v === null && antes[col] != null && String(antes[col]) !== '') continue;
       sets.push(`\`${col}\` = ?`); vals.push(v);
       if (String(antes[col] ?? '') !== String(v ?? '')) cambios.push({ col, antes: antes[col], despues: v });
     }
