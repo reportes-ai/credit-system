@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -67,6 +67,7 @@ const $ = id => document.getElementById(id);
 const fmt = n => (n==null||isNaN(+n)) ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
 const pctF = n => n==null ? '—' : String(Math.round(n*100)/100).replace('.',',')+'%';
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtIn = v => (v==null||v==='') ? '' : '$'+Math.round(+String(v).replace(/[^\d]/g,'')||0).toLocaleString('es-CL');
 const MESN = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesTitulo = m => MESN[+m.slice(5,7)] + ' ' + m.slice(0,4);
 let RES = [];
@@ -158,10 +159,10 @@ async function toggleConc(m, fin, concepto){
     const u = j.data.uac;
     const difA = (u.pagado_real||0) - u.total_nuestro;
     h += `<div class="uac-cuadros">
-      <div class="uac-c"><div class="l">Anticipo (~día 15, tier al liquidar)</div><input class="form-control form-control-sm" id="uacAnt-${rid}" value="${u.anticipo||''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
+      <div class="uac-c"><div class="l">Anticipo (~día 15, tier al liquidar)</div><input class="form-control form-control-sm" id="uacAnt-${rid}" value="${u.anticipo?fmtIn(u.anticipo):''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
       <div class="uac-c"><div class="l">Por facturar al cierre</div><div class="v" id="uacPF-${rid}">${fmt(u.total_nuestro - (u.anticipo||0))}</div></div>
       <div class="uac-c"><div class="l">Total nuestro (motor)</div><div class="v">${fmt(u.total_nuestro)}</div></div>
-      <div class="uac-c"><div class="l">Real pagado por UAC</div><input class="form-control form-control-sm" id="uacReal-${rid}" value="${u.pagado_real||''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
+      <div class="uac-c"><div class="l">Real pagado por UAC</div><input class="form-control form-control-sm" id="uacReal-${rid}" value="${u.pagado_real?fmtIn(u.pagado_real):''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
       <div class="uac-c"><div class="l">Diferencia</div><div class="v ${difA<0?'dif-neg':'dif-ok'}" id="uacDif-${rid}">${fmt(difA)}</div></div>
     </div>`;
     window['UACTOT_'+rid] = u.total_nuestro;
@@ -186,7 +187,7 @@ function filaOp(rid, o, i){
     <td class="num">${fmt(base)}</td><td class="num">${o.plazo||'—'}</td>
     <td class="num"><b>${fmt(o.comision)}</b></td><td class="num">${pctF(o.pct)}</td>
     <td style="text-align:center"><input type="checkbox" id="ok-${rid}-${i}" ${o.ok?'checked':''} onchange="marcarOK('${rid}',${i})"></td>
-    <td class="num"><input class="form-control fact" id="fac-${rid}-${i}" value="${o.monto_facturado!=null?o.monto_facturado:''}" onchange="cambioFact('${rid}',${i})"></td>
+    <td class="num"><input class="form-control fact" id="fac-${rid}-${i}" value="${o.monto_facturado!=null?fmtIn(o.monto_facturado):''}" onchange="cambioFact('${rid}',${i})"></td>
     <td class="num" id="dif-${rid}-${i}"></td><td class="num" id="difp-${rid}-${i}"></td>
   </tr>`;
 }
@@ -194,7 +195,7 @@ function filaOp(rid, o, i){
 function marcarOK(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   const chk = $('ok-'+rid+'-'+i).checked;
-  if (chk) $('fac-'+rid+'-'+i).value = o.comision;          // OK = replica el monto calculado
+  if (chk) $('fac-'+rid+'-'+i).value = fmtIn(o.comision);          // OK = replica el monto calculado
   o.ok = chk; o.monto_facturado = chk ? o.comision : (parseInt($('fac-'+rid+'-'+i).value)||null);
   refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
 }
@@ -202,6 +203,7 @@ function cambioFact(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   const v = String($('fac-'+rid+'-'+i).value).replace(/[^\d]/g,'');
   o.monto_facturado = v === '' ? null : +v;
+  $('fac-'+rid+'-'+i).value = o.monto_facturado != null ? fmtIn(o.monto_facturado) : '';
   o.ok = o.monto_facturado === o.comision;
   $('ok-'+rid+'-'+i).checked = o.ok;
   refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
@@ -231,6 +233,8 @@ async function guardarCheck(rid, i){
 async function guardarUAC(m, rid){
   const ant = String($('uacAnt-'+rid).value).replace(/[^\d]/g,'');
   const real = String($('uacReal-'+rid).value).replace(/[^\d]/g,'');
+  $('uacAnt-'+rid).value = ant ? fmtIn(ant) : '';
+  $('uacReal-'+rid).value = real ? fmtIn(real) : '';
   const tot = window['UACTOT_'+rid] || 0;
   $('uacPF-'+rid).textContent = fmt(tot - (+ant||0));
   const dif = (+real||0) - tot;
