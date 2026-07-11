@@ -651,18 +651,28 @@ exports.preaprobar = async (req, res) => {
     if (rentaDeclarada && rentaInterna && Math.abs(rentaDeclarada - rentaInterna) > rentaInterna * (POL.tolerancia_renta_pct / 100))
       notas.push('Nota: renta declarada (' + fmtCLP(rentaDeclarada) + ') difiere de la interna (' + fmtCLP(rentaInterna) + ') — verificar liquidaciones');
 
-    // 3) Informes comerciales limpios
+    // 3) Informes comerciales limpios — el informe DealerNet ES la fuente:
+    //    primero se traen los informes (paso 5 adelantado: informesEIA), se sincroniza
+    //    informacion_comercial desde el informe cód. 16 (motor único de evaluación
+    //    crediticia) y los protestos se leen de los informes. "El informe dice que no
+    //    hay protestos" = 0 protestos (cumple), no "sin dato".
+    const { guardarPreaprobacion, informesEIA, protestosDealernet } = require('../../../../shared/preaprobacion-repo');
+    const dn = await informesEIA(rut, POL);
+    try { await require('../../../evaluacion-crediticia/src/controllers/evaluacion.controller').sincronizarComercialDealernet(rut); } catch (_) {}
+    let protDN = null;
+    try { const pd = await protestosDealernet(rut); if (pd) protDN = pd.cantidad; } catch (_) {}
+
     const [[ic]] = await pool.query(
       "SELECT protestos_vigentes_q, deuda_morosa, deuda_vencida, deuda_castigada FROM informacion_comercial WHERE REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')=? LIMIT 1", [rutLimpio]);
-    // La preaprobación es para captar clientes NUEVOS desde el dealer: que el cliente no esté
-    // en nuestro sistema NO bloquea. Si tenemos info comercial interna se valida; si no, la
-    // evaluación externa (DealerNet + informe IA) es la que decide.
-    if (ic) {
-      if (+ic.protestos_vigentes_q > POL.max_protestos) motivos.push('Protestos vigentes: ' + ic.protestos_vigentes_q);
-      if (+ic.deuda_morosa > POL.max_deuda_morosa) motivos.push('Deuda morosa: ' + fmtCLP(ic.deuda_morosa));
-      if (+ic.deuda_vencida > POL.max_deuda_vencida) motivos.push('Deuda vencida: ' + fmtCLP(ic.deuda_vencida));
-      if (+ic.deuda_castigada > POL.max_deuda_castigada) motivos.push('Deuda castigada: ' + fmtCLP(ic.deuda_castigada));
-    }
+    // Valores efectivos: interno si existe, si no el derivado del informe DealerNet.
+    const protestos = (ic && ic.protestos_vigentes_q != null) ? +ic.protestos_vigentes_q : protDN;
+    const dMorosa   = (ic && ic.deuda_morosa    != null) ? +ic.deuda_morosa    : null;
+    const dVencida  = (ic && ic.deuda_vencida   != null) ? +ic.deuda_vencida   : null;
+    const dCastig   = (ic && ic.deuda_castigada != null) ? +ic.deuda_castigada : null;
+    if (protestos != null && protestos > POL.max_protestos) motivos.push('Protestos vigentes: ' + protestos);
+    if (dMorosa  != null && dMorosa  > POL.max_deuda_morosa)    motivos.push('Deuda morosa: ' + fmtCLP(dMorosa));
+    if (dVencida != null && dVencida > POL.max_deuda_vencida)   motivos.push('Deuda vencida: ' + fmtCLP(dVencida));
+    if (dCastig  != null && dCastig  > POL.max_deuda_castigada) motivos.push('Deuda castigada: ' + fmtCLP(dCastig));
 
     // 4) Cuotas con el MOTOR ÚNICO + elegibilidad AutoFin + carga ≤30% renta
     const { cotizarCuota } = require('../../../../shared/cotizador');
@@ -683,11 +693,9 @@ exports.preaprobar = async (req, res) => {
       else if (!opciones.length) motivos.push('Cuota supera el ' + POL.carga_max_pct + '% de la renta líquida en todos los plazos elegibles (tope ' + fmtCLP(topeCuota) + ')');
     }
 
-    // 5) Informes DealerNet + REPORTE IA (regla: SIN INFORME IA NO HAY APROBACIÓN)
-    //    + severidad DealerNet contra el umbral — mismos criterios que WhatsApp.
-    const { guardarPreaprobacion, informesEIA } = require('../../../../shared/preaprobacion-repo');
+    // 5) REPORTE IA (regla: SIN INFORME IA NO HAY APROBACIÓN) + severidad DealerNet
+    //    contra el umbral — mismos criterios que WhatsApp. (dn ya se trajo en el paso 3.)
     const SEV = ['bueno', 'regular', 'malo', 'grave'];
-    const dn = await informesEIA(rut, POL);
     if (!dn.ia_informe_id) motivos.push('Sin informe IA: ' + (dn.error || 'no disponible') + ' — no hay aprobación sin análisis crediticio');
     if (dn.peorSeveridad && SEV.indexOf(dn.peorSeveridad) > Math.max(0, SEV.indexOf(POL.wsp_severidad_max)))
       motivos.push('Severidad DealerNet ' + dn.peorSeveridad + ' supera el máximo permitido (' + POL.wsp_severidad_max + ')');
@@ -700,11 +708,11 @@ exports.preaprobar = async (req, res) => {
       { criterio: 'Precio dentro de rango', valor: precio, limite: POL.precio_min + '–' + POL.precio_max, cumple: precio >= POL.precio_min && precio <= POL.precio_max },
       { criterio: 'Antigüedad del vehículo', valor: antig + ' años', limite: antigMax + ' años', cumple: antig <= antigMax },
       { criterio: 'Renta líquida disponible', valor: renta || 0, limite: '> 0 (' + (fuenteRenta || 'sin fuente') + ')', cumple: !!renta },
-      // Sin info interna (cliente nuevo) = N/A, no falla: lo cubre la evaluación externa (DealerNet/IA).
-      { criterio: 'Protestos vigentes', valor: ic ? +ic.protestos_vigentes_q : 'sin dato interno', limite: '≤ ' + POL.max_protestos, cumple: !ic || +ic.protestos_vigentes_q <= POL.max_protestos },
-      { criterio: 'Deuda morosa', valor: ic ? +ic.deuda_morosa : 'sin dato interno', limite: '≤ ' + POL.max_deuda_morosa, cumple: !ic || +ic.deuda_morosa <= POL.max_deuda_morosa },
-      { criterio: 'Deuda vencida', valor: ic ? +ic.deuda_vencida : 'sin dato interno', limite: '≤ ' + POL.max_deuda_vencida, cumple: !ic || +ic.deuda_vencida <= POL.max_deuda_vencida },
-      { criterio: 'Deuda castigada', valor: ic ? +ic.deuda_castigada : 'sin dato interno', limite: '≤ ' + POL.max_deuda_castigada, cumple: !ic || +ic.deuda_castigada <= POL.max_deuda_castigada },
+      // Valores efectivos (interno → informe DealerNet). null = de verdad sin dato, no falla.
+      { criterio: 'Protestos vigentes', valor: protestos, limite: '≤ ' + POL.max_protestos, cumple: protestos == null || protestos <= POL.max_protestos },
+      { criterio: 'Deuda morosa', valor: dMorosa, limite: '≤ ' + POL.max_deuda_morosa, cumple: dMorosa == null || dMorosa <= POL.max_deuda_morosa },
+      { criterio: 'Deuda vencida', valor: dVencida, limite: '≤ ' + POL.max_deuda_vencida, cumple: dVencida == null || dVencida <= POL.max_deuda_vencida },
+      { criterio: 'Deuda castigada', valor: dCastig, limite: '≤ ' + POL.max_deuda_castigada, cumple: dCastig == null || dCastig <= POL.max_deuda_castigada },
       { criterio: 'Cuota ≤ ' + POL.carga_max_pct + '% de la renta', valor: opciones.length + ' plazos caben', limite: 'al menos 1', cumple: opciones.length > 0 },
       { criterio: 'Severidad DealerNet', valor: dn.peorSeveridad, limite: '≤ ' + POL.wsp_severidad_max, cumple: !!dn.peorSeveridad && SEV.indexOf(dn.peorSeveridad) <= Math.max(0, SEV.indexOf(POL.wsp_severidad_max)) },
       { criterio: 'Informe IA generado', valor: dn.ia_nivel_riesgo || null, limite: 'obligatorio', cumple: !!dn.ia_informe_id },

@@ -338,4 +338,4 @@ const validarAfp = async (req, res) => {
   }
 };
 
-module.exports = { ficha, getDocumentos, subirDocumento, verDocumento, removeDocumento, validarAfp };
+module.exports = { ficha, getDocumentos, subirDocumento, verDocumento, removeDocumento, validarAfp, sincronizarComercialDealernet };

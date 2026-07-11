@@ -82,4 +82,30 @@ async function informesEIA(rut, POL) {
   return out;
 }
 
-module.exports = { guardarPreaprobacion, informesEIA, nuevoCodigo };
+/* Protestos según los informes DealerNet guardados del RUT (≤60 días).
+   Si HAY informes y ninguno registra protestos → 0 (el informe dice "no hay" = cero,
+   no "sin dato"). Devuelve { cantidad, monto } o null si no hay informes. */
+async function protestosDealernet(rut) {
+  const dig = String(rut || '').replace(/[.\s-]/g, '').toUpperCase();
+  const num = dig.length > 1 ? dig.slice(0, -1) : dig;          // dealernet_informes guarda el RUT sin DV
+  const [rows] = await pool.query(
+    "SELECT codigo_producto, contenido FROM dealernet_informes WHERE rut=? AND retcode='0' AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY) ORDER BY created_at DESC LIMIT 12", [num]);
+  if (!rows.length) return null;
+  const numD = v => { const n = parseFloat(String(v == null ? '' : v)); return isFinite(n) ? n : 0; };
+  let cantidad = 0, monto = 0;
+  const vistos = new Set();
+  for (const r of rows) {
+    const cod = String(r.codigo_producto);
+    if (vistos.has(cod)) continue; vistos.add(cod);              // solo el más reciente por producto
+    let c = r.contenido; if (typeof c === 'string') { try { c = JSON.parse(c); } catch { continue; } }
+    (function walk(o) { if (o && typeof o === 'object') for (const k in o) { const v = o[k];
+      if (v && typeof v === 'object') walk(v);
+      else { const kl = String(k).toLowerCase();
+        if (/(cant|nro|num|total)_?\w*protest/.test(kl)) cantidad += numD(v);
+        else if (/protest/.test(kl) && /(monto|mto|valor)/.test(kl)) monto += numD(v);
+      } } })(c);
+  }
+  return { cantidad: Math.round(cantidad), monto: Math.round(monto) };
+}
+
+module.exports = { guardarPreaprobacion, informesEIA, nuevoCodigo, protestosDealernet };
