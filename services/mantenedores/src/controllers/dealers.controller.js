@@ -72,24 +72,28 @@ const getDealers = async (req, res) => {
       else { conds.push('d.categoria_asignada = ?'); params.push(categoria); }
     }
     const soloIA = con_ia === '1' || con_ia === 'true';
-    if (soloIA) conds.push(EXISTS_IA);
-    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    // Flag "tiene reporte IA": los RUT con informe se traen UNA vez (tabla chica) y el
+    // flag se calcula en JS. Antes era un EXISTS correlacionado por fila de dealers
+    // (678 ms y ~6K RU por consulta, visto en TiDB SQL Statements).
+    let rutsIA = new Set();
     try {
-      const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where}`, params);
-      const [rows] = await pool.query(
-        `SELECT d.*, ${EXISTS_IA} AS tiene_reporte_ia,
-                (SELECT df.socios FROM dealer_fichas df WHERE df.id_dealer = d.id_dealer AND df.socios IS NOT NULL ORDER BY df.updated_at DESC LIMIT 1) AS ficha_socios
-         FROM dealers d ${where} ORDER BY d.numero ASC LIMIT ? OFFSET ?`,
-        [...params, parseInt(limit), offset]);
-      return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
-    } catch (eIA) {
-      // Fallback si ia_informes_dealernet no existe aún: lista normal sin el flag IA.
-      console.error('[dealers getDealers IA fallback]', eIA.message);
-      const where2 = where.replace(EXISTS_IA, '1=1');
-      const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where2}`, params);
-      const [rows] = await pool.query(`SELECT d.* FROM dealers d ${where2} ORDER BY d.numero ASC LIMIT ? OFFSET ?`, [...params, parseInt(limit), offset]);
-      return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
+      const [ri] = await pool.query('SELECT DISTINCT rut FROM ia_informes_dealernet');
+      rutsIA = new Set(ri.map(r => String(r.rut)));
+    } catch (_) { /* tabla puede no existir aún */ }
+    if (soloIA) {
+      if (!rutsIA.size) return res.json({ success: true, data: { rows: [], total: 0, page: parseInt(page) }, error: null });
+      conds.push(`${RUT_BODY} IN (?)`); params.push([...rutsIA]);
     }
+    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM dealers d ${where}`, params);
+    const [rows] = await pool.query(
+      `SELECT d.*,
+              (SELECT df.socios FROM dealer_fichas df WHERE df.id_dealer = d.id_dealer AND df.socios IS NOT NULL ORDER BY df.updated_at DESC LIMIT 1) AS ficha_socios
+       FROM dealers d ${where} ORDER BY d.numero ASC LIMIT ? OFFSET ?`,
+      [...params, parseInt(limit), offset]);
+    const body = r => { const s = String(r || '').toUpperCase().replace(/[.\-\s]/g, ''); return s.slice(0, -1); };
+    rows.forEach(r => { r.tiene_reporte_ia = rutsIA.has(body(r.rut)) ? 1 : 0; });
+    return res.json({ success: true, data: { rows, total, page: parseInt(page) }, error: null });
   } catch (e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
