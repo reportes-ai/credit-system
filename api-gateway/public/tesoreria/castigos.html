@@ -7,7 +7,7 @@
   <title>Castigos de Saldo — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.3 — libro diario: una línea por cuenta (Debe/Haber separados) -->
+  <!-- v1.4 — banner corporativo + título Provisiones + Castigos -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -25,7 +25,7 @@
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main-content { padding:32px 40px; max-width:1400px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#7f1d1d,#b91c1c 60%,#ef4444); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,var(--accent)); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.4rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
     .page-banner p { opacity:.85; margin:0; font-size:.88rem; }
@@ -77,7 +77,7 @@
 <div class="main-content">
   <div class="page-banner">
     <i class="bi bi-file-earmark-minus"></i>
-    <div><h2>Castigos de Saldo</h2><p>Operaciones dadas de baja contablemente · motivo, comentario y firmas de aprobación</p></div>
+    <div><h2>Provisiones + Castigos</h2><p>Movimiento contable de provisiones y operaciones dadas de baja · motivo, comentario y firmas de aprobación</p></div>
   </div>
 
   <!-- ── Cuadro contable Provisiones / Castigos ── -->
