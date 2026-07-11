@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────
+# Respaldo nocturno de la BD (TiDB Cloud) — complementa el backup
+# automático de TiDB Starter, cuya retención es de SOLO 1 día.
+# Cada noche hace mysqldump completo y lo guarda como artefacto
+# privado del repo con 30 días de retención.
+#
+# Restauración:  descargar el artefacto → descomprimir →
+#   mysql -h <DB_HOST> -P 4000 -u <DB_USER> -p --ssl-mode=VERIFY_IDENTITY <DB_NAME> < backup.sql
+# (restaurar en un cluster/branch nuevo primero; NUNCA directo a prod sin revisar)
+# ─────────────────────────────────────────────────────────────────
+name: Backup BD nocturno
+
+on:
+  schedule:
+    - cron: '17 6 * * *'   # 06:17 UTC = 02:17 Chile (verano) — fuera de horario
+  workflow_dispatch: {}     # también se puede lanzar a mano (pestaña Actions)
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Instalar cliente MySQL
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
+
+      - name: Dump completo
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+        run: |
+          mysqldump -h "$DB_HOST" -P "${DB_PORT:-4000}" -u "$DB_USER" -p"$DB_PASSWORD" \
+            --ssl-mode=REQUIRED --single-transaction --quick --no-tablespaces \
+            --set-gtid-purged=OFF --column-statistics=0 \
+            "$DB_NAME" | gzip -9 > backup-$(date +%Y%m%d).sql.gz
+          ls -lh backup-*.sql.gz
+          # Sanidad: el dump debe terminar completo
+          gunzip -t backup-*.sql.gz
+          zcat backup-*.sql.gz | tail -1 | grep -q "Dump completed" && echo "✓ dump completo"
+
+      - name: Guardar artefacto (30 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-bd-${{ github.run_id }}
+          path: backup-*.sql.gz
+          retention-days: 30
+          compression-level: 0
