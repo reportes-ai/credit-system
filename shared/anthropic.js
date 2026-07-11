@@ -75,9 +75,20 @@ async function analizar({ codigo, system, prompt, documentos = [], max_tokens = 
 
   const texto = (resp.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
   let datos = null;
-  if (json) { try { datos = JSON.parse(texto.replace(/```json/gi, '').replace(/```/g, '').trim()); } catch (_) {} }
+  if (json) {
+    // Extracción robusta: quitar fences/preambulos (del primer { al último }) y
+    // tolerar comas colgantes. Si la respuesta vino CORTADA (stop_reason max_tokens),
+    // el JSON no tiene arreglo — se reporta para que el llamador suba max_tokens.
+    let t = texto.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a >= 0 && b > a) t = t.slice(a, b + 1);
+    try { datos = JSON.parse(t); }
+    catch (_) { try { datos = JSON.parse(t.replace(/,\s*([}\]])/g, '$1')); } catch (_) {} }
+    if (!datos && resp.stop_reason === 'max_tokens')
+      console.error(`[anthropic] respuesta JSON truncada por max_tokens=${max_tokens} (${codigo || 'sin codigo'}) — subir max_tokens`);
+  }
 
-  return { texto, datos, modelo: model, tokens_in, tokens_out, costo };
+  return { texto, datos, modelo: model, tokens_in, tokens_out, costo, stop_reason: resp.stop_reason };
 }
 
 /**

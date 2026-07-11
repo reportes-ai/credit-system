@@ -123,7 +123,8 @@ async function analizarRut({ rut, nombre, id_usuario = null, modelo } = {}) {
     return `### ${i.nombre_producto || i.codigo_producto}\n${s}`;
   }).join('\n\n');
 
-  const r = await analizar({ codigo: CODIGO, id_usuario, system: SYSTEM, prompt: promptDe(datos), json: true, max_tokens: 1500, modelo });
+  // max_tokens 4000: con 1500 los RUT con muchas causas judiciales cortaban el JSON → "sin_analisis"
+  const r = await analizar({ codigo: CODIGO, id_usuario, system: SYSTEM, prompt: promptDe(datos), json: true, max_tokens: 4000, modelo });
   const x = r.datos;
   if (!x) return { ok: false, motivo: 'sin_analisis', texto: r.texto };
 
