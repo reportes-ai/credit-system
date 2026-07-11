@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 -->
+<!-- v1.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -152,7 +152,9 @@ async function toggleConc(m, fin, concepto){
   if (!j.success) { body.innerHTML = '<div class="det-box">'+esc(j.error||'Error')+'</div>'; return; }
   const esUAC = fin.includes('UNIDAD');
   const rid = (key+'-'+concepto).replace(/[^\w-]/g,'');
-  window['DET_'+rid] = { m, fin, concepto, ops: j.data.ops };
+  const sols = j.data.solicitudes || {};
+  const solKey = esUAC ? 'ANTICIPO' : concepto;
+  window['DET_'+rid] = { m, fin, concepto, ops: j.data.ops, sol: sols[solKey] || null, antLock: !!sols['ANTICIPO'] };
 
   let h = '<div class="det-box">';
   if (esUAC && j.data.uac){
@@ -160,6 +162,7 @@ async function toggleConc(m, fin, concepto){
     window['ESUAC_'+rid] = true;
   }
 
+  h += `<div id="solBar-${rid}" style="margin-bottom:10px"></div>`;
   h += `<div style="overflow:auto"><table>
     <thead><tr><th>N° Op</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
     <th class="num">Comisión calculada</th><th class="num">%</th>${esUAC?'<th class="num">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
@@ -171,6 +174,7 @@ async function toggleConc(m, fin, concepto){
   body.innerHTML = h;
   j.data.ops.forEach((o,i)=>refrescarDif(rid,i));
   totalizar(rid);
+  renderSolicitar(rid);
 }
 
 function filaOp(rid, o, i){
@@ -179,7 +183,7 @@ function filaOp(rid, o, i){
     <td><b>${o.num_op}</b></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.cliente)}</td>
     <td class="num">${fmt(base)}</td><td class="num">${o.plazo||'—'}</td>
     <td class="num"><b>${fmt(o.comision)}</b></td><td class="num">${pctF(o.pct)}</td>
-    ${window['ESUAC_'+rid]?`<td class="num"><input class="form-control fact" id="ant-${rid}-${i}" value="${o.anticipo!=null?fmtIn(o.anticipo):''}" onchange="cambioAnt('${rid}',${i})"></td>`:''}
+    ${window['ESUAC_'+rid]?`<td class="num"><input class="form-control fact" id="ant-${rid}-${i}" value="${o.anticipo!=null?fmtIn(o.anticipo):''}" ${window['DET_'+rid].antLock?'disabled title="Anticipo enviado a facturar"':''} onchange="cambioAnt('${rid}',${i})"></td>`:''}
     <td style="text-align:center"><input type="checkbox" id="ok-${rid}-${i}" ${o.ok?'checked':''} onchange="marcarOK('${rid}',${i})"></td>
     <td class="num"><input class="form-control fact" id="fac-${rid}-${i}" value="${o.monto_facturado!=null?fmtIn(o.monto_facturado):''}" onchange="cambioFact('${rid}',${i})"></td>
     <td class="num" id="dif-${rid}-${i}"></td><td class="num" id="difp-${rid}-${i}"></td>
@@ -245,8 +249,47 @@ function totalizar(rid){
       <div class="uac-c"><div class="l">Real pagado por UAC</div><div class="v">${fmt(pagado)}</div></div>
       <div class="uac-c"><div class="l">Diferencia</div><div class="v ${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</div></div>`;
   }
+  renderSolicitar(rid);   // habilita/actualiza el botón de facturación en vivo
 }
 
+function renderSolicitar(rid){
+  const d = window['DET_'+rid];
+  const bar = $('solBar-'+rid); if (!bar) return;
+  const esUAC = !!window['ESUAC_'+rid];
+  const CONC = { COLOCACION:'comisiones por colocación de créditos', SEGUROS:'comisión por colocación de seguros', ANTICIPO:'el ANTICIPO (día 15)' };
+  if (d.sol){
+    const f = new Date(d.sol.created_at);
+    bar.innerHTML = `<span class="btn btn-sm btn-success disabled"><i class="bi bi-check2-circle me-1"></i>Enviado a facturar</span>
+      <span class="muted" style="font-size:.8rem;margin-left:8px">${f.toLocaleDateString('es-CL')} ${f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})} · ${esc(d.sol.usuario||'')} · ${fmt(d.sol.monto)}</span>`;
+    return;
+  }
+  let listo, monto, hint;
+  if (esUAC){
+    monto = d.ops.reduce((a,o)=>a+(+o.anticipo||0),0);
+    listo = monto > 0;
+    hint = listo ? '' : 'Digita los anticipos por operación para habilitar';
+  } else {
+    const llenas = d.ops.filter(o=>o.monto_facturado!=null).length;
+    monto = d.ops.reduce((a,o)=>a+(+o.monto_facturado||0),0);
+    listo = d.ops.length > 0 && llenas === d.ops.length;
+    hint = listo ? '' : `Completa todas las operaciones (${llenas}/${d.ops.length}) para habilitar`;
+  }
+  bar.innerHTML = `<button class="btn btn-sm btn-primary" ${listo?'':'disabled'} onclick="solicitarFact('${rid}')">
+      <i class="bi bi-envelope-arrow-up me-1"></i>Solicitar facturación ${esUAC?'del anticipo':''} — ${fmt(monto)}</button>
+    <span class="muted" style="font-size:.78rem;margin-left:8px">${hint || 'Se enviará a grupo.contabilidad@autofacilchile.cl'}</span>`;
+}
+async function solicitarFact(rid){
+  const d = window['DET_'+rid];
+  const esUAC = !!window['ESUAC_'+rid];
+  const concepto = esUAC ? 'ANTICIPO' : d.concepto;
+  if (!confirm('Se enviará a Contabilidad la solicitud de facturación' + (esUAC?' del ANTICIPO':'') + ' con el detalle de las operaciones. ' + (esUAC?'Los anticipos quedarán BLOQUEADOS. ':'') + '¿Confirmar?')) return;
+  const j = await fetch('/api/facturacion-af/solicitar', { method:'POST', headers:H, body: JSON.stringify({ mes: d.m, financiera: d.fin, concepto }) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error || 'Error al solicitar');
+  d.sol = { monto: j.data.total, usuario: 'tú', created_at: new Date().toISOString() };
+  if (esUAC){ d.antLock = true; d.ops.forEach((o,i)=>{ const el=$('ant-'+rid+'-'+i); if(el) el.disabled = true; }); }
+  renderSolicitar(rid);
+  alert('Solicitud enviada a Contabilidad ✓');
+}
 async function guardarCheck(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   await fetch('/api/facturacion-af/check', { method:'POST', headers:H, body: JSON.stringify({

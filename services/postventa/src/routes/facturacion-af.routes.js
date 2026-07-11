@@ -7,6 +7,7 @@ const ctrl = require('../controllers/facturacion-af.controller');
 router.get('/resumen',  verifyToken, requireFunc('postventa_facturacion_af'), ctrl.resumen);
 router.get('/detalle',  verifyToken, requireFunc('postventa_facturacion_af'), ctrl.detalle);
 router.post('/check',   verifyToken, requireFunc('postventa_facturacion_af'), ctrl.check);
+router.post('/solicitar', verifyToken, requireFunc('postventa_facturacion_af'), ctrl.solicitar);
 router.put('/uac',      verifyToken, requireFunc('postventa_facturacion_af'), ctrl.uacSet);
 
 module.exports = router;
