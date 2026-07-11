@@ -278,9 +278,7 @@ Reglas de diseño que se derivan de este principio:
   - Ejemplos: carga Excel de prueba, revisión de comisiones de un mes, generación de carta
   - No requiere código, solo disciplina de proceso
 
-- [ ] **Paginación y límites en todos los endpoints**
-  - Auditar endpoints que hacen `SELECT *` sin `LIMIT` — con volumen alto pueden timeoutear
-  - Agregar `LIMIT` defensivo en endpoints de reportería y búsquedas
+- [x] ✅ **Paginación y límites en todos los endpoints** (2026-07-10, v111.1: auditoría completa; LIMIT defensivo en old-base-unica/getReporteria/otorgados-incompletos; índices para DISTINCT scans; el resto ya estaba paginado o acotado)
 
 - [ ] **Logs de auditoría para acciones críticas**
   - Registrar en una tabla `audit_log` las acciones: quién hizo qué y cuándo
