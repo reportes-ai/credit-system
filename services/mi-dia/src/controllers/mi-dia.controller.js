@@ -66,7 +66,8 @@ const WIDGETS = [
     get: () => uno("SELECT COUNT(*) n FROM ordenes_pago WHERE estado='EMITIDA'") },
   { codigo: 'digitacion', nombre: 'Créditos con datos faltantes', icono: 'bi-pencil-square', color: '#a16207', href: '/carga-masiva/digitacion/cola',
     scope: 'pool', permiso: ['digitacion_faltantes', 'carga_masiva'], perfiles: [1, 6, 90008],
-    get: () => uno("SELECT COUNT(*) n FROM creditos WHERE estado_credito='OTORGADO' AND (plazo IS NULL OR plazo=0 OR tascli_real IS NULL OR tascli_real=0 OR monto_financiado IS NULL OR monto_financiado=0)") },
+    // Motor único: mismo conteo que la cola de digitación (requeridos, meses cerrados, anulados)
+    get: async () => { const c = await require('../../../creditos/src/controllers/digitacion-faltantes.controller').contarPendientes(); return (c.otorgados || 0) + (c.otros || 0); } },
   { codigo: 'mis_colocaciones', nombre: 'Mis colocaciones del mes', icono: 'bi-graph-up-arrow', color: '#15803d', href: '/dashboard/', destacado: true,
     scope: 'personal', perfiles: [4, 3, 90010],
     get: async (u) => {

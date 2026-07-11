@@ -127,6 +127,16 @@ function esVacio(col, v) {
 }
 const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.status(500).json({ success:false, data:null, error:'Error interno del servidor' }); };
 
+/* Conteo reutilizable (motor único de la cola) — lo consume Mi Día */
+exports.contarPendientes = async () => {
+  const out = {};
+  for (const tipo of ['otorgados', 'otros']) {
+    const [[{ n }]] = await pool.query(`SELECT COUNT(*) n FROM creditos ob WHERE ${pendingWhere(tipo)}`);
+    out[tipo] = n;
+  }
+  return out;
+};
+
 /* ── GET /conteo → { otorgados, otros } ─────────────────────────────────── */
 exports.conteo = async (req, res) => {
   try {
