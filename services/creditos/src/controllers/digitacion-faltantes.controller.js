@@ -230,6 +230,18 @@ exports.guardar = async (req, res) => {
       [id, antes.num_op, tipo, req.usuario.id_usuario, usuario, llenados, faltAntes.length, seg]).catch(() => {});
 
     await pool.query(`UPDATE creditos SET digit_lock_por=NULL, digit_lock_nombre=NULL, digit_lock_at=NULL WHERE id=?`, [id]);
+    // Cuota francesa: se calcula sola (motor único rentabilidad-core) si quedó vacía
+    // y ya hay monto + tasa + plazo. Nunca pisa una cuota existente.
+    if (sets.length) {
+      try {
+        const [[d]] = await pool.query('SELECT monto_financiado, tascli_real, plazo, cuota FROM creditos WHERE id=?', [id]);
+        if (d && !(Number(d.cuota) > 0) && Number(d.monto_financiado) > 0 && Number(d.tascli_real) > 0 && Number(d.plazo) > 0) {
+          const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+          const c = Math.round(core.cuotaFrancesa(Number(d.monto_financiado), Number(d.tascli_real) / 100, Number(d.plazo)));
+          if (c > 0) await pool.query('UPDATE creditos SET cuota=? WHERE id=?', [c, id]);
+        }
+      } catch (e) { console.error('[digit cuota francesa]', e.message); }
+    }
     // Recalcular el mes tras completar datos faltantes (comisiones/ingresos) — automático.
     if (sets.length) recalcularPorOps(id).catch(e => console.error('[recalc digitacion]', e.message));
     res.json({ success:true, data:{ id, cambios: cambios.length, llenados, faltantes: faltAntes.length }, error:null });
