@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.8 -->
+<!-- v46.9 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -458,8 +458,8 @@
                          : '<i class="bi bi-x-circle-fill chk-no"></i>');
         return '<tr><td>' + escapeHtml(c.criterio) + '</td><td>' + escapeHtml(val ?? '—') + '</td><td>' + escapeHtml(fmtVal(c.criterio, c.limite) ?? '—') + '</td><td>' + icono + '</td></tr>';
       }).join('') || '<tr><td colspan="4" class="text-muted">Sin checklist (registro antiguo)</td></tr>') + '</tbody></table>';
-    h += '<h6>Informes DealerNet usados</h6><table class="pre-table"><thead><tr><th>Producto</th><th>Disponible</th><th>Severidad</th><th>Fecha</th></tr></thead><tbody>' +
-      (infs.map(x => '<tr><td>' + escapeHtml(x.nombre || x.codigo) + '</td><td>' + (x.disponible ? 'Sí' : 'No') + '</td><td>' + escapeHtml(x.severidad || '—') + '</td><td>' + (x.fecha ? new Date(x.fecha).toLocaleDateString('es-CL') : '—') + '</td></tr>').join('') || '<tr><td colspan="4" class="text-muted">Sin informes registrados</td></tr>') + '</tbody></table>';
+    h += '<h6>Informes DealerNet usados</h6><table class="pre-table"><thead><tr><th>Producto</th><th>Disponible</th><th>Severidad</th><th>Motivo</th><th>Fecha</th></tr></thead><tbody>' +
+      (infs.map(x => '<tr><td>' + escapeHtml(x.nombre || x.codigo) + '</td><td>' + (x.disponible ? 'Sí' : 'No') + '</td><td>' + escapeHtml(x.severidad || '—') + '</td><td style="font-size:.76rem;color:#6b7280">' + escapeHtml(x.nota || '—') + '</td><td>' + (x.fecha ? new Date(x.fecha).toLocaleDateString('es-CL') : '—') + '</td></tr>').join('') || '<tr><td colspan="5" class="text-muted">Sin informes registrados</td></tr>') + '</tbody></table>';
     h += '<h6>Informe IA</h6><div style="font-size:.8rem">' + (p.ia_informe_id
       ? 'Riesgo <b>' + escapeHtml(p.ia_nivel_riesgo || '—') + '</b> · <a href="#" onclick="event.preventDefault();AF_REP_IA.abrir({tag:\'Cliente\',rut:\'' + escapeHtml(p.rut_cliente) + '\'})">ver reporte crediticio IA</a>'
       : '<span class="chk-no">Sin informe IA — no hubo aprobación</span>') + '</div>';

@@ -761,16 +761,17 @@ function analizarInforme(codigo, contenido) {
   const numD = v => { const n = parseFloat(String(v == null ? '' : v)); return isFinite(n) ? n : 0; };
 
   let montoNeg = 0, cantAnot = 0, indNeg = false, indLimpio = false;
+  const gatillos = [];   // qué campo/valor causó la severidad, para explicarla en pantalla
   for (const [k, v] of flat) {
     // Montos negativos por nombre de campo (deuda vencida / castigada / morosa / mora_xx / impaga / protesto).
-    if (/(vencid|castig|moros|mora_?\d|impag|protest)/.test(k)) montoNeg += numD(v);
+    if (/(vencid|castig|moros|mora_?\d|impag|protest)/.test(k)) { const n = numD(v); montoNeg += n; if (n > 0) gatillos.push(k.replace(/^@_/, '') + ' = ' + n); }
     // Conteo explícito de anotaciones/protestos/registros negativos.
-    if (/(cant.*(anot|protest|moros)|nro_?(anot|protest)|num_?(anot|protest)|total_?(anot|protest))/.test(k) && numD(v) > 0) cantAnot += numD(v);
+    if (/(cant.*(anot|protest|moros)|nro_?(anot|protest)|num_?(anot|protest)|total_?(anot|protest))/.test(k) && numD(v) > 0) { cantAnot += numD(v); gatillos.push(numD(v) + ' anotación(es) en ' + k.replace(/^@_/, '')); }
     // Indicador textual del boletín (ej. inddeu: "Sin deuda" | "Con deuda").
     if (/inddeu|indicador|estado|glosa|situacion/.test(k)) {
       const vl = String(v).toLowerCase();
       if (/sin deuda|no registra|sin registro|sin anotac|sin observ|al d[ií]a/.test(vl)) indLimpio = true;
-      else if (/con deuda|moros|vencid|castig|impag|protest/.test(vl)) indNeg = true;
+      else if (/con deuda|moros|vencid|castig|impag|protest/.test(vl)) { indNeg = true; gatillos.push(k.replace(/^@_/, '') + ': "' + String(v) + '"'); }
     }
   }
 
@@ -778,8 +779,9 @@ function analizarInforme(codigo, contenido) {
   const tieneRegistros = negativo;                 // solo lo NEGATIVO penaliza (deuda vigente/al día = sano)
   const grave = esPenal && negativo;
   const severidad = grave ? 'grave' : (negativo ? 'malo' : 'bueno');
-  const nota = grave ? 'registros penales/judiciales'
-    : (negativo ? 'con observaciones (mora/vencida/castigada/protestos)'
+  const detalle = gatillos.slice(0, 4).join('; ');
+  const nota = grave ? 'registros penales/judiciales' + (detalle ? ': ' + detalle : '')
+    : (negativo ? 'con observaciones: ' + (detalle || 'mora/vencida/castigada/protestos')
     : (indLimpio ? 'sin deuda / al día' : 'sin observaciones negativas'));
   return { tieneRegistros, grave, severidad, nota };
 }
