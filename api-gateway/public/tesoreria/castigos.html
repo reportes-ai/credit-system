@@ -7,7 +7,7 @@
   <title>Castigos de Saldo — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.2 — cuadro contable: inicial = cierre mes pasado, final = al día de hoy -->
+  <!-- v1.3 — libro diario: una línea por cuenta (Debe/Haber separados) -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -209,13 +209,27 @@ async function cargarContable() {
     card('Provisiones (saldo final)', P.saldo_final) +
     card('Castigos (saldo final)', C.saldo_final) +
     card('Total cuentas', P.saldo_final + C.saldo_final, 'res');
-  // Movimientos: constitución de provisión + cada castigo (Debe Provisiones / Haber Cartera)
+  // Movimientos como libro diario: cada LÍNEA es UNA cuenta (Debe o Haber, nunca ambos)
   const filas = [];
-  filas.push(`<tr style="background:#f0fdf4"><td><b>Constitución de provisión del período</b><br><span style="color:#94a3b8;font-size:.75rem">Debe Resultado / Haber Provisiones</span></td><td>—</td><td class="text-right">${fmtP(P.haber)}</td><td class="text-right">${fmtP(P.haber)}</td></tr>`);
+  const asiento = (glosa, detalle, lineas, bg) => {
+    lineas.forEach((l, i) => filas.push(
+      `<tr${bg ? ` style="background:${bg}"` : ''}>
+        <td>${i === 0 ? `<b>${glosa}</b>` : ''}<div style="color:#64748b;font-size:.78rem;padding-left:${i ? 18 : 0}px">${l.cuenta}</div></td>
+        <td>${i === 0 ? detalle : ''}</td>
+        <td class="text-right">${l.debe != null ? fmtP(l.debe) : ''}</td>
+        <td class="text-right">${l.haber != null ? fmtP(l.haber) : ''}</td>
+      </tr>`));
+  };
+  asiento('Constitución de provisión del período', '—', [
+    { cuenta: 'Gasto por deterioro de deudores (Resultado)', debe: P.haber },
+    { cuenta: 'Provisión deudores incobrables (compl. de activo)', haber: P.haber },
+  ], '#f0fdf4');
   (d.movimientos||[]).forEach(m => {
-    filas.push(`<tr><td>Castigo de saldo<br><span style="color:#94a3b8;font-size:.75rem">Debe Provisiones / Haber Cartera</span></td>
-      <td><b>${esc(m.num_op)}</b> · ${esc(m.cliente||'')}<br><span style="color:#94a3b8;font-size:.75rem">${esc(m.motivo)} · ${fmtDT(m.aplicado_at)}</span></td>
-      <td class="text-right">${fmtP(m.saldo_castigado)}</td><td class="text-right">${fmtP(m.saldo_castigado)}</td></tr>`);
+    asiento('Castigo de saldo',
+      `<b>${esc(m.num_op)}</b> · ${esc(m.cliente||'')}<br><span style="color:#94a3b8;font-size:.75rem">${esc(m.motivo)} · ${fmtDT(m.aplicado_at)}</span>`, [
+      { cuenta: 'Provisión deudores incobrables', debe: m.saldo_castigado },
+      { cuenta: 'Deudores por crédito (Cartera)', haber: m.saldo_castigado },
+    ]);
   });
   if (!d.movimientos || !d.movimientos.length) filas.push(`<tr><td colspan="4" style="color:#9ca3af;text-align:center;padding:16px">Sin castigos aplicados en el mes.</td></tr>`);
   document.getElementById('cMovs').innerHTML = filas.join('');
