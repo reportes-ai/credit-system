@@ -234,12 +234,13 @@ async function aplicarCanal(mapaCanal, log) {
   let complementados = 0, sinMatch = 0, omitidosCerrado = 0;
   const cerradoCache = {};
   const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
-  const TEXTOS = ['tipo_vehiculo', 'rut_cliente', 'marca', 'modelo'];
+  // rut_cliente ya NO existe en creditos (homologación: el cliente vive via id_cliente)
+  const TEXTOS = ['tipo_vehiculo', 'marca', 'modelo'];
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
     const [rows] = await pool.query(
       `SELECT id, num_op, id_financiera, mes, seguro_cesantia, seguro_rdh, seguro_rep_menor,
-              gps, tipo_vehiculo, rut_cliente, marca, modelo
+              gps, tipo_vehiculo, marca, modelo
        FROM creditos WHERE num_op IN (?) OR id_financiera IN (?)`,
       [chunk, chunk.map(String)]);
     const vistos = new Set();
