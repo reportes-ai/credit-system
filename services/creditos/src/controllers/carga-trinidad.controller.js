@@ -197,7 +197,8 @@ function parseCanal(buffer) {
   const iId = col('ID'), iCes = col('SEGUROCESANTIA'), iRdh = col('SEGURORDH'),
         iRep = col('SEGUROREPARACIONMENOR'), iGps = pick('GPS'),
         iTipo = pick('TIPOVEHICULO', 'TIPO', 'VEHICULO'),
-        iRut = pick('RUTCLIENTE', 'RUT', 'CLIENTE'), iMarca = pick('MARCA'), iModelo = pick('MODELO');
+        iRut = pick('RUTCLIENTE', 'RUT', 'CLIENTE'), iMarca = pick('MARCA'), iModelo = pick('MODELO'),
+        iTasa = pick('TASACLIENTE'), iCurse = pick('FECHACURSE'), iTerm = pick('FECHATERMINOCONTRATO');
   if (iId < 0) return {};
   const mapa = {};
   for (const row of raw.slice(hIdx + 1)) {
@@ -212,6 +213,15 @@ function parseCanal(buffer) {
       rut_cliente:      iRut  >= 0 ? normRut(row[iRut])  : null,
       marca:            iMarca >= 0 ? normStr(row[iMarca]) : null,
       modelo:           iModelo >= 0 ? normStr(row[iModelo]) : null,
+      // Tasa cliente (% mensual) y plazo en meses (Fecha Término − Fecha Curse, ambos serial Excel):
+      // diferencia por año*12+mes → exacto para plazos estándar (validado vs BD: 24/24, 36/36).
+      tascli_real:      iTasa >= 0 ? (parseFloat(String(row[iTasa]).replace(',', '.')) || null) : null,
+      plazo:            (() => {
+        if (iCurse < 0 || iTerm < 0 || !row[iCurse] || !row[iTerm]) return null;
+        const d1 = new Date(Math.round((row[iCurse] - 25569) * 864e5)), d2 = new Date(Math.round((row[iTerm] - 25569) * 864e5));
+        const m = (d2.getUTCFullYear() - d1.getUTCFullYear()) * 12 + (d2.getUTCMonth() - d1.getUTCMonth());
+        return m > 0 && m <= 120 ? m : null;
+      })(),
     };
   }
   return mapa;
@@ -236,11 +246,14 @@ async function aplicarCanal(mapaCanal, log) {
   const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
   // rut_cliente ya NO existe en creditos (homologación: el cliente vive via id_cliente)
   const TEXTOS = ['tipo_vehiculo', 'marca', 'modelo'];
+  // Tasa y plazo del Canal: fill-only (nunca pisan lo digitado). El recálculo posterior
+  // respeta meses cerrados por sí solo, igual que la digitación de faltantes.
+  const NUMS = ['tascli_real', 'plazo'];
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
     const [rows] = await pool.query(
       `SELECT id, num_op, id_financiera, mes, seguro_cesantia, seguro_rdh, seguro_rep_menor,
-              gps, tipo_vehiculo, marca, modelo
+              gps, tipo_vehiculo, marca, modelo, tascli_real, plazo, cuota, monto_financiado
        FROM creditos WHERE num_op IN (?) OR id_financiera IN (?)`,
       [chunk, chunk.map(String)]);
     const vistos = new Set();
@@ -260,6 +273,17 @@ async function aplicarCanal(mapaCanal, log) {
       const sets = [], vals = [];
       if (!cerrado) for (const c of MONTOS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
       for (const c of TEXTOS) if (f[c] && !normStr(r[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      for (const c of NUMS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      // Cuota francesa (motor único) si queda completa la tripleta monto+tasa+plazo y no hay cuota
+      const tasaFin = (f.tascli_real || 0) > 0 && !(Number(r.tascli_real) > 0) ? f.tascli_real : Number(r.tascli_real);
+      const plazoFin = (f.plazo || 0) > 0 && !(Number(r.plazo) > 0) ? f.plazo : Number(r.plazo);
+      if (!(Number(r.cuota) > 0) && Number(r.monto_financiado) > 0 && tasaFin > 0 && plazoFin > 0) {
+        try {
+          const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+          const cu = Math.round(core.cuotaFrancesa(Number(r.monto_financiado), tasaFin / 100, plazoFin));
+          if (cu > 0) { sets.push('cuota = ?'); vals.push(cu); }
+        } catch (_) {}
+      }
       if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
       await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, r.id]);
