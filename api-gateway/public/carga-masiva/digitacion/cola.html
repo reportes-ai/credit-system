@@ -153,15 +153,19 @@ function renderVacio(pendientes){
     <div class="empty">
       <i class="bi bi-check-circle-fill"></i>
       <h3>¡No hay créditos pendientes!</h3>
-      <p style="color:#64748b">No quedan ${TIPO==='otorgados'?'créditos otorgados':'otros créditos'} con datos faltantes.</p>
+      <p style="color:#64748b">${getSaltados().length && pendientes>0 ? 'Solo quedan los que saltaste en esta sesión ('+pendientes+' pendientes).' : 'No quedan '+(TIPO==='otorgados'?'créditos otorgados':'otros créditos')+' con datos faltantes.'}</p>
+      ${getSaltados().length ? '<button class="btn btn-skip" onclick="sessionStorage.removeItem(SKIP_KEY);cargarSiguiente()"><i class="bi bi-arrow-repeat"></i> Ver saltados de nuevo</button> ' : ''}
       <a class="btn btn-skip" style="text-decoration:none" href="/carga-masiva/digitacion/"><i class="bi bi-arrow-left"></i> Volver</a>
     </div>`;
 }
 
+const SKIP_KEY = 'digit_saltados_'+TIPO;
+const getSaltados = () => { try { return JSON.parse(sessionStorage.getItem(SKIP_KEY)||'[]'); } catch(_){ return []; } };
 async function cargarSiguiente(){
   document.getElementById('main').innerHTML = '<div class="card"><div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-hourglass-split"></i> Buscando el siguiente…</div></div>';
   try {
-    const r = await fetch('/api/digitacion-faltantes/siguiente?tipo='+TIPO, { headers:H });
+    const ex = getSaltados();
+    const r = await fetch('/api/digitacion-faltantes/siguiente?tipo='+TIPO+(ex.length?'&excluir='+ex.join(','):''), { headers:H });
     const j = await r.json();
     if (!j.success) { document.getElementById('main').innerHTML = '<div class="empty"><h3>'+esc(j.error||'Error')+'</h3><a class="btn btn-skip" href="/carga-masiva/digitacion/">Volver</a></div>'; return; }
     if (!j.data.credito) renderVacio(j.data.pendientes); else render(j.data);
@@ -193,6 +197,7 @@ async function guardar(){
 }
 async function saltar(){
   if (!ACTUAL) return;
+  try { const s = getSaltados(); if (!s.includes(ACTUAL.id)) s.push(ACTUAL.id); sessionStorage.setItem(SKIP_KEY, JSON.stringify(s.slice(-300))); } catch(_){}
   try { await fetch('/api/digitacion-faltantes/'+ACTUAL.id+'/liberar?motivo=saltar&tipo='+TIPO, { method:'POST', headers:H }); } catch(_){}
   cargarSiguiente();
 }

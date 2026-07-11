@@ -147,12 +147,16 @@ exports.siguiente = async (req, res) => {
     // No acumular: liberar cualquier bloqueo previo de este usuario.
     await pool.query(`UPDATE creditos SET digit_lock_por=NULL, digit_lock_nombre=NULL, digit_lock_at=NULL WHERE digit_lock_por=?`, [uid]);
 
+    // Saltados en esta sesión: no volver a ofrecerlos (si no, "Saltar" gira en círculo).
+    const excluir = String(req.query.excluir || '').split(',').map(Number).filter(n => n > 0).slice(0, 300);
+    const exSQL = excluir.length ? ` AND ob.id NOT IN (${excluir.join(',')})` : '';
+
     // Claim atómico del más antiguo no bloqueado (o con bloqueo vencido).
     let id = null;
     for (let i = 0; i < 8 && !id; i++) {
       const [[cand]] = await pool.query(`
         SELECT ob.id FROM creditos ob
-        WHERE ${pendingWhere(tipo)}
+        WHERE ${pendingWhere(tipo)}${exSQL}
           AND (ob.digit_lock_por IS NULL OR ob.digit_lock_at < (NOW() - INTERVAL ${LOCK_MIN} MINUTE))
         ORDER BY COALESCE(ob.fecha_otorgado, ob.mes, ob.created_at) ASC, ob.id ASC
         LIMIT 1`);
