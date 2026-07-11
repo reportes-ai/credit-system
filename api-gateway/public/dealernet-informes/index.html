@@ -131,7 +131,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
         <h3 style="margin:0"><i class="bi bi-archive"></i> Informes históricos <span class="muted" id="histRut"></span></h3>
         <div style="display:flex;gap:8px">
-          <button class="btn-ghost" id="btnRepIA" onclick="verReporteIA()" style="background:linear-gradient(135deg,#7c2d12,#c2410c);color:#fff;border:none"><i class="bi bi-stars me-1"></i>Reporte IA</button>
+          <button class="btn-ghost" id="btnRepIA" onclick="verReporteIA()" style="display:none;background:linear-gradient(135deg,#7c2d12,#c2410c);color:#fff;border:none"><i class="bi bi-stars me-1"></i>Reporte IA</button>
           <button class="btn-ghost" id="btnTodos" onclick="descargarTodos()" style="display:none"><i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar todos</button>
         </div>
       </div>
@@ -1064,6 +1064,15 @@ cargarProductos();
 </script>
 <script src="/js/reporte-ia.js"></script>
 <script>
+// El botón Reporte IA es configurable por permiso (funcionalidad 'dealernet_reporte_ia', matriz de Perfiles).
+(async () => {
+  try {
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    if (yo?.perfil === 'Administrador') { document.getElementById('btnRepIA').style.display = ''; return; }
+    const j = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } }).then(r=>r.json());
+    if ((j.funcionalidades||[]).includes('dealernet_reporte_ia')) document.getElementById('btnRepIA').style.display = '';
+  } catch(_){}
+})();
 // Reporte IA bajo demanda: reusa uno reciente (≤15 días) o lo genera y lo abre en el formato AF_REP_IA.
 async function verReporteIA(){
   const rut = (document.getElementById('rut').value || '').trim();

@@ -159,6 +159,7 @@ const EXTRA_CODIGOS = ['16', '2101'];
        VALUES (380001, 'Informes DealerNet', 'Consulta de antecedentes por RUT vía Web Service, con repositorio compartido de informes', 'bi-clipboard-data', '/dealernet-informes/', 105, 'activo')`);
     const funcs = [
       ['Informes DealerNet', 'dealernet_informes_ver', '/dealernet-informes/', 'bi-clipboard-data'],
+      ['Reporte IA (DealerNet)', 'dealernet_reporte_ia', null, 'bi-stars'],   // muestra el botón "Reporte IA"
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -172,6 +173,7 @@ const EXTRA_CODIGOS = ['16', '2101'];
     const [[fc]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_consultar' LIMIT 1");
     const seed = {
       [idFunc['dealernet_informes_ver']]: [1, 4, 6, 90008],
+      [idFunc['dealernet_reporte_ia']]: [1],   // por defecto solo Admin; se abre desde la matriz de Perfiles
       ...(fc ? { [fc.id_funcionalidad]: [1, 6, 90008] } : {}),
     };
     for (const [idf, perfiles] of Object.entries(seed)) {
