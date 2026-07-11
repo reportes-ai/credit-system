@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.5 -->
+<!-- v46.7 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -448,7 +448,7 @@
     h += '<h6>Informes DealerNet usados</h6><table class="pre-table"><thead><tr><th>Producto</th><th>Disponible</th><th>Severidad</th><th>Fecha</th></tr></thead><tbody>' +
       (infs.map(x => '<tr><td>' + escapeHtml(x.nombre || x.codigo) + '</td><td>' + (x.disponible ? 'Sí' : 'No') + '</td><td>' + escapeHtml(x.severidad || '—') + '</td><td>' + (x.fecha ? new Date(x.fecha).toLocaleDateString('es-CL') : '—') + '</td></tr>').join('') || '<tr><td colspan="4" class="text-muted">Sin informes registrados</td></tr>') + '</tbody></table>';
     h += '<h6>Informe IA</h6><div style="font-size:.8rem">' + (p.ia_informe_id
-      ? 'Riesgo <b>' + escapeHtml(p.ia_nivel_riesgo || '—') + '</b> · <a href="/ia/informe-dealernet/?rut=' + encodeURIComponent(p.rut_cliente) + '" target="_blank">ver reporte crediticio IA</a>'
+      ? 'Riesgo <b>' + escapeHtml(p.ia_nivel_riesgo || '—') + '</b> · <a href="#" onclick="event.preventDefault();AF_REP_IA.abrir({tag:\'Cliente\',rut:\'' + escapeHtml(p.rut_cliente) + '\'})">ver reporte crediticio IA</a>'
       : '<span class="chk-no">Sin informe IA — no hubo aprobación</span>') + '</div>';
     h += '<h6>Renta</h6><div style="font-size:.8rem">' + fmtP(p.renta) + (p.fuente_renta ? ' (' + escapeHtml(p.fuente_renta) + ')' : '') + '</div>';
     document.getElementById('preDetBody' + i).innerHTML = h;
@@ -872,6 +872,7 @@
     self: { key:'evaluacion-crediticia', selfHref:'/evaluacion-crediticia/', title:'Evaluación Crediticia', icon:'bi-clipboard-pulse', defaultSection:'home' }
   };
 </script>
+<script src="/js/reporte-ia.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
