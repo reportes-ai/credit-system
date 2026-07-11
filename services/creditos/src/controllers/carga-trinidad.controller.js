@@ -248,15 +248,18 @@ async function aplicarCanal(mapaCanal, log) {
       const f = mapaCanal[key];
       if (!f) continue;
       vistos.add(key);
-      // mes cerrado → no tocar
+      // Mes cerrado → no tocar MONTOS (afectan comisiones liquidadas). Los TEXTOS
+      // (vehículo/RUT) no son financieros: se rellenan igual aunque el mes esté cerrado.
+      let cerrado = false;
       const mesStr = r.mes ? String(r.mes).slice(0, 7) : null;
       if (mesStr) {
         if (cerradoCache[mesStr] === undefined) cerradoCache[mesStr] = await isMesCerrado(mesStr);
-        if (cerradoCache[mesStr]) { omitidosCerrado++; continue; }
+        cerrado = cerradoCache[mesStr];
       }
       const sets = [], vals = [];
-      for (const c of MONTOS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      if (!cerrado) for (const c of MONTOS) if ((f[c] || 0) > 0 && !(Number(r[c]) > 0)) { sets.push(`${c} = ?`); vals.push(f[c]); }
       for (const c of TEXTOS) if (f[c] && !normStr(r[c])) { sets.push(`${c} = ?`); vals.push(f[c]); }
+      if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
       await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, r.id]);
       complementados++;
