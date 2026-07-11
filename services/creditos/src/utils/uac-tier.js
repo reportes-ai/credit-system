@@ -36,15 +36,17 @@ function pctUACMes(cnt, p) {
   return param(p, 'pct_tier1', 14) / 100;
 }
 
-/* Tope por plazo del Modelo 2: una op con plazo >= corte no recibe el tier
-   alto — su % queda en min(pctTier, uac2_pct_largo). En Modelo 1 es no-op. */
+/* Corte por plazo del Modelo 2: una op con plazo >= corte NO participa del
+   sistema de tiers — su % es FIJO uac2_pct_largo (hoy 18%), sea el tier del
+   mes mayor o menor. (Corregido 2026-07-11: antes se aplicaba como tope
+   min(tier, largo) y una op de 36 cuotas en tier 1 quedaba en 14% en vez de
+   su 18% fijo.) En Modelo 1 es no-op. */
 function aplicarCortePlazoUAC(pct, plazo, p) {
   if (modeloActivo(p) !== 2) return pct;
   const corte = Math.round(Number(p.uac2_plazo_corte)) || 36;
   if (!plazo || Number(plazo) < corte) return pct;
-  const tope = (p.uac2_pct_largo !== undefined && p.uac2_pct_largo !== null && !isNaN(p.uac2_pct_largo)
+  return (p.uac2_pct_largo !== undefined && p.uac2_pct_largo !== null && !isNaN(p.uac2_pct_largo)
     ? Number(p.uac2_pct_largo) : 16) / 100;
-  return Math.min(pct, tope);
 }
 
 /* % efectivo de UNA operación: tier del mes + corte por plazo (modelo 2). */

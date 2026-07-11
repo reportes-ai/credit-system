@@ -304,8 +304,8 @@ function tierUACpct(ops, plazo) {
   if (Math.round(Number(P.uac_modelo)) === 2) {
     const corte = Math.round(Number(P.uac2_plazo_corte)) || 36;
     if (plazo && Number(plazo) >= corte) {
-      const tope = (P.uac2_pct_largo !== undefined && P.uac2_pct_largo !== null && !isNaN(P.uac2_pct_largo) ? Number(P.uac2_pct_largo) : 16) / 100;
-      pct = Math.min(pct, tope);
+      // Plazo largo: % FIJO uac2_pct_largo (no participa de los tiers) — igual que el motor uac-tier.js
+      pct = (P.uac2_pct_largo !== undefined && P.uac2_pct_largo !== null && !isNaN(P.uac2_pct_largo) ? Number(P.uac2_pct_largo) : 16) / 100;
     }
   }
   return pct;
