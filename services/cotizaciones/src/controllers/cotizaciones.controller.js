@@ -44,21 +44,24 @@ require('../../../../shared/migrate').enFila('cotizaciones', async () => {
     catch (e) { if (e.errno !== 1060) console.error('[cotizaciones migration alter]', e.message); }
   }
 
-  // Corregir columnas que puedan existir como NOT NULL sin default (bloquean el INSERT)
-  const fixes = [
-    `ALTER TABLE cotizaciones MODIFY COLUMN id_cliente   INT          NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN id_usuario   INT          NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN valor_vehiculo BIGINT     NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN pie            BIGINT     NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN plazo          INT        NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN tasa_mensual   DECIMAL(8,4) NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN monto_financiado BIGINT   NULL DEFAULT NULL`,
-    `ALTER TABLE cotizaciones MODIFY COLUMN cuota           BIGINT    NULL DEFAULT NULL`,
-  ];
-  for (const sql of fixes) {
-    try { await pool.query(sql); }
-    catch (e) { if (e.errno !== 1054) console.error('[cotizaciones migration fix]', e.message); }
-  }
+  // Corregir columnas que puedan existir como NOT NULL sin default (bloquean el INSERT).
+  // MODIFY corre UNA vez (migrarAuto): era DDL repetido en cada boot.
+  require('../../../../shared/migrate').migrarAuto('cotizaciones_nullable_fix', async () => {
+    const fixes = [
+      `ALTER TABLE cotizaciones MODIFY COLUMN id_cliente   INT          NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN id_usuario   INT          NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN valor_vehiculo BIGINT     NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN pie            BIGINT     NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN plazo          INT        NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN tasa_mensual   DECIMAL(8,4) NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN monto_financiado BIGINT   NULL DEFAULT NULL`,
+      `ALTER TABLE cotizaciones MODIFY COLUMN cuota           BIGINT    NULL DEFAULT NULL`,
+    ];
+    for (const sql of fixes) {
+      try { await pool.query(sql); }
+      catch (e) { if (e.errno !== 1054) console.error('[cotizaciones migration fix]', e.message); }
+    }
+  });
 });
 
 const create = async (req, res) => {

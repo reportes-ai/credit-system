@@ -559,8 +559,10 @@ require('../../../../shared/migrate').enFila('portal', async () => {
       ADD COLUMN IF NOT EXISTS ia_nivel_riesgo VARCHAR(10) NULL,
       ADD COLUMN IF NOT EXISTS informes JSON NULL`);
     await pool.query('ALTER TABLE portal_preaprobaciones ADD UNIQUE INDEX idx_codigo (codigo)').catch(() => {});
-    // WhatsApp puede no traer precio/pie/año (preevaluación por RUT)
-    await pool.query('ALTER TABLE portal_preaprobaciones MODIFY precio BIGINT NULL, MODIFY pie BIGINT NULL, MODIFY anio SMALLINT NULL').catch(() => {});
+    // WhatsApp puede no traer precio/pie/año (preevaluación por RUT) — MODIFY una vez (migrarAuto)
+    require('../../../../shared/migrate').migrarAuto('preaprob_nullable_fix', async () => {
+      await pool.query('ALTER TABLE portal_preaprobaciones MODIFY precio BIGINT NULL, MODIFY pie BIGINT NULL, MODIFY anio SMALLINT NULL').catch(() => {});
+    });
     // Funcionalidad del repositorio (página interna /preaprobaciones/, bajo Evaluación Crediticia)
     const [[exF]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='preaprob_repo' LIMIT 1");
     let idF = exF?.id_funcionalidad;

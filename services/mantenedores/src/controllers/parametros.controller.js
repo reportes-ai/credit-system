@@ -16,10 +16,12 @@ const ensureTable = async () => {
       fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
-  // Ampliar precisión si la columna tiene menos de 6 decimales
-  try {
-    await pool.query(`ALTER TABLE parametros_credito MODIFY COLUMN valor DECIMAL(15,6) NOT NULL DEFAULT 0`);
-  } catch(e) { /* ignore */ }
+  // Ampliar precisión si la columna tiene menos de 6 decimales — UNA vez (migrarAuto)
+  require('../../../../shared/migrate').migrarAuto('parametros_valor_decimal6', async () => {
+    try {
+      await pool.query(`ALTER TABLE parametros_credito MODIFY COLUMN valor DECIMAL(15,6) NOT NULL DEFAULT 0`);
+    } catch(e) { /* ignore */ }
+  });
 
   const defaults = [
     // Parámetros operacionales

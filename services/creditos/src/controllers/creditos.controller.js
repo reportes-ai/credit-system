@@ -45,8 +45,10 @@ require('../../../../shared/migrate').enFila('creditos', async () => {
     await addCol(`ALTER TABLE creditos ADD COLUMN cuota              BIGINT       NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN tipo_ubicacion     VARCHAR(50)  NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN nombre_parque_mgmt VARCHAR(100) NULL`);
-    // Ampliar tipo_ubicacion si quedó como VARCHAR(10)
-    await pool.query(`ALTER TABLE creditos MODIFY COLUMN tipo_ubicacion VARCHAR(50) NULL`).catch(() => {});
+    // Ampliar tipo_ubicacion si quedó como VARCHAR(10) — MODIFY una vez (migrarAuto)
+    require('../../../../shared/migrate').migrarAuto('creditos_tipo_ubicacion_v50', async () => {
+      await pool.query(`ALTER TABLE creditos MODIFY COLUMN tipo_ubicacion VARCHAR(50) NULL`).catch(() => {});
+    });
     await addCol(`ALTER TABLE creditos ADD COLUMN id_dealer          INT          NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN id_cliente         INT          NULL`);
     await addCol(`ALTER TABLE creditos ADD COLUMN id_usuario         INT          NULL`);

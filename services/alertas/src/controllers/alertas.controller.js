@@ -385,21 +385,22 @@ async function evaluarAlertas() {
       const usaCreador = String(rg.destino || '').split(',').map(s => s.trim()).includes('CREADOR');
       const clavesActivas = [];
       const delay = rg.delay_min || 0;  // 0 = avisar una sola vez; >0 = repetir cada N min
+
+      // Emitidas de ESTA regla en UNA query (antes: un SELECT por fila → ~34K queries/30min)
+      const [emitidasRows] = await pool.query(
+        "SELECT clave, fired_at FROM alertas_emitidas WHERE clave LIKE ?", [`alerta:${rg.id}:%`]);
+      const emitidas = new Map(emitidasRows.map(r => [r.clave, r.fired_at]));
+
       for (const f of filas) {
         if (!cumple(f.vars[rg.campo], rg.operador, rg.valor1, rg.valor2)) continue;
         const clave = `alerta:${rg.id}:${f.key}`;
         clavesActivas.push(clave);
 
         // ¿Disparar este ciclo? "una sola vez" = no si ya se emitió; "repetir" = no si se emitió hace < delay min
-        let yaEmitida;
-        if (delay === 0) {
-          const [[em]] = await pool.query('SELECT 1 FROM alertas_emitidas WHERE clave = ? LIMIT 1', [clave]);
-          yaEmitida = !!em;
-        } else {
-          const [[em]] = await pool.query(
-            'SELECT 1 FROM alertas_emitidas WHERE clave = ? AND fired_at > (NOW() - INTERVAL ? MINUTE) LIMIT 1', [clave, delay]);
-          yaEmitida = !!em;
-        }
+        const fired = emitidas.get(clave);
+        const yaEmitida = delay === 0
+          ? emitidas.has(clave)
+          : !!(fired && (Date.now() - new Date(fired).getTime()) < delay * 60000);
         if (yaEmitida) continue;
 
         // Destinatarios: base (perfiles/TODOS) + creador del registro si la regla usa 'CREADOR'
@@ -407,11 +408,12 @@ async function evaluarAlertas() {
         if (usaCreador && f.creador) users.push(f.creador);
         users = [...new Set(users)];
         try { users = await require('../../../../shared/backups').expandirAlerta(users); } catch (_) {}
+        // No apilar duplicados sin leer: usuarios ya notificados de esta clave, en UNA query
+        const [yaNotif] = await pool.query(
+          'SELECT DISTINCT id_usuario FROM notificaciones WHERE clave = ? AND leida = 0', [clave]);
+        const yaSet = new Set(yaNotif.map(r => r.id_usuario));
         for (const uid of users) {
-          // No apilar duplicados sin leer al mismo usuario
-          const [[ex]] = await pool.query(
-            'SELECT 1 FROM notificaciones WHERE id_usuario = ? AND clave = ? AND leida = 0 LIMIT 1', [uid, clave]);
-          if (ex) continue;
+          if (yaSet.has(uid)) continue;
           await pool.query(
             `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar, son_cada, son_max, son_tipo)
              VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
