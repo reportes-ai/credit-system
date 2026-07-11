@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facturación AutoFácil — Post Venta</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:1350px; margin:22px auto; padding:0 20px 70px; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,var(--accent)); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .mes-card { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:10px; overflow:hidden; }
+    .mes-head { display:flex; align-items:center; gap:14px; padding:14px 20px; cursor:pointer; }
+    .mes-head:hover { background:#f8fafc; }
+    .mes-head .titulo { font-weight:800; color:var(--navy-dark); font-size:1.02rem; min-width:110px; text-transform:capitalize; }
+    .mes-head .tot { margin-left:auto; font-weight:800; font-size:1.02rem; color:#0f766e; }
+    .fin-row { border-top:1px solid #eef2f7; padding:10px 20px 10px 40px; cursor:pointer; display:flex; align-items:center; gap:12px; }
+    .fin-row:hover { background:#f0f7ff; }
+    .fin-row .nom { font-weight:700; color:#1e3a5f; min-width:180px; }
+    .fin-row .tot { margin-left:auto; font-weight:700; }
+    .conc-row { border-top:1px dashed #eef2f7; padding:8px 20px 8px 64px; cursor:pointer; display:flex; align-items:center; gap:12px; font-size:.9rem; }
+    .conc-row:hover { background:#f8fafc; }
+    .conc-row .tot { margin-left:auto; font-weight:700; }
+    .det-box { border-top:1px solid #eef2f7; background:#fafcff; padding:12px 20px 16px 20px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { text-align:left; color:#64748b; font-size:.68rem; text-transform:uppercase; padding:6px 6px; border-bottom:2px solid #e2e8f0; }
+    td { padding:5px 6px; border-bottom:1px solid #eef2f7; vertical-align:middle; }
+    td.num, th.num { text-align:right; }
+    .dif-ok { color:#166534; font-weight:700; } .dif-neg { color:#b91c1c; font-weight:700; }
+    input.fact { width:110px; text-align:right; font-size:.78rem; padding:2px 6px; }
+    .chev { transition:.15s; } .abierto > .chev { transform:rotate(90deg); }
+    .uac-cuadros { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-bottom:12px; }
+    .uac-c { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+    .uac-c .l { font-size:.66rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
+    .uac-c .v { font-size:1.15rem; font-weight:800; color:var(--navy-dark); margin-top:2px; }
+    .uac-c input { width:100%; text-align:right; font-weight:700; }
+    .muted { color:#94a3b8; }
+    .badge-rev { font-size:.68rem; font-weight:800; border-radius:10px; padding:2px 8px; background:#e0e7ff; color:#3730a3; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="wrap">
+  <div class="page-banner">
+    <i class="bi bi-receipt-cutoff"></i>
+    <div>
+      <h2>Facturación AutoFácil</h2>
+      <p>Control mensual de lo que cada financiera nos paga vs lo calculado por nuestros motores: colocación y seguros por operación, con check de facturación y diferencias. Unidad de Crédito: anticipo del 15 y recálculo al cierre.</p>
+    </div>
+  </div>
+  <div id="meses"><div class="muted">Cargando…</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const fmt = n => (n==null||isNaN(+n)) ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
+const pctF = n => n==null ? '—' : String(Math.round(n*100)/100).replace('.',',')+'%';
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const MESN = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesTitulo = m => MESN[+m.slice(5,7)] + ' ' + m.slice(0,4);
+let RES = [];
+
+async function cargar(){
+  const j = await fetch('/api/facturacion-af/resumen', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('meses').innerHTML = esc(j.error||'Sin acceso'); return; }
+  RES = j.data || [];
+  const porMes = {};
+  RES.forEach(r => { (porMes[r.mes] = porMes[r.mes] || []).push(r); });
+  const meses = Object.keys(porMes).sort().reverse();
+  $('meses').innerHTML = meses.map(m => {
+    const fins = porMes[m];
+    const tot = fins.reduce((a,f)=>a + (+f.colocacion||0) + (+f.seguros||0), 0);
+    const ops = fins.reduce((a,f)=>a + (+f.ops||0), 0);
+    return `<div class="mes-card">
+      <div class="mes-head" id="mh-${m}" onclick="toggleMes('${m}')">
+        <i class="bi bi-chevron-right chev"></i>
+        <span class="titulo">${mesTitulo(m)}</span>
+        <span class="muted" style="font-size:.8rem">${ops} operaciones</span>
+        <span class="tot">${fmt(tot)}</span>
+      </div>
+      <div id="mb-${m}" style="display:none"></div>
+    </div>`;
+  }).join('') || '<div class="muted">Sin operaciones otorgadas.</div>';
+}
+
+function toggleMes(m){
+  const body = $('mb-'+m), head = $('mh-'+m);
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : '';
+  head.classList.toggle('abierto', !abierto);
+  if (abierto || body.dataset.ok) return;
+  body.dataset.ok = 1;
+  const fins = RES.filter(r => r.mes === m);
+  body.innerHTML = fins.map(f => {
+    const key = m + '|' + f.financiera.replace(/\s+/g,'_');
+    const tot = (+f.colocacion||0) + (+f.seguros||0);
+    const rev = f.check ? `<span class="badge-rev">${f.check.oks}/${f.ops} OK · facturado ${fmt(f.check.facturado)}</span>` : '';
+    return `<div class="fin-row" id="fh-${key}" onclick="toggleFin('${m}','${esc(f.financiera)}')">
+        <i class="bi bi-chevron-right chev"></i>
+        <span class="nom">${esc(f.financiera)}</span>
+        <span class="muted" style="font-size:.78rem">${f.ops} ops</span> ${rev}
+        <span class="tot">${fmt(tot)}</span>
+      </div>
+      <div id="fb-${key}" style="display:none"></div>`;
+  }).join('');
+}
+
+function keyDe(m, fin){ return m + '|' + fin.replace(/\s+/g,'_'); }
+
+function toggleFin(m, fin){
+  const key = keyDe(m, fin);
+  const body = $('fb-'+key), head = $('fh-'+key);
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : '';
+  head.classList.toggle('abierto', !abierto);
+  if (abierto || body.dataset.ok) return;
+  body.dataset.ok = 1;
+  const f = RES.find(r => r.mes === m && r.financiera === fin);
+  const esAutofin = fin === 'AUTOFIN';
+  let h = `<div class="conc-row" onclick="toggleConc('${m}','${esc(fin)}','COLOCACION')" id="ch-${key}-COLOCACION">
+    <i class="bi bi-chevron-right chev"></i><span>Ingreso por Colocación</span>
+    <span class="tot">${fmt(f.colocacion)}</span></div>
+    <div id="cb-${key}-COLOCACION" style="display:none"></div>`;
+  if (esAutofin) h += `<div class="conc-row" onclick="toggleConc('${m}','${esc(fin)}','SEGUROS')" id="ch-${key}-SEGUROS">
+    <i class="bi bi-chevron-right chev"></i><span>Ingreso por Seguros</span>
+    <span class="tot">${fmt(f.seguros)}</span></div>
+    <div id="cb-${key}-SEGUROS" style="display:none"></div>`;
+  body.innerHTML = h;
+}
+
+async function toggleConc(m, fin, concepto){
+  const key = keyDe(m, fin);
+  const body = $('cb-'+key+'-'+concepto), head = $('ch-'+key+'-'+concepto);
+  const abierto = body.style.display !== 'none';
+  body.style.display = abierto ? 'none' : '';
+  head.classList.toggle('abierto', !abierto);
+  if (abierto) return;
+  body.innerHTML = '<div class="det-box muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando detalle…</div>';
+  const j = await fetch('/api/facturacion-af/detalle?mes='+m+'&financiera='+encodeURIComponent(fin)+'&concepto='+concepto, { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { body.innerHTML = '<div class="det-box">'+esc(j.error||'Error')+'</div>'; return; }
+  const esUAC = fin.includes('UNIDAD');
+  const rid = (key+'-'+concepto).replace(/[^\w-]/g,'');
+  window['DET_'+rid] = { m, fin, concepto, ops: j.data.ops };
+
+  let h = '<div class="det-box">';
+  if (esUAC && j.data.uac){
+    const u = j.data.uac;
+    const difA = (u.pagado_real||0) - u.total_nuestro;
+    h += `<div class="uac-cuadros">
+      <div class="uac-c"><div class="l">Anticipo (~día 15, tier al liquidar)</div><input class="form-control form-control-sm" id="uacAnt-${rid}" value="${u.anticipo||''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
+      <div class="uac-c"><div class="l">Por facturar al cierre</div><div class="v" id="uacPF-${rid}">${fmt(u.total_nuestro - (u.anticipo||0))}</div></div>
+      <div class="uac-c"><div class="l">Total nuestro (motor)</div><div class="v">${fmt(u.total_nuestro)}</div></div>
+      <div class="uac-c"><div class="l">Real pagado por UAC</div><input class="form-control form-control-sm" id="uacReal-${rid}" value="${u.pagado_real||''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
+      <div class="uac-c"><div class="l">Diferencia</div><div class="v ${difA<0?'dif-neg':'dif-ok'}" id="uacDif-${rid}">${fmt(difA)}</div></div>
+    </div>`;
+    window['UACTOT_'+rid] = u.total_nuestro;
+  }
+  h += `<div style="overflow:auto"><table>
+    <thead><tr><th>N° Op</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
+    <th class="num">Comisión calculada</th><th class="num">%</th><th style="text-align:center">OK</th><th class="num">Monto facturado</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
+    <tbody>${j.data.ops.map((o,i)=>filaOp(rid,o,i)).join('')}</tbody>
+    <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="4">TOTAL (${j.data.ops.length} ops)</td>
+      <td class="num">${fmt(j.data.ops.reduce((a,o)=>a+(+o.comision||0),0))}</td><td></td><td></td>
+      <td class="num" id="totFact-${rid}"></td><td class="num" id="totDif-${rid}"></td><td></td></tr></tfoot>
+  </table></div></div>`;
+  body.innerHTML = h;
+  j.data.ops.forEach((o,i)=>refrescarDif(rid,i));
+  totalizar(rid);
+}
+
+function filaOp(rid, o, i){
+  const base = (window['DET_'+rid] && window['DET_'+rid].concepto === 'SEGUROS') ? o.primas : o.monto;
+  return `<tr>
+    <td><b>${o.num_op}</b></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.cliente)}</td>
+    <td class="num">${fmt(base)}</td><td class="num">${o.plazo||'—'}</td>
+    <td class="num"><b>${fmt(o.comision)}</b></td><td class="num">${pctF(o.pct)}</td>
+    <td style="text-align:center"><input type="checkbox" id="ok-${rid}-${i}" ${o.ok?'checked':''} onchange="marcarOK('${rid}',${i})"></td>
+    <td class="num"><input class="form-control fact" id="fac-${rid}-${i}" value="${o.monto_facturado!=null?o.monto_facturado:''}" onchange="cambioFact('${rid}',${i})"></td>
+    <td class="num" id="dif-${rid}-${i}"></td><td class="num" id="difp-${rid}-${i}"></td>
+  </tr>`;
+}
+
+function marcarOK(rid, i){
+  const d = window['DET_'+rid]; const o = d.ops[i];
+  const chk = $('ok-'+rid+'-'+i).checked;
+  if (chk) $('fac-'+rid+'-'+i).value = o.comision;          // OK = replica el monto calculado
+  o.ok = chk; o.monto_facturado = chk ? o.comision : (parseInt($('fac-'+rid+'-'+i).value)||null);
+  refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
+}
+function cambioFact(rid, i){
+  const d = window['DET_'+rid]; const o = d.ops[i];
+  const v = String($('fac-'+rid+'-'+i).value).replace(/[^\d]/g,'');
+  o.monto_facturado = v === '' ? null : +v;
+  o.ok = o.monto_facturado === o.comision;
+  $('ok-'+rid+'-'+i).checked = o.ok;
+  refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
+}
+function refrescarDif(rid, i){
+  const o = window['DET_'+rid].ops[i];
+  const dEl = $('dif-'+rid+'-'+i), pEl = $('difp-'+rid+'-'+i);
+  if (o.monto_facturado == null){ dEl.textContent=''; pEl.textContent=''; return; }
+  const dif = o.monto_facturado - o.comision;
+  dEl.innerHTML = `<span class="${dif<0?'dif-neg':'dif-ok'}">${dif===0?'✓ $0':fmt(dif)}</span>`;
+  pEl.innerHTML = o.comision>0 ? `<span class="${dif<0?'dif-neg':'dif-ok'}">${String(Math.round(10000*dif/o.comision)/100).replace('.',',')}%</span>` : '';
+}
+function totalizar(rid){
+  const d = window['DET_'+rid];
+  const fact = d.ops.reduce((a,o)=>a+(o.monto_facturado!=null?+o.monto_facturado:0),0);
+  const calc = d.ops.filter(o=>o.monto_facturado!=null).reduce((a,o)=>a+(+o.comision||0),0);
+  const el1 = $('totFact-'+rid), el2 = $('totDif-'+rid);
+  if (el1) el1.textContent = fact ? '$'+fact.toLocaleString('es-CL') : '';
+  if (el2){ const dif = fact - calc; el2.innerHTML = fact ? `<span class="${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</span>` : ''; }
+}
+async function guardarCheck(rid, i){
+  const d = window['DET_'+rid]; const o = d.ops[i];
+  await fetch('/api/facturacion-af/check', { method:'POST', headers:H, body: JSON.stringify({
+    mes: d.m, financiera: d.fin, concepto: d.concepto, num_op: o.num_op,
+    monto_calculado: o.comision, monto_facturado: o.monto_facturado, ok: o.ok }) }).catch(()=>{});
+}
+async function guardarUAC(m, rid){
+  const ant = String($('uacAnt-'+rid).value).replace(/[^\d]/g,'');
+  const real = String($('uacReal-'+rid).value).replace(/[^\d]/g,'');
+  const tot = window['UACTOT_'+rid] || 0;
+  $('uacPF-'+rid).textContent = fmt(tot - (+ant||0));
+  const dif = (+real||0) - tot;
+  const el = $('uacDif-'+rid); el.textContent = fmt(dif); el.className = 'v ' + (dif<0?'dif-neg':'dif-ok');
+  await fetch('/api/facturacion-af/uac', { method:'PUT', headers:H, body: JSON.stringify({ mes: m, anticipo: ant, pagado_real: real }) }).catch(()=>{});
+}
+cargar();
+</script>
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'facturacion-af', selfHref:'/postventa/facturacion-af/', title:'Facturación AutoFácil', icon:'bi-receipt-cutoff', defaultSection:'home' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

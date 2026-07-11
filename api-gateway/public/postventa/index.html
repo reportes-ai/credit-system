@@ -113,6 +113,12 @@
     <p>Historial de cartolas enviadas a concesionarios.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
+  <a href="/postventa/facturacion-af/" class="module-card" id="cardFactAF" style="display:none">
+    <div class="card-icon"><i class="bi bi-receipt-cutoff"></i></div>
+    <h5>Facturación AutoFácil</h5>
+    <p>Control mensual de lo que cada financiera nos paga vs lo calculado: colocación y seguros por operación, con check de facturación y diferencias.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
   <a href="/postventa/mantenedores/" class="module-card" id="cardMant" style="display:none">
     <div class="card-icon"><i class="bi bi-tools"></i></div>
     <h5>Mantenedores Post Venta</h5>
@@ -149,6 +155,7 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_factura'))  { document.getElementById('cardConsFact').style.display='';  alguna=true; }
   if (tiene('aprob_cartolas'))              { document.getElementById('cardCartolas').style.display=''; document.getElementById('cardEnviadas').style.display=''; alguna=true; }
+  if (tiene('postventa_facturacion_af'))   { document.getElementById('cardFactAF').style.display='';   alguna=true; }
   if (tiene('postventa_mantenedores'))      { document.getElementById('cardMant').style.display='';      alguna=true; }
   if (!alguna) document.getElementById('sinAcceso').style.display='';
 })();

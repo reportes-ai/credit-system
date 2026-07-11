@@ -253,6 +253,7 @@ app.use('/api/portal-dealer', require('../../services/portal-dealer/src/routes/p
 
 // Post Venta
 app.use('/api/postventa', require('../../services/postventa/src/routes/postventa.routes'));
+app.use('/api/facturacion-af',       require('../../services/postventa/src/routes/facturacion-af.routes'));
 app.use('/api/comisiones-parques', require('../../services/postventa/src/routes/comisiones-parques.routes'));
 app.use('/api/correos-programados', require('../../services/correos-programados/src/routes/correos.routes'));
 app.use('/api/backups', require('../../services/backups/src/routes/backups.routes'));
