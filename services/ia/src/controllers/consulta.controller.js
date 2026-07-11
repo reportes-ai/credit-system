@@ -68,6 +68,8 @@ require('../../../../shared/migrate').enFila('consulta', async () => {
       idf = r.insertId;
     }
     if (idf) for (const idp of [1, 2, 90008, 90009]) {   // Admin · Gerente · Gte Op y Crédito · Gte General
+      const [[exP]] = await pool.query('SELECT 1 ok FROM perfiles WHERE id_perfil=? LIMIT 1', [idp]);
+      if (!exP) continue;                                // perfil eliminado (ej. id 2 Gerente) → saltar, no romper FK
       const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [idp, idf]);
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
     }
