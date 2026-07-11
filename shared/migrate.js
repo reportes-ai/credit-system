@@ -93,4 +93,15 @@ function migrar(nombre, fn) {
   });
 }
 
-module.exports = { enFila, migrar };
+/* Como migrar(), pero el registro incluye un hash del CÓDIGO del bloque:
+   si el bloque nunca cambia, corre una sola vez; si un programador lo edita
+   (ej. agrega una funcionalidad al array), el hash cambia y el bloque corre
+   una vez más. Ideal para las migraciones versionadas de boot (Perfiles vN)
+   sin riesgo de que una edición futura quede silenciosamente sin aplicar. */
+function migrarAuto(nombre, fn) {
+  const src = fn.toString();
+  let h = 0; for (let i = 0; i < src.length; i++) { h = ((h << 5) - h + src.charCodeAt(i)) | 0; }
+  return migrar(`${nombre}@${(h >>> 0).toString(36)}`, fn);
+}
+
+module.exports = { enFila, migrar, migrarAuto };

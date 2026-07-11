@@ -4,7 +4,7 @@ const { limpiarCachePermisos } = require('../../../../shared/middleware/permisos
 const { auditar } = require('../../../../shared/audit');
 
 // Migración: insertar módulos Tesorería, CRM, Cobranza, Reportería si no existen
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b01', async () => {
   try {
     const nuevos = [
       { nombre: 'Tesorería',  icono: 'bi-safe2',        ruta: '/tesoreria/', descripcion: 'Gestión de pagos y flujos de caja', orden: 20 },
@@ -51,7 +51,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración: agregar funcionalidades faltantes en todos los módulos ──── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b02', async () => {
   try {
     // [nombre_modulo, nombre_funcionalidad, codigo, habilitado_default(0/1)]
     const nuevasFuncs = [
@@ -128,7 +128,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v2: módulos y funcionalidades completos ──────────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b03', async () => {
   try {
     // 1) Asegurar módulo Usuarios
     const [uMod] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre = 'Usuarios'");
@@ -223,7 +223,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    hace falta: Dealers vuelve a ser un sub-item normal y se coloca en Home por
    placement. Este bloque revierte el módulo falso + el gate 'home_dealers', restaura
    el href de 'mantenedores_dealers', y —una sola vez— mueve 'dealers' a la sección Home. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b04', async () => {
   try {
     // 1) Restaurar el sub-item Dealers (su href de menú)
     await pool.query("UPDATE funcionalidades SET href = '/mantenedores/dealers/' WHERE codigo = 'mantenedores_dealers' AND (href IS NULL OR href <> '/mantenedores/dealers/')");
@@ -260,7 +260,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v3: nuevos módulos y funcionalidades ─────────────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b05', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -323,7 +323,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v4: nombres alineados con la app ─────────────────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b06', async () => {
   try {
     // 1) Actualizar nombres para que coincidan exactamente con las páginas/cards
     const renombrar = [
@@ -423,7 +423,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v5: funcionalidades granulares de Cartas de Aprobación ──── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b07', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -490,7 +490,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Tesorería y como checkbox en la grilla de Perfiles. Reversible: mover de vuelta
    a su módulo (Créditos/Tesorería) y restaurar el href. Los permisos_perfil y el
    código legacy se conservan. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b08', async () => {
   try {
     const FLAG = 'retiro_brokerage_fundantes_viejo_v1';
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
@@ -842,7 +842,7 @@ const getUsuariosByPerfil = async (req, res) => {
 };
 
 /* ─── Migración v6: permisos de edición de créditos broker ───────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b09', async () => {
   try {
     const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
 
@@ -900,7 +900,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v7: workflow brokerage completo ───────────────────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b10', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -958,7 +958,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v8: funcionalidades faltantes detectadas ─────────────────── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b11', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -1033,7 +1033,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v9: nombres exactos por card + Solo Dios + limpiar dupl. ─── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b12', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -1106,7 +1106,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v10: limpiar Tesoreros duplicados, Simulador duplicado, Dashboard permiso ── */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b13', async () => {
   try {
     // 1) Eliminar Tesoreros duplicados — conservar solo el de menor id
     const [[primerTesorero]] = await pool.query(
@@ -1196,7 +1196,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 // ── Migración v11: asegurar funcionalidad ver_dashboard en todos los perfiles ──
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b14', async () => {
   try {
     // Buscar módulo dashboard (cualquier estado)
     const [[modDash]] = await pool.query(
@@ -1233,7 +1233,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v12: Meses Cerrados, limpiar Caja duplicados, limpiar Simulador ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b15', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1321,7 +1321,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v13: módulo Aprobaciones (reemplazo de Cartas de Aprobación) ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b16', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1390,7 +1390,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v14: permisos finos módulo Aprobaciones (ver_todas, cartolas) ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b17', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1438,7 +1438,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v15: card Preferencia Financiera en Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b18', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [[modMan]] = await pool.query(
@@ -1482,7 +1482,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Fue creado por código antiguo solo como contenedor del permiso
    ver_dashboard; nunca tuvo página. Sus funcionalidades se mueven al
    módulo Dashboard real y el módulo se elimina (o desactiva).        */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b19', async () => {
   try {
     const [[modSis]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE ruta='/sistema/' LIMIT 1"
@@ -1514,7 +1514,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    usuarios con clave inicial AF2026. Usuarios con perfil Administrador
    conservan su clave y su perfil. Flag en BD evita re-ejecución
    (los usuarios cambiarán su clave y un deploy no debe resetearla).  */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b20', async () => {
   const bcrypt = require('bcryptjs');
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS push_config (clave VARCHAR(50) PRIMARY KEY, valor TEXT NOT NULL)`);
@@ -1622,7 +1622,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
       permisos; luego se agrega el índice único.
    2) Los seeds antiguos regalaban Cobranza/Tesorería/CRM por defecto:
       se apagan para Ejecutivo Comercial (config fina via Perfiles UI). */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b21', async () => {
   try {
     // 1) Dedupe por nombre — conservar el id más bajo (el original)
     const [dups] = await pool.query(
@@ -1674,7 +1674,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v19: módulo Post Venta ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b22', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
@@ -1715,7 +1715,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v20: módulo Edición Créditos ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b23', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/edicion-creditos/' LIMIT 1");
@@ -1752,7 +1752,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v21: funcionalidad Presupuesto bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b24', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1774,7 +1774,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v22: funcionalidad Ayuda bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b25', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1796,7 +1796,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v23: funcionalidad Alertas bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b26', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1818,7 +1818,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v24: funcionalidad Desempeño Analistas en Cartas de Aprobación ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b27', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1839,7 +1839,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v25: funcionalidad Mantenedor de Cartas de Aprobación ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b28', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1864,7 +1864,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    definir fondos (Finanzas/Tesorería), seleccionar (Comercial),
    confirmar pago (Tesorería = postventa_saldos_pagar ya existente),
    generar nómina, emitir orden de pago y revertir pago. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b29', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
     if (!mod) return;
@@ -1894,7 +1894,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v27: funcionalidad Parámetros Cobranza bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b30', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1916,7 +1916,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v28: funcionalidad Definiciones (glosario) bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b31', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1938,7 +1938,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v29: funcionalidad Alertas Saldos Precio bajo Mantenedores ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b32', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1960,7 +1960,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 });
 
 /* ─── Migración v30: permiso Carga Masiva de Cartas de Aprobación ─ */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b33', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1984,7 +1984,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Card de acceso (Comisiones a Pagar / Orden de Pago Comisión) + atribuciones
    granulares: definir fondos, seleccionar, pagar, generar nómina, emitir orden,
    revertir. Todas independientes de las de Saldo Precio. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b34', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
     if (!mod) return;
@@ -2019,7 +2019,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Acción sensible: deshace un envío de cartola (des-estampa Mes Cartola y
    quita la etapa CARTOLA ENVIADA en Post Venta). Solo Admin por defecto;
    el Admin puede habilitarla a otros perfiles desde Perfiles y Permisos. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b35', async () => {
   try {
     const [[modAp]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!modAp) return;
@@ -2041,7 +2041,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 
 /* ─── Migración v33: funcionalidad Cartas de Aprobación Vigentes (Aprobaciones) ─
    Card + acciones Otorgar/Desistir sobre cartas aprobadas dentro de su vigencia. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b36', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -2063,7 +2063,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 
 /* ─── Migración v34: funcionalidad Rentabilidad de Cartas (Aprobaciones) ─
    Pestaña/acción restringida: ve la rentabilidad por carta (AutoFin vs UAC). */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b37', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -2086,7 +2086,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 /* ─── Migración: consolidar "Parques". Había la card huérfana "Parques y Comisiones"
    (con href, generaba el menú) además del permiso canónico mantenedores_parques
    (sin href). Se le da el href al canónico y se elimina la huérfana. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b38', async () => {
   try {
     await pool.query(
       "UPDATE funcionalidades SET href='/mantenedores/parques/', icono=COALESCE(NULLIF(icono,''),'bi-tree') " +
@@ -2109,7 +2109,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Caso: dos funcionalidades con el mismo nombre visible y códigos diferentes (la
    dedup por código no las junta). Se conserva la canónica y se elimina la sobrante,
    no usada como gate. Lista extensible. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b39', async () => {
   // codigo a eliminar → (canónica que se conserva, solo informativo)
   const OBSOLETAS = ['creditos_cargar_doc', 'mantenedores_flujo_brokerage']; // creditos_cargar_doc: "Documentos del Crédito" dup → creditos_documentos. mantenedores_flujo_brokerage: submódulo redundante con Estado Créditos (se unificó)
   try {
@@ -2129,7 +2129,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    (por href o por nombre viejo) y les fija código canónico + href, para que gateen
    cada card del landing y sus rutas. Si no existen, las crea. Admin=1 por defecto
    (preserva el Admin-only previo); el resto en 0. Idempotente. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b40', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%carga-masiva%' LIMIT 1");
     if (!mod) return;
@@ -2179,7 +2179,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Gatea POST /api/dashboard/permisos y /presupuesto. Antes eran Admin-only
    (requirePerfil); se mantiene Admin-only por defecto (habilitado=1 solo Admin)
    y queda configurable desde la matriz. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b41', async () => {
   try {
     const [[modDash]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' LIMIT 1");
     if (!modDash) return;
@@ -2206,7 +2206,8 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    filas con el mismo código en cada arranque. Se consolida a UNA fila por código
    (la de menor id), re-apuntando sus permisos, y se agrega UNIQUE(codigo) para
    que no vuelva a ocurrir. Idempotente y seguro de correr en cada boot. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+// Red de seguridad: corre en CADA boot (enFila, no migrar) — consolida duplicados por código.
+require('../../../../shared/migrate').enFila('perfiles_dedup', async () => {
   try {
     const [dups] = await pool.query(
       `SELECT codigo, MIN(id_funcionalidad) AS keep_id, COUNT(*) AS n
@@ -2254,7 +2255,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
    Tesorería de requirePerfil → requireFunc. Otorga por defecto el permiso a los
    perfiles que antes accedían por nombre. Guardada en migraciones_aplicadas para
    NO volver a correr y NO pisar cambios posteriores del Administrador. */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b43', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2285,7 +2286,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 /* ─── Migración (UNA sola vez): preservar acceso al migrar meses-cerrados →
    requireFunc. Antes era Admin+Gerente; Admin pasa por bypass, así que solo hay
    que otorgar a Gerente. (workflow era solo Admin → no requiere grant). */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b44', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2305,7 +2306,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 /* ─── Migración (UNA sola vez): preservar acceso al migrar CRM campañas →
    requireFunc. Antes create/update de campañas era Admin+Gerente; se otorga a
    Gerente (Admin pasa por bypass). */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b45', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2326,7 +2327,7 @@ require('../../../../shared/migrate').enFila('perfiles', async () => {
 
 /* ─── Migración (UNA sola vez): preservar acceso al migrar auditoría de crédito →
    requireFunc. Antes Admin+Gerente; se otorga a Gerente (Admin pasa por bypass). */
-require('../../../../shared/migrate').enFila('perfiles', async () => {
+require('../../../../shared/migrate').migrarAuto('perfiles_b46', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
