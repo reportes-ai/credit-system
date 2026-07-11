@@ -30,6 +30,7 @@ require('../../../../shared/migrate').enFila('facturacion-af', async () => {
       UNIQUE KEY uq_op (mes, concepto, num_op),
       INDEX idx_mes (mes)
     )`);
+    await pool.query("ALTER TABLE facturacion_af_check ADD COLUMN IF NOT EXISTS anticipo DECIMAL(15,0) NULL");
     await pool.query(`CREATE TABLE IF NOT EXISTS facturacion_af_uac (
       mes CHAR(7) PRIMARY KEY,
       anticipo DECIMAL(15,0) NULL,            -- pagado ~día 15 (tier al liquidar)
@@ -91,7 +92,7 @@ exports.detalle = async (req, res) => {
       WHERE ${BASE} AND DATE_FORMAT(c.mes,'%Y-%m')=? AND c.financiera=?
       ORDER BY c.num_op`, [mes, fin]);
 
-    const [checks] = await pool.query('SELECT num_op, monto_facturado, ok FROM facturacion_af_check WHERE mes=? AND concepto=? AND financiera=?', [mes, concepto, fin]);
+    const [checks] = await pool.query('SELECT num_op, monto_facturado, anticipo, ok FROM facturacion_af_check WHERE mes=? AND concepto=? AND financiera=?', [mes, concepto, fin]);
     const chkMap = {}; checks.forEach(c => chkMap[c.num_op] = c);
 
     const data = ops.map(o => {
@@ -105,15 +106,19 @@ exports.detalle = async (req, res) => {
         comision, pct: pctBase > 0 ? Math.round(10000 * comision / pctBase) / 100 : null,
         ok: chk ? !!chk.ok : false,
         monto_facturado: chk && chk.monto_facturado != null ? +chk.monto_facturado : null,
+        anticipo: chk && chk.anticipo != null ? +chk.anticipo : null,
       };
     });
     // UAC: cuadro anticipo / por facturar
     let uac = null;
     if (esUAC) {
-      const [[u]] = await pool.query('SELECT anticipo, pagado_real, notas FROM facturacion_af_uac WHERE mes=?', [mes]);
+      // Cuadros calculados en vivo desde el detalle: anticipo por operación (día ~15,
+      // tier al liquidar) + facturado al cierre. Se actualizan a medida que avanza el mes.
       const total = data.reduce((a, r) => a + (+r.comision || 0), 0);
-      uac = { anticipo: u ? +u.anticipo || 0 : 0, pagado_real: u ? +u.pagado_real || 0 : 0, notas: u ? u.notas : null,
-              total_nuestro: total, por_facturar: total - (u ? +u.anticipo || 0 : 0) };
+      const antTot = data.reduce((a, r) => a + (+r.anticipo || 0), 0);
+      const factTot = data.reduce((a, r) => a + (+r.monto_facturado || 0), 0);
+      uac = { total_nuestro: total, anticipo_total: antTot, por_facturar: total - antTot,
+              pagado_real: antTot + factTot, diferencia: antTot + factTot - total };
     }
     res.json({ success: true, data: { ops: data, uac }, error: null });
   } catch (e) { errSrv(res, e, 'factAF detalle'); }
@@ -130,11 +135,12 @@ exports.check = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes) || !numOp) return res.status(400).json({ success: false, data: null, error: 'Datos inválidos' });
     const usuario = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email || '';
     await pool.query(`
-      INSERT INTO facturacion_af_check (mes, financiera, concepto, num_op, monto_calculado, monto_facturado, ok, usuario)
-      VALUES (?,?,?,?,?,?,?,?)
-      ON DUPLICATE KEY UPDATE monto_calculado=VALUES(monto_calculado), monto_facturado=VALUES(monto_facturado), ok=VALUES(ok), usuario=VALUES(usuario)`,
+      INSERT INTO facturacion_af_check (mes, financiera, concepto, num_op, monto_calculado, monto_facturado, anticipo, ok, usuario)
+      VALUES (?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE monto_calculado=VALUES(monto_calculado), monto_facturado=VALUES(monto_facturado), anticipo=VALUES(anticipo), ok=VALUES(ok), usuario=VALUES(usuario)`,
       [mes, fin, concepto, numOp, b.monto_calculado != null ? Math.round(+b.monto_calculado) : null,
-       b.monto_facturado != null && b.monto_facturado !== '' ? Math.round(+b.monto_facturado) : null, b.ok ? 1 : 0, usuario]);
+       b.monto_facturado != null && b.monto_facturado !== '' ? Math.round(+b.monto_facturado) : null,
+       b.anticipo != null && b.anticipo !== '' ? Math.round(+b.anticipo) : null, b.ok ? 1 : 0, usuario]);
     res.json({ success: true, data: null, error: null });
   } catch (e) { errSrv(res, e, 'factAF check'); }
 };

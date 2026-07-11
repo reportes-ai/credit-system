@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -156,23 +156,16 @@ async function toggleConc(m, fin, concepto){
 
   let h = '<div class="det-box">';
   if (esUAC && j.data.uac){
-    const u = j.data.uac;
-    const difA = (u.pagado_real||0) - u.total_nuestro;
-    h += `<div class="uac-cuadros">
-      <div class="uac-c"><div class="l">Anticipo (~día 15, tier al liquidar)</div><input class="form-control form-control-sm" id="uacAnt-${rid}" value="${u.anticipo?fmtIn(u.anticipo):''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
-      <div class="uac-c"><div class="l">Por facturar al cierre</div><div class="v" id="uacPF-${rid}">${fmt(u.total_nuestro - (u.anticipo||0))}</div></div>
-      <div class="uac-c"><div class="l">Total nuestro (motor)</div><div class="v">${fmt(u.total_nuestro)}</div></div>
-      <div class="uac-c"><div class="l">Real pagado por UAC</div><input class="form-control form-control-sm" id="uacReal-${rid}" value="${u.pagado_real?fmtIn(u.pagado_real):''}" placeholder="$" onchange="guardarUAC('${m}','${rid}')"></div>
-      <div class="uac-c"><div class="l">Diferencia</div><div class="v ${difA<0?'dif-neg':'dif-ok'}" id="uacDif-${rid}">${fmt(difA)}</div></div>
-    </div>`;
-    window['UACTOT_'+rid] = u.total_nuestro;
+    h += `<div class="uac-cuadros" id="uacBox-${rid}"></div>`;
+    window['ESUAC_'+rid] = true;
   }
+
   h += `<div style="overflow:auto"><table>
     <thead><tr><th>N° Op</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
-    <th class="num">Comisión calculada</th><th class="num">%</th><th style="text-align:center">OK</th><th class="num">Monto facturado</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
+    <th class="num">Comisión calculada</th><th class="num">%</th>${esUAC?'<th class="num">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
     <tbody>${j.data.ops.map((o,i)=>filaOp(rid,o,i)).join('')}</tbody>
     <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="4">TOTAL (${j.data.ops.length} ops)</td>
-      <td class="num">${fmt(j.data.ops.reduce((a,o)=>a+(+o.comision||0),0))}</td><td></td><td></td>
+      <td class="num">${fmt(j.data.ops.reduce((a,o)=>a+(+o.comision||0),0))}</td><td></td>${esUAC?'<td class="num" id="totAnt-'+rid+'"></td>':''}<td></td>
       <td class="num" id="totFact-${rid}"></td><td class="num" id="totDif-${rid}"></td><td></td></tr></tfoot>
   </table></div></div>`;
   body.innerHTML = h;
@@ -186,6 +179,7 @@ function filaOp(rid, o, i){
     <td><b>${o.num_op}</b></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.cliente)}</td>
     <td class="num">${fmt(base)}</td><td class="num">${o.plazo||'—'}</td>
     <td class="num"><b>${fmt(o.comision)}</b></td><td class="num">${pctF(o.pct)}</td>
+    ${window['ESUAC_'+rid]?`<td class="num"><input class="form-control fact" id="ant-${rid}-${i}" value="${o.anticipo!=null?fmtIn(o.anticipo):''}" onchange="cambioAnt('${rid}',${i})"></td>`:''}
     <td style="text-align:center"><input type="checkbox" id="ok-${rid}-${i}" ${o.ok?'checked':''} onchange="marcarOK('${rid}',${i})"></td>
     <td class="num"><input class="form-control fact" id="fac-${rid}-${i}" value="${o.monto_facturado!=null?fmtIn(o.monto_facturado):''}" onchange="cambioFact('${rid}',${i})"></td>
     <td class="num" id="dif-${rid}-${i}"></td><td class="num" id="difp-${rid}-${i}"></td>
@@ -195,8 +189,17 @@ function filaOp(rid, o, i){
 function marcarOK(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   const chk = $('ok-'+rid+'-'+i).checked;
-  if (chk) $('fac-'+rid+'-'+i).value = fmtIn(o.comision);          // OK = replica el monto calculado
-  o.ok = chk; o.monto_facturado = chk ? o.comision : (parseInt($('fac-'+rid+'-'+i).value)||null);
+  // OK = replica lo calculado: en UAC el cierre es comisión − anticipo ya pagado
+  const esperado = window['ESUAC_'+rid] ? o.comision - (+o.anticipo||0) : o.comision;
+  if (chk) $('fac-'+rid+'-'+i).value = fmtIn(esperado);
+  o.ok = chk; o.monto_facturado = chk ? esperado : (parseInt(String($('fac-'+rid+'-'+i).value).replace(/[^\d]/g,''))||null);
+  refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
+}
+function cambioAnt(rid, i){
+  const d = window['DET_'+rid]; const o = d.ops[i];
+  const v = String($('ant-'+rid+'-'+i).value).replace(/[^\d]/g,'');
+  o.anticipo = v === '' ? null : +v;
+  $('ant-'+rid+'-'+i).value = o.anticipo != null ? fmtIn(o.anticipo) : '';
   refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
 }
 function cambioFact(rid, i){
@@ -204,43 +207,53 @@ function cambioFact(rid, i){
   const v = String($('fac-'+rid+'-'+i).value).replace(/[^\d]/g,'');
   o.monto_facturado = v === '' ? null : +v;
   $('fac-'+rid+'-'+i).value = o.monto_facturado != null ? fmtIn(o.monto_facturado) : '';
-  o.ok = o.monto_facturado === o.comision;
+  o.ok = (window['ESUAC_'+rid] ? (+o.anticipo||0) + o.monto_facturado : o.monto_facturado) === o.comision;
   $('ok-'+rid+'-'+i).checked = o.ok;
   refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
 }
 function refrescarDif(rid, i){
   const o = window['DET_'+rid].ops[i];
   const dEl = $('dif-'+rid+'-'+i), pEl = $('difp-'+rid+'-'+i);
-  if (o.monto_facturado == null){ dEl.textContent=''; pEl.textContent=''; return; }
-  const dif = o.monto_facturado - o.comision;
+  const esUAC = !!window['ESUAC_'+rid];
+  if (o.monto_facturado == null && (!esUAC || o.anticipo == null)){ dEl.textContent=''; pEl.textContent=''; return; }
+  const pagado = (esUAC ? (+o.anticipo||0) : 0) + (+o.monto_facturado||0);
+  const dif = pagado - o.comision;
   dEl.innerHTML = `<span class="${dif<0?'dif-neg':'dif-ok'}">${dif===0?'✓ $0':fmt(dif)}</span>`;
   pEl.innerHTML = o.comision>0 ? `<span class="${dif<0?'dif-neg':'dif-ok'}">${String(Math.round(10000*dif/o.comision)/100).replace('.',',')}%</span>` : '';
 }
 function totalizar(rid){
   const d = window['DET_'+rid];
+  const esUAC = !!window['ESUAC_'+rid];
   const fact = d.ops.reduce((a,o)=>a+(o.monto_facturado!=null?+o.monto_facturado:0),0);
-  const calc = d.ops.filter(o=>o.monto_facturado!=null).reduce((a,o)=>a+(+o.comision||0),0);
-  const el1 = $('totFact-'+rid), el2 = $('totDif-'+rid);
+  const ant  = d.ops.reduce((a,o)=>a+(+o.anticipo||0),0);
+  const conDato = o => o.monto_facturado!=null || (esUAC && o.anticipo!=null);
+  const calc = d.ops.filter(conDato).reduce((a,o)=>a+(+o.comision||0),0);
+  const el1 = $('totFact-'+rid), el2 = $('totDif-'+rid), el3 = $('totAnt-'+rid);
+  if (el3) el3.textContent = ant ? '$'+ant.toLocaleString('es-CL') : '';
   if (el1) el1.textContent = fact ? '$'+fact.toLocaleString('es-CL') : '';
-  if (el2){ const dif = fact - calc; el2.innerHTML = fact ? `<span class="${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</span>` : ''; }
+  if (el2){ const dif = (esUAC?ant:0) + fact - calc; el2.innerHTML = (fact||ant) ? `<span class="${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</span>` : ''; }
+  // Cuadros UAC en vivo: se actualizan a medida que avanza el mes
+  const box = $('uacBox-'+rid);
+  if (box){
+    const total = d.ops.reduce((a,o)=>a+(+o.comision||0),0);
+    const pagado = ant + fact;
+    const dif = pagado - total;
+    box.innerHTML = `
+      <div class="uac-c"><div class="l">Anticipos (~día 15, tier al liquidar)</div><div class="v">${fmt(ant)}</div></div>
+      <div class="uac-c"><div class="l">Por facturar al cierre</div><div class="v">${fmt(total-ant)}</div></div>
+      <div class="uac-c"><div class="l">Total nuestro (motor)</div><div class="v">${fmt(total)}</div></div>
+      <div class="uac-c"><div class="l">Real pagado por UAC</div><div class="v">${fmt(pagado)}</div></div>
+      <div class="uac-c"><div class="l">Diferencia</div><div class="v ${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</div></div>`;
+  }
 }
+
 async function guardarCheck(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   await fetch('/api/facturacion-af/check', { method:'POST', headers:H, body: JSON.stringify({
     mes: d.m, financiera: d.fin, concepto: d.concepto, num_op: o.num_op,
-    monto_calculado: o.comision, monto_facturado: o.monto_facturado, ok: o.ok }) }).catch(()=>{});
+    monto_calculado: o.comision, monto_facturado: o.monto_facturado, anticipo: o.anticipo, ok: o.ok }) }).catch(()=>{});
 }
-async function guardarUAC(m, rid){
-  const ant = String($('uacAnt-'+rid).value).replace(/[^\d]/g,'');
-  const real = String($('uacReal-'+rid).value).replace(/[^\d]/g,'');
-  $('uacAnt-'+rid).value = ant ? fmtIn(ant) : '';
-  $('uacReal-'+rid).value = real ? fmtIn(real) : '';
-  const tot = window['UACTOT_'+rid] || 0;
-  $('uacPF-'+rid).textContent = fmt(tot - (+ant||0));
-  const dif = (+real||0) - tot;
-  const el = $('uacDif-'+rid); el.textContent = fmt(dif); el.className = 'v ' + (dif<0?'dif-neg':'dif-ok');
-  await fetch('/api/facturacion-af/uac', { method:'PUT', headers:H, body: JSON.stringify({ mes: m, anticipo: ant, pagado_real: real }) }).catch(()=>{});
-}
+
 cargar();
 </script>
 <script>
