@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v113.2 -->
+<!-- v113.3 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -94,11 +94,21 @@ function toggleDet(i){
   if (tr.style.display !== 'none') { tr.style.display='none'; return; }
   const p = ROWS[i];
   const chk = asJ(p.checklist)||[], infs = asJ(p.informes)||[];
+  const esMon = crit => /precio|renta|deuda|monto|pie|cuota/i.test(String(crit));
+  const fmtVal = (crit, v) => { if (v==null||v===''||v==='—') return null;
+    const s = String(v); return esMon(crit) ? s.replace(/\d{4,}/g, m => '$'+Number(m).toLocaleString('es-CL')) : s; };
   let h = '';
+  const pctPie = (p.precio > 0 && p.pie != null) ? Math.round(p.pie/p.precio*1000)/10 : null;
+  h += '<h6>Solicitud</h6><div style="font-size:.8rem">Precio '+fmt(p.precio)+' · Pie '+fmt(p.pie)+
+       (pctPie!=null?' ('+String(pctPie).replace('.',',')+'%)':'')+(p.anio?' · Año '+p.anio:'')+'</div>';
   if (p.motivos) h += '<h6>Observaciones</h6><div style="font-size:.8rem">'+esc(p.motivos)+'</div>';
   h += '<h6>Checklist de parámetros</h6><table><thead><tr><th>Criterio</th><th>Valor</th><th>Límite</th><th>Cumple</th></tr></thead><tbody>'+
-    (chk.map(c=>'<tr><td>'+esc(c.criterio)+'</td><td>'+esc(c.valor??'—')+'</td><td>'+esc(c.limite??'—')+'</td><td>'+
-      (c.cumple?'<i class="bi bi-check-circle-fill chk-ok"></i>':'<i class="bi bi-x-circle-fill chk-no"></i>')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">Sin checklist (registro antiguo)</td></tr>')+'</tbody></table>';
+    (chk.map(c=>{ const val = fmtVal(c.criterio, c.valor);
+      const icono = c.cumple ? '<i class="bi bi-check-circle-fill chk-ok"></i>'
+        : (val==null ? '<span style="color:#b45309;font-size:.72rem;font-weight:700"><i class="bi bi-dash-circle-fill me-1"></i>sin dato</span>'
+                     : '<i class="bi bi-x-circle-fill chk-no"></i>');
+      return '<tr><td>'+esc(c.criterio)+'</td><td>'+esc(val??'—')+'</td><td>'+esc(fmtVal(c.criterio,c.limite)??'—')+'</td><td>'+icono+'</td></tr>';
+    }).join('')||'<tr><td colspan="4" class="muted">Sin checklist (registro antiguo)</td></tr>')+'</tbody></table>';
   h += '<h6>Informes DealerNet usados</h6><table><thead><tr><th>Producto</th><th>Disponible</th><th>Severidad</th><th>Fecha</th></tr></thead><tbody>'+
     (infs.map(x=>'<tr><td>'+esc(x.nombre||x.codigo)+'</td><td>'+(x.disponible?'Sí':'No')+'</td><td>'+esc(x.severidad||'—')+'</td><td>'+(x.fecha?new Date(x.fecha).toLocaleDateString('es-CL'):'—')+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">Sin informes registrados</td></tr>')+'</tbody></table>';
   h += '<h6>Informe IA</h6><div style="font-size:.8rem">'+(p.ia_informe_id
