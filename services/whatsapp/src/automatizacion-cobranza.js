@@ -18,7 +18,7 @@ const pool = require('../../../shared/config/database');
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
 /* ── Migración ── */
-(async () => {
+require('../../../shared/migrate').enFila('automatizacion-cobranza', async () => {
   try {
     await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS cobranza_auto_activo TINYINT(1) NOT NULL DEFAULT 0`);
     // Programación y focalización (a quiénes): hora, días de semana, tramo de mora y monto mínimo
@@ -58,7 +58,7 @@ const GRAPH = 'https://graph.facebook.com/v21.0';
            'ENVIADO','ENTREGADO','LEIDO','SIMULADO') DEFAULT 'SIN_RESULTADO'`).catch(() => {});
     console.log('[automatizacion-cobranza] listo (nace desactivado)');
   } catch (e) { console.error('[automatizacion-cobranza migration]', e.message); }
-})();
+});
 
 /* ── Seed: plantilla "Mora Temprana" (pedida por Pato 2026-07-05) ─────────
    Se crea UNA VEZ en Meta (queda PENDING hasta que Meta la apruebe) y se

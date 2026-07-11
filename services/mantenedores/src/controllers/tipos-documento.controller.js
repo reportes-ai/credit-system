@@ -14,7 +14,7 @@ const SEED_DOCS = [
   ['Referencias',                       null,                              0, 1,  90],
 ];
 
-(async () => {
+require('../../../../shared/migrate').enFila('tipos-documento', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tipos_documento (
@@ -56,7 +56,7 @@ const SEED_DOCS = [
       }
     }
   } catch(e) { if (e.errno !== 1050) console.error('[tipos_documento migration]', e.message); }
-})();
+});
 
 /* ── AutoFácil: documentos por OCUPACIÓN del cliente (recursos propios) ─────────── */
 const SEED_OCUPACION = [
@@ -132,7 +132,7 @@ const SEED_OCUPACION = [
   ]],
 ];
 
-(async () => {
+require('../../../../shared/migrate').enFila('tipos-documento', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS documentos_ocupacion (
@@ -160,7 +160,7 @@ const SEED_OCUPACION = [
       console.log('✓ documentos_ocupacion: seeded');
     }
   } catch(e) { if (e.errno !== 1050) console.error('[documentos_ocupacion migration]', e.message); }
-})();
+});
 
 const getAll = async (req, res) => {
   try {

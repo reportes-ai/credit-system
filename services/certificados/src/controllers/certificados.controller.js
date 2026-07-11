@@ -18,7 +18,7 @@ const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.contr
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 
 /* ── Schema + auto-registro del módulo (sin hardcode en el frontend) ─────── */
-(async () => {
+require('../../../../shared/migrate').enFila('certificados', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS certificados (
@@ -90,7 +90,7 @@ const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 
     console.log('✓ certificados: módulo + tabla + textos listos');
   } catch (e) { console.error('[certificados migration]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 const N = v => (v == null || v === '') ? 0 : Number(v);

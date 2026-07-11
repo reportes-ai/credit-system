@@ -1,7 +1,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ─── Migración de tabla ─────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('antecedentes', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS antecedentes_laborales (
@@ -42,7 +42,7 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); }
     catch(e) { if (e.errno !== 1060) console.error('[antecedentes migration]', e.message); }
   }
-})();
+});
 
 const getByRut = async (req, res) => {
   try {

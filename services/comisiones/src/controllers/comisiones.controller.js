@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comisiones_variables (
@@ -54,7 +54,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[comisiones migration]', e.message);
   }
-})();
+});
 
 /* ═══ Alertas del flujo de aprobación de comisiones (paramétricas) ═══════════
    - com_rev_aprobada_ops : Operaciones aprobó → avisa al ejecutivo (espera su OK)
@@ -70,7 +70,7 @@ const EVENTOS_REV = [
     mensaje:'Tus comisiones de {mesProd} quedaron aprobadas por el Sistema (sin respuesta en 2 días hábiles).', href:'/comisiones/revision/' },
 ];
 const SONIDOS = ['campana','dingdong','alarma','aplausos'];
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS comisiones_alertas_config (
       evento VARCHAR(40) PRIMARY KEY, perfiles TEXT, incluir_ejecutivo TINYINT(1) NOT NULL DEFAULT 0,
@@ -95,7 +95,7 @@ const SONIDOS = ['campana','dingdong','alarma','aplausos'];
        WHERE evento='com_rev_devuelta' AND perfiles='Administrador'`).catch(()=>{});
     console.log('[comisiones] alertas_config OK');
   } catch (e) { console.error('[comisiones alertas migration]', e.message); }
-})();
+});
 
 const { sumarDiasHabiles } = require('../../../../shared/feriados');  // días hábiles = sin fines de semana ni feriados chilenos
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];

@@ -52,7 +52,7 @@ const PARAMS_DEFAULT = [
   ['pol_aval_padre_hijo_pie',    40, 'Pie mínimo cuando complementa con padre/hijo (%)'],
 ];
 
-(async () => {
+require('../../../../shared/migrate').enFila('politica-aprobacion', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS politica_aprobacion_matriz (
@@ -90,7 +90,7 @@ const PARAMS_DEFAULT = [
       );
     }
   } catch (e) { console.error('[politica-aprobacion migration]', e.message); }
-})();
+});
 
 const getMatriz = async (req, res) => {
   try {

@@ -45,7 +45,7 @@ const GLOSARIO = [
   '- "Comisión / cuánto gana un EJECUTIVO" = las comisiones de venta se calculan en el módulo Comisiones; en creditos están los insumos por operación (com_dealer, com_parque, monto_comision_fin son comisiones del DEALER/parque/financiera, NO el sueldo del ejecutivo). Si preguntan la comisión ganada por un ejecutivo, entrega sus operaciones del período (conteo y montos) y aclara que la liquidación exacta está en Comisiones → Revisión (/comisiones/revision/).',
 ].join('\n');
 
-(async () => {
+require('../../../../shared/migrate').enFila('consulta', async () => {
   try {
     await ia.registrarFuncionalidad({
       codigo: CODIGO_IA,
@@ -83,7 +83,7 @@ const GLOSARIO = [
     await pool.query("INSERT IGNORE INTO ia_consulta_limites (id_perfil, cantidad, periodo) VALUES (1, 0, 'semana')");  // Administrador: ilimitado (0)
     console.log('[ia consulta] registrado');
   } catch (e) { console.error('[ia consulta init]', e.message); }
-})();
+});
 
 /* ── Esquema acotado para el prompt (desde information_schema, cacheado 10 min) ── */
 let _esq = null, _esqAt = 0;

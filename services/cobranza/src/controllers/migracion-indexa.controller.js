@@ -15,7 +15,7 @@ const XLSX = require('xlsx');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Schema: calendario real (no se recalcula) + marca de origen ───────── */
-(async () => {
+require('../../../../shared/migrate').enFila('migracion-indexa', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cuotas_credito (
@@ -42,13 +42,13 @@ const { auditar } = require('../../../../shared/audit');
     await pool.query(`ALTER TABLE creditos ADD COLUMN origen VARCHAR(20) NULL`).catch(() => {});
     console.log('✓ migracion-indexa: cuotas_credito + creditos.origen listos');
   } catch (e) { console.error('[migracion-indexa schema]', e.message); }
-})();
+});
 
 /* ── Fix one-time (idempotente): la 1a carga dejó los créditos INDEXA con campos
    que el listado exige en NULL (numero_credito/estado_eval/fecha_otorgado/mes) y
    los RUT con puntos (el sistema usa SIN puntos). Esto los hace visibles y
    buscables sin re-aplicar. Tras correr no quedan filas que tocar. ── */
-(async () => {
+require('../../../../shared/migrate').enFila('migracion-indexa', async () => {
   try {
     const [r1] = await pool.query(
       `UPDATE creditos
@@ -104,7 +104,7 @@ const { auditar } = require('../../../../shared/audit');
     const [r2] = await pool.query("UPDATE clientes SET rut=REPLACE(rut,'.','') WHERE rut LIKE '%.%'");
     if (merges.length || r2.affectedRows) console.log(`[migracion-indexa fix] RUT: ${r2.affectedRows} renombrados, ${merges.length} fusionados`);
   } catch (e) { console.error('[migracion-indexa fix]', e.message); }
-})();
+});
 
 /* ── Normalizadores ────────────────────────────────────────────────────── */
 // CSV trae RUT con DV pegado ("129382163" → 12.938.216-3)

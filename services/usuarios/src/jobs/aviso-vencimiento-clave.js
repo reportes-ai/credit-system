@@ -14,7 +14,7 @@ const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../sha
 const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
 const DIAS_AVISO_DEFAULT = 5; // días de anticipación por defecto (configurable en Seguridad)
 
-(async () => {
+require('../../../../shared/migrate').enFila('aviso-vencimiento-clave', async () => {
   try {
     // Registro de "último aviso enviado" por usuario → un correo por día
     await pool.query(`CREATE TABLE IF NOT EXISTS avisos_clave_vencimiento (
@@ -22,7 +22,7 @@ const DIAS_AVISO_DEFAULT = 5; // días de anticipación por defecto (configurabl
       last_sent  DATE NOT NULL
     )`);
   } catch (e) { console.error('[aviso-venc-clave migration]', e.message); }
-})();
+});
 
 function correoVencimiento(nombre, dias) {
   const login = `${APP_URL}/login.html`;

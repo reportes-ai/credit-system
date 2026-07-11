@@ -3,7 +3,7 @@ const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
 
 /* ─── Ensure table ───────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('documentos-af', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS documentos_af (
@@ -29,7 +29,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     if (e.errno !== 1050) console.error('[documentos_af migration]', e.message);
   }
-})();
+});
 
 /* ─── GET /:id_credito ───────────────────────────────────────────────────── */
 const getByCredito = async (req, res) => {

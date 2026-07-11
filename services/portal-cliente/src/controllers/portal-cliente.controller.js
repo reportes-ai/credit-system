@@ -19,7 +19,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const rutNorm = r => String(r || '').replace(/[.\s]/g, '').toUpperCase();
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('portal-cliente', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portal_clientes (
@@ -52,7 +52,7 @@ const rutNorm = r => String(r || '').replace(/[.\s]/g, '').toUpperCase();
     ];
     for (const [k, v] of SEED) await pool.query('INSERT IGNORE INTO portal_cliente_config (clave, valor) VALUES (?,?)', [k, v]);
   } catch (e) { console.error('[portal-cliente migration]', e.message); }
-})();
+});
 
 /* ── Middleware: sesión de cliente (JWT propio tipo=cliente) ───────────────── */
 exports.verifyCliente = (req, res, next) => {

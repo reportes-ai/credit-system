@@ -52,7 +52,7 @@ exports.setConfig = async (req, res) => {
 };
 
 /* ── Seed: funcionalidad del mantenedor (aparece en Mantenedores vía BD) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('mando', async () => {
   try {
     const [[ya]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_horarios_analistas'");
     if (!ya) {
@@ -63,7 +63,7 @@ exports.setConfig = async (req, res) => {
       console.log('[mando] funcionalidad mant_horarios_analistas sembrada');
     }
   } catch (e) { console.error('[mando seed]', e.message); }
-})();
+});
 
 exports.mando = async (req, res) => {
   try {

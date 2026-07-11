@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ── */
-(async () => {
+require('../../../../shared/migrate').enFila('cuentas-transitorias', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS correlativo_transacciones (
@@ -29,7 +29,7 @@ const { auditar } = require('../../../../shared/audit');
       )
     `);
   } catch(e) { if (e.errno !== 1050) console.error('[cuentas_transitorias migration]', e.message); }
-})();
+});
 
 const ok  = (res, data)    => res.json({ success: true, data, error: null });
 const err = (res, e, s=500)=> res.status(s).json({ success: false, data: null, error: e?.message||e });

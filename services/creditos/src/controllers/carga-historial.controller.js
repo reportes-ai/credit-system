@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 
 /* ── Migración ──────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('carga-historial', async () => {
   const sqls = [
     `CREATE TABLE IF NOT EXISTS carga_sesiones (
        id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,7 +42,7 @@ const XLSX = require('xlsx');
   for (const sql of sqls) {
     try { await pool.query(sql); } catch (e) { console.error('[carga-historial migration]', e.message); }
   }
-})();
+});
 
 /* ═══════════════════ HELPERS (usados desde otros controllers) ═══════════════ */
 

@@ -56,7 +56,7 @@ async function sincronizarComercialDealernet(rutDash) {
   } catch (e) { console.error('[sincronizarComercialDealernet]', e.message); return false; }
 }
 
-(async () => {
+require('../../../../shared/migrate').enFila('evaluacion', async () => {
   try {
     // Documentos que el ejecutivo carga para evaluar (por RUT + documento requerido).
     await pool.query(`
@@ -108,7 +108,7 @@ async function sincronizarComercialDealernet(rutDash) {
     }
     console.log('[evaluacion-crediticia] módulo/card y permisos listos');
   } catch (e) { console.error('[evaluacion-crediticia migration]', e.message); }
-})();
+});
 
 /* GET /api/evaluacion-crediticia/ficha/:rut — ficha del cliente para evaluar */
 const ficha = async (req, res) => {

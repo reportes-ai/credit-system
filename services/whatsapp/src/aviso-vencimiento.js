@@ -18,7 +18,7 @@ const TPL_SIMPLE = 'aviso_vencimiento';
 const TPL_MORA   = 'aviso_vencimiento_mora';
 
 /* ── Migración ── */
-(async () => {
+require('../../../shared/migrate').enFila('aviso-vencimiento', async () => {
   try {
     for (const col of ["aviso_venc_activo TINYINT(1) NOT NULL DEFAULT 0", "aviso_venc_dias INT NOT NULL DEFAULT 2"]) {
       await pool.query(`ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS ${col}`);
@@ -40,7 +40,7 @@ const TPL_MORA   = 'aviso_vencimiento_mora';
       )`);
     console.log('[aviso-vencimiento] listo (nace desactivado)');
   } catch (e) { console.error('[aviso-vencimiento migration]', e.message); }
-})();
+});
 
 /* ── Utilidades ── */
 const CLP = v => '$' + Math.round(Number(v || 0)).toLocaleString('es-CL');

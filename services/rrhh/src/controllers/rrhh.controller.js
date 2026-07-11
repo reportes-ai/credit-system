@@ -8,7 +8,7 @@ const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('rrhh', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rh_vacaciones (
@@ -146,7 +146,7 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
   } catch (e) { console.error('[rrhh mant saludos]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s || '').trim();

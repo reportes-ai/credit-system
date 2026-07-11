@@ -6,7 +6,7 @@ try { webpush = require('web-push'); }
 catch (e) { console.error('[notif] web-push no instalado — solo notificaciones in-app'); }
 
 /* ── Migración ───────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('notificaciones', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS push_config (
@@ -41,7 +41,7 @@ catch (e) { console.error('[notif] web-push no instalado — solo notificaciones
     `);
     console.log('[notif] tablas OK');
   } catch (e) { console.error('[notif migration]', e.message); }
-})();
+});
 
 /* ── VAPID: se genera una vez y queda en BD ─────────────────────── */
 let VAPID = null;

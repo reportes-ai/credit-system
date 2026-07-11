@@ -128,10 +128,10 @@ exports.restaurar = async (req, res) => {
 };
 
 // Card en Mantenedores (solo la ve el Admin: sin permisos_perfil asignados)
-(async () => {
+require('../../../../shared/migrate').enFila('punto-restauracion', async () => {
   try {
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='punto_restauracion' LIMIT 1");
     if (!ex) await pool.query(
       "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (30001, 'Punto de Restauración (UAT)', 'punto_restauracion', '/mantenedores/punto-restauracion/', 'bi-clock-history')");
   } catch (e) { console.error('[punto-restauracion seed]', e.message); }
-})();
+});

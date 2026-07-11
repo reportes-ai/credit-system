@@ -13,7 +13,7 @@ const { auditar } = require('../../../../shared/audit');
 const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos (idempotente) ──────── */
-(async () => {
+require('../../../../shared/migrate').enFila('ordenes-pago', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS proveedores (
@@ -140,7 +140,7 @@ const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ord
     }
     if (fixed) console.log('[ordenes-pago] snapshots re-congelados (v' + DOC_VERSION + '):', fixed);
   } catch (e) { console.error('[ordenes-pago snapshot repair]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s ?? '').trim();

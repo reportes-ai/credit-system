@@ -53,7 +53,7 @@ const initTablas = async () => {
   await pool.query(`INSERT IGNORE INTO caja_horario_pago (id) VALUES (1)`);
 };
 // Migraciones: perfil Tesorero + funcionalidad /tesoreria/caja/
-(async () => {
+require('../../../../shared/migrate').enFila('cajas', async () => {
   try {
     await pool.query(`
       INSERT INTO perfiles (nombre, descripcion)
@@ -93,7 +93,7 @@ const initTablas = async () => {
       }
     }
   } catch(e) { console.error('[cajas] migración funcionalidad caja:', e.message); }
-})();
+});
 initTablas().catch(e => console.error('[cajas] init tablas:', e.message));
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */

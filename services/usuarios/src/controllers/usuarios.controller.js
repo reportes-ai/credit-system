@@ -51,7 +51,7 @@ const correoClave = (nombre, email, clave, esReset = false) => {
 };
 
 /* ─── Migraciones ──────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN telefono VARCHAR(20) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration telefono]', e.message); }
@@ -83,10 +83,10 @@ const correoClave = (nombre, email, clave, esReset = false) => {
     // M/F: para don/doña en el certificado de antigüedad y saludos
     await pool.query(`ALTER TABLE usuarios ADD COLUMN sexo CHAR(1) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
-})();
+});
 
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
-(async () => {
+require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS permisos_usuario (
@@ -98,10 +98,10 @@ const correoClave = (nombre, email, clave, esReset = false) => {
       )
     `);
   } catch (e) { console.error('[permisos_usuario migration]', e.message); }
-})();
+});
 
 // Tabla asignación ejecutivos por usuario
-(async () => {
+require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuario_ejecutivos (
@@ -112,13 +112,13 @@ const correoClave = (nombre, email, clave, esReset = false) => {
       )
     `);
   } catch (e) { console.error('[usuario_ejecutivos migration]', e.message); }
-})();
+});
 
 /* ─── Migración (UNA sola vez): los ejecutivos del listado viejo (cartas_ejecutivos)
    que no son usuarios se crean como usuarios SUSPENDIDOS (estado='inactivo', perfil
    Ejecutivo Comercial), para que aparezcan en "Usuarios Suspendidos" y su nombre quede
    en el roster. No pueden loguear (inactivo + clave aleatoria). Idempotente por flag. */
-(async () => {
+require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY, aplicada_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
@@ -156,7 +156,7 @@ const correoClave = (nombre, email, clave, esReset = false) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('ejecutivos_a_usuarios_v1')");
     if (creados) console.log(`[ejecutivos_a_usuarios_v1] ${creados} ex-ejecutivo(s) creados como usuarios suspendidos`);
   } catch (e) { console.error('[ejecutivos_a_usuarios_v1]', e.message); }
-})();
+});
 
 /* ─── Cuenta break-glass: administrador GARANTIZADO y PROTEGIDO ──────────────
    Acceso de administrador que no se puede eliminar, suspender ni degradar desde la
@@ -164,7 +164,7 @@ const correoClave = (nombre, email, clave, esReset = false) => {
    la fija con "Resetear clave" (nadie más la conoce y NO queda en el código). El
    bloque se auto-repara en cada arranque (siempre admin + activo + protegido) y NUNCA
    sobrescribe la clave ya fijada. Auditoría: se registra igual que cualquier cuenta. */
-(async () => {
+require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query("ALTER TABLE usuarios ADD COLUMN protegido TINYINT(1) NOT NULL DEFAULT 0").catch(() => {});
     const EMAIL = 'admin@admin.cl';
@@ -183,7 +183,7 @@ const correoClave = (nombre, email, clave, esReset = false) => {
       await pool.query("UPDATE usuarios SET id_perfil = ?, estado = 'activo', protegido = 1, nombre = 'BG-ADMIN', apellido = '' WHERE email = ?", [idAdmin, EMAIL]);
     }
   } catch (e) { console.error('[break-glass admin]', e.message); }
-})();
+});
 
 // ¿La cuenta es protegida (break-glass)? No se puede borrar/suspender/degradar.
 async function esProtegido(id) {

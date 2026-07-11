@@ -31,7 +31,7 @@ const BUCKETS = [
 const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
 
 /* ─── Migración + seed + registro de módulo ──────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_seg (
@@ -136,7 +136,7 @@ const bucketDe = d => BUCKETS.findIndex(b => d <= b.max);
                             WHERE e.id_seguimiento = ps.id AND e.track='SALDO' AND e.etapa='FUNDANTES RECIBIDOS')
        ON DUPLICATE KEY UPDATE id_seguimiento = id_seguimiento`);
   } catch (e) { console.error('[fundantes RECIBIDOS backfill]', e.message); }
-})();
+});
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const nombreUsuario = req => (req.usuario && `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim()) ||

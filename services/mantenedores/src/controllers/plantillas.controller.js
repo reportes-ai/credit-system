@@ -369,7 +369,7 @@ El Deudor ha solicitado a AUTO FÁCIL el otorgamiento de un crédito o mutuo de 
 ];
 
 /* ─── Ensure table + seed ────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('plantillas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS plantillas_documento (
@@ -396,7 +396,7 @@ El Deudor ha solicitado a AUTO FÁCIL el otorgamiento de un crédito o mutuo de 
   } catch (e) {
     if (e.errno !== 1050) console.error('[plantillas migration]', e.message);
   }
-})();
+});
 
 /* ─── Controllers ────────────────────────────────────────────────────────── */
 const getAll = async (req, res) => {

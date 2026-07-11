@@ -11,7 +11,7 @@ const { auditar } = require('../../../../shared/audit');
 
 const CODIGO = 'informe_crediticio';
 
-(async () => {
+require('../../../../shared/migrate').enFila('informe-dealernet', async () => {
   try {
     await ia.registrarFuncionalidad({
       codigo: CODIGO,
@@ -38,7 +38,7 @@ const CODIGO = 'informe_crediticio';
       INDEX idx_fecha (fecha), INDEX idx_rut (rut) )`);
     try { await pool.query('ALTER TABLE ia_informes_dealernet ADD COLUMN IF NOT EXISTS causas JSON NULL'); } catch (e) { if (e.errno !== 1060) console.error('[ia informe-dn alter]', e.message); }
   } catch (e) { console.error('[ia informe-dn init]', e.message); }
-})();
+});
 
 const rutNum = r => { const c = String(r || '').replace(/[.\s-]/g, '').toUpperCase(); return c.length > 1 ? c.slice(0, -1) : c; };
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico

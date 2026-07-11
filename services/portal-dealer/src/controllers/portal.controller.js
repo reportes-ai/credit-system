@@ -14,7 +14,7 @@ const { clientIp } = require('../../../../shared/middleware/rate-limit');
 const CODIGO_IA = 'dealer_ia';
 
 // ── Migración: feature IA del portal (nace DESACTIVADA) + log de uso ────────
-(async () => {
+require('../../../../shared/migrate').enFila('portal', async () => {
   try {
     await ia.registrarFuncionalidad({
       codigo: CODIGO_IA,
@@ -58,7 +58,7 @@ const CODIGO_IA = 'dealer_ia';
   await pool.query('ALTER TABLE creditos ADD INDEX idx_creditos_id_dealer (id_dealer)').catch(() => {});
   await pool.query(`ALTER TABLE creditos ADD INDEX idx_creditos_rutnorm (${RUTNORM_EXPR})`).catch(() => {});
   await pool.query(`ALTER TABLE cartolas_enviadas ADD INDEX idx_cartenv_rutnorm (${RUTNORM_EXPR})`).catch(() => {});
-})();
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 const rutNorm = (r) =>
@@ -527,7 +527,7 @@ exports.simulador = async (req, res) => {
    ═══════════════════════════════════════════════════════════════════════════ */
 const AF_RUT = require('../../../../api-gateway/public/js/rut-core');
 
-(async () => {
+require('../../../../shared/migrate').enFila('portal', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portal_preaprobaciones (
@@ -572,7 +572,7 @@ const AF_RUT = require('../../../../api-gateway/public/js/rut-core');
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     if (adm) await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [adm.id_perfil, idF]);
   } catch (e) { console.error('[preaprobacion migration]', e.message); }
-})();
+});
 
 // Grilla por defecto del Cuadro Preferencia Financiera (misma semilla del
 // mantenedor de Cartas; si existe en cartas_parametros, manda la BD).

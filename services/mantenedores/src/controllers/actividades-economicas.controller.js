@@ -11,7 +11,7 @@ let SEED = [];
 try { SEED = require('../data/actividades-economicas.json'); } catch (e) { console.error('[actividades seed file]', e.message); }
 
 /* ── Migración: tabla + seed + registro en el menú (idempotente) ───────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('actividades-economicas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS actividades_economicas (
@@ -44,7 +44,7 @@ try { SEED = require('../data/actividades-economicas.json'); } catch (e) { conso
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
        VALUES (30001, 'Actividades Económicas', 'mantenedores_actividades_economicas', '/mantenedores/actividades-economicas/', 'bi-briefcase')`);
   } catch (e) { console.error('[actividades-economicas migration]', e.message); }
-})();
+});
 
 const norm = s => String(s ?? '').trim();
 

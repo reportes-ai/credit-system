@@ -9,7 +9,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
-(async () => {
+require('../../../../shared/migrate').enFila('carrera', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS carrera_config (
@@ -40,7 +40,7 @@ const { auditar } = require('../../../../shared/audit');
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
   } catch (e) { console.error('[carrera permisos]', e.message); }
-})();
+});
 
 async function getConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM carrera_config LIMIT 100');

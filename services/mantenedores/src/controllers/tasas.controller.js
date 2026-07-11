@@ -13,7 +13,7 @@ const dispararRecalc = () => recalcularMesesAbiertos()
 // - spread_mayor: spread que el usuario ingresa (aplicado a >200 UF), ej: 0.67%
 // - CF = tasa_mensual_mayor - spread_mayor  (mismo para ambos tramos)
 // - spread_menor: implícito = tasa_mensual_menor - CF (calculado y almacenado)
-(async () => {
+require('../../../../shared/migrate').enFila('tasas', async () => {
   for (const sql of [
     `ALTER TABLE tasas ADD COLUMN spread_menor DECIMAL(8,4) NULL DEFAULT NULL`,
     `ALTER TABLE tasas ADD COLUMN spread_mayor DECIMAL(8,4) NULL DEFAULT NULL`,
@@ -30,7 +30,7 @@ const dispararRecalc = () => recalcularMesesAbiertos()
        SET spread_menor = ROUND(tasa_mensual_menor - tasa_mensual_mayor + spread_mayor, 4)`
     );
   } catch(e) { console.error('[tasas migration spread]', e.message); }
-})();
+});
 
 const getAll = async (req, res) => {
   try {

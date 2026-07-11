@@ -3,7 +3,7 @@
 const pool = require('../../../../shared/config/database');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('gestiones', async () => {
   let conn;
   try {
     conn = await pool.getConnection();
@@ -71,7 +71,7 @@ const pool = require('../../../../shared/config/database');
   } finally {
     if (conn) conn.release();
   }
-})();
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function ok(res, data, status = 200) {

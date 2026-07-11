@@ -2,7 +2,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ── Migración + seed piloto (Post Venta) ─────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('ayuda', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ayuda_paginas (
@@ -268,7 +268,7 @@ const pool = require('../../../../shared/config/database');
     }
     console.log('[ayuda] tabla OK + seed', SEED.length);
   } catch (e) { console.error('[ayuda migration]', e.message); }
-})();
+});
 
 const parse = (s, def) => { try { return JSON.parse(s); } catch { return def; } };
 const normRuta = r => { let x = String(r || '').split('?')[0].split('#')[0]; if (!x.endsWith('/')) x += '/'; return x; };

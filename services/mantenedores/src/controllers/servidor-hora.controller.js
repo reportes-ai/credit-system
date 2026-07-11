@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 // Migración: agregar parámetro db_tz_override si no existe
-(async () => {
+require('../../../../shared/migrate').enFila('servidor-hora', async () => {
   try {
     await pool.query(`
       INSERT IGNORE INTO parametros_credito (clave, valor, descripcion)
@@ -23,7 +23,7 @@ const { auditar } = require('../../../../shared/audit');
       if (adm) await pool.query("INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)", [adm.id_perfil, f.id_funcionalidad]);
     }
   } catch(e) { console.error('[servidor-hora migration]', e.message); }
-})();
+});
 
 /* Próximo cambio de horario DST en Chile */
 function proximoCambioDST() {

@@ -18,7 +18,7 @@
  */
 const pool = require('./config/database');
 
-(async () => {
+require('../shared/migrate').enFila('visibilidad-ejecutivos', async () => {
   try {
     const [[col]] = await pool.query(
       "SELECT COUNT(*) c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='perfiles' AND column_name='ambito_ejecutivos'");
@@ -29,7 +29,7 @@ const pool = require('./config/database');
       console.log('[visibilidad-ejecutivos] columna perfiles.ambito_ejecutivos creada + seed');
     }
   } catch (e) { console.error('[visibilidad-ejecutivos migration]', e.message); }
-})();
+});
 
 const CACHE_MS = 60 * 1000;
 let _cache = null, _exp = 0;

@@ -79,7 +79,7 @@ const WIDGETS = [
 const WIDGET_MAP = Object.fromEntries(WIDGETS.map(w => [w.codigo, w]));
 
 /* ── Migración: config por perfil ─────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('mi-dia', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS mi_dia_config (
@@ -132,7 +132,7 @@ const WIDGET_MAP = Object.fromEntries(WIDGETS.map(w => [w.codigo, w]));
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
   } catch (e) { console.error('[mi-dia migration]', e.message); }
-})();
+});
 
 /* ── Saludo según hora Chile ─────────────────────────────────────────────── */
 function saludo() {

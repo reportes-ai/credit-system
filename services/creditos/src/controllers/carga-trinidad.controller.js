@@ -8,7 +8,7 @@ const { isMesCerrado, getMesDeNumOp } = require('../../../../shared/utils/mes-ce
 const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
   try {
     await pool.query(`ALTER TABLE creditos ADD COLUMN estado_autofin VARCHAR(50) NULL COMMENT 'Estado en sistema Trinidad'`);
     console.log('[carga-trinidad] columna estado_autofin creada');
@@ -44,7 +44,7 @@ const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
   } catch (e) {
     console.error('[carga-trinidad migration estado_eval]', e.message);
   }
-})();
+});
 
 /* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
 async function cargarMapaEstados() {

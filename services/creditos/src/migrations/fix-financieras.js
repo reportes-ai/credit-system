@@ -19,7 +19,7 @@ const pool = require('../../../../shared/config/database');
 
 const FLAG = 'fin_fix_2026_06';
 
-(async () => {
+require('../../../../shared/migrate').enFila('fix-financieras', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS data_migraciones (
       clave VARCHAR(60) PRIMARY KEY, detalle VARCHAR(255), applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
@@ -71,4 +71,4 @@ const FLAG = 'fin_fix_2026_06';
       } catch (e) { console.error('[fin-fix recalc require]', e.message); }
     }
   } catch (e) { console.error('[fin-fix migration]', e.message); }
-})();
+});

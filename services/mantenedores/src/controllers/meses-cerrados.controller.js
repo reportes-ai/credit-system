@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ─────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('meses-cerrados', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS meses_cerrados (
@@ -34,7 +34,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[meses-cerrados migration]', e.message);
   }
-})();
+});
 
 /* ── Helpers ─────────────────────────────────────────────────────────── */
 function generarMeses(n = 24) {

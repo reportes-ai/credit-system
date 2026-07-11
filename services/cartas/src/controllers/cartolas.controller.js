@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ───────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('cartolas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cartolas_movimientos (
@@ -78,7 +78,7 @@ const { auditar } = require('../../../../shared/audit');
     } catch(e){ console.error('[num_op->int cartolas_movimientos]', e.message); }
     console.log('[cartolas] tablas OK');
   } catch (e) { console.error('[cartolas migration]', e.message); }
-})();
+});
 const nombreUsuario = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Usuario';
 
 /* ── POST /api/cartolas/sync ─────────────────────────────────────────

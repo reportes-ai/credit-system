@@ -13,7 +13,7 @@ const { auditar } = require('../../../../shared/audit');
    ───────────────────────────────────────────────────────────────────────────── */
 
 // Card en Mantenedores (funcionalidad + permiso Administrador)
-(async () => {
+require('../../../../shared/migrate').enFila('ia-config', async () => {
   try {
     const [[m]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre = 'Mantenedores' LIMIT 1");
     if (!m) return;
@@ -27,7 +27,7 @@ const { auditar } = require('../../../../shared/audit');
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre = 'Administrador' LIMIT 1");
     if (adm) await pool.query("INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)", [adm.id_perfil, f.id_funcionalidad]);
   } catch (e) { console.error('[ia-config migration]', e.message); }
-})();
+});
 
 /* GET /api/ia-config → { activa, texto_analizando, texto_analizado, mostrar_logo, funcionalidades[] } */
 const getConfig = async (req, res) => {

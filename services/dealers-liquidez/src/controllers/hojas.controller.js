@@ -22,7 +22,7 @@ const NIVELES_SEED = [
 ];
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('hojas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dealer_liquidez_hojas (
@@ -133,7 +133,7 @@ const NIVELES_SEED = [
     }
     console.log('[dealers-liquidez] hojas: permisos cadena registrados');
   } catch (e) { console.error('[dlz hojas permisos]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const num = v => { const n = Number(String(v ?? '').replace(/[^\d.-]/g, '')); return isNaN(n) ? 0 : n; };

@@ -2,7 +2,7 @@ const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 
 // ── Migración ──────────────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('broker-validaciones', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS broker_validation_items (
@@ -53,7 +53,7 @@ const audit = require('../../../../shared/auditoria');
     }
     console.log('✓ broker_validation: tablas listas');
   } catch(e) { console.error('[broker-validaciones migration]', e.message); }
-})();
+});
 
 // ── Items (catálogo) ───────────────────────────────────────────────────────
 const getItems = async (req, res) => {

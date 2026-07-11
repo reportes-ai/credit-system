@@ -95,7 +95,7 @@ const TERMINOS_DEFAULT = [
 ];
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('campanas-ventas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cv_campanas (
@@ -203,7 +203,7 @@ const TERMINOS_DEFAULT = [
     }
     console.log('[campanas-ventas] módulo listo');
   } catch (e) { console.error('[campanas-ventas migration]', e.message); }
-})();
+});
 
 /* ── Helpers de normalización — las bases vienen de procedencias MUY
    distintas, así que cada dato clave se normaliza a un formato canónico ── */

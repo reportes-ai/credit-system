@@ -37,7 +37,7 @@ const oauthConfig = () => !!(CLIENT_ID && CLIENT_SECRET);
 
 const configurado = () => centralizado() || oauthConfig();
 
-(async () => {
+require('../../../../shared/migrate').enFila('google-calendar', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS mi_dia_google (
@@ -47,7 +47,7 @@ const configurado = () => centralizado() || oauthConfig();
         connected_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
   } catch (e) { console.error('[mi_dia_google migration]', e.message); }
-})();
+});
 
 /* ── Utilidades comunes ── */
 function rangoHoyChile() {

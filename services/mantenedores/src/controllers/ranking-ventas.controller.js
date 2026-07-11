@@ -9,7 +9,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
-(async () => {
+require('../../../../shared/migrate').enFila('ranking-ventas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS rank_config (
@@ -44,7 +44,7 @@ const { auditar } = require('../../../../shared/audit');
       if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     }
   } catch (e) { console.error('[ranking permisos]', e.message); }
-})();
+});
 
 async function getConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM rank_config LIMIT 100');

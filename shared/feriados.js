@@ -69,10 +69,10 @@ async function cargar() {
   } catch (e) { console.error('[feriados cargar]', e.message); }
 }
 
-(async () => {
+require('../shared/migrate').enFila('feriados', async () => {
   try { await migrarYsembrar(); await cargar(); console.log('[feriados] CL cargados:', _set.size); }
   catch (e) { console.error('[feriados init]', e.message); }
-})();
+});
 setInterval(cargar, 6 * 60 * 60 * 1000);   // refresca cada 6 h por si el Admin edita la tabla
 
 const esFinde   = d => d.getDay() === 0 || d.getDay() === 6;

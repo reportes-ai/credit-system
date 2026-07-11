@@ -1,7 +1,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ─── Migración de tabla ─────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('informacion-comercial', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS informacion_comercial (
@@ -37,7 +37,7 @@ const pool = require('../../../../shared/config/database');
   } catch (e) {
     if (e.errno !== 1050) console.error('[informacion_comercial migration]', e.message);
   }
-})();
+});
 
 const getByRut = async (req, res) => {
   try {

@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const CONFIG_KEY = 'dashboard_tab_permisos';
 
 // ── Inicializar tabla config si no existe ─────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('dashboard', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dashboard_config (
@@ -16,7 +16,7 @@ const CONFIG_KEY = 'dashboard_tab_permisos';
   } catch (e) {
     console.error('[dashboard] CREATE TABLE dashboard_config:', e.message);
   }
-})();
+});
 
 // ── Labels de meses ──────────────────────────────────────────────────────────
 const MESES_LABELS = {

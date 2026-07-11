@@ -16,7 +16,7 @@ const { mesChile } = require('../../../../shared/utils/fecha-futura');   // MOTO
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración: tabla de config + funcionalidades (card Soporte) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('bono-jefe', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS bono_jefe_config (
@@ -47,7 +47,7 @@ const { auditar } = require('../../../../shared/audit');
     }
     console.log('✓ bono_jefe_config lista');
   } catch (e) { console.error('[bono-jefe schema]', e.message); }
-})();
+});
 
 async function getCfg() {
   const [rows] = await pool.query('SELECT clave, valor FROM bono_jefe_config');

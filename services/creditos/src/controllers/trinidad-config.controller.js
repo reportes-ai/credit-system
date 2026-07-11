@@ -2,7 +2,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ── Migraciones ─────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('trinidad-config', async () => {
   const sqls = [
     `CREATE TABLE IF NOT EXISTS trinidad_estados (
        id               INT AUTO_INCREMENT PRIMARY KEY,
@@ -103,7 +103,7 @@ const pool = require('../../../../shared/config/database');
     }
     console.log('[trinidad-config] seed estados insertado');
   }
-})();
+});
 
 /* ══════════════════ ESTADOS ══════════════════ */
 

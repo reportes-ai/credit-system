@@ -4,7 +4,7 @@ const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
 const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.controller');
 
-(async () => {
+require('../../../../shared/migrate').enFila('pagos-credito', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pagos_credito (
@@ -84,7 +84,7 @@ const { _calc: COB } = require('../../../cobranza/src/controllers/cobranza.contr
       )
     `);
   } catch(e) { if (e.errno !== 1050) console.error('[pagos_credito migration]', e.message); }
-})();
+});
 
 /* ─── Condonación: validación server-side contra atribuciones de la caja ──────
  * Recalcula (canónico, igual que /api/cobranza/calcular-cobranza-lote) la mora y

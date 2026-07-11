@@ -36,13 +36,13 @@ async function desistirAprobadosVencidos() {
   return { dias, desistidos: r.affectedRows };
 }
 
-(async () => {
+require('../../../../shared/migrate').enFila('desistir-aprobados', async () => {
   try {
     await pool.query(`INSERT IGNORE INTO parametros_credito (clave, valor, descripcion)
       VALUES ('aprobado_desiste_dias', '6', 'Días corridos para que un crédito APROBADO sin cursar pase a DESISTIDO automáticamente')`);
     setTimeout(() => desistirAprobadosVencidos().catch(e => console.error('[desistir-aprobados]', e.message)), 20000);
     setInterval(() => desistirAprobadosVencidos().catch(e => console.error('[desistir-aprobados]', e.message)), 12 * 60 * 60 * 1000);
   } catch (e) { console.error('[desistir-aprobados init]', e.message); }
-})();
+});
 
 module.exports = { desistirAprobadosVencidos };

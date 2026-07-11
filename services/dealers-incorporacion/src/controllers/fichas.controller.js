@@ -42,7 +42,7 @@ async function comDefaults() {
 }
 
 /* ── Migración: tabla + registro de módulo/funcionalidades/permisos ───────── */
-(async () => {
+require('../../../../shared/migrate').enFila('fichas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dealer_fichas (
@@ -249,7 +249,7 @@ async function comDefaults() {
     }
     console.log('[dealers-incorporacion] módulo registrado');
   } catch (e) { console.error('[dealers-incorporacion migration]', e.message); }
-})();
+});
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
 const norm = s => String(s || '').trim();
@@ -360,7 +360,7 @@ const EVENTOS_DEALER = [
   { evento: 'dealer_cerrada',        titulo: 'Dealer — creado/actualizado',          son_def: 'dingdong' },
   { evento: 'dealer_rechazada',      titulo: 'Dealer — ficha rechazada',             son_def: 'alarma' },
 ];
-(async () => {
+require('../../../../shared/migrate').enFila('fichas', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS dealer_alertas_config (
       evento            VARCHAR(40) PRIMARY KEY,
@@ -379,7 +379,7 @@ const EVENTOS_DEALER = [
         `INSERT IGNORE INTO dealer_alertas_config (evento, perfiles, incluir_ejecutivo, activo, prioridad, sonido, sonido_tipo) VALUES (?,?,0,1,'alta',1,?)`,
         [e.evento, '', e.son_def]);
   } catch (e) { console.error('[dealer_alertas migration]', e.message); }
-})();
+});
 
 // Envía la alerta de una etapa respetando su configuración (activo/perfiles/sonido).
 // idsBase = destinatarios intrínsecos del flujo (pool del nivel o el ejecutivo); el

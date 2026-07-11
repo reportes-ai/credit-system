@@ -11,7 +11,7 @@ const MES_COMPLETO_DIAS  = 30;   // días de un mes completo (estándar liquidac
 const UMBRAL_VARIABLE_PCT = 5;   // variación de imponible sobre la cual la renta se considera variable
 
 // Auto-registro + tabla de evaluaciones de renta.
-(async () => {
+require('../../../../shared/migrate').enFila('liquidaciones', async () => {
   try {
     await ia.registrarFuncionalidad({
       codigo: CODIGO,
@@ -46,7 +46,7 @@ const UMBRAL_VARIABLE_PCT = 5;   // variación de imponible sobre la cual la ren
       INDEX idx_fecha (fecha), INDEX idx_rut (rut_trabajador) )`);
     try { await pool.query('ALTER TABLE ia_evaluaciones_renta ADD COLUMN IF NOT EXISTS inconsistencias JSON NULL'); } catch (e) { if (e.errno !== 1060) console.error('[ia eval alter]', e.message); }
   } catch (e) { console.error('[ia liquidaciones init]', e.message); }
-})();
+});
 
 const normRut = v => v ? String(v).replace(/\./g, '').toUpperCase().trim() : null;
 const ent = v => (v == null || v === '' || isNaN(parseInt(v))) ? null : parseInt(v);

@@ -40,7 +40,7 @@ const CAMPOS = [
 const CAMPO_KEYS = CAMPOS.map(c => c.key);
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('campanas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS campanas_masivas (
@@ -127,7 +127,7 @@ const CAMPO_KEYS = CAMPOS.map(c => c.key);
     await seedCampanasTest();
     console.log('[campanas-masivas] módulo listo');
   } catch (e) { console.error('[campanas-masivas migration]', e.message); }
-})();
+});
 
 /* ── Seed: 4 "Campaña TEST" (mail/wsp × venta/cobranza) con datos inventados ── */
 async function seedCampanasTest() {

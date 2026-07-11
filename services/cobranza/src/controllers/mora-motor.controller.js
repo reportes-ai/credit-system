@@ -40,7 +40,7 @@ function emailHTMLCobranza(cuerpoTxt) {
 }
 
 /* ── Migración + seed (3 tramos) + config (desactivada) + funcionalidad ── */
-(async () => {
+require('../../../../shared/migrate').enFila('mora-motor', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS cobranza_mora_plantillas (
       codigo     VARCHAR(30) PRIMARY KEY,
@@ -91,7 +91,7 @@ function emailHTMLCobranza(cuerpoTxt) {
     }
     console.log('[cobranza mora-motor] tablas + seed listos');
   } catch (e) { console.error('[cobranza mora-motor migration]', e.message); }
-})();
+});
 
 /* ── Config del motor (claves en cobranza_config) ── */
 const CFG_KEYS = ['mora_activo', 'mora_hora', 'mora_dias', 'mora_remitente', 'mora_cooldown_dias', 'mora_max', 'mora_pausa_seg'];

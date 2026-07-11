@@ -32,7 +32,7 @@ async function secretKey() {
 }
 
 /* ── Migración ──────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('banco-conexiones', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS banco_conexiones (
@@ -81,7 +81,7 @@ async function secretKey() {
     }
     console.log('[banco-conexiones] módulo listo');
   } catch (e) { console.error('[banco-conexiones migration]', e.message); }
-})();
+});
 
 /* ── Config ─────────────────────────────────────────────────────────────────── */
 const getConfig = async (req, res) => {

@@ -20,7 +20,7 @@ NO puedes: prometer aprobaciones, dar tasas o montos de cuota exactos, entregar 
 Si el cliente muestra molestia seria, urgencia de pago o intención concreta de compra, deriva.`;
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('whatsapp', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS wsp_config (
@@ -219,7 +219,7 @@ Si el cliente muestra molestia seria, urgencia de pago o intención concreta de 
     }
     console.log('[whatsapp] módulo registrado');
   } catch (e) { console.error('[whatsapp permisos]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const nombreDe = u => `${u?.nombre || ''} ${u?.apellido || ''}`.trim() || u?.email || null;

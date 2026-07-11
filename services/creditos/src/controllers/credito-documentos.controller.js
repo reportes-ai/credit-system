@@ -2,7 +2,7 @@ const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
 
-(async () => {
+require('../../../../shared/migrate').enFila('credito-documentos', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS credito_documentos (
@@ -44,7 +44,7 @@ const { auditar } = require('../../../../shared/audit');
       )
     `);
   } catch(e) { if (e.errno !== 1050) console.error('[credito_documentos migration]', e.message); }
-})();
+});
 
 /* ─── GET por crédito (sin datos binarios) ──────────────────────────────── */
 const getByCredito = async (req, res) => {

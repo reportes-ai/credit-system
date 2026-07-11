@@ -10,7 +10,7 @@ const UTM_SEED = [
   ['2026-01-01', 69751], ['2026-02-01', 69611], ['2026-03-01', 69889], ['2026-04-01', 69889],
   ['2026-05-01', 70588], ['2026-06-01', 71506], ['2026-07-01', 71649],
 ];
-(async () => {
+require('../../../../shared/migrate').enFila('utm', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS utm (
       id_utm     INT AUTO_INCREMENT PRIMARY KEY,
@@ -21,7 +21,7 @@ const UTM_SEED = [
     if (n === 0) for (const [f, v] of UTM_SEED)
       await pool.query('INSERT IGNORE INTO utm (fecha, valor) VALUES (?,?)', [f, v]);
   } catch (e) { if (e.errno !== 1050) console.error('[utm migration]', e.message); }
-})();
+});
 
 const errSrv = (res, e) => { console.error('[utm]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 

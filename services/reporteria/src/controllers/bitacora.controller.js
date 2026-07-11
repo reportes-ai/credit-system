@@ -18,7 +18,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ─── Seed de la funcionalidad/permiso (paramétrico, igual que el resto) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('bitacora', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/reporteria/' LIMIT 1");
     if (!mod) return;
@@ -36,7 +36,7 @@ const pool = require('../../../../shared/config/database');
       [adm.id_perfil, idF]);
     console.log('✓ funcionalidad rep_bitacora registrada');
   } catch (e) { console.error('[bitacora seed]', e.message); }
-})();
+});
 
 /* ─── Helpers ──────────────────────────────────────────────────────── */
 const normRut = s => String(s || '').replace(/[.\-\s]/g, '').toUpperCase();

@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 // Glosario de definiciones de negocio usadas en el sistema (editable por el Admin).
-(async () => {
+require('../../../../shared/migrate').enFila('definiciones', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS definiciones (
       id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -31,11 +31,11 @@ const { auditar } = require('../../../../shared/audit');
     }
     console.log('✓ Mantenedores: tabla definiciones verificada');
   } catch (e) { console.error('✗ definiciones migración:', e.message); }
-})();
+});
 
 // Carga incremental de la base de conocimiento (idempotente: inserta solo los
 // términos que aún no existen, por nombre). Concentra glosario + fórmulas por tema.
-(async () => {
+require('../../../../shared/migrate').enFila('definiciones', async () => {
   try {
     const KB = [
       // ── Glosario e identificadores ──────────────────────────────────────
@@ -135,7 +135,7 @@ const { auditar } = require('../../../../shared/audit');
     }
     if (nuevas) console.log(`✓ definiciones: base de conocimiento cargada (+${nuevas})`);
   } catch (e) { console.error('✗ definiciones KB:', e.message); }
-})();
+});
 
 const getAll = async (req, res) => {
   try {

@@ -79,7 +79,7 @@ const CATALOGO = [
   { codigo: 'evaluacion_consistencia', nombre: 'Evaluación de consistencia / scoring',    descripcion: 'Cruza todos los documentos del cliente y entrega alertas y scoring asistido', modelo: 'claude-opus-4-8' },
 ];
 
-(async () => {
+require('../shared/migrate').enFila('ia', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS ia_config (
       clave VARCHAR(40) PRIMARY KEY, valor TEXT )`);
@@ -147,7 +147,7 @@ const CATALOGO = [
          ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion)`,
         [f.codigo, f.nombre, f.descripcion, f.modelo]);
   } catch (e) { if (e.errno !== 1050) console.error('[ia migration]', e.message); }
-})();
+});
 
 let _cache = null, _cacheAt = 0;
 const TTL = 60000;

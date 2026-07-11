@@ -12,7 +12,7 @@ const SEED = require('../politica-v3-seed.json');
    tipo: 'parametrico' (editable por el Administrador) | 'fijo' (referencia).
    ───────────────────────────────────────────────────────────────────────── */
 
-(async () => {
+require('../../../../shared/migrate').enFila('politica-v3', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS politica_v3_tablas (
@@ -35,7 +35,7 @@ const SEED = require('../politica-v3-seed.json');
     }
     console.log(`[politica-v3] ${SEED.length} cuadros listos`);
   } catch (e) { console.error('[politica-v3 migration]', e.message); }
-})();
+});
 
 const parse = v => { if (v == null) return v; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
 

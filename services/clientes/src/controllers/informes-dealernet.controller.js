@@ -7,7 +7,7 @@ let pdfParse;
 try { pdfParse = require('pdf-parse'); } catch(e) { console.warn('[informes-dealernet] pdf-parse no disponible:', e.message); }
 
 // ── Migración ────────────────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('informes-dealernet', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS informes_dealernet (
@@ -42,7 +42,7 @@ try { pdfParse = require('pdf-parse'); } catch(e) { console.warn('[informes-deal
   } catch(e) {
     console.error('[informes_dealernet] migration error:', e.message);
   }
-})();
+});
 
 // ── Upload storage ────────────────────────────────────────────────────────────
 const UPLOAD_DIR = path.join(__dirname, '../../../../api-gateway/uploads/informes-dealernet');

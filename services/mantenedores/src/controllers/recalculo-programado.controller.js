@@ -45,7 +45,7 @@ function intervaloActual(tramos, defaultInt, ch) {
 }
 
 /* ── Migración + registro del mantenedor ── */
-(async () => {
+require('../../../../shared/migrate').enFila('recalculo-programado', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS recalc_programado (
@@ -83,7 +83,7 @@ function intervaloActual(tramos, defaultInt, ch) {
     }
     console.log('[recalc-programado] listo');
   } catch (e) { console.error('[recalc-programado migration]', e.message); }
-})();
+});
 
 /* ── Ejecuta el recálculo de todos los meses abiertos y persiste el resultado ── */
 async function ejecutar(nombreTramo, req) {

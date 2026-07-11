@@ -10,7 +10,7 @@
  */
 const pool = require('./config/database');
 
-(async () => {
+require('../shared/migrate').enFila('audit', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS auditoria_movimientos (
@@ -37,7 +37,7 @@ const pool = require('./config/database');
     await pool.query('ALTER TABLE auditoria_movimientos ADD COLUMN IF NOT EXISTS id_titular INT NULL').catch(() => {});
     await pool.query('ALTER TABLE auditoria_movimientos ADD COLUMN IF NOT EXISTS titular_nombre VARCHAR(200) NULL').catch(() => {});
   } catch (e) { if (e.errno !== 1050) console.error('[audit migration]', e.message); }
-})();
+});
 
 const _nombre = u => {
   if (!u) return 'Sistema';

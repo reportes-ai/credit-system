@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración: tabla de impuestos paramétricos + seed + registro en el menú ── */
-(async () => {
+require('../../../../shared/migrate').enFila('impuestos', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS impuestos (
@@ -23,7 +23,7 @@ const { auditar } = require('../../../../shared/audit');
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
        VALUES (30001, 'Impuestos', 'mantenedores_impuestos', '/mantenedores/impuestos/', 'bi-percent')`);
   } catch (e) { console.error('[impuestos migration]', e.message); }
-})();
+});
 
 /* Helper para leer un impuesto (% como número, ej. IVA → 19). Usar en cálculos del backend. */
 async function getImpuestoPct(codigo) {

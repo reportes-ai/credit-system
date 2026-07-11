@@ -1,6 +1,6 @@
 const pool = require('../../../../shared/config/database');
 
-(async () => {
+require('../../../../shared/migrate').enFila('cotizaciones', async () => {
   // 1. Crear tabla si no existe
   try {
     await pool.query(`
@@ -59,7 +59,7 @@ const pool = require('../../../../shared/config/database');
     try { await pool.query(sql); }
     catch (e) { if (e.errno !== 1054) console.error('[cotizaciones migration fix]', e.message); }
   }
-})();
+});
 
 const create = async (req, res) => {
   try {

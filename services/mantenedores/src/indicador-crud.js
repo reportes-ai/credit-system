@@ -7,7 +7,7 @@ const pool = require('../../../shared/config/database');
 const { auditar } = require('../../../shared/audit');
 
 function crear(tabla, idCol, label) {
-  (async () => {
+  require('../../../shared/migrate').enFila(`indicador:${tabla}`, async () => {
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS ${tabla} (
         ${idCol}   INT AUTO_INCREMENT PRIMARY KEY,
@@ -15,7 +15,7 @@ function crear(tabla, idCol, label) {
         valor      DECIMAL(14,4) NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP )`);
     } catch (e) { if (e.errno !== 1050) console.error(`[${tabla} migration]`, e.message); }
-  })();
+  });
 
   const err = (res, e) => { console.error(`[${tabla}]`, e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 

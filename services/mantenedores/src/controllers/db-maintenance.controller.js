@@ -2,7 +2,7 @@
 const pool = require('../../../../shared/config/database');
 
 // ─── Migraciones ─────────────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('db-maintenance', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS db_maintenance_log (
@@ -48,7 +48,7 @@ const pool = require('../../../../shared/config/database');
   } catch (e) {
     console.error('[db-maintenance] migraciones:', e.message);
   }
-})();
+});
 
 // ─── Diagnóstico ────────────────────────────────────────────────────────────
 exports.getDiagnostico = async (req, res) => {

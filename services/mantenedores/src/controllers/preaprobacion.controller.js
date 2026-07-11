@@ -32,7 +32,7 @@ const IA_MODELOS = ['auto', 'claude-haiku-4-5', 'claude-sonnet-5', 'claude-opus-
 const MSG_KEYS = ['msg_aprobado_expres', 'msg_sev_bueno', 'msg_sev_regular', 'msg_sev_malo'];
 
 /* ─── Migración + seed (funcionalidad bajo módulo Mantenedores) ────── */
-(async () => {
+require('../../../../shared/migrate').enFila('preaprobacion', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS preaprobacion_parametros (
@@ -62,7 +62,7 @@ const MSG_KEYS = ['msg_aprobado_expres', 'msg_sev_bueno', 'msg_sev_regular', 'ms
     }
     console.log('✓ mantenedor Políticas de Preaprobación listo');
   } catch (e) { console.error('[preaprobacion-politicas migration]', e.message); }
-})();
+});
 
 /* ─── GET /api/preaprobacion-politicas ─────────────────────────────── */
 const getAll = async (_req, res) => {

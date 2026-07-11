@@ -5,7 +5,7 @@ const { auditar } = require('../../../../shared/audit');
 const CONFIG_KEY = 'workflow_estados_v1';
 
 // ── Migración tabla ────────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('workflow', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS workflow_config (
@@ -18,7 +18,7 @@ const CONFIG_KEY = 'workflow_estados_v1';
   } catch (e) {
     console.error('[workflow] CREATE TABLE:', e.message);
   }
-})();
+});
 
 // ── Etapas por defecto ─────────────────────────────────────────────────────
 const DEFAULT_ETAPAS = [

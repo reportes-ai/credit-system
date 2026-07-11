@@ -19,7 +19,7 @@ const { recalcularEstadoCartera } = require('../../../creditos/src/utils/recalcu
    Fase actual: configuración + umbrales. El motor calcula y muestra, NO bloquea
    ni mueve automáticamente todavía (enforcement se activa cuando se valide).
    ───────────────────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('estado-cartera', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS estados_cartera (
@@ -100,7 +100,7 @@ const { recalcularEstadoCartera } = require('../../../creditos/src/utils/recalcu
         .catch(e => console.error('[estado-cartera] motor inicial', e.message));
     }, 8000);
   } catch (e) { console.error('[estado-cartera migration]', e.message); }
-})();
+});
 
 const RE_COD = /^[A-Z0-9_]+$/;
 const limpiarCodigo = s => String(s || '').trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');

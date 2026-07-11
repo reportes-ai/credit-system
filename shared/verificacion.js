@@ -10,7 +10,7 @@
 const pool   = require('./config/database');
 const crypto = require('crypto');
 
-(async () => {
+require('../shared/migrate').enFila('verificacion', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS documentos_verificables (
@@ -42,7 +42,7 @@ const crypto = require('crypto');
     ]) { try { await pool.query('ALTER TABLE documentos_verificables ' + col); } catch (e) { if (e.errno !== 1060) console.error('[verificacion alter]', e.message); } }
     console.log('✓ documentos_verificables: tabla lista');
   } catch (e) { console.error('[verificacion schema]', e.message); }
-})();
+});
 
 // Hash SHA-256 del snapshot (huella del contenido firmado).
 function hashDe(datosStr) {

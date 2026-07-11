@@ -59,7 +59,7 @@ const REQUERIDOS = {
 const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
 
 /* ── Migración: columnas de bloqueo del pool ────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('digitacion-faltantes', async () => {
   for (const ddl of [
     `ALTER TABLE creditos ADD COLUMN digit_lock_por    INT          NULL`,
     `ALTER TABLE creditos ADD COLUMN digit_lock_nombre VARCHAR(150) NULL`,
@@ -84,7 +84,7 @@ const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
     `ALTER TABLE digitacion_log ADD COLUMN accion   VARCHAR(12) DEFAULT 'guardar'`,  // guardar | saltar
     `ALTER TABLE digitacion_log ADD COLUMN segundos INT NULL`,                        // desde que cayó hasta grabar
   ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[digitacion_log alter]', e.message); } }
-})();
+});
 
 /* ── Construcción del WHERE de pendientes ───────────────────────────────── */
 function estadoCond(tipo) {

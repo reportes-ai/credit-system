@@ -12,7 +12,7 @@ const { auditar } = require('../../../../shared/audit');
 
 const PERFILES_ANALISTA = ['Analista de Crédito', 'Supervisor de Crédito'];
 
-(async () => {
+require('../../../../shared/migrate').enFila('desempeno', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sesiones_usuario (
@@ -39,7 +39,7 @@ const PERFILES_ANALISTA = ['Analista de Crédito', 'Supervisor de Crédito'];
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS comentario_aprobacion TEXT DEFAULT NULL`).catch(()=>{});
     console.log('[desempeno] tablas OK');
   } catch (e) { console.error('[desempeno migration]', e.message); }
-})();
+});
 
 /* ── Captura ─────────────────────────────────────────────────────── */
 // Llamado desde el login (registra una sesión nueva)

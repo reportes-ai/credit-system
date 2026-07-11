@@ -13,7 +13,7 @@ const COM  = require('../../../../shared/comunicados');
      cumplir (ej: otro analista tomó la carta), borra su notificación.
    ════════════════════════════════════════════════════════════════ */
 
-(async () => {
+require('../../../../shared/migrate').enFila('alertas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS alertas_config (
@@ -88,7 +88,7 @@ const COM  = require('../../../../shared/comunicados');
     }
     console.log('[alertas] tabla OK');
   } catch (e) { console.error('[alertas migration]', e.message); }
-})();
+});
 
 /* ── Orígenes predefinidos (consultas seguras + variables disponibles) ── */
 const ORIGENES = {

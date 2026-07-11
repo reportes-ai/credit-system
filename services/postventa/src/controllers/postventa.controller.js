@@ -4,7 +4,7 @@ const { emitirCorrelativo, pagarCorrelativo } = require('../../../../shared/orde
 const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
 
 /* ── Migración ───────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('postventa', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS postventa_seguimiento (
@@ -186,7 +186,7 @@ const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad
     }
     console.log('[postventa] tablas OK');
   } catch (e) { console.error('[postventa migration]', e.message); }
-})();
+});
 
 const loginDe = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : u?.email) || 'Sistema';
 // Caja activa del usuario (para timbrar el pago en op_correlativos). null si no tiene.
@@ -259,7 +259,7 @@ const EVENTOS_PARQUE = [
     mensaje: 'Se registró el pago de la comisión de un parque.', href: '/postventa/comisiones-parques/' },
 ];
 const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
-(async () => {
+require('../../../../shared/migrate').enFila('postventa', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS postventa_alertas_config (
       evento            VARCHAR(40) PRIMARY KEY,
@@ -288,7 +288,7 @@ const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
          (e.evento === 'pago_realizado' || e.evento === 'com_pago_realizado') ? 1 : 0, '']);
     console.log('[postventa] alertas_config OK');
   } catch (e) { console.error('[postventa alertas migration]', e.message); }
-})();
+});
 
 // Resuelve destinatarios y crea las notificaciones (campana) de un evento.
 async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, claveExtra } = {}) {
@@ -1483,7 +1483,7 @@ const enviarCorreoOrden = async (req, res) => {
 /* ── Saneo único (guardado por flag): órdenes ya marcadas "ORDEN DE PAGO EMITIDA"
  *    sin correlativo en op_correlativos → quedaron invisibles en el módulo Órdenes
  *    de Pago. Les asigna el ODP ahora para que aparezcan en el historial. ── */
-(async () => {
+require('../../../../shared/migrate').enFila('postventa', async () => {
   try {
     const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_op_correlativos_v1'");
     if (flag && flag.valor === '1') return;
@@ -1500,13 +1500,13 @@ const enviarCorreoOrden = async (req, res) => {
     await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_op_correlativos_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
     if (saldo.length || com.length) console.log('[postventa] saneo op_correlativos → saldo:', saldo.length, 'comisión:', com.length);
   } catch (e) { console.error('[postventa saneo op_correlativos]', e.message); }
-})();
+});
 
 /* ── Saneo único del TIMBRE (guardado por flag): órdenes ya PAGADAS por la etapa de
  *    Post Venta pero sin pago en el libro (pagada=0) → quedan sin timbre. Les pone la
  *    fecha de su etapa de pago como fecha_pagada (sin N° de caja, porque no se registró
  *    en su momento) para que el documento muestre el timbre PAGADO + fecha. ── */
-(async () => {
+require('../../../../shared/migrate').enFila('postventa', async () => {
   try {
     const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_pago_timbre_v1'");
     if (flag && flag.valor === '1') return;
@@ -1525,14 +1525,14 @@ const enviarCorreoOrden = async (req, res) => {
     await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_pago_timbre_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
     if (s.affectedRows || c.affectedRows) console.log('[postventa] saneo timbre pago → saldo:', s.affectedRows, 'comisión:', c.affectedRows);
   } catch (e) { console.error('[postventa saneo timbre]', e.message); }
-})();
+});
 
 /* ── Saneo único (flag): Saldo Precio de AUTOFIN — la Orden de Pago debe disponer
  *    saldo_precio + Transferencia + Limitación de dominio. Las órdenes emitidas antes
  *    guardaron solo el saldo base → se ajusta el monto del correlativo y de
  *    postventa_ordenes al total (asignación absoluta = idempotente). El documento se
  *    re-congela aparte por el bump de DOC_VERSION en ordenes-pago. ── */
-(async () => {
+require('../../../../shared/migrate').enFila('postventa', async () => {
   try {
     const [[flag]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='backfill_autofin_saldo_total_v1'");
     if (flag && flag.valor === '1') return;
@@ -1554,7 +1554,7 @@ const enviarCorreoOrden = async (req, res) => {
     }
     await pool.query("INSERT INTO postventa_config (clave, valor) VALUES ('backfill_autofin_saldo_total_v1','1') ON DUPLICATE KEY UPDATE valor='1'");
   } catch (e) { console.error('[postventa saneo AUTOFIN saldo]', e.message); }
-})();
+});
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,

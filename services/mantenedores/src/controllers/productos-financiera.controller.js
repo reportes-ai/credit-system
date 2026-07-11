@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración ───────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('productos-financiera', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS productos_financiera (
@@ -44,7 +44,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[productos-financiera migration]', e.message);
   }
-})();
+});
 
 /* ── GET /api/productos-financiera?financiera=XXX&activo=1 ───────────────── */
 const getAll = async (req, res) => {

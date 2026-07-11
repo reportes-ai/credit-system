@@ -106,7 +106,7 @@ async function idsRevisores(excluirEmail) {
 }
 
 // Auto-migración: crea tablas si no existen
-(async () => {
+require('../../../../shared/migrate').enFila('cartas', async () => {
   const sqls = [
     `CREATE TABLE IF NOT EXISTS cartas_ejecutivos (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -291,7 +291,7 @@ async function idsRevisores(excluirEmail) {
       console.log('✓ cartas_ejecutivos: seeded con lista inicial de ejecutivos');
     }
   } catch (e) { console.error('[cartas ejecutivos seed]', e.message); }
-})();
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

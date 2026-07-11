@@ -62,7 +62,7 @@ const ACTIVOS_DEFAULT = ['3435', '3425', '16', '2101'];
 // tener estos códigos (no fuerza 'activo' tras el alta — eso lo maneja el admin).
 const EXTRA_CODIGOS = ['16', '2101'];
 
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_productos (
       id     INT AUTO_INCREMENT PRIMARY KEY,
@@ -121,10 +121,10 @@ const EXTRA_CODIGOS = ['16', '2101'];
     }
     console.log('[dealernet-ws] mantenedor y esquema listos');
   } catch (e) { console.error('[dealernet-ws migration]', e.message); }
-})();
+});
 
 /* ── Migración: repositorio de informes compartido + config + módulo card ──── */
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     // Repositorio compartido: un registro por RUT+producto+consulta. Todos los
     // usuarios con permiso ven el mismo histórico (no se duplica por usuario).
@@ -184,10 +184,10 @@ const EXTRA_CODIGOS = ['16', '2101'];
     }
     console.log('[dealernet-ws] repositorio de informes y card listos');
   } catch (e) { console.error('[dealernet-informes migration]', e.message); }
-})();
+});
 
 /* ── Migración: auditoría de uso + aviso a supervisor/RRHH ────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     // Bitácora de avisos enviados cuando alguien consulta su propio RUT o el de un colega
     await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_avisos_uso (
@@ -215,7 +215,7 @@ const EXTRA_CODIGOS = ['16', '2101'];
     if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
     console.log('[dealernet-ws] auditoría de uso lista');
   } catch (e) { console.error('[dealernet-auditoria migration]', e.message); }
-})();
+});
 
 /* ── Migración: costos en UF + facturación prepago ───────────────────────── */
 // Precio unitario en UF por informe, por tramo de plan [10, 20, 40, 80] UF mín. mensual.
@@ -232,7 +232,7 @@ const PRECIO_UF4 = {
   '3420':[0.0075,0.0068,0.0058,0.0048], '3419':[0.0075,0.0068,0.0058,0.0048], '3431':[0.0038,0.0034,0.0029,0.0024],
   '3434':[0.0038,0.0034,0.0029,0.0024], '3432':[0.0031,0.0028,0.0024,0.0020], '3433':[0.0035,0.0032,0.0027,0.0023],
 };
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     for (const c of ['precio_uf', ...Object.values(COLS_UF)]) {
       try { await pool.query(`ALTER TABLE dealernet_productos ADD COLUMN ${c} DECIMAL(8,4) NOT NULL DEFAULT 0`); }
@@ -293,14 +293,14 @@ const PRECIO_UF4 = {
     if (!ppF) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
     console.log('[dealernet-ws] costos y facturación listos');
   } catch (e) { console.error('[dealernet-costos migration]', e.message); }
-})();
+});
 
 /* ── Migración: set de informes para la Ficha de Dealer (empresa / socio) ────
    Flags paramétricos por producto: qué informes pide/valida la ficha de dealer
    para la EMPRESA y para cada SOCIO. La empresa NO lleva Deudores de Alimentos
    (2101); los socios sí. El Administrador ajusta los sets en el mantenedor de
    Productos DealerNet. Seed conservador (incluye un penal para la alerta grave). */
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     for (const c of ['ficha_empresa', 'ficha_socio']) {
       try { await pool.query(`ALTER TABLE dealernet_productos ADD COLUMN ${c} TINYINT(1) NOT NULL DEFAULT 0`); }
@@ -319,7 +319,7 @@ const PRECIO_UF4 = {
     }
     console.log('[dealernet-ws] sets de informes para ficha de dealer listos');
   } catch (e) { console.error('[dealernet-ficha-sets migration]', e.message); }
-})();
+});
 
 /* ── Utilidades RUT ──────────────────────────────────────────────────────── */
 function splitRut(rut) {
@@ -1108,7 +1108,7 @@ const repositorio = async (req, res) => {
 };
 
 /* Seed: funcionalidad dealernet_repositorio (solo Administrador, id_perfil=1) */
-(async () => {
+require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
   try {
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='dealernet_repositorio' LIMIT 1");
     let idf = ex && ex.id_funcionalidad;
@@ -1118,7 +1118,7 @@ const repositorio = async (req, res) => {
     }
     await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
   } catch (e) { console.error('[dealernet-repositorio migration]', e.message); }
-})();
+});
 
 module.exports = { getProductos, fichaInformes, asegurarInformes, analizarInforme, addProducto, updateProducto, deleteProducto, reordenarProductos, consultar, listConsultas, estado,
   verificarRepositorio, solicitarInformes, productosActivos, historicos, verInforme, descargarPdf, getConfigEndpoint, updateConfigEndpoint,

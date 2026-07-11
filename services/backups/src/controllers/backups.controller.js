@@ -17,7 +17,7 @@ const CATS = [
 ];
 
 /* ── Migración + seed de defaults (suplente de la misma área, desactivado) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('backups', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS usuario_backups (
       id_titular  INT PRIMARY KEY,
@@ -50,7 +50,7 @@ const CATS = [
     await sembrarDefaults();
     console.log('[backups] tabla OK');
   } catch (e) { console.error('[backups migration]', e.message); }
-})();
+});
 
 // Crea una fila por usuario vigente que aún no la tenga, con un suplente de la misma área (desactivado).
 async function sembrarDefaults() {

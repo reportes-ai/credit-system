@@ -16,7 +16,7 @@
  */
 const pool = require('./config/database');
 
-(async () => {
+require('../shared/migrate').enFila('ordenes-pago', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS op_correlativos (
@@ -59,7 +59,7 @@ const pool = require('./config/database');
     await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_json LONGTEXT NULL`);
     await pool.query(`ALTER TABLE op_correlativos ADD COLUMN IF NOT EXISTS snapshot_at DATETIME NULL`);
   } catch (e) { console.error('[op_correlativos snapshot col]', e.message); }
-})();
+});
 
 // Próximo correlativo del año (atómico: lock de fila con FOR UPDATE).
 async function nextSeq(anio) {

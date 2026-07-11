@@ -16,7 +16,7 @@ const MOTIVOS_SEED = [
 ];
 
 /* ── Migración ─────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('tickets', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ti_motivos (
@@ -108,7 +108,7 @@ const MOTIVOS_SEED = [
     }
     console.log('[tickets-ti] módulo registrado');
   } catch (e) { console.error('[tickets-ti permisos]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const norm = s => String(s || '').trim();

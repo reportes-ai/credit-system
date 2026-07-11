@@ -34,7 +34,7 @@ const DEFAULT_CUART = {
   '4': 'Mantención: autoservicio / campañas masivas',
 };
 
-(async () => {
+require('../../../../shared/migrate').enFila('dealer-potencial', async () => {
   try {
     const addCol = sql => pool.query(sql).catch(() => {});
     await addCol(`ALTER TABLE dealers ADD COLUMN posiciones         INT NULL`);
@@ -55,7 +55,7 @@ const DEFAULT_CUART = {
       `INSERT IGNORE INTO dealer_potencial_config (clave, valor) VALUES ('prioriz_segmentos', ?), ('prioriz_cuartiles', ?)`,
       [JSON.stringify(DEFAULT_SEG), JSON.stringify(DEFAULT_CUART)]);
   } catch (e) { console.error('[dealer-potencial migration]', e.message); }
-})();
+});
 
 async function getConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM dealer_potencial_config');

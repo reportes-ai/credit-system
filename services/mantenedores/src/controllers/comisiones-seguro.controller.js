@@ -1,7 +1,7 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones-seguro', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comisiones_seguro_plazo (
@@ -36,7 +36,7 @@ const { auditar } = require('../../../../shared/audit');
       console.log('✓ comisiones_seguro_plazo: datos por defecto insertados');
     }
   } catch (e) { console.error('[comisiones_seguro migration]', e.message); }
-})();
+});
 
 const getAll = async (_req, res) => {
   try {
@@ -65,7 +65,7 @@ const update = async (req, res) => {
 };
 
 /* ── Tabla tramos de comisión por penetración ────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones-seguro', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comisiones_seguro_penetracion (
@@ -100,7 +100,7 @@ const update = async (req, res) => {
       console.log('✓ comisiones_seguro_penetracion: datos por defecto insertados');
     }
   } catch (e) { console.error('[comisiones_pen migration]', e.message); }
-})();
+});
 
 const getAllPen = async (_req, res) => {
   try {
@@ -133,7 +133,7 @@ module.exports = { getAll, update, getAllPen, updatePen };
 /* ── % del mes INFORMADO por AutoFin (override del calculado) ───────────────
    El cierre oficial de AutoFin puede diferir de nuestra BD (ops o primas
    re-informadas); como ellos pagan, su % manda cuando se registra aquí. */
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones-seguro', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comisiones_seguro_pct_mes (
@@ -143,7 +143,7 @@ module.exports = { getAll, update, getAllPen, updatePen };
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
   } catch (e) { console.error('[pct_mes migration]', e.message); }
-})();
+});
 
 const getPctMes = async (_req, res) => {
   try {

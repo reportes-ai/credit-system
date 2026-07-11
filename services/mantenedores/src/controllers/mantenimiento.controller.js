@@ -13,7 +13,7 @@ const { comunicadosParaUsuario } = require('../../../../shared/comunicados');
 
 const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
 
-(async () => {
+require('../../../../shared/migrate').enFila('mantenimiento', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS mantenimiento_config (
       clave VARCHAR(40) PRIMARY KEY, valor TEXT )`);
@@ -29,7 +29,7 @@ const MSG_DEFAULT = 'AVISO. El sistema se encuentra en Mantención.';
     await pool.query(`INSERT IGNORE INTO mantenimiento_config (clave, valor) VALUES
       ('juego_activo','0'),('juego_nombre',''),('juego_mensaje',''),('juego_nonce','')`);
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
-})();
+});
 
 const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta', 'comeletras', 'escapistas', 'vidrio', 'terminal', 'clickloco'];
 async function leerJuego() {

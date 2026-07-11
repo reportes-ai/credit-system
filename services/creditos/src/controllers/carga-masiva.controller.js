@@ -51,7 +51,7 @@ function leerFilasExcel(buffer) {
 }
 
 /* ── Asegurar columnas extra en creditos ──────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('carga-masiva', async () => {
   const extra = [
     `ALTER TABLE creditos ADD COLUMN com_rdh            DECIMAL(15,0) NULL`,
     `ALTER TABLE creditos ADD COLUMN com_cesantia       DECIMAL(15,0) NULL`,
@@ -80,7 +80,7 @@ function leerFilasExcel(buffer) {
   try {
     await pool.query(`ALTER TABLE creditos ADD UNIQUE INDEX uq_num_op (num_op)`);
   } catch (e) { /* ya existe o hay num_op duplicados legacy — ignorar */ }
-})();
+});
 
 /* ── Normaliza un valor del Excel ──────────────────────────────────────── */
 function norm(v) {

@@ -4,7 +4,7 @@ const pool = require('../../../../shared/config/database');
 // ── Migración: config paramétrica de los avisos del popup de inicio ──────────
 // Cada aviso del popup "Datos próximos a vencer" se puede activar/desactivar y
 // (cuando aplica) fijar con cuántos días de anticipación/atraso avisar.
-(async () => {
+require('../../../../shared/migrate').enFila('alertas', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS alertas_vencimiento_config (
       clave        VARCHAR(40)  PRIMARY KEY,
@@ -28,7 +28,7 @@ const pool = require('../../../../shared/config/database');
            (clave,nombre,descripcion,activo,usa_dias,dias_aviso,orden) VALUES (?,?,?,?,?,?,?)`, s);
     }
   } catch (e) { console.error('[alertas] migracion venc-config:', e.message); }
-})();
+});
 
 // GET /api/alertas-vencimiento
 // Verifica UF y Tasas — retorna alertas para mostrar al admin al conectarse

@@ -23,7 +23,7 @@ const { auditar } = require('../../../../shared/audit');
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 
 /* ── Migración + registro de funcionalidades ─────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS parques_pagos_mes (
       id                INT AUTO_INCREMENT PRIMARY KEY,
@@ -71,7 +71,7 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpp
     }
     console.log('[comisiones-parques] módulo registrado');
   } catch (e) { console.error('[comisiones-parques migration]', e.message); }
-})();
+});
 
 /* ── Cálculo del mes: agrega lo ya persistido por operación ──────────────────
    Atribución igual que dealer-potencial: 1) dealers.ccs_parque vía rut_dealer;

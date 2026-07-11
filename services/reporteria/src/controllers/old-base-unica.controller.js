@@ -9,7 +9,7 @@ const pool = require('../../../../shared/config/database');
 
 /* ─── Seed paramétrico: card DENTRO de Reportería (v101.0; antes módulo propio,
        retirado — la funcionalidad se re-cuelga del módulo Reportería) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('old-base-unica', async () => {
   try {
     const [[rep]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/reporteria/' LIMIT 1");
     if (!rep) return;
@@ -31,7 +31,7 @@ const pool = require('../../../../shared/config/database');
     await pool.query("UPDATE modulos SET estado='inactivo' WHERE ruta='/old-base-unica/'");
     console.log('✓ Old Base Única colgada de Reportería');
   } catch (e) { console.error('[old-base-unica seed]', e.message); }
-})();
+});
 
 /* Columnas en el mismo orden de la hoja DETALLE (solo las que existen en BD).
    [encabezado visible, alias SQL] */

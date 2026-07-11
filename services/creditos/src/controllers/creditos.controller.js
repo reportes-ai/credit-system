@@ -23,7 +23,7 @@ async function idsAnalistasCredito(excluirId) {
 }
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
-(async () => {
+require('../../../../shared/migrate').enFila('creditos', async () => {
   try {
     const addCol = async (sql) => pool.query(sql).catch(e => { if (e.errno !== 1060) throw e; });
     // Campos de vehículo
@@ -98,7 +98,7 @@ async function idsAnalistasCredito(excluirId) {
   } catch (e) {
     if (e.errno !== 1050) console.error('[creditos migration]', e.message);
   }
-})();
+});
 
 // ── Generar número de crédito (YYMMXXX) ──────────────────────────────────────
 async function generarNumero() {

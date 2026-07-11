@@ -18,7 +18,7 @@ const TABLAS_OCULTAS = new Set(['usuarios_tokens', 'sesiones']);
 const COLS_OCULTAS = /pass|clave|token|secret|hash|otp/i;
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('diseno-consulta', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS consultas_diseno (
@@ -45,7 +45,7 @@ const COLS_OCULTAS = /pass|clave|token|secret|hash|otp/i;
     }
     console.log('[diseno-consulta] módulo listo');
   } catch (e) { console.error('[diseno-consulta migration]', e.message); }
-})();
+});
 
 /* ── Schema en caché (60s) ──────────────────────────────────────────────── */
 let SCHEMA = null, SCHEMA_TS = 0;

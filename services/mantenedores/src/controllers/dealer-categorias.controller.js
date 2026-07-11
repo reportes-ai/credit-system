@@ -25,7 +25,7 @@ const SEED = [
       'Incentivos exclusivos por meta trimestral', 'Exclusividad territorial negociable'] },
 ];
 
-(async () => {
+require('../../../../shared/migrate').enFila('dealer-categorias', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dealer_categorias (
@@ -72,7 +72,7 @@ const SEED = [
     }
     console.log('[dealer-categorias] mantenedor registrado');
   } catch (e) { console.error('[dealer-categorias migration]', e.message); }
-})();
+});
 
 /* Determina el código de categoría según unidades vendidas y las metas. */
 function categoriaPara(unidades, cats) {

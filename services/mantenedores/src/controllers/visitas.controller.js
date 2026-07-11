@@ -18,7 +18,7 @@ const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
 
 /* ─── Migración + seed de permisos ─────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('visitas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS visitas_config (
@@ -122,7 +122,7 @@ const DIAS_DEFAULT = '1,2,3,4,5'; // ISO: 1=Lun … 7=Dom
     await pool.query('ALTER TABLE visitas_dealers ADD COLUMN IF NOT EXISTS id_asignacion INT NULL').catch(() => {});
     console.log('✓ módulo visitas-dealers: tablas + permisos listos');
   } catch (e) { console.error('[visitas migration]', e.message); }
-})();
+});
 
 /* ─── Helpers ──────────────────────────────────────────────────────── */
 const ok  = (res, data) => res.json({ success: true, data, error: null });

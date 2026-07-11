@@ -24,7 +24,7 @@ const SEED = {
 };
 
 /* ── Migración de estructura ────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('judicial', async () => {
   try {
     await pool.query("ALTER TABLE creditos ADD COLUMN IF NOT EXISTS cartera_original VARCHAR(40) NULL");
     await pool.query("ALTER TABLE creditos ADD COLUMN IF NOT EXISTS status_cobranza VARCHAR(40) NULL");
@@ -91,7 +91,7 @@ const SEED = {
     }
     console.log('[cobranza-judicial] estructura lista');
   } catch (e) { console.error('[cobranza-judicial migration]', e.message); }
-})();
+});
 
 /* ── Catálogos (mantenedor) ─────────────────────────────────────────────── */
 exports.getCatalogos = async (req, res) => {

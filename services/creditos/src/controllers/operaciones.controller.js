@@ -6,7 +6,7 @@ const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 
 // Migración: tabla creditos
-(async () => {
+require('../../../../shared/migrate').enFila('operaciones', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS creditos (
@@ -62,10 +62,10 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
   } catch (e) {
     console.error('[operaciones migration]', e.message);
   }
-})();
+});
 
 // Migración v2: nuevas columnas workflow completo
-(async () => {
+require('../../../../shared/migrate').enFila('operaciones', async () => {
   const alteraciones = [
     `ALTER TABLE creditos ADD COLUMN numero_credito VARCHAR(20) NULL AFTER id`,
     `ALTER TABLE creditos ADD COLUMN vendedor VARCHAR(150) NULL`,
@@ -80,10 +80,10 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
   for (const sql of alteraciones) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v2]', e.message); }
   }
-})();
+});
 
 // Migración v3: datos de vehículo
-(async () => {
+require('../../../../shared/migrate').enFila('operaciones', async () => {
   const cols = [
     `ALTER TABLE creditos ADD COLUMN marca VARCHAR(100) NULL`,
     `ALTER TABLE creditos ADD COLUMN modelo VARCHAR(100) NULL`,
@@ -94,10 +94,10 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
   for (const sql of cols) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v3]', e.message); }
   }
-})();
+});
 
 // Migración v4: índices para mejorar performance de búsquedas
-(async () => {
+require('../../../../shared/migrate').enFila('operaciones', async () => {
   const indices = [
     `ALTER TABLE creditos ADD INDEX idx_mes (mes)`,
     `ALTER TABLE creditos ADD INDEX idx_estado_credito (estado_credito)`,
@@ -108,10 +108,10 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
   for (const sql of indices) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1061) console.error('[operaciones v4]', e.message); }
   }
-})();
+});
 
 // Migración v5: columnas para cálculo automático de ingresos y comisiones
-(async () => {
+require('../../../../shared/migrate').enFila('operaciones', async () => {
   const cols = [
     `ALTER TABLE creditos ADD COLUMN com_reparaciones DECIMAL(15,0) NULL`,
     `ALTER TABLE creditos ADD COLUMN comej DECIMAL(15,0) NULL`,
@@ -120,7 +120,7 @@ const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerra
   for (const sql of cols) {
     try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[operaciones v5]', e.message); }
   }
-})();
+});
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 function calcular(body) {

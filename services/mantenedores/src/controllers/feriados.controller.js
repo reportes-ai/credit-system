@@ -3,14 +3,14 @@ const { feriadosDeAnio, cargarFeriados } = require('../../../../shared/feriados'
 const { auditar } = require('../../../../shared/audit');
 
 /* ── Registro del mantenedor en el menú (la tabla la crea shared/feriados.js) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('feriados', async () => {
   try {
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_feriados' LIMIT 1");
     if (!ex) await pool.query(
       `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
        VALUES (30001, 'Feriados', 'mantenedores_feriados', '/mantenedores/feriados/', 'bi-calendar-event')`);
   } catch (e) { console.error('[feriados migration]', e.message); }
-})();
+});
 
 const getAll = async (req, res) => {
   try {

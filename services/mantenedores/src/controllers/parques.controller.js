@@ -8,7 +8,7 @@ const dispararRecalc = () => recalcularMesesAbiertos()
   .catch(e => console.error('[recalc auto]', e.message));
 
 // Migración: crear tabla parques_comisiones con datos iniciales del Excel
-(async () => {
+require('../../../../shared/migrate').enFila('parques', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS parques_comisiones (
@@ -52,7 +52,7 @@ const dispararRecalc = () => recalcularMesesAbiertos()
   } catch (e) {
     console.error('[parques migration]', e.message);
   }
-})();
+});
 
 const getAll = async (req, res) => {
   try {

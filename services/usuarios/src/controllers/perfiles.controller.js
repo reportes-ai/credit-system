@@ -4,7 +4,7 @@ const { limpiarCachePermisos } = require('../../../../shared/middleware/permisos
 const { auditar } = require('../../../../shared/audit');
 
 // Migración: insertar módulos Tesorería, CRM, Cobranza, Reportería si no existen
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const nuevos = [
       { nombre: 'Tesorería',  icono: 'bi-safe2',        ruta: '/tesoreria/', descripcion: 'Gestión de pagos y flujos de caja', orden: 20 },
@@ -48,10 +48,10 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[modulos migration]', e.message);
   }
-})();
+});
 
 /* ─── Migración: agregar funcionalidades faltantes en todos los módulos ──── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // [nombre_modulo, nombre_funcionalidad, codigo, habilitado_default(0/1)]
     const nuevasFuncs = [
@@ -125,10 +125,10 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[funcionalidades migration]', e.message);
   }
-})();
+});
 
 /* ─── Migración v2: módulos y funcionalidades completos ──────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // 1) Asegurar módulo Usuarios
     const [uMod] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre = 'Usuarios'");
@@ -215,7 +215,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[perfiles migration v2]', e.message);
   }
-})();
+});
 
 /* ─── Migración: Dealers como sub-item en Home (limpia el módulo "falso") ─────
    Antes registramos Dealers como módulo para que apareciera en Home. Con el render
@@ -223,7 +223,7 @@ const { auditar } = require('../../../../shared/audit');
    hace falta: Dealers vuelve a ser un sub-item normal y se coloca en Home por
    placement. Este bloque revierte el módulo falso + el gate 'home_dealers', restaura
    el href de 'mantenedores_dealers', y —una sola vez— mueve 'dealers' a la sección Home. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // 1) Restaurar el sub-item Dealers (su href de menú)
     await pool.query("UPDATE funcionalidades SET href = '/mantenedores/dealers/' WHERE codigo = 'mantenedores_dealers' AND (href IS NULL OR href <> '/mantenedores/dealers/')");
@@ -257,10 +257,10 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[migracion revert Dealers]', e.message);
   }
-})();
+});
 
 /* ─── Migración v3: nuevos módulos y funcionalidades ─────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -320,10 +320,10 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[perfiles migration v3]', e.message);
   }
-})();
+});
 
 /* ─── Migración v4: nombres alineados con la app ─────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // 1) Actualizar nombres para que coincidan exactamente con las páginas/cards
     const renombrar = [
@@ -420,10 +420,10 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[perfiles migration v4]', e.message);
   }
-})();
+});
 
 /* ─── Migración v5: funcionalidades granulares de Cartas de Aprobación ──── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -479,7 +479,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[perfiles migration v5]', e.message);
   }
-})();
+});
 
 /* ─── Retiro del flujo brokerage/fundantes VIEJO (jun-2026) ───────────────────
    La generación vieja —Tesorería "Panel Brokerage" + "Fundantes Brokerage" en
@@ -490,7 +490,7 @@ const { auditar } = require('../../../../shared/audit');
    Tesorería y como checkbox en la grilla de Perfiles. Reversible: mover de vuelta
    a su módulo (Créditos/Tesorería) y restaurar el href. Los permisos_perfil y el
    código legacy se conservan. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const FLAG = 'retiro_brokerage_fundantes_viejo_v1';
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
@@ -512,7 +512,7 @@ const { auditar } = require('../../../../shared/audit');
     limpiarCachePermisos();
     console.log('✓ Retiro brokerage/fundantes viejo: 6 funcionalidades archivadas en módulo inactivo "Retirados"');
   } catch (e) { console.error('[retiro brokerage viejo]', e.message); }
-})();
+});
 
 const getAllPerfiles = async (req, res) => {
   try {
@@ -842,7 +842,7 @@ const getUsuariosByPerfil = async (req, res) => {
 };
 
 /* ─── Migración v6: permisos de edición de créditos broker ───────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[admin]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
 
@@ -897,10 +897,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v6]', e.message);
   }
-})();
+});
 
 /* ─── Migración v7: workflow brokerage completo ───────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -955,10 +955,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v7]', e.message);
   }
-})();
+});
 
 /* ─── Migración v8: funcionalidades faltantes detectadas ─────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -1030,10 +1030,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v8]', e.message);
   }
-})();
+});
 
 /* ─── Migración v9: nombres exactos por card + Solo Dios + limpiar dupl. ─── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
     const [[admin]]  = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
@@ -1103,10 +1103,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v9]', e.message);
   }
-})();
+});
 
 /* ─── Migración v10: limpiar Tesoreros duplicados, Simulador duplicado, Dashboard permiso ── */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // 1) Eliminar Tesoreros duplicados — conservar solo el de menor id
     const [[primerTesorero]] = await pool.query(
@@ -1193,10 +1193,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v10]', e.message);
   }
-})();
+});
 
 // ── Migración v11: asegurar funcionalidad ver_dashboard en todos los perfiles ──
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // Buscar módulo dashboard (cualquier estado)
     const [[modDash]] = await pool.query(
@@ -1230,10 +1230,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v11]', e.message);
   }
-})();
+});
 
 /* ─── Migración v12: Meses Cerrados, limpiar Caja duplicados, limpiar Simulador ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1318,10 +1318,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v12]', e.message);
   }
-})();
+});
 
 /* ─── Migración v13: módulo Aprobaciones (reemplazo de Cartas de Aprobación) ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1387,10 +1387,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v13]', e.message);
   }
-})();
+});
 
 /* ─── Migración v14: permisos finos módulo Aprobaciones (ver_todas, cartolas) ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles');
@@ -1435,10 +1435,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v14]', e.message);
   }
-})();
+});
 
 /* ─── Migración v15: card Preferencia Financiera en Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     const [[modMan]] = await pool.query(
@@ -1476,13 +1476,13 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v15]', e.message);
   }
-})();
+});
 
 /* ─── Migración v16: eliminar módulo fantasma "Sistema" (/sistema/) ─
    Fue creado por código antiguo solo como contenedor del permiso
    ver_dashboard; nunca tuvo página. Sus funcionalidades se mueven al
    módulo Dashboard real y el módulo se elimina (o desactiva).        */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modSis]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE ruta='/sistema/' LIMIT 1"
@@ -1507,14 +1507,14 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v16]', e.message);
   }
-})();
+});
 
 /* ─── Migración v17: perfiles y usuarios desde planilla (UNA SOLA VEZ) ─
    Crea los 11 perfiles del organigrama y carga/actualiza los 25
    usuarios con clave inicial AF2026. Usuarios con perfil Administrador
    conservan su clave y su perfil. Flag en BD evita re-ejecución
    (los usuarios cambiarán su clave y un deploy no debe resetearla).  */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   const bcrypt = require('bcryptjs');
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS push_config (clave VARCHAR(50) PRIMARY KEY, valor TEXT NOT NULL)`);
@@ -1614,7 +1614,7 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v17]', e.message);
   }
-})();
+});
 
 /* ─── Migración v18: deduplicar perfiles + limpiar permisos heredados ─
    1) v17 creó perfiles duplicados (la tabla no tenía UNIQUE en nombre):
@@ -1622,7 +1622,7 @@ const getUsuariosByPerfil = async (req, res) => {
       permisos; luego se agrega el índice único.
    2) Los seeds antiguos regalaban Cobranza/Tesorería/CRM por defecto:
       se apagan para Ejecutivo Comercial (config fina via Perfiles UI). */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     // 1) Dedupe por nombre — conservar el id más bajo (el original)
     const [dups] = await pool.query(
@@ -1671,10 +1671,10 @@ const getUsuariosByPerfil = async (req, res) => {
   } catch (e) {
     console.error('[perfiles migration v18]', e.message);
   }
-})();
+});
 
 /* ─── Migración v19: módulo Post Venta ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
@@ -1712,10 +1712,10 @@ const getUsuariosByPerfil = async (req, res) => {
     }
     console.log('✓ Perfiles v19: módulo Post Venta registrado');
   } catch (e) { console.error('[perfiles migration v19]', e.message); }
-})();
+});
 
 /* ─── Migración v20: módulo Edición Créditos ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre='Administrador' LIMIT 1");
     let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/edicion-creditos/' LIMIT 1");
@@ -1749,10 +1749,10 @@ const getUsuariosByPerfil = async (req, res) => {
     }
     console.log('✓ Perfiles v20: módulo Edición Créditos registrado');
   } catch (e) { console.error('[perfiles migration v20]', e.message); }
-})();
+});
 
 /* ─── Migración v21: funcionalidad Presupuesto bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1771,10 +1771,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v21: funcionalidad Presupuesto registrada');
   } catch (e) { console.error('[perfiles migration v21]', e.message); }
-})();
+});
 
 /* ─── Migración v22: funcionalidad Ayuda bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1793,10 +1793,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v22: funcionalidad Ayuda registrada');
   } catch (e) { console.error('[perfiles migration v22]', e.message); }
-})();
+});
 
 /* ─── Migración v23: funcionalidad Alertas bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1815,10 +1815,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v23: funcionalidad Alertas registrada');
   } catch (e) { console.error('[perfiles migration v23]', e.message); }
-})();
+});
 
 /* ─── Migración v24: funcionalidad Desempeño Analistas en Cartas de Aprobación ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1836,10 +1836,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v24: funcionalidad Desempeño Analistas registrada');
   } catch (e) { console.error('[perfiles migration v24]', e.message); }
-})();
+});
 
 /* ─── Migración v25: funcionalidad Mantenedor de Cartas de Aprobación ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1857,14 +1857,14 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v25: funcionalidad Mantenedor de Cartas registrada');
   } catch (e) { console.error('[perfiles migration v25]', e.message); }
-})();
+});
 
 /* ─── Migración v26: atribuciones granulares del flujo Saldos Precio ─
    Separa el proceso en acciones independientes para asignar por perfil:
    definir fondos (Finanzas/Tesorería), seleccionar (Comercial),
    confirmar pago (Tesorería = postventa_saldos_pagar ya existente),
    generar nómina, emitir orden de pago y revertir pago. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
     if (!mod) return;
@@ -1891,10 +1891,10 @@ const getUsuariosByPerfil = async (req, res) => {
     }
     console.log('✓ Perfiles v26: atribuciones de Saldos Precio registradas');
   } catch (e) { console.error('[perfiles migration v26]', e.message); }
-})();
+});
 
 /* ─── Migración v27: funcionalidad Parámetros Cobranza bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1913,10 +1913,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v27: funcionalidad Parámetros Cobranza registrada');
   } catch (e) { console.error('[perfiles migration v27]', e.message); }
-})();
+});
 
 /* ─── Migración v28: funcionalidad Definiciones (glosario) bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1935,10 +1935,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v28: funcionalidad Definiciones registrada');
   } catch (e) { console.error('[perfiles migration v28]', e.message); }
-})();
+});
 
 /* ─── Migración v29: funcionalidad Alertas Saldos Precio bajo Mantenedores ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modMan]] = await pool.query(
       "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo'");
@@ -1957,10 +1957,10 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v29: funcionalidad Alertas Saldos Precio registrada');
   } catch (e) { console.error('[perfiles migration v29]', e.message); }
-})();
+});
 
 /* ─── Migración v30: permiso Carga Masiva de Cartas de Aprobación ─ */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -1978,13 +1978,13 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v30: permiso Carga Masiva Cartas registrado');
   } catch (e) { console.error('[perfiles migration v30]', e.message); }
-})();
+});
 
 /* ─── Migración v31: flujo de pago de Comisiones (espejo de Saldos Precio) ─
    Card de acceso (Comisiones a Pagar / Orden de Pago Comisión) + atribuciones
    granulares: definir fondos, seleccionar, pagar, generar nómina, emitir orden,
    revertir. Todas independientes de las de Saldo Precio. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
     if (!mod) return;
@@ -2013,13 +2013,13 @@ const getUsuariosByPerfil = async (req, res) => {
     }
     console.log('✓ Perfiles v31: flujo de pago de Comisiones registrado');
   } catch (e) { console.error('[perfiles migration v31]', e.message); }
-})();
+});
 
 /* ─── Migración v32: permiso Reversar Envío de Cartola (Aprobaciones) ─
    Acción sensible: deshace un envío de cartola (des-estampa Mes Cartola y
    quita la etapa CARTOLA ENVIADA en Post Venta). Solo Admin por defecto;
    el Admin puede habilitarla a otros perfiles desde Perfiles y Permisos. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modAp]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!modAp) return;
@@ -2037,11 +2037,11 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v32: permiso Reversar Envío de Cartola registrado');
   } catch (e) { console.error('[perfiles migration v32]', e.message); }
-})();
+});
 
 /* ─── Migración v33: funcionalidad Cartas de Aprobación Vigentes (Aprobaciones) ─
    Card + acciones Otorgar/Desistir sobre cartas aprobadas dentro de su vigencia. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -2059,11 +2059,11 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v33: funcionalidad Cartas de Aprobación Vigentes registrada');
   } catch (e) { console.error('[perfiles migration v33]', e.message); }
-})();
+});
 
 /* ─── Migración v34: funcionalidad Rentabilidad de Cartas (Aprobaciones) ─
    Pestaña/acción restringida: ve la rentabilidad por carta (AutoFin vs UAC). */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/aprobaciones/' LIMIT 1");
     if (!mod) return;
@@ -2081,12 +2081,12 @@ const getUsuariosByPerfil = async (req, res) => {
       [adm.id_perfil, idF]);
     console.log('✓ Perfiles v34: funcionalidad Rentabilidad de la Carta registrada');
   } catch (e) { console.error('[perfiles migration v34]', e.message); }
-})();
+});
 
 /* ─── Migración: consolidar "Parques". Había la card huérfana "Parques y Comisiones"
    (con href, generaba el menú) además del permiso canónico mantenedores_parques
    (sin href). Se le da el href al canónico y se elimina la huérfana. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     await pool.query(
       "UPDATE funcionalidades SET href='/mantenedores/parques/', icono=COALESCE(NULLIF(icono,''),'bi-tree') " +
@@ -2103,13 +2103,13 @@ const getUsuariosByPerfil = async (req, res) => {
     }
     if (orphans.length) console.log(`[parques-consolidar] ${orphans.length} funcionalidad(es) sobrante(s) eliminada(s)`);
   } catch (e) { console.error('[parques-consolidar]', e.message); }
-})();
+});
 
 /* ─── Migración: eliminar funcionalidades duplicadas por NOMBRE (códigos distintos) ─
    Caso: dos funcionalidades con el mismo nombre visible y códigos diferentes (la
    dedup por código no las junta). Se conserva la canónica y se elimina la sobrante,
    no usada como gate. Lista extensible. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   // codigo a eliminar → (canónica que se conserva, solo informativo)
   const OBSOLETAS = ['creditos_cargar_doc', 'mantenedores_flujo_brokerage']; // creditos_cargar_doc: "Documentos del Crédito" dup → creditos_documentos. mantenedores_flujo_brokerage: submódulo redundante con Estado Créditos (se unificó)
   try {
@@ -2123,13 +2123,13 @@ const getUsuariosByPerfil = async (req, res) => {
       if (rows.length) console.log(`[func-obsoletas] eliminada '${cod}' (${rows.length})`);
     }
   } catch (e) { console.error('[func-obsoletas]', e.message); }
-})();
+});
 
 /* ─── Migración: Carga Masiva paramétrica. Adopta las funcionalidades existentes
    (por href o por nombre viejo) y les fija código canónico + href, para que gateen
    cada card del landing y sus rutas. Si no existen, las crea. Admin=1 por defecto
    (preserva el Admin-only previo); el resto en 0. Idempotente. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%carga-masiva%' LIMIT 1");
     if (!mod) return;
@@ -2173,13 +2173,13 @@ const getUsuariosByPerfil = async (req, res) => {
       }
     }
   } catch (e) { console.error('[carga-masiva paramétrico]', e.message); }
-})();
+});
 
 /* ─── Migración: funcionalidad "Configurar Dashboard" (dashboard_config) ────────
    Gatea POST /api/dashboard/permisos y /presupuesto. Antes eran Admin-only
    (requirePerfil); se mantiene Admin-only por defecto (habilitado=1 solo Admin)
    y queda configurable desde la matriz. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [[modDash]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '%dashboard%' LIMIT 1");
     if (!modDash) return;
@@ -2198,7 +2198,7 @@ const getUsuariosByPerfil = async (req, res) => {
       await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,?)', [p.id_perfil, idF, hab]);
     }
   } catch (e) { console.error('[dashboard_config seed]', e.message); }
-})();
+});
 
 /* ─── Migración: deduplicar funcionalidades por código + UNIQUE(codigo) ─────────
    Causa raíz de checkboxes duplicados (p.ej. "Caja", "Documentos del Crédito"):
@@ -2206,7 +2206,7 @@ const getUsuariosByPerfil = async (req, res) => {
    filas con el mismo código en cada arranque. Se consolida a UNA fila por código
    (la de menor id), re-apuntando sus permisos, y se agrega UNIQUE(codigo) para
    que no vuelva a ocurrir. Idempotente y seguro de correr en cada boot. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     const [dups] = await pool.query(
       `SELECT codigo, MIN(id_funcionalidad) AS keep_id, COUNT(*) AS n
@@ -2248,13 +2248,13 @@ const getUsuariosByPerfil = async (req, res) => {
       console.log('[func-dedup] UNIQUE(codigo) agregado');
     } catch (e) { if (e.errno !== 1061 && e.errno !== 1062) console.error('[func-dedup uniq]', e.message); }
   } catch (e) { console.error('[func-dedup]', e.message); }
-})();
+});
 
 /* ─── Migración (UNA sola vez): preservar acceso histórico al migrar las rutas de
    Tesorería de requirePerfil → requireFunc. Otorga por defecto el permiso a los
    perfiles que antes accedían por nombre. Guardada en migraciones_aplicadas para
    NO volver a correr y NO pisar cambios posteriores del Administrador. */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2280,12 +2280,12 @@ const getUsuariosByPerfil = async (req, res) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('tesoreria_requirefunc_v1')");
     console.log('[tesoreria_requirefunc_v1] permisos históricos preservados');
   } catch (e) { console.error('[tesoreria_requirefunc_v1]', e.message); }
-})();
+});
 
 /* ─── Migración (UNA sola vez): preservar acceso al migrar meses-cerrados →
    requireFunc. Antes era Admin+Gerente; Admin pasa por bypass, así que solo hay
    que otorgar a Gerente. (workflow era solo Admin → no requiere grant). */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2300,12 +2300,12 @@ const getUsuariosByPerfil = async (req, res) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('meses_cerrados_requirefunc_v1')");
     console.log('[meses_cerrados_requirefunc_v1] permiso histórico (Gerente) preservado');
   } catch (e) { console.error('[meses_cerrados_requirefunc_v1]', e.message); }
-})();
+});
 
 /* ─── Migración (UNA sola vez): preservar acceso al migrar CRM campañas →
    requireFunc. Antes create/update de campañas era Admin+Gerente; se otorga a
    Gerente (Admin pasa por bypass). */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2322,11 +2322,11 @@ const getUsuariosByPerfil = async (req, res) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('crm_campanas_requirefunc_v1')");
     console.log('[crm_campanas_requirefunc_v1] permiso histórico (Gerente) preservado');
   } catch (e) { console.error('[crm_campanas_requirefunc_v1]', e.message); }
-})();
+});
 
 /* ─── Migración (UNA sola vez): preservar acceso al migrar auditoría de crédito →
    requireFunc. Antes Admin+Gerente; se otorga a Gerente (Admin pasa por bypass). */
-(async () => {
+require('../../../../shared/migrate').enFila('perfiles', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (
       clave VARCHAR(80) PRIMARY KEY,
@@ -2341,6 +2341,6 @@ const getUsuariosByPerfil = async (req, res) => {
     await pool.query("INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES ('auditoria_credito_requirefunc_v1')");
     console.log('[auditoria_credito_requirefunc_v1] permiso histórico (Gerente) preservado');
   } catch (e) { console.error('[auditoria_credito_requirefunc_v1]', e.message); }
-})();
+});
 
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, masivoPermisos, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };

@@ -4,7 +4,7 @@ const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular-mes');
 
 // Migración: tabla log de ediciones
-(async () => {
+require('../../../../shared/migrate').enFila('edicion', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS creditos_edicion_log (
@@ -30,7 +30,7 @@ const { marcarForzadosCalculo, recalcularPorOps } = require('../utils/recalcular
     await pool.query(`ALTER TABLE creditos ADD COLUMN campos_forzados JSON NULL`)
       .catch(e => { if (e.errno !== 1060) console.error('[creditos campos_forzados]', e.message); });
   } catch (e) { if (e.errno !== 1050) console.error('[edicion log migration]', e.message); }
-})();
+});
 
 // Campos CALCULADOS por el motor (recalcular-mes.js) que aparecen en esta grilla.
 // Si uno se edita a mano queda "forzado" (rojo) y el recálculo no lo sobrescribe.

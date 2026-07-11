@@ -3,7 +3,7 @@ const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 
 /* ── Registro del módulo en el menú (idempotente). Solo Administrador. ──────── */
-(async () => {
+require('../../../../shared/migrate').enFila('auditoria', async () => {
   try {
     await pool.query(
       `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
@@ -20,7 +20,7 @@ const XLSX = require('xlsx');
     if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idFunc]);
     console.log('[auditoria] módulo registrado');
   } catch (e) { console.error('[auditoria migration]', e.message); }
-})();
+});
 
 /* ── Construcción de filtros WHERE (compartido entre listar y exportar) ─────── */
 function whereMovimientos(qy) {

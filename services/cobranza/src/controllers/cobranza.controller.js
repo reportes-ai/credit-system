@@ -5,7 +5,7 @@ const { auditar } = require('../../../../shared/audit');
 const { getUF } = require('../../../../shared/uf');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
-(async () => {
+require('../../../../shared/migrate').enFila('cobranza', async () => {
   let conn;
   try {
     conn = await pool.getConnection();
@@ -40,7 +40,7 @@ const { getUF } = require('../../../../shared/uf');
   } finally {
     if (conn) conn.release();
   }
-})();
+});
 
 // ─── Parámetros de Cobranza (mantenedor) ───────────────────────────────────────
 // Plantillas de mensaje (con variables {trato} {nombre} {numero} {dias} {cuotas}
@@ -69,7 +69,7 @@ const COB_DEFAULTS = {
 // Fecha de tasa fija para el motor de mora según el modo configurado (null = variable).
 const moraFechaFija = (cfg, fechaOtorgado) =>
   String((cfg && cfg.mora_tasa_modo) || 'fija_otorgamiento') === 'variable' ? null : (fechaOtorgado || null);
-(async () => {
+require('../../../../shared/migrate').enFila('cobranza', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS cobranza_config (
       clave VARCHAR(50) PRIMARY KEY,
@@ -88,7 +88,7 @@ const moraFechaFija = (cfg, fechaOtorgado) =>
     } catch (_) {}
     console.log('✓ Cobranza: tabla cobranza_config verificada');
   } catch (err) { console.error('✗ Cobranza config migración:', err.message); }
-})();
+});
 
 async function getCobranzaConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM cobranza_config');

@@ -27,7 +27,7 @@ const MOTIVOS = ['INCOBRABLE', 'NEGOCIACION', 'OTROS'];
 const ROLES = { FINANZAS: 'castigo_aprobar_finanzas', OPERACIONES: 'castigo_aprobar_operaciones' };
 
 /* ── Migración ──────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('castigos', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS castigos_contables (
@@ -96,7 +96,7 @@ const ROLES = { FINANZAS: 'castigo_aprobar_finanzas', OPERACIONES: 'castigo_apro
     }
     console.log('[castigos] módulo listo');
   } catch (e) { console.error('[castigos migration]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const ORIGENES_PROPIA = ['CARTERA_AFA', 'CARTERA_XLSX'];

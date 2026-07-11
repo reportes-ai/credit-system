@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migraciones ────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('brokerage', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS facturas_brokerage (
@@ -31,9 +31,9 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[facturas_brokerage migration]', e.message);
   }
-})();
+});
 
-(async () => {
+require('../../../../shared/migrate').enFila('brokerage', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS pagos_brokerage (
@@ -60,7 +60,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[pagos_brokerage migration]', e.message);
   }
-})();
+});
 
 /* ─── GET /api/brokerage/operaciones ─────────────────────────────────
    Panel de Tesorería: lista operaciones con toda la info relevante

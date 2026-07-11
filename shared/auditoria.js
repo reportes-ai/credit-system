@@ -5,7 +5,7 @@
  */
 const pool = require('./config/database');
 
-(async () => {
+require('../shared/migrate').enFila('auditoria', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS auditoria_credito (
@@ -30,7 +30,7 @@ const pool = require('./config/database');
     await pool.query(`ALTER TABLE auditoria_credito ADD UNIQUE KEY uq_ref_origen (ref_origen)`)
       .catch(e => { if (e.errno !== 1061 && e.errno !== 1062) throw e; });
   } catch(e) { if (e.errno !== 1050) console.error('[auditoria migration]', e.message); }
-})();
+});
 
 function _nombreUsuario(u) {
   if (!u) return 'Sistema';

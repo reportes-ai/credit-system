@@ -13,7 +13,7 @@ const DIAS_NOMBRE = { '1': 'Lun', '2': 'Mar', '3': 'Mié', '4': 'Jue', '5': 'Vie
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
 /* ── Migración + seed (Informe Diario de Ventas, DESACTIVADO) ── */
-(async () => {
+require('../../../../shared/migrate').enFila('correos', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS correos_programados (
       codigo VARCHAR(50) PRIMARY KEY,
@@ -63,7 +63,7 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
        VALUES (30001, 'Correos Programados', 'mantenedores_correos_programados', '/mantenedores/correos-programados/', 'bi-envelope-at')`);
     console.log('[correos-programados] tabla OK');
   } catch (e) { console.error('[correos-programados migration]', e.message); }
-})();
+});
 
 /* ── Helpers ── */
 const fmt = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CL');

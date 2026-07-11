@@ -2,7 +2,7 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migración ─────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('fundantes', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_brokerage (
@@ -34,7 +34,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[fundantes migration]', e.message);
   }
-})();
+});
 
 /* ─── helpers ─────────────────────────────────────────────────────────── */
 const ANALISTAS = ['Administrador', 'Gerente', 'Analista de Crédito', 'Supervisor'];

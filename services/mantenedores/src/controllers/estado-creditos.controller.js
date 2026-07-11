@@ -7,7 +7,7 @@ const { auditar } = require('../../../../shared/audit');
    AutoFácil/recursos propios a futuro). El Flujo Brokerage se dibuja desde acá.
    Fase actual: configuración + dibujo del flujo. NO bloquea transiciones todavía.
    ───────────────────────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('estado-creditos', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS estados_credito (
@@ -104,7 +104,7 @@ const { auditar } = require('../../../../shared/audit');
     // La página ahora unifica Etapas (brokerage/autofácil) + Estado de Cartera.
     await pool.query("UPDATE funcionalidades SET nombre='Etapas y Estados' WHERE codigo='mantenedores_estado_creditos'").catch(() => {});
   } catch (e) { console.error('[estado-creditos migration]', e.message); }
-})();
+});
 
 const RE_COD = /^[A-Z0-9_]+$/;
 const limpiarCodigo = s => String(s || '').trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_]/g, '');

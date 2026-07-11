@@ -9,7 +9,7 @@ const { auditar } = require('../../../../shared/audit');
 const { liquidar } = require('../../../../shared/liquidez-core');
 
 /* ── Migración (idempotente, en fila) ──────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('liquidez', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS dealer_liquidez_planes (
@@ -72,7 +72,7 @@ const { liquidar } = require('../../../../shared/liquidez-core');
         INDEX idx_dealer (id_dealer)
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_liquidez_movimientos migration]', e.message); }
-})();
+});
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const num = v => { const n = Number(String(v ?? '').replace(/[^\d.-]/g, '')); return isNaN(n) ? 0 : n; };

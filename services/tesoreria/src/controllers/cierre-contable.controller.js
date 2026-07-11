@@ -26,7 +26,7 @@ const finDeMes = mes => {
 };
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('cierre-contable', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cierre_contable_meses (
@@ -59,7 +59,7 @@ const finDeMes = mes => {
     }
     console.log('[cierre-contable] módulo listo');
   } catch (e) { console.error('[cierre-contable migration]', e.message); }
-})();
+});
 
 /* ── Cartera vigente al cierre (AFA + AutoFácil vieja, sin lo pagado) ────── */
 async function carteraVigente(cierre) {

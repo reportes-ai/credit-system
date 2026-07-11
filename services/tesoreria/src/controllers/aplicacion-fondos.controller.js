@@ -35,7 +35,7 @@ const MOTIVOS = ['AVENIMIENTO JUDICIAL', 'RENEGOCIACIÓN', 'PREPAGO NEGOCIADO', 
 const FLUJO = ['HECHO', 'REVISADO', 'APROBADO', 'PROCESADO'];
 
 /* ── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('aplicacion-fondos', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS aplicaciones_fondos (
@@ -80,7 +80,7 @@ const FLUJO = ['HECHO', 'REVISADO', 'APROBADO', 'PROCESADO'];
     }
     console.log('[aplicacion-fondos] módulo listo');
   } catch (e) { console.error('[aplicacion-fondos migration]', e.message); }
-})();
+});
 
 /* ── GET /api/aplicacion-fondos/catalogo ────────────────────────────────── */
 exports.catalogo = (req, res) => ok(res, { items: ITEMS, motivos: MOTIVOS, flujo: FLUJO });

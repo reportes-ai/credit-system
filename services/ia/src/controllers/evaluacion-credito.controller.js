@@ -15,7 +15,7 @@ const { auditar } = require('../../../../shared/audit');
 
 const CODIGO = 'evaluacion_consistencia';
 
-(async () => {
+require('../../../../shared/migrate').enFila('evaluacion-credito', async () => {
   try {
     await ia.registrarFuncionalidad({
       codigo: CODIGO,
@@ -40,7 +40,7 @@ const CODIGO = 'evaluacion_consistencia';
       costo_usd     DECIMAL(12,6) NULL,
       INDEX idx_fecha (fecha), INDEX idx_rut (rut) )`);
   } catch (e) { console.error('[ia eval-credito init]', e.message); }
-})();
+});
 
 const normCli = v => v ? String(v).replace(/\./g, '').toUpperCase().trim() : null;     // NNNNNNN-DV (tabla clientes / documentos)
 const rutNum  = v => { const c = String(v || '').replace(/[.\s-]/g, '').toUpperCase(); return c.length > 1 ? c.slice(0, -1) : c; }; // solo dígitos (dealernet)

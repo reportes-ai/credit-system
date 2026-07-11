@@ -29,7 +29,7 @@ ensureTable().catch(e => console.error('dealers table init:', e.message));
 // Dealers AMBOS (Calle+Parque): segunda tabla de comisión PARQUE + dirección de parque.
 // Boot-migration para que el cálculo de créditos y el mantenedor lean estas columnas
 // aunque todavía no se haya cerrado ninguna ficha AMBOS (ensureDealersCols las crea en cierre).
-(async () => {
+require('../../../../shared/migrate').enFila('dealers', async () => {
   const cols = [
     'com_parque_6_12 DECIMAL(5,2)', 'com_parque_13_24 DECIMAL(5,2)',
     'com_parque_25_36 DECIMAL(5,2)', 'com_parque_37 DECIMAL(5,2)',
@@ -41,7 +41,7 @@ ensureTable().catch(e => console.error('dealers table init:', e.message));
     'geo_precision VARCHAR(30)', 'geo_partial TINYINT(1)', 'dir_revisada TINYINT(1)',
   ];
   for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
-})();
+});
 
 function excelDate(v) {
   if (!v) return null;

@@ -18,7 +18,7 @@ const { auditar } = require('../../../../shared/audit');
 const { enviarCorreo, envolverHTML, remitenteCobranza } = require('../../../../shared/mailer');
 
 /* ─── Migración + auto-registro de módulo/funcionalidades ───────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('odp-cuotas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ordenes_pago_cuotas (
@@ -100,7 +100,7 @@ const { enviarCorreo, envolverHTML, remitenteCobranza } = require('../../../../s
           [p.id_perfil, fCola.id_funcionalidad]);
     }
   } catch (e) { console.error('[odp_cuotas funcionalidades]', e.message); }
-})();
+});
 
 /* ─── helpers ───────────────────────────────────────────────────────────────── */
 const ok  = (res, data)            => res.json({ success: true, data, error: null });

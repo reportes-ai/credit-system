@@ -2,7 +2,7 @@
 const pool = require('../../../../shared/config/database');
 
 /* ── Migración ─────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('tablas-dinamicas', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tablas_dinamicas_guardadas (
@@ -22,7 +22,7 @@ const pool = require('../../../../shared/config/database');
   } catch (e) {
     if (e.errno !== 1050) console.error('[tablas-dinamicas migration]', e.message);
   }
-})();
+});
 
 /* ── Fuentes disponibles ─────────────────────────────────────────
    Whitelist de tablas y sus campos (nombre legible + campo real).

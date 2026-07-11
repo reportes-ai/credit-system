@@ -3,7 +3,7 @@ const { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, envolverHTM
 const { auditar } = require('../../../../shared/audit');
 
 /* ─── Migración ──────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('seguridad', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS config_seguridad (
@@ -35,7 +35,7 @@ const { auditar } = require('../../../../shared/audit');
   } catch (e) {
     console.error('[config_seguridad migration]', e.message);
   }
-})();
+});
 
 /* ─── GET config ─────────────────────────────────────────────────────────── */
 const getConfig = async (req, res) => {

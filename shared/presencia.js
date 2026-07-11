@@ -16,7 +16,7 @@ const VENTANA_MS = 2.5 * 60 * 1000;
 /* ── Persistencia: bloques de 5 min por usuario (para "horas de conexión") ──
    Cada request marca el bloque de 5 min en curso; un flush por minuto los
    graba con INSERT IGNORE (máx 12 filas/usuario/hora — costo mínimo). */
-(async () => {
+require('../shared/migrate').enFila('presencia', async () => {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS presencia_bloques (
@@ -26,7 +26,7 @@ const VENTANA_MS = 2.5 * 60 * 1000;
         INDEX idx_bloque (bloque)
       )`);
   } catch (e) { console.error('[presencia migration]', e.message); }
-})();
+});
 
 const _buffer = new Set(); // "id|YYYY-MM-DD HH:MM:00" (bloque de 5 min)
 function marcarBloque(id) {

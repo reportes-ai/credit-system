@@ -40,7 +40,7 @@ async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
 }
 
 /* ── Migraciones ─────────────────────────────────────────────────────────── */
-(async () => {
+require('../../../../shared/migrate').enFila('atencion', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_dealer_cuentas (
       id            INT AUTO_INCREMENT PRIMARY KEY,
@@ -250,7 +250,7 @@ async function logAcceso({ tipo, email, id_cuenta, resultado, req }) {
 
     console.log('[atencion-remota] módulo y esquema listos');
   } catch (e) { console.error('[atencion-remota migration]', e.message); }
-})();
+});
 
 /* ── ICE servers (WebRTC) desde configuración paramétrica ─────────────────── */
 function buildIce(cfg) {

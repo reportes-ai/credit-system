@@ -12,7 +12,7 @@ const MOD_SOPORTE = 500001;     // módulo nuevo "Soporte" (Home)
 const MOD_MANT    = 30001;      // módulo "Mantenedores" (existente)
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos + precarga direcciones ── */
-(async () => {
+require('../../../../shared/migrate').enFila('compras', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS compras_articulos (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -139,7 +139,7 @@ const MOD_MANT    = 30001;      // módulo "Mantenedores" (existente)
     }
     console.log('[compras] módulo registrado');
   } catch (e) { console.error('[compras migration]', e.message); }
-})();
+});
 
 const err = (res, e) => { console.error('[compras]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
