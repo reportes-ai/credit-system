@@ -26,6 +26,7 @@ router.get('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.ge
 router.put('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.setLimites);
 
 router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
+router.get('/evaluacion-credito', verifyToken, evalCredito.listado);
 router.get('/evaluacion-credito/detalle/:id', verifyToken, evalCredito.detalle);
 router.get('/evaluacion-credito/:rut/historial', verifyToken, evalCredito.historial);
 router.get('/evaluacion-credito/:rut', verifyToken, evalCredito.ultima);

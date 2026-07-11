@@ -215,6 +215,29 @@ exports.evaluar = async (req, res) => {
   }
 };
 
+/* GET /api/ia/evaluacion-credito?desde=&hasta=&rut=&decision= → listado global con filtros */
+exports.listado = async (req, res) => {
+  try {
+    const conds = [], params = [];
+    const desde = String(req.query.desde || '').slice(0, 10);
+    const hasta = String(req.query.hasta || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(desde)) { conds.push('fecha >= ?'); params.push(desde); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { conds.push('fecha < DATE_ADD(?, INTERVAL 1 DAY)'); params.push(hasta); }
+    const rut = normCli(req.query.rut);
+    if (rut) { conds.push("REPLACE(UPPER(COALESCE(rut,'')),'.','') LIKE ?"); params.push('%' + rut.replace(/-/g, '%') + '%'); }
+    const dec = String(req.query.decision || '').toLowerCase().trim();
+    if (dec) { conds.push('LOWER(decision) = ?'); params.push(dec); }
+    const [rows] = await pool.query(
+      `SELECT id, fecha, rut, puntaje, quintil, decision, monto_maximo, modelo, costo_usd
+       FROM ia_evaluaciones_credito ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+       ORDER BY fecha DESC LIMIT 300`, params);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[ia eval-credito listado]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* GET /api/ia/evaluacion-credito/:rut/historial → todas las evaluaciones del RUT */
 exports.historial = async (req, res) => {
   try {

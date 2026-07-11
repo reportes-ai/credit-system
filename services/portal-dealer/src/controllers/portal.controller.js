@@ -804,6 +804,14 @@ exports.listarPreaprobaciones = async (req, res) => {
       const like = '%' + q + '%';
       params.push(like, like, like, like);
     }
+    // Filtros del repositorio: rango de fechas, resultado, RUT cliente y N° PREaammxxx
+    const desde = String(req.query.desde || '').slice(0, 10);
+    const hasta = String(req.query.hasta || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(desde)) { where += ' AND created_at >= ?'; params.push(desde); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(hasta)) { where += ' AND created_at < DATE_ADD(?, INTERVAL 1 DAY)'; params.push(hasta); }
+    if (req.query.resultado) { where += ' AND resultado = ?'; params.push(String(req.query.resultado).toUpperCase().trim()); }
+    if (req.query.rut) { where += " AND REPLACE(UPPER(rut_cliente),'.','') LIKE ?"; params.push('%' + String(req.query.rut).toUpperCase().replace(/\./g, '') + '%'); }
+    if (req.query.codigo) { where += " AND UPPER(COALESCE(codigo,'')) LIKE ?"; params.push('%' + String(req.query.codigo).toUpperCase().trim() + '%'); }
     const [rows] = await pool.query(
       `SELECT id, codigo, canal, created_at, id_dealer, rut_dealer, dealer_nombre, rut_cliente,
               precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta, contacto,
