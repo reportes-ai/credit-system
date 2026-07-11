@@ -32,7 +32,7 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
         run: |
           mysqldump -h "$DB_HOST" -P "${DB_PORT:-4000}" -u "$DB_USER" -p"$DB_PASSWORD" \
-            --ssl-mode=REQUIRED --single-transaction --quick --no-tablespaces \
+            --ssl-mode=REQUIRED --skip-lock-tables --quick --no-tablespaces \
             --set-gtid-purged=OFF --column-statistics=0 \
             "$DB_NAME" | gzip -9 > backup-$(date +%Y%m%d).sql.gz
           ls -lh backup-*.sql.gz
