@@ -4458,9 +4458,14 @@ function generatePDF(c, forPrint, fromRev){
       <p style="margin:2px 0">15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.</p>
     </div>
     <!-- FIRMA -->
-    <div style="margin-top:18px;text-align:center">
-      ${firmaImg}
-      <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:0.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+    <div style="margin-top:18px;display:flex;align-items:flex-end">
+      <div id="cartaQRSlot" style="width:130px"></div>
+      <div style="flex:1;text-align:center">
+        ${firmaImg}
+        <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:0.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+        <div id="cartaFESLine" style="font-size:7.5px;color:#64748b;margin-top:3px"></div>
+      </div>
+      <div style="width:130px"></div>
     </div>
     <!-- PIE -->
     <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:0.5px solid #e0e0e0;padding-top:4px;margin-bottom:0;padding-bottom:0">
@@ -4483,9 +4488,33 @@ function generatePDF(c, forPrint, fromRev){
     }
   }
   
+  // QR de verificación + Firma Electrónica Simple (solo cartas aprobadas/otorgadas)
+  estamparVerificableCarta(c, forPrint);
+}
+
+// Registra la carta como documento verificable (server) y estampa el QR + la línea FES.
+// Si es para imprimir, espera el estampado antes de abrir el PDF.
+async function estamparVerificableCarta(c, forPrint){
+  try{
+    if(c && c.id && (c.status === 'APROBADA' || c.status === 'OTORGADA')){
+      const r = await fetch('/api/cartas/' + c.id + '/verificable', { method:'POST', headers:_hdr() });
+      const j = await r.json();
+      if(j.success && j.data && j.data.codigo){
+        const slot = document.getElementById('cartaQRSlot');
+        if(slot && typeof qrVerificacionHTML === 'function') slot.innerHTML = qrVerificacionHTML(j.data.codigo, { px: 88 });
+        const fes = document.getElementById('cartaFESLine');
+        if(fes){
+          const f = new Date(j.data.firmado_at || Date.now()).toLocaleDateString('es-CL');
+          fes.textContent = 'Documento suscrito con Firma Electrónica Simple (Ley 19.799) por ' + (j.data.firmante || '') +
+            ' · ' + f + ' · válida hasta ' + (j.data.valida_hasta ? j.data.valida_hasta.split('-').reverse().join('-') : '') +
+            ' · verificación: ' + location.host + '/verificar/' + j.data.codigo;
+        }
+      }
+    }
+  }catch(_){ }
   if(forPrint){
     // Use html2pdf to download directly (no print dialog)
-    setTimeout(() => printPDF(), 400);
+    setTimeout(() => printPDF(), 300);
   }
 }
 

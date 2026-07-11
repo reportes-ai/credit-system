@@ -1121,4 +1121,39 @@ const verDocumento = async (req, res) => {
   } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento };
+
+// POST /api/cartas/:id/verificable — registra la carta como documento verificable
+// (QR → /verificar/<codigo>) con Firma Electrónica Simple del usuario que emite.
+// Snapshot en duro con la VIGENCIA (fecha carta + vigencia_carta_dias). Idempotente.
+const verificable = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id) || 0;
+    const [[c]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!c) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada' });
+    if (c.status !== 'APROBADA' && c.status !== 'OTORGADA')
+      return res.status(400).json({ success: false, data: null, error: 'Solo cartas aprobadas llevan QR y firma' });
+    const dias = await vigenciaDias();
+    const base = c.fecha ? new Date(c.fecha) : new Date(c.fecha_creacion || Date.now());
+    const vig = new Date(base); vig.setDate(vig.getDate() + dias);
+    const datos = {
+      documento: 'Carta de Aprobación de Crédito',
+      operacion: c.op_carta, fecha: String(c.fecha || '').slice(0, 10),
+      vigencia_dias: dias, valida_hasta: vig.toISOString().slice(0, 10),
+      cliente: c.cliente, rut_cliente: c.rut_cliente,
+      dealer: c.nombre_dealer, vehiculo: [c.marca, c.modelo, c.anio].filter(Boolean).join(' '),
+      saldo_precio: c.saldo, plazo: c.plazo, acreedor: c.acreedor, estado: c.status,
+    };
+    const { registrarVerificable } = require('../../../../shared/verificacion');
+    const usuario = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email || '';
+    const codigo = await registrarVerificable({
+      tipo: 'carta_aprobacion', ref_tabla: 'cartas_aprobacion', ref_id: id,
+      num_op: parseInt(c.op_carta) || null, rut: c.rut_cliente, nombre: c.cliente,
+      datos, emitido_por: usuario,
+      firmante: { id: req.usuario.id_usuario, nombre: usuario, cargo: 'AutoFácil SPA',
+                  ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress || null },
+    });
+    res.json({ success: true, data: { codigo, firmante: usuario, valida_hasta: datos.valida_hasta, firmado_at: new Date() }, error: null });
+  } catch (e) { console.error('[cartas verificable]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable };

@@ -15,6 +15,7 @@ router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVi
 router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), ctrl.rentabilidadTier);
 
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
+router.post('/:id/verificable', verifyToken, ctrl.verificable);
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
 router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
 router.post('/carga-masiva', verifyToken, requireFunc('aprob_carga_masiva'), ctrl.cargaMasivaCartas);
