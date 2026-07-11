@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 — botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -130,7 +130,10 @@
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
         <h3 style="margin:0"><i class="bi bi-archive"></i> Informes históricos <span class="muted" id="histRut"></span></h3>
-        <button class="btn-ghost" id="btnTodos" onclick="descargarTodos()" style="display:none"><i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar todos</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" id="btnRepIA" onclick="verReporteIA()" style="background:linear-gradient(135deg,#7c2d12,#c2410c);color:#fff;border:none"><i class="bi bi-stars me-1"></i>Reporte IA</button>
+          <button class="btn-ghost" id="btnTodos" onclick="descargarTodos()" style="display:none"><i class="bi bi-file-earmark-arrow-down me-1"></i>Descargar todos</button>
+        </div>
       </div>
       <div id="hist"><div class="muted">Ingresa un RUT y solicita o consulta para ver su historial.</div></div>
     </div>
@@ -1058,6 +1061,28 @@ document.getElementById('rut').addEventListener('blur', ()=>{ const v=document.g
 cargarProductos();
 // Prefill por ?rut= (lo usa el botón "Informe DealerNet" de la revisión de fichas de dealer).
 (()=>{ try{ const rp=new URLSearchParams(location.search).get('rut'); if(rp){ const el=document.getElementById('rut'); if(el){ el.value=rp; cargarHistoricos(rp); } } }catch(_){}})();
+</script>
+<script src="/js/reporte-ia.js"></script>
+<script>
+// Reporte IA bajo demanda: reusa uno reciente (≤15 días) o lo genera y lo abre en el formato AF_REP_IA.
+async function verReporteIA(){
+  const rut = (document.getElementById('rut').value || '').trim();
+  if(!rut){ alert('Ingresa un RUT primero.'); return; }
+  const btn = document.getElementById('btnRepIA'); const t = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Consultando…';
+  try {
+    // ¿ya hay uno reciente? (≤15 días) → reusar
+    let d = null;
+    try { const j = await fetch('/api/ia/informe-dealernet/por-rut/'+encodeURIComponent(rut), { headers:H }).then(r=>r.json()); if(j.success) d = j.data; } catch(_){}
+    const reciente = d && d.fecha && (Date.now() - new Date(d.fecha).getTime()) < 15*864e5;
+    if(!reciente){
+      btn.innerHTML = '<i class="bi bi-stars me-1"></i>Generando con IA…';
+      const g = await fetch('/api/ia/informe-dealernet', { method:'POST', headers:{...H,'Content-Type':'application/json'}, body: JSON.stringify({ rut }) }).then(r=>r.json());
+      if(!g.success){ alert(g.error || 'No se pudo generar el reporte IA'); return; }
+    }
+    await AF_REP_IA.abrirRut(rut, (d && d.nombre) || '');
+  } finally { btn.disabled=false; btn.innerHTML = t; }
+}
 </script>
 <script src="/js/app-version.js"></script>
 </body>
