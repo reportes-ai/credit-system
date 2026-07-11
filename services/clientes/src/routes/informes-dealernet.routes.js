@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const ctrl = require('../controllers/informes-dealernet.controller');
+const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 // GET  /api/informes-dealernet?rut=xxx         → listar (con filtro opcional)
 router.get('/',           verifyToken, ctrl.getAll);
@@ -16,9 +17,9 @@ router.get('/:id(\\d+)', verifyToken, ctrl.getById);
 router.get('/:id/pdf',    verifyToken, ctrl.getPDF);
 
 // POST /api/informes-dealernet/upload          → subir y parsear PDF
-router.post('/upload',    verifyToken, ...ctrl.uploadInforme);
+router.post('/upload',    verifyToken, requireFunc('dealernet_informes_ver','dealernet_repositorio'), ...ctrl.uploadInforme);
 
 // DELETE /api/informes-dealernet/:id
-router.delete('/:id',     verifyToken, ctrl.deleteInforme);
+router.delete('/:id',     verifyToken, requireFunc('dealernet_informes_ver','dealernet_repositorio'), ctrl.deleteInforme);
 
 module.exports = router;
