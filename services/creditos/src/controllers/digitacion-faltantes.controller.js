@@ -117,6 +117,7 @@ function esVacio(col, v) {
   if (v === null || v === undefined) return true;
   const c = CAMPO[col] || {};
   if (col === 'seguros') return false;
+  if (col === 'anio') return false;   // 0 = "S/I" (backfill jun-2026 hacia atrás): cuenta como completado
   if (c.tipo === 'text' || c.tipo === 'select') return String(v).trim() === '';
   if (c.tipo === 'date' || c.tipo === 'month') return false;
   return Number(v) === 0;
