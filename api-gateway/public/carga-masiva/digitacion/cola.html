@@ -128,7 +128,7 @@ function render(d){
       <div>
         <div class="op">N° Operación ${esc(cr.numero_credito)} <span class="pill-tipo ${d.tipo==='otorgados'?'otorg':'otros'}">${d.tipo==='otorgados'?'OTORGADO':'OTROS'}</span></div>
         <div class="cli">${esc(cr.nombre_cliente||'—')} <span class="rut">${esc(cr.rut_cliente||'')}</span></div>
-        <div style="font-size:.8rem;color:#64748b;margin-top:2px">ID Financiera: <b>${esc(cr.id_financiera||'—')}</b></div>
+        <div style="font-size:.8rem;color:#64748b;margin-top:2px">ID Financiera: <b>${esc(cr.id_financiera||'—')}</b>${cr.financiera?` · <span style="background:#eff6ff;color:#1e40af;border-radius:6px;padding:1px 8px;font-weight:700">${esc(cr.financiera)}</span>`:''}</div>
       </div>
       <span class="pend"><i class="bi bi-stack me-1"></i>${d.pendientes} por digitar</span>
     </div>
