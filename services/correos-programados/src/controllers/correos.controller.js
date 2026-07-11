@@ -599,7 +599,13 @@ async function buildSalud() {
     add('Correos programados', !ce.length, ce.length ? ce.map(x => `${x.nombre}: ${x.ultimo_estado}`).join(' · ') : 'sin errores');
   } catch (e) { add('Correos programados', false, e.message); }
 
-  // 5. Memoria del proceso (límite Render Starter: 512 MB)
+  // 5. Gasto IA del mes (Anthropic) — visibilidad de costo
+  try {
+    const [[ia]] = await pool.query("SELECT ROUND(COALESCE(SUM(costo_usd),0),2) usd, COUNT(*) n FROM ia_uso WHERE fecha>=DATE_FORMAT(CURDATE(),'%Y-%m-01')");
+    add('Gasto IA del mes', Number(ia.usd) < 50, `US$ ${ia.usd} en ${ia.n} análisis` + (Number(ia.usd) >= 50 ? ' — sobre US$50: revisar en Mantenedores → IA' : ''));
+  } catch (_) { add('Gasto IA del mes', true, 'sin registro'); }
+
+  // 6. Memoria del proceso (límite Render Starter: 512 MB)
   const rss = Math.round(process.memoryUsage().rss / 1048576);
   add('Memoria del servidor', rss < 360, `${rss} MB de 512 MB (${Math.round(rss / 5.12)}%)` + (rss >= 360 ? ' — sobre 70%: considerar subir plan Render' : ''));
 
@@ -615,6 +621,7 @@ async function buildSalud() {
         1. <a href="https://dashboard.render.com">Render → Metrics</a>: memoria base bajo 70%.<br>
         2. <a href="https://tidbcloud.com">TiDB → Diagnosis → SQL Statement</a> (3 días, por Total RU): statements &gt;100K RU → pantallazo a la IA.<br>
         3. <a href="https://github.com/reportes-ai/credit-system/actions">GitHub → Actions → Backup BD nocturno</a>: última corrida verde (GitHub además avisa por correo si falla).<br>
+        4. <b>Cada 3 meses</b>: simulacro de restauración — descargar el último backup y restaurarlo en un branch de TiDB (ver Definiciones → "Respaldo de la Base de Datos").<br>
         Guía completa: Mantenedores → Definiciones → "Monitoreo del Sistema".
       </div>
       <div style="padding:12px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">Correo automático semanal de AutoFácil · se configura en Mantenedores → Correos Programados.</div>
