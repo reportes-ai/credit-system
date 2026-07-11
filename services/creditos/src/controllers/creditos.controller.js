@@ -926,6 +926,7 @@ const getReporteria = async (req, res) => {
       FROM creditos ob
       LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
       ORDER BY ob.mes DESC, ob.id DESC
+      LIMIT 50000 -- LIMIT defensivo: evita timeout si la tabla crece
     `);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
@@ -948,6 +949,7 @@ const getOtorgadosIncompletos = async (req, res) => {
         AND estado_credito NOT IN ('RECHAZADO','ANULADO')
         AND (plazo IS NULL OR plazo = 0 OR tascli_real IS NULL OR tascli_real = 0)
       ORDER BY mes DESC, num_op DESC
+      LIMIT 2000 -- LIMIT defensivo (cola de digitacion faltantes)
     `);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {

@@ -105,7 +105,8 @@ const getDatos = async (_req, res) => {
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       LEFT JOIN dealers d ON d.id_dealer = c.id_dealer
       WHERE c.num_op >= 77130
-      ORDER BY c.num_op`);
+      ORDER BY c.num_op
+      LIMIT 50000`);   // LIMIT defensivo: evita timeout si la tabla crece
     const keys = COLS.map(c => c[1]);
     const data = rows.map(r => keys.map(k => r[k] ?? null));
     res.json({ success: true, data: {
