@@ -95,6 +95,7 @@ function estadoCond(tipo) {
 function colVacioSQL(col) {
   const c = CAMPO[col] || {};
   if (col === 'seguros') return `(ob.${col} IS NULL)`;                       // 0 = sin seguro, válido
+  if (col === 'anio')    return `(ob.${col} IS NULL)`;                       // 0 = "S/I", válido
   if (c.tipo === 'text' || c.tipo === 'select') return `(ob.${col} IS NULL OR ob.${col} = '')`;
   if (c.tipo === 'date' || c.tipo === 'month')  return `(ob.${col} IS NULL)`;
   return `(ob.${col} IS NULL OR ob.${col} = 0)`;                            // number/decimal
