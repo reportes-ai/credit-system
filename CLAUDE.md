@@ -230,10 +230,7 @@ Reglas de diseño que se derivan de este principio:
 
 ### 🔴 Crítico (seguridad y datos)
 
-- [ ] **Verificar backups automáticos en TiDB Cloud**
-  - Confirmar que los backups diarios están activos en el panel de TiDB Cloud
-  - Hacer una prueba de restauración al menos una vez
-  - Documentar el procedimiento de recuperación ante desastre
+- [x] ✅ **Backups de BD** (2026-07-10: TiDB Starter tiene backup diario automático pero retención de SOLO 1 día → se agregó respaldo propio: GitHub Action `backup-bd.yml` hace mysqldump nocturno (02:17 Chile) → artefacto privado con 30 días de retención; probado OK, 22 MB comprimido. Restauración documentada en el workflow. Pendiente menor: hacer una prueba de restauración real en un branch de TiDB)
 
 - [x] ✅ **Auditar variables de entorno** (2026-07-04: solo .env.example con placeholders en el repo, sin secretos hardcodeados, auth.js exige JWT_SECRET al boot; falta solo confirmar rotación si alguna vez estuvo expuesto)
   - Verificar que `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` estén en Render como env vars, NO en el código ni en `.env` commiteado
