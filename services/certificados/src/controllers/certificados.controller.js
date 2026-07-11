@@ -354,7 +354,7 @@ async function calcularPrepago(num_op) {
       if (enMora) {                                   // en mora
         nM++; moraC += N(q.valor_cuota);
         const diasMora = Math.floor((ref - venc) / 86400000);
-        cuMora = (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaISO, tramo, tasasMora).interes || 0);
+        cuMora = (COB.calcularInteresMora(N(q.valor_cuota), q.venc, fechaISO, tramo, tasasMora, COB.moraFechaFija(cfg, c.fecha_otorgado)).interes || 0);
         intMora += cuMora;
         if (diasMora >= gastosDias) {
           const uf = await COB.getUFporFecha(COB.addDias(q.venc, gastosDias));

@@ -123,7 +123,7 @@ async function cobranzaFullMap(id_credito, pagos, fechaCalc) {
           gastos = COB.calcularGastoCobranza(cuota, uf, tramosUF).gasto_pesos || 0;
         }
       }
-      const mora = fv ? (COB.calcularInteresMora(cuota, fv, fechaCalc, tramo, tasas).interes || 0) : 0;
+      const mora = fv ? (COB.calcularInteresMora(cuota, fv, fechaCalc, tramo, tasas, COB.moraFechaFija(cfg, cr && cr.fecha_otorgado)).interes || 0) : 0;
       out.set(Number(q.numero_cuota), { mora: Math.round(mora), gastos: Math.round(gastos) });
     }
   } catch (e) { console.error('[cobranzaFullMap]', e.message); }

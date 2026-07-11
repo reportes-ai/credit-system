@@ -62,7 +62,13 @@ const COB_DEFAULTS = {
     { hasta_dias: 15, pct: 1 }, { hasta_dias: 30, pct: 5 }, { hasta_dias: 60, pct: 20 },
     { hasta_dias: 90, pct: 40 }, { hasta_dias: 180, pct: 80 }, { hasta_dias: null, pct: 100 },
   ]),
+  // Modo de tasa del interés por mora: 'fija_otorgamiento' (TMC al otorgar, per contrato 6.1)
+  // o 'variable' (TMC vigente de cada día de mora — Ley 18.010 art. 16 sin pacto).
+  mora_tasa_modo: 'fija_otorgamiento',
 };
+// Fecha de tasa fija para el motor de mora según el modo configurado (null = variable).
+const moraFechaFija = (cfg, fechaOtorgado) =>
+  String((cfg && cfg.mora_tasa_modo) || 'fija_otorgamiento') === 'variable' ? null : (fechaOtorgado || null);
 (async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS cobranza_config (
@@ -112,10 +118,15 @@ function calcularGastoCobranza(deudaPesos, ufValor, tramos) {
 }
 
 // Interés por mora: diario simple sobre la cuota original. Tasa diaria = TMC mensual / 30.
-// Cada día usa la TMC vigente de SU mes (tabla tasas por rango de fechas) y el tramo del
-// crédito (menor/mayor 200 UF). Se acumulan los días de atraso (venc+1 .. fecha_calculo).
+// Modo de tasa (cobranza_config.mora_tasa_modo, mantenedor Parámetros de Cobranza):
+//   'fija_otorgamiento' (default) → TMC vigente a la FECHA DE OTORGAMIENTO del crédito,
+//     fija para toda la mora (Contrato cláusula 6.1: interés máximo convencional según
+//     monto y plazo, pactado al originar — Ley 18.010 art. 16 permite pacto en contrario).
+//     Requiere pasar fechaTasaFija (fecha_otorgado); sin ella cae a variable.
+//   'variable' → cada día usa la TMC vigente de SU mes (tabla tasas por rango de fechas).
+// Tramo del crédito (menor/mayor 200 UF) elige la columna.
 //   tasas = filas {fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor}
-function calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas) {
+function calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas, fechaTasaFija) {
   const c = Number(cuota) || 0;
   if (!c || !fechaVenc) return { dias: 0, interes: 0, detalle: [] };
   const ini = new Date(fechaVenc + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() + 1); // día 1 de mora
@@ -125,10 +136,13 @@ function calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas) {
     const row = (tasas || []).find(t => String(t.fecha_desde) <= fechaStr && fechaStr <= String(t.fecha_hasta));
     return row ? (parseFloat(row[campo]) || 0) : 0; // % mensual
   };
+  // Tasa fija al otorgamiento: se resuelve UNA vez y aplica a todos los días de mora.
+  // Fallback: si a la fecha de otorgamiento no hay TMC cargada (historia incompleta), variable.
+  const tmcFija = fechaTasaFija ? tmcDe(String(fechaTasaFija).slice(0, 10)) : 0;
   let dias = 0, interes = 0; const porPeriodo = {};
   for (let d = new Date(ini); d <= fin; d.setUTCDate(d.getUTCDate() + 1)) {
     const fs = d.toISOString().slice(0, 10);
-    const tmcMes = tmcDe(fs);
+    const tmcMes = tmcFija > 0 ? tmcFija : tmcDe(fs);
     const interesDia = c * (tmcMes / 100) / 30;
     interes += interesDia; dias++;
     const k = tmcMes.toFixed(4);
@@ -992,7 +1006,7 @@ exports.getParametros = async (req, res) => {
 exports.setParametros = async (req, res) => {
   try {
     const body = req.body || {};
-    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf', 'tramos_provision'];
+    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf', 'tramos_provision', 'mora_tasa_modo'];
     for (const clave of permitidas) {
       if (body[clave] === undefined) continue;
       let valor = body[clave];
@@ -1023,7 +1037,7 @@ function addDias(fechaStr, n) {
 }
 
 // Reutilizable por otros módulos (ej. certificados: liquidación de prepago).
-exports._calc = { calcularGastoCobranza, calcularInteresMora, getCobranzaConfig, getUFporFecha, addDias };
+exports._calc = { calcularGastoCobranza, calcularInteresMora, moraFechaFija, getCobranzaConfig, getUFporFecha, addDias };
 // Dependencias para el motor de automatización de mora (mora-motor.controller).
 exports._motor = { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase };
 
@@ -1080,9 +1094,15 @@ exports.calcularCobranza = async (req, res) => {
       gasto = { ...calcularGastoCobranza(cuota, uf, tramos), aplica: true, uf, fecha_uf: fechaUF };
     }
 
-    // Interés por mora: por día con la TMC mensual vigente del tramo del crédito
+    // Interés por mora: TMC del tramo del crédito, fija al otorgamiento o variable según modo.
+    // fecha_otorgamiento (o id_credito para resolverla) es opcional en el body.
     const [tasas] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
-    const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas);
+    let fOtorgado = req.body?.fecha_otorgamiento || null;
+    if (!fOtorgado && req.body?.id_credito) {
+      const [[cr]] = await pool.query('SELECT DATE_FORMAT(fecha_otorgado,"%Y-%m-%d") f FROM creditos WHERE id=?', [req.body.id_credito]);
+      fOtorgado = cr ? cr.f : null;
+    }
+    const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas, moraFechaFija(cfg, fOtorgado));
 
     const total = cuota + (gasto.gasto_pesos || 0) + (interes.interes || 0);
     ok(res, {
@@ -1111,11 +1131,12 @@ exports.calcularCobranzaLote = async (req, res) => {
     const [tasas] = await pool.query("SELECT DATE_FORMAT(fecha_desde,'%Y-%m-%d') fecha_desde, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor FROM tasas");
 
     // Tramo del crédito: saldo precio (o monto financiado) vs umbral × UF de la fecha de otorgamiento
-    let tramo = 'menor';
+    let tramo = 'menor', fOtorgado = null;
     if (id_credito) {
       const [[cr]] = await pool.query(
         'SELECT saldo_precio, monto_financiado, DATE_FORMAT(fecha_otorgado,"%Y-%m-%d") AS fecha_otorgado FROM creditos WHERE id=?', [id_credito]);
       if (cr) {
+        fOtorgado = cr.fecha_otorgado;
         const [[um]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='umbral_uf_tramo'");
         const umbral = um ? parseFloat(um.valor) || 200 : 200;
         const ufOt = await getUFporFecha(cr.fecha_otorgado);
@@ -1123,6 +1144,7 @@ exports.calcularCobranzaLote = async (req, res) => {
         if (ufOt > 0 && base > umbral * ufOt) tramo = 'mayor';
       }
     }
+    const fTasaFija = moraFechaFija(cfg, fOtorgado);
 
     // Cache de UF por fecha-día-21 para no repetir queries
     const ufCache = new Map();
@@ -1139,7 +1161,7 @@ exports.calcularCobranzaLote = async (req, res) => {
         const uf = await ufDe(fechaUF);
         gasto = { ...calcularGastoCobranza(cuota, uf, tramos), aplica: true, uf, fecha_uf: fechaUF };
       }
-      const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas);
+      const interes = calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas, fTasaFija);
       out.push({ numero: q.numero, dias_mora: diasMora, gasto, interes,
         total: cuota + (gasto.gasto_pesos || 0) + (interes.interes || 0) });
     }

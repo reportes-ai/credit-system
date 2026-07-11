@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros Cobranza — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -71,6 +71,21 @@
         <label class="fl">Días desde el vencimiento para cobrar gastos</label>
         <input type="number" min="0" class="form-control" id="gastosDias">
         <div class="form-text">Ley 19.496: solo se cobran tras 20 días corridos del vencimiento → día 21.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modo de tasa del interés por mora -->
+  <div class="card-af">
+    <div class="lbl">Interés por Mora — Modo de Tasa</div>
+    <div class="row g-3 mt-1">
+      <div class="col-sm-6">
+        <label class="fl">Tasa aplicada a los días de mora</label>
+        <select class="form-control" id="moraTasaModo">
+          <option value="fija_otorgamiento">Fija al otorgamiento (TMC vigente al otorgar el crédito)</option>
+          <option value="variable">Variable (TMC vigente de cada día de mora)</option>
+        </select>
+        <div class="form-text">Contrato cláusula 6.1 pacta la tasa al originar (según monto y plazo) → <b>fija</b>. Sin pacto, la Ley 18.010 art. 16 usa la TMC vigente durante el retardo → <b>variable</b>.</div>
       </div>
     </div>
   </div>
@@ -155,7 +170,8 @@
     <ul>
       <li><b>Textos Email / SMS / WhatsApp y datos de transferencia</b> → los mensajes que se generan en <a href="/cobranza/">Cobranza</a> → ficha del deudor → <i>Mensajes</i> (botón Email/SMS/WhatsApp).</li>
       <li><b>Días y Tramos UF de gastos de cobranza</b> → cálculo del <b>gasto de cobranza</b> (Ley 19.496, tramos marginales sobre la deuda en UF; UF fija del día 21). Se expone vía <code>POST /api/cobranza/calcular-gasto</code> y, junto al interés, en <code>POST /api/cobranza/calcular-cobranza</code> para <a href="/cobranza/">Cobranza</a> y <b>Caja</b>.</li>
-      <li><b>Interés por mora</b> → usa las <a href="/mantenedores/tasas/">Tasas (TMC)</a> por mes y tramo; tasa diaria = TMC mensual/30 sobre la cuota original. No se edita aquí: depende del mantenedor de Tasas.</li>
+      <li><b>Interés por mora</b> → usa las <a href="/mantenedores/tasas/">Tasas (TMC)</a> por tramo; tasa diaria = TMC mensual/30 sobre la cuota original. Los valores dependen del mantenedor de Tasas.</li>
+      <li><b>Modo de tasa del interés por mora</b> (fija al otorgamiento / variable) → TODO cálculo de mora: <a href="/cobranza/">Cobranza</a>, Caja (pago de cuotas y condonación), <b>prepago/certificados</b> (motor <code>calcularPrepago</code>), Aplicación de Fondos y Portal del Cliente.</li>
       <li><b>Tramos de provisión</b> → la pestaña <b>Provisiones</b> del CRM de <a href="/cobranza/">Cobranza</a> (<code>GET /api/cobranza/provisiones</code>): % por tramo de días de mora sobre el capital insoluto de la cartera propia (AutoFácil + AFA). Desde 181 días se provisiona el 100%.</li>
     </ul>
   </div>
@@ -224,6 +240,7 @@ async function cargar(){
     const j = await r.json();
     const d = j.data || {};
     document.getElementById('gastosDias').value   = d.gastos_dias ?? '';
+    document.getElementById('moraTasaModo').value = d.mora_tasa_modo || 'fija_otorgamiento';
     document.getElementById('datosTransf').value  = d.datos_transferencia || '';
     document.getElementById('txtWhatsapp').value  = d.texto_whatsapp || '';
     document.getElementById('txtSms').value        = d.texto_sms || '';
@@ -253,6 +270,7 @@ async function guardar(){
   });
   const payload = {
     gastos_dias: document.getElementById('gastosDias').value || '0',
+    mora_tasa_modo: document.getElementById('moraTasaModo').value,
     tramos_provision: TRAMOS_PROV,
     datos_transferencia: document.getElementById('datosTransf').value,
     texto_whatsapp: document.getElementById('txtWhatsapp').value,
