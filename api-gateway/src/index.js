@@ -216,6 +216,7 @@ app.use('/api/evaluacion-crediticia', require('../../services/evaluacion-crediti
 app.use('/api/creditos',            require('../../services/creditos/src/routes/creditos.routes'));
 app.use('/api/edicion-creditos',    require('../../services/creditos/src/routes/edicion.routes'));
 app.use('/api/digitacion-faltantes', require('../../services/creditos/src/routes/digitacion-faltantes.routes'));
+app.use('/api/score-mora',           require('../../services/creditos/src/routes/score-mora.routes'));
 app.use('/api/credito-documentos',  require('../../services/creditos/src/routes/credito-documentos.routes'));
 app.use('/api/documentos-af',       require('../../services/creditos/src/routes/documentos-af.routes'));
 app.use('/api/pagos-credito',       require('../../services/creditos/src/routes/pagos-credito.routes'));
@@ -234,6 +235,7 @@ app.use('/api/cuentas-transitorias', require('../../services/tesoreria/src/route
 app.use('/api/brokerage',            require('../../services/tesoreria/src/routes/brokerage.routes'));
 app.use('/api/aplicacion-fondos',    require('../../services/tesoreria/src/routes/aplicacion-fondos.routes'));
 app.use('/api/cierre-contable',      require('../../services/tesoreria/src/routes/cierre-contable.routes'));
+app.use('/api/venta-cartera',        require('../../services/tesoreria/src/routes/venta-cartera.routes'));
 app.use('/api/banco',                require('../../services/tesoreria/src/routes/banco-conexiones.routes'));
 
 // Cartas de Aprobación

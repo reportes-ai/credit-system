@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venta de Cartera — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:1400px; margin:22px auto; padding:0 20px 70px; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,var(--accent)); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .tabs { display:flex; gap:6px; margin-bottom:16px; }
+    .tab { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:9px 18px; font-weight:700; font-size:.88rem; color:#6b7280; cursor:pointer; }
+    .tab.active { background:var(--navy-dark); border-color:var(--navy-dark); color:#fff; }
+    .card-x { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; padding:7px 8px; border-bottom:2px solid #eef2f7; }
+    td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .pill { font-weight:800; border-radius:10px; padding:2px 10px; font-size:.72rem; }
+    .pill.resp { background:#fee2e2; color:#991b1b; } .pill.adm { background:#dbeafe; color:#1e40af; }
+    .pill.both { background:#fef3c7; color:#92400e; } .pill.plain { background:#f1f5f9; color:#475569; }
+    .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:14px; }
+    .kpi { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:14px 16px; }
+    .kpi .l { font-size:.68rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }
+    .kpi .v { font-size:1.35rem; font-weight:800; color:var(--navy-dark); margin-top:2px; }
+    .filtro-bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px; }
+    .filtro-bar label { font-size:.68rem; text-transform:uppercase; color:#6b7280; font-weight:700; display:block; margin-bottom:2px; }
+    .charts { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:900px){ .charts{ grid-template-columns:1fr; } }
+    .muted { color:#94a3b8; }
+    input[type=number].precio { width:120px; font-size:.8rem; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="wrap">
+  <div class="page-banner">
+    <i class="bi bi-bag-check"></i>
+    <div>
+      <h2>Venta de Cartera</h2>
+      <p>Venta de créditos AutoFácil (cartera propia) a otra financiera. Precio propuesto por el motor (capital vigente), marcas de Administración y Responsabilidad, reporte de stock y cuotas del mes a pagar al comprador.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabBtnVender" onclick="tab('vender')"><i class="bi bi-cart-check me-1"></i>Vender</div>
+    <div class="tab" id="tabBtnStock" onclick="tab('stock')"><i class="bi bi-clipboard-data me-1"></i>Stock Vendido</div>
+    <div class="tab" id="tabBtnCuotas" onclick="tab('cuotas')"><i class="bi bi-calendar-week me-1"></i>Cuotas del Mes (Responsabilidad)</div>
+  </div>
+
+  <!-- ══ VENDER ══ -->
+  <div id="tabVender">
+    <div class="card-x">
+      <div class="filtro-bar">
+        <div><label>Comprador</label><input id="vComprador" class="form-control form-control-sm" list="dlComp" value="CFC" style="width:180px"><datalist id="dlComp"><option>CFC</option><option>AUTOFIN</option><option>UNIDAD DE CREDITO</option></datalist></div>
+        <div><label>Fecha de venta</label><input type="date" id="vFecha" class="form-control form-control-sm"></div>
+        <div class="form-check" style="margin-bottom:4px"><input class="form-check-input" type="checkbox" id="vAdm"><label class="form-check-label" for="vAdm" style="font-size:.85rem">Con Administración <span class="muted">(cobranza y recaudación nuestra)</span></label></div>
+        <div class="form-check" style="margin-bottom:4px"><input class="form-check-input" type="checkbox" id="vResp"><label class="form-check-label" for="vResp" style="font-size:.85rem">Con Responsabilidad <span class="muted">(recourse)</span></label></div>
+        <button class="btn btn-sm btn-success" onclick="vender()"><i class="bi bi-bag-check me-1"></i>Vender seleccionadas</button>
+      </div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th><input type="checkbox" onclick="selAll(this)"></th><th>N° Op</th><th>Cliente</th><th>RUT</th><th>Mes</th><th>Monto</th><th>Cuotas pend.</th><th>Capital vigente (motor)</th><th>Precio de venta</th></tr></thead>
+          <tbody id="vBody"><tr><td colspan="9" class="muted">Cargando…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ STOCK ══ -->
+  <div id="tabStock" style="display:none">
+    <div class="kpi-row" id="kpis"></div>
+    <div class="card-x">
+      <h6 style="font-weight:800;color:var(--navy-dark)">Stock por categoría</h6>
+      <table>
+        <thead><tr><th>Categoría</th><th>Casos</th><th>Capital al vender</th><th>Precio de venta</th><th>Capital vigente hoy</th></tr></thead>
+        <tbody id="catBody"></tbody>
+      </table>
+    </div>
+    <div class="charts">
+      <div class="card-x"><h6 style="font-weight:800;color:var(--navy-dark)">Casos por categoría</h6><canvas id="chCat" height="220"></canvas></div>
+      <div class="card-x"><h6 style="font-weight:800;color:var(--navy-dark)">Precio de venta por mes</h6><canvas id="chMes" height="220"></canvas></div>
+    </div>
+    <div class="card-x" style="overflow:auto">
+      <h6 style="font-weight:800;color:var(--navy-dark)">Detalle de operaciones vendidas</h6>
+      <table>
+        <thead><tr><th>N° Op</th><th>Cliente</th><th>Comprador</th><th>Fecha venta</th><th>Categoría</th><th>Capital venta</th><th>Precio venta</th><th>Capital vigente</th><th>Cuotas pend.</th><th></th></tr></thead>
+        <tbody id="sBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ CUOTAS DEL MES ══ -->
+  <div id="tabCuotas" style="display:none">
+    <div class="card-x">
+      <div class="filtro-bar">
+        <div><label>Mes</label><input type="month" id="cMes" class="form-control form-control-sm"></div>
+        <button class="btn btn-sm btn-primary" onclick="cargarCuotas()"><i class="bi bi-search me-1"></i>Ver</button>
+        <div id="cResumen" style="font-size:.9rem;font-weight:700;color:var(--navy-dark)"></div>
+      </div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>Vence</th><th>N° Op</th><th>Cliente</th><th>Comprador</th><th>N° Cuota</th><th>Valor cuota</th><th>Pagada</th></tr></thead>
+          <tbody id="cBody"><tr><td colspan="7" class="muted">Elige un mes.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/chart.umd.min.js"></script>
+<script>
+'use strict';
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const fmt = n => (n==null||n==='') ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const CATL = { RESP_ADM:'Responsabilidad + Administración', RESP:'Con Responsabilidad', ADM:'Con Administración', SIN_MARCAS:'Sin marcas' };
+const CATP = { RESP_ADM:'both', RESP:'resp', ADM:'adm', SIN_MARCAS:'plain' };
+let ELE = [];
+
+function tab(t){
+  ['Vender','Stock','Cuotas'].forEach(x => {
+    $('tab'+x).style.display = (x.toLowerCase()===t) ? '' : 'none';
+    $('tabBtn'+x).classList.toggle('active', x.toLowerCase()===t);
+  });
+  if (t==='vender') cargarElegibles();
+  if (t==='stock') cargarStock();
+  if (t==='cuotas'){ if(!$('cMes').value) $('cMes').value = new Date().toISOString().slice(0,7); cargarCuotas(); }
+}
+function selAll(el){ document.querySelectorAll('#vBody input[type=checkbox]').forEach(c => c.checked = el.checked); }
+
+async function cargarElegibles(){
+  const tb = $('vBody');
+  tb.innerHTML = '<tr><td colspan="9" class="muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando…</td></tr>';
+  const j = await fetch('/api/venta-cartera/elegibles', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { tb.innerHTML = '<tr><td colspan="9">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  ELE = j.data || [];
+  tb.innerHTML = ELE.length ? ELE.map((o,i)=>`
+    <tr>
+      <td><input type="checkbox" data-i="${i}"></td>
+      <td><b>${o.num_op}</b></td><td>${esc(o.cliente)}</td><td>${esc(o.rut)}</td><td>${esc(o.mes||'—')}</td>
+      <td>${fmt(o.monto_financiado)}</td><td>${o.cuotas_pendientes ?? '—'}</td>
+      <td><b>${fmt(o.capital_vigente)}</b></td>
+      <td><input type="number" class="form-control form-control-sm precio" id="precio${i}" value="${o.precio_motor||''}"></td>
+    </tr>`).join('') : '<tr><td colspan="9" class="muted">No hay créditos AutoFácil vendibles (otorgados y no vendidos).</td></tr>';
+}
+
+async function vender(){
+  const sel = [...document.querySelectorAll('#vBody input[type=checkbox]:checked')].filter(c=>c.dataset.i!=null);
+  if (!sel.length) return alert('Selecciona al menos una operación.');
+  const ventas = sel.map(c => { const i = +c.dataset.i; return { id_credito: ELE[i].id, precio_venta: +($('precio'+i).value||0) }; });
+  if (ventas.some(v => !(v.precio_venta > 0))) return alert('Todas las operaciones seleccionadas necesitan un precio de venta > 0.');
+  const comprador = $('vComprador').value.trim();
+  if (!comprador) return alert('Indica el comprador.');
+  if (!confirm(`Vender ${ventas.length} operación(es) a ${comprador.toUpperCase()}${$('vResp').checked?' CON responsabilidad':''}${$('vAdm').checked?' CON administración':''}. ¿Confirmar?`)) return;
+  const j = await fetch('/api/venta-cartera/vender', { method:'POST', headers:H, body: JSON.stringify({
+    comprador, fecha_venta: $('vFecha').value || undefined,
+    con_administracion: $('vAdm').checked, con_responsabilidad: $('vResp').checked, ventas }) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error || 'Error al vender');
+  alert(`Vendidas: ${j.data.vendidas}` + (j.data.errores.length ? `\nErrores:\n- ${j.data.errores.join('\n- ')}` : ''));
+  cargarElegibles();
+}
+
+let CH1=null, CH2=null;
+async function cargarStock(){
+  const j = await fetch('/api/venta-cartera/stock', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('sBody').innerHTML = '<tr><td colspan="10">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  const d = j.data, r = d.ratios;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="l">Casos vendidos</div><div class="v">${r.total_casos.toLocaleString('es-CL')}</div></div>
+    <div class="kpi"><div class="l">Precio de venta total</div><div class="v">${fmt(r.total_precio_venta)}</div></div>
+    <div class="kpi"><div class="l">Capital vigente hoy</div><div class="v">${fmt(r.total_capital_vigente)}</div></div>
+    <div class="kpi"><div class="l">% con Responsabilidad</div><div class="v">${r.pct_con_responsabilidad}%</div></div>
+    <div class="kpi"><div class="l">% con Administración</div><div class="v">${r.pct_con_administracion}%</div></div>
+    <div class="kpi"><div class="l">Precio promedio</div><div class="v">${fmt(r.precio_promedio)}</div></div>`;
+  $('catBody').innerHTML = Object.keys(CATL).filter(k=>d.porCategoria[k]).map(k => { const a = d.porCategoria[k]; return `
+    <tr><td><span class="pill ${CATP[k]}">${CATL[k]}</span></td><td>${a.casos}</td>
+    <td>${fmt(a.capital_venta)}</td><td>${fmt(a.precio_venta)}</td><td>${fmt(a.capital_vigente)}</td></tr>`; }).join('') || '<tr><td colspan="5" class="muted">Sin ventas registradas.</td></tr>';
+  $('sBody').innerHTML = (d.ventas||[]).map(v => `
+    <tr><td><b>${v.num_op}</b></td><td>${esc(v.cliente)}</td><td>${esc(v.comprador)}</td>
+    <td>${String(v.fecha_venta).slice(0,10)}</td><td><span class="pill ${CATP[v.categoria]}">${CATL[v.categoria]}</span></td>
+    <td>${fmt(v.capital_venta)}</td><td>${fmt(v.precio_venta)}</td><td>${fmt(v.capital_vigente)}</td><td>${v.cuotas_pendientes ?? '—'}</td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="deshacer(${v.id})" title="Deshacer venta"><i class="bi bi-arrow-counterclockwise"></i></button></td></tr>`).join('')
+    || '<tr><td colspan="10" class="muted">Sin ventas registradas.</td></tr>';
+  // Gráficos
+  const cats = Object.keys(d.porCategoria);
+  if (CH1) CH1.destroy();
+  CH1 = new Chart($('chCat'), { type:'doughnut', data:{ labels: cats.map(k=>CATL[k]),
+    datasets:[{ data: cats.map(k=>d.porCategoria[k].casos), backgroundColor:['#fbbf24','#ef4444','#3b82f6','#94a3b8'] }] },
+    options:{ plugins:{ legend:{ position:'bottom' } } } });
+  const meses = Object.keys(d.porMes).sort();
+  if (CH2) CH2.destroy();
+  CH2 = new Chart($('chMes'), { type:'bar', data:{ labels: meses,
+    datasets:[{ label:'Precio de venta', data: meses.map(m=>d.porMes[m].precio_venta), backgroundColor:'#0255c5' }] },
+    options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ ticks:{ callback:v=>'$'+Number(v).toLocaleString('es-CL') } } } } });
+}
+
+async function deshacer(id){
+  if (!confirm('¿Deshacer esta venta? La operación vuelve a la cartera AutoFácil.')) return;
+  const j = await fetch('/api/venta-cartera/'+id, { method:'DELETE', headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error');
+  cargarStock();
+}
+
+async function cargarCuotas(){
+  const mes = $('cMes').value || new Date().toISOString().slice(0,7);
+  const tb = $('cBody');
+  tb.innerHTML = '<tr><td colspan="7" class="muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando…</td></tr>';
+  const j = await fetch('/api/venta-cartera/cuotas-mes?mes='+mes, { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { tb.innerHTML = '<tr><td colspan="7">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  const d = j.data;
+  $('cResumen').innerHTML = `Total del mes: ${fmt(d.total)} · Impago a la fecha: <span style="color:#b91c1c">${fmt(d.total_impago)} (${d.n_impagas} cuotas)</span>`;
+  tb.innerHTML = (d.cuotas||[]).map(c => `
+    <tr><td>${String(c.fecha_vencimiento).slice(0,10)}</td><td><b>${c.num_op}</b></td><td>${esc(c.cliente)}</td>
+    <td>${esc(c.comprador)}</td><td>${c.numero_cuota}</td><td>${fmt(c.valor_cuota)}</td>
+    <td>${c.fecha_pago ? '<span style="color:#166534">✓ '+String(c.fecha_pago).slice(0,10)+'</span>' : '<span style="color:#b91c1c">pendiente</span>'}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="muted">Sin cuotas con vencimiento en el mes para cartera vendida con responsabilidad.</td></tr>';
+}
+
+cargarElegibles();
+</script>
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'venta-cartera', selfHref:'/tesoreria/venta-cartera.html', title:'Venta de Cartera', icon:'bi-bag-check', defaultSection:'tesoreria' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
