@@ -38,6 +38,15 @@ router.put('/aviso-vencimiento/config',     verifyToken, requireFunc('wsp_config
 router.post('/aviso-vencimiento/probar',    verifyToken, requireFunc('wsp_config', 'mant_cobranza_mora'), ctrl.avisoVencProbar);
 router.post('/aviso-vencimiento/correr',    verifyToken, requireFunc('wsp_config', 'mant_cobranza_mora'), ctrl.avisoVencCorrer);
 router.post('/aviso-vencimiento/plantillas',verifyToken, requireFunc('wsp_config'), ctrl.avisoVencCrearPlantillas);
+
+// Seguimiento de Cartas de Aprobación a dealers (Facilito)
+const segCartas = require('../seguimiento-cartas');
+router.get('/seguimiento-cartas',              verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.listar);
+router.put('/seguimiento-cartas/activo',       verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.setActivo);
+router.post('/seguimiento-cartas/probar',      verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.simularCorrida);
+router.post('/seguimiento-cartas/correr',      verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.correrAhora);
+router.get('/seguimiento-cartas/plantilla',    verifyToken, requireFunc('wsp_seg_cartas', 'wsp_config'), segCartas.plantilla);
+router.post('/seguimiento-cartas/plantilla',   verifyToken, requireFunc('wsp_config'), segCartas.crearPlantillaHttp);
 router.get('/plantillas',            verifyToken, requireFunc('wsp_config', 'mant_cobranza_mora'), ctrl.plantillas);
 router.post('/plantillas',           verifyToken, requireFunc('wsp_config'), ctrl.crearPlantilla);
 router.post('/plantillas/revisar',   verifyToken, requireFunc('wsp_config'), ctrl.revisarPlantilla);

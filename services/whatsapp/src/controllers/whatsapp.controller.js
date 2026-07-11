@@ -584,6 +584,18 @@ async function enviarOportunidad(conv, texto) {
 
 /* ── IA conversacional (Haiku): arma el contexto y pide JSON ───────────────── */
 async function respuestaIA(conv, texto, cfg) {
+  // Modo SEGUIMIENTO DE CARTA (dealer): conversación abierta por Facilito para
+  // saber si el negocio de una carta que vence sigue vigente o se perdió.
+  let seg = null;
+  if (conv.seguimiento_carta_id) {
+    try {
+      const [[s]] = await pool.query(
+        `SELECT s.*, ca.ejecutivo, ca.ejecutivo_tel, ca.ejecutivo_mail
+         FROM wsp_seguimiento_cartas s LEFT JOIN cartas_aprobacion ca ON ca.id = s.id_carta
+         WHERE s.id=? AND s.cerrado_at IS NULL`, [conv.seguimiento_carta_id]);
+      seg = s || null;
+    } catch (_) {}
+  }
   // Base de conocimiento: las respuestas configuradas del bot (paramétricas)
   const [resps] = await pool.query('SELECT nombre, respuesta FROM wsp_respuestas WHERE activo=1 ORDER BY orden, id');
   const conocimiento = resps.map(r => `• ${r.nombre}: ${r.respuesta}`).join('\n');
@@ -620,7 +632,22 @@ CUÁNDO DESPEDIRSE Y CORTAR: si percibes que están jugando contigo (mensajes si
 
 CONTACTO: al derivar a COMERCIAL indica "contacto":"AHORA" si el cliente quiere hablar de inmediato, o "contacto":"DESPUES" si prefiere que lo llamen/contacten más tarde o no quiere hablar en este momento. Si es DESPUES o es fuera de horario, dile que un Ejecutivo Comercial lo contactará (no prometas que será al instante).
 
-Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "contacto": "AHORA"|"DESPUES" (si derivas a COMERCIAL), "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo en preevaluación de compra), "donde_pagar": {"rut": "..."} (solo si pregunta dónde pagar y da su RUT), "finalizar": true (solo al despedirte y cortar)}`;
+Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/false, "area": "COMERCIAL"|"COBRANZA"|"OPERACIONES", "motivo": "por qué derivas (si derivas)", "contacto": "AHORA"|"DESPUES" (si derivas a COMERCIAL), "simulacion": {"valor_auto": V, "pie": P, "plazo": N} (solo si corresponde), "evaluacion": {"rut": "...", "pie_pct": P} (solo en preevaluación de compra), "donde_pagar": {"rut": "..."} (solo si pregunta dónde pagar y da su RUT), "finalizar": true (solo al despedirte y cortar)}`
++ (seg ? `
+
+════ MODO SEGUIMIENTO DE CARTA (PRIORITARIO — estás hablando con un DEALER, no con un cliente final) ════
+Facilito abrió esta conversación para hacer seguimiento de una Carta de Aprobación que VENCE MAÑANA:
+• Cliente aprobado: ${seg.cliente || 's/i'} · Vehículo: ${seg.vehiculo || 's/i'} · Saldo precio: ${'$' + Math.round(+seg.saldo || 0).toLocaleString('es-CL')} · Dealer: ${seg.dealer || 's/i'}
+• Ejecutivo Comercial de la operación: ${seg.ejecutivo || 's/i'}${seg.ejecutivo_tel ? ', teléfono ' + seg.ejecutivo_tel : ''}${seg.ejecutivo_mail ? ', correo ' + seg.ejecutivo_mail : ''}.
+Tu ÚNICO objetivo es saber cómo va ese negocio, con tono cercano y breve (1-3 frases por mensaje). NO cotices, NO preevalúes, NO pidas RUT.
+FLUJO:
+1. Si el negocio SIGUE VIGENTE/pendiente → responde algo como: "Perfecto, si necesitas cualquier cosa de nuestra parte no dudes en contactarnos. El Ejecutivo Comercial es ${seg.ejecutivo || 'tu ejecutivo'}${seg.ejecutivo_tel ? ' y su teléfono es ' + seg.ejecutivo_tel : ''}. Quedamos atentos a tus novedades. ¡Chao!" → tabula resultado VIGENTE y cierra.
+2. Si YA VENDIÓ el auto → pregunta: "Ah, ok. ¿Lo vendiste con crédito?". Si fue con crédito de OTRA financiera → pregunta quién lo financió y por qué no con nosotros; clasifica el motivo en: calidad | tiempo_respuesta | comision | tasa | otro (si es otro, describe en detalle). Luego despídete: "Qué lástima que esta vez no haya resultado el negocio, pero cuentas con nosotros para cualquier futura operación. Agradezco el tiempo y estamos en contacto. ¡Chao!" → tabula VENDIDO_CREDITO_OTRO.
+   Si lo vendió al CONTADO o con crédito nuestro u otro cierre → despídete igual de cordial → tabula VENDIDO_CONTADO u OTRO según corresponda.
+3. Si el negocio SE CAYÓ (cliente desistió, no compró) → despídete cordial → tabula NO_VENDIDO.
+Cuando tengas claro el desenlace, agrega al JSON: "seguimiento": {"resultado": "VIGENTE"|"VENDIDO_CREDITO_OTRO"|"VENDIDO_CONTADO"|"NO_VENDIDO"|"OTRO", "financiado_por": "nombre financiera (si aplica)", "motivo": "calidad"|"tiempo_respuesta"|"comision"|"tasa"|"otro" (si aplica), "detalle": "resumen en 1 frase", "cerrar": true} y despídete en la misma respuesta ("finalizar": true).
+Si la respuesta del dealer aún no aclara el desenlace, sigue el flujo con UNA pregunta a la vez y NO agregues "seguimiento".`
+: '');
 
   const { datos } = await anthropic.analizar({
     codigo: 'wsp_bot', json: true, max_tokens: 400,
@@ -629,6 +656,21 @@ Responde SOLO con JSON: {"respuesta": "texto para el cliente", "derivar": true/f
   });
   if (!datos || typeof datos.respuesta !== 'string') return null;
   let respuesta = datos.respuesta.trim().slice(0, 1500);
+  // Tabulación del seguimiento de carta (modo dealer): resultado + motivo si se perdió
+  if (seg && datos.seguimiento && datos.seguimiento.resultado) {
+    try {
+      const sg = datos.seguimiento;
+      const RES = ['VIGENTE', 'VENDIDO_CREDITO_OTRO', 'VENDIDO_CONTADO', 'NO_VENDIDO', 'OTRO'];
+      const MOT = ['calidad', 'tiempo_respuesta', 'comision', 'tasa', 'otro'];
+      await pool.query(
+        `UPDATE wsp_seguimiento_cartas SET resultado=?, financiado_por=?, motivo=?, resumen=?, cerrado_at=${sg.cerrar ? 'NOW()' : 'cerrado_at'} WHERE id=?`,
+        [RES.includes(String(sg.resultado).toUpperCase()) ? String(sg.resultado).toUpperCase() : 'OTRO',
+         sg.financiado_por ? String(sg.financiado_por).slice(0, 120) : null,
+         MOT.includes(String(sg.motivo || '').toLowerCase()) ? String(sg.motivo).toLowerCase() : null,
+         sg.detalle ? String(sg.detalle).slice(0, 400) : null, seg.id]);
+      if (sg.cerrar) await pool.query('UPDATE wsp_conversaciones SET seguimiento_carta_id=NULL WHERE id=?', [conv.id]);
+    } catch (e) { console.error('[wsp seguimiento carta]', e.message); }
+  }
   // Cálculo determinístico de la cuota (motor del módulo de cotizaciones: gastos + seguros)
   if (datos.simulacion && (datos.simulacion.valor_auto || datos.simulacion.monto) && datos.simulacion.plazo) {
     try {

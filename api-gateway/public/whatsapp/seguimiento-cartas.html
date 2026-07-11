@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento de Cartas (Facilito) — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:1300px; margin:22px auto; padding:0 20px 70px; }
+    .page-banner { background:linear-gradient(135deg,#075E54,#128C7E 60%,#25D366); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.2rem; opacity:.9; }
+    .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
+    .page-banner p { opacity:.9; margin:0; font-size:.82rem; }
+    .card-x { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:14px; }
+    .card-x h6 { font-weight:800; color:var(--navy-dark); }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; padding:7px 8px; border-bottom:2px solid #eef2f7; }
+    td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .pill { font-weight:800; border-radius:10px; padding:2px 10px; font-size:.72rem; }
+    .pill.ok { background:#dcfce7; color:#166534; } .pill.warn { background:#fef3c7; color:#92400e; }
+    .pill.err { background:#fee2e2; color:#991b1b; } .pill.info { background:#e0e7ff; color:#3730a3; }
+    .muted { color:#94a3b8; }
+    .guion { background:#f8fafc; border-left:4px solid #25D366; border-radius:8px; padding:10px 14px; font-size:.84rem; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="wrap">
+  <div class="page-banner">
+    <i class="bi bi-envelope-heart"></i>
+    <div>
+      <h2>Seguimiento de Cartas de Aprobación — Facilito 🤖</h2>
+      <p>El día antes de que venza cada carta, Facilito escribe por WhatsApp al móvil del dealer: pregunta si el negocio sigue vigente, y si se perdió con otro financiamiento tabula el motivo (calidad, tiempo de respuesta, comisión, tasa).</p>
+    </div>
+  </div>
+
+  <div class="card-x">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <div class="form-check form-switch" style="font-size:1rem">
+        <input class="form-check-input" type="checkbox" id="swActivo" onchange="setActivo()">
+        <label class="form-check-label" for="swActivo"><b>Envío automático diario</b> (11:00, cartas que vencen mañana)</label>
+      </div>
+      <button class="btn btn-sm btn-outline-primary" onclick="probar()"><i class="bi bi-eye me-1"></i>Ver candidatos de hoy</button>
+      <button class="btn btn-sm btn-success" onclick="correr()"><i class="bi bi-send me-1"></i>Enviar ahora</button>
+      <span id="tplEstado" class="muted" style="font-size:.84rem"></span>
+      <button class="btn btn-sm btn-outline-secondary" id="btnTpl" style="display:none" onclick="crearTpl()">Crear plantilla en Meta</button>
+    </div>
+    <div id="probarOut" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card-x">
+    <h6><i class="bi bi-chat-left-quote me-1"></i>Guión del bot</h6>
+    <div class="guion">
+      "Hola, soy Facilito de AutoFácil 🤖. Te escribo porque hace unos días aprobamos un crédito automotriz a nombre de <b>[cliente]</b> para la compra de un <b>[vehículo]</b> por un saldo precio de <b>[saldo]</b>. Esta carta vence mañana… ¿Está vigente el negocio o ya vendiste el auto?"<br>
+      <span class="muted">→ Vigente: entrega el contacto del Ejecutivo Comercial de la carta. → Vendido con otro crédito: pregunta quién financió y por qué, y tabula el motivo. Cierre siempre cordial.</span>
+    </div>
+  </div>
+
+  <div class="card-x" style="overflow:auto">
+    <h6><i class="bi bi-clipboard-data me-1"></i>Seguimientos <span class="muted" id="segCount"></span></h6>
+    <table>
+      <thead><tr><th>Fecha</th><th>Op</th><th>Dealer</th><th>Teléfono</th><th>Cliente</th><th>Vehículo</th><th>Saldo</th><th>Vence</th><th>Envío</th><th>Resultado</th><th>Financió</th><th>Motivo</th><th>Resumen</th></tr></thead>
+      <tbody id="segBody"><tr><td colspan="13" class="muted">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => (n==null||n==='') ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');
+const RESL = { VIGENTE:['Vigente','ok'], VENDIDO_CREDITO_OTRO:['Vendido — crédito de otro','err'], VENDIDO_CONTADO:['Vendido al contado','warn'], NO_VENDIDO:['No se vendió','warn'], OTRO:['Otro','info'] };
+const MOTL = { calidad:'Calidad', tiempo_respuesta:'Tiempo de respuesta', comision:'Comisión', tasa:'Tasa', otro:'Otro' };
+
+async function cargar(){
+  const j = await fetch('/api/whatsapp/seguimiento-cartas', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('segBody').innerHTML = '<tr><td colspan="13">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  $('swActivo').checked = !!j.data.activo;
+  const rows = j.data.seguimientos || [];
+  $('segCount').textContent = rows.length ? '('+rows.length+')' : '';
+  $('segBody').innerHTML = rows.length ? rows.map(s => {
+    const r = RESL[s.resultado] || (s.resultado ? [s.resultado,'info'] : null);
+    return `<tr>
+      <td style="white-space:nowrap">${String(s.created_at).slice(0,10)}</td>
+      <td><b>${esc(s.op_carta||'—')}</b></td><td>${esc(s.dealer||'—')}</td>
+      <td style="white-space:nowrap">${esc(s.telefono||'—')}</td>
+      <td>${esc(s.cliente||'—')}</td><td>${esc(s.vehiculo||'—')}</td><td>${fmt(s.saldo)}</td>
+      <td style="white-space:nowrap">${s.vence?String(s.vence).slice(0,10):'—'}</td>
+      <td><span class="pill ${s.estado==='ENVIADO'?'ok':s.estado==='SIMULADO'?'info':'err'}" title="${esc(s.error_msg||'')}">${esc(s.estado)}</span></td>
+      <td>${r?`<span class="pill ${r[1]}">${r[0]}</span>`:'<span class="muted">sin respuesta aún</span>'}</td>
+      <td>${esc(s.financiado_por||'—')}</td><td>${MOTL[s.motivo]||'—'}</td>
+      <td style="font-size:.76rem;color:#6b7280">${esc(s.resumen||'')}</td></tr>`;
+  }).join('') : '<tr><td colspan="13" class="muted">Sin seguimientos todavía.</td></tr>';
+  const t = await fetch('/api/whatsapp/seguimiento-cartas/plantilla', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (t.success){
+    const e = t.data.estado;
+    $('tplEstado').innerHTML = 'Plantilla Meta <b>'+esc(t.data.nombre)+'</b>: ' + (e==='APPROVED'?'<span style="color:#166534;font-weight:700">APROBADA ✓</span>':'<span style="color:#b45309;font-weight:700">'+esc(e||'sin token')+'</span>');
+    $('btnTpl').style.display = (e==='NO_EXISTE') ? '' : 'none';
+  }
+}
+async function setActivo(){
+  await fetch('/api/whatsapp/seguimiento-cartas/activo', { method:'PUT', headers:H, body: JSON.stringify({ activo: $('swActivo').checked }) });
+}
+async function probar(){
+  $('probarOut').innerHTML = '<span class="muted"><span class="spinner-border spinner-border-sm me-1"></span>Buscando cartas que vencen mañana…</span>';
+  const j = await fetch('/api/whatsapp/seguimiento-cartas/probar', { method:'POST', headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('probarOut').innerHTML = esc(j.error||'Error'); return; }
+  const c = j.data.candidatos || [];
+  $('probarOut').innerHTML = c.length
+    ? '<b>'+c.length+' carta(s) por avisar mañana:</b><ul style="font-size:.84rem;margin:4px 0">'+c.map(x=>'<li>Op '+esc(x.op_carta||x.id)+' · '+esc(x.nombre_dealer||'—')+' · '+esc(x.cliente||'')+' · '+esc(x.vehiculo||'')+' · '+(x.movil?'📱 '+x.movil:'<span style="color:#b91c1c">sin móvil +569</span>')+'</li>').join('')+'</ul>'
+    : '<span class="muted">No hay cartas que venzan mañana sin seguimiento.</span>';
+}
+async function correr(){
+  if (!confirm('¿Enviar AHORA el seguimiento a los dealers con cartas que vencen mañana?')) return;
+  const j = await fetch('/api/whatsapp/seguimiento-cartas/correr', { method:'POST', headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error');
+  alert((j.data.resultados||[]).map(r=>r.dealer+': '+r.estado+(r.error?' ('+r.error+')':'')).join('\n') || 'Sin candidatos.');
+  cargar();
+}
+async function crearTpl(){
+  if (!confirm('Se enviará la plantilla "seguimiento_carta" a aprobación de Meta. ¿Continuar?')) return;
+  const j = await fetch('/api/whatsapp/seguimiento-cartas/plantilla', { method:'POST', headers:H }).then(r=>r.json()).catch(()=>({}));
+  alert(j.success ? 'Plantilla enviada a Meta (queda PENDING hasta que la aprueben).' : (j.error||'Error'));
+  cargar();
+}
+cargar();
+</script>
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'wsp-seg-cartas', selfHref:'/whatsapp/seguimiento-cartas.html', title:'Seguimiento de Cartas', icon:'bi-envelope-heart', defaultSection:'home' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
