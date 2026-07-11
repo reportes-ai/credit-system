@@ -80,8 +80,14 @@ async function asegurarTabla() {
 function migrar(nombre, fn) {
   return enFila(`migracion:${nombre}`, async () => {
     await asegurarTabla();
-    const [r] = await pool.query('INSERT IGNORE INTO _migraciones (nombre) VALUES (?)', [nombre]);
-    if (!r.affectedRows) return;                       // ya corrió (o la corre otra instancia)
+    let [r] = await pool.query('INSERT IGNORE INTO _migraciones (nombre) VALUES (?)', [nombre]);
+    if (!r.affectedRows) {
+      // Claim huérfano: quedó EN_CURSO >30 min (proceso muerto a mitad de camino) → retomar.
+      const [ret] = await pool.query(
+        "UPDATE _migraciones SET creada_en=NOW() WHERE nombre=? AND estado='EN_CURSO' AND creada_en < (NOW() - INTERVAL 30 MINUTE)", [nombre]);
+      if (!ret.affectedRows) return;                   // ya corrió OK (o la corre otra instancia)
+      console.warn(`[migrate] retomando migración huérfana ${nombre}`);
+    }
     try {
       await fn();
       await pool.query("UPDATE _migraciones SET estado='OK', aplicada_en=NOW() WHERE nombre=?", [nombre]);

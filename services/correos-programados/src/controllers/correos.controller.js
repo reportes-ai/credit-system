@@ -56,6 +56,13 @@ require('../../../../shared/migrate').enFila('correos', async () => {
       ['alerta_penetracion_seguros', 'Alerta Penetración de Seguros (AutoFin)',
         'Avisa cuando la penetración de algún seguro cae bajo el tramo del 40% de comisión (y cuando se recupera): estado por seguro, ejecutivos que no cumplen y cuánto se deja de ganar vs el 40%. Se evalúa a diario pero solo se envía al CAMBIAR de estado.',
         '08:45', '1,2,3,4,5,6', '']);
+    // Informe de Salud del Sistema (v111.2) — semanal, chequeos automaticos + recordatorio de rutina manual.
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
+       VALUES (?,?,?,?,?,?,1)`,
+      ['informe_salud_sistema', 'Informe de Salud del Sistema',
+        'Chequeo semanal automatico: BD (ping, tamano, migraciones fallidas), frescura de indicadores (UF/tasas/dolar), correos programados con error y memoria del proceso. Incluye el recordatorio de la rutina manual (Render Metrics, TiDB SQL Statements, backups).',
+        '08:00', '1', 'patricio.escobar@autofacilchile.cl']);
     // Registrar el mantenedor en el menú (funcionalidad) si no existe
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_correos_programados' LIMIT 1");
     if (!ex) await pool.query(
@@ -551,7 +558,72 @@ async function buildAlertaPenetracion(opts = {}) {
   return { asunto, html };
 }
 
-const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion };
+
+/* ── Informe de Salud del Sistema (semanal) ─────────────────────────────────
+   Todo lo que la app puede chequear SOLA. Lo que requiere ojos (Render Metrics,
+   TiDB SQL Statements, backups) va como checklist-recordatorio en el mismo correo. */
+async function buildSalud() {
+  const checks = [];
+  const add = (nombre, ok, detalle) => checks.push({ nombre, ok, detalle });
+
+  // 1. BD viva + tamaño
+  try {
+    const [[sz]] = await pool.query(
+      "SELECT ROUND(SUM(data_length+index_length)/1048576) mb, COUNT(*) tablas FROM information_schema.tables WHERE table_schema=DATABASE()");
+    add('Base de datos', true, `responde OK · ${sz.tablas} tablas · ${Number(sz.mb).toLocaleString('es-CL')} MB`);
+  } catch (e) { add('Base de datos', false, 'NO RESPONDE: ' + e.message); }
+
+  // 2. Migraciones fallidas / a medias
+  try {
+    const [m] = await pool.query("SELECT nombre FROM _migraciones WHERE estado<>'OK' LIMIT 10");
+    add('Migraciones', !m.length, m.length ? ('pendientes/fallidas: ' + m.map(x => x.nombre).join(', ')) : 'todas OK');
+  } catch (_) { add('Migraciones', true, 'sin tabla aún'); }
+
+  // 3. Frescura de indicadores
+  try {
+    const [[u]] = await pool.query('SELECT DATEDIFF(CURDATE(), MAX(fecha)) d FROM uf');
+    add('UF al día', u.d <= 0, u.d <= 0 ? 'cargada hasta hoy o más' : `última UF hace ${u.d} días`);
+  } catch (e) { add('UF al día', false, e.message); }
+  try {
+    const [[t]] = await pool.query('SELECT COUNT(*) n FROM tasas WHERE CURDATE() BETWEEN fecha_desde AND fecha_hasta');
+    add('TMC vigente', t.n > 0, t.n > 0 ? 'hay tasa vigente para hoy' : 'SIN tasa vigente (revisar sincronización CMF)');
+  } catch (e) { add('TMC vigente', false, e.message); }
+  try {
+    const [[dd]] = await pool.query('SELECT DATEDIFF(CURDATE(), MAX(fecha)) d FROM dolar');
+    add('Dólar', dd.d <= 5, `último valor hace ${dd.d} día(s)`);
+  } catch (_) { add('Dólar', true, 'sin tabla'); }
+
+  // 4. Correos programados con error
+  try {
+    const [ce] = await pool.query("SELECT nombre, ultimo_estado FROM correos_programados WHERE activo=1 AND ultimo_estado LIKE 'Error%'");
+    add('Correos programados', !ce.length, ce.length ? ce.map(x => `${x.nombre}: ${x.ultimo_estado}`).join(' · ') : 'sin errores');
+  } catch (e) { add('Correos programados', false, e.message); }
+
+  // 5. Memoria del proceso (límite Render Starter: 512 MB)
+  const rss = Math.round(process.memoryUsage().rss / 1048576);
+  add('Memoria del servidor', rss < 360, `${rss} MB de 512 MB (${Math.round(rss / 5.12)}%)` + (rss >= 360 ? ' — sobre 70%: considerar subir plan Render' : ''));
+
+  const malos = checks.filter(c => !c.ok);
+  const fila = c => `<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">${c.ok ? '✅' : '🔴'} <b>${c.nombre}</b></td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#475569">${c.detalle}</td></tr>`;
+  const html = `
+  <div style="font-family:Segoe UI,Arial,sans-serif;background:#f6f8fb;padding:22px">
+    <div style="max-width:680px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
+      <div style="background:${malos.length ? '#b91c1c' : '#0f4c81'};color:#fff;padding:16px 28px"><b style="font-size:16px">${malos.length ? '⚠️' : '💙'} Salud del Sistema — ${malos.length ? malos.length + ' alerta(s)' : 'todo en orden'}</b></div>
+      <table style="border-collapse:collapse;width:100%;font-size:13px">${checks.map(fila).join('')}</table>
+      <div style="padding:14px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12.5px;color:#475569">
+        <b>Rutina manual del mes (10 min)</b> — lo que la app no puede ver sola:<br>
+        1. <a href="https://dashboard.render.com">Render → Metrics</a>: memoria base bajo 70%.<br>
+        2. <a href="https://tidbcloud.com">TiDB → Diagnosis → SQL Statement</a> (3 días, por Total RU): statements &gt;100K RU → pantallazo a la IA.<br>
+        3. <a href="https://github.com/reportes-ai/credit-system/actions">GitHub → Actions → Backup BD nocturno</a>: última corrida verde (GitHub además avisa por correo si falla).<br>
+        Guía completa: Mantenedores → Definiciones → "Monitoreo del Sistema".
+      </div>
+      <div style="padding:12px 28px;border-top:1px solid #f1f5f9;color:#94a3b8;font-size:11px">Correo automático semanal de AutoFácil · se configura en Mantenedores → Correos Programados.</div>
+    </div>
+  </div>`;
+  return { asunto: malos.length ? `⚠️ Salud del Sistema: ${malos.length} alerta(s)` : '💙 Salud del Sistema: todo en orden', html };
+}
+
+const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion, informe_salud_sistema: buildSalud };
 
 /* ── Ejecuta y envía un reporte. auto=true marca el dedup diario. ── */
 async function ejecutarReporte(r, { auto = false } = {}) {
@@ -647,4 +719,4 @@ const preview = async (req, res) => {
   } catch (e) { console.error('[correos preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, enviarAhora, preview };
+module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud };
