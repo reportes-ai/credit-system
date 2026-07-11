@@ -241,7 +241,7 @@ function esArchivoCanal(buffer) {
 async function aplicarCanal(mapaCanal, log) {
   const ids = Object.keys(mapaCanal).map(Number);
   const idsSet = new Set(ids);
-  let complementados = 0, sinMatch = 0, omitidosCerrado = 0;
+  let complementados = 0, sinMatch = 0, omitidosCerrado = 0, erroresSQL = 0; let primerError = null;
   const cerradoCache = {};
   const MONTOS = ['seguro_cesantia', 'seguro_rdh', 'seguro_rep_menor', 'gps'];
   // rut_cliente ya NO existe en creditos (homologación: el cliente vive via id_cliente)
@@ -286,14 +286,19 @@ async function aplicarCanal(mapaCanal, log) {
       }
       if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
-      await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, r.id]);
-      complementados++;
+      try {
+        await pool.query(`UPDATE creditos SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, [...vals, r.id]);
+        complementados++;
+      } catch (e) { erroresSQL++; if (!primerError) primerError = e.message; }
     }
     sinMatch += chunk.filter(k => !vistos.has(k)).length;
   }
-  if (complementados) log.push(`📎 Informe Canal: ${complementados} créditos complementados (seguros/GPS/tipo vehículo/RUT)`);
-  if (omitidosCerrado) log.push(`⏭ Informe Canal: ${omitidosCerrado} omitidos por mes cerrado`);
-  return { complementados, sinMatch, omitidosCerrado };
+  if (complementados) log.push(`📎 Informe Canal: ${complementados} créditos complementados (vehículo/tasa/plazo/cuota/seguros)`);
+  if (omitidosCerrado) log.push(`⏭ Informe Canal: ${omitidosCerrado} omitidos por mes cerrado (solo montos)`);
+  if (erroresSQL) { log.push(`🔴 Informe Canal: ${erroresSQL} filas con ERROR SQL — ${primerError}`); console.error('[aplicarCanal]', erroresSQL, 'errores;', primerError); }
+  // Alerta clara si NADA se complementó teniendo archivo con datos (antes fallaba en silencio)
+  if (!complementados && !omitidosCerrado && ids.length) log.push('⚠ Informe Canal: 0 complementados — revisar encabezados/IDs del archivo');
+  return { complementados, sinMatch, omitidosCerrado, errores: erroresSQL, error: primerError };
 }
 
 /* ── Helper: archivos de la request (fields o single, retrocompatible) ── */
@@ -372,6 +377,12 @@ exports.importar = async (req, res) => {
       if (!mapaCanal || !Object.keys(mapaCanal).length) return res.json({ success: false, error: 'El Informe Canal no tiene registros con ID válido' });
       const log = [];
       const rc = await aplicarCanal(mapaCanal, log);
+      historial.crearSesion({
+        fuente: 'trinidad', usuario: req.user?.nombre || req.user?.email || null,
+        archivo: canal?.originalname || null,
+        insertados: 0, actualizados: rc.complementados || 0, errores: rc.error ? 1 : 0,
+        total: Object.keys(mapaCanal).length,
+      }).catch(() => {});
       return res.json({ success: true, data: { total: Object.keys(mapaCanal).length, insertados: 0, actualizados: 0,
         omitidos_futuro: 0, errores: 0, canal: rc, log, cursados: [] } });
     }
@@ -518,7 +529,7 @@ exports.importar = async (req, res) => {
     let resCanal = null;
     if (mapaCanal && Object.keys(mapaCanal).length) {
       try { resCanal = await aplicarCanal(mapaCanal, log); }
-      catch (e) { log.push(`⚠ Informe Canal: ${e.message}`); }
+      catch (e) { log.push(`🔴 Informe Canal FALLÓ COMPLETO: ${e.message}`); console.error('[importar canal]', e.message); }
     }
 
     // ── Guardar en historial ──────────────────────────────────────
