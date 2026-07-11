@@ -90,7 +90,9 @@ async function calcularPenetracionMes(mes) {
       -- cursadas: mismo universo del cierre de AutoFin. Algunos créditos traen el estado en
       -- estado_credito y NO en estado (queda NULL) → COALESCE para no vaciar el universo
       -- (si no, la penetración da 0% y la comisión de seguros queda en 0). Igual criterio que el dashboard.
-      AND COALESCE(NULLIF(c.estado, ''), c.estado_credito) IN ('OTORGADO', 'APROBADO')
+      -- Solo OTORGADO: desde la sincronización con Trinidad (2026-07) las APROBADO son
+      -- solicitudes aprobadas NO cursadas (sin seguros) y hundirían la penetración.
+      AND COALESCE(NULLIF(c.estado, ''), c.estado_credito) = 'OTORGADO'
   `, [mesStr]);
 
   const esEmpresa = o => String(o.tipo_cliente || '').toUpperCase() === 'EMPRESA';

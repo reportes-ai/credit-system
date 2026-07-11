@@ -348,7 +348,8 @@ exports.getSegurosHistorico = async (req, res) => {
              SUM(seguro_rdh>0) nrdh, SUM(seguro_cesantia>0) nces, SUM(seguro_rep_menor>0) nrep,
              SUM(COALESCE(seguro_rdh,0)) prdh, SUM(COALESCE(seguro_cesantia,0)) pces, SUM(COALESCE(seguro_rep_menor,0)) prep
       FROM creditos
-      WHERE UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND estado IN ('OTORGADO','APROBADO') AND mes IS NOT NULL
+      WHERE UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND mes IS NOT NULL
+        AND COALESCE(NULLIF(estado,''), estado_credito) = 'OTORGADO'
       GROUP BY 1 ORDER BY 1 DESC LIMIT 24`);
     const data = rows.map(r => {
       const pen = {
