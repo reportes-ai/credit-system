@@ -36,21 +36,27 @@ function pctUACMes(cnt, p) {
   return param(p, 'pct_tier1', 14) / 100;
 }
 
-/* Corte por plazo del Modelo 2: una op con plazo >= corte NO participa del
-   sistema de tiers — su % es FIJO uac2_pct_largo (hoy 18%), sea el tier del
-   mes mayor o menor. (Corregido 2026-07-11: antes se aplicaba como tope
-   min(tier, largo) y una op de 36 cuotas en tier 1 quedaba en 14% en vez de
-   su 18% fijo.) En Modelo 1 es no-op. */
-function aplicarCortePlazoUAC(pct, plazo, p) {
+/* Corte por plazo del Modelo 2 — dos vigencias (regla negociada con UAC):
+   · Desde uac2_largo_fijo_desde (AAAAMM, default 202607 = julio 2026): la op
+     con plazo >= corte NO participa de los tiers — su % es FIJO uac2_pct_largo
+     (hoy 18%), sea el tier del mes mayor o menor.
+   · Meses ANTERIORES: regla antigua — tope min(tier del mes, uac2_pct_largo).
+   `mes` es 'YYYY-MM' (o Date) de la operación; sin mes se asume regla vigente.
+   En Modelo 1 es no-op. */
+function aplicarCortePlazoUAC(pct, plazo, p, mes) {
   if (modeloActivo(p) !== 2) return pct;
   const corte = Math.round(Number(p.uac2_plazo_corte)) || 36;
   if (!plazo || Number(plazo) < corte) return pct;
-  return (p.uac2_pct_largo !== undefined && p.uac2_pct_largo !== null && !isNaN(p.uac2_pct_largo)
+  const pctLargo = (p.uac2_pct_largo !== undefined && p.uac2_pct_largo !== null && !isNaN(p.uac2_pct_largo)
     ? Number(p.uac2_pct_largo) : 16) / 100;
+  const desde = Math.round(Number(p.uac2_largo_fijo_desde)) || 202607;
+  const mesNum = mes ? Number(String(mes instanceof Date ? mes.toISOString() : mes).slice(0, 7).replace('-', '')) : null;
+  if (mesNum && mesNum < desde) return Math.min(pct, pctLargo);   // regla antigua (tope)
+  return pctLargo;                                                // regla vigente (% fijo)
 }
 
 /* % efectivo de UNA operación: tier del mes + corte por plazo (modelo 2). */
-const pctUACOperacion = ({ ops, plazo }, p) => aplicarCortePlazoUAC(pctUACMes(ops, p), plazo, p);
+const pctUACOperacion = ({ ops, plazo, mes }, p) => aplicarCortePlazoUAC(pctUACMes(ops, p), plazo, p, mes);
 
 /* Tier "informativo" (n° y %) del mes — para el snapshot de la carta. */
 function tierUACInfo(cnt, p) {

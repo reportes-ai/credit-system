@@ -110,6 +110,7 @@ const ensureTable = async () => {
     ['uac2_ops_tier3_max',  15,    'UAC M2 — N° máximo de ops para tier 3'],
     ['uac2_plazo_corte',    36,    'UAC M2 — plazo (cuotas) desde el cual la op NO recibe el tier alto'],
     ['uac2_pct_largo',      16.00, 'UAC M2 — % tope para ops con plazo >= corte (no pagan el tier alto)'],
+    ['uac2_largo_fijo_desde', 202607, 'UAC M2 — mes (AAAAMM) desde el cual el % de plazo largo es FIJO (uac2_pct_largo); antes era tope min(tier, largo)'],
     // ── Factores de comisión AutoFácil por seguros (% de prima desg) ─────
     ['seg_com_desg_6',  62.525, 'Factor comisión desgravamen plazo ≤6m'],
     ['seg_com_cesa_6',  52.636, 'Factor comisión cesantía plazo ≤6m'],

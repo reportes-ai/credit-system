@@ -112,7 +112,7 @@ async function calcularOperacion(op) {
       // UAC: % del saldo precio según volumen del mes — motor único uac-tier.js
       // (modelo 1 clásico o modelo 2 con corte por plazo, según uac_modelo).
       const ops = await contarOpsUAC(op.mes);
-      const pct = require('./uac-tier').pctUACOperacion({ ops, plazo }, p);
+      const pct = require('./uac-tier').pctUACOperacion({ ops, plazo, mes: op.mes }, p);
       monto_comision_fin = core.ingresoColocacionUAC({ saldo: saldo_precio, pctUAC: pct });
     }
   }

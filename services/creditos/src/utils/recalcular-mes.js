@@ -134,7 +134,7 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
     // UAC: % del saldo precio según el tier DINÁMICO del mes (proyecta el cierre).
     // Modelo 2: la op con plazo >= corte no recibe el tier alto (tope uac2_pct_largo).
     // El snapshot de la decisión se congela aparte en la carta (cartas_aprobacion.tier_uac_*).
-    monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC: aplicarCortePlazoUAC(pctUAC, plazo, p) });
+    monto_comision_fin = core.ingresoColocacionUAC({ saldo, pctUAC: aplicarCortePlazoUAC(pctUAC, plazo, p, op.mes || op.fecha_otorgado) });
   } else if (plazo > 0 && montoCap > 0) {
     const tasa = getTasaByFecha(op.fecha_otorgado, todasTasas);
     if (tasa) {
