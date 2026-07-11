@@ -813,11 +813,14 @@ exports.listarPreaprobaciones = async (req, res) => {
     if (req.query.rut) { where += " AND REPLACE(UPPER(rut_cliente),'.','') LIKE ?"; params.push('%' + String(req.query.rut).toUpperCase().replace(/\./g, '') + '%'); }
     if (req.query.codigo) { where += " AND UPPER(COALESCE(codigo,'')) LIKE ?"; params.push('%' + String(req.query.codigo).toUpperCase().trim() + '%'); }
     const [rows] = await pool.query(
-      `SELECT id, codigo, canal, created_at, id_dealer, rut_dealer, dealer_nombre, rut_cliente,
-              precio, pie, anio, resultado, motivos, opciones, renta, fuente_renta, contacto,
-              checklist, ia_informe_id, ia_nivel_riesgo, informes
-         FROM portal_preaprobaciones WHERE ${where}
-        ORDER BY id DESC LIMIT 300`, params);
+      `SELECT p.id, p.codigo, p.canal, p.created_at, p.id_dealer, p.rut_dealer, p.dealer_nombre, p.rut_cliente,
+              p.precio, p.pie, p.anio, p.resultado, p.motivos, p.opciones, p.renta, p.fuente_renta, p.contacto,
+              p.checklist, p.ia_informe_id, p.ia_nivel_riesgo, p.informes,
+              cl.nombre_completo AS cliente_nombre
+         FROM portal_preaprobaciones p
+         LEFT JOIN clientes cl ON cl.rut = p.rut_cliente
+        WHERE ${where}
+        ORDER BY p.id DESC LIMIT 300`, params);
     res.json({ success: true, data: rows, error: null });
   } catch (err) {
     console.error('[portal-dealer] listarPreaprobaciones:', err.message);

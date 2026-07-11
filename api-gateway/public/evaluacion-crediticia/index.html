@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v46.4 -->
+<!-- v46.5 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -11,6 +11,7 @@
     body { background:#f3f4f6; }
     .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:2px; }
     .page-wrap { max-width:980px; margin:24px auto; padding:0 20px 80px; }
+    .page-wrap.full { max-width:1500px; }   /* pestaña Preaprobaciones: tabla ancha */
     .ev-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:22px 24px; margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
     .ev-card h5 { font-size:1rem; font-weight:700; color:#1f2937; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
     .ev-card h5 i { color:#1e3a5f; }
@@ -226,8 +227,8 @@
       </div>
       <div style="overflow:auto">
         <table class="pre-table">
-          <thead><tr><th>N°</th><th>Canal</th><th>Fecha</th><th>Dealer</th><th>RUT Cliente</th><th>Precio</th><th>Resultado</th><th>Riesgo IA</th><th>Condiciones</th></tr></thead>
-          <tbody id="preBody"><tr><td colspan="9" class="text-muted">Cargando…</td></tr></tbody>
+          <thead><tr><th>N°</th><th>Canal</th><th>Fecha</th><th>Dealer</th><th>RUT Cliente</th><th>Nombre</th><th>Precio</th><th>Resultado</th><th>Riesgo IA</th><th>Condiciones</th></tr></thead>
+          <tbody id="preBody"><tr><td colspan="10" class="text-muted">Cargando…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -353,6 +354,7 @@
     document.getElementById('tabBtnEval').classList.toggle('active', t === 'eval');
     document.getElementById('tabBtnHist').classList.toggle('active', t === 'hist');
     document.getElementById('tabBtnPre').classList.toggle('active', t === 'pre');
+    document.querySelector('.page-wrap').classList.toggle('full', t === 'pre');
     if (t === 'hist') cargarHistoricas();
     if (t === 'pre')  cargarPreaprobaciones();
   }
@@ -398,6 +400,9 @@
   let PRE_ROWS = [];
   const asJ = v => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch(_) { return null; } };
   const fmtP = n => (n == null || n === '') ? '—' : '$' + Math.round(+n).toLocaleString('es-CL');
+  // Etiquetas legibles del canal de origen de la preaprobación
+  const canalLabel = c => ({ PORTAL:'Portal Dealer', WHATSAPP:'WhatsApp', WSP:'WhatsApp', EJECUTIVO:'Ejecutivo', EVALUACION:'Ejecutivo' }[String(c || 'PORTAL').toUpperCase()] ||
+    String(c).charAt(0).toUpperCase() + String(c).slice(1).toLowerCase());
   function cargarPreaprobaciones(){
     defaultRango('pDesde','pHasta');
     const tb = document.getElementById('preBody');
@@ -407,27 +412,28 @@
     const rutF = document.getElementById('pRut').value.trim();    if (rutF) ps.set('rut', rutF);
     const cod  = document.getElementById('pCodigo').value.trim(); if (cod)  ps.set('codigo', cod);
     const resF = document.getElementById('pRes').value;           if (resF) ps.set('resultado', resF);
-    tb.innerHTML = '<tr><td colspan="9" class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando…</td></tr>';
+    tb.innerHTML = '<tr><td colspan="10" class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Cargando…</td></tr>';
     fetch('/api/portal-dealer/preaprobaciones?' + ps.toString(), { headers: H })
       .then(r => r.json()).then(j => {
-        if (!j.success) { tb.innerHTML = '<tr><td colspan="9">' + escapeHtml(j.error || 'Sin acceso') + '</td></tr>'; return; }
+        if (!j.success) { tb.innerHTML = '<tr><td colspan="10">' + escapeHtml(j.error || 'Sin acceso') + '</td></tr>'; return; }
         PRE_ROWS = j.data || [];
         document.getElementById('preCount').textContent = PRE_ROWS.length ? '(' + PRE_ROWS.length + ')' : '';
         tb.innerHTML = PRE_ROWS.length ? PRE_ROWS.map((p, i) => {
           const ops = asJ(p.opciones) || [];
           return `<tr class="row-pre" onclick="togglePreDet(${i})">
             <td><b>${escapeHtml(p.codigo || ('#' + p.id))}</b></td>
-            <td><span class="pill canal">${escapeHtml(p.canal || 'PORTAL')}</span></td>
+            <td><span class="pill canal">${escapeHtml(canalLabel(p.canal))}</span></td>
             <td style="white-space:nowrap">${new Date(p.created_at).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'})}</td>
             <td>${escapeHtml(p.dealer_nombre || '—')}</td>
             <td style="white-space:nowrap">${escapeHtml(p.rut_cliente)}</td>
+            <td>${escapeHtml(p.cliente_nombre || '—')}</td>
             <td>${fmtP(p.precio)}</td>
             <td><span class="pill ${p.resultado === 'PREAPROBADO' ? 'ok' : 'rev'}">${escapeHtml(p.resultado)}</span></td>
             <td>${escapeHtml(p.ia_nivel_riesgo || '—')}</td>
             <td style="font-size:.74rem">${ops.map(o => o.plazo + '×' + fmtP(o.cuota)).join(' · ') || '—'}</td>
-          </tr><tr id="preDet${i}" class="det" style="display:none"><td colspan="9" id="preDetBody${i}"></td></tr>`;
-        }).join('') : '<tr><td colspan="9" class="text-muted">Sin preaprobaciones en el rango. Amplía las fechas o quita filtros.</td></tr>';
-      }).catch(() => { tb.innerHTML = '<tr><td colspan="9" class="text-danger">Error al cargar preaprobaciones.</td></tr>'; });
+          </tr><tr id="preDet${i}" class="det" style="display:none"><td colspan="10" id="preDetBody${i}"></td></tr>`;
+        }).join('') : '<tr><td colspan="10" class="text-muted">Sin preaprobaciones en el rango. Amplía las fechas o quita filtros.</td></tr>';
+      }).catch(() => { tb.innerHTML = '<tr><td colspan="10" class="text-danger">Error al cargar preaprobaciones.</td></tr>'; });
   }
   function togglePreDet(i){
     const tr = document.getElementById('preDet' + i);
