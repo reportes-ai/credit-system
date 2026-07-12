@@ -475,6 +475,10 @@ exports.importar = async (req, res) => {
           if (String(ant ?? '') !== String(nvo ?? '')) {
             cambiosLog.push({ num_op: f.num_op, campo: 'estado_autofin', valor_anterior: ant, valor_nuevo: nvo });
           }
+          // Si la fila viene CURSADA, la Fecha Curse de Trinidad manda sobre lo estampado
+          // al insertar (una op ingresada un mes y cursada al siguiente quedaba pegada al
+          // mes de ingreso y desaparecía del dashboard del mes real de curse).
+          const esCursado = (f.estado_credito || '').toLowerCase() === 'otorgado';
           await pool.query(
             `UPDATE creditos SET
                estado_autofin = ?, ejecutivo_tri = ?,
@@ -482,10 +486,14 @@ exports.importar = async (req, res) => {
                estado_eval    = ?,
                id_financiera  = COALESCE(NULLIF(id_financiera,''), ?),
                id_cliente     = COALESCE(id_cliente, ?),
+               fecha_otorgado = COALESCE(?, fecha_otorgado),
+               mes            = COALESCE(?, mes),
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), idCliente, f.marca, f.modelo, f.vendedor, f.num_op]
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), idCliente,
+             esCursado ? f.fecha_otorgado : null, esCursado ? f.mes : null,
+             f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
