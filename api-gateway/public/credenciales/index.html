@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -24,7 +24,7 @@
 
     /* ── Tarjetas (86 × 54 mm formato carnet) ── */
     #hoja { display:flex; flex-wrap:wrap; gap:8mm; }
-    .cred { width:86mm; height:54mm; border:1px dashed #cbd5e1; border-radius:3mm; overflow:hidden; background:#fff; position:relative; page-break-inside:avoid; }
+    .cred { width:82.3mm; height:52mm; border:1px dashed #cbd5e1; border-radius:3mm; overflow:hidden; background:#fff; position:relative; page-break-inside:avoid; }
     .cred.frente { display:flex; flex-direction:column; }
     .cred .top { display:flex; align-items:flex-start; justify-content:space-between; padding:3mm 4mm 0; }
     .cred .logo { height:9mm; }
@@ -44,6 +44,7 @@
     .cred.reverso .pie { color:rgba(255,255,255,.85); font-size:2.6mm; }
 
     @media print {
+      @page { size: A4; margin: 8mm; }
       body { background:#fff; }
       .no-print, #af-topnav { display:none !important; }
       .wrap { max-width:none; margin:0; padding:0; }
@@ -60,7 +61,7 @@
     <i class="bi bi-person-badge"></i>
     <div>
       <h2>Credenciales Corporativas</h2>
-      <p>Genera e imprime credenciales tamaño carnet (86×54 mm): anverso con foto, nombre, cargo, RUT y expiración; reverso con QR vCard "escanea y guarda mi contacto". Los datos salen de la ficha del usuario.</p>
+      <p>Genera e imprime credenciales tamaño 8,23 × 5,20 cm: anverso con foto, nombre, cargo, RUT y expiración; reverso con QR vCard "escanea y guarda mi contacto". Los datos salen de la ficha del usuario.</p>
     </div>
   </div>
 
@@ -70,6 +71,7 @@
         <input type="date" id="expDefault" class="form-control form-control-sm"></div>
       <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar credenciales seleccionadas</button>
       <button class="btn btn-sm btn-success" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="copiarImagen()"><i class="bi bi-clipboard me-1"></i>Copiar como imagen (PowerPoint)</button>
     </div>
     <div style="overflow:auto;max-height:340px">
       <table>
@@ -85,6 +87,7 @@
 
 <script src="/js/auth-guard.js"></script>
 <script src="/js/qrcode-generator.js"></script>
+<script src="/js/html2pdf.bundle.min.js"></script>
 <script>
 'use strict';
 const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
@@ -192,6 +195,23 @@ async function generar(){
       </div>`);
   }
   hoja.innerHTML = cards.join('');
+}
+async function copiarImagen(){
+  const hoja = $('hoja');
+  if (!hoja.children.length || hoja.querySelector('.muted')) return alert('Primero genera las credenciales.');
+  try {
+    const canvas = await html2canvas(hoja, { scale: 3, backgroundColor: '#ffffff' });
+    canvas.toBlob(async blob => {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        alert('Copiado ✓ — pega en PowerPoint con Ctrl+V. Tip: en PPT fija el tamaño de cada tarjeta a 8,23 × 5,20 cm.');
+      } catch (e) {
+        // Fallback: descargar el PNG si el portapapeles no lo permite
+        const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'credenciales.png'; a.click();
+        alert('Tu navegador no permitió copiar al portapapeles: se descargó credenciales.png para insertarlo en PowerPoint.');
+      }
+    }, 'image/png');
+  } catch (e) { alert('No se pudo generar la imagen: ' + e.message); }
 }
 cargar();
 </script>
