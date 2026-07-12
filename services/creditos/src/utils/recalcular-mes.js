@@ -224,7 +224,7 @@ async function recalcularMeses(meses, opciones = {}) {
 
     // ── Traer todas las ops del mes (estados activos) ────────────────
     const [ops] = await pool.query(`
-      SELECT id, num_op, financiera, parque, rut_dealer,
+      SELECT id, num_op, financiera, parque, rut_dealer, estado, estado_credito,
              saldo_precio, monto_financiado, monto_capitalizado,
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
@@ -257,14 +257,29 @@ async function recalcularMeses(meses, opciones = {}) {
     const penMes    = await calcularPenetracionMes(mesStr);
     log.push(`Mes ${mesStr}: ${ops.length} ops | UAC=${cntUAC} (${(pctUAC*100).toFixed(0)}%) | pen RDH ${penMes.pen_rdh.toFixed(0)}% Ces ${penMes.pen_cesantia.toFixed(0)}% Rep ${penMes.pen_reparaciones.toFixed(0)}%`);
 
+    // ── Arriendo de parque: FIJO mensual por parque, PRORRATEADO entre las
+    //    otorgadas del mes de ese parque (regla Pato: mide qué tan rentables
+    //    son las ops de cada parque; 1 sola op carga todo el arriendo).
+    //    Con 0 otorgadas, una op no cursada proyecta el arriendo completo.
+    const esOtorgada = o => (String(o.estado || '').trim() || String(o.estado_credito || '').trim()).toUpperCase() === 'OTORGADO';
+    const otorgadasPorParque = {};
+    for (const o of ops) {
+      const k = (o.parque || '').toUpperCase().trim();
+      if (k.includes('PARQUE') && esOtorgada(o)) otorgadasPorParque[k] = (otorgadasPorParque[k] || 0) + 1;
+    }
+
     // ── Paso 3: recalcular cada op ───────────────────────────────────
     for (const op of ops) {
       // 1-3. Valores calculados por fórmula (Ing x Colocaciones, Comisión Dealer, Parque)
       const calc = await calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC);
       const monto_comision_fin = calc.monto_comision_fin;
       const com_parque_val     = calc.com_parque;
-      const arriendo_val       = calc.arriendo;
       const comdea_real        = calc.comdea_real;
+      let arriendo_val         = calc.arriendo; // arriendo FIJO del parque
+      if (arriendo_val > 0) {
+        const nOtorg = otorgadasPorParque[(op.parque || '').toUpperCase().trim()] || 0;
+        arriendo_val = Math.round(arriendo_val / Math.max(nOtorg, 1));
+      }
 
       // Comisiones de seguros — para AUTOFIN se recalculan con la penetración del mes
       // (motor penetracion.js); para el resto se conservan los valores guardados.
