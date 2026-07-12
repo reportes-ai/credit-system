@@ -580,13 +580,36 @@ function buildRentabTable() {
    del KPI Ing. Neto AutoFácil (usa window.__PL_LAST = {totIN, totFin} del
    último render, así sobrevive a los re-render por filtros). */
 const __plComEjCache = {};
+
+/* Arriendo FIJO mensual total de los parques activos (mantenedor parques_comisiones).
+   Los parques CON otorgadas ya suman su fijo vía prorrateo en las ops; el resto
+   (parques sin colocación en el mes) se agrega aparte como costo fijo. */
+let __arrFijoMes = null;
+async function getArrFijoMes() {
+  if (__arrFijoMes != null) return __arrFijoMes;
+  try {
+    const r = await fetch('/api/parques-comisiones', {
+      headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') }
+    }).then(x => x.json());
+    __arrFijoMes = (r.data || [])
+      .filter(p => p.activo === undefined || p.activo == 1)
+      .reduce((a, p) => a + (parseFloat(p.arriendo) || 0), 0);
+  } catch (e) { __arrFijoMes = 0; }
+  return __arrFijoMes;
+}
 async function cargarComEjPL() {
   const cell = document.getElementById('r-comejec-pl');
   if (!cell) return;
-  const aplicar = (comEj) => {
+  const aplicar = (comEj, nMeses) => {
     cell.textContent = fM(comEj);
     const L = window.__PL_LAST || {};
-    const inFinal = (L.totIN || 0) - comEj;
+    // Arriendo fijo total del período: parques con ops ya lo aportan prorrateado
+    // (L.arrOps); el resto (parques sin colocación) se descuenta como faltante.
+    const arrTotal = (__arrFijoMes || 0) * (nMeses || 1);
+    const arrFaltante = Math.max(0, arrTotal - (L.arrOps || 0));
+    const arrCell = document.getElementById('r-arrparque-pl');
+    if (arrCell && arrTotal > 0) arrCell.textContent = fM(arrTotal);
+    const inFinal = (L.totIN || 0) - comEj - arrFaltante;
     const kv = document.getElementById('kpi-in-pl'), ks = document.getElementById('kpi-in-sub-pl');
     if (kv) kv.textContent = fM(inFinal);
     if (ks) ks.textContent = L.totFin ? (inFinal / L.totFin * 100).toFixed(1) + '%' : '';
@@ -595,8 +618,6 @@ async function cargarComEjPL() {
     const desde = document.getElementById('sel-desde')?.value || '';
     const hasta = document.getElementById('sel-hasta')?.value || desde;
     if (!desde) { cell.textContent = '—'; return; }
-    const clave = desde + '|' + hasta;
-    if (__plComEjCache[clave] != null) return aplicar(__plComEjCache[clave]);
     const meses = [];
     let [y, m] = desde.split('-').map(Number);
     const [hy, hm] = hasta.split('-').map(Number);
@@ -605,6 +626,9 @@ async function cargarComEjPL() {
       m++; if (m > 12) { m = 1; y++; }
       if (meses.length > 24) break; // tope defensivo
     }
+    await getArrFijoMes();
+    const clave = desde + '|' + hasta;
+    if (__plComEjCache[clave] != null) return aplicar(__plComEjCache[clave], meses.length);
     const H = { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') };
     let comEj = 0;
     for (const mes of meses) {
@@ -612,7 +636,7 @@ async function cargarComEjPL() {
       if (r.success) comEj += (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
     }
     __plComEjCache[clave] = comEj;
-    aplicar(comEj);
+    aplicar(comEj, meses.length);
   } catch (e) { cell.textContent = '—'; }
 }
 
@@ -659,9 +683,10 @@ function buildV2pl() {
   document.getElementById('r-comparque-pl').textContent = fM(totPar);
   document.getElementById('r-totcd-pl').textContent = fM(totCD_P);
   document.getElementById('r-totcd-pct-pl').textContent = totFin?(totCD_P/totFin*100).toFixed(1)+'%':'';
-  document.getElementById('r-arrparque-pl').textContent = fM(det.reduce((a,r)=>a+(r.arriendo_parque||0),0));
+  const arrOps = det.reduce((a,r)=>a+(r.arriendo_parque||0),0);
+  document.getElementById('r-arrparque-pl').textContent = fM(arrOps);
 
-  window.__PL_LAST = { totIN, totFin };
+  window.__PL_LAST = { totIN, totFin, arrOps };
   cargarComEjPL();
   document.getElementById('r-plazo-pl').textContent = avgPlazo+'m';
   document.getElementById('r-finprom-pl').textContent = fM(avgFin);
@@ -816,6 +841,7 @@ function buildRentabTablePL() {
   const avgFinF   = totOpsF ? Math.round(tot.fin/totOpsF) : 0;
   // Motor único: ingreso_neto_total (incluye arriendo); com. ejecutivos se descuenta en cargarComEjPL
   const totIN_F = rows.reduce((a,r)=>a+(r.ing_neto||0),0);
+  const arrOpsF = rows.reduce((a,r)=>a+(r.arriendo_parque||0),0);
   document.getElementById('kpi2-pl').innerHTML = `
     <div class="kpi-box"><div class="kpi-label">Total Financiado</div><div class="kpi-val big">${fM(tot.fin)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Operaciones Otorgadas</div><div class="kpi-val big">${totOpsF}</div></div>
@@ -823,14 +849,14 @@ function buildRentabTablePL() {
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Seguros</div><div class="kpi-val big">${fM(tot.seg)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. Bruto</div><div class="kpi-val big">${fM(tot.ig)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. Neto AutoFácil</div><div class="kpi-val big" id="kpi-in-pl">${fM(totIN_F)}</div><div class="kpi-sub" id="kpi-in-sub-pl">${tot.fin?(totIN_F/tot.fin*100).toFixed(1)+'%':''}</div></div>`;
-  window.__PL_LAST = { totIN: totIN_F, totFin: tot.fin };
+  window.__PL_LAST = { totIN: totIN_F, totFin: tot.fin, arrOps: arrOpsF };
   cargarComEjPL();
   document.getElementById('r-saldo-pl').textContent = fM(tot.sal);
   document.getElementById('r-comdealer-pl').textContent = fM(tot.cd);
   document.getElementById('r-comparque-pl').textContent = fM(tot.par);
   document.getElementById('r-totcd-pl').textContent = fM(tot.cd + tot.par);
   document.getElementById('r-totcd-pct-pl').textContent = tot.fin?((tot.cd+tot.par)/tot.fin*100).toFixed(1)+'%':'';
-  document.getElementById('r-arrparque-pl').textContent = fM(rows.reduce((a,r)=>a+(r.arriendo_parque||0),0));
+  document.getElementById('r-arrparque-pl').textContent = fM(arrOpsF);
   document.getElementById('r-plazo-pl').textContent = avgPlazoF+'m';
   document.getElementById('r-finprom-pl').textContent = fM(avgFinF);
 }
@@ -1063,7 +1089,7 @@ function buildV1b() {
       <tr><td><b>Total Ingresos</b></td><td><b>${fM(jTotAFA + jTotSeg)}</b></td></tr>
       <tr><td>Com. Dealer</td><td>${fM(jTotCD)}</td></tr>
       <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td></tr>
-      <tr><td>Arriendo Parque</td><td>${fM(jTotArr)}</td></tr>
+      <tr><td>Arriendo Parque</td><td id="jan1b-arr">${fM(jTotArr)}</td></tr>
       <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td></tr>
       <tr><td><b>Ingreso Neto</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td></tr>
     </tbody>`;
@@ -1085,9 +1111,16 @@ function buildV1b() {
       if (!r.success) throw new Error(r.error);
       const tot = (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
       cell.textContent = fM(tot);
-      // Ingreso Neto final = neto del motor − comisión ejecutivos
+      // Arriendo fijo del mes completo: los parques SIN colocación también suman
+      const arrFijo = await getArrFijoMes();
+      const arrFaltante = Math.max(0, (arrFijo || 0) - jTotArr);
+      if (arrFijo > 0) {
+        const arrCell = document.getElementById('jan1b-arr');
+        if (arrCell) arrCell.textContent = fM(arrFijo);
+      }
+      // Ingreso Neto final = neto del motor − com. ejecutivos − arriendo de parques sin colocación
       const netoCell = document.getElementById('jan1b-neto');
-      if (netoCell) netoCell.textContent = fM(jTotNeto - tot);
+      if (netoCell) netoCell.textContent = fM(jTotNeto - tot - arrFaltante);
     } catch (e) { cell.textContent = '—'; }
   }
 
