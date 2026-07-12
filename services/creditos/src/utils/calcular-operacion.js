@@ -104,8 +104,9 @@ async function calcularOperacion(op) {
         const mantTasa   = mayor ? parseFloat(tasa.tasa_mensual_mayor) : parseFloat(tasa.tasa_mensual_menor);
         const mantSpread = mayor ? parseFloat(tasa.spread_mayor)       : parseFloat(tasa.spread_menor);
         const costoFondo = (mantTasa - mantSpread) / 100;
-        const real    = core.normTasaMensualPct(op.tascli_real); // blindaje: fracción → %
-        const tasaCli = (real > 0 ? real : mantTasa) / 100;
+        // Regla de negocio: tasa cliente JAMÁS bajo el costo de fondo (dato inválido
+        // → cae al mantenedor). Incluye normalización fracción→% (motor único).
+        const tasaCli = core.tasaClienteValida(op.tascli_real, mantTasa, costoFondo) / 100;
         monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap: monto_cap, plazo, tasaCli, costoFondo });
       }
     } else if (financiera.includes('UNIDAD') || financiera.includes('UAC')) {

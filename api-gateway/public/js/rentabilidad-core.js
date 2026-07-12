@@ -35,6 +35,17 @@
     return v;
   }
 
+  // REGLA DE NEGOCIO (Pato): la tasa CLIENTE jamás puede ser menor que el costo
+  // de fondo — ahí se pierde plata, así que un valor bajo el costo es un dato
+  // inválido. Devuelve la tasa a usar (% mensual): si la real está bajo el costo
+  // de fondo, cae al default del mantenedor. `costoFondo` viene en fracción.
+  function tasaClienteValida(realPct, mantTasaPct, costoFondo) {
+    const real = normTasaMensualPct(realPct);
+    const cfPct = (parseFloat(costoFondo) || 0) * 100;
+    if (real > 0 && real >= cfPct) return real;   // tasa real válida → manda
+    return parseFloat(mantTasaPct) || 0;          // inválida o vacía → mantenedor
+  }
+
   // Cuota francesa de un capital a una tasa mensual (fracción) por N cuotas.
   function cuotaFrancesa(capital, tasaMensual, plazo) {
     const c = +capital || 0, t = +tasaMensual || 0, n = parseInt(plazo) || 0;
@@ -111,6 +122,7 @@
 
   return {
     normTasaMensualPct,
+    tasaClienteValida,
     cuotaFrancesa,
     valorPresenteAnualidad,
     tablaDesarrollo,
