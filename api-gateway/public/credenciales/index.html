@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credenciales Corporativas — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
+    .wrap { max-width:1300px; margin:22px auto; padding:0 20px 70px; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,var(--accent)); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; }
+    .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
+    .page-banner p { opacity:.85; margin:0; font-size:.82rem; }
+    .card-x { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    th { text-align:left; color:#64748b; font-size:.7rem; text-transform:uppercase; padding:7px 8px; border-bottom:2px solid #eef2f7; }
+    td { padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .muted { color:#94a3b8; }
+
+    /* ── Tarjetas (86 × 54 mm formato carnet) ── */
+    #hoja { display:flex; flex-wrap:wrap; gap:8mm; }
+    .cred { width:86mm; height:54mm; border:1px dashed #cbd5e1; border-radius:3mm; overflow:hidden; background:#fff; position:relative; page-break-inside:avoid; }
+    .cred.frente { display:flex; flex-direction:column; }
+    .cred .top { display:flex; align-items:flex-start; justify-content:space-between; padding:3mm 4mm 0; }
+    .cred .logo { height:9mm; }
+    .cred .cuerpo { display:flex; gap:4mm; padding:1mm 4mm; flex:1; }
+    .cred .foto { width:24mm; height:30mm; object-fit:cover; border:1px solid #e2e8f0; border-radius:1.5mm; background:#f1f5f9; }
+    .cred .foto-ph { width:24mm; height:30mm; display:flex; align-items:center; justify-content:center; color:#cbd5e1; font-size:8mm; border:1px dashed #e2e8f0; border-radius:1.5mm; }
+    .cred .nom { font-size:6mm; font-weight:800; color:#111; line-height:1; margin-top:1mm; }
+    .cred .ape { font-size:3.6mm; font-weight:700; color:#333; }
+    .cred .cargo { font-size:3mm; font-weight:700; color:#000; margin-top:1mm; }
+    .cred .datos { font-size:2.8mm; margin-top:2mm; }
+    .cred .datos b { display:inline-block; min-width:12mm; }
+    .cred .franja { height:3mm; background:linear-gradient(90deg,var(--navy-dark),var(--accent)); margin-top:auto; }
+    .cred.reverso { background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2mm; }
+    .cred.reverso .titulo { color:#fff; font-weight:800; font-size:3.6mm; letter-spacing:.5px; border:1px solid rgba(255,255,255,.6); padding:1mm 4mm; border-radius:1.5mm; }
+    .cred.reverso .qrbox { background:#fff; padding:2mm; border-radius:2mm; }
+    .cred.reverso img.qr { width:26mm; height:26mm; display:block; }
+    .cred.reverso .pie { color:rgba(255,255,255,.85); font-size:2.6mm; }
+
+    @media print {
+      body { background:#fff; }
+      .no-print, #af-topnav { display:none !important; }
+      .wrap { max-width:none; margin:0; padding:0; }
+      .cred { border:0.3mm solid #94a3b8; }
+      #hoja { gap:4mm; }
+    }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="wrap">
+  <div class="page-banner no-print">
+    <i class="bi bi-person-badge"></i>
+    <div>
+      <h2>Credenciales Corporativas</h2>
+      <p>Genera e imprime credenciales tamaño carnet (86×54 mm): anverso con foto, nombre, cargo, RUT y expiración; reverso con QR vCard "escanea y guarda mi contacto". Los datos salen de la ficha del usuario.</p>
+    </div>
+  </div>
+
+  <div class="card-x no-print">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
+      <div><label style="font-size:.68rem;text-transform:uppercase;color:#6b7280;font-weight:700;display:block">Expira (aplica a los seleccionados sin fecha)</label>
+        <input type="date" id="expDefault" class="form-control form-control-sm"></div>
+      <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar credenciales seleccionadas</button>
+      <button class="btn btn-sm btn-success" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    </div>
+    <div style="overflow:auto;max-height:340px">
+      <table>
+        <thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.selu').forEach(c=>c.checked=this.checked)"></th>
+          <th>Nombre</th><th>Cargo</th><th>RUT</th><th>Teléfono</th><th>Foto</th><th>Expira</th></tr></thead>
+        <tbody id="uBody"><tr><td colspan="7" class="muted">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="hoja"></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/qrcode-generator.js"></script>
+<script>
+'use strict';
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let USERS = [];
+
+async function cargar(){
+  const j = await fetch('/api/credenciales', { headers:H }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) { $('uBody').innerHTML = '<tr><td colspan="7">'+esc(j.error||'Sin acceso')+'</td></tr>'; return; }
+  USERS = j.data || [];
+  $('uBody').innerHTML = USERS.map((u,i)=>`
+    <tr>
+      <td><input type="checkbox" class="selu" data-i="${i}"></td>
+      <td><b>${esc(u.nombre)} ${esc(u.apellido||'')}</b></td>
+      <td><input class="form-control form-control-sm" style="width:170px" id="cargo-${i}" value="${esc(u.cargo||'')}" placeholder="Ejecutivo Comercial" onchange="guardarDato(${i})"></td>
+      <td>${esc(u.rut||'—')}</td><td>${esc(u.telefono||'—')}</td>
+      <td>${u.tiene_foto?'<i class="bi bi-check-circle-fill" style="color:#16a34a"></i>':''} <input type="file" accept="image/*" style="font-size:.7rem;width:170px" onchange="subirFoto(${i}, this)"></td>
+      <td><input type="date" class="form-control form-control-sm" style="width:140px" id="exp-${i}" value="${u.expira?String(u.expira).slice(0,10):''}" onchange="guardarDato(${i})"></td>
+    </tr>`).join('');
+}
+
+function fileToDataUrl(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
+
+// Reduce la foto a ~300px de ancho (carnet) para no guardar megas en BD
+async function comprimir(dataUrl){
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const w = 300, h = Math.round(img.height * w / img.width);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      res(c.toDataURL('image/jpeg', .85));
+    };
+    img.onerror = () => res(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function subirFoto(i, input){
+  const f = input.files && input.files[0]; if (!f) return;
+  const foto = await comprimir(await fileToDataUrl(f));
+  const u = USERS[i];
+  const j = await fetch('/api/credenciales/'+u.id_usuario, { method:'PUT', headers:H, body: JSON.stringify({ foto }) }).then(r=>r.json()).catch(()=>({}));
+  if (!j.success) return alert(j.error||'Error al subir la foto');
+  u.tiene_foto = 1; u._foto = foto;
+  cargar();
+}
+async function guardarDato(i){
+  const u = USERS[i];
+  await fetch('/api/credenciales/'+u.id_usuario, { method:'PUT', headers:H, body: JSON.stringify({
+    cargo: $('cargo-'+i).value, expira: $('exp-'+i).value || null }) }).catch(()=>{});
+  u.cargo = $('cargo-'+i).value; u.expira = $('exp-'+i).value || null;
+}
+
+function vCard(u){
+  const nom = (u.nombre||'').trim(), ape = ((u.apellido||'')+' '+(u.apellido_materno||'')).trim();
+  const tel = String(u.telefono||'').replace(/[^\d+]/g,'');
+  return ['BEGIN:VCARD','VERSION:3.0',
+    `N:${ape};${nom};;;`, `FN:${nom} ${ape}`.trim(),
+    'ORG:AutoFácil Crédito Automotriz', u.cargo?`TITLE:${u.cargo}`:'',
+    tel?`TEL;TYPE=CELL:${tel}`:'', u.email?`EMAIL:${u.email}`:'',
+    'URL:https://www.autofacilchile.cl','END:VCARD'].filter(Boolean).join('\n');
+}
+function qrDataUrl(texto){
+  const qr = qrcode(0,'M'); qr.addData(texto, 'Byte'); qr.make();
+  return qr.createDataURL(5, 2);
+}
+const fFecha = d => d ? String(d).slice(0,10).split('-').reverse().join('/') : '—';
+
+async function generar(){
+  const sel = [...document.querySelectorAll('.selu:checked')].map(c=>+c.dataset.i);
+  if (!sel.length) return alert('Selecciona al menos un usuario.');
+  const expDef = $('expDefault').value;
+  const hoja = $('hoja'); hoja.innerHTML = '<div class="muted no-print">Generando…</div>';
+  const cards = [];
+  for (const i of sel){
+    const u = USERS[i];
+    // traer la foto guardada
+    let foto = u._foto;
+    if (!foto && u.tiene_foto){
+      const j = await fetch('/api/credenciales/'+u.id_usuario, { headers:H }).then(r=>r.json()).catch(()=>({}));
+      if (j.success) foto = j.data.foto;
+    }
+    const expira = u.expira || expDef || null;
+    if (expDef && !u.expira) fetch('/api/credenciales/'+u.id_usuario, { method:'PUT', headers:H, body: JSON.stringify({ expira: expDef }) }).catch(()=>{});
+    cards.push(`
+      <div class="cred frente">
+        <div class="top"><div></div><img class="logo" src="/img/logo-autofacil.png" onerror="this.style.display='none'"></div>
+        <div class="cuerpo">
+          ${foto?`<img class="foto" src="${foto}">`:`<div class="foto-ph"><i class="bi bi-person"></i></div>`}
+          <div>
+            <div class="nom">${esc((u.nombre||'').split(' ')[0].toUpperCase())}</div>
+            <div class="ape">${esc(((u.nombre||'').split(' ').slice(1).join(' ')+' '+(u.apellido||'')).trim())} ${esc(u.apellido_materno||'')}</div>
+            <div class="cargo">${esc(u.cargo||'')}</div>
+            <div class="datos"><b>RUT:</b> ${esc(u.rut||'—')}<br><b>Expira:</b> ${fFecha(expira)}</div>
+          </div>
+        </div>
+        <div class="franja"></div>
+      </div>
+      <div class="cred reverso">
+        <div class="titulo">ESCANEA Y GUARDA MI CONTACTO</div>
+        <div class="qrbox"><img class="qr" src="${qrDataUrl(vCard(u))}"></div>
+        <div class="pie">${esc((u.nombre||'').split(' ')[0])} ${esc(u.apellido||'')} · AutoFácil Crédito Automotriz</div>
+      </div>`);
+  }
+  hoja.innerHTML = cards.join('');
+}
+cargar();
+</script>
+<script>
+  window.AF_TOPNAV = {
+    self: { key:'credenciales', selfHref:'/credenciales/', title:'Credenciales Corporativas', icon:'bi-person-badge', defaultSection:'usuarios' }
+  };
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
