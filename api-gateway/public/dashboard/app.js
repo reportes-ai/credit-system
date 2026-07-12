@@ -2674,24 +2674,28 @@ function reflowTabs() {
   if (!cont) return;
   let more = document.getElementById('tabMore'), menu = document.getElementById('tabMoreMenu');
   if (!more) {
-    cont.style.position = 'relative';
+    // El botón y el menú viven FUERA de .tabs (que tiene overflow:hidden y los recortaría)
+    const fila = cont.parentElement; // .topbar-row2
+    fila.style.position = 'relative';
     more = document.createElement('div');
     more.id = 'tabMore'; more.className = 'tab';
+    more.style.flex = '0 0 auto';
     more.innerHTML = '⋯ Más ▾';
     menu = document.createElement('div');
     menu.id = 'tabMoreMenu';
-    menu.style.cssText = 'position:absolute;top:100%;right:0;background:#0d1d3a;border:1px solid #1e3a6a;border-top:none;border-radius:0 0 10px 10px;z-index:998;display:none;min-width:210px;box-shadow:0 14px 34px rgba(0,0,0,.45);padding:4px 0';
+    menu.style.cssText = 'position:absolute;top:100%;right:8px;background:#0d1d3a;border:1px solid #1e3a6a;border-top:none;border-radius:0 0 10px 10px;z-index:998;display:none;min-width:210px;box-shadow:0 14px 34px rgba(0,0,0,.45);padding:4px 0';
     more.addEventListener('click', e => { e.stopPropagation(); menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; });
     document.addEventListener('click', () => { menu.style.display = 'none'; });
-    cont.appendChild(more); cont.appendChild(menu);
+    fila.insertBefore(more, cont.nextSibling); fila.appendChild(menu);
     let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(reflowTabs, 150); });
+    setTimeout(reflowTabs, 400); // re-medir tras el primer render (fuentes/layout)
   }
   const tabs = [...cont.querySelectorAll('.tab')].filter(t => t !== more);
   // 1. restaurar visibles (las ocultas por permisos siguen ocultas)
   tabs.forEach(t => { if (t.dataset.permHidden !== '1') t.style.display = ''; });
   more.style.display = '';
-  // 2. medir y colapsar las que exceden el ancho disponible
-  const avail = cont.clientWidth - more.offsetWidth - 10;
+  // 2. medir y colapsar las que exceden el ancho disponible (.tabs ya excluye al botón Más)
+  const avail = cont.clientWidth - 4;
   let x = 0; const fuera = [];
   for (const t of tabs) {
     if (t.style.display === 'none') continue;
