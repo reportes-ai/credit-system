@@ -132,6 +132,7 @@ function showV(id, el) {
   if(id==='vseg')  { buildVSeg(); }
   if(id==='vdealers') { buildColocMensual('vdealers'); }
   if(id==='vparques') { buildColocMensual('vparques'); }
+  if(id==='vproy') { buildVProy(); }
   if(id==='vadmin') {
     if (!esAdmin()) { alert('Acceso denegado.'); return; }
     buildVAdmin();
@@ -2376,6 +2377,131 @@ function buildV7() {
   });
 }
 
+// ======== PROYECCIÓN DE CIERRE ========
+// Método: curva de avance intra-mes. Para cada mes histórico se calcula qué
+// fracción del total del mes estaba colocada al día d (por Q y por monto).
+// La proyección = actual del mes en curso ÷ fracción promedio histórica al día
+// de hoy. La banda usa ±1 desviación estándar de esa fracción entre meses.
+function buildVProy() {
+  const MESES_HIST = 6;
+  const rows = (window.RAW_DATA || []).filter(r => r.estado_eval === 'OTORGADO' && r.fecha_otorgado && r.mes);
+  const hoy = new Date();
+  const mesAct = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  const diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  const diaHoy = Math.min(hoy.getDate(), diasMes);
+  const MES_NOM = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  document.getElementById('proy-mes-label').textContent = MES_NOM[hoy.getMonth()] + ' ' + hoy.getFullYear();
+
+  // ── Meses históricos (cerrados, anteriores al actual) ──
+  const mesesHist = [...new Set(rows.map(r => r.mes))].filter(m => m < mesAct).sort().slice(-MESES_HIST);
+  document.getElementById('proy-n-meses').textContent = mesesHist.length;
+
+  // Curvas acumuladas por día (fracción 0-1) por métrica, por mes histórico
+  const diaDe = f => Math.min(parseInt(String(f).slice(8, 10)) || 1, 31);
+  const curvas = { q: [], m: [] };
+  for (const mh of mesesHist) {
+    const ops = rows.filter(r => r.mes === mh);
+    if (!ops.length) continue;
+    const totQ = ops.length, totM = ops.reduce((a, r) => a + r.monto_financiado, 0);
+    if (!totM) continue;
+    const cq = Array(32).fill(0), cm = Array(32).fill(0);
+    ops.forEach(r => { const d = diaDe(r.fecha_otorgado); cq[d] += 1; cm[d] += r.monto_financiado; });
+    for (let d = 1; d <= 31; d++) { cq[d] += cq[d - 1]; cm[d] += cm[d - 1]; }
+    curvas.q.push(cq.map(v => v / totQ));
+    curvas.m.push(cm.map(v => v / totM));
+  }
+  const stats = (arr, d) => {
+    const vals = arr.map(c => c[d]).filter(v => v != null);
+    if (!vals.length) return { mu: 0, sd: 0 };
+    const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mu) ** 2, 0) / vals.length);
+    return { mu, sd };
+  };
+  const sQ = stats(curvas.q, diaHoy), sM = stats(curvas.m, diaHoy);
+
+  // ── Actual del mes en curso por institución ──
+  const act = { AUTOFIN: { q: 0, m: 0, f: 0 }, UNIDAD: { q: 0, m: 0, f: 0 } };
+  rows.filter(r => r.mes === mesAct).forEach(r => {
+    const k = (r.institucion || '').includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
+    act[k].q += 1; act[k].m += r.monto_financiado; act[k].f += (r.rentab_afa || 0) + (r.com_seguros || 0);
+  });
+
+  // Proyección con guardas: fracción mínima 5% (muy temprano en el mes = no proyectable)
+  const proy = (actual, s) => s.mu > 0.05 ? actual / s.mu : null;
+  const rango = (actual, s) => {
+    if (s.mu <= 0.05) return null;
+    const lo = actual / Math.min(s.mu + s.sd, 1), hi = actual / Math.max(s.mu - s.sd, 0.05);
+    return [lo, hi];
+  };
+
+  // Días hábiles restantes (L-V, desde mañana al fin de mes)
+  let habiles = 0;
+  for (let d = diaHoy + 1; d <= diasMes; d++) { const dow = new Date(hoy.getFullYear(), hoy.getMonth(), d).getDay(); if (dow >= 1 && dow <= 5) habiles++; }
+
+  document.getElementById('kpi-proy').innerHTML = `
+    <div class="kpi-box"><div class="kpi-label">Día del mes</div><div class="kpi-val big">${diaHoy} / ${diasMes}</div><div class="kpi-sub">${habiles} días hábiles restantes</div></div>
+    <div class="kpi-box"><div class="kpi-label">Avance esperado a hoy (Q)</div><div class="kpi-val big">${(sQ.mu * 100).toFixed(1)}%</div><div class="kpi-sub">±${(sQ.sd * 100).toFixed(1)}% (σ histórica)</div></div>
+    <div class="kpi-box"><div class="kpi-label">Avance esperado a hoy (monto)</div><div class="kpi-val big">${(sM.mu * 100).toFixed(1)}%</div><div class="kpi-sub">±${(sM.sd * 100).toFixed(1)}%</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Q proyectado cierre</div><div class="kpi-val big">${proy(act.AUTOFIN.q + act.UNIDAD.q, sQ) ? Math.round(proy(act.AUTOFIN.q + act.UNIDAD.q, sQ)) : '—'}</div><div class="kpi-sub">hoy: ${act.AUTOFIN.q + act.UNIDAD.q} ops</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Monto proyectado cierre</div><div class="kpi-val big">${proy(act.AUTOFIN.m + act.UNIDAD.m, sM) ? fM(proy(act.AUTOFIN.m + act.UNIDAD.m, sM)) : '—'}</div><div class="kpi-sub">hoy: ${fM(act.AUTOFIN.m + act.UNIDAD.m)}</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Facturación proyectada</div><div class="kpi-val big">${proy(act.AUTOFIN.f + act.UNIDAD.f, sM) ? fM(proy(act.AUTOFIN.f + act.UNIDAD.f, sM)) : '—'}</div><div class="kpi-sub">hoy: ${fM(act.AUTOFIN.f + act.UNIDAD.f)}</div></div>`;
+
+  // ── Tabla por institución ──
+  const fila = (nom, a) => {
+    const pq = proy(a.q, sQ), pm = proy(a.m, sM), pf = proy(a.f, sM);
+    const rq = rango(a.q, sQ), rm = rango(a.m, sM);
+    return `<tr><td><b>${nom}</b></td>
+      <td>${a.q}</td><td><b>${pq ? Math.round(pq) : '—'}</b>${rq ? ` <span style="color:#94a3b8;font-size:.72rem">(${Math.round(rq[0])}–${Math.round(rq[1])})</span>` : ''}</td>
+      <td>${fM(a.m)}</td><td><b>${pm ? fM(pm) : '—'}</b>${rm ? ` <span style="color:#94a3b8;font-size:.72rem">(${fM(rm[0])}–${fM(rm[1])})</span>` : ''}</td>
+      <td>${fM(a.f)}</td><td><b>${pf ? fM(pf) : '—'}</b></td></tr>`;
+  };
+  const tot = { q: act.AUTOFIN.q + act.UNIDAD.q, m: act.AUTOFIN.m + act.UNIDAD.m, f: act.AUTOFIN.f + act.UNIDAD.f };
+  document.getElementById('t-proy').innerHTML = `
+    <thead><tr><th>Institución</th><th>Q hoy</th><th>Q cierre proy.</th><th>Monto hoy</th><th>Monto cierre proy.</th><th>Fact. hoy</th><th>Fact. cierre proy.</th></tr></thead>
+    <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
+    <tfoot>${fila('Total', tot)}</tfoot>`;
+  document.getElementById('proy-nota').innerHTML =
+    `<i class="bi bi-info-circle me-1"></i>Método: al día ${diaHoy} los últimos ${mesesHist.length} meses llevaban en promedio el ${(sM.mu*100).toFixed(1)}% del monto del mes (σ ${(sM.sd*100).toFixed(1)}%). ` +
+    `Proyección = actual ÷ avance esperado; el rango entre paréntesis usa ±1σ. Facturación = Ing. x Colocaciones + Ing. x Seguros. La proyección se afina sola a medida que avanza el mes.`;
+
+  // ── Gráfico 1: monto mensual histórico (12m) + mes actual real+proyección ──
+  const meses12 = [...new Set(rows.map(r => r.mes))].sort().slice(-12).filter(m => m < mesAct);
+  const histM = meses12.map(m => rows.filter(r => r.mes === m).reduce((a, r) => a + r.monto_financiado, 0));
+  const pmTot = proy(tot.m, sM) || tot.m;
+  const labels1 = [...meses12, mesAct].map(m => { const [y, mm] = m.split('-'); return MES_NOM[+mm - 1].slice(0, 3) + ' ' + y.slice(2); });
+  const c1 = Chart.getChart(document.getElementById('ch-proy-hist')); if (c1) c1.destroy();
+  new Chart(document.getElementById('ch-proy-hist'), {
+    type: 'bar',
+    data: { labels: labels1, datasets: [
+      { label: 'Colocado', data: [...histM, tot.m], backgroundColor: '#0141A2cc', borderRadius: 3, stack: 's' },
+      { label: 'Proyección restante', data: [...histM.map(() => 0), Math.max(pmTot - tot.m, 0)], backgroundColor: '#90caf9aa', borderColor: '#0141A2', borderWidth: 1, borderDash: [4, 3], borderRadius: 3, stack: 's' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
+      scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
+  });
+
+  // ── Gráfico 2: acumulado diario del mes vs curva histórica escalada ──
+  const cmAct = Array(diasMes + 1).fill(0);
+  rows.filter(r => r.mes === mesAct).forEach(r => { cmAct[Math.min(diaDe(r.fecha_otorgado), diasMes)] += r.monto_financiado; });
+  for (let d = 1; d <= diasMes; d++) cmAct[d] += cmAct[d - 1];
+  const curvaProm = Array(diasMes + 1).fill(0);
+  for (let d = 1; d <= diasMes; d++) curvaProm[d] = stats(curvas.m, Math.min(d, 31)).mu * pmTot;
+  const dias = Array.from({ length: diasMes }, (_, i) => i + 1);
+  const c2 = Chart.getChart(document.getElementById('ch-proy-curva')); if (c2) c2.destroy();
+  new Chart(document.getElementById('ch-proy-curva'), {
+    type: 'line',
+    data: { labels: dias, datasets: [
+      { label: 'Real acumulado', data: dias.map(d => d <= diaHoy ? cmAct[d] : null), borderColor: '#0141A2', backgroundColor: '#0141A222', fill: true, tension: .25, pointRadius: 0, borderWidth: 2.5 },
+      { label: 'Proyección', data: dias.map(d => d >= diaHoy ? (d === diaHoy ? cmAct[d] : curvaProm[d]) : null), borderColor: '#e53935', borderDash: [6, 4], tension: .25, pointRadius: 0, borderWidth: 2 },
+      { label: 'Curva histórica esperada', data: dias.map(d => curvaProm[d]), borderColor: '#94a3b8', borderDash: [2, 3], tension: .25, pointRadius: 0, borderWidth: 1.5 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
+      scales: { x: { title: { display: true, text: 'Día del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
+  });
+}
+
 // ──────────────────────────────────────────────────────────────
 // BLOQUE ORIGINAL línea 3044
 // ──────────────────────────────────────────────────────────────
@@ -2396,6 +2522,7 @@ const TABS_NAV = [
   { id:'vseg',  label:'🛡️ Seguros' },
   { id:'vdealers', label:'🏪 Dealers' },
   { id:'vparques', label:'🅿️ Parques' },
+  { id:'vproy',  label:'🔮 Proyección' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
