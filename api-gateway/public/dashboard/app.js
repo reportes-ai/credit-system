@@ -2474,8 +2474,11 @@ function buildVProy2() {
   (async () => {
     const kv = document.getElementById('kpi-proy2-neto'), ks = document.getElementById('kpi-proy2-neto-sub');
     try {
-      const netoAct = rows.filter(r => r.mes === mesAct).reduce((a, r) => a + (r.ingreso_neto_total || 0), 0);
-      const serieNeto = mesesHist.map(mh => rows.filter(r => r.mes === mh).reduce((a, r) => a + (r.ingreso_neto_total || 0), 0));
+      // Neto operacional SIN arriendo (se devuelve el prorrateo a cada op): el
+      // arriendo es FIJO — se descuenta completo al final, coloquen o no.
+      const netoSinArr = r => (r.ingreso_neto_total || 0) + (r.arriendo_parque || 0);
+      const netoAct = rows.filter(r => r.mes === mesAct).reduce((a, r) => a + netoSinArr(r), 0);
+      const serieNeto = mesesHist.map(mh => rows.filter(r => r.mes === mh).reduce((a, r) => a + netoSinArr(r), 0));
       const lin = (serie) => { const n = serie.length; if (!n) return 0; if (n === 1) return serie[0];
         const xm = (n - 1) / 2, ym = serie.reduce((a, b) => a + b, 0) / n;
         let nu = 0, de = 0; serie.forEach((v, i) => { nu += (i - xm) * (v - ym); de += (i - xm) ** 2; });
@@ -2483,10 +2486,8 @@ function buildVProy2() {
       const pcN = medM > 0.04 ? netoAct / medM : null;
       const ptN = lin(serieNeto.slice(-MESES_TREND));
       const mzN = pcN == null ? ptN : w * pcN + (1 - w) * ptN;
-      // arriendo de parques sin colocación (fijo total − estampado en ops), prom. 3 meses
-      const arrFijo = await getArrFijoMes();
-      const falt = mesesHist.slice(-3).map(mh => Math.max((arrFijo || 0) - rows.filter(r => r.mes === mh).reduce((a, r) => a + (r.arriendo_parque || 0), 0), 0));
-      const arrFalt = falt.length ? falt.reduce((a, b) => a + b, 0) / falt.length : 0;
+      // arriendo FIJO mensual completo (mantenedor) — se paga vendan o no
+      const arrFijo = (await getArrFijoMes()) || 0;
       // comisión ejecutivos: tendencia de los últimos 3 meses (motor comisiones)
       const H = { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') };
       const comSerie = [];
@@ -2495,9 +2496,9 @@ function buildVProy2() {
           if (r.success) comSerie.push((r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0)); } catch (e) {}
       }
       const comEjProj = lin(comSerie);
-      const netoFinal = mzN - arrFalt - comEjProj;
+      const netoFinal = mzN - arrFijo - comEjProj;
       kv.textContent = fM(netoFinal);
-      ks.textContent = `neto oper. ${fM(mzN)} − arriendos s/coloc. ${fM(arrFalt)} − com. ejec. ${fM(comEjProj)}`;
+      ks.textContent = `neto oper. ${fM(mzN)} − arriendo fijo ${fM(arrFijo)} − com. ejec. ${fM(comEjProj)}`;
     } catch (e) { kv.textContent = '—'; ks.textContent = 'sin datos suficientes'; }
   })();
 
