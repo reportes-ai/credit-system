@@ -4113,21 +4113,24 @@ function cerrarModalEjec() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 
-function _buildModalContent() {
+function _buildModalContent(full) {
   const { ops, titulo, totSaldo, totFin, totCD, totIng, fM } = _modalData;
+  // full=true (copiar/Excel): montos COMPLETOS en pesos, como número plano —
+  // así Excel/PPT los reciben operables, no "$11.5M".
+  const F = full ? (v => Math.round(parseFloat(v) || 0)) : fM;
   const cols = ['N° Operación','ID Financiera','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
   const dataRows = ops.map(r => [
     r.op||'—', r.id_financiera||'—', r.financiera||'—',
     r.automotora||'—', r.estado_eval||'—',
-    fM(r.saldo_precio), fM(r.monto_financiado),
-    r.plazo||'—', fM(r.com_dealer), fM(r.rentab_afa)
+    F(r.saldo_precio), F(r.monto_financiado),
+    r.plazo||'—', F(r.com_dealer), F(r.rentab_afa)
   ]);
-  const footRow = ['Total ('+ops.length+' ops)','','','','',fM(totSaldo),fM(totFin),'—',fM(totCD),fM(totIng)];
+  const footRow = ['Total ('+ops.length+' ops)','','','','',F(totSaldo),F(totFin),'—',F(totCD),F(totIng)];
   return { cols, dataRows, footRow, titulo };
 }
 
 function _tablaHtml() {
-  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
   const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Total Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)}`;
   const thStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#1a3a6a;color:#fff;font-weight:bold';
@@ -4143,7 +4146,7 @@ function _tablaHtml() {
 
 function copiarTablaModal() {
   const html  = _tablaHtml();
-  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const plain = [cols, ...dataRows, footRow].map(r => r.join('\t')).join('\n');
   navigator.clipboard.write([new ClipboardItem({
     'text/html':  new Blob([html],  { type: 'text/html' }),
@@ -4158,7 +4161,7 @@ function copiarTablaModal() {
 }
 
 function exportarExcelModal() {
-  const { cols, dataRows, footRow, titulo } = _buildModalContent();
+  const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
   const kpis = `Operaciones: ${ops.length}; Total Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}`;
   const esc = v => '"' + String(v).replace(/"/g,'""') + '"';
