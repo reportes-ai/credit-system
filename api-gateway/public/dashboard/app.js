@@ -1063,7 +1063,7 @@ function buildV1b() {
       <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td></tr>
       <tr><td>Arriendo Parque</td><td>${fM(jTotArr)}</td></tr>
       <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td></tr>
-      <tr><td><b>Ingreso Neto</b></td><td><b>${fM(jTotNeto)}</b></td></tr>
+      <tr><td><b>Ingreso Neto</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td></tr>
     </tbody>`;
   // Comisión de ejecutivos del mes anterior — motor único del módulo Comisiones
   cargarComisionEjecutivosMesAnt();
@@ -1083,6 +1083,9 @@ function buildV1b() {
       if (!r.success) throw new Error(r.error);
       const tot = (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
       cell.textContent = fM(tot);
+      // Ingreso Neto final = neto del motor − comisión ejecutivos
+      const netoCell = document.getElementById('jan1b-neto');
+      if (netoCell) netoCell.textContent = fM(jTotNeto - tot);
     } catch (e) { cell.textContent = '—'; }
   }
 
