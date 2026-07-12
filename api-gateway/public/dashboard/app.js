@@ -608,13 +608,45 @@ function buildV2pl() {
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Colocaciones</div><div class="kpi-val big">${fM(totAFA)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Seguros</div><div class="kpi-val big">${fM(totSeg)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. Bruto</div><div class="kpi-val big">${fM(totIG)}</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Ing. Neto AutoFácil</div><div class="kpi-val big">${fM(totIN)}</div><div class="kpi-sub">${totFin?(totIN/totFin*100).toFixed(1)+'%':''}</div></div>`;
+    <div class="kpi-box highlight"><div class="kpi-label">Ing. Neto AutoFácil</div><div class="kpi-val big" id="kpi-in-pl">${fM(totIN)}</div><div class="kpi-sub" id="kpi-in-sub-pl">${totFin?(totIN/totFin*100).toFixed(1)+'%':''}</div></div>`;
 
   document.getElementById('r-saldo-pl').textContent = fM(totSal);
   document.getElementById('r-comdealer-pl').textContent = fM(totCD);
   document.getElementById('r-comparque-pl').textContent = fM(totPar);
   document.getElementById('r-totcd-pl').textContent = fM(totCD_P);
   document.getElementById('r-totcd-pct-pl').textContent = totFin?(totCD_P/totFin*100).toFixed(1)+'%':'';
+
+  // Comisión de ejecutivos del período (motor único del módulo Comisiones, por mes)
+  // → se muestra en su caja y se descuenta del Ing. Neto AutoFácil.
+  (async () => {
+    const cell = document.getElementById('r-comejec-pl');
+    if (!cell) return;
+    try {
+      const desde = document.getElementById('sel-desde')?.value || '';
+      const hasta = document.getElementById('sel-hasta')?.value || desde;
+      if (!desde) { cell.textContent = '—'; return; }
+      // Lista de meses YYYY-MM del período seleccionado
+      const meses = [];
+      let [y, m] = desde.split('-').map(Number);
+      const [hy, hm] = hasta.split('-').map(Number);
+      while (y < hy || (y === hy && m <= hm)) {
+        meses.push(`${y}-${String(m).padStart(2, '0')}`);
+        m++; if (m > 12) { m = 1; y++; }
+        if (meses.length > 24) break; // tope defensivo
+      }
+      const H = { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') };
+      let comEj = 0;
+      for (const mes of meses) {
+        const r = await fetch('/api/comisiones/calculo?mes=' + mes, { headers: H }).then(x => x.json());
+        if (r.success) comEj += (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
+      }
+      cell.textContent = fM(comEj);
+      const inFinal = totIN - comEj;
+      const kv = document.getElementById('kpi-in-pl'), ks = document.getElementById('kpi-in-sub-pl');
+      if (kv) kv.textContent = fM(inFinal);
+      if (ks) ks.textContent = totFin ? (inFinal / totFin * 100).toFixed(1) + '%' : '';
+    } catch (e) { cell.textContent = '—'; }
+  })();
   document.getElementById('r-plazo-pl').textContent = avgPlazo+'m';
   document.getElementById('r-finprom-pl').textContent = fM(avgFin);
 
