@@ -145,7 +145,7 @@ async function calcularValoresOp(op, p, parqMap, todasTasas, dealerMap, pctUAC) 
       const costoFondo = (mantTasa - mantSpread) / 100;        // costo de fondo del mantenedor a la fecha
       // Tasa cliente (cuota): la real de la op (tascli_real, % mensual normalizado) MANDA;
       // por defecto la del mantenedor a la fecha de otorgamiento.
-      const real    = parseFloat(op.tascli_real) || 0;
+      const real    = core.normTasaMensualPct(op.tascli_real); // blindaje: fracción → %
       const tasaCli = (real > 0 ? real : mantTasa) / 100;
       monto_comision_fin = core.ingresoColocacionAutoFin({ montoCap, plazo, tasaCli, costoFondo });
     }

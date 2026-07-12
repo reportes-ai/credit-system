@@ -25,6 +25,16 @@
 })(function () {
   'use strict';
 
+  // Normaliza una tasa cliente a % MENSUAL. Las fuentes externas (Informe Canal
+  // AutoFin, Excel) a veces la traen como fracción (0.02868 en vez de 2.868):
+  // ninguna tasa mensual real es < 0.2%, así que bajo ese umbral se asume
+  // fracción y se multiplica ×100. Úsese SIEMPRE antes de consumir tascli_real.
+  function normTasaMensualPct(t) {
+    const v = parseFloat(t) || 0;
+    if (v > 0 && v < 0.2) return v * 100;
+    return v;
+  }
+
   // Cuota francesa de un capital a una tasa mensual (fracción) por N cuotas.
   function cuotaFrancesa(capital, tasaMensual, plazo) {
     const c = +capital || 0, t = +tasaMensual || 0, n = parseInt(plazo) || 0;
@@ -100,6 +110,7 @@
   }
 
   return {
+    normTasaMensualPct,
     cuotaFrancesa,
     valorPresenteAnualidad,
     tablaDesarrollo,
