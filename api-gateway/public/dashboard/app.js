@@ -2616,7 +2616,7 @@ const TABS_NAV = [
   { id:'vseg',  label:'🛡️ Seguros' },
   { id:'vdealers', label:'🏪 Dealers' },
   { id:'vparques', label:'🅿️ Parques' },
-  { id:'vproy2', label:'🔮 Proyección' },
+  { id:'vproy2', label:'🔮 Proyección Pro' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
