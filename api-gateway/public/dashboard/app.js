@@ -1041,8 +1041,16 @@ function buildV1b() {
   const jTotCD = jDet.reduce((a,r)=>a+r.com_dealer,0), jTotAFA = jDet.reduce((a,r)=>a+r.ing_autofacil,0);
   const jTotSeg = jDet.reduce((a,r)=>a+(r.com_seguros||0),0);
   const jTotPar = jDet.reduce((a,r)=>a+(r.com_par||0),0);
+  const jTotArr = jDet.reduce((a,r)=>a+(r.arriendo_parque||0),0);
   const jTotNeto = jDet.reduce((a,r)=>a+(r.ing_neto||0),0);
   const jFinStyle = jTotFin < 30000000 ? 'color:#e53935;font-weight:700' : '';
+  // Nombre del mes anterior en el título — mismo criterio de mes que la comisión ejecutivos
+  const _refJ = document.getElementById('sel-hasta')?.value || document.getElementById('sel-desde')?.value || '';
+  const [_jy, _jm] = _refJ ? _refJ.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+  const _dJ = new Date(_jy, _jm - 2, 1);
+  const MES_NOM = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const headJ = document.getElementById('head-jan1b');
+  if (headJ) headJ.textContent = `Resumen Mes Anterior — Otorgados (${MES_NOM[_dJ.getMonth()]})`;
   document.getElementById('t-jan1b').innerHTML = `
     <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
     <tbody>
@@ -1050,8 +1058,10 @@ function buildV1b() {
       <tr><td>Total Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td></tr>
       <tr><td>Ing. x Colocaciones</td><td>${fM(jTotAFA)}</td></tr>
       <tr><td>Ing. x Seguros</td><td>${fM(jTotSeg)}</td></tr>
+      <tr><td><b>Total Ingresos</b></td><td><b>${fM(jTotAFA + jTotSeg)}</b></td></tr>
       <tr><td>Com. Dealer</td><td>${fM(jTotCD)}</td></tr>
       <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td></tr>
+      <tr><td>Arriendo Parque</td><td>${fM(jTotArr)}</td></tr>
       <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td></tr>
       <tr><td><b>Ingreso Neto</b></td><td><b>${fM(jTotNeto)}</b></td></tr>
     </tbody>`;
