@@ -913,13 +913,30 @@ async function cargarFichaDealer(idDealer){
   const fichaBtn = f.tiene_ficha
     ? `<a href="/api/dealer-incorporacion/fichas/${f.id}/archivo?token=${encodeURIComponent(token)}" target="_blank" class="btn btn-sm" style="background:#0ea5e9;color:#fff;text-decoration:none"><i class="bi bi-file-earmark-pdf me-1"></i>Ver ficha firmada por el dealer</a>`
     : '<span style="font-size:.82rem;color:#94a3b8">Sin ficha firmada subida.</span>';
+  // Documentación cargada en la ficha (poderes, escrituras, informes)
+  let docsHTML = '';
+  try {
+    const ra = await fetch(`/api/dealer-incorporacion/fichas/${f.id}/archivos`, { headers: H });
+    const ja = await ra.json();
+    const CAT_LBL = { EMPRESA:'Informe Empresa', SOCIOS:'Informe Socios', PODER_SIMPLE:'Poder Simple', PODER_REP_LEGAL:'Poderes Rep. Legal' };
+    const docs = (ja.success && ja.data) ? ja.data : [];
+    if (docs.length) {
+      docsHTML = `<div style="font-weight:800;color:#3730a3;font-size:.82rem;margin:12px 0 4px"><i class="bi bi-paperclip me-1"></i>Documentación cargada</div>`
+        + docs.map(a => `<div style="font-size:.83rem;margin-top:3px">
+            <i class="bi bi-${(a.mime||'').includes('pdf')?'file-earmark-pdf':'file-earmark-image'} me-1" style="color:#0ea5e9"></i>
+            <b>${E(CAT_LBL[a.categoria] || a.categoria)}:</b>
+            <a href="/api/dealer-incorporacion/fichas/${f.id}/archivos/${a.id}?token=${encodeURIComponent(token)}" target="_blank" style="text-decoration:none">${E(a.nombre)}</a>
+            <span style="color:#94a3b8;font-size:.72rem"> · ${E(DT(a.created_at))}</span></div>`).join('');
+    }
+  } catch (e) { /* sin docs, no romper la ficha */ }
   const cadena = (f.autorizaciones||[]).map(a=>`<div style="margin-top:5px;font-size:.83rem"><i class="bi bi-check2-circle me-1" style="color:#15803d"></i><b>${E(a.nombre_nivel||'Nivel')}:</b> ${E(a.usuario_nombre||'—')}${a.perfil?` (${E(a.perfil)})`:''} · ${E(DT(a.fecha))}${a.sin_revision?' <span style="color:#b91c1c;font-weight:700">· sin revisión</span>':''}</div>`).join('')
     || '<div style="font-size:.82rem;color:#94a3b8">Sin registro de autorizaciones.</div>';
   const esp = f.part_especial_por ? `<div style="margin-top:6px;font-size:.82rem;color:#5b21b6"><i class="bi bi-patch-check-fill me-1"></i>Participación especial aprobada por <b>${E(f.part_especial_por)}</b></div>` : '';
   cont.innerHTML = `<div style="border-top:1px solid #f1f5f9;padding-top:12px">
     ${timbre}
     <div style="margin-bottom:12px">${fichaBtn}</div>
-    <div style="font-weight:800;color:#3730a3;font-size:.82rem;margin-bottom:2px"><i class="bi bi-diagram-3 me-1"></i>Aprobaciones por etapa</div>
+    ${docsHTML}
+    <div style="font-weight:800;color:#3730a3;font-size:.82rem;margin:12px 0 2px"><i class="bi bi-diagram-3 me-1"></i>Aprobaciones por etapa</div>
     ${cadena}${esp}</div>`;
 }
 
