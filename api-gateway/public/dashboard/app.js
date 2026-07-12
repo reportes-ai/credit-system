@@ -2570,7 +2570,7 @@ function buildVProy2() {
     new Chart(document.getElementById(canvasId), {
       type: 'line',
       data: { labels: dias, datasets: [
-        { label: 'p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
+        { label: 'p25–p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
         { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
         { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
         ...(prevArr ? [{ label: prevLbl + ' (mes pasado)', data: dias.map(d => prevArr[Math.min(d, prevArr.length - 1)]), borderColor: '#16a34a', borderWidth: 2, borderDash: [8, 4], pointRadius: 0, tension: .2 }] : []),
