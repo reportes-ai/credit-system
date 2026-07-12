@@ -2608,11 +2608,23 @@ function afChartZoom(canvasId, titulo) {
     holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:1600px;height:760px';
     const cnv = document.createElement('canvas');
     holder.appendChild(cnv); document.body.appendChild(holder);
+    // Clonar las opciones ESCALANDO todas las fuentes (los 9-10px del gráfico
+    // chico se ven diminutos a 1600px — se multiplican ×2.2)
+    const escalarFuentes = (o) => {
+      if (o == null || typeof o !== 'object') return o;
+      if (Array.isArray(o)) return o.map(escalarFuentes);
+      const out = {};
+      for (const k of Object.keys(o)) {
+        if (k === 'font' && o[k] && typeof o[k] === 'object') {
+          out[k] = { ...o[k], size: Math.round((o[k].size || 12) * 2.2) };
+        } else out[k] = escalarFuentes(o[k]);
+      }
+      return out;
+    };
     const cfg = {
       type: chart.config.type,
       data: chart.config.data,
-      options: { ...chart.config.options, responsive: false, animation: false, devicePixelRatio: 2,
-        plugins: { ...chart.config.options.plugins, legend: { ...(chart.config.options.plugins?.legend || {}), labels: { ...(chart.config.options.plugins?.legend?.labels || {}), font: { size: 16 } } } } },
+      options: { ...escalarFuentes(chart.config.options), responsive: false, animation: false, devicePixelRatio: 2 },
     };
     cnv.width = 1600; cnv.height = 760;
     const tmp = new Chart(cnv, cfg);
