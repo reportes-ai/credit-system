@@ -960,12 +960,12 @@ function buildV1b() {
     data:{labels:['AUTOFIN','UNIDAD'],datasets:[{data:dv,backgroundColor:[C.blue,'#ff7043'],borderWidth:2,borderColor:'#fff'}]},
     options:{cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+fM(ctx.raw)+' ('+((ctx.raw/(dtot||1))*100).toFixed(1)+'%)'}}},animation:{duration:500},responsive:true,maintainAspectRatio:false}
   });
-  // Donut 1: Saldo Precio por institución
+  // Donut 1: Saldo Precio por institución (% al lado de la cifra, como ING. AFA)
   document.getElementById('donut1b-leg').innerHTML = ['AUTOFIN','UNIDAD'].map((l,i)=>`
     <div class="dleg"><div class="dleg-dot" style="background:${[C.blue,'#ff7043'][i]}"></div>
     <div><div style="font-size:9px;color:#555">${l}</div>
     <span class="dleg-val" style="font-size:11px">${fM(dv[i])}</span>
-    <div style="font-size:10px;color:#888">${dtot?(dv[i]/dtot*100).toFixed(1):0}%</div></div></div>`).join('');
+    <span style="font-size:10px;color:#888"> ${dtot?(dv[i]/dtot*100).toFixed(1):0}%</span></div></div>`).join('');
 
   // Donut 2: Operaciones por institución
   const dvOps = ['AUTOFIN','UNIDAD'].map(k => finOt[k]?.ops||0);
@@ -982,7 +982,7 @@ function buildV1b() {
     <div class="dleg"><div class="dleg-dot" style="background:${[C.blue,'#ff7043'][i]}"></div>
     <div><div style="font-size:9px;color:#555">${l}</div>
     <span class="dleg-val" style="font-size:11px">${dvOps[i]}</span>
-    <div style="font-size:10px;color:#888">${dtotOps?(dvOps[i]/dtotOps*100).toFixed(1):0}%</div></div></div>`).join('');
+    <span style="font-size:10px;color:#888"> ${dtotOps?(dvOps[i]/dtotOps*100).toFixed(1):0}%</span></div></div>`).join('');
 
   // ── 4 Donuts adicionales ──
   // 1. Composición 200UF (ops)
