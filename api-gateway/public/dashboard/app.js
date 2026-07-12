@@ -2542,13 +2542,29 @@ function afChartZoom(canvasId, titulo) {
   cv.style.cursor = 'zoom-in';
   cv.title = 'Click para ampliar y copiar';
   cv.addEventListener('click', () => {
-    // Snapshot en alta resolución: re-render del canvas actual escalado ×2 sobre fondo blanco
-    const src = document.getElementById(canvasId);
+    // Alta resolución REAL: re-renderizar el gráfico (no estirar píxeles) en un
+    // canvas offscreen grande con devicePixelRatio 2 → nítido en PPT/pantalla.
+    const chart = Chart.getChart(document.getElementById(canvasId));
+    if (!chart) return;
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-99999px;top:0;width:1600px;height:760px';
+    const cnv = document.createElement('canvas');
+    holder.appendChild(cnv); document.body.appendChild(holder);
+    const cfg = {
+      type: chart.config.type,
+      data: chart.config.data,
+      options: { ...chart.config.options, responsive: false, animation: false, devicePixelRatio: 2,
+        plugins: { ...chart.config.options.plugins, legend: { ...(chart.config.options.plugins?.legend || {}), labels: { ...(chart.config.options.plugins?.legend?.labels || {}), font: { size: 16 } } } } },
+    };
+    cnv.width = 1600; cnv.height = 760;
+    const tmp = new Chart(cnv, cfg);
+    // fondo blanco bajo el render
     const big = document.createElement('canvas');
-    big.width = src.width * 2; big.height = src.height * 2;
+    big.width = cnv.width * 2; big.height = cnv.height * 2; // dpr 2
     const ctx = big.getContext('2d');
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, big.width, big.height);
-    ctx.drawImage(src, 0, 0, big.width, big.height);
+    ctx.drawImage(cnv, 0, 0, big.width, big.height);
+    tmp.destroy(); holder.remove();
     const url = big.toDataURL('image/png');
 
     let dlg = document.getElementById('afChartDlg');
