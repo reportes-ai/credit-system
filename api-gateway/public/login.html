@@ -362,6 +362,12 @@
         document.getElementById('btnSpinnerNC').classList.add('d-none');
       }
     });
+    // Aviso si llegó por sesión expirada (interceptor global en app-version.js)
+    if (sessionStorage.getItem('sesion_expirada')) {
+      sessionStorage.removeItem('sesion_expirada');
+      const a = document.getElementById('alerta');
+      if (a) { a.textContent = 'Tu sesión expiró por inactividad. Vuelve a ingresar.'; a.style.display = 'block'; }
+    }
   </script>
 <script src="/js/app-version.js"></script>
 </body>

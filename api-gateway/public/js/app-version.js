@@ -2,7 +2,38 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v116.14';
+const APP_VERSION = 'v116.15';
+
+/* ── Guardián global de sesión ─────────────────────────────────────────
+   El auth-guard solo revisa el token al CARGAR la página. Como el token dura
+   8h, si vence mientras trabajas la siguiente llamada devuelve 401 y el error
+   "Token inválido o expirado" se mostraba inline. Este interceptor de fetch
+   detecta ese 401 y te saca a login con aviso, en vez de dejarte atascado.
+   No toca el 401 del propio login (credenciales) ni otros errores (permisos). */
+(function () {
+  if (window.__afSesionGuard) return;
+  window.__afSesionGuard = true;
+  const _fetch = window.fetch.bind(window);
+  window.fetch = async function (...args) {
+    const res = await _fetch(...args);
+    try {
+      if (res.status === 401 && sessionStorage.getItem('token') &&
+          !/login\.html$/.test(location.pathname)) {
+        const url = (typeof args[0] === 'string' ? args[0] : args[0] && args[0].url) || '';
+        if (!/\/api\/auth\/login/.test(url)) {
+          const j = await res.clone().json().catch(() => null);
+          if (!j || /token/i.test(j.error || '')) {
+            sessionStorage.setItem('sesion_expirada', '1');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('usuario');
+            location.href = '/login.html';
+          }
+        }
+      }
+    } catch (e) { /* nunca romper la petición original */ }
+    return res;
+  };
+})();
 
 /* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
    Inyecta el manifest y registra el service worker en TODAS las páginas.
