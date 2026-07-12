@@ -2527,6 +2527,57 @@ function buildVProy2() {
       plugins: { legend: { position: 'top', labels: { font: { size: 10 }, filter: i => i.text !== 'p25' } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
       scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
   });
+
+  // Click en cualquiera de los dos gráficos → popup grande con copiar/descargar
+  afChartZoom('ch-proy2-hist', 'Monto colocado mensual — histórico y proyectado');
+  afChartZoom('ch-proy2-curva', 'Avance acumulado por día hábil — real vs esperado');
+}
+
+/* ── Popup de gráfico: agranda el canvas y permite copiarlo como imagen (PPT) ──
+   Reutilizable: afChartZoom(idCanvas, titulo) tras crear el Chart. */
+function afChartZoom(canvasId, titulo) {
+  const cv = document.getElementById(canvasId);
+  if (!cv || cv.dataset.zoomOn) return;
+  cv.dataset.zoomOn = '1';
+  cv.style.cursor = 'zoom-in';
+  cv.title = 'Click para ampliar y copiar';
+  cv.addEventListener('click', () => {
+    // Snapshot en alta resolución: re-render del canvas actual escalado ×2 sobre fondo blanco
+    const src = document.getElementById(canvasId);
+    const big = document.createElement('canvas');
+    big.width = src.width * 2; big.height = src.height * 2;
+    const ctx = big.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, big.width, big.height);
+    ctx.drawImage(src, 0, 0, big.width, big.height);
+    const url = big.toDataURL('image/png');
+
+    let dlg = document.getElementById('afChartDlg');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'afChartDlg';
+      dlg.style.cssText = 'border:0;border-radius:14px;padding:0;max-width:92vw;width:1100px;box-shadow:0 24px 80px rgba(0,0,0,.4)';
+      document.body.appendChild(dlg);
+      dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+    }
+    dlg.innerHTML = `
+      <div style="padding:14px 20px;display:flex;align-items:center;gap:10px;background:linear-gradient(90deg,#012d70,#0255c5);color:#fff">
+        <b style="flex:1;font-size:.95rem">${titulo}</b>
+        <button id="afChZCopy" style="border:none;background:#16a34a;color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-size:.82rem"><i class="bi bi-clipboard me-1"></i>Copiar imagen</button>
+        <a id="afChZDown" download="${canvasId}.png" href="${url}" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;font-size:.82rem;text-decoration:none"><i class="bi bi-download me-1"></i>PNG</a>
+        <button onclick="document.getElementById('afChartDlg').close()" style="border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:7px 12px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:16px;background:#fff"><img src="${url}" style="width:100%;display:block;border-radius:8px"></div>`;
+    dlg.querySelector('#afChZCopy').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      try {
+        const blob = await new Promise(res => big.toBlob(res, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Copiado — pega con Ctrl+V';
+      } catch (err) { btn.innerHTML = '<i class="bi bi-x me-1"></i>Usa el botón PNG'; }
+      setTimeout(() => { btn.innerHTML = '<i class="bi bi-clipboard me-1"></i>Copiar imagen'; }, 2500);
+    });
+    dlg.showModal();
+  });
 }
 
 // ──────────────────────────────────────────────────────────────
