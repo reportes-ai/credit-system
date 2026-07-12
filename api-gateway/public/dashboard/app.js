@@ -989,6 +989,9 @@ function buildV1b() {
   const jDet = D.jan.detalle_v2||[];
   const jTotOps = jDet.length, jTotFin = jDet.reduce((a,r)=>a+r.total_a_financiar,0);
   const jTotCD = jDet.reduce((a,r)=>a+r.com_dealer,0), jTotAFA = jDet.reduce((a,r)=>a+r.ing_autofacil,0);
+  const jTotSeg = jDet.reduce((a,r)=>a+(r.com_seguros||0),0);
+  const jTotPar = jDet.reduce((a,r)=>a+(r.com_par||0),0);
+  const jTotNeto = jDet.reduce((a,r)=>a+(r.ing_neto||0),0);
   const jFinStyle = jTotFin < 30000000 ? 'color:#e53935;font-weight:700' : '';
   document.getElementById('t-jan1b').innerHTML = `
     <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
@@ -996,8 +999,32 @@ function buildV1b() {
       <tr><td>Operaciones Otorgadas</td><td>${jTotOps}</td></tr>
       <tr><td>Total Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td></tr>
       <tr><td>Ing. x Colocaciones</td><td>${fM(jTotAFA)}</td></tr>
+      <tr><td>Ing. x Seguros</td><td>${fM(jTotSeg)}</td></tr>
       <tr><td>Com. Dealer</td><td>${fM(jTotCD)}</td></tr>
+      <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td></tr>
+      <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td></tr>
+      <tr><td><b>Ingreso Neto</b></td><td><b>${fM(jTotNeto)}</b></td></tr>
     </tbody>`;
+  // Comisión de ejecutivos del mes anterior — motor único del módulo Comisiones
+  cargarComisionEjecutivosMesAnt();
+
+  async function cargarComisionEjecutivosMesAnt() {
+    const cell = document.getElementById('jan1b-comej');
+    if (!cell) return;
+    try {
+      // Mes anterior al período seleccionado (mismo criterio que D.jan)
+      const ref = document.getElementById('sel-hasta')?.value || document.getElementById('sel-desde')?.value || '';
+      const [ry, rm] = ref ? ref.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+      const d = new Date(ry, rm - 2, 1); // -2: mes-1 en base 0
+      const mesAnt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const r = await fetch('/api/comisiones/calculo?mes=' + mesAnt, {
+        headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') }
+      }).then(x => x.json());
+      if (!r.success) throw new Error(r.error);
+      const tot = (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
+      cell.textContent = fM(tot);
+    } catch (e) { cell.textContent = '—'; }
+  }
 
   // ── Tabla "Mismos días faltantes mes anterior" ──
   // Calcular: hoy → días faltantes hasta fin de mes actual → aplicar al mes anterior
@@ -1431,7 +1458,8 @@ window.RAW_DATA = [];
         plazo: r.plazo, tasa_cli: r.tasa_cli||0, ing_autofacil: r.rentab_afa, pct_a,
         com_dealer: r.com_dealer, pct_d, com_par: r.com_parque, pct_p: 0,
         total_com_broke: tcb, pct_t, com_seguros: r.com_seguros,
-        ingreso_bruto: ib, pct_b
+        ingreso_bruto: ib, pct_b,
+        ing_neto: r.ingreso_neto_total || 0, arriendo_parque: r.arriendo_parque || 0
       };
     });
 
