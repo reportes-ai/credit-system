@@ -350,6 +350,9 @@ exports.getSegurosHistorico = async (req, res) => {
       FROM creditos
       WHERE UPPER(COALESCE(financiera,'')) LIKE '%AUTOFIN%' AND mes IS NOT NULL
         AND COALESCE(NULLIF(estado,''), estado_credito) = 'OTORGADO'
+        -- mismo universo del motor penetracion.js: ops con los 3 seguros en 0 son
+        -- dato faltante (sync Trinidad sin primas), no rechazo de todos los seguros
+        AND (COALESCE(seguro_rdh,0) + COALESCE(seguro_cesantia,0) + COALESCE(seguro_rep_menor,0)) > 0
       GROUP BY 1 ORDER BY 1 DESC LIMIT 24`);
     const data = rows.map(r => {
       const pen = {
