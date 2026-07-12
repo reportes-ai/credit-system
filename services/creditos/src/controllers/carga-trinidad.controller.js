@@ -225,7 +225,14 @@ function parseCanal(buffer) {
       modelo:           iModelo >= 0 ? normStr(row[iModelo]) : null,
       // Tasa cliente (% mensual) y plazo en meses (Fecha Término − Fecha Curse, ambos serial Excel):
       // diferencia por año*12+mes → exacto para plazos estándar (validado vs BD: 24/24, 36/36).
-      tascli_real:      iTasa >= 0 ? (parseFloat(String(row[iTasa]).replace(',', '.')) || null) : null,
+      // Tasa cliente % mensual. AutoFin a veces la exporta como FRACCIÓN (0.02868)
+      // y a veces como porcentaje (2.868) → normalizar: bajo 0.2 es fracción, ×100
+      // (ninguna tasa mensual real es < 0.2%; sin esto el motor calculaba margen negativo).
+      tascli_real:      iTasa >= 0 ? (() => {
+                          let t = parseFloat(String(row[iTasa]).replace(',', '.')) || null;
+                          if (t != null && t > 0 && t < 0.2) t = t * 100;
+                          return t;
+                        })() : null,
       plazo:            (() => {
         if (iCurse < 0 || iTerm < 0 || !row[iCurse] || !row[iTerm]) return null;
         const d1 = new Date(Math.round((row[iCurse] - 25569) * 864e5)), d2 = new Date(Math.round((row[iTerm] - 25569) * 864e5));
