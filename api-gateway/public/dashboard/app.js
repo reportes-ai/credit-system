@@ -1101,7 +1101,8 @@ function buildV1b() {
     ejOt[k].ops++; ejOt[k].saldo += r.saldo_precio; ejOt[k].fin += r.total_a_financiar;
     ejOt[k].cd += r.com_dealer; ejOt[k].afa += r.ing_autofacil;
   });
-  const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].saldo-a[1].saldo);
+  // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio)
+  const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin);
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < 40000000 ? 'color:#e53935;font-weight:700' : '';
     return `<tr>
@@ -1445,7 +1446,7 @@ window.RAW_DATA = [];
       ot_saldo: otorgados.reduce((a,r)=>a+r.saldo_precio,0),
       financieras: fin,
       ccs: Object.entries(ccs).sort((a,b)=>b[1].saldo-a[1].saldo).map(([nombre,v])=>({nombre,...v})),
-      ejecutivos: Object.entries(ej).sort((a,b)=>b[1].ops-a[1].ops||b[1].saldo-a[1].saldo).map(([nombre,v])=>({nombre,...v,prom_plazo:v.cnt_plazo?+(v.plazo_sum/v.cnt_plazo).toFixed(1):0})),
+      ejecutivos: Object.entries(ej).sort((a,b)=>b[1].ops-a[1].ops||b[1].prom_fin-a[1].prom_fin).map(([nombre,v])=>({nombre,...v,prom_plazo:v.cnt_plazo?+(v.plazo_sum/v.cnt_plazo).toFixed(1):0})),
       estados, motivos, donut, detalle_v2
     };
   }
