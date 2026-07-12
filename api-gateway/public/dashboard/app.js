@@ -2524,48 +2524,71 @@ function buildVProy2() {
       <tr style="background:#eff6ff"><td><b>Mezcla (recomendada)</b></td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td><b>${mzF ? fM(mzF) : '—'}</b></td><td style="font-size:.74rem;color:#64748b">pondera ambas según cuánto mes ha transcurrido</td></tr>
     </tbody>`;
 
-  // ── Gráfico: monto mensual histórico (12m) + mes actual real+proyección (mezcla) ──
+  // ── Gráficos: histórico mensual (12m) + mes actual real+proyección, en Q y monto ──
   const meses12 = [...new Set(rows.map(r => r.mes))].sort().filter(m => m < mesAct).slice(-12);
   const histM = meses12.map(m => rows.filter(r => r.mes === m).reduce((a, r) => a + r.monto_financiado, 0));
+  const histQ = meses12.map(m => rows.filter(r => r.mes === m).length);
   const labels1 = [...meses12, mesAct].map(m => { const [y, mm] = m.split('-'); return MES_NOM[+mm - 1].slice(0, 3) + ' ' + y.slice(2); });
-  const cH = Chart.getChart(document.getElementById('ch-proy2-hist')); if (cH) cH.destroy();
-  new Chart(document.getElementById('ch-proy2-hist'), {
-    type: 'bar',
-    data: { labels: labels1, datasets: [
-      { label: 'Colocado', data: [...histM, tot.m], backgroundColor: '#0141A2cc', borderRadius: 3, stack: 's' },
-      { label: 'Proyección restante (mezcla)', data: [...histM.map(() => 0), Math.max((mzM || tot.m) - tot.m, 0)], backgroundColor: '#90caf9aa', borderColor: '#0141A2', borderWidth: 1, borderDash: [4, 3], borderRadius: 3, stack: 's' },
-    ]},
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
-      scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
-  });
+  const barHist = (canvasId, serie, actual, proyTot, fmt) => {
+    const c = Chart.getChart(document.getElementById(canvasId)); if (c) c.destroy();
+    new Chart(document.getElementById(canvasId), {
+      type: 'bar',
+      data: { labels: labels1, datasets: [
+        { label: 'Real', data: [...serie, actual], backgroundColor: '#0141A2cc', borderRadius: 3, stack: 's' },
+        { label: 'Proyección restante (mezcla)', data: [...serie.map(() => 0), Math.max((proyTot || actual) - actual, 0)], backgroundColor: '#90caf9aa', borderColor: '#0141A2', borderWidth: 1, borderDash: [4, 3], borderRadius: 3, stack: 's' },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } } },
+        scales: { x: { ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fmt(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
+    });
+  };
+  barHist('ch-proy2-histq', histQ, tot.q, mzQ, v => Math.round(v));
+  barHist('ch-proy2-hist', histM, tot.m, mzM, fM);
 
-  // ── Gráfico: acumulado por día hábil vs banda esperada ──
-  const cmAct = Array(D + 1).fill(0);
-  rows.filter(r => r.mes === mesAct).forEach(r => { cmAct[Math.min(habilDe(r.fecha_otorgado), D)] += r.monto_financiado; });
-  for (let d = 1; d <= D; d++) cmAct[d] += cmAct[d - 1];
+  // ── Curvas acumuladas por día hábil (Q y monto) + mes pasado en verde ──
   const dias = Array.from({ length: D }, (_, i) => i + 1);
-  const base = mzM || tot.m;
-  const med = dias.map(d => en(curvasM, d / D * 100, .5) * base);
-  const p25 = dias.map(d => en(curvasM, d / D * 100, .25) * base);
-  const p75 = dias.map(d => en(curvasM, d / D * 100, .75) * base);
-  const c2 = Chart.getChart(document.getElementById('ch-proy2-curva')); if (c2) c2.destroy();
-  new Chart(document.getElementById('ch-proy2-curva'), {
-    type: 'line',
-    data: { labels: dias, datasets: [
-      { label: 'p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
-      { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
-      { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
-      { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? cmAct[d] : null), borderColor: '#0141A2', backgroundColor: '#0141A222', fill: false, tension: .2, pointRadius: 0, borderWidth: 2.5 },
-    ]},
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'top', labels: { font: { size: 10 }, filter: i => i.text !== 'p25' } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
-      scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
-  });
+  const acum = (mes, metric, Dm) => {
+    const arr = Array(Dm + 1).fill(0);
+    rows.filter(r => r.mes === mes).forEach(r => { arr[Math.min(habilDe(r.fecha_otorgado), Dm)] += metric === 'q' ? 1 : r.monto_financiado; });
+    for (let d = 1; d <= Dm; d++) arr[d] += arr[d - 1];
+    return arr;
+  };
+  const mesPrev = mesesHist[mesesHist.length - 1] || null;
+  let prevQ = null, prevM = null, prevLbl = '';
+  if (mesPrev) {
+    const [py, pm] = mesPrev.split('-').map(Number);
+    const Dp = habilesDelMes(py, pm - 1);
+    prevQ = acum(mesPrev, 'q', Dp); prevM = acum(mesPrev, 'm', Dp);
+    prevLbl = MES_NOM[pm - 1].charAt(0) + MES_NOM[pm - 1].slice(1).toLowerCase();
+  }
+  const curvaChart = (canvasId, curvas, actArr, proyTot, prevArr, fmt) => {
+    const base = proyTot || actArr[dHoy];
+    const med = dias.map(d => en(curvas, d / D * 100, .5) * base);
+    const p25 = dias.map(d => en(curvas, d / D * 100, .25) * base);
+    const p75 = dias.map(d => en(curvas, d / D * 100, .75) * base);
+    const c = Chart.getChart(document.getElementById(canvasId)); if (c) c.destroy();
+    new Chart(document.getElementById(canvasId), {
+      type: 'line',
+      data: { labels: dias, datasets: [
+        { label: 'p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
+        { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
+        { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
+        ...(prevArr ? [{ label: prevLbl + ' (mes pasado)', data: dias.map(d => prevArr[Math.min(d, prevArr.length - 1)]), borderColor: '#16a34a', borderWidth: 2, borderDash: [8, 4], pointRadius: 0, tension: .2 }] : []),
+        { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? actArr[d] : null), borderColor: '#0141A2', fill: false, tension: .2, pointRadius: 0, borderWidth: 2.5 },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { size: 10 }, filter: i => i.text !== 'p25' } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } } },
+        scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fmt(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
+    });
+  };
+  curvaChart('ch-proy2-curvaq', curvasQ, acum(mesAct, 'q', D), mzQ, prevQ, v => Math.round(v));
+  curvaChart('ch-proy2-curva', curvasM, acum(mesAct, 'm', D), mzM, prevM, fM);
 
-  // Click en cualquiera de los dos gráficos → popup grande con copiar/descargar
+  // Click en cualquiera de los gráficos → popup grande con copiar/descargar
+  afChartZoom('ch-proy2-histq', 'Q operaciones mensual — histórico y proyectado');
+  afChartZoom('ch-proy2-curvaq', 'Avance Q acumulado por día hábil — real vs esperado');
   afChartZoom('ch-proy2-hist', 'Monto colocado mensual — histórico y proyectado');
-  afChartZoom('ch-proy2-curva', 'Avance acumulado por día hábil — real vs esperado');
+  afChartZoom('ch-proy2-curva', 'Avance monto acumulado por día hábil — real vs esperado');
 }
 
 /* ── Popup de gráfico: agranda el canvas y permite copiarlo como imagen (PPT) ──
