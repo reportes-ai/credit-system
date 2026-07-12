@@ -659,6 +659,7 @@ function buildV2pl() {
   document.getElementById('r-comparque-pl').textContent = fM(totPar);
   document.getElementById('r-totcd-pl').textContent = fM(totCD_P);
   document.getElementById('r-totcd-pct-pl').textContent = totFin?(totCD_P/totFin*100).toFixed(1)+'%':'';
+  document.getElementById('r-arrparque-pl').textContent = fM(det.reduce((a,r)=>a+(r.arriendo_parque||0),0));
 
   window.__PL_LAST = { totIN, totFin };
   cargarComEjPL();
@@ -829,6 +830,7 @@ function buildRentabTablePL() {
   document.getElementById('r-comparque-pl').textContent = fM(tot.par);
   document.getElementById('r-totcd-pl').textContent = fM(tot.cd + tot.par);
   document.getElementById('r-totcd-pct-pl').textContent = tot.fin?((tot.cd+tot.par)/tot.fin*100).toFixed(1)+'%':'';
+  document.getElementById('r-arrparque-pl').textContent = fM(rows.reduce((a,r)=>a+(r.arriendo_parque||0),0));
   document.getElementById('r-plazo-pl').textContent = avgPlazoF+'m';
   document.getElementById('r-finprom-pl').textContent = fM(avgFinF);
 }
