@@ -111,6 +111,16 @@ function normStr(v) {
   return s === '' ? null : s;
 }
 
+// AutoFin enmascara el apellido materno de clientes extranjeros con X's
+// ("MAGUEL SAINT-FLEUR XXXXXX"). Quita ese relleno final para que el nombre
+// se muestre limpio. Solo toca un token final de 3+ X seguidas.
+function limpiarNombre(v) {
+  const s = normStr(v);
+  if (!s) return s;
+  const limpio = s.replace(/\s+X{3,}\s*$/i, '').trim();
+  return limpio === '' ? s : limpio; // si quedara vacío, deja el original
+}
+
 /* ── Lee el Excel y retorna array de filas mapeadas ─────────────── */
 function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
   const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
@@ -171,7 +181,7 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         modelo:          normStr(get('Modelo')),
         vendedor:        normStr(get('Vendedor')),
         rut_cliente:     normRut(get('Rut Cliente')),
-        nombre_cliente:  normStr(get('Nombre')),
+        nombre_cliente:  limpiarNombre(get('Nombre')),
       };
     })
     .filter(Boolean);
