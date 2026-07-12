@@ -50,8 +50,7 @@
       <div class="tab" data-viewid="v2pl" onclick="showV('v2pl',this)">📋 P&L Operativo</div>
       <div class="tab" data-viewid="vdealers" onclick="showV('vdealers',this)">🏪 Dealers</div>
       <div class="tab" data-viewid="vparques" onclick="showV('vparques',this)">🅿️ Parques</div>
-      <div class="tab" data-viewid="vproy" onclick="showV('vproy',this)">🔮 Proyección</div>
-      <div class="tab" data-viewid="vproy2" onclick="showV('vproy2',this)">🎯 Proyección Pro</div>
+      <div class="tab" data-viewid="vproy2" onclick="showV('vproy2',this)">🔮 Proyección</div>
       <div class="tab" id="tab-admin" onclick="showV('vadmin',this)" style="display:none;border-left:1px solid #2a4070;margin-left:8px">⚙️ Admin</div>
     </div>
   </div>
@@ -798,33 +797,9 @@
 </div>
 
 <!-- VISTA PROYECCIÓN DE CIERRE -->
-<div id="vproy" class="view">
-  <div class="dash-header">
-    <div class="dash-title">🔮 Proyección de Cierre — <span id="proy-mes-label"></span></div>
-    <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
-  </div>
-  <div class="kpi-strip" id="kpi-proy"></div>
-  <div class="card">
-    <div class="card-head" style="justify-content:flex-start;gap:4px"><span>Proyección por institución — método: curva de avance intra-mes histórica (últimos <span id="proy-n-meses">6</span> meses)</span></div>
-    <div style="overflow:auto"><table class="sumtbl" id="t-proy"></table></div>
-    <div id="proy-nota" style="padding:8px 14px;font-size:.74rem;color:#64748b"></div>
-  </div>
-  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-    <div class="card">
-      <div class="card-head">Monto colocado mensual — histórico y proyectado</div>
-      <div style="height:320px;position:relative"><canvas id="ch-proy-hist"></canvas></div>
-    </div>
-    <div class="card">
-      <div class="card-head">Avance acumulado del mes vs curva histórica (por día)</div>
-      <div style="height:320px;position:relative"><canvas id="ch-proy-curva"></canvas></div>
-    </div>
-  </div>
-</div>
-
-<!-- VISTA PROYECCIÓN PRO -->
 <div id="vproy2" class="view">
   <div class="dash-header">
-    <div class="dash-title">🎯 Proyección Pro — <span id="proy2-mes-label"></span></div>
+    <div class="dash-title">🔮 Proyección de Cierre — <span id="proy2-mes-label"></span></div>
     <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
   </div>
   <div class="kpi-strip" id="kpi-proy2"></div>
@@ -837,9 +812,15 @@
     <div class="card-head" style="justify-content:flex-start"><span>Los 3 métodos comparados (monto de cierre)</span></div>
     <div style="overflow:auto"><table class="sumtbl" id="t-proy2-met"></table></div>
   </div>
-  <div class="card" style="margin-top:14px">
-    <div class="card-head" style="justify-content:flex-start"><span>Avance acumulado por día hábil — real vs esperado</span></div>
-    <div style="height:320px;position:relative"><canvas id="ch-proy2-curva"></canvas></div>
+  <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+    <div class="card">
+      <div class="card-head" style="justify-content:flex-start"><span>Monto colocado mensual — histórico y proyectado</span></div>
+      <div style="height:320px;position:relative"><canvas id="ch-proy2-hist"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head" style="justify-content:flex-start"><span>Avance acumulado por día hábil — real vs esperado</span></div>
+      <div style="height:320px;position:relative"><canvas id="ch-proy2-curva"></canvas></div>
+    </div>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-head" style="justify-content:flex-start"><span>📖 Cómo leer estos métodos — explicación, diferencias y ventajas</span></div>
