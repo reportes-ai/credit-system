@@ -841,6 +841,37 @@
     <div class="card-head" style="justify-content:flex-start"><span>Avance acumulado por día hábil — real vs esperado</span></div>
     <div style="height:320px;position:relative"><canvas id="ch-proy2-curva"></canvas></div>
   </div>
+  <div class="card" style="margin-top:14px">
+    <div class="card-head" style="justify-content:flex-start"><span>📖 Cómo leer estos métodos — explicación, diferencias y ventajas</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;padding:14px">
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px">
+        <div style="font-weight:800;color:#0141A2;font-size:.85rem;margin-bottom:6px">🔮 Curva de avance (pestaña Proyección)</div>
+        <div style="font-size:.78rem;color:#374151;line-height:1.5">
+          Mide qué % del mes se llevaba colocado cada día en los últimos 6 meses y divide tu avance real por ese % esperado.
+          <br><b>Ventaja:</b> usa TUS datos del mes en curso — captura si el mes viene bueno o malo de verdad.
+          <br><b>Debilidad:</b> los primeros días proyecta mal (dividir por un avance chico exagera cualquier ruido) y no considera que el negocio crece.
+          <br><b>Confiar:</b> desde la 2ª semana del mes.
+        </div>
+      </div>
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px">
+        <div style="font-weight:800;color:#0141A2;font-size:.85rem;margin-bottom:6px">📈 Tendencia (regresión de cierres)</div>
+        <div style="font-size:.78rem;color:#374151;line-height:1.5">
+          Línea recta sobre los últimos 3 cierres reales: "si venías creciendo así, este mes cierras allá". No mira el mes en curso.
+          <br><b>Ventaja:</b> estable desde el día 1 y captura el crecimiento del negocio.
+          <br><b>Debilidad:</b> ciega a lo que está pasando ESTE mes — no ve un feriado largo, una campaña o una caída real.
+          <br><b>Confiar:</b> los primeros días del mes, o como techo/piso de referencia.
+        </div>
+      </div>
+      <div style="border:1px solid #bfdbfe;background:#eff6ff;border-radius:10px;padding:12px 14px">
+        <div style="font-weight:800;color:#0141A2;font-size:.85rem;margin-bottom:6px">🎯 Mezcla (la recomendada)</div>
+        <div style="font-size:.78rem;color:#374151;line-height:1.5">
+          Pondera las dos según cuánto mes ha transcurrido: día 2 = casi pura tendencia; día 20 = casi pura curva. Además usa <b>días hábiles</b> (no calendario) y <b>mediana</b> (un mes raro en el histórico no la distorsiona).
+          <br><b>Ventaja:</b> combina lo mejor de ambas — estable al inicio, precisa al final.
+          <br><b>Regla práctica:</b> si los 3 métodos convergen, el cierre es confiable; si divergen mucho, el mes viene atípico — mirar la curva del gráfico para saber hacia dónde.
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- VISTA ADMIN: GESTIÓN DE USUARIOS -->
