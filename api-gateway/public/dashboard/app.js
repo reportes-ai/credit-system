@@ -2465,7 +2465,41 @@ function buildVProy2() {
     <div class="kpi-box"><div class="kpi-label">Peso curva vs tendencia</div><div class="kpi-val big">${(w*100).toFixed(0)}% / ${((1-w)*100).toFixed(0)}%</div><div class="kpi-sub">la curva pesa más al avanzar el mes</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Q cierre (mezcla)</div><div class="kpi-val big">${mzQ ? Math.round(mzQ) : '—'}</div><div class="kpi-sub">hoy: ${tot.q} ops</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Monto cierre (mezcla)</div><div class="kpi-val big">${mzM ? fM(mzM) : '—'}</div><div class="kpi-sub">${rgM ? 'banda ' + fM(rgM[0]) + '–' + fM(rgM[1]) : ''}</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Facturación cierre (mezcla)</div><div class="kpi-val big">${mzF ? fM(mzF) : '—'}</div><div class="kpi-sub">hoy: ${fM(tot.f)}</div></div>`;
+    <div class="kpi-box highlight"><div class="kpi-label">Facturación cierre (mezcla)</div><div class="kpi-val big">${mzF ? fM(mzF) : '—'}</div><div class="kpi-sub">hoy: ${fM(tot.f)}</div></div>
+    <div class="kpi-box highlight" style="background:#f0fdf4;border-color:#86efac"><div class="kpi-label">Ingreso Neto proyectado</div><div class="kpi-val big" id="kpi-proy2-neto">…</div><div class="kpi-sub" id="kpi-proy2-neto-sub">calculando…</div></div>`;
+
+  // ── Ingreso Neto proyectado: neto operacional (motor, incluye arriendo prorrateado
+  //    y com. dealer/parque) proyectado con la misma mezcla, menos el arriendo de
+  //    parques sin colocación (promedio 3 meses) y la comisión de ejecutivos (tendencia).
+  (async () => {
+    const kv = document.getElementById('kpi-proy2-neto'), ks = document.getElementById('kpi-proy2-neto-sub');
+    try {
+      const netoAct = rows.filter(r => r.mes === mesAct).reduce((a, r) => a + (r.ingreso_neto_total || 0), 0);
+      const serieNeto = mesesHist.map(mh => rows.filter(r => r.mes === mh).reduce((a, r) => a + (r.ingreso_neto_total || 0), 0));
+      const lin = (serie) => { const n = serie.length; if (!n) return 0; if (n === 1) return serie[0];
+        const xm = (n - 1) / 2, ym = serie.reduce((a, b) => a + b, 0) / n;
+        let nu = 0, de = 0; serie.forEach((v, i) => { nu += (i - xm) * (v - ym); de += (i - xm) ** 2; });
+        return Math.max(ym + (de ? nu / de : 0) * n, 0); };
+      const pcN = medM > 0.04 ? netoAct / medM : null;
+      const ptN = lin(serieNeto.slice(-MESES_TREND));
+      const mzN = pcN == null ? ptN : w * pcN + (1 - w) * ptN;
+      // arriendo de parques sin colocación (fijo total − estampado en ops), prom. 3 meses
+      const arrFijo = await getArrFijoMes();
+      const falt = mesesHist.slice(-3).map(mh => Math.max((arrFijo || 0) - rows.filter(r => r.mes === mh).reduce((a, r) => a + (r.arriendo_parque || 0), 0), 0));
+      const arrFalt = falt.length ? falt.reduce((a, b) => a + b, 0) / falt.length : 0;
+      // comisión ejecutivos: tendencia de los últimos 3 meses (motor comisiones)
+      const H = { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') };
+      const comSerie = [];
+      for (const mh of mesesHist.slice(-3)) {
+        try { const r = await fetch('/api/comisiones/calculo?mes=' + mh, { headers: H }).then(x => x.json());
+          if (r.success) comSerie.push((r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0)); } catch (e) {}
+      }
+      const comEjProj = lin(comSerie);
+      const netoFinal = mzN - arrFalt - comEjProj;
+      kv.textContent = fM(netoFinal);
+      ks.textContent = `neto oper. ${fM(mzN)} − arriendos s/coloc. ${fM(arrFalt)} − com. ejec. ${fM(comEjProj)}`;
+    } catch (e) { kv.textContent = '—'; ks.textContent = 'sin datos suficientes'; }
+  })();
 
   // ── Tabla por institución (mezcla, repartida proporcional al actual) ──
   const parte = (total, a, t) => t > 0 ? total * (a / t) : 0;
