@@ -4160,6 +4160,33 @@ function copiarTablaModal() {
   });
 }
 
+/* Copia el modal completo (KPIs + tabla) como IMAGEN al portapapeles — para
+   pegar bonito en PPT/WhatsApp. "Copiar datos" queda para Excel. */
+async function copiarImagenModal() {
+  const btn = document.getElementById('btnCopiarImgModal');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ Generando…';
+  try {
+    const nodo = document.getElementById('modal-ejec');
+    const canvas = await html2canvas(nodo, { scale: 2, backgroundColor: '#ffffff' });
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    btn.innerHTML = '✓ Copiada — pega con Ctrl+V';
+  } catch (e) {
+    // Fallback: descargar el PNG si el portapapeles no lo permite
+    try {
+      const nodo = document.getElementById('modal-ejec');
+      const canvas = await html2canvas(nodo, { scale: 2, backgroundColor: '#ffffff' });
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = (_modalData?.titulo || 'detalle').replace(/[/\\:*?"<>|]/g, '_') + '.png';
+      a.click();
+      btn.innerHTML = '⬇ Descargada (portapapeles bloqueado)';
+    } catch (e2) { btn.innerHTML = '✗ Error'; }
+  }
+  setTimeout(() => { btn.innerHTML = orig; }, 2500);
+}
+
 function exportarExcelModal() {
   const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
