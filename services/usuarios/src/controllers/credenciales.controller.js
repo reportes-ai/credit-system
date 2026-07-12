@@ -16,6 +16,16 @@ require('../../../../shared/migrate').enFila('credenciales', async () => {
       expira DATE NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS credenciales_empresa (
+      id TINYINT PRIMARY KEY,
+      organizacion VARCHAR(120) NULL,
+      direccion VARCHAR(200) NULL,
+      web VARCHAR(200) NULL,
+      telefono VARCHAR(30) NULL,
+      email VARCHAR(120) NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+    await pool.query(`INSERT IGNORE INTO credenciales_empresa (id, organizacion, web) VALUES (1, 'AutoFácil Crédito Automotriz', 'https://www.autofacilchile.cl')`);
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='credenciales' LIMIT 1");
     if (!ex) {
       await pool.query("INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (1,'Credenciales Corporativas','credenciales','/credenciales/','bi-person-badge')");
@@ -39,6 +49,24 @@ exports.listar = async (_req, res) => {
       ORDER BY u.nombre, u.apellido`);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { errSrv(res, e, 'credenciales listar'); }
+};
+
+/* ── Datos comunes de la empresa (van al vCard del QR, no impresos en la tarjeta) ── */
+exports.empresaGet = async (_req, res) => {
+  try {
+    const [[e]] = await pool.query('SELECT organizacion, direccion, web, telefono, email FROM credenciales_empresa WHERE id=1');
+    res.json({ success: true, data: e || {}, error: null });
+  } catch (e) { errSrv(res, e, 'credenciales empresaGet'); }
+};
+exports.empresaPut = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const v = c => String(b[c] ?? '').trim().slice(0, 200) || null;
+    await pool.query(`INSERT INTO credenciales_empresa (id, organizacion, direccion, web, telefono, email) VALUES (1,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE organizacion=VALUES(organizacion), direccion=VALUES(direccion), web=VALUES(web), telefono=VALUES(telefono), email=VALUES(email)`,
+      [v('organizacion'), v('direccion'), v('web'), v('telefono'), v('email')]);
+    res.json({ success: true, data: null, error: null });
+  } catch (e) { errSrv(res, e, 'credenciales empresaPut'); }
 };
 
 /* ── GET /api/credenciales/:id — con foto (para el render) ───────────────── */
