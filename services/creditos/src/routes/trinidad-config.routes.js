@@ -19,5 +19,6 @@ router.get   ('/ejecutivos',      verifyToken, ctrl.getEjecutivos);
 router.post  ('/ejecutivos',      verifyToken, puedeEjecutivos, ctrl.createEjecutivo);
 router.put   ('/ejecutivos/:id',  verifyToken, puedeEjecutivos, ctrl.updateEjecutivo);
 router.delete('/ejecutivos/:id',  verifyToken, puedeEjecutivos, ctrl.deleteEjecutivo);
+router.post  ('/reaplicar-ejecutivos', verifyToken, puedeEjecutivos, ctrl.reaplicarEjecutivos);
 
 module.exports = router;

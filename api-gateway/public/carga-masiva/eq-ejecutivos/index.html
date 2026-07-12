@@ -76,8 +76,12 @@
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <div id="avisoSinAsignar" style="display:none;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:8px 14px;font-size:.82rem;color:#92400e;flex:1"></div>
+      <button onclick="eqReaplicar()" class="btn-main" id="btnReaplicar"
+        style="background:#475569;margin-left:auto" title="Renombra en los créditos ya cargados (meses abiertos) según estas equivalencias">
+        <i class="bi bi-arrow-repeat"></i>Reaplicar a créditos existentes
+      </button>
       <button onclick="eqGuardarEjecutivos()" class="btn-main" id="btnGuardarEjecs"
-        style="background:#0891b2;margin-left:auto">
+        style="background:#0891b2">
         <i class="bi bi-floppy"></i>Guardar cambios
       </button>
     </div>
@@ -238,6 +242,20 @@ async function eqGuardarEjecutivos() {
   }
   btn.disabled=false; btn.innerHTML='<i class="bi bi-floppy"></i>Guardar cambios'; btn.style.background='#0891b2';
   toast(err?`✗ ${err} error(es)`:`✓ ${ok} ejecutivos guardados`,!err);
+  if (!err) eqReaplicar(true); // renombrar de inmediato los créditos ya cargados
+}
+
+async function eqReaplicar(silencioso=false) {
+  const btn=document.getElementById('btnReaplicar');
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Reaplicando…';
+  try {
+    const res=await fetch('/api/trinidad-config/reaplicar-ejecutivos',{method:'POST',headers:H}).then(x=>x.json());
+    if (!res.success) throw new Error(res.error);
+    const cambios=(res.data.log||[]).filter(l=>l.includes('→'));
+    if (cambios.length) toast(`✓ Nombres reaplicados: ${cambios.join(' · ')}`,true);
+    else if (!silencioso) toast('Sin cambios: todos los créditos ya usan los nombres actuales',true);
+  } catch(e) { toast('Error al reaplicar: '+e.message,false); }
+  btn.disabled=false; btn.innerHTML='<i class="bi bi-arrow-repeat"></i>Reaplicar a créditos existentes';
 }
 
 async function eqAgregarEjecutivo() {
@@ -251,6 +269,7 @@ async function eqAgregarEjecutivo() {
   if (!res.success) { toast('Error: '+res.error,false); return; }
   document.getElementById('nuevoEjecTri').value=''; document.getElementById('nuevoEjecAF').value='';
   toast('Ejecutivo agregado',true); eqCargarEjecutivos();
+  if (af) eqReaplicar(true);
 }
 
 async function eqEliminarEjecutivo(id) {

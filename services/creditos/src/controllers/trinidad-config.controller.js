@@ -217,6 +217,25 @@ exports.updateEjecutivo = async (req, res) => {
   }
 };
 
+/* ── POST /reaplicar-ejecutivos — normaliza los nombres en creditos con las
+   equivalencias actuales, en TODOS los meses abiertos (los cerrados no se tocan).
+   Se dispara solo al guardar una equivalencia, y también existe como botón. ── */
+exports.reaplicarEjecutivos = async (req, res) => {
+  try {
+    const { normalizarEjecutivosMes } = require('../utils/recalcular-mes');
+    const [meses] = await pool.query(`
+      SELECT DISTINCT DATE_FORMAT(c.mes, '%Y-%m') AS mes FROM creditos c
+      WHERE c.mes IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM meses_cerrados mc
+                        WHERE mc.mes = DATE_FORMAT(c.mes, '%Y-%m') AND mc.cerrado = 1)`);
+    const log = [];
+    for (const m of meses) await normalizarEjecutivosMes(m.mes, log);
+    return res.json({ success: true, data: { meses: meses.length, log }, error: null });
+  } catch (e) {
+    return res.json({ success: false, error: e.message });
+  }
+};
+
 exports.deleteEjecutivo = async (req, res) => {
   const { id } = req.params;
   try {
