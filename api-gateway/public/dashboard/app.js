@@ -133,6 +133,7 @@ function showV(id, el) {
   if(id==='vdealers') { buildColocMensual('vdealers'); }
   if(id==='vparques') { buildColocMensual('vparques'); }
   if(id==='vproy') { buildVProy(); }
+  if(id==='vproy2') { buildVProy2(); }
   if(id==='vadmin') {
     if (!esAdmin()) { alert('Acceso denegado.'); return; }
     buildVAdmin();
@@ -2502,6 +2503,142 @@ function buildVProy() {
   });
 }
 
+// ======== PROYECCIÓN PRO ========
+// Mejoras sobre la curva simple:
+//  1. DÍAS HÁBILES (L-V) en vez de calendario — un mes que parte en fin de
+//     semana no se lee como "atrasado".
+//  2. MEDIANA de las fracciones históricas (robusta a meses raros) con banda
+//     p25–p75 en vez de promedio ±σ.
+//  3. MEZCLA CON TENDENCIA: regresión lineal de los últimos 3 cierres da una
+//     proyección independiente del avance; el peso de la curva crece con el
+//     mes (al inicio manda la tendencia, al final mandan los datos reales).
+function buildVProy2() {
+  const MESES_HIST = 6, MESES_TREND = 3;
+  const rows = (window.RAW_DATA || []).filter(r => r.estado_eval === 'OTORGADO' && r.fecha_otorgado && r.mes);
+  const hoy = new Date();
+  const mesAct = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
+  const MES_NOM = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  document.getElementById('proy2-mes-label').textContent = MES_NOM[hoy.getMonth()] + ' ' + hoy.getFullYear();
+
+  // Día hábil (L-V) dentro del mes de una fecha; y total de hábiles del mes.
+  const habilIdx = (y, m, dia) => { let n = 0; for (let d = 1; d <= dia; d++) { const w = new Date(y, m, d).getDay(); if (w >= 1 && w <= 5) n++; } return Math.max(n, 1); };
+  const habilesDelMes = (y, m) => habilIdx(y, m, new Date(y, m + 1, 0).getDate());
+  const habilDe = f => { const [y, m, d] = String(f).slice(0, 10).split('-').map(Number); return habilIdx(y, m - 1, d); };
+
+  const D = habilesDelMes(hoy.getFullYear(), hoy.getMonth());          // hábiles del mes actual
+  const dHoy = habilIdx(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()); // hábil de hoy
+
+  // ── Curvas históricas por día hábil (fracción acumulada 0-1, normalizada a 0-1 del mes) ──
+  const mesesHist = [...new Set(rows.map(r => r.mes))].filter(m => m < mesAct).sort().slice(-MESES_HIST);
+  const curvasQ = [], curvasM = [];
+  for (const mh of mesesHist) {
+    const [y, m] = mh.split('-').map(Number);
+    const Dm = habilesDelMes(y, m - 1);
+    const ops = rows.filter(r => r.mes === mh);
+    const totQ = ops.length, totM = ops.reduce((a, r) => a + r.monto_financiado, 0);
+    if (!totQ || !totM) continue;
+    // acumulado sobre eje NORMALIZADO t = díaHábil/Dm (0-1), muestreado en 100 puntos
+    const cq = Array(101).fill(0), cm = Array(101).fill(0);
+    ops.forEach(r => { const t = Math.min(Math.round(habilDe(r.fecha_otorgado) / Dm * 100), 100); cq[t] += 1; cm[t] += r.monto_financiado; });
+    for (let t = 1; t <= 100; t++) { cq[t] += cq[t - 1]; cm[t] += cm[t - 1]; }
+    curvasQ.push(cq.map(v => v / totQ)); curvasM.push(cm.map(v => v / totM));
+  }
+  const cuantil = (vals, p) => { const s = [...vals].sort((a, b) => a - b); const i = (s.length - 1) * p; const lo = Math.floor(i); return s[lo] + (s[Math.min(lo + 1, s.length - 1)] - s[lo]) * (i - lo); };
+  const en = (curvas, t, p) => cuantil(curvas.map(c => c[Math.min(Math.max(Math.round(t), 0), 100)]), p);
+  const tHoy = dHoy / D * 100;
+  const medQ = en(curvasQ, tHoy, .5), medM = en(curvasM, tHoy, .5);
+  const p25M = en(curvasM, tHoy, .25), p75M = en(curvasM, tHoy, .75);
+
+  // ── Actual del mes por institución ──
+  const act = { AUTOFIN: { q: 0, m: 0, f: 0 }, UNIDAD: { q: 0, m: 0, f: 0 } };
+  rows.filter(r => r.mes === mesAct).forEach(r => {
+    const k = (r.institucion || '').includes('UNIDAD') ? 'UNIDAD' : 'AUTOFIN';
+    act[k].q += 1; act[k].m += r.monto_financiado; act[k].f += (r.rentab_afa || 0) + (r.com_seguros || 0);
+  });
+  const tot = { q: act.AUTOFIN.q + act.UNIDAD.q, m: act.AUTOFIN.m + act.UNIDAD.m, f: act.AUTOFIN.f + act.UNIDAD.f };
+
+  // ── Método 1: curva (mediana) ──
+  const projCurva = (actual, med) => med > 0.04 ? actual / med : null;
+
+  // ── Método 2: tendencia (regresión lineal últimos 3 cierres) ──
+  const trend = (metric) => {
+    const ult = mesesHist.slice(-MESES_TREND).map(mh => {
+      const ops = rows.filter(r => r.mes === mh);
+      return metric === 'q' ? ops.length : ops.reduce((a, r) => a + (metric === 'm' ? r.monto_financiado : (r.rentab_afa || 0) + (r.com_seguros || 0)), 0);
+    });
+    const n = ult.length; if (!n) return 0;
+    if (n === 1) return ult[0];
+    const xm = (n - 1) / 2, ym = ult.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0; ult.forEach((v, i) => { num += (i - xm) * (v - ym); den += (i - xm) ** 2; });
+    const b = den ? num / den : 0;
+    return Math.max(ym + b * n, 0); // valor proyectado para el mes siguiente a la serie
+  };
+
+  // ── Mezcla: peso de la curva = avance esperado (al inicio manda la tendencia) ──
+  const w = Math.min(Math.max(medM, 0), 1);
+  const mezcla = (pc, pt) => pc == null ? pt : Math.round(w * pc + (1 - w) * pt);
+
+  const pcQ = projCurva(tot.q, medQ), ptQ = trend('q');
+  const pcM = projCurva(tot.m, medM), ptM = trend('m');
+  const pcF = projCurva(tot.f, medM), ptF = trend('f');
+  const mzQ = mezcla(pcQ, ptQ), mzM = mezcla(pcM, ptM), mzF = mezcla(pcF, ptF);
+  // Banda del monto con p25/p75 de la curva (solo informativa)
+  const rgM = medM > 0.04 ? [tot.m / Math.min(p75M, 1), tot.m / Math.max(p25M, 0.04)] : null;
+
+  document.getElementById('kpi-proy2').innerHTML = `
+    <div class="kpi-box"><div class="kpi-label">Día hábil</div><div class="kpi-val big">${dHoy} / ${D}</div><div class="kpi-sub">${(tHoy).toFixed(0)}% del mes transcurrido</div></div>
+    <div class="kpi-box"><div class="kpi-label">Avance esperado (mediana)</div><div class="kpi-val big">${(medM * 100).toFixed(1)}%</div><div class="kpi-sub">p25 ${(p25M*100).toFixed(0)}% · p75 ${(p75M*100).toFixed(0)}%</div></div>
+    <div class="kpi-box"><div class="kpi-label">Peso curva vs tendencia</div><div class="kpi-val big">${(w*100).toFixed(0)}% / ${((1-w)*100).toFixed(0)}%</div><div class="kpi-sub">la curva pesa más al avanzar el mes</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Q cierre (mezcla)</div><div class="kpi-val big">${mzQ ? Math.round(mzQ) : '—'}</div><div class="kpi-sub">hoy: ${tot.q} ops</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Monto cierre (mezcla)</div><div class="kpi-val big">${mzM ? fM(mzM) : '—'}</div><div class="kpi-sub">${rgM ? 'banda ' + fM(rgM[0]) + '–' + fM(rgM[1]) : ''}</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Facturación cierre (mezcla)</div><div class="kpi-val big">${mzF ? fM(mzF) : '—'}</div><div class="kpi-sub">hoy: ${fM(tot.f)}</div></div>`;
+
+  // ── Tabla por institución (mezcla, repartida proporcional al actual) ──
+  const parte = (total, a, t) => t > 0 ? total * (a / t) : 0;
+  const fila = (nom, a) => `<tr><td><b>${nom}</b></td>
+    <td>${a.q}</td><td><b>${mzQ ? Math.round(parte(mzQ, a.q, tot.q)) : '—'}</b></td>
+    <td>${fM(a.m)}</td><td><b>${mzM ? fM(parte(mzM, a.m, tot.m)) : '—'}</b></td>
+    <td>${fM(a.f)}</td><td><b>${mzF ? fM(parte(mzF, a.f, tot.f)) : '—'}</b></td></tr>`;
+  document.getElementById('t-proy2').innerHTML = `
+    <thead><tr><th>Institución</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
+    <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
+    <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${mzF ? fM(mzF) : '—'}</b></td></tr></tfoot>`;
+  document.getElementById('proy2-nota').innerHTML =
+    `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución es proporcional al avance real de cada una.`;
+
+  // ── Tabla comparativa de métodos (monto) ──
+  document.getElementById('t-proy2-met').innerHTML = `
+    <thead><tr><th>Método</th><th>Monto cierre</th><th>Q cierre</th><th>Facturación</th><th>Cómo funciona</th></tr></thead>
+    <tbody>
+      <tr><td>Curva hábil (mediana)</td><td>${pcM ? fM(pcM) : '—'}</td><td>${pcQ ? Math.round(pcQ) : '—'}</td><td>${pcF ? fM(pcF) : '—'}</td><td style="font-size:.74rem;color:#64748b">actual ÷ avance mediano histórico al día hábil ${dHoy}</td></tr>
+      <tr><td>Tendencia (últimos ${MESES_TREND})</td><td>${fM(ptM)}</td><td>${Math.round(ptQ)}</td><td>${fM(ptF)}</td><td style="font-size:.74rem;color:#64748b">regresión lineal de los cierres previos, sin mirar el mes en curso</td></tr>
+      <tr style="background:#eff6ff"><td><b>Mezcla (recomendada)</b></td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td><b>${mzF ? fM(mzF) : '—'}</b></td><td style="font-size:.74rem;color:#64748b">pondera ambas según cuánto mes ha transcurrido</td></tr>
+    </tbody>`;
+
+  // ── Gráfico: acumulado por día hábil vs banda esperada ──
+  const cmAct = Array(D + 1).fill(0);
+  rows.filter(r => r.mes === mesAct).forEach(r => { cmAct[Math.min(habilDe(r.fecha_otorgado), D)] += r.monto_financiado; });
+  for (let d = 1; d <= D; d++) cmAct[d] += cmAct[d - 1];
+  const dias = Array.from({ length: D }, (_, i) => i + 1);
+  const base = mzM || tot.m;
+  const med = dias.map(d => en(curvasM, d / D * 100, .5) * base);
+  const p25 = dias.map(d => en(curvasM, d / D * 100, .25) * base);
+  const p75 = dias.map(d => en(curvasM, d / D * 100, .75) * base);
+  const c2 = Chart.getChart(document.getElementById('ch-proy2-curva')); if (c2) c2.destroy();
+  new Chart(document.getElementById('ch-proy2-curva'), {
+    type: 'line',
+    data: { labels: dias, datasets: [
+      { label: 'p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
+      { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
+      { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
+      { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? cmAct[d] : null), borderColor: '#0141A2', backgroundColor: '#0141A222', fill: false, tension: .2, pointRadius: 0, borderWidth: 2.5 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 10 }, filter: i => i.text !== 'p25' } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fM(c.raw) } } },
+      scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fM(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
+  });
+}
+
 // ──────────────────────────────────────────────────────────────
 // BLOQUE ORIGINAL línea 3044
 // ──────────────────────────────────────────────────────────────
@@ -2523,6 +2660,7 @@ const TABS_NAV = [
   { id:'vdealers', label:'🏪 Dealers' },
   { id:'vparques', label:'🅿️ Parques' },
   { id:'vproy',  label:'🔮 Proyección' },
+  { id:'vproy2', label:'🎯 Proyección Pro' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
