@@ -33,7 +33,7 @@ function actualizarTopbarUsuario() {
   }
   // Mostrar tab Admin solo para Administrador
   const tabAdmin = document.getElementById('tab-admin');
-  if (tabAdmin) tabAdmin.style.display = esAdmin() ? 'flex' : 'none';
+  if (tabAdmin) { tabAdmin.style.display = esAdmin() ? 'flex' : 'none'; tabAdmin.dataset.permHidden = esAdmin() ? '0' : '1'; }
   aplicarPermisosNavTabs();
 }
 
@@ -2662,8 +2662,58 @@ function aplicarPermisosNavTabs() {
     // Mostrar si: sin restricción, array vacío, o el perfil está incluido (case-insensitive)
     const visible = !permitidos || permitidos.length === 0 ||
                     permitidos.some(function(p){ return p.toUpperCase() === perfil; });
+    el.dataset.permHidden = visible ? '0' : '1';
     el.style.display = visible ? '' : 'none';
   });
+  reflowTabs();
+}
+
+/* ── Overflow de pestañas: las que no caben en el ancho se colapsan en "⋯ Más" ── */
+function reflowTabs() {
+  const cont = document.querySelector('.tabs');
+  if (!cont) return;
+  let more = document.getElementById('tabMore'), menu = document.getElementById('tabMoreMenu');
+  if (!more) {
+    cont.style.position = 'relative';
+    more = document.createElement('div');
+    more.id = 'tabMore'; more.className = 'tab';
+    more.innerHTML = '⋯ Más ▾';
+    menu = document.createElement('div');
+    menu.id = 'tabMoreMenu';
+    menu.style.cssText = 'position:absolute;top:100%;right:0;background:#0d1d3a;border:1px solid #1e3a6a;border-top:none;border-radius:0 0 10px 10px;z-index:998;display:none;min-width:210px;box-shadow:0 14px 34px rgba(0,0,0,.45);padding:4px 0';
+    more.addEventListener('click', e => { e.stopPropagation(); menu.style.display = menu.style.display === 'none' ? 'block' : 'none'; });
+    document.addEventListener('click', () => { menu.style.display = 'none'; });
+    cont.appendChild(more); cont.appendChild(menu);
+    let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(reflowTabs, 150); });
+  }
+  const tabs = [...cont.querySelectorAll('.tab')].filter(t => t !== more);
+  // 1. restaurar visibles (las ocultas por permisos siguen ocultas)
+  tabs.forEach(t => { if (t.dataset.permHidden !== '1') t.style.display = ''; });
+  more.style.display = '';
+  // 2. medir y colapsar las que exceden el ancho disponible
+  const avail = cont.clientWidth - more.offsetWidth - 10;
+  let x = 0; const fuera = [];
+  for (const t of tabs) {
+    if (t.style.display === 'none') continue;
+    x += t.offsetWidth;
+    if (x > avail) fuera.push(t);
+  }
+  fuera.forEach(t => { t.style.display = 'none'; });
+  // 3. menú con las colapsadas (marca la activa)
+  menu.innerHTML = '';
+  fuera.forEach(t => {
+    const it = document.createElement('div');
+    it.textContent = t.textContent;
+    const activa = t.classList.contains('active');
+    it.style.cssText = 'padding:9px 16px;color:' + (activa ? '#fff' : '#cfe3ff') + ';cursor:pointer;font-size:12px;white-space:nowrap;font-weight:' + (activa ? '800' : '500') + ';background:' + (activa ? '#1a3a6a' : 'transparent');
+    it.onmouseenter = () => { it.style.background = '#1a3a6a'; };
+    it.onmouseleave = () => { it.style.background = activa ? '#1a3a6a' : 'transparent'; };
+    it.onclick = e => { e.stopPropagation(); menu.style.display = 'none'; t.click(); reflowTabs(); };
+    menu.appendChild(it);
+  });
+  // resaltar "Más" si la pestaña activa está colapsada
+  more.classList.toggle('active', fuera.some(t => t.classList.contains('active')));
+  if (!fuera.length) more.style.display = 'none';
 }
 
 // ======== ADMIN DE USUARIOS ========
