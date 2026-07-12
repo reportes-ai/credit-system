@@ -25,6 +25,7 @@ require('../../../../shared/migrate').enFila('seguridad', async () => {
       ['req_especiales',        '0'],
       ['permitir_misma_clave',  '1'],
       ['historial_claves',      '0'],    // 0 = sin restricción, N = no reutilizar hasta N cambios
+      ['max_intentos_login',    '3'],    // intentos fallidos seguidos antes de bloquear la cuenta (0 = sin bloqueo)
     ];
     for (const [clave, valor] of defaults) {
       await pool.query(
@@ -55,7 +56,7 @@ const putConfig = async (req, res) => {
     const allowed = [
       'timeout_inactividad', 'dias_venc_clave', 'aviso_venc_correo', 'aviso_venc_dias',
       'longitud_minima', 'req_mayusculas', 'req_numeros', 'req_especiales',
-      'permitir_misma_clave', 'historial_claves',
+      'permitir_misma_clave', 'historial_claves', 'max_intentos_login',
     ];
     const updates = Object.entries(req.body).filter(([k]) => allowed.includes(k));
     if (!updates.length) return res.status(400).json({ success: false, data: null, error: 'Sin campos válidos' });

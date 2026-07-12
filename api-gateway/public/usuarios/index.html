@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v62.7</span>
+        <span class="version-badge" id="versionBadge">v116.16</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -470,6 +470,29 @@
                     <option value="7">7 días</option>
                     <option value="10">10 días</option>
                     <option value="15">15 días</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloqueo por intentos fallidos -->
+          <div class="seg-section">
+            <div class="seg-section-header">
+              <i class="bi bi-lock"></i>Bloqueo por Intentos Fallidos
+            </div>
+            <div class="seg-section-body">
+              <div class="seg-row">
+                <div>
+                  <div class="seg-label">Bloquear la cuenta tras</div>
+                  <div class="seg-desc">Intentos con contraseña incorrecta seguidos antes de bloquear el ingreso. El admin desbloquea desde la lista de usuarios.</div>
+                </div>
+                <div class="seg-control">
+                  <select id="sMaxIntentos" class="seg-select">
+                    <option value="0">Nunca (sin bloqueo)</option>
+                    <option value="3">3 intentos</option>
+                    <option value="5">5 intentos</option>
+                    <option value="10">10 intentos</option>
                   </select>
                 </div>
               </div>
@@ -863,8 +886,9 @@
         </div>
         <div class="modal-body">
           <div id="resetContenido">
-            <p class="text-muted mb-3" style="font-size:0.88rem">¿Confirmas el reset de contraseña para <strong id="resetNombreUsuario"></strong>?</p>
-            <p class="text-muted mb-0" style="font-size:0.82rem">Se generará una clave temporal y se enviará al correo del usuario. Deberá cambiarla en su primer ingreso.</p>
+            <p class="text-muted mb-3" style="font-size:0.88rem">Usuario: <strong id="resetNombreUsuario"></strong></p>
+            <p class="text-muted mb-2" style="font-size:0.82rem"><b>Resetear clave:</b> genera una clave temporal, la envía al correo y desbloquea la cuenta. El usuario deberá cambiarla en su primer ingreso.</p>
+            <p class="text-muted mb-0" style="font-size:0.82rem"><b>Solo desbloquear:</b> quita el bloqueo por intentos fallidos y conserva la contraseña actual del usuario.</p>
           </div>
           <div id="resetResultado" class="d-none">
             <div class="nueva-clave-box">
@@ -1001,13 +1025,14 @@
           <td><span class="badge-perfil">${u.perfil}</span></td>
           <td>${u.nombre_caja ? `<span style="font-size:.75rem;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:2px 9px;font-weight:600"><i class="bi bi-cash-stack me-1"></i>${u.nombre_caja}</span>` : '<span class="text-muted" style="font-size:.8rem">—</span>'}</td>
           <td class="text-muted">${u.supervisor_nombre || '—'}</td>
-          <td><span class="badge-estado badge-${u.estado}">${u.estado}</span></td>
+          <td><span class="badge-estado badge-${u.estado}">${u.estado}</span>${u.bloqueado ? ' <span class="badge-estado" style="background:#fef3c7;color:#92400e" title="Bloqueada por intentos fallidos"><i class="bi bi-lock-fill"></i> bloqueada</span>' : ''}</td>
           <td class="text-muted" style="font-size:0.8rem">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-CL') : 'Nunca'}</td>
           <td>
             ${puedeGestionarUsuarios ? `
               <button class="btn btn-outline-primary btn-sm me-1" title="Editar" onclick="abrirModalUsuario(${u.id_usuario})"><i class="bi bi-pencil"></i></button>
               <button class="btn btn-outline-success btn-sm me-1" title="Ejecutivos asignados" onclick="abrirModalEjecutivos(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-people"></i></button>
-              <button class="btn btn-outline-warning btn-sm me-1" title="Resetear clave" onclick="abrirResetClave(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-key"></i></button>
+              ${u.bloqueado ? `<button class="btn btn-warning btn-sm me-1" title="Desbloquear cuenta" onclick="desbloquearUsuario(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-unlock-fill"></i></button>` : ''}
+              <button class="btn btn-outline-warning btn-sm me-1" title="Resetear clave / desbloquear" onclick="abrirResetClave(${u.id_usuario}, '${u.nombre} ${u.apellido}')"><i class="bi bi-key"></i></button>
               <button class="btn btn-outline-danger btn-sm" title="Suspender" onclick="desactivarUsuario(${u.id_usuario})"><i class="bi bi-person-x"></i></button>
             ` : '—'}
           </td>
@@ -1209,9 +1234,24 @@
       document.getElementById('resetResultado').classList.add('d-none');
       document.getElementById('resetFooter').innerHTML = `
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-warning" onclick="confirmarReset()"><i class="bi bi-arrow-clockwise me-1"></i>Resetear</button>
+        <button class="btn btn-outline-warning" onclick="desbloquearDesdeModal()"><i class="bi bi-unlock me-1"></i>Solo desbloquear</button>
+        <button class="btn btn-warning" onclick="confirmarReset()"><i class="bi bi-arrow-clockwise me-1"></i>Resetear clave</button>
       `;
       bootstrap.Modal.getOrCreateInstance(document.getElementById('modalResetClave')).show();
+    }
+
+    async function desbloquearDesdeModal() {
+      const data = await api('POST', `/api/usuarios/${resetId}/desbloquear`);
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('modalResetClave')).hide();
+      if (data?.success) { showToast(data.data?.mensaje || 'Cuenta desbloqueada', 'success'); cargarUsuarios(); }
+      else showToast(data?.error || 'Error al desbloquear', 'danger');
+    }
+
+    async function desbloquearUsuario(id, nombre) {
+      if (!confirm(`¿Desbloquear la cuenta de ${nombre}? Conserva su contraseña actual.`)) return;
+      const data = await api('POST', `/api/usuarios/${id}/desbloquear`);
+      if (data?.success) { showToast(data.data?.mensaje || 'Cuenta desbloqueada', 'success'); cargarUsuarios(); }
+      else showToast(data?.error || 'Error al desbloquear', 'danger');
     }
 
     function copiarClaveReset() {
@@ -1810,6 +1850,7 @@
       _setChk('sReqEsp',        c.req_especiales      === '1');
       _setChk('sPermitirMisma', c.permitir_misma_clave !== '0');
       _setVal('sHistorial',     c.historial_claves    || '0');
+      _setVal('sMaxIntentos',   c.max_intentos_login  || '0');
       actualizarAvisoVenc();
     }
 
@@ -1911,6 +1952,7 @@
         req_especiales:       document.getElementById('sReqEsp').checked   ? '1' : '0',
         permitir_misma_clave: document.getElementById('sPermitirMisma').checked ? '1' : '0',
         historial_claves:     document.getElementById('sHistorial').value,
+        max_intentos_login:   document.getElementById('sMaxIntentos').value,
       };
       const data = await api('PUT', '/api/config/seguridad', body);
       if (data?.success) {

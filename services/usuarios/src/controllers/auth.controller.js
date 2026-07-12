@@ -26,9 +26,41 @@ const login = async (req, res) => {
     }
 
     const usuario = rows[0];
+
+    // Cuenta bloqueada por intentos fallidos (break-glass exentas)
+    if (usuario.bloqueado === 1 && !usuario.protegido) {
+      return res.status(423).json({ success: false, data: null, error: 'Cuenta bloqueada por intentos fallidos. Contacta al administrador para desbloquearla.' });
+    }
+
     const valid = await bcrypt.compare(password, usuario.password_hash);
     if (!valid) {
-      return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
+      // Contar el fallo y bloquear al llegar al máximo configurado (0 = sin bloqueo).
+      // Las cuentas protegidas (break-glass) nunca se bloquean.
+      let bloqueada = false, restantes = null;
+      try {
+        const [[cfg]] = await pool.query("SELECT valor FROM config_seguridad WHERE clave = 'max_intentos_login'");
+        const maxIntentos = parseInt(cfg && cfg.valor) || 0;
+        if (maxIntentos > 0 && !usuario.protegido) {
+          const nuevos = (usuario.intentos_fallidos || 0) + 1;
+          if (nuevos >= maxIntentos) {
+            await pool.query('UPDATE usuarios SET intentos_fallidos = ?, bloqueado = 1 WHERE id_usuario = ?', [nuevos, usuario.id_usuario]);
+            bloqueada = true;
+            auditar({ req, usuario, accion: 'EDITAR', modulo: 'auth', entidad: 'usuario', entidad_id: usuario.id_usuario, detalle: `Cuenta bloqueada tras ${nuevos} intentos fallidos` });
+          } else {
+            await pool.query('UPDATE usuarios SET intentos_fallidos = ? WHERE id_usuario = ?', [nuevos, usuario.id_usuario]);
+            restantes = maxIntentos - nuevos;
+          }
+        }
+      } catch (_) { /* si falla el conteo, no bloquea */ }
+      if (bloqueada)
+        return res.status(423).json({ success: false, data: null, error: 'Cuenta bloqueada por intentos fallidos. Contacta al administrador para desbloquearla.' });
+      const extra = restantes != null ? ` Te queda${restantes === 1 ? '' : 'n'} ${restantes} intento${restantes === 1 ? '' : 's'}.` : '';
+      return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas.' + extra });
+    }
+
+    // Ingreso correcto: limpiar contador de fallos si venía con alguno
+    if (usuario.intentos_fallidos > 0 || usuario.bloqueado) {
+      await pool.query('UPDATE usuarios SET intentos_fallidos = 0, bloqueado = 0 WHERE id_usuario = ?', [usuario.id_usuario]);
     }
 
     // Vencimiento de clave: si la política exige cambio cada N días y ya venció, forzar cambio.

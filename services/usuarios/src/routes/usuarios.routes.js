@@ -15,6 +15,7 @@ router.delete('/:id', verifyToken, requireFunc('usuarios.editar', 'usuarios.elim
 router.delete('/:id/definitivo', verifyToken, requireFunc('usuarios.eliminar'), ctrl.eliminarDefinitivo);
 router.post('/:id/reactivar', verifyToken, requireFunc('usuarios.editar', 'usuarios_gestionar'), ctrl.reactivarUsuario);
 router.post('/:id/reset-clave', verifyToken, requireFunc('usuarios.reset_clave', 'usuarios_gestionar'), ctrl.resetClave);
+router.post('/:id/desbloquear', verifyToken, requireFunc('usuarios.reset_clave', 'usuarios_gestionar'), ctrl.desbloquearUsuario);
 router.get('/:id/permisos',    verifyToken, ctrl.getPermisosUsuario);
 router.put('/:id/permisos',    verifyToken, requireFunc('usuarios.permisos', 'usuarios_perfiles'), ctrl.updatePermisosUsuario);
 router.get('/me/ejecutivos',   verifyToken, ctrl.misEjecutivos);

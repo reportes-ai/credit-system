@@ -65,6 +65,13 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN debe_cambiar_clave TINYINT(1) NOT NULL DEFAULT 0`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration debe_cambiar_clave]', e.message); }
   try {
+    // Bloqueo por intentos fallidos de login
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN intentos_fallidos INT NOT NULL DEFAULT 0`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration intentos_fallidos]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN bloqueado TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration bloqueado]', e.message); }
+  try {
     // Fecha del último cambio de clave (para calcular el vencimiento). Backfill a la creación.
     await pool.query(`ALTER TABLE usuarios ADD COLUMN password_updated_at DATETIME NULL DEFAULT NULL`);
     await pool.query(`UPDATE usuarios SET password_updated_at = COALESCE(fecha_creacion, NOW()) WHERE password_updated_at IS NULL`);
@@ -220,7 +227,7 @@ const getAllUsuarios = async (req, res) => {
               u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
-              u.estado, u.ultimo_acceso, u.fecha_creacion,
+              u.estado, u.ultimo_acceso, u.fecha_creacion, u.bloqueado, u.intentos_fallidos,
               cj.id_caja, cj.nombre AS nombre_caja
        FROM usuarios u
        JOIN perfiles p ON u.id_perfil = p.id_perfil
@@ -403,8 +410,8 @@ const resetClave = async (req, res) => {
     const nuevaClave = generarClaveTemporal();
 
     const hash = await bcrypt.hash(nuevaClave, 10);
-    // Forzar cambio en el próximo ingreso (igual que en el alta)
-    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1, password_updated_at = NOW() WHERE id_usuario = ?', [hash, id]);
+    // Forzar cambio en el próximo ingreso (igual que en el alta) y desbloquear la cuenta.
+    await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1, password_updated_at = NOW(), intentos_fallidos = 0, bloqueado = 0 WHERE id_usuario = ?', [hash, id]);
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Reseteó la contraseña del usuario #${id}` });
 
@@ -425,6 +432,19 @@ const resetClave = async (req, res) => {
         ? 'Contraseña reseteada y enviada al correo del usuario.'
         : 'Contraseña reseteada. Comparte esta clave con el usuario.'
     }, error: null });
+  } catch (error) {
+    res.status(500).json({ success: false, data: null, error: error.message });
+  }
+};
+
+/* ─── Desbloquear cuenta (sin resetear la clave) ───────────────── */
+const desbloquearUsuario = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [r] = await pool.query('UPDATE usuarios SET intentos_fallidos = 0, bloqueado = 0 WHERE id_usuario = ?', [id]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Desbloqueó la cuenta del usuario #${id}` });
+    res.json({ success: true, data: { mensaje: 'Cuenta desbloqueada. El usuario ya puede ingresar con su contraseña actual.' }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }
@@ -534,4 +554,4 @@ const misEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, desbloquearUsuario, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
