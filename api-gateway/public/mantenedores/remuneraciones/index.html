@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores de Remuneraciones — AutoFácil</title>
-  <!-- v1.0 — mantenedor AFP, topes, IMM y tramos de impuesto único -->
+  <!-- v1.1 — revisor automático Previred+IA: propuesta mensual con Aplicar/Descartar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -44,7 +44,18 @@
 </nav>
 
 <div class="main">
-  <div class="banner"><i class="bi bi-percent"></i><div><h2>Indicadores de Remuneraciones</h2><p>Tasas AFP, topes imponibles, IMM y tramos del impuesto único — todo paramétrico, sin tocar código.</p></div></div>
+  <div class="banner"><i class="bi bi-percent"></i><div style="flex:1"><h2>Indicadores de Remuneraciones</h2><p>Tasas AFP, topes imponibles, IMM y tramos del impuesto único — todo paramétrico, sin tocar código.</p></div>
+    <button class="btn-navy" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35)" onclick="revisarIA(this)"><i class="bi bi-robot me-1"></i>Revisar Previred ahora</button></div>
+
+  <div class="panel" id="propBox" style="display:none;border:2px solid #f59e0b;background:#fffbeb">
+    <h5 style="color:#92400e"><i class="bi bi-robot me-1"></i>Propuesta de actualización desde Previred <span id="propMes" style="font-weight:400"></span></h5>
+    <table><thead><tr><th>Indicador</th><th style="text-align:right">Actual</th><th style="text-align:right">Previred</th></tr></thead><tbody id="tbProp"></tbody></table>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px">
+      <button class="btn-navy" style="background:#6b7280" onclick="resolverProp('DESCARTAR')">Descartar</button>
+      <button class="btn-navy" style="background:#16a34a" onclick="resolverProp('APLICAR')"><i class="bi bi-check2-all me-1"></i>Aplicar cambios</button>
+    </div>
+    <div style="font-size:.72rem;color:#92400e;margin-top:8px"><i class="bi bi-info-circle me-1"></i>Extraído por IA desde previred.com el día 1 de cada mes (o con el botón "Revisar ahora"). Nada se aplica sin tu confirmación; verifica contra la publicación oficial.</div>
+  </div>
 
   <div class="panel">
     <h5><i class="bi bi-sliders me-1"></i>Parámetros Generales <span id="refInd" style="font-weight:400;color:#94a3b8;font-size:.74rem"></span></h5>
@@ -120,7 +131,40 @@ async function guardar(){
   if (!j.success) return alert(j.error||'No se pudo guardar');
   toast('✓ Indicadores guardados'); cargar();
 }
-cargar();
+let PROP = null;
+async function cargarPropuesta(){
+  try {
+    const j = await (await fetch('/api/rrhh/remuneraciones/indicadores/propuesta', { headers:H })).json();
+    PROP = j.data;
+    const box = document.getElementById('propBox');
+    if (!PROP || !(PROP.diffs||[]).length) { box.style.display='none'; return; }
+    document.getElementById('propMes').textContent = '— '+PROP.mes;
+    document.getElementById('tbProp').innerHTML = PROP.diffs.map(d=>`<tr>
+      <td>${d.etiqueta}</td>
+      <td style="text-align:right">${d.actual!=null?Number(d.actual).toLocaleString('es-CL'):'—'}</td>
+      <td style="text-align:right;font-weight:800;color:#b45309">${Number(d.propuesto).toLocaleString('es-CL')}</td></tr>`).join('');
+    box.style.display='';
+  } catch(e){}
+}
+async function revisarIA(btn){
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Consultando Previred…';
+  try {
+    const j = await (await fetch('/api/rrhh/remuneraciones/indicadores/revisar', { method:'POST', headers:HJ, body:'{}' })).json();
+    if (!j.success) throw new Error(j.error);
+    toast(j.data.diffs.length ? `⚠ ${j.data.diffs.length} diferencia(s) detectada(s)` : '✓ Todo al día con Previred');
+    cargarPropuesta();
+  } catch(e){ alert(e.message||'Error consultando Previred'); }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-robot me-1"></i>Revisar Previred ahora';
+}
+async function resolverProp(accion){
+  if (!PROP) return;
+  if (accion==='APLICAR' && !confirm('¿Aplicar los valores de Previred al mantenedor? Regirán desde el próximo cálculo de liquidaciones.')) return;
+  const j = await (await fetch(`/api/rrhh/remuneraciones/indicadores/propuesta/${PROP.id}/resolver`, { method:'POST', headers:HJ, body:JSON.stringify({ accion }) })).json();
+  if (!j.success) return alert(j.error);
+  toast(accion==='APLICAR' ? `✓ ${j.data.aplicados} indicadores actualizados` : 'Propuesta descartada');
+  cargarPropuesta(); cargar();
+}
+cargar(); cargarPropuesta();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

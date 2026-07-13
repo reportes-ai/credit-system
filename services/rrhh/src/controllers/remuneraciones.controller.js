@@ -298,6 +298,171 @@ const misLiquidaciones = async (req, res) => {
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 
+/* ════════════ REVISOR AUTOMÁTICO DE INDICADORES (Previred + IA) ══════════════
+   Previred/SII/SP no tienen API oficial → un job mensual (días 1-3) baja la
+   página de Indicadores Previsionales de Previred, la IA extrae IMM, topes y
+   tasas AFP, se comparan con el mantenedor y si hay diferencias se crea una
+   PROPUESTA + correo a RRHH. NUNCA aplica solo: el humano confirma en el
+   mantenedor (Aplicar/Descartar). Ver Definiciones: "Indicadores de
+   Remuneraciones — actualización automática". */
+require('../../../../shared/migrate').enFila('rrhh-indicadores-sync', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rh_indicadores_propuestas (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        mes        CHAR(7) NOT NULL,
+        fuente     VARCHAR(200) NULL,
+        datos      JSON NULL,
+        diffs      JSON NULL,
+        estado     VARCHAR(12) NOT NULL DEFAULT 'PENDIENTE',
+        resuelto_por VARCHAR(160) NULL,
+        resuelto_at  DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mes (mes, estado)
+      )`);
+    const ia = require('../../../../shared/ia');
+    await ia.registrarFuncionalidad({
+      codigo: 'ia_indicadores_previred',
+      nombre: 'Indicadores Previred (Remuneraciones)',
+      descripcion: 'Extrae IMM, topes imponibles y tasas AFP desde la página de Indicadores Previsionales de Previred para proponer la actualización mensual del mantenedor.',
+    });
+  } catch (e) { console.error('[rrhh-indicadores-sync migration]', e.message); }
+});
+
+const PREVIRED_URL = 'https://www.previred.com/indicadores-previsionales/';
+
+async function extraerIndicadoresPrevired() {
+  const resp = await fetch(PREVIRED_URL, { headers: { 'User-Agent': 'Mozilla/5.0 (AutoFacil BusinessSuite)' } });
+  if (!resp.ok) throw new Error('Previred respondió HTTP ' + resp.status);
+  let html = await resp.text();
+  // HTML → texto plano acotado (la página trae las tablas del mes)
+  const texto = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+    .slice(0, 28000);
+  const { analizar } = require('../../../../shared/anthropic');
+  const out = await analizar({
+    codigo: 'ia_indicadores_previred', json: true, max_tokens: 1200,
+    system: 'Eres un analista previsional chileno. Extraes indicadores desde texto de la página de Previred. Respondes SOLO JSON válido.',
+    prompt: `Del siguiente texto de la página "Indicadores Previsionales" de Previred, extrae EXACTAMENTE este JSON (números sin puntos de miles, decimales con punto; si un valor no aparece usa null):
+{"imm": <ingreso mínimo mensual trabajadores 18-65 en pesos>,
+ "tope_imponible_uf": <tope imponible AFP/Salud en UF>,
+ "tope_afc_uf": <tope imponible seguro cesantía en UF>,
+ "afps": {"CAPITAL": <tasa AFP dependiente %>, "CUPRUM": <>, "HABITAT": <>, "MODELO": <>, "PLANVITAL": <>, "PROVIDA": <>, "UNO": <>}}
+Las tasas AFP son la cotización obligatoria del trabajador dependiente (10% + comisión, ej: 11.44).
+TEXTO: ${texto}`,
+  });
+  const datos = typeof out === 'string' ? JSON.parse(out.replace(/```json|```/g, '').trim()) : out;
+  if (!datos || (!datos.imm && !datos.afps)) throw new Error('La IA no pudo extraer indicadores');
+  return datos;
+}
+
+function compararIndicadores(datos, ind) {
+  const diffs = [];
+  const num = v => v == null || v === '' ? null : parseFloat(v);
+  const cmp = (campo, etiqueta, actual, propuesto, tol = 0.001) => {
+    const p = num(propuesto); if (p == null || p <= 0) return;
+    if (Math.abs((num(actual) || 0) - p) > tol) diffs.push({ campo, etiqueta, actual: num(actual), propuesto: p });
+  };
+  cmp('rem_imm', 'Ingreso Mínimo Mensual', ind.rem_imm, datos.imm, 0.5);
+  cmp('rem_tope_imponible_uf', 'Tope imponible AFP/Salud (UF)', ind.rem_tope_imponible_uf, datos.tope_imponible_uf);
+  cmp('rem_tope_afc_uf', 'Tope imponible AFC (UF)', ind.rem_tope_afc_uf, datos.tope_afc_uf);
+  for (const a of ind.afps || []) {
+    const p = datos.afps ? datos.afps[a.afp] : null;
+    cmp('afp:' + a.afp, 'Tasa AFP ' + a.afp + ' (%)', a.tasa_pct, p, 0.005);
+  }
+  return diffs;
+}
+
+async function revisarIndicadores(usuario) {
+  const mes = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date()).slice(0, 7);
+  const datos = await extraerIndicadoresPrevired();
+  const ind = await indicadores(mes);
+  const diffs = compararIndicadores(datos, ind);
+  // Cerrar propuestas pendientes anteriores del mismo mes (la nueva manda)
+  await pool.query("UPDATE rh_indicadores_propuestas SET estado='DESCARTADA', resuelto_por='sistema (nueva revisión)', resuelto_at=NOW() WHERE mes=? AND estado='PENDIENTE'", [mes]);
+  const [r] = await pool.query(
+    'INSERT INTO rh_indicadores_propuestas (mes, fuente, datos, diffs) VALUES (?,?,?,?)',
+    [mes, PREVIRED_URL, JSON.stringify(datos), JSON.stringify(diffs)]);
+  if (diffs.length) {
+    try {
+      const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+      const [dest] = await pool.query(
+        `SELECT DISTINCT u.email FROM usuarios u
+           LEFT JOIN perfiles p ON p.id_perfil=u.id_perfil
+           LEFT JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
+           LEFT JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+          WHERE u.estado='activo' AND u.email IS NOT NULL AND (p.nombre='Administrador' OR (f.codigo='rh_remuneraciones' AND pp.habilitado=1))`);
+      const filas = diffs.map(d => `<tr><td style="padding:4px 10px;border:1px solid #e2e8f0">${d.etiqueta}</td><td style="padding:4px 10px;border:1px solid #e2e8f0;text-align:right">${(d.actual ?? '—').toLocaleString ? Number(d.actual).toLocaleString('es-CL') : d.actual}</td><td style="padding:4px 10px;border:1px solid #e2e8f0;text-align:right;font-weight:700;color:#b45309">${Number(d.propuesto).toLocaleString('es-CL')}</td></tr>`).join('');
+      const html = `<p>La revisión mensual de <b>Previred</b> detectó ${diffs.length} indicador(es) de remuneraciones distintos a los del mantenedor:</p>
+        <table style="border-collapse:collapse;font-size:13px"><tr><th style="padding:4px 10px;border:1px solid #e2e8f0;background:#f8fafc">Indicador</th><th style="padding:4px 10px;border:1px solid #e2e8f0;background:#f8fafc">Actual</th><th style="padding:4px 10px;border:1px solid #e2e8f0;background:#f8fafc">Previred</th></tr>${filas}</table>
+        <p>Revísalos y aplícalos con un clic en el mantenedor:<br><a href="https://app.autofacilchile.cl/mantenedores/remuneraciones/">Mantenedores → Indicadores de Remuneraciones</a></p>
+        <p style="color:#94a3b8;font-size:12px">Los valores fueron extraídos por IA desde ${PREVIRED_URL} — nada se aplica sin tu confirmación.</p>`;
+      if (dest.length) await enviarCorreo({ to: dest.map(d => d.email), subject: `📊 Indicadores Previred ${mes}: ${diffs.length} cambio(s) por revisar`, html: envolverHTML ? envolverHTML(html) : html });
+    } catch (e) { console.error('[indicadores-sync correo]', e.message); }
+  }
+  auditar({ req: { usuario: usuario || { id_usuario: null } }, accion: 'CREAR', modulo: 'rrhh', entidad: 'indicadores_propuesta', entidad_id: r.insertId,
+    detalle: `Revisión Previred ${mes}: ${diffs.length} diferencia(s) detectada(s)` });
+  return { id: r.insertId, mes, diffs, datos };
+}
+
+// Cron liviano: cada hora; corre los días 1-3 (09-18h Chile) si el mes no tiene revisión aún.
+setInterval(async () => {
+  try {
+    const ahora = new Date().toLocaleString('en-CA', { timeZone: 'America/Santiago', hour12: false });
+    const dia = parseInt(ahora.slice(8, 10), 10), hora = parseInt(ahora.slice(11, 13), 10);
+    if (dia < 1 || dia > 3 || hora < 9 || hora > 18) return;
+    const mes = ahora.slice(0, 7);
+    const [[ya]] = await pool.query('SELECT id FROM rh_indicadores_propuestas WHERE mes=? LIMIT 1', [mes]);
+    if (ya) return;
+    console.log('[indicadores-sync] revisión mensual automática', mes);
+    await revisarIndicadores(null);
+  } catch (e) { console.error('[indicadores-sync cron]', e.message); }
+}, 60 * 60 * 1000);
+
+/* POST /api/rrhh/remuneraciones/indicadores/revisar — gatillo manual */
+const revisarAhora = async (req, res) => {
+  try { ok(res, await revisarIndicadores(req.usuario)); }
+  catch (e) { console.error('[rrhh revisarAhora]', e.message); fail(res, 'No se pudo revisar Previred: ' + e.message); }
+};
+
+/* GET /api/rrhh/remuneraciones/indicadores/propuesta — última pendiente */
+const getPropuesta = async (req, res) => {
+  try {
+    const [[p]] = await pool.query("SELECT * FROM rh_indicadores_propuestas WHERE estado='PENDIENTE' ORDER BY id DESC LIMIT 1");
+    if (!p) return ok(res, null);
+    const parse = v => { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } };
+    ok(res, { ...p, datos: parse(p.datos), diffs: parse(p.diffs) });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+
+/* POST /api/rrhh/remuneraciones/indicadores/propuesta/:id/resolver { accion: 'APLICAR'|'DESCARTAR' } */
+const resolverPropuesta = async (req, res) => {
+  try {
+    const accion = String((req.body || {}).accion || '').toUpperCase();
+    if (!['APLICAR', 'DESCARTAR'].includes(accion)) return fail(res, 'Acción inválida', 400);
+    const [[p]] = await pool.query("SELECT * FROM rh_indicadores_propuestas WHERE id=? AND estado='PENDIENTE'", [req.params.id]);
+    if (!p) return fail(res, 'Propuesta no encontrada o ya resuelta', 404);
+    let aplicados = 0;
+    if (accion === 'APLICAR') {
+      let diffs = []; try { diffs = typeof p.diffs === 'string' ? JSON.parse(p.diffs) : (p.diffs || []); } catch (_) {}
+      for (const d of diffs) {
+        if (d.campo.startsWith('afp:')) {
+          await pool.query('UPDATE rh_afp_tasas SET tasa_pct=? WHERE afp=?', [d.propuesto, d.campo.slice(4)]);
+        } else {
+          await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [d.campo, String(d.propuesto)]);
+        }
+        aplicados++;
+      }
+    }
+    await pool.query('UPDATE rh_indicadores_propuestas SET estado=?, resuelto_por=?, resuelto_at=NOW() WHERE id=?',
+      [accion === 'APLICAR' ? 'APLICADA' : 'DESCARTADA', nombreDe(req.usuario), p.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'indicadores_propuesta', entidad_id: p.id,
+      detalle: `Propuesta Previred ${p.mes} → ${accion}${aplicados ? ` (${aplicados} indicadores actualizados)` : ''}` });
+    ok(res, { estado: accion === 'APLICAR' ? 'APLICADA' : 'DESCARTADA', aplicados });
+  } catch (e) { console.error('[rrhh resolverPropuesta]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* ── Mantenedor Indicadores de Remuneraciones ───────────────────────────────── */
 const getIndicadores = async (req, res) => {
   try {
@@ -332,4 +497,5 @@ const putIndicadores = async (req, res) => {
   } catch (e) { console.error('[rrhh putIndicadores]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores };
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
+  revisarAhora, getPropuesta, resolverPropuesta };

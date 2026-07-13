@@ -34,6 +34,9 @@ router.post('/remuneraciones/emitir',         verifyToken, requireFunc('rh_remun
 router.get('/remuneraciones/mias',            verifyToken, rem.misLiquidaciones);
 router.get('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones', 'rh_remuneraciones'), rem.getIndicadores);
 router.put('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones'), rem.putIndicadores);
+router.post('/remuneraciones/indicadores/revisar', verifyToken, requireFunc('mant_remuneraciones'), rem.revisarAhora);
+router.get('/remuneraciones/indicadores/propuesta', verifyToken, requireFunc('mant_remuneraciones', 'rh_remuneraciones'), rem.getPropuesta);
+router.post('/remuneraciones/indicadores/propuesta/:id/resolver', verifyToken, requireFunc('mant_remuneraciones'), rem.resolverPropuesta);
 router.get('/remuneraciones/liquidacion/:id', verifyToken, rem.getLiquidacion); // valida dueño/RRHH adentro
 
 // Ausencias y Permisos + Saldo de Vacaciones (Fase 2 módulo RRHH)
