@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.3 -->
+  <!-- v2.4 — Depositar en/Titular con banco, tipo cuenta, N° y RUT del dealer -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -274,7 +274,8 @@ function docHTML(ops){
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${conceptoDet}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodoCL(f0.fecha_factura)}</td></tr>
       ${f0.numero_factura?`<tr><td style="${SresL}">N° ${esBoleta?'Boleta':'Factura'}</td><td style="${SresV}">${f0.numero_factura}${esBoleta?' (Boleta)':''}${f0.es_terceros?' · terceros':''}${ops.length>1?` · ${ops.length} operaciones`:''}</td></tr>`:''}
-      <tr><td style="${SresL}">Destino</td><td style="${SresV}">CTA. CTE. ${f0.num_cuenta? f0.num_cuenta+(f0.banco?(' · '+f0.banco):'') : ''}</td></tr>
+      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}">${f0.num_cuenta? `<b>${f0.banco||''}</b>${f0.tipo_cuenta?' · '+f0.tipo_cuenta:''} · Cta. N° <b>${f0.num_cuenta}</b>` : '—'}</td></tr>
+      <tr><td style="${SresL}">Titular</td><td style="${SresV}">${f0.nombre_cuenta||f0.nombre_dealer||'—'}${(f0.rut_pago||f0.rut_dealer)?' · RUT '+(f0.rut_pago||f0.rut_dealer):''}</td></tr>
       <tr><td style="${SresL}">Monto ${esBoleta?'bruto':'neto'} factura</td><td style="${SresV}">${fmt(facturaNeto)}</td></tr>
       <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(facturaImp)}</td></tr>
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(facturaPagar)}</td></tr>
