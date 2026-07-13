@@ -87,6 +87,9 @@ async function calcularPenetracionMes(mes) {
     LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
     WHERE DATE_FORMAT(c.mes, '%Y-%m') = ?
       AND UPPER(c.financiera) LIKE '%AUTOFIN%'
+      -- Universo NCNU: AUTOFIN sin productos CORFO (mismo criterio que el motor
+      -- de comisiones de ejecutivos — CORFO no mide seguros).
+      AND UPPER(COALESCE(c.producto,'')) NOT LIKE '%CORFO%'
       -- cursadas: mismo universo del cierre de AutoFin. Algunos créditos traen el estado en
       -- estado_credito y NO en estado (queda NULL) → COALESCE para no vaciar el universo
       -- (si no, la penetración da 0% y la comisión de seguros queda en 0). Igual criterio que el dashboard.
