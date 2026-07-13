@@ -208,7 +208,13 @@ function parseCanal(buffer) {
         iRep = col('SEGUROREPARACIONMENOR'), iGps = pick('GPS'),
         iTipo = pick('TIPOVEHICULO', 'TIPO', 'VEHICULO'),
         iRut = pick('RUTCLIENTE', 'RUT', 'CLIENTE'), iMarca = pick('MARCA'), iModelo = pick('MODELO'),
-        iTasa = pick('TASACLIENTE'), iCurse = pick('FECHACURSE'), iTerm = pick('FECHATERMINOCONTRATO');
+        iTasa = pick('TASACLIENTE'), iCurse = pick('FECHACURSE'), iTerm = pick('FECHATERMINOCONTRATO'),
+        iEstado = pick('ESTADO');
+  const aFechaISO = v => {
+    if (!v) return null;
+    const d = v instanceof Date ? v : (typeof v === 'number' ? new Date(Math.round((v - 25569) * 864e5)) : new Date(v));
+    return isNaN(d) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
   if (iId < 0) return {};
   const mapa = {};
   for (const row of raw.slice(hIdx + 1)) {
@@ -219,6 +225,9 @@ function parseCanal(buffer) {
       seguro_rdh:       iRdh  >= 0 ? normInt(row[iRdh])  : null,
       seguro_rep_menor: iRep  >= 0 ? normInt(row[iRep])  : null,
       gps:              iGps  >= 0 ? normInt(row[iGps])  : null,
+      // Fecha Curse REAL + estado del Canal: corrige fecha_otorgado en meses abiertos
+      fecha_curse:      iCurse >= 0 ? aFechaISO(row[iCurse]) : null,
+      estado_canal:     iEstado >= 0 ? normStr(row[iEstado]) : null,
       tipo_vehiculo:    iTipo >= 0 ? normStr(row[iTipo]) : null,
       rut_cliente:      iRut  >= 0 ? normRut(row[iRut])  : null,
       marca:            iMarca >= 0 ? normStr(row[iMarca]) : null,
@@ -281,7 +290,8 @@ async function aplicarCanal(mapaCanal, log) {
     const chunk = ids.slice(i, i + 500);
     const [rows] = await pool.query(
       `SELECT id, num_op, id_financiera, mes, seguro_cesantia, seguro_rdh, seguro_rep_menor,
-              gps, tipo_vehiculo, marca, modelo, tascli_real, plazo, cuota, monto_financiado
+              gps, tipo_vehiculo, marca, modelo, tascli_real, plazo, cuota, monto_financiado,
+              estado_credito, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') AS fo
        FROM creditos WHERE num_op IN (?) OR id_financiera IN (?)`,
       [chunk, chunk.map(String)]);
     const vistos = new Set();
@@ -311,6 +321,13 @@ async function aplicarCanal(mapaCanal, log) {
           const cu = Math.round(core.cuotaFrancesa(Number(r.monto_financiado), tasaFin / 100, plazoFin));
           if (cu > 0) { sets.push('cuota = ?'); vals.push(cu); }
         } catch (_) {}
+      }
+      // Fecha de otorgamiento: la Fecha Curse del Canal MANDA para ops cursadas
+      // (el sync antiguo dejaba la fecha del día de carga). Solo meses abiertos.
+      const esCursadoCanal = /^(cursado|otorgad)/i.test(String(f.estado_canal || ''));
+      if (!cerrado && esCursadoCanal && f.fecha_curse &&
+          String(r.estado_credito || '').toUpperCase() === 'OTORGADO' && r.fo !== f.fecha_curse) {
+        sets.push('fecha_otorgado = ?'); vals.push(f.fecha_curse);
       }
       if (cerrado && !sets.length) { omitidosCerrado++; continue; }
       if (!sets.length) continue;
