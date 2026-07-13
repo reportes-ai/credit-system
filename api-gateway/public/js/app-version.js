@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v118.6';
+const APP_VERSION = 'v118.7';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lk = document.createElement('link');
     lk.id = 'af-cards-uniform';
     lk.rel = 'stylesheet';
-    lk.href = '/css/cards-uniform.css';
+    lk.href = '/css/cards-uniform.css?v=' + encodeURIComponent(APP_VERSION);  // cache-bust por versión
     document.head.appendChild(lk);
   }
 

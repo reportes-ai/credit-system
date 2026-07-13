@@ -95,3 +95,92 @@
   margin-top: auto !important;
   align-self: flex-start;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   TAMAÑO INTERNO UNIFORME (v2): todas las landings con las cards
+   COMPACTAS del Home (padding 18×16, ícono 40, títulos .85rem).
+   Antes cada landing traía su propio padding 32×28 / ícono 58 /
+   h5 1.05rem y las cards se veían gigantes fuera del Home.
+   ───────────────────────────────────────────────────────────── */
+.modules-grid > .module-card:not([style*="none"]),
+.cards-grid   > .module-card:not([style*="none"]),
+.ap-grid      > .ap-card:not([style*="none"]),
+.reports-grid > .report-card:not([style*="none"]) {
+  padding: 18px 16px !important;
+  border-radius: 12px !important;
+  min-height: 200px !important;
+}
+.modules-grid > .module-card .card-icon,
+.cards-grid   > .module-card .card-icon,
+.ap-grid      > .ap-card .card-icon,
+.reports-grid > .report-card .card-icon {
+  width: 40px !important; height: 40px !important;
+  border-radius: 10px !important;
+  font-size: 1.15rem !important;
+  margin-bottom: 12px !important;
+}
+.modules-grid > .module-card h5, .modules-grid > .module-card h6,
+.cards-grid   > .module-card h5, .cards-grid   > .module-card h6,
+.ap-grid      > .ap-card h5,     .ap-grid      > .ap-card h6,
+.reports-grid > .report-card h5, .reports-grid > .report-card h6 {
+  font-size: 0.85rem !important;
+  margin: 0 0 5px !important;
+}
+.modules-grid > .module-card p,
+.cards-grid   > .module-card p,
+.ap-grid      > .ap-card p,
+.reports-grid > .report-card p {
+  font-size: 0.72rem !important;
+  margin: 0 0 12px !important;
+  line-height: 1.35 !important;
+  min-height: 4.05em !important;   /* 3 líneas al nuevo line-height */
+}
+.modules-grid > .module-card .btn-acceder,
+.cards-grid   > .module-card .btn-acceder,
+.ap-grid      > .ap-card .btn-acceder,
+.reports-grid > .report-card .btn-acceder {
+  padding: 6px 14px !important;
+  font-size: 0.75rem !important;
+  border-radius: 7px !important;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   COLORES CORPORATIVOS uniformes (algunas landings traían navys
+   propios #001345 / celestes distintos): ícono, hover y botón
+   siempre con la paleta oficial #012d70 → #0141A2 → #009AFE.
+   ───────────────────────────────────────────────────────────── */
+.modules-grid > .module-card .card-icon,
+.cards-grid   > .module-card .card-icon,
+.ap-grid      > .ap-card .card-icon,
+.reports-grid > .report-card .card-icon {
+  background: linear-gradient(135deg, #e8eaf6, #c5cae9) !important;
+  color: #0141A2 !important;
+}
+.modules-grid > .module-card:hover .card-icon,
+.cards-grid   > .module-card:hover .card-icon,
+.ap-grid      > .ap-card:hover .card-icon,
+.reports-grid > .report-card:hover .card-icon {
+  background: linear-gradient(135deg, #0141A2, #009AFE) !important;
+  color: #fff !important;
+}
+.modules-grid > .module-card:hover,
+.cards-grid   > .module-card:hover,
+.ap-grid      > .ap-card:hover,
+.reports-grid > .report-card:hover {
+  border-color: #0141A2 !important;
+  box-shadow: 0 12px 32px rgba(1, 65, 162, .15) !important;
+}
+.modules-grid > .module-card .btn-acceder,
+.cards-grid   > .module-card .btn-acceder,
+.ap-grid      > .ap-card .btn-acceder,
+.reports-grid > .report-card .btn-acceder {
+  background: #0141A2 !important;
+  color: #fff !important;
+}
+.modules-grid > .module-card:hover .btn-acceder,
+.cards-grid   > .module-card:hover .btn-acceder,
+.ap-grid      > .ap-card:hover .btn-acceder,
+.reports-grid > .report-card:hover .btn-acceder {
+  background: #009AFE !important;
+}
+
