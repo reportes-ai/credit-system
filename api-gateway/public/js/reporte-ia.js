@@ -16,7 +16,8 @@
   // Render de una sección (una entidad). ent: {tag, nombre, rut}; d: fila ia_informes_dealernet o null.
   function seccionHTML(ent, d) {
     const head = `<div style="font-weight:800;color:#0f172a;margin-bottom:8px"><i class="bi bi-${ent.tag === 'Empresa' ? 'building' : 'person'} me-1"></i>${E(ent.tag || '')} · ${E(ent.nombre || '')} <span style="color:#94a3b8;font-weight:600">${E(ent.rut || '')}</span></div>`;
-    if (!d) return head + '<div style="color:#94a3b8">Sin reporte IA para este RUT (aún no analizado, o la IA estaba desactivada al enviar).</div>';
+    if (!d) return head + `<div style="color:#94a3b8">Sin reporte IA para este RUT (aún no analizado, o la IA estaba desactivada al enviar).
+      <div style="margin-top:8px"><button onclick="AF_REP_IA.analizar('${E(ent.rut)}', this)" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:.8rem;font-weight:700;cursor:pointer"><i class="bi bi-stars me-1"></i>Analizar ahora con IA</button></div></div>`;
     const rg = RIESGO[String(d.nivel_riesgo || '').toUpperCase()] || { c: '#475569', b: '#f1f5f9' };
     const fecha = d.fecha ? new Date(d.fecha).toLocaleString('es-CL') : '—';
     const lst = (a, vac) => (a && a.length) ? '<ul style="margin:3px 0 0;padding-left:18px">' + a.map(x => `<li>${E(typeof x === 'string' ? x : JSON.stringify(x))}</li>`).join('') + '</ul>' : `<span style="color:#94a3b8">${vac}</span>`;
@@ -57,12 +58,35 @@
     const valid = ents.filter(e => e && e.rut);
     if (!valid.length) { cont.innerHTML = '<div style="color:#94a3b8">Sin entidades con RUT.</div>'; return; }
     const secs = [];
-    for (const e of valid) { const d = await fetchRut(e.rut); secs.push(seccionHTML(e, d)); }
+    for (const e of valid) {
+      const d = await fetchRut(e.rut);
+      secs.push(`<div data-repia-rut="${E(e.rut)}" data-ent='${E(JSON.stringify({ tag: e.tag, nombre: e.nombre, rut: e.rut })).replace(/'/g, "&#39;")}'>${seccionHTML(e, d)}</div>`);
+    }
     cont.innerHTML = secs.join('<hr style="border:none;border-top:1px solid #eef2f7;margin:18px 0">');
   }
 
   // Atajo por RUT único (Base Dealer, etc.).
   function abrirRut(rut, nombre) { return abrir([{ tag: 'Empresa', nombre, rut }]); }
 
-  window.AF_REP_IA = { abrir, abrirRut, seccionHTML };
+  // Analiza el RUT a demanda (POST /api/ia/informe-dealernet) y refresca la sección.
+  // Cubre los casos en que el análisis al enviar la ficha falló (timeout DealerNet, IA off).
+  async function analizar(rut, btn) {
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando…'; }
+    try {
+      const r = await fetch('/api/ia/informe-dealernet', { method: 'POST',
+        headers: { ...H(), 'Content-Type': 'application/json' }, body: JSON.stringify({ rut }) });
+      const j = await r.json();
+      if (!j.success) throw new Error(j.error || 'No se pudo analizar');
+      // Re-render de la sección con el reporte fresco
+      const d = await fetchRut(rut);
+      const sec = btn && btn.closest('div[data-repia-rut]');
+      if (sec && d) sec.innerHTML = seccionHTML(JSON.parse(sec.dataset.ent || '{}'), d);
+      else if (d && btn) { btn.parentElement.parentElement.outerHTML = seccionHTML({ tag: '', nombre: '', rut }, d); }
+    } catch (e) {
+      alert('No se pudo analizar: ' + e.message);
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Analizar ahora con IA'; }
+    }
+  }
+
+  window.AF_REP_IA = { abrir, abrirRut, seccionHTML, analizar };
 })();
