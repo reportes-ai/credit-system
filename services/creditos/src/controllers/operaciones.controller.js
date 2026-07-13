@@ -240,6 +240,19 @@ const create = async (req, res) => {
       } catch (e) { console.error('[operaciones→cliente]', e.message); }
     }
 
+    // Duplicados: avisar ANTES de insertar con mensaje claro (los UNIQUE de la tabla
+    // devolvían un 500 genérico que no decía qué operación chocaba).
+    if (b.id_financiera) {
+      const [[dupF]] = await pool.query('SELECT num_op, estado_credito FROM creditos WHERE id_financiera = ? LIMIT 1', [String(b.id_financiera)]);
+      if (dupF) return res.status(409).json({ success: false, data: null,
+        error: `El ID Financiera ${b.id_financiera} ya existe en la operación N° ${dupF.num_op} (${dupF.estado_credito || 's/estado'}). Si es la misma operación, edítala en Créditos en vez de digitarla de nuevo.` });
+    }
+    if (b.num_op) {
+      const [[dupO]] = await pool.query('SELECT num_op, estado_credito FROM creditos WHERE num_op = ? LIMIT 1', [String(b.num_op)]);
+      if (dupO) return res.status(409).json({ success: false, data: null,
+        error: `El N° de operación ${b.num_op} ya existe (${dupO.estado_credito || 's/estado'}).` });
+    }
+
     // Auto-asignar numero_credito si no viene del formulario
     if (!b.numero_credito) {
       b.numero_credito = await generarNumeroCred(b.mes || null);
@@ -306,6 +319,11 @@ const create = async (req, res) => {
       meta: { num_op: b.num_op, financiera: b.financiera, estado: b.estado_credito } });
     res.status(201).json({ success: true, data: row, error: null });
   } catch (e) {
+    // Red de seguridad: si igual choca un UNIQUE (carrera), mensaje claro en vez de 500
+    if (e && e.code === 'ER_DUP_ENTRY') {
+      const cual = /uq_id_financiera/.test(e.message) ? 'El ID Financiera' : 'El N° de operación';
+      return res.status(409).json({ success: false, data: null, error: `${cual} ya existe en otra operación (registro duplicado).` });
+    }
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
