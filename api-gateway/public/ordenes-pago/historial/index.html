@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.14 -->
+  <!-- v1.15 — bloque Depositar en/Titular (datos bancarios del dealer) en el documento -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -325,7 +325,10 @@ function docHTML(o){
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
-      <tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>
+      ${o.deposito ? `
+      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}"><b>${escH(o.deposito.banco||'—')}</b>${o.deposito.tipo_cuenta?' · '+escH(o.deposito.tipo_cuenta):''} · Cta. N° <b>${escH(o.deposito.num_cuenta||'')}</b></td></tr>
+      <tr><td style="${SresL}">Titular</td><td style="${SresV}">${escH(o.deposito.titular||'—')}${o.deposito.rut?' · RUT '+escH(o.deposito.rut):''}</td></tr>`
+      : `<tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>`}
       ${montoRows}
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>

@@ -357,7 +357,7 @@ const getOrden = async (req, res) => {
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, etc.) para forzar el re-congelado idempotente de los snapshots.
-const DOC_VERSION = 4;
+const DOC_VERSION = 5;
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -388,6 +388,7 @@ async function construirDocumento(oc) {
     ? `SELECT s.id AS id_seg, s.num_op, s.financiera,
               COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+              d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
               fc.numero_factura, fc.es_boleta, fc.fecha_factura,
               fc.monto_bruto AS fc_base, fc.impuesto_pct AS fc_pct, fc.impuesto_monto AS fc_imp, fc.monto_liquido AS fc_liquido,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
@@ -400,6 +401,7 @@ async function construirDocumento(oc) {
     : `SELECT s.id AS id_seg, s.num_op, s.financiera, s.saldo_precio,
               COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
+              d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='SALDO' AND pe.etapa='SALDO PRECIO PAGADO' LIMIT 1) AS pagado
          FROM postventa_ordenes spo
          JOIN postventa_seguimiento s ON s.id = spo.id_seguimiento
@@ -410,7 +412,32 @@ async function construirDocumento(oc) {
   const row = rws[0] || {};
   let monto = Number(oc.monto) || 0;   // = A pagar (líquido del correlativo)
   const estado = oc.anulada ? 'ANULADA' : ((oc.pagada || row.pagado) ? 'PAGADA' : 'EMITIDA');
-  const destino = [row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null;
+
+  // Datos de depósito: ficha del dealer (una sola fuente). Si el crédito no tiene
+  // id_dealer (JOIN vacío), fallback por RUT o razón social del seguimiento.
+  let dep = { banco: row.banco, num_cuenta: row.num_cuenta, cuenta_tipo: row.cuenta_tipo,
+              tipo_cuenta: row.tipo_cuenta, titular: row.nombre_cuenta, rut_pago: row.rut_pago };
+  if (!dep.num_cuenta && (row.dealer_rut || row.dealer_nombre)) {
+    const [[d2]] = await pool.query(
+      `SELECT banco, num_cuenta, cuenta_tipo, tipo_cuenta, nombre_cuenta, rut_pago, rut, nombre_razon
+         FROM dealers WHERE (rut = ? AND ? != '') OR nombre_razon = ? OR nombre_indexa = ? LIMIT 1`,
+      [row.dealer_rut || '', row.dealer_rut || '', row.dealer_nombre || '', row.dealer_nombre || '']);
+    if (d2) {
+      dep = { banco: d2.banco, num_cuenta: d2.num_cuenta, cuenta_tipo: d2.cuenta_tipo,
+              tipo_cuenta: d2.tipo_cuenta, titular: d2.nombre_cuenta, rut_pago: d2.rut_pago || d2.rut };
+      if (!row.dealer_rut && d2.rut) row.dealer_rut = d2.rut;   // completa el RUT del proveedor
+    }
+  }
+  const deposito = dep.num_cuenta ? {
+    banco: dep.banco || null,
+    tipo_cuenta: dep.tipo_cuenta || dep.cuenta_tipo || null,
+    num_cuenta: dep.num_cuenta,
+    titular: dep.titular || row.dealer_nombre || null,
+    rut: dep.rut_pago || row.dealer_rut || null,
+  } : null;
+  const destino = deposito
+    ? [deposito.banco, deposito.tipo_cuenta, 'N° ' + deposito.num_cuenta].filter(Boolean).join(' · ')
+    : ([row.num_cuenta, row.banco].filter(Boolean).join(' · ') || null);
 
   // Desglose tributario. Saldo Precio: exento. Comisión: usa el desglose CONGELADO de la
   // factura/boleta (postventa_facturas_comision: base/neto, impuesto, líquido).
@@ -451,7 +478,7 @@ async function construirDocumento(oc) {
     numero_documento: esCom ? (row.numero_factura || null) : null,
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
     tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
-    destino, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
+    destino, deposito, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
     anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,
   };

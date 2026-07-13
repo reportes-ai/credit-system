@@ -762,8 +762,12 @@ const getOrdenPago = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.saldo_precio, s.financiera, s.fecha_otorgado,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
-             COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
-             d.num_cuenta, d.banco, d.rut_pago,
+             COALESCE(c.rut_dealer, d.rut, dn.rut) AS rut_dealer,
+             COALESCE(d.num_cuenta, dn.num_cuenta) AS num_cuenta,
+             COALESCE(d.banco, dn.banco) AS banco,
+             COALESCE(d.rut_pago, dn.rut_pago) AS rut_pago,
+             COALESCE(d.tipo_cuenta, d.cuenta_tipo, dn.tipo_cuenta, dn.cuenta_tipo) AS tipo_cuenta,
+             COALESCE(d.nombre_cuenta, dn.nombre_cuenta) AS nombre_cuenta,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias
       FROM postventa_seguimiento s
@@ -771,6 +775,8 @@ const getOrdenPago = async (req, res) => {
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
+      -- Fallback: créditos sin id_dealer → dealer por razón social del seguimiento
+      LEFT JOIN dealers  dn ON d.id_dealer IS NULL AND (dn.nombre_razon = s.nombre_dealer OR dn.nombre_indexa = s.nombre_dealer)
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='ORDEN DE PAGO EMITIDA')
