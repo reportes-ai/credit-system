@@ -125,6 +125,7 @@ function showV(id, el) {
   if(id==='v4') { buildV4(); window._v4=true; }
   if(id==='v5'&&!window._v5) { buildV5(); window._v5=true; }
   if(id==='v7') { const sd7=document.getElementById('sel-desde'); if(!sd7?.value) window.aplicarFiltro(); buildV7(); window._v7=true; }
+  if(id==='v7p') { const sd7p=document.getElementById('sel-desde'); if(!sd7p?.value) window.aplicarFiltro(); buildV7p(); window._v7p=true; }
   if(id==='v8') { const sd8=document.getElementById('sel-desde'); if(!sd8?.value) window.aplicarFiltro(); buildV8(); window._v8=true; }
   if(id==='vhist') { initVHist(); }
   if(id==='vppto') { buildVPpto(); }
@@ -1621,7 +1622,7 @@ window.RAW_DATA = [];
 
     // Rebuild vistas activas
     destroyCharts();
-    window._v2 = false; window._v3 = false; window._v4 = false; window._v1b = false; window._v5 = false; window._v6 = false; window._v6_filtro = null; window._v7 = false; window._v8 = false; window._v2pl = false;
+    window._v2 = false; window._v3 = false; window._v4 = false; window._v1b = false; window._v5 = false; window._v6 = false; window._v6_filtro = null; window._v7 = false; window._v7p = false; window._v8 = false; window._v2pl = false;
     buildV1();
     if (document.getElementById('v1b').classList.contains('active')) { buildV1b(); window._v1b=true; }
     if (document.getElementById('v2').classList.contains('active')) { buildV2(); window._v2 = true; }
@@ -1630,6 +1631,7 @@ window.RAW_DATA = [];
     if (document.getElementById('v4').classList.contains('active')) { buildV4(); window._v4 = true; }
     if (document.getElementById('v6') && document.getElementById('v6').classList.contains('active')) { buildV6(); window._v6 = true; }
     if (document.getElementById('v7') && document.getElementById('v7').classList.contains('active')) { buildV7(); window._v7 = true; }
+    if (document.getElementById('v7p') && document.getElementById('v7p').classList.contains('active')) { buildV7p(); window._v7p = true; }
     if (document.getElementById('v8') && document.getElementById('v8').classList.contains('active')) { buildV8(); window._v8 = true; }
   };
 
@@ -2377,6 +2379,193 @@ function buildV7() {
   });
 }
 
+// ======== PROSPECCIÓN (funnel + meta ingresos diarios) ========
+// Regla negocio: cada ejecutivo debe digitar al menos META_ING_DIA ingresos por
+// día hábil (lunes a sábado). Bajo eso, el problema clave es PROSPECCIÓN.
+const META_ING_DIA = 2;
+
+// Días hábiles L-S entre dos meses 'YYYY-MM' inclusive; el mes en curso se
+// cuenta solo hasta hoy (hora Chile).
+function diasHabilesLS(desde, hasta) {
+  const hoyStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' });
+  const ini = new Date(desde + '-01T12:00:00');
+  const [hy, hm] = hasta.split('-').map(Number);
+  let fin = new Date(hy, hm, 0, 12); // último día del mes hasta
+  const hoy = new Date(hoyStr + 'T12:00:00');
+  if (fin > hoy) fin = hoy;
+  let n = 0;
+  for (let d = new Date(ini); d <= fin; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0) n++; // todo menos domingo
+  }
+  return Math.max(n, 1);
+}
+
+function buildV7p() {
+  const desde = document.getElementById('sel-desde')?.value || '';
+  const hasta = document.getElementById('sel-hasta')?.value || '';
+  const lbl = document.getElementById('periodo-label')?.textContent || '';
+  document.getElementById('titulo-v7p').textContent = 'Embudo por Ejecutivo — ' + lbl;
+
+  const diasHab = diasHabilesLS(desde, hasta);
+  const metaIng = META_ING_DIA * diasHab;
+
+  const rows = window.RAW_DATA.filter(r => r.mes >= desde && r.mes <= hasta && r.ejecutivo);
+  const ejMap = {};
+  rows.forEach(r => {
+    const ej = r.ejecutivo;
+    if (!ejMap[ej]) ejMap[ej] = {ing:0,apro:0,ot:0,rec:0};
+    const d = ejMap[ej];
+    d.ing++;
+    const est = r.estado_eval || '';
+    if (!['RECHAZADO','ANULADO'].includes(est)) d.apro++;
+    if (est === 'OTORGADO') d.ot++;
+    if (est === 'RECHAZADO') d.rec++;
+  });
+
+  const ejs = Object.entries(ejMap).filter(([,v]) => v.ing > 0).sort((a,b) => b[1].ot - a[1].ot);
+
+  const totIng  = ejs.reduce((a,[,v])=>a+v.ing,0);
+  const totApro = ejs.reduce((a,[,v])=>a+v.apro,0);
+  const totOt   = ejs.reduce((a,[,v])=>a+v.ot,0);
+  const bajoMeta = ejs.filter(([,v]) => v.ing/diasHab < META_ING_DIA).length;
+  document.getElementById('kpi7p').innerHTML = `
+    <div class="kpi-box"><div class="kpi-label">Días Hábiles (L–S)</div><div class="kpi-val big">${diasHab}</div><div class="kpi-sub">del período</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Meta Ing. / Ejecutivo</div><div class="kpi-val big">${metaIng}</div><div class="kpi-sub">${META_ING_DIA} × ${diasHab} días</div></div>
+    <div class="kpi-box"><div class="kpi-label">Ingresados</div><div class="kpi-val big">${totIng}</div><div class="kpi-sub">${(totIng/Math.max(ejs.length,1)/diasHab).toFixed(2)} ing/día prom.</div></div>
+    <div class="kpi-box"><div class="kpi-label">Aprobados</div><div class="kpi-val big">${totApro}</div><div class="kpi-sub">${fPct(totApro,totIng)} TA</div></div>
+    <div class="kpi-box"><div class="kpi-label">Otorgados</div><div class="kpi-val big">${totOt}</div><div class="kpi-sub">${fPct(totOt,totApro)} TC</div></div>
+    <div class="kpi-box"><div class="kpi-label">Bajo Meta Prospección</div><div class="kpi-val big" style="color:${bajoMeta?'#e53935':'#43a047'}">${bajoMeta}</div><div class="kpi-sub">de ${ejs.length} ejecutivos</div></div>`;
+
+  const taTeam = totApro/Math.max(totIng,1)*100;
+  const tcTeam = totOt/Math.max(totApro,1)*100;
+
+  const thead = `<thead><tr style="background:#1a3a6a;color:#fff;font-size:10px">
+    <th style="padding:6px 8px;text-align:left;position:sticky;left:0;background:#1a3a6a;min-width:160px">Ejecutivo</th>
+    <th style="padding:6px;text-align:center;min-width:50px">Ing.</th>
+    <th style="padding:6px;text-align:center;min-width:55px" title="Ingresados / días hábiles L-S">Ing./día</th>
+    <th style="padding:6px;text-align:center;min-width:50px" title="Meta = ${META_ING_DIA} × días hábiles">Meta</th>
+    <th style="padding:6px;text-align:center;min-width:50px">Apro.</th>
+    <th style="padding:6px;text-align:center;min-width:55px" title="Tasa Aprobación">TA%</th>
+    <th style="padding:6px;text-align:center;min-width:45px">Ot.</th>
+    <th style="padding:6px;text-align:center;min-width:55px" title="Tasa Conversión">TC%</th>
+    <th style="padding:6px;text-align:center;min-width:45px">Rec.</th>
+    <th style="padding:6px;text-align:center;min-width:120px">Barra de caída</th>
+    <th style="padding:6px;text-align:center;min-width:80px">Prob. clave</th>
+  </tr></thead>`;
+
+  const tbRows = ejs.map(([ej, v]) => {
+    const ta = v.ing ? v.apro/v.ing*100 : 0;
+    const tc = v.apro ? v.ot/v.apro*100 : 0;
+    const ingDia = v.ing / diasHab;
+    const taC = ta >= taTeam*0.9 ? '#43a047' : ta >= taTeam*0.7 ? '#fb8c00' : '#e53935';
+    const tcC = tc >= tcTeam*0.9 ? '#43a047' : tc >= tcTeam*0.7 ? '#fb8c00' : '#e53935';
+    const idC = ingDia >= META_ING_DIA ? '#43a047' : ingDia >= META_ING_DIA*0.75 ? '#fb8c00' : '#e53935';
+
+    const pApro = v.ing ? v.apro/v.ing*100 : 0;
+    const pOt   = v.ing ? v.ot/v.ing*100 : 0;
+
+    // Diagnóstico: prospección primero (tope del embudo), luego el resto
+    let diag = '', diagC = '#666';
+    if (ingDia < META_ING_DIA)      { diag = '⚠ Prospección'; diagC = '#e53935'; }
+    else if (ta < taTeam*0.7)       { diag = '⚠ Aprobación';  diagC = '#e53935'; }
+    else if (tc < tcTeam*0.7)       { diag = '⚠ Conversión';  diagC = '#fb8c00'; }
+    else                            { diag = '✓ OK';          diagC = '#43a047'; }
+
+    const nombre = ej.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');
+
+    return `<tr style="border-bottom:1px solid #f0f2f5">
+      <td style="padding:5px 8px;font-weight:600;font-size:10px;position:sticky;left:0;background:#fff">${nombre}</td>
+      <td style="text-align:center;padding:4px 6px">${v.ing}</td>
+      <td style="text-align:center;padding:4px 6px;font-weight:700;color:${idC}">${ingDia.toFixed(2).replace('.',',')}</td>
+      <td style="text-align:center;padding:4px 6px;color:#888">${metaIng}</td>
+      <td style="text-align:center;padding:4px 6px">${v.apro}</td>
+      <td style="text-align:center;padding:4px 6px;font-weight:700;color:${taC}">${ta.toFixed(1)}%</td>
+      <td style="text-align:center;padding:4px 6px">${v.ot}</td>
+      <td style="text-align:center;padding:4px 6px;font-weight:700;color:${tcC}">${tc.toFixed(1)}%</td>
+      <td style="text-align:center;padding:4px 6px;color:#e53935">${v.rec}</td>
+      <td style="padding:4px 8px">
+        <div style="position:relative;height:14px;background:#f0f2f5;border-radius:3px;overflow:hidden">
+          <div style="position:absolute;left:0;top:0;height:100%;width:100%;background:#e8edf5;border-radius:3px"></div>
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pApro.toFixed(1)}%;background:#2196F355;border-radius:3px"></div>
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pOt.toFixed(1)}%;background:#1565C0;border-radius:3px"></div>
+        </div>
+      </td>
+      <td style="text-align:center;padding:4px 6px;font-weight:700;font-size:10px;color:${diagC}">${diag}</td>
+    </tr>`;
+  }).join('');
+
+  const tfootRow = `<tfoot><tr style="background:#e8edf5;font-weight:700;font-size:10px;border-top:2px solid #1a3a6a">
+    <td style="padding:5px 8px;position:sticky;left:0;background:#e8edf5">TOTAL EQUIPO</td>
+    <td style="text-align:center;padding:4px 6px">${totIng}</td>
+    <td style="text-align:center;padding:4px 6px">${(totIng/Math.max(ejs.length,1)/diasHab).toFixed(2).replace('.',',')}</td>
+    <td style="text-align:center;padding:4px 6px;color:#888">${metaIng * ejs.length}</td>
+    <td style="text-align:center;padding:4px 6px">${totApro}</td>
+    <td style="text-align:center;padding:4px 6px;color:#2196F3">${taTeam.toFixed(1)}%</td>
+    <td style="text-align:center;padding:4px 6px">${totOt}</td>
+    <td style="text-align:center;padding:4px 6px;color:#43a047">${tcTeam.toFixed(1)}%</td>
+    <td style="text-align:center;padding:4px 6px;color:#e53935">${ejs.reduce((a,[,v])=>a+v.rec,0)}</td>
+    <td></td><td></td>
+  </tr></tfoot>`;
+
+  document.getElementById('t-funnelp').innerHTML = thead + '<tbody>' + tbRows + '</tbody>' + tfootRow;
+
+  // Gráfico: ingresos por día hábil vs meta (ordenado por ing/día desc)
+  const ejsIng = ejs.slice().sort((a,b) => b[1].ing - a[1].ing).slice(0,15);
+  const lblIng = ejsIng.map(([ej])=>ej.split(' ').slice(0,2).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '));
+  const valIng = ejsIng.map(([,v])=>+(v.ing/diasHab).toFixed(2));
+  const existIng = Chart.getChart(document.getElementById('ch-funnelp-ing'));
+  if (existIng) existIng.destroy();
+  new Chart(document.getElementById('ch-funnelp-ing'), {
+    type: 'bar',
+    data: {
+      labels: lblIng,
+      datasets: [{
+        label: 'Ing./día', data: valIng,
+        backgroundColor: valIng.map(v => v >= META_ING_DIA ? '#43a047cc' : v >= META_ING_DIA*0.75 ? '#fb8c00cc' : '#e53935cc'),
+        borderRadius: 3
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw} ing/día (meta: ${META_ING_DIA})` } }
+      },
+      scales: {
+        x: { min: 0, ticks: { font: { size: 9 } }, grid: { color: '#f0f2f5' } },
+        y: { ticks: { font: { size: 9 } } }
+      }
+    }
+  });
+
+  // Gráfico barras horizontales — caída en cada etapa (igual al Funnel)
+  const labels = ejs.slice(0,15).map(([ej])=>ej.split(' ').slice(0,2).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '));
+  const dataTA = ejs.slice(0,15).map(([,v])=>v.ing?+(v.apro/v.ing*100).toFixed(1):0);
+  const dataTC = ejs.slice(0,15).map(([,v])=>v.apro?+(v.ot/v.apro*100).toFixed(1):0);
+  const existBar = Chart.getChart(document.getElementById('ch-funnelp-bar'));
+  if (existBar) existBar.destroy();
+  new Chart(document.getElementById('ch-funnelp-bar'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'TA% (Aprobación)', data: dataTA, backgroundColor: '#2196F3aa', borderRadius: 3 },
+        { label: 'TC% (Conversión)', data: dataTC, backgroundColor: '#43a047aa', borderRadius: 3 },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } } },
+      scales: {
+        x: { min: 0, max: 100, ticks: { callback: v => v+'%', font: { size: 9 } }, grid: { color: '#f0f2f5' } },
+        y: { ticks: { font: { size: 9 } } }
+      }
+    }
+  });
+}
+
 // ======== PROYECCIÓN PRO ========
 // Mejoras sobre la curva simple:
 //  1. DÍAS HÁBILES (L-V) en vez de calendario — un mes que parte en fin de
@@ -2677,6 +2866,7 @@ const TABS_NAV = [
   { id:'v3',    label:'📈 Tendencia' },
   { id:'v5',    label:'👤 Ejecutivos' },
   { id:'v7',    label:'🔻 Funnel' },
+  { id:'v7p',   label:'🎯 Prospección' },
   { id:'v6',    label:'💳 Saldo Precio' },
   { id:'v8',    label:'📋 Comparativo' },
   { id:'vhist', label:'📅 Historia' },

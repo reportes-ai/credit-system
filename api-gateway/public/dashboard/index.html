@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.4 -->
+<!-- v1.5 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -41,6 +41,7 @@
       <div class="tab" data-viewid="v3" onclick="showV('v3',this)">📈 Tendencia</div>
       <div class="tab" data-viewid="v5" onclick="showV('v5',this)">👤 Ejecutivos</div>
       <div class="tab" data-viewid="v7" onclick="showV('v7',this)">🔻 Funnel</div>
+      <div class="tab" data-viewid="v7p" onclick="showV('v7p',this)">🎯 Prospección</div>
       <div class="tab" data-viewid="v6" onclick="showV('v6',this)">💳 Saldo Precio</div>
       <div class="tab" data-viewid="v8" onclick="showV('v8',this)">📋 Comparativo</div>
       <div class="tab" data-viewid="vhist" onclick="showV('vhist',this)">📅 Historia</div>
@@ -758,6 +759,64 @@
           <div style="margin-top:8px;color:#888">El semáforo compara cada ejecutivo contra el promedio del equipo en el período.</div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- VISTA PROSPECCIÓN: funnel + meta de ingresos diarios -->
+<div id="v7p" class="view">
+  <div class="dash-header">
+    <div class="dash-title">🎯 Funnel de Prospección por Ejecutivo</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="period-badge" id="badge-periodo">📅 —</div>
+      <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
+    </div>
+  </div>
+
+  <!-- KPIs resumen equipo -->
+  <div class="kpi-strip" id="kpi7p"></div>
+
+  <!-- Contenido principal -->
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:10px;margin-top:10px">
+
+    <!-- Tabla funnel por ejecutivo -->
+    <div class="card">
+      <div class="card-head" id="titulo-v7p">Embudo por Ejecutivo</div>
+      <div style="overflow-x:auto;max-height:980px;overflow-y:auto">
+        <table id="t-funnelp" style="width:100%;border-collapse:collapse;font-size:11px"></table>
+      </div>
+    </div>
+
+    <!-- Panel derecho: gráficos -->
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="card">
+        <div class="card-head light">Ingresos por día hábil vs meta</div>
+        <div class="ch" style="height:320px;padding:8px"><canvas id="ch-funnelp-ing"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head light">Dónde se pierde cada ejecutivo</div>
+        <div class="ch" style="height:260px;padding:8px"><canvas id="ch-funnelp-bar"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parámetros y fórmulas -->
+  <div class="card" style="margin-top:10px;background:#f7f9fc;border-left:4px solid #0255c5">
+    <div class="card-head light" style="background:transparent"><i class="bi bi-diagram-3"></i> Parámetros y cómo se calcula cada uno</div>
+    <div style="padding:10px 16px;font-size:11px;line-height:1.9;color:#444">
+      <ul style="margin:0;padding-left:18px">
+        <li><b>Meta de prospección</b> → cada ejecutivo debe digitar <b>al menos 2 ingresos por día hábil</b>. Días hábiles = <b>lunes a sábado</b> (solo se excluyen los domingos). En el mes en curso se cuentan los días hábiles transcurridos hasta hoy, no el mes completo.</li>
+        <li><b>Ing.</b> (Ingresados) → operaciones digitadas por el ejecutivo en el período (cualquier estado).</li>
+        <li><b>Ing./día</b> → Ingresados ÷ días hábiles L–S del período. Verde si ≥ 2,00; naranjo si ≥ 1,50; rojo si menos.</li>
+        <li><b>Meta</b> → 2 × días hábiles L–S del período (ingresos mínimos exigidos a cada ejecutivo).</li>
+        <li><b>Apro.</b> (Aprobados) → ingresados que no están en estado RECHAZADO ni ANULADO.</li>
+        <li><b>TA%</b> (Tasa de Aprobación) → Aprobados ÷ Ingresados.</li>
+        <li><b>Ot.</b> (Otorgados) → operaciones cursadas (estado OTORGADO).</li>
+        <li><b>TC%</b> (Tasa de Conversión) → Otorgados ÷ Aprobados.</li>
+        <li><b>Rec.</b> → operaciones en estado RECHAZADO.</li>
+        <li><b>Prob. clave</b> → diagnóstico en este orden de prioridad: <span style="color:#e53935;font-weight:700">⚠ Prospección</span> si Ing./día &lt; 2,00 (no cumple la meta de digitación) · <span style="color:#e53935;font-weight:700">⚠ Aprobación</span> si su TA% está bajo el 70% del promedio del equipo · <span style="color:#fb8c00;font-weight:700">⚠ Conversión</span> si su TC% está bajo el 70% del promedio del equipo · <span style="color:#43a047;font-weight:700">✓ OK</span> si cumple todo.</li>
+        <li><b>Semáforo TA%/TC%</b> → verde si ≥ 90% del promedio del equipo, naranjo si ≥ 70%, rojo si menos.</li>
+      </ul>
     </div>
   </div>
 </div>
