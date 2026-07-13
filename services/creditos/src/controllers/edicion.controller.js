@@ -211,7 +211,12 @@ const updateCredito = async (req, res) => {
     for (const [campo, nuevoVal] of Object.entries(cambios)) {
       if (!colsValidas.has(campo)) continue;
       const valorAntes = actual?.[campo];
-      const valorDespues = nuevoVal === '' ? null : nuevoVal;
+      let valorDespues = nuevoVal === '' ? null : nuevoVal;
+      // Tasa cliente siempre en % mensual (motor único: fracción <0,2 → ×100)
+      if (campo === 'tascli_real' && valorDespues != null) {
+        const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+        valorDespues = core.normTasaMensualPct(valorDespues) || valorDespues;
+      }
       sets.push(`${campo} = ?`);
       vals.push(valorDespues);
       logEntries.push([id, cred.num_op, usuario, campo, valorAntes ?? null, valorDespues ?? null]);

@@ -223,7 +223,12 @@ exports.guardar = async (req, res) => {
     const sets = [], vals = [], cambios = [];
     for (const [col, raw] of Object.entries(campos)) {
       if (!valid.has(col)) continue;
-      const v = (raw === '' || raw === undefined) ? null : raw;
+      let v = (raw === '' || raw === undefined) ? null : raw;
+      // Tasa cliente siempre en % mensual (motor único: fracción <0,2 → ×100)
+      if (col === 'tascli_real' && v != null) {
+        const core = require('../../../../api-gateway/public/js/rentabilidad-core');
+        v = core.normTasaMensualPct(v) || v;
+      }
       // No pisar un dato existente con vacío: si el form llegó con el campo en blanco
       // pero la BD ya tiene valor (ej. lo llenó una carga posterior), se conserva.
       if (v === null && antes[col] != null && String(antes[col]) !== '') continue;

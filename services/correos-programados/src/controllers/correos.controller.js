@@ -593,6 +593,14 @@ async function buildSalud() {
     add('Dólar', dd.d <= 5, `último valor hace ${dd.d} día(s)`);
   } catch (_) { add('Dólar', true, 'sin tabla'); }
 
+  // 3b. Coherencia de negocio: tasas de crédito en FRACCIÓN (0.028 en vez de 2.8%).
+  // Todas las vías de escritura normalizan (motor único normTasaMensualPct), pero si
+  // alguna nueva se salta el blindaje, este vigilante lo acusa al día siguiente.
+  try {
+    const [[tf]] = await pool.query("SELECT COUNT(*) n, GROUP_CONCAT(num_op SEPARATOR ', ') ops FROM (SELECT num_op FROM creditos WHERE tascli_real > 0 AND tascli_real < 0.2 LIMIT 10) x");
+    add('Tasas en % mensual', !tf.n, tf.n ? `${tf.n} crédito(s) con tasa en FRACCIÓN (ops: ${tf.ops}) — normalizar ×100` : 'sin tasas en fracción');
+  } catch (e) { add('Tasas en % mensual', false, e.message); }
+
   // 4. Correos programados con error
   try {
     const [ce] = await pool.query("SELECT nombre, ultimo_estado FROM correos_programados WHERE activo=1 AND ultimo_estado LIKE 'Error%'");
