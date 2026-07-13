@@ -64,7 +64,8 @@ async function crearCreditoDesdeCartas(c) {
             NOW(),NOW())
   `, [
     numero_credito, (/^\d+$/.test(String(numero_credito)) ? parseInt(numero_credito, 10) : null), financiera,
-    (c.id_financiera ?? c.idFinanciera ?? null),
+    // ID de la operación en la financiera: el frontend lo manda como opOrigen
+    (c.id_financiera ?? c.idFinanciera ?? c.opOrigen ?? c.op_origen ?? null),
     cliRow?.id_cliente || null,
     (c.rut_conc || c.rutConc || null),
     (c.vendedor || null),
