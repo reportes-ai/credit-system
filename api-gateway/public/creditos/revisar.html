@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.4 — resumen de la tabla de amortización usa la cuota calculada (no la guardada en 0) -->
+<!-- v2.5 — header muestra num_op (las ops del sync no tienen numero_credito) -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -612,7 +612,7 @@ function renderPagina(c, ant, com) {
     <div class="cred-header">
       <div class="ch-left">
         <div class="ch-num"><i class="bi bi-credit-card me-1"></i>N° Operación</div>
-        <div class="ch-name">${c.numero_credito||'—'}</div>
+        <div class="ch-name">${c.num_op||c.numero_credito||'—'}</div>
         <div class="ch-name" style="font-size:1.1rem;margin-top:2px">${c.nombre_cliente||'—'}</div>
         <div class="ch-rut">${c.rut_cliente||'—'}</div>
       </div>
@@ -1301,7 +1301,7 @@ function parseDJ() {
 function abrirEditBroker() {
   const c = _credito;
   if (!c) return;
-  document.getElementById('editBrokerNumCred').textContent = c.numero_credito||c.numero_credito_fmt||'—';
+  document.getElementById('editBrokerNumCred').textContent = c.num_op||c.numero_credito||c.numero_credito_fmt||'—';
   const setV = (id, v) => { const el=document.getElementById(id); if(el) el.value=(v!=null?v:''); };
   const setP = (id, v) => { const el=document.getElementById(id); if(el) el.value=(v!=null&&v!=='')?('$'+Math.round(Number(v)).toLocaleString('es-CL')):''; };
   const setD = (id, v) => { const el=document.getElementById(id); if(el) el.value=v?(v.split?v.split('T')[0]:v):''; };
