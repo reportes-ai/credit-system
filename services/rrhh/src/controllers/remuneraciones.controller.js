@@ -352,8 +352,9 @@ async function extraerIndicadoresPrevired() {
 Las tasas AFP son la cotización obligatoria del trabajador dependiente (10% + comisión, ej: 11.44).
 TEXTO: ${texto}`,
   });
-  const datos = typeof out === 'string' ? JSON.parse(out.replace(/```json|```/g, '').trim()) : out;
-  if (!datos || (!datos.imm && !datos.afps)) throw new Error('La IA no pudo extraer indicadores');
+  // analizar() devuelve { texto, datos, ... } — con json:true el JSON parseado viene en .datos
+  const datos = out && out.datos ? out.datos : null;
+  if (!datos || (!datos.imm && !datos.afps)) throw new Error('La IA no pudo extraer indicadores (respuesta: ' + String(out && out.texto || '').slice(0, 120) + ')');
   return datos;
 }
 
@@ -420,10 +421,12 @@ setInterval(async () => {
   } catch (e) { console.error('[indicadores-sync cron]', e.message); }
 }, 60 * 60 * 1000);
 
-/* POST /api/rrhh/remuneraciones/indicadores/revisar — gatillo manual */
+/* POST /api/rrhh/remuneraciones/indicadores/revisar — gatillo manual.
+   502 (no 500): el error describe un servicio EXTERNO (Previred / IA) y el
+   gateway deja pasar los 502 al usuario — un 500 se sanitiza a mensaje genérico. */
 const revisarAhora = async (req, res) => {
   try { ok(res, await revisarIndicadores(req.usuario)); }
-  catch (e) { console.error('[rrhh revisarAhora]', e.message); fail(res, 'No se pudo revisar Previred: ' + e.message); }
+  catch (e) { console.error('[rrhh revisarAhora]', e.message); fail(res, 'No se pudo revisar Previred: ' + e.message, 502); }
 };
 
 /* GET /api/rrhh/remuneraciones/indicadores/propuesta — última pendiente */
