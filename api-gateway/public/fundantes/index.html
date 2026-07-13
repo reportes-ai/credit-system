@@ -15,7 +15,7 @@
     .page-banner i { font-size:2.4rem; opacity:.85; }
     .page-banner h2 { font-weight:800; margin:0 0 3px; font-size:1.3rem; }
     .page-banner p { opacity:.85; margin:0; font-size:.88rem; }
-    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+    .cards-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
     .module-card { background:#fff; border-radius:16px; box-shadow:0 1px 6px rgba(0,0,0,.08); padding:26px 24px; text-decoration:none; color:inherit; display:flex; flex-direction:column; gap:10px; border:1.5px solid transparent; transition:.15s; }
     .module-card:hover { border-color:#bfdbfe; transform:translateY(-2px); box-shadow:0 8px 24px rgba(1,65,162,.12); }
     .card-icon { width:54px; height:54px; border-radius:14px; background:linear-gradient(135deg,#eff6ff,#dbeafe); display:flex; align-items:center; justify-content:center; }
@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <div class="cards" id="cards">
+  <div class="cards-grid" id="cards">
     <a href="/fundantes-seguimiento/" class="module-card" id="cardEjec" style="display:none">
       <div class="card-icon"><i class="bi bi-folder-check"></i></div>
       <h6>Seguimiento Fundantes - Ejecutivo Comercial</h6>

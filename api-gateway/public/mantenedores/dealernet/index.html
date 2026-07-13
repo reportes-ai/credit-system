@@ -13,7 +13,7 @@
     .main { max-width:980px; margin:26px auto; padding:0 20px 60px; }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.4rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 2px; font-size:1.25rem; } .page-banner p { opacity:.8; margin:0; font-size:.86rem; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
+    .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:18px; }
     .module-card { background:#fff; border-radius:14px; padding:24px 22px; cursor:pointer; text-decoration:none; color:inherit; border:2px solid transparent; transition:transform .18s, box-shadow .18s, border-color .18s; display:flex; flex-direction:column; min-height:200px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
     .module-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); border-color:var(--navy); }
     .card-icon { width:52px; height:52px; border-radius:12px; background:#eef4fb; color:var(--navy); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:14px; transition:.18s; }
@@ -32,7 +32,7 @@
     <i class="bi bi-cloud-arrow-down"></i>
     <div><h2>Mantenedor DealerNet</h2><p>Configuración de la integración DealerNet: productos disponibles y costos en UF.</p></div>
   </div>
-  <div class="grid" id="grid"><div class="text-muted">Cargando…</div></div>
+  <div class="cards-grid" id="grid"><div class="text-muted">Cargando…</div></div>
 </div>
 
 <script src="/js/auth-guard.js"></script>
