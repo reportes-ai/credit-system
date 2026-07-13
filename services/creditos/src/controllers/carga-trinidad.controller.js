@@ -235,8 +235,19 @@ function parseCanal(buffer) {
                         })() : null,
       plazo:            (() => {
         if (iCurse < 0 || iTerm < 0 || !row[iCurse] || !row[iTerm]) return null;
-        const d1 = new Date(Math.round((row[iCurse] - 25569) * 864e5)), d2 = new Date(Math.round((row[iTerm] - 25569) * 864e5));
-        const m = (d2.getUTCFullYear() - d1.getUTCFullYear()) * 12 + (d2.getUTCMonth() - d1.getUTCMonth());
+        // AutoFin exporta las fechas a veces como serial Excel y a veces como fecha
+        // (con cellDates llegan como Date) → aceptar ambos formatos.
+        const aFecha = v => v instanceof Date ? v
+          : (typeof v === 'number' ? new Date(Math.round((v - 25569) * 864e5)) : new Date(v));
+        const d1 = aFecha(row[iCurse]), d2 = aFecha(row[iTerm]);
+        if (isNaN(d1) || isNaN(d2)) return null;
+        let m = (d2.getUTCFullYear() - d1.getUTCFullYear()) * 12 + (d2.getUTCMonth() - d1.getUTCMonth());
+        // Si el día del término no alcanza al día del curse, el último mes no está
+        // completo (curse 12-07 → término 01-08 del año N es plazo 48, no 49).
+        // El ±1 es intrínsecamente ambiguo (la 1ª cuota puede caer a 20-45 días del
+        // curse); validado contra 3.000 ops con plazo digitado esta regla da 75%
+        // exacto y el resto ±1 — es fill-only: lo digitado siempre manda.
+        if (d2.getUTCDate() < d1.getUTCDate()) m--;
         return m > 0 && m <= 120 ? m : null;
       })(),
     };
@@ -764,3 +775,6 @@ exports.parseCarta = async (req, res) => {
     return res.status(500).json({ success: false, error: 'No se pudo leer el PDF: ' + e.message });
   }
 };
+
+// Internos expuestos para scripts de operación y pruebas (mismo motor, cero duplicación)
+exports._interno = { parseCanal, aplicarCanal, esArchivoCanal };
