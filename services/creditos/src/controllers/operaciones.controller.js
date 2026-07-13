@@ -260,6 +260,13 @@ const create = async (req, res) => {
 
     const { saldo_precio, pct_financiado } = calcular(b);
 
+    // Cuota francesa automática (motor único) si viene la tripleta monto+tasa+plazo
+    // y no digitaron cuota — antes las ops de Unidad quedaban con cuota vacía.
+    if (!(Number(b.cuota) > 0)) {
+      const _m = parseFloat(b.monto_financiado) || 0, _t = core.normTasaMensualPct(b.tascli_real), _p = parseInt(b.plazo) || 0;
+      if (_m > 0 && _t > 0 && _p > 0) b.cuota = Math.round(core.cuotaFrancesa(_m, _t / 100, _p));
+    }
+
     const fields = [
       'numero_credito',
       'num_op','mes','financiera','comentarios',
@@ -268,7 +275,7 @@ const create = async (req, res) => {
       'valor_vehiculo','pie','saldo_precio','pct_financiado',
       'impuesto','estado_impuesto','limitacion','gastos','gps',
       'seguro_rdh','seguro_cesantia','seguro_rep_menor',
-      'monto_financiado','plazo','tascli_real','tascli_pizarra','tasfin_pizarra',
+      'monto_financiado','plazo','tascli_real','tascli_pizarra','tasfin_pizarra','cuota',
       'comdea_real','monto_comision_fin','id_financiera','fecha_primera_cuota',
       'parque','mayor_menor','monto_capitalizado',
       'boleta_factura','cantidad_docs','docs_autorizados','fecha_recep_doc',
@@ -358,7 +365,7 @@ const update = async (req, res) => {
       'valor_vehiculo=?','pie=?',
       'saldo_precio=?','pct_financiado=?','impuesto=?','estado_impuesto=?',
       'limitacion=?','gastos=?','gps=?','seguro_rdh=?','seguro_cesantia=?','seguro_rep_menor=?',
-      'monto_financiado=?','plazo=?','tascli_real=?','tascli_pizarra=?','tasfin_pizarra=?',
+      'monto_financiado=?','plazo=?','tascli_real=?','tascli_pizarra=?','tasfin_pizarra=?','cuota=?',
       'comdea_real=?','monto_comision_fin=?','id_financiera=?','fecha_primera_cuota=?',
       'parque=?','mayor_menor=?','monto_capitalizado=?',
       'boleta_factura=?','cantidad_docs=?','docs_autorizados=?','fecha_recep_doc=?',
@@ -377,6 +384,11 @@ const update = async (req, res) => {
       b.seguro_rdh||0, b.seguro_cesantia||0, b.seguro_rep_menor||0,
       b.monto_financiado||null, b.plazo||null,
       b.tascli_real||null, b.tascli_pizarra||null, b.tasfin_pizarra||null,
+      // Cuota: la digitada, o la francesa automática con monto+tasa+plazo (motor único)
+      (Number(b.cuota) > 0) ? Math.round(b.cuota) : (() => {
+        const _m = parseFloat(b.monto_financiado) || 0, _t = core.normTasaMensualPct(b.tascli_real), _p = parseInt(b.plazo) || 0;
+        return (_m > 0 && _t > 0 && _p > 0) ? Math.round(core.cuotaFrancesa(_m, _t / 100, _p)) : null;
+      })(),
       b.comdea_real||null, b.monto_comision_fin||null, b.id_financiera||null, b.fecha_primera_cuota||null,
       b.parque||'NO APLICA', b.mayor_menor||null, b.monto_capitalizado||0,
       b.boleta_factura||null, b.cantidad_docs||0, b.docs_autorizados||0, b.fecha_recep_doc||null,
