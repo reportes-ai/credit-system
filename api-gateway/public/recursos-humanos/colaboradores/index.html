@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.0 — gestión RRHH: fichas, previsión, sueldo y carpeta digital (Fase 1 módulo RRHH) -->
+  <!-- v1.1 — fix: tr class row chocaba con .row de Bootstrap (tabla apilada) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -24,7 +24,7 @@
     table { width:100%; border-collapse:collapse; font-size:.83rem; }
     th { background:#f8fafc; color:#475569; font-size:.7rem; text-transform:uppercase; padding:8px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
     td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-    tr.row:hover td { background:#f8fafc; cursor:pointer; }
+    tr.filac:hover td { background:#f8fafc; cursor:pointer; }
     .pill { border-radius:10px; padding:2px 9px; font-size:.7rem; font-weight:700; }
     .pill.activo { background:#dcfce7; color:#15803d; } .pill.inactivo { background:#fee2e2; color:#b91c1c; }
     .tag { background:#e0e7ff; color:#3730a3; border-radius:6px; padding:2px 8px; font-size:.7rem; font-weight:700; }
@@ -110,7 +110,7 @@ function render(){
   const rows = DATA.filter(r => !q || [r.nombre,r.rut,r.cargo,r.perfil].some(v=>String(v||'').toLowerCase().includes(q)));
   const activos = DATA.filter(r=>r.estado==='activo').length;
   document.getElementById('resumen').textContent = `${activos} colaboradores activos · ${DATA.length} en total`;
-  document.getElementById('tb').innerHTML = rows.length ? rows.map(r=>`<tr class="row" onclick="abrir(${r.id_usuario})">
+  document.getElementById('tb').innerHTML = rows.length ? rows.map(r=>`<tr class="filac" onclick="abrir(${r.id_usuario})">
     <td style="font-weight:600">${esc(r.nombre)}</td><td>${esc(r.rut||'—')}</td><td>${esc(r.cargo||'—')}</td>
     <td>${fD(r.fecha_ingreso)}</td><td>${r.tipo_contrato?`<span class="tag">${esc(r.tipo_contrato)}</span>`:'—'}</td>
     <td>${esc(r.afp||'—')}</td><td>${esc(r.salud||'—')}</td>
