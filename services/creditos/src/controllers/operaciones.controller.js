@@ -260,6 +260,10 @@ const create = async (req, res) => {
 
     const { saldo_precio, pct_financiado } = calcular(b);
 
+    // Tasa cliente SIEMPRE normalizada a % mensual (0.02868 → 2.868): blindaje
+    // contra fuentes que la traen en fracción (caso op 6121299).
+    if (b.tascli_real != null && b.tascli_real !== '') b.tascli_real = core.normTasaMensualPct(b.tascli_real) || b.tascli_real;
+
     // Cuota francesa automática (motor único) si viene la tripleta monto+tasa+plazo
     // y no digitaron cuota — antes las ops de Unidad quedaban con cuota vacía.
     if (!(Number(b.cuota) > 0)) {
@@ -349,6 +353,8 @@ const update = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesUpd} cerrado — no se permiten modificaciones` });
 
     if (b.rut_cliente) b.rut_cliente = b.rut_cliente.replace(/\./g, '').toUpperCase().trim();
+    // Tasa cliente siempre en % mensual (misma normalización que en create)
+    if (b.tascli_real != null && b.tascli_real !== '') b.tascli_real = core.normTasaMensualPct(b.tascli_real) || b.tascli_real;
     const { saldo_precio, pct_financiado } = calcular(b);
 
     // Resolver id_cliente si viene rut_cliente
