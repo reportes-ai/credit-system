@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indicadores de Remuneraciones — AutoFácil</title>
+  <!-- v1.0 — mantenedor AFP, topes, IMM y tramos de impuesto único -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:26px 30px; max-width:1000px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 20px; margin-bottom:16px; }
+    .panel h5 { font-weight:700; font-size:.92rem; color:#0141A2; margin:0 0 12px; }
+    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px 18px; } @media(max-width:700px){ .grid3{grid-template-columns:1fr;} }
+    .fld label { font-size:.68rem; font-weight:700; text-transform:uppercase; color:#94a3b8; display:block; margin-bottom:2px; }
+    .fld input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:.86rem; box-sizing:border-box; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    th { background:#f8fafc; color:#475569; font-size:.7rem; text-transform:uppercase; padding:7px 10px; text-align:left; border-bottom:2px solid #e2e8f0; }
+    td { padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    td input { border:1.5px solid #e2e8f0; border-radius:6px; padding:4px 8px; font-size:.82rem; width:110px; text-align:right; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:700; font-size:.87rem; cursor:pointer; }
+    .footer-afecta { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:14px 20px; font-size:.8rem; color:#475569; line-height:1.9; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:2000; display:none; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-percent me-1"></i>Indicadores de Remuneraciones</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-percent"></i><div><h2>Indicadores de Remuneraciones</h2><p>Tasas AFP, topes imponibles, IMM y tramos del impuesto único — todo paramétrico, sin tocar código.</p></div></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-sliders me-1"></i>Parámetros Generales <span id="refInd" style="font-weight:400;color:#94a3b8;font-size:.74rem"></span></h5>
+    <div class="grid3">
+      <div class="fld"><label>Ingreso Mínimo Mensual (IMM) $</label><input id="rem_imm" type="number"></div>
+      <div class="fld"><label>Tope gratificación (× IMM anual)</label><input id="rem_grat_tope_imm" type="number" step="0.01"></div>
+      <div class="fld"><label>Tope imponible AFP/Salud (UF)</label><input id="rem_tope_imponible_uf" type="number" step="0.1"></div>
+      <div class="fld"><label>Tope imponible AFC (UF)</label><input id="rem_tope_afc_uf" type="number" step="0.1"></div>
+      <div class="fld"><label>AFC trabajador (%) — indefinidos</label><input id="rem_afc_trabajador_pct" type="number" step="0.1"></div>
+      <div class="fld"><label>Salud legal (%)</label><input id="rem_salud_pct" type="number" step="0.1"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-bank me-1"></i>Tasas AFP (cotización 10% + comisión, % del imponible)</h5>
+    <table><thead><tr><th>AFP</th><th>Tasa trabajador %</th></tr></thead><tbody id="tbAfp"></tbody></table>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-graph-up me-1"></i>Impuesto Único 2ª Categoría — tramos mensuales en UTM</h5>
+    <table><thead><tr><th>Desde (UTM)</th><th>Hasta (UTM, vacío = ∞)</th><th>Factor</th><th>Rebaja (UTM)</th></tr></thead><tbody id="tbTramos"></tbody></table>
+    <div style="font-size:.74rem;color:#94a3b8;margin-top:6px">Impuesto = base tributable × factor − rebaja × UTM. Actualizar cuando el SII publique la tabla vigente.</div>
+  </div>
+
+  <div style="text-align:right;margin-bottom:18px"><button class="btn-navy" onclick="guardar()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button></div>
+
+  <div class="footer-afecta">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <li><b>Tasas AFP</b> → descuento AFP de cada liquidación en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> (según la AFP de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>).</li>
+      <li><b>IMM y tope gratificación</b> → tope de la gratificación legal (25%, máx 4,75 IMM ÷ 12) en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</li>
+      <li><b>Topes imponibles UF y AFC</b> → base de cotización AFP/Salud/AFC de las liquidaciones (usa la UF del mes del mantenedor <a href="/mantenedores/uf/">UF</a>).</li>
+      <li><b>Salud legal %</b> → descuento de salud (Fonasa/Isapre 7% base) en las liquidaciones.</li>
+      <li><b>Tramos impuesto único</b> → impuesto de 2ª categoría de cada liquidación y del <a href="/recursos-humanos/remuneraciones/">libro de remuneraciones</a>.</li>
+      <li>Las liquidaciones <b>EMITIDAS no cambian</b> (quedan congeladas); los cambios rigen desde el próximo cálculo.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token||!yo) location.href='/login.html';
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
+const CFG = ['rem_imm','rem_grat_tope_imm','rem_tope_imponible_uf','rem_tope_afc_uf','rem_afc_trabajador_pct','rem_salud_pct'];
+
+async function cargar(){
+  const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { headers:H })).json();
+  if (!j.success) return alert(j.error||'Error');
+  const d = j.data;
+  CFG.forEach(k => document.getElementById(k).value = d[k] ?? '');
+  document.getElementById('refInd').textContent = `(referencia hoy: UF ${Number(d.uf).toLocaleString('es-CL',{maximumFractionDigits:2})} · UTM ${Number(d.utm).toLocaleString('es-CL')})`;
+  document.getElementById('tbAfp').innerHTML = (d.afps||[]).map(a=>`<tr>
+    <td style="font-weight:600">${a.afp}</td>
+    <td><input type="number" step="0.01" data-afp="${a.afp}" value="${a.tasa_pct}"></td></tr>`).join('');
+  document.getElementById('tbTramos').innerHTML = (d.tramos||[]).map((t,i)=>`<tr>
+    <td><input type="number" step="0.01" class="tr-d" value="${t.desde_utm}"></td>
+    <td><input type="number" step="0.01" class="tr-h" value="${t.hasta_utm==null?'':t.hasta_utm}"></td>
+    <td><input type="number" step="0.0001" class="tr-f" value="${t.factor}"></td>
+    <td><input type="number" step="0.01" class="tr-r" value="${t.rebaja_utm}"></td></tr>`).join('');
+}
+async function guardar(){
+  const body = {};
+  CFG.forEach(k => body[k] = document.getElementById(k).value);
+  body.afps = [...document.querySelectorAll('[data-afp]')].map(el=>({ afp: el.dataset.afp, tasa_pct: el.value }));
+  const d=[...document.querySelectorAll('.tr-d')], h=[...document.querySelectorAll('.tr-h')], f=[...document.querySelectorAll('.tr-f')], r=[...document.querySelectorAll('.tr-r')];
+  body.tramos = d.map((el,i)=>({ desde_utm: el.value, hasta_utm: h[i].value, factor: f[i].value, rebaja_utm: r[i].value }));
+  const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
+  if (!j.success) return alert(j.error||'No se pudo guardar');
+  toast('✓ Indicadores guardados'); cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

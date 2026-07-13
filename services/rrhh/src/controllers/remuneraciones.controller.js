@@ -91,6 +91,18 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
     for (const idp of [1, 2, 90009]) {
       await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
     }
+    // Mantenedor "Indicadores de Remuneraciones" (AFP, topes, IMM, tramos impuesto)
+    const [[modM]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' LIMIT 1");
+    if (modM) {
+      const [[exm]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_remuneraciones' LIMIT 1");
+      let idm = exm && exm.id_funcionalidad;
+      if (!idm) {
+        const [r] = await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+          [modM.id_modulo, 'Indicadores de Remuneraciones', 'mant_remuneraciones', '/mantenedores/remuneraciones/', 'bi-percent']);
+        idm = r.insertId;
+      }
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idm]);
+    }
     console.log('[rrhh-remuneraciones] listo');
   } catch (e) { console.error('[rrhh-remuneraciones migration]', e.message); }
 });
@@ -286,4 +298,38 @@ const misLiquidaciones = async (req, res) => {
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion };
+/* ── Mantenedor Indicadores de Remuneraciones ───────────────────────────────── */
+const getIndicadores = async (req, res) => {
+  try {
+    const mes = new Date().toISOString().slice(0, 7);
+    ok(res, await indicadores(mes));
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+const putIndicadores = async (req, res) => {
+  try {
+    const b = req.body || {};
+    // Config rem_* permitidas
+    const PERM = ['rem_tope_imponible_uf', 'rem_tope_afc_uf', 'rem_afc_trabajador_pct', 'rem_salud_pct', 'rem_imm', 'rem_grat_tope_imm'];
+    for (const k of PERM) if (k in b && b[k] !== '' && !isNaN(parseFloat(b[k]))) {
+      await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(parseFloat(b[k]))]);
+    }
+    // Tasas AFP: upsert por administradora
+    if (Array.isArray(b.afps)) for (const a of b.afps) {
+      const nombre = String(a.afp || '').toUpperCase().trim(); const tasa = parseFloat(a.tasa_pct);
+      if (!nombre || isNaN(tasa) || tasa <= 0 || tasa > 20) continue;
+      await pool.query('INSERT INTO rh_afp_tasas (afp, tasa_pct) VALUES (?,?) ON DUPLICATE KEY UPDATE tasa_pct=VALUES(tasa_pct)', [nombre, tasa]);
+    }
+    // Tramos de impuesto: reemplazo completo si vienen (validados)
+    if (Array.isArray(b.tramos) && b.tramos.length >= 2) {
+      const val = b.tramos.map(t => [parseFloat(t.desde_utm), t.hasta_utm == null || t.hasta_utm === '' ? null : parseFloat(t.hasta_utm), parseFloat(t.factor), parseFloat(t.rebaja_utm)]);
+      if (val.every(t => !isNaN(t[0]) && !isNaN(t[2]) && !isNaN(t[3]))) {
+        await pool.query('DELETE FROM rh_impuesto_tramos');
+        for (const t of val) await pool.query('INSERT INTO rh_impuesto_tramos (desde_utm, hasta_utm, factor, rebaja_utm) VALUES (?,?,?,?)', t);
+      }
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'indicadores_remuneraciones', detalle: 'Actualizó indicadores de remuneraciones: ' + Object.keys(b).join(', ') });
+    ok(res, { ok: true });
+  } catch (e) { console.error('[rrhh putIndicadores]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores };
