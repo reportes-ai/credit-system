@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.12 — filtro de dealer por subcadena (cualquier parte del nombre) sobre el select; match único auto-selecciona -->
+  <!-- v4.13 — la carta (vista e impresión) incluye sección APROBADA CON EXCEPCIONES con la justificación de cada una -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2283,6 +2283,15 @@ function cartaHTML(c, preview){
       <tr><td class="lbl" style="width:13%">VALOR NETO</td><td class="val" style="width:20%">${fmtCLP(c.partNeto)}</td><td class="lbl" style="width:13%">VALOR IVA</td><td class="val">${fmtCLP(c.partIVA)}</td></tr>
       <tr><td class="lbl">VALOR BRUTO</td><td class="val">${fmtCLP(c.partBruto)}</td><td class="lbl">ACREEDOR</td><td class="val">${escH(c.acreedor||'')}</td></tr>
     </table>
+    ${(Array.isArray(c.excepciones) && c.excepciones.length) ? (() => {
+      const LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual',
+                    PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
+      const coms = c.excepcionesComentarios || {};
+      return `<div class="sec-title" style="background:#fde68a;color:#7c2d12">APROBADA CON EXCEPCIONES (${c.excepciones.length})</div>
+      <table class="data-tbl">
+        ${c.excepciones.map(e=>`<tr><td class="lbl" style="width:32%">${escH(LBL[e]||e)}</td><td class="val">${escH(coms[e]||'(sin justificación registrada)')}</td></tr>`).join('')}
+      </table>`;
+    })() : ''}
     <div class="sec-title">CONSIDERACIONES</div>
     <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
       ${CARTA_CONSID.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p style="margin:2px 0">${escH(l).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>`).join('')}
