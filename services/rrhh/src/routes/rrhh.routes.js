@@ -26,6 +26,15 @@ router.get('/empleados',               verifyToken, requireFunc('rh_aprobar'), c
 router.get('/cumple/estado', verifyToken, ctrl.cumpleEstado);
 router.get('/cumple/hoy',    verifyToken, ctrl.cumpleHoy);
 
+// Ausencias y Permisos + Saldo de Vacaciones (Fase 2 módulo RRHH)
+const aus = require('../controllers/ausencias.controller');
+router.get('/ausencias/hoy',          verifyToken, aus.ausentesHoy);
+router.get('/ausencias/adjunto/:id',  verifyToken, aus.adjunto);
+router.get('/ausencias',              verifyToken, requireFunc('rh_ausencias', 'rh_aprobar'), aus.listar);
+router.post('/ausencias',             verifyToken, requireFunc('rh_ausencias'), aus.crear);
+router.post('/ausencias/:id/resolver', verifyToken, aus.resolver); // valida jefatura/RRHH adentro
+router.get('/vacaciones/saldo',       verifyToken, aus.saldoVacaciones);
+
 // Ficha del Colaborador + Carpeta Digital + Directorio (Fase 1 módulo RRHH)
 const ficha = require('../controllers/ficha.controller');
 router.get('/directorio',          verifyToken, requireFunc('rh_directorio', 'rh_ver', 'rh_aprobar'), ficha.directorio);

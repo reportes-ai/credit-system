@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.0 -->
+  <!-- v1.1 — saldo de vacaciones (devengado proporcional vs usados) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -35,6 +35,7 @@
 </nav>
 <div class="main">
   <div class="page-banner"><i class="bi bi-airplane"></i><div><h2>Solicitudes de Vacaciones</h2><p>Pide tus días, sigue la aprobación y revisa tu historial.</p></div></div>
+  <div id="saldoBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 16px;font-size:.84rem;color:#1e3a8a;margin-bottom:14px"></div>
   <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div></div>
   <div id="secCrear" class="card-box">
     <div class="grid2"><div class="fld"><label>Desde</label><input type="date" id="fD"></div><div class="fld"><label>Hasta</label><input type="date" id="fH"></div></div>
@@ -74,7 +75,12 @@
   async function resolver(id,estado){ let mot=null; if(estado==='RECHAZADA'){ mot=prompt('Motivo del rechazo:')||''; }
     const j=await(await fetch(`/api/rrhh/vacaciones/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado,motivo_rechazo:mot})})).json();
     if(!j.success)return alert(j.error); cargar(); }
-  (async()=>{ await cargarPendientes(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
+  async function cargarSaldo(){ try{ const j=await(await fetch('/api/rrhh/vacaciones/saldo',{headers:H})).json(); if(!j.success)return; const d=j.data;
+    const el=document.getElementById('saldoBox'); const co=n=>String(n).replace('.',',');
+    if(d.sin_fecha){ el.innerHTML='<i class="bi bi-info-circle me-1"></i>'+d.mensaje; el.style.display=''; return; }
+    el.innerHTML=`<i class="bi bi-sun me-1"></i><b>Tu saldo de vacaciones:</b> ${co(d.disponibles)} día(s) hábil(es) disponibles &nbsp;·&nbsp; devengados ${co(d.devengados)} (${d.meses} meses × ${co(Math.round(d.dias_anuales/12*100)/100)}/mes) &nbsp;·&nbsp; usados ${co(d.usados)}`;
+    el.style.display=''; }catch(e){} }
+  (async()=>{ await cargarPendientes(); cargarSaldo(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

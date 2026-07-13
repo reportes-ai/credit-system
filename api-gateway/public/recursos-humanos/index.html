@@ -60,6 +60,12 @@
       <p>Gestión de fichas del equipo: datos laborales, AFP y salud, sueldo base, cuenta de pago y carpeta digital.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/ausencias/" class="module-card" id="cardAus" style="display:none">
+      <div class="card-icon"><i class="bi bi-calendar-x"></i></div>
+      <h5>Ausencias y Permisos</h5>
+      <p>Licencias médicas (con adjunto), permisos con o sin goce y días administrativos — los aprueba tu jefatura o RRHH.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/vacaciones/" class="module-card" id="cardVac" style="display:none">
       <div class="card-icon"><i class="bi bi-airplane"></i></div>
       <h5>Solicitudes de Vacaciones</h5>
@@ -87,6 +93,7 @@
     if (tiene('rh_ficha','rh_aprobar')) document.getElementById('cardFicha').style.display='';
     if (tiene('rh_directorio','rh_ver','rh_aprobar')) document.getElementById('cardDir').style.display='';
     if (tiene('rh_colaboradores','rh_aprobar')) document.getElementById('cardCol').style.display='';
+    if (tiene('rh_ausencias','rh_aprobar')) document.getElementById('cardAus').style.display='';
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
   })();
