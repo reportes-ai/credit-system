@@ -7,7 +7,7 @@
   <title>Provisiones + Castigos — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.5 — nombre unificado Provisiones + Castigos (card BD, breadcrumb, title) -->
+  <!-- v1.6 — N° TRX correlativo (correlativo_transacciones) en castigos y cierre; link a bitácora -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -122,7 +122,7 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Solicitado</th><th>N° Op</th><th>Cliente</th><th>Motivo</th><th>Comentario</th>
+          <th>N° TRX</th><th>Solicitado</th><th>N° Op</th><th>Cliente</th><th>Motivo</th><th>Comentario</th>
           <th class="text-right">Saldo castigado</th><th>Estado</th><th>Aprobaciones</th>
         </tr></thead>
         <tbody id="tbody"></tbody>
@@ -168,6 +168,7 @@ async function cargar() {
       return `<span class="firma">${f.decision==='APROBADO'?'✔':'✗'} ${esc(f.aprobado_por_nombre||'')}<br><span style="color:#94a3b8">${fmtDT(f.aprobado_at)}</span></span>`;
     };
     return `<tr>
+      <td style="font-family:Consolas,monospace;font-weight:700;color:#0141A2">${c.numero_transaccion!=null?'TRX-'+String(c.numero_transaccion).padStart(6,'0'):'—'}</td>
       <td>${fmtDT(c.solicitado_at)}<br><span style="color:#94a3b8;font-size:.75rem">${esc(c.solicitado_por_nombre||'')}</span></td>
       <td><b>${esc(c.num_op)}</b></td>
       <td>${esc(c.cliente||'')}<br><span style="color:#94a3b8;font-size:.75rem">${esc(c.rut||'')}</span></td>
@@ -239,7 +240,7 @@ async function cerrarMes() {
   if (!confirm('¿Guardar los saldos finales de '+mes+' como cierre? Serán el saldo inicial del mes siguiente.')) return;
   const j = await fetch('/api/castigos/contable/cierre', { method:'POST', headers: H, body: JSON.stringify({ mes }) }).then(r=>r.json());
   if (!j.success) return alert(j.error || 'No se pudo guardar el cierre');
-  alert('Cierre guardado: Provisiones '+fmtP(j.data.provisiones)+' · Castigos '+fmtP(j.data.castigos));
+  alert('Cierre guardado — TRX-'+String(j.data.numero_transaccion||0).padStart(6,'0')+': Provisiones '+fmtP(j.data.provisiones)+' · Castigos '+fmtP(j.data.castigos));
   cargarContable();
 }
 document.getElementById('cMes').value = new Date().toISOString().slice(0,7);

@@ -94,9 +94,37 @@ require('../../../../shared/migrate').enFila('castigos', async () => {
       const fHist = await seedFunc(modT.id_modulo, 'Provisiones + Castigos', 'castigos_historial', '/tesoreria/castigos', 'bi-file-earmark-minus');
       await grant(fHist, 'Gerente General', 'Gerente de Finanzas', 'Gerente de Operaciones y Crédito', 'Tesorero', 'Auditor');
     }
+    // Número de transacción TRX-XXXXXX (correlativo único global correlativo_transacciones,
+    // el mismo motor que usan los pagos de caja) para castigos y cierres de provisiones.
+    await pool.query(`CREATE TABLE IF NOT EXISTS correlativo_transacciones (
+      id INT AUTO_INCREMENT PRIMARY KEY, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+    await pool.query(`ALTER TABLE castigos_contables ADD COLUMN numero_transaccion INT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE contab_saldos_mensuales ADD COLUMN numero_transaccion INT NULL`).catch(() => {});
+
     console.log('[castigos] módulo listo');
   } catch (e) { console.error('[castigos migration]', e.message); }
 });
+
+// Backfill una vez: asigna TRX a castigos y cierres históricos, en orden cronológico.
+require('../../../../shared/migrate').migrar('castigos_trx_backfill_v1', async () => {
+  const [cas] = await pool.query('SELECT id FROM castigos_contables WHERE numero_transaccion IS NULL ORDER BY solicitado_at, id');
+  for (const c of cas) {
+    const trx = await nuevaTransaccion();
+    await pool.query('UPDATE castigos_contables SET numero_transaccion=? WHERE id=?', [trx, c.id]);
+  }
+  const [cie] = await pool.query("SELECT DISTINCT mes FROM contab_saldos_mensuales WHERE numero_transaccion IS NULL ORDER BY mes");
+  for (const s of cie) {
+    const trx = await nuevaTransaccion();
+    await pool.query('UPDATE contab_saldos_mensuales SET numero_transaccion=? WHERE mes=?', [trx, s.mes]);
+  }
+  if (cas.length || cie.length) console.log(`[castigos] TRX backfill: ${cas.length} castigos + ${cie.length} cierres`);
+});
+
+/* Correlativo único global de transacciones (motor compartido con pagos de caja). */
+async function nuevaTransaccion() {
+  const [r] = await pool.query('INSERT INTO correlativo_transacciones (created_at) VALUES (NOW())');
+  return r.insertId;
+}
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const ORIGENES_PROPIA = ['CARTERA_AFA', 'CARTERA_XLSX'];
@@ -137,13 +165,14 @@ const solicitar = async (req, res) => {
     let snap = null, saldo = null;
     try { snap = await calcularPrepago(num_op); saldo = snap.saldo_insoluto; } catch (_) { /* sin calendario → saldo null */ }
 
+    const numero_transaccion = await nuevaTransaccion();
     const [r] = await pool.query(
-      `INSERT INTO castigos_contables (num_op, id_credito, motivo, comentario, saldo_castigado, snapshot, solicitado_por, solicitado_por_nombre)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO castigos_contables (num_op, id_credito, motivo, comentario, saldo_castigado, snapshot, solicitado_por, solicitado_por_nombre, numero_transaccion)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
       [num_op, c.id, motivo, (comentario || '').slice(0, 1000), saldo, snap ? JSON.stringify(snap) : null,
-       req.usuario.id_usuario, nombreUsuario(req)]);
-    auditar({ req, accion: 'CREAR', modulo: 'creditos', entidad: 'castigos_contables', entidad_id: r.insertId, detalle: `Solicitó castigo op ${num_op} (${motivo})`, meta: { num_op, motivo, saldo } });
-    ok(res, { id: r.insertId, num_op, motivo, saldo_castigado: saldo, estado: 'PENDIENTE' });
+       req.usuario.id_usuario, nombreUsuario(req), numero_transaccion]);
+    auditar({ req, accion: 'CREAR', modulo: 'creditos', entidad: 'castigos_contables', entidad_id: r.insertId, detalle: `Solicitó castigo op ${num_op} (${motivo}) TRX-${String(numero_transaccion).padStart(6, '0')}`, meta: { num_op, motivo, saldo, numero_transaccion } });
+    ok(res, { id: r.insertId, num_op, motivo, saldo_castigado: saldo, estado: 'PENDIENTE', numero_transaccion });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -309,15 +338,17 @@ const cerrarMesContable = async (req, res) => {
     let payload = null;
     await contable(req, { json: d => { payload = d.data; }, status: () => ({ json: () => {} }) });
     if (!payload) return fail(res, 'No se pudo calcular el cuadro para cerrar.');
+    // Un TRX por evento de cierre (ambas cuentas del mes comparten el número).
+    const numero_transaccion = await nuevaTransaccion();
     for (const cuenta of CUENTAS) {
       const saldo = cuenta === 'PROVISIONES' ? payload.provisiones.saldo_final : payload.castigos.saldo_final;
       await pool.query(
-        `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre)
-         VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_por=VALUES(guardado_por), guardado_por_nombre=VALUES(guardado_por_nombre), guardado_at=NOW()`,
-        [mes, cuenta, saldo, req.usuario.id_usuario, nombreUsuario(req)]);
+        `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre, numero_transaccion)
+         VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_por=VALUES(guardado_por), guardado_por_nombre=VALUES(guardado_por_nombre), guardado_at=NOW(), numero_transaccion=VALUES(numero_transaccion)`,
+        [mes, cuenta, saldo, req.usuario.id_usuario, nombreUsuario(req), numero_transaccion]);
     }
-    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${payload.provisiones.saldo_final}, castigo ${payload.castigos.saldo_final})` });
-    ok(res, { mes, guardado: true, provisiones: payload.provisiones.saldo_final, castigos: payload.castigos.saldo_final });
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${payload.provisiones.saldo_final}, castigo ${payload.castigos.saldo_final}) TRX-${String(numero_transaccion).padStart(6, '0')}` });
+    ok(res, { mes, guardado: true, provisiones: payload.provisiones.saldo_final, castigos: payload.castigos.saldo_final, numero_transaccion });
   } catch (e) { fail(res, e.message); }
 };
 
