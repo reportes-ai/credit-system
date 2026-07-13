@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v118.8';
+const APP_VERSION = 'v118.9';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -89,6 +89,32 @@ document.addEventListener('DOMContentLoaded', () => {
     lk.href = '/css/cards-uniform.css?v=' + encodeURIComponent(APP_VERSION);  // cache-bust por versión
     document.head.appendChild(lk);
   }
+
+  /* 0b ── Avatar con FOTO real (de Credenciales) en vez de la inicial.
+     La foto propia se cachea en sessionStorage (af_mi_foto: dataURL o '' si no hay). */
+  (function fotoAvatar() {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    const aplicar = (foto) => {
+      if (!foto) return;
+      document.querySelectorAll('.avatar, #avatarInicial').forEach(el => {
+        if (el.querySelector('img')) return;
+        el.innerHTML = '<img src="' + foto + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
+        el.style.overflow = 'hidden';
+        el.style.padding = '0';
+      });
+    };
+    const cached = sessionStorage.getItem('af_mi_foto');
+    if (cached !== null) { aplicar(cached); setTimeout(() => aplicar(cached), 900); return; }
+    fetch('/api/credenciales/mi-foto', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json())
+      .then(j => {
+        const foto = (j && j.success && j.data && j.data.foto) || '';
+        try { sessionStorage.setItem('af_mi_foto', foto); } catch (_) {}  // fotos muy pesadas: no cachear
+        aplicar(foto);
+        setTimeout(() => aplicar(foto), 900);   // re-aplica si la página pisó el avatar con la inicial (setters async)
+      }).catch(() => {});
+  })();
 
   /* 1 ── Versión en todos los badges de la barra de navegación */
   document.querySelectorAll('.version-badge, #versionBadge').forEach(el => {

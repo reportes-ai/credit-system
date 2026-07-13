@@ -69,6 +69,14 @@ exports.empresaPut = async (req, res) => {
   } catch (e) { errSrv(res, e, 'credenciales empresaPut'); }
 };
 
+/* ── GET /api/credenciales/mi-foto — foto del usuario logueado (avatar topnav) ── */
+exports.miFoto = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT foto FROM credenciales_usuario WHERE id_usuario=?', [req.usuario.id_usuario]);
+    res.json({ success: true, data: { foto: (c && c.foto) || null }, error: null });
+  } catch (e) { errSrv(res, e, 'credenciales miFoto'); }
+};
+
 /* ── GET /api/credenciales/:id — con foto (para el render) ───────────────── */
 exports.una = async (req, res) => {
   try {
