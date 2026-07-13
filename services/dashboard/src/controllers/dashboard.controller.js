@@ -344,7 +344,9 @@ exports.getSegurosHistorico = async (req, res) => {
       ov.forEach(o => { overrides[String(o.mes).slice(0, 7)] = parseFloat(o.pct) / 100; });
     } catch (e) { /* tabla puede no existir */ }
     const [rows] = await pool.query(`
-      SELECT DATE_FORMAT(mes,'%Y-%m') m, COUNT(*) n,
+      SELECT DATE_FORMAT(mes,'%Y-%m') m,
+             SUM(NOT (seguro_rdh IS NULL AND seguro_cesantia IS NULL AND seguro_rep_menor IS NULL)) n,
+             SUM(seguro_rdh IS NULL AND seguro_cesantia IS NULL AND seguro_rep_menor IS NULL) sin_info,
              SUM(seguro_rdh>0) nrdh, SUM(seguro_cesantia>0) nces, SUM(seguro_rep_menor>0) nrep,
              SUM(COALESCE(seguro_rdh,0)) prdh, SUM(COALESCE(seguro_cesantia,0)) pces, SUM(COALESCE(seguro_rep_menor,0)) prep
       FROM creditos
@@ -352,9 +354,6 @@ exports.getSegurosHistorico = async (req, res) => {
         AND COALESCE(NULLIF(estado,''), estado_credito) = 'OTORGADO'
         -- universo NCNU: sin CORFO (mismo criterio que el motor penetracion.js)
         AND UPPER(COALESCE(producto,'')) NOT LIKE '%CORFO%'
-        -- mismo universo del motor penetracion.js: ops con los 3 seguros en 0 son
-        -- dato faltante (sync Trinidad sin primas), no rechazo de todos los seguros
-        AND (COALESCE(seguro_rdh,0) + COALESCE(seguro_cesantia,0) + COALESCE(seguro_rep_menor,0)) > 0
       GROUP BY 1 ORDER BY 1 DESC LIMIT 24`);
     const data = rows.map(r => {
       const pen = {
@@ -368,7 +367,7 @@ exports.getSegurosHistorico = async (req, res) => {
         getPenComision('cesantia', pen.ces, tramos),
         getPenComision('reparacion', pen.rep, tramos));
       return {
-        mes: r.m, ops: r.n,
+        mes: r.m, ops: +r.n, sin_info: +r.sin_info,
         pen_rdh: Math.round(pen.rdh * 10) / 10, pen_cesantia: Math.round(pen.ces * 10) / 10, pen_reparaciones: Math.round(pen.rep * 10) / 10,
         pct_comision: Math.round(pct * 10000) / 100,
         pct_fuente: informado ? 'INFORMADO' : 'CALCULADO',

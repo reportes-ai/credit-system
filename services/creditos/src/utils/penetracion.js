@@ -96,11 +96,11 @@ async function calcularPenetracionMes(mes) {
       -- Solo OTORGADO: desde la sincronización con Trinidad (2026-07) las APROBADO son
       -- solicitudes aprobadas NO cursadas (sin seguros) y hundirían la penetración.
       AND COALESCE(NULLIF(c.estado, ''), c.estado_credito) = 'OTORGADO'
-      -- Ops con los 3 seguros en 0 = SIN INFORMACIÓN de primas (la sincronización con
-      -- Trinidad crea otorgados sin seguros hasta que se digitan). Se excluyen del
-      -- universo: son dato faltante, no cliente que rechazó todo (desgravamen ~100%
-      -- histórico; contarlas hundía RDH bajo el tramo mínimo y dejaba el mes en 0%).
-      AND (COALESCE(c.seguro_rdh,0) + COALESCE(c.seguro_cesantia,0) + COALESCE(c.seguro_rep_menor,0)) > 0
+      -- Convención de datos: NULL = seguro SIN INFORMACIÓN (op de la sync Trinidad
+      -- aún no digitada) · 0 = informado explícitamente sin ese seguro.
+      -- El universo solo cuenta ops con al menos un seguro INFORMADO; las 3-en-NULL
+      -- quedan fuera (dato pendiente, no rechazo — contarlas hundía la penetración).
+      AND NOT (c.seguro_rdh IS NULL AND c.seguro_cesantia IS NULL AND c.seguro_rep_menor IS NULL)
   `, [mesStr]);
 
   const esEmpresa = o => String(o.tipo_cliente || '').toUpperCase() === 'EMPRESA';

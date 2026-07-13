@@ -4383,7 +4383,7 @@ async function buildVSeg() {
         const inf = x.pct_fuente === 'INFORMADO';
         return `<tr>
           <td style="font-weight:700">${x.mes}</td>
-          <td style="text-align:center">${x.ops}</td>
+          <td style="text-align:center">${x.ops}${x.sin_info ? ` <span style="color:#ffb74d;font-size:10px;font-weight:700" title="${x.sin_info} operación(es) cursada(s) SIN información de seguros aún (sync Trinidad) — entran al cargar el Informe Canal">+${x.sin_info} s/i</span>` : ''}</td>
           ${cell(x.pen_rdh, 92, 95, 98)}${cell(x.pen_cesantia, 30, 40, 50)}${cell(x.pen_reparaciones, 30, 40, 50)}
           <td style="text-align:center;font-weight:800;color:${pctColor}" title="${inf ? 'Informado por AutoFin (manda sobre el calculado)' : 'Calculado por tramos — clic en ✏️ para registrar el % informado por AutoFin'}">
             ${Number(x.pct_comision).toLocaleString('es-CL')}%${inf ? ' 📌' : ''}
