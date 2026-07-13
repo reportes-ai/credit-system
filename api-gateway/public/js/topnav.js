@@ -104,6 +104,10 @@
     politica:     { label: 'Política',             href: '/politica/' },
     simulador:    { label: 'Simulador',            href: '/simulador/' },
     carga_masiva: { label: 'Carga Masiva',         href: '/carga-masiva/' },
+    postventa:    { label: 'Post Venta',           href: '/postventa/' },
+    soporte:      { label: 'Soporte',              href: '/soporte/' },
+    whatsapp:     { label: 'WhatsApp',             href: '/whatsapp/' },
+    'evaluacion-crediticia': { label: 'Evaluación Crediticia', href: '/evaluacion-crediticia/' },
   };
 
   // Construye el breadcrumb desde self + la sección resuelta: Inicio › [Sección] › Título › [extra…]
