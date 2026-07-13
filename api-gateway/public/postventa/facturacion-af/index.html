@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 -->
+<!-- v1.4 — desmarcar limpia el monto facturado; badge del grupo se refresca en vivo -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -106,7 +106,7 @@ function toggleMes(m){
   body.innerHTML = fins.map(f => {
     const key = m + '|' + f.financiera.replace(/\s+/g,'_');
     const tot = (+f.colocacion||0) + (+f.seguros||0);
-    const rev = f.check ? `<span class="badge-rev">${f.check.oks}/${f.ops} OK · facturado ${fmt(f.check.facturado)}</span>` : '';
+    const rev = f.check ? `<span class="badge-rev" id="rev-${key}">${f.check.oks}/${f.ops} OK · facturado ${fmt(f.check.facturado)}</span>` : `<span class="badge-rev" id="rev-${key}" style="display:none"></span>`;
     return `<div class="fin-row" id="fh-${key}" onclick="toggleFin('${m}','${esc(f.financiera)}')">
         <i class="bi bi-chevron-right chev"></i>
         <span class="nom">${esc(f.financiera)}</span>
@@ -193,10 +193,11 @@ function filaOp(rid, o, i){
 function marcarOK(rid, i){
   const d = window['DET_'+rid]; const o = d.ops[i];
   const chk = $('ok-'+rid+'-'+i).checked;
-  // OK = replica lo calculado: en UAC el cierre es comisión − anticipo ya pagado
+  // OK = replica lo calculado: en UAC el cierre es comisión − anticipo ya pagado.
+  // Desmarcar = DESHACER: limpia también el monto facturado (antes quedaba pegado).
   const esperado = window['ESUAC_'+rid] ? o.comision - (+o.anticipo||0) : o.comision;
-  if (chk) $('fac-'+rid+'-'+i).value = fmtIn(esperado);
-  o.ok = chk; o.monto_facturado = chk ? esperado : (parseInt(String($('fac-'+rid+'-'+i).value).replace(/[^\d]/g,''))||null);
+  $('fac-'+rid+'-'+i).value = chk ? fmtIn(esperado) : '';
+  o.ok = chk; o.monto_facturado = chk ? esperado : null;
   refrescarDif(rid, i); totalizar(rid); guardarCheck(rid, i);
 }
 function cambioAnt(rid, i){
@@ -250,6 +251,26 @@ function totalizar(rid){
       <div class="uac-c"><div class="l">Diferencia</div><div class="v ${dif<0?'dif-neg':'dif-ok'}">${fmt(dif)}</div></div>`;
   }
   renderSolicitar(rid);   // habilita/actualiza el botón de facturación en vivo
+  actualizarBadge(d.m, d.fin);
+}
+
+// Refresca EN VIVO el badge "x/y OK · facturado $z" del grupo de la financiera
+// sumando todos los conceptos ya cargados (antes solo se actualizaba al recargar).
+function actualizarBadge(m, fin){
+  const key = keyDe(m, fin);
+  const el = $('rev-'+key); if (!el) return;
+  let oks = 0, fact = 0, ops = 0;
+  for (const k in window){
+    if (!k.startsWith('DET_')) continue;
+    const d = window[k];
+    if (!d || d.m !== m || d.fin !== fin || !Array.isArray(d.ops)) continue;
+    ops += d.ops.length;
+    oks += d.ops.filter(o=>o.ok).length;
+    fact += d.ops.reduce((a,o)=>a+(o.monto_facturado!=null?+o.monto_facturado:0),0) + d.ops.reduce((a,o)=>a+(+o.anticipo||0),0);
+  }
+  if (!ops) { el.style.display='none'; return; }
+  el.style.display='';
+  el.textContent = `${oks}/${ops} OK · facturado ${fmt(fact)}`;
 }
 
 function renderSolicitar(rid){
