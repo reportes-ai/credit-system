@@ -15,10 +15,27 @@
 const pool = require('./config/database');
 const { getUF } = require('./uf');
 
-// Tabla de seguros del simulador (tasa sobre subtotal sin seguros, por tramo plazo).
-// 'drc' = Desgravamen + RDH + Cesantía (paquete completo, default del simulador).
-const SEG_RATES = { 6: 0.053186, 12: 0.071008, 24: 0.08613, 36: 0.1012, 48: 0.136622, 72: 0.164822 };
+// Tasa de seguros por tramo de plazo (paquete completo D+RDH+Cesantía, default
+// del simulador) — PARAMÉTRICA: sale del mantenedor Factores de Seguros Clientes
+// (parametros_credito: seg_d_* + seg_r_* + seg_c_*). Fallback = valores 2026-07
+// si la BD no responde. Caché 60s para no consultar en cada cotización.
+const SEG_FALLBACK = { 6: 0.053186, 12: 0.071008, 24: 0.08613, 36: 0.1012, 48: 0.136622, 72: 0.164822 };
 const bracket = p => [6, 12, 24, 36, 48, 72].find(b => p <= b) || 72;
+let _segCache = null, _segCacheAt = 0;
+async function segRates() {
+  if (_segCache && Date.now() - _segCacheAt < 60000) return _segCache;
+  try {
+    // seg_full_drc_<bracket>: factor actuarial del combo COMPLETO (tabla de la
+    // aseguradora, mantenedor Factores de Seguros Clientes) — NO es la suma de
+    // los factores individuales seg_d/r/c (esos solo distribuyen el total).
+    const [rows] = await pool.query("SELECT clave, valor FROM parametros_credito WHERE clave LIKE 'seg_full_drc_%'");
+    const p = {}; rows.forEach(r => { p[r.clave] = parseFloat(r.valor) || 0; });
+    const t = {};
+    for (const b of [6, 12, 24, 36, 48, 72]) t[b] = p['seg_full_drc_' + b] > 0 ? p['seg_full_drc_' + b] : SEG_FALLBACK[b];
+    _segCache = t; _segCacheAt = Date.now();
+    return t;
+  } catch (e) { return SEG_FALLBACK; }
+}
 
 function pmt(r, n, pv) {
   if (Math.abs(r) < 1e-10) return pv / n;
@@ -43,7 +60,7 @@ async function cotizarCuota(valorVehiculo, pie, plazo) {
   const gastosOp = (g.prenda || 0) + (g.retiro_gestion || 0) + (g.limitacion_dominio || 0) + (g.gastos_admin || 0) + (g.inscripcion || 0) + (g.gps_24meses || 0) + (g.reparaciones_menores || 0);
 
   const subSin = saldoPrecio + gastosOp;
-  const seguros = SEG_RATES[bracket(n)] * subSin;
+  const seguros = (await segRates())[bracket(n)] * subSin;
   const montoFin = Math.round(subSin + seguros);
 
   // Tasa vigente del mantenedor Tasas, tramo por 200 UF sobre el monto financiado
