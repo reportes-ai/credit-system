@@ -26,6 +26,14 @@ router.get('/empleados',               verifyToken, requireFunc('rh_aprobar'), c
 router.get('/cumple/estado', verifyToken, ctrl.cumpleEstado);
 router.get('/cumple/hoy',    verifyToken, ctrl.cumpleHoy);
 
+// Remuneraciones (Fase 3 módulo RRHH) — solo RRHH salvo la liquidación propia
+const rem = require('../controllers/remuneraciones.controller');
+router.get('/remuneraciones',                 verifyToken, requireFunc('rh_remuneraciones'), rem.getMes);
+router.post('/remuneraciones/guardar',        verifyToken, requireFunc('rh_remuneraciones'), rem.guardar);
+router.post('/remuneraciones/emitir',         verifyToken, requireFunc('rh_remuneraciones'), rem.emitir);
+router.get('/remuneraciones/mias',            verifyToken, rem.misLiquidaciones);
+router.get('/remuneraciones/liquidacion/:id', verifyToken, rem.getLiquidacion); // valida dueño/RRHH adentro
+
 // Ausencias y Permisos + Saldo de Vacaciones (Fase 2 módulo RRHH)
 const aus = require('../controllers/ausencias.controller');
 router.get('/ausencias/hoy',          verifyToken, aus.ausentesHoy);

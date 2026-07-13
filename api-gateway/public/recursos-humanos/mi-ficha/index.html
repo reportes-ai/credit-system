@@ -69,6 +69,11 @@
     <div class="grid3" id="gPrev"></div>
   </div>
 
+  <div class="panel" id="pLiq" style="display:none">
+    <h5><i class="bi bi-cash-stack"></i> Mis Liquidaciones de Sueldo</h5>
+    <table><thead><tr><th>Mes</th><th>Total Haberes</th><th>Descuentos</th><th>Líquido</th><th></th></tr></thead><tbody id="tbLiq"></tbody></table>
+  </div>
+
   <div class="panel">
     <h5><i class="bi bi-folder2-open"></i> Mi Carpeta Digital</h5>
     <table><thead><tr><th>Tipo</th><th>Documento</th><th>Subido por</th><th>Fecha</th><th></th></tr></thead><tbody id="tbDocs"></tbody></table>
@@ -140,10 +145,50 @@ async function abrirDoc(id){
   } catch(e){ alert('Error al abrir'); }
   return false;
 }
+async function cargarLiqs(){
+  try {
+    const j = await (await fetch('/api/rrhh/remuneraciones/mias', { headers:H })).json();
+    const rows = j.data||[]; if (!rows.length) return;
+    document.getElementById('pLiq').style.display = '';
+    document.getElementById('tbLiq').innerHTML = rows.map(l=>`<tr>
+      <td><b>${esc(l.mes)}</b></td><td>${fP(l.total_haberes)}</td><td style="color:#b91c1c">−${fP(l.total_descuentos).slice(0)}</td>
+      <td style="font-weight:700;color:#15803d">${fP(l.liquido)}</td>
+      <td><a href="#" onclick="return verLiq(${l.id})" style="font-weight:700"><i class="bi bi-receipt me-1"></i>Ver</a></td></tr>`).join('');
+  } catch(e){}
+}
+async function verLiq(id){
+  const j = await (await fetch('/api/rrhh/remuneraciones/liquidacion/'+id, { headers:H })).json();
+  if (!j.success) { alert(j.error||'Error'); return false; }
+  const l = j.data, d = l.detalle||{};
+  const co = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+  const fila = (lbl,v,neg) => (Number(v)||0) ? `<tr><td style="padding:3px 8px">${lbl}</td><td style="text-align:right;padding:3px 8px;${neg?'color:#b91c1c':''}">${neg?'−':''}${co(v)}</td></tr>` : '';
+  const w = window.open('', '_blank');
+  w.document.write(`<html><head><title>Liquidación ${l.mes}</title></head>
+  <body style="font-family:Segoe UI,sans-serif;max-width:620px;margin:30px auto;color:#1e293b;font-size:13px">
+    <h3 style="color:#012d70;margin:0">LIQUIDACIÓN DE SUELDO — ${l.mes}</h3>
+    <div style="color:#64748b;font-size:12px;margin-bottom:12px">AutoFácil SpA · RUT 76.916.907-K</div>
+    <p><b>${esc(l.nombre)}</b> · ${esc(l.rut||'')} · ${esc(l.cargo||'')}<br>
+    <span style="color:#64748b;font-size:12px">${esc(d.tipo_contrato||'')} · AFP ${esc(d.afp||'—')} · ${esc(d.salud||'—')}</span></p>
+    <table style="width:100%;border-collapse:collapse">
+      <tr><td colspan="2" style="background:#eff6ff;font-weight:800;font-size:11px;padding:5px 8px">HABERES</td></tr>
+      ${fila('Sueldo base',d.sueldo_base)}${fila('Comisiones',d.comisiones)}${fila('Otros imponibles',d.otros_imponibles)}${fila('Gratificación legal',d.gratificacion)}${fila('Colación',d.colacion)}${fila('Movilización',d.movilizacion)}${fila('Otros no imponibles',d.otros_no_imponibles)}
+      <tr><td style="font-weight:700;padding:3px 8px">Total haberes</td><td style="text-align:right;font-weight:700;padding:3px 8px">${co(d.total_haberes)}</td></tr>
+      <tr><td colspan="2" style="background:#eff6ff;font-weight:800;font-size:11px;padding:5px 8px">DESCUENTOS</td></tr>
+      ${fila('AFP '+(d.afp||''),d.desc_afp,1)}${fila('Salud',d.desc_salud,1)}${fila('Seguro cesantía AFC',d.desc_afc,1)}${fila('Impuesto único',d.impuesto,1)}${fila('Otros descuentos',d.otros_descuentos,1)}
+      <tr><td style="font-weight:700;padding:3px 8px">Total descuentos</td><td style="text-align:right;font-weight:700;color:#b91c1c;padding:3px 8px">−${co(d.total_descuentos)}</td></tr>
+      <tr><td style="font-weight:800;font-size:15px;padding:10px 8px 3px">LÍQUIDO A PAGAR</td><td style="text-align:right;font-weight:800;font-size:15px;color:#15803d;padding:10px 8px 3px">${co(d.liquido)}</td></tr>
+    </table>
+    <div style="margin-top:14px;font-size:10px;color:#94a3b8">Emitida ${l.emitido_at?new Date(l.emitido_at).toLocaleDateString('es-CL'):''} por ${esc(l.emitido_por||'')} · documento informativo</div>
+    <script>window.print();<\/script>
+  </body></html>`);
+  w.document.close();
+  return false;
+}
 (async()=>{
   const j = await (await fetch('/api/rrhh/ficha', { headers:H })).json();
   if (!j.success) { alert(j.error||'Error'); return; }
   DATA = j.data; render();
+  cargarLiqs();
 })();
 </script>
 <script src="/js/app-version.js"></script>

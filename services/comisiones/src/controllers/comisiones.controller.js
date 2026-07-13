@@ -588,4 +588,5 @@ const setAlertasConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen };
+module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen,
+  calcularMes };  // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles
