@@ -643,6 +643,61 @@ exports.cerrarEjercicio = async (req, res) => {
   } finally { conn.release(); }
 };
 
+/* ── Plantillas de asientos ────────────────────────────────────────────────────
+   Asientos recurrentes (arriendo, honorarios, provisiones…) guardados como
+   plantilla: cuentas + lados fijos, montos se digitan al aplicarla. */
+require('../../../../shared/migrate').enFila('contabilidad-plantillas', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_plantillas (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        nombre     VARCHAR(120) NOT NULL,
+        tipo       VARCHAR(10) NOT NULL DEFAULT 'TRASPASO',
+        lineas     JSON NOT NULL,                -- [{cuenta, glosa, lado DEBE/HABER}]
+        creado_por VARCHAR(160) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_nombre (nombre)
+      )`);
+  } catch (e) { console.error('[contabilidad-plantillas migration]', e.message); }
+});
+
+exports.getPlantillas = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM ctb_plantillas ORDER BY nombre');
+    ok(res, rows.map(r => ({ ...r, lineas: typeof r.lineas === 'string' ? JSON.parse(r.lineas) : r.lineas })));
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.crearPlantilla = async (req, res) => {
+  try {
+    const { nombre, tipo, lineas } = req.body || {};
+    if (!nombre || !String(nombre).trim()) return fail(res, 'Nombre obligatorio', 400);
+    if (!['INGRESO', 'EGRESO', 'TRASPASO'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
+    if (!Array.isArray(lineas) || lineas.length < 2) return fail(res, 'Mínimo 2 líneas', 400);
+    for (const l of lineas) {
+      if (!l.cuenta || !['DEBE', 'HABER'].includes(l.lado)) return fail(res, 'Cada línea necesita cuenta y lado', 400);
+      const [[c]] = await pool.query('SELECT imputable, activo FROM ctb_cuentas WHERE codigo=?', [l.cuenta]);
+      if (!c || !c.imputable || !c.activo) return fail(res, `Cuenta ${l.cuenta} no existe o no es imputable`, 400);
+    }
+    const limpio = lineas.map(l => ({ cuenta: l.cuenta, lado: l.lado, glosa: (l.glosa || '').slice(0, 200) || null }));
+    await pool.query(
+      `INSERT INTO ctb_plantillas (nombre, tipo, lineas, creado_por) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE tipo=VALUES(tipo), lineas=VALUES(lineas), creado_por=VALUES(creado_por)`,
+      [String(nombre).trim().slice(0, 120), tipo, JSON.stringify(limpio), nombreDe(req.user)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'plantilla', entidad_id: nombre, detalle: `Plantilla "${nombre}" (${tipo}, ${lineas.length} líneas)` });
+    ok(res, { nombre });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.eliminarPlantilla = async (req, res) => {
+  try {
+    const [r] = await pool.query('DELETE FROM ctb_plantillas WHERE id=?', [req.params.id]);
+    if (!r.affectedRows) return fail(res, 'No existe', 404);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'plantilla', entidad_id: req.params.id, detalle: 'Plantilla eliminada' });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Reglas de centralización (Fase 2) ─────────────────────────────────────── */
 exports.getReglas = async (req, res) => {
   try {

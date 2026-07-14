@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comprobantes Contables — AutoFácil</title>
-  <!-- v1.0 — digitación de comprobantes I/E/T con partida doble -->
+  <!-- v2.0 — grilla pro: autocompletar cuenta, teclado, cuadrar aquí, plantillas, duplicar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -25,6 +25,11 @@
     .badge-t { font-size:.72rem; font-weight:700; border-radius:6px; padding:2px 8px; }
     .cuadre { font-weight:700; font-size:.9rem; } .cuadre.ok { color:#166534; } .cuadre.mal { color:#991b1b; }
     .anulado-row td { opacity:.5; text-decoration:line-through; }
+    .ac-dd { display:none; position:absolute; z-index:50; left:0; right:0; top:100%; background:#fff; border:1px solid #d1d5db; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.15); max-height:280px; overflow:auto; }
+    .ac-it { padding:6px 10px; font-size:.8rem; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ac-it b { font-family:Consolas,monospace; color:var(--navy); margin-right:6px; }
+    .ac-it.sel, .ac-it:hover { background:#e0f2fe; }
+    .l-cta.is-invalid { border-color:#dc2626; background:#fef2f2; }
   </style>
 </head>
 <body>
@@ -36,7 +41,14 @@
 
   <!-- Digitación -->
   <div class="panel panel-pad" id="panelNuevo">
-    <h6 class="fw-bold mb-3"><i class="bi bi-pencil-square me-1"></i>Nuevo comprobante</h6>
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h6 class="fw-bold mb-0"><i class="bi bi-pencil-square me-1"></i>Nuevo comprobante</h6>
+      <div class="d-flex gap-2 align-items-center">
+        <select id="selPlantilla" class="form-select form-select-sm" style="max-width:260px" onchange="aplicarPlantilla()"><option value="">📋 Usar plantilla…</option></select>
+        <button class="btn btn-sm btn-outline-secondary" title="Guardar las líneas actuales como plantilla" onclick="guardarPlantilla()"><i class="bi bi-bookmark-plus"></i></button>
+        <button class="btn btn-sm btn-outline-danger" title="Eliminar la plantilla seleccionada" onclick="eliminarPlantilla()"><i class="bi bi-bookmark-x"></i></button>
+      </div>
+    </div>
     <div class="row g-2 mb-3">
       <div class="col-auto"><label class="form-label small fw-semibold mb-1">Tipo</label>
         <select id="nTipo" class="form-select form-select-sm"><option>EGRESO</option><option>INGRESO</option><option>TRASPASO</option></select></div>
@@ -45,14 +57,16 @@
       <div class="col"><label class="form-label small fw-semibold mb-1">Glosa</label>
         <input id="nGlosa" class="form-control form-control-sm" placeholder="Descripción del comprobante"></div>
     </div>
+    <div class="small text-muted mb-1"><i class="bi bi-keyboard me-1"></i>Escribe código o nombre de la cuenta y elige con ↑↓ + Enter · Enter avanza a la siguiente celda · en Haber de la última línea, Enter agrega otra</div>
     <table class="mb-2"><thead><tr>
-      <th style="width:290px">Cuenta</th><th>Glosa línea</th><th style="width:120px">N° OP</th><th style="width:120px">RUT</th>
+      <th style="width:290px">Cuenta</th><th>Glosa línea</th><th style="width:110px">N° OP</th><th style="width:110px">RUT</th>
       <th style="width:130px" class="text-right">Debe</th><th style="width:130px" class="text-right">Haber</th><th style="width:40px"></th>
     </tr></thead><tbody id="nLineas"></tbody></table>
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-      <button class="btn btn-sm btn-outline-primary" onclick="addLinea()"><i class="bi bi-plus-lg me-1"></i>Agregar línea</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="addLinea(null,true)"><i class="bi bi-plus-lg me-1"></i>Agregar línea</button>
       <div class="d-flex align-items-center gap-3">
         <span class="cuadre" id="nCuadre"></span>
+        <button class="btn btn-sm btn-outline-success d-none" id="btnCuadrarAqui" onclick="cuadrarAqui()"><i class="bi bi-magic me-1"></i>Cuadrar aquí</button>
         <button class="btn btn-sm btn-primary" id="btnGrabar" onclick="grabar()"><i class="bi bi-check-lg me-1"></i>Contabilizar</button>
       </div>
     </div>
@@ -88,30 +102,166 @@ async function cargarCuentas(){
   const r = await fetch('/api/contabilidad/cuentas',{headers:H}); const j = await r.json();
   CTAS = (j.data||[]).filter(c=>c.imputable && c.activo);
 }
-const optsCuentas = sel => '<option value="">— cuenta —</option>' + CTAS.map(c=>`<option value="${esc(c.codigo)}" ${c.codigo===sel?'selected':''}>${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join('');
+/* ── Autocompletar de cuenta (código o nombre) ── */
+function attachAutocomplete(inp){
+  const dd = document.createElement('div');
+  dd.className = 'ac-dd';
+  inp.parentElement.style.position = 'relative';
+  inp.parentElement.appendChild(dd);
+  let idx = -1, matches = [];
+  const render = () => {
+    dd.innerHTML = matches.map((c,i)=>`<div class="ac-it ${i===idx?'sel':''}" data-cod="${esc(c.codigo)}"><b>${esc(c.codigo)}</b> ${esc(c.nombre)}</div>`).join('');
+    dd.style.display = matches.length ? 'block' : 'none';
+    dd.querySelectorAll('.ac-it').forEach(el=>el.onmousedown = e=>{ e.preventDefault(); pick(el.dataset.cod); });
+  };
+  const pick = cod => {
+    const c = CTAS.find(x=>x.codigo===cod); if (!c) return;
+    inp.value = `${c.codigo} · ${c.nombre}`; inp.dataset.cuenta = c.codigo;
+    inp.classList.remove('is-invalid'); matches=[]; render();
+    const next = inp.closest('tr').querySelector('.l-glosa'); if (next) next.focus();
+  };
+  inp.addEventListener('input', ()=>{
+    inp.dataset.cuenta = '';
+    const q = inp.value.trim().toLowerCase();
+    matches = !q ? [] : CTAS.filter(c => c.codigo.startsWith(q) || c.nombre.toLowerCase().includes(q)).slice(0,12);
+    idx = matches.length ? 0 : -1; render();
+  });
+  inp.addEventListener('keydown', e=>{
+    if (matches.length){
+      if (e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(idx+1,matches.length-1); render(); return; }
+      if (e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(idx-1,0); render(); return; }
+      if (e.key==='Enter' || e.key==='Tab'){ e.preventDefault(); pick(matches[idx>=0?idx:0].codigo); return; }
+      if (e.key==='Escape'){ matches=[]; render(); return; }
+    }
+  });
+  inp.addEventListener('blur', ()=>setTimeout(()=>{ matches=[]; render();
+    if (inp.value.trim() && !inp.dataset.cuenta){
+      // intento de match exacto por código digitado
+      const cod = inp.value.split('·')[0].trim();
+      const c = CTAS.find(x=>x.codigo===cod);
+      if (c){ inp.value = `${c.codigo} · ${c.nombre}`; inp.dataset.cuenta = c.codigo; inp.classList.remove('is-invalid'); }
+      else inp.classList.add('is-invalid');
+    }
+  },150));
+}
 
-function addLinea(){
+/* Enter = avanzar a la siguiente celda; en Haber de la última línea agrega otra */
+function attachNav(tr){
+  const orden = ['.l-glosa','.l-op','.l-rut','.l-debe','.l-haber'];
+  orden.forEach((sel,i)=>{
+    tr.querySelector(sel).addEventListener('keydown', e=>{
+      if (e.key!=='Enter') return;
+      e.preventDefault();
+      if (i < orden.length-1) return tr.querySelector(orden[i+1]).focus();
+      const next = tr.nextElementSibling;
+      if (next) next.querySelector('.l-cta').focus();
+      else { addLinea(null,true); }
+    });
+  });
+}
+
+function addLinea(datos, focus){
   const tr = document.createElement('tr');
-  tr.innerHTML = `<td><select class="form-select form-select-sm l-cta">${optsCuentas()}</select></td>
+  tr.innerHTML = `<td><input class="form-control form-control-sm l-cta" placeholder="código o nombre…" autocomplete="off"></td>
     <td><input class="form-control form-control-sm l-glosa"></td>
     <td><input class="form-control form-control-sm l-op"></td>
     <td><input class="form-control form-control-sm l-rut"></td>
-    <td><input class="form-control form-control-sm text-end l-debe" oninput="cuadrar()"></td>
-    <td><input class="form-control form-control-sm text-end l-haber" oninput="cuadrar()"></td>
-    <td><button class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('tr').remove();cuadrar()"><i class="bi bi-x-lg"></i></button></td>`;
+    <td><input class="form-control form-control-sm text-end l-debe" inputmode="numeric" oninput="cuadrar()"></td>
+    <td><input class="form-control form-control-sm text-end l-haber" inputmode="numeric" oninput="cuadrar()"></td>
+    <td><button class="btn btn-sm btn-link text-danger p-0" tabindex="-1" onclick="this.closest('tr').remove();cuadrar()"><i class="bi bi-x-lg"></i></button></td>`;
   document.getElementById('nLineas').appendChild(tr);
+  attachAutocomplete(tr.querySelector('.l-cta'));
+  attachNav(tr);
+  if (datos){
+    if (datos.cuenta){ const c = CTAS.find(x=>x.codigo===datos.cuenta);
+      const inp = tr.querySelector('.l-cta');
+      inp.value = c ? `${c.codigo} · ${c.nombre}` : datos.cuenta; inp.dataset.cuenta = datos.cuenta; }
+    if (datos.glosa) tr.querySelector('.l-glosa').value = datos.glosa;
+    if (datos.num_op) tr.querySelector('.l-op').value = datos.num_op;
+    if (datos.rut) tr.querySelector('.l-rut').value = datos.rut;
+    if (datos.debe) tr.querySelector('.l-debe').value = datos.debe;
+    if (datos.haber) tr.querySelector('.l-haber').value = datos.haber;
+    tr.dataset.lado = datos.lado || '';
+  }
+  if (focus) tr.querySelector('.l-cta').focus();
+  cuadrar();
+  return tr;
 }
 const val = el => Math.round(Number(String(el.value).replace(/\./g,'').replace(/,/g,'.'))||0);
 function cuadrar(){
   let d=0,h=0;
   document.querySelectorAll('#nLineas tr').forEach(tr=>{ d+=val(tr.querySelector('.l-debe')); h+=val(tr.querySelector('.l-haber')); });
   const el = document.getElementById('nCuadre');
-  el.textContent = `Debe $${fmt(d)} · Haber $${fmt(h)} ${d===h&&d>0?'✓ cuadrado':(d||h?'≠ descuadrado':'')}`;
+  const dif = d - h;
+  el.textContent = d===h && d>0 ? `Debe $${fmt(d)} = Haber $${fmt(h)} ✓ cuadrado`
+    : (d||h) ? `Debe $${fmt(d)} · Haber $${fmt(h)} — faltan $${fmt(Math.abs(dif))} al ${dif>0?'Haber':'Debe'}`
+    : 'Debe $0 · Haber $0';
   el.className = 'cuadre ' + (d===h&&d>0?'ok':'mal');
+  document.getElementById('btnCuadrarAqui').classList.toggle('d-none', dif===0);
+  window._dif = dif;
+}
+/* Completa la diferencia en la última línea con el lado vacío (o crea una línea) */
+function cuadrarAqui(){
+  const dif = window._dif||0; if (!dif) return;
+  const lado = dif>0 ? '.l-haber' : '.l-debe';
+  const filas = [...document.querySelectorAll('#nLineas tr')];
+  let dest = filas.reverse().find(tr => !val(tr.querySelector('.l-debe')) && !val(tr.querySelector('.l-haber')));
+  if (!dest) dest = addLinea(null,false);
+  dest.querySelector(lado).value = Math.abs(dif);
+  cuadrar();
+  const cta = dest.querySelector('.l-cta'); if (!cta.dataset.cuenta) cta.focus();
+}
+
+/* ── Plantillas de asientos ── */
+let PLANTILLAS = [];
+async function cargarPlantillas(){
+  const r = await fetch('/api/contabilidad/plantillas',{headers:H}); const j = await r.json();
+  PLANTILLAS = j.data||[];
+  document.getElementById('selPlantilla').innerHTML = '<option value="">📋 Usar plantilla…</option>' +
+    PLANTILLAS.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('');
+}
+function aplicarPlantilla(){
+  const p = PLANTILLAS.find(x=>String(x.id)===selPlantilla.value); if (!p) return;
+  nTipo.value = p.tipo;
+  document.getElementById('nLineas').innerHTML = '';
+  p.lineas.forEach(l=>addLinea({cuenta:l.cuenta, glosa:l.glosa, lado:l.lado}));
+  cuadrar();
+  const first = document.querySelector('#nLineas tr .l-debe'); if (first) first.focus();
+}
+async function guardarPlantilla(){
+  const lineas = [...document.querySelectorAll('#nLineas tr')].map(tr=>({
+    cuenta: tr.querySelector('.l-cta').dataset.cuenta||'',
+    glosa: tr.querySelector('.l-glosa').value.trim()||null,
+    lado: val(tr.querySelector('.l-debe'))>0 || (!val(tr.querySelector('.l-haber')) && tr.dataset.lado==='DEBE') ? 'DEBE' : 'HABER',
+  })).filter(l=>l.cuenta);
+  if (lineas.length<2) return alert('Arma primero el asiento (mínimo 2 líneas con cuenta) y luego guárdalo como plantilla.');
+  const nombre = prompt('Nombre de la plantilla (ej. "Arriendo oficina"):'); if (!nombre||!nombre.trim()) return;
+  const r = await fetch('/api/contabilidad/plantillas',{method:'POST',headers:H,body:JSON.stringify({nombre:nombre.trim(),tipo:nTipo.value,lineas})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  await cargarPlantillas(); alert('Plantilla guardada. La próxima vez elígela en "Usar plantilla…" y solo digita los montos.');
+}
+async function eliminarPlantilla(){
+  const p = PLANTILLAS.find(x=>String(x.id)===selPlantilla.value);
+  if (!p) return alert('Selecciona primero la plantilla a eliminar en el combo.');
+  if (!confirm(`¿Eliminar la plantilla "${p.nombre}"?`)) return;
+  const r = await fetch('/api/contabilidad/plantillas/'+p.id,{method:'DELETE',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  await cargarPlantillas();
+}
+
+/* Duplicar un comprobante existente como base del nuevo */
+async function duplicar(id){
+  const r = await fetch('/api/contabilidad/comprobantes/'+id,{headers:H}); const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const c = j.data;
+  nTipo.value = c.tipo; nGlosa.value = c.glosa;
+  document.getElementById('nLineas').innerHTML = '';
+  c.movimientos.forEach(m=>addLinea({cuenta:m.cuenta, glosa:m.glosa, num_op:m.num_op, rut:m.rut, debe:Number(m.debe)||'', haber:Number(m.haber)||''}));
+  cuadrar(); window.scrollTo({top:0,behavior:'smooth'}); nGlosa.focus();
 }
 async function grabar(){
   const movimientos = [...document.querySelectorAll('#nLineas tr')].map(tr=>({
-    cuenta: tr.querySelector('.l-cta').value, glosa: tr.querySelector('.l-glosa').value.trim()||null,
+    cuenta: tr.querySelector('.l-cta').dataset.cuenta||'', glosa: tr.querySelector('.l-glosa').value.trim()||null,
     num_op: tr.querySelector('.l-op').value.trim()||null, rut: tr.querySelector('.l-rut').value.trim()||null,
     debe: val(tr.querySelector('.l-debe')), haber: val(tr.querySelector('.l-haber')),
   })).filter(m=>m.cuenta||m.debe||m.haber);
@@ -122,7 +272,7 @@ async function grabar(){
     const j = await r.json();
     if (!j.success) return alert(j.error||'Error');
     alert('Comprobante '+j.data.numero+' contabilizado por $'+fmt(j.data.total));
-    nGlosa.value=''; document.getElementById('nLineas').innerHTML=''; addLinea(); addLinea(); cuadrar(); listar();
+    nGlosa.value=''; selPlantilla.value=''; document.getElementById('nLineas').innerHTML=''; addLinea(); addLinea(); cuadrar(); listar();
   } finally { btn.disabled = false; }
 }
 async function listar(){
@@ -140,7 +290,8 @@ async function listar(){
       <td>${c.estado==='ANULADO'?'<span class="badge-t b-ANULADO">ANULADO</span>':'<span class="badge-t" style="background:#dcfce7;color:#166534">OK</span>'}</td>
       <td>${esc(c.creado_por||'—')}</td>
       <td class="text-end">
-        <button class="btn btn-sm btn-link p-0 me-2" onclick="ver(${c.id})"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm btn-link p-0 me-2" title="Ver" onclick="ver(${c.id})"><i class="bi bi-eye"></i></button>
+        <button class="btn btn-sm btn-link p-0 me-2" title="Duplicar como base del nuevo" onclick="duplicar(${c.id})"><i class="bi bi-copy"></i></button>
         ${c.estado==='CONTABILIZADO'?`<button class="btn btn-sm btn-link text-danger p-0" title="Anular" onclick="anular(${c.id},'${esc(c.num)}')"><i class="bi bi-slash-circle"></i></button>`:''}
       </td>
     </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted py-4">Sin comprobantes en el período</td></tr>';
@@ -168,7 +319,7 @@ async function anular(id,num){
   const r = await fetch(`/api/contabilidad/comprobantes/${id}/anular`,{method:'POST',headers:H,body:JSON.stringify({motivo:motivo.trim()})});
   const j = await r.json(); if (!j.success) return alert(j.error); listar();
 }
-(async()=>{ await cargarCuentas(); addLinea(); addLinea(); cuadrar(); listar(); })();
+(async()=>{ await cargarCuentas(); await cargarPlantillas(); addLinea(); addLinea(); cuadrar(); listar(); })();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
