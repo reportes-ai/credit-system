@@ -605,6 +605,9 @@ const emitir = async (req, res) => {
 };
 
 /* ── Correo de liquidación a cada colaborador al emitir el mes ─────────────── */
+const MESES_TXT = ['', 'ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+const mesPalabras = m => `${MESES_TXT[Number(String(m).slice(5, 7))] || ''} ${String(m).slice(0, 4)}`;
+
 async function enviarLiquidacionesCorreo(mes) {
   const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
   const [liqs] = await pool.query(
@@ -616,7 +619,7 @@ async function enviarLiquidacionesCorreo(mes) {
     let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
     const fila = (lbl, v, neg) => (Number(v) || 0) ? `<tr><td style="padding:3px 10px">${lbl}</td><td style="padding:3px 10px;text-align:right;${neg ? 'color:#b91c1c' : ''}">${neg ? '−' : ''}${co(v)}</td></tr>` : '';
     const html = `
-      <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mes}</b> fue emitida:</p>
+      <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mesPalabras(mes)}</b> fue emitida:</p>
       <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
         ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones', d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
@@ -628,7 +631,7 @@ async function enviarLiquidacionesCorreo(mes) {
       </table>
       <p style="font-size:12px;color:#64748b">El detalle completo e imprimible está en el Business Suite → Recursos Humanos → <a href="https://app.autofacilchile.cl/recursos-humanos/mi-ficha/">Mi Ficha</a>.</p>`;
     try {
-      await enviarCorreo({ to: l.email, subject: `💰 Liquidación de sueldo ${mes} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
+      await enviarCorreo({ to: l.email, subject: `💰 Liquidación de sueldo ${mesPalabras(mes)} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
       enviadas++;
     } catch (e) { console.error('[remuneraciones correo]', l.email, e.message); }
   }
