@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe de Cierre Mensual — AutoFácil</title>
+  <!-- v1.0 — informe mensual CLP/USD al TC de cierre (reporte a la matriz) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1150px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; border-bottom:2px solid #e5e7eb; text-align:right; }
+    thead th:first-child, thead th:nth-child(2) { text-align:left; }
+    tbody td { padding:6px 12px; border-bottom:1px solid #f1f5f9; text-align:right; }
+    tbody td:first-child, tbody td:nth-child(2) { text-align:left; }
+    .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .grupo td { background:#eef2ff; font-weight:700; } .tot td { background:#f0fdf4; font-weight:700; }
+    .neg { color:#991b1b; }
+    .cabecera { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 24px; margin-bottom:22px; }
+    .cabecera h4 { font-weight:700; margin:0; } .cabecera .sub { color:#6b7280; font-size:.85rem; }
+    h5.sec { font-weight:700; font-size:1rem; margin:26px 0 10px; }
+    @media print { .page-banner, .toolbar, #af-topnav { display:none !important; } body { background:#fff; } .panel { box-shadow:none; border:1px solid #ddd; } }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Cierre Mensual', icon:'bi-flag', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-flag"></i><div><h2>Informe de Cierre Mensual</h2><p>Balance y resultados del mes en pesos y dólares al tipo de cambio del cierre — listo para reportar a la matriz.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar">
+    <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">TC de cierre (CLP/USD)</label><input id="fTC" class="form-control form-control-sm" style="width:140px"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Generar</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+  </div>
+
+  <div id="out"><div class="text-muted">Elige el mes y genera el informe.</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = n => { const v = Math.round(Number(n)||0); return (v<0?'−$':'$') + Math.abs(v).toLocaleString('es-CL'); };
+let TC = 0;
+const usd = n => { if (!TC) return '—'; const v = (Number(n)||0)/TC; return (v<0?'−US$':'US$') + Math.abs(v).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+// por defecto el mes anterior (el que se reporta)
+const prev = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+fMes.value = `${prev.getFullYear()}-${pad(prev.getMonth()+1)}`;
+let D = null;
+
+const filas = (arr, campo) => arr.map(x=>`<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'')}</td>
+  <td class="${x[campo]<0?'neg':''}">${clp(x[campo])}</td><td class="${x[campo]<0?'neg':''}">${usd(x[campo])}</td></tr>`).join('');
+const cab = titulo => `<thead><tr><th style="width:105px">Cuenta</th><th>${titulo}</th><th style="width:150px">CLP</th><th style="width:140px">USD</th></tr></thead>`;
+
+async function consultar(){
+  const r = await fetch(`/api/contabilidad/cierre-mes?mes=${fMes.value}`,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data;
+  const tcManual = parseFloat(String(fTC.value).replace(/\./g,'').replace(',','.'));
+  TC = tcManual > 0 ? tcManual : (D.tipo_cambio?.valor || 0);
+  if (!tcManual && D.tipo_cambio) fTC.value = D.tipo_cambio.valor.toLocaleString('es-CL');
+  render();
+}
+function render(){
+  const b = D.balance, em = D.eerr_mes, ea = D.eerr_acum;
+  const [y,m] = D.mes.split('-');
+  const MESES = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  document.getElementById('out').innerHTML = `
+    <div class="cabecera">
+      <h4>AutoFácil Chile — Informe de Cierre Mensual</h4>
+      <div class="sub">Período: <b>${MESES[Number(m)]} ${y}</b> (al ${D.fin_mes}) ·
+        Tipo de cambio de cierre: <b>$${TC.toLocaleString('es-CL')} CLP/USD</b>${D.tipo_cambio?` (dólar observado CMF del ${D.tipo_cambio.fecha})`:' (ingresado manualmente)'} ·
+        Generado el ${new Date().toLocaleDateString('es-CL')}</div>
+    </div>
+
+    <h5 class="sec">1. Balance General al ${D.fin_mes}</h5>
+    <div class="panel"><table>${cab('Balance General')}<tbody>
+      <tr class="grupo"><td colspan="4">ACTIVO</td></tr>${filas(b.activo,'saldo')}
+      <tr class="tot"><td colspan="2">TOTAL ACTIVO</td><td>${clp(b.tot.activo)}</td><td>${usd(b.tot.activo)}</td></tr>
+      <tr class="grupo"><td colspan="4">PASIVO</td></tr>${filas(b.pasivo,'saldo')}
+      <tr class="tot"><td colspan="2">TOTAL PASIVO</td><td>${clp(b.tot.pasivo)}</td><td>${usd(b.tot.pasivo)}</td></tr>
+      <tr class="grupo"><td colspan="4">PATRIMONIO</td></tr>${filas(b.patrimonio,'saldo')}
+      <tr><td class="num">—</td><td>Resultado del Ejercicio</td><td class="${b.resultado_ejercicio<0?'neg':''}">${clp(b.resultado_ejercicio)}</td><td class="${b.resultado_ejercicio<0?'neg':''}">${usd(b.resultado_ejercicio)}</td></tr>
+      <tr class="tot"><td colspan="2">TOTAL PASIVO + PATRIMONIO + RESULTADO</td><td>${clp(b.tot.pas_pat_result)}</td><td>${usd(b.tot.pas_pat_result)}</td></tr>
+    </tbody></table></div>
+
+    <h5 class="sec">2. Estado de Resultados del mes (${MESES[Number(m)]})</h5>
+    <div class="panel"><table>${cab('Resultados del mes')}<tbody>
+      <tr class="grupo"><td colspan="4">INGRESOS</td></tr>${filas(em.ingresos,'monto')}
+      <tr class="tot"><td colspan="2">TOTAL INGRESOS</td><td>${clp(em.total_ingresos)}</td><td>${usd(em.total_ingresos)}</td></tr>
+      <tr class="grupo"><td colspan="4">GASTOS</td></tr>${filas(em.gastos,'monto')}
+      <tr class="tot"><td colspan="2">TOTAL GASTOS</td><td>${clp(em.total_gastos)}</td><td>${usd(em.total_gastos)}</td></tr>
+      <tr class="tot"><td colspan="2">${em.resultado>=0?'UTILIDAD':'PÉRDIDA'} DEL MES</td><td class="${em.resultado<0?'neg':''}">${clp(Math.abs(em.resultado))}</td><td class="${em.resultado<0?'neg':''}">${usd(Math.abs(em.resultado))}</td></tr>
+    </tbody></table></div>
+
+    <h5 class="sec">3. Estado de Resultados acumulado (enero → ${MESES[Number(m)]})</h5>
+    <div class="panel"><table>${cab('Resultados acumulados '+y)}<tbody>
+      <tr class="tot"><td colspan="2">TOTAL INGRESOS</td><td>${clp(ea.total_ingresos)}</td><td>${usd(ea.total_ingresos)}</td></tr>
+      <tr class="tot"><td colspan="2">TOTAL GASTOS</td><td>${clp(ea.total_gastos)}</td><td>${usd(ea.total_gastos)}</td></tr>
+      <tr class="tot"><td colspan="2">${ea.resultado>=0?'UTILIDAD':'PÉRDIDA'} ACUMULADA</td><td class="${ea.resultado<0?'neg':''}">${clp(Math.abs(ea.resultado))}</td><td class="${ea.resultado<0?'neg':''}">${usd(Math.abs(ea.resultado))}</td></tr>
+    </tbody></table></div>
+    <div class="text-muted small">Conversión a USD: montos CLP divididos por el tipo de cambio de cierre indicado. Los saldos de balance son acumulados históricos; los resultados, del período señalado. ${b.cuadre?'✓ Balance cuadrado.':'✗ ATENCIÓN: balance descuadrado — revisar comprobantes.'}</div>`;
+}
+fTC.addEventListener('change', ()=>{ if (D) { const t = parseFloat(String(fTC.value).replace(/\./g,'').replace(',','.')); if (t>0) { TC=t; render(); } } });
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

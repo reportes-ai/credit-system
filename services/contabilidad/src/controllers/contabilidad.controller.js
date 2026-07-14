@@ -106,6 +106,7 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
       ['Balance de Comprobación', 'ctb_balance',      '/contabilidad/balance/',      'bi-clipboard-data'],
       ['Reglas de Centralización', 'ctb_reglas',      '/contabilidad/reglas/',       'bi-gear-wide-connected'],
       ['Estados Financieros',     'ctb_estados',      '/contabilidad/estados/',      'bi-graph-up-arrow'],
+      ['Informe Cierre Mensual',  'ctb_cierre_mes',   '/contabilidad/cierre-mes/',   'bi-flag'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -373,6 +374,37 @@ exports.estadoResultados = async (req, res) => {
       else { const s = Number(x.debe) - Number(x.haber); if (s) { gastos.push({ cuenta: x.cuenta, nombre: x.nombre, monto: s }); tg += s; } }
     }
     ok(res, { ingresos, gastos, total_ingresos: ti, total_gastos: tg, resultado: ti - tg, centros: ccs.map(x => x.centro_costo) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Informe de Cierre Mensual (reporte a la matriz en Ecuador) ────────────────
+   Un solo payload con TODO el mes: Balance General al último día, EERR del mes,
+   EERR acumulado del año y el tipo de cambio del cierre (último dólar CMF ≤ fin
+   de mes, tabla `dolar`). La conversión a USD la hace el frontend con ese TC
+   (o con el TC manual que el usuario ingrese). Reusa los motores de balance y
+   EERR llamándolos internamente — un solo motor por magnitud. */
+exports.cierreMes = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const fin = `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+    const ini = `${mes}-01`;
+    const interno = (fn, query) => new Promise((resolve, reject) => {
+      const r2 = { status() { return this; }, json(j) { j.success ? resolve(j.data) : reject(new Error(j.error)); } };
+      fn({ query, params: {}, body: {}, user: req.user }, r2).catch(reject);
+    });
+    const [balance, eerr_mes, eerr_acum] = await Promise.all([
+      interno(exports.balanceGeneral, { hasta: fin }),
+      interno(exports.estadoResultados, { desde: ini, hasta: fin }),
+      interno(exports.estadoResultados, { desde: `${y}-01-01`, hasta: fin }),
+    ]);
+    const [[tc]] = await pool.query('SELECT DATE_FORMAT(fecha, "%Y-%m-%d") fecha, valor FROM dolar WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fin]);
+    ok(res, {
+      mes, fin_mes: fin,
+      tipo_cambio: tc ? { fecha: tc.fecha, valor: Number(tc.valor) } : null,
+      balance, eerr_mes, eerr_acum,
+    });
   } catch (e) { fail(res, e.message); }
 };
 

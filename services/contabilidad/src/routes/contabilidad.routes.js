@@ -29,5 +29,6 @@ router.get('/balance',      verifyToken, requireFunc('ctb_balance', 'ctb_libros'
 router.get('/balance-general',   verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.balanceGeneral);
 router.get('/estado-resultados', verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.estadoResultados);
 router.post('/cierre-ejercicio', verifyToken, requireFunc('ctb_estados'), ctrl.cerrarEjercicio);
+router.get('/cierre-mes',        verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.cierreMes);
 
 module.exports = router;
