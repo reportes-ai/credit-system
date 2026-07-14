@@ -756,6 +756,149 @@ exports.analizarCierre = async (req, res) => {
   }
 };
 
+/* ── Presentación Directorio ───────────────────────────────────────────────────
+   Réplica viva del PPT mensual de finanzas para el directorio: balance con
+   variación contra el mes anterior, detalle CxC/CxP, EERR del mes y acumulado
+   comparados contra el mismo período del año anterior, movimiento de caja y
+   "Hechos Relevantes" editables por lámina (con borrador IA). Los números
+   salen SOLOS de los libros — se acabó pegar tablas de Excel como imagen. */
+require('../../../../shared/migrate').enFila('contabilidad-directorio', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_dir_hechos (
+        mes        VARCHAR(7) NOT NULL,
+        seccion    VARCHAR(30) NOT NULL,      -- BALANCE / CXC / CXP / EERR_MES / EERR_ACUM / CAJA
+        texto      TEXT NOT NULL,
+        actualizado_por VARCHAR(160) NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (mes, seccion)
+      )`);
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_directorio' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Presentación Directorio','ctb_directorio','/contabilidad/directorio/','bi-easel2')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    await require('../../../../shared/ia').registrarFuncionalidad({
+      codigo: 'ctb_directorio_ia',
+      nombre: 'Hechos Relevantes Directorio',
+      descripcion: 'Borrador de los "Hechos Relevantes" de cada lámina de la Presentación Directorio (balance, CxC/CxP, resultados, caja) a partir de las cifras del mes. El usuario siempre revisa y guarda.',
+    });
+    console.log('[contabilidad] presentación directorio lista');
+  } catch (e) { console.error('[contabilidad-directorio migration]', e.message); }
+});
+
+const finDeMes = mes => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
+
+exports.directorioMes = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const mesAnt = mesAnteriorDe(mes);
+    const finMes = finDeMes(mes), finAnt = finDeMes(mesAnt);
+    const iniMes = `${mes}-01`, iniAnio = `${y}-01-01`;
+    const mesAA = `${y - 1}-${String(m).padStart(2, '0')}`;               // mismo mes año anterior
+    const finAA = finDeMes(mesAA), iniAA = `${mesAA}-01`, iniAnioAA = `${y - 1}-01-01`;
+
+    // Balance: saldo por cuenta al fin de mes y al fin del mes anterior (una pasada)
+    const [bal] = await pool.query(
+      `SELECT m.cuenta, k.nombre, k.tipo,
+              SUM(CASE WHEN c.fecha <= ? THEN m.debe - m.haber ELSE 0 END) s_actual,
+              SUM(CASE WHEN c.fecha <= ? THEN m.debe - m.haber ELSE 0 END) s_anterior
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo = m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha <= ? AND k.tipo IN ('ACTIVO','PASIVO','PATRIMONIO')
+        GROUP BY m.cuenta, k.nombre, k.tipo HAVING ABS(s_actual) > 0.5 OR ABS(s_anterior) > 0.5
+        ORDER BY m.cuenta`, [finMes, finAnt, finMes]);
+
+    // EERR: mes / acumulado, año actual y año anterior (una pasada, excluye cierre de ejercicio)
+    const [eerr] = await pool.query(
+      `SELECT m.cuenta, k.nombre, k.tipo,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) mes_actual,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) mes_aa,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) acum_actual,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) acum_aa
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo = m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.origen<>'CIERRE_EJERCICIO' AND k.tipo IN ('INGRESO','GASTO')
+          AND ((c.fecha BETWEEN ? AND ?) OR (c.fecha BETWEEN ? AND ?))
+        GROUP BY m.cuenta, k.nombre, k.tipo
+        HAVING ABS(mes_actual)+ABS(mes_aa)+ABS(acum_actual)+ABS(acum_aa) > 0.5
+        ORDER BY k.tipo DESC, m.cuenta`,
+      [iniMes, finMes, iniAA, finAA, iniAnio, finMes, iniAnioAA, finAA, iniAnio, finMes, iniAnioAA, finAA]);
+
+    // Movimiento de caja y bancos del mes (cuentas 1101/1102/1103)
+    const [caja] = await pool.query(
+      `SELECT m.cuenta, k.nombre,
+              SUM(CASE WHEN c.fecha < ? THEN m.debe - m.haber ELSE 0 END) saldo_ini,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN m.debe ELSE 0 END) entradas,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN m.haber ELSE 0 END) salidas
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo = m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha <= ?
+          AND (m.cuenta LIKE '1101%' OR m.cuenta LIKE '1102%' OR m.cuenta LIKE '1103%')
+        GROUP BY m.cuenta, k.nombre
+        HAVING ABS(saldo_ini)+entradas+salidas > 0.5 ORDER BY m.cuenta`,
+      [iniMes, iniMes, finMes, iniMes, finMes, finMes]);
+
+    const [[tc]] = await pool.query('SELECT DATE_FORMAT(fecha,"%Y-%m-%d") fecha, valor FROM dolar WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [finMes]);
+    const [hechos] = await pool.query('SELECT seccion, texto, actualizado_por, updated_at FROM ctb_dir_hechos WHERE mes=?', [mes]);
+    ok(res, {
+      mes, fin_mes: finMes, mes_anterior: mesAnt, mes_aa: mesAA,
+      tipo_cambio: tc ? { fecha: tc.fecha, valor: Number(tc.valor) } : null,
+      balance: bal.map(x => ({ ...x, s_actual: Number(x.s_actual), s_anterior: Number(x.s_anterior) })),
+      eerr: eerr.map(x => ({ ...x, mes_actual: Number(x.mes_actual), mes_aa: Number(x.mes_aa), acum_actual: Number(x.acum_actual), acum_aa: Number(x.acum_aa) })),
+      caja: caja.map(x => ({ ...x, saldo_ini: Number(x.saldo_ini), entradas: Number(x.entradas), salidas: Number(x.salidas) })),
+      hechos: Object.fromEntries(hechos.map(h => [h.seccion, { texto: h.texto, actualizado_por: h.actualizado_por, updated_at: h.updated_at }])),
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
+const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA'];
+
+exports.guardarHechoDirectorio = async (req, res) => {
+  try {
+    const { mes, seccion, texto } = req.body || {};
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
+    await pool.query(
+      `INSERT INTO ctb_dir_hechos (mes, seccion, texto, actualizado_por) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE texto=VALUES(texto), actualizado_por=VALUES(actualizado_por)`,
+      [mes, seccion, String(texto || '').slice(0, 8000), nombreDe(req.user)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'directorio_hechos', entidad_id: `${mes}/${seccion}`, detalle: 'Hechos relevantes guardados' });
+    ok(res, { mes, seccion });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.hechosDirectorioIA = async (req, res) => {
+  try {
+    const { mes, seccion, datos } = req.body || {};
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos' };
+    const { analizar } = require('../../../../shared/anthropic');
+    const out = await analizar({
+      codigo: 'ctb_directorio_ia',
+      id_usuario: (req.usuario || req.user || {}).id_usuario || null,
+      system: 'Eres el gerente de finanzas de AutoFácil Chile (crédito automotriz). Escribes los "Hechos Relevantes" de la presentación mensual al directorio (matriz en Ecuador). Estilo del directorio: puntos numerados 1), 2)…, montos en millones de pesos con una decimal ("$207,6 Millones"), directo, sin adornos. NO inventes cifras: usa solo los datos entregados.',
+      prompt: `Lámina: ${NOMBRES[seccion]} — mes ${mes}.\nCifras de la lámina (JSON):\n${JSON.stringify(datos || {}).slice(0, 14000)}\n\nEscribe 3-6 "Hechos Relevantes" numerados (1), 2)…) para el directorio: qué cambió contra el período de comparación, qué explica las variaciones grandes y qué debe saber o decidir el directorio. Sin encabezado ni cierre: solo los puntos.`,
+      max_tokens: 1024,
+    });
+    if (!out || !out.texto) return fail(res, 'La IA no devolvió borrador', 502);
+    ok(res, { borrador: out.texto.trim() });
+  } catch (e) {
+    console.error('[ctb directorioIA]', e.message);
+    fail(res, 'No se pudo generar el borrador: ' + e.message, 502);
+  }
+};
+
 /* ── Cierre de ejercicio ───────────────────────────────────────────────────────
    Genera el comprobante de TRASPASO al 31-12 que deja en CERO todas las cuentas
    de resultado (ingresos y gastos) y lleva la utilidad/pérdida del año a la

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presentación Directorio — AutoFácil</title>
+  <!-- v1.0 — réplica viva del PPT mensual de finanzas: láminas con cifras de los libros + hechos relevantes editables con IA -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1250px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .lamina { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.08); margin-bottom:26px; overflow:hidden; page-break-after:always; }
+    .lam-head { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; padding:12px 22px; font-weight:700; font-size:.95rem; display:flex; justify-content:space-between; align-items:center; }
+    .lam-head .kicker { font-size:.7rem; letter-spacing:.12em; opacity:.75; }
+    .lam-body { padding:18px 22px; }
+    table { width:100%; border-collapse:collapse; font-size:.79rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:7px 10px; border-bottom:2px solid #e5e7eb; text-align:left; white-space:nowrap; }
+    tbody td { padding:5px 10px; border-bottom:1px solid #f1f5f9; }
+    .tr-tot td { font-weight:800; background:#f0f6ff; border-top:2px solid var(--navy); }
+    .tr-grupo td { font-weight:800; background:#f8fafc; color:var(--navy); }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; }
+    .neg { color:#b91c1c; } .pos { color:#166534; }
+    .hechos { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 14px; margin-top:14px; }
+    .hechos h6 { font-size:.82rem; font-weight:800; color:#92400e; margin:0 0 6px; }
+    .hechos textarea { width:100%; border:1px solid #fde68a; border-radius:8px; font-size:.82rem; padding:8px 10px; background:#fff; min-height:88px; }
+    .portada { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); color:#fff; border-radius:14px; padding:80px 40px; text-align:center; margin-bottom:26px; page-break-after:always; }
+    .portada h1 { font-weight:800; font-size:2rem; margin-bottom:8px; } .portada .sub { opacity:.85; font-size:1.05rem; }
+    .kpi-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:26px; justify-content:center; }
+    .kpi { background:rgba(255,255,255,.12); border-radius:12px; padding:14px 22px; min-width:170px; }
+    .kpi .v { font-size:1.3rem; font-weight:800; } .kpi .l { font-size:.72rem; opacity:.8; text-transform:uppercase; letter-spacing:.08em; }
+    @media print {
+      body { background:#fff; } .main-content { padding:0; max-width:none; }
+      .no-print, #af-topnav, .toolbar { display:none !important; }
+      .lamina, .portada { box-shadow:none; border-radius:0; margin:0; }
+      .hechos textarea { border:none; background:transparent; resize:none; }
+      .hechos .btns { display:none; }
+      @page { size:letter landscape; margin:10mm; }
+    }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Presentación Directorio', icon:'bi-easel2', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner no-print"><i class="bi bi-easel2"></i><div><h2>Presentación Directorio</h2><p>La presentación mensual de finanzas armada sola con los libros: balance, cuentas por cobrar y pagar, resultados vs año anterior, caja — con Hechos Relevantes editables por lámina. Imprime a PDF apaisado y listo.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar no-print">
+    <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar presentación</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+  </div>
+
+  <div id="out"><div class="text-muted no-print">Elige el mes y genera la presentación.</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = n => { const v=Math.round(Number(n)||0); return (v<0?'−$':'$')+Math.abs(v).toLocaleString('es-CL'); };
+const mm = n => { const v=(Number(n)||0)/1e6; return (v<0?'−$':'$')+Math.abs(v).toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1})+' MM'; };
+const pct = (a,b) => !b ? '—' : ((a-b)/Math.abs(b)*100).toLocaleString('es-CL',{maximumFractionDigits:1})+'%';
+const varCls = v => v<0?'neg':(v>0?'pos':'');
+const MESES = ['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const hoy = new Date(); const pad=n=>String(n).padStart(2,'0');
+const prev = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+fMes.value = `${prev.getFullYear()}-${pad(prev.getMonth()+1)}`;
+let D = null;
+
+const filaCta = (x, cols) => `<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'')}</td>${cols.map(c=>`<td class="text-right num ${c.cls||''}">${c.txt}</td>`).join('')}</tr>`;
+
+function bloqueHechos(sec, titulo){
+  const h = D.hechos[sec];
+  return `<div class="hechos">
+    <h6><i class="bi bi-exclamation-circle me-1"></i>Hechos Relevantes — ${titulo}</h6>
+    <textarea id="hx_${sec}" placeholder="1) ...">${esc(h?.texto||'')}</textarea>
+    <div class="btns d-flex justify-content-between align-items-center mt-1">
+      <span class="small text-muted">${h?`Guardado por ${esc(h.actualizado_por||'')} · ${String(h.updated_at).slice(0,16).replace('T',' ')}`:''}</span>
+      <span>
+        <button class="btn btn-sm btn-outline-primary me-1" onclick="hechosIA('${sec}')"><i class="bi bi-stars me-1"></i>Borrador IA</button>
+        <button class="btn btn-sm btn-primary" onclick="guardarHechos('${sec}')"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </span>
+    </div>
+  </div>`;
+}
+
+function lamina(kicker, titulo, cuerpo, sec, tituloHechos){
+  return `<div class="lamina">
+    <div class="lam-head"><span>${titulo}</span><span class="kicker">${kicker} · AUTOFÁCIL</span></div>
+    <div class="lam-body">${cuerpo}${sec?bloqueHechos(sec, tituloHechos||titulo):''}</div>
+  </div>`;
+}
+
+function generar(){ consultar(); }
+async function consultar(){
+  const r = await fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data; render();
+}
+
+function render(){
+  const [y,m] = D.mes.split('-').map(Number);
+  const nomMes = MESES[m].toUpperCase()+' '+y;
+  const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
+  const bal = D.balance;
+  const act = bal.filter(x=>x.tipo==='ACTIVO'), pas = bal.filter(x=>x.tipo==='PASIVO'), pat = bal.filter(x=>x.tipo==='PATRIMONIO');
+  const sum = (arr,f) => arr.reduce((s,x)=>s+x[f],0);
+  const totAct = sum(act,'s_actual'), totPas = -sum(pas,'s_actual'), totPat = -sum(pat,'s_actual');
+  const ing = D.eerr.filter(x=>x.tipo==='INGRESO'), gas = D.eerr.filter(x=>x.tipo==='GASTO');
+  const resMes = sum(ing,'mes_actual')-sum(gas,'mes_actual'), resMesAA = sum(ing,'mes_aa')-sum(gas,'mes_aa');
+  const resAcum = sum(ing,'acum_actual')-sum(gas,'acum_actual'), resAcumAA = sum(ing,'acum_aa')-sum(gas,'acum_aa');
+
+  // Lámina balance: 3 grupos con actual/anterior/variación
+  const filasBal = (arr, inv) => arr.filter(x=>Math.abs(x.s_actual)>0.5||Math.abs(x.s_anterior)>0.5).map(x=>{
+    const a = inv?-x.s_actual:x.s_actual, b = inv?-x.s_anterior:x.s_anterior, v = a-b;
+    return filaCta(x, [{txt:mm(a)},{txt:mm(b)},{txt:mm(v),cls:varCls(v)}]);
+  }).join('');
+  const cabBal = `<thead><tr><th style="width:95px">Cuenta</th><th></th><th class="text-right" style="width:120px">${MESES[m].slice(0,3)}-${String(y).slice(2)}</th><th class="text-right" style="width:120px">Mes anterior</th><th class="text-right" style="width:120px">Variación</th></tr></thead>`;
+  const lamBal = lamina('BALANCE', `BALANCE GENERAL AL MES DE ${nomMes}`, `
+    <table>${cabBal}<tbody>
+      <tr class="tr-grupo"><td colspan="5">ACTIVO</td></tr>${filasBal(act,false)}
+      <tr class="tr-tot"><td colspan="2">TOTAL ACTIVO</td><td class="text-right num">${mm(totAct)}</td><td class="text-right num">${mm(sum(act,'s_anterior'))}</td><td class="text-right num">${mm(totAct-sum(act,'s_anterior'))}</td></tr>
+      <tr class="tr-grupo"><td colspan="5">PASIVO</td></tr>${filasBal(pas,true)}
+      <tr class="tr-tot"><td colspan="2">TOTAL PASIVO</td><td class="text-right num">${mm(totPas)}</td><td class="text-right num">${mm(-sum(pas,'s_anterior'))}</td><td class="text-right num">${mm(totPas+sum(pas,'s_anterior'))}</td></tr>
+      <tr class="tr-grupo"><td colspan="5">PATRIMONIO</td></tr>${filasBal(pat,true)}
+      <tr class="tr-tot"><td colspan="2">TOTAL PATRIMONIO</td><td class="text-right num">${mm(totPat)}</td><td class="text-right num">${mm(-sum(pat,'s_anterior'))}</td><td class="text-right num">${mm(totPat+sum(pat,'s_anterior'))}</td></tr>
+    </tbody></table>`, 'BALANCE');
+
+  // CxC / CxP
+  const cxc = act.filter(esCxC), cxp = pas.filter(x=>/^21/.test(x.cuenta));
+  const lamCxC = lamina('BALANCE', `DETALLE CUENTAS POR COBRAR — ${nomMes}`, `
+    <table>${cabBal}<tbody>${filasBal(cxc,false)}
+      <tr class="tr-tot"><td colspan="2">TOTAL CUENTAS POR COBRAR</td><td class="text-right num">${mm(sum(cxc,'s_actual'))}</td><td class="text-right num">${mm(sum(cxc,'s_anterior'))}</td><td class="text-right num">${mm(sum(cxc,'s_actual')-sum(cxc,'s_anterior'))}</td></tr>
+    </tbody></table>`, 'CXC', 'Cuentas por Cobrar');
+  const lamCxP = lamina('BALANCE', `DETALLE CUENTAS POR PAGAR — ${nomMes}`, `
+    <table>${cabBal}<tbody>${filasBal(cxp,true)}
+      <tr class="tr-tot"><td colspan="2">TOTAL CUENTAS POR PAGAR</td><td class="text-right num">${mm(-sum(cxp,'s_actual'))}</td><td class="text-right num">${mm(-sum(cxp,'s_anterior'))}</td><td class="text-right num">${mm(-sum(cxp,'s_actual')+sum(cxp,'s_anterior'))}</td></tr>
+    </tbody></table>`, 'CXP', 'Cuentas por Pagar');
+
+  // EERR mes y acumulado (vs año anterior)
+  const cabEERR = (c1,c2) => `<thead><tr><th style="width:95px">Cuenta</th><th></th><th class="text-right" style="width:115px">${c1}</th><th class="text-right" style="width:115px">${c2}</th><th class="text-right" style="width:105px">Var $</th><th class="text-right" style="width:75px">Var %</th></tr></thead>`;
+  const filasEERR = (arr, fA, fB) => arr.filter(x=>Math.abs(x[fA])>0.5||Math.abs(x[fB])>0.5).map(x=>{
+    const v = x[fA]-x[fB];
+    return filaCta(x, [{txt:mm(x[fA])},{txt:mm(x[fB])},{txt:mm(v),cls:x.tipo==='GASTO'?varCls(-v):varCls(v)},{txt:pct(x[fA],x[fB])}]);
+  }).join('');
+  const totEERR = (fA,fB) => `
+    <tr class="tr-tot"><td colspan="2">TOTAL INGRESOS</td><td class="text-right num">${mm(sum(ing,fA))}</td><td class="text-right num">${mm(sum(ing,fB))}</td><td class="text-right num">${mm(sum(ing,fA)-sum(ing,fB))}</td><td class="text-right num">${pct(sum(ing,fA),sum(ing,fB))}</td></tr>
+    <tr class="tr-tot"><td colspan="2">TOTAL GASTOS</td><td class="text-right num">${mm(sum(gas,fA))}</td><td class="text-right num">${mm(sum(gas,fB))}</td><td class="text-right num">${mm(sum(gas,fA)-sum(gas,fB))}</td><td class="text-right num">${pct(sum(gas,fA),sum(gas,fB))}</td></tr>
+    <tr class="tr-tot"><td colspan="2">RESULTADO</td><td class="text-right num ${varCls(sum(ing,fA)-sum(gas,fA))}">${mm(sum(ing,fA)-sum(gas,fA))}</td><td class="text-right num ${varCls(sum(ing,fB)-sum(gas,fB))}">${mm(sum(ing,fB)-sum(gas,fB))}</td><td colspan="2"></td></tr>`;
+  const cuerpoEERR = (fA,fB,c1,c2) => `
+    <table>${cabEERR(c1,c2)}<tbody>
+      <tr class="tr-grupo"><td colspan="6">INGRESOS</td></tr>${filasEERR(ing,fA,fB)}
+      <tr class="tr-grupo"><td colspan="6">GASTOS</td></tr>${filasEERR(gas,fA,fB)}
+      ${totEERR(fA,fB)}
+    </tbody></table>`;
+  const lamEERRMes = lamina('EERR', `RESULTADOS DEL MES DE ${nomMes} (vs ${MESES[m]} ${y-1})`,
+    cuerpoEERR('mes_actual','mes_aa', `${MESES[m].slice(0,3)}-${String(y).slice(2)}`, `${MESES[m].slice(0,3)}-${String(y-1).slice(2)}`), 'EERR_MES', 'Resultados del mes');
+  const lamEERRAcum = lamina('EERR', `P&G ACUMULADO A ${nomMes} (vs mismo período ${y-1})`,
+    cuerpoEERR('acum_actual','acum_aa', `Acum ${y}`, `Acum ${y-1}`), 'EERR_ACUM', 'Resultados acumulados');
+
+  // Caja y bancos
+  const lamCaja = lamina('FDC', `CAJA Y BANCOS — MOVIMIENTO DE ${nomMes}`, `
+    <table><thead><tr><th style="width:95px">Cuenta</th><th></th><th class="text-right">Saldo inicial</th><th class="text-right">Entradas</th><th class="text-right">Salidas</th><th class="text-right">Saldo final</th></tr></thead><tbody>
+      ${D.caja.map(x=>filaCta(x,[{txt:mm(x.saldo_ini)},{txt:mm(x.entradas),cls:'pos'},{txt:mm(x.salidas),cls:'neg'},{txt:mm(x.saldo_ini+x.entradas-x.salidas)}])).join('')}
+      <tr class="tr-tot"><td colspan="2">TOTAL DISPONIBLE</td>
+        <td class="text-right num">${mm(sum(D.caja,'saldo_ini'))}</td>
+        <td class="text-right num pos">${mm(sum(D.caja,'entradas'))}</td>
+        <td class="text-right num neg">${mm(sum(D.caja,'salidas'))}</td>
+        <td class="text-right num">${mm(sum(D.caja,'saldo_ini')+sum(D.caja,'entradas')-sum(D.caja,'salidas'))}</td></tr>
+    </tbody></table>`, 'CAJA', 'Caja y bancos');
+
+  document.getElementById('out').innerHTML = `
+    <div class="portada">
+      <div style="font-size:.85rem;letter-spacing:.25em;opacity:.75">INFORME DE FINANZAS AL DIRECTORIO</div>
+      <h1>AutoFácil Chile</h1>
+      <div class="sub">${MESES[m][0].toUpperCase()+MESES[m].slice(1)} ${y} · generado desde los libros el ${new Date().toLocaleDateString('es-CL')}${D.tipo_cambio?` · TC cierre $${D.tipo_cambio.valor.toLocaleString('es-CL')}`:''}</div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="v">${mm(totAct)}</div><div class="l">Activo</div></div>
+        <div class="kpi"><div class="v">${mm(totPas)}</div><div class="l">Pasivo</div></div>
+        <div class="kpi"><div class="v ${varCls(resMes)}" style="color:#fff">${mm(resMes)}</div><div class="l">Resultado del mes</div></div>
+        <div class="kpi"><div class="v" style="color:#fff">${mm(resAcum)}</div><div class="l">Resultado acumulado</div></div>
+      </div>
+    </div>
+    ${lamBal}${lamCxC}${lamCxP}${lamEERRMes}${lamEERRAcum}${lamCaja}
+    <div class="lamina"><div class="lam-head"><span>CIERRE</span><span class="kicker">AUTOFÁCIL</span></div>
+      <div class="lam-body" style="text-align:center;padding:70px 20px"><h3 class="fw-bold" style="color:var(--navy)">¿Preguntas?</h3>
+      <div class="text-muted small">Detalle disponible en Contabilidad → Libros, Estados Financieros e Informe de Cierre Mensual</div></div></div>`;
+}
+
+async function guardarHechos(sec){
+  const texto = document.getElementById('hx_'+sec).value.trim();
+  const r = await fetch('/api/contabilidad/directorio/hechos',{method:'PUT',headers:H,body:JSON.stringify({mes:fMes.value,seccion:sec,texto})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D.hechos[sec] = { texto, actualizado_por:'tú', updated_at:new Date().toISOString() };
+  alert('Hechos relevantes guardados.');
+}
+
+function datosSeccion(sec){
+  const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
+  if (sec==='BALANCE') return { balance: D.balance };
+  if (sec==='CXC') return { cxc: D.balance.filter(x=>x.tipo==='ACTIVO'&&esCxC(x)) };
+  if (sec==='CXP') return { cxp: D.balance.filter(x=>x.tipo==='PASIVO'&&/^21/.test(x.cuenta)) };
+  if (sec==='EERR_MES') return { eerr_mes: D.eerr.map(x=>({cuenta:x.cuenta,nombre:x.nombre,tipo:x.tipo,mes_actual:x.mes_actual,mes_anio_anterior:x.mes_aa})) };
+  if (sec==='EERR_ACUM') return { eerr_acum: D.eerr.map(x=>({cuenta:x.cuenta,nombre:x.nombre,tipo:x.tipo,acum_actual:x.acum_actual,acum_anio_anterior:x.acum_aa})) };
+  return { caja: D.caja };
+}
+async function hechosIA(sec){
+  const btn = event.target.closest('button');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando…';
+  try {
+    const r = await fetch('/api/contabilidad/directorio/hechos-ia',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value,seccion:sec,datos:datosSeccion(sec)})});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+    const ta = document.getElementById('hx_'+sec);
+    ta.value = (ta.value.trim()?ta.value.trim()+'\n\n':'')+j.data.borrador;
+    alert('Borrador IA agregado — revísalo, ajústalo y presiona Guardar.');
+  } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Borrador IA'; }
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
