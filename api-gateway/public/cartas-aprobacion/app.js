@@ -4498,7 +4498,7 @@ async function printPDF(){
      el margen visual lo da el padding del body → cabe en 1 hoja carta */
   @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; font-family: Arial, sans-serif; }
-  body { margin: 0; padding: 10mm 14mm; font-size: 10px; color: #222; width: 100%; }
+  body { margin: 0; padding: 8mm 11mm; font-size: 10px; color: #222; width: 100%; }
   .carta-doc { width: 100%; border:none !important; }
   .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; margin-bottom:0; font-size:9.5px; color:#111; text-transform:uppercase; display:block; }
   .data-tbl { width:100%; border-collapse:collapse; margin-bottom:0; table-layout:fixed; }

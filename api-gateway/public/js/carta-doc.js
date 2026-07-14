@@ -102,7 +102,7 @@
     <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
       ${String(opts.consid || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => `<p style="margin:2px 0">${esc(l).replace(/\{\{ACREEDOR\}\}/g, acreedor)}</p>`).join('')}
     </div>
-    <div style="margin-top:18px;display:flex;align-items:flex-end">
+    <div style="margin-top:8px;display:flex;align-items:flex-end">
       <div id="cartaQRSlot" style="width:130px">${qrHTML}</div>
       <div style="flex:1;text-align:center">
         ${opts.firmaImg || ''}
@@ -111,7 +111,7 @@
       </div>
       <div style="width:130px"></div>
     </div>
-    <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:.5px solid #e0e0e0;padding-top:4px">
+    <div style="margin-top:5px;font-size:7.5px;color:#aaa;text-align:right;border-top:.5px solid #e0e0e0;padding-top:3px">
       Creado por: ${esc(c.creadoPorInitials || '')} | ${c.aprobadoPorInitials ? 'Revisado por: ' + esc(c.aprobadoPorInitials) : 'Pendiente de Revisión'} | Tipo: ${esc(c.tipo || '')}
     </div>
   </div>`;
