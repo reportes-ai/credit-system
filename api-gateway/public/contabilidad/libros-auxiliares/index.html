@@ -36,6 +36,7 @@
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-cart3 me-1"></i>Compras</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabV" onclick="tab('V');return false"><i class="bi bi-receipt me-1"></i>Ventas</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-person-badge me-1"></i>Honorarios</a></li>
   </ul>
 
@@ -50,7 +51,7 @@
     <button class="btn btn-sm btn-outline-success" onclick="exportar()" id="btnXls" disabled><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
     <span class="flex-grow-1"></span>
     <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
-      <input type="file" hidden accept=".csv,.txt" onchange="importar(this)"></label>
+      <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
   </div>
 
   <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis" style="display:none"></div>
@@ -72,7 +73,7 @@
 
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.82rem">
     <div class="fw-bold mb-1"><i class="bi bi-info-circle me-1"></i>De dónde salen estos datos</div>
-    Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)" y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
+    Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)", <b>Ventas</b> → "Exportar Documentos de Ventas" (un archivo por mes; las notas de crédito tipo 61 entran con signo negativo) y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
   </div>
 </div>
 
@@ -85,6 +86,7 @@ const fmt = n => Number(n||0).toLocaleString('es-CL');
 const MESES = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const nomMes = m => { const [y,mm]=m.split('-'); return MESES[Number(mm)]+'-'+y.slice(2); };
 let MODO = 'C', D = null;
+const tipoDte = t => ({ '33':'33 Factura', '34':'34 F.Exenta', '39':'39 Boleta', '56':'56 N.Débito', '61':'61 N.Crédito' }[String(t)] || t || '');
 
 const hoy = new Date();
 fHasta.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
@@ -92,8 +94,8 @@ fDesde.value = `${hoy.getFullYear()}-01`;
 
 function tab(m){
   MODO = m; D = null;
-  tabC.classList.toggle('active', m==='C'); tabH.classList.toggle('active', m==='H');
-  lblQ.textContent = m==='C' ? 'Proveedor, RUT o N° doc' : 'Profesional, RUT, boleta o glosa';
+  tabC.classList.toggle('active', m==='C'); tabV.classList.toggle('active', m==='V'); tabH.classList.toggle('active', m==='H');
+  lblQ.textContent = m==='C' ? 'Proveedor, RUT o N° doc' : m==='V' ? 'Cliente, RUT o N° doc' : 'Profesional, RUT, boleta o glosa';
   document.getElementById('kpis').style.display='none';
   theadMes.innerHTML=''; tbodyMes.innerHTML='';
   theadDet.innerHTML=''; tbodyDet.innerHTML='<tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr>';
@@ -111,7 +113,7 @@ function qs(){
 }
 
 async function consultar(){
-  const url = MODO==='C' ? '/api/contabilidad/compras-aux/lista?' : '/api/contabilidad/honorarios-aux/lista?';
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/lista?' : MODO==='V' ? '/api/contabilidad/ventas-aux/lista?' : '/api/contabilidad/honorarios-aux/lista?';
   const r = await fetch(url+qs(), { headers:H }); const j = await r.json();
   if (!j.success) return alert(j.error);
   D = j.data; render();
@@ -132,6 +134,20 @@ function render(){
     tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.tipo_doc||'')}-${esc(d.num_doc||'')}</td>
       <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):''}</td>
       <td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
+      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
+      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
+  } else if (MODO==='V'){
+    k.innerHTML = `
+      <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Documentos</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.neto)}</div><div class="l">Neto</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.iva)}</div><div class="l">IVA (débito fiscal)</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.total)}</div><div class="l">Total</div></div>`;
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.neto)}</td><td class="text-right num">${fmt(x.iva)}</td><td class="text-right num">${fmt(x.total)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Tipo</th><th>N° Doc</th><th>Emisión</th><th>RUT</th><th>Cliente</th><th>Cta ingreso</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(tipoDte(d.tipo_doc))}</td><td>${esc(d.num_doc||'')}</td>
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_ingreso||'')}</td>
       <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
   } else {
@@ -157,13 +173,18 @@ function render(){
 function irMes(m){ fDesde.value = m; fHasta.value = m; consultar(); }
 
 async function importar(inp){
-  const f = inp.files[0]; if (!f) return; inp.value='';
-  const base64 = await new Promise(res=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(f); });
-  const url = MODO==='C' ? '/api/contabilidad/compras-aux/importar' : '/api/contabilidad/honorarios-aux/importar';
-  const r = await fetch(url,{method:'POST',headers:H,body:JSON.stringify({base64})});
-  const j = await r.json(); if (!j.success) return alert(j.error);
-  const n = j.data.documentos || j.data.boletas, ms = j.data.meses.sort();
-  alert(`Importados ${n.toLocaleString('es-CL')} documentos (${ms.length} meses: ${ms[0]} → ${ms[ms.length-1]}). Los meses del archivo se reemplazaron completos.`);
+  const files = [...inp.files]; if (!files.length) return; inp.value='';
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/importar' : MODO==='V' ? '/api/contabilidad/ventas-aux/importar' : '/api/contabilidad/honorarios-aux/importar';
+  let tot = 0; const meses = new Set(); const errores = [];
+  for (const f of files){
+    const base64 = await new Promise(res=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(f); });
+    const r = await fetch(url,{method:'POST',headers:H,body:JSON.stringify({base64})});
+    const j = await r.json();
+    if (!j.success){ errores.push(`${f.name}: ${j.error}`); continue; }
+    tot += (j.data.documentos || j.data.boletas); j.data.meses.forEach(m=>meses.add(m));
+  }
+  const ms = [...meses].sort();
+  alert(`Importados ${tot.toLocaleString('es-CL')} documentos de ${files.length-errores.length} archivo(s)${ms.length?` (${ms.length} meses: ${ms[0]} → ${ms[ms.length-1]})`:''}. Los meses de cada archivo se reemplazaron completos.`+(errores.length?`\n\nErrores:\n`+errores.join('\n'):''));
   consultar();
 }
 
@@ -172,13 +193,16 @@ function exportar(){
   const filas = MODO==='C'
     ? [['Mes','Tipo','N° Doc','Emisión','Vencimiento','RUT','Proveedor','Cta CxP','Cta Gasto','Neto','Exento','IVA','Total'],
        ...D.documentos.map(d=>[d.mes,d.tipo_doc,d.num_doc,String(d.fecha_doc||'').slice(0,10),String(d.fecha_vcto||'').slice(0,10),d.rut,d.razon_social,d.cuenta_cxp,d.cuenta_gasto,d.neto,d.exento,d.iva,d.total])]
+    : MODO==='V'
+    ? [['Mes','Tipo DTE','N° Doc','Emisión','RUT','Cliente','Cta Ingreso','Neto','Exento','IVA','Total'],
+       ...D.documentos.map(d=>[d.mes,tipoDte(d.tipo_doc),d.num_doc,String(d.fecha_doc||'').slice(0,10),d.rut,d.razon_social,d.cuenta_ingreso,d.neto,d.exento,d.iva,d.total])]
     : [['Mes','N° Boleta','Emisión','RUT','Profesional','Glosa','Cta Gasto','Bruto','Tasa Ret.','Retención','Líquido'],
        ...D.documentos.map(d=>[d.mes,d.num_boleta,String(d.fecha_emision||'').slice(0,10),d.rut,d.nombre,d.glosa,d.cuenta_gasto,d.bruto,d.tasa_retencion,d.retencion,d.liquido])];
   const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
   const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'], { type:'application/vnd.ms-excel' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (MODO==='C'?'auxiliar-compras':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
+  a.download = (MODO==='C'?'auxiliar-compras':MODO==='V'?'auxiliar-ventas':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
   a.click(); URL.revokeObjectURL(a.href);
 }
 

@@ -79,6 +79,8 @@ router.get('/honorarios-aux',           verifyToken, requireFunc('ctb_directorio
 router.post('/honorarios-aux/importar', verifyToken, requireFunc('ctb_directorio', 'ctb_libros_aux'), ctrl.importarHonorariosAux);
 router.get('/compras-aux/lista',     verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaComprasAux);
 router.get('/honorarios-aux/lista',  verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaHonorariosAux);
+router.post('/ventas-aux/importar',  verifyToken, requireFunc('ctb_directorio', 'ctb_libros_aux'), ctrl.importarVentasAux);
+router.get('/ventas-aux/lista',      verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaVentasAux);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);
 router.post('/directorio/hechos-ia', verifyToken, requireFunc('ctb_directorio'), ctrl.hechosDirectorioIA);
 

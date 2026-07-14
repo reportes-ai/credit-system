@@ -1117,6 +1117,84 @@ exports.getHonorariosAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Auxiliar de Ventas (export AVSOFT "Exportar Documentos de Ventas") ───────
+   Formato multilínea: ENC (encabezado del doc) + DEA/DEE/DEI (detalle). Se
+   toma el ENC y la cuenta de ingreso del primer DEA/DEE. Un archivo por mes.
+   Notas de crédito (tipo 61) se guardan con signo negativo. */
+require('../../../../shared/migrate').enFila('contabilidad-ventas-aux', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_ventas_aux (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        mes            VARCHAR(7) NOT NULL,        -- YYYY-MM (período contable)
+        tipo_doc       VARCHAR(10) NULL,           -- 33 factura, 61 NC, 56 ND...
+        num_doc        VARCHAR(30) NULL,
+        fecha_doc      DATE NULL,
+        rut            VARCHAR(15) NULL,
+        razon_social   VARCHAR(200) NULL,
+        cuenta_ingreso VARCHAR(20) NULL,
+        neto           DECIMAL(14,0) NOT NULL DEFAULT 0,
+        exento         DECIMAL(14,0) NOT NULL DEFAULT 0,
+        iva            DECIMAL(14,0) NOT NULL DEFAULT 0,
+        total          DECIMAL(14,0) NOT NULL DEFAULT 0,
+        INDEX idx_mes (mes), INDEX idx_rut (rut)
+      )`);
+  } catch (e) { console.error('[contabilidad-ventas-aux migration]', e.message); }
+});
+
+exports.importarVentasAux = async (req, res) => {
+  try {
+    const { base64 } = req.body || {};
+    if (!base64) return fail(res, 'Archivo (base64) obligatorio', 400);
+    const texto = Buffer.from(String(base64).replace(/^data:[^;]+;base64,/, ''), 'base64').toString('latin1');
+    const lineas = texto.split(/\r?\n/);
+    const filas = [];
+    let actual = null;
+    for (const l of lineas) {
+      const c = l.split(';');
+      if (c[0] === 'ENC') {
+        const mes = `${c[1]}-${String(Number(c[2])).padStart(2, '0')}`;
+        if (!/^\d{4}-\d{2}$/.test(mes)) { actual = null; continue; }
+        const tipo = String(c[3] || '').trim();
+        const sgn = tipo === '61' ? -1 : 1;   // nota de crédito resta
+        actual = [mes, tipo, String(c[4] || '').trim(), fechaCL(c[8]), String(c[5] || '').trim(),
+          String(c[6] || '').trim().slice(0, 200), null,
+          sgn * (Number(c[13]) || 0), sgn * (Number(c[14]) || 0), sgn * (Number(c[17]) || 0), sgn * (Number(c[20]) || 0)];
+        filas.push(actual);
+      } else if ((c[0] === 'DEA' || c[0] === 'DEE') && actual && !actual[6]) {
+        actual[6] = String(c[1] || '').trim() || null; // cuenta de ingreso del primer detalle
+      }
+    }
+    if (!filas.length) return fail(res, 'El archivo no parece el export "Documentos de Ventas" de AVSOFT (líneas ENC/DEA)', 400);
+    const meses = [...new Set(filas.map(f => f[0]))];
+    await pool.query('DELETE FROM ctb_ventas_aux WHERE mes IN (?)', [meses]);
+    for (let i = 0; i < filas.length; i += 500)
+      await pool.query(
+        'INSERT INTO ctb_ventas_aux (mes, tipo_doc, num_doc, fecha_doc, rut, razon_social, cuenta_ingreso, neto, exento, iva, total) VALUES ?',
+        [filas.slice(i, i + 500)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'ventas_aux', entidad_id: null, detalle: `Import ventas AVSOFT: ${filas.length} docs, meses ${meses.join(', ')}` });
+    ok(res, { documentos: filas.length, meses });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.listaVentasAux = async (req, res) => {
+  try {
+    const { desde, hasta, q, cuenta } = req.query;
+    const w = [], p = [];
+    if (/^\d{4}-\d{2}$/.test(desde || '')) { w.push('mes >= ?'); p.push(desde); }
+    if (/^\d{4}-\d{2}$/.test(hasta || '')) { w.push('mes <= ?'); p.push(hasta); }
+    if (q) { w.push('(razon_social LIKE ? OR rut LIKE ? OR num_doc LIKE ?)'); p.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (cuenta) { w.push('cuenta_ingreso LIKE ?'); p.push(`${cuenta}%`); }
+    const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+    const [docs] = await pool.query(`SELECT * FROM ctb_ventas_aux ${where} ORDER BY mes DESC, ABS(total) DESC LIMIT 1000`, p);
+    const [meses] = await pool.query(
+      `SELECT mes, COUNT(*) docs, SUM(neto) neto, SUM(exento) exento, SUM(iva) iva, SUM(total) total
+         FROM ctb_ventas_aux ${where} GROUP BY mes ORDER BY mes DESC`, p);
+    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(neto),0) neto, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total FROM ctb_ventas_aux ${where}`, p);
+    ok(res, { documentos: docs, meses, total: tot, truncado: docs.length === 1000 });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Libros Auxiliares (/contabilidad/libros-auxiliares/) ─────────────────────
    Consulta completa de los auxiliares importados (compras, honorarios) con
    filtros y totales por mes. Solo lectura: la importación vive en el
