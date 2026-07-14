@@ -77,6 +77,19 @@ exports.miFoto = async (req, res) => {
   } catch (e) { errSrv(res, e, 'credenciales miFoto'); }
 };
 
+/* ── GET /api/credenciales/fotos — fotos de todos los usuarios activos.
+   Para el Directorio de colaboradores: cualquier usuario logueado (la foto
+   carnet es información de directorio, no sensible). */
+exports.fotos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT c.id_usuario, c.foto FROM credenciales_usuario c
+        JOIN usuarios u ON u.id_usuario = c.id_usuario AND u.estado='activo'
+       WHERE c.foto IS NOT NULL`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[credenciales fotos]', e.message); res.status(500).json({ success:false, data:null, error:'Error interno del servidor' }); }
+};
+
 /* ── GET /api/credenciales/:id — con foto (para el render) ───────────────── */
 exports.una = async (req, res) => {
   try {

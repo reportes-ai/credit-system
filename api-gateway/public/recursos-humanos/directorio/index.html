@@ -56,14 +56,14 @@ if (!token||!yo) location.href='/login.html';
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-let DATA = [];
+let DATA = [], FOTOS = {};
 function render(){
   const q = (document.getElementById('q').value||'').toLowerCase();
   const rows = DATA.filter(r => !q || [r.nombre,r.cargo].some(v=>String(v||'').toLowerCase().includes(q)));
   document.getElementById('resumen').textContent = `${rows.length} colaborador(es)`;
   document.getElementById('empty').style.display = rows.length ? 'none' : '';
   document.getElementById('grid').innerHTML = rows.map(r=>`<div class="card-p">
-    <div class="avatar">${esc((r.nombre||'?')[0].toUpperCase())}</div>
+    <div class="avatar">${FOTOS[r.id_usuario]?`<img src="${FOTOS[r.id_usuario]}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`:esc((r.nombre||'?')[0].toUpperCase())}</div>
     <div style="min-width:0">
       <h6>${esc(r.nombre)}</h6>
       <div class="cargo">${esc(r.cargo||'—')}</div>
@@ -78,6 +78,11 @@ function render(){
   const j = await (await fetch('/api/rrhh/directorio', { headers:{Authorization:'Bearer '+token} })).json();
   if (!j.success) { document.getElementById('empty').style.display=''; document.getElementById('empty').textContent = j.error||'Error'; return; }
   DATA = j.data || []; render();
+  // Fotos reales (Credenciales) — llegan aparte para no demorar el listado
+  try {
+    const jf = await (await fetch('/api/credenciales/fotos', { headers:{Authorization:'Bearer '+token} })).json();
+    if (jf.success) { (jf.data||[]).forEach(f=>{ if (f.foto) FOTOS[f.id_usuario]=f.foto; }); render(); }
+  } catch(e){}
 })();
 </script>
 <script src="/js/app-version.js"></script>
