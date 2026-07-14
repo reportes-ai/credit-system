@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.0 — réplica viva del PPT mensual de finanzas: láminas con cifras de los libros + hechos relevantes editables con IA -->
+  <!-- v1.2 — cuadros Excel + copiar con formato + descargar .xls por lámina -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -105,9 +105,56 @@ function bloqueHechos(sec, titulo){
 
 function lamina(kicker, titulo, cuerpo, sec, tituloHechos){
   return `<div class="lamina">
-    <div class="lam-head"><span>${titulo}</span><span class="kicker">${kicker} · AUTOFÁCIL</span></div>
+    <div class="lam-head"><span>${titulo}</span>
+      <span class="d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-light no-print" style="--bs-btn-padding-y:2px;--bs-btn-font-size:.72rem" title="Copiar el cuadro con formato (pégalo en Excel, Word o correo)" onclick="copiarCuadro(this)"><i class="bi bi-clipboard me-1"></i>Copiar</button>
+        <button class="btn btn-sm btn-outline-light no-print" style="--bs-btn-padding-y:2px;--bs-btn-font-size:.72rem" title="Descargar como Excel" onclick="descargarCuadro(this,'${esc(titulo)}')"><i class="bi bi-download me-1"></i>Excel</button>
+        <span class="kicker">${kicker} · AUTOFÁCIL</span>
+      </span></div>
     <div class="lam-body">${cuerpo}${sec?bloqueHechos(sec, tituloHechos||titulo):''}</div>
   </div>`;
+}
+
+/* ── Copiar / descargar cuadros con formato ──
+   Clona la tabla y aplica los estilos computados INLINE (los <style> de la
+   página no viajan en el portapapeles ni al .xls): así el pegado en Excel,
+   Word o Gmail conserva colores, negritas y bordes. */
+function tablaInline(tbl){
+  const clon = tbl.cloneNode(true);
+  const props = ['background-color','color','font-weight','font-size','font-family','text-align','border','padding','white-space'];
+  const src = tbl.querySelectorAll('*'), dst = clon.querySelectorAll('*');
+  const aplicar = (s,d) => { const cs = getComputedStyle(s); d.style.cssText = props.map(p=>`${p}:${cs.getPropertyValue(p)}`).join(';'); };
+  aplicar(tbl, clon); clon.style.borderCollapse = 'collapse';
+  for (let i=0;i<src.length;i++) aplicar(src[i], dst[i]);
+  clon.querySelectorAll('button,input,textarea').forEach(e=>e.remove());
+  return clon;
+}
+function tablaDe(btn){
+  const t = btn.closest('.lamina').querySelector('.lam-body table');
+  if (!t) alert('Esta lámina no tiene cuadro para copiar.');
+  return t;
+}
+async function copiarCuadro(btn){
+  const t = tablaDe(btn); if (!t) return;
+  const html = '<meta charset="utf-8">' + tablaInline(t).outerHTML;
+  const plano = [...t.rows].map(r=>[...r.cells].map(c=>c.innerText.trim()).join('\t')).join('\n');
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html],{type:'text/html'}),
+      'text/plain': new Blob([plano],{type:'text/plain'}),
+    })]);
+    const orig = btn.innerHTML; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Copiado';
+    setTimeout(()=>btn.innerHTML=orig, 1800);
+  } catch(e) { alert('No se pudo copiar: '+e.message); }
+}
+function descargarCuadro(btn, titulo){
+  const t = tablaDe(btn); if (!t) return;
+  const html = `<html><head><meta charset="utf-8"></head><body>${tablaInline(t).outerHTML}</body></html>`;
+  const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = titulo.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'') + '-' + fMes.value + '.xls';
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
 function generar(){ consultar(); }
