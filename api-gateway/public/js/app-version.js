@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v123.8';
+const APP_VERSION = 'v123.9';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -97,7 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!token) return;
     const aplicar = (foto) => {
       if (!foto) return;
-      document.querySelectorAll('.avatar, #avatarInicial').forEach(el => {
+      // SOLO el avatar propio de la barra superior — nunca los .avatar de las
+      // páginas (directorio, fichas, etc.), que son de OTRAS personas.
+      document.querySelectorAll('.user-chip .avatar, #avatarInicial').forEach(el => {
         if (el.querySelector('img')) return;
         el.innerHTML = '<img src="' + foto + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
         el.style.overflow = 'hidden';
