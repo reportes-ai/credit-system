@@ -111,9 +111,39 @@ function render(){
       <tr class="tot"><td colspan="2">TOTAL GASTOS</td><td>${clp(ea.total_gastos)}</td><td>${usd(ea.total_gastos)}</td></tr>
       <tr class="tot"><td colspan="2">${ea.resultado>=0?'UTILIDAD':'PÉRDIDA'} ACUMULADA</td><td class="${ea.resultado<0?'neg':''}">${clp(Math.abs(ea.resultado))}</td><td class="${ea.resultado<0?'neg':''}">${usd(Math.abs(ea.resultado))}</td></tr>
     </tbody></table></div>
+    <h5 class="sec">4. Comentarios al cierre</h5>
+    <div class="panel" style="padding:16px 20px">
+      <div id="comView" class="no-print-edit" style="white-space:pre-wrap; font-size:.86rem; ${D.comentario?'':'color:#9ca3af'}">${esc(D.comentario?.comentario || 'Sin comentarios para este mes.')}</div>
+      <div class="small text-muted mt-1" id="comMeta">${D.comentario?`Guardado por ${esc(D.comentario.actualizado_por||'—')} el ${String(D.comentario.updated_at).replace('T',' ').slice(0,16)}`:''}</div>
+      <div class="mt-2 d-print-none">
+        <textarea id="comTxt" class="form-control form-control-sm" rows="6" placeholder="Escribe los comentarios del mes o pide un borrador a la IA…">${esc(D.comentario?.comentario || '')}</textarea>
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-sm btn-outline-primary" id="btnIA" onclick="borradorIA()"><i class="bi bi-stars me-1"></i>Borrador con IA</button>
+          <button class="btn btn-sm btn-primary" onclick="guardarCom()"><i class="bi bi-check-lg me-1"></i>Guardar comentarios</button>
+        </div>
+      </div>
+    </div>
     <div class="text-muted small">Conversión a USD: montos CLP divididos por el tipo de cambio de cierre indicado. Los saldos de balance son acumulados históricos; los resultados, del período señalado. ${b.cuadre?'✓ Balance cuadrado.':'✗ ATENCIÓN: balance descuadrado — revisar comprobantes.'}</div>`;
 }
 fTC.addEventListener('change', ()=>{ if (D) { const t = parseFloat(String(fTC.value).replace(/\./g,'').replace(',','.')); if (t>0) { TC=t; render(); } } });
+
+async function borradorIA(){
+  const btn = document.getElementById('btnIA');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando el mes…';
+  try {
+    const r = await fetch('/api/contabilidad/cierre-mes/comentario-ia',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({mes:fMes.value})});
+    const j = await r.json();
+    if (!j.success) return alert(j.error);
+    document.getElementById('comTxt').value = j.data.borrador;
+    alert('Borrador listo: revísalo, edítalo si hace falta y presiona Guardar.');
+  } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Borrador con IA'; }
+}
+async function guardarCom(){
+  const comentario = document.getElementById('comTxt').value.trim();
+  const r = await fetch('/api/contabilidad/cierre-mes/comentario',{method:'PUT',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({mes:fMes.value,comentario})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  consultar();
+}
 </script>
 <script src="/js/app-version.js"></script>
 </body>

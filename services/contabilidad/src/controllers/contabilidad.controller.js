@@ -400,12 +400,89 @@ exports.cierreMes = async (req, res) => {
       interno(exports.estadoResultados, { desde: `${y}-01-01`, hasta: fin }),
     ]);
     const [[tc]] = await pool.query('SELECT DATE_FORMAT(fecha, "%Y-%m-%d") fecha, valor FROM dolar WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fin]);
+    const [[com]] = await pool.query('SELECT comentario, actualizado_por, updated_at FROM ctb_cierre_comentarios WHERE mes=?', [mes]).catch(() => [[null]]);
     ok(res, {
       mes, fin_mes: fin,
       tipo_cambio: tc ? { fecha: tc.fecha, valor: Number(tc.valor) } : null,
       balance, eerr_mes, eerr_acum,
+      comentario: com || null,
     });
   } catch (e) { fail(res, e.message); }
+};
+
+/* ── Comentarios al cierre mensual (management commentary) ─────────────────────
+   Texto libre por mes, guardado con autor y fecha; sale en el PDF del informe.
+   El borrador con IA compara el mes contra el anterior y propone 4-6 puntos —
+   nada se guarda sin que el usuario lo revise y grabe. */
+require('../../../../shared/migrate').enFila('contabilidad-comentarios', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_cierre_comentarios (
+        mes         VARCHAR(7) PRIMARY KEY,
+        comentario  TEXT NOT NULL,
+        borrador_ia TINYINT NOT NULL DEFAULT 0,
+        actualizado_por VARCHAR(160) NULL,
+        updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    // Registrar la funcionalidad en el subsistema de IA (el admin la gobierna desde el mantenedor IA)
+    await require('../../../../shared/ia').registrarFuncionalidad({
+      codigo: 'ctb_comentario_cierre',
+      nombre: 'Comentarios al Cierre Mensual',
+      descripcion: 'Borrador de los comentarios de la administración del informe mensual a la matriz: compara el mes contra el anterior y propone 4-6 viñetas (resultado, variaciones, alertas). El usuario siempre revisa y guarda.',
+    });
+  } catch (e) { console.error('[contabilidad-comentarios migration]', e.message); }
+});
+
+exports.guardarComentario = async (req, res) => {
+  try {
+    const { mes, comentario } = req.body || {};
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    await pool.query(
+      `INSERT INTO ctb_cierre_comentarios (mes, comentario, borrador_ia, actualizado_por) VALUES (?,?,0,?)
+       ON DUPLICATE KEY UPDATE comentario=VALUES(comentario), borrador_ia=0, actualizado_por=VALUES(actualizado_por)`,
+      [mes, String(comentario || '').slice(0, 8000), nombreDe(req.user)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'comentario_cierre', entidad_id: mes, detalle: `Comentarios al cierre ${mes} guardados` });
+    ok(res, { mes });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.comentarioIA = async (req, res) => {
+  try {
+    const mes = req.body?.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    const interno = (fn, query) => new Promise((resolve, reject) => {
+      const r2 = { status() { return this; }, json(j) { j.success ? resolve(j.data) : reject(new Error(j.error)); } };
+      fn({ query, params: {}, body: {}, user: req.user }, r2).catch(reject);
+    });
+    const [y, m] = mes.split('-').map(Number);
+    const mesAnt = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const [actual, anterior] = await Promise.all([
+      interno(exports.cierreMes, { mes }),
+      interno(exports.cierreMes, { mes: mesAnt }).catch(() => null),
+    ]);
+    const resumen = d => d && {
+      mes: d.mes, tc: d.tipo_cambio?.valor,
+      activo: d.balance.tot.activo, pasivo: d.balance.tot.pasivo, patrimonio: d.balance.tot.patrimonio,
+      resultado_ejercicio: d.balance.resultado_ejercicio,
+      ingresos_mes: d.eerr_mes.total_ingresos, gastos_mes: d.eerr_mes.total_gastos, resultado_mes: d.eerr_mes.resultado,
+      resultado_acumulado: d.eerr_acum.resultado,
+      top_ingresos: d.eerr_mes.ingresos.slice().sort((a, b) => b.monto - a.monto).slice(0, 6),
+      top_gastos: d.eerr_mes.gastos.slice().sort((a, b) => b.monto - a.monto).slice(0, 6),
+    };
+    const { analizar } = require('../../../../shared/anthropic');
+    const out = await analizar({
+      codigo: 'ctb_comentario_cierre',
+      id_usuario: (req.usuario || req.user || {}).id_usuario || null,
+      system: 'Eres el contador gerencial de AutoFácil Chile (crédito automotriz). Escribes los comentarios de la administración del informe mensual que se envía a la matriz en Ecuador. Estilo: profesional, directo, en español, montos en CLP con separador de miles. NO inventes cifras: usa solo los datos entregados.',
+      prompt: `Datos del mes reportado y del mes anterior (JSON):\n${JSON.stringify({ actual: resumen(actual), anterior: resumen(anterior) })}\n\nEscribe los "Comentarios al cierre" del mes ${mes}: 4 a 6 viñetas (formato "• ..."), cada una de 1-2 líneas. Cubre: resultado del mes y su variación contra el mes anterior (si hay datos), los movimientos más relevantes de ingresos y gastos, la posición de balance (activo/pasivo/patrimonio) y cualquier alerta que un gerente deba saber (patrimonio negativo, pérdidas sostenidas, concentraciones). Sin encabezado ni despedida: solo las viñetas.`,
+      max_tokens: 1024,
+    });
+    if (!out || !out.texto) return fail(res, 'La IA no devolvió comentarios', 502);
+    ok(res, { borrador: out.texto.trim() });
+  } catch (e) {
+    console.error('[ctb comentarioIA]', e.message);
+    fail(res, 'No se pudo generar el borrador con IA: ' + e.message, 502);
+  }
 };
 
 /* ── Cierre de ejercicio ───────────────────────────────────────────────────────
