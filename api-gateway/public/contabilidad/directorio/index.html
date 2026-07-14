@@ -64,6 +64,8 @@
     <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar presentación</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="configRubros()"><i class="bi bi-sliders me-1"></i>Configurar rubros</button>
+    <label class="btn btn-sm btn-outline-secondary mb-0" title="Sube el export AVSOFT: Compras → Importador/Exportador → Exportar Documentos de Compras (1 Línea)"><i class="bi bi-upload me-1"></i>Importar compras AVSOFT
+      <input type="file" hidden accept=".csv,.txt" onchange="importarCompras(this)"></label>
   </div>
 
   <div id="out"><div class="text-muted no-print">Elige el mes y genera la presentación.</div></div>
@@ -158,15 +160,24 @@ function descargarCuadro(btn, titulo){
 }
 
 function generar(){ consultar(); }
-let Q = null; // cuadros estilo Excel
+let Q = null, C = null; // cuadros estilo Excel + auxiliar compras
 async function consultar(){
-  const [j, jq] = await Promise.all([
+  const [j, jq, jc] = await Promise.all([
     fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
+    fetch('/api/contabilidad/compras-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
   ]);
   if (!j.success) return alert(j.error);
   if (!jq.success) return alert(jq.error);
-  D = j.data; Q = jq.data; render();
+  D = j.data; Q = jq.data; C = jc.success ? jc.data : null; render();
+}
+async function importarCompras(inp){
+  const f = inp.files[0]; if (!f) return; inp.value='';
+  const base64 = await new Promise(res=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(f); });
+  const r = await fetch('/api/contabilidad/compras-aux/importar',{method:'POST',headers:H,body:JSON.stringify({base64})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Importadas ${j.data.documentos.toLocaleString('es-CL')} facturas (${j.data.meses.length} meses: ${j.data.meses[0]} → ${j.data.meses[j.data.meses.length-1]}). Los meses del archivo se reemplazaron completos.`);
+  if (D) consultar();
 }
 /* miles de pesos, formato Excel */
 const miles = n => { const v = Math.round((Number(n)||0)/1000); return `<span class="${v<0?'neg':''}">${v.toLocaleString('es-CL')}</span>`; };
@@ -270,6 +281,28 @@ function render(){
         <td class="text-right num">${mm(sum(D.caja,'saldo_ini')+sum(D.caja,'entradas')-sum(D.caja,'salidas'))}</td></tr>
     </tbody></table>`, 'CAJA', 'Caja y bancos');
 
+  // Lámina compras (auxiliar AVSOFT), solo si hay datos del mes
+  let lamCompras = '';
+  if (C && C.total_mes.docs){
+    const f10 = C.documentos.slice(0,25);
+    lamCompras = lamina('COMPRAS', `DETALLE COMPRAS DE ${nomMes} (facturas de proveedores)`, `
+      <div class="row g-3"><div class="col-lg-7">
+      <table class="xls"><thead>
+        <tr><th colspan="5" class="tit">FACTURAS DEL MES — ${C.total_mes.docs} docs · ${mm(C.total_mes.total)} (se muestran las 25 mayores)</th></tr>
+        <tr><th>Proveedor</th><th>Doc</th><th>Emisión</th><th>Vencim.</th><th>Total</th></tr></thead><tbody>
+        ${f10.map(d=>`<tr><td>${esc(d.razon_social||d.rut||'')}</td><td class="n">${esc(d.tipo_doc||'')}-${esc(d.num_doc||'')}</td>
+          <td class="n">${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td class="n">${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):''}</td>
+          <td class="n">${pesos(d.total)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="col-lg-5">
+      <table class="xls"><thead>
+        <tr><th colspan="3" class="tit">TOP PROVEEDORES ACUMULADO ${y}</th></tr>
+        <tr><th>Proveedor</th><th>Docs</th><th>Total</th></tr></thead><tbody>
+        ${C.proveedores_anio.map(p=>`<tr><td>${esc(p.razon_social||p.rut||'')}</td><td class="n">${p.docs}</td><td class="n">${pesos(p.total)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="small text-muted mt-1">Fuente: export AVSOFT "Documentos de Compras (1 Línea)" — re-importable desde el botón de la barra.</div>
+      </div></div>`, 'COMPRAS', 'Compras del mes');
+  }
   document.getElementById('out').innerHTML = `
     <div class="portada">
       <div style="font-size:.85rem;letter-spacing:.25em;opacity:.75">INFORME DE FINANZAS AL DIRECTORIO</div>
@@ -282,7 +315,7 @@ function render(){
         <div class="kpi"><div class="v" style="color:#fff">${mm(resAcum)}</div><div class="l">Resultado acumulado</div></div>
       </div>
     </div>
-    ${lamBal}${lamCxC}${lamCxP}${lamEERRMes}${lamEERRAcum}${lamCaja}
+    ${lamBal}${lamCxC}${lamCxP}${lamCompras}${lamEERRMes}${lamEERRAcum}${lamCaja}
     <div class="lamina"><div class="lam-head"><span>CIERRE</span><span class="kicker">AUTOFÁCIL</span></div>
       <div class="lam-body" style="text-align:center;padding:70px 20px"><h3 class="fw-bold" style="color:var(--navy)">¿Preguntas?</h3>
       <div class="text-muted small">Detalle disponible en Contabilidad → Libros, Estados Financieros e Informe de Cierre Mensual</div></div></div>`;
@@ -362,6 +395,7 @@ function datosSeccion(sec){
   if (sec==='CXP') return { cxp: D.balance.filter(x=>x.tipo==='PASIVO'&&/^21/.test(x.cuenta)) };
   if (sec==='EERR_MES') return { eerr_mes: D.eerr.map(x=>({cuenta:x.cuenta,nombre:x.nombre,tipo:x.tipo,mes_actual:x.mes_actual,mes_anio_anterior:x.mes_aa})) };
   if (sec==='EERR_ACUM') return { eerr_acum: D.eerr.map(x=>({cuenta:x.cuenta,nombre:x.nombre,tipo:x.tipo,acum_actual:x.acum_actual,acum_anio_anterior:x.acum_aa})) };
+  if (sec==='COMPRAS') return C ? { total_mes: C.total_mes, mayores_facturas: C.documentos.slice(0,15).map(d=>({proveedor:d.razon_social,doc:(d.tipo_doc||'')+'-'+(d.num_doc||''),vencimiento:d.fecha_vcto,total:d.total})), top_proveedores_anio: C.proveedores_anio } : {};
   return { caja: D.caja };
 }
 async function hechosIA(sec){

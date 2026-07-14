@@ -949,6 +949,92 @@ exports.directorioCuadros = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Auxiliar de Compras (export AVSOFT "Documentos de Compras 1 Línea") ──────
+   Detalle factura por factura de proveedores: alimenta la lámina de compras
+   del directorio. Se re-importa cuando quieran (botón en la página): borra y
+   reemplaza los meses que vienen en el archivo. */
+require('../../../../shared/migrate').enFila('contabilidad-compras-aux', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_compras_aux (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        mes          VARCHAR(7) NOT NULL,        -- YYYY-MM (período contable del doc)
+        tipo_doc     VARCHAR(10) NULL,
+        num_doc      VARCHAR(30) NULL,
+        fecha_doc    DATE NULL,
+        fecha_vcto   DATE NULL,
+        estado       VARCHAR(20) NULL,
+        rut          VARCHAR(15) NULL,
+        razon_social VARCHAR(200) NULL,
+        cuenta_cxp   VARCHAR(20) NULL,
+        cuenta_gasto VARCHAR(20) NULL,
+        neto         DECIMAL(14,0) NOT NULL DEFAULT 0,
+        exento       DECIMAL(14,0) NOT NULL DEFAULT 0,
+        iva          DECIMAL(14,0) NOT NULL DEFAULT 0,
+        total        DECIMAL(14,0) NOT NULL DEFAULT 0,
+        INDEX idx_mes (mes), INDEX idx_rut (rut)
+      )`);
+  } catch (e) { console.error('[contabilidad-compras-aux migration]', e.message); }
+});
+
+const fechaCL = s => { const m = /^(\d{2})-(\d{2})-(\d{4})$/.exec(String(s || '').trim()); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+
+exports.importarComprasAux = async (req, res) => {
+  try {
+    const { base64 } = req.body || {};
+    if (!base64) return fail(res, 'Archivo (base64) obligatorio', 400);
+    const texto = Buffer.from(String(base64).replace(/^data:[^;]+;base64,/, ''), 'base64').toString('latin1');
+    const lineas = texto.split(/\r?\n/).filter(l => l.trim());
+    if (lineas.length < 2) return fail(res, 'Archivo vacío', 400);
+    const head = lineas[0].split(';').map(s => s.trim().toLowerCase());
+    const col = (frag) => head.findIndex(h => h.includes(frag));
+    const ix = {
+      anio: col('a'), mes: col('mes'), tipo: col('tipo de doc'), num: col('documento'),
+      fdoc: col('fecha doc'), fvcto: col('fecha venc'), estado: col('estado'),
+      rut: col('rut proveedor'), razon: col('raz'), cxp: col('concepto cliente'),
+      gasto: head.findIndex(h => h === 'cuenta contable'), neto: col('monto afecto'),
+      exento: col('monto exento'), iva: col('iva total'), total: col('total documento'),
+    };
+    ix.anio = 0; // primera columna siempre Año (el acento rompe el match)
+    if (ix.total < 0 || ix.rut < 0) return fail(res, 'El archivo no parece el export "Documentos de Compras (1 Línea)" de AVSOFT', 400);
+    const filas = [];
+    for (let i = 1; i < lineas.length; i++) {
+      const c = lineas[i].split(';');
+      if (c.length < 10) continue;
+      const mes = `${c[ix.anio]}-${String(Number(c[ix.mes])).padStart(2, '0')}`;
+      if (!/^\d{4}-\d{2}$/.test(mes)) continue;
+      filas.push([mes, c[ix.tipo]?.trim() || null, c[ix.num]?.trim() || null, fechaCL(c[ix.fdoc]), fechaCL(c[ix.fvcto]),
+        c[ix.estado]?.trim() || null, c[ix.rut]?.trim() || null, c[ix.razon]?.trim().slice(0, 200) || null,
+        c[ix.cxp]?.trim() || null, c[ix.gasto]?.trim() || null,
+        Number(c[ix.neto]) || 0, Number(c[ix.exento]) || 0, Number(c[ix.iva]) || 0, Number(c[ix.total]) || 0]);
+    }
+    if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
+    const meses = [...new Set(filas.map(f => f[0]))];
+    await pool.query('DELETE FROM ctb_compras_aux WHERE mes IN (?)', [meses]);
+    for (let i = 0; i < filas.length; i += 500)
+      await pool.query(
+        'INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total) VALUES ?',
+        [filas.slice(i, i + 500)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'compras_aux', entidad_id: null, detalle: `Import compras AVSOFT: ${filas.length} docs, meses ${meses.join(', ')}` });
+    ok(res, { documentos: filas.length, meses });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.getComprasAux = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes obligatorio', 400);
+    const [docs] = await pool.query(
+      'SELECT * FROM ctb_compras_aux WHERE mes=? ORDER BY total DESC LIMIT 300', [mes]);
+    const [prov] = await pool.query(
+      `SELECT razon_social, rut, COUNT(*) docs, SUM(total) total
+         FROM ctb_compras_aux WHERE mes LIKE CONCAT(LEFT(?,4),'-%') AND mes <= ?
+        GROUP BY razon_social, rut ORDER BY total DESC LIMIT 12`, [mes, mes]);
+    const [[tot]] = await pool.query('SELECT COUNT(*) n, COALESCE(SUM(total),0) total FROM ctb_compras_aux WHERE mes=?', [mes]);
+    ok(res, { documentos: docs, proveedores_anio: prov, total_mes: { docs: Number(tot.n), total: Number(tot.total) } });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* CRUD de rubros (botón Configurar rubros en la página) */
 exports.getDirRubros = async (req, res) => {
   try { const [rows] = await pool.query('SELECT * FROM ctb_dir_rubros ORDER BY cuadro, orden, id'); ok(res, rows); }
@@ -1061,7 +1147,7 @@ exports.directorioMes = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA'];
+const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS'];
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
@@ -1082,7 +1168,7 @@ exports.hechosDirectorioIA = async (req, res) => {
     const { mes, seccion, datos } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
-    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos' };
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)' };
     const { analizar } = require('../../../../shared/anthropic');
     const out = await analizar({
       codigo: 'ctb_directorio_ia',
