@@ -38,6 +38,7 @@
     <li class="nav-item"><a class="nav-link active" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-cart3 me-1"></i>Compras</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabV" onclick="tab('V');return false"><i class="bi bi-receipt me-1"></i>Ventas</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-person-badge me-1"></i>Honorarios</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabR" onclick="tab('R');return false"><i class="bi bi-people me-1"></i>Remuneraciones</a></li>
   </ul>
 
   <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
@@ -97,8 +98,9 @@ fDesde.value = `${hoy.getFullYear()}-01`;
 
 function tab(m){
   MODO = m; D = null;
-  tabC.classList.toggle('active', m==='C'); tabV.classList.toggle('active', m==='V'); tabH.classList.toggle('active', m==='H');
-  lblQ.textContent = m==='C' ? 'Proveedor, RUT o N° doc' : m==='V' ? 'Cliente, RUT o N° doc' : 'Profesional, RUT, boleta o glosa';
+  tabC.classList.toggle('active', m==='C'); tabV.classList.toggle('active', m==='V'); tabH.classList.toggle('active', m==='H'); tabR.classList.toggle('active', m==='R');
+  lblQ.textContent = m==='C' ? 'Proveedor, RUT o N° doc' : m==='V' ? 'Cliente, RUT o N° doc' : m==='R' ? 'Trabajador, RUT, cargo o centro de costo' : 'Profesional, RUT, boleta o glosa';
+  document.getElementById('btnDig').style.display = m==='R' ? 'none' : '';
   document.getElementById('kpis').style.display='none';
   theadMes.innerHTML=''; tbodyMes.innerHTML='';
   theadDet.innerHTML=''; tbodyDet.innerHTML='<tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr>';
@@ -116,7 +118,7 @@ function qs(){
 }
 
 async function consultar(){
-  const url = MODO==='C' ? '/api/contabilidad/compras-aux/lista?' : MODO==='V' ? '/api/contabilidad/ventas-aux/lista?' : '/api/contabilidad/honorarios-aux/lista?';
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/lista?' : MODO==='V' ? '/api/contabilidad/ventas-aux/lista?' : MODO==='R' ? '/api/contabilidad/remun-aux/lista?' : '/api/contabilidad/honorarios-aux/lista?';
   const r = await fetch(url+qs(), { headers:H }); const j = await r.json();
   if (!j.success) return alert(j.error);
   D = j.data; render();
@@ -153,6 +155,21 @@ function render(){
       <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_ingreso||'')}</td>
       <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
+  } else if (MODO==='R'){
+    k.innerHTML = `
+      <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Liquidaciones</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.haberes)}</div><div class="l">Total haberes</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.impuesto_unico)}</div><div class="l">Impuesto único (048)</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.liquido)}</div><div class="l">Líquido pagado</div></div>`;
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Trab.</th><th class="text-right">Imponible</th><th class="text-right">Imp.único</th><th class="text-right">Líquido</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.imponible)}</td><td class="text-right num">${fmt(x.impuesto_unico)}</td><td class="text-right num">${fmt(x.liquido)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>RUT</th><th>Trabajador</th><th>Cargo</th><th>C.Costo</th><th class="text-right">Días</th><th class="text-right">Imponible</th><th>AFP</th><th>Salud</th><th class="text-right">Imp.único</th><th class="text-right">Líquido</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.rut||'')}</td><td>${esc(d.nombre||'')}</td>
+      <td>${esc(d.cargo||'')}</td><td>${esc(d.centro_costo||'')}</td><td class="text-right">${d.dias}</td>
+      <td class="text-right num">${fmt(d.imponible)}</td><td>${esc(d.afp_nombre||'')}</td><td>${esc(d.salud_nombre||'')}</td>
+      <td class="text-right num">${fmt(d.impuesto_unico)}</td><td class="text-right num">${fmt(d.liquido)}</td></tr>`).join('')
+      || '<tr><td colspan="11" class="text-center text-muted py-3">Sin liquidaciones</td></tr>';
   } else {
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Boletas</div></div>
@@ -177,14 +194,14 @@ function irMes(m){ fDesde.value = m; fHasta.value = m; consultar(); }
 
 async function importar(inp){
   const files = [...inp.files]; if (!files.length) return; inp.value='';
-  const url = MODO==='C' ? '/api/contabilidad/compras-aux/importar' : MODO==='V' ? '/api/contabilidad/ventas-aux/importar' : '/api/contabilidad/honorarios-aux/importar';
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/importar' : MODO==='V' ? '/api/contabilidad/ventas-aux/importar' : MODO==='R' ? '/api/contabilidad/remun-aux/importar' : '/api/contabilidad/honorarios-aux/importar';
   let tot = 0; const meses = new Set(); const errores = [];
   for (const f of files){
     const base64 = await new Promise(res=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(f); });
     const r = await fetch(url,{method:'POST',headers:H,body:JSON.stringify({base64})});
     const j = await r.json();
     if (!j.success){ errores.push(`${f.name}: ${j.error}`); continue; }
-    tot += (j.data.documentos || j.data.boletas); j.data.meses.forEach(m=>meses.add(m));
+    tot += (j.data.documentos || j.data.boletas || j.data.liquidaciones); j.data.meses.forEach(m=>meses.add(m));
   }
   const ms = [...meses].sort();
   alert(`Importados ${tot.toLocaleString('es-CL')} documentos de ${files.length-errores.length} archivo(s)${ms.length?` (${ms.length} meses: ${ms[0]} → ${ms[ms.length-1]})`:''}. Los meses de cada archivo se reemplazaron completos.`+(errores.length?`\n\nErrores:\n`+errores.join('\n'):''));
@@ -199,13 +216,16 @@ function exportar(){
     : MODO==='V'
     ? [['Mes','Tipo DTE','N° Doc','Emisión','RUT','Cliente','Cta Ingreso','Neto','Exento','IVA','Total'],
        ...D.documentos.map(d=>[d.mes,tipoDte(d.tipo_doc),d.num_doc,String(d.fecha_doc||'').slice(0,10),d.rut,d.razon_social,d.cuenta_ingreso,d.neto,d.exento,d.iva,d.total])]
+    : MODO==='R'
+    ? [['Mes','RUT','Trabajador','Cargo','Centro Costo','Días','Sueldo Base','Imponible','Haberes','AFP','Monto AFP','Salud','Monto Salud','Imp.Único','Descuentos','Líquido'],
+       ...D.documentos.map(d=>[d.mes,d.rut,d.nombre,d.cargo,d.centro_costo,d.dias,d.sueldo_base,d.imponible,d.haberes,d.afp_nombre,d.afp_monto,d.salud_nombre,d.salud_monto,d.impuesto_unico,d.descuentos,d.liquido])]
     : [['Mes','N° Boleta','Emisión','RUT','Profesional','Glosa','Cta Gasto','Bruto','Tasa Ret.','Retención','Líquido'],
        ...D.documentos.map(d=>[d.mes,d.num_boleta,String(d.fecha_emision||'').slice(0,10),d.rut,d.nombre,d.glosa,d.cuenta_gasto,d.bruto,d.tasa_retencion,d.retencion,d.liquido])];
   const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
   const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'], { type:'application/vnd.ms-excel' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (MODO==='C'?'auxiliar-compras':MODO==='V'?'auxiliar-ventas':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
+  a.download = (MODO==='C'?'auxiliar-compras':MODO==='V'?'auxiliar-ventas':MODO==='R'?'auxiliar-remuneraciones':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
   a.click(); URL.revokeObjectURL(a.href);
 }
 

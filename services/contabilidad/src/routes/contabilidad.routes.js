@@ -85,6 +85,8 @@ router.get('/digitar-config',        verifyToken, requireFunc('ctb_libros_aux'),
 router.post('/compras-aux/digitar',    verifyToken, requireFunc('ctb_libros_aux'), ctrl.digitarCompraAux);
 router.post('/honorarios-aux/digitar', verifyToken, requireFunc('ctb_libros_aux'), ctrl.digitarHonorarioAux);
 router.delete('/docs-aux/:tipo/:id',   verifyToken, requireFunc('ctb_libros_aux'), ctrl.eliminarDocAux);
+router.post('/remun-aux/importar', verifyToken, requireFunc('ctb_libros_aux'), ctrl.importarRemunAux);
+router.get('/remun-aux/lista',     verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros'), ctrl.listaRemunAux);
 router.get('/f29',   verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.getF29);
 router.post('/f29',  verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.guardarF29);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);

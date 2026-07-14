@@ -1358,6 +1358,109 @@ exports.eliminarDocAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Auxiliar de Remuneraciones (export AVSOFT "Libro de Remuneraciones") ─────
+   LIBREMUN_MMYYYY.CSV: una fila por trabajador con haberes, imposiciones,
+   impuesto único y líquido. Alimenta la pestaña Remuneraciones y el código
+   048 del F29. Mismo patrón: reemplaza los meses del archivo. */
+require('../../../../shared/migrate').enFila('contabilidad-remun-aux', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_remun_aux (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        mes           VARCHAR(7) NOT NULL,
+        rut           VARCHAR(15) NULL,
+        nombre        VARCHAR(200) NULL,
+        cargo         VARCHAR(120) NULL,
+        centro_costo  VARCHAR(80) NULL,
+        dias          INT NOT NULL DEFAULT 0,
+        sueldo_base   DECIMAL(14,0) NOT NULL DEFAULT 0,
+        imponible     DECIMAL(14,0) NOT NULL DEFAULT 0,
+        haberes       DECIMAL(14,0) NOT NULL DEFAULT 0,
+        afp_nombre    VARCHAR(40) NULL,
+        afp_monto     DECIMAL(14,0) NOT NULL DEFAULT 0,
+        salud_nombre  VARCHAR(40) NULL,
+        salud_monto   DECIMAL(14,0) NOT NULL DEFAULT 0,
+        impuesto_unico DECIMAL(14,0) NOT NULL DEFAULT 0,
+        descuentos    DECIMAL(14,0) NOT NULL DEFAULT 0,
+        liquido       DECIMAL(14,0) NOT NULL DEFAULT 0,
+        seg_ces_emp   DECIMAL(14,0) NOT NULL DEFAULT 0,
+        sis_emp       DECIMAL(14,0) NOT NULL DEFAULT 0,
+        INDEX idx_mes (mes), INDEX idx_rut (rut)
+      )`);
+  } catch (e) { console.error('[contabilidad-remun-aux migration]', e.message); }
+});
+
+exports.importarRemunAux = async (req, res) => {
+  try {
+    const { base64 } = req.body || {};
+    if (!base64) return fail(res, 'Archivo (base64) obligatorio', 400);
+    const texto = Buffer.from(String(base64).replace(/^data:[^;]+;base64,/, ''), 'base64').toString('latin1');
+    const lineas = texto.split(/\r?\n/).filter(l => l.trim());
+    const iHead = lineas.findIndex(l => /A.O;MES;CODIGO;RUT/i.test(l));
+    if (iHead < 0) return fail(res, 'El archivo no parece el Libro de Remuneraciones de AVSOFT (LIBREMUN)', 400);
+    const head = lineas[iHead].split(';').map(s => s.trim().toUpperCase());
+    const col = (nom) => head.findIndex(h => h === nom);
+    // Columnas de identificación: posición fija desde el INICIO.
+    const ini = {
+      rut: col('RUT'), nombre: col('NOMBRE'), pat: col('AP PATERNO'), mat: col('AP MATERNO'),
+      cargo: col('CARGO'), cc: col('CENTRO COSTO'), dias: col('DIAS TRABAJADOS'), base: col('SUELDO BASE CALC.'),
+    };
+    // Columnas de montos: offset desde el FINAL. El export anual de AVSOFT trae
+    // más columnas en el encabezado que en las filas (sección haberes variable),
+    // pero la cola (imposiciones→aportes) es idéntica en todos los layouts.
+    const off = {};
+    for (const [k, nom] of Object.entries({
+      imponible: 'TOTAL IMPONIBLE', haberes: 'TOTAL HABERES', afp: 'AFP', afpM: 'TOTAL AFP',
+      salud: 'ORG.SALUD', saludM: 'TOTAL SALUD', impUnico: 'IMPTO UNICO', desc: 'TOTAL DESCUENTOS',
+      liquido: 'SUELDO LIQUIDO', segCes: 'SEG.CES. EMP.', sis: 'SIS EMP.',
+    })) { const i = col(nom); off[k] = i < 0 ? -1 : head.length - i; }
+    if (ini.rut < 0 || off.imponible < 0 || off.liquido < 0) return fail(res, 'No se reconocieron las columnas del LIBREMUN', 400);
+    const filas = [];
+    for (let i = iHead + 1; i < lineas.length; i++) {
+      const c = lineas[i].split(';');
+      if (c.length < 20 || !/^\d{4}$/.test(c[0])) continue;
+      const mes = `${c[0]}-${String(Number(c[1])).padStart(2, '0')}`;
+      if (!/^\d{4}-\d{2}$/.test(mes)) continue;
+      const fin = k => off[k] < 0 ? undefined : c[c.length - off[k]];
+      const n = v => Math.round(Number(v) || 0);
+      filas.push([mes, c[ini.rut]?.trim() || null,
+        `${c[ini.nombre] || ''} ${c[ini.pat] || ''} ${c[ini.mat] || ''}`.replace(/\s+/g, ' ').trim().slice(0, 200) || null,
+        c[ini.cargo]?.trim().slice(0, 120) || null, c[ini.cc]?.trim().slice(0, 80) || null,
+        n(c[ini.dias]), n(c[ini.base]), n(fin('imponible')), n(fin('haberes')),
+        (fin('afp') || '').trim().slice(0, 40) || null, n(fin('afpM')),
+        (fin('salud') || '').trim().slice(0, 40) || null, n(fin('saludM')),
+        n(fin('impUnico')), n(fin('desc')), n(fin('liquido')), n(fin('segCes')), n(fin('sis'))]);
+    }
+    if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
+    const meses = [...new Set(filas.map(f => f[0]))];
+    await pool.query('DELETE FROM ctb_remun_aux WHERE mes IN (?)', [meses]);
+    for (let i = 0; i < filas.length; i += 300)
+      await pool.query(
+        `INSERT INTO ctb_remun_aux (mes, rut, nombre, cargo, centro_costo, dias, sueldo_base, imponible, haberes,
+          afp_nombre, afp_monto, salud_nombre, salud_monto, impuesto_unico, descuentos, liquido, seg_ces_emp, sis_emp) VALUES ?`,
+        [filas.slice(i, i + 300)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'remun_aux', entidad_id: null, detalle: `Import remuneraciones AVSOFT: ${filas.length} liquidaciones, meses ${meses.join(', ')}` });
+    ok(res, { liquidaciones: filas.length, meses });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.listaRemunAux = async (req, res) => {
+  try {
+    const { desde, hasta, q } = req.query;
+    const w = [], p = [];
+    if (/^\d{4}-\d{2}$/.test(desde || '')) { w.push('mes >= ?'); p.push(desde); }
+    if (/^\d{4}-\d{2}$/.test(hasta || '')) { w.push('mes <= ?'); p.push(hasta); }
+    if (q) { w.push('(nombre LIKE ? OR rut LIKE ? OR cargo LIKE ? OR centro_costo LIKE ?)'); p.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+    const [docs] = await pool.query(`SELECT * FROM ctb_remun_aux ${where} ORDER BY mes DESC, liquido DESC LIMIT 1000`, p);
+    const [meses] = await pool.query(
+      `SELECT mes, COUNT(*) docs, SUM(imponible) imponible, SUM(haberes) haberes, SUM(impuesto_unico) impuesto_unico, SUM(liquido) liquido
+         FROM ctb_remun_aux ${where} GROUP BY mes ORDER BY mes DESC`, p);
+    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(haberes),0) haberes, COALESCE(SUM(impuesto_unico),0) impuesto_unico, COALESCE(SUM(liquido),0) liquido FROM ctb_remun_aux ${where}`, p);
+    ok(res, { documentos: docs, meses, total: tot, truncado: docs.length === 1000 });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── F29 Borrador (/contabilidad/f29/) ────────────────────────────────────────
    Propuesta del Formulario 29 mensual a partir de los auxiliares de ventas
    (débito fiscal), compras (crédito fiscal) y honorarios (retención). Los
@@ -1411,12 +1514,15 @@ exports.getF29 = async (req, res) => {
       FROM ctb_compras_aux WHERE mes=?`, [mes]);
     // Honorarios (retención 151) — ojo: el SII declara por fecha de PAGO
     const [[h]] = await pool.query('SELECT COALESCE(SUM(retencion),0) c151, COUNT(*) n FROM ctb_honorarios_aux WHERE mes=?', [mes]);
+    // Remuneraciones (impuesto único código 048)
+    const [[r]] = await pool.query('SELECT COALESCE(SUM(impuesto_unico),0) c048, COUNT(*) n FROM ctb_remun_aux WHERE mes=?', [mes]);
     const [[aj]] = await pool.query('SELECT ajustes, actualizado_por, updated_at FROM ctb_f29 WHERE mes=?', [mes]);
     ok(res, {
       mes,
       ventas: { c503: Number(v.c503), c512: Number(v.c512), c509: Number(v.c509), c502: Number(v.c502), c513: Number(v.c513), c510: Number(v.c510), c538: Number(v.c538) },
       compras: { c519: Number(c.c519), c527: Number(c.c527), c520: Number(c.c520), c528: Number(c.c528) },
       honorarios: { c151: Number(h.c151), boletas: Number(h.n) },
+      remuneraciones: { c048: Number(r.c048), trabajadores: Number(r.n) },
       ajustes: aj ? JSON.parse(aj.ajustes) : {},
       guardado: aj ? { por: aj.actualizado_por, en: aj.updated_at } : null,
     });

@@ -50,7 +50,7 @@
     <ul class="mb-0 mt-1">
       <li><b>Código 520 (crédito):</b> si la empresa aplica <b>proporcionalidad</b> del crédito fiscal (por ingresos exentos), parte del IVA de compras no da derecho a crédito — ajusta el valor con el cálculo del contador (en mayo 2026 la diferencia fue $191.616).</li>
       <li><b>Código 151 (retención honorarios):</b> el SII declara por fecha de <b>pago</b> de la boleta; el auxiliar va por período contable. Puede haber corrimientos de un mes.</li>
-      <li><b>Códigos 048 (imp. único trabajadores) y PPM:</b> vienen de remuneraciones y del cálculo tributario — manuales por ahora.</li>
+      <li><b>Código 048 (imp. único trabajadores):</b> sale del libro de remuneraciones importado — si el mes aún no está cargado, usa el ajuste 048A. <b>PPM:</b> manual (cálculo tributario).</li>
     </ul>
   </div>
 </div>
@@ -104,7 +104,8 @@ function render(){
     <tr class="tot"><td class="cod">089</td><td>IMPUESTO DETERMINADO IVA (538 − 537)</td><td class="num" id="t089"></td></tr>
     ${filaC('151','Retención honorarios (según auxiliar, '+D.honorarios.boletas+' boletas — SII usa fecha de pago)', D.honorarios.c151)}
     ${filaM('151A','Ajuste retención honorarios (+/−)')}
-    ${filaM('048','Retención impuesto único trabajadores (remuneraciones)')}
+    ${filaC('048','Retención impuesto único trabajadores (según libro remuneraciones, '+D.remuneraciones.trabajadores+' trab.)', D.remuneraciones.c048)}
+    ${filaM('048A','Ajuste impuesto único (+/−)')}
     ${filaM('062','PPM del período')}
     <tr class="granTot"><td class="cod">547</td><td>TOTAL DETERMINADO A PAGAR</td><td class="num" id="t547"></td></tr>
   </table></div>
@@ -116,7 +117,7 @@ function recalc(){
   if (!D) return;
   const t537 = D.compras.c520 - man('520A') - D.compras.c528;
   const t089 = Math.max(0, D.ventas.c538 - t537);
-  const t547 = t089 + D.honorarios.c151 + man('151A') + man('048') + man('062');
+  const t547 = t089 + D.honorarios.c151 + man('151A') + D.remuneraciones.c048 + man('048A') + man('062');
   document.getElementById('t537').textContent = fmt(t537);
   document.getElementById('t089').textContent = fmt(t089);
   document.getElementById('t547').textContent = fmt(t547);
