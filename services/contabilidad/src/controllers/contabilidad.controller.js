@@ -793,6 +793,206 @@ require('../../../../shared/migrate').enFila('contabilidad-directorio', async ()
 
 const finDeMes = mes => { const [y, m] = mes.split('-').map(Number); return `${y}-${String(m).padStart(2, '0')}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`; };
 
+/* ── Rubros de presentación (mapeo cuenta→rubro, 100% paramétrico) ─────────────
+   Los cuadros del directorio agrupan las cuentas en rubros gerenciales (como
+   los Excel de finanzas): el balance por grupos con columnas mensuales y el
+   P&G con márgenes acumulativos. La asignación es por PREFIJO de cuenta, gana
+   el primer rubro (por orden); lo no asignado cae a "Otros". Se configura
+   desde la propia página (botón Configurar rubros). */
+require('../../../../shared/migrate').enFila('contabilidad-dir-rubros', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_dir_rubros (
+        id       INT AUTO_INCREMENT PRIMARY KEY,
+        cuadro   VARCHAR(10) NOT NULL,          -- BALANCE / EERR
+        grupo    VARCHAR(80) NULL,              -- BALANCE: Activo Corriente, Pasivo Corriente…
+        etiqueta VARCHAR(120) NOT NULL,         -- nombre de la fila en el cuadro
+        clase    VARCHAR(10) NOT NULL DEFAULT 'RUBRO',  -- RUBRO / MARGEN (EERR: fila azul calculada)
+        tipo     VARCHAR(10) NULL,              -- EERR: INGRESO / GASTO
+        prefijos TEXT NULL,                     -- prefijos de cuenta separados por coma
+        orden    INT NOT NULL DEFAULT 0,
+        activo   TINYINT NOT NULL DEFAULT 1
+      )`);
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM ctb_dir_rubros');
+    if (!n) {
+      const B = [ // [grupo, etiqueta, prefijos]
+        ['Activo Corriente', 'Efectivo y equivalentes', '1101'],
+        ['Activo Corriente', 'Inversiones', '1102,1103'],
+        ['Activo Corriente', 'Cuentas por cobrar Cartera', '110401,110402,110403,110406'],
+        ['Activo Corriente', '(-) Provisión cartera', '110405'],
+        ['Activo Corriente', 'Otras cuentas por cobrar', '1105,1106,1107,1108,1109'],
+        ['Activo no Corriente', 'Activo fijo', '12'],
+        ['Activo no Corriente', 'Otros activos no corrientes', '13,14,15,16,17,18,19'],
+        ['Pasivo Corriente', 'Cuentas por pagar Proveedores', '210202,210206'],
+        ['Pasivo Corriente', 'Cuentas por pagar Concesionarios', '2102024,2102025,2106012'],
+        ['Pasivo Corriente', 'Remuneraciones y previsión', '2104,2105,221090'],
+        ['Pasivo Corriente', 'Impuestos por pagar', '2103'],
+        ['Pasivo Corriente', 'Provisiones', '2106'],
+        ['Pasivo Corriente', 'Otras cuentas por pagar', '21'],
+        ['Pasivo no Corriente', 'Préstamos relacionados y LP', '22'],
+        ['Patrimonio', 'Capital', '2701'],
+        ['Patrimonio', 'Resultados acumulados', '2702,2703'],
+      ];
+      let o = 0;
+      for (const [g, e, p] of B)
+        await pool.query("INSERT INTO ctb_dir_rubros (cuadro, grupo, etiqueta, clase, prefijos, orden) VALUES ('BALANCE',?,?,'RUBRO',?,?)", [g, e, p, ++o]);
+      const E = [ // [etiqueta, clase, tipo, prefijos]
+        ['Ingresos Financieros', 'RUBRO', 'INGRESO', '3001010,3001040,3001090,3001120,3001150'],
+        ['Egresos Financieros', 'RUBRO', 'GASTO', '4201010,4201030,4001020,4001030,4001040,4301050'],
+        ['Provisiones', 'RUBRO', 'GASTO', '4001190'],
+        ['Margen Ordinario', 'MARGEN', null, null],
+        ['Ingresos Operativos', 'RUBRO', 'INGRESO', '3001020,3001072,3001073,3001075,3001087,3001170'],
+        ['Egresos Operativos', 'RUBRO', 'GASTO', '4001050,4001100,4001110,4001127,4001128,4001150,4001152,4001162,4001171,4001172,4001180'],
+        ['Margen Operativo Bruto', 'MARGEN', null, null],
+        ['Gastos de Personal', 'RUBRO', 'GASTO', '400106,400107,400108,400109,4002030,4002050,4002060,4002120,4002302'],
+        ['Gastos de Operación', 'RUBRO', 'GASTO', '4002'],
+        ['Margen Operativo Neto', 'MARGEN', null, null],
+        ['Gastos No Operacionales', 'RUBRO', 'GASTO', '4003,4201,4401'],
+        ['Ingresos No Operacionales', 'RUBRO', 'INGRESO', '3001151,3001200,3'],
+        ['Utilidad Antes de Impuestos', 'MARGEN', null, null],
+      ];
+      o = 0;
+      for (const [e, c, t, p] of E)
+        await pool.query("INSERT INTO ctb_dir_rubros (cuadro, etiqueta, clase, tipo, prefijos, orden) VALUES ('EERR',?,?,?,?,?)", [e, c, t, p, ++o]);
+    }
+    console.log('[contabilidad] rubros directorio listos');
+  } catch (e) { console.error('[contabilidad-dir-rubros migration]', e.message); }
+});
+
+const asignaRubro = (cuenta, rubros) => rubros.find(r =>
+  r.clase === 'RUBRO' && String(r.prefijos || '').split(',').map(s => s.trim()).filter(Boolean).some(p => String(cuenta).startsWith(p))) || null;
+
+/* Cuadros estilo Excel del directorio: balance por rubros con columnas mensuales
+   (dic año anterior + ene→mes) y P&G comparativo (acumulado y del mes) con
+   márgenes acumulativos. */
+exports.directorioCuadros = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const [rubros] = await pool.query('SELECT * FROM ctb_dir_rubros WHERE activo=1 ORDER BY orden, id');
+    const rB = rubros.filter(r => r.cuadro === 'BALANCE'), rE = rubros.filter(r => r.cuadro === 'EERR');
+
+    // ── BALANCE: saldo por cuenta al cierre de dic-(y-1) y de cada mes ene..m
+    const cortes = [`${y - 1}-12-31`];
+    const etiquetasCol = [`DIC.${String(y - 1).slice(2)}`];
+    const MESL = ['', 'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    for (let k = 1; k <= m; k++) { cortes.push(finDeMes(`${y}-${String(k).padStart(2, '0')}`)); etiquetasCol.push(MESL[k]); }
+    const colsSQL = cortes.map((f, i) => `SUM(CASE WHEN c.fecha <= '${f}' THEN m.debe - m.haber ELSE 0 END) c${i}`).join(', ');
+    const [salBal] = await pool.query(
+      `SELECT m.cuenta, k.tipo, ${colsSQL}
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha <= ? AND k.tipo IN ('ACTIVO','PASIVO','PATRIMONIO')
+        GROUP BY m.cuenta, k.tipo`, [cortes[cortes.length - 1]]);
+    const nCols = cortes.length;
+    const filaB = new Map(); // etiqueta rubro → valores[]
+    const otros = { ACTIVO: Array(nCols).fill(0), PASIVO: Array(nCols).fill(0), PATRIMONIO: Array(nCols).fill(0) };
+    for (const x of salBal) {
+      const signo = x.tipo === 'ACTIVO' ? 1 : -1; // pasivo/patrimonio se muestran acreedor +
+      const ru = asignaRubro(x.cuenta, rB);
+      const destino = ru ? (filaB.get(ru.id) || filaB.set(ru.id, Array(nCols).fill(0)).get(ru.id)) : otros[x.tipo];
+      for (let i = 0; i < nCols; i++) destino[i] += signo * Number(x[`c${i}`]);
+    }
+    const GRUPO_TIPO = g => /^Activo/.test(g) ? 'ACTIVO' : (/^Patrimonio/.test(g) ? 'PATRIMONIO' : 'PASIVO');
+    const balance = { columnas: etiquetasCol, grupos: [] };
+    const gruposOrden = [...new Set(rB.map(r => r.grupo))];
+    for (const g of gruposOrden) {
+      const filas = rB.filter(r => r.grupo === g).map(r => ({ etiqueta: r.etiqueta, valores: filaB.get(r.id) || Array(nCols).fill(0) }));
+      // "Otros" sin rubro caen al último grupo de su tipo
+      const esUltimoDelTipo = g === gruposOrden.filter(x => GRUPO_TIPO(x) === GRUPO_TIPO(g)).pop();
+      if (esUltimoDelTipo && otros[GRUPO_TIPO(g)].some(v => Math.abs(v) > 0.5))
+        filas.push({ etiqueta: 'Otros (sin rubro asignado)', valores: otros[GRUPO_TIPO(g)] });
+      balance.grupos.push({ grupo: g, tipo: GRUPO_TIPO(g), filas, subtotal: filas.reduce((acc, f) => acc.map((v, i) => v + f.valores[i]), Array(nCols).fill(0)) });
+    }
+
+    // ── EERR por cuenta: acumulado y mes, año actual y anterior
+    const finMes = finDeMes(mes), iniAnio = `${y}-01-01`, iniMes = `${mes}-01`;
+    const mesAA = `${y - 1}-${String(m).padStart(2, '0')}`;
+    const finAA = finDeMes(mesAA), iniAnioAA = `${y - 1}-01-01`, iniAA = `${mesAA}-01`;
+    const [salE] = await pool.query(
+      `SELECT m.cuenta, k.tipo,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) acum,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) acum_aa,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) mes,
+              SUM(CASE WHEN c.fecha BETWEEN ? AND ? THEN (CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE m.debe-m.haber END) ELSE 0 END) mes_aa
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.origen<>'CIERRE_EJERCICIO' AND k.tipo IN ('INGRESO','GASTO')
+          AND ((c.fecha BETWEEN ? AND ?) OR (c.fecha BETWEEN ? AND ?))
+        GROUP BY m.cuenta, k.tipo`,
+      [iniAnio, finMes, iniAnioAA, finAA, iniMes, finMes, iniAA, finAA, iniAnio, finMes, iniAnioAA, finAA]);
+    const CAMPOS = ['acum', 'acum_aa', 'mes', 'mes_aa'];
+    const filaE = new Map();
+    const otrosE = { INGRESO: [0, 0, 0, 0], GASTO: [0, 0, 0, 0] };
+    for (const x of salE) {
+      const ru = asignaRubro(x.cuenta, rE.filter(r => r.tipo === x.tipo));
+      const destino = ru ? (filaE.get(ru.id) || filaE.set(ru.id, [0, 0, 0, 0]).get(ru.id)) : otrosE[x.tipo];
+      CAMPOS.forEach((c, i) => destino[i] += Number(x[c]));
+    }
+    const eerr = [];
+    const acumulado = [0, 0, 0, 0]; // margen acumulativo (ingresos − gastos)
+    for (const r of rE) {
+      if (r.clase === 'MARGEN') { eerr.push({ etiqueta: r.etiqueta, clase: 'MARGEN', valores: [...acumulado] }); continue; }
+      const v = filaE.get(r.id) || [0, 0, 0, 0];
+      eerr.push({ etiqueta: r.etiqueta, clase: 'RUBRO', tipo: r.tipo, valores: v });
+      CAMPOS.forEach((c, i) => acumulado[i] += (r.tipo === 'INGRESO' ? v[i] : -v[i]));
+    }
+    for (const t of ['INGRESO', 'GASTO']) if (otrosE[t].some(v => Math.abs(v) > 0.5)) {
+      eerr.push({ etiqueta: `Otros ${t === 'INGRESO' ? 'ingresos' : 'gastos'} (sin rubro)`, clase: 'RUBRO', tipo: t, valores: otrosE[t] });
+      CAMPOS.forEach((c, i) => acumulado[i] += (t === 'INGRESO' ? otrosE[t][i] : -otrosE[t][i]));
+      const ult = eerr.map(x => x.clase).lastIndexOf('MARGEN');
+      if (ult >= 0) eerr[ult].valores = [...acumulado]; // la utilidad final incluye lo sin rubro
+    }
+    const totIng = f => eerr.filter(x => x.tipo === 'INGRESO').reduce((s, x) => s + x.valores[f], 0);
+    ok(res, { mes, balance, eerr, base_pct: { acum: totIng(0), acum_aa: totIng(1), mes: totIng(2), mes_aa: totIng(3) } });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* CRUD de rubros (botón Configurar rubros en la página) */
+exports.getDirRubros = async (req, res) => {
+  try { const [rows] = await pool.query('SELECT * FROM ctb_dir_rubros ORDER BY cuadro, orden, id'); ok(res, rows); }
+  catch (e) { fail(res, e.message); }
+};
+exports.putDirRubro = async (req, res) => {
+  try {
+    const { etiqueta, grupo, prefijos, orden, activo } = req.body || {};
+    const sets = [], vals = [];
+    if (etiqueta !== undefined) { sets.push('etiqueta=?'); vals.push(String(etiqueta).trim().slice(0, 120)); }
+    if (grupo !== undefined) { sets.push('grupo=?'); vals.push(String(grupo).trim().slice(0, 80) || null); }
+    if (prefijos !== undefined) { sets.push('prefijos=?'); vals.push(String(prefijos).trim() || null); }
+    if (orden !== undefined) { sets.push('orden=?'); vals.push(Number(orden) || 0); }
+    if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
+    if (!sets.length) return fail(res, 'Nada que actualizar', 400);
+    vals.push(req.params.id);
+    const [r] = await pool.query(`UPDATE ctb_dir_rubros SET ${sets.join(', ')} WHERE id=?`, vals);
+    if (!r.affectedRows) return fail(res, 'No existe', 404);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'dir_rubro', entidad_id: req.params.id, detalle: JSON.stringify(req.body) });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+exports.crearDirRubro = async (req, res) => {
+  try {
+    const { cuadro, grupo, etiqueta, tipo, prefijos, orden } = req.body || {};
+    if (!['BALANCE', 'EERR'].includes(cuadro)) return fail(res, 'cuadro inválido', 400);
+    if (!etiqueta) return fail(res, 'etiqueta obligatoria', 400);
+    if (cuadro === 'EERR' && !['INGRESO', 'GASTO'].includes(tipo)) return fail(res, 'tipo INGRESO/GASTO obligatorio en EERR', 400);
+    const [r] = await pool.query(
+      "INSERT INTO ctb_dir_rubros (cuadro, grupo, etiqueta, clase, tipo, prefijos, orden) VALUES (?,?,?,'RUBRO',?,?,?)",
+      [cuadro, grupo || null, String(etiqueta).trim().slice(0, 120), cuadro === 'EERR' ? tipo : null, String(prefijos || '').trim() || null, Number(orden) || 0]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'dir_rubro', entidad_id: r.insertId, detalle: etiqueta });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.message); }
+};
+exports.eliminarDirRubro = async (req, res) => {
+  try {
+    const [r] = await pool.query("DELETE FROM ctb_dir_rubros WHERE id=? AND clase='RUBRO'", [req.params.id]);
+    if (!r.affectedRows) return fail(res, 'No existe (los márgenes no se eliminan, se desactivan)', 404);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'dir_rubro', entidad_id: req.params.id, detalle: 'Rubro eliminado' });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.directorioMes = async (req, res) => {
   try {
     const mes = req.query.mes;

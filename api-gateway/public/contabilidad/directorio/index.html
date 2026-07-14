@@ -33,6 +33,15 @@
     .kpi-row { display:flex; gap:14px; flex-wrap:wrap; margin-top:26px; justify-content:center; }
     .kpi { background:rgba(255,255,255,.12); border-radius:12px; padding:14px 22px; min-width:170px; }
     .kpi .v { font-size:1.3rem; font-weight:800; } .kpi .l { font-size:.72rem; opacity:.8; text-transform:uppercase; letter-spacing:.08em; }
+    /* Cuadros estilo Excel de finanzas */
+    .xls { border-collapse:collapse; width:100%; font-size:.78rem; }
+    .xls th, .xls td { border:1px solid #b7b7b7; padding:3px 8px; }
+    .xls .tit { background:#FFD966; font-weight:800; text-align:center; font-size:.85rem; border:2px solid #7f6000; }
+    .xls thead th { background:#FFD966; text-align:center; font-weight:800; border:2px solid #7f6000; }
+    .xls td.n { text-align:right; font-family:Calibri,Consolas,monospace; white-space:nowrap; }
+    .xls .grupo td { background:#efefef; font-weight:800; }
+    .xls .margen td { background:#dce6f1; color:#1F4E79; font-weight:800; }
+    .xls .neg { color:#b91c1c; }
     @media print {
       body { background:#fff; } .main-content { padding:0; max-width:none; }
       .no-print, #af-topnav, .toolbar { display:none !important; }
@@ -54,10 +63,13 @@
     <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
     <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar presentación</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="configRubros()"><i class="bi bi-sliders me-1"></i>Configurar rubros</button>
   </div>
 
   <div id="out"><div class="text-muted no-print">Elige el mes y genera la presentación.</div></div>
 </div>
+
+<dialog id="dlgRubros" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:24px;width:900px;max-width:96vw;max-height:88vh;overflow:auto"></dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -99,10 +111,68 @@ function lamina(kicker, titulo, cuerpo, sec, tituloHechos){
 }
 
 function generar(){ consultar(); }
+let Q = null; // cuadros estilo Excel
 async function consultar(){
-  const r = await fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H});
-  const j = await r.json(); if (!j.success) return alert(j.error);
-  D = j.data; render();
+  const [j, jq] = await Promise.all([
+    fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
+    fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
+  ]);
+  if (!j.success) return alert(j.error);
+  if (!jq.success) return alert(jq.error);
+  D = j.data; Q = jq.data; render();
+}
+/* miles de pesos, formato Excel */
+const miles = n => { const v = Math.round((Number(n)||0)/1000); return `<span class="${v<0?'neg':''}">${v.toLocaleString('es-CL')}</span>`; };
+const pesos = n => { const v = Math.round(Number(n)||0); return `<span class="${v<0?'neg':''}">${v.toLocaleString('es-CL')}</span>`; };
+const pctDe = (v, base) => base ? `<span class="${v<0?'neg':''}">${(v/Math.abs(base)*100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})}%</span>` : '';
+
+function cuadroBalance(){
+  const b = Q.balance, nC = b.columnas.length;
+  let html = `<table class="xls"><thead>
+    <tr><th colspan="${nC+1}" class="tit">AUTOFACIL CHILE SPA<br>BALANCE GENERAL EN MILES DE PESOS</th></tr>
+    <tr><th style="min-width:220px"></th>${b.columnas.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  const T = { ACTIVO:Array(nC).fill(0), PASIVO:Array(nC).fill(0), PATRIMONIO:Array(nC).fill(0) };
+  b.grupos.forEach(g=>{ g.subtotal.forEach((v,i)=>T[g.tipo][i]+=v); });
+  const filaTot = (lbl, arr) => `<tr class="margen"><td>${lbl}</td>${arr.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`;
+  html += filaTot('Activo', T.ACTIVO);
+  b.grupos.filter(g=>g.tipo==='ACTIVO').forEach(g=>{
+    html += `<tr class="grupo"><td>${esc(g.grupo)}</td>${g.subtotal.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`;
+    g.filas.forEach(f=>{ html += `<tr><td>${esc(f.etiqueta)}</td>${f.valores.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`; });
+  });
+  html += filaTot('Pasivo', T.PASIVO);
+  b.grupos.filter(g=>g.tipo==='PASIVO').forEach(g=>{
+    html += `<tr class="grupo"><td>${esc(g.grupo)}</td>${g.subtotal.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`;
+    g.filas.forEach(f=>{ html += `<tr><td>${esc(f.etiqueta)}</td>${f.valores.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`; });
+  });
+  b.grupos.filter(g=>g.tipo==='PATRIMONIO').forEach(g=>{
+    html += `<tr class="grupo"><td>${esc(g.grupo)}</td>${g.subtotal.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`;
+    g.filas.forEach(f=>{ html += `<tr><td>${esc(f.etiqueta)}</td>${f.valores.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`; });
+  });
+  // Resultado del ejercicio = Activo − Pasivo − Patrimonio (para que cuadre a la vista)
+  const RES = T.ACTIVO.map((v,i)=>v - T.PASIVO[i] - T.PATRIMONIO[i]);
+  html += `<tr><td>Resultado del Ejercicio</td>${RES.map(v=>`<td class="n">${miles(v)}</td>`).join('')}</tr>`;
+  html += filaTot('Total Pasivo y Patrimonio', T.PASIVO.map((v,i)=>v+T.PATRIMONIO[i]+RES[i]));
+  return html + '</tbody></table>';
+}
+
+function cuadroEERR(fV, fAA, titulo, lblA, lblAA){
+  // columnas: actual | % | PPTO | % | año anterior | % | VAR/AA | %
+  const base = Q.base_pct[fV], baseAA = Q.base_pct[fAA];
+  const idx = { acum:0, acum_aa:1, mes:2, mes_aa:3 };
+  let html = `<table class="xls"><thead>
+    <tr><th colspan="9" class="tit">AUTOFACIL CHILE SPA<br>${titulo}</th></tr>
+    <tr><th style="min-width:220px"></th><th>${lblA}</th><th>%</th><th>PPTO</th><th>${lblAA}</th><th>%</th><th>VAR/${lblAA.slice(-2)}</th><th>%</th><th></th></tr></thead><tbody>`;
+  Q.eerr.forEach(r=>{
+    const a = r.valores[idx[fV]], b = r.valores[idx[fAA]];
+    const varV = a-b, varP = b ? (varV/Math.abs(b)*100) : null;
+    const cls = r.clase==='MARGEN' ? 'margen' : '';
+    html += `<tr class="${cls}"><td>${esc(r.etiqueta)}</td>
+      <td class="n">${pesos(a)}</td><td class="n">${pctDe(a,base)}</td>
+      <td class="n" style="color:#999">—</td>
+      <td class="n">${pesos(b)}</td><td class="n">${pctDe(b,baseAA)}</td>
+      <td class="n">${pesos(varV)}</td><td class="n">${varP===null?'':`<span class="${varP<0?'neg':''}">${varP.toLocaleString('es-CL',{maximumFractionDigits:1})}%</span>`}</td><td></td></tr>`;
+  });
+  return html + `</tbody></table><div class="small text-muted mt-1">Columna PPTO en gris: se llenará cuando exista el mantenedor de presupuesto anual.</div>`;
 }
 
 function render(){
@@ -123,15 +193,7 @@ function render(){
     return filaCta(x, [{txt:mm(a)},{txt:mm(b)},{txt:mm(v),cls:varCls(v)}]);
   }).join('');
   const cabBal = `<thead><tr><th style="width:95px">Cuenta</th><th></th><th class="text-right" style="width:120px">${MESES[m].slice(0,3)}-${String(y).slice(2)}</th><th class="text-right" style="width:120px">Mes anterior</th><th class="text-right" style="width:120px">Variación</th></tr></thead>`;
-  const lamBal = lamina('BALANCE', `BALANCE GENERAL AL MES DE ${nomMes}`, `
-    <table>${cabBal}<tbody>
-      <tr class="tr-grupo"><td colspan="5">ACTIVO</td></tr>${filasBal(act,false)}
-      <tr class="tr-tot"><td colspan="2">TOTAL ACTIVO</td><td class="text-right num">${mm(totAct)}</td><td class="text-right num">${mm(sum(act,'s_anterior'))}</td><td class="text-right num">${mm(totAct-sum(act,'s_anterior'))}</td></tr>
-      <tr class="tr-grupo"><td colspan="5">PASIVO</td></tr>${filasBal(pas,true)}
-      <tr class="tr-tot"><td colspan="2">TOTAL PASIVO</td><td class="text-right num">${mm(totPas)}</td><td class="text-right num">${mm(-sum(pas,'s_anterior'))}</td><td class="text-right num">${mm(totPas+sum(pas,'s_anterior'))}</td></tr>
-      <tr class="tr-grupo"><td colspan="5">PATRIMONIO</td></tr>${filasBal(pat,true)}
-      <tr class="tr-tot"><td colspan="2">TOTAL PATRIMONIO</td><td class="text-right num">${mm(totPat)}</td><td class="text-right num">${mm(-sum(pat,'s_anterior'))}</td><td class="text-right num">${mm(totPat+sum(pat,'s_anterior'))}</td></tr>
-    </tbody></table>`, 'BALANCE');
+  const lamBal = lamina('BALANCE', `BALANCE GENERAL AL MES DE ${nomMes}`, cuadroBalance(), 'BALANCE');
 
   // CxC / CxP
   const cxc = act.filter(esCxC), cxp = pas.filter(x=>/^21/.test(x.cuenta));
@@ -144,26 +206,11 @@ function render(){
       <tr class="tr-tot"><td colspan="2">TOTAL CUENTAS POR PAGAR</td><td class="text-right num">${mm(-sum(cxp,'s_actual'))}</td><td class="text-right num">${mm(-sum(cxp,'s_anterior'))}</td><td class="text-right num">${mm(-sum(cxp,'s_actual')+sum(cxp,'s_anterior'))}</td></tr>
     </tbody></table>`, 'CXP', 'Cuentas por Pagar');
 
-  // EERR mes y acumulado (vs año anterior)
-  const cabEERR = (c1,c2) => `<thead><tr><th style="width:95px">Cuenta</th><th></th><th class="text-right" style="width:115px">${c1}</th><th class="text-right" style="width:115px">${c2}</th><th class="text-right" style="width:105px">Var $</th><th class="text-right" style="width:75px">Var %</th></tr></thead>`;
-  const filasEERR = (arr, fA, fB) => arr.filter(x=>Math.abs(x[fA])>0.5||Math.abs(x[fB])>0.5).map(x=>{
-    const v = x[fA]-x[fB];
-    return filaCta(x, [{txt:mm(x[fA])},{txt:mm(x[fB])},{txt:mm(v),cls:x.tipo==='GASTO'?varCls(-v):varCls(v)},{txt:pct(x[fA],x[fB])}]);
-  }).join('');
-  const totEERR = (fA,fB) => `
-    <tr class="tr-tot"><td colspan="2">TOTAL INGRESOS</td><td class="text-right num">${mm(sum(ing,fA))}</td><td class="text-right num">${mm(sum(ing,fB))}</td><td class="text-right num">${mm(sum(ing,fA)-sum(ing,fB))}</td><td class="text-right num">${pct(sum(ing,fA),sum(ing,fB))}</td></tr>
-    <tr class="tr-tot"><td colspan="2">TOTAL GASTOS</td><td class="text-right num">${mm(sum(gas,fA))}</td><td class="text-right num">${mm(sum(gas,fB))}</td><td class="text-right num">${mm(sum(gas,fA)-sum(gas,fB))}</td><td class="text-right num">${pct(sum(gas,fA),sum(gas,fB))}</td></tr>
-    <tr class="tr-tot"><td colspan="2">RESULTADO</td><td class="text-right num ${varCls(sum(ing,fA)-sum(gas,fA))}">${mm(sum(ing,fA)-sum(gas,fA))}</td><td class="text-right num ${varCls(sum(ing,fB)-sum(gas,fB))}">${mm(sum(ing,fB)-sum(gas,fB))}</td><td colspan="2"></td></tr>`;
-  const cuerpoEERR = (fA,fB,c1,c2) => `
-    <table>${cabEERR(c1,c2)}<tbody>
-      <tr class="tr-grupo"><td colspan="6">INGRESOS</td></tr>${filasEERR(ing,fA,fB)}
-      <tr class="tr-grupo"><td colspan="6">GASTOS</td></tr>${filasEERR(gas,fA,fB)}
-      ${totEERR(fA,fB)}
-    </tbody></table>`;
-  const lamEERRMes = lamina('EERR', `RESULTADOS DEL MES DE ${nomMes} (vs ${MESES[m]} ${y-1})`,
-    cuerpoEERR('mes_actual','mes_aa', `${MESES[m].slice(0,3)}-${String(y).slice(2)}`, `${MESES[m].slice(0,3)}-${String(y-1).slice(2)}`), 'EERR_MES', 'Resultados del mes');
-  const lamEERRAcum = lamina('EERR', `P&G ACUMULADO A ${nomMes} (vs mismo período ${y-1})`,
-    cuerpoEERR('acum_actual','acum_aa', `Acum ${y}`, `Acum ${y-1}`), 'EERR_ACUM', 'Resultados acumulados');
+  const MESU = MESES[m].slice(0,3).toUpperCase();
+  const lamEERRMes = lamina('EERR', `MARGEN OPERATIVO DE ${nomMes}`,
+    cuadroEERR('mes','mes_aa', `ESTADO DE RESULTADOS COMPARATIVO DEL MES EN PESOS`, `${MESU}.${String(y).slice(2)}`, `${MESU}.${String(y-1).slice(2)}`), 'EERR_MES', 'Resultados del mes');
+  const lamEERRAcum = lamina('EERR', `P&G ACUMULADO AL MES DE ${nomMes}`,
+    cuadroEERR('acum','acum_aa', `ESTADO DE RESULTADOS COMPARATIVO ACUMULADO EN PESOS`, `${MESU}.${String(y).slice(2)}`, `${MESU}.${String(y-1).slice(2)}`), 'EERR_ACUM', 'Resultados acumulados');
 
   // Caja y bancos
   const lamCaja = lamina('FDC', `CAJA Y BANCOS — MOVIMIENTO DE ${nomMes}`, `
@@ -192,6 +239,65 @@ function render(){
     <div class="lamina"><div class="lam-head"><span>CIERRE</span><span class="kicker">AUTOFÁCIL</span></div>
       <div class="lam-body" style="text-align:center;padding:70px 20px"><h3 class="fw-bold" style="color:var(--navy)">¿Preguntas?</h3>
       <div class="text-muted small">Detalle disponible en Contabilidad → Libros, Estados Financieros e Informe de Cierre Mensual</div></div></div>`;
+}
+
+/* ── Configurar rubros (mapeo cuenta→rubro de los cuadros) ── */
+async function configRubros(){
+  const r = await fetch('/api/contabilidad/directorio/rubros',{headers:H}); const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const rows = j.data;
+  const fila = x => `
+    <tr data-id="${x.id}" class="${x.activo?'':'text-muted'}">
+      <td><input class="form-control form-control-sm r-et" value="${esc(x.etiqueta)}" ${x.clase==='MARGEN'?'':''}></td>
+      <td>${x.cuadro==='BALANCE'?`<input class="form-control form-control-sm r-gr" value="${esc(x.grupo||'')}">`:(x.tipo||'<span class="text-muted">margen</span>')}</td>
+      <td>${x.clase==='MARGEN'?'<span class="text-muted small">calculado</span>':`<input class="form-control form-control-sm r-pf" value="${esc(x.prefijos||'')}" placeholder="prefijos, coma">`}</td>
+      <td style="width:70px"><input class="form-control form-control-sm r-or" type="number" value="${x.orden}"></td>
+      <td class="text-nowrap">
+        <button class="btn btn-sm btn-link p-0 me-1" title="Guardar" onclick="guardarRubro(${x.id},this)"><i class="bi bi-check-lg"></i></button>
+        <button class="btn btn-sm btn-link p-0 me-1" title="${x.activo?'Desactivar':'Activar'}" onclick="toggleRubro(${x.id},${x.activo?0:1})"><i class="bi bi-power"></i></button>
+        ${x.clase==='RUBRO'?`<button class="btn btn-sm btn-link text-danger p-0" title="Eliminar" onclick="eliminarRubro(${x.id})"><i class="bi bi-trash"></i></button>`:''}
+      </td>
+    </tr>`;
+  const seccion = (cuadro, titulo) => `
+    <h6 class="fw-bold mt-3">${titulo}</h6>
+    <table class="table table-sm" style="font-size:.8rem"><thead><tr><th>Etiqueta</th><th>${cuadro==='BALANCE'?'Grupo':'Tipo'}</th><th>Prefijos de cuenta</th><th>Orden</th><th></th></tr></thead>
+    <tbody>${rows.filter(x=>x.cuadro===cuadro).map(fila).join('')}</tbody></table>
+    <button class="btn btn-sm btn-outline-primary" onclick="nuevoRubro('${cuadro}')"><i class="bi bi-plus-lg me-1"></i>Agregar rubro ${cuadro==='BALANCE'?'al balance':'al P&G'}</button>`;
+  document.getElementById('dlgRubros').innerHTML = `
+    <div class="d-flex justify-content-between align-items-start">
+      <h5 class="fw-bold">Rubros de los cuadros</h5>
+      <button class="btn btn-sm btn-outline-secondary" onclick="dlgRubros.close();consultar()"><i class="bi bi-x-lg"></i> Cerrar y regenerar</button></div>
+    <div class="small text-muted mb-2">Cada cuenta se asigna al PRIMER rubro (por orden) cuyo prefijo calce con su código. Lo que no calza aparece como "Otros (sin rubro)". Los márgenes azules se calculan solos (acumulado ingresos − gastos hasta esa fila).</div>
+    ${seccion('BALANCE','Cuadro Balance General')}
+    ${seccion('EERR','Cuadro Estado de Resultados (P&G)')}`;
+  document.getElementById('dlgRubros').showModal();
+}
+async function guardarRubro(id, btn){
+  const tr = btn.closest('tr');
+  const body = { etiqueta: tr.querySelector('.r-et').value.trim(), orden: Number(tr.querySelector('.r-or').value)||0 };
+  const gr = tr.querySelector('.r-gr'); if (gr) body.grupo = gr.value.trim();
+  const pf = tr.querySelector('.r-pf'); if (pf) body.prefijos = pf.value.trim();
+  const r = await fetch('/api/contabilidad/directorio/rubros/'+id,{method:'PUT',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  btn.innerHTML = '<i class="bi bi-check-all text-success"></i>';
+}
+async function toggleRubro(id, activo){
+  const r = await fetch('/api/contabilidad/directorio/rubros/'+id,{method:'PUT',headers:H,body:JSON.stringify({activo:!!activo})});
+  const j = await r.json(); if (!j.success) return alert(j.error); configRubros();
+}
+async function eliminarRubro(id){
+  if (!confirm('¿Eliminar este rubro? Sus cuentas caerán a "Otros (sin rubro)".')) return;
+  const r = await fetch('/api/contabilidad/directorio/rubros/'+id,{method:'DELETE',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error); configRubros();
+}
+async function nuevoRubro(cuadro){
+  const etiqueta = prompt('Nombre del rubro:'); if (!etiqueta||!etiqueta.trim()) return;
+  const body = { cuadro, etiqueta: etiqueta.trim(), orden: 99 };
+  if (cuadro==='BALANCE') body.grupo = prompt('Grupo (ej. Activo Corriente, Pasivo Corriente, Patrimonio):')||'Activo Corriente';
+  else body.tipo = (prompt('Tipo (INGRESO o GASTO):')||'').toUpperCase()==='INGRESO'?'INGRESO':'GASTO';
+  body.prefijos = prompt('Prefijos de cuenta (separados por coma, ej. 4002,400106):')||'';
+  const r = await fetch('/api/contabilidad/directorio/rubros',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); if (!j.success) return alert(j.error); configRubros();
 }
 
 async function guardarHechos(sec){
