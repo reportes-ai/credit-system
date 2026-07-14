@@ -609,6 +609,17 @@ const cambiarEstadoOrden = async (req, res) => {
         [estado, fechaPago, metodo, id]);
     }
     auditar({ req, accion: estado === 'PAGADA' ? 'PAGAR' : (estado === 'ANULADA' ? 'ANULAR' : 'EDITAR'), modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `${o.numero || id}: ${o.estado} → ${estado}` });
+    // Centralización contable: asiento automático al pagar la ODP (nunca bloquea)
+    if (estado === 'PAGADA') {
+      pool.query('SELECT numero, concepto, proveedor_nombre, proveedor_rut, monto FROM ordenes_pago WHERE id=?', [id]).then(([[od]]) => {
+        if (!od) return;
+        return require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'ODP_PAGADA', fecha: fechaPago,
+          glosa: `Pago ODP ${od.numero || id} — ${od.proveedor_nombre || od.concepto}`.slice(0, 300),
+          ref: `ODP-${od.numero || id}`, montos: { monto: Math.round(Number(od.monto) || 0) }, rut: od.proveedor_rut || null,
+        });
+      }).catch(() => {});
+    }
     res.json({ success: true, data: { id, estado, fecha_pago: fechaPago }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

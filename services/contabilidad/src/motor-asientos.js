@@ -60,6 +60,16 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['3001040', 'HABER', 'mora', 'Interés de mora'],
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
+      ['PREPAGO', 'Prepago de crédito en Caja', 'Se dispara al saldar completo un crédito en Caja. Campos: total (lo cobrado), cuota (capital+interés de cuotas), mora (interés de mora + comisión de prepago), gastos (gastos de cobranza).', 'INGRESO', 1, [
+        ['1101090', 'DEBE', 'total', 'Recaudación prepago'],
+        ['1104010', 'HABER', 'cuota', 'Abono a contratos'],
+        ['3001090', 'HABER', 'mora', 'Ingresos por prepago'],
+        ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
+      ]],
+      ['ODP_PAGADA', 'Orden de Pago pagada', 'Se dispara al marcar PAGADA una Orden de Pago a proveedor. Campos: monto (total de la orden).', 'EGRESO', 1, [
+        ['2102022', 'DEBE', 'monto', 'Pago a proveedor'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       ['CASTIGO', 'Castigo de saldo aprobado', 'Se dispara cuando el castigo recibe ambas firmas gerenciales. Campos: monto (saldo castigado).', 'TRASPASO', 1, [
         ['1104050', 'DEBE', 'monto', 'Uso de provisión por castigo'],
         ['1104020', 'HABER', 'monto', 'Baja del contrato'],

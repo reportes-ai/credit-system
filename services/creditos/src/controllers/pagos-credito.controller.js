@@ -616,6 +616,19 @@ const prepagar = async (req, res) => {
     await conn.query("UPDATE operaciones_brokerage SET estado_cartera='PREPAGADO' WHERE num_op=?", [num_op]).catch(() => {});
 
     await conn.commit();
+
+    // Centralización contable: asiento del prepago con lo efectivamente cobrado (nunca bloquea)
+    try {
+      const [[sm]] = await pool.query(
+        `SELECT COALESCE(SUM(monto_cuota),0) c, COALESCE(SUM(interes_mora),0) m, COALESCE(SUM(gastos_cobranza),0) g, COALESCE(SUM(total_pagado),0) t
+           FROM pagos_credito WHERE numero_transaccion=? AND estado_pago='PAGADO'`, [trx]);
+      await require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'PREPAGO', fecha: fp,
+        glosa: `Prepago crédito ${num_op} — ${pp.nombre || ''}`.trim().slice(0, 300),
+        ref: `TRX-${String(trx).padStart(6, '0')}`, num_op, rut: pp.rut || null,
+        montos: { total: Number(sm.t), cuota: Number(sm.c), mora: Number(sm.m), gastos: Number(sm.g) },
+      });
+    } catch (_) {}
     auditar({ req, accion: 'PAGAR', modulo: 'pagos', entidad: 'prepago', entidad_id: trx,
       detalle: `Prepago crédito ${num_op} — cobrado $${_r2(totalCobrado).toLocaleString('es-CL')} (condonado gastos $${condG.toLocaleString('es-CL')} / intereses $${condI.toLocaleString('es-CL')} / capital $${condC.toLocaleString('es-CL')}) — TRX #${trx}`,
       meta: { id_credito, num_op, numero_transaccion: trx, total_cobrado: _r2(totalCobrado), condona_gastos: condG, condona_intereses: condI, condona_capital: condC } });
