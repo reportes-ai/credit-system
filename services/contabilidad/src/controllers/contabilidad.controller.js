@@ -107,6 +107,7 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
       ['Reglas de Centralización', 'ctb_reglas',      '/contabilidad/reglas/',       'bi-gear-wide-connected'],
       ['Estados Financieros',     'ctb_estados',      '/contabilidad/estados/',      'bi-graph-up-arrow'],
       ['Informe Cierre Mensual',  'ctb_cierre_mes',   '/contabilidad/cierre-mes/',   'bi-flag'],
+      ['Bitácora de Cierres',     'ctb_bitacora',     '/contabilidad/bitacora-cierres/', 'bi-journal-bookmark'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -482,6 +483,97 @@ exports.comentarioIA = async (req, res) => {
   } catch (e) {
     console.error('[ctb comentarioIA]', e.message);
     fail(res, 'No se pudo generar el borrador con IA: ' + e.message, 502);
+  }
+};
+
+/* ── Bitácora de Cierres ───────────────────────────────────────────────────────
+   Memoria financiera mes a mes: snapshot de KPIs del cierre + análisis en
+   profundidad generado con IA (tendencia de 6 meses incluida). Cada análisis
+   queda guardado con fecha y autor; re-analizar reemplaza el texto (la foto de
+   KPIs se recalcula al momento de analizar). */
+require('../../../../shared/migrate').enFila('contabilidad-bitacora', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_cierres_bitacora (
+        mes         VARCHAR(7) PRIMARY KEY,
+        kpis        JSON NULL,
+        analisis    TEXT NULL,
+        generado_por VARCHAR(160) NULL,
+        updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    await require('../../../../shared/ia').registrarFuncionalidad({
+      codigo: 'ctb_analisis_cierre',
+      nombre: 'Análisis de Cierre (Bitácora)',
+      descripcion: 'Análisis financiero en profundidad de cada mes cerrado para la Bitácora de Cierres: tendencia de 6 meses, variaciones relevantes, riesgos y recomendaciones. Se genera a pedido y queda guardado.',
+    });
+  } catch (e) { console.error('[contabilidad-bitacora migration]', e.message); }
+});
+
+const mesAnteriorDe = mes => { let [y, m] = mes.split('-').map(Number); m--; if (m < 1) { m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; };
+
+exports.bitacoraCierres = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM ctb_cierres_bitacora ORDER BY mes DESC LIMIT 60');
+    ok(res, rows.map(r => ({ ...r, kpis: typeof r.kpis === 'string' ? JSON.parse(r.kpis) : r.kpis })));
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.analizarCierre = async (req, res) => {
+  try {
+    const mes = req.params.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    const interno = (fn, query) => new Promise((resolve, reject) => {
+      const r2 = { status() { return this; }, json(j) { j.success ? resolve(j.data) : reject(new Error(j.error)); } };
+      fn({ query, params: {}, body: {}, user: req.user }, r2).catch(reject);
+    });
+    const actual = await interno(exports.cierreMes, { mes });
+    const anterior = await interno(exports.cierreMes, { mes: mesAnteriorDe(mes) }).catch(() => null);
+    // Tendencia: resultado mensual de los últimos 6 meses (excluye cierre de ejercicio)
+    const [tend] = await pool.query(
+      `SELECT DATE_FORMAT(c.fecha,'%Y-%m') mes,
+              SUM(CASE WHEN k.tipo='INGRESO' THEN m.haber-m.debe ELSE 0 END) ingresos,
+              SUM(CASE WHEN k.tipo='GASTO' THEN m.debe-m.haber ELSE 0 END) gastos
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.origen<>'CIERRE_EJERCICIO' AND k.tipo IN ('INGRESO','GASTO')
+          AND c.fecha > DATE_SUB(CONCAT(?, '-01'), INTERVAL 6 MONTH) AND c.fecha <= LAST_DAY(CONCAT(?, '-01'))
+        GROUP BY 1 ORDER BY 1`, [mes, mes]);
+    const kpis = {
+      tc: actual.tipo_cambio?.valor || null,
+      activo: actual.balance.tot.activo, pasivo: actual.balance.tot.pasivo,
+      patrimonio: actual.balance.tot.patrimonio, resultado_ejercicio: actual.balance.resultado_ejercicio,
+      ingresos_mes: actual.eerr_mes.total_ingresos, gastos_mes: actual.eerr_mes.total_gastos,
+      resultado_mes: actual.eerr_mes.resultado, resultado_acumulado: actual.eerr_acum.resultado,
+      cuadre: actual.balance.cuadre,
+    };
+    const datos = {
+      mes, kpis,
+      mes_anterior: anterior && { ingresos: anterior.eerr_mes.total_ingresos, gastos: anterior.eerr_mes.total_gastos, resultado: anterior.eerr_mes.resultado, activo: anterior.balance.tot.activo, patrimonio: anterior.balance.tot.patrimonio },
+      tendencia_6m: tend.map(t => ({ mes: t.mes, resultado: Number(t.ingresos) - Number(t.gastos) })),
+      top_ingresos: actual.eerr_mes.ingresos.slice().sort((a, b) => b.monto - a.monto).slice(0, 8),
+      top_gastos: actual.eerr_mes.gastos.slice().sort((a, b) => b.monto - a.monto).slice(0, 8),
+      pasivos_principales: actual.balance.pasivo.slice().sort((a, b) => b.saldo - a.saldo).slice(0, 6),
+      activos_principales: actual.balance.activo.slice().sort((a, b) => b.saldo - a.saldo).slice(0, 6),
+    };
+    const { analizar } = require('../../../../shared/anthropic');
+    const out = await analizar({
+      codigo: 'ctb_analisis_cierre',
+      id_usuario: (req.usuario || req.user || {}).id_usuario || null,
+      system: 'Eres el analista financiero senior de AutoFácil Chile (crédito automotriz, matriz en Ecuador). Escribes el análisis del cierre mensual para la bitácora interna: lo lee gerencia y el directorio. Español claro, montos CLP con miles, sin jerga innecesaria. NO inventes cifras: usa solo los datos entregados.',
+      prompt: `Datos del cierre (JSON):\n${JSON.stringify(datos)}\n\nEscribe el ANÁLISIS DEL CIERRE de ${mes} con esta estructura (títulos en negrita markdown **así**):\n**Resumen ejecutivo** (2-3 líneas: cómo le fue al mes)\n**Resultados** (resultado del mes vs mes anterior y vs tendencia de 6 meses; qué partidas lo explican)\n**Balance** (posición: activos y pasivos principales, patrimonio y su evolución)\n**Alertas y riesgos** (lo que gerencia debe vigilar: patrimonio negativo, pérdidas sostenidas, concentraciones, descuadres)\n**Recomendaciones** (2-3 acciones concretas)\nMáximo ~350 palabras en total.`,
+      max_tokens: 1500,
+    });
+    if (!out || !out.texto) return fail(res, 'La IA no devolvió análisis', 502);
+    await pool.query(
+      `INSERT INTO ctb_cierres_bitacora (mes, kpis, analisis, generado_por) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE kpis=VALUES(kpis), analisis=VALUES(analisis), generado_por=VALUES(generado_por)`,
+      [mes, JSON.stringify(kpis), out.texto.trim(), nombreDe(req.user)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'bitacora_cierre', entidad_id: mes, detalle: `Análisis IA del cierre ${mes} generado` });
+    ok(res, { mes, kpis, analisis: out.texto.trim() });
+  } catch (e) {
+    console.error('[ctb analizarCierre]', e.message);
+    fail(res, 'No se pudo generar el análisis: ' + e.message, 502);
   }
 };
 

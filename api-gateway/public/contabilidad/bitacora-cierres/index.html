@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitácora de Cierres — AutoFácil</title>
+  <!-- v1.0 — memoria financiera mes a mes: KPIs + análisis IA de cada cierre -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1000px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .cierre { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:20px; padding:20px 24px; }
+    .cierre h5 { font-weight:700; margin:0; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+    .kpi { background:#f8fafc; border-radius:10px; padding:10px 12px; }
+    .kpi .lbl { font-size:.68rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; }
+    .kpi .val { font-size:.95rem; font-weight:700; color:var(--navy); font-family:Consolas,monospace; }
+    .kpi .val.neg { color:#991b1b; }
+    .analisis { font-size:.87rem; line-height:1.6; white-space:pre-wrap; border-top:1px solid #f1f5f9; padding-top:12px; }
+    .analisis b { color:var(--navy); }
+    .meta { font-size:.75rem; color:#9ca3af; margin-top:8px; }
+    @media print { .page-banner, .toolbar, #af-topnav, .btn { display:none !important; } body { background:#fff; } .cierre { box-shadow:none; border:1px solid #ddd; page-break-inside:avoid; } }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Bitácora de Cierres', icon:'bi-journal-bookmark', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journal-bookmark"></i><div><h2>Bitácora de Cierres</h2><p>La memoria financiera de AutoFácil: cada mes cerrado con su foto de cifras y el análisis del analista IA — variaciones, riesgos y recomendaciones.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar">
+    <div><label class="form-label small fw-semibold mb-1">Analizar mes</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" id="btnAn" onclick="analizar()"><i class="bi bi-stars me-1"></i>Analizar con IA</button>
+    <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+  </div>
+
+  <div id="lista">Cargando…</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = n => { const v = Math.round(Number(n)||0); return (v<0?'−$':'$') + Math.abs(v).toLocaleString('es-CL'); };
+const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+const prev = new Date(hoy.getFullYear(), hoy.getMonth()-1, 1);
+fMes.value = `${prev.getFullYear()}-${pad(prev.getMonth()+1)}`;
+
+const md = t => esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+
+async function cargar(){
+  const r = await fetch('/api/contabilidad/bitacora-cierres',{headers:H}); const j = await r.json();
+  const rows = j.data||[];
+  document.getElementById('lista').innerHTML = rows.map(x=>{
+    const [y,m] = x.mes.split('-'); const k = x.kpis||{};
+    const kpi = (lbl,v) => `<div class="kpi"><div class="lbl">${lbl}</div><div class="val ${v<0?'neg':''}">${clp(v)}</div></div>`;
+    return `<div class="cierre">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5><i class="bi bi-calendar3 me-1"></i>${MESES[Number(m)]} ${y}</h5>
+        <button class="btn btn-sm btn-outline-primary" onclick="fMes.value='${x.mes}';analizar()"><i class="bi bi-arrow-repeat me-1"></i>Re-analizar</button>
+      </div>
+      <div class="kpis">
+        ${kpi('Resultado del mes', k.resultado_mes)} ${kpi('Acumulado año', k.resultado_acumulado)}
+        ${kpi('Ingresos', k.ingresos_mes)} ${kpi('Gastos', k.gastos_mes)}
+        ${kpi('Activo', k.activo)} ${kpi('Patrimonio', k.patrimonio)}
+      </div>
+      <div class="analisis">${md(x.analisis||'')}</div>
+      <div class="meta">Generado por ${esc(x.generado_por||'—')} · ${String(x.updated_at).replace('T',' ').slice(0,16)} · TC cierre $${(k.tc||0).toLocaleString('es-CL')}</div>
+    </div>`;
+  }).join('') || '<div class="text-muted">Aún no hay cierres analizados. Elige un mes arriba y presiona "Analizar con IA".</div>';
+}
+async function analizar(){
+  const btn = document.getElementById('btnAn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando '+fMes.value+'…';
+  try {
+    const r = await fetch(`/api/contabilidad/bitacora-cierres/${fMes.value}/analizar`,{method:'POST',headers:H});
+    const j = await r.json();
+    if (!j.success) return alert(j.error);
+    cargar();
+  } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Analizar con IA'; }
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -60,6 +60,12 @@
       <p>El paquete del mes para la matriz: balance y resultados en pesos y dólares al tipo de cambio del cierre, imprimible a PDF.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/bitacora-cierres/" class="module-card" id="cardBit" style="display:none">
+      <div class="card-icon"><i class="bi bi-journal-bookmark"></i></div>
+      <h5>Bitácora de Cierres</h5>
+      <p>La memoria financiera mes a mes: cada cierre con sus cifras clave y el análisis del analista IA — tendencia, riesgos y recomendaciones.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/reglas/" class="module-card" id="cardReglas" style="display:none">
       <div class="card-icon"><i class="bi bi-gear-wide-connected"></i></div>
       <h5>Reglas de Centralización <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
@@ -89,6 +95,7 @@
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';
     if (tiene('ctb_estados','ctb_balance')) document.getElementById('cardEst').style.display='';
     if (tiene('ctb_cierre_mes','ctb_estados')) document.getElementById('cardCM').style.display='';
+    if (tiene('ctb_bitacora','ctb_cierre_mes')) document.getElementById('cardBit').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>

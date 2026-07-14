@@ -33,4 +33,8 @@ router.get('/cierre-mes',        verifyToken, requireFunc('ctb_cierre_mes', 'ctb
 router.put('/cierre-mes/comentario',  verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.guardarComentario);
 router.post('/cierre-mes/comentario-ia', verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.comentarioIA);
 
+// Bitácora de Cierres
+router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);
+router.post('/bitacora-cierres/:mes/analizar', verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados'), ctrl.analizarCierre);
+
 module.exports = router;
