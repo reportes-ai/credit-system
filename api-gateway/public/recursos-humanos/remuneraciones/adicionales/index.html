@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adicionales de Remuneración — AutoFácil</title>
+  <!-- v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.68rem; font-weight:700; }
+    .pill.imp { background:#dbeafe; color:#1e40af; } .pill.noimp { background:#f1f5f9; color:#475569; } .pill.liq { background:#dcfce7; color:#15803d; }
+    .bloq { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:12px 16px; font-size:.85rem; color:#7f1d1d; margin-bottom:14px; }
+    .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
+    .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
+    .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Adicionales', icon:'bi-cash-coin', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-cash-coin"></i><div><h2>Adicionales de Remuneración</h2><p>Bonos, aguinaldos, viáticos y otros pagos del mes por colaborador. La causal define si es imponible; se integran solos al libro de liquidaciones y el mes se bloquea al emitir.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabI" onclick="tab('I');return false"><i class="bi bi-plus-circle me-1"></i>Ingresar</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabD" onclick="tab('D');return false"><i class="bi bi-list-ul me-1"></i>Detalle del mes</a></li>
+  </ul>
+
+  <div class="d-flex gap-2 align-items-end mb-3">
+    <div><label class="form-label small fw-semibold mb-1">Mes de remuneración</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+    <span id="lblBloq"></span>
+  </div>
+
+  <div id="secI" class="panel">
+    <div id="avisoBloq" class="bloq" style="display:none"><i class="bi bi-lock-fill me-1"></i>Las remuneraciones de este mes ya fueron <b>EMITIDAS</b>: bloqueado para nuevos adicionales.</div>
+    <div class="row g-2">
+      <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Colaborador</label>
+        <select id="fColab" class="form-select form-select-sm"><option value="">— elegir —</option></select></div>
+      <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Causal del pago</label>
+        <select id="fCausal" class="form-select form-select-sm" onchange="causalUI()"></select></div>
+      <div class="col-md-3" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Describe la causal</label>
+        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Premio concurso interno"></div>
+      <div class="col-md-2" id="wOtroImp" style="display:none"><label class="form-label small fw-semibold mb-1">¿Imponible?</label>
+        <select id="fOtroImp" class="form-select form-select-sm"><option value="1">Sí, imponible</option><option value="0">No imponible</option></select></div>
+      <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Monto $</label>
+        <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
+      <div class="col-md-2 d-flex align-items-end pb-1">
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="fLiq">
+          <label class="form-check-label small fw-semibold" for="fLiq" title="El colaborador recibe exactamente este monto: entra como haber no imponible, sin descuentos">Líquido</label></div>
+      </div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </div>
+    </div>
+    <div class="small text-muted mt-2" id="hintImp"></div>
+  </div>
+
+  <div id="secD" style="display:none">
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>Causal</th><th>Tipo</th><th class="text-right">Monto</th><th>Ingresado por</th><th>Fecha</th><th></th></tr></thead>
+      <tbody id="tbDet"><tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+    <button class="btn btn-sm btn-outline-success" onclick="exportar()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+  </div>
+
+  <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
+    <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo se integran</div>
+    Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> y los marcados <b>Líquido</b> entran como "Otros No Imponibles" (se pagan tal cual). Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+let D = null, CAUSALES = null;
+
+fMes.value = new Date().toISOString().slice(0,7);
+
+function fmtMonto(el){
+  const raw = el.value.replace(/[^\d]/g,'');
+  el.value = raw ? Number(raw).toLocaleString('es-CL') : '';
+  hintImp();
+}
+const montoVal = () => Number(document.getElementById('fMonto').value.replace(/[^\d]/g,''))||0;
+
+function tab(m){
+  tabI.classList.toggle('active', m==='I'); tabD.classList.toggle('active', m==='D');
+  secI.style.display = m==='I'?'':'none'; secD.style.display = m==='D'?'':'none';
+}
+
+function causalUI(){
+  const otro = fCausal.value==='OTRO';
+  wOtro.style.display = otro?'':'none'; wOtroImp.style.display = otro?'':'none';
+  hintImp();
+}
+function hintImp(){
+  if (!CAUSALES) return;
+  const c = fCausal.value; if (!c) return;
+  const liq = document.getElementById('fLiq').checked;
+  const imp = liq ? false : (c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1);
+  document.getElementById('hintImp').innerHTML = liq
+    ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>Líquido</b>: el colaborador recibe exactamente este monto (entra como haber no imponible).'
+    : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`;
+}
+document.addEventListener('change', e=>{ if (e.target.id==='fLiq'||e.target.id==='fOtroImp') hintImp(); });
+
+async function cargar(){
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales?mes='+fMes.value,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data;
+  if (!CAUSALES){
+    CAUSALES = D.causales;
+    fCausal.innerHTML = Object.keys(CAUSALES).map(c=>`<option>${esc(c)}</option>`).join('');
+    const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
+    fColab.innerHTML = '<option value="">— elegir —</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+    causalUI();
+  }
+  document.getElementById('avisoBloq').style.display = D.bloqueado?'':'none';
+  document.getElementById('btnGuardar').disabled = D.bloqueado;
+  document.getElementById('lblBloq').innerHTML = D.bloqueado ? '<span class="pill" style="background:#fee2e2;color:#991b1b"><i class="bi bi-lock-fill"></i> MES EMITIDO — BLOQUEADO</span>' : '';
+  render();
+}
+
+function render(){
+  const t = D.totales;
+  document.getElementById('kpis').innerHTML = `
+    <div class="card-kpi"><div class="v">${D.adicionales.length}</div><div class="l">Adicionales</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(t.imponible)}</div><div class="l">Imponibles</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(t.no_imponible)}</div><div class="l">No imponibles</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(t.liquido)}</div><div class="l">Líquidos</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(t.imponible+t.no_imponible+t.liquido)}</div><div class="l">Total del mes</div></div>`;
+  document.getElementById('tbDet').innerHTML = D.adicionales.map(a=>`<tr>
+    <td>${esc(a.nombre_actual||a.nombre)}</td>
+    <td>${esc(a.causal)}${a.causal_texto?` — <i>${esc(a.causal_texto)}</i>`:''}</td>
+    <td>${a.es_liquido?'<span class="pill liq">LÍQUIDO</span>':a.imponible?'<span class="pill imp">Imponible</span>':'<span class="pill noimp">No imponible</span>'}</td>
+    <td class="text-right num">$${fmt(a.monto)}</td>
+    <td>${esc(a.creado_por||'')}</td>
+    <td>${String(a.created_at).slice(0,10)}</td>
+    <td>${D.bloqueado?'':`<i class="bi bi-trash text-danger" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`}</td>
+  </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">Sin adicionales este mes</td></tr>';
+}
+
+async function guardar(){
+  const body = { mes: fMes.value, id_usuario: fColab.value, causal: fCausal.value,
+    causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked, monto: montoVal() };
+  if (!body.id_usuario) return alert('Elige el colaborador');
+  if (!body.monto) return alert('Ingresa el monto');
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
+  fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
+  fColab.focus();
+  cargar();
+}
+
+async function eliminar(id){
+  if (!confirm('¿Eliminar este adicional?')) return;
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales/'+id,{method:'DELETE',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  cargar();
+}
+
+function exportar(){
+  if (!D?.adicionales.length) return;
+  const filas = [['Mes','Colaborador','Causal','Detalle','Tipo','Monto','Ingresado por','Fecha'],
+    ...D.adicionales.map(a=>[a.mes,a.nombre_actual||a.nombre,a.causal,a.causal_texto||'',a.es_liquido?'LIQUIDO':a.imponible?'IMPONIBLE':'NO IMPONIBLE',a.monto,a.creado_por||'',String(a.created_at).slice(0,10)]),
+    [],['','','','TOTAL IMPONIBLE','',D.totales.imponible],['','','','TOTAL NO IMPONIBLE','',D.totales.no_imponible],['','','','TOTAL LIQUIDO','',D.totales.liquido]];
+  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
+  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'adicionales-remuneracion-'+fMes.value+'.xls'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

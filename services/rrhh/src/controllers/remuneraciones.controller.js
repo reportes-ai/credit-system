@@ -122,6 +122,104 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones-v2', async () 
   } catch (e) { console.error('[rrhh-remuneraciones-v2 migration]', e.message); }
 });
 
+/* v3: ADICIONALES DE REMUNERACIÓN — pagos extra del mes por colaborador con
+   causal paramétrica (la causal define si es imponible); "líquido" = se paga
+   tal cual, sin descuentos (entra como haber no imponible). Se integran solos
+   al libro del mes y se bloquean cuando el mes ya fue EMITIDO. */
+require('../../../../shared/migrate').enFila('rrhh-adicionales', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rh_adicionales (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        mes          CHAR(7) NOT NULL,
+        id_usuario   INT NOT NULL,
+        nombre       VARCHAR(200) NULL,
+        causal       VARCHAR(60) NOT NULL,
+        causal_texto VARCHAR(200) NULL,          -- solo cuando causal=OTRO
+        imponible    TINYINT(1) NOT NULL DEFAULT 1,
+        es_liquido   TINYINT(1) NOT NULL DEFAULT 0,
+        monto        DECIMAL(12,0) NOT NULL,
+        creado_por   VARCHAR(160) NULL,
+        created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_mes (mes), INDEX idx_usuario (id_usuario, mes)
+      )`);
+    console.log('[rrhh-adicionales] listo');
+  } catch (e) { console.error('[rrhh-adicionales migration]', e.message); }
+});
+
+// Causal → imponible (paramétrico simple; OTRO lo decide el usuario)
+const CAUSALES_ADIC = {
+  'BONO DE DESEMPEÑO': 1, 'AGUINALDO': 1, 'HORAS EXTRAS': 1, 'COMISIÓN EXTRAORDINARIA': 1,
+  'BONO POR META': 1, 'DIFERENCIA DE SUELDO': 1,
+  'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
+  'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
+};
+
+const mesEmitido = async (mes) => {
+  const [[e]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+  return (e?.c || 0) > 0;
+};
+
+const getAdicionales = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const [rows] = await pool.query(
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual FROM rh_adicionales a
+        LEFT JOIN usuarios u ON u.id_usuario=a.id_usuario WHERE a.mes=? ORDER BY a.created_at DESC`, [mes]);
+    const tot = { imponible: 0, no_imponible: 0, liquido: 0 };
+    rows.forEach(r => { const m = Number(r.monto);
+      if (r.es_liquido) tot.liquido += m; else if (r.imponible) tot.imponible += m; else tot.no_imponible += m; });
+    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: CAUSALES_ADIC });
+  } catch (e) { console.error('[rrhh adicionales get]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+const crearAdicional = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const b = req.body || {};
+    const mes = b.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'Mes inválido', 400);
+    if (await mesEmitido(mes)) return fail(res, `Las remuneraciones de ${mes} ya fueron EMITIDAS: el mes está bloqueado para nuevos adicionales.`, 423);
+    const idU = Number(b.id_usuario);
+    const monto = Math.round(Number(b.monto) || 0);
+    const causal = String(b.causal || '').toUpperCase().trim();
+    if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
+    if (!(causal in CAUSALES_ADIC)) return fail(res, 'Causal no válida', 400);
+    if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail(res, 'Describe la causal en "Otro"', 400);
+    const esLiquido = b.es_liquido ? 1 : 0;
+    const imponible = esLiquido ? 0 : (CAUSALES_ADIC[causal] != null ? CAUSALES_ADIC[causal] : (b.imponible ? 1 : 0));
+    const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
+    if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+    const [r] = await pool.query(
+      'INSERT INTO rh_adicionales (mes, id_usuario, nombre, causal, causal_texto, imponible, es_liquido, monto, creado_por) VALUES (?,?,?,?,?,?,?,?,?)',
+      [mes, idU, colab.nombre, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, nombreDe(u)]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
+      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}` });
+    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido });
+  } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+const eliminarAdicional = async (req, res) => {
+  try {
+    const [[a]] = await pool.query('SELECT * FROM rh_adicionales WHERE id=?', [req.params.id]);
+    if (!a) return fail(res, 'No existe', 404);
+    if (await mesEmitido(a.mes)) return fail(res, 'El mes ya fue emitido: no se puede eliminar', 423);
+    await pool.query('DELETE FROM rh_adicionales WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: Number(req.params.id), detalle: `Eliminó adicional ${a.mes} ${a.nombre} ${a.causal} $${Number(a.monto).toLocaleString('es-CL')}` });
+    ok(res, { eliminado: true });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+
+// Suma de adicionales del mes por usuario → alimenta el libro de liquidaciones
+async function adicionalesDelMes(mes) {
+  const [rows] = await pool.query(
+    `SELECT id_usuario,
+            SUM(CASE WHEN es_liquido=0 AND imponible=1 THEN monto ELSE 0 END) imp,
+            SUM(CASE WHEN es_liquido=1 OR imponible=0 THEN monto ELSE 0 END) noimp
+       FROM rh_adicionales WHERE mes=? GROUP BY id_usuario`, [mes]);
+  const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp) });
+  return m;
+}
+
 /* ── Indicadores del período ────────────────────────────────────────────────── */
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
@@ -223,6 +321,7 @@ const getMes = async (req, res) => {
     const [guardadas] = await pool.query('SELECT * FROM rh_liquidaciones WHERE mes = ?', [mes]);
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
     const comis = await comisionesDelMes(mes);
+    const adics = await adicionalesDelMes(mes);
 
     const filas = emps.map(e => {
       const g = gMap[e.id_usuario];
@@ -238,8 +337,8 @@ const getMes = async (req, res) => {
         plan_isapre_uf: e.plan_isapre_uf, dias: over.dias ?? 30,
         colacion: over.colacion ?? e.colacion, movilizacion: over.movilizacion ?? e.movilizacion,
         comisiones: over.comisiones ?? (comis[String(e.nombre_corto).trim()] || 0),
-        otros_imponibles: over.otros_imponibles ?? 0,
-        otros_no_imponibles: over.otros_no_imponibles ?? 0,
+        otros_imponibles: over.otros_imponibles ?? (adics[e.id_usuario]?.imp || 0),
+        otros_no_imponibles: over.otros_no_imponibles ?? (adics[e.id_usuario]?.noimp || 0),
         otros_descuentos: over.otros_descuentos ?? 0,
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
@@ -574,4 +673,4 @@ const putIndicadores = async (req, res) => {
 };
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
-  revisarAhora, getPropuesta, resolverPropuesta };
+  revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional };
