@@ -6,7 +6,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 const ctrl = require('../controllers/contabilidad.controller');
 
 // Plan de cuentas
-router.get('/cuentas',            verifyToken, requireFunc('ctb_ver', 'ctb_plan', 'ctb_comprobantes', 'ctb_libros', 'ctb_balance'), ctrl.getCuentas);
+router.get('/cuentas',            verifyToken, requireFunc('ctb_ver', 'ctb_plan', 'ctb_comprobantes', 'ctb_libros', 'ctb_balance', 'ctb_libros_aux'), ctrl.getCuentas);
 router.post('/cuentas',           verifyToken, requireFunc('ctb_plan'), ctrl.crearCuenta);
 router.put('/cuentas/:codigo',    verifyToken, requireFunc('ctb_plan'), ctrl.editarCuenta);
 router.delete('/cuentas/:codigo', verifyToken, requireFunc('ctb_plan'), ctrl.eliminarCuenta);
@@ -81,6 +81,10 @@ router.get('/compras-aux/lista',     verifyToken, requireFunc('ctb_libros_aux', 
 router.get('/honorarios-aux/lista',  verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaHonorariosAux);
 router.post('/ventas-aux/importar',  verifyToken, requireFunc('ctb_directorio', 'ctb_libros_aux'), ctrl.importarVentasAux);
 router.get('/ventas-aux/lista',      verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaVentasAux);
+router.get('/digitar-config',        verifyToken, requireFunc('ctb_libros_aux'), ctrl.getDigitarConfig);
+router.post('/compras-aux/digitar',    verifyToken, requireFunc('ctb_libros_aux'), ctrl.digitarCompraAux);
+router.post('/honorarios-aux/digitar', verifyToken, requireFunc('ctb_libros_aux'), ctrl.digitarHonorarioAux);
+router.delete('/docs-aux/:tipo/:id',   verifyToken, requireFunc('ctb_libros_aux'), ctrl.eliminarDocAux);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);
 router.post('/directorio/hechos-ia', verifyToken, requireFunc('ctb_directorio'), ctrl.hechosDirectorioIA);
 

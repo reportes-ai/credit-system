@@ -49,6 +49,7 @@
       <input id="fCuenta" class="form-control form-control-sm" style="width:130px" placeholder="ej. 4002" onkeydown="if(event.key==='Enter')consultar()"></div>
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="btn btn-sm btn-outline-success" onclick="exportar()" id="btnXls" disabled><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+    <button class="btn btn-sm btn-success" id="btnDig" onclick="abrirDigitar()"><i class="bi bi-pencil-square me-1"></i>Digitar documento</button>
     <span class="flex-grow-1"></span>
     <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
       <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
@@ -76,6 +77,8 @@
     Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)", <b>Ventas</b> → "Exportar Documentos de Ventas" (un archivo por mes; las notas de crédito tipo 61 entran con signo negativo) y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
   </div>
 </div>
+
+<dialog id="dlgDig" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:620px;max-width:94vw"></dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -134,7 +137,7 @@ function render(){
     tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.tipo_doc||'')}-${esc(d.num_doc||'')}</td>
       <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):''}</td>
       <td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
-      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
+      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('compras',${d.id})"></i>`:''}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
   } else if (MODO==='V'){
     k.innerHTML = `
@@ -163,7 +166,7 @@ function render(){
     tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.num_boleta||'')}</td>
       <td>${d.fecha_emision?String(d.fecha_emision).slice(0,10):''}</td><td>${esc(d.rut||'')}</td>
       <td>${esc(d.nombre||'')}</td><td>${esc(d.glosa||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
-      <td class="text-right num">${fmt(d.bruto)}</td><td class="text-right num">${fmt(d.retencion)}</td><td class="text-right num">${fmt(d.liquido)}</td></tr>`).join('')
+      <td class="text-right num">${fmt(d.bruto)}</td><td class="text-right num">${fmt(d.retencion)}</td><td class="text-right num">${fmt(d.liquido)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('honorarios',${d.id})"></i>`:''}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin boletas</td></tr>';
   }
   notaTrunc.innerHTML = D.truncado ? '<i class="bi bi-exclamation-triangle me-1"></i>Se muestran los primeros 1.000 documentos — acota el rango o los filtros para ver el resto.' : '';
@@ -207,6 +210,125 @@ function exportar(){
 }
 
 consultar();
+
+/* ── Digitación de documentos (compras y honorarios; ventas no se digitan) ── */
+let CUENTAS = null, CFG = null;
+async function cargarBase(){
+  if (!CUENTAS){
+    const r = await fetch('/api/contabilidad/cuentas',{headers:H}); const j = await r.json();
+    CUENTAS = (j.data||[]).filter(c=>c.imputable && c.activo);
+  }
+  const r2 = await fetch('/api/contabilidad/digitar-config',{headers:H}); const j2 = await r2.json();
+  CFG = j2.data || {};
+}
+const selCta = (id, val, filtro) => {
+  const ops = CUENTAS.filter(c=>!filtro || filtro.test(c.codigo));
+  return `<select id="${id}" class="form-select form-select-sm">
+    <option value="">— elegir —</option>
+    ${ops.map(c=>`<option value="${c.codigo}" ${c.codigo===val?'selected':''}>${c.codigo} — ${esc(c.nombre)}</option>`).join('')}
+  </select>`;
+};
+async function abrirDigitar(){
+  if (MODO==='V') return alert('Las ventas no se digitan aquí: nacen en la facturación electrónica (SII) y se importan.');
+  await cargarBase();
+  const d = document.getElementById('dlgDig');
+  const hoyStr = new Date().toISOString().slice(0,10);
+  if (MODO==='C'){
+    d.innerHTML = `
+      <h5 class="fw-bold mb-3"><i class="bi bi-cart3 me-2"></i>Digitar factura de compra</h5>
+      <div class="row g-2">
+        <div class="col-3"><label class="form-label small mb-1">Tipo DTE</label>
+          <select id="dTipo" class="form-select form-select-sm"><option value="33">33 Factura</option><option value="34">34 F.Exenta</option><option value="56">56 N.Débito</option><option value="61">61 N.Crédito</option></select></div>
+        <div class="col-3"><label class="form-label small mb-1">Folio *</label><input id="dNum" class="form-control form-control-sm"></div>
+        <div class="col-3"><label class="form-label small mb-1">Emisión *</label><input type="date" id="dFecha" class="form-control form-control-sm" value="${hoyStr}"></div>
+        <div class="col-3"><label class="form-label small mb-1">Vencimiento</label><input type="date" id="dVcto" class="form-control form-control-sm"></div>
+        <div class="col-4"><label class="form-label small mb-1">RUT proveedor *</label><input id="dRut" class="form-control form-control-sm" placeholder="76123456-7"></div>
+        <div class="col-8"><label class="form-label small mb-1">Razón social *</label><input id="dRazon" class="form-control form-control-sm"></div>
+        <div class="col-4"><label class="form-label small mb-1">Neto</label><input type="number" id="dNeto" class="form-control form-control-sm" oninput="calcC()"></div>
+        <div class="col-4"><label class="form-label small mb-1">Exento</label><input type="number" id="dExento" class="form-control form-control-sm" value="0" oninput="calcC()"></div>
+        <div class="col-4"><label class="form-label small mb-1">IVA (19%)</label><input type="number" id="dIva" class="form-control form-control-sm"></div>
+        <div class="col-12 small text-end text-muted">Total: <b id="dTotal" class="num">0</b></div>
+        <div class="col-12"><label class="form-label small mb-1">Cuenta de gasto/activo *</label>${selCta('dCtaGasto','')}</div>
+      </div>
+      <div class="form-check mt-3"><input type="checkbox" class="form-check-input" id="dAsiento" checked onchange="dlgAsientoUI()">
+        <label class="form-check-label small fw-semibold" for="dAsiento">Generar el asiento contable de inmediato</label></div>
+      <div id="dCtasAsiento" class="row g-2 mt-1">
+        <div class="col-6"><label class="form-label small mb-1">Cuenta IVA crédito fiscal</label>${selCta('dCtaIva', CFG.cta_iva_credito)}</div>
+        <div class="col-6"><label class="form-label small mb-1">Cuenta por pagar (proveedores)</label>${selCta('dCtaCxp', CFG.cta_cxp, /^2/)}</div>
+        <div class="col-12 small text-muted">Asiento: Debe gasto (neto+exento) + Debe IVA crédito · Haber proveedores (total). Las cuentas quedan recordadas para la próxima.</div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-sm btn-outline-secondary" onclick="dlgDig.close()">Cancelar</button>
+        <button class="btn btn-sm btn-primary" onclick="guardarCompra(this)"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </div>`;
+  } else {
+    d.innerHTML = `
+      <h5 class="fw-bold mb-3"><i class="bi bi-person-badge me-2"></i>Digitar boleta de honorarios</h5>
+      <div class="row g-2">
+        <div class="col-4"><label class="form-label small mb-1">N° boleta *</label><input id="dNum" class="form-control form-control-sm"></div>
+        <div class="col-4"><label class="form-label small mb-1">Emisión *</label><input type="date" id="dFecha" class="form-control form-control-sm" value="${hoyStr}"></div>
+        <div class="col-4"><label class="form-label small mb-1">RUT profesional *</label><input id="dRut" class="form-control form-control-sm" placeholder="12345678-9"></div>
+        <div class="col-12"><label class="form-label small mb-1">Nombre profesional *</label><input id="dNombre" class="form-control form-control-sm"></div>
+        <div class="col-12"><label class="form-label small mb-1">Glosa</label><input id="dGlosa" class="form-control form-control-sm" placeholder="ej. ASESORÍA COMERCIAL OP 88123"></div>
+        <div class="col-4"><label class="form-label small mb-1">Bruto *</label><input type="number" id="dBruto" class="form-control form-control-sm" oninput="calcH()"></div>
+        <div class="col-4"><label class="form-label small mb-1">Tasa retención %</label><input type="number" step="0.01" id="dTasa" class="form-control form-control-sm" value="${CFG.tasa_retencion||15.25}" oninput="calcH()"></div>
+        <div class="col-4"><label class="form-label small mb-1">&nbsp;</label><div class="small">Ret: <b id="dRet" class="num">0</b><br>Líq: <b id="dLiq" class="num">0</b></div></div>
+        <div class="col-12"><label class="form-label small mb-1">Cuenta de gasto *</label>${selCta('dCtaGasto','', /^4/)}</div>
+      </div>
+      <div class="form-check mt-3"><input type="checkbox" class="form-check-input" id="dAsiento" checked onchange="dlgAsientoUI()">
+        <label class="form-check-label small fw-semibold" for="dAsiento">Generar el asiento contable de inmediato</label></div>
+      <div id="dCtasAsiento" class="row g-2 mt-1">
+        <div class="col-6"><label class="form-label small mb-1">Cuenta retención por pagar</label>${selCta('dCtaRet', CFG.cta_ret_honorarios, /^2/)}</div>
+        <div class="col-6"><label class="form-label small mb-1">Cuenta honorarios por pagar</label>${selCta('dCtaPag', CFG.cta_hon_por_pagar, /^2/)}</div>
+        <div class="col-12 small text-muted">Asiento: Debe gasto (bruto) · Haber retención + Haber honorarios por pagar (líquido). Si pones tasa 0, no hay línea de retención.</div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3">
+        <button class="btn btn-sm btn-outline-secondary" onclick="dlgDig.close()">Cancelar</button>
+        <button class="btn btn-sm btn-primary" onclick="guardarHonorario(this)"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </div>`;
+  }
+  d.showModal();
+}
+function dlgAsientoUI(){ document.getElementById('dCtasAsiento').style.display = document.getElementById('dAsiento').checked ? '' : 'none'; }
+function calcC(){
+  const neto = Number(dNeto.value)||0;
+  if (document.activeElement === dNeto) dIva.value = Math.round(neto*0.19);
+  dTotal.textContent = fmt(neto + (Number(dExento.value)||0) + (Number(dIva.value)||0));
+}
+function calcH(){
+  const b = Number(dBruto.value)||0, t = Number(dTasa.value)||0;
+  const r = Math.round(b*t/100);
+  dRet.textContent = fmt(r); dLiq.textContent = fmt(b-r);
+}
+async function guardarCompra(btn){
+  btn.disabled = true;
+  const body = { tipo_doc:dTipo.value, num_doc:dNum.value.trim(), fecha_doc:dFecha.value, fecha_vcto:dVcto.value||null,
+    rut:dRut.value.trim(), razon_social:dRazon.value.trim(), neto:dNeto.value, exento:dExento.value, iva:dIva.value,
+    cuenta_gasto:dCtaGasto.value, generar_asiento:dAsiento.checked, cuenta_iva:dCtaIva.value, cuenta_cxp:dCtaCxp.value };
+  const r = await fetch('/api/contabilidad/compras-aux/digitar',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); btn.disabled = false;
+  if (!j.success) return alert(j.error);
+  alert('Factura guardada en el auxiliar.'+(j.data.comprobante?` Asiento ${j.data.comprobante.numero} contabilizado.`:''));
+  dlgDig.close(); consultar();
+}
+async function guardarHonorario(btn){
+  btn.disabled = true;
+  const body = { num_boleta:dNum.value.trim(), fecha_emision:dFecha.value, rut:dRut.value.trim(), nombre:dNombre.value.trim(),
+    glosa:dGlosa.value.trim(), bruto:dBruto.value, tasa_retencion:dTasa.value,
+    cuenta_gasto:dCtaGasto.value, generar_asiento:dAsiento.checked, cuenta_retencion:dCtaRet.value, cuenta_por_pagar:dCtaPag.value };
+  const r = await fetch('/api/contabilidad/honorarios-aux/digitar',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); btn.disabled = false;
+  if (!j.success) return alert(j.error);
+  alert(`Boleta guardada: retención $${fmt(j.data.retencion)}, líquido $${fmt(j.data.liquido)}.`+(j.data.comprobante?` Asiento ${j.data.comprobante.numero} contabilizado.`:''));
+  dlgDig.close(); consultar();
+}
+async function eliminarDoc(tipo, id){
+  if (!confirm('¿Eliminar este documento digitado del auxiliar? Si generó asiento, el asiento NO se anula solo (hazlo en Comprobantes).')) return;
+  const r = await fetch(`/api/contabilidad/docs-aux/${tipo}/${id}`,{method:'DELETE',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  if (j.data.id_comprobante) alert(`Documento eliminado. Recuerda anular su asiento (id ${j.data.id_comprobante}) en Comprobantes si corresponde.`);
+  consultar();
+}
 </script>
 <script src="/js/app-version.js"></script>
 </body>

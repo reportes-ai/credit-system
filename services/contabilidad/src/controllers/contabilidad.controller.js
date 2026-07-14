@@ -1195,6 +1195,169 @@ exports.listaVentasAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Digitación de documentos tributarios (compras y honorarios) ──────────────
+   Reemplaza la digitación en AVSOFT: el documento entra al auxiliar
+   (origen='DIGITADO') y opcionalmente genera su asiento contable de una vez.
+   Cuentas y tasa de retención son paramétricas (ctb_config, se recuerda lo
+   último usado). Ventas NO se digitan: nacen en la facturación electrónica. */
+require('../../../../shared/migrate').enFila('contabilidad-digitar-docs', async () => {
+  try {
+    await pool.query("ALTER TABLE ctb_compras_aux ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'AVSOFT', ADD COLUMN id_comprobante INT NULL").catch(() => {});
+    await pool.query("ALTER TABLE ctb_honorarios_aux ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'AVSOFT', ADD COLUMN id_comprobante INT NULL").catch(() => {});
+    await pool.query("ALTER TABLE ctb_ventas_aux ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'AVSOFT'").catch(() => {});
+    console.log('[contabilidad] digitación de documentos lista');
+  } catch (e) { console.error('[contabilidad-digitar-docs migration]', e.message); }
+});
+
+const getConfigDig = async () => {
+  const [rows] = await pool.query("SELECT clave, valor FROM ctb_config WHERE clave LIKE 'dig_%'");
+  const c = Object.fromEntries(rows.map(r => [r.clave, r.valor]));
+  return {
+    cta_iva_credito: c.dig_cta_iva_credito || '',
+    cta_cxp: c.dig_cta_cxp || '',
+    cta_ret_honorarios: c.dig_cta_ret_honorarios || '',
+    cta_hon_por_pagar: c.dig_cta_hon_por_pagar || '',
+    tasa_retencion: Number(c.dig_tasa_retencion || 15.25),
+  };
+};
+const setConfigDig = async (pares) => {
+  for (const [k, v] of Object.entries(pares))
+    if (v !== undefined && v !== null && v !== '')
+      await pool.query('INSERT INTO ctb_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', ['dig_' + k, String(v)]);
+};
+exports.getDigitarConfig = async (req, res) => {
+  try { ok(res, await getConfigDig()); } catch (e) { fail(res, e.message); }
+};
+
+/* Comprobante interno para la digitación de documentos: respeta candado y
+   correlativo; no pasa por el guardián (el documento ya trae su estructura). */
+const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_ref, usuario }) => {
+  const candado = await mesConCandado(fecha);
+  if (candado) throw Object.assign(new Error(`El mes ${candado} está CERRADO con candado. Reábrelo en Informe Cierre Mensual para digitar en él.`), { http: 423 });
+  const codigos = [...new Set(movimientos.map(m => String(m.cuenta)))];
+  const [ctas] = await pool.query('SELECT codigo, imputable, activo FROM ctb_cuentas WHERE codigo IN (?)', [codigos]);
+  const mapa = Object.fromEntries(ctas.map(c => [c.codigo, c]));
+  for (const cod of codigos) {
+    if (!mapa[cod]) throw new Error(`Cuenta ${cod} no existe en el plan`);
+    if (!mapa[cod].imputable) throw new Error(`Cuenta ${cod} no es imputable`);
+    if (!mapa[cod].activo) throw new Error(`Cuenta ${cod} está desactivada`);
+  }
+  const debe = movimientos.reduce((s, m) => s + (m.debe || 0), 0);
+  const haber = movimientos.reduce((s, m) => s + (m.haber || 0), 0);
+  if (debe !== haber || !debe) throw new Error(`Asiento descuadrado: $${debe.toLocaleString('es-CL')} ≠ $${haber.toLocaleString('es-CL')}`);
+  const conn = await pool.getConnection();
+  try {
+    const anio = Number(fecha.slice(0, 4));
+    await conn.beginTransaction();
+    const [[{ sig }]] = await conn.query(
+      'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', ['TRASPASO', anio]);
+    const [r] = await conn.query(
+      `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, total, origen, origen_ref, creado_por) VALUES ('TRASPASO',?,?,?,?,?,?,?,?)`,
+      [anio, sig, fecha, glosa, debe, origen, origen_ref, usuario]);
+    for (const m of movimientos)
+      await conn.query('INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber, rut) VALUES (?,?,?,?,?,?)',
+        [r.insertId, m.cuenta, m.glosa || null, m.debe || 0, m.haber || 0, m.rut || null]);
+    await conn.commit();
+    return { id: r.insertId, numero: `T-${anio}-${String(sig).padStart(5, '0')}` };
+  } catch (e) { await conn.rollback().catch(() => {}); throw e; }
+  finally { conn.release(); }
+};
+
+exports.digitarCompraAux = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const { tipo_doc, num_doc, rut, razon_social, fecha_doc, fecha_vcto, cuenta_gasto, cuenta_iva, cuenta_cxp } = b;
+    const neto = Math.round(Number(b.neto) || 0), exento = Math.round(Number(b.exento) || 0), iva = Math.round(Number(b.iva) || 0);
+    const total = neto + exento + iva;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_doc || '')) return fail(res, 'Fecha del documento inválida', 400);
+    if (!num_doc || !rut || !razon_social) return fail(res, 'Folio, RUT y razón social son obligatorios', 400);
+    if (total <= 0) return fail(res, 'Montos en cero', 400);
+    if (!cuenta_gasto) return fail(res, 'Cuenta de gasto obligatoria', 400);
+    const mes = fecha_doc.slice(0, 7);
+    const [[dup]] = await pool.query('SELECT id FROM ctb_compras_aux WHERE rut=? AND tipo_doc=? AND num_doc=? LIMIT 1', [rut, tipo_doc || '33', String(num_doc)]);
+    if (dup) return fail(res, `Ya existe la factura ${num_doc} de ${rut} en el auxiliar (id ${dup.id})`, 409);
+
+    let comp = null;
+    if (b.generar_asiento) {
+      if (iva > 0 && !cuenta_iva) return fail(res, 'Cuenta IVA crédito obligatoria para el asiento', 400);
+      if (!cuenta_cxp) return fail(res, 'Cuenta por pagar obligatoria para el asiento', 400);
+      const movimientos = [
+        { cuenta: cuenta_gasto, debe: neto + exento, haber: 0, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
+        ...(iva > 0 ? [{ cuenta: cuenta_iva, debe: iva, haber: 0, glosa: `IVA FC ${num_doc}`, rut }] : []),
+        { cuenta: cuenta_cxp, debe: 0, haber: total, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
+      ];
+      comp = await crearComprobanteDoc({
+        fecha: fecha_doc, glosa: `Compra ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
+        movimientos, origen: 'COMPRA_DIG', origen_ref: `${rut}|${tipo_doc || '33'}|${num_doc}`, usuario: nombreDe(req.user),
+      });
+    }
+    const [r] = await pool.query(
+      `INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total, origen, id_comprobante)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DIGITADO',?)`,
+      [mes, tipo_doc || '33', String(num_doc), fecha_doc, fecha_vcto || null, 'Vigente', rut, String(razon_social).slice(0, 200),
+       cuenta_cxp || null, cuenta_gasto, neto, exento, iva, total, comp?.id || null]);
+    await setConfigDig({ cta_iva_credito: cuenta_iva, cta_cxp: cuenta_cxp });
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'compra_digitada', entidad_id: r.insertId, detalle: `FC ${num_doc} ${razon_social} $${total.toLocaleString('es-CL')}${comp ? ' → ' + comp.numero : ''}` });
+    ok(res, { id: r.insertId, comprobante: comp });
+  } catch (e) { fail(res, e.message, e.http || 500); }
+};
+
+exports.digitarHonorarioAux = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const { rut, nombre, num_boleta, fecha_emision, glosa, cuenta_gasto, cuenta_retencion, cuenta_por_pagar } = b;
+    const bruto = Math.round(Number(b.bruto) || 0);
+    const tasa = Number(b.tasa_retencion) || 0;
+    const retencion = Math.round(bruto * tasa / 100);
+    const liquido = bruto - retencion;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_emision || '')) return fail(res, 'Fecha de emisión inválida', 400);
+    if (!rut || !nombre || !num_boleta) return fail(res, 'RUT, nombre y N° de boleta son obligatorios', 400);
+    if (bruto <= 0) return fail(res, 'Bruto en cero', 400);
+    if (!cuenta_gasto) return fail(res, 'Cuenta de gasto obligatoria', 400);
+    const mes = fecha_emision.slice(0, 7);
+    const [[dup]] = await pool.query('SELECT id FROM ctb_honorarios_aux WHERE rut=? AND num_boleta=? LIMIT 1', [rut, String(num_boleta)]);
+    if (dup) return fail(res, `Ya existe la boleta ${num_boleta} de ${rut} en el auxiliar (id ${dup.id})`, 409);
+
+    let comp = null;
+    if (b.generar_asiento) {
+      if (retencion > 0 && !cuenta_retencion) return fail(res, 'Cuenta de retención obligatoria para el asiento', 400);
+      if (!cuenta_por_pagar) return fail(res, 'Cuenta honorarios por pagar obligatoria para el asiento', 400);
+      const movimientos = [
+        { cuenta: cuenta_gasto, debe: bruto, haber: 0, glosa: `BH ${num_boleta} ${nombre}`.slice(0, 200), rut },
+        ...(retencion > 0 ? [{ cuenta: cuenta_retencion, debe: 0, haber: retencion, glosa: `Ret ${tasa}% BH ${num_boleta}`, rut }] : []),
+        { cuenta: cuenta_por_pagar, debe: 0, haber: liquido, glosa: `BH ${num_boleta} ${nombre}`.slice(0, 200), rut },
+      ];
+      comp = await crearComprobanteDoc({
+        fecha: fecha_emision, glosa: `Honorarios BH ${num_boleta} ${nombre}`.slice(0, 250),
+        movimientos, origen: 'HONORARIO_DIG', origen_ref: `${rut}|BH|${num_boleta}`, usuario: nombreDe(req.user),
+      });
+    }
+    const [r] = await pool.query(
+      `INSERT INTO ctb_honorarios_aux (mes, rut, nombre, num_boleta, fecha_emision, glosa, cuenta_gasto, bruto, tasa_retencion, retencion, liquido, origen, id_comprobante)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,'DIGITADO',?)`,
+      [mes, rut, String(nombre).slice(0, 200), String(num_boleta), fecha_emision, (glosa || '').slice(0, 200) || null,
+       cuenta_gasto, bruto, tasa, retencion, liquido, comp?.id || null]);
+    await setConfigDig({ cta_ret_honorarios: cuenta_retencion, cta_hon_por_pagar: cuenta_por_pagar, tasa_retencion: tasa });
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'honorario_digitado', entidad_id: r.insertId, detalle: `BH ${num_boleta} ${nombre} $${bruto.toLocaleString('es-CL')}${comp ? ' → ' + comp.numero : ''}` });
+    ok(res, { id: r.insertId, retencion, liquido, comprobante: comp });
+  } catch (e) { fail(res, e.message, e.http || 500); }
+};
+
+exports.eliminarDocAux = async (req, res) => {
+  try {
+    const tabla = { compras: 'ctb_compras_aux', honorarios: 'ctb_honorarios_aux' }[req.params.tipo];
+    if (!tabla) return fail(res, 'Tipo inválido', 400);
+    const [[doc]] = await pool.query(`SELECT * FROM ${tabla} WHERE id=?`, [req.params.id]);
+    if (!doc) return fail(res, 'No existe', 404);
+    if (doc.origen !== 'DIGITADO') return fail(res, 'Solo se pueden eliminar documentos DIGITADOS (los importados se corrigen re-importando el mes)', 400);
+    const candado = await mesConCandado(doc.mes + '-01');
+    if (candado) return fail(res, `El mes ${candado} está cerrado con candado`, 423);
+    await pool.query(`DELETE FROM ${tabla} WHERE id=?`, [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: req.params.tipo + '_digitado', entidad_id: Number(req.params.id), detalle: `${doc.num_doc || doc.num_boleta} ${doc.razon_social || doc.nombre}${doc.id_comprobante ? ` (OJO: su asiento id ${doc.id_comprobante} sigue vigente — anúlalo en Comprobantes si corresponde)` : ''}` });
+    ok(res, { eliminado: true, id_comprobante: doc.id_comprobante });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Libros Auxiliares (/contabilidad/libros-auxiliares/) ─────────────────────
    Consulta completa de los auxiliares importados (compras, honorarios) con
    filtros y totales por mes. Solo lectura: la importación vive en el
