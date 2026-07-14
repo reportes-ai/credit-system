@@ -512,6 +512,7 @@ const PAGINAS = [
   ['/contabilidad/cierre-mes', 'contabilidad/cierre-mes/index.html'],
   ['/contabilidad/bitacora-cierres', 'contabilidad/bitacora-cierres/index.html'],
   ['/contabilidad/guardian', 'contabilidad/guardian/index.html'],
+  ['/contabilidad/punto-restauracion', 'contabilidad/punto-restauracion/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
   ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
   ['/recursos-humanos/vacaciones', 'recursos-humanos/vacaciones/index.html'],

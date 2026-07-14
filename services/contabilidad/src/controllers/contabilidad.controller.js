@@ -339,6 +339,74 @@ exports.libroMayor = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Punto de Restauración (Contabilidad) ──────────────────────────────────────
+   Marca de agua antes de algo arriesgado (importar un libro, digitación masiva,
+   probar reglas): guarda el MAX(id) de comprobantes y del log del motor.
+   Restaurar borra TODO lo contabilizado después de la marca (comprobantes +
+   movimientos + adjuntos + log). NO toca plan de cuentas, reglas, plantillas,
+   guardián ni candados — solo asientos. Nivel Dios y auditado. */
+const PR_KEY = 'punto_restauracion';
+
+exports.prEstado = async (req, res) => {
+  try {
+    const [[row]] = await pool.query('SELECT valor FROM ctb_config WHERE clave=?', [PR_KEY]).catch(() => [[null]]);
+    const punto = row ? JSON.parse(row.valor) : null;
+    let pendientes = null;
+    if (punto) {
+      const [[c]] = await pool.query('SELECT COUNT(*) n, COALESCE(SUM(total),0) monto FROM ctb_comprobantes WHERE id > ?', [punto.max_comprobante]);
+      pendientes = { comprobantes: Number(c.n), monto: Number(c.monto) };
+    }
+    ok(res, { punto, pendientes });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.prCrear = async (req, res) => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)`);
+    const [[c]] = await pool.query('SELECT COALESCE(MAX(id),0) mx FROM ctb_comprobantes');
+    const [[l]] = await pool.query('SELECT COALESCE(MAX(id),0) mx FROM ctb_eventos_log');
+    const punto = { max_comprobante: Number(c.mx), max_log: Number(l.mx), creado_at: new Date().toISOString(), creado_por: nombreDe(req.user) };
+    await pool.query('INSERT INTO ctb_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [PR_KEY, JSON.stringify(punto)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'punto_restauracion', entidad_id: null, detalle: 'Punto creado: ' + JSON.stringify(punto) });
+    ok(res, punto);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.prRestaurar = async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const [[row]] = await pool.query('SELECT valor FROM ctb_config WHERE clave=?', [PR_KEY]);
+    if (!row) return fail(res, 'No hay punto de restauración creado', 400);
+    if (String(req.body?.confirmar) !== 'RESTAURAR') return fail(res, 'Falta la confirmación (escribe RESTAURAR)', 400);
+    const punto = JSON.parse(row.valor);
+    const marca = Number(punto.max_comprobante) || 0;
+    await conn.beginTransaction();
+    const [movs] = await conn.query('DELETE FROM ctb_movimientos WHERE id_comprobante > ?', [marca]);
+    const [adjs] = await conn.query('DELETE FROM ctb_adjuntos WHERE id_comprobante > ?', [marca]);
+    const [comps] = await conn.query('DELETE FROM ctb_comprobantes WHERE id > ?', [marca]);
+    const [logs] = await conn.query('DELETE FROM ctb_eventos_log WHERE id > ?', [Number(punto.max_log) || 0]);
+    await conn.commit();
+    const borrado = { comprobantes: comps.affectedRows, movimientos: movs.affectedRows, adjuntos: adjs.affectedRows, eventos_log: logs.affectedRows };
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'punto_restauracion', entidad_id: null,
+      detalle: 'RESTAURACIÓN CONTABLE ejecutada (marca id ' + marca + '): ' + JSON.stringify(borrado) });
+    ok(res, { borrado, punto });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    fail(res, e.message);
+  } finally { conn.release(); }
+};
+
+// Card (solo Admin: sin permisos_perfil asignados)
+require('../../../../shared/migrate').enFila('contabilidad-punto-restauracion', async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)`);
+    await pool.query('ALTER TABLE ctb_config MODIFY valor VARCHAR(500) NOT NULL').catch(() => {});
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_punto_restauracion' LIMIT 1");
+    if (!ex) await pool.query(
+      "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003, 'Punto de Restauración (Contabilidad)', 'ctb_punto_restauracion', '/contabilidad/punto-restauracion/', 'bi-clock-history')");
+  } catch (e) { console.error('[contabilidad-punto-restauracion seed]', e.message); }
+});
+
 /* ── Buscador global de movimientos ────────────────────────────────────────────
    "Todos los movimientos de la cuenta X con la palabra NOTARIA": busca en las
    glosas (línea y comprobante), RUT y N° OP, con filtros opcionales de cuenta

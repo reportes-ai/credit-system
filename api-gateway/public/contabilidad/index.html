@@ -84,6 +84,12 @@
       <p>Plan de cuentas jerárquico y 100% paramétrico: crea, edita y desactiva cuentas sin tocar código.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/punto-restauracion/" class="module-card" id="cardPR" style="display:none">
+      <div class="card-icon"><i class="bi bi-clock-history"></i></div>
+      <h5>Punto de Restauración <span style="font-size:.68rem;background:#fee2e2;color:#991b1b;border-radius:8px;padding:2px 8px;vertical-align:middle">Solo Dios</span></h5>
+      <p>Marca el estado de los libros antes de algo arriesgado (importación, digitación masiva) y vuelve atrás borrando todos los asientos posteriores. Plan, reglas y plantillas no se tocan.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
   </div>
 </div>
 <script src="/js/auth-guard.js"></script>
@@ -103,6 +109,7 @@
     if (tiene('ctb_estados','ctb_balance')) document.getElementById('cardEst').style.display='';
     if (tiene('ctb_cierre_mes','ctb_estados')) document.getElementById('cardCM').style.display='';
     if (tiene('ctb_bitacora','ctb_cierre_mes')) document.getElementById('cardBit').style.display='';
+    if (esAdmin || funcs.has('mantenedores_solo_dios')) document.getElementById('cardPR').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>

@@ -17,6 +17,11 @@ router.post('/comprobantes',           verifyToken, requireFunc('ctb_comprobante
 router.get('/comprobantes/:id',        verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.getComprobante);
 router.post('/comprobantes/:id/anular', verifyToken, requireFunc('ctb_comprobantes'), ctrl.anularComprobante);
 
+// Punto de Restauración (nivel Dios: borra asientos posteriores a la marca)
+router.get('/punto-restauracion',            verifyToken, requireFunc('mantenedores_solo_dios'), ctrl.prEstado);
+router.post('/punto-restauracion/crear',     verifyToken, requireFunc('mantenedores_solo_dios'), ctrl.prCrear);
+router.post('/punto-restauracion/restaurar', verifyToken, requireFunc('mantenedores_solo_dios'), ctrl.prRestaurar);
+
 // Buscador global de movimientos
 router.get('/movimientos', verifyToken, requireFunc('ctb_libros', 'ctb_balance', 'ctb_comprobantes'), ctrl.buscarMovimientos);
 

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!-- v1.0 — punto de restauración contable: marca de agua y borrado de asientos posteriores -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Punto de Restauración — Contabilidad — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { max-width:860px; margin:24px auto; padding:0 22px 60px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2); border-radius:16px; color:#fff; padding:22px 26px; margin-bottom:20px; display:flex; gap:16px; align-items:center; }
+  .banner i { font-size:2.2rem; opacity:.85; }
+  .banner h2 { margin:0 0 4px; font-size:1.2rem; } .banner p { margin:0; opacity:.85; font-size:.84rem; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+  .card h5 { margin:0 0 10px; color:var(--navy); font-size:.98rem; }
+  .estado { font-size:.88rem; } .estado b { color:var(--navy); }
+  .btn { border:none; border-radius:10px; padding:10px 18px; font-weight:800; font-size:.88rem; cursor:pointer; }
+  .b-azul { background:linear-gradient(135deg,#012d70,#0141A2); color:#fff; }
+  .b-rojo { background:linear-gradient(135deg,#b91c1c,#dc2626); color:#fff; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .aviso { background:#fef9c3; border-left:4px solid #f59e0b; border-radius:8px; padding:10px 14px; font-size:.8rem; margin-top:12px; }
+  .ok { background:#dcfce7; border-left:4px solid #16a34a; border-radius:8px; padding:10px 14px; font-size:.84rem; margin-top:12px; }
+  .conf input { border:1.5px solid #d7dfee; border-radius:8px; padding:8px 12px; font-size:.9rem; margin-right:10px; }
+  .footer-afecta { background:#f8fafc; border-left:4px solid var(--accent); border-radius:10px; padding:14px 18px; margin-top:26px; font-size:.8rem; }
+  .footer-afecta h6 { margin:0 0 8px; color:var(--navy); }
+  .footer-afecta ul { margin:0; padding-left:18px; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Contabilidad',href:'/contabilidad/'},{label:'Punto de Restauración',icon:'bi-clock-history',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner"><i class="bi bi-clock-history"></i>
+    <div><h2>Punto de Restauración — Contabilidad</h2>
+    <p>Fija una marca antes de algo arriesgado (importar un libro, digitación masiva, probar reglas de centralización) y vuelve atrás de una: borra todos los comprobantes posteriores con sus líneas, respaldos y log del motor. El plan de cuentas, las reglas, las plantillas, el guardián y los candados NO se tocan.</p></div>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-bookmark-star"></i> Punto actual</h5>
+    <div class="estado" id="estado">Cargando…</div>
+    <div style="margin-top:14px"><button class="btn b-azul" onclick="crear()"><i class="bi bi-bookmark-plus"></i> Crear punto AHORA</button></div>
+    <div class="aviso"><b>Crear un punto nuevo reemplaza el anterior.</b> Hazlo justo antes de la operación arriesgada.</div>
+  </div>
+
+  <div class="card">
+    <h5><i class="bi bi-trash3"></i> Restaurar (borrar los asientos posteriores al punto)</h5>
+    <div id="pend" class="estado">—</div>
+    <div class="conf" style="margin-top:14px">
+      <input id="conf" placeholder='Escribe RESTAURAR'>
+      <button class="btn b-rojo" id="btnRest" onclick="restaurar()"><i class="bi bi-exclamation-triangle"></i> Restaurar</button>
+    </div>
+    <div id="resultado"></div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h6>
+    <ul>
+      <li><b>Restaurar</b> → elimina definitivamente los comprobantes con ID posterior a la marca (y sus movimientos, adjuntos y log del motor): desaparecen de <a href="/contabilidad/comprobantes/">Comprobantes</a>, <a href="/contabilidad/libros/">Libros</a>, <a href="/contabilidad/balance/">Balance</a>, <a href="/contabilidad/estados/">Estados Financieros</a> y del <a href="/contabilidad/cierre-mes/">Informe de Cierre</a>.</li>
+      <li>NO toca <a href="/contabilidad/plan-cuentas/">Plan de Cuentas</a>, <a href="/contabilidad/reglas/">Reglas de Centralización</a>, <a href="/contabilidad/guardian/">Guardián</a>, plantillas ni candados de mes.</li>
+      <li>Ojo: si el motor ya contabilizó eventos (pagos, ODP, remuneraciones) después de la marca, al restaurar esos asientos se pierden — el motor los re-creará solo si el evento de negocio se vuelve a gatillar (la idempotencia por origen+ref queda liberada al borrarse el comprobante). Todo queda <a href="/auditoria/">auditado</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+const fmtN = n => Number(n||0).toLocaleString('es-CL');
+
+async function cargar(){
+  try {
+    const r = await fetch('/api/contabilidad/punto-restauracion', { headers: H });
+    const j = await r.json();
+    if (!j.success) { document.getElementById('estado').textContent = j.error || 'Error'; return; }
+    const p = j.data.punto;
+    if (!p) {
+      document.getElementById('estado').innerHTML = 'No hay punto creado todavía.';
+      document.getElementById('pend').innerHTML = 'Crea primero un punto de restauración.';
+      document.getElementById('btnRest').disabled = true;
+      return;
+    }
+    document.getElementById('btnRest').disabled = false;
+    document.getElementById('estado').innerHTML =
+      `Creado el <b>${new Date(p.creado_at).toLocaleString('es-CL')}</b>${p.creado_por ? ' por <b>'+p.creado_por+'</b>' : ''}.<br>` +
+      `Marca: último comprobante ID <b>${fmtN(p.max_comprobante)}</b> · último evento del motor ID <b>${fmtN(p.max_log)}</b>.`;
+    const pend = j.data.pendientes;
+    document.getElementById('pend').innerHTML = pend && pend.comprobantes
+      ? `Se borrarían ahora: <b>${fmtN(pend.comprobantes)}</b> comprobante(s) por un total de <b>$${fmtN(pend.monto)}</b>.`
+      : 'No hay comprobantes posteriores al punto — nada que borrar.';
+  } catch(e){ document.getElementById('estado').textContent = 'Error de conexión'; }
+}
+
+async function crear(){
+  if (!confirm('¿Fijar el punto de restauración contable AHORA? Reemplaza el anterior si existía.')) return;
+  const r = await fetch('/api/contabilidad/punto-restauracion/crear', { method:'POST', headers: H });
+  const j = await r.json();
+  if (!j.success) return alert(j.error || 'Error');
+  document.getElementById('resultado').innerHTML = '';
+  cargar();
+}
+
+async function restaurar(){
+  const conf = document.getElementById('conf').value.trim();
+  if (conf !== 'RESTAURAR') return alert('Escribe RESTAURAR en el campo de confirmación.');
+  if (!confirm('⚠️ Esto BORRA definitivamente todos los comprobantes posteriores al punto, con sus movimientos, respaldos adjuntos y log del motor. No se puede deshacer. ¿Continuar?')) return;
+  document.getElementById('btnRest').disabled = true;
+  try {
+    const r = await fetch('/api/contabilidad/punto-restauracion/restaurar', { method:'POST', headers: H, body: JSON.stringify({ confirmar: 'RESTAURAR' }) });
+    const j = await r.json();
+    if (!j.success) return alert(j.error || 'Error');
+    const b = j.data.borrado || {};
+    document.getElementById('resultado').innerHTML = `<div class="ok"><b>✅ Restauración lista.</b> Borrado: ${fmtN(b.comprobantes)} comprobantes · ${fmtN(b.movimientos)} movimientos · ${fmtN(b.adjuntos)} adjuntos · ${fmtN(b.eventos_log)} eventos de log</div>`;
+    document.getElementById('conf').value = '';
+    cargar();
+  } finally { document.getElementById('btnRest').disabled = false; }
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
