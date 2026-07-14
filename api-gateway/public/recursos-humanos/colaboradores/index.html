@@ -155,7 +155,8 @@ async function abrir(id){
     <div class="sec">Previsión y pago (confidencial)</div>
     <div class="grid3">
       ${sel('f_afp','AFP',f.afp,['CAPITAL','CUPRUM','HABITAT','MODELO','PLANVITAL','PROVIDA','UNO'])}
-      ${inp('f_salud','Salud (Fonasa / Isapre y plan)',f.salud)}
+      ${inp('f_salud','Salud (Fonasa / Isapre)',f.salud)}
+      ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
       ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number')}
       ${inp('f_banco_pago','Banco de pago',f.banco_pago)}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
@@ -186,7 +187,7 @@ async function guardarFicha(){
     direccion:g('f_direccion'), comuna:g('f_comuna'), ciudad:g('f_ciudad'),
     email_personal:g('f_email_personal'), telefono_personal:g('f_telefono_personal'),
     emergencia_nombre:g('f_emergencia_nombre'), emergencia_fono:g('f_emergencia_fono'),
-    afp:g('f_afp'), salud:g('f_salud'), sueldo_base:g('f_sueldo_base'),
+    afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),
   };

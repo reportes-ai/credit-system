@@ -107,6 +107,21 @@ require('../../../../shared/migrate').enFila('rrhh-remuneraciones', async () => 
   } catch (e) { console.error('[rrhh-remuneraciones migration]', e.message); }
 });
 
+/* v2: plan isapre pactado en UF, días trabajados proporcionales y aportes
+   del empleador (SIS, AFC empleador, mutual) — cierran la brecha contra la
+   liquidación real de AVSOFT (validado con liquidación may-2026). */
+require('../../../../shared/migrate').enFila('rrhh-remuneraciones-v2', async () => {
+  try {
+    await pool.query('ALTER TABLE rh_fichas ADD COLUMN plan_isapre_uf DECIMAL(8,3) NULL').catch(() => {});
+    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
+      ('rem_sis_pct', '1.88'),
+      ('rem_afc_emp_pct', '2.4'),
+      ('rem_afc_emp_pfijo_pct', '3'),
+      ('rem_mutual_pct', '0.93')`);
+    console.log('[rrhh-remuneraciones-v2] listo');
+  } catch (e) { console.error('[rrhh-remuneraciones-v2 migration]', e.message); }
+});
+
 /* ── Indicadores del período ────────────────────────────────────────────────── */
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
@@ -122,7 +137,9 @@ async function indicadores(mes) {
 
 /* ── MOTOR ÚNICO: liquidación de un colaborador ─────────────────────────────── */
 function calcLiquidacion(inp, ind) {
-  const sueldo = R(inp.sueldo_base), comisiones = R(inp.comisiones), otrosImp = R(inp.otros_imponibles);
+  // Días trabajados: sueldo proporcional en 30avos (ausencias/ingresos parciales)
+  const dias = inp.dias == null || inp.dias === '' ? 30 : Math.max(0, Math.min(30, Number(inp.dias)));
+  const sueldo = R(R(inp.sueldo_base) * dias / 30), comisiones = R(inp.comisiones), otrosImp = R(inp.otros_imponibles);
   const colacion = R(inp.colacion), movilizacion = R(inp.movilizacion), otrosNoImp = R(inp.otros_no_imponibles);
   const otrosDesc = R(inp.otros_descuentos);
 
@@ -138,6 +155,10 @@ function calcLiquidacion(inp, ind) {
   const afpPct = parseFloat((ind.afps.find(a => a.afp === String(inp.afp || '').toUpperCase()) || {}).tasa_pct) || 0;
   const descAfp = inp.afp ? R(baseCotiz * afpPct / 100) : 0;
   const descSalud = R(baseCotiz * ind.rem_salud_pct / 100);
+  // Plan Isapre pactado en UF: lo que exceda el 7% legal es "adicional isapre"
+  // (descuento al líquido, pero NO rebaja la base tributable — solo el 7% legal).
+  const planUF = Number(inp.plan_isapre_uf) || 0;
+  const descSaludAdicional = planUF > 0 ? Math.max(0, R(planUF * ind.uf) - descSalud) : 0;
   const esIndef = String(inp.tipo_contrato || '').toUpperCase() === 'INDEFINIDO';
   const baseAfc = Math.min(imponible, R(ind.rem_tope_afc_uf * ind.uf));
   const descAfc = esIndef ? R(baseAfc * ind.rem_afc_trabajador_pct / 100) : 0;
@@ -153,18 +174,25 @@ function calcLiquidacion(inp, ind) {
   impuesto = Math.max(0, impuesto);
 
   const totalHaberes = imponible + colacion + movilizacion + otrosNoImp;
-  const totalDescuentos = descAfp + descSalud + descAfc + impuesto + otrosDesc;
+  const totalDescuentos = descAfp + descSalud + descSaludAdicional + descAfc + impuesto + otrosDesc;
+  // Aportes del EMPLEADOR (no afectan el líquido; alimentan costo empresa/Previred)
+  const aporteSis = R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
+  const aporteAfcEmp = R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
+  const aporteMutual = R(baseCotiz * (ind.rem_mutual_pct || 0) / 100);
   return {
-    sueldo_base: sueldo, comisiones, otros_imponibles: otrosImp, gratificacion,
+    dias, sueldo_base: sueldo, comisiones, otros_imponibles: otrosImp, gratificacion,
     total_imponible: imponible, base_cotizacion: baseCotiz,
     colacion, movilizacion, otros_no_imponibles: otrosNoImp,
     total_haberes: totalHaberes,
     afp: inp.afp || null, afp_pct: afpPct, desc_afp: descAfp,
     salud: inp.salud || null, salud_pct: ind.rem_salud_pct, desc_salud: descSalud,
+    plan_isapre_uf: planUF || null, desc_salud_adicional: descSaludAdicional,
     afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc,
     base_tributable: baseTrib, impuesto,
     otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
     liquido: totalHaberes - totalDescuentos,
+    aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual,
+    costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual,
     tipo_contrato: inp.tipo_contrato || null,
   };
 }
@@ -188,7 +216,7 @@ const getMes = async (req, res) => {
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
               CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-              u.rut, u.cargo, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion
+              u.rut, u.cargo, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
         ORDER BY nombre`);
@@ -207,6 +235,7 @@ const getMes = async (req, res) => {
       if (g) { try { over = typeof g.detalle === 'string' ? JSON.parse(g.detalle) : (g.detalle || {}); } catch (_) {} }
       const inp = {
         sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato,
+        plan_isapre_uf: e.plan_isapre_uf, dias: over.dias ?? 30,
         colacion: over.colacion ?? e.colacion, movilizacion: over.movilizacion ?? e.movilizacion,
         comisiones: over.comisiones ?? (comis[String(e.nombre_corto).trim()] || 0),
         otros_imponibles: over.otros_imponibles ?? 0,
@@ -232,13 +261,14 @@ const guardar = async (req, res) => {
     for (const f of filas) {
       const [[emp]] = await pool.query(
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre, u.rut, u.cargo,
-                fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.colacion, fi.movilizacion
+                fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
            FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [f.id_usuario]);
       if (!emp) continue;
       const [[ya]] = await pool.query('SELECT id, estado FROM rh_liquidaciones WHERE id_usuario=? AND mes=?', [f.id_usuario, mes]);
       if (ya && ya.estado === 'EMITIDA') continue;   // congelada
       const inp = {
         sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato,
+        plan_isapre_uf: emp.plan_isapre_uf, dias: f.dias ?? 30,
         colacion: f.colacion ?? emp.colacion, movilizacion: f.movilizacion ?? emp.movilizacion,
         comisiones: f.comisiones ?? 0, otros_imponibles: f.otros_imponibles ?? 0,
         otros_no_imponibles: f.otros_no_imponibles ?? 0, otros_descuentos: f.otros_descuentos ?? 0,
@@ -484,7 +514,8 @@ const putIndicadores = async (req, res) => {
   try {
     const b = req.body || {};
     // Config rem_* permitidas
-    const PERM = ['rem_tope_imponible_uf', 'rem_tope_afc_uf', 'rem_afc_trabajador_pct', 'rem_salud_pct', 'rem_imm', 'rem_grat_tope_imm'];
+    const PERM = ['rem_tope_imponible_uf', 'rem_tope_afc_uf', 'rem_afc_trabajador_pct', 'rem_salud_pct', 'rem_imm', 'rem_grat_tope_imm',
+                  'rem_sis_pct', 'rem_afc_emp_pct', 'rem_afc_emp_pfijo_pct', 'rem_mutual_pct'];
     for (const k of PERM) if (k in b && b[k] !== '' && !isNaN(parseFloat(b[k]))) {
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(parseFloat(b[k]))]);
     }

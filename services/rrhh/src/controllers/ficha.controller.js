@@ -101,7 +101,7 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',
   'emergencia_nombre', 'emergencia_fono', 'estado_civil', 'nacionalidad'];
-const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'sueldo_base',
+const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
 const CAMPOS_USUARIO = ['cargo', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];

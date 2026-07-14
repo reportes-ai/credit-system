@@ -69,10 +69,10 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Colaborador</th><th>Sueldo Base</th><th>Comisiones ✎</th><th>Otros Imp. ✎</th><th>Gratif.</th><th>Imponible</th>
+          <th>Colaborador</th><th>Días ✎</th><th>Sueldo Base</th><th>Comisiones ✎</th><th>Otros Imp. ✎</th><th>Gratif.</th><th>Imponible</th>
           <th>No Impon.</th><th>AFP</th><th>Salud</th><th>AFC</th><th>Impuesto</th><th>Otros Dcto. ✎</th><th>Líquido</th><th>Estado</th><th></th>
         </tr></thead>
-        <tbody id="tb"><tr><td colspan="15" class="empty">Cargando…</td></tr></tbody>
+        <tbody id="tb"><tr><td colspan="16" class="empty">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -118,7 +118,7 @@ let DATA = null;
 async function cargar(){
   const mes = document.getElementById('mes').value;
   const j = await (await fetch('/api/rrhh/remuneraciones?mes='+mes, { headers:H })).json();
-  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="15" class="empty">${esc(j.error)}</td></tr>`; return; }
+  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="16" class="empty">${esc(j.error)}</td></tr>`; return; }
   DATA = j.data;
   const ind = DATA.indicadores;
   document.getElementById('indBar').innerHTML =
@@ -127,12 +127,13 @@ async function cargar(){
 }
 function render(){
   const rows = DATA.filas || [];
-  if (!rows.length) { document.getElementById('tb').innerHTML = '<tr><td colspan="15" class="empty">No hay colaboradores con sueldo base en su ficha. Complétalos en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>.</td></tr>'; return; }
+  if (!rows.length) { document.getElementById('tb').innerHTML = '<tr><td colspan="16" class="empty">No hay colaboradores con sueldo base en su ficha. Complétalos en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>.</td></tr>'; return; }
   document.getElementById('tb').innerHTML = rows.map((r,i)=>{
     const em = r.estado==='EMITIDA';
     const inp = (campo)=> em ? $(r[campo]) : `<input data-i="${i}" data-c="${campo}" value="${Math.round(r[campo]||0)}" onchange="recalc(this)">`;
     return `<tr class="fila">
       <td style="font-weight:600">${esc(r.nombre)}<div style="font-size:.66rem;color:#94a3b8">${esc(r.cargo||'')}</div></td>
+      <td>${em ? (r.dias??30) : `<input data-i="${i}" data-c="dias" value="${r.dias??30}" onchange="recalc(this)" style="width:44px" title="Días trabajados (30avos)">`}</td>
       <td>${$(r.sueldo_base)}</td>
       <td>${inp('comisiones')}</td>
       <td>${inp('otros_imponibles')}</td>
@@ -140,7 +141,7 @@ function render(){
       <td style="font-weight:700">${$(r.total_imponible)}</td>
       <td>${$( (r.colacion||0)+(r.movilizacion||0)+(r.otros_no_imponibles||0) )}</td>
       <td style="color:#b91c1c">${$(r.desc_afp)}<div style="font-size:.62rem;color:#94a3b8">${esc(r.afp||'—')}</div></td>
-      <td style="color:#b91c1c">${$(r.desc_salud)}</td>
+      <td style="color:#b91c1c">${$((r.desc_salud||0)+(r.desc_salud_adicional||0))}${r.desc_salud_adicional?`<div style="font-size:.62rem;color:#94a3b8">7% + adic. isapre</div>`:''}</td>
       <td style="color:#b91c1c">${$(r.desc_afc)}</td>
       <td style="color:#b91c1c">${$(r.impuesto)}</td>
       <td>${inp('otros_descuentos')}</td>
@@ -153,10 +154,10 @@ function render(){
 function totalRow(rows){
   const s = c => rows.reduce((a,r)=>a+(Number(r[c])||0),0);
   return `<tr style="background:#e8edf5;font-weight:800">
-    <td>TOTAL (${rows.length})</td><td>${$(s('sueldo_base'))}</td><td>${$(s('comisiones'))}</td><td>${$(s('otros_imponibles'))}</td>
+    <td>TOTAL (${rows.length})</td><td></td><td>${$(s('sueldo_base'))}</td><td>${$(s('comisiones'))}</td><td>${$(s('otros_imponibles'))}</td>
     <td>${$(s('gratificacion'))}</td><td>${$(s('total_imponible'))}</td>
     <td>${$(rows.reduce((a,r)=>a+(r.colacion||0)+(r.movilizacion||0)+(r.otros_no_imponibles||0),0))}</td>
-    <td>${$(s('desc_afp'))}</td><td>${$(s('desc_salud'))}</td><td>${$(s('desc_afc'))}</td><td>${$(s('impuesto'))}</td>
+    <td>${$(s('desc_afp'))}</td><td>${$(s('desc_salud')+s('desc_salud_adicional'))}</td><td>${$(s('desc_afc'))}</td><td>${$(s('impuesto'))}</td>
     <td>${$(s('otros_descuentos'))}</td><td style="color:#15803d">${$(s('liquido'))}</td><td></td><td></td></tr>`;
 }
 // Edición inline: recalcula al servidor al guardar; localmente solo actualiza el valor
@@ -168,7 +169,7 @@ function recalc(el){
 async function guardar(){
   const mes = document.getElementById('mes').value;
   const filas = (DATA.filas||[]).filter(r=>r.estado!=='EMITIDA').map(r=>({
-    id_usuario: r.id_usuario, comisiones: r.comisiones, otros_imponibles: r.otros_imponibles,
+    id_usuario: r.id_usuario, dias: r.dias, comisiones: r.comisiones, otros_imponibles: r.otros_imponibles,
     otros_no_imponibles: r.otros_no_imponibles, otros_descuentos: r.otros_descuentos,
     colacion: r.colacion, movilizacion: r.movilizacion,
   }));
@@ -201,6 +202,7 @@ async function verLiq(id){
       <tr><td style="color:#64748b">RUT</td><td style="text-align:right">${esc(l.rut||'—')}</td></tr>
       <tr><td style="color:#64748b">Cargo</td><td style="text-align:right">${esc(l.cargo||'—')}</td></tr>
       <tr><td style="color:#64748b">Contrato / AFP / Salud</td><td style="text-align:right">${esc(d.tipo_contrato||'—')} · ${esc(d.afp||'—')} · ${esc(d.salud||'—')}</td></tr>
+      <tr><td style="color:#64748b">Días trabajados</td><td style="text-align:right">${d.dias??30}</td></tr>
     </table>
     <table style="width:100%">
       <tr><td class="sec" colspan="2">Haberes imponibles</td></tr>
@@ -212,11 +214,15 @@ async function verLiq(id){
       <tr><td class="sec" colspan="2">Descuentos legales</td></tr>
       ${fila('AFP '+(d.afp||'')+' ('+String(d.afp_pct||0).replace('.',',')+'%)', d.desc_afp, 1)}
       ${fila('Salud ('+String(d.salud_pct||7).replace('.',',')+'%)', d.desc_salud, 1)}
+      ${fila('Adicional Isapre (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional, 1)}
       ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc, 1)}
       ${fila('Impuesto único 2ª categoría', d.impuesto, 1)}
       ${fila('Otros descuentos', d.otros_descuentos, 1)}
       <tr><td style="font-weight:700">Total descuentos</td><td style="text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
       <tr><td style="font-weight:800;font-size:.95rem;padding-top:10px">LÍQUIDO A PAGAR</td><td style="text-align:right;font-weight:800;font-size:.95rem;color:#15803d;padding-top:10px">${co(d.liquido)}</td></tr>
+      ${(d.aporte_sis||d.aporte_afc_emp||d.aporte_mutual)?`<tr><td class="sec" colspan="2">Aportes del empleador (no descuentan al trabajador)</td></tr>
+      ${fila('SIS', d.aporte_sis)}${fila('AFC empleador', d.aporte_afc_emp)}${fila('Mutual de seguridad', d.aporte_mutual)}
+      <tr><td style="font-weight:700">Costo empresa</td><td style="text-align:right;font-weight:700">${co(d.costo_empresa)}</td></tr>`:''}
     </table>
     <div style="margin-top:14px;font-size:.68rem;color:#94a3b8">Estado: ${esc(l.estado)}${l.emitido_at?' · emitida el '+new Date(l.emitido_at).toLocaleDateString('es-CL')+' por '+esc(l.emitido_por||''):''}</div>`;
   dlgLiq.showModal();
