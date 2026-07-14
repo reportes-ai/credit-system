@@ -35,6 +35,9 @@ router.get('/remuneraciones/mias',            verifyToken, rem.misLiquidaciones)
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
+router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);
+router.post('/remuneraciones/descuentos',        verifyToken, requireFunc('rh_remuneraciones'), rem.crearDescuento);
+router.post('/remuneraciones/descuentos/:id/anular', verifyToken, requireFunc('rh_remuneraciones'), rem.anularDescuento);
 router.get('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones', 'rh_remuneraciones'), rem.getIndicadores);
 router.put('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones'), rem.putIndicadores);
 router.post('/remuneraciones/indicadores/revisar', verifyToken, requireFunc('mant_remuneraciones'), rem.revisarAhora);

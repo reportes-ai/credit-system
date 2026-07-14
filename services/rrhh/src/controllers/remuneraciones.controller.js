@@ -220,6 +220,135 @@ async function adicionalesDelMes(mes) {
   return m;
 }
 
+/* v4: DESCUENTOS DE REMUNERACIÓN — anticipos en N meses, préstamos al personal
+   con interés (cuota francesa capital+interés, tasa tope = TMC vigente),
+   pagos en exceso y descuentos permanentes (tribunal/TGR/APV/otro). Las
+   cuotas parten en la PRÓXIMA remuneración y se integran solas al libro. */
+require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rh_descuentos (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario    INT NOT NULL,
+        nombre        VARCHAR(200) NULL,
+        tipo          VARCHAR(20) NOT NULL,        -- ANTICIPO / PRESTAMO / PAGO_EXCESO / PERMANENTE
+        subtipo       VARCHAR(30) NULL,            -- PERMANENTE: ORDEN TRIBUNAL / ORDEN TGR / APV / OTRO
+        detalle_texto VARCHAR(200) NULL,
+        mes_referencia CHAR(7) NULL,               -- PAGO_EXCESO: mes del pago en exceso
+        monto_total   DECIMAL(12,0) NOT NULL,      -- capital (PERMANENTE: monto mensual)
+        tasa_pct      DECIMAL(6,3) NULL,           -- PRESTAMO: interés mensual %
+        cuotas        INT NOT NULL DEFAULT 1,      -- PERMANENTE: 0 = indefinido
+        valor_cuota   DECIMAL(12,0) NOT NULL,
+        mes_inicio    CHAR(7) NOT NULL,            -- próxima remuneración
+        estado        VARCHAR(12) NOT NULL DEFAULT 'VIGENTE',   -- VIGENTE / ANULADO
+        creado_por    VARCHAR(160) NULL,
+        created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        anulado_por   VARCHAR(160) NULL,
+        anulado_at    DATETIME NULL,
+        INDEX idx_usuario (id_usuario), INDEX idx_mes (mes_inicio)
+      )`);
+    console.log('[rrhh-descuentos] listo');
+  } catch (e) { console.error('[rrhh-descuentos migration]', e.message); }
+});
+
+const mesMas = (mes, n) => { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
+const difMeses = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
+// Cuota francesa (solo capital + interés)
+const cuotaFrancesa = (M, iPct, n) => { const i = iPct / 100; return i > 0 ? Math.round(M * i / (1 - Math.pow(1 + i, -n))) : Math.round(M / n); };
+const tmcVigente = async () => {
+  const [[t]] = await pool.query('SELECT tasa_mensual_menor FROM tasas ORDER BY fecha_desde DESC LIMIT 1').catch(() => [[null]]);
+  return t ? parseFloat(t.tasa_mensual_menor) : null;
+};
+
+// Cuota del descuento VIGENTE d en el mes m (null si ese mes no le toca)
+const cuotaEnMes = (d, m) => {
+  const k = difMeses(d.mes_inicio, m);
+  if (k < 0) return null;
+  if (d.tipo === 'PERMANENTE') return Number(d.valor_cuota);   // mensual hasta anular
+  if (k >= d.cuotas) return null;                              // plan ya pagado
+  return Number(d.valor_cuota);
+};
+
+const getDescuentos = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const [rows] = await pool.query(
+      `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual FROM rh_descuentos d
+        LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario ORDER BY d.created_at DESC LIMIT 500`);
+    const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes) != null)
+      .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
+    const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
+    ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente() });
+  } catch (e) { console.error('[rrhh descuentos get]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+const crearDescuento = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const b = req.body || {};
+    const idU = Number(b.id_usuario);
+    const tipo = String(b.tipo || '').toUpperCase();
+    const monto = Math.round(Number(b.monto) || 0);
+    if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
+    if (!['ANTICIPO', 'PRESTAMO', 'PAGO_EXCESO', 'PERMANENTE'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
+    const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
+    if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+    // Siempre parte en la PRÓXIMA remuneración (mes siguiente al actual)
+    const mesInicio = mesMas(new Date().toISOString().slice(0, 7), 1);
+    let cuotas = 1, valorCuota = monto, tasa = null, subtipo = null, detalle = null, mesRef = null;
+    if (tipo === 'ANTICIPO') {
+      cuotas = Math.max(1, Math.min(24, Number(b.cuotas) || 1));
+      valorCuota = Math.round(monto / cuotas);
+    } else if (tipo === 'PRESTAMO') {
+      cuotas = Math.max(1, Math.min(48, Number(b.cuotas) || 1));
+      tasa = Number(b.tasa_pct);
+      if (!(tasa >= 0)) return fail(res, 'Indica la tasa de interés mensual', 400);
+      const tmc = await tmcVigente();
+      if (tmc != null && tasa > tmc) return fail(res, `La tasa (${tasa}% mensual) supera la TMC vigente (${tmc}% mensual). Máximo legal: ${tmc}%.`, 400);
+      valorCuota = cuotaFrancesa(monto, tasa, cuotas);
+    } else if (tipo === 'PAGO_EXCESO') {
+      if (!/^\d{4}-\d{2}$/.test(b.mes_referencia || '')) return fail(res, 'Indica el mes del pago en exceso', 400);
+      mesRef = b.mes_referencia;
+      cuotas = Math.max(1, Math.min(12, Number(b.cuotas) || 1));
+      valorCuota = Math.round(monto / cuotas);
+    } else { // PERMANENTE
+      subtipo = String(b.subtipo || '').toUpperCase();
+      if (!['ORDEN TRIBUNAL', 'ORDEN TGR', 'APV', 'OTRO'].includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
+      if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento permanente', 400);
+      detalle = String(b.detalle_texto || '').trim().slice(0, 200) || null;
+      cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
+    }
+    const [r] = await pool.query(
+      `INSERT INTO rh_descuentos (id_usuario, nombre, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [idU, colab.nombre, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u)]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: r.insertId,
+      detalle: `${tipo}${subtipo ? '/' + subtipo : ''} ${colab.nombre}: $${monto.toLocaleString('es-CL')}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de $${valorCuota.toLocaleString('es-CL')} desde ${mesInicio}` });
+    ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio });
+  } catch (e) { console.error('[rrhh descuentos crear]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+const anularDescuento = async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    const [[d]] = await pool.query("SELECT * FROM rh_descuentos WHERE id=? AND estado='VIGENTE'", [req.params.id]);
+    if (!d) return fail(res, 'No existe o ya está anulado', 404);
+    await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW() WHERE id=?", [nombreDe(u), d.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: d.id, detalle: `Anuló ${d.tipo} de ${d.nombre} ($${Number(d.valor_cuota).toLocaleString('es-CL')}/mes) — deja de descontarse desde ahora` });
+    ok(res, { anulado: true });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+
+// Suma de cuotas de descuento del mes por usuario → alimenta el libro
+async function descuentosDelMes(mes) {
+  const [rows] = await pool.query("SELECT * FROM rh_descuentos WHERE estado='VIGENTE'");
+  const m = {};
+  for (const d of rows) {
+    const c = cuotaEnMes(d, mes);
+    if (c != null) m[d.id_usuario] = (m[d.id_usuario] || 0) + c;
+  }
+  return m;
+}
+
 /* ── Indicadores del período ────────────────────────────────────────────────── */
 async function indicadores(mes) {
   const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave LIKE 'rem_%'");
@@ -322,6 +451,7 @@ const getMes = async (req, res) => {
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
     const comis = await comisionesDelMes(mes);
     const adics = await adicionalesDelMes(mes);
+    const descs = await descuentosDelMes(mes);
 
     const filas = emps.map(e => {
       const g = gMap[e.id_usuario];
@@ -339,7 +469,7 @@ const getMes = async (req, res) => {
         comisiones: over.comisiones ?? (comis[String(e.nombre_corto).trim()] || 0),
         otros_imponibles: over.otros_imponibles ?? (adics[e.id_usuario]?.imp || 0),
         otros_no_imponibles: over.otros_no_imponibles ?? (adics[e.id_usuario]?.noimp || 0),
-        otros_descuentos: over.otros_descuentos ?? 0,
+        otros_descuentos: over.otros_descuentos ?? (descs[e.id_usuario] || 0),
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
         estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, ...calcLiquidacion(inp, ind) };
@@ -673,4 +803,5 @@ const putIndicadores = async (req, res) => {
 };
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
-  revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional };
+  revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
+  getDescuentos, crearDescuento, anularDescuento };

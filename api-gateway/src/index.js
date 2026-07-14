@@ -527,6 +527,7 @@ const PAGINAS = [
   ['/recursos-humanos/remuneraciones', 'recursos-humanos/remuneraciones/index.html'],
   ['/recursos-humanos/remuneraciones/liquidaciones', 'recursos-humanos/remuneraciones/liquidaciones/index.html'],
   ['/recursos-humanos/remuneraciones/adicionales', 'recursos-humanos/remuneraciones/adicionales/index.html'],
+  ['/recursos-humanos/remuneraciones/descuentos', 'recursos-humanos/remuneraciones/descuentos/index.html'],
   ['/mantenedores/remuneraciones', 'mantenedores/remuneraciones/index.html'],
   ['/mantenedores/tickets-ti', 'mantenedores/tickets-ti/index.html'],
   ['/soporte/compras-admin', 'soporte/compras-admin/index.html'],

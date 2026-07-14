@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Descuentos de Remuneración — AutoFácil</title>
+  <!-- v1.0 — anticipos, préstamos al personal (cuota francesa, tope TMC), pagos en exceso y descuentos permanentes -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1250px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 10px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.66rem; font-weight:700; }
+    .pill.ANTICIPO { background:#dbeafe; color:#1e40af; } .pill.PRESTAMO { background:#fef3c7; color:#92400e; }
+    .pill.PAGO_EXCESO { background:#fce7f3; color:#9d174d; } .pill.PERMANENTE { background:#f1f5f9; color:#475569; }
+    .pill.ANULADO { background:#fee2e2; color:#991b1b; }
+    .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; }
+    .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.1rem; color:var(--navy); }
+    .card-kpi .l { font-size:.7rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .preview { background:#eff6ff; border-left:4px solid var(--navy); border-radius:8px; padding:10px 14px; font-size:.85rem; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Remuneraciones', href:'/recursos-humanos/remuneraciones/' }, { label:'Descuentos', icon:'bi-dash-circle', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-dash-circle"></i><div><h2>Descuentos de Remuneración</h2><p>Anticipos en cuotas, préstamos al personal con interés (tope TMC), pagos en exceso y descuentos permanentes. Las cuotas parten en la próxima remuneración y se integran solas al libro.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabI" onclick="tab('I');return false"><i class="bi bi-plus-circle me-1"></i>Ingresar</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabM" onclick="tab('M');return false"><i class="bi bi-calendar-month me-1"></i>Cuotas del mes</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabT" onclick="tab('T');return false"><i class="bi bi-list-ul me-1"></i>Todos los descuentos</a></li>
+  </ul>
+
+  <div id="secI" class="panel">
+    <div class="row g-2">
+      <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Colaborador</label>
+        <select id="fColab" class="form-select form-select-sm"><option value="">— elegir —</option></select></div>
+      <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Tipo de descuento</label>
+        <select id="fTipo" class="form-select form-select-sm" onchange="tipoUI()">
+          <option value="ANTICIPO">Anticipo de sueldo</option>
+          <option value="PRESTAMO">Préstamo al personal</option>
+          <option value="PAGO_EXCESO">Pago en exceso</option>
+          <option value="PERMANENTE">Descuento permanente</option>
+        </select></div>
+      <div class="col-md-2"><label class="form-label small fw-semibold mb-1" id="lblMonto">Monto $</label>
+        <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
+      <div class="col-md-2" id="wCuotas"><label class="form-label small fw-semibold mb-1">N° de meses/cuotas</label>
+        <input type="number" id="fCuotas" class="form-control form-control-sm" value="1" min="1" max="48" oninput="preview()"></div>
+      <div class="col-md-2" id="wTasa" style="display:none"><label class="form-label small fw-semibold mb-1">Interés mensual % <span id="lblTmc" class="text-muted"></span></label>
+        <input type="number" step="0.01" id="fTasa" class="form-control form-control-sm" value="0" min="0" oninput="preview()"></div>
+      <div class="col-md-2" id="wMesRef" style="display:none"><label class="form-label small fw-semibold mb-1">Mes del pago en exceso</label>
+        <input type="month" id="fMesRef" class="form-control form-control-sm"></div>
+      <div class="col-md-3" id="wSubtipo" style="display:none"><label class="form-label small fw-semibold mb-1">Concepto permanente</label>
+        <select id="fSubtipo" class="form-select form-select-sm" onchange="tipoUI()">
+          <option>ORDEN TRIBUNAL</option><option>ORDEN TGR</option><option>APV</option><option>OTRO</option>
+        </select></div>
+      <div class="col-md-4" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Describe el descuento</label>
+        <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Seguro complementario dental"></div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+      </div>
+    </div>
+    <div class="preview mt-3" id="prev"></div>
+  </div>
+
+  <div id="secM" style="display:none">
+    <div class="d-flex gap-2 align-items-end mb-3">
+      <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+      <span id="lblBloq"></span>
+      <span class="flex-grow-1"></span>
+      <button class="btn btn-sm btn-outline-success" onclick="exportar('M')"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+    </div>
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Detalle</th><th>Cuota</th><th class="text-right">Monto del mes</th><th>Ingresado por</th></tr></thead>
+      <tbody id="tbMes"><tr><td colspan="6" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div id="secT" style="display:none">
+    <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-success" onclick="exportar('T')"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button></div>
+    <div class="panel" style="padding:0;overflow:auto">
+      <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Detalle</th><th class="text-right">Capital</th><th>Tasa</th><th>Cuotas</th><th class="text-right">Valor cuota</th><th>Inicio</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="tbTodos"><tr><td colspan="10" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
+    <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo funcionan</div>
+    <b>Anticipo</b>: capital ÷ N meses, sin interés. <b>Préstamo al personal</b>: cuota francesa solo capital + interés; la tasa mensual <b>no puede superar la TMC vigente</b> (se valida contra la tabla de tasas sincronizada con la CMF). <b>Pago en exceso</b>: referencia al mes pagado de más, en 1 o más cuotas. <b>Permanente</b> (tribunal, TGR, APV, otro): monto mensual indefinido hasta que se anule. Todas las cuotas parten en la <b>próxima remuneración</b> y caen solas en "Otros Dcto." del <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> (si editas la celda a mano, tu valor manda). Anular un descuento detiene las cuotas futuras; lo ya descontado en meses emitidos no se toca.
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+let D = null;
+
+fMes.value = new Date().toISOString().slice(0,7);
+
+function fmtMonto(el){ const raw = el.value.replace(/[^\d]/g,''); el.value = raw ? Number(raw).toLocaleString('es-CL') : ''; preview(); }
+const montoVal = () => Number(document.getElementById('fMonto').value.replace(/[^\d]/g,''))||0;
+
+function tab(m){
+  tabI.classList.toggle('active',m==='I'); tabM.classList.toggle('active',m==='M'); tabT.classList.toggle('active',m==='T');
+  secI.style.display=m==='I'?'':'none'; secM.style.display=m==='M'?'':'none'; secT.style.display=m==='T'?'':'none';
+}
+
+function tipoUI(){
+  const t = fTipo.value, sub = fSubtipo.value;
+  wCuotas.style.display = t==='PERMANENTE' ? 'none' : '';
+  wTasa.style.display = t==='PRESTAMO' ? '' : 'none';
+  wMesRef.style.display = t==='PAGO_EXCESO' ? '' : 'none';
+  wSubtipo.style.display = t==='PERMANENTE' ? '' : 'none';
+  wOtro.style.display = (t==='PERMANENTE' && sub==='OTRO') ? '' : 'none';
+  document.getElementById('lblMonto').textContent = t==='PERMANENTE' ? 'Monto mensual $' : 'Monto $';
+  preview();
+}
+
+const cuotaFr = (M,i,n) => i>0 ? Math.round(M*(i/100)/(1-Math.pow(1+i/100,-n))) : Math.round(M/n);
+function preview(){
+  const t = fTipo.value, M = montoVal(), n = Math.max(1,Number(fCuotas.value)||1);
+  const el = document.getElementById('prev');
+  if (!M) { el.innerHTML = '<i class="bi bi-info-circle me-1"></i>Ingresa el monto para ver la cuota.'; return; }
+  if (t==='ANTICIPO') el.innerHTML = `<i class="bi bi-calculator me-1"></i>Anticipo de <b>$${fmt(M)}</b> en <b>${n}</b> mes(es): cuota de <b>$${fmt(Math.round(M/n))}</b>, desde la próxima remuneración.`;
+  else if (t==='PRESTAMO'){
+    const i = Number(fTasa.value)||0, c = cuotaFr(M,i,n);
+    el.innerHTML = `<i class="bi bi-calculator me-1"></i>Préstamo de <b>$${fmt(M)}</b> al <b>${String(i).replace('.',',')}% mensual</b> en <b>${n}</b> cuota(s): <b>$${fmt(c)}</b> c/u (total $${fmt(c*n)}, interés $${fmt(c*n-M)}). Solo capital + interés. Desde la próxima remuneración.${D&&D.tmc!=null?` <span class="text-muted">TMC vigente: ${String(D.tmc).replace('.',',')}% mensual.</span>`:''}`;
+  }
+  else if (t==='PAGO_EXCESO') el.innerHTML = `<i class="bi bi-calculator me-1"></i>Devolución de pago en exceso de <b>$${fmt(M)}</b> en <b>${n}</b> cuota(s) de <b>$${fmt(Math.round(M/n))}</b>, desde la próxima remuneración.`;
+  else el.innerHTML = `<i class="bi bi-calculator me-1"></i>Descuento permanente de <b>$${fmt(M)}</b> mensuales, desde la próxima remuneración y hasta que se anule.`;
+}
+
+async function cargar(){
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos?mes='+fMes.value,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data;
+  if (fColab.options.length<=1){
+    const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
+    fColab.innerHTML = '<option value="">— elegir —</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+  }
+  document.getElementById('lblTmc').textContent = D.tmc!=null ? `(TMC ${String(D.tmc).replace('.',',')}%)` : '';
+  document.getElementById('lblBloq').innerHTML = D.bloqueado ? '<span class="pill ANULADO"><i class="bi bi-lock-fill"></i> MES EMITIDO</span>' : '';
+  render(); preview();
+}
+
+const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
+function render(){
+  document.getElementById('kpis').innerHTML = `
+    <div class="card-kpi"><div class="v">${D.del_mes.length}</div><div class="l">Descuentos activos</div></div>
+    <div class="card-kpi"><div class="v">$${fmt(D.total_mes)}</div><div class="l">Total a descontar en ${fMes.value}</div></div>`;
+  document.getElementById('tbMes').innerHTML = D.del_mes.map(d=>`<tr>
+    <td>${esc(d.nombre_actual||d.nombre)}</td>
+    <td><span class="pill ${d.tipo}">${esc(tipoTxt(d))}</span></td>
+    <td>${esc(d.detalle_texto||'')}${d.tasa_pct!=null?` <span class="text-muted">(${String(Number(d.tasa_pct)).replace('.',',')}% mensual)</span>`:''}</td>
+    <td>${d.cuota_num?`${d.cuota_num} de ${d.cuotas}`:'mensual'}</td>
+    <td class="text-right num">$${fmt(d.cuota_mes)}</td>
+    <td>${esc(d.creado_por||'')}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="text-center text-muted py-3">Sin descuentos este mes</td></tr>';
+  document.getElementById('tbTodos').innerHTML = D.descuentos.map(d=>`<tr style="${d.estado==='ANULADO'?'opacity:.55':''}">
+    <td>${esc(d.nombre_actual||d.nombre)}</td>
+    <td><span class="pill ${d.tipo}">${esc(tipoTxt(d))}</span></td>
+    <td>${esc(d.detalle_texto||'')}</td>
+    <td class="text-right num">$${fmt(d.monto_total)}</td>
+    <td>${d.tasa_pct!=null?String(Number(d.tasa_pct)).replace('.',',')+'%':''}</td>
+    <td>${d.cuotas||'mensual'}</td>
+    <td class="text-right num">$${fmt(d.valor_cuota)}</td>
+    <td>${d.mes_inicio}</td>
+    <td>${d.estado==='ANULADO'?`<span class="pill ANULADO">ANULADO</span><div style="font-size:.64rem;color:#94a3b8">${esc(d.anulado_por||'')}</div>`:'<span class="pill" style="background:#dcfce7;color:#15803d">VIGENTE</span>'}</td>
+    <td>${d.estado==='VIGENTE'?`<i class="bi bi-x-circle text-danger" style="cursor:pointer" title="Anular (detiene cuotas futuras)" onclick="anular(${d.id})"></i>`:''}</td></tr>`).join('')
+    || '<tr><td colspan="10" class="text-center text-muted py-3">Sin descuentos registrados</td></tr>';
+}
+
+async function guardar(){
+  const body = { id_usuario: fColab.value, tipo: fTipo.value, monto: montoVal(), cuotas: fCuotas.value,
+    tasa_pct: fTasa.value, mes_referencia: fMesRef.value, subtipo: fSubtipo.value, detalle_texto: fOtro.value };
+  if (!body.id_usuario) return alert('Elige el colaborador');
+  if (!body.monto) return alert('Ingresa el monto');
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Descuento guardado: ${j.data.cuotas||'mensual'} cuota(s) de $${fmt(j.data.valor_cuota)} desde ${j.data.mes_inicio}.`);
+  fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; fColab.focus();
+  cargar();
+}
+
+async function anular(id){
+  if (!confirm('¿Anular este descuento? Deja de descontarse desde ahora (lo ya descontado no se toca).')) return;
+  const r = await fetch(`/api/rrhh/remuneraciones/descuentos/${id}/anular`,{method:'POST',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  cargar();
+}
+
+function exportar(m){
+  const filas = m==='M'
+    ? [['Mes','Colaborador','Tipo','Detalle','Cuota','Monto del mes','Ingresado por'],
+       ...D.del_mes.map(d=>[fMes.value,d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.cuota_num?`${d.cuota_num} de ${d.cuotas}`:'mensual',d.cuota_mes,d.creado_por||'']),
+       [],['','','','','TOTAL',D.total_mes]]
+    : [['Colaborador','Tipo','Detalle','Capital','Tasa','Cuotas','Valor cuota','Inicio','Estado'],
+       ...D.descuentos.map(d=>[d.nombre_actual||d.nombre,tipoTxt(d),d.detalle_texto||'',d.monto_total,d.tasa_pct||'',d.cuotas||'mensual',d.valor_cuota,d.mes_inicio,d.estado])];
+  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
+  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = (m==='M'?'descuentos-mes-'+fMes.value:'descuentos-todos')+'.xls'; a.click(); URL.revokeObjectURL(a.href);
+}
+
+tipoUI(); cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
