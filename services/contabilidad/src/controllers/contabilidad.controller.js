@@ -934,6 +934,70 @@ exports.eliminarPlantilla = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Asistente IA de asientos ──────────────────────────────────────────────────
+   El usuario describe en lenguaje natural lo que pasó ("pagamos $450.000 de la
+   factura 830 de JFR por el Santander") y la IA propone el asiento completo
+   usando el plan de cuentas real + asientos históricos similares como contexto.
+   NUNCA graba: solo llena la grilla para que el usuario revise y contabilice
+   (y ahí igual pasa por el Guardián). */
+require('../../../../shared/migrate').enFila('contabilidad-asistente', async () => {
+  try {
+    await require('../../../../shared/ia').registrarFuncionalidad({
+      codigo: 'ctb_asistente_asiento',
+      nombre: 'Asistente de Asientos Contables',
+      descripcion: 'Propone el asiento contable completo (cuentas, debe/haber, glosa) a partir de una descripción en lenguaje natural, usando el plan de cuentas y asientos históricos similares. Nunca contabiliza solo: el usuario siempre revisa y graba.',
+    });
+  } catch (e) { console.error('[contabilidad-asistente migration]', e.message); }
+});
+
+exports.asistenteAsiento = async (req, res) => {
+  try {
+    const texto = String(req.body?.texto || '').trim();
+    if (texto.length < 10) return fail(res, 'Describe la operación con más detalle (mínimo 10 caracteres)', 400);
+
+    const [cuentas] = await pool.query("SELECT codigo, nombre, tipo FROM ctb_cuentas WHERE imputable=1 AND activo=1 ORDER BY codigo");
+    // Asientos históricos similares: palabras significativas de la descripción contra las glosas
+    const palabras = [...new Set(texto.toUpperCase().replace(/[^A-ZÁÉÍÓÚÑ0-9 ]/g, ' ').split(/\s+/)
+      .filter(w => w.length >= 4 && !/^\d+$/.test(w)))].slice(0, 6);
+    let ejemplos = [];
+    if (palabras.length) {
+      const like = palabras.map(() => 'c.glosa LIKE ?').join(' OR ');
+      const [comps] = await pool.query(
+        `SELECT c.id, c.tipo, c.glosa FROM ctb_comprobantes c
+          WHERE c.estado='CONTABILIZADO' AND (${like}) ORDER BY c.fecha DESC LIMIT 5`,
+        palabras.map(w => `%${w}%`));
+      if (comps.length) {
+        const [movs] = await pool.query(
+          'SELECT id_comprobante, cuenta, debe, haber FROM ctb_movimientos WHERE id_comprobante IN (?)',
+          [comps.map(c => c.id)]);
+        ejemplos = comps.map(c => ({ tipo: c.tipo, glosa: c.glosa,
+          lineas: movs.filter(m => m.id_comprobante === c.id).map(m => ({ cuenta: m.cuenta, debe: Number(m.debe), haber: Number(m.haber) })) }));
+      }
+    }
+    const { analizar } = require('../../../../shared/anthropic');
+    const out = await analizar({
+      codigo: 'ctb_asistente_asiento',
+      id_usuario: (req.usuario || req.user || {}).id_usuario || null,
+      json: true,
+      system: 'Eres el contador senior de AutoFácil Chile (crédito automotriz). Propones asientos contables de partida doble usando SOLO cuentas del plan entregado. Respondes SOLO un JSON válido, sin texto adicional.',
+      prompt: `PLAN DE CUENTAS (imputables): ${JSON.stringify(cuentas)}\n\nASIENTOS HISTÓRICOS SIMILARES (referencia de cómo se contabiliza aquí): ${JSON.stringify(ejemplos)}\n\nOPERACIÓN DESCRITA POR EL USUARIO: "${texto}"\n\nPropón el asiento. Responde SOLO este JSON:\n{"tipo":"INGRESO|EGRESO|TRASPASO","glosa":"glosa clara del comprobante","movimientos":[{"cuenta":"código del plan","glosa":"detalle línea o null","debe":numero,"haber":numero}],"explicacion":"1-2 frases de por qué estas cuentas"}\nReglas: suma debe = suma haber; cada línea lleva debe O haber (no ambos); usa los montos que el usuario indicó (pesos chilenos, sin decimales); si el usuario no dio monto usa 0 y explica; EGRESO = sale plata del banco/caja, INGRESO = entra, TRASPASO = no toca caja.`,
+      max_tokens: 1500,
+    });
+    const prop = out?.datos;
+    if (!prop || !Array.isArray(prop.movimientos) || prop.movimientos.length < 2)
+      return fail(res, 'La IA no devolvió un asiento válido; intenta describir la operación de otra forma', 502);
+    // Validar cuentas propuestas contra el plan (la IA no inventa códigos)
+    const validas = new Set(cuentas.map(c => c.codigo));
+    for (const m of prop.movimientos)
+      if (!validas.has(String(m.cuenta))) return fail(res, `La IA propuso la cuenta ${m.cuenta}, que no existe en el plan; reintenta`, 502);
+    auditar({ req, accion: 'CONSULTAR', modulo: 'contabilidad', entidad: 'asistente_asiento', entidad_id: null, detalle: texto.slice(0, 200) });
+    ok(res, prop);
+  } catch (e) {
+    console.error('[ctb asistente]', e.message);
+    fail(res, 'Asistente no disponible: ' + e.message, 502);
+  }
+};
+
 /* ── Reglas de centralización (Fase 2) ─────────────────────────────────────── */
 exports.getReglas = async (req, res) => {
   try {

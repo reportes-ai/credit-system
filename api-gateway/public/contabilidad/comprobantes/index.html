@@ -44,6 +44,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
       <h6 class="fw-bold mb-0"><i class="bi bi-pencil-square me-1"></i>Nuevo comprobante</h6>
       <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-sm btn-outline-primary" id="btnAsistente" onclick="asistenteIA()"><i class="bi bi-stars me-1"></i>Asistente IA</button>
         <select id="selPlantilla" class="form-select form-select-sm" style="max-width:260px" onchange="aplicarPlantilla()"><option value="">📋 Usar plantilla…</option></select>
         <button class="btn btn-sm btn-outline-secondary" title="Guardar las líneas actuales como plantilla" onclick="guardarPlantilla()"><i class="bi bi-bookmark-plus"></i></button>
         <button class="btn btn-sm btn-outline-danger" title="Eliminar la plantilla seleccionada" onclick="eliminarPlantilla()"><i class="bi bi-bookmark-x"></i></button>
@@ -247,6 +248,25 @@ async function eliminarPlantilla(){
   const r = await fetch('/api/contabilidad/plantillas/'+p.id,{method:'DELETE',headers:H});
   const j = await r.json(); if (!j.success) return alert(j.error);
   await cargarPlantillas();
+}
+
+/* ── Asistente IA: describe la operación y la IA propone el asiento ── */
+async function asistenteIA(){
+  const texto = prompt('Describe la operación en tus palabras y la IA propone el asiento (tú siempre revisas antes de contabilizar).\n\nEj: "pagamos $450.000 de la factura 830 de JFR por el banco Santander"');
+  if (!texto || texto.trim().length < 10) return;
+  const btn = document.getElementById('btnAsistente');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pensando…';
+  try {
+    const r = await fetch('/api/contabilidad/asistente-asiento',{method:'POST',headers:H,body:JSON.stringify({texto:texto.trim()})});
+    const j = await r.json();
+    if (!j.success) return alert(j.error);
+    const p = j.data;
+    nTipo.value = p.tipo; nGlosa.value = p.glosa || texto.trim();
+    document.getElementById('nLineas').innerHTML = '';
+    p.movimientos.forEach(m=>addLinea({cuenta:m.cuenta, glosa:m.glosa, debe:Number(m.debe)||'', haber:Number(m.haber)||''}));
+    cuadrar();
+    if (p.explicacion) alert('💡 Propuesta de la IA:\n\n'+p.explicacion+'\n\nRevisa cuentas y montos antes de Contabilizar.');
+  } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Asistente IA'; }
 }
 
 /* Duplicar un comprobante existente como base del nuevo */

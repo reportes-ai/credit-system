@@ -17,6 +17,9 @@ router.post('/comprobantes',           verifyToken, requireFunc('ctb_comprobante
 router.get('/comprobantes/:id',        verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.getComprobante);
 router.post('/comprobantes/:id/anular', verifyToken, requireFunc('ctb_comprobantes'), ctrl.anularComprobante);
 
+// Asistente IA de asientos
+router.post('/asistente-asiento', verifyToken, requireFunc('ctb_comprobantes'), ctrl.asistenteAsiento);
+
 // Guardián contable
 router.get('/guardian',        verifyToken, requireFunc('ctb_guardian', 'ctb_comprobantes'), ctrl.getGuardianReglas);
 router.post('/guardian',       verifyToken, requireFunc('ctb_guardian'), ctrl.crearGuardianRegla);
