@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reglas de Centralización — AutoFácil</title>
+  <!-- v1.0 — mantenedor reglas evento→asiento del motor de centralización -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1150px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .regla { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:18px; padding:20px 24px; }
+    .regla h6 { font-weight:700; }
+    .regla .desc { font-size:.8rem; color:#6b7280; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; margin:10px 0; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:8px 10px; text-align:left; border-bottom:2px solid #e5e7eb; }
+    tbody td { padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    .badge-ev { font-family:Consolas,monospace; font-size:.72rem; background:#eef2ff; color:var(--navy); border-radius:6px; padding:2px 8px; font-weight:700; }
+    .badge-l { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .l-DEBE { background:#dcfce7; color:#166534; } .l-HABER { background:#fee2e2; color:#991b1b; }
+    .b-CONTABILIZADO{background:#dcfce7;color:#166534}.b-SIN_REGLA{background:#fef3c7;color:#92400e}.b-DESACTIVADA{background:#f3f4f6;color:#6b7280}.b-DESCUADRE{background:#fee2e2;color:#991b1b}.b-ERROR{background:#fee2e2;color:#991b1b}.b-DUPLICADO{background:#e0f2fe;color:#075985}
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; font-size:.83rem; color:#374151; margin-top:8px; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Reglas de Centralización', icon:'bi-gear-wide-connected', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-gear-wide-connected"></i><div><h2>Reglas de Centralización</h2><p>Cada evento de la Suite genera su comprobante contable automáticamente según estas reglas. Los montos vienen del proceso de negocio (campos); tú defines a qué cuentas van.</p></div></div>
+  <div id="reglas">Cargando…</div>
+
+  <h6 class="fw-bold mt-4 mb-2"><i class="bi bi-clock-history me-1"></i>Últimas ejecuciones del motor</h6>
+  <div class="panel"><table>
+    <thead><tr><th>Fecha</th><th>Evento</th><th>Referencia</th><th>Resultado</th><th>Detalle</th></tr></thead>
+    <tbody id="logBody"><tr><td colspan="5" class="text-center text-muted py-3">—</td></tr></tbody>
+  </table></div>
+
+  <div class="footer-afecta">
+    <h6 class="fw-bold"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</h6>
+    <ul class="mb-0">
+      <li><b>Cuentas y lados de cada regla</b> → los comprobantes automáticos que aparecen en <a href="/contabilidad/comprobantes/">Comprobantes</a>, <a href="/contabilidad/libros/">Libros</a> y <a href="/contabilidad/balance/">Balance</a>.</li>
+      <li><b>Interruptor Activa</b> → si está apagado, el evento NO se contabiliza (queda registrado en el log como DESACTIVADA); el proceso de negocio sigue funcionando igual.</li>
+      <li><b>Eventos conectados hoy</b>: pago de cuotas en <a href="/tesoreria/">Caja</a> (por transacción), <a href="/tesoreria/castigar-saldo/">Castigo de saldo</a> aprobado, cierre de mes de Provisiones, y emisión del libro de <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let CTAS = [], REGLAS = [];
+
+const optsCuentas = sel => CTAS.map(c=>`<option value="${esc(c.codigo)}" ${c.codigo===sel?'selected':''}>${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join('');
+
+async function cargar(){
+  const [rc, rr, rl] = await Promise.all([
+    fetch('/api/contabilidad/cuentas',{headers:H}).then(r=>r.json()),
+    fetch('/api/contabilidad/reglas',{headers:H}).then(r=>r.json()),
+    fetch('/api/contabilidad/eventos-log',{headers:H}).then(r=>r.json()),
+  ]);
+  CTAS = (rc.data||[]).filter(c=>c.imputable && c.activo);
+  REGLAS = rr.data||[];
+  render(); renderLog(rl.data||[]);
+}
+function render(){
+  document.getElementById('reglas').innerHTML = REGLAS.map(r=>`
+    <div class="regla" id="regla-${r.evento}">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+        <div>
+          <h6 class="mb-1">${esc(r.nombre)} <span class="badge-ev">${esc(r.evento)}</span>
+            <span class="badge-ev" style="background:#f0fdf4;color:#166534">${esc(r.tipo)}</span></h6>
+          <div class="desc">${esc(r.descripcion||'')}</div>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" ${r.activa?'checked':''} onchange="toggleActiva('${r.evento}',this.checked)">
+          <label class="form-check-label small fw-semibold">${r.activa?'Activa':'Apagada'}</label>
+        </div>
+      </div>
+      <table><thead><tr><th style="width:340px">Cuenta</th><th style="width:110px">Lado</th><th style="width:150px">Campo (monto)</th><th>Glosa</th><th style="width:36px"></th></tr></thead>
+      <tbody>${r.lineas.map(l=>filaHTML(l)).join('')}</tbody></table>
+      <div class="d-flex justify-content-between">
+        <button class="btn btn-sm btn-outline-primary" onclick="addFila('${r.evento}')"><i class="bi bi-plus-lg me-1"></i>Línea</button>
+        <button class="btn btn-sm btn-primary" onclick="guardar('${r.evento}')"><i class="bi bi-check-lg me-1"></i>Guardar regla</button>
+      </div>
+    </div>`).join('') || '<div class="text-muted">Sin reglas</div>';
+}
+function filaHTML(l={}){
+  return `<tr>
+    <td><select class="form-select form-select-sm r-cta">${optsCuentas(l.cuenta)}</select></td>
+    <td><select class="form-select form-select-sm r-lado"><option ${l.lado==='DEBE'?'selected':''}>DEBE</option><option ${l.lado==='HABER'?'selected':''}>HABER</option></select></td>
+    <td><input class="form-control form-control-sm r-campo" value="${esc(l.campo||'')}"></td>
+    <td><input class="form-control form-control-sm r-glosa" value="${esc(l.glosa||'')}"></td>
+    <td><button class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('tr').remove()"><i class="bi bi-x-lg"></i></button></td></tr>`;
+}
+function addFila(ev){
+  document.querySelector(`#regla-${ev} tbody`).insertAdjacentHTML('beforeend', filaHTML());
+}
+async function toggleActiva(ev, activa){
+  const r = await fetch('/api/contabilidad/reglas/'+ev,{method:'PUT',headers:H,body:JSON.stringify({activa})});
+  const j = await r.json(); if (!j.success) alert(j.error); cargar();
+}
+async function guardar(ev){
+  const lineas = [...document.querySelectorAll(`#regla-${ev} tbody tr`)].map(tr=>({
+    cuenta: tr.querySelector('.r-cta').value, lado: tr.querySelector('.r-lado').value,
+    campo: tr.querySelector('.r-campo').value.trim(), glosa: tr.querySelector('.r-glosa').value.trim(),
+  }));
+  const r = await fetch('/api/contabilidad/reglas/'+ev,{method:'PUT',headers:H,body:JSON.stringify({lineas})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert('Regla '+ev+' guardada'); cargar();
+}
+function renderLog(rows){
+  document.getElementById('logBody').innerHTML = rows.map(x=>`
+    <tr><td>${String(x.created_at).replace('T',' ').slice(0,19)}</td>
+      <td><span class="badge-ev">${esc(x.evento)}</span></td>
+      <td>${esc(x.ref||'')}</td>
+      <td><span class="badge-l b-${x.estado}">${x.estado}</span></td>
+      <td>${esc(x.detalle||'')}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="text-center text-muted py-3">El motor aún no registra ejecuciones</td></tr>';
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

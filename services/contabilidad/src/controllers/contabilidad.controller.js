@@ -12,6 +12,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+require('../motor-asientos'); // Fase 2: carga el motor (migra reglas + log al boot)
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -103,6 +104,7 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
       ['Comprobantes',            'ctb_comprobantes', '/contabilidad/comprobantes/', 'bi-journal-plus'],
       ['Libros Diario y Mayor',   'ctb_libros',       '/contabilidad/libros/',       'bi-book'],
       ['Balance de Comprobación', 'ctb_balance',      '/contabilidad/balance/',      'bi-clipboard-data'],
+      ['Reglas de Centralización', 'ctb_reglas',      '/contabilidad/reglas/',       'bi-gear-wide-connected'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -313,6 +315,54 @@ exports.libroMayor = async (req, res) => {
         WHERE c.estado='CONTABILIZADO' AND m.cuenta=? AND c.fecha BETWEEN ? AND ?
         ORDER BY c.fecha, c.id LIMIT 5000`, [cuenta, r.desde, r.hasta]);
     ok(res, { saldo_inicial: Number(ini.d) - Number(ini.h), movimientos: rows.map(x => ({ ...x, num: fmtNum(x) })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Reglas de centralización (Fase 2) ─────────────────────────────────────── */
+exports.getReglas = async (req, res) => {
+  try {
+    const [reglas] = await pool.query('SELECT * FROM ctb_reglas ORDER BY evento');
+    const [lineas] = await pool.query(
+      `SELECT l.*, k.nombre cuenta_nombre FROM ctb_reglas_lineas l
+        LEFT JOIN ctb_cuentas k ON k.codigo=l.cuenta ORDER BY l.evento, l.id`);
+    ok(res, reglas.map(r => ({ ...r, lineas: lineas.filter(l => l.evento === r.evento) })));
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.putRegla = async (req, res) => {
+  try {
+    const { activa, tipo, lineas } = req.body || {};
+    const [[regla]] = await pool.query('SELECT evento FROM ctb_reglas WHERE evento=?', [req.params.evento]);
+    if (!regla) return fail(res, 'Evento no existe', 404);
+    if (tipo !== undefined && !['INGRESO', 'EGRESO', 'TRASPASO'].includes(tipo)) return fail(res, 'Tipo inválido', 400);
+    if (Array.isArray(lineas)) {
+      if (lineas.length < 2) return fail(res, 'Mínimo 2 líneas (partida doble)', 400);
+      for (const l of lineas) {
+        if (!l.cuenta || !['DEBE', 'HABER'].includes(l.lado) || !l.campo) return fail(res, 'Cada línea necesita cuenta, lado y campo', 400);
+        const [[c]] = await pool.query('SELECT imputable, activo FROM ctb_cuentas WHERE codigo=?', [l.cuenta]);
+        if (!c || !c.imputable || !c.activo) return fail(res, `Cuenta ${l.cuenta} no existe, no es imputable o está inactiva`, 400);
+      }
+      await pool.query('DELETE FROM ctb_reglas_lineas WHERE evento=?', [req.params.evento]);
+      for (const l of lineas)
+        await pool.query('INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?,?,?,?,?)',
+          [req.params.evento, l.cuenta, l.lado, l.campo.trim(), (l.glosa || '').trim() || null]);
+    }
+    const sets = [], vals = [];
+    if (activa !== undefined) { sets.push('activa=?'); vals.push(activa ? 1 : 0); }
+    if (tipo !== undefined) { sets.push('tipo=?'); vals.push(tipo); }
+    if (sets.length) { vals.push(req.params.evento); await pool.query(`UPDATE ctb_reglas SET ${sets.join(', ')} WHERE evento=?`, vals); }
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'regla', entidad_id: req.params.evento, detalle: JSON.stringify({ activa, tipo, lineas: lineas?.length }) });
+    ok(res, { evento: req.params.evento });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.getEventosLog = async (req, res) => {
+  try {
+    const w = [], vals = [];
+    if (req.query.evento) { w.push('evento=?'); vals.push(req.query.evento); }
+    const [rows] = await pool.query(
+      `SELECT * FROM ctb_eventos_log ${w.length ? 'WHERE ' + w.join(' AND ') : ''} ORDER BY id DESC LIMIT 200`, vals);
+    ok(res, rows);
   } catch (e) { fail(res, e.message); }
 };
 

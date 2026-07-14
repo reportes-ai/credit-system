@@ -467,6 +467,18 @@ const createBatch = async (req, res) => {
 
     await conn.commit();
 
+    // Centralización contable: un asiento por transacción de caja (nunca bloquea el pago)
+    try {
+      const sum = k => pagos.reduce((s, p) => s + (parseFloat(p[k]) || 0), 0);
+      const mCuota = sum('monto_cuota'), mMora = sum('interes_mora'), mGastos = sum('gastos_cobranza');
+      require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'PAGO_CAJA', fecha: fecha_pago || undefined,
+        glosa: `Pago en caja ${pagos.length} cuota(s) crédito ${id_credito}`,
+        ref: `TRX-${String(numero_transaccion).padStart(6, '0')}`,
+        montos: { total: mCuota + mMora + mGastos, cuota: mCuota, mora: mMora, gastos: mGastos },
+      }).catch(() => {});
+    } catch (_) {}
+
     // Auditoría (fuera de la transacción, no crítica)
     try {
       audit.registrar({

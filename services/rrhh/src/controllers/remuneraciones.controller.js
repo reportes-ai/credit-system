@@ -271,6 +271,13 @@ const emitir = async (req, res) => {
       "UPDATE rh_liquidaciones SET estado='EMITIDA', emitido_por=?, emitido_at=NOW() WHERE mes=? AND estado='BORRADOR'",
       [nombreDe(u), mes]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'liquidaciones', detalle: `EMITIÓ las liquidaciones de ${mes} (${r.affectedRows}) — quedan congeladas` });
+    // Centralización: asiento del libro de remuneraciones (haberes = líquidos + descuentos)
+    const [[t]] = await pool.query(
+      "SELECT COALESCE(SUM(total_haberes),0) h, COALESCE(SUM(liquido),0) l, COALESCE(SUM(total_descuentos),0) d FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
+    require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
+      montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
+    }).catch(() => {});
     ok(res, { emitidas: r.affectedRows });
   } catch (e) { console.error('[rrhh remuneraciones emitir]', e.message); fail(res, 'Error interno del servidor'); }
 };

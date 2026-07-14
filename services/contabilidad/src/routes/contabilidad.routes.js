@@ -17,6 +17,11 @@ router.post('/comprobantes',           verifyToken, requireFunc('ctb_comprobante
 router.get('/comprobantes/:id',        verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.getComprobante);
 router.post('/comprobantes/:id/anular', verifyToken, requireFunc('ctb_comprobantes'), ctrl.anularComprobante);
 
+// Reglas de centralización (Fase 2)
+router.get('/reglas',            verifyToken, requireFunc('ctb_reglas'), ctrl.getReglas);
+router.put('/reglas/:evento',    verifyToken, requireFunc('ctb_reglas'), ctrl.putRegla);
+router.get('/eventos-log',       verifyToken, requireFunc('ctb_reglas', 'ctb_libros'), ctrl.getEventosLog);
+
 // Libros y balance
 router.get('/libro-diario', verifyToken, requireFunc('ctb_libros', 'ctb_balance'), ctrl.libroDiario);
 router.get('/libro-mayor',  verifyToken, requireFunc('ctb_libros', 'ctb_balance'), ctrl.libroMayor);

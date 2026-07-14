@@ -209,6 +209,11 @@ const aprobar = async (req, res) => {
         await pool.query("UPDATE creditos SET estado_cartera='CASTIGADO' WHERE id=? OR num_op=?", [cas.id_credito, cas.num_op]);
         await pool.query("UPDATE castigos_contables SET estado='APROBADO', aplicado_at=NOW() WHERE id=?", [req.params.id]);
         estadoFinal = 'APROBADO';
+        // Centralización: asiento automático del castigo (nunca bloquea la operación)
+        require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'CASTIGO', glosa: `Castigo op ${cas.num_op} (${cas.motivo || 'castigo aprobado'})`,
+          ref: `CASTIGO-${req.params.id}`, montos: { monto: Number(cas.saldo_castigado) || 0 }, num_op: cas.num_op,
+        }).catch(() => {});
       }
     }
     auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'castigos_contables', entidad_id: req.params.id, detalle: `Firma ${rol}=${decision} castigo op ${cas.num_op}${estadoFinal === 'APROBADO' ? ' → APLICADO (baja)' : ''}`, meta: { rol, decision } });
@@ -348,6 +353,13 @@ const cerrarMesContable = async (req, res) => {
         [mes, cuenta, saldo, req.usuario.id_usuario, nombreUsuario(req), numero_transaccion]);
     }
     auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${payload.provisiones.saldo_final}, castigo ${payload.castigos.saldo_final}) TRX-${String(numero_transaccion).padStart(6, '0')}` });
+    // Centralización: constitución de provisión del período (haber_prov = cargo a resultado)
+    if (Number(payload.provisiones.haber) > 0) {
+      require('../../../contabilidad/src/motor-asientos').contabilizar({
+        evento: 'PROVISION_CIERRE', fecha: ultimoDiaMes(mes), glosa: `Constitución provisión incobrables ${mes}`,
+        ref: `PROV-${mes}`, montos: { constitucion: Number(payload.provisiones.haber) },
+      }).catch(() => {});
+    }
     ok(res, { mes, guardado: true, provisiones: payload.provisiones.saldo_final, castigos: payload.castigos.saldo_final, numero_transaccion });
   } catch (e) { fail(res, e.message); }
 };
