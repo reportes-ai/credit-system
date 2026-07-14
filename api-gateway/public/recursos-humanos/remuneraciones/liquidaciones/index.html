@@ -42,7 +42,15 @@
     .liq table { font-size:.8rem; } .liq td { padding:4px 8px; border-bottom:1px solid #f1f5f9; }
     .liq .sec { background:#eff6ff; color:#1e3a8a; font-weight:800; font-size:.7rem; text-transform:uppercase; padding:5px 8px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; }
-    @media print { body * { visibility:hidden; } #dlgLiq, #dlgLiq * { visibility:visible; } #dlgLiq { position:absolute; inset:0; box-shadow:none; max-width:100%; } .no-print { display:none!important; } }
+    /* Impresión: solo la liquidación, CON sus colores de fondo (los navegadores
+       los eliminan por defecto → print-color-adjust:exact los fuerza) */
+    @media print {
+      body * { visibility:hidden; }
+      #dlgLiq, #dlgLiq * { visibility:visible; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+      #dlgLiq { position:absolute; inset:0; box-shadow:none; max-width:100%; }
+      .no-print { display:none!important; }
+    }
+    #dlgLiq * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   </style>
 </head>
 <body>
