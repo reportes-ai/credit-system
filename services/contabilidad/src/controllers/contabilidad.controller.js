@@ -1035,6 +1035,88 @@ exports.getComprasAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Auxiliar de Honorarios (export AVSOFT "Movimiento Honorarios") ───────────
+   Boleta por boleta con bruto/retención/líquido: alimenta la lámina de
+   honorarios del directorio. Mismo patrón que compras: borra y reemplaza
+   los meses que vienen en el archivo. */
+require('../../../../shared/migrate').enFila('contabilidad-honorarios-aux', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_honorarios_aux (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        mes           VARCHAR(7) NOT NULL,       -- YYYY-MM (período contable)
+        rut           VARCHAR(15) NULL,
+        nombre        VARCHAR(200) NULL,
+        num_boleta    VARCHAR(30) NULL,
+        fecha_emision DATE NULL,
+        glosa         VARCHAR(200) NULL,
+        cuenta_gasto  VARCHAR(20) NULL,
+        bruto         DECIMAL(14,0) NOT NULL DEFAULT 0,
+        tasa_retencion DECIMAL(6,2) NOT NULL DEFAULT 0,
+        retencion     DECIMAL(14,0) NOT NULL DEFAULT 0,
+        liquido       DECIMAL(14,0) NOT NULL DEFAULT 0,
+        INDEX idx_mes (mes), INDEX idx_rut (rut)
+      )`);
+  } catch (e) { console.error('[contabilidad-honorarios-aux migration]', e.message); }
+});
+
+exports.importarHonorariosAux = async (req, res) => {
+  try {
+    const { base64 } = req.body || {};
+    if (!base64) return fail(res, 'Archivo (base64) obligatorio', 400);
+    const texto = Buffer.from(String(base64).replace(/^data:[^;]+;base64,/, ''), 'base64').toString('latin1');
+    const lineas = texto.split(/\r?\n/).filter(l => l.trim() && l.replace(/;/g, '').trim());
+    // buscar la fila de encabezado (el export trae un título arriba)
+    const iHead = lineas.findIndex(l => l.toLowerCase().includes('rut profesional'));
+    if (iHead < 0) return fail(res, 'El archivo no parece el export de Honorarios de AVSOFT', 400);
+    const head = lineas[iHead].split(';').map(s => s.trim().toLowerCase());
+    const col = (frag) => head.findIndex(h => h.includes(frag));
+    const ix = {
+      anio: 0, mes: col('mes'), rut: col('rut profesional'), nombre: col('nombre'),
+      num: col('nro boleta'), femi: col('fecha emision'), glosa: col('glosa'),
+      cuenta: col('cod cuenta'), bruto: col('bruto'), tasa: col('tasa retencion'),
+      ret: head.findIndex(h => h === 'retencion'), liq: col('liquido'),
+    };
+    if (ix.bruto < 0 || ix.rut < 0) return fail(res, 'El archivo no parece el export de Honorarios de AVSOFT', 400);
+    const filas = [];
+    for (let i = iHead + 1; i < lineas.length; i++) {
+      const c = lineas[i].split(';');
+      if (c.length < 10) continue;
+      const mes = `${c[ix.anio]}-${String(Number(c[ix.mes])).padStart(2, '0')}`;
+      if (!/^\d{4}-\d{2}$/.test(mes)) continue;
+      filas.push([mes, c[ix.rut]?.trim() || null, c[ix.nombre]?.replace(/�| /g, ' ').trim().slice(0, 200) || null,
+        c[ix.num]?.trim() || null, fechaCL(c[ix.femi]), c[ix.glosa]?.trim().slice(0, 200) || null,
+        c[ix.cuenta]?.trim() || null, Number(c[ix.bruto]) || 0,
+        Number(String(c[ix.tasa] || '0').replace(',', '.')) || 0,
+        Number(c[ix.ret]) || 0, Number(c[ix.liq]) || 0]);
+    }
+    if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
+    const meses = [...new Set(filas.map(f => f[0]))];
+    await pool.query('DELETE FROM ctb_honorarios_aux WHERE mes IN (?)', [meses]);
+    for (let i = 0; i < filas.length; i += 500)
+      await pool.query(
+        'INSERT INTO ctb_honorarios_aux (mes, rut, nombre, num_boleta, fecha_emision, glosa, cuenta_gasto, bruto, tasa_retencion, retencion, liquido) VALUES ?',
+        [filas.slice(i, i + 500)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'honorarios_aux', entidad_id: null, detalle: `Import honorarios AVSOFT: ${filas.length} boletas, meses ${meses.join(', ')}` });
+    ok(res, { boletas: filas.length, meses });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.getHonorariosAux = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes obligatorio', 400);
+    const [docs] = await pool.query(
+      'SELECT * FROM ctb_honorarios_aux WHERE mes=? ORDER BY bruto DESC LIMIT 300', [mes]);
+    const [prof] = await pool.query(
+      `SELECT nombre, rut, COUNT(*) boletas, SUM(bruto) bruto, SUM(liquido) liquido
+         FROM ctb_honorarios_aux WHERE mes LIKE CONCAT(LEFT(?,4),'-%') AND mes <= ?
+        GROUP BY nombre, rut ORDER BY bruto DESC LIMIT 12`, [mes, mes]);
+    const [[tot]] = await pool.query('SELECT COUNT(*) n, COALESCE(SUM(bruto),0) bruto, COALESCE(SUM(retencion),0) retencion, COALESCE(SUM(liquido),0) liquido FROM ctb_honorarios_aux WHERE mes=?', [mes]);
+    ok(res, { boletas: docs, profesionales_anio: prof, total_mes: { docs: Number(tot.n), bruto: Number(tot.bruto), retencion: Number(tot.retencion), liquido: Number(tot.liquido) } });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* CRUD de rubros (botón Configurar rubros en la página) */
 exports.getDirRubros = async (req, res) => {
   try { const [rows] = await pool.query('SELECT * FROM ctb_dir_rubros ORDER BY cuadro, orden, id'); ok(res, rows); }
@@ -1147,7 +1229,7 @@ exports.directorioMes = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS'];
+const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS'];
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
@@ -1168,7 +1250,7 @@ exports.hechosDirectorioIA = async (req, res) => {
     const { mes, seccion, datos } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
-    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)' };
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)' };
     const { analizar } = require('../../../../shared/anthropic');
     const out = await analizar({
       codigo: 'ctb_directorio_ia',

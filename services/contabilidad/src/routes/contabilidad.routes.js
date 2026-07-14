@@ -75,6 +75,8 @@ router.put('/directorio/rubros/:id',   verifyToken, requireFunc('ctb_directorio'
 router.delete('/directorio/rubros/:id', verifyToken, requireFunc('ctb_directorio'), ctrl.eliminarDirRubro);
 router.get('/compras-aux',           verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes'), ctrl.getComprasAux);
 router.post('/compras-aux/importar', verifyToken, requireFunc('ctb_directorio'), ctrl.importarComprasAux);
+router.get('/honorarios-aux',           verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes'), ctrl.getHonorariosAux);
+router.post('/honorarios-aux/importar', verifyToken, requireFunc('ctb_directorio'), ctrl.importarHonorariosAux);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);
 router.post('/directorio/hechos-ia', verifyToken, requireFunc('ctb_directorio'), ctrl.hechosDirectorioIA);
 
