@@ -1541,6 +1541,135 @@ exports.guardarF29 = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── LRE: Libro de Remuneraciones Electrónico (Dirección del Trabajo) ─────────
+   Genera el CSV mensual oficial (Manual LRE de la DT: separador ';', nombre
+   rutempleador_aaaamm.csv, montos enteros, opcionales vacíos, headers =
+   códigos de concepto). Fuente preferente: liquidaciones EMITIDAS del motor
+   propio (rh_liquidaciones); si el mes aún se pagó por AVSOFT, cae al
+   auxiliar importado (ctb_remun_aux) como referencial. */
+require('../../../../shared/migrate').enFila('contabilidad-lre', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_lre' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'LRE — Libro Remuneraciones Electrónico','ctb_lre','/contabilidad/lre/','bi-journal-arrow-up')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] lre listo');
+  } catch (e) { console.error('[contabilidad-lre migration]', e.message); }
+});
+
+// Catálogos oficiales del Manual LRE (tablas N°9, 11, 13, 14)
+const LRE_AFP = { 'PROVIDA': 6, 'PLANVITAL': 11, 'PLAN VITAL': 11, 'CUPRUM': 13, 'HABITAT': 14, 'UNO': 19, 'CAPITAL': 31, 'MODELO': 103 };
+const LRE_SALUD = { 'FONASA': 102, 'CRUZ BLANCA': 1, 'ISAPRE CRUZ BLANCA S.A.': 1, 'BANMEDICA': 3, 'COLMENA': 4, 'CONSALUD': 9, 'VIDA TRES': 12, 'NUEVA MAS VIDA': 43, 'ESENCIAL': 44, 'ESCENCIAL': 44 };
+const lreFecha = f => { const s = isoF(f); return s ? s.split('-').reverse().join('/') : ''; };
+const isoF = f => f == null ? null
+  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+
+// Orden de columnas del archivo (solo los conceptos que la empresa usa + obligatorios)
+const LRE_COLS = ['1101','1102','1103','1104','1105','1106','1170','1146','1107','1108','1109','1141','1142','1143','1151','1110','1152',
+  '1115','1116','1118','1155','1157','1131',
+  '2101','2103','2106','2113','2301','2302','2306',
+  '3141','3143','3144','3151','3161','3183',
+  '4151','4152','4155',
+  '5201','5210','5220','5230','5240','5301','5361','5341','5302','5410','5501','5564'];
+
+exports.getLRE = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes obligatorio', 400);
+    // Días de licencia médica del mes por usuario (corridos, tope 30)
+    const [lics] = await pool.query(
+      `SELECT a.id_usuario, u.rut, a.fecha_desde, a.fecha_hasta FROM rh_ausencias a JOIN usuarios u ON u.id_usuario=a.id_usuario
+        WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA'
+          AND a.fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND a.fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
+    const licDias = {};
+    const ini = mes + '-01', finStr = mes + '-31';
+    for (const l of lics) {
+      const d = isoF(l.fecha_desde) > ini ? isoF(l.fecha_desde) : ini;
+      const h = isoF(l.fecha_hasta) < finStr ? isoF(l.fecha_hasta) : finStr;
+      if (h >= d) {
+        const n = Math.min(30, Number(h.slice(8, 10))) - Math.min(30, Number(d.slice(8, 10))) + 1;
+        const key = String(l.rut || '').replace(/\./g, '').toUpperCase();
+        licDias[key] = Math.min(30, (licDias[key] || 0) + Math.max(0, n));
+      }
+    }
+    const nRut = r => String(r || '').replace(/\./g, '').replace(/\s/g, '').toUpperCase();
+    const afpCod = n => LRE_AFP[String(n || '').toUpperCase().trim()] ?? 100;
+    const salCod = n => LRE_SALUD[String(n || '').toUpperCase().trim()] ?? 99;
+
+    // Fuente 1: liquidaciones EMITIDAS del motor propio
+    const [liqs] = await pool.query(
+      `SELECT l.*, u.rut urut, u.fecha_ingreso, f.afp fafp, f.salud fsalud, f.tipo_contrato
+         FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
+         LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
+        WHERE l.mes=? AND l.estado='EMITIDA'`, [mes]);
+    let fuente, filas;
+    if (liqs.length) {
+      fuente = 'MOTOR';
+      filas = liqs.map(l => {
+        let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+        const rut = nRut(l.rut || l.urut);
+        const cotiz = (d.desc_afp || 0) + (d.desc_salud || 0) + (d.desc_salud_adicional || 0) + (d.desc_afc || 0);
+        const noImp = (d.colacion || 0) + (d.movilizacion || 0) + (d.otros_no_imponibles || 0);
+        const aportes = (d.aporte_afc_emp || 0) + (d.aporte_mutual || 0) + (d.aporte_sis || 0);
+        return {
+          '1101': rut, '1102': lreFecha(l.fecha_ingreso), '1105': 13, '1106': 13114, '1170': 1, '1146': 0, '1107': 101,
+          '1108': 0, '1109': 0, '1141': afpCod(d.afp || l.fafp), '1142': 0, '1143': salCod(d.salud || l.fsalud),
+          '1151': 1, '1110': 1, '1152': 2,
+          '1115': d.dias ?? 30, '1116': licDias[rut] || '', '1118': 0, '1155': 0, '1157': 0, '1131': 0,
+          '2101': d.sueldo_base || 0, '2103': d.comisiones || '', '2106': d.gratificacion || '', '2113': d.otros_imponibles || '',
+          '2301': d.colacion || '', '2302': d.movilizacion || '', '2306': d.otros_no_imponibles || '',
+          '3141': d.desc_afp || 0, '3143': d.desc_salud || 0, '3144': d.desc_salud_adicional || '',
+          '3151': d.desc_afc || '', '3161': d.impuesto || 0, '3183': d.otros_descuentos || '',
+          '4151': d.aporte_afc_emp || '', '4152': d.aporte_mutual || 0, '4155': d.aporte_sis || 0,
+          '5201': d.total_haberes || 0, '5210': d.total_imponible || 0, '5220': 0, '5230': noImp, '5240': 0,
+          '5301': d.total_descuentos || 0, '5361': d.impuesto || 0, '5341': cotiz,
+          '5302': Math.max(0, (d.total_descuentos || 0) - (d.impuesto || 0) - cotiz),
+          '5410': aportes, '5501': d.liquido || 0, '5564': 0,
+          _nombre: l.nombre,
+        };
+      });
+    } else {
+      // Fuente 2: auxiliar AVSOFT (referencial: sin desglose fino de haberes)
+      const [rem] = await pool.query('SELECT * FROM ctb_remun_aux WHERE mes=?', [mes]);
+      if (!rem.length) return fail(res, `No hay remuneraciones para ${mes} (ni emitidas en el motor ni importadas de AVSOFT)`, 404);
+      fuente = 'AVSOFT';
+      const [usrs] = await pool.query("SELECT rut, fecha_ingreso, id_usuario FROM usuarios WHERE rut IS NOT NULL");
+      const uMap = {}; usrs.forEach(u => uMap[nRut(u.rut)] = u);
+      const [fichas] = await pool.query('SELECT f.id_usuario, f.afp, f.salud FROM rh_fichas f');
+      const fMap = {}; fichas.forEach(f => fMap[f.id_usuario] = f);
+      filas = rem.map(r => {
+        const rut = nRut(r.rut);
+        const u = uMap[rut] || {};
+        const cotiz = Number(r.afp_monto) + Number(r.salud_monto);
+        const resto = Math.max(0, Number(r.imponible) - Number(r.sueldo_base));
+        const noImp = Math.max(0, Number(r.haberes) - Number(r.imponible));
+        const otrosDesc = Math.max(0, Number(r.descuentos) - cotiz - Number(r.impuesto_unico) - Number(r.seg_ces_emp) * 0);
+        return {
+          '1101': rut, '1102': lreFecha(u.fecha_ingreso), '1105': 13, '1106': 13114, '1170': 1, '1146': 0, '1107': 101,
+          '1108': 0, '1109': 0, '1141': afpCod(r.afp_nombre), '1142': 0, '1143': salCod(r.salud_nombre),
+          '1151': 1, '1110': 1, '1152': 2,
+          '1115': r.dias || 30, '1116': licDias[rut] || '', '1118': 0, '1155': 0, '1157': 0, '1131': 0,
+          '2101': Number(r.sueldo_base) || 0, '2103': '', '2106': '', '2113': resto || '',
+          '2301': '', '2302': '', '2306': noImp || '',
+          '3141': Number(r.afp_monto) || 0, '3143': Number(r.salud_monto) || 0, '3144': '',
+          '3151': '', '3161': Number(r.impuesto_unico) || 0, '3183': otrosDesc || '',
+          '4151': '', '4152': '', '4155': Number(r.sis_emp) || '',
+          '5201': Number(r.haberes) || 0, '5210': Number(r.imponible) || 0, '5220': 0, '5230': noImp, '5240': 0,
+          '5301': Number(r.descuentos) || 0, '5361': Number(r.impuesto_unico) || 0, '5341': cotiz,
+          '5302': otrosDesc, '5410': Number(r.sis_emp) + Number(r.seg_ces_emp), '5501': Number(r.liquido) || 0, '5564': 0,
+          _nombre: r.nombre,
+        };
+      });
+    }
+    ok(res, { mes, fuente, columnas: LRE_COLS, filas, archivo: `76545638-K_${mes.replace('-', '')}.csv` });
+  } catch (e) { console.error('[ctb lre]', e.message); fail(res, e.message); }
+};
+
 /* ── Libros Auxiliares (/contabilidad/libros-auxiliares/) ─────────────────────
    Consulta completa de los auxiliares importados (compras, honorarios) con
    filtros y totales por mes. Solo lectura: la importación vive en el

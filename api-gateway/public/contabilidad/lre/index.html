@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LRE — Libro de Remuneraciones Electrónico — AutoFácil</title>
+  <!-- v1.0 — CSV oficial DT (Manual LRE): headers = códigos de concepto, separador ';', rutempleador_aaaamm.csv -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 30px; max-width:none; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:18px; }
+    table { border-collapse:collapse; font-size:.72rem; }
+    thead th { background:#012d70; color:#fff; font-weight:700; padding:6px 8px; text-align:right; white-space:nowrap; position:sticky; top:0; }
+    thead th:first-child { text-align:left; }
+    tbody td { padding:4px 8px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; font-family:Consolas,monospace; }
+    tbody td:first-child { text-align:left; font-family:'Segoe UI'; font-weight:600; }
+    .pill { border-radius:9px; padding:2px 10px; font-size:.7rem; font-weight:700; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'LRE', icon:'bi-journal-arrow-up', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journal-arrow-up"></i><div><h2>LRE — Libro de Remuneraciones Electrónico</h2><p>El archivo mensual oficial para la Dirección del Trabajo (formato Manual LRE: CSV con punto y coma, códigos de concepto, montos enteros). Se sube en midt.dirtrab.cl antes del día 15 del mes siguiente.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+    <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+    <span id="lblFuente"></span>
+    <span class="flex-grow-1"></span>
+    <button class="btn btn-sm btn-success" id="btnCsv" onclick="descargar()" disabled><i class="bi bi-download me-1"></i>Descargar CSV para la DT</button>
+  </div>
+
+  <div class="panel" style="max-height:65vh"><table id="tabla">
+    <thead id="thead"></thead><tbody id="tbody"><tr><td class="text-muted p-3">Elige un mes</td></tr></tbody>
+  </table></div>
+
+  <div class="p-3" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem">
+    <b><i class="bi bi-exclamation-triangle me-1"></i>Antes de subir a la DT:</b>
+    <ul class="mb-0 mt-1">
+      <li><b>Fuente MOTOR</b> = liquidaciones emitidas en el Suite (desglose completo por concepto). <b>Fuente AVSOFT</b> = auxiliar importado, referencial: el desglose fino de haberes (gratificación vs bonos) no viene en el export, así que el resto imponible va en el código 2113 — para declarar oficialmente esos meses usa el LRE de AVSOFT.</li>
+      <li>Supuestos parametrizados por defecto: región 13 / comuna Las Condes (13114), jornada ordinaria Art. 22 (101), CCAF Los Andes, Mutual CCHC, AFC afiliado. Si algún trabajador difiere, corrige la celda en el CSV antes de subir.</li>
+      <li>Compara el primer archivo contra el último LRE subido por AVSOFT (como hicimos con el F29) antes de usarlo oficialmente.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+let D = null;
+const hoy = new Date(); hoy.setMonth(hoy.getMonth()-1);
+fMes.value = hoy.toISOString().slice(0,7);
+
+async function cargar(){
+  const r = await fetch('/api/contabilidad/lre?mes='+fMes.value,{headers:H});
+  const j = await r.json();
+  if (!j.success){ D=null; btnCsv.disabled=true; lblFuente.innerHTML='';
+    thead.innerHTML=''; tbody.innerHTML=`<tr><td class="text-muted p-3">${esc(j.error)}</td></tr>`; return; }
+  D = j.data; btnCsv.disabled = false;
+  lblFuente.innerHTML = D.fuente==='MOTOR'
+    ? '<span class="pill" style="background:#dcfce7;color:#15803d">FUENTE: MOTOR PROPIO (liquidaciones emitidas)</span>'
+    : '<span class="pill" style="background:#fef3c7;color:#92400e">FUENTE: AVSOFT importado — referencial</span>';
+  thead.innerHTML = '<tr><th>Trabajador</th>' + D.columnas.map(c=>`<th>${c}</th>`).join('') + '</tr>';
+  tbody.innerHTML = D.filas.map(f=>`<tr><td>${esc(f._nombre||'')}</td>` +
+    D.columnas.map(c=>`<td>${esc(f[c] ?? '')}</td>`).join('') + '</tr>').join('');
+}
+
+function descargar(){
+  if (!D) return;
+  const lineas = [D.columnas.join(';')];
+  for (const f of D.filas) lineas.push(D.columnas.map(c=>f[c] ?? '').join(';'));
+  const blob = new Blob(['﻿'+lineas.join('\r\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = D.archivo; a.click(); URL.revokeObjectURL(a.href);
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
