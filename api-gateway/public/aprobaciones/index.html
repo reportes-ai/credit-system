@@ -659,6 +659,8 @@
 <script src="/js/comision-dealer.js"></script>
 <script src="/js/rentabilidad-calc.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
+<script src="/js/qrcode-generator.js"></script>
+<script src="/js/qr-verificacion.js"></script>
 <script src="/js/html2pdf.bundle.min.js"></script>
 <script>
 'use strict';
@@ -2296,9 +2298,14 @@ function cartaHTML(c, preview){
     <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
       ${CARTA_CONSID.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p style="margin:2px 0">${escH(l).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>`).join('')}
     </div>
-    <div style="margin-top:18px;text-align:center">
-      ${firmaImg}
-      <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+    <div style="margin-top:18px;display:flex;align-items:flex-end">
+      <div style="width:130px">${(arguments.length > 2 && arguments[2] && arguments[2].qrHTML) ? arguments[2].qrHTML : ''}</div>
+      <div style="flex:1;text-align:center">
+        ${firmaImg}
+        <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
+        ${(arguments.length > 2 && arguments[2] && arguments[2].fes) ? `<div style="font-size:7.5px;color:#64748b;margin-top:3px">${arguments[2].fes}</div>` : ''}
+      </div>
+      <div style="width:130px"></div>
     </div>
     <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:.5px solid #e0e0e0;padding-top:4px">
       Creado por: ${escH(c.creadoPorInitials||'')} | ${c.aprobadoPorInitials ? 'Revisado por: '+escH(c.aprobadoPorInitials) : 'Pendiente de Revisión'} | Tipo: ${escH(c.tipo||'')}
@@ -2306,19 +2313,34 @@ function cartaHTML(c, preview){
   </div>`;
 }
 
-function imprimirCarta(id){
+async function imprimirCarta(id){
   const c = CARTAS.find(x=>x.id===id);
   if (!c) return;
   if (c.status !== 'APROBADA') { alert('La carta debe estar APROBADA para imprimir.'); return; }
   if (!c.otorgado && vigenciaDeCarta(c).vencida) { alert('La carta venció su plazo de vigencia (' + VIGENCIA_DIAS + ' días) y quedó Desistida. Ya no se puede imprimir.'); return; }
   marcarImpVista(c.id);
+  // QR de verificación + FES (obligatorio en la carta impresa)
+  let qr = null;
+  try {
+    const r = await fetch('/api/cartas/' + c.id + '/verificable', { method:'POST', headers: hdr() });
+    const j = await r.json();
+    if (j.success && j.data && j.data.codigo && typeof qrVerificacionHTML === 'function') {
+      const f = new Date(j.data.firmado_at || Date.now()).toLocaleDateString('es-CL');
+      qr = { qrHTML: qrVerificacionHTML(j.data.codigo, { px: 88 }),
+        fes: 'Documento suscrito con Firma Electrónica Simple (Ley 19.799) por ' + escH(j.data.firmante || '') +
+             ' · ' + f + ' · válida hasta ' + (j.data.valida_hasta ? j.data.valida_hasta.split('-').reverse().join('-') : '') +
+             ' · verificación: ' + location.host + '/verificar/' + j.data.codigo };
+    }
+  } catch(e) { console.error('[carta verificable]', e); }
+  if (!qr && !confirm('No se pudo generar el QR de verificación. ¿Imprimir la carta SIN QR?')) return;
   const title = `Carta de Aprobación - ${(c.cliente||'').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g,'').trim()} - ${c.opCarta||''} - ${(c.rutCliente||'').replace(/[^0-9kK\-]/g,'')}`;
   const w = window.open('', '_blank');
   if (!w) { alert('Permite las ventanas emergentes para imprimir.'); return; }
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escH(title)}</title><style>
-    @page { size: Letter; margin: 12mm 15mm; }
+    /* margin:0 elimina el encabezado/pie del navegador (about:blank, 1/1) */
+    @page { size: Letter; margin: 0; }
     * { box-sizing:border-box; font-family:Arial,sans-serif; }
-    body { margin:0; padding:0; font-size:10px; color:#222; }
+    body { margin:0; padding:10mm 14mm; font-size:10px; color:#222; }
     .carta-doc { border:none !important; padding:0 !important; }
     .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; font-size:9.5px; color:#111; text-transform:uppercase; display:block; }
     .data-tbl { width:100%; border-collapse:collapse; table-layout:fixed; }
@@ -2327,7 +2349,7 @@ function imprimirCarta(id){
     .val { background:#fff; color:#333; }
     img { max-width:100%; }
     p { margin:2px 0; }
-  </style></head><body>${cartaHTML(c, false)}</body></html>`);
+  </style></head><body>${cartaHTML(c, false, qr)}</body></html>`);
   w.document.close();
   setTimeout(() => { w.focus(); w.print(); }, 600);
 }
