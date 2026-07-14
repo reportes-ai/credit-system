@@ -59,7 +59,8 @@
     <tr><td>documentos_verificables</td><td>Núcleo de certificados + firma electrónica (hash SHA-256, verificación pública /verificar QR).</td></tr>
     <tr><td>uf / utm / tasas</td><td>Indicadores; UF se carga completa en memoria (getUF(fecha)).</td></tr>
     <tr><td>ctb_cuentas / ctb_comprobantes / ctb_movimientos</td><td>Contabilidad (reemplazo AVSOFT): plan de cuentas real (176 ctas, 7 dígitos), comprobantes I/E/T con partida doble y correlativo por tipo+año, líneas Debe/Haber con num_op/rut. Libro 2025 de AVSOFT importado (origen='AVSOFT'). Anular = estado ANULADO, nunca DELETE.</td></tr>
-    <tr><td>ctb_reglas / ctb_reglas_lineas / ctb_eventos_log</td><td>Centralización automática: reglas paramétricas evento→cuentas (mantenedor Reglas de Centralización) y log de cada ejecución del motor.</td></tr>
+    <tr><td>ctb_reglas / ctb_reglas_lineas / ctb_eventos_log</td><td>Centralización automática: reglas paramétricas evento→cuentas (mantenedor Reglas de Centralización) y log de cada ejecución del motor (incluye estado MES_CERRADO cuando el candado bloquea un evento).</td></tr>
+    <tr><td>ctb_plantillas / ctb_guardian_reglas / ctb_meses_cerrados / ctb_adjuntos</td><td>Digitación pro: plantillas de asientos recurrentes (cuentas+lado, montos al aplicar); reglas del Guardián Contable (COMBINACION por prefijos y SISTEMA con lógica propia, severidad BLOQUEA/ADVIERTE, evaluadas en crearComprobante); candado de mes reportado (bloquea digitar/anular/motor, HTTP 423); respaldos adjuntos por comprobante (MEDIUMBLOB, máx 5MB). También ctb_cierre_comentarios y ctb_cierres_bitacora (comentarios e informes IA del cierre mensual).</td></tr>
   </table>
 
   <h2>Motores de cálculo (un solo hogar cada uno)</h2>

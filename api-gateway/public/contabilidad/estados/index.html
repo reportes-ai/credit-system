@@ -73,7 +73,8 @@ function tab(m){ MODO=m;
 }
 tab('BG');
 
-const filas = (arr, campo) => arr.map(x=>`<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'')}</td><td class="text-right ${x[campo]<0?'neg':''}">${fmt(x[campo])}</td></tr>`).join('');
+const linkMayor = cta => `/contabilidad/libros/?cuenta=${encodeURIComponent(cta)}&desde=${fDesde.value||fHasta.value.slice(0,4)+'-01-01'}&hasta=${fHasta.value}`;
+const filas = (arr, campo) => arr.map(x=>`<tr><td class="num"><a href="${linkMayor(x.cuenta)}" title="Ver libro mayor de la cuenta" style="text-decoration:none">${esc(x.cuenta)}</a></td><td>${esc(x.nombre||'')}</td><td class="text-right ${x[campo]<0?'neg':''}">${fmt(x[campo])}</td></tr>`).join('');
 
 async function consultar(){
   if (MODO==='BG') {

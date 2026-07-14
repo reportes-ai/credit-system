@@ -339,6 +339,99 @@ exports.libroMayor = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Buscador global de movimientos ────────────────────────────────────────────
+   "Todos los movimientos de la cuenta X con la palabra NOTARIA": busca en las
+   glosas (línea y comprobante), RUT y N° OP, con filtros opcionales de cuenta
+   y fechas. Siempre acotado (LIMIT 500). */
+exports.buscarMovimientos = async (req, res) => {
+  try {
+    const { q, cuenta, desde, hasta } = req.query;
+    if (!q && !cuenta) return fail(res, 'Indica texto a buscar (q) o una cuenta', 400);
+    const w = ["c.estado='CONTABILIZADO'"], vals = [];
+    if (q) { w.push('(m.glosa LIKE ? OR c.glosa LIKE ? OR m.rut LIKE ? OR CAST(m.num_op AS CHAR) LIKE ? OR c.origen_ref LIKE ?)');
+      const like = `%${q}%`; vals.push(like, like, like, like, like); }
+    if (cuenta) { w.push('m.cuenta=?'); vals.push(cuenta); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(desde || '')) { w.push('c.fecha>=?'); vals.push(desde); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(hasta || '')) { w.push('c.fecha<=?'); vals.push(hasta); }
+    const [rows] = await pool.query(
+      `SELECT c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa, c.origen,
+              m.cuenta, k.nombre cuenta_nombre, m.glosa, m.debe, m.haber, m.num_op, m.rut
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         LEFT JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE ${w.join(' AND ')} ORDER BY c.fecha DESC, c.id DESC, m.id LIMIT 500`, vals);
+    ok(res, rows.map(x => ({ ...x, num: fmtNum(x) })));
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Adjuntos de respaldo (factura PDF, comprobante de transferencia…) ──────── */
+require('../../../../shared/migrate').enFila('contabilidad-adjuntos', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_adjuntos (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        id_comprobante INT NOT NULL,
+        nombre         VARCHAR(200) NOT NULL,
+        mime           VARCHAR(100) NOT NULL,
+        tamano         INT NOT NULL DEFAULT 0,
+        datos          MEDIUMBLOB NOT NULL,
+        subido_por     VARCHAR(160) NULL,
+        created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_comp (id_comprobante)
+      )`);
+  } catch (e) { console.error('[contabilidad-adjuntos migration]', e.message); }
+});
+
+const MAX_ADJUNTO = 5 * 1024 * 1024; // 5 MB
+
+exports.listarAdjuntos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, nombre, mime, tamano, subido_por, created_at FROM ctb_adjuntos WHERE id_comprobante=? ORDER BY id', [req.params.id]);
+    ok(res, rows);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.subirAdjunto = async (req, res) => {
+  try {
+    const { nombre, mime, base64 } = req.body || {};
+    if (!nombre || !base64) return fail(res, 'nombre y base64 obligatorios', 400);
+    const [[comp]] = await pool.query('SELECT id FROM ctb_comprobantes WHERE id=?', [req.params.id]);
+    if (!comp) return fail(res, 'Comprobante no existe', 404);
+    const buf = Buffer.from(String(base64).replace(/^data:[^;]+;base64,/, ''), 'base64');
+    if (!buf.length) return fail(res, 'Archivo vacío', 400);
+    if (buf.length > MAX_ADJUNTO) return fail(res, 'Máximo 5 MB por adjunto', 400);
+    const [r] = await pool.query(
+      'INSERT INTO ctb_adjuntos (id_comprobante, nombre, mime, tamano, datos, subido_por) VALUES (?,?,?,?,?,?)',
+      [comp.id, String(nombre).slice(0, 200), String(mime || 'application/octet-stream').slice(0, 100), buf.length, buf, nombreDe(req.user)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'adjunto', entidad_id: r.insertId, detalle: `${nombre} (${buf.length} bytes) en comprobante ${comp.id}` });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.descargarAdjunto = async (req, res) => {
+  try {
+    const [[a]] = await pool.query('SELECT * FROM ctb_adjuntos WHERE id=?', [req.params.id]);
+    if (!a) return fail(res, 'No existe', 404);
+    res.setHeader('Content-Type', a.mime);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(a.nombre)}"`);
+    res.send(a.datos);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.eliminarAdjunto = async (req, res) => {
+  try {
+    const [[a]] = await pool.query(
+      'SELECT a.id, a.nombre, c.fecha FROM ctb_adjuntos a JOIN ctb_comprobantes c ON c.id=a.id_comprobante WHERE a.id=?', [req.params.id]);
+    if (!a) return fail(res, 'No existe', 404);
+    const candado = await mesConCandado(a.fecha.toISOString ? a.fecha.toISOString().slice(0, 10) : a.fecha);
+    if (candado) return fail(res, `El comprobante es del mes ${candado} (cerrado con candado); no se pueden quitar respaldos`, 423);
+    await pool.query('DELETE FROM ctb_adjuntos WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'adjunto', entidad_id: req.params.id, detalle: `Adjunto ${a.nombre} eliminado` });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Estados financieros (Fase 3) ──────────────────────────────────────────────
    Balance General a una fecha: saldos acumulados de ACTIVO / PASIVO / PATRIMONIO
    + Resultado del Ejercicio (ingresos − gastos acumulados) para que cuadre.

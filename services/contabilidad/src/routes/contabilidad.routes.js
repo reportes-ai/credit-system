@@ -17,6 +17,15 @@ router.post('/comprobantes',           verifyToken, requireFunc('ctb_comprobante
 router.get('/comprobantes/:id',        verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.getComprobante);
 router.post('/comprobantes/:id/anular', verifyToken, requireFunc('ctb_comprobantes'), ctrl.anularComprobante);
 
+// Buscador global de movimientos
+router.get('/movimientos', verifyToken, requireFunc('ctb_libros', 'ctb_balance', 'ctb_comprobantes'), ctrl.buscarMovimientos);
+
+// Adjuntos de respaldo
+router.get('/comprobantes/:id/adjuntos',  verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.listarAdjuntos);
+router.post('/comprobantes/:id/adjuntos', verifyToken, requireFunc('ctb_comprobantes'), ctrl.subirAdjunto);
+router.get('/adjuntos/:id',               verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.descargarAdjunto);
+router.delete('/adjuntos/:id',            verifyToken, requireFunc('ctb_comprobantes'), ctrl.eliminarAdjunto);
+
 // Asistente IA de asientos
 router.post('/asistente-asiento', verifyToken, requireFunc('ctb_comprobantes'), ctrl.asistenteAsiento);
 

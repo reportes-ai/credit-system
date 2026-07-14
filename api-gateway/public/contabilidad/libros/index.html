@@ -21,6 +21,7 @@
     .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
     .tot td { font-weight:700; background:#f8fafc; }
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .fila-click { cursor:pointer; } .fila-click:hover td { background:#f0f9ff; }
   </style>
 </head>
 <body>
@@ -33,20 +34,26 @@
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabD" onclick="tab('D');return false">Libro Diario</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabM" onclick="tab('M');return false">Libro Mayor</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabB" onclick="tab('B');return false"><i class="bi bi-search me-1"></i>Buscar</a></li>
   </ul>
 
   <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+    <div id="wQ" style="display:none"><label class="form-label small fw-semibold mb-1">Texto (glosa, RUT, N° OP)</label>
+      <input id="fQ" class="form-control form-control-sm" style="min-width:260px" placeholder="ej. NOTARIA" onkeydown="if(event.key==='Enter')consultar()"></div>
     <div id="wCuenta" style="display:none"><label class="form-label small fw-semibold mb-1">Cuenta</label>
       <select id="fCuenta" class="form-select form-select-sm" style="min-width:300px"></select></div>
     <div><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
     <div><label class="form-label small fw-semibold mb-1">Hasta</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
   </div>
+  <div class="small text-muted mb-2"><i class="bi bi-hand-index me-1"></i>Haz clic en cualquier fila para ver el comprobante completo (con sus respaldos adjuntos).</div>
 
   <div class="panel"><table id="tabla">
     <thead id="thead"></thead><tbody id="tbody"><tr><td class="text-center text-muted py-4">Elige un período y consulta</td></tr></tbody>
   </table></div>
 </div>
+
+<dialog id="dlgVer" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:760px;max-width:94vw"></dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -62,7 +69,11 @@ fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate(
 function tab(m){ MODO=m;
   document.getElementById('tabD').classList.toggle('active',m==='D');
   document.getElementById('tabM').classList.toggle('active',m==='M');
-  document.getElementById('wCuenta').style.display = m==='M'?'':'none';
+  document.getElementById('tabB').classList.toggle('active',m==='B');
+  document.getElementById('wCuenta').style.display = m==='M'||m==='B'?'':'none';
+  document.getElementById('wQ').style.display = m==='B'?'':'none';
+  if (m==='B' && ![...fCuenta.options].some(o=>o.value==='')) fCuenta.insertAdjacentHTML('afterbegin','<option value="">— todas las cuentas —</option>');
+  if (m==='M' && [...fCuenta.options].some(o=>o.value==='') ) fCuenta.querySelector('option[value=""]').remove();
   document.getElementById('tbody').innerHTML='<tr><td class="text-center text-muted py-4">Elige un período y consulta</td></tr>';
   document.getElementById('thead').innerHTML='';
 }
@@ -72,7 +83,56 @@ async function cargarCuentas(){
 }
 async function consultar(){
   if (MODO==='D') return diario();
+  if (MODO==='B') return buscar();
   return mayor();
+}
+async function buscar(){
+  const p = new URLSearchParams();
+  if (fQ.value.trim()) p.set('q',fQ.value.trim());
+  if (fCuenta.value) p.set('cuenta',fCuenta.value);
+  if (fDesde.value) p.set('desde',fDesde.value);
+  if (fHasta.value) p.set('hasta',fHasta.value);
+  const r = await fetch('/api/contabilidad/movimientos?'+p,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const rows = j.data||[];
+  document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Cuenta</th><th>Detalle</th><th>RUT</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr>';
+  document.getElementById('tbody').innerHTML = rows.map(x=>`
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+      <td class="num">${esc(x.cuenta)}</td><td>${esc(x.cuenta_nombre||'')} — ${esc(x.glosa||x.comp_glosa)}</td>
+      <td>${esc(x.rut||'')}</td><td>${esc(x.num_op||'')}</td>
+      <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="text-center text-muted py-4">Sin resultados</td></tr>';
+  if (rows.length===500) document.getElementById('tbody').insertAdjacentHTML('beforeend','<tr><td colspan="8" class="text-center text-muted small">Se muestran los primeros 500 — acota con fechas o cuenta</td></tr>');
+}
+
+/* Ver comprobante completo con adjuntos (drill-down) */
+async function ver(id){
+  const [rc, ra] = await Promise.all([
+    fetch('/api/contabilidad/comprobantes/'+id,{headers:H}).then(r=>r.json()),
+    fetch(`/api/contabilidad/comprobantes/${id}/adjuntos`,{headers:H}).then(r=>r.json()).catch(()=>({data:[]})),
+  ]);
+  if (!rc.success) return alert(rc.error);
+  const c = rc.data, adj = ra.data||[];
+  document.getElementById('dlgVer').innerHTML = `
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <h6 class="fw-bold mb-0">Comprobante ${esc(c.num)} — ${esc(c.tipo)}</h6>
+      <button class="btn btn-sm btn-outline-secondary" onclick="dlgVer.close()"><i class="bi bi-x-lg"></i></button></div>
+    <div class="small text-muted mb-2">${String(c.fecha).slice(0,10)} · ${esc(c.glosa)} · digitó ${esc(c.creado_por||'—')} · origen ${esc(c.origen)}
+      ${c.estado==='ANULADO'?`<br><b class="text-danger">ANULADO por ${esc(c.anulado_por||'')}: ${esc(c.anulado_motivo||'')}</b>`:''}</div>
+    <table><thead><tr><th>Cuenta</th><th>Glosa</th><th>N° OP</th><th>RUT</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr></thead>
+    <tbody>${c.movimientos.map(m=>`<tr><td class="num">${esc(m.cuenta)}</td><td>${esc(m.cuenta_nombre||'')}${m.glosa?' · '+esc(m.glosa):''}</td>
+      <td>${esc(m.num_op||'')}</td><td>${esc(m.rut||'')}</td>
+      <td class="text-right">${m.debe>0?'$'+fmt(m.debe):''}</td><td class="text-right">${m.haber>0?'$'+fmt(m.haber):''}</td></tr>`).join('')}
+      <tr class="tot"><td colspan="4">TOTAL</td><td class="text-right">$${fmt(c.total)}</td><td class="text-right">$${fmt(c.total)}</td></tr>
+    </tbody></table>
+    ${adj.length?`<div class="mt-3 small"><b><i class="bi bi-paperclip me-1"></i>Respaldos:</b> ${adj.map(a=>`<a href="#" onclick="descargar(${a.id},'${esc(a.nombre)}');return false">${esc(a.nombre)}</a> (${Math.round(a.tamano/1024)} KB)`).join(' · ')}</div>`:''}`;
+  document.getElementById('dlgVer').showModal();
+}
+async function descargar(id,nombre){
+  const r = await fetch('/api/contabilidad/adjuntos/'+id,{headers:H});
+  if (!r.ok) return alert('No se pudo descargar');
+  const blob = await r.blob(); const u = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=u; a.download=nombre; a.click(); URL.revokeObjectURL(u);
 }
 async function diario(){
   const r = await fetch(`/api/contabilidad/libro-diario?desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
@@ -80,7 +140,7 @@ async function diario(){
   const rows = j.data||[]; let d=0,h=0;
   document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Cuenta</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr>';
   document.getElementById('tbody').innerHTML = rows.map(x=>{ d+=Number(x.debe); h+=Number(x.haber); return `
-    <tr><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
       <td class="num">${esc(x.cuenta)}</td><td>${esc(x.cuenta_nombre||'')} — ${esc(x.glosa||x.comp_glosa)}</td>
       <td>${esc(x.num_op||'')}</td>
       <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td></tr>`;
@@ -94,7 +154,7 @@ async function mayor(){
   document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th><th class="text-right">Saldo</th></tr>';
   let html = `<tr class="tot"><td colspan="6">SALDO INICIAL al ${fDesde.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
   html += movimientos.map(x=>{ saldo += Number(x.debe)-Number(x.haber); return `
-    <tr><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+    <tr class="fila-click" onclick="ver(${x.id})"><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
       <td>${esc(x.glosa||x.comp_glosa)}</td><td>${esc(x.num_op||'')}</td>
       <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td>
       <td class="text-right">$${fmt(saldo)}</td></tr>`;
@@ -102,7 +162,18 @@ async function mayor(){
   html += `<tr class="tot"><td colspan="6">SALDO FINAL al ${fHasta.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
   document.getElementById('tbody').innerHTML = html;
 }
-cargarCuentas();
+(async()=>{
+  await cargarCuentas();
+  // Drill-down desde balance/estados: /contabilidad/libros/?cuenta=X&desde=&hasta=
+  const p = new URLSearchParams(location.search);
+  if (p.get('cuenta')){
+    tab('M');
+    fCuenta.value = p.get('cuenta');
+    if (p.get('desde')) fDesde.value = p.get('desde');
+    if (p.get('hasta')) fHasta.value = p.get('hasta');
+    consultar();
+  }
+})();
 </script>
 <script src="/js/app-version.js"></script>
 </body>

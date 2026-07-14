@@ -63,7 +63,7 @@ async function consultar(){
   const T = { debe:0, haber:0, deudor:0, acreedor:0, activo:0, pasivo:0, perdida:0, ganancia:0 };
   const html = rows.map(x=>{
     for (const k of Object.keys(T)) T[k]+=Number(x[k]||0);
-    return `<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'(sin nombre)')}</td>
+    return `<tr><td class="num"><a href="/contabilidad/libros/?cuenta=${encodeURIComponent(x.cuenta)}&desde=${fDesde.value}&hasta=${fHasta.value}" title="Ver libro mayor de la cuenta" style="text-decoration:none">${esc(x.cuenta)}</a></td><td>${esc(x.nombre||'(sin nombre)')}</td>
       <td>${fmt(x.debe)}</td><td>${fmt(x.haber)}</td><td>${fmt(x.deudor)}</td><td>${fmt(x.acreedor)}</td>
       <td>${fmt(x.activo)}</td><td>${fmt(x.pasivo)}</td><td>${fmt(x.perdida)}</td><td>${fmt(x.ganancia)}</td></tr>`;
   }).join('');
