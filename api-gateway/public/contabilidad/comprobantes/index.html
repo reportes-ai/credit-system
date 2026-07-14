@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comprobantes Contables — AutoFácil</title>
+  <!-- v1.0 — digitación de comprobantes I/E/T con partida doble -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1250px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; margin-bottom:22px; }
+    .panel-pad { padding:20px 24px; }
+    table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:8px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .b-INGRESO { background:#dcfce7; color:#166534; } .b-EGRESO { background:#fee2e2; color:#991b1b; } .b-TRASPASO { background:#e0f2fe; color:#075985; }
+    .b-ANULADO { background:#f3f4f6; color:#6b7280; text-decoration:line-through; }
+    .badge-t { font-size:.72rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .cuadre { font-weight:700; font-size:.9rem; } .cuadre.ok { color:#166534; } .cuadre.mal { color:#991b1b; }
+    .anulado-row td { opacity:.5; text-decoration:line-through; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Comprobantes', icon:'bi-journal-plus', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journal-plus"></i><div><h2>Comprobantes Contables</h2><p>Ingreso, Egreso y Traspaso con partida doble validada (Debe = Haber) y correlativo automático por tipo y año.</p></div></div>
+
+  <!-- Digitación -->
+  <div class="panel panel-pad" id="panelNuevo">
+    <h6 class="fw-bold mb-3"><i class="bi bi-pencil-square me-1"></i>Nuevo comprobante</h6>
+    <div class="row g-2 mb-3">
+      <div class="col-auto"><label class="form-label small fw-semibold mb-1">Tipo</label>
+        <select id="nTipo" class="form-select form-select-sm"><option>EGRESO</option><option>INGRESO</option><option>TRASPASO</option></select></div>
+      <div class="col-auto"><label class="form-label small fw-semibold mb-1">Fecha</label>
+        <input type="date" id="nFecha" class="form-control form-control-sm"></div>
+      <div class="col"><label class="form-label small fw-semibold mb-1">Glosa</label>
+        <input id="nGlosa" class="form-control form-control-sm" placeholder="Descripción del comprobante"></div>
+    </div>
+    <table class="mb-2"><thead><tr>
+      <th style="width:290px">Cuenta</th><th>Glosa línea</th><th style="width:120px">N° OP</th><th style="width:120px">RUT</th>
+      <th style="width:130px" class="text-right">Debe</th><th style="width:130px" class="text-right">Haber</th><th style="width:40px"></th>
+    </tr></thead><tbody id="nLineas"></tbody></table>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <button class="btn btn-sm btn-outline-primary" onclick="addLinea()"><i class="bi bi-plus-lg me-1"></i>Agregar línea</button>
+      <div class="d-flex align-items-center gap-3">
+        <span class="cuadre" id="nCuadre"></span>
+        <button class="btn btn-sm btn-primary" id="btnGrabar" onclick="grabar()"><i class="bi bi-check-lg me-1"></i>Contabilizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Listado -->
+  <div class="d-flex gap-2 align-items-end mb-2 flex-wrap">
+    <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="listar()"></div>
+    <div><label class="form-label small fw-semibold mb-1">Tipo</label>
+      <select id="fTipo" class="form-select form-select-sm" onchange="listar()"><option value="">Todos</option><option>INGRESO</option><option>EGRESO</option><option>TRASPASO</option></select></div>
+    <div><label class="form-label small fw-semibold mb-1">Buscar glosa</label><input id="fQ" class="form-control form-control-sm" onchange="listar()"></div>
+  </div>
+  <div class="panel"><table>
+    <thead><tr><th>N°</th><th>Tipo</th><th>Fecha</th><th>Glosa</th><th class="text-right">Total</th><th>Estado</th><th>Digitó</th><th></th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="8" class="text-center text-muted py-4">Cargando…</td></tr></tbody>
+  </table></div>
+</div>
+
+<dialog id="dlgVer" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:760px;max-width:94vw"></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+let CTAS = [];
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+document.getElementById('nFecha').value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
+document.getElementById('fMes').value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}`;
+
+async function cargarCuentas(){
+  const r = await fetch('/api/contabilidad/cuentas',{headers:H}); const j = await r.json();
+  CTAS = (j.data||[]).filter(c=>c.imputable && c.activo);
+}
+const optsCuentas = sel => '<option value="">— cuenta —</option>' + CTAS.map(c=>`<option value="${esc(c.codigo)}" ${c.codigo===sel?'selected':''}>${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join('');
+
+function addLinea(){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><select class="form-select form-select-sm l-cta">${optsCuentas()}</select></td>
+    <td><input class="form-control form-control-sm l-glosa"></td>
+    <td><input class="form-control form-control-sm l-op"></td>
+    <td><input class="form-control form-control-sm l-rut"></td>
+    <td><input class="form-control form-control-sm text-end l-debe" oninput="cuadrar()"></td>
+    <td><input class="form-control form-control-sm text-end l-haber" oninput="cuadrar()"></td>
+    <td><button class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('tr').remove();cuadrar()"><i class="bi bi-x-lg"></i></button></td>`;
+  document.getElementById('nLineas').appendChild(tr);
+}
+const val = el => Math.round(Number(String(el.value).replace(/\./g,'').replace(/,/g,'.'))||0);
+function cuadrar(){
+  let d=0,h=0;
+  document.querySelectorAll('#nLineas tr').forEach(tr=>{ d+=val(tr.querySelector('.l-debe')); h+=val(tr.querySelector('.l-haber')); });
+  const el = document.getElementById('nCuadre');
+  el.textContent = `Debe $${fmt(d)} · Haber $${fmt(h)} ${d===h&&d>0?'✓ cuadrado':(d||h?'≠ descuadrado':'')}`;
+  el.className = 'cuadre ' + (d===h&&d>0?'ok':'mal');
+}
+async function grabar(){
+  const movimientos = [...document.querySelectorAll('#nLineas tr')].map(tr=>({
+    cuenta: tr.querySelector('.l-cta').value, glosa: tr.querySelector('.l-glosa').value.trim()||null,
+    num_op: tr.querySelector('.l-op').value.trim()||null, rut: tr.querySelector('.l-rut').value.trim()||null,
+    debe: val(tr.querySelector('.l-debe')), haber: val(tr.querySelector('.l-haber')),
+  })).filter(m=>m.cuenta||m.debe||m.haber);
+  const body = { tipo:nTipo.value, fecha:nFecha.value, glosa:nGlosa.value.trim(), movimientos };
+  const btn = document.getElementById('btnGrabar'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/contabilidad/comprobantes',{method:'POST',headers:H,body:JSON.stringify(body)});
+    const j = await r.json();
+    if (!j.success) return alert(j.error||'Error');
+    alert('Comprobante '+j.data.numero+' contabilizado por $'+fmt(j.data.total));
+    nGlosa.value=''; document.getElementById('nLineas').innerHTML=''; addLinea(); addLinea(); cuadrar(); listar();
+  } finally { btn.disabled = false; }
+}
+async function listar(){
+  const p = new URLSearchParams();
+  if (fMes.value) p.set('mes',fMes.value); if (fTipo.value) p.set('tipo',fTipo.value); if (fQ.value.trim()) p.set('q',fQ.value.trim());
+  const r = await fetch('/api/contabilidad/comprobantes?'+p,{headers:H}); const j = await r.json();
+  const rows = j.data||[];
+  document.getElementById('tbody').innerHTML = rows.map(c=>`
+    <tr class="${c.estado==='ANULADO'?'anulado-row':''}">
+      <td class="num">${esc(c.num)}</td>
+      <td><span class="badge-t b-${c.tipo}">${c.tipo}</span></td>
+      <td>${String(c.fecha).slice(0,10)}</td>
+      <td>${esc(c.glosa)}${c.origen!=='MANUAL'?` <span class="badge-t" style="background:#ede9fe;color:#5b21b6">${esc(c.origen)}</span>`:''}</td>
+      <td class="text-right">$${fmt(c.total)}</td>
+      <td>${c.estado==='ANULADO'?'<span class="badge-t b-ANULADO">ANULADO</span>':'<span class="badge-t" style="background:#dcfce7;color:#166534">OK</span>'}</td>
+      <td>${esc(c.creado_por||'—')}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-link p-0 me-2" onclick="ver(${c.id})"><i class="bi bi-eye"></i></button>
+        ${c.estado==='CONTABILIZADO'?`<button class="btn btn-sm btn-link text-danger p-0" title="Anular" onclick="anular(${c.id},'${esc(c.num)}')"><i class="bi bi-slash-circle"></i></button>`:''}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted py-4">Sin comprobantes en el período</td></tr>';
+}
+async function ver(id){
+  const r = await fetch('/api/contabilidad/comprobantes/'+id,{headers:H}); const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const c = j.data;
+  document.getElementById('dlgVer').innerHTML = `
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <h6 class="fw-bold mb-0">Comprobante ${esc(c.num)} — ${esc(c.tipo)}</h6>
+      <button class="btn btn-sm btn-outline-secondary" onclick="dlgVer.close()"><i class="bi bi-x-lg"></i></button></div>
+    <div class="small text-muted mb-2">${String(c.fecha).slice(0,10)} · ${esc(c.glosa)} · digitó ${esc(c.creado_por||'—')}
+      ${c.estado==='ANULADO'?`<br><b class="text-danger">ANULADO por ${esc(c.anulado_por||'')}: ${esc(c.anulado_motivo||'')}</b>`:''}</div>
+    <table><thead><tr><th>Cuenta</th><th>Glosa</th><th>N° OP</th><th>RUT</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr></thead>
+    <tbody>${c.movimientos.map(m=>`<tr><td class="num">${esc(m.cuenta)}</td><td>${esc(m.cuenta_nombre||'')}${m.glosa?' · '+esc(m.glosa):''}</td>
+      <td>${esc(m.num_op||'')}</td><td>${esc(m.rut||'')}</td>
+      <td class="text-right">${m.debe>0?'$'+fmt(m.debe):''}</td><td class="text-right">${m.haber>0?'$'+fmt(m.haber):''}</td></tr>`).join('')}
+      <tr style="font-weight:700"><td colspan="4">TOTAL</td><td class="text-right">$${fmt(c.total)}</td><td class="text-right">$${fmt(c.total)}</td></tr>
+    </tbody></table>`;
+  document.getElementById('dlgVer').showModal();
+}
+async function anular(id,num){
+  const motivo = prompt('Motivo de anulación de '+num+':'); if (!motivo||!motivo.trim()) return;
+  const r = await fetch(`/api/contabilidad/comprobantes/${id}/anular`,{method:'POST',headers:H,body:JSON.stringify({motivo:motivo.trim()})});
+  const j = await r.json(); if (!j.success) return alert(j.error); listar();
+}
+(async()=>{ await cargarCuentas(); addLinea(); addLinea(); cuadrar(); listar(); })();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

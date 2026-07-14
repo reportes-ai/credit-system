@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan de Cuentas — AutoFácil</title>
+  <!-- v1.0 — mantenedor del plan de cuentas jerárquico -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1100px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; margin-bottom:22px; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; }
+    tbody td { padding:8px 14px; border-bottom:1px solid #f1f5f9; }
+    .cod { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .agrupa td { background:#f8fafc; font-weight:700; }
+    .inactiva td { opacity:.45; }
+    .badge-t { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .t-ACTIVO { background:#dcfce7; color:#166534; } .t-PASIVO { background:#fee2e2; color:#991b1b; }
+    .t-PATRIMONIO { background:#e0f2fe; color:#075985; } .t-INGRESO { background:#ede9fe; color:#5b21b6; } .t-GASTO { background:#fef3c7; color:#92400e; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; display:flex; align-items:center; gap:8px; }
+    .btn-mini { border:none; background:none; color:#6b7280; cursor:pointer; font-size:.95rem; } .btn-mini:hover { color:var(--navy); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Plan de Cuentas', icon:'bi-diagram-3', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-diagram-3"></i><div><h2>Plan de Cuentas</h2><p>Plan jerárquico y paramétrico. Solo las cuentas <b>imputables</b> reciben movimientos; las de agrupación ordenan el árbol.</p></div></div>
+
+  <div class="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-2">
+    <div class="d-flex gap-2">
+      <input id="fBuscar" class="form-control form-control-sm" style="width:260px" placeholder="Buscar cuenta o código…" oninput="render()">
+      <select id="fTipo" class="form-select form-select-sm" style="width:160px" onchange="render()">
+        <option value="">Todos los tipos</option><option>ACTIVO</option><option>PASIVO</option><option>PATRIMONIO</option><option>INGRESO</option><option>GASTO</option>
+      </select>
+    </div>
+    <button class="btn btn-sm btn-primary" onclick="abrirNueva()"><i class="bi bi-plus-lg me-1"></i>Nueva cuenta</button>
+  </div>
+
+  <div class="panel"><table>
+    <thead><tr><th style="width:120px">Código</th><th>Nombre</th><th style="width:120px">Tipo</th><th style="width:100px">Imputable</th><th style="width:90px">Estado</th><th style="width:90px"></th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="6" class="text-center text-muted py-4">Cargando…</td></tr></tbody>
+  </table></div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i>Qué afecta este mantenedor</h6>
+    <ul class="mb-0">
+      <li><b>Cuentas imputables</b> → son las que se pueden usar al digitar <a href="/contabilidad/comprobantes/">Comprobantes</a>.</li>
+      <li><b>Nombre y tipo de cuenta</b> → cómo se muestra y clasifica cada línea en los <a href="/contabilidad/libros/">Libros Diario y Mayor</a> y en qué columna cae en el <a href="/contabilidad/balance/">Balance de Comprobación</a> (tipo INGRESO/GASTO → columnas de resultado; el resto → inventario).</li>
+      <li><b>Desactivar una cuenta</b> → deja de aceptar movimientos nuevos, pero su historial sigue visible en libros y balance.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:420px;max-width:92vw">
+  <h6 class="fw-bold mb-3" id="dlgTitulo">Nueva cuenta</h6>
+  <div class="mb-2"><label class="form-label small fw-semibold mb-1">Código (jerárquico, ej: 1.1.09)</label><input id="dCod" class="form-control form-control-sm"></div>
+  <div class="mb-2"><label class="form-label small fw-semibold mb-1">Nombre</label><input id="dNom" class="form-control form-control-sm"></div>
+  <div class="mb-2"><label class="form-label small fw-semibold mb-1">Tipo</label>
+    <select id="dTipo" class="form-select form-select-sm"><option>ACTIVO</option><option>PASIVO</option><option>PATRIMONIO</option><option>INGRESO</option><option>GASTO</option></select></div>
+  <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="dImp" checked><label class="form-check-label small" for="dImp">Imputable (recibe movimientos)</label></div>
+  <div class="d-flex justify-content-end gap-2">
+    <button class="btn btn-sm btn-outline-secondary" onclick="dlg.close()">Cancelar</button>
+    <button class="btn btn-sm btn-primary" onclick="guardar()">Guardar</button>
+  </div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let CTAS = [], editando = null;
+const dlg = document.getElementById('dlg');
+
+async function cargar(){
+  const r = await fetch('/api/contabilidad/cuentas',{headers:H}); const j = await r.json();
+  CTAS = j.data||[]; render();
+}
+function render(){
+  const q = (document.getElementById('fBuscar').value||'').toLowerCase();
+  const t = document.getElementById('fTipo').value;
+  const rows = CTAS.filter(c => (!t||c.tipo===t) && (!q || c.codigo.includes(q) || c.nombre.toLowerCase().includes(q)));
+  document.getElementById('tbody').innerHTML = rows.map(c=>{
+    const nivel = c.codigo.split('.').length - 1;
+    return `<tr class="${c.imputable?'':'agrupa'} ${c.activo?'':'inactiva'}">
+      <td class="cod" style="padding-left:${14+nivel*18}px">${esc(c.codigo)}</td>
+      <td>${esc(c.nombre)}</td>
+      <td><span class="badge-t t-${c.tipo}">${c.tipo}</span></td>
+      <td>${c.imputable?'<i class="bi bi-check-circle-fill text-success"></i>':'—'}</td>
+      <td>${c.activo?'Activa':'Inactiva'}</td>
+      <td class="text-end">
+        <button class="btn-mini" title="Editar" onclick="abrirEditar('${esc(c.codigo)}')"><i class="bi bi-pencil"></i></button>
+        <button class="btn-mini" title="${c.activo?'Desactivar':'Activar'}" onclick="toggleActiva('${esc(c.codigo)}',${c.activo?0:1})"><i class="bi bi-${c.activo?'toggle-on':'toggle-off'}"></i></button>
+        <button class="btn-mini" title="Eliminar" onclick="eliminar('${esc(c.codigo)}')"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="text-center text-muted py-4">Sin cuentas</td></tr>';
+}
+function abrirNueva(){ editando=null; document.getElementById('dlgTitulo').textContent='Nueva cuenta';
+  dCod.value=''; dCod.disabled=false; dNom.value=''; dTipo.value='ACTIVO'; dImp.checked=true; dlg.showModal(); }
+function abrirEditar(cod){ const c = CTAS.find(x=>x.codigo===cod); if(!c) return; editando=cod;
+  document.getElementById('dlgTitulo').textContent='Editar '+cod;
+  dCod.value=c.codigo; dCod.disabled=true; dNom.value=c.nombre; dTipo.value=c.tipo; dImp.checked=!!c.imputable; dlg.showModal(); }
+async function guardar(){
+  const body = { nombre:dNom.value.trim(), tipo:dTipo.value, imputable:dImp.checked };
+  let r;
+  if (editando) r = await fetch('/api/contabilidad/cuentas/'+encodeURIComponent(editando),{method:'PUT',headers:H,body:JSON.stringify(body)});
+  else r = await fetch('/api/contabilidad/cuentas',{method:'POST',headers:H,body:JSON.stringify({...body,codigo:dCod.value.trim()})});
+  const j = await r.json();
+  if (!j.success) return alert(j.error||'Error');
+  dlg.close(); cargar();
+}
+async function toggleActiva(cod,activo){
+  const r = await fetch('/api/contabilidad/cuentas/'+encodeURIComponent(cod),{method:'PUT',headers:H,body:JSON.stringify({activo})});
+  const j = await r.json(); if(!j.success) return alert(j.error); cargar();
+}
+async function eliminar(cod){
+  if (!confirm('¿Eliminar la cuenta '+cod+'? Solo se puede si no tiene movimientos ni subcuentas.')) return;
+  const r = await fetch('/api/contabilidad/cuentas/'+encodeURIComponent(cod),{method:'DELETE',headers:H});
+  const j = await r.json(); if(!j.success) return alert(j.error); cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

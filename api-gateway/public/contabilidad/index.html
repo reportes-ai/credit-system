@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contabilidad — AutoFácil</title>
+  <!-- v1.0 — Fase 1: plan de cuentas, comprobantes, libros diario/mayor, balance de comprobación -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .main-content { padding:36px 40px; max-width:1000px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:28px 36px; margin-bottom:36px; display:flex; align-items:center; gap:20px; }
+    .page-banner i { font-size:3rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 4px; font-size:1.4rem; } .page-banner p { opacity:.85; margin:0; font-size:.9rem; }
+    .cards-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; } @media(max-width:700px){ .cards-grid { grid-template-columns:1fr; } }
+    .module-card { background:#fff; border-radius:16px; padding:32px 28px; text-decoration:none; color:inherit; border:2px solid transparent; transition:all .18s; display:block; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .module-card:hover { border-color:var(--navy); transform:translateY(-4px); box-shadow:0 12px 32px rgba(1,65,162,.15); }
+    .card-icon { width:58px; height:58px; border-radius:14px; background:linear-gradient(135deg,#e8eaf6,#c5cae9); display:flex; align-items:center; justify-content:center; font-size:1.7rem; color:var(--navy); margin-bottom:18px; }
+    .module-card:hover .card-icon { background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; }
+    .module-card h5 { font-weight:700; font-size:1.05rem; margin:0 0 8px; color:#111827; } .module-card p { font-size:.83rem; color:#6b7280; margin:0 0 20px; line-height:1.5; }
+    .btn-acceder { background:var(--navy); color:#fff; border-radius:8px; padding:8px 18px; font-size:.83rem; font-weight:600; display:inline-flex; align-items:center; gap:6px; } .module-card:hover .btn-acceder { background:var(--accent); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', icon:'bi-calculator-fill', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-calculator-fill"></i><div><h2>Contabilidad</h2><p>El corazón contable de AutoFácil: comprobantes con partida doble, libros y balances — conectado a toda la operación de la Suite.</p></div></div>
+  <div class="cards-grid">
+    <a href="/contabilidad/comprobantes/" class="module-card" id="cardComp" style="display:none">
+      <div class="card-icon"><i class="bi bi-journal-plus"></i></div>
+      <h5>Comprobantes</h5>
+      <p>Digitación de comprobantes de Ingreso, Egreso y Traspaso con partida doble validada y correlativo automático por tipo y año.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+    <a href="/contabilidad/libros/" class="module-card" id="cardLib" style="display:none">
+      <div class="card-icon"><i class="bi bi-book"></i></div>
+      <h5>Libros Diario y Mayor</h5>
+      <p>Libro diario por rango de fechas y libro mayor por cuenta con saldo inicial y acumulado — con referencia a operación y RUT.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+    <a href="/contabilidad/balance/" class="module-card" id="cardBal" style="display:none">
+      <div class="card-icon"><i class="bi bi-clipboard-data"></i></div>
+      <h5>Balance de Comprobación</h5>
+      <p>Balance de 8 columnas: sumas, saldos, inventario y resultado — la foto contable del período en un clic.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+    <a href="/contabilidad/plan-cuentas/" class="module-card" id="cardPlan" style="display:none">
+      <div class="card-icon"><i class="bi bi-diagram-3"></i></div>
+      <h5>Plan de Cuentas <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
+      <p>Plan de cuentas jerárquico y 100% paramétrico: crea, edita y desactiva cuentas sin tocar código.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token = sessionStorage.getItem('token'); const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if (!token||!yo) location.href='/login.html';
+  (async()=>{
+    let funcs = new Set(); const esAdmin = yo?.perfil==='Administrador';
+    try { const r = await fetch('/api/auth/mis-permisos?_='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+token}}); const j = await r.json(); (j.funcionalidades||[]).forEach(c=>funcs.add(c)); } catch(e){}
+    const tiene = (...cs)=> esAdmin || cs.some(c=>funcs.has(c));
+    if (tiene('ctb_comprobantes')) document.getElementById('cardComp').style.display='';
+    if (tiene('ctb_libros')) document.getElementById('cardLib').style.display='';
+    if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
+    if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
+  })();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

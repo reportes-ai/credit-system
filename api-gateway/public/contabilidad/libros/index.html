@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Libros Diario y Mayor — AutoFácil</title>
+  <!-- v1.0 — libro diario por rango + libro mayor por cuenta con saldo acumulado -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1250px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .tot td { font-weight:700; background:#f8fafc; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Libros', icon:'bi-book', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-book"></i><div><h2>Libros Diario y Mayor</h2><p>El diario muestra cada asiento del período; el mayor, la película de UNA cuenta con saldo inicial y acumulado.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabD" onclick="tab('D');return false">Libro Diario</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabM" onclick="tab('M');return false">Libro Mayor</a></li>
+  </ul>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+    <div id="wCuenta" style="display:none"><label class="form-label small fw-semibold mb-1">Cuenta</label>
+      <select id="fCuenta" class="form-select form-select-sm" style="min-width:300px"></select></div>
+    <div><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">Hasta</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
+  </div>
+
+  <div class="panel"><table id="tabla">
+    <thead id="thead"></thead><tbody id="tbody"><tr><td class="text-center text-muted py-4">Elige un período y consulta</td></tr></tbody>
+  </table></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+let MODO = 'D';
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+fDesde.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-01`;
+fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
+
+function tab(m){ MODO=m;
+  document.getElementById('tabD').classList.toggle('active',m==='D');
+  document.getElementById('tabM').classList.toggle('active',m==='M');
+  document.getElementById('wCuenta').style.display = m==='M'?'':'none';
+  document.getElementById('tbody').innerHTML='<tr><td class="text-center text-muted py-4">Elige un período y consulta</td></tr>';
+  document.getElementById('thead').innerHTML='';
+}
+async function cargarCuentas(){
+  const r = await fetch('/api/contabilidad/cuentas',{headers:H}); const j = await r.json();
+  fCuenta.innerHTML = (j.data||[]).filter(c=>c.imputable).map(c=>`<option value="${esc(c.codigo)}">${esc(c.codigo)} · ${esc(c.nombre)}</option>`).join('');
+}
+async function consultar(){
+  if (MODO==='D') return diario();
+  return mayor();
+}
+async function diario(){
+  const r = await fetch(`/api/contabilidad/libro-diario?desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const rows = j.data||[]; let d=0,h=0;
+  document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Cuenta</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th></tr>';
+  document.getElementById('tbody').innerHTML = rows.map(x=>{ d+=Number(x.debe); h+=Number(x.haber); return `
+    <tr><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+      <td class="num">${esc(x.cuenta)}</td><td>${esc(x.cuenta_nombre||'')} — ${esc(x.glosa||x.comp_glosa)}</td>
+      <td>${esc(x.num_op||'')}</td>
+      <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td></tr>`;
+  }).join('') + (rows.length?`<tr class="tot"><td colspan="5">TOTALES</td><td class="text-right">$${fmt(d)}</td><td class="text-right">$${fmt(h)}</td></tr>`:'<tr><td colspan="7" class="text-center text-muted py-4">Sin movimientos en el período</td></tr>');
+}
+async function mayor(){
+  const r = await fetch(`/api/contabilidad/libro-mayor?cuenta=${encodeURIComponent(fCuenta.value)}&desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const { saldo_inicial, movimientos } = j.data;
+  let saldo = Number(saldo_inicial);
+  document.getElementById('thead').innerHTML = '<tr><th>N°</th><th>Fecha</th><th>Detalle</th><th>N° OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th><th class="text-right">Saldo</th></tr>';
+  let html = `<tr class="tot"><td colspan="6">SALDO INICIAL al ${fDesde.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
+  html += movimientos.map(x=>{ saldo += Number(x.debe)-Number(x.haber); return `
+    <tr><td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+      <td>${esc(x.glosa||x.comp_glosa)}</td><td>${esc(x.num_op||'')}</td>
+      <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td>
+      <td class="text-right">$${fmt(saldo)}</td></tr>`;
+  }).join('');
+  html += `<tr class="tot"><td colspan="6">SALDO FINAL al ${fHasta.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
+  document.getElementById('tbody').innerHTML = html;
+}
+cargarCuentas();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

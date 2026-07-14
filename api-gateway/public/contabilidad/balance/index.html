@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balance de Comprobación — AutoFácil</title>
+  <!-- v1.0 — balance de comprobación y saldos de 8 columnas -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1350px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 10px; text-align:right; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    thead th:first-child, thead th:nth-child(2) { text-align:left; }
+    tbody td { padding:7px 10px; border-bottom:1px solid #f1f5f9; text-align:right; }
+    tbody td:first-child, tbody td:nth-child(2) { text-align:left; }
+    .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .tot td { font-weight:700; background:#eef2ff; }
+    .res td { font-weight:700; background:#f0fdf4; }
+    @media print { .page-banner, .toolbar, #af-topnav { display:none !important; } body { background:#fff; } }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Balance', icon:'bi-clipboard-data', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-clipboard-data"></i><div><h2>Balance de Comprobación y Saldos</h2><p>8 columnas: sumas del período, saldos, inventario (activo/pasivo) y resultado (pérdida/ganancia).</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar">
+    <div><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">Hasta</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+  </div>
+
+  <div class="panel"><table>
+    <thead><tr><th>Cuenta</th><th>Nombre</th><th>Débitos</th><th>Créditos</th><th>Deudor</th><th>Acreedor</th><th>Activo</th><th>Pasivo</th><th>Pérdida</th><th>Ganancia</th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="10" style="text-align:center" class="text-muted py-4">Elige un período y consulta</td></tr></tbody>
+  </table></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => n ? '$'+Number(n).toLocaleString('es-CL') : '';
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+fDesde.value = `${hoy.getFullYear()}-01-01`;
+fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
+
+async function consultar(){
+  const r = await fetch(`/api/contabilidad/balance?desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const rows = j.data||[];
+  const T = { debe:0, haber:0, deudor:0, acreedor:0, activo:0, pasivo:0, perdida:0, ganancia:0 };
+  const html = rows.map(x=>{
+    for (const k of Object.keys(T)) T[k]+=Number(x[k]||0);
+    return `<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'(sin nombre)')}</td>
+      <td>${fmt(x.debe)}</td><td>${fmt(x.haber)}</td><td>${fmt(x.deudor)}</td><td>${fmt(x.acreedor)}</td>
+      <td>${fmt(x.activo)}</td><td>${fmt(x.pasivo)}</td><td>${fmt(x.perdida)}</td><td>${fmt(x.ganancia)}</td></tr>`;
+  }).join('');
+  if (!rows.length) { document.getElementById('tbody').innerHTML = '<tr><td colspan="10" style="text-align:center" class="text-muted py-4">Sin movimientos en el período</td></tr>'; return; }
+  const resultado = T.ganancia - T.perdida; // utilidad (+) o pérdida (−) del período
+  document.getElementById('tbody').innerHTML = html +
+    `<tr class="tot"><td colspan="2">SUMAS</td><td>${fmt(T.debe)}</td><td>${fmt(T.haber)}</td><td>${fmt(T.deudor)}</td><td>${fmt(T.acreedor)}</td><td>${fmt(T.activo)}</td><td>${fmt(T.pasivo)}</td><td>${fmt(T.perdida)}</td><td>${fmt(T.ganancia)}</td></tr>` +
+    `<tr class="res"><td colspan="2">RESULTADO DEL PERÍODO</td><td colspan="7" style="text-align:left">${resultado>=0?'UTILIDAD':'PÉRDIDA'}</td><td>${fmt(Math.abs(resultado))}</td></tr>`;
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

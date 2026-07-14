@@ -171,6 +171,7 @@ app.use('/api/tickets',              require('../../services/tickets/src/routes/
 app.use('/api/whatsapp',             require('../../services/whatsapp/src/routes/whatsapp.routes'));
 app.use('/api/portal-cliente',       require('../../services/portal-cliente/src/routes/portal-cliente.routes'));
 app.use('/api/rrhh',                 require('../../services/rrhh/src/routes/rrhh.routes'));
+app.use('/api/contabilidad',         require('../../services/contabilidad/src/routes/contabilidad.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
@@ -501,6 +502,11 @@ const PAGINAS = [
   ['/whatsapp', 'whatsapp/index.html'],
   ['/portal-cliente', 'portal-cliente/index.html'],
   ['/mis-creditos', 'portal-cliente/index.html'],
+  ['/contabilidad', 'contabilidad/index.html'],
+  ['/contabilidad/plan-cuentas', 'contabilidad/plan-cuentas/index.html'],
+  ['/contabilidad/comprobantes', 'contabilidad/comprobantes/index.html'],
+  ['/contabilidad/libros', 'contabilidad/libros/index.html'],
+  ['/contabilidad/balance', 'contabilidad/balance/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
   ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
   ['/recursos-humanos/vacaciones', 'recursos-humanos/vacaciones/index.html'],
