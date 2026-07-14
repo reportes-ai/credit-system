@@ -113,8 +113,7 @@ const crear = async (req, res) => {
     if (fh < fd) return fail(res, 'La fecha hasta no puede ser anterior a desde', 400);
     const tipos = await tiposAusencia();
     if (!tipos.includes(tipo)) return fail(res, 'Tipo de ausencia no válido', 400);
-    const medioDia = b.medio_dia ? 1 : 0;
-    const dias = medioDia ? 0.5 : diasHabilesLV(fd, fh);
+    const esLicencia = tipo === 'LICENCIA MEDICA';
     let adjNombre = null, adjMime = null, adjData = null;
     if (b.adjunto_data) {
       adjData = Buffer.from(b.adjunto_data, 'base64');
@@ -122,6 +121,43 @@ const crear = async (req, res) => {
       adjNombre = String(b.adjunto_nombre || 'adjunto').slice(0, 255);
       adjMime = b.adjunto_mime || null;
     }
+
+    if (esLicencia) {
+      // LICENCIA MÉDICA: no es una solicitud — la INGRESA solo RRHH (o Admin) a
+      // nombre del colaborador, sin medio día, queda APROBADA de inmediato y se
+      // informa por correo al supervisor directo.
+      const rrhh = (u.perfil === 'Administrador') || await esRRHH(u.id_usuario);
+      if (!rrhh) return fail(res, 'Las licencias médicas las ingresa Recursos Humanos. Haz llegar tu licencia a RRHH.', 403);
+      const idColab = Number(b.id_colaborador);
+      if (!idColab) return fail(res, 'Indica el colaborador de la licencia', 400);
+      const [[colab]] = await pool.query(
+        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.id_supervisor FROM usuarios u WHERE u.id_usuario=?`, [idColab]);
+      if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+      const dias = diasHabilesLV(fd, fh);
+      const [r] = await pool.query(
+        `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data, estado, resuelto_por, resuelto_nombre)
+         VALUES (?,?,?,?,?,0,?,?,?,?,?,'APROBADA',?,?)`,
+        [colab.id_usuario, colab.nombre, tipo, fd, fh, dias, norm(b.comentario) || null, adjNombre, adjMime, adjData, u.id_usuario, nombreDe(u)]);
+      // Correo informativo al supervisor directo (+ notificación campana)
+      const fmtF = f => new Date(f + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+      const msg = `Se ha ingresado licencia médica a nombre de ${colab.nombre} entre los días ${fmtF(fd)} y ${fmtF(fh)}, ambas fechas inclusive.`;
+      if (colab.id_supervisor) {
+        notificar([colab.id_supervisor], { tipo: 'RH_AUSENCIA', titulo: '🏥 Licencia médica ingresada', mensaje: msg, href: '/recursos-humanos/ausencias/' });
+        try {
+          const [[sup]] = await pool.query('SELECT email, nombre FROM usuarios WHERE id_usuario=?', [colab.id_supervisor]);
+          if (sup?.email) {
+            const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+            const html = `<p>Hola ${sup.nombre || ''},</p><p>${msg}</p><p style="font-size:12px;color:#64748b">Ingresada por ${nombreDe(u)} (Recursos Humanos). Detalle en <a href="https://app.autofacilchile.cl/recursos-humanos/ausencias/">Ausencias y Permisos</a>.</p>`;
+            await enviarCorreo({ to: sup.email, subject: `🏥 Licencia médica — ${colab.nombre}`, html: envolverHTML ? envolverHTML(html) : html });
+          }
+        } catch (e) { console.error('[licencia correo supervisor]', e.message); }
+      }
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'licencia_medica', entidad_id: r.insertId, detalle: `Licencia de ${colab.nombre} ${fd}→${fh} (${dias}d hábiles), supervisor informado` });
+      return ok(res, { id: r.insertId, dias, licencia: true });
+    }
+
+    const medioDia = b.medio_dia ? 1 : 0;
+    const dias = medioDia ? 0.5 : diasHabilesLV(fd, fh);
     const [r] = await pool.query(
       `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data)
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
