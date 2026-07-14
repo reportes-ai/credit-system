@@ -44,6 +44,11 @@ router.get('/cierre-mes',        verifyToken, requireFunc('ctb_cierre_mes', 'ctb
 router.put('/cierre-mes/comentario',  verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.guardarComentario);
 router.post('/cierre-mes/comentario-ia', verifyToken, requireFunc('ctb_cierre_mes', 'ctb_estados'), ctrl.comentarioIA);
 
+// Candado de mes cerrado
+router.get('/meses-cerrados',        verifyToken, requireFunc('ctb_cierre_mes', 'ctb_comprobantes', 'ctb_estados'), ctrl.getMesesCerrados);
+router.post('/meses-cerrados',       verifyToken, requireFunc('ctb_cierre_mes'), ctrl.cerrarMesCandado);
+router.delete('/meses-cerrados/:mes', verifyToken, requireFunc('ctb_cierre_mes'), ctrl.reabrirMes);
+
 // Bitácora de Cierres
 router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);
 router.post('/bitacora-cierres/:mes/analizar', verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados'), ctrl.analizarCierre);

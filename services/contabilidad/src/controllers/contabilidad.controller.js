@@ -218,6 +218,10 @@ exports.crearComprobante = async (req, res) => {
       if (!c.activo) return fail(res, `Cuenta ${cod} está desactivada`, 400);
     }
 
+    // Candado: mes reportado no se toca
+    const candado = await mesConCandado(fecha);
+    if (candado) return fail(res, `El mes ${candado} está CERRADO con candado (ya fue reportado). Para digitar en él, reábrelo primero en Informe Cierre Mensual.`, 423);
+
     // Guardián contable: reglas de coherencia antes de tocar los libros.
     // BLOQUEA → error; ADVIERTE → 409 con las advertencias para que el usuario
     // confirme (el frontend reenvía con confirmar_guardian=true).
@@ -280,6 +284,11 @@ exports.anularComprobante = async (req, res) => {
   try {
     const motivo = String(req.body?.motivo || '').trim();
     if (!motivo) return fail(res, 'Motivo de anulación obligatorio', 400);
+    const [[comp]] = await pool.query('SELECT fecha FROM ctb_comprobantes WHERE id=?', [req.params.id]);
+    if (comp) {
+      const candado = await mesConCandado(comp.fecha.toISOString ? comp.fecha.toISOString().slice(0, 10) : comp.fecha);
+      if (candado) return fail(res, `El comprobante es del mes ${candado}, que está CERRADO con candado. Reábrelo primero en Informe Cierre Mensual.`, 423);
+    }
     const [r] = await pool.query(
       "UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE id=? AND estado='CONTABILIZADO'",
       [nombreDe(req.user), motivo, req.params.id]);
@@ -598,6 +607,8 @@ exports.cerrarEjercicio = async (req, res) => {
     if (!anio || anio < 2020 || anio > 2100) return fail(res, 'anio inválido', 400);
     const fecha = `${anio}-12-31`;
     const ref = `CIERRE-${anio}`;
+    const candado = await mesConCandado(fecha);
+    if (candado) return fail(res, `Diciembre ${anio} está cerrado con candado; reábrelo antes de ejecutar el cierre de ejercicio.`, 423);
     const [[dup]] = await pool.query(
       "SELECT id FROM ctb_comprobantes WHERE origen='CIERRE_EJERCICIO' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [ref]);
     if (dup) return fail(res, `El ejercicio ${anio} ya está cerrado (comprobante id ${dup.id}); anúlalo si necesitas rehacerlo`, 409);
@@ -650,6 +661,53 @@ exports.cerrarEjercicio = async (req, res) => {
     await conn.rollback().catch(() => {});
     fail(res, e.message);
   } finally { conn.release(); }
+};
+
+/* ── Candado de mes cerrado ────────────────────────────────────────────────────
+   Un mes reportado a la matriz se cierra con candado: nadie puede digitar ni
+   anular comprobantes en él (tampoco el motor de asientos → log MES_CERRADO).
+   Reabrir queda auditado. Así el informe enviado nunca queda desactualizado
+   en silencio. */
+require('../../../../shared/migrate').enFila('contabilidad-candado', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_meses_cerrados (
+        mes        VARCHAR(7) PRIMARY KEY,
+        cerrado_por VARCHAR(160) NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+  } catch (e) { console.error('[contabilidad-candado migration]', e.message); }
+});
+
+const mesConCandado = async (fecha) => {
+  const mes = String(fecha).slice(0, 7);
+  const [[r]] = await pool.query('SELECT mes FROM ctb_meses_cerrados WHERE mes=?', [mes]);
+  return r ? mes : null;
+};
+
+exports.getMesesCerrados = async (req, res) => {
+  try { const [rows] = await pool.query('SELECT * FROM ctb_meses_cerrados ORDER BY mes DESC'); ok(res, rows); }
+  catch (e) { fail(res, e.message); }
+};
+
+exports.cerrarMesCandado = async (req, res) => {
+  try {
+    const mes = req.body?.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    await pool.query('INSERT IGNORE INTO ctb_meses_cerrados (mes, cerrado_por) VALUES (?,?)', [mes, nombreDe(req.user)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'candado_mes', entidad_id: mes, detalle: `Mes ${mes} CERRADO con candado` });
+    ok(res, { mes, cerrado: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.reabrirMes = async (req, res) => {
+  try {
+    const mes = req.params.mes;
+    const [r] = await pool.query('DELETE FROM ctb_meses_cerrados WHERE mes=?', [mes]);
+    if (!r.affectedRows) return fail(res, 'El mes no estaba cerrado', 404);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'candado_mes', entidad_id: mes, detalle: `Mes ${mes} REABIERTO` });
+    ok(res, { mes, cerrado: false });
+  } catch (e) { fail(res, e.message); }
 };
 
 /* ── Guardián contable ─────────────────────────────────────────────────────────

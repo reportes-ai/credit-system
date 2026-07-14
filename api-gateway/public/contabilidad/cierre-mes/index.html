@@ -41,6 +41,8 @@
     <div><label class="form-label small fw-semibold mb-1">TC de cierre (CLP/USD)</label><input id="fTC" class="form-control form-control-sm" style="width:140px"></div>
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Generar</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+    <button class="btn btn-sm btn-outline-danger d-none" id="btnCandado" onclick="toggleCandado()"></button>
+    <span class="align-self-center small fw-bold d-none" id="lblCandado"></span>
   </div>
 
   <div id="out"><div class="text-muted">Elige el mes y genera el informe.</div></div>
@@ -72,6 +74,35 @@ async function consultar(){
   TC = tcManual > 0 ? tcManual : (D.tipo_cambio?.valor || 0);
   if (!tcManual && D.tipo_cambio) fTC.value = D.tipo_cambio.valor.toLocaleString('es-CL');
   render();
+  candadoUI();
+}
+
+/* ── Candado del mes ── */
+let CERRADOS = [];
+async function candadoUI(){
+  try {
+    const r = await fetch('/api/contabilidad/meses-cerrados',{headers:H}); const j = await r.json();
+    CERRADOS = (j.data||[]).map(x=>x.mes);
+  } catch(e){}
+  const mes = fMes.value, cerrado = CERRADOS.includes(mes);
+  const btn = document.getElementById('btnCandado'), lbl = document.getElementById('lblCandado');
+  btn.classList.remove('d-none'); lbl.classList.remove('d-none');
+  btn.className = 'btn btn-sm ' + (cerrado ? 'btn-outline-secondary' : 'btn-outline-danger');
+  btn.innerHTML = cerrado ? '<i class="bi bi-unlock me-1"></i>Reabrir mes' : '<i class="bi bi-lock-fill me-1"></i>Cerrar mes con candado';
+  lbl.innerHTML = cerrado ? '<i class="bi bi-lock-fill text-danger me-1"></i><span class="text-danger">MES CERRADO: no se puede digitar ni anular en '+mes+'</span>' : '';
+}
+async function toggleCandado(){
+  const mes = fMes.value, cerrado = CERRADOS.includes(mes);
+  if (cerrado){
+    if (!confirm('¿Reabrir '+mes+'? Se podrá volver a digitar y anular en ese mes (queda auditado). Si ya reportaste a Ecuador, tendrás que reenviar el informe si algo cambia.')) return;
+    const r = await fetch('/api/contabilidad/meses-cerrados/'+mes,{method:'DELETE',headers:H});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+  } else {
+    if (!confirm('¿Cerrar '+mes+' con candado? Nadie podrá digitar ni anular comprobantes de ese mes (los asientos automáticos quedarán en el log del motor para regularizar). Hazlo DESPUÉS de enviar el informe a la matriz.')) return;
+    const r = await fetch('/api/contabilidad/meses-cerrados',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({mes})});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+  }
+  candadoUI();
 }
 function render(){
   const b = D.balance, em = D.eerr_mes, ea = D.eerr_acum;

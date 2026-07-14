@@ -130,6 +130,9 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
     if (debe !== haber) { await log(evento, ref, 'DESCUADRE', `Debe ${debe} ≠ Haber ${haber} — revisa la regla`); return null; }
 
     const f = /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : new Date().toISOString().slice(0, 10);
+    // Candado de mes cerrado: el evento queda en el log para regularizarlo a mano
+    const [[cerrado]] = await pool.query('SELECT mes FROM ctb_meses_cerrados WHERE mes=?', [f.slice(0, 7)]);
+    if (cerrado) { await log(evento, ref, 'MES_CERRADO', `El mes ${f.slice(0, 7)} está cerrado con candado — asiento NO contabilizado; reabrir el mes y reprocesar, o digitarlo en el mes abierto`); return null; }
     const anio = Number(f.slice(0, 4));
     const conn = await pool.getConnection();
     try {
