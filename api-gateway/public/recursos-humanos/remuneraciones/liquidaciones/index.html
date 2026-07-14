@@ -66,12 +66,14 @@
     <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
   </div>
 
+  <div id="avisoComis" style="display:none;background:#fef2f2;border-left:4px solid #dc2626;border-radius:10px;padding:11px 16px;font-size:.83rem;color:#7f1d1d;margin-bottom:12px"></div>
+
   <div class="panel">
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Colaborador</th><th>Días ✎</th><th>Sueldo Base</th><th>Comisiones ✎</th><th>Otros Imp. ✎</th><th>Gratif.</th><th>Imponible</th>
-          <th>No Impon.</th><th>AFP</th><th>Salud</th><th>AFC</th><th>Impuesto</th><th>Otros Dcto. ✎</th><th>Líquido</th><th>Estado</th><th></th>
+          <th>Colaborador</th><th>Días</th><th>Sueldo Base</th><th>Comisiones</th><th>Otros Imp.</th><th>Gratif.</th><th>Imponible</th>
+          <th>No Impon.</th><th>AFP</th><th>Salud</th><th>AFC</th><th>Impuesto</th><th>Otros Dcto.</th><th>Líquido</th><th>Estado</th><th>Ver</th>
         </tr></thead>
         <tbody id="tb"><tr><td colspan="16" class="empty">Cargando…</td></tr></tbody>
       </table>
@@ -84,8 +86,8 @@
     · <b>Imponible</b> topado a UF del mes × tope imponible para AFP/Salud.
     · <b>AFP</b> según administradora de la ficha (tasas en <i>rh_afp_tasas</i>) · <b>Salud</b> 7% legal · <b>AFC</b> 0,6% solo contrato indefinido.
     · <b>Impuesto único</b>: tramos UTM paramétricos (<i>rh_impuesto_tramos</i>) sobre imponible − previsión.
-    · Sueldo base, AFP, salud, contrato, colación y movilización salen de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; comisiones del <a href="/comisiones/revision/">motor de Comisiones</a> (editables antes de emitir).
-    · <b>Emitir mes</b> congela las liquidaciones (inmutables) y las publica en Mi Ficha de cada colaborador.
+    · <b>En este libro no se digita nada</b> — cada dato viene de su fuente: sueldo/AFP/salud/contrato/plan isapre de la <a href="/recursos-humanos/colaboradores/">ficha</a>; <b>días trabajados</b> de la fecha de ingreso y las <a href="/recursos-humanos/licencias/">licencias médicas</a>; <b>comisiones</b> del <a href="/comisiones/revision/">motor de Comisiones</a> (deben estar APROBADAS para emitir); <b>otros haberes</b> de <a href="/recursos-humanos/remuneraciones/adicionales/">Adicionales</a>; <b>otros descuentos</b> de <a href="/recursos-humanos/remuneraciones/descuentos/">Descuentos</a>.
+    · <b>Emitir mes</b> congela las liquidaciones (inmutables), las publica en Mi Ficha y las envía por correo. Bloqueado si hay comisiones sin aprobar.
   </div>
 </div>
 
@@ -129,15 +131,19 @@ async function cargar(){
 function render(){
   const rows = DATA.filas || [];
   if (!rows.length) { document.getElementById('tb').innerHTML = '<tr><td colspan="16" class="empty">No hay colaboradores con sueldo base en su ficha. Complétalos en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>.</td></tr>'; return; }
+  // Libro de SOLO LECTURA: todo viene de su fuente (ficha, licencias,
+  // comisiones aprobadas, Adicionales y Descuentos) — aquí no se digita nada.
+  const aviso = document.getElementById('avisoComis');
+  if (aviso) aviso.style.display = (DATA.comisiones_sin_aprobar||[]).length ? '' : 'none';
+  if (aviso && (DATA.comisiones_sin_aprobar||[]).length)
+    aviso.innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i><b>Comisiones sin aprobar</b> en <a href="/comisiones/revision/">Revisión de Comisiones</a> para: ${DATA.comisiones_sin_aprobar.map(esc).join(', ')} — el mes NO se podrá emitir hasta aprobarlas.`;
   document.getElementById('tb').innerHTML = rows.map((r,i)=>{
-    const em = r.estado==='EMITIDA';
-    const inp = (campo)=> em ? $(r[campo]) : `<input data-i="${i}" data-c="${campo}" value="${Math.round(r[campo]||0)}" onchange="recalc(this)">`;
     return `<tr class="fila">
       <td style="font-weight:600">${esc(r.nombre)}<div style="font-size:.66rem;color:#94a3b8">${esc(r.cargo||'')}</div></td>
-      <td>${em ? (r.dias??30) : `<input data-i="${i}" data-c="dias" value="${r.dias??30}" onchange="recalc(this)" title="Días trabajados (30avos)">`}</td>
+      <td>${(r.dias??30)===30?'30/30':`<b style="color:#b45309">${r.dias}/30</b>`}${r.licencia_dias?`<div style="font-size:.6rem;color:#94a3b8">${r.licencia_dias}d licencia</div>`:''}</td>
       <td>${$(r.sueldo_base)}</td>
-      <td>${inp('comisiones')}</td>
-      <td>${inp('otros_imponibles')}</td>
+      <td>${$(r.comisiones)}</td>
+      <td>${$(r.otros_imponibles)}</td>
       <td>${$(r.gratificacion)}</td>
       <td style="font-weight:700">${$(r.total_imponible)}</td>
       <td>${$( (r.colacion||0)+(r.movilizacion||0)+(r.otros_no_imponibles||0) )}</td>
@@ -145,10 +151,10 @@ function render(){
       <td style="color:#b91c1c">${$((r.desc_salud||0)+(r.desc_salud_adicional||0))}${r.desc_salud_adicional?`<div style="font-size:.62rem;color:#94a3b8">7% + adic. isapre</div>`:''}</td>
       <td style="color:#b91c1c">${$(r.desc_afc)}</td>
       <td style="color:#b91c1c">${$(r.impuesto)}</td>
-      <td>${inp('otros_descuentos')}</td>
+      <td>${$(r.otros_descuentos)}</td>
       <td style="font-weight:800;color:#15803d">${$(r.liquido)}</td>
       <td style="text-align:center"><span class="pill ${r.estado.replace(' ','')}">${r.estado}</span></td>
-      <td>${r.id_liq?`<button class="btn-ghost" style="padding:3px 8px;font-size:.72rem" onclick="verLiq(${r.id_liq})"><i class="bi bi-receipt"></i></button>`:''}</td>
+      <td><button class="btn-ghost" style="padding:3px 8px;font-size:.72rem" title="Vista previa de la liquidación" onclick="${r.id_liq&&r.estado==='EMITIDA'?`verLiq(${r.id_liq})`:`verPrev(${i})`}"><i class="bi bi-receipt"></i></button></td>
     </tr>`;
   }).join('') + totalRow(rows);
 }
@@ -161,19 +167,10 @@ function totalRow(rows){
     <td>${$(s('desc_afp'))}</td><td>${$(s('desc_salud')+s('desc_salud_adicional'))}</td><td>${$(s('desc_afc'))}</td><td>${$(s('impuesto'))}</td>
     <td>${$(s('otros_descuentos'))}</td><td style="color:#15803d">${$(s('liquido'))}</td><td></td><td></td></tr>`;
 }
-// Edición inline: recalcula al servidor al guardar; localmente solo actualiza el valor
-function recalc(el){
-  const r = DATA.filas[+el.dataset.i];
-  r[el.dataset.c] = parseFloat(el.value)||0;
-  r._editado = true;
-}
 async function guardar(){
   const mes = document.getElementById('mes').value;
-  const filas = (DATA.filas||[]).filter(r=>r.estado!=='EMITIDA').map(r=>({
-    id_usuario: r.id_usuario, dias: r.dias, comisiones: r.comisiones, otros_imponibles: r.otros_imponibles,
-    otros_no_imponibles: r.otros_no_imponibles, otros_descuentos: r.otros_descuentos,
-    colacion: r.colacion, movilizacion: r.movilizacion,
-  }));
+  // Solo se envían los IDs: el servidor recalcula TODO desde las fuentes
+  const filas = (DATA.filas||[]).filter(r=>r.estado!=='EMITIDA').map(r=>({ id_usuario: r.id_usuario }));
   if (!filas.length) return alert('Nada que guardar (todo emitido)');
   const j = await (await fetch('/api/rrhh/remuneraciones/guardar', { method:'POST', headers:HJ, body:JSON.stringify({ mes, filas }) })).json();
   if (!j.success) return alert(j.error);
@@ -193,10 +190,18 @@ async function emitir(){
   if (!j.success) return alert(j.error);
   toast(`✓ ${j.data.emitidas} liquidaciones emitidas — enviándose por correo a cada colaborador`); cargar();
 }
+function verPrev(i){
+  const r = DATA.filas[i];
+  pintarLiq({ mes: document.getElementById('mes').value, nombre: r.nombre, rut: r.rut, cargo: r.cargo,
+    estado: 'VISTA PREVIA — aún no emitida' }, r);
+}
 async function verLiq(id){
   const j = await (await fetch('/api/rrhh/remuneraciones/liquidacion/'+id, { headers:H })).json();
   if (!j.success) return alert(j.error);
-  const l = j.data, d = l.detalle||{};
+  const l = j.data;
+  pintarLiq(l, l.detalle||{});
+}
+function pintarLiq(l, d){
   const co = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
   const fila = (lbl,v,neg) => (Number(v)||0) ? `<tr><td>${lbl}</td><td style="text-align:right;${neg?'color:#b91c1c':''}">${neg?'−':''}${co(v)}</td></tr>` : '';
   document.getElementById('liqBody').innerHTML = `

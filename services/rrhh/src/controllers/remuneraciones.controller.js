@@ -424,6 +424,46 @@ function calcLiquidacion(inp, ind) {
   };
 }
 
+/* ── Días trabajados del mes (convención 30avos): 30 − ingreso parcial − licencias ── */
+const isoF = f => f == null ? null
+  : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
+
+function diasTrabajadosMes(mes, fechaIngreso, licencias) {
+  let dias = 30;
+  const ini = mes + '-01', finStr = mes + '-31';
+  const fi = isoF(fechaIngreso);
+  if (fi) {
+    if (fi > finStr) return 0;                                   // ingresó después del mes
+    if (fi >= ini) dias = 30 - (Number(fi.slice(8, 10)) - 1);    // ingresó dentro del mes
+  }
+  let lic = 0;
+  for (const l of licencias || []) {
+    const d = isoF(l.fecha_desde) > ini ? isoF(l.fecha_desde) : ini;
+    const h = isoF(l.fecha_hasta) < finStr ? isoF(l.fecha_hasta) : finStr;
+    if (h >= d) lic += Math.min(30, Number(h.slice(8, 10))) - Math.min(30, Number(d.slice(8, 10))) + 1;
+  }
+  return Math.max(0, Math.min(30, dias - lic));
+}
+
+async function licenciasDelMes(mes) {
+  const [rows] = await pool.query(
+    `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_ausencias
+      WHERE tipo='LICENCIA MEDICA' AND estado='APROBADA'
+        AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
+  const m = {};
+  rows.forEach(r => { (m[r.id_usuario] = m[r.id_usuario] || []).push(r); });
+  return m;
+}
+
+/* ── Comisiones aprobadas: sin aprobación de Operaciones no se emite el mes ── */
+async function comisionesSinAprobar(mes, comis) {
+  const conComision = Object.entries(comis).filter(([, monto]) => monto > 0).map(([nom]) => nom);
+  if (!conComision.length) return [];
+  const [aps] = await pool.query("SELECT ejecutivo FROM comisiones_aprobaciones WHERE mes=? AND estado='aprobado'", [mes]).catch(() => [[]]);
+  const okSet = new Set(aps.map(a => String(a.ejecutivo).toUpperCase().trim()));
+  return conComision.filter(n => !okSet.has(n));
+}
+
 /* ── Comisiones del mes por colaborador (motor único de comisiones) ─────────── */
 async function comisionesDelMes(mes) {
   try {
@@ -443,7 +483,7 @@ const getMes = async (req, res) => {
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
               CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-              u.rut, u.cargo, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
+              u.rut, u.cargo, u.fecha_ingreso, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
         ORDER BY nombre`);
@@ -452,7 +492,11 @@ const getMes = async (req, res) => {
     const comis = await comisionesDelMes(mes);
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
+    const lics = await licenciasDelMes(mes);
 
+    // Todo viene de su fuente: días (ficha ingreso + licencias), comisiones
+    // (motor de comisiones), otros haberes (Adicionales), otros descuentos
+    // (Descuentos). En este libro no se digita nada.
     const filas = emps.map(e => {
       const g = gMap[e.id_usuario];
       if (g && g.estado === 'EMITIDA') {
@@ -460,22 +504,24 @@ const getMes = async (req, res) => {
         let det = {}; try { det = typeof g.detalle === 'string' ? JSON.parse(g.detalle) : (g.detalle || {}); } catch (_) {}
         return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo, estado: 'EMITIDA', id_liq: g.id, ...det };
       }
-      let over = {};
-      if (g) { try { over = typeof g.detalle === 'string' ? JSON.parse(g.detalle) : (g.detalle || {}); } catch (_) {} }
       const inp = {
         sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato,
-        plan_isapre_uf: e.plan_isapre_uf, dias: over.dias ?? 30,
-        colacion: over.colacion ?? e.colacion, movilizacion: over.movilizacion ?? e.movilizacion,
-        comisiones: over.comisiones ?? (comis[String(e.nombre_corto).trim()] || 0),
-        otros_imponibles: over.otros_imponibles ?? (adics[e.id_usuario]?.imp || 0),
-        otros_no_imponibles: over.otros_no_imponibles ?? (adics[e.id_usuario]?.noimp || 0),
-        otros_descuentos: over.otros_descuentos ?? (descs[e.id_usuario] || 0),
+        plan_isapre_uf: e.plan_isapre_uf,
+        dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario]),
+        colacion: e.colacion, movilizacion: e.movilizacion,
+        comisiones: comis[String(e.nombre_corto).trim()] || 0,
+        otros_imponibles: adics[e.id_usuario]?.imp || 0,
+        otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
+        otros_descuentos: descs[e.id_usuario] || 0,
       };
       return { id_usuario: e.id_usuario, nombre: e.nombre, rut: e.rut, cargo: e.cargo,
+        licencia_dias: 30 - diasTrabajadosMes(mes, null, lics[e.id_usuario]),
         estado: g ? 'BORRADOR' : 'SIN GUARDAR', id_liq: g?.id || null, ...calcLiquidacion(inp, ind) };
     });
     const emitidas = filas.filter(f => f.estado === 'EMITIDA').length;
-    ok(res, { mes, filas, indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_uf: ind.rem_tope_imponible_uf, salud_pct: ind.rem_salud_pct, afc_pct: ind.rem_afc_trabajador_pct, grat_tope_imm: ind.rem_grat_tope_imm, afps: ind.afps, tramos: ind.tramos },
+    const sinAprobar = await comisionesSinAprobar(mes, comis);
+    ok(res, { mes, filas, comisiones_sin_aprobar: sinAprobar,
+      indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_uf: ind.rem_tope_imponible_uf, salud_pct: ind.rem_salud_pct, afc_pct: ind.rem_afc_trabajador_pct, grat_tope_imm: ind.rem_grat_tope_imm, afps: ind.afps, tramos: ind.tramos },
       mes_emitido: emitidas > 0 && emitidas === filas.length });
   } catch (e) { console.error('[rrhh remuneraciones getMes]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -486,10 +532,17 @@ const guardar = async (req, res) => {
     const { mes, filas } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '') || !Array.isArray(filas)) return fail(res, 'mes y filas requeridos', 400);
     const ind = await indicadores(mes);
+    // Se recalcula SIEMPRE desde las fuentes (nada viene digitado del libro)
+    const comis = await comisionesDelMes(mes);
+    const adics = await adicionalesDelMes(mes);
+    const descs = await descuentosDelMes(mes);
+    const lics = await licenciasDelMes(mes);
     let n = 0;
     for (const f of filas) {
       const [[emp]] = await pool.query(
-        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre, u.rut, u.cargo,
+        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
+                CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
+                u.rut, u.cargo, u.fecha_ingreso,
                 fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
            FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [f.id_usuario]);
       if (!emp) continue;
@@ -497,10 +550,13 @@ const guardar = async (req, res) => {
       if (ya && ya.estado === 'EMITIDA') continue;   // congelada
       const inp = {
         sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato,
-        plan_isapre_uf: emp.plan_isapre_uf, dias: f.dias ?? 30,
-        colacion: f.colacion ?? emp.colacion, movilizacion: f.movilizacion ?? emp.movilizacion,
-        comisiones: f.comisiones ?? 0, otros_imponibles: f.otros_imponibles ?? 0,
-        otros_no_imponibles: f.otros_no_imponibles ?? 0, otros_descuentos: f.otros_descuentos ?? 0,
+        plan_isapre_uf: emp.plan_isapre_uf,
+        dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario]),
+        colacion: emp.colacion, movilizacion: emp.movilizacion,
+        comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        otros_imponibles: adics[emp.id_usuario]?.imp || 0,
+        otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
+        otros_descuentos: descs[emp.id_usuario] || 0,
       };
       const calc = calcLiquidacion(inp, ind);
       await pool.query(
@@ -525,6 +581,10 @@ const emitir = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes requerido', 400);
     const [[nb]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='BORRADOR'", [mes]);
     if (!nb.c) return fail(res, 'No hay borradores guardados para emitir en ' + mes, 400);
+    // Gate: sin comisiones APROBADAS (Operaciones) no se emiten las liquidaciones
+    const sinAprobar = await comisionesSinAprobar(mes, await comisionesDelMes(mes));
+    if (sinAprobar.length)
+      return fail(res, `No se puede emitir: hay comisiones SIN APROBAR en Revisión de Comisiones para: ${sinAprobar.join(', ')}. Apruébalas primero en /comisiones/revision/.`, 409);
     const u = req.usuario || {};
     const [r] = await pool.query(
       "UPDATE rh_liquidaciones SET estado='EMITIDA', emitido_por=?, emitido_at=NOW() WHERE mes=? AND estado='BORRADOR'",
