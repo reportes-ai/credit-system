@@ -42,8 +42,11 @@
   <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar">
     <div id="wDesde"><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
     <div><label class="form-label small fw-semibold mb-1" id="lblHasta">Al día</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
+    <div id="wCC" style="display:none"><label class="form-label small fw-semibold mb-1">Centro de costo</label>
+      <select id="fCC" class="form-select form-select-sm" style="min-width:190px" onchange="consultar()"><option value="">Todos</option></select></div>
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    <button class="btn btn-sm btn-outline-danger ms-auto" id="btnCierre" onclick="cerrarEjercicio()"><i class="bi bi-lock me-1"></i>Cerrar ejercicio…</button>
   </div>
 
   <div id="out"><div class="text-muted">Elige la fecha y consulta.</div></div>
@@ -64,6 +67,7 @@ function tab(m){ MODO=m;
   document.getElementById('tabBG').classList.toggle('active',m==='BG');
   document.getElementById('tabER').classList.toggle('active',m==='ER');
   document.getElementById('wDesde').style.display = m==='ER'?'':'none';
+  document.getElementById('wCC').style.display = m==='ER'?'':'none';
   document.getElementById('lblHasta').textContent = m==='ER'?'Hasta':'Al día';
   document.getElementById('out').innerHTML = '<div class="text-muted">Elige la fecha y consulta.</div>';
 }
@@ -93,9 +97,14 @@ async function consultar(){
           <tr><td colspan="3" class="${d.cuadre?'cuadre-ok':'cuadre-mal'}">${d.cuadre?'✓ El balance cuadra: Activo = Pasivo + Patrimonio + Resultado':'✗ DESCUADRE — revisa los comprobantes del período'}</td></tr>
         </tbody></table></div>`;
   } else {
-    const r = await fetch(`/api/contabilidad/estado-resultados?desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
+    const cc = document.getElementById('fCC').value;
+    const r = await fetch(`/api/contabilidad/estado-resultados?desde=${fDesde.value}&hasta=${fHasta.value}${cc?'&cc='+encodeURIComponent(cc):''}`,{headers:H});
     const j = await r.json(); if (!j.success) return alert(j.error);
     const d = j.data;
+    // refrescar selector de centros de costo conservando la selección
+    const sel = document.getElementById('fCC');
+    const actual = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>' + (d.centros||[]).map(c=>`<option ${c===actual?'selected':''}>${esc(c)}</option>`).join('') + `<option value="__SIN__" ${actual==='__SIN__'?'selected':''}>(sin centro de costo)</option>`;
     document.getElementById('out').innerHTML = `
       <div class="panel"><table>
         <thead><tr><th style="width:110px">Cuenta</th><th>Estado de Resultados ${fDesde.value} → ${fHasta.value}</th><th class="text-right" style="width:170px">Monto</th></tr></thead>
@@ -109,6 +118,15 @@ async function consultar(){
           <tr class="tot"><td colspan="2">${d.resultado>=0?'UTILIDAD':'PÉRDIDA'} DEL PERÍODO</td><td class="text-right ${d.resultado<0?'neg':''}">${fmt(Math.abs(d.resultado))}</td></tr>
         </tbody></table></div>`;
   }
+}
+async function cerrarEjercicio(){
+  const anio = prompt('Cerrar ejercicio: ¿qué año? (deja en CERO ingresos y gastos del año y lleva la utilidad/pérdida a Resultados Acumulados; se deshace anulando el comprobante)');
+  if (!anio) return;
+  if (!confirm(`¿Confirmas el cierre del ejercicio ${anio}? Se generará un comprobante de Traspaso al 31-12-${anio}.`)) return;
+  const r = await fetch('/api/contabilidad/cierre-ejercicio',{method:'POST',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({anio:Number(anio)})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Ejercicio ${anio} cerrado: comprobante ${j.data.numero}, ${j.data.cuentas_cerradas} cuentas de resultado → ${j.data.resultado>=0?'utilidad':'pérdida'} de ${fmt(Math.abs(j.data.resultado))} a Resultados Acumulados.`);
+  consultar();
 }
 </script>
 <script src="/js/app-version.js"></script>

@@ -350,23 +350,96 @@ exports.balanceGeneral = async (req, res) => {
 
 exports.estadoResultados = async (req, res) => {
   try {
-    const { desde, hasta } = req.query;
+    const { desde, hasta, cc } = req.query;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || '') || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || ''))
       return fail(res, 'desde y hasta obligatorios', 400);
-    const [rows] = await pool.query(
-      `SELECT m.cuenta, k.nombre, k.tipo, SUM(m.debe) debe, SUM(m.haber) haber
-         FROM ctb_movimientos m
+    // El cierre de ejercicio deja los resultados en cero: se excluye para que el EERR muestre el período real
+    const base = `FROM ctb_movimientos m
          JOIN ctb_comprobantes c ON c.id=m.id_comprobante
          LEFT JOIN ctb_cuentas k ON k.codigo=m.cuenta
-        WHERE c.estado='CONTABILIZADO' AND c.fecha BETWEEN ? AND ? AND k.tipo IN ('INGRESO','GASTO')
-        GROUP BY m.cuenta, k.nombre, k.tipo ORDER BY m.cuenta`, [desde, hasta]);
+        WHERE c.estado='CONTABILIZADO' AND c.origen<>'CIERRE_EJERCICIO' AND c.fecha BETWEEN ? AND ? AND k.tipo IN ('INGRESO','GASTO')`;
+    const vals = [desde, hasta];
+    let filtroCC = '';
+    if (cc === '__SIN__') filtroCC = ' AND m.centro_costo IS NULL';
+    else if (cc) { filtroCC = ' AND m.centro_costo = ?'; vals.push(cc); }
+    const [rows] = await pool.query(
+      `SELECT m.cuenta, k.nombre, k.tipo, SUM(m.debe) debe, SUM(m.haber) haber ${base}${filtroCC}
+        GROUP BY m.cuenta, k.nombre, k.tipo ORDER BY m.cuenta`, vals);
+    const [ccs] = await pool.query(
+      `SELECT DISTINCT m.centro_costo ${base} AND m.centro_costo IS NOT NULL ORDER BY 1`, [desde, hasta]);
     const ingresos = [], gastos = []; let ti = 0, tg = 0;
     for (const x of rows) {
       if (x.tipo === 'INGRESO') { const s = Number(x.haber) - Number(x.debe); if (s) { ingresos.push({ cuenta: x.cuenta, nombre: x.nombre, monto: s }); ti += s; } }
       else { const s = Number(x.debe) - Number(x.haber); if (s) { gastos.push({ cuenta: x.cuenta, nombre: x.nombre, monto: s }); tg += s; } }
     }
-    ok(res, { ingresos, gastos, total_ingresos: ti, total_gastos: tg, resultado: ti - tg });
+    ok(res, { ingresos, gastos, total_ingresos: ti, total_gastos: tg, resultado: ti - tg, centros: ccs.map(x => x.centro_costo) });
   } catch (e) { fail(res, e.message); }
+};
+
+/* ── Cierre de ejercicio ───────────────────────────────────────────────────────
+   Genera el comprobante de TRASPASO al 31-12 que deja en CERO todas las cuentas
+   de resultado (ingresos y gastos) y lleva la utilidad/pérdida del año a la
+   cuenta de Resultados Acumulados (paramétrica en ctb_config). Idempotente por
+   origen CIERRE_EJERCICIO + ref CIERRE-<año>; se deshace anulando el comprobante. */
+exports.cerrarEjercicio = async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const anio = Number(req.body?.anio);
+    if (!anio || anio < 2020 || anio > 2100) return fail(res, 'anio inválido', 400);
+    const fecha = `${anio}-12-31`;
+    const ref = `CIERRE-${anio}`;
+    const [[dup]] = await pool.query(
+      "SELECT id FROM ctb_comprobantes WHERE origen='CIERRE_EJERCICIO' AND origen_ref=? AND estado='CONTABILIZADO' LIMIT 1", [ref]);
+    if (dup) return fail(res, `El ejercicio ${anio} ya está cerrado (comprobante id ${dup.id}); anúlalo si necesitas rehacerlo`, 409);
+
+    // Cuenta destino paramétrica (default: Resultados Acumulados del plan AVSOFT)
+    await pool.query(`CREATE TABLE IF NOT EXISTS ctb_config (clave VARCHAR(60) PRIMARY KEY, valor VARCHAR(200) NOT NULL)`);
+    await pool.query(`INSERT IGNORE INTO ctb_config (clave, valor) VALUES ('cuenta_resultados_acumulados','2703010')`);
+    const [[cfg]] = await pool.query("SELECT valor FROM ctb_config WHERE clave='cuenta_resultados_acumulados'");
+    const ctaResult = cfg.valor;
+    const [[cr]] = await pool.query('SELECT imputable, activo FROM ctb_cuentas WHERE codigo=?', [ctaResult]);
+    if (!cr || !cr.imputable || !cr.activo) return fail(res, `Cuenta de Resultados Acumulados ${ctaResult} inválida (revisa ctb_config)`, 400);
+
+    // Saldos de las cuentas de resultado hasta el 31-12 (cierres previos ya se netean solos)
+    const [rows] = await pool.query(
+      `SELECT m.cuenta, k.nombre, SUM(m.debe)-SUM(m.haber) s
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha <= ? AND k.tipo IN ('INGRESO','GASTO')
+        GROUP BY m.cuenta, k.nombre HAVING s <> 0 ORDER BY m.cuenta`, [fecha]);
+    if (!rows.length) return fail(res, `No hay saldos de resultado que cerrar al ${fecha}`, 400);
+
+    let debe = 0, haber = 0;
+    const movs = rows.map(x => {
+      const s = Math.round(Number(x.s));
+      const m = { cuenta: x.cuenta, glosa: `Cierre ${x.nombre}`.slice(0, 200), debe: s < 0 ? -s : 0, haber: s > 0 ? s : 0 };
+      debe += m.debe; haber += m.haber;
+      return m;
+    });
+    const resultado = debe - haber; // + = utilidad (ingresos > gastos)
+    movs.push({ cuenta: ctaResult, glosa: `${resultado >= 0 ? 'Utilidad' : 'Pérdida'} del ejercicio ${anio}`,
+      debe: resultado < 0 ? -resultado : 0, haber: resultado > 0 ? resultado : 0 });
+    const total = Math.max(debe, haber);
+
+    await conn.beginTransaction();
+    const [[{ sig }]] = await conn.query(
+      "SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo='TRASPASO' AND anio=? FOR UPDATE", [anio]);
+    const [r] = await conn.query(
+      `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, origen, origen_ref, total, creado_por)
+       VALUES ('TRASPASO',?,?,?,?,'CIERRE_EJERCICIO',?,?,?)`,
+      [anio, sig, fecha, `Cierre de ejercicio ${anio}`, ref, total, nombreDe(req.user) || 'Cierre de ejercicio']);
+    for (const m of movs)
+      await conn.query('INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber) VALUES (?,?,?,?,?)',
+        [r.insertId, m.cuenta, m.glosa, m.debe, m.haber]);
+    await conn.commit();
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'cierre_ejercicio', entidad_id: anio,
+      detalle: `Cierre ${anio}: ${rows.length} cuentas de resultado → ${resultado >= 0 ? 'utilidad' : 'pérdida'} $${Math.abs(resultado).toLocaleString('es-CL')} a ${ctaResult}` });
+    ok(res, { id: r.insertId, numero: `T-${anio}-${String(sig).padStart(5, '0')}`, resultado, cuentas_cerradas: rows.length });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    fail(res, e.message);
+  } finally { conn.release(); }
 };
 
 /* ── Reglas de centralización (Fase 2) ─────────────────────────────────────── */
