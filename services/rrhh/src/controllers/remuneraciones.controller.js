@@ -308,9 +308,44 @@ const emitir = async (req, res) => {
       evento: 'REMUNERACIONES', glosa: `Libro de remuneraciones ${mes}`, ref: `REM-${mes}`,
       montos: { haberes: Number(t.h), liquido: Number(t.l), descuentos: Number(t.d) },
     }).catch(() => {});
+    // Envío automático: cada colaborador recibe su liquidación al correo
+    // (no bloquea la respuesta; Modo Desarrollo redirige solo, vía shared/mailer)
+    enviarLiquidacionesCorreo(mes).catch(e => console.error('[remuneraciones correo]', e.message));
     ok(res, { emitidas: r.affectedRows });
   } catch (e) { console.error('[rrhh remuneraciones emitir]', e.message); fail(res, 'Error interno del servidor'); }
 };
+
+/* ── Correo de liquidación a cada colaborador al emitir el mes ─────────────── */
+async function enviarLiquidacionesCorreo(mes) {
+  const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+  const [liqs] = await pool.query(
+    `SELECT l.*, u.email FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
+      WHERE l.mes=? AND l.estado='EMITIDA' AND u.email IS NOT NULL`, [mes]);
+  const co = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+  let enviadas = 0;
+  for (const l of liqs) {
+    let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+    const fila = (lbl, v, neg) => (Number(v) || 0) ? `<tr><td style="padding:3px 10px">${lbl}</td><td style="padding:3px 10px;text-align:right;${neg ? 'color:#b91c1c' : ''}">${neg ? '−' : ''}${co(v)}</td></tr>` : '';
+    const html = `
+      <p>Hola ${String(l.nombre || '').split(' ')[0]}, tu liquidación de sueldo de <b>${mes}</b> fue emitida:</p>
+      <table style="border-collapse:collapse;font-size:13px;border:1px solid #e2e8f0;width:100%;max-width:460px">
+        <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">HABERES</td></tr>
+        ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones', d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+        <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
+        <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
+        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}
+        <tr><td style="padding:3px 10px;font-weight:700">Total descuentos</td><td style="padding:3px 10px;text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
+        <tr><td style="padding:8px 10px;font-weight:800;font-size:14px">LÍQUIDO A PAGAR</td><td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;color:#15803d">${co(d.liquido)}</td></tr>
+      </table>
+      <p style="font-size:12px;color:#64748b">El detalle completo e imprimible está en el Business Suite → Recursos Humanos → <a href="https://app.autofacilchile.cl/recursos-humanos/mi-ficha/">Mi Ficha</a>.</p>`;
+    try {
+      await enviarCorreo({ to: l.email, subject: `💰 Liquidación de sueldo ${mes} — AutoFácil`, html: envolverHTML ? envolverHTML(html) : html });
+      enviadas++;
+    } catch (e) { console.error('[remuneraciones correo]', l.email, e.message); }
+  }
+  console.log(`[remuneraciones] liquidaciones ${mes}: ${enviadas}/${liqs.length} correos enviados`);
+  return enviadas;
+}
 
 /* ── GET /api/rrhh/remuneraciones/liquidacion/:id — detalle imprimible (dueño o RRHH) ── */
 const getLiquidacion = async (req, res) => {

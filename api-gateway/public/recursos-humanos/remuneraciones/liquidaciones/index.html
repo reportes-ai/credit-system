@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Remuneraciones — AutoFácil</title>
+  <!-- v1.0 — liquidaciones de sueldo: motor único chileno + comisiones automáticas (Fase 3 módulo RRHH) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:24px 28px; max-width:1420px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:18px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.1rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.15rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.83rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 18px; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#f8fafc; color:#475569; font-size:.66rem; text-transform:uppercase; padding:7px 8px; text-align:right; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+    th:first-child, td:first-child { text-align:left; }
+    td { padding:6px 8px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; }
+    tr.fila:hover td { background:#f8fafc; }
+    td input { width:92px; border:1.5px solid #bfdbfe; border-radius:6px; padding:3px 6px; font-size:.78rem; text-align:right; background:#eff6ff; }
+    .pill { border-radius:9px; padding:2px 8px; font-size:.66rem; font-weight:700; }
+    .pill.EMITIDA { background:#dcfce7; color:#15803d; } .pill.BORRADOR { background:#fef9c3; color:#854d0e; } .pill.SINGUARDAR { background:#f1f5f9; color:#64748b; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+    .btn-verde { background:#16a34a; color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.82rem; cursor:pointer; }
+    .empty { text-align:center; color:#9ca3af; padding:30px 0; }
+    .foot { background:#f7f9fc; border-left:4px solid #0255c5; border-radius:10px; padding:12px 18px; font-size:.76rem; color:#475569; line-height:1.8; }
+    dialog { border:none; border-radius:14px; padding:0; box-shadow:0 20px 60px rgba(0,0,0,.3); max-width:640px; width:95%; }
+    dialog::backdrop { background:rgba(15,23,42,.55); }
+    .liq { font-family:'Segoe UI',sans-serif; padding:26px 30px; font-size:.82rem; color:#1e293b; }
+    .liq h4 { font-weight:800; color:#012d70; margin:0; font-size:1rem; }
+    .liq table { font-size:.8rem; } .liq td { padding:4px 8px; border-bottom:1px solid #f1f5f9; }
+    .liq .sec { background:#eff6ff; color:#1e3a8a; font-weight:800; font-size:.7rem; text-transform:uppercase; padding:5px 8px; }
+    .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; }
+    @media print { body * { visibility:hidden; } #dlgLiq, #dlgLiq * { visibility:visible; } #dlgLiq { position:absolute; inset:0; box-shadow:none; max-width:100%; } .no-print { display:none!important; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/recursos-humanos/">Recursos Humanos</a> › <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-receipt-cutoff me-1"></i>Liquidaciones de Sueldo</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-receipt-cutoff"></i><div><h2>Liquidaciones de Sueldo — Libro del Mes</h2><p>Preview de todas las liquidaciones: valida los días trabajados (30/30, o menos con licencias), comisiones y bonos. Al EMITIR quedan congeladas y cada colaborador recibe la suya por correo.</p></div></div>
+
+  <div class="panel" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <label style="font-size:.8rem;font-weight:700;color:#374151">Mes <input type="month" id="mes" class="form-control form-control-sm" style="display:inline-block;width:auto;margin-left:6px" onchange="cargar()"></label>
+    <span id="indBar" style="font-size:.76rem;color:#64748b"></span>
+    <div style="flex:1"></div>
+    <button class="btn-ghost" onclick="exportCSV()"><i class="bi bi-filetype-csv me-1"></i>Libro CSV</button>
+    <button class="btn-navy" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
+    <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
+  </div>
+
+  <div class="panel">
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Colaborador</th><th>Días ✎</th><th>Sueldo Base</th><th>Comisiones ✎</th><th>Otros Imp. ✎</th><th>Gratif.</th><th>Imponible</th>
+          <th>No Impon.</th><th>AFP</th><th>Salud</th><th>AFC</th><th>Impuesto</th><th>Otros Dcto. ✎</th><th>Líquido</th><th>Estado</th><th></th>
+        </tr></thead>
+        <tbody id="tb"><tr><td colspan="16" class="empty">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot" id="footParams">
+    <b><i class="bi bi-diagram-3 me-1"></i>Parámetros y fórmulas</b><br>
+    · <b>Gratificación legal</b> = 25% de (sueldo + comisiones + otros imponibles), tope 4,75 IMM ÷ 12.
+    · <b>Imponible</b> topado a UF del mes × tope imponible para AFP/Salud.
+    · <b>AFP</b> según administradora de la ficha (tasas en <i>rh_afp_tasas</i>) · <b>Salud</b> 7% legal · <b>AFC</b> 0,6% solo contrato indefinido.
+    · <b>Impuesto único</b>: tramos UTM paramétricos (<i>rh_impuesto_tramos</i>) sobre imponible − previsión.
+    · Sueldo base, AFP, salud, contrato, colación y movilización salen de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; comisiones del <a href="/comisiones/revision/">motor de Comisiones</a> (editables antes de emitir).
+    · <b>Emitir mes</b> congela las liquidaciones (inmutables) y las publica en Mi Ficha de cada colaborador.
+  </div>
+</div>
+
+<dialog id="dlgLiq">
+  <div class="liq" id="liqBody"></div>
+  <div class="no-print" style="display:flex;justify-content:flex-end;gap:10px;padding:0 22px 18px">
+    <button class="btn-ghost" onclick="dlgLiq.close()">Cerrar</button>
+    <button class="btn-navy" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+  </div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token||!yo) location.href='/login.html';
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+(async()=>{ if (yo?.perfil==='Administrador') return; let okp=false;
+  try { const j = await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+    okp = (j.funcionalidades||[]).includes('rh_remuneraciones'); } catch(e){}
+  if (!okp) { alert('Acceso restringido'); location.href='/recursos-humanos/'; } })();
+
+const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const $ = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
+const dlgLiq = document.getElementById('dlgLiq');
+
+let DATA = null;
+async function cargar(){
+  const mes = document.getElementById('mes').value;
+  const j = await (await fetch('/api/rrhh/remuneraciones?mes='+mes, { headers:H })).json();
+  if (!j.success) { document.getElementById('tb').innerHTML = `<tr><td colspan="16" class="empty">${esc(j.error)}</td></tr>`; return; }
+  DATA = j.data;
+  const ind = DATA.indicadores;
+  document.getElementById('indBar').innerHTML =
+    `UF ${Number(ind.uf).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})} · UTM ${$(ind.utm).slice(1)} · IMM ${$(ind.imm)} · tope imp. ${String(ind.tope_uf).replace('.',',')} UF`;
+  render();
+}
+function render(){
+  const rows = DATA.filas || [];
+  if (!rows.length) { document.getElementById('tb').innerHTML = '<tr><td colspan="16" class="empty">No hay colaboradores con sueldo base en su ficha. Complétalos en <a href="/recursos-humanos/colaboradores/">Colaboradores</a>.</td></tr>'; return; }
+  document.getElementById('tb').innerHTML = rows.map((r,i)=>{
+    const em = r.estado==='EMITIDA';
+    const inp = (campo)=> em ? $(r[campo]) : `<input data-i="${i}" data-c="${campo}" value="${Math.round(r[campo]||0)}" onchange="recalc(this)">`;
+    return `<tr class="fila">
+      <td style="font-weight:600">${esc(r.nombre)}<div style="font-size:.66rem;color:#94a3b8">${esc(r.cargo||'')}</div></td>
+      <td>${em ? (r.dias??30) : `<input data-i="${i}" data-c="dias" value="${r.dias??30}" onchange="recalc(this)" style="width:44px" title="Días trabajados (30avos)">`}</td>
+      <td>${$(r.sueldo_base)}</td>
+      <td>${inp('comisiones')}</td>
+      <td>${inp('otros_imponibles')}</td>
+      <td>${$(r.gratificacion)}</td>
+      <td style="font-weight:700">${$(r.total_imponible)}</td>
+      <td>${$( (r.colacion||0)+(r.movilizacion||0)+(r.otros_no_imponibles||0) )}</td>
+      <td style="color:#b91c1c">${$(r.desc_afp)}<div style="font-size:.62rem;color:#94a3b8">${esc(r.afp||'—')}</div></td>
+      <td style="color:#b91c1c">${$((r.desc_salud||0)+(r.desc_salud_adicional||0))}${r.desc_salud_adicional?`<div style="font-size:.62rem;color:#94a3b8">7% + adic. isapre</div>`:''}</td>
+      <td style="color:#b91c1c">${$(r.desc_afc)}</td>
+      <td style="color:#b91c1c">${$(r.impuesto)}</td>
+      <td>${inp('otros_descuentos')}</td>
+      <td style="font-weight:800;color:#15803d">${$(r.liquido)}</td>
+      <td style="text-align:center"><span class="pill ${r.estado.replace(' ','')}">${r.estado}</span></td>
+      <td>${r.id_liq?`<button class="btn-ghost" style="padding:3px 8px;font-size:.72rem" onclick="verLiq(${r.id_liq})"><i class="bi bi-receipt"></i></button>`:''}</td>
+    </tr>`;
+  }).join('') + totalRow(rows);
+}
+function totalRow(rows){
+  const s = c => rows.reduce((a,r)=>a+(Number(r[c])||0),0);
+  return `<tr style="background:#e8edf5;font-weight:800">
+    <td>TOTAL (${rows.length})</td><td></td><td>${$(s('sueldo_base'))}</td><td>${$(s('comisiones'))}</td><td>${$(s('otros_imponibles'))}</td>
+    <td>${$(s('gratificacion'))}</td><td>${$(s('total_imponible'))}</td>
+    <td>${$(rows.reduce((a,r)=>a+(r.colacion||0)+(r.movilizacion||0)+(r.otros_no_imponibles||0),0))}</td>
+    <td>${$(s('desc_afp'))}</td><td>${$(s('desc_salud')+s('desc_salud_adicional'))}</td><td>${$(s('desc_afc'))}</td><td>${$(s('impuesto'))}</td>
+    <td>${$(s('otros_descuentos'))}</td><td style="color:#15803d">${$(s('liquido'))}</td><td></td><td></td></tr>`;
+}
+// Edición inline: recalcula al servidor al guardar; localmente solo actualiza el valor
+function recalc(el){
+  const r = DATA.filas[+el.dataset.i];
+  r[el.dataset.c] = parseFloat(el.value)||0;
+  r._editado = true;
+}
+async function guardar(){
+  const mes = document.getElementById('mes').value;
+  const filas = (DATA.filas||[]).filter(r=>r.estado!=='EMITIDA').map(r=>({
+    id_usuario: r.id_usuario, dias: r.dias, comisiones: r.comisiones, otros_imponibles: r.otros_imponibles,
+    otros_no_imponibles: r.otros_no_imponibles, otros_descuentos: r.otros_descuentos,
+    colacion: r.colacion, movilizacion: r.movilizacion,
+  }));
+  if (!filas.length) return alert('Nada que guardar (todo emitido)');
+  const j = await (await fetch('/api/rrhh/remuneraciones/guardar', { method:'POST', headers:HJ, body:JSON.stringify({ mes, filas }) })).json();
+  if (!j.success) return alert(j.error);
+  toast(`✓ ${j.data.guardadas} liquidaciones guardadas (borrador)`); cargar();
+}
+async function emitir(){
+  const mes = document.getElementById('mes').value;
+  // Validación de días trabajados ANTES de emitir (30/30; menos si hubo licencias/ingresos parciales)
+  const pend = (DATA?.filas||[]).filter(r=>r.estado!=='EMITIDA');
+  const parciales = pend.filter(r=>(r.dias??30)!==30);
+  const resumen = parciales.length
+    ? `\n\nDías trabajados DISTINTOS de 30/30 (revísalos — licencias o ingresos parciales):\n${parciales.map(r=>`  · ${r.nombre}: ${r.dias}/30`).join('\n')}`
+    : `\n\nTodos con 30/30 días trabajados.`;
+  if (!confirm(`VALIDACIÓN DE DÍAS TRABAJADOS — ${mes}\n${pend.length} liquidaciones por emitir.${resumen}\n\n¿Los días están correctos?`)) return;
+  if (!confirm(`¿EMITIR las liquidaciones de ${mes}?\n\nQuedan CONGELADAS (inmutables), visibles en Mi Ficha y se ENVÍAN POR CORREO a cada colaborador. Guarda el borrador antes si hiciste cambios.`)) return;
+  const j = await (await fetch('/api/rrhh/remuneraciones/emitir', { method:'POST', headers:HJ, body:JSON.stringify({ mes }) })).json();
+  if (!j.success) return alert(j.error);
+  toast(`✓ ${j.data.emitidas} liquidaciones emitidas — enviándose por correo a cada colaborador`); cargar();
+}
+async function verLiq(id){
+  const j = await (await fetch('/api/rrhh/remuneraciones/liquidacion/'+id, { headers:H })).json();
+  if (!j.success) return alert(j.error);
+  const l = j.data, d = l.detalle||{};
+  const co = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+  const fila = (lbl,v,neg) => (Number(v)||0) ? `<tr><td>${lbl}</td><td style="text-align:right;${neg?'color:#b91c1c':''}">${neg?'−':''}${co(v)}</td></tr>` : '';
+  document.getElementById('liqBody').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+      <div><h4>LIQUIDACIÓN DE SUELDO — ${esc(l.mes)}</h4>
+        <div style="font-size:.78rem;color:#64748b">AutoFácil SpA · RUT 76.916.907-K</div></div>
+      <img src="/img/logo-autofacil.png" onerror="this.src='/img/logo.png'" style="height:30px">
+    </div>
+    <table style="width:100%;margin-bottom:8px">
+      <tr><td style="color:#64748b">Colaborador</td><td style="text-align:right;font-weight:700">${esc(l.nombre)}</td></tr>
+      <tr><td style="color:#64748b">RUT</td><td style="text-align:right">${esc(l.rut||'—')}</td></tr>
+      <tr><td style="color:#64748b">Cargo</td><td style="text-align:right">${esc(l.cargo||'—')}</td></tr>
+      <tr><td style="color:#64748b">Contrato / AFP / Salud</td><td style="text-align:right">${esc(d.tipo_contrato||'—')} · ${esc(d.afp||'—')} · ${esc(d.salud||'—')}</td></tr>
+      <tr><td style="color:#64748b">Días trabajados</td><td style="text-align:right">${d.dias??30}</td></tr>
+    </table>
+    <table style="width:100%">
+      <tr><td class="sec" colspan="2">Haberes imponibles</td></tr>
+      ${fila('Sueldo base', d.sueldo_base)}${fila('Comisiones', d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal (25%, tope 4,75 IMM/12)', d.gratificacion)}
+      <tr><td style="font-weight:700">Total imponible</td><td style="text-align:right;font-weight:700">${co(d.total_imponible)}</td></tr>
+      <tr><td class="sec" colspan="2">Haberes no imponibles</td></tr>
+      ${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
+      <tr><td style="font-weight:700">Total haberes</td><td style="text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
+      <tr><td class="sec" colspan="2">Descuentos legales</td></tr>
+      ${fila('AFP '+(d.afp||'')+' ('+String(d.afp_pct||0).replace('.',',')+'%)', d.desc_afp, 1)}
+      ${fila('Salud ('+String(d.salud_pct||7).replace('.',',')+'%)', d.desc_salud, 1)}
+      ${fila('Adicional Isapre (plan '+String(d.plan_isapre_uf||'').replace('.',',')+' UF)', d.desc_salud_adicional, 1)}
+      ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc, 1)}
+      ${fila('Impuesto único 2ª categoría', d.impuesto, 1)}
+      ${fila('Otros descuentos', d.otros_descuentos, 1)}
+      <tr><td style="font-weight:700">Total descuentos</td><td style="text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
+      <tr><td style="font-weight:800;font-size:.95rem;padding-top:10px">LÍQUIDO A PAGAR</td><td style="text-align:right;font-weight:800;font-size:.95rem;color:#15803d;padding-top:10px">${co(d.liquido)}</td></tr>
+      ${(d.aporte_sis||d.aporte_afc_emp||d.aporte_mutual)?`<tr><td class="sec" colspan="2">Aportes del empleador (no descuentan al trabajador)</td></tr>
+      ${fila('SIS', d.aporte_sis)}${fila('AFC empleador', d.aporte_afc_emp)}${fila('Mutual de seguridad', d.aporte_mutual)}
+      <tr><td style="font-weight:700">Costo empresa</td><td style="text-align:right;font-weight:700">${co(d.costo_empresa)}</td></tr>`:''}
+    </table>
+    <div style="margin-top:14px;font-size:.68rem;color:#94a3b8">Estado: ${esc(l.estado)}${l.emitido_at?' · emitida el '+new Date(l.emitido_at).toLocaleDateString('es-CL')+' por '+esc(l.emitido_por||''):''}</div>`;
+  dlgLiq.showModal();
+}
+function exportCSV(){
+  const rows = DATA?.filas||[]; if (!rows.length) return;
+  const sep=';', head=['Colaborador','RUT','Cargo','Sueldo Base','Comisiones','Otros Imponibles','Gratificacion','Total Imponible','Colacion','Movilizacion','Otros No Imp','Total Haberes','AFP','Desc AFP','Desc Salud','Desc AFC','Impuesto','Otros Dctos','Total Descuentos','Liquido','Estado'];
+  const lines = rows.map(r=>[r.nombre,r.rut,r.cargo,r.sueldo_base,r.comisiones,r.otros_imponibles,r.gratificacion,r.total_imponible,r.colacion||0,r.movilizacion||0,r.otros_no_imponibles||0,r.total_haberes,r.afp||'',r.desc_afp,r.desc_salud,r.desc_afc,r.impuesto,r.otros_descuentos,r.total_descuentos,r.liquido,r.estado].map(v=>String(v??'').replace(/;/g,',')).join(sep));
+  const blob = new Blob(['﻿'+[head.join(sep),...lines].join('\n')], {type:'text/csv'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'libro-remuneraciones-'+document.getElementById('mes').value+'.csv'; a.click();
+}
+document.getElementById('mes').value = new Date().toISOString().slice(0,7);
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
