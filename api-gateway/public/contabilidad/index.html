@@ -66,6 +66,12 @@
       <p>La memoria financiera mes a mes: cada cierre con sus cifras clave y el análisis del analista IA — tendencia, riesgos y recomendaciones.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/libros-auxiliares/" class="module-card" id="cardLibAux" style="display:none">
+      <div class="card-icon"><i class="bi bi-journals"></i></div>
+      <h5>Libros Auxiliares</h5>
+      <p>Compras y honorarios documento a documento (importados de AVSOFT): filtra por proveedor, RUT o cuenta, revisa totales por mes con IVA y retenciones, y exporta a Excel.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/reglas/" class="module-card" id="cardReglas" style="display:none">
       <div class="card-icon"><i class="bi bi-gear-wide-connected"></i></div>
       <h5>Reglas de Centralización <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
@@ -108,6 +114,7 @@
     const tiene = (...cs)=> esAdmin || cs.some(c=>funcs.has(c));
     if (tiene('ctb_comprobantes')) document.getElementById('cardComp').style.display='';
     if (tiene('ctb_libros')) document.getElementById('cardLib').style.display='';
+    if (tiene('ctb_libros_aux','ctb_libros')) document.getElementById('cardLibAux').style.display='';
     if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
     if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';

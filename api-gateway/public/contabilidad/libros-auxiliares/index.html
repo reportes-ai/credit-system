@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Libros Auxiliares — AutoFácil</title>
+  <!-- v1.0 — auxiliares de compras y honorarios (import AVSOFT): filtros, totales por mes, export Excel -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1350px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:6px 12px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .tot td { font-weight:700; background:#f8fafc; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .card-kpi { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; }
+    .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.15rem; color:var(--navy); }
+    .card-kpi .l { font-size:.72rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
+    .mes-click { cursor:pointer; } .mes-click:hover td { background:#f0f9ff; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Libros Auxiliares', icon:'bi-journals', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-journals"></i><div><h2>Libros Auxiliares</h2><p>Detalle documento a documento de los auxiliares importados desde AVSOFT: compras (facturas de proveedores con IVA) y honorarios (boletas con retención). Filtra, revisa totales por mes y exporta a Excel.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-cart3 me-1"></i>Compras</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-person-badge me-1"></i>Honorarios</a></li>
+  </ul>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+    <div><label class="form-label small fw-semibold mb-1">Desde (mes)</label><input type="month" id="fDesde" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1">Hasta (mes)</label><input type="month" id="fHasta" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1" id="lblQ">Proveedor, RUT o N° doc</label>
+      <input id="fQ" class="form-control form-control-sm" style="min-width:240px" placeholder="ej. INDEXA" onkeydown="if(event.key==='Enter')consultar()"></div>
+    <div><label class="form-label small fw-semibold mb-1">Cuenta (prefijo)</label>
+      <input id="fCuenta" class="form-control form-control-sm" style="width:130px" placeholder="ej. 4002" onkeydown="if(event.key==='Enter')consultar()"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
+    <button class="btn btn-sm btn-outline-success" onclick="exportar()" id="btnXls" disabled><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+    <span class="flex-grow-1"></span>
+    <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
+      <input type="file" hidden accept=".csv,.txt" onchange="importar(this)"></label>
+  </div>
+
+  <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis" style="display:none"></div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="panel"><table>
+        <thead id="theadMes"></thead><tbody id="tbodyMes"></tbody>
+      </table></div>
+      <div class="small text-muted"><i class="bi bi-hand-index me-1"></i>Clic en un mes para filtrar el detalle a ese mes.</div>
+    </div>
+    <div class="col-lg-8">
+      <div class="panel"><table id="tablaDet">
+        <thead id="theadDet"></thead><tbody id="tbodyDet"><tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr></tbody>
+      </table></div>
+      <div class="small text-muted" id="notaTrunc"></div>
+    </div>
+  </div>
+
+  <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.82rem">
+    <div class="fw-bold mb-1"><i class="bi bi-info-circle me-1"></i>De dónde salen estos datos</div>
+    Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)" y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+const MESES = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const nomMes = m => { const [y,mm]=m.split('-'); return MESES[Number(mm)]+'-'+y.slice(2); };
+let MODO = 'C', D = null;
+
+const hoy = new Date();
+fHasta.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+fDesde.value = `${hoy.getFullYear()}-01`;
+
+function tab(m){
+  MODO = m; D = null;
+  tabC.classList.toggle('active', m==='C'); tabH.classList.toggle('active', m==='H');
+  lblQ.textContent = m==='C' ? 'Proveedor, RUT o N° doc' : 'Profesional, RUT, boleta o glosa';
+  document.getElementById('kpis').style.display='none';
+  theadMes.innerHTML=''; tbodyMes.innerHTML='';
+  theadDet.innerHTML=''; tbodyDet.innerHTML='<tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr>';
+  notaTrunc.textContent=''; btnXls.disabled = true;
+  consultar();
+}
+
+function qs(){
+  const p = new URLSearchParams();
+  if (fDesde.value) p.set('desde', fDesde.value);
+  if (fHasta.value) p.set('hasta', fHasta.value);
+  if (fQ.value.trim()) p.set('q', fQ.value.trim());
+  if (fCuenta.value.trim()) p.set('cuenta', fCuenta.value.trim());
+  return p.toString();
+}
+
+async function consultar(){
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/lista?' : '/api/contabilidad/honorarios-aux/lista?';
+  const r = await fetch(url+qs(), { headers:H }); const j = await r.json();
+  if (!j.success) return alert(j.error);
+  D = j.data; render();
+}
+
+function render(){
+  const k = document.getElementById('kpis'); k.style.display='flex';
+  if (MODO==='C'){
+    k.innerHTML = `
+      <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Facturas</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.neto)}</div><div class="l">Neto</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.iva)}</div><div class="l">IVA (crédito fiscal)</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.total)}</div><div class="l">Total</div></div>`;
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.neto)}</td><td class="text-right num">${fmt(x.iva)}</td><td class="text-right num">${fmt(x.total)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Doc</th><th>Emisión</th><th>Vencim.</th><th>RUT</th><th>Proveedor</th><th>Cta gasto</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.tipo_doc||'')}-${esc(d.num_doc||'')}</td>
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):''}</td>
+      <td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
+      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
+      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
+  } else {
+    k.innerHTML = `
+      <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Boletas</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.bruto)}</div><div class="l">Bruto</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.retencion)}</div><div class="l">Retención</div></div>
+      <div class="card-kpi"><div class="v">$${fmt(D.total.liquido)}</div><div class="l">Líquido</div></div>`;
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Boletas</th><th class="text-right">Bruto</th><th class="text-right">Retención</th><th class="text-right">Líquido</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.bruto)}</td><td class="text-right num">${fmt(x.retencion)}</td><td class="text-right num">${fmt(x.liquido)}</td></tr>`).join('')
+      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Boleta</th><th>Emisión</th><th>RUT</th><th>Profesional</th><th>Glosa</th><th>Cta</th><th class="text-right">Bruto</th><th class="text-right">Ret.</th><th class="text-right">Líquido</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.num_boleta||'')}</td>
+      <td>${d.fecha_emision?String(d.fecha_emision).slice(0,10):''}</td><td>${esc(d.rut||'')}</td>
+      <td>${esc(d.nombre||'')}</td><td>${esc(d.glosa||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
+      <td class="text-right num">${fmt(d.bruto)}</td><td class="text-right num">${fmt(d.retencion)}</td><td class="text-right num">${fmt(d.liquido)}</td></tr>`).join('')
+      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin boletas</td></tr>';
+  }
+  notaTrunc.innerHTML = D.truncado ? '<i class="bi bi-exclamation-triangle me-1"></i>Se muestran los primeros 1.000 documentos — acota el rango o los filtros para ver el resto.' : '';
+  btnXls.disabled = !D.documentos.length;
+}
+
+function irMes(m){ fDesde.value = m; fHasta.value = m; consultar(); }
+
+async function importar(inp){
+  const f = inp.files[0]; if (!f) return; inp.value='';
+  const base64 = await new Promise(res=>{ const fr = new FileReader(); fr.onload = ()=>res(fr.result); fr.readAsDataURL(f); });
+  const url = MODO==='C' ? '/api/contabilidad/compras-aux/importar' : '/api/contabilidad/honorarios-aux/importar';
+  const r = await fetch(url,{method:'POST',headers:H,body:JSON.stringify({base64})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const n = j.data.documentos || j.data.boletas, ms = j.data.meses.sort();
+  alert(`Importados ${n.toLocaleString('es-CL')} documentos (${ms.length} meses: ${ms[0]} → ${ms[ms.length-1]}). Los meses del archivo se reemplazaron completos.`);
+  consultar();
+}
+
+function exportar(){
+  if (!D || !D.documentos.length) return;
+  const filas = MODO==='C'
+    ? [['Mes','Tipo','N° Doc','Emisión','Vencimiento','RUT','Proveedor','Cta CxP','Cta Gasto','Neto','Exento','IVA','Total'],
+       ...D.documentos.map(d=>[d.mes,d.tipo_doc,d.num_doc,String(d.fecha_doc||'').slice(0,10),String(d.fecha_vcto||'').slice(0,10),d.rut,d.razon_social,d.cuenta_cxp,d.cuenta_gasto,d.neto,d.exento,d.iva,d.total])]
+    : [['Mes','N° Boleta','Emisión','RUT','Profesional','Glosa','Cta Gasto','Bruto','Tasa Ret.','Retención','Líquido'],
+       ...D.documentos.map(d=>[d.mes,d.num_boleta,String(d.fecha_emision||'').slice(0,10),d.rut,d.nombre,d.glosa,d.cuenta_gasto,d.bruto,d.tasa_retencion,d.retencion,d.liquido])];
+  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
+  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'], { type:'application/vnd.ms-excel' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (MODO==='C'?'auxiliar-compras':'auxiliar-honorarios')+'-'+(fDesde.value||'')+'-'+(fHasta.value||'')+'.xls';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+consultar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

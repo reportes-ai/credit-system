@@ -74,9 +74,11 @@ router.post('/directorio/rubros',      verifyToken, requireFunc('ctb_directorio'
 router.put('/directorio/rubros/:id',   verifyToken, requireFunc('ctb_directorio'), ctrl.putDirRubro);
 router.delete('/directorio/rubros/:id', verifyToken, requireFunc('ctb_directorio'), ctrl.eliminarDirRubro);
 router.get('/compras-aux',           verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes'), ctrl.getComprasAux);
-router.post('/compras-aux/importar', verifyToken, requireFunc('ctb_directorio'), ctrl.importarComprasAux);
+router.post('/compras-aux/importar', verifyToken, requireFunc('ctb_directorio', 'ctb_libros_aux'), ctrl.importarComprasAux);
 router.get('/honorarios-aux',           verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes'), ctrl.getHonorariosAux);
-router.post('/honorarios-aux/importar', verifyToken, requireFunc('ctb_directorio'), ctrl.importarHonorariosAux);
+router.post('/honorarios-aux/importar', verifyToken, requireFunc('ctb_directorio', 'ctb_libros_aux'), ctrl.importarHonorariosAux);
+router.get('/compras-aux/lista',     verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaComprasAux);
+router.get('/honorarios-aux/lista',  verifyToken, requireFunc('ctb_libros_aux', 'ctb_libros', 'ctb_directorio'), ctrl.listaHonorariosAux);
 router.put('/directorio/hechos',     verifyToken, requireFunc('ctb_directorio'), ctrl.guardarHechoDirectorio);
 router.post('/directorio/hechos-ia', verifyToken, requireFunc('ctb_directorio'), ctrl.hechosDirectorioIA);
 

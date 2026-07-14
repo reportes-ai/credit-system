@@ -1117,6 +1117,61 @@ exports.getHonorariosAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Libros Auxiliares (/contabilidad/libros-auxiliares/) ─────────────────────
+   Consulta completa de los auxiliares importados (compras, honorarios) con
+   filtros y totales por mes. Solo lectura: la importación vive en el
+   directorio y en esta misma página. */
+require('../../../../shared/migrate').enFila('contabilidad-libros-aux', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_libros_aux' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Libros Auxiliares','ctb_libros_aux','/contabilidad/libros-auxiliares/','bi-journals')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] libros auxiliares listos');
+  } catch (e) { console.error('[contabilidad-libros-aux migration]', e.message); }
+});
+
+exports.listaComprasAux = async (req, res) => {
+  try {
+    const { desde, hasta, q, cuenta } = req.query;
+    const w = [], p = [];
+    if (/^\d{4}-\d{2}$/.test(desde || '')) { w.push('mes >= ?'); p.push(desde); }
+    if (/^\d{4}-\d{2}$/.test(hasta || '')) { w.push('mes <= ?'); p.push(hasta); }
+    if (q) { w.push('(razon_social LIKE ? OR rut LIKE ? OR num_doc LIKE ?)'); p.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (cuenta) { w.push('(cuenta_gasto LIKE ? OR cuenta_cxp LIKE ?)'); p.push(`${cuenta}%`, `${cuenta}%`); }
+    const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+    const [docs] = await pool.query(`SELECT * FROM ctb_compras_aux ${where} ORDER BY mes DESC, total DESC LIMIT 1000`, p);
+    const [meses] = await pool.query(
+      `SELECT mes, COUNT(*) docs, SUM(neto) neto, SUM(exento) exento, SUM(iva) iva, SUM(total) total
+         FROM ctb_compras_aux ${where} GROUP BY mes ORDER BY mes DESC`, p);
+    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(neto),0) neto, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total FROM ctb_compras_aux ${where}`, p);
+    ok(res, { documentos: docs, meses, total: tot, truncado: docs.length === 1000 });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.listaHonorariosAux = async (req, res) => {
+  try {
+    const { desde, hasta, q, cuenta } = req.query;
+    const w = [], p = [];
+    if (/^\d{4}-\d{2}$/.test(desde || '')) { w.push('mes >= ?'); p.push(desde); }
+    if (/^\d{4}-\d{2}$/.test(hasta || '')) { w.push('mes <= ?'); p.push(hasta); }
+    if (q) { w.push('(nombre LIKE ? OR rut LIKE ? OR num_boleta LIKE ? OR glosa LIKE ?)'); p.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    if (cuenta) { w.push('cuenta_gasto LIKE ?'); p.push(`${cuenta}%`); }
+    const where = w.length ? 'WHERE ' + w.join(' AND ') : '';
+    const [docs] = await pool.query(`SELECT * FROM ctb_honorarios_aux ${where} ORDER BY mes DESC, bruto DESC LIMIT 1000`, p);
+    const [meses] = await pool.query(
+      `SELECT mes, COUNT(*) docs, SUM(bruto) bruto, SUM(retencion) retencion, SUM(liquido) liquido
+         FROM ctb_honorarios_aux ${where} GROUP BY mes ORDER BY mes DESC`, p);
+    const [[tot]] = await pool.query(`SELECT COUNT(*) docs, COALESCE(SUM(bruto),0) bruto, COALESCE(SUM(retencion),0) retencion, COALESCE(SUM(liquido),0) liquido FROM ctb_honorarios_aux ${where}`, p);
+    ok(res, { documentos: docs, meses, total: tot, truncado: docs.length === 1000 });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* CRUD de rubros (botón Configurar rubros en la página) */
 exports.getDirRubros = async (req, res) => {
   try { const [rows] = await pool.query('SELECT * FROM ctb_dir_rubros ORDER BY cuadro, orden, id'); ok(res, rows); }
