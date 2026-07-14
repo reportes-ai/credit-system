@@ -280,4 +280,35 @@ const saldoVacaciones = async (req, res) => {
   } catch (e) { console.error('[rrhh saldoVacaciones]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { crear, listar, resolver, adjunto, ausentesHoy, saldoVacaciones };
+/* ── GET /api/rrhh/ausencias/licencias-resumen — solo RRHH/jefes ─────────────
+   Resumen de LICENCIA MEDICA aprobadas: por mes (mes de inicio) y por persona.
+   Las licencias que cruzan de mes se cuentan en el mes en que COMIENZAN. */
+const licenciasResumen = async (req, res) => {
+  try {
+    const u = req.usuario || {};
+    const rrhh = (u.perfil === 'Administrador') || await esRRHH(u.id_usuario);
+    const [[rep]] = await pool.query("SELECT COUNT(*) c FROM usuarios WHERE id_supervisor=? AND estado='activo'", [u.id_usuario]);
+    if (!rrhh && !(rep?.c > 0)) return fail(res, 'Sin permiso', 403);
+    const soloEquipo = !rrhh; // un jefe ve solo a su equipo
+    const wEq = soloEquipo ? 'AND a.id_usuario IN (SELECT id_usuario FROM usuarios WHERE id_supervisor=?)' : '';
+    const p = soloEquipo ? [u.id_usuario] : [];
+    const [porMes] = await pool.query(
+      `SELECT DATE_FORMAT(a.fecha_desde,'%Y-%m') mes, COUNT(*) licencias, SUM(a.dias_habiles) dias,
+              COUNT(DISTINCT a.id_usuario) personas
+         FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
+        GROUP BY mes ORDER BY mes DESC LIMIT 36`, p);
+    const [porPersona] = await pool.query(
+      `SELECT a.id_usuario, a.nombre, COUNT(*) licencias, SUM(a.dias_habiles) dias,
+              MIN(a.fecha_desde) primera, MAX(a.fecha_hasta) ultima
+         FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
+        GROUP BY a.id_usuario, a.nombre ORDER BY dias DESC`, p);
+    const [detalle] = await pool.query(
+      `SELECT a.id, a.nombre, a.fecha_desde, a.fecha_hasta, a.dias_habiles, a.comentario,
+              a.adjunto_nombre IS NOT NULL tiene_adjunto, a.resuelto_nombre, a.created_at
+         FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
+        ORDER BY a.fecha_desde DESC LIMIT 300`, p);
+    ok(res, { por_mes: porMes, por_persona: porPersona, detalle });
+  } catch (e) { console.error('[rrhh licenciasResumen]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+module.exports = { crear, listar, resolver, adjunto, ausentesHoy, saldoVacaciones, licenciasResumen };

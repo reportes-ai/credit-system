@@ -42,6 +42,7 @@ router.get('/remuneraciones/liquidacion/:id', verifyToken, rem.getLiquidacion); 
 // Ausencias y Permisos + Saldo de Vacaciones (Fase 2 módulo RRHH)
 const aus = require('../controllers/ausencias.controller');
 router.get('/ausencias/hoy',          verifyToken, aus.ausentesHoy);
+router.get('/ausencias/licencias-resumen', verifyToken, requireFunc('rh_ausencias', 'rh_aprobar'), aus.licenciasResumen); // valida RRHH/jefe adentro
 router.get('/ausencias/adjunto/:id',  verifyToken, aus.adjunto);
 router.get('/ausencias',              verifyToken, requireFunc('rh_ausencias', 'rh_aprobar'), aus.listar);
 router.post('/ausencias',             verifyToken, requireFunc('rh_ausencias'), aus.crear);
