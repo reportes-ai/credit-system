@@ -4511,16 +4511,24 @@ async function estamparVerificableCarta(c, forPrint){
         }
       }
     }
-  }catch(_){ }
+  }catch(e){ console.error('[carta verificable]', e); }
   if(forPrint){
     // Use html2pdf to download directly (no print dialog)
     setTimeout(() => printPDF(), 300);
   }
 }
 
-function printPDF(){
+async function printPDF(){
   const carta = window._currentCartaForPrint;
   if(!carta){ alert('Error: no hay carta seleccionada.'); return; }
+
+  // El QR de verificación es obligatorio en la carta impresa: si el estampado
+  // asíncrono aún no llegó (o falló), se reintenta una vez antes de imprimir.
+  const slotQR = document.getElementById('cartaQRSlot');
+  if(slotQR && !slotQR.innerHTML.trim() && (carta.status === 'APROBADA' || carta.status === 'OTORGADA')){
+    await estamparVerificableCarta(carta, false);
+    if(!slotQR.innerHTML.trim() && typeof showToast === 'function') showToast('⚠ No se pudo estampar el QR de verificación — la carta saldrá sin QR');
+  }
 
   const nombre = carta.cliente.replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ ]/g, '').trim();
   const rut = carta.rutCliente.replace(/[^0-9kK\-]/g, '').trim();
@@ -4546,9 +4554,11 @@ function printPDF(){
 <meta charset="UTF-8">
 <title>${title}</title>
 <style>
-  @page { size: Letter; margin: 12mm 15mm; }
+  /* margin:0 elimina el encabezado/pie del navegador (about:blank, 1/1);
+     el margen visual lo da el padding del body → cabe en 1 hoja carta */
+  @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; font-family: Arial, sans-serif; }
-  body { margin: 0; padding: 0; font-size: 10px; color: #222; width: 100%; }
+  body { margin: 0; padding: 10mm 14mm; font-size: 10px; color: #222; width: 100%; }
   #cartaPDF { width: 100%; }
   .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; margin-bottom:0; font-size:9.5px; color:#111; text-transform:uppercase; display:block; }
   .data-tbl { width:100%; border-collapse:collapse; margin-bottom:0; table-layout:fixed; }
