@@ -72,6 +72,12 @@
       <p>Compras y honorarios documento a documento (importados de AVSOFT): filtra por proveedor, RUT o cuenta, revisa totales por mes con IVA y retenciones, y exporta a Excel.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/f29/" class="module-card" id="cardF29" style="display:none">
+      <div class="card-icon"><i class="bi bi-file-earmark-ruled"></i></div>
+      <h5>F29 Borrador</h5>
+      <p>Propuesta de la declaración mensual de IVA armada desde los auxiliares: débitos, créditos y retención de honorarios calculados; proporcionalidad, imp. único y PPM editables.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/reglas/" class="module-card" id="cardReglas" style="display:none">
       <div class="card-icon"><i class="bi bi-gear-wide-connected"></i></div>
       <h5>Reglas de Centralización <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
@@ -115,6 +121,7 @@
     if (tiene('ctb_comprobantes')) document.getElementById('cardComp').style.display='';
     if (tiene('ctb_libros')) document.getElementById('cardLib').style.display='';
     if (tiene('ctb_libros_aux','ctb_libros')) document.getElementById('cardLibAux').style.display='';
+    if (tiene('ctb_f29','ctb_libros_aux')) document.getElementById('cardF29').style.display='';
     if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
     if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';

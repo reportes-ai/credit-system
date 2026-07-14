@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>F29 Borrador — AutoFácil</title>
+  <!-- v1.0 — borrador del Formulario 29 desde los auxiliares; códigos manuales editables y guardados por mes -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1000px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:20px; overflow:hidden; }
+    .panel h6 { background:#f8fafc; margin:0; padding:10px 18px; font-weight:800; font-size:.8rem; letter-spacing:.4px; color:var(--navy-dark); border-bottom:1px solid #e5e7eb; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    td { padding:7px 18px; border-bottom:1px solid #f1f5f9; }
+    .cod { font-family:Consolas,monospace; font-weight:800; color:var(--navy); width:64px; }
+    .num { font-family:Consolas,monospace; font-weight:700; text-align:right; white-space:nowrap; }
+    .calc { color:#1d4ed8; }  /* azul = calculado de los auxiliares */
+    .man input { width:140px; text-align:right; font-family:Consolas,monospace; font-weight:700; color:#b91c1c; border:1.5px solid #fca5a5; border-radius:6px; padding:2px 8px; font-size:.85rem; }
+    .tot td { background:#eef6ff; font-weight:800; }
+    .granTot td { background:var(--navy); color:#fff; font-weight:800; font-size:.95rem; }
+    .nota { font-size:.76rem; color:#64748b; }
+    @media print { .no-print{display:none!important} body{background:#fff} .main-content{padding:0} }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'F29 Borrador', icon:'bi-file-earmark-ruled', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-file-earmark-ruled"></i><div><h2>F29 Borrador — Declaración Mensual de IVA</h2><p>Propuesta armada desde los auxiliares de ventas, compras y honorarios. Los valores azules vienen de los libros; los rojos son manuales y quedan guardados. La declaración oficial se hace en sii.cl.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 no-print">
+    <div><label class="form-label small fw-semibold mb-1">Período</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Generar</button>
+    <button class="btn btn-sm btn-success" onclick="guardar()" id="btnSave" disabled><i class="bi bi-save me-1"></i>Guardar ajustes</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+    <span id="lblGuardado" class="small text-muted ms-2"></span>
+  </div>
+
+  <div id="out"><div class="text-center text-muted py-5">Elige un período y presiona Generar</div></div>
+
+  <div class="mt-3 p-3 no-print" style="background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;font-size:.8rem">
+    <b><i class="bi bi-exclamation-triangle me-1"></i>Esto es un borrador de trabajo, no la declaración.</b>
+    <ul class="mb-0 mt-1">
+      <li><b>Código 520 (crédito):</b> si la empresa aplica <b>proporcionalidad</b> del crédito fiscal (por ingresos exentos), parte del IVA de compras no da derecho a crédito — ajusta el valor con el cálculo del contador (en mayo 2026 la diferencia fue $191.616).</li>
+      <li><b>Código 151 (retención honorarios):</b> el SII declara por fecha de <b>pago</b> de la boleta; el auxiliar va por período contable. Puede haber corrimientos de un mes.</li>
+      <li><b>Códigos 048 (imp. único trabajadores) y PPM:</b> vienen de remuneraciones y del cálculo tributario — manuales por ahora.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+let D = null, AJ = {};
+const hoy = new Date(); hoy.setMonth(hoy.getMonth()-1);
+fMes.value = hoy.toISOString().slice(0,7);
+
+const man = (cod) => Number(AJ[cod]) || 0;
+
+async function consultar(){
+  const r = await fetch('/api/contabilidad/f29?mes='+fMes.value,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data; AJ = D.ajustes || {}; render();
+  btnSave.disabled = false;
+  lblGuardado.textContent = D.guardado ? `Ajustes guardados por ${D.guardado.por} (${new Date(D.guardado.en).toLocaleString('es-CL')})` : '';
+}
+
+const filaC = (cod, glosa, val) => `<tr><td class="cod">${cod}</td><td>${glosa}</td><td class="num calc">${fmt(val)}</td></tr>`;
+const filaM = (cod, glosa) => `<tr class="man"><td class="cod">${cod}</td><td>${glosa}</td><td class="num"><input type="number" value="${man(cod)||''}" placeholder="0" oninput="AJ['${cod}']=Number(this.value)||0;recalc()"></td></tr>`;
+
+function render(){
+  const [y,m] = D.mes.split('-');
+  document.getElementById('out').innerHTML = `
+  <div class="text-center mb-3"><b>AUTOFACIL SPA · RUT 76.545.638-K · Período ${m}/${y}</b></div>
+  <div class="panel"><h6>DÉBITO FISCAL (ventas)</h6><table>
+    ${filaC('503','Cantidad facturas emitidas', D.ventas.c503)}
+    ${filaC('512','Cantidad notas de débito emitidas', D.ventas.c512)}
+    ${filaC('509','Cantidad notas de crédito emitidas', D.ventas.c509)}
+    ${filaC('502','Débitos facturas emitidas', D.ventas.c502)}
+    ${filaC('513','Débitos notas de débito emitidas', D.ventas.c513)}
+    ${filaC('510','Débitos notas de crédito emitidas (restan)', D.ventas.c510)}
+    <tr class="tot"><td class="cod">538</td><td>TOTAL DÉBITOS</td><td class="num">${fmt(D.ventas.c538)}</td></tr>
+  </table></div>
+
+  <div class="panel"><h6>CRÉDITO FISCAL (compras)</h6><table>
+    ${filaC('519','Cantidad facturas recibidas del giro', D.compras.c519)}
+    ${filaC('527','Cantidad notas de crédito recibidas', D.compras.c527)}
+    ${filaC('520','Crédito facturas del giro (según auxiliar)', D.compras.c520)}
+    ${filaM('520A','Ajuste proporcionalidad / sin derecho a crédito (resta)')}
+    ${filaC('528','Crédito notas de crédito recibidas (restan)', D.compras.c528)}
+    <tr class="tot"><td class="cod">537</td><td>TOTAL CRÉDITOS</td><td class="num" id="t537"></td></tr>
+  </table></div>
+
+  <div class="panel"><h6>IVA DETERMINADO + RETENCIONES + PPM</h6><table>
+    <tr class="tot"><td class="cod">089</td><td>IMPUESTO DETERMINADO IVA (538 − 537)</td><td class="num" id="t089"></td></tr>
+    ${filaC('151','Retención honorarios (según auxiliar, '+D.honorarios.boletas+' boletas — SII usa fecha de pago)', D.honorarios.c151)}
+    ${filaM('151A','Ajuste retención honorarios (+/−)')}
+    ${filaM('048','Retención impuesto único trabajadores (remuneraciones)')}
+    ${filaM('062','PPM del período')}
+    <tr class="granTot"><td class="cod">547</td><td>TOTAL DETERMINADO A PAGAR</td><td class="num" id="t547"></td></tr>
+  </table></div>
+  <div class="nota">Azul = calculado de los auxiliares (ventas/compras/honorarios importados o digitados). Rojo = manual, se guarda por mes con el botón Guardar ajustes. Declarar en sii.cl → Impuestos mensuales → F29.</div>`;
+  recalc();
+}
+
+function recalc(){
+  if (!D) return;
+  const t537 = D.compras.c520 - man('520A') - D.compras.c528;
+  const t089 = Math.max(0, D.ventas.c538 - t537);
+  const t547 = t089 + D.honorarios.c151 + man('151A') + man('048') + man('062');
+  document.getElementById('t537').textContent = fmt(t537);
+  document.getElementById('t089').textContent = fmt(t089);
+  document.getElementById('t547').textContent = fmt(t547);
+}
+
+async function guardar(){
+  const r = await fetch('/api/contabilidad/f29',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value,ajustes:AJ})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  lblGuardado.textContent = 'Ajustes guardados ✓';
+}
+
+consultar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

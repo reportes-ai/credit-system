@@ -1358,6 +1358,83 @@ exports.eliminarDocAux = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── F29 Borrador (/contabilidad/f29/) ────────────────────────────────────────
+   Propuesta del Formulario 29 mensual a partir de los auxiliares de ventas
+   (débito fiscal), compras (crédito fiscal) y honorarios (retención). Los
+   códigos que el sistema no puede conocer (proporcionalidad del crédito,
+   impuesto único trabajadores, PPM) son editables y se guardan por mes.
+   ES UN BORRADOR: la declaración se hace en el SII. Validado contra el F29
+   real de mayo 2026 (débitos y NC al peso; crédito difiere solo por la
+   proporcionalidad; honorarios el SII los toma por fecha de pago). */
+require('../../../../shared/migrate').enFila('contabilidad-f29', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_f29 (
+        mes        VARCHAR(7) PRIMARY KEY,
+        ajustes    TEXT NOT NULL,                 -- JSON {codigo: valor} de los códigos manuales
+        actualizado_por VARCHAR(160) NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_f29' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'F29 Borrador','ctb_f29','/contabilidad/f29/','bi-file-earmark-ruled')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] f29 borrador listo');
+  } catch (e) { console.error('[contabilidad-f29 migration]', e.message); }
+});
+
+exports.getF29 = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes obligatorio', 400);
+    // Ventas (débito fiscal). Las NC 61 están guardadas con signo negativo.
+    const [[v]] = await pool.query(`SELECT
+        COUNT(CASE WHEN tipo_doc IN ('33','34') THEN 1 END) c503,
+        COUNT(CASE WHEN tipo_doc='56' THEN 1 END) c512,
+        COUNT(CASE WHEN tipo_doc='61' THEN 1 END) c509,
+        COALESCE(SUM(CASE WHEN tipo_doc='33' THEN iva END),0) c502,
+        COALESCE(SUM(CASE WHEN tipo_doc='56' THEN iva END),0) c513,
+        COALESCE(SUM(CASE WHEN tipo_doc='61' THEN -iva END),0) c510,
+        COALESCE(SUM(iva),0) c538
+      FROM ctb_ventas_aux WHERE mes=?`, [mes]);
+    // Compras (crédito fiscal)
+    const [[c]] = await pool.query(`SELECT
+        COUNT(CASE WHEN tipo_doc IN ('33','34','30','46') THEN 1 END) c519,
+        COUNT(CASE WHEN tipo_doc IN ('61','60') THEN 1 END) c527,
+        COALESCE(SUM(CASE WHEN tipo_doc NOT IN ('61','60') THEN iva END),0) c520,
+        COALESCE(SUM(CASE WHEN tipo_doc IN ('61','60') THEN iva END),0) c528
+      FROM ctb_compras_aux WHERE mes=?`, [mes]);
+    // Honorarios (retención 151) — ojo: el SII declara por fecha de PAGO
+    const [[h]] = await pool.query('SELECT COALESCE(SUM(retencion),0) c151, COUNT(*) n FROM ctb_honorarios_aux WHERE mes=?', [mes]);
+    const [[aj]] = await pool.query('SELECT ajustes, actualizado_por, updated_at FROM ctb_f29 WHERE mes=?', [mes]);
+    ok(res, {
+      mes,
+      ventas: { c503: Number(v.c503), c512: Number(v.c512), c509: Number(v.c509), c502: Number(v.c502), c513: Number(v.c513), c510: Number(v.c510), c538: Number(v.c538) },
+      compras: { c519: Number(c.c519), c527: Number(c.c527), c520: Number(c.c520), c528: Number(c.c528) },
+      honorarios: { c151: Number(h.c151), boletas: Number(h.n) },
+      ajustes: aj ? JSON.parse(aj.ajustes) : {},
+      guardado: aj ? { por: aj.actualizado_por, en: aj.updated_at } : null,
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.guardarF29 = async (req, res) => {
+  try {
+    const { mes, ajustes } = req.body || {};
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
+    await pool.query(
+      'INSERT INTO ctb_f29 (mes, ajustes, actualizado_por) VALUES (?,?,?) ON DUPLICATE KEY UPDATE ajustes=VALUES(ajustes), actualizado_por=VALUES(actualizado_por)',
+      [mes, JSON.stringify(ajustes || {}), nombreDe(req.user)]);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'f29', entidad_id: null, detalle: `Ajustes F29 ${mes}` });
+    ok(res, { guardado: true });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Libros Auxiliares (/contabilidad/libros-auxiliares/) ─────────────────────
    Consulta completa de los auxiliares importados (compras, honorarios) con
    filtros y totales por mes. Solo lectura: la importación vive en el
