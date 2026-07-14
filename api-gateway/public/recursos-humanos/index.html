@@ -66,6 +66,12 @@
       <p>El ciclo de sueldos completo: Liquidaciones de Sueldo (preview, validación de días y envío por correo al emitir), indicadores paramétricos, y próximamente licencias médicas y vacaciones.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/licencias/" class="module-card" id="cardLic" style="display:none">
+      <div class="card-icon"><i class="bi bi-file-medical"></i></div>
+      <h5>Licencias Médicas <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Registro de licencias a nombre del colaborador: fechas de inicio y término, días hábiles calculados y correo automático al supervisor directo. Con resumen por mes y por persona.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/ausencias/" class="module-card" id="cardAus" style="display:none">
       <div class="card-icon"><i class="bi bi-calendar-x"></i></div>
       <h5>Ausencias y Permisos</h5>
@@ -101,6 +107,7 @@
     if (tiene('rh_colaboradores','rh_aprobar')) document.getElementById('cardCol').style.display='';
     if (tiene('rh_remuneraciones')) document.getElementById('cardRem').style.display='';
     if (tiene('rh_ausencias','rh_aprobar')) document.getElementById('cardAus').style.display='';
+    if (tiene('rh_aprobar')) document.getElementById('cardLic').style.display='';
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
   })();

@@ -51,7 +51,7 @@
 </nav>
 
 <div class="main">
-  <div class="page-banner"><i class="bi bi-calendar-x"></i><div><h2>Ausencias y Permisos</h2><p>Licencias médicas, permisos y días administrativos — con aprobación de tu jefatura o RRHH.</p></div></div>
+  <div class="page-banner"><i class="bi bi-calendar-x"></i><div><h2>Ausencias y Permisos</h2><p>Permisos y días administrativos — con aprobación de tu jefatura o RRHH. Las licencias médicas las registra RRHH en su propio módulo.</p></div></div>
   <div class="ausentes" id="ausentesHoy" style="display:none"></div>
 
   <div class="tabs">
@@ -59,43 +59,19 @@
     <div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div>
     <div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja<span class="badge-count" id="bCount" style="display:none">0</span></div>
     <div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Históricas</div>
-    <div class="tab" id="t5" onclick="tab('licencias')" style="display:none"><i class="bi bi-file-medical me-1"></i>Licencias</div>
   </div>
 
   <div id="secCrear" class="card-box">
     <div class="grid2">
-      <div class="fld"><label>Tipo de ausencia</label><select id="fTipo" onchange="tipoUI()"></select></div>
+      <div class="fld"><label>Tipo de ausencia</label><select id="fTipo"></select></div>
       <div class="fld" id="wMedio"><label>Medio día</label><select id="fMedio"><option value="">No — día(s) completo(s)</option><option value="1">Sí — medio día</option></select></div>
-      <div class="fld" id="wColab" style="display:none"><label>Colaborador (la licencia se ingresa a su nombre)</label><select id="fColab"><option value="">— elegir —</option></select></div>
       <div class="fld"><label>Desde</label><input type="date" id="fD"></div>
       <div class="fld"><label>Hasta</label><input type="date" id="fH"></div>
     </div>
     <div class="fld"><label>Comentario</label><textarea id="fC" rows="2" placeholder="Motivo o detalle"></textarea></div>
-    <div class="fld"><label>Adjunto (licencia médica, comprobante — opcional, máx 10 MB)</label><input type="file" id="fAdj"></div>
+    <div class="fld"><label>Adjunto (comprobante — opcional, máx 10 MB)</label><input type="file" id="fAdj"></div>
     <div id="diasInfo" style="font-size:.82rem;color:#475569;margin-bottom:10px"></div>
-    <div id="notaLic" style="display:none;background:#fff7ed;border-left:4px solid #f59e0b;border-radius:8px;padding:10px 14px;font-size:.8rem;margin-bottom:10px">
-      <b>Licencia médica:</b> no es una solicitud — queda registrada de inmediato (siempre por días completos) y se <b>informa por correo al supervisor directo</b> del colaborador. Adjunta la licencia si la tienes digitalizada.</div>
     <div style="text-align:right"><button class="btn-navy" onclick="crear()" id="btnCrear"><i class="bi bi-send me-1"></i>Enviar solicitud</button></div>
-  </div>
-
-  <div id="secLic" style="display:none">
-    <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
-      <div class="card-box">
-        <h6 style="font-weight:800;color:#012d70;font-size:.8rem;text-transform:uppercase"><i class="bi bi-calendar3 me-1"></i>Licencias por mes</h6>
-        <table><thead><tr><th>Mes</th><th>Licencias</th><th>Personas</th><th>Días hábiles</th></tr></thead>
-        <tbody id="tbLicMes"><tr><td colspan="4" class="empty">Cargando…</td></tr></tbody></table>
-      </div>
-      <div class="card-box">
-        <h6 style="font-weight:800;color:#012d70;font-size:.8rem;text-transform:uppercase"><i class="bi bi-person me-1"></i>Licencias por persona</h6>
-        <table><thead><tr><th>Colaborador</th><th>Licencias</th><th>Días hábiles</th><th>Última</th></tr></thead>
-        <tbody id="tbLicPers"><tr><td colspan="4" class="empty">Cargando…</td></tr></tbody></table>
-      </div>
-    </div>
-    <div class="card-box" style="margin-top:16px">
-      <h6 style="font-weight:800;color:#012d70;font-size:.8rem;text-transform:uppercase"><i class="bi bi-list-ul me-1"></i>Detalle de licencias</h6>
-      <table><thead><tr><th>Colaborador</th><th>Desde</th><th>Hasta</th><th>Días háb.</th><th>Comentario</th><th>Ingresada por</th><th></th></tr></thead>
-      <tbody id="tbLicDet"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
-    </div>
   </div>
 
   <div id="secLista" class="card-box" style="display:none">
@@ -115,22 +91,7 @@ const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
 const fd = s => s ? String(s).slice(0,10) : '';
 let VISTA = 'mias', PUEDE_RESOLVER = false, ES_RRHH = false, COLABS = null;
 
-const esLicSel = () => document.getElementById('fTipo').value === 'LICENCIA MEDICA';
-async function tipoUI(){
-  const lic = esLicSel();
-  document.getElementById('wMedio').style.display = lic ? 'none' : '';
-  document.getElementById('wColab').style.display = lic ? '' : 'none';
-  document.getElementById('notaLic').style.display = lic ? '' : 'none';
-  document.getElementById('btnCrear').innerHTML = lic ? '<i class="bi bi-file-medical me-1"></i>Ingresar licencia' : '<i class="bi bi-send me-1"></i>Enviar solicitud';
-  if (lic) { document.getElementById('fMedio').value = '';
-    if (!COLABS) {
-      const j = await (await fetch('/api/rrhh/directorio', { headers:H })).json();
-      COLABS = j.data||[];
-      document.getElementById('fColab').innerHTML = '<option value="">— elegir —</option>' +
-        COLABS.map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
-    }
-  }
-}
+const esLicSel = () => false;
 
 function diasInfo(){
   const a = document.getElementById('fD').value, b = document.getElementById('fH').value;
@@ -146,34 +107,15 @@ document.getElementById('fMedio').addEventListener('change', () => {
   if (document.getElementById('fMedio').value === '1') document.getElementById('fH').value = document.getElementById('fD').value;
 });
 
-const TABMAP = { crear:'t1', mias:'t2', bandeja:'t3', historicas:'t4', licencias:'t5' };
+const TABMAP = { crear:'t1', mias:'t2', bandeja:'t3', historicas:'t4' };
 function tab(t){
-  ['t1','t2','t3','t4','t5'].forEach(id=>document.getElementById(id).classList.remove('active'));
+  ['t1','t2','t3','t4'].forEach(id=>document.getElementById(id).classList.remove('active'));
   document.getElementById(TABMAP[t]).classList.add('active');
   document.getElementById('secCrear').style.display = t==='crear'?'':'none';
-  document.getElementById('secLic').style.display = t==='licencias'?'':'none';
-  document.getElementById('secLista').style.display = (t==='crear'||t==='licencias')?'none':'';
-  if (t==='licencias'){ cargarLicencias(); return; }
+  document.getElementById('secLista').style.display = t==='crear'?'none':'';
   if (t!=='crear'){ VISTA=t; cargar(); }
 }
 
-const nomMesL = m => { const M=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const [y,mm]=m.split('-'); return M[Number(mm)]+'-'+y.slice(2); };
-async function cargarLicencias(){
-  const j = await (await fetch('/api/rrhh/ausencias/licencias-resumen', { headers:H })).json();
-  if (!j.success) { document.getElementById('tbLicMes').innerHTML = `<tr><td colspan="4" class="empty">${esc(j.error)}</td></tr>`; return; }
-  const d = j.data, dnum = v => String(Number(v)).replace('.',',');
-  document.getElementById('tbLicMes').innerHTML = (d.por_mes||[]).map(x=>
-    `<tr><td>${nomMesL(x.mes)}</td><td><b>${x.licencias}</b></td><td>${x.personas}</td><td><b>${dnum(x.dias)}</b></td></tr>`).join('')
-    || '<tr><td colspan="4" class="empty">Sin licencias registradas.</td></tr>';
-  document.getElementById('tbLicPers').innerHTML = (d.por_persona||[]).map(x=>
-    `<tr><td>${esc(x.nombre)}</td><td><b>${x.licencias}</b></td><td><b>${dnum(x.dias)}</b></td><td>${fd(x.ultima)}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="empty">Sin licencias registradas.</td></tr>';
-  document.getElementById('tbLicDet').innerHTML = (d.detalle||[]).map(x=>
-    `<tr><td>${esc(x.nombre)}</td><td>${fd(x.fecha_desde)}</td><td>${fd(x.fecha_hasta)}</td><td><b>${dnum(x.dias_habiles)}</b></td>
-     <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis">${esc(x.comentario||'')}</td><td>${esc(x.resuelto_nombre||'')}</td>
-     <td>${x.tiene_adjunto?`<a href="#" onclick="return verAdj(${x.id})" title="Ver licencia adjunta"><i class="bi bi-paperclip"></i></a>`:''}</td></tr>`).join('')
-    || '<tr><td colspan="7" class="empty">Sin licencias registradas.</td></tr>';
-}
 
 async function crear(){
   const tipo = document.getElementById('fTipo').value;
@@ -186,16 +128,9 @@ async function crear(){
     body.adjunto_nombre = file.name; body.adjunto_mime = file.type;
     body.adjunto_data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(file); });
   }
-  if (esLicSel()){
-    body.medio_dia = false;
-    body.id_colaborador = document.getElementById('fColab').value;
-    if (!body.id_colaborador) return alert('Elige el colaborador de la licencia');
-  }
   const j = await (await fetch('/api/rrhh/ausencias', { method:'POST', headers:HJ, body:JSON.stringify(body) })).json();
   if (!j.success) return alert(j.error);
-  alert(j.data.licencia
-    ? `Licencia médica ingresada (${String(j.data.dias).replace('.',',')} día/s hábil/es). El supervisor directo fue informado por correo.`
-    : `Solicitud enviada (${String(j.data.dias).replace('.',',')} día/s hábil/es). Tu jefatura y RRHH fueron notificados.`);
+  alert(`Solicitud enviada (${String(j.data.dias).replace('.',',')} día/s hábil/es). Tu jefatura y RRHH fueron notificados.`);
   document.getElementById('fC').value=''; document.getElementById('fAdj').value='';
   tab('mias');
 }
@@ -207,7 +142,6 @@ async function cargar(){
   const d = j.data; PUEDE_RESOLVER = d.es_rrhh || d.es_jefe; ES_RRHH = !!d.es_rrhh || yo?.perfil==='Administrador';
   document.getElementById('t3').style.display = PUEDE_RESOLVER?'':'none';
   document.getElementById('t4').style.display = PUEDE_RESOLVER?'':'none';
-  document.getElementById('t5').style.display = PUEDE_RESOLVER?'':'none';
   llenarTipos(d.tipos);
   document.getElementById('thAcc').textContent = VISTA==='bandeja' ? 'Acción' : '';
   const rows = d.solicitudes || [];
@@ -226,9 +160,8 @@ let TIPOS_OK = false;
 function llenarTipos(tipos){
   if (TIPOS_OK || !tipos?.length) return; TIPOS_OK = true;
   // LICENCIA MEDICA solo la ingresa RRHH (no es solicitud del colaborador)
-  const visibles = ES_RRHH ? tipos : tipos.filter(t=>t!=='LICENCIA MEDICA');
+  const visibles = tipos.filter(t=>t!=='LICENCIA MEDICA'); // las licencias viven en /recursos-humanos/licencias/
   document.getElementById('fTipo').innerHTML = visibles.map(t=>`<option>${esc(t)}</option>`).join('');
-  tipoUI();
 }
 async function resolver(id, estado){
   let mot = null; if (estado==='RECHAZADA') mot = prompt('Motivo del rechazo:')||'';
@@ -257,7 +190,7 @@ async function ausentesHoy(){
   if (j.success) { ES_RRHH = !!j.data.es_rrhh || yo?.perfil==='Administrador'; llenarTipos(j.data.tipos); PUEDE_RESOLVER = j.data.es_rrhh || j.data.es_jefe;
     document.getElementById('t3').style.display = PUEDE_RESOLVER?'':'none';
     document.getElementById('t4').style.display = PUEDE_RESOLVER?'':'none';
-    document.getElementById('t5').style.display = PUEDE_RESOLVER?'':'none'; }
+    }
   ausentesHoy();
   if (new URLSearchParams(location.search).get('id')) tab(PUEDE_RESOLVER?'bandeja':'mias');
 })();

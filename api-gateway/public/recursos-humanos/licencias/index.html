@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Licencias Médicas — AutoFácil</title>
+  <!-- v1.0 — registro de licencias por RRHH: días hábiles calculados, correo al supervisor, resumen por mes y persona -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:7px 12px; border-bottom:1px solid #f1f5f9; }
+    .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .preview { background:#eff6ff; border-left:4px solid var(--navy); border-radius:8px; padding:10px 14px; font-size:.85rem; }
+    h6.sec { font-weight:800; color:#012d70; font-size:.78rem; text-transform:uppercase; letter-spacing:.4px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Recursos Humanos', href:'/recursos-humanos/' }, { label:'Licencias Médicas', icon:'bi-file-medical', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-file-medical"></i><div><h2>Licencias Médicas</h2><p>Registro a nombre del colaborador: se calculan los días hábiles y al grabar el supervisor directo recibe un correo informativo. Solo Recursos Humanos ingresa licencias.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabI" onclick="tab('I');return false"><i class="bi bi-plus-circle me-1"></i>Ingresar</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabR" onclick="tab('R');return false"><i class="bi bi-bar-chart me-1"></i>Resumen</a></li>
+  </ul>
+
+  <div id="secI" class="panel">
+    <div class="row g-2">
+      <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Colaborador</label>
+        <select id="fColab" class="form-select form-select-sm"><option value="">— elegir —</option></select></div>
+      <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Inicio de la licencia</label>
+        <input type="date" id="fD" class="form-control form-control-sm" onchange="diasInfo()"></div>
+      <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Término de la licencia</label>
+        <input type="date" id="fH" class="form-control form-control-sm" onchange="diasInfo()"></div>
+      <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Comentario (opcional)</label>
+        <input id="fC" class="form-control form-control-sm" maxlength="500" placeholder="ej. N° de licencia, diagnóstico reservado NO"></div>
+      <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Adjunto — licencia digitalizada (opcional, máx 10 MB)</label>
+        <input type="file" id="fAdj" class="form-control form-control-sm"></div>
+      <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-sm btn-primary w-100" onclick="guardar(this)"><i class="bi bi-check-lg me-1"></i>Grabar</button>
+      </div>
+    </div>
+    <div class="preview mt-3" id="prev"><i class="bi bi-info-circle me-1"></i>Elige colaborador y fechas — ambas inclusive.</div>
+  </div>
+
+  <div id="secR" style="display:none">
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="panel"><h6 class="sec"><i class="bi bi-calendar3 me-1"></i>Licencias por mes</h6>
+          <table><thead><tr><th>Mes</th><th>Licencias</th><th>Personas</th><th>Días hábiles</th></tr></thead>
+          <tbody id="tbMes"><tr><td colspan="4" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table></div>
+      </div>
+      <div class="col-lg-7">
+        <div class="panel"><h6 class="sec"><i class="bi bi-person me-1"></i>Licencias por persona</h6>
+          <table><thead><tr><th>Colaborador</th><th>Licencias</th><th>Días hábiles</th><th>Última</th></tr></thead>
+          <tbody id="tbPers"><tr><td colspan="4" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table></div>
+      </div>
+    </div>
+    <div class="panel"><h6 class="sec"><i class="bi bi-list-ul me-1"></i>Detalle</h6>
+      <table><thead><tr><th>Colaborador</th><th>Desde</th><th>Hasta</th><th>Días háb.</th><th>Comentario</th><th>Ingresada por</th><th></th></tr></thead>
+      <tbody id="tbDet"><tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table></div>
+    <button class="btn btn-sm btn-outline-success" onclick="exportar()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fd = s => s ? String(s).slice(0,10) : '';
+const dnum = v => String(Number(v)).replace('.',',');
+const nomMes = m => { const M=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const [y,mm]=m.split('-'); return M[Number(mm)]+'-'+y.slice(2); };
+let R = null;
+
+function tab(m){
+  tabI.classList.toggle('active',m==='I'); tabR.classList.toggle('active',m==='R');
+  secI.style.display=m==='I'?'':'none'; secR.style.display=m==='R'?'':'none';
+  if (m==='R') cargarResumen();
+}
+
+function diasHab(a,b){ let n=0; for (let d=new Date(a+'T12:00:00'); d<=new Date(b+'T12:00:00'); d.setDate(d.getDate()+1)){ const w=d.getDay(); if (w!==0&&w!==6) n++; } return n; }
+function diasInfo(){
+  const a=fD.value,b=fH.value, el=document.getElementById('prev');
+  if (!a||!b) return;
+  if (b<a) { el.innerHTML='<i class="bi bi-exclamation-triangle me-1"></i>La fecha de término no puede ser anterior al inicio.'; return; }
+  const tot = Math.round((new Date(b)-new Date(a))/86400000)+1;
+  el.innerHTML = `<i class="bi bi-calculator me-1"></i>Licencia de <b>${tot} día(s) corridos</b> (<b>${diasHab(a,b)} hábiles L-V</b>), ambas fechas inclusive. Al grabar se enviará el correo al supervisor directo.`;
+}
+
+async function cargarColabs(){
+  const j = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
+  fColab.innerHTML = '<option value="">— elegir —</option>' + (j.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
+}
+
+async function guardar(btn){
+  if (!fColab.value) return alert('Elige el colaborador');
+  if (!fD.value||!fH.value) return alert('Completa las fechas de inicio y término');
+  if (fH.value<fD.value) return alert('La fecha de término no puede ser anterior al inicio');
+  btn.disabled = true;
+  const body = { tipo:'LICENCIA MEDICA', id_colaborador:fColab.value, fecha_desde:fD.value, fecha_hasta:fH.value, comentario:fC.value };
+  const file = fAdj.files[0];
+  if (file){
+    if (file.size>10*1024*1024){ btn.disabled=false; return alert('Adjunto máximo 10 MB'); }
+    body.adjunto_nombre=file.name; body.adjunto_mime=file.type;
+    body.adjunto_data = await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result.split(',')[1]); fr.readAsDataURL(file); });
+  }
+  const j = await (await fetch('/api/rrhh/ausencias',{method:'POST',headers:H,body:JSON.stringify(body)})).json();
+  btn.disabled = false;
+  if (!j.success) return alert(j.error);
+  alert(`Licencia grabada (${String(j.data.dias).replace('.',',')} día/s hábil/es). El supervisor directo fue informado por correo.`);
+  fColab.value=''; fD.value=''; fH.value=''; fC.value=''; fAdj.value='';
+  document.getElementById('prev').innerHTML='<i class="bi bi-info-circle me-1"></i>Elige colaborador y fechas — ambas inclusive.';
+  fColab.focus();
+}
+
+async function cargarResumen(){
+  const j = await (await fetch('/api/rrhh/ausencias/licencias-resumen',{headers:H})).json();
+  if (!j.success){ tbMes.innerHTML=`<tr><td colspan="4" class="text-center text-muted py-3">${esc(j.error)}</td></tr>`; return; }
+  R = j.data;
+  tbMes.innerHTML = (R.por_mes||[]).map(x=>`<tr><td>${nomMes(x.mes)}</td><td><b>${x.licencias}</b></td><td>${x.personas}</td><td class="num">${dnum(x.dias)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="text-center text-muted py-3">Sin licencias registradas.</td></tr>';
+  tbPers.innerHTML = (R.por_persona||[]).map(x=>`<tr><td>${esc(x.nombre)}</td><td><b>${x.licencias}</b></td><td class="num">${dnum(x.dias)}</td><td>${fd(x.ultima)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="text-center text-muted py-3">Sin licencias registradas.</td></tr>';
+  tbDet.innerHTML = (R.detalle||[]).map(x=>`<tr><td>${esc(x.nombre)}</td><td>${fd(x.fecha_desde)}</td><td>${fd(x.fecha_hasta)}</td><td class="num">${dnum(x.dias_habiles)}</td>
+    <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc(x.comentario||'')}</td><td>${esc(x.resuelto_nombre||'')}</td>
+    <td>${x.tiene_adjunto?`<a href="#" onclick="return verAdj(${x.id})" title="Ver licencia adjunta"><i class="bi bi-paperclip"></i></a>`:''}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="text-center text-muted py-3">Sin licencias registradas.</td></tr>';
+}
+async function verAdj(id){
+  const r = await fetch('/api/rrhh/ausencias/adjunto/'+id,{headers:H});
+  if (!r.ok){ alert('No se pudo abrir el adjunto'); return false; }
+  const blob = await r.blob(); window.open(URL.createObjectURL(blob),'_blank'); return false;
+}
+function exportar(){
+  if (!R?.detalle?.length) return;
+  const filas = [['Colaborador','Desde','Hasta','Días hábiles','Comentario','Ingresada por'],
+    ...R.detalle.map(x=>[x.nombre,fd(x.fecha_desde),fd(x.fecha_hasta),Number(x.dias_habiles),x.comentario||'',x.resuelto_nombre||''])];
+  const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
+  const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='licencias-medicas.xls'; a.click(); URL.revokeObjectURL(a.href);
+}
+cargarColabs();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
