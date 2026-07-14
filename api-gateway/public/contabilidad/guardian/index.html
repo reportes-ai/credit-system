@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guardián Contable — AutoFácil</title>
+  <!-- v1.0 — reglas de coherencia que revisan cada comprobante antes de contabilizar -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1150px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:hidden; margin-bottom:22px; }
+    .panel-pad { padding:20px 24px; }
+    table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 12px; text-align:left; border-bottom:2px solid #e5e7eb; }
+    tbody td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .badge-s { font-size:.72rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .b-BLOQUEA { background:#fee2e2; color:#991b1b; } .b-ADVIERTE { background:#fef3c7; color:#92400e; }
+    .b-SISTEMA { background:#ede9fe; color:#5b21b6; } .b-COMBINACION { background:#e0f2fe; color:#075985; }
+    .num { font-family:Consolas,monospace; font-weight:600; color:var(--navy); }
+    .inactiva td { opacity:.45; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:18px 22px; font-size:.84rem; }
+    .footer-afecta ul { margin:8px 0 0; padding-left:18px; } .footer-afecta li { margin-bottom:5px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Guardián Contable', icon:'bi-shield-check', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-shield-check"></i><div><h2>Guardián Contable</h2><p>Reglas de coherencia que revisan cada comprobante ANTES de contabilizar: combinaciones de cuentas que no deben ir juntas y chequeos automáticos. BLOQUEA impide grabar; ADVIERTE pide confirmación.</p></div></div>
+
+  <div class="panel panel-pad">
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <h6 class="fw-bold mb-0"><i class="bi bi-list-check me-1"></i>Reglas</h6>
+      <button class="btn btn-sm btn-primary" onclick="nueva()"><i class="bi bi-plus-lg me-1"></i>Nueva regla de combinación</button>
+    </div>
+    <table>
+      <thead><tr><th>Regla</th><th>Tipo</th><th>Cuentas A</th><th>Cuentas B</th><th>Severidad</th><th>Activa</th><th></th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="7" class="text-center text-muted py-4">Cargando…</td></tr></tbody>
+    </table>
+    <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Las reglas de <b>combinación</b> saltan cuando un mismo comprobante usa una cuenta que empieza con algún prefijo de "Cuentas A" y otra con alguno de "Cuentas B" (prefijos separados por coma). Las reglas de <b>sistema</b> tienen lógica propia: solo se activan/desactivan o se les cambia severidad y mensaje.</div>
+  </div>
+
+  <div class="footer-afecta">
+    <div class="fw-bold"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul>
+      <li><b>Reglas de combinación y de sistema</b> → se evalúan al grabar cada comprobante manual en <a href="/contabilidad/comprobantes/">Comprobantes</a> (los asientos automáticos del motor de centralización NO pasan por el guardián: sus reglas ya están validadas en <a href="/contabilidad/reglas/">Reglas de Centralización</a>).</li>
+      <li><b>Severidad BLOQUEA</b> → el comprobante no se puede grabar hasta corregirlo.</li>
+      <li><b>Severidad ADVIERTE</b> → el usuario ve la advertencia y decide contabilizar o corregir.</li>
+      <li><b>Desactivar una regla</b> → deja de revisarse de inmediato en la digitación.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:640px;max-width:94vw"></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let REGLAS = [];
+
+async function cargar(){
+  const r = await fetch('/api/contabilidad/guardian',{headers:H}); const j = await r.json();
+  REGLAS = j.data||[];
+  document.getElementById('tbody').innerHTML = REGLAS.map(x=>`
+    <tr class="${x.activo?'':'inactiva'}">
+      <td><b>${esc(x.nombre)}</b><div class="small text-muted">${esc(x.mensaje)}</div></td>
+      <td><span class="badge-s b-${x.tipo}">${x.tipo}</span></td>
+      <td class="num">${esc(x.cuentas_a||'—')}</td>
+      <td class="num">${esc(x.cuentas_b||'—')}</td>
+      <td><span class="badge-s b-${x.severidad}">${x.severidad}</span></td>
+      <td><div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" ${x.activo?'checked':''} onchange="toggle(${x.id},this.checked)"></div></td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-link p-0 me-2" onclick="editar(${x.id})"><i class="bi bi-pencil"></i></button>
+        ${x.tipo==='COMBINACION'?`<button class="btn btn-sm btn-link text-danger p-0" onclick="eliminar(${x.id})"><i class="bi bi-trash"></i></button>`:''}
+      </td>
+    </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-4">Sin reglas</td></tr>';
+}
+async function toggle(id, activo){
+  const r = await fetch('/api/contabilidad/guardian/'+id,{method:'PUT',headers:H,body:JSON.stringify({activo})});
+  const j = await r.json(); if (!j.success) alert(j.error); cargar();
+}
+function form(x){
+  const esSis = x && x.tipo==='SISTEMA';
+  document.getElementById('dlg').innerHTML = `
+    <h6 class="fw-bold mb-3">${x?'Editar regla':'Nueva regla de combinación'}</h6>
+    <div class="mb-2"><label class="form-label small fw-semibold mb-1">Nombre</label>
+      <input id="fNombre" class="form-control form-control-sm" value="${esc(x?.nombre||'')}"></div>
+    ${esSis?'':`<div class="row g-2 mb-2">
+      <div class="col"><label class="form-label small fw-semibold mb-1">Cuentas A (prefijos, coma)</label>
+        <input id="fA" class="form-control form-control-sm" placeholder="ej. 2106,1104050" value="${esc(x?.cuentas_a||'')}"></div>
+      <div class="col"><label class="form-label small fw-semibold mb-1">Cuentas B (prefijos, coma)</label>
+        <input id="fB" class="form-control form-control-sm" placeholder="ej. 1101" value="${esc(x?.cuentas_b||'')}"></div>
+    </div>`}
+    <div class="mb-2"><label class="form-label small fw-semibold mb-1">Severidad</label>
+      <select id="fSev" class="form-select form-select-sm">
+        <option ${x?.severidad==='ADVIERTE'?'selected':''}>ADVIERTE</option>
+        <option ${x?.severidad==='BLOQUEA'?'selected':''}>BLOQUEA</option></select></div>
+    <div class="mb-3"><label class="form-label small fw-semibold mb-1">Mensaje al usuario (explica en simple por qué está mal)</label>
+      <textarea id="fMsg" class="form-control form-control-sm" rows="3">${esc(x?.mensaje||'')}</textarea></div>
+    <div class="d-flex justify-content-end gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="dlg.close()">Cancelar</button>
+      <button class="btn btn-sm btn-primary" onclick="guardar(${x?x.id:'null'})">Guardar</button></div>`;
+  document.getElementById('dlg').showModal();
+}
+const nueva = () => form(null);
+const editar = id => form(REGLAS.find(r=>r.id===id));
+async function guardar(id){
+  const body = { nombre:fNombre.value.trim(), severidad:fSev.value, mensaje:fMsg.value.trim() };
+  const fA = document.getElementById('fA'), fB = document.getElementById('fB');
+  if (fA) { body.cuentas_a = fA.value.trim(); body.cuentas_b = fB.value.trim(); }
+  const r = await fetch('/api/contabilidad/guardian'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:H,body:JSON.stringify(body)});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  dlg.close(); cargar();
+}
+async function eliminar(id){
+  if (!confirm('¿Eliminar esta regla?')) return;
+  const r = await fetch('/api/contabilidad/guardian/'+id,{method:'DELETE',headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error); cargar();
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

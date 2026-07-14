@@ -268,8 +268,15 @@ async function grabar(){
   const body = { tipo:nTipo.value, fecha:nFecha.value, glosa:nGlosa.value.trim(), movimientos };
   const btn = document.getElementById('btnGrabar'); btn.disabled = true;
   try {
-    const r = await fetch('/api/contabilidad/comprobantes',{method:'POST',headers:H,body:JSON.stringify(body)});
-    const j = await r.json();
+    let r = await fetch('/api/contabilidad/comprobantes',{method:'POST',headers:H,body:JSON.stringify(body)});
+    let j = await r.json();
+    if (j.error==='GUARDIAN_BLOQUEA')
+      return alert('🛡️ El Guardián Contable bloqueó este asiento:\n\n• '+j.data.bloqueos.join('\n• ')+'\n\nCorrige las cuentas o pide al administrador revisar la regla en el mantenedor Guardián.');
+    if (j.error==='GUARDIAN_ADVIERTE'){
+      if (!confirm('🛡️ El Guardián Contable tiene advertencias:\n\n• '+j.data.advertencias.join('\n\n• ')+'\n\n¿Contabilizar de todas formas?')) return;
+      r = await fetch('/api/contabilidad/comprobantes',{method:'POST',headers:H,body:JSON.stringify({...body, confirmar_guardian:true})});
+      j = await r.json();
+    }
     if (!j.success) return alert(j.error||'Error');
     alert('Comprobante '+j.data.numero+' contabilizado por $'+fmt(j.data.total));
     nGlosa.value=''; selPlantilla.value=''; document.getElementById('nLineas').innerHTML=''; addLinea(); addLinea(); cuadrar(); listar();

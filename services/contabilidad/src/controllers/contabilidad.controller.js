@@ -218,6 +218,15 @@ exports.crearComprobante = async (req, res) => {
       if (!c.activo) return fail(res, `Cuenta ${cod} está desactivada`, 400);
     }
 
+    // Guardián contable: reglas de coherencia antes de tocar los libros.
+    // BLOQUEA → error; ADVIERTE → 409 con las advertencias para que el usuario
+    // confirme (el frontend reenvía con confirmar_guardian=true).
+    const guardian = await evaluarGuardian({ glosa, movimientos });
+    if (guardian.bloqueos.length)
+      return res.status(400).json({ success: false, data: { bloqueos: guardian.bloqueos }, error: 'GUARDIAN_BLOQUEA' });
+    if (guardian.advertencias.length && !req.body.confirmar_guardian)
+      return res.status(409).json({ success: false, data: { advertencias: guardian.advertencias }, error: 'GUARDIAN_ADVIERTE' });
+
     const anio = Number(fecha.slice(0, 4));
     await conn.beginTransaction();
     const [[{ sig }]] = await conn.query(
@@ -641,6 +650,175 @@ exports.cerrarEjercicio = async (req, res) => {
     await conn.rollback().catch(() => {});
     fail(res, e.message);
   } finally { conn.release(); }
+};
+
+/* ── Guardián contable ─────────────────────────────────────────────────────────
+   Reglas de coherencia que revisan cada comprobante ANTES de contabilizar,
+   para que un error conceptual no entre a los libros. Dos familias:
+   · COMBINACION: pares de cuentas (por prefijo) que no deben ir juntas en un
+     mismo asiento (ej. provisión contra banco). 100% paramétricas.
+   · SISTEMA: chequeos con lógica propia (monto atípico, saldo de naturaleza
+     contraria, glosa pobre) que se activan/desactivan desde el mantenedor.
+   Severidad: BLOQUEA (no deja grabar) o ADVIERTE (pide confirmación). */
+require('../../../../shared/migrate').enFila('contabilidad-guardian', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_guardian_reglas (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        codigo     VARCHAR(40) NULL,               -- solo reglas SISTEMA (lógica en código)
+        nombre     VARCHAR(150) NOT NULL,
+        tipo       VARCHAR(15) NOT NULL DEFAULT 'COMBINACION',  -- COMBINACION / SISTEMA
+        cuentas_a  VARCHAR(300) NULL,              -- prefijos separados por coma
+        cuentas_b  VARCHAR(300) NULL,
+        severidad  VARCHAR(10) NOT NULL DEFAULT 'ADVIERTE',     -- BLOQUEA / ADVIERTE
+        mensaje    VARCHAR(400) NOT NULL,
+        activo     TINYINT NOT NULL DEFAULT 1,
+        UNIQUE KEY uq_codigo (codigo)
+      )`);
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM ctb_guardian_reglas');
+    if (!n) {
+      const S = [ // [codigo, nombre, tipo, a, b, severidad, mensaje]
+        [null, 'Provisión contra banco o caja', 'COMBINACION', '2106,1104050', '1101', 'ADVIERTE',
+         'Una provisión se constituye contra una cuenta de GASTO (o se libera contra la que la originó), no contra el banco. Si estás pagando algo, la contrapartida del banco debiera ser la deuda o el gasto real.'],
+        [null, 'Provisión contra compras/gastos de oficina', 'COMBINACION', '2106,1104050', '4002060,4002070', 'ADVIERTE',
+         'Estás moviendo una provisión contra compras/gastos de oficina. Las provisiones se constituyen contra su gasto específico (ej. estimación incobrables contra 4001190). Revisa que no sea un error de cuenta.'],
+        [null, 'Ingreso neteado contra gasto', 'COMBINACION', '3', '4', 'ADVIERTE',
+         'Este asiento mueve un INGRESO directamente contra un GASTO. Salvo reclasificaciones deliberadas, ingresos y gastos se registran por separado (cada uno contra su contraparte de balance) para no distorsionar el EERR.'],
+        ['GLOSA_POBRE', 'Glosa vacía o demasiado corta', 'SISTEMA', null, null, 'ADVIERTE',
+         'La glosa es muy corta. En 6 meses nadie va a recordar qué fue este asiento: describe qué se pagó/recibió y a quién.'],
+        ['MONTO_ATIPICO', 'Monto fuera de lo habitual para la cuenta', 'SISTEMA', null, null, 'ADVIERTE',
+         'El monto es más de 10 veces el movimiento promedio de esta cuenta en los últimos 12 meses. Verifica que no tenga un cero de más.'],
+        ['NATURALEZA_CONTRARIA', 'La cuenta quedaría con saldo contrario a su naturaleza', 'SISTEMA', null, null, 'ADVIERTE',
+         'Con este asiento la cuenta queda con saldo contrario a su naturaleza (ej. un activo con saldo acreedor). Puede ser legítimo (sobregiro, anticipo) pero revísalo.'],
+      ];
+      for (const s of S) await pool.query(
+        'INSERT IGNORE INTO ctb_guardian_reglas (codigo,nombre,tipo,cuentas_a,cuentas_b,severidad,mensaje) VALUES (?,?,?,?,?,?,?)', s);
+    }
+    // Funcionalidad + card del mantenedor
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_guardian' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Guardián Contable','ctb_guardian','/contabilidad/guardian/','bi-shield-check')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] guardián listo');
+  } catch (e) { console.error('[contabilidad-guardian migration]', e.message); }
+});
+
+const prefMatch = (cuenta, lista) => String(lista || '').split(',').map(s => s.trim()).filter(Boolean).some(p => String(cuenta).startsWith(p));
+
+/* Evalúa todas las reglas activas sobre un comprobante propuesto.
+   Devuelve { bloqueos: [msg], advertencias: [msg] }. Nunca lanza. */
+async function evaluarGuardian({ glosa, movimientos }) {
+  const out = { bloqueos: [], advertencias: [] };
+  const push = (regla, msg) => out[regla.severidad === 'BLOQUEA' ? 'bloqueos' : 'advertencias'].push(msg);
+  try {
+    const [reglas] = await pool.query('SELECT * FROM ctb_guardian_reglas WHERE activo=1');
+    const cuentas = movimientos.map(m => String(m.cuenta));
+    for (const r of reglas) {
+      if (r.tipo === 'COMBINACION') {
+        const hitA = cuentas.filter(c => prefMatch(c, r.cuentas_a));
+        const hitB = cuentas.filter(c => prefMatch(c, r.cuentas_b));
+        if (hitA.length && hitB.length && hitA.some(a => hitB.some(b => a !== b)))
+          push(r, `${r.nombre} (${[...new Set([...hitA, ...hitB])].join(' + ')}): ${r.mensaje}`);
+        continue;
+      }
+      if (r.codigo === 'GLOSA_POBRE') {
+        if (String(glosa || '').trim().length < 8) push(r, r.mensaje);
+        continue;
+      }
+      if (r.codigo === 'MONTO_ATIPICO') {
+        const unicas = [...new Set(cuentas)];
+        const [hist] = await pool.query(
+          `SELECT m.cuenta, AVG(GREATEST(m.debe, m.haber)) prom, COUNT(*) n
+             FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+            WHERE c.estado='CONTABILIZADO' AND m.cuenta IN (?) AND c.fecha >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+            GROUP BY m.cuenta HAVING n >= 5`, [unicas]);
+        for (const h of hist) {
+          const max = Math.max(...movimientos.filter(m => String(m.cuenta) === h.cuenta)
+            .map(m => Math.max(Number(m.debe) || 0, Number(m.haber) || 0)));
+          if (max > Number(h.prom) * 10)
+            push(r, `Cuenta ${h.cuenta}: monto $${max.toLocaleString('es-CL')} vs promedio histórico $${Math.round(h.prom).toLocaleString('es-CL')}. ${r.mensaje}`);
+        }
+        continue;
+      }
+      if (r.codigo === 'NATURALEZA_CONTRARIA') {
+        const unicas = [...new Set(cuentas)];
+        const [saldos] = await pool.query(
+          `SELECT m.cuenta, k.tipo, k.nombre, SUM(m.debe)-SUM(m.haber) s
+             FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+             JOIN ctb_cuentas k ON k.codigo=m.cuenta
+            WHERE c.estado='CONTABILIZADO' AND m.cuenta IN (?) GROUP BY m.cuenta, k.tipo, k.nombre`, [unicas]);
+        const mapa = Object.fromEntries(saldos.map(x => [x.cuenta, x]));
+        const [tipos] = await pool.query('SELECT codigo, tipo, nombre FROM ctb_cuentas WHERE codigo IN (?)', [unicas]);
+        for (const t of tipos) {
+          const previo = Number(mapa[t.codigo]?.s || 0);
+          const delta = movimientos.filter(m => String(m.cuenta) === t.codigo)
+            .reduce((s, m) => s + (Number(m.debe) || 0) - (Number(m.haber) || 0), 0);
+          const final = previo + delta;
+          const deudora = ['ACTIVO', 'GASTO'].includes(t.tipo);
+          if ((deudora && final < 0) || (!deudora && final > 0))
+            push(r, `Cuenta ${t.codigo} ${t.nombre} (${t.tipo}) quedaría con saldo ${final < 0 ? 'acreedor' : 'deudor'} de $${Math.abs(final).toLocaleString('es-CL')}. ${r.mensaje}`);
+        }
+      }
+    }
+  } catch (e) { console.error('[ctb guardian]', e.message); }
+  return out;
+}
+
+exports.getGuardianReglas = async (req, res) => {
+  try { const [rows] = await pool.query('SELECT * FROM ctb_guardian_reglas ORDER BY tipo, id'); ok(res, rows); }
+  catch (e) { fail(res, e.message); }
+};
+
+exports.crearGuardianRegla = async (req, res) => {
+  try {
+    const { nombre, cuentas_a, cuentas_b, severidad, mensaje } = req.body || {};
+    if (!nombre || !cuentas_a || !cuentas_b || !mensaje) return fail(res, 'nombre, cuentas_a, cuentas_b y mensaje son obligatorios', 400);
+    if (!['BLOQUEA', 'ADVIERTE'].includes(severidad)) return fail(res, 'Severidad inválida', 400);
+    const [r] = await pool.query(
+      "INSERT INTO ctb_guardian_reglas (nombre, tipo, cuentas_a, cuentas_b, severidad, mensaje) VALUES (?,'COMBINACION',?,?,?,?)",
+      [String(nombre).trim().slice(0, 150), String(cuentas_a).trim(), String(cuentas_b).trim(), severidad, String(mensaje).trim().slice(0, 400)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'guardian_regla', entidad_id: r.insertId, detalle: `Regla "${nombre}" (${severidad})` });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.editarGuardianRegla = async (req, res) => {
+  try {
+    const { nombre, cuentas_a, cuentas_b, severidad, mensaje, activo } = req.body || {};
+    const [[regla]] = await pool.query('SELECT * FROM ctb_guardian_reglas WHERE id=?', [req.params.id]);
+    if (!regla) return fail(res, 'No existe', 404);
+    const sets = [], vals = [];
+    if (nombre !== undefined) { sets.push('nombre=?'); vals.push(String(nombre).trim().slice(0, 150)); }
+    if (mensaje !== undefined) { sets.push('mensaje=?'); vals.push(String(mensaje).trim().slice(0, 400)); }
+    if (severidad !== undefined) {
+      if (!['BLOQUEA', 'ADVIERTE'].includes(severidad)) return fail(res, 'Severidad inválida', 400);
+      sets.push('severidad=?'); vals.push(severidad);
+    }
+    if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
+    if (regla.tipo === 'COMBINACION') { // las SISTEMA no cambian sus cuentas (lógica en código)
+      if (cuentas_a !== undefined) { sets.push('cuentas_a=?'); vals.push(String(cuentas_a).trim()); }
+      if (cuentas_b !== undefined) { sets.push('cuentas_b=?'); vals.push(String(cuentas_b).trim()); }
+    }
+    if (!sets.length) return fail(res, 'Nada que actualizar', 400);
+    vals.push(req.params.id);
+    await pool.query(`UPDATE ctb_guardian_reglas SET ${sets.join(', ')} WHERE id=?`, vals);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'guardian_regla', entidad_id: req.params.id, detalle: JSON.stringify(req.body) });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.eliminarGuardianRegla = async (req, res) => {
+  try {
+    const [r] = await pool.query("DELETE FROM ctb_guardian_reglas WHERE id=? AND tipo='COMBINACION'", [req.params.id]);
+    if (!r.affectedRows) return fail(res, 'No existe (las reglas de sistema se desactivan, no se eliminan)', 404);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'contabilidad', entidad: 'guardian_regla', entidad_id: req.params.id, detalle: 'Regla eliminada' });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
 };
 
 /* ── Plantillas de asientos ────────────────────────────────────────────────────

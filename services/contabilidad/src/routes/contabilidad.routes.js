@@ -17,6 +17,12 @@ router.post('/comprobantes',           verifyToken, requireFunc('ctb_comprobante
 router.get('/comprobantes/:id',        verifyToken, requireFunc('ctb_comprobantes', 'ctb_libros'), ctrl.getComprobante);
 router.post('/comprobantes/:id/anular', verifyToken, requireFunc('ctb_comprobantes'), ctrl.anularComprobante);
 
+// Guardián contable
+router.get('/guardian',        verifyToken, requireFunc('ctb_guardian', 'ctb_comprobantes'), ctrl.getGuardianReglas);
+router.post('/guardian',       verifyToken, requireFunc('ctb_guardian'), ctrl.crearGuardianRegla);
+router.put('/guardian/:id',    verifyToken, requireFunc('ctb_guardian'), ctrl.editarGuardianRegla);
+router.delete('/guardian/:id', verifyToken, requireFunc('ctb_guardian'), ctrl.eliminarGuardianRegla);
+
 // Plantillas de asientos
 router.get('/plantillas',        verifyToken, requireFunc('ctb_comprobantes'), ctrl.getPlantillas);
 router.post('/plantillas',       verifyToken, requireFunc('ctb_comprobantes'), ctrl.crearPlantilla);

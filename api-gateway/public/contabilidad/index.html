@@ -72,6 +72,12 @@
       <p>El motor de asientos automáticos: cada pago de caja, castigo, provisión o libro de remuneraciones se contabiliza solo, según estas reglas.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/guardian/" class="module-card" id="cardGuard" style="display:none">
+      <div class="card-icon"><i class="bi bi-shield-check"></i></div>
+      <h5>Guardián Contable <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
+      <p>Reglas de coherencia que revisan cada asiento antes de contabilizar: combinaciones de cuentas prohibidas, montos atípicos y saldos contrarios a su naturaleza.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/plan-cuentas/" class="module-card" id="cardPlan" style="display:none">
       <div class="card-icon"><i class="bi bi-diagram-3"></i></div>
       <h5>Plan de Cuentas <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
@@ -93,6 +99,7 @@
     if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
     if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';
+    if (tiene('ctb_guardian')) document.getElementById('cardGuard').style.display='';
     if (tiene('ctb_estados','ctb_balance')) document.getElementById('cardEst').style.display='';
     if (tiene('ctb_cierre_mes','ctb_estados')) document.getElementById('cardCM').style.display='';
     if (tiene('ctb_bitacora','ctb_cierre_mes')) document.getElementById('cardBit').style.display='';
