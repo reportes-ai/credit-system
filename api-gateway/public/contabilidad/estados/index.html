@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estados Financieros — AutoFácil</title>
+  <!-- v1.0 — Fase 3: balance general + estado de resultados -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:32px 40px; max-width:1150px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:22px; padding:6px 0; }
+    table { width:100%; border-collapse:collapse; font-size:.83rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 14px; text-align:left; border-bottom:2px solid #e5e7eb; }
+    tbody td { padding:7px 14px; border-bottom:1px solid #f1f5f9; }
+    .text-right { text-align:right; } .num { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    .grupo td { background:#eef2ff; font-weight:700; }
+    .tot td { background:#f0fdf4; font-weight:700; }
+    .neg { color:#991b1b; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
+    .cuadre-ok { color:#166534; font-weight:700; } .cuadre-mal { color:#991b1b; font-weight:700; }
+    @media print { .page-banner, .toolbar, #af-topnav, .nav-tabs { display:none !important; } body { background:#fff; } }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Estados Financieros', icon:'bi-graph-up-arrow', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-graph-up-arrow"></i><div><h2>Estados Financieros</h2><p>Balance General (la foto: qué tienes, qué debes y el patrimonio a una fecha) y Estado de Resultados (la película: cuánto ganaste o perdiste en el período).</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tabBG" onclick="tab('BG');return false">Balance General</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabER" onclick="tab('ER');return false">Estado de Resultados</a></li>
+  </ul>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap toolbar">
+    <div id="wDesde"><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
+    <div><label class="form-label small fw-semibold mb-1" id="lblHasta">Al día</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
+    <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
+  </div>
+
+  <div id="out"><div class="text-muted">Elige la fecha y consulta.</div></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => { const v = Math.round(Number(n)||0); return (v<0?'−$':'$') + Math.abs(v).toLocaleString('es-CL'); };
+let MODO = 'BG';
+const hoy = new Date(); const pad = n=>String(n).padStart(2,'0');
+fDesde.value = `${hoy.getFullYear()}-01-01`;
+fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate())}`;
+
+function tab(m){ MODO=m;
+  document.getElementById('tabBG').classList.toggle('active',m==='BG');
+  document.getElementById('tabER').classList.toggle('active',m==='ER');
+  document.getElementById('wDesde').style.display = m==='ER'?'':'none';
+  document.getElementById('lblHasta').textContent = m==='ER'?'Hasta':'Al día';
+  document.getElementById('out').innerHTML = '<div class="text-muted">Elige la fecha y consulta.</div>';
+}
+tab('BG');
+
+const filas = (arr, campo) => arr.map(x=>`<tr><td class="num">${esc(x.cuenta)}</td><td>${esc(x.nombre||'')}</td><td class="text-right ${x[campo]<0?'neg':''}">${fmt(x[campo])}</td></tr>`).join('');
+
+async function consultar(){
+  if (MODO==='BG') {
+    const r = await fetch(`/api/contabilidad/balance-general?hasta=${fHasta.value}`,{headers:H});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+    const d = j.data;
+    document.getElementById('out').innerHTML = `
+      <div class="panel"><table>
+        <thead><tr><th style="width:110px">Cuenta</th><th>Balance General al ${fHasta.value}</th><th class="text-right" style="width:170px">Saldo</th></tr></thead>
+        <tbody>
+          <tr class="grupo"><td colspan="3">ACTIVO — lo que la empresa TIENE (bancos, créditos por cobrar, equipos)</td></tr>
+          ${filas(d.activo,'saldo')}
+          <tr class="tot"><td colspan="2">TOTAL ACTIVO</td><td class="text-right">${fmt(d.tot.activo)}</td></tr>
+          <tr class="grupo"><td colspan="3">PASIVO — lo que la empresa DEBE (proveedores, remuneraciones, provisiones)</td></tr>
+          ${filas(d.pasivo,'saldo')}
+          <tr class="tot"><td colspan="2">TOTAL PASIVO</td><td class="text-right">${fmt(d.tot.pasivo)}</td></tr>
+          <tr class="grupo"><td colspan="3">PATRIMONIO — el aporte de los dueños + resultados guardados</td></tr>
+          ${filas(d.patrimonio,'saldo')}
+          <tr><td class="num">—</td><td>Resultado del Ejercicio (utilidad o pérdida acumulada del año)</td><td class="text-right ${d.resultado_ejercicio<0?'neg':''}">${fmt(d.resultado_ejercicio)}</td></tr>
+          <tr class="tot"><td colspan="2">TOTAL PASIVO + PATRIMONIO + RESULTADO</td><td class="text-right">${fmt(d.tot.pas_pat_result)}</td></tr>
+          <tr><td colspan="3" class="${d.cuadre?'cuadre-ok':'cuadre-mal'}">${d.cuadre?'✓ El balance cuadra: Activo = Pasivo + Patrimonio + Resultado':'✗ DESCUADRE — revisa los comprobantes del período'}</td></tr>
+        </tbody></table></div>`;
+  } else {
+    const r = await fetch(`/api/contabilidad/estado-resultados?desde=${fDesde.value}&hasta=${fHasta.value}`,{headers:H});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+    const d = j.data;
+    document.getElementById('out').innerHTML = `
+      <div class="panel"><table>
+        <thead><tr><th style="width:110px">Cuenta</th><th>Estado de Resultados ${fDesde.value} → ${fHasta.value}</th><th class="text-right" style="width:170px">Monto</th></tr></thead>
+        <tbody>
+          <tr class="grupo"><td colspan="3">INGRESOS — lo que la empresa GANÓ en el período</td></tr>
+          ${filas(d.ingresos,'monto')}
+          <tr class="tot"><td colspan="2">TOTAL INGRESOS</td><td class="text-right">${fmt(d.total_ingresos)}</td></tr>
+          <tr class="grupo"><td colspan="3">GASTOS — lo que costó operar en el período</td></tr>
+          ${filas(d.gastos,'monto')}
+          <tr class="tot"><td colspan="2">TOTAL GASTOS</td><td class="text-right">${fmt(d.total_gastos)}</td></tr>
+          <tr class="tot"><td colspan="2">${d.resultado>=0?'UTILIDAD':'PÉRDIDA'} DEL PERÍODO</td><td class="text-right ${d.resultado<0?'neg':''}">${fmt(Math.abs(d.resultado))}</td></tr>
+        </tbody></table></div>`;
+  }
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

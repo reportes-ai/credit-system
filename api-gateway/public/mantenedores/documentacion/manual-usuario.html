@@ -48,6 +48,7 @@
     <a href="#comercial">14. Gestión comercial</a>
     <a href="#soporte">15. RRHH, Compras y Tickets</a>
     <a href="#reporteria">16. Reportería, BI y bitácora</a>
+    <a href="#contabilidad">17. Contabilidad (reemplazo de AVSOFT)</a>
   </div>
 
   <h2 id="acceso">1. Acceso y navegación</h2>
@@ -289,6 +290,19 @@
   <figure class="shot"><img src="img/dashboard.png" alt="Dashboard de colocaciones" loading="lazy"><figcaption>El Dashboard: KPIs del mes, participación por institución, dealers y ejecutivos (las cifras de la imagen son ficticias).</figcaption></figure>
 
   <div class="tip"><b>Regla de oro:</b> si un número se ve raro, no lo corrijas a mano en una planilla — repórtalo. En el Suite cada cifra tiene un motor único: si se corrige, se corrige una sola vez y para todos.</div>
+
+  <h2 id="contabilidad">17. Contabilidad (reemplazo de AVSOFT)</h2>
+  <div class="paso"><b>La idea en una frase:</b> la contabilidad es el registro ordenado de TODO lo que entra y sale de la empresa. Cada movimiento se anota dos veces (a eso se le llama <b>partida doble</b>): de dónde salió la plata y a dónde llegó. Si las dos anotaciones no suman lo mismo, el sistema no deja grabar — por eso la contabilidad "siempre cuadra".</div>
+  <ul>
+    <li><b>Plan de Cuentas</b> (mantenedor): el "árbol de casilleros" donde se clasifica cada peso. Son las mismas cuentas que usaba AVSOFT (Banco, Contratos, Proveedores, Sueldo Base…). Hay 5 familias: <b>Activo</b> = lo que la empresa TIENE; <b>Pasivo</b> = lo que DEBE; <b>Patrimonio</b> = el aporte de los dueños; <b>Ingresos</b> = lo que GANA; <b>Gastos</b> = lo que le CUESTA operar. Solo las cuentas "imputables" reciben movimientos; las demás son títulos para ordenar el árbol.</li>
+    <li><b>Comprobantes:</b> cada anotación contable. Tres tipos: <b>Ingreso</b> (entró plata), <b>Egreso</b> (salió plata) y <b>Traspaso</b> (se movió entre casilleros, sin entrar ni salir). El formulario valida en vivo que Debe = Haber y numera solo (E-2026-00001…). Un comprobante grabado <b>no se borra</b>: si estaba malo, se ANULA con motivo y queda el rastro completo.</li>
+    <li><b>La magia — Reglas de Centralización:</b> la mayoría de los comprobantes <b>se escriben solos</b>. Cuando alguien registra un pago o prepago en Caja, aprueba un castigo, paga una Orden de Pago, cierra las provisiones del mes o emite las liquidaciones de sueldo, el motor genera el asiento automáticamente según reglas configurables (qué cuenta al Debe, qué cuenta al Haber). Tú NO digitas nada: la contabilidad va siguiendo a la operación. El mantenedor muestra el log de cada ejecución del motor, y si algo no se pudo contabilizar, te dice por qué.</li>
+    <li><b>Libro Diario:</b> la lista día a día de todos los asientos de un período. <b>Libro Mayor:</b> la película de UNA cuenta (ej: cuánto entró y salió del Banco este mes, con saldo inicial y acumulado). Los mismos libros que pedías a AVSOFT, pero al instante y con búsqueda.</li>
+    <li><b>Balance de Comprobación:</b> el "chequeo médico" — todas las cuentas con sus sumas y saldos en 8 columnas. Sirve para revisar que todo cuadra antes de leer los estados financieros.</li>
+    <li><b>Estados Financieros:</b> los dos informes que importan al final. <b>Balance General</b> = la FOTO a una fecha: qué tenemos, qué debemos y cuánto patrimonio hay (siempre Activo = Pasivo + Patrimonio + Resultado). <b>Estado de Resultados</b> = la PELÍCULA de un período: ingresos − gastos = utilidad o pérdida. Ambos imprimibles.</li>
+    <li><b>Historia:</b> el año 2025 completo de AVSOFT ya está importado (3.831 comprobantes, cuadrado al peso), así que puedes consultar cualquier fecha del año pasado desde el propio Suite.</li>
+  </ul>
+  <div class="tip"><b>Rutina para no contadores:</b> (1) opera normal en el Suite — caja, ODP, castigos, remuneraciones: la contabilidad se anota sola; (2) el contador digita a mano solo lo excepcional (un ajuste, una factura fuera de proceso) en Comprobantes; (3) a fin de mes: Balance de Comprobación para verificar y Estados Financieros para leer cómo va el negocio. Si un asiento automático salió con la cuenta equivocada: se corrige la REGLA en el mantenedor (arregla el futuro) y se anula y redigita el comprobante puntual (arregla el pasado).</div>
 </div>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

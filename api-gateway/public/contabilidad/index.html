@@ -48,6 +48,12 @@
       <p>Balance de 8 columnas: sumas, saldos, inventario y resultado — la foto contable del período en un clic.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/estados/" class="module-card" id="cardEst" style="display:none">
+      <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <h5>Estados Financieros</h5>
+      <p>Balance General (qué tienes, qué debes y el patrimonio a una fecha) y Estado de Resultados (utilidad o pérdida del período), listos para imprimir.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/reglas/" class="module-card" id="cardReglas" style="display:none">
       <div class="card-icon"><i class="bi bi-gear-wide-connected"></i></div>
       <h5>Reglas de Centralización <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">Mantenedor</span></h5>
@@ -75,6 +81,7 @@
     if (tiene('ctb_balance')) document.getElementById('cardBal').style.display='';
     if (tiene('ctb_plan')) document.getElementById('cardPlan').style.display='';
     if (tiene('ctb_reglas')) document.getElementById('cardReglas').style.display='';
+    if (tiene('ctb_estados','ctb_balance')) document.getElementById('cardEst').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>

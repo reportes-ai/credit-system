@@ -58,6 +58,8 @@
     <tr><td>auditoria_movimientos</td><td>Bitácora central (shared/audit.js): acción, módulo, entidad, detalle, usuario, IP.</td></tr>
     <tr><td>documentos_verificables</td><td>Núcleo de certificados + firma electrónica (hash SHA-256, verificación pública /verificar QR).</td></tr>
     <tr><td>uf / utm / tasas</td><td>Indicadores; UF se carga completa en memoria (getUF(fecha)).</td></tr>
+    <tr><td>ctb_cuentas / ctb_comprobantes / ctb_movimientos</td><td>Contabilidad (reemplazo AVSOFT): plan de cuentas real (176 ctas, 7 dígitos), comprobantes I/E/T con partida doble y correlativo por tipo+año, líneas Debe/Haber con num_op/rut. Libro 2025 de AVSOFT importado (origen='AVSOFT'). Anular = estado ANULADO, nunca DELETE.</td></tr>
+    <tr><td>ctb_reglas / ctb_reglas_lineas / ctb_eventos_log</td><td>Centralización automática: reglas paramétricas evento→cuentas (mantenedor Reglas de Centralización) y log de cada ejecución del motor.</td></tr>
   </table>
 
   <h2>Motores de cálculo (un solo hogar cada uno)</h2>
@@ -72,6 +74,7 @@
     <tr><td>shared/uf.js</td><td>Lookup UF por fecha (memoria). Tramo mayor/menor 200 UF se recalcula con UF de fecha_otorgado.</td></tr>
     <tr><td>shared/verificacion.js</td><td>Documentos verificables + FES: hash, firmante, QR público, detección de adulteración.</td></tr>
     <tr><td>shared/ordenes-pago.js</td><td>Correlativo único global OP- (libro op_correlativos).</td></tr>
+    <tr><td>contabilidad/src/motor-asientos.js</td><td>Motor ÚNICO de asientos automáticos: contabilizar({evento, montos, ref}) — idempotente por origen+ref, nunca lanza (la operación de negocio no se cae por contabilidad). Eventos: PAGO_CAJA, PREPAGO, ODP_PAGADA, CASTIGO, PROVISION_CIERRE, REMUNERACIONES.</td></tr>
   </table>
 
   <h2>Subsistema de IA</h2>

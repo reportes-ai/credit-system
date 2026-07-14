@@ -105,6 +105,7 @@ require('../../../../shared/migrate').enFila('contabilidad-nucleo', async () => 
       ['Libros Diario y Mayor',   'ctb_libros',       '/contabilidad/libros/',       'bi-book'],
       ['Balance de Comprobación', 'ctb_balance',      '/contabilidad/balance/',      'bi-clipboard-data'],
       ['Reglas de Centralización', 'ctb_reglas',      '/contabilidad/reglas/',       'bi-gear-wide-connected'],
+      ['Estados Financieros',     'ctb_estados',      '/contabilidad/estados/',      'bi-graph-up-arrow'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -315,6 +316,56 @@ exports.libroMayor = async (req, res) => {
         WHERE c.estado='CONTABILIZADO' AND m.cuenta=? AND c.fecha BETWEEN ? AND ?
         ORDER BY c.fecha, c.id LIMIT 5000`, [cuenta, r.desde, r.hasta]);
     ok(res, { saldo_inicial: Number(ini.d) - Number(ini.h), movimientos: rows.map(x => ({ ...x, num: fmtNum(x) })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Estados financieros (Fase 3) ──────────────────────────────────────────────
+   Balance General a una fecha: saldos acumulados de ACTIVO / PASIVO / PATRIMONIO
+   + Resultado del Ejercicio (ingresos − gastos acumulados) para que cuadre.
+   EERR de un período: ingresos y gastos entre fechas, utilidad/pérdida. */
+exports.balanceGeneral = async (req, res) => {
+  try {
+    const hasta = req.query.hasta;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(hasta || '')) return fail(res, 'hasta (YYYY-MM-DD) obligatorio', 400);
+    const [rows] = await pool.query(
+      `SELECT m.cuenta, k.nombre, k.tipo, SUM(m.debe) debe, SUM(m.haber) haber
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         LEFT JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha <= ?
+        GROUP BY m.cuenta, k.nombre, k.tipo ORDER BY m.cuenta`, [hasta]);
+    const out = { activo: [], pasivo: [], patrimonio: [], tot: { activo: 0, pasivo: 0, patrimonio: 0 }, resultado_ejercicio: 0 };
+    for (const x of rows) {
+      const deudor = Number(x.debe) - Number(x.haber);          // saldo con signo (deudor +)
+      if (x.tipo === 'ACTIVO') { if (deudor) { out.activo.push({ cuenta: x.cuenta, nombre: x.nombre, saldo: deudor }); out.tot.activo += deudor; } }
+      else if (x.tipo === 'PASIVO') { const s = -deudor; if (s) { out.pasivo.push({ cuenta: x.cuenta, nombre: x.nombre, saldo: s }); out.tot.pasivo += s; } }
+      else if (x.tipo === 'PATRIMONIO') { const s = -deudor; if (s) { out.patrimonio.push({ cuenta: x.cuenta, nombre: x.nombre, saldo: s }); out.tot.patrimonio += s; } }
+      else out.resultado_ejercicio += -deudor;                  // INGRESO acreedor (+), GASTO deudor (−)
+    }
+    out.tot.pas_pat_result = out.tot.pasivo + out.tot.patrimonio + out.resultado_ejercicio;
+    out.cuadre = Math.round(out.tot.activo) === Math.round(out.tot.pas_pat_result);
+    ok(res, out);
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.estadoResultados = async (req, res) => {
+  try {
+    const { desde, hasta } = req.query;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || '') || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || ''))
+      return fail(res, 'desde y hasta obligatorios', 400);
+    const [rows] = await pool.query(
+      `SELECT m.cuenta, k.nombre, k.tipo, SUM(m.debe) debe, SUM(m.haber) haber
+         FROM ctb_movimientos m
+         JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+         LEFT JOIN ctb_cuentas k ON k.codigo=m.cuenta
+        WHERE c.estado='CONTABILIZADO' AND c.fecha BETWEEN ? AND ? AND k.tipo IN ('INGRESO','GASTO')
+        GROUP BY m.cuenta, k.nombre, k.tipo ORDER BY m.cuenta`, [desde, hasta]);
+    const ingresos = [], gastos = []; let ti = 0, tg = 0;
+    for (const x of rows) {
+      if (x.tipo === 'INGRESO') { const s = Number(x.haber) - Number(x.debe); if (s) { ingresos.push({ cuenta: x.cuenta, nombre: x.nombre, monto: s }); ti += s; } }
+      else { const s = Number(x.debe) - Number(x.haber); if (s) { gastos.push({ cuenta: x.cuenta, nombre: x.nombre, monto: s }); tg += s; } }
+    }
+    ok(res, { ingresos, gastos, total_ingresos: ti, total_gastos: tg, resultado: ti - tg });
   } catch (e) { fail(res, e.message); }
 };
 

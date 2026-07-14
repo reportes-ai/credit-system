@@ -26,5 +26,7 @@ router.get('/eventos-log',       verifyToken, requireFunc('ctb_reglas', 'ctb_lib
 router.get('/libro-diario', verifyToken, requireFunc('ctb_libros', 'ctb_balance'), ctrl.libroDiario);
 router.get('/libro-mayor',  verifyToken, requireFunc('ctb_libros', 'ctb_balance'), ctrl.libroMayor);
 router.get('/balance',      verifyToken, requireFunc('ctb_balance', 'ctb_libros'), ctrl.balance);
+router.get('/balance-general',   verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.balanceGeneral);
+router.get('/estado-resultados', verifyToken, requireFunc('ctb_estados', 'ctb_balance', 'ctb_libros'), ctrl.estadoResultados);
 
 module.exports = router;
