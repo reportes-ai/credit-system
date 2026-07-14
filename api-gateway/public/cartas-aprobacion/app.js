@@ -2807,8 +2807,36 @@ function doLogout(){
   location.href = '/';
 }
 
+
+/* ── Textos de la carta: MISMA fuente paramétrica que Aprobaciones ──────────
+   (cartas-params carta_intro / carta_consideraciones; defaults idénticos) */
+let CARTA_INTRO = 'Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.';
+let CARTA_CONSID = [
+  '1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.',
+  '2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.',
+  '3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.',
+  '4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.',
+  '5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Dealer deberán corregir dicha situación enviando la documentación en forma correcta.',
+  '6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.',
+  '7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.',
+  '8. El Dealer debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.',
+  '9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de {{ACREEDOR}}.',
+  '10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.',
+  '11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.',
+  '12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.',
+  '13. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.',
+  '14. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.',
+].join('\n');
+async function cargarTextosCarta(){
+  try { const r = await fetch('/api/cartas-params/carta_intro', { headers:_hdr() }); const j = await r.json();
+    if (j.success && j.data && j.data.trim()) CARTA_INTRO = j.data; } catch(e){}
+  try { const r = await fetch('/api/cartas-params/carta_consideraciones', { headers:_hdr() }); const j = await r.json();
+    if (j.success && j.data && j.data.trim()) CARTA_CONSID = j.data; } catch(e){}
+}
+
 async function initApp(){
   showLoading('Cargando datos...');
+  cargarTextosCarta();
   try {
     // Load users from Supabase
     const dbUsers = await dbGetUsers();
@@ -4371,107 +4399,19 @@ function imprimirCarta(id){
 }
 
 function generatePDF(c, forPrint, fromRev){
-  const isParqueType = c.tipo && c.tipo.includes('PARQUE');
-  
-  const statusBanner = c.status !== 'APROBADA' 
-    ? `<div style="background:#FFF3E0;border:2px solid #F57C00;border-radius:4px;padding:6px;margin-bottom:8px;text-align:center;font-size:9px;font-weight:bold;color:#E65100">⚠ VISTA PREVIA — Pendiente de revisión. No habilitada para impresión.</div>` 
+  // MOTOR ÚNICO del documento: /js/carta-doc.js (idéntica en todos los módulos)
+  const statusBanner = c.status !== 'APROBADA'
+    ? `<div style="background:#FFF3E0;border:2px solid #F57C00;border-radius:4px;padding:6px;margin-bottom:8px;text-align:center;font-size:9px;font-weight:bold;color:#E65100">⚠ VISTA PREVIA — Pendiente de revisión. No habilitada para impresión.</div>`
     : '';
-
-  const parqueSection = isParqueType ? `
-    <div class="sec-title">DATOS DEL PARQUE Y DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl">PARQUE AUTOMOTRIZ</td><td class="val">${c.parque||''}</td><td class="lbl">VENDEDOR</td><td class="val">${c.vendedor||''}</td></tr>
-      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
-      <tr><td class="lbl">RUT</td><td class="val" colspan="3">${c.rutConc||''}</td></tr>
-    </table>` : `
-    <div class="sec-title">DATOS DEL DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${c.concesionario||''}</td></tr>
-      <tr><td class="lbl">RUT</td><td class="val">${c.rutConc||''}</td><td class="lbl">VENDEDOR</td><td class="val">${c.vendedor||''}</td></tr>
-    </table>`;
-
   const validez = new Date(c.fecha);
   validez.setDate(validez.getDate()+5);
-  const validezStr = validez.toLocaleDateString('es-CL');
-  const fechaStr = new Date(c.fecha).toLocaleDateString('es-CL');
   const firmaEmpresa = getFirmaEmpresa();
-  const firmaImg = firmaEmpresa 
-    ? `<img src="${firmaEmpresa}" style="max-width:150px;max-height:60px;display:block;margin:0 auto 4px">` 
+  const firmaImg = firmaEmpresa
+    ? `<img src="${firmaEmpresa}" style="max-width:150px;max-height:60px;display:block;margin:0 auto 4px">`
     : `<div style="border-bottom:1px solid #555;width:160px;margin:0 auto 5px">&nbsp;</div>`;
-
-  const html = `<div id="cartaPDF" style="font-family:Arial,sans-serif;font-size:10px;color:#222;padding:2px 2px 0 2px">
-    ${statusBanner}
-    <!-- HEADER -->
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #0141A2;padding-bottom:6px;margin-bottom:8px">
-      <div style="font-size:8px;color:#546E7A;line-height:1.6">Av. Presidente Kennedy 5757, Of. 1601, Las Condes<br>Santiago, Chile &middot; www.autofacilchile.cl</div>
-      <img src="${APP_LOGO_B64}" style="height:30px;object-fit:contain">
-    </div>
-    <!-- TITULO -->
-    <div style="text-align:center;font-size:12px;font-weight:bold;color:#0141A2;letter-spacing:0.5px;margin-bottom:7px;text-transform:uppercase">CARTA DE APROBACIÓN DE CRÉDITO</div>
-    <!-- INTRO -->
-    <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">Tenemos el agrado de informarle que el cliente detallado a continuación tiene aprobado un crédito de acuerdo a la información personal, demográfica, laboral y financiera entregada por él, la cual está sujeta a confirmación.</p>
-    <!-- DATOS GENERALES -->
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">FECHA</td><td class="val" style="width:18%">${fechaStr}</td><td class="lbl" style="width:18%">VALIDEZ APROBACIÓN</td><td class="val">${validezStr}</td></tr>
-      <tr><td class="lbl">EJECUTIVO</td><td class="val">${c.ejecutivoNombre||''}</td><td class="lbl">TELÉFONO</td><td class="val">${c.ejecutivoTel||''}</td></tr>
-      <tr><td class="lbl">CORREO</td><td class="val">${c.ejecutivoMail||''}</td><td class="lbl">OPERACIÓN</td><td class="val"><strong>${c.opCarta||''}</strong></td></tr>
-    </table>
-    <!-- CLIENTE -->
-    <div class="sec-title">DATOS DEL CLIENTE</div>
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">NOMBRE</td><td class="val" style="width:37%">${toTitleCase(c.cliente||'')}</td><td class="lbl" style="width:13%">RUT</td><td class="val">${formatRUT(c.rutCliente||'')}</td></tr>
-    </table>
-    <!-- VEHICULO -->
-    <div class="sec-title">DATOS DEL VEHÍCULO</div>
-    <table class="data-tbl" style="table-layout:fixed;width:100%">
-      <colgroup><col style="width:19%"><col style="width:31%"><col style="width:19%"><col style="width:31%"></colgroup>
-      <tr><td class="lbl">TIPO</td><td class="val">${c.tipoVehiculo||''}</td><td class="lbl">MARCA</td><td class="val">${c.marca||''}</td></tr>
-      <tr><td class="lbl">MODELO</td><td class="val">${c.modelo||''}</td><td class="lbl">AÑO</td><td class="val">${c.anio||''}</td></tr>
-      <tr><td class="lbl">PRECIO VENTA</td><td class="val">${fmtCLP(c.precioVenta)}</td><td class="lbl">PLACA PATENTE</td><td class="val">${c.patente||''}</td></tr>
-      <tr><td class="lbl">PIE</td><td class="val">${fmtCLP(c.pie)}</td><td class="lbl">PRENDA VEHÍCULO</td><td class="val">${c.prenda||''}</td></tr>
-      <tr><td class="lbl">SALDO PRECIO</td><td class="val">${fmtCLP(c.saldo)}</td><td class="lbl">PLAZO</td><td class="val">${c.plazo||''} cuotas</td></tr>
-    </table>
-    <!-- DEALER -->
-    ${parqueSection}
-    <!-- PARTICIPACION -->
-    <div class="sec-title">PARTICIPACIÓN DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">VALOR NETO</td><td class="val" style="width:20%">${fmtCLP(c.partNeto)}</td><td class="lbl" style="width:13%">VALOR IVA</td><td class="val">${fmtCLP(c.partIVA)}</td></tr>
-      <tr><td class="lbl">VALOR BRUTO</td><td class="val">${fmtCLP(c.partBruto)}</td><td class="lbl">ACREEDOR</td><td class="val">${c.acreedor||''}</td></tr>
-    </table>
-    <!-- CONSIDERACIONES -->
-    <div class="sec-title">CONSIDERACIONES</div>
-    <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
-      <p style="margin:2px 0">1. El Crédito se encuentra aprobado en las condiciones detalladas anteriormente y de acuerdo a la información entregada por el concesionario, por el cliente y los avales si correspondiera.</p>
-      <p style="margin:2px 0">2. El crédito está sujeto a validación de los antecedentes presentados y sus respaldos necesarios para la formalización del mismo, como la firma de los documentos relacionados para la entrega del crédito.</p>
-      <p style="margin:2px 0">3. AutoFácil actúa como Agente Colocador del crédito independiente del proveedor de financiamiento que cubra el producto. Por lo anterior, el Ejecutivo AutoFácil utilizará el set de documentos legales que correspondan según el producto que se esté otorgando.</p>
-      <p style="margin:2px 0">4. El pago del saldo precio, seguros, gastos y otros queda supeditado al correcto y oportuno envío de toda la información necesaria para la venta, transferencia, inscripción, prenda y entrega del vehículo que permitirán formalizar la operación de Crédito.</p>
-      <p style="margin:2px 0">5. De no contar con la documentación completa o si esta presenta errores de firma, impresión, formato u otro, tanto el Cliente, Ejecutivo AutoFácil y/o el Dealer deberán corregir dicha situación enviando la documentación en forma correcta.</p>
-      <p style="margin:2px 0">6. La participación del Dealer queda establecida, inicialmente y de no mediar una situación especial, que la participación se obtendrá de multiplicar el saldo precio por un factor que se determina según el plazo del financiamiento.</p>
-      <p style="margin:2px 0">7. Para los casos en que se autorice un descuento en la tasa de financiamiento, la participación quedará definida de manera específica y deberá contar con la firma del representante del concesionario o dealer.</p>
-      <p style="margin:2px 0">8. El Dealer debe entregar a Ejecutivo AutoFácil la Factura y Solicitud de Primera Inscripción o Contrato de Compraventa y Transferencia del Vehículo a más tardar al quinto (5) día corrido desde la fecha de inscripción o transferencia del vehículo, respectivamente.</p>
-      <p style="margin:2px 0">9. Al momento de la inscripción de la compra venta, se deberá incluir la inscripción de la limitación de dominio como prohibiciones de enajenar a favor de ${c.acreedor||'AUTOFIN'}.</p>
-      <p style="margin:2px 0">10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.</p>
-      <p style="margin:2px 0">11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.</p>
-      <p style="margin:2px 0">12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.</p>
-      <p style="margin:2px 0">14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.</p>
-      <p style="margin:2px 0">15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.</p>
-    </div>
-    <!-- FIRMA -->
-    <div style="margin-top:18px;display:flex;align-items:flex-end">
-      <div id="cartaQRSlot" style="width:130px"></div>
-      <div style="flex:1;text-align:center">
-        ${firmaImg}
-        <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:0.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
-        <div id="cartaFESLine" style="font-size:7.5px;color:#64748b;margin-top:3px"></div>
-      </div>
-      <div style="width:130px"></div>
-    </div>
-    <!-- PIE -->
-    <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:0.5px solid #e0e0e0;padding-top:4px;margin-bottom:0;padding-bottom:0">
-      Creado por: ${c.creadoPorInitials||''} | ${c.aprobadoPorInitials ? 'Revisado por: ' + c.aprobadoPorInitials : 'Pendiente de Revisión'} | Tipo: ${c.tipo||''}
-    </div>
-  </div>`;
+  const html = AF_CARTA_DOC(c, { banner: statusBanner, intro: CARTA_INTRO, consid: CARTA_CONSID,
+    logoSrc: localStorage.getItem('af_logo') || APP_LOGO_B64, firmaImg,
+    validezStr: validez.toLocaleDateString('es-CL') });
 
   document.getElementById('pdfContent').innerHTML = html;
   document.getElementById('app').style.display='none';
@@ -4539,7 +4479,7 @@ async function printPDF(){
   btn.disabled = true;
 
   // Get the rendered HTML of the carta
-  const cartaEl = document.getElementById('cartaPDF');
+  const cartaEl = document.getElementById('cartaDoc');
   if(!cartaEl){ btn.textContent='🖨 Imprimir PDF'; btn.disabled=false; return; }
   const cartaHTML = cartaEl.outerHTML;
 
@@ -4559,7 +4499,7 @@ async function printPDF(){
   @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; font-family: Arial, sans-serif; }
   body { margin: 0; padding: 10mm 14mm; font-size: 10px; color: #222; width: 100%; }
-  #cartaPDF { width: 100%; }
+  .carta-doc { width: 100%; border:none !important; }
   .sec-title { background:#d8d8d8; font-weight:bold; padding:3px 6px; margin-top:5px; margin-bottom:0; font-size:9.5px; color:#111; text-transform:uppercase; display:block; }
   .data-tbl { width:100%; border-collapse:collapse; margin-bottom:0; table-layout:fixed; }
   .data-tbl td { padding:3px 6px; font-size:9px; border:0.5px solid #e0e0e0; overflow:hidden; }

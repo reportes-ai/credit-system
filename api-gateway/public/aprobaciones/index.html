@@ -659,6 +659,7 @@
 <script src="/js/comision-dealer.js"></script>
 <script src="/js/rentabilidad-calc.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
+<script src="/js/carta-doc.js"></script>
 <script src="/js/qrcode-generator.js"></script>
 <script src="/js/qr-verificacion.js"></script>
 <script src="/js/html2pdf.bundle.min.js"></script>
@@ -705,8 +706,8 @@ const CARTA_CONSID_DEFAULT = [
   '10. En caso de que la entrega de la documentación del Vehículo al Ejecutivo AutoFácil ocurra con posterioridad al quinto (5) día corrido desde la fecha de Solicitud de Primera Inscripción o Transferencia del mismo, el Saldo de Precio será pagado por AutoFácil contra la inscripción efectiva de la Prenda.',
   '11. Una vez recibido el set legal de documentos firmados en conformidad, la factura e inscripción o contrato de compraventa y transferencia del vehículo dentro de los plazos señalados anteriormente, AutoFácil procederá a pagar el saldo de precio dentro de las 96 horas hábiles siguientes.',
   '12. El concesionario deberá inscribir una Limitación al Dominio al momento de inscribir el vehículo a nombre del cliente a favor de la entidad financiera a la que corresponda el producto de crédito otorgado.',
-  '14. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.',
-  '15. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.',
+  '13. Se deja expresa constancia que AutoFácil sólo es responsable por hechos o actos imputables a su responsabilidad o la de su personal, en ningún caso a actuaciones de terceros.',
+  '14. AutoFácil declara no tener responsabilidad alguna respecto a la venta del vehículo, ni de su calidad ni de la documentación, clonación u otros aspectos relacionados al bien financiado.',
 ].join('\n');
 let CARTA_INTRO = CARTA_INTRO_DEFAULT;
 let CARTA_CONSID = CARTA_CONSID_DEFAULT;
@@ -2231,9 +2232,8 @@ function rentHTML(c,R,tier){
   <div style="margin-top:10px;font-size:.73rem;color:#94a3b8">Comisión Dealer = participación de la carta (si no la trae, pizarra por plazo). Tasa cliente = TMC vigente por tramo. Tier UAC fijado al emitir la carta. Mismas fórmulas del Simulador de Rentabilidad.</div>`;
 }
 
-/* Formato de carta — fiel al documento original */
-function cartaHTML(c, preview){
-  const isParque = c.tipo && c.tipo.includes('PARQUE');
+/* Formato de carta — MOTOR ÚNICO en /js/carta-doc.js (idéntica en todos los módulos) */
+function cartaHTML(c, preview, qr){
   const banner = preview && c.status!=='APROBADA'
     ? '<div style="background:#FFF3E0;border:2px solid #F57C00;border-radius:4px;padding:6px;margin-bottom:8px;text-align:center;font-size:9px;font-weight:bold;color:#E65100">&#9888; VISTA PREVIA — Pendiente de revisión. No habilitada para impresión.</div>' : '';
   const validez = c.fecha ? new Date(c.fecha) : new Date();
@@ -2241,76 +2241,9 @@ function cartaHTML(c, preview){
   const firmaImg = FIRMA_B64
     ? `<img src="${FIRMA_B64}" style="max-width:150px;max-height:60px;display:block;margin:0 auto 4px">`
     : '<div style="border-bottom:1px solid #555;width:160px;margin:0 auto 5px">&nbsp;</div>';
-  const parqueSec = isParque ? `
-    <div class="sec-title">DATOS DEL PARQUE Y DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl">PARQUE AUTOMOTRIZ</td><td class="val">${escH(c.parque||'')}</td><td class="lbl">VENDEDOR</td><td class="val">${escH(c.vendedor||'')}</td></tr>
-      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${escH(c.concesionario||'')}</td></tr>
-      <tr><td class="lbl">RUT</td><td class="val" colspan="3">${fmtRUT(c.rutConc||'')}</td></tr>
-    </table>` : `
-    <div class="sec-title">DATOS DEL DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl">DEALER</td><td class="val" colspan="3">${escH(c.concesionario||'')}</td></tr>
-      <tr><td class="lbl">RUT</td><td class="val">${fmtRUT(c.rutConc||'')}</td><td class="lbl">VENDEDOR</td><td class="val">${escH(c.vendedor||'')}</td></tr>
-    </table>`;
-  return `<div class="carta-doc" id="cartaDoc">
-    ${banner}
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #0141A2;padding-bottom:6px;margin-bottom:8px">
-      <div style="font-size:8px;color:#546E7A;line-height:1.6">Av. Presidente Kennedy 5757, Of. 1601, Las Condes<br>Santiago, Chile &middot; www.autofacilchile.cl</div>
-      <img src="${location.origin}/img/logo-autofacil.png" style="height:30px;object-fit:contain">
-    </div>
-    <div style="text-align:center;font-size:12px;font-weight:bold;color:#0141A2;letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase">CARTA DE APROBACIÓN DE CRÉDITO</div>
-    <p style="font-size:9px;text-align:justify;line-height:1.5;margin:0 0 7px">${escH(CARTA_INTRO).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">FECHA</td><td class="val" style="width:18%">${fmtFecha(c.fecha)}</td><td class="lbl" style="width:18%">VALIDEZ APROBACIÓN</td><td class="val">${validez.toLocaleDateString('es-CL')}</td></tr>
-      <tr><td class="lbl">EJECUTIVO</td><td class="val">${escH(c.ejecutivoNombre||'')}</td><td class="lbl">TELÉFONO</td><td class="val">${escH(c.ejecutivoTel||'')}</td></tr>
-      <tr><td class="lbl">CORREO</td><td class="val">${escH(c.ejecutivoMail||'')}</td><td class="lbl">N° CARTA</td><td class="val"><strong>${escH(c.opCarta||'')}</strong>${c.numeroCreditoCreado ? ` &nbsp;<span style="color:#475569;font-weight:normal;font-size:8.5px">· Crédito: <b>${escH(c.numeroCreditoCreado)}</b></span>` : ''}</td></tr>
-    </table>
-    <div class="sec-title">DATOS DEL CLIENTE</div>
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">NOMBRE</td><td class="val" style="width:37%">${escH(toTitle(c.cliente||''))}</td><td class="lbl" style="width:13%">RUT</td><td class="val">${fmtRUT(c.rutCliente||'')}</td></tr>
-    </table>
-    <div class="sec-title">DATOS DEL VEHÍCULO</div>
-    <table class="data-tbl" style="table-layout:fixed;width:100%">
-      <colgroup><col style="width:19%"><col style="width:31%"><col style="width:19%"><col style="width:31%"></colgroup>
-      <tr><td class="lbl">TIPO</td><td class="val">${escH(c.tipoVehiculo||'')}</td><td class="lbl">MARCA</td><td class="val">${escH(c.marca||'')}</td></tr>
-      <tr><td class="lbl">MODELO</td><td class="val">${escH(c.modelo||'')}</td><td class="lbl">AÑO</td><td class="val">${escH(c.anio||'')}</td></tr>
-      <tr><td class="lbl">PRECIO VENTA</td><td class="val">${fmtCLP(c.precioVenta)}</td><td class="lbl">PLACA PATENTE</td><td class="val">${escH(c.patente||'')}</td></tr>
-      <tr><td class="lbl">PIE</td><td class="val">${fmtCLP(c.pie)}</td><td class="lbl">PRENDA VEHÍCULO</td><td class="val">${escH(c.prenda||'')}</td></tr>
-      <tr><td class="lbl">SALDO PRECIO</td><td class="val">${fmtCLP(c.saldo)}</td><td class="lbl">PLAZO</td><td class="val">${escH(c.plazo||'')} cuotas</td></tr>
-    </table>
-    ${parqueSec}
-    <div class="sec-title">PARTICIPACIÓN DEALER</div>
-    <table class="data-tbl">
-      <tr><td class="lbl" style="width:13%">VALOR NETO</td><td class="val" style="width:20%">${fmtCLP(c.partNeto)}</td><td class="lbl" style="width:13%">VALOR IVA</td><td class="val">${fmtCLP(c.partIVA)}</td></tr>
-      <tr><td class="lbl">VALOR BRUTO</td><td class="val">${fmtCLP(c.partBruto)}</td><td class="lbl">ACREEDOR</td><td class="val">${escH(c.acreedor||'')}</td></tr>
-    </table>
-    ${(Array.isArray(c.excepciones) && c.excepciones.length) ? (() => {
-      const LBL = { TASA_BAJO_PIZARRA:'Tasa bajo pizarra', CAMBIO_PARTICIPACION:'Cambio de participación manual',
-                    PARTICIPACION_SOBRE_PIZARRA:'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE:'Financiera distinta a la preferente' };
-      const coms = c.excepcionesComentarios || {};
-      return `<div class="sec-title" style="background:#fde68a;color:#7c2d12">APROBADA CON EXCEPCIONES (${c.excepciones.length})</div>
-      <table class="data-tbl">
-        ${c.excepciones.map(e=>`<tr><td class="lbl" style="width:32%">${escH(LBL[e]||e)}</td><td class="val">${escH(coms[e]||'(sin justificación registrada)')}</td></tr>`).join('')}
-      </table>`;
-    })() : ''}
-    <div class="sec-title">CONSIDERACIONES</div>
-    <div style="font-size:9px;line-height:1.5;text-align:justify;margin-top:3px">
-      ${CARTA_CONSID.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>`<p style="margin:2px 0">${escH(l).replace(/\{\{ACREEDOR\}\}/g, escH(c.acreedor||'AUTOFIN'))}</p>`).join('')}
-    </div>
-    <div style="margin-top:18px;display:flex;align-items:flex-end">
-      <div style="width:130px">${(arguments.length > 2 && arguments[2] && arguments[2].qrHTML) ? arguments[2].qrHTML : ''}</div>
-      <div style="flex:1;text-align:center">
-        ${firmaImg}
-        <div style="font-weight:bold;font-size:10px;margin-top:3px;letter-spacing:.3px">GERENTE OPERACIONES AUTOFÁCIL SPA</div>
-        ${(arguments.length > 2 && arguments[2] && arguments[2].fes) ? `<div style="font-size:7.5px;color:#64748b;margin-top:3px">${arguments[2].fes}</div>` : ''}
-      </div>
-      <div style="width:130px"></div>
-    </div>
-    <div style="margin-top:8px;font-size:7.5px;color:#aaa;text-align:right;border-top:.5px solid #e0e0e0;padding-top:4px">
-      Creado por: ${escH(c.creadoPorInitials||'')} | ${c.aprobadoPorInitials ? 'Revisado por: '+escH(c.aprobadoPorInitials) : 'Pendiente de Revisión'} | Tipo: ${escH(c.tipo||'')}
-    </div>
-  </div>`;
+  return AF_CARTA_DOC(c, { banner, intro: CARTA_INTRO, consid: CARTA_CONSID,
+    logoSrc: location.origin + '/img/logo-autofacil.png', firmaImg,
+    validezStr: validez.toLocaleDateString('es-CL'), qr });
 }
 
 async function imprimirCarta(id){
