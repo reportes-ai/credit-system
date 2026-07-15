@@ -39,6 +39,7 @@ const GLOSARIO = [
   '- Balance general a una fecha → herramienta balance_general. Estado de resultados entre fechas → estado_resultados.',
   '- P&G gerencial por rubros con comparación contra AÑO ANTERIOR y PRESUPUESTO (mes y acumulado) → pyg_rubros. Es LA herramienta para "cómo vamos contra el presupuesto", márgenes y desviaciones.',
   '- Presupuesto anual completo cuenta a cuenta → presupuesto_anual.',
+  '- NÚMERO DE OPERACIONES / producción / colocación → herramienta produccion_mensual (créditos OTORGADOS reales por mes, con montos). NUNCA cuentes asientos o movimientos contables como "operaciones": un asiento agrupa muchas operaciones y el conteo sale ~10 veces menor que la realidad.',
   'Nunca digas que estos datos no existen: existen vía herramientas.',
   '',
   "Montos en PESOS CHILENOS. En las respuestas usa millones con un decimal cuando el monto sea grande (ej. $207,6 Millones) y formato es-CL.",
@@ -132,6 +133,9 @@ const TOOLS = [
   { name: 'estado_resultados',
     description: 'Estado de resultados cuenta a cuenta entre dos fechas: ingresos, gastos y resultado del período.',
     input_schema: { type: 'object', properties: { desde: { type: 'string' }, hasta: { type: 'string' } }, required: ['desde', 'hasta'] } },
+  { name: 'produccion_mensual',
+    description: 'Producción REAL del negocio por mes: número de créditos OTORGADOS, monto financiado total y promedio. LA fuente para "cuántas operaciones", punto de equilibrio en operaciones, ingreso o margen por operación (divide los ingresos contables por estas operaciones, no por asientos).',
+    input_schema: { type: 'object', properties: { desde: { type: 'string', description: 'YYYY-MM' }, hasta: { type: 'string', description: 'YYYY-MM' } } } },
   { name: 'presupuesto_anual',
     description: 'Presupuesto anual completo cuenta a cuenta: 12 meses por cuenta en sentido natural (ingresos y gastos positivos). Hoy existe 2026.',
     input_schema: { type: 'object', properties: { anio: { type: 'number' } }, required: ['anio'] } },
@@ -173,6 +177,16 @@ function crearDispatcher(ultimo) {
         ...(d.gastos || []).map(x => ({ tipo: 'GASTO', ...x })),
       ]);
       return d;
+    }
+    if (name === 'produccion_mensual') {
+      const desde = mesOk(input.desde) || '2025-01', hasta = mesOk(input.hasta) || new Date().toISOString().slice(0, 7);
+      const [rows] = await pool.query(
+        `SELECT DATE_FORMAT(mes,'%Y-%m') mes, COUNT(*) operaciones,
+                ROUND(SUM(monto_financiado)) monto_financiado, ROUND(AVG(monto_financiado)) monto_promedio
+           FROM creditos WHERE estado='OTORGADO' AND DATE_FORMAT(mes,'%Y-%m') BETWEEN ? AND ?
+          GROUP BY 1 ORDER BY 1`, [desde, hasta]);
+      tabla(rows);
+      return { desde, hasta, meses: rows };
     }
     if (name === 'presupuesto_anual') {
       const anio = Number(input.anio); if (!anio) throw new Error('anio inválido');
