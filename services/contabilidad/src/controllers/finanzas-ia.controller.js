@@ -52,7 +52,7 @@ require('../../../../shared/migrate').enFila('contabilidad-finanzas-ia', async (
       codigo: CODIGO_IA,
       nombre: 'Pregúntale a Finanzas (BI conversacional)',
       descripcion: 'Responde preguntas de finanzas, gastos, ingresos y presupuesto sobre la contabilidad (herramientas de motores + SQL de solo lectura)',
-      modelo: 'claude-sonnet-4-6',
+      modelo: 'claude-opus-4-8',
     });
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_finanzas_ia' LIMIT 1");
     let idf = ex?.id_funcionalidad;
@@ -66,6 +66,58 @@ require('../../../../shared/migrate').enFila('contabilidad-finanzas-ia', async (
     console.log('[contabilidad] pregúntale a finanzas listo');
   } catch (e) { console.error('[contabilidad-finanzas-ia migration]', e.message); }
 });
+
+/* ── Lecciones aprendidas: la educación de la IA es PARAMÉTRICA ────────────────
+   Cada vez que una respuesta sale mala, el usuario la corrige con 👎 y la
+   corrección queda como REGLA permanente que se inyecta en el prompt de todas
+   las preguntas siguientes — sin tocar código (misma filosofía que el resto
+   de los mantenedores). */
+require('../../../../shared/migrate').enFila('contabilidad-finia-lecciones', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_finia_lecciones (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        regla      TEXT NOT NULL,               -- la lección, redactada como instrucción
+        pregunta   VARCHAR(500) NULL,           -- pregunta que la originó (contexto)
+        creada_por VARCHAR(160) NULL,
+        activa     TINYINT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+  } catch (e) { console.error('[contabilidad-finia-lecciones migration]', e.message); }
+});
+
+async function leccionesActivas() {
+  try {
+    const [rows] = await pool.query('SELECT regla FROM ctb_finia_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 40');
+    return rows.map(r => '- ' + String(r.regla).replace(/\s+/g, ' ').trim());
+  } catch (_) { return []; }
+}
+
+exports.getLecciones = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, regla, pregunta, creada_por, activa, created_at FROM ctb_finia_lecciones ORDER BY id DESC LIMIT 200');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.crearLeccion = async (req, res) => {
+  try {
+    const regla = String(req.body.regla || '').trim().slice(0, 2000);
+    if (regla.length < 10) return res.status(400).json({ success: false, data: null, error: 'Describe la corrección (mínimo 10 caracteres)' });
+    const pregunta = String(req.body.pregunta || '').trim().slice(0, 500) || null;
+    const quien = (req.usuario || req.user || {}).nombre || (req.usuario || req.user || {}).correo || null;
+    const [r] = await pool.query('INSERT INTO ctb_finia_lecciones (regla, pregunta, creada_por) VALUES (?,?,?)', [regla, pregunta, quien]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'finia_leccion', entidad_id: String(r.insertId), detalle: `Lección IA finanzas: ${regla.slice(0, 120)}` });
+    res.json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
+exports.toggleLeccion = async (req, res) => {
+  try {
+    await pool.query('UPDATE ctb_finia_lecciones SET activa=? WHERE id=?', [req.body.activa ? 1 : 0, Number(req.params.id)]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
 
 /* ── Esquema acotado (cacheado 10 min) ── */
 let _esq = null, _esqAt = 0;
@@ -209,6 +261,7 @@ exports.preguntar = async (req, res) => {
     if (!pregunta) return res.status(400).json({ success: false, data: null, error: 'Escribe una pregunta' });
     const uid = (req.usuario || req.user || {}).id_usuario || null;
     const esquema = await getEsquema();
+    const lecciones = await leccionesActivas();
     const historial = (Array.isArray(req.body.historial) ? req.body.historial : [])
       .filter(h => h && h.pregunta && h.resumen).slice(-3)
       .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), resumen: String(h.resumen).slice(0, 600) }));
@@ -221,6 +274,8 @@ exports.preguntar = async (req, res) => {
       'estado_resultados para cifras oficiales; presupuesto_anual para el plan; consulta_sql para el detalle fino. ' +
       'Piensa qué herramienta responde mejor ANTES de escribir SQL a mano.\n\n' +
       'Esquema disponible para consulta_sql:\n' + esquema + '\n\n' + GLOSARIO + '\n\n' +
+      (lecciones.length ? 'LECCIONES APRENDIDAS (correcciones dictadas por los usuarios en respuestas anteriores — OBEDÉCELAS SIEMPRE, tienen prioridad sobre tu criterio):\n' + lecciones.join('\n') + '\n\n' : '') +
+      'ANTES DE CONCLUIR una cifra clave (punto de equilibrio, desviación, margen), verifica que las fuentes sean coherentes entre sí (ej. operaciones reales vs ingresos contables); si dos fuentes contradicen, dilo.\n\n' +
       'Al terminar responde SOLO con JSON (sin NINGÚN texto antes ni después, sin markdown, sin tablas, sin fórmulas: la tabla de datos se muestra sola bajo tu respuesta): ' +
       '{"respuesta":"2 a 5 frases en español para un gerente de finanzas, texto plano con las cifras clave", ' +
       '"grafico": {"tipo":"bar","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
@@ -235,7 +290,7 @@ exports.preguntar = async (req, res) => {
     const ultimo = { sql: null, rows: [], columns: [] };
     const { texto } = await analizarTools({
       codigo: CODIGO_IA, id_usuario: uid, system, prompt,
-      tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 8,
+      tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 10,
     });
 
     // Extracción robusta del JSON final: el modelo a veces antepone prosa con llaves

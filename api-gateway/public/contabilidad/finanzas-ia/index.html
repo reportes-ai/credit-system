@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pregúntale a Finanzas — AutoFácil</title>
-  <!-- v1.1 — BI conversacional ámbito finanzas: motores contables como herramientas + SQL solo lectura -->
+  <!-- v1.2 — BI conversacional ámbito finanzas: motores contables como herramientas + SQL solo lectura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,7 +56,8 @@
 <div class="wrap">
   <div class="banner">
     <i class="bi bi-piggy-bank"></i>
-    <div><h2>Pregúntale a Finanzas</h2><p>Ingresos, gastos, presupuesto, márgenes, balance, proveedores — la IA consulta los libros y los motores del módulo</p></div>
+    <div style="flex:1"><h2>Pregúntale a Finanzas</h2><p>Ingresos, gastos, presupuesto, márgenes, balance, proveedores — la IA consulta los libros y los motores del módulo</p></div>
+    <button class="btn-mini" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff" onclick="verLecciones()" title="Reglas que los usuarios le han enseñado con 👎 Corregir"><i class="bi bi-mortarboard"></i> Lecciones</button>
   </div>
   <div class="chips">
     <span class="chip" onclick="usarChip(this)">¿Cómo vamos contra el presupuesto este año?</span>
@@ -75,6 +76,15 @@
   </div>
   <div class="nota">Respuestas generadas con IA sobre los libros contables (solo lectura). Verifica antes de decidir.</div>
 </div>
+
+<dialog id="dlgLec" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:20px;width:640px;max-width:95vw;max-height:80vh;overflow:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <h5 style="font-weight:700;margin:0"><i class="bi bi-mortarboard me-1"></i>Lecciones aprendidas</h5>
+    <button class="btn-mini" onclick="dlgLec.close()">✕</button>
+  </div>
+  <p style="font-size:.78rem;color:#64748b;margin:0 0 8px">Reglas permanentes que los usuarios le han enseñado a la IA con 👎 Corregir. Se inyectan en cada pregunta y tienen prioridad sobre su criterio.</p>
+  <div id="lecBody"></div>
+</dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -136,9 +146,45 @@ function render(d, idx){
     if (d.rows.length>50) html += `<div class="muted" style="font-size:.76rem;margin-top:4px">Mostrando 50 de ${d.rows.length} filas.</div>`;
   }
   if (d.sql) html += `<div class="sql-toggle" onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='block'?'none':'block'"><i class="bi bi-code-slash"></i> Ver consulta SQL</div><div class="sql-box">${esc(d.sql)}</div>`;
-  html += `<div class="acciones"><button class="btn-mini" onclick="copiarInfo(${idx})"><i class="bi bi-clipboard"></i> Copiar info</button></div>
+  html += `<div class="acciones">
+    <button class="btn-mini" onclick="copiarInfo(${idx})"><i class="bi bi-clipboard"></i> Copiar info</button>
+    <span style="flex:1"></span>
+    <button class="btn-mini" title="La respuesta está buena" onclick="this.innerHTML='👍 ¡Gracias!';this.disabled=true">👍</button>
+    <button class="btn-mini" title="La respuesta está mala: corrige a la IA y lo aprende para siempre" onclick="corregir(${idx}, this)">👎 Corregir</button>
+  </div>
     <div class="fuente"><i class="bi bi-database"></i> Fuente: libros contables de AutoFácil (solo lectura).</div>`;
   return html;
+}
+
+/* 👎 → la corrección queda como LECCIÓN permanente que la IA obedece en todas
+   las preguntas siguientes (educación paramétrica, sin programador). */
+async function corregir(i, btn){
+  const d = TURNS[i]; if (!d) return;
+  const regla = prompt('¿Qué estuvo mal y cómo debe hacerlo la próxima vez?\n(Se guarda como regla permanente para la IA — ej: "las operaciones de Unidad se cuentan con produccion_mensual financiera=UNIDAD, no desde facturas")');
+  if (!regla || regla.trim().length < 10) return;
+  const r = await fetch('/api/contabilidad/finanzas-ia/lecciones',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({regla:regla.trim(), pregunta:d.pregunta})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  btn.innerHTML = '✅ Aprendido'; btn.disabled = true;
+  alert('Lección guardada: la IA la obedecerá desde la próxima pregunta. Puedes verlas y desactivarlas en el botón "Lecciones".');
+}
+
+async function verLecciones(){
+  const r = await fetch('/api/contabilidad/finanzas-ia/lecciones',{headers:{Authorization:'Bearer '+token}});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  const dlg = document.getElementById('dlgLec');
+  dlg.querySelector('#lecBody').innerHTML = j.data.length ? j.data.map(x=>`
+    <div style="border-bottom:1px solid #f1f5f9;padding:9px 0;${x.activa?'':'opacity:.45'}">
+      <div style="font-size:.86rem">${esc(x.regla)}</div>
+      <div style="font-size:.72rem;color:#94a3b8;margin-top:3px">
+        ${x.pregunta?`Origen: “${esc(x.pregunta)}” · `:''}${esc(x.creada_por||'')} · ${String(x.created_at).slice(0,10)}
+        · <a href="#" onclick="toggleLec(${x.id},${x.activa?0:1});return false">${x.activa?'desactivar':'reactivar'}</a>
+      </div>
+    </div>`).join('') : '<div class="muted p-2">Aún no hay lecciones. Usa 👎 Corregir en una respuesta mala para enseñarle.</div>';
+  dlg.showModal();
+}
+async function toggleLec(id, activa){
+  await fetch('/api/contabilidad/finanzas-ia/lecciones/'+id,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({activa:!!activa})});
+  verLecciones();
 }
 
 function copiarInfo(i){
