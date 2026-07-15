@@ -28,12 +28,13 @@ const ALLOW = new Set(TABLAS_BI);
 const GLOSARIO = [
   'GLOSARIO DE NEGOCIO (usa esto para mapear lo que pide el usuario a columnas reales):',
   '- "Otorgado / colocado / cursado" = creditos con estado=\'OTORGADO\'. El MES CONTABLE es la columna creditos.mes (NUNCA fecha_otorgado). Ej. otorgados de este mes: WHERE estado=\'OTORGADO\' AND DATE_FORMAT(mes,\'%Y-%m\')=DATE_FORMAT(CURDATE(),\'%Y-%m\').',
-  '- "Aprobado" = estado=\'APROBADO\'; "Rechazado" = \'RECHAZADO\'; "Otorgado" = \'OTORGADO\'; clave del negocio = creditos.num_op.',
-  '- "Financiera / institución" = creditos.financiera (valores: AUTOFIN, UNIDAD, AUTOFACIL/AFA).',
+  '- ESTADOS DEL PIPELINE: la columna con el estado REAL es creditos.estado_credito (DIGITADO, APROBADO, RECHAZADO, DESISTIDO, OTORGADO, ANULADO, PENDIENTE) — la columna estado está NULL en casi todo lo no otorgado; úsala SOLO para estado=\'OTORGADO\'. Para aprobados/rechazados/desistidos/digitados usa SIEMPRE UPPER(estado_credito)=\'...\' (hay valores en mixto como \'Digitado\'). Clave del negocio = creditos.num_op.',
+  '- "Financiera / canal / institución" = creditos.financiera. Valores REALES: \'AUTOFIN\', \'UNIDAD DE CREDITO\' (así, NO \'UNIDAD\'), \'AUTOFACIL\', \'AFA\' (cartera comprada a AFA), \'NO APLICA\'. Si piden "Unidad" filtra financiera=\'UNIDAD DE CREDITO\'.',
   '- "Saldo precio" = creditos.saldo_precio. "Monto financiado" = creditos.monto_financiado. "Plazo (cuotas)" = creditos.plazo. "Tasa" = creditos.tasa.',
   '- "Comisión dealer" = creditos.com_dealer. "Comisión parque" = creditos.com_parque. "Arriendo parque" = creditos.arriendo_parque. "Ingreso por colocación / UAC" = creditos.monto_comision_fin.',
-  '- "Dealer / patio" = creditos.rut_dealer → dealers (dealers.nombre, dealers.ccs_parque = parque). "Ejecutivo" = creditos.ejecutivo. "Cliente" = clientes por rut.',
-  '- "Cartas de aprobación por vencer" = cartas_aprobacion vigentes cuya fecha de vencimiento se acerca.',
+  '- "Dealer / patio" = creditos.rut_dealer → dealers por rut. El NOMBRE del dealer es dealers.nombre_razon (o nombre_indexa) — NO existe dealers.nombre. El parque es dealers.ccs_parque (PARQUE OESTE, CALLE = dealers de calle, PARQUE LONQUEN, AUTOMALL…). "Ejecutivo" = creditos.ejecutivo. "Cliente" = clientes por rut.',
+  '- "Carta de aprobación VIGENTE" = cartas_aprobacion sin desenlace: fecha_otorgado, fecha_desistimiento, fecha_anulacion, fecha_eliminacion y fecha_rechazo todas NULL (no hay columna estado en esa tabla).',
+  '- "Cuotas / calendario de pago" = cuotas_credito (numero_cuota, fecha_vencimiento, valor_cuota, saldo_insoluto, estado_cuota, fecha_pago) — es la cartera propia.',
   '- "Cobranza / gestiones" = cobranza_gestiones (canal, resultado, monto_promesa, confirmado, created_at). "Promesa de pago" = resultado=\'PROMESA_PAGO\'. "Recuperación / recaudación" = promesas y gestiones confirmadas de cobranza_gestiones.',
   '',
   'MÉTRICAS QUE SE CALCULAN EN EL MÓDULO COBRANZA (NO son columnas de estas tablas; NO inventes SQL para ellas):',
@@ -43,6 +44,21 @@ const GLOSARIO = [
   '',
   'BÚSQUEDA POR NOMBRES DE PERSONAS (ejecutivos, clientes, dealers): NUNCA compares con = exacto. La BD es CASE-SENSITIVE (utf8mb4_bin) y los nombres están en MAYÚSCULAS SIN TILDES: usa siempre UPPER(columna) LIKE \'%PALABRA%\' por cada palabra, con el patrón en mayúsculas y sin tildes (ej. UPPER(ejecutivo) LIKE \'%ALVARO%\' AND UPPER(ejecutivo) LIKE \'%VARGAS%\'). Si no hay match, intenta con solo el apellido antes de concluir que no existe.',
   '- "Comisión / cuánto gana un EJECUTIVO" = las comisiones de venta se calculan en el módulo Comisiones; en creditos están los insumos por operación (com_dealer, com_parque, monto_comision_fin son comisiones del DEALER/parque/financiera, NO el sueldo del ejecutivo). Si preguntan la comisión ganada por un ejecutivo, entrega sus operaciones del período (conteo y montos) y aclara que la liquidación exacta está en Comisiones → Revisión (/comisiones/revision/).',
+  '',
+  'ÁMBITO PROHIBIDO (aunque insistan, NUNCA lo respondas aquí):',
+  '- FINANZAS DE LA EMPRESA (resultados, gastos, ingresos contables, presupuesto, balance, EBITDA, caja/bancos, proveedores, remuneraciones de la empresa, deuda con la matriz): NO es tu ámbito y esas tablas no están disponibles. Responde amablemente que eso se pregunta en "Pregúntale a Finanzas" (Contabilidad → Pregúntale a Finanzas) y NO intentes aproximarlo con las tablas de créditos.',
+  '- INFORMACIÓN PERSONAL DE EMPLEADOS/COLABORADORES (sueldo, liquidaciones, RUT, teléfono, correo, edad, dirección, salud, AFP, licencias, evaluaciones): NUNCA la entregues, ni siquiera a un gerente. Solo puedes hablar de su PRODUCCIÓN COMERCIAL (operaciones, montos, ranking). Si la piden, dilo: los datos de personas se gestionan en RRHH con sus propios permisos.',
+  '',
+  'CURSO ACELERADO (entrenado con 12.000 preguntas de 4 perfiles — hechos verificados contra la BD):',
+  '- ADAPTA EL TONO: pregunta simple o "con peras y manzanas" → explica sin jerga, con analogía y un ejemplo con números reales. Pregunta de gestión → 2-3 cifras clave + tendencia + comparación y, si piden, recomendación. Pregunta técnica → precisión de columnas.',
+  '- LA BASE: ~14.000 operaciones históricas desde dic-2016 (incluye la cartera migrada de INDEXA) y ~16.000 clientes. El ritmo actual de colocación es ~55-95 otorgadas/mes. El mes EN CURSO está incompleto: adviértelo.',
+  '- El mes contable de la operación es creditos.mes; los estados del pipeline en estado_credito (con UPPER). Tasa de aprobación = aprobados+otorgados / digitados del período; conversión = otorgados / aprobados. Explica el denominador que uses.',
+  '- cobranza_gestiones y pagos_credito están VACÍAS hoy (módulos nuevos): si preguntan por gestiones o recuperación, dilo honestamente en vez de mostrar 0 como si fuera un dato. La mora REAL vive en cuotas_credito vía las herramientas mora_provision/cartera_mora.',
+  '- "Ticket promedio" = AVG(monto_financiado) de OTORGADOS. "Colocación" = COUNT + SUM(monto_financiado). Participación = entidad / total del período. Trimestres: Q1=ene-mar, Q2=abr-jun, Q3=jul-sep, Q4=oct-dic.',
+  '- Al proyectar el cierre de mes: otorgadas al día ÷ días corridos × días del mes, declarado como proyección simple.',
+  '- Penetración de seguros = operaciones con seguro / operaciones elegibles del período (columnas seguro_* en creditos); el cálculo oficial está en el módulo Penetración.',
+  '- No haces simulaciones hipotéticas ("qué pasaría si...") ni evalúas/apruebas créditos ni das consejos de inversión: dilo y ofrece el dato real más cercano.',
+  '- Cifras en formato es-CL (punto miles), montos grandes en millones con un decimal. Nunca inventes: si un dato no existe, dilo y sugiere dónde podría estar.',
 ].join('\n');
 
 require('../../../../shared/migrate').enFila('consulta', async () => {
@@ -106,7 +122,7 @@ require('../../../../shared/migrate').enFila('consulta-lecciones', async () => {
 
 async function leccionesActivas() {
   try {
-    const [rows] = await pool.query('SELECT regla FROM ia_consulta_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 40');
+    const [rows] = await pool.query('SELECT regla FROM ia_consulta_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 80');
     return rows.map(r => '- ' + String(r.regla).replace(/\s+/g, ' ').trim());
   } catch (_) { return []; }
 }
@@ -146,8 +162,12 @@ async function getEsquema() {
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN (?) ORDER BY TABLE_NAME, ORDINAL_POSITION`,
     [TABLAS_BI]);
   const byT = {};
+  // De usuarios (empleados) solo se exponen columnas NO personales: nada de rut,
+  // email, teléfono, etc. — la información personal de colaboradores está fuera del BI.
+  const USUARIOS_OK = new Set(['id_usuario', 'nombre', 'apellido', 'id_perfil', 'estado', 'id_supervisor', 'centro_costo']);
   for (const r of rows) {
     if (/password|hash|token|secret|clave/i.test(r.c)) continue;   // nunca exponer columnas sensibles
+    if (r.t === 'usuarios' && !USUARIOS_OK.has(r.c)) continue;
     (byT[r.t] = byT[r.t] || []).push(`${r.c}:${r.d}`);
   }
   _esq = Object.entries(byT).map(([t, cs]) => `${t}(${cs.join(', ')})`).join('\n');
@@ -192,6 +212,9 @@ function validarSQL(s) {
   if (s.includes(';')) throw new Error('Solo se permite una consulta.');
   if (PROHIB.test(low)) throw new Error('La consulta contiene operaciones no permitidas.');
   if (/password|hash|token|secret|clave/i.test(low)) throw new Error('No se pueden consultar columnas sensibles.');
+  // Datos personales de empleados fuera del BI: si el SQL toca usuarios, solo columnas permitidas
+  if (/\busuarios\b/i.test(low) && /\b(email|telefono|rut|apellido_materno|ultimo_acceso|fecha_creacion)\b/i.test(low))
+    throw new Error('No se puede consultar información personal de colaboradores.');
   const tablas = [...s.matchAll(/\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi)].map(m => m[1].toLowerCase());
   for (const t of tablas) if (!ALLOW.has(t)) throw new Error('Tabla no permitida: ' + t);
 }
