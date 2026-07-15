@@ -527,6 +527,7 @@ const PAGINAS = [
   ['/recursos-humanos/colaboradores', 'recursos-humanos/colaboradores/index.html'],
   ['/recursos-humanos/directorio', 'recursos-humanos/directorio/index.html'],
   ['/recursos-humanos/ausencias', 'recursos-humanos/ausencias/index.html'],
+  ['/recursos-humanos/aumento-renta', 'recursos-humanos/aumento-renta/index.html'],
   ['/recursos-humanos/remuneraciones', 'recursos-humanos/remuneraciones/index.html'],
   ['/recursos-humanos/remuneraciones/liquidaciones', 'recursos-humanos/remuneraciones/liquidaciones/index.html'],
   ['/recursos-humanos/remuneraciones/adicionales', 'recursos-humanos/remuneraciones/adicionales/index.html'],

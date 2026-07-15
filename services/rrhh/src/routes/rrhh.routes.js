@@ -45,6 +45,10 @@ router.get('/remuneraciones/indicadores/propuesta', verifyToken, requireFunc('ma
 router.post('/remuneraciones/indicadores/propuesta/:id/resolver', verifyToken, requireFunc('mant_remuneraciones'), rem.resolverPropuesta);
 router.get('/remuneraciones/liquidacion/:id', verifyToken, rem.getLiquidacion); // valida dueño/RRHH adentro
 
+// Aumento de Renta (calculadora sobre el motor único de liquidaciones)
+router.get('/remuneraciones/aumento-renta/personas', verifyToken, requireFunc('rh_aumento_renta', 'rh_remuneraciones'), rem.aumentoPersonas);
+router.post('/remuneraciones/aumento-renta',         verifyToken, requireFunc('rh_aumento_renta', 'rh_remuneraciones'), rem.aumentoRenta);
+
 // Ausencias y Permisos + Saldo de Vacaciones (Fase 2 módulo RRHH)
 const aus = require('../controllers/ausencias.controller');
 router.get('/ausencias/hoy',          verifyToken, aus.ausentesHoy);

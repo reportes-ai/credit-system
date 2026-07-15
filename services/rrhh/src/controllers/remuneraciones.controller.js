@@ -865,6 +865,120 @@ const putIndicadores = async (req, res) => {
   } catch (e) { console.error('[rrhh putIndicadores]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* ── AUMENTO DE RENTA: calculadora por persona sobre el MOTOR ÚNICO ────────────
+   "Alcance líquido" = liquidación con SOLO los descuentos legales (AFP, salud 7%,
+   AFC, impuesto único): se excluyen créditos, anticipos, APV, adicional de isapre
+   y cualquier otro descuento personal, para que el resultado sea comparable entre
+   personas y no dependa de su situación puntual del mes. */
+require('../../../../shared/migrate').enFila('rrhh-aumento-renta', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_aumento_renta' LIMIT 1");
+    let idf = ex && ex.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500002, 'Aumento de Renta', 'rh_aumento_renta', '/recursos-humanos/aumento-renta/', 'bi-graph-up-arrow')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 2, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[rrhh-aumento-renta] listo');
+  } catch (e) { console.error('[rrhh-aumento-renta migration]', e.message); }
+});
+
+// Liquidación de ALCANCE LÍQUIDO para un sueldo base dado (sin descuentos personales)
+function liqAlcance(sueldoBase, ficha, ind) {
+  return calcLiquidacion({
+    sueldo_base: sueldoBase, dias: 30,
+    comisiones: 0, otros_imponibles: 0, otros_no_imponibles: 0, otros_descuentos: 0,
+    colacion: ficha.colacion || 0, movilizacion: ficha.movilizacion || 0,
+    afp: ficha.afp || null, salud: ficha.salud || null,
+    plan_isapre_uf: 0,                    // adicional isapre EXCLUIDO del alcance
+    tipo_contrato: ficha.tipo_contrato || 'INDEFINIDO',
+  }, ind);
+}
+
+// Búsqueda binaria del sueldo base que logra un objetivo (imponible o líquido) —
+// ambas magnitudes son monótonas crecientes en el sueldo base.
+function resolverSueldo(objetivo, campo, ficha, ind) {
+  let lo = 0, hi = 200000000;
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (liqAlcance(mid, ficha, ind)[campo] < objetivo) lo = mid; else hi = mid;
+  }
+  return Math.round(hi);
+}
+
+// GET /remuneraciones/aumento-renta/personas → colaboradores activos con ficha
+const aumentoPersonas = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo,
+             f.sueldo_base, f.afp, f.tipo_contrato
+      FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
+      WHERE u.estado='activo' AND f.sueldo_base > 0
+      ORDER BY nombre`);
+    ok(res, { personas: rows });
+  } catch (e) { console.error('[rrhh aumento personas]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+// POST /remuneraciones/aumento-renta { id_usuario, modo, valor }
+// modos: A_BRUTO (que quede en $X imponible) · EN_BRUTO (+$X imponible)
+//        A_LIQUIDO (que quede en $X líquido) · EN_LIQUIDO (+$X líquido)
+const aumentoRenta = async (req, res) => {
+  try {
+    const idU = Number(req.body.id_usuario);
+    const modo = String(req.body.modo || '').toUpperCase();
+    const valor = Math.round(Number(req.body.valor) || 0);
+    if (!idU) return fail(res, 'Selecciona un colaborador', 400);
+    if (!['A_BRUTO', 'EN_BRUTO', 'A_LIQUIDO', 'EN_LIQUIDO'].includes(modo)) return fail(res, 'Modo inválido', 400);
+    if (valor <= 0) return fail(res, 'Ingresa un monto mayor a 0', 400);
+
+    const [[p]] = await pool.query(`
+      SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo,
+             f.sueldo_base, f.colacion, f.movilizacion, f.afp, f.salud, f.plan_isapre_uf, f.tipo_contrato
+      FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
+      WHERE u.id_usuario=? LIMIT 1`, [idU]);
+    if (!p) return fail(res, 'Colaborador sin ficha RRHH', 404);
+    if (!(Number(p.sueldo_base) > 0)) return fail(res, 'El colaborador no tiene sueldo base en su ficha', 400);
+
+    const ind = await indicadores(new Date().toISOString().slice(0, 7));
+    const actual = liqAlcance(Number(p.sueldo_base), p, ind);
+
+    let objetivo, campo;
+    if (modo === 'A_BRUTO')    { campo = 'total_imponible'; objetivo = valor; }
+    if (modo === 'EN_BRUTO')   { campo = 'total_imponible'; objetivo = actual.total_imponible + valor; }
+    if (modo === 'A_LIQUIDO')  { campo = 'liquido';         objetivo = valor; }
+    if (modo === 'EN_LIQUIDO') { campo = 'liquido';         objetivo = actual.liquido + valor; }
+
+    const advertencias = [];
+    if (objetivo <= actual[campo])
+      advertencias.push(`El objetivo (${objetivo.toLocaleString('es-CL')}) es menor o igual al valor actual: el resultado es una REBAJA, no un aumento.`);
+
+    const sueldoNuevo = resolverSueldo(objetivo, campo, p, ind);
+    const nuevo = liqAlcance(sueldoNuevo, p, ind);
+    if (Number(p.plan_isapre_uf) > 0)
+      advertencias.push('Tiene plan de isapre pactado en UF: el adicional sobre el 7% legal NO está considerado (alcance líquido). Su líquido real de bolsillo será menor.');
+    if (nuevo.base_cotizacion >= Math.round(ind.rem_tope_imponible_uf * ind.uf))
+      advertencias.push(`El imponible supera el tope de cotización (${ind.rem_tope_imponible_uf} UF): sobre el tope solo crecen impuesto y líquido, no las cotizaciones.`);
+
+    ok(res, {
+      persona: { id_usuario: p.id_usuario, nombre: p.nombre, cargo: p.cargo, afp: p.afp, tipo_contrato: p.tipo_contrato },
+      indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_imponible_uf: ind.rem_tope_imponible_uf },
+      modo, valor, actual, nuevo,
+      delta: {
+        sueldo_base: sueldoNuevo - actual.sueldo_base,
+        bruto: nuevo.total_imponible - actual.total_imponible,
+        liquido: nuevo.liquido - actual.liquido,
+        costo_empresa: nuevo.costo_empresa - actual.costo_empresa,
+        pct_sueldo: actual.sueldo_base > 0 ? Math.round((sueldoNuevo / actual.sueldo_base - 1) * 1000) / 10 : null,
+      },
+      advertencias,
+    });
+    auditar({ req, accion: 'CONSULTA', modulo: 'rrhh', entidad: 'aumento_renta', entidad_id: idU,
+      detalle: `Simuló aumento de renta de ${p.nombre}: ${modo} $${valor.toLocaleString('es-CL')}` });
+  } catch (e) { console.error('[rrhh aumento renta]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
-  getDescuentos, crearDescuento, anularDescuento };
+  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.0 — módulo propio: Mi Ficha, Directorio y Colaboradores (Fase 1 estilo Buk) -->
+  <!-- v2.1 — card Aumento de Renta (calculadora sobre el motor de liquidaciones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -66,6 +66,12 @@
       <p>El ciclo de sueldos completo: Liquidaciones de Sueldo (preview, validación de días y envío por correo al emitir), indicadores paramétricos, y próximamente licencias médicas y vacaciones.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/aumento-renta/" class="module-card" id="cardAum" style="display:none">
+      <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <h5>Aumento de Renta <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Simula un aumento por persona: a $X bruto, en $X bruto, a $X líquido o en $X líquido — con el motor de las liquidaciones (alcance líquido, sin créditos ni descuentos personales) y el costo empresa del cambio.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/licencias/" class="module-card" id="cardLic" style="display:none">
       <div class="card-icon"><i class="bi bi-file-medical"></i></div>
       <h5>Licencias Médicas <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
@@ -106,6 +112,7 @@
     if (tiene('rh_directorio','rh_ver','rh_aprobar')) document.getElementById('cardDir').style.display='';
     if (tiene('rh_colaboradores','rh_aprobar')) document.getElementById('cardCol').style.display='';
     if (tiene('rh_remuneraciones')) document.getElementById('cardRem').style.display='';
+    if (tiene('rh_aumento_renta','rh_remuneraciones')) document.getElementById('cardAum').style.display='';
     if (tiene('rh_ausencias','rh_aprobar')) document.getElementById('cardAus').style.display='';
     if (tiene('rh_aprobar')) document.getElementById('cardLic').style.display='';
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';

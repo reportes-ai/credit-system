@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aumento de Renta — AutoFácil</title>
+  <!-- v1.0 — calculadora de aumento de renta por persona sobre el motor único de liquidaciones (alcance líquido) -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:26px 30px; max-width:1080px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:16px; }
+    .fld label { font-size:.72rem; font-weight:700; text-transform:uppercase; color:#64748b; display:block; margin-bottom:3px; }
+    .fld input, .fld select { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:.9rem; box-sizing:border-box; }
+    .modos { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0; } @media(max-width:780px){ .modos{grid-template-columns:repeat(2,1fr);} }
+    .modo { border:2px solid #e2e8f0; border-radius:12px; padding:12px 10px; cursor:pointer; text-align:center; background:#fff; }
+    .modo:hover { border-color:#94a3b8; } .modo.sel { border-color:var(--navy); background:#eff6ff; }
+    .modo b { display:block; font-size:.84rem; color:#111827; } .modo span { font-size:.72rem; color:#64748b; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:10px 26px; font-weight:700; font-size:.9rem; cursor:pointer; }
+    .btn-navy:disabled { opacity:.5; cursor:default; }
+    table { width:100%; border-collapse:collapse; font-size:.87rem; }
+    th { background:#f8fafc; color:#475569; font-size:.7rem; text-transform:uppercase; padding:8px 12px; text-align:right; border-bottom:2px solid #e2e8f0; }
+    th:first-child, td:first-child { text-align:left; }
+    td { padding:7px 12px; border-bottom:1px solid #f1f5f9; text-align:right; font-variant-numeric:tabular-nums; }
+    tr.total td { font-weight:800; background:#f8fafc; border-top:2px solid #e2e8f0; }
+    tr.liq td { font-weight:800; background:#ecfdf5; color:#065f46; font-size:.95rem; }
+    .delta-pos { color:#15803d; font-weight:700; } .delta-neg { color:#b91c1c; font-weight:700; }
+    .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; } @media(max-width:780px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+    .kpi { background:linear-gradient(135deg,#eff6ff,#dbeafe); border-radius:12px; padding:12px 16px; }
+    .kpi .v { font-size:1.25rem; font-weight:800; color:#0141A2; } .kpi .l { font-size:.7rem; font-weight:700; text-transform:uppercase; color:#64748b; }
+    .aviso { background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:9px 14px; font-size:.82rem; color:#9a3412; margin-bottom:10px; }
+    .nota { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:12px 16px; font-size:.8rem; color:#475569; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#475569; margin-top:22px; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-graph-up-arrow me-1"></i>Aumento de Renta</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+
+<div class="main">
+  <div class="page-banner"><i class="bi bi-graph-up-arrow"></i><div><h2>Aumento de Renta</h2><p>Simula cómo queda un colaborador en bruto y líquido — con el mismo motor de las liquidaciones de sueldo (alcance líquido: solo descuentos legales).</p></div></div>
+
+  <div class="card-box">
+    <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:14px;align-items:end">
+      <div class="fld"><label>Colaborador</label><select id="fPersona"><option value="">Cargando…</option></select></div>
+      <div class="fld"><label>Monto $</label><input type="text" id="fValor" inputmode="numeric" placeholder="Ej: 1.500.000"></div>
+      <button class="btn-navy" id="btnCalc" onclick="calcular()"><i class="bi bi-calculator me-1"></i>Calcular</button>
+    </div>
+    <div class="modos">
+      <div class="modo sel" data-m="A_BRUTO" onclick="modo(this)"><b>Que quede EN $X bruto</b><span>renta imponible objetivo</span></div>
+      <div class="modo" data-m="EN_BRUTO" onclick="modo(this)"><b>Aumentar EN $X bruto</b><span>suma al imponible actual</span></div>
+      <div class="modo" data-m="A_LIQUIDO" onclick="modo(this)"><b>Que quede EN $X líquido</b><span>alcance líquido objetivo</span></div>
+      <div class="modo" data-m="EN_LIQUIDO" onclick="modo(this)"><b>Aumentar EN $X líquido</b><span>suma al líquido actual</span></div>
+    </div>
+    <div class="nota"><i class="bi bi-info-circle me-1"></i><b>Alcance líquido</b>: la comparación usa solo los descuentos legales (AFP con comisión, salud 7%, seguro cesantía e impuesto único) sobre sueldo base + gratificación art. 50 + colación y movilización de la ficha. <b>No considera</b> créditos, anticipos, APV, adicional de isapre ni otros descuentos personales del mes.</div>
+  </div>
+
+  <div id="resultado" style="display:none">
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="kSueldo">—</div><div class="l">Nuevo sueldo base (contrato)</div></div>
+      <div class="kpi"><div class="v" id="kPct">—</div><div class="l">% de aumento</div></div>
+      <div class="kpi"><div class="v" id="kLiq">—</div><div class="l">Nuevo alcance líquido</div></div>
+      <div class="kpi"><div class="v" id="kCosto">—</div><div class="l">Costo empresa adicional /mes</div></div>
+    </div>
+    <div id="avisos"></div>
+    <div class="card-box">
+      <table>
+        <thead><tr><th>Concepto</th><th>Actual</th><th>Nuevo</th><th>Diferencia</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+      <div style="text-align:right;margin-top:10px"><button class="btn-navy" style="background:#475569" onclick="copiar()"><i class="bi bi-clipboard me-1"></i>Copiar resumen</button></div>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <div style="font-weight:700;color:#0141A2;margin-bottom:6px"><i class="bi bi-diagram-3 me-1"></i>Qué usa esta calculadora</div>
+    <ul style="margin:0;padding-left:18px">
+      <li><b>Motor único de liquidaciones</b> (mismo cálculo de Remuneraciones, validado contra AVSOFT) → <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a></li>
+      <li><b>Indicadores paramétricos</b> (AFP, tope imponible, IMM, tramos de impuesto, UF/UTM) → <a href="/mantenedores/remuneraciones/">Mantenedores › Indicadores de Remuneraciones</a></li>
+      <li><b>Ficha del colaborador</b> (sueldo base, colación, movilización, AFP, tipo de contrato) → <a href="/recursos-humanos/colaboradores/">Colaboradores</a></li>
+    </ul>
+    <div style="margin-top:6px;font-size:.75rem;color:#94a3b8">Es una simulación: no modifica la ficha ni las liquidaciones.</div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+if (!token||!yo) location.href='/login.html';
+document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { Authorization:'Bearer '+token }, HJ = { ...H, 'Content-Type':'application/json' };
+const fmt = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+let MODO = 'A_BRUTO', ULT = null;
+
+function modo(el){ document.querySelectorAll('.modo').forEach(m=>m.classList.remove('sel')); el.classList.add('sel'); MODO = el.dataset.m; }
+
+// Input con separador de miles es-CL
+const fV = document.getElementById('fValor');
+fV.addEventListener('input', () => {
+  const raw = fV.value.replace(/\D/g,'');
+  fV.value = raw ? Number(raw).toLocaleString('es-CL') : '';
+});
+fV.addEventListener('keydown', e => { if (e.key === 'Enter') calcular(); });
+
+(async () => {
+  try {
+    const r = await fetch('/api/rrhh/remuneraciones/aumento-renta/personas', { headers: H });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const sel = document.getElementById('fPersona');
+    sel.innerHTML = '<option value="">— Selecciona —</option>' +
+      j.data.personas.map(p => `<option value="${p.id_usuario}">${p.nombre}${p.cargo ? ' — ' + p.cargo : ''}</option>`).join('');
+  } catch (e) { document.getElementById('fPersona').innerHTML = `<option value="">${e.message}</option>`; }
+})();
+
+async function calcular(){
+  const id = document.getElementById('fPersona').value;
+  const valor = Number(fV.value.replace(/\D/g,''));
+  if (!id) return alert('Selecciona un colaborador');
+  if (!valor) return alert('Ingresa el monto');
+  const btn = document.getElementById('btnCalc'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/rrhh/remuneraciones/aumento-renta', { method:'POST', headers: HJ,
+      body: JSON.stringify({ id_usuario: Number(id), modo: MODO, valor }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    pintar(j.data);
+  } catch (e) { alert('No se pudo calcular: ' + e.message); }
+  btn.disabled = false;
+}
+
+function pintar(d){
+  ULT = d;
+  const a = d.actual, n = d.nuevo, dl = d.delta;
+  document.getElementById('kSueldo').textContent = fmt(n.sueldo_base);
+  document.getElementById('kPct').textContent = dl.pct_sueldo == null ? '—' : ('+' + dl.pct_sueldo.toLocaleString('es-CL') + '%').replace('+-','−');
+  document.getElementById('kLiq').textContent = fmt(n.liquido);
+  document.getElementById('kCosto').textContent = fmt(dl.costo_empresa);
+  document.getElementById('avisos').innerHTML = (d.advertencias||[]).map(x => `<div class="aviso"><i class="bi bi-exclamation-triangle me-1"></i>${x}</div>`).join('');
+  const dif = v => `<td class="${v>=0?'delta-pos':'delta-neg'}">${v>=0?'+':''}${fmt(v).replace('$-','−$')}</td>`;
+  const fila = (l, ca, cn, cls='') => `<tr class="${cls}"><td>${l}</td><td>${fmt(ca)}</td><td>${fmt(cn)}</td>${dif(cn-ca)}</tr>`;
+  document.getElementById('tb').innerHTML =
+    fila('Sueldo base (contrato)', a.sueldo_base, n.sueldo_base) +
+    fila('Gratificación legal (art. 50)', a.gratificacion, n.gratificacion) +
+    fila('<b>Total imponible (bruto)</b>', a.total_imponible, n.total_imponible, 'total') +
+    fila('Colación + movilización', a.colacion + a.movilizacion, n.colacion + n.movilizacion) +
+    fila(`AFP ${d.persona.afp || ''} (${a.afp_pct}%)`, -a.desc_afp, -n.desc_afp) +
+    fila('Salud legal (7%)', -a.desc_salud, -n.desc_salud) +
+    fila(`Seguro cesantía (${a.afc_pct}%)`, -a.desc_afc, -n.desc_afc) +
+    fila('Impuesto único 2ª cat.', -a.impuesto, -n.impuesto) +
+    fila('<b>ALCANCE LÍQUIDO</b>', a.liquido, n.liquido, 'liq') +
+    fila('Costo empresa (con SIS + AFC + mutual)', a.costo_empresa, n.costo_empresa);
+  document.getElementById('resultado').style.display = '';
+  document.getElementById('resultado').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function copiar(){
+  if (!ULT) return;
+  const a = ULT.actual, n = ULT.nuevo, d = ULT.delta;
+  const t = [
+    `AUMENTO DE RENTA — ${ULT.persona.nombre}${ULT.persona.cargo ? ' (' + ULT.persona.cargo + ')' : ''}`,
+    `Sueldo base: ${fmt(a.sueldo_base)} → ${fmt(n.sueldo_base)} (${d.pct_sueldo == null ? '' : '+' + d.pct_sueldo + '%'})`,
+    `Total imponible (bruto): ${fmt(a.total_imponible)} → ${fmt(n.total_imponible)}`,
+    `Alcance líquido: ${fmt(a.liquido)} → ${fmt(n.liquido)} (+${fmt(d.liquido)})`,
+    `Costo empresa mensual: ${fmt(a.costo_empresa)} → ${fmt(n.costo_empresa)} (+${fmt(d.costo_empresa)})`,
+    `(Alcance líquido: solo descuentos legales — sin créditos, anticipos, APV ni adicional isapre)`,
+  ].join('\n');
+  navigator.clipboard.writeText(t).then(() => alert('Resumen copiado'));
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
