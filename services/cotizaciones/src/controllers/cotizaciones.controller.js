@@ -203,16 +203,15 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
   const cae = d.res.cae != null ? (d.res.cae * 100).toFixed(2) + '%' : '—';
   const logo = `${baseUrl}/img/logo.png`;
   const fila = (l, v, opt = {}) => `<tr${opt.strong ? ' style="font-weight:700"' : ''}>
-    <td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151${opt.strong ? ';font-weight:700' : ''}">${_esc(l)}</td>
-    <td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right;font-variant-numeric:tabular-nums;color:#111827${opt.strong ? ';font-weight:700' : ''}">${_fmt(v)}</td></tr>`;
+    <td style="padding:3px 14px;border-bottom:1px solid #eef2f7;color:#374151${opt.strong ? ';font-weight:700' : ''}">${_esc(l)}</td>
+    <td style="padding:3px 14px;border-bottom:1px solid #eef2f7;text-align:right;font-variant-numeric:tabular-nums;color:#111827${opt.strong ? ';font-weight:700' : ''}">${_fmt(v)}</td></tr>`;
   const seccion = (titulo, filasHtml) => filasHtml ? `
-    <tr><td colspan="2" style="padding:10px 14px 3px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#0141A2">${titulo}</td></tr>${filasHtml}` : '';
+    <tr><td colspan="2" style="padding:7px 14px 2px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#0141A2">${titulo}</td></tr>${filasHtml}` : '';
 
   const cuerpo = `
   <div style="max-width:620px;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937">
-    <div style="background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);color:#fff;padding:18px 28px;border-radius:14px 14px 0 0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
-      <img src="${logo}" alt="AutoFácil" style="height:30px;filter:brightness(0) invert(1)">
-      <div style="opacity:.85;font-size:12.5px;margin-top:4px">Crédito Automotriz — Cotización</div>
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);color:#fff;padding:14px 28px;border-radius:14px 14px 0 0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <img src="${logo}" alt="AutoFácil" style="height:28px;filter:brightness(0) invert(1)">
     </div>
     <div style="padding:14px 28px 16px">
       <div style="font-size:13.5px;margin-bottom:2px"><b>${_tratamiento(cot.nombre_cliente)}(a): ${_esc(cot.nombre_cliente)}</b></div>
@@ -225,8 +224,8 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
         ${seccion('Gastos Operacionales', d.gastos.map(g => fila(g[0], g[1])).join('') + fila('Total Gastos Operacionales', d.totalGastos, { strong: true }))}
         ${d.seguros.length ? seccion('Seguros', d.seguros.map(s => fila(s[0], s[1])).join('') + fila('Total Seguros', d.totalSeg, { strong: true })) : ''}
         ${seccion('Financiamiento', fila('Monto a Financiar', cot.monto_financiado, { strong: true }) +
-          `<tr><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151">Plazo</td><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right">${cot.plazo} meses</td></tr>` +
-          `<tr><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151">Tasa Mensual</td><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right">${tasa}</td></tr>`)}
+          `<tr><td style="padding:3px 14px;border-bottom:1px solid #eef2f7;color:#374151">Plazo</td><td style="padding:3px 14px;border-bottom:1px solid #eef2f7;text-align:right">${cot.plazo} meses</td></tr>` +
+          `<tr><td style="padding:3px 14px;border-bottom:1px solid #eef2f7;color:#374151">Tasa Mensual</td><td style="padding:3px 14px;border-bottom:1px solid #eef2f7;text-align:right">${tasa}</td></tr>`)}
       </table>
 
       <table style="width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:avoid">
