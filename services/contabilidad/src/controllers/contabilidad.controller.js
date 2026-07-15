@@ -944,8 +944,77 @@ exports.directorioCuadros = async (req, res) => {
       const ult = eerr.map(x => x.clase).lastIndexOf('MARGEN');
       if (ult >= 0) eerr[ult].valores = [...acumulado]; // la utilidad final incluye lo sin rubro
     }
+    // ── PPTO: presupuesto anual de finanzas por rubro (acumulado ene..m y del mes)
+    try {
+      const [ppto] = await pool.query('SELECT cuenta, mes, monto FROM ctb_presupuesto WHERE anio=?', [y]);
+      const pptoRubro = new Map(); // id rubro → [acum, mes]
+      const pptoOtros = { INGRESO: [0, 0], GASTO: [0, 0] };
+      for (const p of ppto) {
+        if (p.mes > m) continue;
+        const tipo = String(p.cuenta).startsWith('3') ? 'INGRESO' : 'GASTO';
+        const ru = asignaRubro(p.cuenta, rE.filter(r => r.tipo === tipo));
+        const destino = ru ? (pptoRubro.get(ru.id) || pptoRubro.set(ru.id, [0, 0]).get(ru.id)) : pptoOtros[tipo];
+        destino[0] += Number(p.monto);
+        if (p.mes === m) destino[1] += Number(p.monto);
+      }
+      const pptoAcum = [0, 0];
+      for (const fila of eerr) {
+        if (fila.clase === 'MARGEN') { fila.ppto = [...pptoAcum]; continue; }
+        const rid = rE.find(r => r.etiqueta === fila.etiqueta && r.clase === 'RUBRO')?.id;
+        const v = /sin rubro/.test(fila.etiqueta) ? pptoOtros[fila.tipo] : (rid != null ? pptoRubro.get(rid) : null) || [0, 0];
+        fila.ppto = v;
+        [0, 1].forEach(i => pptoAcum[i] += (fila.tipo === 'INGRESO' ? v[i] : -v[i]));
+      }
+      const ultM = eerr.map(x => x.clase).lastIndexOf('MARGEN');
+      if (ultM >= 0) eerr[ultM].ppto = [...pptoAcum];
+    } catch (_) { /* sin presupuesto cargado: columna queda vacía */ }
     const totIng = f => eerr.filter(x => x.tipo === 'INGRESO').reduce((s, x) => s + x.valores[f], 0);
     ok(res, { mes, balance, eerr, base_pct: { acum: totIng(0), acum_aa: totIng(1), mes: totIng(2), mes_aa: totIng(3) } });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Presupuesto anual (PPTO del P&G del directorio) ──────────────────────────
+   El Excel de finanzas ("Plantilla Presupuestos": id_cuenta + 12 meses) se
+   importa desde la Presentación Directorio y llena la columna PPTO del EERR.
+   Se guarda NORMALIZADO en sentido natural (ingresos positivos): en el Excel
+   los ingresos vienen en negativo (convención al haber). Re-importar un año
+   lo reemplaza completo. */
+require('../../../../shared/migrate').enFila('contabilidad-presupuesto', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_presupuesto (
+        anio   SMALLINT NOT NULL,
+        mes    TINYINT NOT NULL,          -- 1..12
+        cuenta VARCHAR(20) NOT NULL,
+        nombre VARCHAR(160) NULL,
+        monto  DECIMAL(14,0) NOT NULL,    -- sentido natural: ingreso +, gasto +
+        PRIMARY KEY (anio, mes, cuenta)
+      )`);
+  } catch (e) { console.error('[contabilidad-presupuesto migration]', e.message); }
+});
+
+exports.importarPresupuesto = async (req, res) => {
+  try {
+    const { anio, filas } = req.body || {};
+    const y = Number(anio);
+    if (!y || y < 2020 || y > 2100) return fail(res, 'anio inválido', 400);
+    if (!Array.isArray(filas) || !filas.length) return fail(res, 'filas obligatorias', 400);
+    const values = [];
+    for (const f of filas) {
+      const cuenta = String(f.cuenta || '').trim();
+      if (!/^\d{4,}$/.test(cuenta) || !Array.isArray(f.meses)) continue;
+      const esIngreso = cuenta.startsWith('3');
+      f.meses.forEach((v, i) => {
+        const raw = Math.round(Number(v) || 0);
+        if (!raw || i > 11) return;
+        values.push([y, i + 1, cuenta, String(f.nombre || '').slice(0, 160) || null, esIngreso ? -raw : raw]);
+      });
+    }
+    if (!values.length) return fail(res, 'El archivo no trae montos (revisa la hoja "Plantilla Presupuestos")', 400);
+    await pool.query('DELETE FROM ctb_presupuesto WHERE anio=?', [y]);
+    await pool.query('INSERT INTO ctb_presupuesto (anio, mes, cuenta, nombre, monto) VALUES ?', [values]);
+    const cuentas = new Set(values.map(v => v[2]));
+    ok(res, { anio: y, cuentas: cuentas.size, celdas: values.length });
   } catch (e) { fail(res, e.message); }
 };
 

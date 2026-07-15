@@ -5,8 +5,9 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.2 — cuadros Excel + copiar con formato + descargar .xls por lámina -->
+  <!-- v1.3 — columna PPTO del P&G con presupuesto anual importable (Excel finanzas) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
@@ -68,6 +69,8 @@
       <input type="file" hidden accept=".csv,.txt" onchange="importarCompras(this)"></label>
     <label class="btn btn-sm btn-outline-secondary mb-0" title="Sube el export AVSOFT: Honorarios → Importador/Exportador → Movimiento Honorarios"><i class="bi bi-upload me-1"></i>Importar honorarios AVSOFT
       <input type="file" hidden accept=".csv,.txt" onchange="importarHonorarios(this)"></label>
+    <label class="btn btn-sm btn-outline-secondary mb-0" title="Sube el Excel de finanzas con la hoja 'Plantilla Presupuestos' (id_cuenta + 12 meses): llena la columna PPTO del P&G"><i class="bi bi-upload me-1"></i>Importar presupuesto
+      <input type="file" hidden accept=".xlsx,.xls" onchange="importarPresupuesto(this)"></label>
   </div>
 
   <div id="out"><div class="text-muted no-print">Elige el mes y genera la presentación.</div></div>
@@ -190,6 +193,34 @@ async function importarHonorarios(inp){
   alert(`Importadas ${j.data.boletas.toLocaleString('es-CL')} boletas de honorarios (${j.data.meses.length} meses: ${j.data.meses.sort()[0]} → ${j.data.meses.sort()[j.data.meses.length-1]}). Los meses del archivo se reemplazaron completos.`);
   if (D) consultar();
 }
+/* Importa el Excel de presupuesto de finanzas (hoja "Plantilla Presupuestos"):
+   columnas id_almacen, id_centro, id_cuenta, nombre, enero..diciembre.
+   El año se pregunta (el archivo no lo trae). */
+async function importarPresupuesto(inp){
+  const f = inp.files[0]; if (!f) return; inp.value='';
+  const anio = prompt('¿Año del presupuesto?', String(new Date().getFullYear()));
+  if (!anio || !/^\d{4}$/.test(anio.trim())) return;
+  const buf = await f.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const hoja = wb.SheetNames.find(n=>/presupuesto/i.test(n)) || wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], {header:1, defval:null});
+  if (!rows.length) return alert('La hoja está vacía.');
+  const head = rows[0].map(c=>String(c||'').toLowerCase().trim());
+  const iCta = head.findIndex(c=>/cuenta/.test(c));
+  const iEne = head.findIndex(c=>/^enero$/.test(c));
+  if (iCta<0 || iEne<0) return alert(`No encuentro las columnas id_cuenta/enero en la hoja "${hoja}".`);
+  const filas = [];
+  for (const r of rows.slice(1)){
+    const cuenta = String(r[iCta]||'').trim();
+    if (!/^\d{4,}$/.test(cuenta)) continue;
+    filas.push({ cuenta, nombre: String(r[iCta+1]||'').trim(), meses: Array.from({length:12},(_,k)=>Number(r[iEne+k])||0) });
+  }
+  const r = await fetch('/api/contabilidad/presupuesto/importar',{method:'POST',headers:H,body:JSON.stringify({anio:Number(anio), filas})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Presupuesto ${anio} importado: ${j.data.cuentas} cuentas, ${j.data.celdas.toLocaleString('es-CL')} celdas con monto. El año se reemplazó completo.`);
+  if (D) consultar();
+}
+
 /* miles de pesos, formato Excel */
 const miles = n => { const v = Math.round((Number(n)||0)/1000); return `<span class="${v<0?'neg':''}">${v.toLocaleString('es-CL')}</span>`; };
 const pesos = n => { const v = Math.round(Number(n)||0); return `<span class="${v<0?'neg':''}">${v.toLocaleString('es-CL')}</span>`; };
@@ -231,17 +262,19 @@ function cuadroEERR(fV, fAA, titulo, lblA, lblAA){
   let html = `<table class="xls"><thead>
     <tr><th colspan="9" class="tit">AUTOFACIL CHILE SPA<br>${titulo}</th></tr>
     <tr><th style="min-width:220px"></th><th>${lblA}</th><th>%</th><th>PPTO</th><th>${lblAA}</th><th>%</th><th>VAR/${lblAA.slice(-2)}</th><th>%</th><th></th></tr></thead><tbody>`;
+  const hayPpto = Q.eerr.some(r=>r.ppto && (r.ppto[0]||r.ppto[1]));
   Q.eerr.forEach(r=>{
     const a = r.valores[idx[fV]], b = r.valores[idx[fAA]];
     const varV = a-b, varP = b ? (varV/Math.abs(b)*100) : null;
+    const p = r.ppto ? r.ppto[fV==='acum'?0:1] : null;
     const cls = r.clase==='MARGEN' ? 'margen' : '';
     html += `<tr class="${cls}"><td>${esc(r.etiqueta)}</td>
       <td class="n">${pesos(a)}</td><td class="n">${pctDe(a,base)}</td>
-      <td class="n" style="color:#999">—</td>
+      <td class="n">${hayPpto&&p!=null?pesos(p):'<span style="color:#999">—</span>'}</td>
       <td class="n">${pesos(b)}</td><td class="n">${pctDe(b,baseAA)}</td>
       <td class="n">${pesos(varV)}</td><td class="n">${varP===null?'':`<span class="${varP<0?'neg':''}">${varP.toLocaleString('es-CL',{maximumFractionDigits:1})}%</span>`}</td><td></td></tr>`;
   });
-  return html + `</tbody></table><div class="small text-muted mt-1">Columna PPTO en gris: se llenará cuando exista el mantenedor de presupuesto anual.</div>`;
+  return html + `</tbody></table><div class="small text-muted mt-1">${hayPpto?'PPTO: presupuesto anual de finanzas importado (mismo corte que la columna actual).':'Columna PPTO vacía: importa el Excel de presupuesto con el botón de la barra.'}</div>`;
 }
 
 function render(){
