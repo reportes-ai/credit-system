@@ -1130,8 +1130,16 @@ exports.importarComprasAux = async (req, res) => {
     if (lineas.length < 2) return fail(res, 'Archivo vacío', 400);
     const head = lineas[0].split(';').map(s => s.trim().toLowerCase());
     const col = (frag) => head.findIndex(h => h.includes(frag));
+    // El folio: 'documento' a secas también matchea "Tipo de Documento" (antes en el
+    // encabezado) → num_doc quedaba con el tipo ("33"). Preferir 'folio'/'nro/n° documento'
+    // y excluir explícitamente la columna de tipo.
+    const colFolio = () => {
+      let i = head.findIndex(h => h.includes('folio')); if (i >= 0) return i;
+      i = head.findIndex(h => h.includes('doc') && /(n°|nº|nro|numero|número)/.test(h)); if (i >= 0) return i;
+      return head.findIndex(h => h.includes('documento') && !h.includes('tipo'));
+    };
     const ix = {
-      anio: col('a'), mes: col('mes'), tipo: col('tipo de doc'), num: col('documento'),
+      anio: col('a'), mes: col('mes'), tipo: col('tipo de doc'), num: colFolio(),
       fdoc: col('fecha doc'), fvcto: col('fecha venc'), estado: col('estado'),
       rut: col('rut proveedor'), razon: col('raz'), cxp: col('concepto cliente'),
       gasto: head.findIndex(h => h === 'cuenta contable'), neto: col('monto afecto'),
@@ -1151,14 +1159,22 @@ exports.importarComprasAux = async (req, res) => {
         Number(c[ix.neto]) || 0, Number(c[ix.exento]) || 0, Number(c[ix.iva]) || 0, Number(c[ix.total]) || 0]);
     }
     if (!filas.length) return fail(res, 'No se pudo interpretar ninguna fila', 400);
-    const meses = [...new Set(filas.map(f => f[0]))];
+    // Dedup: descarta filas de documento IDÉNTICAS (mismo mes, tipo, rut, folio, fecha y
+    // montos) — AVSOFT a veces repite el documento e inflaba el IVA (crédito fiscal) al sumar.
+    const vistos = new Set();
+    const unicas = filas.filter(f => {
+      const k = [f[0], f[1], f[6], f[2], f[3], f[13], f[12]].join('|'); // mes|tipo|rut|folio|fecha|total|iva
+      if (vistos.has(k)) return false; vistos.add(k); return true;
+    });
+    const duplicados = filas.length - unicas.length;
+    const meses = [...new Set(unicas.map(f => f[0]))];
     await pool.query('DELETE FROM ctb_compras_aux WHERE mes IN (?)', [meses]);
-    for (let i = 0; i < filas.length; i += 500)
+    for (let i = 0; i < unicas.length; i += 500)
       await pool.query(
         'INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total) VALUES ?',
-        [filas.slice(i, i + 500)]);
-    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'compras_aux', entidad_id: null, detalle: `Import compras AVSOFT: ${filas.length} docs, meses ${meses.join(', ')}` });
-    ok(res, { documentos: filas.length, meses });
+        [unicas.slice(i, i + 500)]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'compras_aux', entidad_id: null, detalle: `Import compras AVSOFT: ${unicas.length} docs${duplicados ? ` (${duplicados} duplicados omitidos)` : ''}, meses ${meses.join(', ')}` });
+    ok(res, { documentos: unicas.length, duplicados_omitidos: duplicados, meses });
   } catch (e) { fail(res, e.message); }
 };
 
