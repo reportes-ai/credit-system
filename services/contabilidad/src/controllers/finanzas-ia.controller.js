@@ -20,6 +20,7 @@ const TABLAS = [
   'ctb_compras_aux', 'ctb_honorarios_aux', 'ctb_ventas_aux', 'ctb_remun_aux',
   'ctb_dir_rubros', 'ctb_meses_cerrados', 'uf', 'utm', 'dolar',
   'usuarios',   // SOLO columnas laborales no sensibles (ver filtro en getEsquema)
+  'rh_fichas',  // SOLO columnas de remuneración (sueldo_base, contrato) — resto filtrado
 ];
 const ALLOW = new Set(TABLAS);
 
@@ -60,7 +61,8 @@ const GLOSARIO = [
   "- PUNTO DE EQUILIBRIO en operaciones = gasto mensual promedio ÷ ingreso promedio por operación (ingresos contables del mes ÷ operaciones OTORGADAS del mes vía produccion_mensual). Nunca uses conteo de asientos.",
   "- EBITDA aproximado = resultado + depreciaciones (cuentas 4003%) + estimación incobrables (4001190). Dilo como aproximación.",
   "- La UF tiene valores futuros cargados (se publica por adelantado): para 'UF de hoy' usa fecha <= CURDATE().",
-  "- ANTIGÜEDAD / fecha de ingreso de los colaboradores = usuarios.fecha_ingreso (empleado más antiguo = MIN con estado='activo'; antigüedad en años = TIMESTAMPDIFF). También tienes usuarios.cargo. NO tienes acceso a sus datos personales (rut, teléfono, nacimiento): si los piden, derívalo a RRHH.",
+  "- ANTIGÜEDAD / fecha de ingreso de los colaboradores = usuarios.fecha_ingreso (empleado más antiguo = MIN con estado='activo'; antigüedad en años = TIMESTAMPDIFF). También tienes usuarios.cargo y rh_fichas.sueldo_base (+ colación/movilización/tipo_contrato) para análisis de planilla. NO tienes acceso a sus datos personales (rut, teléfono, nacimiento, dirección, banco, AFP, salud): si los piden, derívalo a RRHH.",
+  "- VERIFICAR UNA PROVISIÓN = comparar el saldo contable (cuentas 2106%) contra el cálculo teórico y explicar la base. Provisiones EXISTENTES en el libro: vacaciones (2106030), comisiones dealer (2106011) y parque (2106012), comisiones ejecutivos (2106060), gastos (2106020/2106050), cesión de operaciones (2106022) y finiquitos por pagar (2106070). NO existe cuenta de provisión por INDEMNIZACIÓN DE AÑOS DE SERVICIO (IAS): si preguntan por ella, dilo explícitamente; el teórico si se pactara a todo evento sería sueldo_base mensual (tope 90 UF) × años de servicio (tope 11 años, TIMESTAMPDIFF desde usuarios.fecha_ingreso) por empleado activo — puedes calcularlo con rh_fichas.sueldo_base y ofrecerlo como referencia de pasivo no contabilizado. Vacaciones teórico ≈ días pendientes × (sueldo_base/30) — los días pendientes no están en estas tablas (dilo).",
   "- Trimestres: Q1=ene-mar, Q2=abr-jun, Q3=jul-sep, Q4=oct-dic (año calendario).",
   "- NO puedes modificar ni borrar datos (solo lectura) — si lo piden, dilo. No des consejos de inversión personal. Preguntas de negocio no contable (producción comercial fina, clientes, cobranza) → sugiere 'Pregúntale a AutoFácil'.",
   "- Al proyectar el año, usa el promedio de los últimos 3 meses reales × meses restantes + acumulado, y decláralo como proyección simple.",
@@ -150,9 +152,13 @@ async function getEsquema() {
   // De usuarios (empleados) SOLO columnas laborales: nada de rut, teléfono, email,
   // fecha de nacimiento, etc. — la información personal de colaboradores queda fuera.
   const USUARIOS_OK = new Set(['id_usuario', 'nombre', 'apellido', 'cargo', 'fecha_ingreso', 'estado', 'centro_costo', 'id_perfil']);
+  // De la ficha RRHH solo lo necesario para análisis de planilla/provisiones:
+  // nada de dirección, banco, salud, AFP, contactos ni datos de emergencia.
+  const RHFICHA_OK = new Set(['id_usuario', 'sueldo_base', 'colacion', 'movilizacion', 'tipo_contrato', 'jornada']);
   for (const r of rows) {
     if (/password|hash|token|secret|clave/i.test(r.c)) continue;
     if (r.t === 'usuarios' && !USUARIOS_OK.has(r.c)) continue;
+    if (r.t === 'rh_fichas' && !RHFICHA_OK.has(r.c)) continue;
     (byT[r.t] = byT[r.t] || []).push(`${r.c}:${r.d}`);
   }
   _esq = Object.entries(byT).map(([t, cs]) => `${t}(${cs.join(', ')})`).join('\n');
@@ -170,6 +176,8 @@ function validarSQL(s) {
   if (PROHIB.test(low)) throw new Error('La consulta contiene operaciones no permitidas.');
   // Datos personales de empleados fuera: si toca usuarios, solo columnas laborales
   if (/\busuarios\b/i.test(low) && /\b(email|telefono|fecha_nacimiento|sexo|apellido_materno|rut_cuerpo|rut_dv)\b/i.test(low))
+    throw new Error('No se puede consultar información personal de colaboradores.');
+  if (/\brh_fichas\b/i.test(low) && /\b(direccion|comuna|ciudad|email_personal|telefono_personal|emergencia_nombre|emergencia_fono|estado_civil|nacionalidad|afp|salud|plan_isapre_uf|banco_pago|tipo_cuenta_pago|num_cuenta_pago)\b/i.test(low))
     throw new Error('No se puede consultar información personal de colaboradores.');
   const tablas = [...s.matchAll(/\b(?:from|join)\s+`?([a-z_][a-z0-9_]*)`?/gi)].map(m => m[1].toLowerCase());
   for (const t of tablas) if (!ALLOW.has(t)) throw new Error('Tabla no permitida: ' + t);
