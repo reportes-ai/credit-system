@@ -119,7 +119,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v2.0</span>
+      <span class="version-badge" id="versionBadge">v2.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -1475,6 +1475,51 @@ async function cargarStatsVisitas(){
 }
 
 /* ═════════ FICHA DIARIA IMPRIMIBLE (datos + mapa) ═════════ */
+/* Mapa ESTÁTICO para impresión: cose tiles OSM en un canvas y dibuja la ruta
+   numerada. Se incrusta como <img> → imprime siempre bien (el Leaflet vivo
+   salía cortado o sin tiles al imprimir). */
+async function mapaEstaticoPNG(pts, W, H){
+  const TS=256, lat2y=(lat,z)=>{const s=Math.sin(lat*Math.PI/180);return (0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*TS*Math.pow(2,z);};
+  const lng2x=(lng,z)=>(lng+180)/360*TS*Math.pow(2,z);
+  let z=17;
+  for(;z>3;z--){
+    const xs=pts.map(p=>lng2x(p.lng,z)), ys=pts.map(p=>lat2y(p.lat,z));
+    if(Math.max(...xs)-Math.min(...xs)<=W-80 && Math.max(...ys)-Math.min(...ys)<=H-80) break;
+  }
+  const xs=pts.map(p=>lng2x(p.lng,z)), ys=pts.map(p=>lat2y(p.lat,z));
+  const cx=(Math.min(...xs)+Math.max(...xs))/2, cy=(Math.min(...ys)+Math.max(...ys))/2;
+  const x0=cx-W/2, y0=cy-H/2;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d'); ctx.fillStyle='#eef2f7'; ctx.fillRect(0,0,W,H);
+  const t0x=Math.floor(x0/TS), t0y=Math.floor(y0/TS), t1x=Math.floor((x0+W)/TS), t1y=Math.floor((y0+H)/TS);
+  const cargas=[];
+  for(let tx=t0x;tx<=t1x;tx++) for(let ty=t0y;ty<=t1y;ty++){
+    cargas.push(new Promise(resv=>{
+      const im=new Image(); im.crossOrigin='anonymous';
+      im.onload=()=>{ ctx.drawImage(im,tx*TS-x0,ty*TS-y0); resv(); };
+      im.onerror=()=>resv();
+      im.src=`https://tile.openstreetmap.org/${z}/${tx}/${ty}.png`;
+    }));
+  }
+  await Promise.all(cargas);
+  const px=p=>({x:lng2x(p.lng,z)-x0, y:lat2y(p.lat,z)-y0});
+  // línea de ruta (orden de visita)
+  ctx.strokeStyle='#0141A2'; ctx.lineWidth=2.5; ctx.setLineDash([7,5]); ctx.beginPath();
+  pts.forEach((p,i)=>{ const q=px(p); i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y); }); ctx.stroke(); ctx.setLineDash([]);
+  // marcadores numerados
+  pts.forEach((p,i)=>{
+    const q=px(p);
+    ctx.beginPath(); ctx.arc(q.x,q.y,11,0,7); ctx.fillStyle='#0141A2'; ctx.fill();
+    ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.font='bold 11px Segoe UI,Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(String(i+1), q.x, q.y+0.5);
+  });
+  ctx.fillStyle='rgba(255,255,255,.85)'; ctx.fillRect(W-92,H-16,92,16);
+  ctx.fillStyle='#475569'; ctx.font='10px Segoe UI,Arial'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  ctx.fillText('© OpenStreetMap', W-4, H-8);
+  return cv.toDataURL('image/png');
+}
+
 async function imprimirFicha(){
   const fecha = document.getElementById('fichaFecha').value || hoyYmd();
   const usuario = (ES_REVISOR && SCOPE==='todos') ? document.getElementById('scUser').value : '';
@@ -1483,23 +1528,25 @@ async function imprimirFicha(){
   if (!j.success) return alert(j.error);
   const vs = j.data.visitas;
   if (!vs.length) return alert('No hay visitas programadas ese día para ese ejecutivo.');
-  const conGeo = vs.filter(v=>v.lat!=null&&v.lng!=null);
-  const w = window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ficha de visitas ${fecha}</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  const conGeo = vs.filter(v=>v.lat!=null&&v.lng!=null).map(v=>({lat:+v.lat,lng:+v.lng}));
+  let mapaImg = '';
+  if (conGeo.length){
+    try{ mapaImg = await mapaEstaticoPNG(conGeo, 760, 380); }catch(e){ console.warn('mapa estático', e); }
+  }
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ficha de visitas ${fecha}</title>
     <style>
-      body{font-family:'Segoe UI',sans-serif;margin:24px;color:#1e293b}
-      h2{margin:0 0 2px;color:#012d70} .sub{color:#64748b;font-size:.9rem;margin-bottom:14px}
-      #mapa{height:340px;border-radius:12px;margin-bottom:16px}
+      @page{ size:letter portrait; margin:12mm }
+      *{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
+      body{font-family:'Segoe UI',sans-serif;margin:0;color:#1e293b}
+      h2{margin:0 0 2px;color:#012d70} .sub{color:#64748b;font-size:.9rem;margin-bottom:12px}
+      #mapa{width:100%;border-radius:12px;margin-bottom:14px;border:1.5px solid #e2e8f0}
       .card{border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:10px;page-break-inside:avoid}
       .card h4{margin:0 0 6px;color:#0141A2} .g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:.85rem}
       .g b{color:#012d70} .obs{border-top:1px dashed #cbd5e1;margin-top:8px;padding-top:6px;font-size:.8rem;color:#64748b;min-height:44px}
-      @media print{ #btnP{display:none} }
     </style></head><body>
-    <button id="btnP" onclick="print()" style="float:right;padding:8px 18px;border:none;border-radius:8px;background:#0141A2;color:#fff;font-weight:700;cursor:pointer">🖨 Imprimir</button>
     <h2>Ficha diaria de visitas — ${fFecha(fecha)}</h2>
-    <div class="sub">Ejecutivo: <b>${esc(j.data.usuario)}</b> · ${vs.length} visita(s)</div>
-    ${conGeo.length?'<div id="mapa"></div>':''}
+    <div class="sub">Ejecutivo: <b>${esc(j.data.usuario)}</b> · ${vs.length} visita(s) · los números del mapa siguen el orden de la ruta</div>
+    ${mapaImg?`<img id="mapa" src="${mapaImg}" alt="Mapa de la ruta">`:''}
     ${vs.map((v,i)=>`<div class="card"><h4>${i+1}. ${esc(v.nombre_dealer||'—')} ${v.categoria_asignada?'· Cat. '+esc(v.categoria_asignada):''}</h4>
       <div class="g">
         <div><b>RUT:</b> ${esc(v.rut_dealer||'—')}</div>
@@ -1513,16 +1560,15 @@ async function imprimirFicha(){
       </div>
       <div class="obs"><b>Resultado / observaciones:</b></div>
     </div>`).join('')}
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
-    <script>
-      const pts=${JSON.stringify(conGeo.map(v=>({lat:+v.lat,lng:+v.lng,n:v.nombre_dealer})))};
-      if(pts.length){
-        const m=L.map('mapa'); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(m);
-        pts.forEach((p,i)=>L.marker([p.lat,p.lng]).addTo(m).bindTooltip((i+1)+'. '+p.n,{permanent:true,direction:'top',offset:[-14,-8]}));
-        m.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(0.25));
-      }
-    <\/script></body></html>`);
-  w.document.close();
+    </body></html>`;
+  // iframe oculto → diálogo de impresión directo, sin bloqueo de popups
+  let fr = document.getElementById('fichaPrintFrame');
+  if (fr) fr.remove();
+  fr = document.createElement('iframe');
+  fr.id='fichaPrintFrame'; fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  fr.srcdoc = html;
+  fr.onload = () => setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){} }, 250);
 }
 
 /* ── Init ── */
