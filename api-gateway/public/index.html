@@ -99,6 +99,10 @@
       position: relative; overflow: hidden;
     }
     .welcome-banner::after { content: '\F5D5'; font-family: 'bootstrap-icons'; position: absolute; right: 32px; top: 50%; transform: translateY(-50%); font-size: 5rem; opacity: 0.07; }
+    .alerta-critica { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,#dc2626,#b91c1c); color:#fff; border-radius:14px; padding:14px 22px; margin-bottom:18px; text-decoration:none; box-shadow:0 4px 14px rgba(220,38,38,.32); font-size:.9rem; font-weight:600; animation:alertaPulse 2s ease-in-out infinite; }
+    .alerta-critica i.bi-exclamation-triangle-fill { font-size:1.5rem; flex-shrink:0; }
+    .alerta-critica .cta { margin-left:auto; background:rgba(255,255,255,.22); padding:6px 14px; border-radius:8px; white-space:nowrap; font-weight:700; }
+    @keyframes alertaPulse { 0%,100%{box-shadow:0 4px 14px rgba(220,38,38,.32)} 50%{box-shadow:0 6px 24px rgba(220,38,38,.6)} }
     .welcome-banner h2 { font-weight: 700; margin: 0 0 4px; font-size: 1.35rem; }
     .welcome-banner p { opacity: 0.8; margin: 0; font-size: 0.88rem; }
     .section-title { font-weight: 700; font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
@@ -345,6 +349,11 @@
   </div>
 
   <div class="main-content">
+    <a id="alertaTMC" href="/mantenedores/tasas/" class="alerta-critica" style="display:none">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span id="alertaTMCMsg"></span>
+      <span class="cta">Actualizar ahora →</span>
+    </a>
     <div class="welcome-banner">
       <h2>Bienvenido, <span id="bienvenidoNombre">—</span></h2>
       <p>Selecciona el módulo con el que deseas trabajar.</p>
@@ -510,6 +519,26 @@
       }));
     }
 
+    async function checkTMCVencida(funcs) {
+      try {
+        const esAdmin = usuario?.perfil === 'Administrador';
+        if (!esAdmin && !(funcs || []).includes('mantenedores_tasas')) return;   // solo quien puede corregir
+        const r = await fetch('/api/tasas/vigente', { headers: H });
+        const j = await r.json();
+        const t = j && j.data;
+        if (!t || !t.fecha_hasta) return;
+        const hasta = new Date(t.fecha_hasta).toISOString().slice(0, 10);
+        const hoy = new Date().toISOString().slice(0, 10);
+        if (hasta < hoy) {
+          const fLbl = hasta.split('-').reverse().join('-');   // DD-MM-YYYY
+          document.getElementById('alertaTMCMsg').innerHTML =
+            `<b>Tasa Máxima Convencional (TMC) vencida.</b> Rigió hasta el ${fLbl} y no se actualizó automáticamente. ` +
+            `Los créditos se están simulando con una TMC vencida — actualízala en Tasas.`;
+          document.getElementById('alertaTMC').style.display = 'flex';
+        }
+      } catch (e) { /* silencioso: la alerta es informativa */ }
+    }
+
     async function cargarModulos() {
       try {
         // Carga módulos y orden guardado en paralelo
@@ -532,6 +561,10 @@
         const tieneDashboard = esAdminGerente || tieneFuncDash || tieneModDash;
         const linkDash = document.getElementById('linkDashboard');
         if (linkDash) linkDash.style.display = tieneDashboard ? 'flex' : 'none';
+
+        // Alerta persistente: TMC vencida (afecta el cálculo de todos los créditos).
+        // Solo se muestra a quien puede corregirla (Administrador o permiso de Tasas).
+        checkTMCVencida(data.funcionalidades || []);
 
         const grid = document.getElementById('modulesGrid');
         grid.innerHTML = '';

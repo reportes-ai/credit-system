@@ -27,6 +27,14 @@ async function setParam(clave, valor, desc) {
 // entrega "44" → comparar numéricamente (la comparación de texto exacto nunca matchea).
 const mismoTipo = (a, b) => Number(a) === Number(b) && isFinite(Number(a));
 
+// La CMF a veces entrega solo "Fecha" (inicio) sin "Hasta". La TMC rige un mes exacto
+// (del día X al día X-1 del mes siguiente): derivamos el término desde la fecha de inicio.
+function finVigencia(desde) {
+  const [y, m, d] = String(desde || '').split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return new Date(Date.UTC(y, m, d - 1)).toISOString().slice(0, 10);
+}
+
 // La CMF entrega los períodos HISTÓRICOS con punto decimal ("29.68") y los recientes con coma
 // chilena ("30,92"): parseCLNum lee el punto como miles → 2968. La TMC anual real siempre está
 // bajo 80%: se corrige la escala dividiendo por 10 hasta entrar al rango. Idempotente para valores sanos.
@@ -63,7 +71,7 @@ async function sincronizarTMC() {
   if (!eMenor || !eMayor) return { ok: false, pendiente: true, motivo: 'La CMF aún no publica los TMC calibrados de este mes.' };
 
   const desde = eMenor.fecha || eMayor.fecha;
-  const hasta = eMenor.hasta || eMayor.hasta;
+  const hasta = eMenor.hasta || eMayor.hasta || finVigencia(desde);
   if (!desde || !hasta) return { ok: false, motivo: 'La CMF no entregó fechas de vigencia válidas.' };
 
   const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [desde]);
@@ -108,9 +116,10 @@ async function backfillTMC(desde = '2017-01') {
       const tmcs = await cmfGet('tmc', yy, mm);
       const eMenor = tmcs.find(x => mismoTipo(x.tipo, tipoMenor));
       const eMayor = tmcs.find(x => mismoTipo(x.tipo, tipoMayor));
-      if (eMenor && eMayor && eMenor.fecha && eMenor.hasta) {
+      if (eMenor && eMayor && eMenor.fecha) {
+        const hastaBf = eMenor.hasta || finVigencia(eMenor.fecha);
         const [[ya]] = await pool.query('SELECT id_tasa FROM tasas WHERE fecha_desde=? LIMIT 1', [eMenor.fecha]);
-        if (!ya) {
+        if (!ya && hastaBf) {
           const anual_menor = normAnual(eMenor.valor), anual_mayor = normAnual(eMayor.valor);
           const mensual_menor = tasaUtils.anualAMensual(anual_menor);
           const mensual_mayor = tasaUtils.anualAMensual(anual_mayor);
@@ -118,7 +127,7 @@ async function backfillTMC(desde = '2017-01') {
           const sp_menor = tasaUtils.spreadMenor(mensual_menor, mensual_mayor, sp_mayor);
           await pool.query(
             'INSERT INTO tasas (fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor, tasa_anual_mayor, tasa_mensual_mayor, spread_menor, spread_mayor) VALUES (?,?,?,?,?,?,?,?)',
-            [eMenor.fecha, eMenor.hasta, anual_menor, mensual_menor, anual_mayor, mensual_mayor, sp_menor, sp_mayor]);
+            [eMenor.fecha, hastaBf, anual_menor, mensual_menor, anual_mayor, mensual_mayor, sp_menor, sp_mayor]);
           insertados++;
         }
       }
