@@ -73,6 +73,7 @@ router.get('/directorio/rubros',       verifyToken, requireFunc('ctb_directorio'
 router.post('/directorio/rubros',      verifyToken, requireFunc('ctb_directorio'), ctrl.crearDirRubro);
 router.put('/directorio/rubros/:id',   verifyToken, requireFunc('ctb_directorio'), ctrl.putDirRubro);
 router.delete('/directorio/rubros/:id', verifyToken, requireFunc('ctb_directorio'), ctrl.eliminarDirRubro);
+router.post('/finanzas-ia',          verifyToken, requireFunc('ctb_finanzas_ia'), require('../controllers/finanzas-ia.controller').preguntar);
 router.get('/presupuesto',           verifyToken, requireFunc('ctb_presupuesto', 'ctb_directorio'), ctrl.getPresupuesto);
 router.put('/presupuesto',           verifyToken, requireFunc('ctb_presupuesto'), ctrl.guardarPresupuesto);
 router.post('/presupuesto/copiar',   verifyToken, requireFunc('ctb_presupuesto'), ctrl.copiarPresupuesto);

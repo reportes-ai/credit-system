@@ -102,6 +102,12 @@
       <p>Plan de cuentas jerárquico y 100% paramétrico: crea, edita y desactiva cuentas sin tocar código.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/finanzas-ia/" class="module-card" id="cardFinIA" style="display:none">
+      <div class="card-icon"><i class="bi bi-chat-dots"></i></div>
+      <h5>Preg&uacute;ntale a Finanzas <span style="font-size:.68rem;background:#ede9fe;color:#6d28d9;border-radius:8px;padding:2px 8px;vertical-align:middle">IA</span></h5>
+      <p>Pregunta en lenguaje natural sobre ingresos, gastos, presupuesto, m&aacute;rgenes, balance y proveedores: la IA consulta los libros y los motores del m&oacute;dulo y responde con cifras y tabla.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/presupuesto/" class="module-card" id="cardPpto" style="display:none">
       <div class="card-icon"><i class="bi bi-calculator"></i></div>
       <h5>Presupuesto Anual</h5>
@@ -145,6 +151,7 @@
     if (esAdmin || funcs.has('mantenedores_solo_dios')) document.getElementById('cardPR').style.display='';
     if (tiene('ctb_directorio','ctb_cierre_mes')) document.getElementById('cardDir').style.display='';
     if (tiene('ctb_presupuesto','ctb_directorio')) document.getElementById('cardPpto').style.display='';
+    if (tiene('ctb_finanzas_ia')) document.getElementById('cardFinIA').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>
