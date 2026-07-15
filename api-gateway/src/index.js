@@ -511,6 +511,7 @@ const PAGINAS = [
   ['/contabilidad/estados', 'contabilidad/estados/index.html'],
   ['/contabilidad/cierre-mes', 'contabilidad/cierre-mes/index.html'],
   ['/contabilidad/bitacora-cierres', 'contabilidad/bitacora-cierres/index.html'],
+  ['/contabilidad/cluster-pg', 'contabilidad/cluster-pg/index.html'],
   ['/contabilidad/guardian', 'contabilidad/guardian/index.html'],
   ['/contabilidad/punto-restauracion', 'contabilidad/punto-restauracion/index.html'],
   ['/contabilidad/directorio', 'contabilidad/directorio/index.html'],

@@ -114,6 +114,12 @@
       <p>La planilla de presupuesto de finanzas viva en el sistema: cuenta &times; 12 meses, editable, importable desde Excel y con copia al a&ntilde;o siguiente. Alimenta la columna PPTO del P&amp;G del directorio.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/contabilidad/cluster-pg/" class="module-card" id="cardCluster" style="display:none">
+      <div class="card-icon"><i class="bi bi-columns-gap"></i></div>
+      <h5>Cluster Balance PG</h5>
+      <p>El informe Cl&uacute;ster Originaci&oacute;n de Cartera que se reporta a la matriz: Balance General por mes y Estado de Resultados acumulado, con validaci&oacute;n A&minus;P&minus;Pat=0, KPIs por empleado y export a Excel en el mismo formato.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/directorio/" class="module-card" id="cardDir" style="display:none">
       <div class="card-icon"><i class="bi bi-easel2"></i></div>
       <h5>Presentación Directorio</h5>
@@ -152,6 +158,7 @@
     if (tiene('ctb_directorio','ctb_cierre_mes')) document.getElementById('cardDir').style.display='';
     if (tiene('ctb_presupuesto','ctb_directorio')) document.getElementById('cardPpto').style.display='';
     if (tiene('ctb_finanzas_ia')) document.getElementById('cardFinIA').style.display='';
+    if (tiene('ctb_cluster','ctb_directorio')) document.getElementById('cardCluster').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>
