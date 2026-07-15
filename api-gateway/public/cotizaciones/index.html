@@ -345,7 +345,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-      <span class="version-badge" id="versionBadge">v4.7</span>
+      <span class="version-badge" id="versionBadge">v4.8</span>
     </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1976,6 +1976,71 @@ function _abrirDetalleDesdeVista() {
   if (_vistaRowData) abrirDetalle(_vistaRowData);
 }
 
+/* ── Imprimir cotización (HTML bonito del backend, se inyecta y se imprime) ── */
+async function imprimirCotizacion() {
+  const id = _vistaRowData && _vistaRowData.id_cotizacion;
+  if (!id) { showToast('Guarda la cotización antes de imprimir', 'warning'); return; }
+  try {
+    const resp = await fetch(`/api/cotizaciones/${id}/html`, { headers: authHdr() });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error || 'No se pudo generar');
+    const w = window.open('', '_blank');
+    if (!w) { showToast('Permite las ventanas emergentes para imprimir', 'warning'); return; }
+    w.document.write(j.data.html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 350);
+  } catch (e) { showToast('Error al imprimir: ' + e.message, 'error'); }
+}
+
+/* ── Enviar cotización por correo ── */
+async function abrirEnviarMail() {
+  const id = _vistaRowData && _vistaRowData.id_cotizacion;
+  if (!id) { showToast('Guarda la cotización antes de enviar', 'warning'); return; }
+  // Sugerir el correo del cliente si lo tenemos
+  let sugerido = '';
+  try {
+    const r = await fetch(`/api/cotizaciones/${id}/html`, { headers: authHdr() });
+    const j = await r.json();
+    if (j.success) sugerido = j.data.email_sugerido || '';
+  } catch {}
+  document.getElementById('mMailInput').value = sugerido;
+  document.getElementById('mMailNombre').textContent = _vistaRowData.nombre_cliente || '';
+  document.getElementById('mMailError').style.display = 'none';
+  document.getElementById('mMailBtn').disabled = false;
+  document.getElementById('mMailBtnText').textContent = 'Enviar cotización';
+  document.getElementById('modalMail').style.display = 'flex';
+  setTimeout(() => document.getElementById('mMailInput').focus(), 100);
+}
+
+function cerrarModalMail() { document.getElementById('modalMail').style.display = 'none'; }
+
+async function enviarCotizacionMail() {
+  const id = _vistaRowData && _vistaRowData.id_cotizacion;
+  const email = document.getElementById('mMailInput').value.trim();
+  const errEl = document.getElementById('mMailError');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errEl.textContent = 'Ingresa un correo válido'; errEl.style.display = 'block'; return;
+  }
+  errEl.style.display = 'none';
+  const btn = document.getElementById('mMailBtn');
+  btn.disabled = true;
+  document.getElementById('mMailBtnText').textContent = 'Enviando…';
+  try {
+    const resp = await fetch(`/api/cotizaciones/${id}/enviar`, {
+      method: 'POST', headers: authHdr(), body: JSON.stringify({ email }),
+    });
+    const j = await resp.json();
+    if (!j.success) throw new Error(j.error || 'No se pudo enviar');
+    cerrarModalMail();
+    showToast(j.data.dev ? 'Enviado (Modo Desarrollo: redirigido a prueba)' : `Cotización enviada a ${j.data.to}`, 'success');
+  } catch (e) {
+    errEl.textContent = e.message; errEl.style.display = 'block';
+    btn.disabled = false;
+    document.getElementById('mMailBtnText').textContent = 'Enviar cotización';
+  }
+}
+
 async function copiarDetalle() {
   const texto = document.getElementById('detalleTexto').value;
   try {
@@ -2009,8 +2074,14 @@ async function copiarDetalle() {
     <div class="modal-vista-body" id="vBody"></div>
     <div class="modal-vista-footer">
       <button onclick="cerrarVista()" style="background:#f3f4f6;color:#374151;border:1.5px solid #d1d5db;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer">Cerrar</button>
-      <button onclick="_abrirDetalleDesdeVista()" style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:.88rem;font-weight:700;cursor:pointer">
-        <i class="bi bi-envelope-paper me-1"></i>Preparar mensaje
+      <button onclick="_abrirDetalleDesdeVista()" style="background:#fff;color:#0141A2;border:1.5px solid #0141A2;border-radius:8px;padding:9px 16px;font-size:.88rem;font-weight:700;cursor:pointer">
+        <i class="bi bi-whatsapp me-1"></i>Texto
+      </button>
+      <button onclick="imprimirCotizacion()" style="background:#fff;color:#0141A2;border:1.5px solid #0141A2;border-radius:8px;padding:9px 16px;font-size:.88rem;font-weight:700;cursor:pointer">
+        <i class="bi bi-printer me-1"></i>Imprimir
+      </button>
+      <button onclick="abrirEnviarMail()" style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:.88rem;font-weight:700;cursor:pointer">
+        <i class="bi bi-envelope-paper me-1"></i>Enviar por correo
       </button>
     </div>
   </div>
@@ -2061,6 +2132,36 @@ async function copiarDetalle() {
       <span id="mGrabarBtnText">Buscar cliente</span>
     </button>
     <button onclick="cerrarModalGrabar()"
+      style="width:100%;margin-top:8px;background:none;color:#6b7280;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 0;font-size:.88rem;font-weight:600;cursor:pointer">
+      Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- ═══ MODAL ENVIAR POR CORREO ═══ -->
+<div id="modalMail" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:32px 36px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative">
+    <button onclick="cerrarModalMail()" style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:1.3rem;color:#9ca3af;cursor:pointer">&#x2715;</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#0141A2,#009AFE);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem">
+        <i class="bi bi-envelope-paper-fill"></i>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:1.05rem;color:#111827">Enviar Cotización</div>
+        <div style="font-size:.82rem;color:#6b7280">a <span id="mMailNombre" style="font-weight:600"></span></div>
+      </div>
+    </div>
+    <label style="font-size:.82rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">Correo del cliente</label>
+    <input id="mMailInput" type="email" placeholder="cliente@correo.cl"
+      style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 14px;font-size:.95rem;box-sizing:border-box;outline:none"
+      onfocus="this.style.borderColor='#0141A2'" onblur="this.style.borderColor='#d1d5db'"
+      onkeydown="if(event.key==='Enter')enviarCotizacionMail()">
+    <div id="mMailError" style="display:none;color:#dc2626;font-size:.8rem;margin-top:6px"></div>
+    <button id="mMailBtn" onclick="enviarCotizacionMail()"
+      style="width:100%;margin-top:20px;background:#0141A2;color:#fff;border:none;border-radius:10px;padding:11px 0;font-size:.92rem;font-weight:700;cursor:pointer">
+      <span id="mMailBtnText">Enviar cotización</span>
+    </button>
+    <button onclick="cerrarModalMail()"
       style="width:100%;margin-top:8px;background:none;color:#6b7280;border:1.5px solid #e5e7eb;border-radius:10px;padding:9px 0;font-size:.88rem;font-weight:600;cursor:pointer">
       Cancelar
     </button>

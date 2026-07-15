@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
-const { create, getAll, getByRut } = require('../controllers/cotizaciones.controller');
+const { create, getAll, getByRut, getHtml, enviar } = require('../controllers/cotizaciones.controller');
 
 router.use(verifyToken);
 // Simulador rápido (motor único shared/cotizador.js) — cualquier usuario autenticado
@@ -20,5 +20,7 @@ router.get('/simulador-rapido', async (req, res) => {
 router.post('/',           requireFunc('cotizaciones.crear'), create);
 router.get('/',            getAll);
 router.get('/rut/:rut',    getByRut);
+router.get('/:id/html',    getHtml);
+router.post('/:id/enviar', enviar);
 
 module.exports = router;

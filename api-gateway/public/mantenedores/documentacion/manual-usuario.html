@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.9 -->
+<!-- v3.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -151,6 +151,7 @@
     <li>El dealer ve <b>sus</b> operaciones (solo las suyas): estado de cada una, <b>qué documentos le faltan</b> para el pago, sus cartolas/comisiones, el <b>estado de sus saldos precio</b> y la <b>fecha estimada de pago</b> — sin llamar a preguntar.</li>
     <li>Tiene <b>chat con su ejecutivo</b> y un <b>asistente IA</b> que responde preguntas sobre sus operaciones.</li>
     <li><b>Simulador de Cuotas</b> (botón Simulador): ingresa el monto a financiar y ve la cuota a 12/24/36/48 meses con su CAE. Calcula con el mismo motor del módulo Cotizaciones (tasas del mantenedor Tasas por tramo 200 UF, gastos y seguros de Parámetros de Crédito). El mismo popup existe como card <b>Simulador Rápido</b> en la Home interna.</li>
+    <li><b>Imprimir y enviar cotizaciones:</b> una cotización guardada se abre con <b>Ver</b> y desde ahí se puede <b>Imprimir</b> (abre una versión bonita con el membrete AutoFácil, lista para guardar como PDF desde el navegador) o <b>Enviar por correo</b> (pide el correo del cliente —se sugiere el que esté en su ficha— y despacha el mismo formato). El texto resume que, de acuerdo a lo conversado, se adjunta la cotización de un crédito para un auto usado con su valor comercial y pie, que la simulación incluye gastos operacionales y seguros dando el valor a financiar y la cuota al plazo elegido, y el descargo de que los datos son informativos y aproximados y no obligan a AutoFácil (la aprobación queda sujeta a documentación y políticas de crédito vigentes). El formato es el mismo para imprimir y para el correo (un solo motor de presentación en el backend); en Modo Desarrollo el correo se redirige a las cuentas de prueba. El botón <b>Texto</b> sigue disponible para copiar la versión plana a WhatsApp.</li>
     <li><b>Pre-Aprobación en línea</b> (pestaña Pre-Aprobación): el dealer ingresa RUT del cliente + precio + pie + año del auto y el sistema evalúa al instante con las fuentes internas (renta líquida ≤30% de carga, informes comerciales limpios, antigüedad máxima del vehículo, elegibilidad AutoFin del Cuadro Preferencia Financiera). Si aprueba, ofrece las cuotas por plazo y el botón "Sí, contáctame" lleva al chat indicando cuántos ejecutivos hay conectados/disponibles; además se envía correo automático al <b>Jefe Comercial</b> con el detalle para seguimiento. Al dealer nunca se le muestran los datos del cliente, solo el veredicto.</li>
     <li>Soporte interno: si un dealer no puede entrar, revisar su cuenta en Atención Remota (activa, email correcto, regenerar link de acceso).</li>
   </ul>
