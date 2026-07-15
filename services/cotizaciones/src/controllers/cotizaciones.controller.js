@@ -214,11 +214,11 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
       <img src="${logo}" alt="AutoFácil" style="height:30px;filter:brightness(0) invert(1)">
       <div style="opacity:.85;font-size:12.5px;margin-top:4px">Crédito Automotriz — Cotización</div>
     </div>
-    <div style="padding:16px 28px 20px">
+    <div style="padding:14px 28px 16px">
       <div style="font-size:13.5px;margin-bottom:2px"><b>${_tratamiento(cot.nombre_cliente)}(a): ${_esc(cot.nombre_cliente)}</b></div>
       <div style="font-size:12.5px;color:#6b7280">RUT: ${_esc(cot.rut_cliente)}</div>
-      <div style="font-size:12.5px;color:#6b7280;margin-bottom:12px">Fecha: ${_fechaLarga(cot.fecha_cotizacion)}</div>
-      <p style="font-size:13px;line-height:1.5;margin:0 0 14px">${resumenCotizacion(cot)}</p>
+      <div style="font-size:12.5px;color:#6b7280;margin-bottom:10px">Fecha: ${_fechaLarga(cot.fecha_cotizacion)}</div>
+      <p style="font-size:12.5px;line-height:1.45;margin:0 0 12px">${resumenCotizacion(cot)}</p>
 
       <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">
         ${seccion('Vehículo', fila('Valor Comercial del Vehículo', cot.valor_vehiculo) + fila('Pie', cot.pie) + fila('Saldo Precio', d.saldoPrecio, { strong: true }))}
@@ -243,9 +243,9 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
         </tr>
       </table>
 
-      <p style="font-size:11px;line-height:1.45;color:#6b7280;margin:14px 0 0;padding:10px 13px;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${DISCLAIMER}</p>
+      <p style="font-size:10.5px;line-height:1.4;color:#6b7280;margin:12px 0 0;padding:9px 12px;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${DISCLAIMER}</p>
 
-      <div style="margin-top:16px;font-size:12.5px;color:#374151">
+      <div style="margin-top:12px;font-size:12px;color:#374151">
         Atentamente,<br>
         <b>${_esc(ejecutivo || 'Equipo AutoFácil')}</b>${emailEjec ? `<br><span style="color:#6b7280">${_esc(emailEjec)}</span>` : ''}<br>
         <span style="color:#0141A2;font-weight:700">AutoFácil</span>
@@ -256,12 +256,13 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
   if (!standalone) return cuerpo;
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cotización ${_esc(cot.nombre_cliente)}</title>
     <style>
-      @page { size: A4; margin: 10mm; }
+      @page { size: letter; margin: 11mm 20mm; }
       html, body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       body { background:#f0f4f8; margin:0; padding:18px; }
+      .hoja { page-break-inside:avoid; }
       @media print { body { background:#fff; padding:0; } }
     </style></head>
-    <body>${cuerpo}</body></html>`;
+    <body><div class="hoja">${cuerpo}</div></body></html>`;
 }
 
 async function _cargarCot(id) {
