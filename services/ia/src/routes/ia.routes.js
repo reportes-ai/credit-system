@@ -24,6 +24,9 @@ router.post('/consulta', verifyToken, requireFunc('ia_consulta'), consulta.pregu
 router.get('/consulta/cuota', verifyToken, requireFunc('ia_consulta'), consulta.cuota);
 router.get('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.getLimites);
 router.put('/consulta/limites', verifyToken, requireFunc('mant_ia'), consulta.setLimites);
+router.get('/consulta/lecciones',     verifyToken, requireFunc('ia_consulta'), consulta.getLecciones);
+router.post('/consulta/lecciones',    verifyToken, requireFunc('ia_consulta'), consulta.crearLeccion);
+router.put('/consulta/lecciones/:id', verifyToken, requireFunc('ia_consulta'), consulta.toggleLeccion);
 
 router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
 router.get('/evaluacion-credito', verifyToken, evalCredito.listado);

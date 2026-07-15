@@ -87,6 +87,56 @@ require('../../../../shared/migrate').enFila('consulta', async () => {
   } catch (e) { console.error('[ia consulta init]', e.message); }
 });
 
+/* ── Lecciones aprendidas: educación PARAMÉTRICA de la IA (mismo patrón que
+   Pregúntale a Finanzas): un 👎 con corrección queda como REGLA permanente que
+   se inyecta en el prompt de todas las preguntas siguientes — sin programador. */
+require('../../../../shared/migrate').enFila('consulta-lecciones', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ia_consulta_lecciones (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        regla      TEXT NOT NULL,
+        pregunta   VARCHAR(500) NULL,
+        creada_por VARCHAR(160) NULL,
+        activa     TINYINT NOT NULL DEFAULT 1,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+  } catch (e) { console.error('[consulta-lecciones migration]', e.message); }
+});
+
+async function leccionesActivas() {
+  try {
+    const [rows] = await pool.query('SELECT regla FROM ia_consulta_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 40');
+    return rows.map(r => '- ' + String(r.regla).replace(/\s+/g, ' ').trim());
+  } catch (_) { return []; }
+}
+
+const getLecciones = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, regla, pregunta, creada_por, activa, created_at FROM ia_consulta_lecciones ORDER BY id DESC LIMIT 200');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { err(res, e); }
+};
+
+const crearLeccion = async (req, res) => {
+  try {
+    const regla = String(req.body.regla || '').trim().slice(0, 2000);
+    if (regla.length < 10) return res.status(400).json({ success: false, data: null, error: 'Describe la corrección (mínimo 10 caracteres)' });
+    const pregunta = String(req.body.pregunta || '').trim().slice(0, 500) || null;
+    const quien = (req.usuario || req.user || {}).nombre || (req.usuario || req.user || {}).correo || null;
+    const [r] = await pool.query('INSERT INTO ia_consulta_lecciones (regla, pregunta, creada_por) VALUES (?,?,?)', [regla, pregunta, quien]);
+    auditar({ req, accion: 'CREAR', modulo: 'ia', entidad: 'consulta_leccion', entidad_id: String(r.insertId), detalle: `Lección BI: ${regla.slice(0, 120)}` });
+    res.json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+const toggleLeccion = async (req, res) => {
+  try {
+    await pool.query('UPDATE ia_consulta_lecciones SET activa=? WHERE id=?', [req.body.activa ? 1 : 0, Number(req.params.id)]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { err(res, e); }
+};
+
 /* ── Esquema acotado para el prompt (desde information_schema, cacheado 10 min) ── */
 let _esq = null, _esqAt = 0;
 async function getEsquema() {
@@ -235,6 +285,7 @@ const preguntar = async (req, res) => {
       return res.json({ success: false, data: { cuota: cuotaPre }, error: `Alcanzaste tu límite de ${cuotaPre.cantidad} pregunta(s) por ${PERIODOS[cuotaPre.periodo] || cuotaPre.periodo}. Se renueva el ${ddmmaaaa(cuotaPre.hasta)}.` });
     if (!cuotaPre.ilimitado) { try { await pool.query('INSERT INTO ia_consulta_uso (id_usuario) VALUES (?)', [uid]); } catch (_) {} }
     const esquema = await getEsquema();
+    const lecciones = await leccionesActivas();
     const historial = (Array.isArray(req.body.historial) ? req.body.historial : [])
       .filter(h => h && h.pregunta && h.sql)
       .slice(-3)
@@ -246,6 +297,7 @@ const preguntar = async (req, res) => {
       'para mora/provisión/recuperación/rendimiento (usa SIEMPRE esas para dichas métricas, jamás SQL propio). ' +
       'Los datos son la BASE INTERNA de AutoFácil (sus propias operaciones), no el mercado.\n\n' +
       'Esquema disponible para consulta_sql:\n' + esquema + '\n\n' + GLOSARIO + '\n\n' +
+      (lecciones.length ? 'LECCIONES APRENDIDAS (correcciones dictadas por los usuarios — OBEDÉCELAS SIEMPRE, tienen prioridad sobre tu criterio):\n' + lecciones.join('\n') + '\n\n' : '') +
       'Al terminar, responde SOLO con JSON: {"respuesta":"1 a 3 frases en español, breve y claro para un gerente, montos en pesos chilenos con separador de miles", ' +
       '"grafico": {"tipo":"bar|line|pie","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
       'El gráfico debe referirse a columnas de la última tabla obtenida. Si la pregunta no se puede responder (ej. simulaciones "qué pasaría si"), dilo en "respuesta" sin inventar datos.';
@@ -317,4 +369,4 @@ const setLimites = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
-module.exports = { preguntar, cuota, getLimites, setLimites };
+module.exports = { preguntar, cuota, getLimites, setLimites, getLecciones, crearLeccion, toggleLeccion };

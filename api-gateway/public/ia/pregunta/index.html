@@ -71,6 +71,7 @@
       <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-chat-dots me-1"></i>Pregúntale a AutoFácil</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn-logout" onclick="verLecciones()" title="Reglas que los usuarios le han enseñado con el boton Corregir"><i class="bi bi-mortarboard me-1"></i>Lecciones</button>
       <button class="btn-logout" id="btnLimites" style="display:none" onclick="abrirLimites()"><i class="bi bi-sliders me-1"></i>Límites</button>
       <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
     </div>
@@ -99,6 +100,15 @@
     </div>
     <div class="nota">Respuestas generadas con IA sobre tus datos (solo lectura). Verifica antes de decidir.</div>
   </div>
+
+  <dialog id="dlgLec" style="border:none;border-radius:14px;padding:20px;width:640px;max-width:95vw;max-height:80vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h5 style="font-weight:700;margin:0"><i class="bi bi-mortarboard me-1"></i>Lecciones aprendidas</h5>
+      <button class="btn-mini" onclick="document.getElementById('dlgLec').close()">✕</button>
+    </div>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 8px">Reglas permanentes que los usuarios le han enseñado a la IA con 👎 Corregir. Se inyectan en cada pregunta y tienen prioridad sobre su criterio.</p>
+    <div id="lecBody"></div>
+  </dialog>
 
   <dialog id="dlgLim" style="border:none;border-radius:14px;padding:0;width:560px;max-width:95vw">
     <div style="padding:20px">
@@ -138,6 +148,16 @@
       return res.json();
     }
     function usarChip(el){ document.getElementById('q').value = el.textContent; preguntar(); }
+
+    // Aviso flotante (no existía: los botones Copiar fallaban en silencio)
+    function toast(msg, ok=true){
+      const t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText = `position:fixed;bottom:86px;left:50%;transform:translateX(-50%);z-index:999;background:${ok?'#065f46':'#991b1b'};color:#fff;border-radius:10px;padding:9px 18px;font-size:.85rem;box-shadow:0 6px 20px rgba(0,0,0,.25)`;
+      document.body.appendChild(t);
+      setTimeout(()=>t.remove(), 2600);
+    }
+
 
     let cargando = false;
     const TURNS = [];   // guarda cada respuesta para los botones Copiar
@@ -193,6 +213,9 @@
       html += `<div class="acciones">
         <button class="btn-mini" onclick="copiarInfo(${idx})"><i class="bi bi-clipboard"></i> Copiar info</button>
         ${tieneGrafico(d) ? `<button class="btn-mini" onclick="copiarGrafico(${idx})"><i class="bi bi-image"></i> Copiar gráfico</button>` : ''}
+        <span style="flex:1"></span>
+        <button class="btn-mini" title="La respuesta está buena" onclick="this.innerHTML='👍 ¡Gracias!';this.disabled=true">👍</button>
+        <button class="btn-mini" title="La respuesta está mala: corrige a la IA y lo aprende para siempre" onclick="corregir(${idx}, this)">👎 Corregir</button>
       </div>
       <div class="fuente"><i class="bi bi-database"></i> Fuente: AutoFácil — base de datos interna.</div>`;
       return html;
@@ -254,6 +277,33 @@
         const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'grafico-autofacil.png'; a.click();
         toast('Gráfico descargado como imagen');
       }
+    }
+
+    /* ── Educación paramétrica: 👎 guarda la corrección como lección permanente ── */
+    async function corregir(i, btn){
+      const d = TURNS[i]; if (!d) return;
+      const regla = prompt('¿Qué estuvo mal y cómo debe hacerlo la próxima vez?\n(Se guarda como regla permanente para la IA)');
+      if (!regla || regla.trim().length < 10) return;
+      const j = await api('/api/ia/consulta/lecciones', { method:'POST', body: JSON.stringify({ regla: regla.trim(), pregunta: d.pregunta }) });
+      if (!j || !j.success) return toast((j && j.error) || 'No se pudo guardar', false);
+      btn.innerHTML = '✅ Aprendido'; btn.disabled = true;
+      toast('Lección guardada: la IA la obedecerá desde la próxima pregunta');
+    }
+    async function verLecciones(){
+      const j = await api('/api/ia/consulta/lecciones'); if (!j || !j.success) return toast('No se pudo cargar', false);
+      document.getElementById('lecBody').innerHTML = j.data.length ? j.data.map(x=>`
+        <div style="border-bottom:1px solid #f1f5f9;padding:9px 0;${x.activa?'':'opacity:.45'}">
+          <div style="font-size:.86rem">${esc(x.regla)}</div>
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:3px">
+            ${x.pregunta?`Origen: “${esc(x.pregunta)}” · `:''}${esc(x.creada_por||'')} · ${String(x.created_at).slice(0,10)}
+            · <a href="#" onclick="toggleLec(${x.id},${x.activa?0:1});return false">${x.activa?'desactivar':'reactivar'}</a>
+          </div>
+        </div>`).join('') : '<div class="muted p-2">Aún no hay lecciones. Usa 👎 Corregir en una respuesta mala para enseñarle.</div>';
+      document.getElementById('dlgLec').showModal();
+    }
+    async function toggleLec(id, activa){
+      await api('/api/ia/consulta/lecciones/'+id, { method:'PUT', body: JSON.stringify({ activa: !!activa }) });
+      verLecciones();
     }
 
     /* ── Cuota de preguntas (saldo) + configuración por perfil (admin) ── */
