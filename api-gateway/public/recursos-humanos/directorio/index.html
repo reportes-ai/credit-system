@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.0 — directorio + organigrama + configuración de visibilidad (pestañas) -->
+  <!-- v2.1 — full width + organigrama escalera indentado + configuración de visibilidad (pestañas) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -17,7 +17,7 @@
     .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .main { padding:26px 30px; max-width:1200px; margin:0 auto; }
+    .main { padding:26px 30px; }
     .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
     .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
     .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
@@ -32,22 +32,16 @@
     .card-p .dato a { color:#475569; text-decoration:none; } .card-p .dato a:hover { color:#0141A2; }
     .empty { text-align:center; color:#9ca3af; padding:36px 0; }
 
-    /* ── Organigrama (árbol CSS con conectores) ── */
-    .org-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:24px 18px; overflow-x:auto; }
-    .org-tree, .org-tree ul { display:flex; padding-top:20px; position:relative; margin:0; list-style:none; }
-    .org-tree { justify-content:center; }
-    .org-tree ul::before { content:''; position:absolute; top:0; left:50%; border-left:1.5px solid #cbd5e1; height:20px; }
-    .org-tree li { display:flex; flex-direction:column; align-items:center; padding:20px 8px 0; position:relative; }
-    .org-tree li::before, .org-tree li::after { content:''; position:absolute; top:0; right:50%; border-top:1.5px solid #cbd5e1; width:50%; height:20px; }
-    .org-tree li::after { right:auto; left:50%; border-left:1.5px solid #cbd5e1; }
-    .org-tree li:only-child::before, .org-tree li:only-child::after { display:none; }
-    .org-tree li:first-child::before, .org-tree li:last-child::after { border:0 none; }
-    .org-tree li:last-child::before { border-right:1.5px solid #cbd5e1; border-radius:0 6px 0 0; }
-    .org-tree li:first-child::after { border-radius:6px 0 0 0; }
-    .org-node { border:1.5px solid #e2e8f0; border-radius:12px; background:#fff; padding:9px 12px; min-width:150px; max-width:180px; box-shadow:0 1px 3px rgba(0,0,0,.06); text-align:center; }
-    .org-node .oa { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; margin:0 auto 6px; overflow:hidden; }
-    .org-node .on { font-weight:700; font-size:.8rem; color:#111827; line-height:1.15; }
-    .org-node .oc { font-size:.68rem; color:#0141A2; font-weight:600; margin-top:2px; line-height:1.15; }
+    /* ── Organigrama estilo escalera (indentado vertical; crece hacia abajo) ── */
+    .org-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:20px 24px; }
+    .org-item { position:relative; }
+    .org-children { margin-left:22px; padding-left:22px; border-left:2px solid #dbe3ec; }
+    .org-row { display:flex; align-items:center; gap:11px; background:#fff; border:1.5px solid #e5e9f0; border-radius:10px; padding:8px 14px; margin:7px 0; box-shadow:0 1px 2px rgba(0,0,0,.04); position:relative; }
+    .org-children > .org-item > .org-row::before { content:''; position:absolute; left:-22px; top:50%; width:18px; border-top:2px solid #dbe3ec; }
+    .org-row .oa { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; overflow:hidden; flex-shrink:0; }
+    .org-row .on { font-weight:700; font-size:.85rem; color:#111827; line-height:1.2; }
+    .org-row .oc { font-size:.72rem; color:#0141A2; font-weight:600; line-height:1.2; }
+    .org-row .cnt { margin-left:auto; font-size:.68rem; color:#64748b; background:#eef2f7; border-radius:20px; padding:2px 9px; font-weight:700; white-space:nowrap; }
 
     /* ── Configurar ── */
     .cfg-box { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
@@ -164,18 +158,23 @@ async function cargarOrg(){
     pintarOrg();
   } catch(e){ document.getElementById('orgTree').textContent = 'Error: '+e.message; }
 }
-function nodoHTML(n){
+function contarDescendientes(id, hijosDe){
+  const hijos = hijosDe[id] || [];
+  return hijos.reduce((s,h)=>s+1+contarDescendientes(h.id_usuario,hijosDe),0);
+}
+function nodoRow(n, hijosDe){
   const foto = FOTOS[n.id_usuario];
-  return `<div class="org-node">
+  const tot = contarDescendientes(n.id_usuario, hijosDe);
+  return `<div class="org-row">
     <div class="oa">${foto?`<img src="${foto}" alt="" style="width:100%;height:100%;object-fit:cover">`:esc((n.nombre||'?')[0].toUpperCase())}</div>
-    <div class="on">${esc(n.nombre)}</div>
-    <div class="oc">${esc(n.cargo||'')}</div>
+    <div style="min-width:0"><div class="on">${esc(n.nombre)}</div><div class="oc">${esc(n.cargo||'')}</div></div>
+    ${tot?`<span class="cnt"><i class="bi bi-people-fill"></i> ${tot}</span>`:''}
   </div>`;
 }
 function ramaHTML(id, hijosDe){
   const hijos = hijosDe[id] || [];
   const n = MAPA[id];
-  return `<li>${nodoHTML(n)}${hijos.length?`<ul>${hijos.map(h=>ramaHTML(h.id_usuario,hijosDe)).join('')}</ul>`:''}</li>`;
+  return `<div class="org-item">${nodoRow(n,hijosDe)}${hijos.length?`<div class="org-children">${hijos.map(h=>ramaHTML(h.id_usuario,hijosDe)).join('')}</div>`:''}</div>`;
 }
 let MAPA = {};
 function pintarOrg(){
@@ -192,7 +191,7 @@ function pintarOrg(){
   const el = document.getElementById('orgTree');
   if (!ORG.length){ el.textContent='Sin colaboradores para mostrar.'; return; }
   el.className='';
-  el.innerHTML = `<ul class="org-tree">${raices.map(r=>ramaHTML(r.id_usuario,hijosDe)).join('')}</ul>`;
+  el.innerHTML = raices.map(r=>ramaHTML(r.id_usuario,hijosDe)).join('');
 }
 
 /* ── Configurar ── */
