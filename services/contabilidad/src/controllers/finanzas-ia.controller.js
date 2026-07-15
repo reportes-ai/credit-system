@@ -44,6 +44,24 @@ const GLOSARIO = [
   'Nunca digas que estos datos no existen: existen vía herramientas.',
   '',
   "Montos en PESOS CHILENOS. En las respuestas usa millones con un decimal cuando el monto sea grande (ej. $207,6 Millones) y formato es-CL.",
+  '',
+  'CURSO ACELERADO (entrenado con 10.000 preguntas reales de 3 perfiles — hechos verificados contra la BD):',
+  "- ADAPTA EL REGISTRO AL USUARIO: si la pregunta es simple o pide 'con peras y manzanas', explica SIN jerga y con analogías, usando cifras nuestras como ejemplo. Si es de gestión (directorio), da 2-3 cifras clave + tendencia + comparación (ppto y año anterior) + una recomendación concreta. Si es técnica, sé preciso con códigos de cuenta.",
+  "- Valores REALES de creditos.financiera: 'AUTOFIN', 'UNIDAD DE CREDITO', 'AUTOFACIL', 'AFA' (cartera comprada), 'NO APLICA'. En produccion_mensual pide UNIDAD y el sistema lo traduce.",
+  "- Libros contables: 2025-01 a hoy. NO existe contabilidad 2024 ni anterior (dilo, no inventes). El mes EN CURSO está incompleto: adviértelo al comparar.",
+  "- HITOS que explican anomalías: jun-2025 ingresos extraordinarios (~$279M, no repetible); dic-2025 gastos ~$314M por ajustes de cierre anual; jun-2026 capitalización de la deuda con la matriz (CFC) llevó el patrimonio de -$43,6M a ~$1.080M — antes era negativo (pérdidas acumuladas superaban el capital).",
+  "- REALIDAD 2026: los ingresos reales vienen muy por debajo del presupuesto (ej. may-26 real ~$69M vs ppto ~$221M) y la empresa opera con pérdida mensual (gastos ~$110-215M vs ingresos ~$55-100M). No lo maquilles: repórtalo con la brecha y su tendencia.",
+  "- Cuenta a cuenta: busca por nombre con LIKE en ctb_cuentas (ej. 'arriendos' → 4002100). Si no existe cuenta específica, dilo y ofrece la más cercana. Los nombres pueden traer caracteres corruptos (CONDONACIàN) — usa LIKE con la raíz.",
+  "- ctb_honorarios_aux usa la columna nombre (NO razon_social). ctb_compras_aux y ctb_ventas_aux sí usan razon_social.",
+  "- Un banco con saldo NEGATIVO (ej. BICE) = línea de crédito girada/sobregiro, no un error. Caja consolidada = SUM sobre cuentas 1101%. 'Meses de caja' = caja ÷ gasto mensual promedio.",
+  "- Ventas facturadas: ~93% a AUTOFIN S.A. — es la comisión de producción del canal brokerage, no venta de autos.",
+  "- Dotación: ~25-29 personas pagadas/mes (ctb_remun_aux, COUNT DISTINCT rut). Sueldos individuales: da agregados o promedios, no expongas el detalle por persona salvo que lo pidan explícitamente con nombre.",
+  "- PUNTO DE EQUILIBRIO en operaciones = gasto mensual promedio ÷ ingreso promedio por operación (ingresos contables del mes ÷ operaciones OTORGADAS del mes vía produccion_mensual). Nunca uses conteo de asientos.",
+  "- EBITDA aproximado = resultado + depreciaciones (cuentas 4003%) + estimación incobrables (4001190). Dilo como aproximación.",
+  "- La UF tiene valores futuros cargados (se publica por adelantado): para 'UF de hoy' usa fecha <= CURDATE().",
+  "- Trimestres: Q1=ene-mar, Q2=abr-jun, Q3=jul-sep, Q4=oct-dic (año calendario).",
+  "- NO puedes modificar ni borrar datos (solo lectura) — si lo piden, dilo. No des consejos de inversión personal. Preguntas de negocio no contable (producción comercial fina, clientes, cobranza) → sugiere 'Pregúntale a AutoFácil'.",
+  "- Al proyectar el año, usa el promedio de los últimos 3 meses reales × meses restantes + acumulado, y decláralo como proyección simple.",
 ].join('\n');
 
 require('../../../../shared/migrate').enFila('contabilidad-finanzas-ia', async () => {
@@ -88,7 +106,7 @@ require('../../../../shared/migrate').enFila('contabilidad-finia-lecciones', asy
 
 async function leccionesActivas() {
   try {
-    const [rows] = await pool.query('SELECT regla FROM ctb_finia_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 40');
+    const [rows] = await pool.query('SELECT regla FROM ctb_finia_lecciones WHERE activa=1 ORDER BY id DESC LIMIT 80');
     return rows.map(r => '- ' + String(r.regla).replace(/\s+/g, ' ').trim());
   } catch (_) { return []; }
 }
@@ -233,7 +251,9 @@ function crearDispatcher(ultimo) {
     }
     if (name === 'produccion_mensual') {
       const desde = mesOk(input.desde) || '2025-01', hasta = mesOk(input.hasta) || new Date().toISOString().slice(0, 7);
-      const fin = ['AUTOFIN', 'UNIDAD', 'AUTOFACIL'].includes(input.financiera) ? input.financiera : null;
+      // En la BD el canal Unidad se llama 'UNIDAD DE CREDITO' (no 'UNIDAD')
+      const MAPA_FIN = { AUTOFIN: 'AUTOFIN', UNIDAD: 'UNIDAD DE CREDITO', AUTOFACIL: 'AUTOFACIL' };
+      const fin = MAPA_FIN[input.financiera] || null;
       const porFin = !!input.por_financiera || !!fin;
       const [rows] = await pool.query(
         `SELECT DATE_FORMAT(mes,'%Y-%m') mes${porFin ? ', financiera' : ''}, COUNT(*) operaciones,
