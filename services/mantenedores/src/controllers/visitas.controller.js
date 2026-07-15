@@ -606,6 +606,26 @@ const asignacionMasiva = async (req, res) => {
     if (b.simular) return ok(res, { simulacion: true, candidatos: cand.length, fechas_habiles: fechas.length,
       capacidad_por_ejecutivo: capacidad, por_ejecutivo: resumen });
 
+    // Orden de RUTA por cercanía: tour vecino-más-cercano por ejecutivo (parte
+    // en el dealer más al norte; sin coordenadas van al final). Los bloques de
+    // visitas_dia consecutivos quedan como ruta diaria y la ficha (ORDER BY id)
+    // los muestra en ese mismo orden.
+    const tourCercania = (ds) => {
+      const geo = ds.filter(d => d.lat != null && d.lng != null);
+      const sin = ds.filter(d => d.lat == null || d.lng == null);
+      if (geo.length < 3) return ds;
+      const dist = (a, b2) => Math.hypot(Number(a.lat) - Number(b2.lat), Number(a.lng) - Number(b2.lng));
+      geo.sort((a, b2) => Number(b2.lat) - Number(a.lat));
+      const ruta = [geo.shift()];
+      while (geo.length) {
+        let bi = 0, bd = Infinity;
+        geo.forEach((d, i) => { const k = dist(ruta[ruta.length - 1], d); if (k < bd) { bd = k; bi = i; } });
+        ruta.push(geo.splice(bi, 1)[0]);
+      }
+      return ruta.concat(sin);
+    };
+    for (const [idU, ds] of carga.entries()) carga.set(idU, tourCercania(ds));
+
     // ── Ejecutar: plan + asignaciones + agenda ──
     const [rp] = await pool.query(
       `INSERT INTO visitas_planes (nombre, fecha_inicio, fecha_cierre, params, created_by, created_nombre)
