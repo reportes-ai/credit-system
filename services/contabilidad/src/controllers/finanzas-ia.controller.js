@@ -32,6 +32,7 @@ const GLOSARIO = [
   "- \"Presupuesto / PPTO\" = ctb_presupuesto (anio, mes 1..12, cuenta, monto) en sentido NATURAL: ingresos y gastos POSITIVOS. Hoy hay presupuesto cargado para 2026. Desviación = real − presupuesto.",
   "- \"Gastos de personal / remuneraciones\" = cuentas 400106%-400109% (sueldos, gratificación, colación, etc.) o el auxiliar ctb_remun_aux (líquidos e imposiciones pagadas por mes).",
   "- \"Compras / facturas de proveedores\" = ctb_compras_aux (mes, rut, razon_social, neto, iva, total). \"Honorarios / boletas\" = ctb_honorarios_aux (bruto, retencion, liquido). \"Ventas / facturación\" = ctb_ventas_aux.",
+  "- \"Canal / financiera\" de una operación = creditos.financiera (AUTOFIN, UNIDAD, AUTOFACIL): usa produccion_mensual con por_financiera/financiera para operaciones por canal. Los ingresos contables por canal se ven en ctb_ventas_aux (razon_social AUTOFIN S.A. / UNIDAD CREDITOS S.A.).",
   "- \"Deuda con la matriz / CFC\" = cuentas de documentos por pagar en dólares (busca k.nombre LIKE '%DOLAR%' o '%EXTRANJERO%'). La capitalización de jun-2026 llevó el patrimonio de -$43,6MM a $1.080MM.",
   "- \"Rubros gerenciales\" (Ingresos Operativos, Gastos de Personal, Margen Operativo…) = ctb_dir_rubros: cada cuenta se asigna al primer rubro cuyo prefijo calce. Para P&G por rubros usa la herramienta pyg_rubros (NO lo armes a mano).",
   '',
@@ -134,8 +135,8 @@ const TOOLS = [
     description: 'Estado de resultados cuenta a cuenta entre dos fechas: ingresos, gastos y resultado del período.',
     input_schema: { type: 'object', properties: { desde: { type: 'string' }, hasta: { type: 'string' } }, required: ['desde', 'hasta'] } },
   { name: 'produccion_mensual',
-    description: 'Producción REAL del negocio por mes: número de créditos OTORGADOS, monto financiado total y promedio. LA fuente para "cuántas operaciones", punto de equilibrio en operaciones, ingreso o margen por operación (divide los ingresos contables por estas operaciones, no por asientos).',
-    input_schema: { type: 'object', properties: { desde: { type: 'string', description: 'YYYY-MM' }, hasta: { type: 'string', description: 'YYYY-MM' } } } },
+    description: 'Producción REAL del negocio por mes: número de créditos OTORGADOS, monto financiado total y promedio, desglosado POR FINANCIERA/canal (AUTOFIN, UNIDAD, AUTOFACIL) si pides agrupar. LA fuente para "cuántas operaciones", punto de equilibrio en operaciones, ingreso o margen por operación o por canal (divide los ingresos contables por estas operaciones, no por asientos).',
+    input_schema: { type: 'object', properties: { desde: { type: 'string', description: 'YYYY-MM' }, hasta: { type: 'string', description: 'YYYY-MM' }, financiera: { type: 'string', enum: ['AUTOFIN', 'UNIDAD', 'AUTOFACIL'], description: 'filtra un canal' }, por_financiera: { type: 'boolean', description: 'true = una fila por mes y financiera' } } } },
   { name: 'presupuesto_anual',
     description: 'Presupuesto anual completo cuenta a cuenta: 12 meses por cuenta en sentido natural (ingresos y gastos positivos). Hoy existe 2026.',
     input_schema: { type: 'object', properties: { anio: { type: 'number' } }, required: ['anio'] } },
@@ -180,13 +181,15 @@ function crearDispatcher(ultimo) {
     }
     if (name === 'produccion_mensual') {
       const desde = mesOk(input.desde) || '2025-01', hasta = mesOk(input.hasta) || new Date().toISOString().slice(0, 7);
+      const fin = ['AUTOFIN', 'UNIDAD', 'AUTOFACIL'].includes(input.financiera) ? input.financiera : null;
+      const porFin = !!input.por_financiera || !!fin;
       const [rows] = await pool.query(
-        `SELECT DATE_FORMAT(mes,'%Y-%m') mes, COUNT(*) operaciones,
+        `SELECT DATE_FORMAT(mes,'%Y-%m') mes${porFin ? ', financiera' : ''}, COUNT(*) operaciones,
                 ROUND(SUM(monto_financiado)) monto_financiado, ROUND(AVG(monto_financiado)) monto_promedio
-           FROM creditos WHERE estado='OTORGADO' AND DATE_FORMAT(mes,'%Y-%m') BETWEEN ? AND ?
-          GROUP BY 1 ORDER BY 1`, [desde, hasta]);
+           FROM creditos WHERE estado='OTORGADO' AND DATE_FORMAT(mes,'%Y-%m') BETWEEN ? AND ?${fin ? ' AND financiera=?' : ''}
+          GROUP BY 1${porFin ? ', financiera' : ''} ORDER BY 1`, fin ? [desde, hasta, fin] : [desde, hasta]);
       tabla(rows);
-      return { desde, hasta, meses: rows };
+      return { desde, hasta, financiera: fin || (porFin ? 'todas (desglosado)' : 'todas'), meses: rows };
     }
     if (name === 'presupuesto_anual') {
       const anio = Number(input.anio); if (!anio) throw new Error('anio inválido');
@@ -221,7 +224,7 @@ exports.preguntar = async (req, res) => {
       'Al terminar responde SOLO con JSON (sin NINGÚN texto antes ni después, sin markdown, sin tablas, sin fórmulas: la tabla de datos se muestra sola bajo tu respuesta): ' +
       '{"respuesta":"2 a 5 frases en español para un gerente de finanzas, texto plano con las cifras clave", ' +
       '"grafico": {"tipo":"bar","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
-      'El gráfico debe referirse a columnas de la última tabla obtenida. Si algo no se puede responder, dilo sin inventar cifras.';
+      'El gráfico debe referirse a columnas de la última tabla obtenida. Si algo no se puede responder, dilo sin inventar cifras. Si ya tienes datos suficientes, responde de inmediato: no anuncies pasos ni digas \"verifiquemos\" — ejecuta o concluye.';
 
     let prompt = '';
     if (historial.length)
@@ -232,7 +235,7 @@ exports.preguntar = async (req, res) => {
     const ultimo = { sql: null, rows: [], columns: [] };
     const { texto } = await analizarTools({
       codigo: CODIGO_IA, id_usuario: uid, system, prompt,
-      tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 6,
+      tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 8,
     });
 
     // Extracción robusta del JSON final: el modelo a veces antepone prosa con llaves
