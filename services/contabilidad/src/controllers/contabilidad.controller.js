@@ -2516,3 +2516,39 @@ exports.balance = async (req, res) => {
     ok(res, data);
   } catch (e) { fail(res, e.message); }
 };
+
+/* ═══════ RCV SII (SimpleAPI) — libro de compras oficial, sync cada 2 días ═══════ */
+const rcv = require('../rcv-sync');
+
+/* GET /api/contabilidad/rcv/estado?mes=YYYY-MM — estado + comparación vs auxiliar */
+exports.rcvEstado = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(String(req.query.mes || '')) ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const [logs] = await pool.query('SELECT * FROM ctb_rcv_sync_log ORDER BY id DESC LIMIT 15');
+    const [[sii]] = await pool.query(
+      `SELECT COUNT(*) docs, COALESCE(SUM(iva_recuperable),0) iva, COALESCE(SUM(monto_total),0) total
+         FROM ctb_rcv_compras WHERE mes=?`, [mes]);
+    let aux = null;
+    try {
+      [[aux]] = await pool.query(
+        `SELECT COUNT(*) docs, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total
+           FROM ctb_compras_aux WHERE mes=?`, [mes]);
+    } catch (_) {}
+    ok(res, { configurado: rcv.configurado(), mes, sii, auxiliar: aux, logs });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* POST /api/contabilidad/rcv/sincronizar {mes?:'YYYY-MM'} — manual */
+exports.rcvSincronizar = async (req, res) => {
+  try {
+    if (!rcv.configurado())
+      return fail(res, 'Falta configurar SIMPLEAPI_KEY, SII_RUT_EMPRESA y SII_CLAVE (env vars en Render).', 400);
+    const m = String(req.body?.mes || '');
+    const r = /^\d{4}-\d{2}$/.test(m)
+      ? await rcv.sincronizarMes(Number(m.slice(0, 4)), Number(m.slice(5, 7)))
+      : await rcv.sincronizar();
+    auditar({ req, accion: 'SINCRONIZAR', modulo: 'contabilidad', entidad: 'rcv_sii',
+      detalle: `RCV SII manual ${m || '(rutina)'}: ${JSON.stringify(r).slice(0, 300)}` });
+    ok(res, r);
+  } catch (e) { fail(res, e.message); }
+};

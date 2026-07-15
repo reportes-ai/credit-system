@@ -104,6 +104,10 @@ router.post('/directorio/hechos-ia', verifyToken, requireFunc('ctb_directorio'),
 // Cluster Balance PG (informe a la matriz)
 router.get('/cluster-pg', verifyToken, requireFunc('ctb_cluster', 'ctb_directorio', 'ctb_estados'), require('../controllers/cluster.controller').getClusterPG);
 
+// RCV SII (SimpleAPI) — libro de compras oficial
+router.get('/rcv/estado',       verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux', 'ctb_cierre_mes'), ctrl.rcvEstado);
+router.post('/rcv/sincronizar', verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.rcvSincronizar);
+
 // Bitácora de Cierres
 router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);
 router.post('/bitacora-cierres/:mes/analizar', verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados'), ctrl.analizarCierre);
