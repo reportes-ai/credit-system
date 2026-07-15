@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presupuesto Anual — AutoFácil</title>
+  <!-- v1.0 — grilla cuenta × 12 meses estilo Excel de finanzas: ver, editar, importar y continuar al año siguiente -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <script src="/js/xlsx.full.min.js" defer></script>
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 30px; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.85; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.85; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); overflow:auto; margin-bottom:18px; max-height:72vh; }
+    /* Grilla estilo Excel de finanzas */
+    .xls { border-collapse:collapse; font-size:.75rem; width:100%; }
+    .xls th, .xls td { border:1px solid #b7b7b7; padding:2px 6px; white-space:nowrap; }
+    .xls thead th { background:#FFD966; text-align:center; font-weight:800; border:2px solid #7f6000; position:sticky; top:0; z-index:3; }
+    .xls thead th:first-child, .xls thead th:nth-child(2) { z-index:4; }
+    .xls td.n, .xls th.n { text-align:right; font-family:Calibri,Consolas,monospace; }
+    .xls .grupo td { background:#efefef; font-weight:800; }
+    .xls .resultado td { background:#dce6f1; color:#1F4E79; font-weight:800; }
+    .xls .neg { color:#b91c1c; }
+    .xls td.cta { position:sticky; left:0; background:#fff; z-index:2; font-family:Consolas,monospace; }
+    .xls td.nom { position:sticky; left:74px; background:#fff; z-index:2; max-width:250px; overflow:hidden; text-overflow:ellipsis; }
+    .xls .grupo td.cta, .xls .grupo td.nom { background:#efefef; }
+    .xls .resultado td.cta, .xls .resultado td.nom { background:#dce6f1; }
+    .xls td[contenteditable] { min-width:78px; cursor:cell; }
+    .xls td[contenteditable]:focus { outline:2px solid var(--accent); background:#eff8ff; }
+    .xls td.tot { background:#f4f4f4; font-weight:700; }
+    .dirty { box-shadow:inset 0 0 0 2px #f59e0b !important; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Presupuesto Anual', icon:'bi-calculator', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-calculator"></i><div><h2>Presupuesto Anual</h2><p>La planilla de presupuesto de finanzas, viva en el sistema: cuenta × 12 meses en pesos (ingresos y gastos en positivo). Alimenta la columna PPTO del P&G de la Presentación Directorio.</p></div></div>
+
+  <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
+    <div><label class="form-label small fw-semibold mb-1">Año</label><select id="fAnio" class="form-select form-select-sm" onchange="cargar()" style="width:110px"></select></div>
+    <button class="btn btn-sm btn-primary" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar año</button>
+    <button class="btn btn-sm btn-outline-primary" onclick="agregarCuenta()"><i class="bi bi-plus-lg me-1"></i>Agregar cuenta</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="continuarAnio()" title="Copia este presupuesto al año siguiente con % de reajuste opcional"><i class="bi bi-fast-forward me-1"></i>Continuar al año siguiente</button>
+    <label class="btn btn-sm btn-outline-secondary mb-0" title="Sube el Excel de finanzas (hoja 'Plantilla Presupuestos'): reemplaza el año completo"><i class="bi bi-upload me-1"></i>Importar Excel
+      <input type="file" hidden accept=".xlsx,.xls" onchange="importarExcel(this)"></label>
+    <button class="btn btn-sm btn-outline-secondary" onclick="exportar()"><i class="bi bi-download me-1"></i>Exportar</button>
+    <span class="flex-grow-1"></span>
+    <label class="small mb-1"><input type="checkbox" id="chkTodas" onchange="pintar()"> Mostrar cuentas en $0</label>
+  </div>
+
+  <div class="panel"><table class="xls" id="tabla"><thead></thead><tbody><tr><td class="p-3 text-muted">Cargando…</td></tr></tbody></table></div>
+
+  <div class="p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
+    <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+    <ul class="mb-0 mt-1">
+      <li><b>Montos mensuales por cuenta</b> → columna <b>PPTO</b> del P&G (mes y acumulado) en la <a href="/contabilidad/directorio/">Presentación Directorio</a>, agrupados por los mismos rubros paramétricos del cuadro (botón Configurar rubros de esa página).</li>
+      <li><b>Análisis del Analista IA</b> de las láminas de resultados → compara contra estos montos cuando existen.</li>
+      <li>Convención: <b>ingresos y gastos en positivo</b> (el Excel original de finanzas trae ingresos en negativo; el importador los normaliza solo).</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token, 'Content-Type':'application/json' };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = n => { const v = Math.round(Number(n)||0); return v ? v.toLocaleString('es-CL') : ''; };
+const parseNum = s => Math.round(Number(String(s).replace(/\./g,'').replace(/,/g,'.').replace(/[^\d.-]/g,''))||0);
+const MES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+let D = null, dirty = false;
+
+async function cargar(anio){
+  const y = anio || fAnio.value || (new Date().getFullYear());
+  const r = await fetch('/api/contabilidad/presupuesto?anio='+y,{headers:H});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  D = j.data; dirty = false;
+  const anios = [...new Set([...D.anios, Number(y), new Date().getFullYear(), new Date().getFullYear()+1])].sort();
+  fAnio.innerHTML = anios.map(a=>`<option ${a==y?'selected':''}>${a}</option>`).join('');
+  pintar();
+}
+
+function pintar(){
+  const todas = document.getElementById('chkTodas').checked;
+  const filas = D.filas.filter(f => todas || f.meses.some(v=>v));
+  const thead = `<tr><th colspan="16" style="font-size:.85rem">AUTOFACIL CHILE SPA — PRESUPUESTO ${D.anio} EN PESOS</th></tr>
+    <tr><th style="min-width:74px">Cuenta</th><th style="min-width:230px">Nombre</th>${MES.map(m=>`<th class="n">${m}</th>`).join('')}<th class="n">TOTAL</th><th></th></tr>`;
+  const fila = (f,i) => {
+    const tot = f.meses.reduce((s,v)=>s+(Number(v)||0),0);
+    return `<tr data-i="${i}"><td class="cta">${esc(f.cuenta)}</td><td class="nom" title="${esc(f.nombre)}">${esc(f.nombre)}</td>
+      ${f.meses.map((v,m)=>`<td class="n" contenteditable data-m="${m}" onblur="celda(this,${i})" onkeydown="tecla(event)">${fmt(v)}</td>`).join('')}
+      <td class="n tot">${fmt(tot)}</td>
+      <td><button class="btn btn-sm btn-link text-danger p-0" title="Vaciar fila" onclick="vaciar(${i})"><i class="bi bi-eraser"></i></button></td></tr>`;
+  };
+  const grupo = (lbl, arr) => {
+    const tot = Array(12).fill(0); arr.forEach(f=>f.meses.forEach((v,m)=>tot[m]+=Number(v)||0));
+    return `<tr class="grupo"><td class="cta"></td><td class="nom">${lbl}</td>${tot.map(v=>`<td class="n">${fmt(v)}</td>`).join('')}<td class="n">${fmt(tot.reduce((s,v)=>s+v,0))}</td><td></td></tr>`;
+  };
+  const ing = filas.filter(f=>f.tipo==='INGRESO'), gas = filas.filter(f=>f.tipo!=='INGRESO');
+  const res = Array(12).fill(0);
+  ing.forEach(f=>f.meses.forEach((v,m)=>res[m]+=Number(v)||0));
+  gas.forEach(f=>f.meses.forEach((v,m)=>res[m]-=Number(v)||0));
+  document.querySelector('#tabla thead').innerHTML = thead;
+  document.querySelector('#tabla tbody').innerHTML =
+    grupo('TOTAL INGRESOS', ing) + ing.map(f=>fila(f, D.filas.indexOf(f))).join('') +
+    grupo('TOTAL GASTOS', gas) + gas.map(f=>fila(f, D.filas.indexOf(f))).join('') +
+    `<tr class="resultado"><td class="cta"></td><td class="nom">RESULTADO</td>${res.map(v=>`<td class="n"><span class="${v<0?'neg':''}">${fmt(v)||'0'}</span></td>`).join('')}<td class="n"><span class="${res.reduce((s,v)=>s+v,0)<0?'neg':''}">${fmt(res.reduce((s,v)=>s+v,0))||'0'}</span></td><td></td></tr>`;
+}
+
+function celda(td, i){
+  const m = Number(td.dataset.m), v = parseNum(td.textContent);
+  if ((D.filas[i].meses[m]||0) !== v){ D.filas[i].meses[m] = v; dirty = true; marcarDirty(); pintar(); }
+  else td.textContent = fmt(v);
+}
+function tecla(e){ if (e.key==='Enter'){ e.preventDefault(); e.target.blur(); } }
+function vaciar(i){ D.filas[i].meses = Array(12).fill(0); dirty = true; marcarDirty(); pintar(); }
+function marcarDirty(){ btnGuardar.classList.toggle('dirty', dirty); }
+window.addEventListener('beforeunload', e => { if (dirty){ e.preventDefault(); e.returnValue=''; } });
+
+async function guardar(){
+  const r = await fetch('/api/contabilidad/presupuesto',{method:'PUT',headers:H,body:JSON.stringify({anio:D.anio, filas:D.filas})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  dirty = false; marcarDirty();
+  alert(`Presupuesto ${D.anio} guardado (${j.data.celdas.toLocaleString('es-CL')} celdas con monto). La columna PPTO del directorio ya lo refleja.`);
+}
+
+function agregarCuenta(){
+  const cuenta = (prompt('Código de cuenta (3xxxxxxx ingreso / 4xxxxxxx gasto):')||'').trim();
+  if (!/^\d{4,}$/.test(cuenta)) return;
+  if (D.filas.some(f=>f.cuenta===cuenta)) return alert('La cuenta ya está en la grilla (activa "Mostrar cuentas en $0" para verla).');
+  const nombre = (prompt('Nombre de la cuenta:')||cuenta).trim();
+  D.filas.push({ cuenta, nombre, tipo: cuenta.startsWith('3')?'INGRESO':'GASTO', meses: Array(12).fill(0) });
+  D.filas.sort((a,b)=>a.cuenta.localeCompare(b.cuenta));
+  document.getElementById('chkTodas').checked = true; dirty = true; marcarDirty(); pintar();
+}
+
+async function continuarAnio(){
+  if (dirty) return alert('Guarda primero los cambios pendientes.');
+  const hacia = Number(D.anio)+1;
+  const pct = prompt(`Copiar el presupuesto ${D.anio} → ${hacia}. ¿% de reajuste sobre los montos? (0 = igual)`, '0');
+  if (pct===null) return;
+  const r = await fetch('/api/contabilidad/presupuesto/copiar',{method:'POST',headers:H,body:JSON.stringify({desde:D.anio, hacia, reajuste_pct:Number(String(pct).replace(',','.'))||0})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Presupuesto ${hacia} creado (${j.data.celdas.toLocaleString('es-CL')} celdas). Ahora edítalo a gusto.`);
+  cargar(hacia);
+}
+
+async function importarExcel(inp){
+  const f = inp.files[0]; if (!f) return; inp.value='';
+  const anio = prompt('¿Año del presupuesto del archivo?', String(D?.anio||new Date().getFullYear()));
+  if (!anio || !/^\d{4}$/.test(anio.trim())) return;
+  const buf = await f.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const hoja = wb.SheetNames.find(n=>/presupuesto/i.test(n)) || wb.SheetNames[0];
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], {header:1, defval:null});
+  const head = (rows[0]||[]).map(c=>String(c||'').toLowerCase().trim());
+  const iCta = head.findIndex(c=>/cuenta/.test(c)), iEne = head.findIndex(c=>/^enero$/.test(c));
+  if (iCta<0 || iEne<0) return alert(`No encuentro las columnas id_cuenta/enero en la hoja "${hoja}".`);
+  const filas = [];
+  for (const r of rows.slice(1)){
+    const cuenta = String(r[iCta]||'').trim();
+    if (!/^\d{4,}$/.test(cuenta)) continue;
+    filas.push({ cuenta, nombre: String(r[iCta+1]||'').trim(), meses: Array.from({length:12},(_,k)=>Number(r[iEne+k])||0) });
+  }
+  const r = await fetch('/api/contabilidad/presupuesto/importar',{method:'POST',headers:H,body:JSON.stringify({anio:Number(anio), filas})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  alert(`Presupuesto ${anio} importado: ${j.data.cuentas} cuentas. El año se reemplazó completo.`);
+  cargar(Number(anio));
+}
+
+function exportar(){
+  const html = `<html><head><meta charset="utf-8"></head><body>${document.getElementById('tabla').outerHTML}</body></html>`;
+  const blob = new Blob(['﻿'+html], {type:'application/vnd.ms-excel'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `presupuesto-${D.anio}.xls`; a.click(); URL.revokeObjectURL(a.href);
+}
+cargar(new Date().getFullYear());
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

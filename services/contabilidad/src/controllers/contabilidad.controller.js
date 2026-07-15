@@ -993,6 +993,79 @@ require('../../../../shared/migrate').enFila('contabilidad-presupuesto', async (
   } catch (e) { console.error('[contabilidad-presupuesto migration]', e.message); }
 });
 
+/* Card Presupuesto Anual: grilla cuenta × 12 meses editable (estilo Excel de
+   finanzas), con copia al año siguiente ("continuar el presupuesto"). */
+require('../../../../shared/migrate').enFila('contabilidad-presupuesto-card', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_presupuesto' LIMIT 1");
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Presupuesto Anual','ctb_presupuesto','/contabilidad/presupuesto/','bi-calculator')");
+      idf = r.insertId;
+    }
+    for (const idp of [1, 90003, 90007, 90009])
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    console.log('[contabilidad] presupuesto anual listo');
+  } catch (e) { console.error('[contabilidad-presupuesto-card migration]', e.message); }
+});
+
+exports.getPresupuesto = async (req, res) => {
+  try {
+    const y = Number(req.query.anio);
+    if (!y) return fail(res, 'anio obligatorio', 400);
+    const [anios] = await pool.query('SELECT DISTINCT anio FROM ctb_presupuesto ORDER BY anio');
+    const [plan] = await pool.query("SELECT codigo, nombre, tipo FROM ctb_cuentas WHERE tipo IN ('INGRESO','GASTO') AND activo=1 ORDER BY codigo");
+    const [vals] = await pool.query('SELECT cuenta, nombre, mes, monto FROM ctb_presupuesto WHERE anio=?', [y]);
+    const filas = new Map(); // cuenta → fila
+    for (const c of plan) filas.set(c.codigo, { cuenta: c.codigo, nombre: c.nombre, tipo: c.tipo, meses: Array(12).fill(0) });
+    for (const v of vals) {
+      if (!filas.has(v.cuenta)) filas.set(v.cuenta, { cuenta: v.cuenta, nombre: v.nombre || v.cuenta, tipo: String(v.cuenta).startsWith('3') ? 'INGRESO' : 'GASTO', meses: Array(12).fill(0) });
+      filas.get(v.cuenta).meses[v.mes - 1] = Number(v.monto);
+    }
+    ok(res, { anio: y, anios: anios.map(a => a.anio), filas: [...filas.values()].sort((a, b) => a.cuenta.localeCompare(b.cuenta)) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Guarda el año completo desde el editor. A diferencia del import Excel, aquí
+   los montos ya vienen en sentido natural (ingresos y gastos positivos). */
+exports.guardarPresupuesto = async (req, res) => {
+  try {
+    const { anio, filas } = req.body || {};
+    const y = Number(anio);
+    if (!y || y < 2020 || y > 2100) return fail(res, 'anio inválido', 400);
+    if (!Array.isArray(filas)) return fail(res, 'filas obligatorias', 400);
+    const values = [];
+    for (const f of filas) {
+      const cuenta = String(f.cuenta || '').trim();
+      if (!/^\d{4,}$/.test(cuenta) || !Array.isArray(f.meses)) continue;
+      f.meses.forEach((v, i) => {
+        const m = Math.round(Number(v) || 0);
+        if (m && i < 12) values.push([y, i + 1, cuenta, String(f.nombre || '').slice(0, 160) || null, m]);
+      });
+    }
+    await pool.query('DELETE FROM ctb_presupuesto WHERE anio=?', [y]);
+    if (values.length) await pool.query('INSERT INTO ctb_presupuesto (anio, mes, cuenta, nombre, monto) VALUES ?', [values]);
+    auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'presupuesto', entidad_id: String(y), detalle: `Presupuesto ${y} guardado (${values.length} celdas)` });
+    ok(res, { anio: y, celdas: values.length });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* "Continuar el presupuesto": copia un año al siguiente con reajuste % opcional. */
+exports.copiarPresupuesto = async (req, res) => {
+  try {
+    const desde = Number(req.body?.desde), hacia = Number(req.body?.hacia), pct = Number(req.body?.reajuste_pct) || 0;
+    if (!desde || !hacia || hacia === desde) return fail(res, 'desde/hacia inválidos', 400);
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM ctb_presupuesto WHERE anio=?', [hacia]);
+    if (n) return fail(res, `El año ${hacia} ya tiene presupuesto (${n} celdas). Bórralo o edítalo directo.`, 409);
+    const [r] = await pool.query(
+      `INSERT INTO ctb_presupuesto (anio, mes, cuenta, nombre, monto)
+       SELECT ?, mes, cuenta, nombre, ROUND(monto * (1 + ?/100)) FROM ctb_presupuesto WHERE anio=?`, [hacia, pct, desde]);
+    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'presupuesto', entidad_id: String(hacia), detalle: `Presupuesto ${hacia} creado desde ${desde} (reajuste ${pct}%)` });
+    ok(res, { hacia, celdas: r.affectedRows });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.importarPresupuesto = async (req, res) => {
   try {
     const { anio, filas } = req.body || {};
