@@ -190,59 +190,62 @@ function resumenCotizacion(cot) {
     `lo que da un valor a financiar de ${_fmt(cot.monto_financiado)}, con una cuota a ${cot.plazo} meses de ${_fmt(cot.cuota)}.`;
 }
 
+const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+
 const DISCLAIMER = 'Los datos adjuntos son solo informativos y aproximados, pudiendo variar, por lo que la presente ' +
   'cotización no obliga a AutoFácil en ninguna manera. La aprobación del crédito está sujeta a la presentación de la ' +
   'documentación requerida y a las políticas de crédito vigentes de AutoFácil y/o de las financieras asociadas.';
 
 // HTML completo y bonito de la cotización (para imprimir y para el cuerpo del correo)
-function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true } = {}) {
+function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, baseUrl = '' } = {}) {
   const d = _desglose(cot);
   const tasa = cot.tasa_mensual ? Number(cot.tasa_mensual).toFixed(2) + '%' : '—';
   const cae = d.res.cae != null ? (d.res.cae * 100).toFixed(2) + '%' : '—';
+  const logo = `${baseUrl}/img/logo.png`;
   const fila = (l, v, opt = {}) => `<tr${opt.strong ? ' style="font-weight:700"' : ''}>
-    <td style="padding:7px 14px;border-bottom:1px solid #eef2f7;color:#374151${opt.strong ? ';font-weight:700' : ''}">${_esc(l)}</td>
-    <td style="padding:7px 14px;border-bottom:1px solid #eef2f7;text-align:right;font-variant-numeric:tabular-nums;color:#111827${opt.strong ? ';font-weight:700' : ''}">${_fmt(v)}</td></tr>`;
+    <td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151${opt.strong ? ';font-weight:700' : ''}">${_esc(l)}</td>
+    <td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right;font-variant-numeric:tabular-nums;color:#111827${opt.strong ? ';font-weight:700' : ''}">${_fmt(v)}</td></tr>`;
   const seccion = (titulo, filasHtml) => filasHtml ? `
-    <tr><td colspan="2" style="padding:14px 14px 4px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#0141A2">${titulo}</td></tr>${filasHtml}` : '';
+    <tr><td colspan="2" style="padding:10px 14px 3px;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#0141A2">${titulo}</td></tr>${filasHtml}` : '';
 
   const cuerpo = `
-  <div style="max-width:640px;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937">
-    <div style="background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);color:#fff;padding:26px 30px;border-radius:14px 14px 0 0">
-      <div style="font-size:22px;font-weight:800;letter-spacing:-.01em">AutoFácil</div>
-      <div style="opacity:.85;font-size:13px;margin-top:2px">Crédito Automotriz — Cotización</div>
+  <div style="max-width:620px;margin:0 auto;background:#fff;font-family:'Segoe UI',Arial,sans-serif;color:#1f2937">
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);color:#fff;padding:18px 28px;border-radius:14px 14px 0 0;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+      <img src="${logo}" alt="AutoFácil" style="height:30px;filter:brightness(0) invert(1)">
+      <div style="opacity:.85;font-size:12.5px;margin-top:4px">Crédito Automotriz — Cotización</div>
     </div>
-    <div style="padding:24px 30px">
-      <div style="font-size:14px;margin-bottom:2px"><b>${_tratamiento(cot.nombre_cliente)}(a): ${_esc(cot.nombre_cliente)}</b></div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:2px">RUT: ${_esc(cot.rut_cliente)}</div>
-      <div style="font-size:13px;color:#6b7280;margin-bottom:16px">Fecha: ${_fechaLarga(cot.fecha_cotizacion)}</div>
-      <p style="font-size:14px;line-height:1.55;margin:0 0 20px">${resumenCotizacion(cot)}</p>
+    <div style="padding:16px 28px 20px">
+      <div style="font-size:13.5px;margin-bottom:2px"><b>${_tratamiento(cot.nombre_cliente)}(a): ${_esc(cot.nombre_cliente)}</b></div>
+      <div style="font-size:12.5px;color:#6b7280">RUT: ${_esc(cot.rut_cliente)}</div>
+      <div style="font-size:12.5px;color:#6b7280;margin-bottom:12px">Fecha: ${_fechaLarga(cot.fecha_cotizacion)}</div>
+      <p style="font-size:13px;line-height:1.5;margin:0 0 14px">${resumenCotizacion(cot)}</p>
 
-      <table style="width:100%;border-collapse:collapse;font-size:13.5px;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;border:1px solid #e5e9f0;border-radius:10px;overflow:hidden">
         ${seccion('Vehículo', fila('Valor Comercial del Vehículo', cot.valor_vehiculo) + fila('Pie', cot.pie) + fila('Saldo Precio', d.saldoPrecio, { strong: true }))}
         ${seccion('Gastos Operacionales', d.gastos.map(g => fila(g[0], g[1])).join('') + fila('Total Gastos Operacionales', d.totalGastos, { strong: true }))}
         ${d.seguros.length ? seccion('Seguros', d.seguros.map(s => fila(s[0], s[1])).join('') + fila('Total Seguros', d.totalSeg, { strong: true })) : ''}
         ${seccion('Financiamiento', fila('Monto a Financiar', cot.monto_financiado, { strong: true }) +
-          `<tr><td style="padding:7px 14px;border-bottom:1px solid #eef2f7;color:#374151">Plazo</td><td style="padding:7px 14px;border-bottom:1px solid #eef2f7;text-align:right">${cot.plazo} meses</td></tr>` +
-          `<tr><td style="padding:7px 14px;border-bottom:1px solid #eef2f7;color:#374151">Tasa Mensual</td><td style="padding:7px 14px;border-bottom:1px solid #eef2f7;text-align:right">${tasa}</td></tr>`)}
+          `<tr><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151">Plazo</td><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right">${cot.plazo} meses</td></tr>` +
+          `<tr><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;color:#374151">Tasa Mensual</td><td style="padding:5px 14px;border-bottom:1px solid #eef2f7;text-align:right">${tasa}</td></tr>`)}
       </table>
 
-      <table style="width:100%;border-collapse:collapse;margin-top:16px">
+      <table style="width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:avoid">
         <tr>
-          <td style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;padding:16px 20px;border-radius:12px 0 0 12px;width:60%">
-            <div style="font-size:12px;opacity:.85;text-transform:uppercase;letter-spacing:.05em">Cuota Mensual</div>
-            <div style="font-size:26px;font-weight:800;margin-top:2px">${_fmt(cot.cuota)}</div>
+          <td style="background:linear-gradient(135deg,#0141A2,#009AFE);color:#fff;padding:13px 20px;border-radius:12px 0 0 12px;width:60%;-webkit-print-color-adjust:exact;print-color-adjust:exact">
+            <div style="font-size:11.5px;opacity:.85;text-transform:uppercase;letter-spacing:.05em">Cuota Mensual</div>
+            <div style="font-size:25px;font-weight:800;margin-top:2px">${_fmt(cot.cuota)}</div>
           </td>
-          <td style="background:#eff6ff;padding:16px 20px;border-radius:0 12px 12px 0;text-align:right">
+          <td style="background:#eff6ff;padding:13px 20px;border-radius:0 12px 12px 0;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact">
             <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em">CAE</div>
             <div style="font-size:18px;font-weight:800;color:#0141A2">${cae}</div>
-            <div style="font-size:11px;color:#64748b;margin-top:4px">${cot.plazo} meses</div>
+            <div style="font-size:11px;color:#64748b;margin-top:3px">${cot.plazo} meses</div>
           </td>
         </tr>
       </table>
 
-      <p style="font-size:11.5px;line-height:1.5;color:#6b7280;margin:20px 0 0;padding:12px 14px;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px">${DISCLAIMER}</p>
+      <p style="font-size:11px;line-height:1.45;color:#6b7280;margin:14px 0 0;padding:10px 13px;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${DISCLAIMER}</p>
 
-      <div style="margin-top:22px;font-size:13px;color:#374151">
+      <div style="margin-top:16px;font-size:12.5px;color:#374151">
         Atentamente,<br>
         <b>${_esc(ejecutivo || 'Equipo AutoFácil')}</b>${emailEjec ? `<br><span style="color:#6b7280">${_esc(emailEjec)}</span>` : ''}<br>
         <span style="color:#0141A2;font-weight:700">AutoFácil</span>
@@ -252,7 +255,12 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true } = 
 
   if (!standalone) return cuerpo;
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cotización ${_esc(cot.nombre_cliente)}</title>
-    <style>@media print{body{margin:0}@page{margin:12mm}} body{background:#f0f4f8;margin:0;padding:24px}</style></head>
+    <style>
+      @page { size: A4; margin: 10mm; }
+      html, body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      body { background:#f0f4f8; margin:0; padding:18px; }
+      @media print { body { background:#fff; padding:0; } }
+    </style></head>
     <body>${cuerpo}</body></html>`;
 }
 
@@ -274,7 +282,7 @@ const getHtml = async (req, res) => {
     const u = req.usuario || {};
     const ejecutivo = `${u.nombre || ''} ${u.apellido || ''}`.trim();
     res.json({ success: true, data: {
-      html: buildCotizacionHTML(cot, { ejecutivo, emailEjec: u.email }),
+      html: buildCotizacionHTML(cot, { ejecutivo, emailEjec: u.email, baseUrl: APP_URL }),
       email_sugerido: cot.cli_email || cot.cli_correo || '',
       nombre_cliente: cot.nombre_cliente,
     }, error: null });
@@ -298,7 +306,7 @@ const enviar = async (req, res) => {
 
     const u = req.usuario || {};
     const ejecutivo = `${u.nombre || ''} ${u.apellido || ''}`.trim();
-    const html = buildCotizacionHTML(cot, { ejecutivo, emailEjec: u.email });
+    const html = buildCotizacionHTML(cot, { ejecutivo, emailEjec: u.email, baseUrl: APP_URL });
     const texto = `${_tratamiento(cot.nombre_cliente)}(a) ${cot.nombre_cliente}:\n\n${resumenCotizacion(cot)}\n\n${DISCLAIMER}\n\nAtentamente,\n${ejecutivo || 'AutoFácil'}`;
 
     const r = await enviarCorreo({
