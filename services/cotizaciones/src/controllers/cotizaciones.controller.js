@@ -186,7 +186,7 @@ function resumenCotizacion(cot) {
   const tieneSeg = d.seguros.length > 0;
   return `De acuerdo a lo conversado, adjunto le enviamos la cotización de un crédito para la compra de un automóvil usado ` +
     `con un valor comercial de ${_fmt(cot.valor_vehiculo)} y un pie de ${_fmt(cot.pie)}. ` +
-    `La simulación incluye los gastos operacionales de la operación${tieneSeg ? ` y los seguros (${_fmt(d.totalSeg)})` : ''}, ` +
+    `La simulación incluye los gastos operacionales${tieneSeg ? ` y los seguros (${_fmt(d.totalSeg)})` : ''}, ` +
     `lo que da un valor a financiar de ${_fmt(cot.monto_financiado)}, con una cuota a ${cot.plazo} meses de ${_fmt(cot.cuota)}.`;
 }
 
