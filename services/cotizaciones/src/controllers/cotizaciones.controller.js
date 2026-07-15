@@ -245,7 +245,7 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
 
       <p style="font-size:10.5px;line-height:1.4;color:#6b7280;margin:12px 0 0;padding:9px 12px;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact">${DISCLAIMER}</p>
 
-      <div style="margin-top:12px;font-size:12px;color:#374151">
+      <div style="margin-top:10px;font-size:12px;color:#374151">
         Atentamente,<br>
         <b>${_esc(ejecutivo || 'Equipo AutoFácil')}</b>${emailEjec ? `<br><span style="color:#6b7280">${_esc(emailEjec)}</span>` : ''}<br>
         <span style="color:#0141A2;font-weight:700">AutoFácil</span>
@@ -256,7 +256,7 @@ function buildCotizacionHTML(cot, { ejecutivo, emailEjec, standalone = true, bas
   if (!standalone) return cuerpo;
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cotización ${_esc(cot.nombre_cliente)}</title>
     <style>
-      @page { size: letter; margin: 11mm 20mm; }
+      @page { size: letter; margin: 8mm 24mm; }
       html, body { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       body { background:#f0f4f8; margin:0; padding:18px; }
       .hoja { page-break-inside:avoid; }
