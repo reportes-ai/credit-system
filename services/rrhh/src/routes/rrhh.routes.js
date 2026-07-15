@@ -62,6 +62,9 @@ router.get('/vacaciones/saldo',       verifyToken, aus.saldoVacaciones);
 // Ficha del Colaborador + Carpeta Digital + Directorio (Fase 1 módulo RRHH)
 const ficha = require('../controllers/ficha.controller');
 router.get('/directorio',          verifyToken, requireFunc('rh_directorio', 'rh_ver', 'rh_aprobar'), ficha.directorio);
+router.get('/organigrama',         verifyToken, requireFunc('rh_directorio', 'rh_ver', 'rh_aprobar'), ficha.organigrama);
+router.get('/directorio/config',   verifyToken, requireFunc('rh_directorio_config'), ficha.directorioConfig);
+router.put('/directorio/config',   verifyToken, requireFunc('rh_directorio_config'), ficha.guardarDirectorioConfig);
 router.get('/colaboradores',       verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), ficha.listarColaboradores);
 router.get('/ficha',               verifyToken, ficha.getFicha);
 router.get('/ficha/:id',           verifyToken, ficha.getFicha);

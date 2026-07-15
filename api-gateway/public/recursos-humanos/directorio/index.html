@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v1.0 — directorio de colaboradores (Fase 1 módulo RRHH) -->
+  <!-- v2.0 — directorio + organigrama + configuración de visibilidad (pestañas) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -18,16 +18,46 @@
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main { padding:26px 30px; max-width:1200px; margin:0 auto; }
-    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
     .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { font-weight:700; margin:0; font-size:1.2rem; } .banner p { margin:2px 0 0; opacity:.85; font-size:.85rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 18px; font-size:.86rem; font-weight:700; color:#475569; cursor:pointer; display:flex; align-items:center; gap:7px; }
+    .tab.active { background:var(--navy); border-color:var(--navy); color:#fff; }
     .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
     .card-p { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 18px; display:flex; gap:14px; align-items:flex-start; }
-    .avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.05rem; flex-shrink:0; }
+    .avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1.05rem; flex-shrink:0; overflow:hidden; }
     .card-p h6 { margin:0 0 2px; font-weight:700; font-size:.92rem; color:#111827; }
     .card-p .cargo { font-size:.76rem; color:#0141A2; font-weight:600; margin-bottom:6px; }
     .card-p .dato { font-size:.76rem; color:#475569; display:flex; align-items:center; gap:6px; margin-top:2px; word-break:break-all; }
     .card-p .dato a { color:#475569; text-decoration:none; } .card-p .dato a:hover { color:#0141A2; }
     .empty { text-align:center; color:#9ca3af; padding:36px 0; }
+
+    /* ── Organigrama (árbol CSS con conectores) ── */
+    .org-wrap { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:24px 18px; overflow-x:auto; }
+    .org-tree, .org-tree ul { display:flex; padding-top:20px; position:relative; margin:0; list-style:none; }
+    .org-tree { justify-content:center; }
+    .org-tree ul::before { content:''; position:absolute; top:0; left:50%; border-left:1.5px solid #cbd5e1; height:20px; }
+    .org-tree li { display:flex; flex-direction:column; align-items:center; padding:20px 8px 0; position:relative; }
+    .org-tree li::before, .org-tree li::after { content:''; position:absolute; top:0; right:50%; border-top:1.5px solid #cbd5e1; width:50%; height:20px; }
+    .org-tree li::after { right:auto; left:50%; border-left:1.5px solid #cbd5e1; }
+    .org-tree li:only-child::before, .org-tree li:only-child::after { display:none; }
+    .org-tree li:first-child::before, .org-tree li:last-child::after { border:0 none; }
+    .org-tree li:last-child::before { border-right:1.5px solid #cbd5e1; border-radius:0 6px 0 0; }
+    .org-tree li:first-child::after { border-radius:6px 0 0 0; }
+    .org-node { border:1.5px solid #e2e8f0; border-radius:12px; background:#fff; padding:9px 12px; min-width:150px; max-width:180px; box-shadow:0 1px 3px rgba(0,0,0,.06); text-align:center; }
+    .org-node .oa { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; margin:0 auto 6px; overflow:hidden; }
+    .org-node .on { font-weight:700; font-size:.8rem; color:#111827; line-height:1.15; }
+    .org-node .oc { font-size:.68rem; color:#0141A2; font-weight:600; margin-top:2px; line-height:1.15; }
+
+    /* ── Configurar ── */
+    .cfg-box { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
+    .cfg-table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .cfg-table th { text-align:left; font-size:.7rem; text-transform:uppercase; color:#64748b; padding:8px 10px; border-bottom:2px solid #e2e8f0; }
+    .cfg-table th.c, .cfg-table td.c { text-align:center; }
+    .cfg-table td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+    .cfg-table tr:hover td { background:#f8fafc; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 22px; font-weight:700; font-size:.87rem; cursor:pointer; }
+    .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#065f46; color:#fff; padding:11px 22px; border-radius:10px; font-size:.88rem; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.2); z-index:3000; display:none; }
   </style>
 </head>
 <body>
@@ -41,13 +71,49 @@
 
 <div class="main">
   <div class="banner"><i class="bi bi-person-lines-fill"></i><div><h2>Directorio de Colaboradores</h2><p>Quién es quién en AutoFácil — contacto directo con todo el equipo.</p></div></div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
-    <div style="font-weight:700;color:#012d70" id="resumen">—</div>
-    <input id="q" placeholder="Buscar nombre o cargo…" oninput="render()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;width:280px;max-width:60%">
+
+  <div class="tabs">
+    <div class="tab active" id="tab-dir"  onclick="tab('dir')"><i class="bi bi-grid-3x3-gap"></i>Directorio</div>
+    <div class="tab"        id="tab-org"  onclick="tab('org')"><i class="bi bi-diagram-3"></i>Organigrama</div>
+    <div class="tab"        id="tab-cfg"  onclick="tab('cfg')" style="display:none"><i class="bi bi-sliders"></i>Configurar</div>
   </div>
-  <div class="grid" id="grid"></div>
-  <div id="empty" class="empty" style="display:none">Sin resultados.</div>
+
+  <!-- DIRECTORIO -->
+  <div id="pane-dir">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <div style="font-weight:700;color:#012d70" id="resumen">—</div>
+      <input id="q" placeholder="Buscar nombre o cargo…" oninput="render()" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 12px;font-size:.85rem;width:280px;max-width:60%">
+    </div>
+    <div class="grid" id="grid"></div>
+    <div id="empty" class="empty" style="display:none">Sin resultados.</div>
+  </div>
+
+  <!-- ORGANIGRAMA -->
+  <div id="pane-org" style="display:none">
+    <div class="org-wrap"><div id="orgTree" class="empty">Cargando…</div></div>
+  </div>
+
+  <!-- CONFIGURAR -->
+  <div id="pane-cfg" style="display:none">
+    <div class="cfg-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+        <div style="font-size:.83rem;color:#475569">Marca quién aparece en el <b>Directorio</b> y en el <b>Organigrama</b>. Los cambios afectan a todos los usuarios.</div>
+        <button class="btn-navy" onclick="guardarCfg()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="cfg-table">
+          <thead><tr>
+            <th>Colaborador</th><th>Cargo</th>
+            <th class="c">Directorio <input type="checkbox" id="allDir" onchange="toggleAll('dir',this.checked)"></th>
+            <th class="c">Organigrama <input type="checkbox" id="allOrg" onchange="toggleAll('org',this.checked)"></th>
+          </tr></thead>
+          <tbody id="cfgBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -55,15 +121,29 @@ const token = sessionStorage.getItem('token'), yo = JSON.parse(sessionStorage.ge
 if (!token||!yo) location.href='/login.html';
 document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
 function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H = { Authorization:'Bearer '+token };
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-let DATA = [], FOTOS = {};
+let DATA = [], FOTOS = {}, ORG = null, CFG = null, PUEDE_CFG = false;
+
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2600); }
+
+function tab(v){
+  ['dir','org','cfg'].forEach(k=>{
+    document.getElementById('tab-'+k).classList.toggle('active', k===v);
+    document.getElementById('pane-'+k).style.display = k===v ? '' : 'none';
+  });
+  if (v==='org' && !ORG) cargarOrg();
+  if (v==='cfg' && !CFG) cargarCfg();
+}
+
+/* ── Directorio ── */
 function render(){
   const q = (document.getElementById('q').value||'').toLowerCase();
   const rows = DATA.filter(r => !q || [r.nombre,r.cargo].some(v=>String(v||'').toLowerCase().includes(q)));
   document.getElementById('resumen').textContent = `${rows.length} colaborador(es)`;
   document.getElementById('empty').style.display = rows.length ? 'none' : '';
   document.getElementById('grid').innerHTML = rows.map(r=>`<div class="card-p">
-    <div class="avatar">${FOTOS[r.id_usuario]?`<img src="${FOTOS[r.id_usuario]}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">`:esc((r.nombre||'?')[0].toUpperCase())}</div>
+    <div class="avatar">${FOTOS[r.id_usuario]?`<img src="${FOTOS[r.id_usuario]}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`:esc((r.nombre||'?')[0].toUpperCase())}</div>
     <div style="min-width:0">
       <h6>${esc(r.nombre)}</h6>
       <div class="cargo">${esc(r.cargo||'—')}</div>
@@ -74,14 +154,109 @@ function render(){
     </div>
   </div>`).join('');
 }
-(async()=>{
-  const j = await (await fetch('/api/rrhh/directorio', { headers:{Authorization:'Bearer '+token} })).json();
+
+/* ── Organigrama ── */
+async function cargarOrg(){
+  try {
+    const j = await (await fetch('/api/rrhh/organigrama', { headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    ORG = j.data || [];
+    pintarOrg();
+  } catch(e){ document.getElementById('orgTree').textContent = 'Error: '+e.message; }
+}
+function nodoHTML(n){
+  const foto = FOTOS[n.id_usuario];
+  return `<div class="org-node">
+    <div class="oa">${foto?`<img src="${foto}" alt="" style="width:100%;height:100%;object-fit:cover">`:esc((n.nombre||'?')[0].toUpperCase())}</div>
+    <div class="on">${esc(n.nombre)}</div>
+    <div class="oc">${esc(n.cargo||'')}</div>
+  </div>`;
+}
+function ramaHTML(id, hijosDe){
+  const hijos = hijosDe[id] || [];
+  const n = MAPA[id];
+  return `<li>${nodoHTML(n)}${hijos.length?`<ul>${hijos.map(h=>ramaHTML(h.id_usuario,hijosDe)).join('')}</ul>`:''}</li>`;
+}
+let MAPA = {};
+function pintarOrg(){
+  MAPA = {}; ORG.forEach(n=>MAPA[n.id_usuario]=n);
+  const hijosDe = {}; const raices = [];
+  ORG.forEach(n=>{
+    const sup = n.id_supervisor;
+    if (sup && MAPA[sup]) (hijosDe[sup]=hijosDe[sup]||[]).push(n);
+    else raices.push(n);
+  });
+  const orden = a => (a.nombre||'').toLowerCase();
+  Object.values(hijosDe).forEach(arr=>arr.sort((a,b)=>orden(a)<orden(b)?-1:1));
+  raices.sort((a,b)=>orden(a)<orden(b)?-1:1);
+  const el = document.getElementById('orgTree');
+  if (!ORG.length){ el.textContent='Sin colaboradores para mostrar.'; return; }
+  el.className='';
+  el.innerHTML = `<ul class="org-tree">${raices.map(r=>ramaHTML(r.id_usuario,hijosDe)).join('')}</ul>`;
+}
+
+/* ── Configurar ── */
+async function cargarCfg(){
+  try {
+    const j = await (await fetch('/api/rrhh/directorio/config', { headers:H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    CFG = j.data || [];
+    document.getElementById('cfgBody').innerHTML = CFG.map(r=>`<tr>
+      <td>${esc(r.nombre)}</td>
+      <td style="color:#0141A2;font-weight:600">${esc(r.cargo||'—')}</td>
+      <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="dir" ${r.en_directorio?'checked':''}></td>
+      <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="org" ${r.en_organigrama?'checked':''}></td>
+    </tr>`).join('');
+    syncAll();
+  } catch(e){ document.getElementById('cfgBody').innerHTML = `<tr><td colspan="4" style="color:#ef4444;padding:14px">Error: ${esc(e.message)}</td></tr>`; }
+}
+function toggleAll(k, val){ document.querySelectorAll(`#cfgBody input[data-k="${k}"]`).forEach(c=>c.checked=val); }
+function syncAll(){
+  ['dir','org'].forEach(k=>{
+    const all = document.querySelectorAll(`#cfgBody input[data-k="${k}"]`);
+    const marc = document.querySelectorAll(`#cfgBody input[data-k="${k}"]:checked`);
+    const box = document.getElementById(k==='dir'?'allDir':'allOrg');
+    box.checked = all.length && marc.length===all.length;
+    box.indeterminate = marc.length>0 && marc.length<all.length;
+  });
+}
+document.getElementById('cfgBody').addEventListener('change', syncAll);
+async function guardarCfg(){
+  const map = {};
+  document.querySelectorAll('#cfgBody input[type=checkbox]').forEach(c=>{
+    const id = c.dataset.id; if (!id) return;
+    map[id] = map[id] || { id_usuario:Number(id), en_directorio:0, en_organigrama:0 };
+    if (c.dataset.k==='dir') map[id].en_directorio = c.checked?1:0;
+    if (c.dataset.k==='org') map[id].en_organigrama = c.checked?1:0;
+  });
+  try {
+    const r = await fetch('/api/rrhh/directorio/config', { method:'PUT', headers:{...H,'Content-Type':'application/json'}, body:JSON.stringify({ items:Object.values(map) }) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Cambios guardados');
+    DATA = []; ORG = null;   // forzar recarga del directorio y organigrama
+    await cargarDir();
+  } catch(e){ toast('Error: '+e.message); }
+}
+
+/* ── Carga inicial ── */
+async function cargarDir(){
+  const j = await (await fetch('/api/rrhh/directorio', { headers:H })).json();
   if (!j.success) { document.getElementById('empty').style.display=''; document.getElementById('empty').textContent = j.error||'Error'; return; }
   DATA = j.data || []; render();
-  // Fotos reales (Credenciales) — llegan aparte para no demorar el listado
+}
+(async()=>{
+  await cargarDir();
+  // Fotos reales (Credenciales)
   try {
-    const jf = await (await fetch('/api/credenciales/fotos', { headers:{Authorization:'Bearer '+token} })).json();
-    if (jf.success) { (jf.data||[]).forEach(f=>{ if (f.foto) FOTOS[f.id_usuario]=f.foto; }); render(); }
+    const jf = await (await fetch('/api/credenciales/fotos', { headers:H })).json();
+    if (jf.success) { (jf.data||[]).forEach(f=>{ if (f.foto) FOTOS[f.id_usuario]=f.foto; }); render(); if (ORG) pintarOrg(); }
+  } catch(e){}
+  // Permiso para la pestaña Configurar
+  try {
+    const jp = await (await fetch('/api/auth/mis-permisos?_='+Date.now(), { cache:'no-store', headers:H })).json();
+    PUEDE_CFG = yo?.perfil==='Administrador' || (jp.funcionalidades||[]).includes('rh_directorio_config');
+    if (PUEDE_CFG) document.getElementById('tab-cfg').style.display='';
   } catch(e){}
 })();
 </script>

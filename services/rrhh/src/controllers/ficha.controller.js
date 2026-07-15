@@ -195,6 +195,7 @@ const listarColaboradores = async (req, res) => {
 /* ── Directorio (todos): datos públicos, sin nada sensible ──────────────────── */
 const directorio = async (req, res) => {
   try {
+    // Solo los marcados visibles en el directorio (sin registro = visible por defecto)
     const [rows] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) AS nombre,
               u.cargo, u.email, u.telefono,
@@ -202,10 +203,58 @@ const directorio = async (req, res) => {
               TRIM(CONCAT_WS(' ', s.nombre, s.apellido)) AS supervisor
          FROM usuarios u
          LEFT JOIN usuarios s ON s.id_usuario = u.id_supervisor
-        WHERE u.estado = 'activo'
+         LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
+        WHERE u.estado = 'activo' AND COALESCE(c.en_directorio, 1) = 1
         ORDER BY nombre LIMIT 800`);
     ok(res, rows);
   } catch (e) { console.error('[rrhh directorio]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* GET /api/rrhh/organigrama — colaboradores visibles en el organigrama + su jefatura */
+const organigrama = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) AS nombre,
+              u.cargo, u.email, u.id_supervisor
+         FROM usuarios u
+         LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
+        WHERE u.estado = 'activo' AND COALESCE(c.en_organigrama, 1) = 1
+        ORDER BY nombre LIMIT 800`);
+    ok(res, rows);
+  } catch (e) { console.error('[rrhh organigrama]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* GET /api/rrhh/directorio/config — TODOS los activos con sus dos flags (Admin) */
+const directorioConfig = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) AS nombre, u.cargo,
+              COALESCE(c.en_directorio, 1)  AS en_directorio,
+              COALESCE(c.en_organigrama, 1) AS en_organigrama
+         FROM usuarios u
+         LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
+        WHERE u.estado = 'activo'
+        ORDER BY nombre LIMIT 800`);
+    ok(res, rows.map(r => ({ ...r, en_directorio: !!r.en_directorio, en_organigrama: !!r.en_organigrama })));
+  } catch (e) { console.error('[rrhh directorioConfig]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* PUT /api/rrhh/directorio/config { items:[{id_usuario, en_directorio, en_organigrama}] } (Admin) */
+const guardarDirectorioConfig = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    let n = 0;
+    for (const it of items) {
+      const id = parseInt(it.id_usuario, 10); if (!id) continue;
+      await pool.query(
+        `INSERT INTO rh_directorio_config (id_usuario, en_directorio, en_organigrama) VALUES (?,?,?)
+         ON DUPLICATE KEY UPDATE en_directorio=VALUES(en_directorio), en_organigrama=VALUES(en_organigrama)`,
+        [id, it.en_directorio ? 1 : 0, it.en_organigrama ? 1 : 0]);
+      n++;
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'directorio_config', detalle: `Actualizó visibilidad de ${n} colaborador(es) en directorio/organigrama` });
+    ok(res, { ok: true, n });
+  } catch (e) { console.error('[rrhh guardarDirectorioConfig]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
 /* ── Carpeta digital ────────────────────────────────────────────────────────── */
@@ -265,4 +314,27 @@ const eliminarDoc = async (req, res) => {
   } catch (e) { console.error('[rrhh eliminarDoc]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getFicha, putFicha, listarColaboradores, directorio, subirDoc, descargarDoc, eliminarDoc };
+/* ── Visibilidad en directorio/organigrama + funcionalidad de config (solo Admin) ── */
+require('../../../../shared/migrate').enFila('rrhh-directorio-config', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rh_directorio_config (
+        id_usuario     INT PRIMARY KEY,
+        en_directorio  TINYINT(1) NOT NULL DEFAULT 1,
+        en_organigrama TINYINT(1) NOT NULL DEFAULT 1,
+        updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    // Funcionalidad de acción (href NULL) para gatear la pestaña Configurar — solo Administrador por ahora
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_directorio_config' LIMIT 1");
+    let idf = ex && ex.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500001, 'Configurar Directorio/Organigrama', 'rh_directorio_config', NULL, 'bi-sliders')");
+      idf = r.insertId;
+    }
+    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
+    console.log('[rrhh-directorio-config] listo');
+  } catch (e) { console.error('[rrhh-directorio-config migration]', e.message); }
+});
+
+module.exports = { getFicha, putFicha, listarColaboradores, directorio, organigrama, directorioConfig, guardarDirectorioConfig, subirDoc, descargarDoc, eliminarDoc };
