@@ -218,7 +218,8 @@ exports.preguntar = async (req, res) => {
       'estado_resultados para cifras oficiales; presupuesto_anual para el plan; consulta_sql para el detalle fino. ' +
       'Piensa qué herramienta responde mejor ANTES de escribir SQL a mano.\n\n' +
       'Esquema disponible para consulta_sql:\n' + esquema + '\n\n' + GLOSARIO + '\n\n' +
-      'Al terminar responde SOLO con JSON: {"respuesta":"2 a 4 frases en español para un gerente de finanzas, con las cifras clave", ' +
+      'Al terminar responde SOLO con JSON (sin NINGÚN texto antes ni después, sin markdown, sin tablas, sin fórmulas: la tabla de datos se muestra sola bajo tu respuesta): ' +
+      '{"respuesta":"2 a 5 frases en español para un gerente de finanzas, texto plano con las cifras clave", ' +
       '"grafico": {"tipo":"bar","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
       'El gráfico debe referirse a columnas de la última tabla obtenida. Si algo no se puede responder, dilo sin inventar cifras.';
 
@@ -234,11 +235,29 @@ exports.preguntar = async (req, res) => {
       tools: TOOLS, ejecutarTool: crearDispatcher(ultimo), max_tokens: 1500, max_iter: 6,
     });
 
-    let fin = null;
+    // Extracción robusta del JSON final: el modelo a veces antepone prosa con llaves
+    // (fórmulas, tablas markdown) — se busca el ÚLTIMO objeto balanceado que tenga "respuesta".
     const limpio = String(texto || '').replace(/```json/gi, '').replace(/```/g, '');
-    const m = limpio.match(/\{[\s\S]*\}/);
-    if (m) { try { fin = JSON.parse(m[0]); } catch (_) {} }
-    const respuesta = (fin && fin.respuesta) || limpio.replace(/\{[\s\S]*\}/, '').trim() || 'No pude interpretar la pregunta. ¿Puedes reformularla?';
+    let fin = null;
+    for (let i = limpio.lastIndexOf('{"respuesta"'); i >= 0 && !fin; i = limpio.lastIndexOf('{"respuesta"', i - 1)) {
+      let depth = 0;
+      for (let j = i; j < limpio.length; j++) {
+        const ch = limpio[j];
+        if (ch === '{') depth++;
+        else if (ch === '}' && --depth === 0) {
+          try { fin = JSON.parse(limpio.slice(i, j + 1)); } catch (_) {}
+          break;
+        }
+      }
+    }
+    if (!fin) { const m = limpio.match(/\{[\s\S]*\}/); if (m) { try { fin = JSON.parse(m[0]); } catch (_) {} } }
+    let respuesta = (fin && fin.respuesta) || '';
+    if (!respuesta) {
+      // Sin JSON válido: mostrar la prosa pero desnudada de markdown (##, **, |tablas|, $$fórmulas$$)
+      respuesta = limpio.replace(/\{[\s\S]*\}/, '').replace(/\$\$[\s\S]*?\$\$/g, '').replace(/^#+\s*/gm, '')
+        .replace(/\*\*/g, '').replace(/^\s*\|.*\|\s*$/gm, '').replace(/^-{3,}\s*$/gm, '')
+        .replace(/\n{3,}/g, '\n\n').trim() || 'No pude interpretar la pregunta. ¿Puedes reformularla?';
+    }
 
     auditar({ req, accion: 'CONSULTA', modulo: 'contabilidad', entidad: 'finanzas_ia', detalle: `Pregunta: ${pregunta}`, meta: { sql: ultimo.sql, filas: ultimo.rows.length } });
     res.json({ success: true, data: { pregunta, respuesta, sql: ultimo.sql, columns: ultimo.columns, rows: ultimo.rows, grafico: (fin && fin.grafico) || null }, error: null });
