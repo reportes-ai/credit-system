@@ -1912,7 +1912,9 @@ exports.guardarHechoDirectorio = async (req, res) => {
   try {
     const { mes, seccion, texto } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
-    if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
+    // AN_<sección> = análisis del analista IA que se muestra sobre los hechos
+    const base = String(seccion || '').replace(/^AN_/, '');
+    if (!SECCIONES_DIR.includes(base)) return fail(res, 'Sección inválida', 400);
     await pool.query(
       `INSERT INTO ctb_dir_hechos (mes, seccion, texto, actualizado_por) VALUES (?,?,?,?)
        ON DUPLICATE KEY UPDATE texto=VALUES(texto), actualizado_por=VALUES(actualizado_por)`,
@@ -1924,16 +1926,21 @@ exports.guardarHechoDirectorio = async (req, res) => {
 
 exports.hechosDirectorioIA = async (req, res) => {
   try {
-    const { mes, seccion, datos } = req.body || {};
+    const { mes, seccion, datos, modo } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
     const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)' };
     const { analizar } = require('../../../../shared/anthropic');
+    const esAnalisis = modo === 'analisis';
     const out = await analizar({
       codigo: 'ctb_directorio_ia',
       id_usuario: (req.usuario || req.user || {}).id_usuario || null,
-      system: 'Eres el gerente de finanzas de AutoFácil Chile (crédito automotriz). Escribes los "Hechos Relevantes" de la presentación mensual al directorio (matriz en Ecuador). Estilo del directorio: puntos numerados 1), 2)…, montos en millones de pesos con una decimal ("$207,6 Millones"), directo, sin adornos. NO inventes cifras: usa solo los datos entregados.',
-      prompt: `Lámina: ${NOMBRES[seccion]} — mes ${mes}.\nCifras de la lámina (JSON):\n${JSON.stringify(datos || {}).slice(0, 14000)}\n\nEscribe 3-6 "Hechos Relevantes" numerados (1), 2)…) para el directorio: qué cambió contra el período de comparación, qué explica las variaciones grandes y qué debe saber o decidir el directorio. Sin encabezado ni cierre: solo los puntos.`,
+      system: esAnalisis
+        ? 'Eres el analista financiero de AutoFácil Chile (crédito automotriz). Escribes el ANÁLISIS de una lámina de la presentación mensual al directorio (matriz en Ecuador): lectura ejecutiva de las cifras, no una lista de hechos. Montos en millones de pesos con una decimal ("$207,6 Millones"), directo, sin adornos. NO inventes cifras: usa solo los datos entregados.'
+        : 'Eres el gerente de finanzas de AutoFácil Chile (crédito automotriz). Escribes los "Hechos Relevantes" de la presentación mensual al directorio (matriz en Ecuador). Estilo del directorio: puntos numerados 1), 2)…, montos en millones de pesos con una decimal ("$207,6 Millones"), directo, sin adornos. NO inventes cifras: usa solo los datos entregados.',
+      prompt: `Lámina: ${NOMBRES[seccion]} — mes ${mes}.\nCifras de la lámina (JSON):\n${JSON.stringify(datos || {}).slice(0, 14000)}\n\n` + (esAnalisis
+        ? 'Escribe un análisis breve (2-4 frases corridas, sin numerar): la lectura principal de la lámina, la variación que más pesa y su implicancia para el directorio. Si hay presupuesto (ppto) en los datos, compara contra él. Sin encabezado ni cierre.'
+        : 'Escribe 3-6 "Hechos Relevantes" numerados (1), 2)…) para el directorio: qué cambió contra el período de comparación, qué explica las variaciones grandes y qué debe saber o decidir el directorio. Sin encabezado ni cierre: solo los puntos.'),
       max_tokens: 1024,
     });
     if (!out || !out.texto) return fail(res, 'La IA no devolvió borrador', 502);

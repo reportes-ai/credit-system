@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.3 — columna PPTO del P&G con presupuesto anual importable (Excel finanzas) -->
+  <!-- v1.4 — Análisis del Analista IA por lámina (guardado por mes, sobre los Hechos Relevantes) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -64,6 +64,7 @@
     <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm"></div>
     <button class="btn btn-sm btn-primary" onclick="generar()"><i class="bi bi-magic me-1"></i>Generar presentación</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+    <button class="btn btn-sm btn-outline-primary" onclick="analizarTodo()" title="Genera el análisis IA de cada lámina (se guarda por mes y sale sobre los Hechos Relevantes)"><i class="bi bi-stars me-1"></i>Análisis IA de todo</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="configRubros()"><i class="bi bi-sliders me-1"></i>Configurar rubros</button>
     <label class="btn btn-sm btn-outline-secondary mb-0" title="Sube el export AVSOFT: Compras → Importador/Exportador → Exportar Documentos de Compras (1 Línea)"><i class="bi bi-upload me-1"></i>Importar compras AVSOFT
       <input type="file" hidden accept=".csv,.txt" onchange="importarCompras(this)"></label>
@@ -97,7 +98,16 @@ const filaCta = (x, cols) => `<tr><td class="num">${esc(x.cuenta)}</td><td>${esc
 
 function bloqueHechos(sec, titulo){
   const h = D.hechos[sec];
-  return `<div class="hechos">
+  const an = D.hechos['AN_'+sec];
+  return `<div class="analisis" id="an_${sec}" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-top:14px">
+    <div class="d-flex justify-content-between align-items-start">
+      <h6 style="font-size:.82rem;font-weight:800;color:#1e40af;margin:0 0 6px"><i class="bi bi-stars me-1"></i>Análisis del Analista IA — ${titulo}</h6>
+      <button class="btn btn-sm btn-outline-primary no-print" style="--bs-btn-padding-y:2px;--bs-btn-font-size:.72rem" onclick="analizarIA('${sec}')"><i class="bi bi-arrow-repeat me-1"></i>${an?'Re-analizar':'Analizar'}</button>
+    </div>
+    <div class="an-texto" style="font-size:.84rem;white-space:pre-wrap">${an?esc(an.texto):'<span class="text-muted">Sin análisis aún — presiona Analizar (o "Análisis IA de todo" en la barra).</span>'}</div>
+    ${an?`<div class="small text-muted mt-1 no-print">Generado ${String(an.updated_at).slice(0,16).replace('T',' ')}</div>`:''}
+  </div>
+  <div class="hechos">
     <h6><i class="bi bi-exclamation-circle me-1"></i>Hechos Relevantes — ${titulo}</h6>
     <textarea id="hx_${sec}" placeholder="1) ...">${esc(h?.texto||'')}</textarea>
     <div class="btns d-flex justify-content-between align-items-center mt-1">
@@ -464,6 +474,31 @@ function datosSeccion(sec){
   if (sec==='COMPRAS') return C ? { total_mes: C.total_mes, mayores_facturas: C.documentos.slice(0,15).map(d=>({proveedor:d.razon_social,doc:(d.tipo_doc||'')+'-'+(d.num_doc||''),vencimiento:d.fecha_vcto,total:d.total})), top_proveedores_anio: C.proveedores_anio } : {};
   if (sec==='HONORARIOS') return HN ? { total_mes: HN.total_mes, mayores_boletas: HN.boletas.slice(0,15).map(d=>({profesional:d.nombre,boleta:d.num_boleta,glosa:d.glosa,bruto:d.bruto,liquido:d.liquido})), top_profesionales_anio: HN.profesionales_anio } : {};
   return { caja: D.caja };
+}
+/* Análisis IA por lámina: se guarda como sección AN_<sec> en los mismos hechos
+   del mes y se muestra ARRIBA de los Hechos Relevantes (también al imprimir). */
+async function analizarIA(sec, silencioso){
+  const btn = document.querySelector(`#an_${sec} button`);
+  if (btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando…'; }
+  try {
+    const datos = datosSeccion(sec);
+    if ((sec==='EERR_MES'||sec==='EERR_ACUM') && Q) datos.ppto_rubros = Q.eerr.map(x=>({rubro:x.etiqueta, clase:x.clase, actual:x.valores[sec==='EERR_MES'?2:0], anio_anterior:x.valores[sec==='EERR_MES'?3:1], ppto:x.ppto?x.ppto[sec==='EERR_MES'?1:0]:null}));
+    const r = await fetch('/api/contabilidad/directorio/hechos-ia',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value,seccion:sec,modo:'analisis',datos})});
+    const j = await r.json(); if (!j.success) { if(!silencioso) alert(j.error); return; }
+    await fetch('/api/contabilidad/directorio/hechos',{method:'PUT',headers:H,body:JSON.stringify({mes:fMes.value,seccion:'AN_'+sec,texto:j.data.borrador})});
+    D.hechos['AN_'+sec] = { texto:j.data.borrador, updated_at:new Date().toISOString() };
+    const box = document.querySelector(`#an_${sec} .an-texto`);
+    if (box) box.textContent = j.data.borrador;
+  } finally { if (btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Re-analizar'; } }
+}
+async function analizarTodo(){
+  if (!D) return alert('Genera primero la presentación.');
+  const secs = ['BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
+  if (C && C.total_mes.docs) secs.push('COMPRAS');
+  if (HN && HN.total_mes.docs) secs.push('HONORARIOS');
+  const btn = event.target.closest('button'); btn.disabled = true;
+  for (let i=0;i<secs.length;i++){ btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${i+1}/${secs.length}…`; await analizarIA(secs[i], true); }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Análisis IA de todo';
 }
 async function hechosIA(sec){
   const btn = event.target.closest('button');
