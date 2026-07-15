@@ -5,10 +5,10 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cluster Balance PG — AutoFácil</title>
-  <!-- v1.1 — full width — réplica del informe Clúster Originación de Cartera (Balance + P&G YTD) con export Excel -->
+  <!-- v1.2 — export Excel con estilos (xlsx-js-style) — réplica del informe Clúster Originación de Cartera (Balance + P&G YTD) con export Excel -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <script src="/js/xlsx.full.min.js" defer></script>
+  <script src="/js/xlsx-style.min.js" defer></script>
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -143,24 +143,56 @@ function pintar(){
 function exportar(){
   if (!D || typeof XLSX === 'undefined') return alert('Aún cargando…');
   const wb = XLSX.utils.book_new();
+  const B = { style: 'thin', color: { rgb: 'B7C4D6' } };
+  const bordes = { top: B, bottom: B, left: B, right: B };
+  const EST = {
+    titulo:   { font: { bold: true, sz: 13, color: { rgb: '1F4E78' } } },
+    head:     { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, fill: { fgColor: { rgb: '1F4E78' } }, alignment: { horizontal: 'right' }, border: bordes },
+    headIzq:  { font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 10 }, fill: { fgColor: { rgb: '1F4E78' } }, border: bordes },
+    GRUPO:    { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1F4E78' } }, border: bordes },
+    HEADER:   { font: { bold: true, color: { rgb: '1F4E78' } }, fill: { fgColor: { rgb: 'DDEBF7' } }, border: bordes },
+    LINEA:    { border: bordes },
+    SUBTOTAL: { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F2' } }, border: bordes },
+    MARGEN:   { font: { bold: true }, fill: { fgColor: { rgb: 'F2F2F2' } }, border: bordes },
+    RESULTADO:{ border: bordes },
+    ACUMULADO:{ border: bordes },
+    TOTAL:    { font: { bold: true }, fill: { fgColor: { rgb: 'BDD7EE' } }, border: bordes },
+    VALID:    { font: { bold: true, color: { rgb: '375623' } }, fill: { fgColor: { rgb: 'E2EFDA' } }, border: bordes },
+    KPI:      { font: { bold: true }, fill: { fgColor: { rgb: 'FFF2CC' } }, border: bordes },
+  };
+  const Z_MONTO = '#,##0;[Red]-#,##0', Z_PCT = '0.0%;[Red]-0.0%';
   const hoja = (nombre, subtitulo, filas, conKpis) => {
     const base = baseDe(nombre === 'Balance Cluster' ? 'bal' : 'pg');
-    const aoa = [[D.titulo], [subtitulo], []];
-    const head = ['CUENTAS']; D.columnas.forEach(c => head.push(c, '%')); aoa.push(head);
+    const aoa = [], estilos = [];
+    const meteFila = (cells, ests) => { aoa.push(cells); estilos.push(ests); };
+    meteFila([D.titulo], [EST.titulo]); meteFila([subtitulo], [EST.titulo]); meteFila([''], [null]);
+    const head = ['CUENTAS'], headE = [EST.headIzq];
+    D.columnas.forEach(c => { head.push(c, '%'); headE.push(EST.head, EST.head); });
+    meteFila(head, headE);
     const mete = f => {
-      const row = [f.etiqueta];
+      const est = EST[f.clase] || EST.LINEA;
+      const row = [f.etiqueta], ests = [est];
       D.columnas.forEach((_, i) => {
         const v = f.valores ? f.valores[i] : null;
         row.push(v == null ? '' : (f.formato === '%' ? v / 100 : v));
+        ests.push(v == null ? est : { ...est, numFmt: f.formato === '%' ? Z_PCT : Z_MONTO, alignment: { horizontal: 'right' } });
         const p = (f.valores && base && base[i] && f.clase === 'LINEA') ? v / Math.abs(base[i]) : null;
         row.push(p == null ? '' : p);
+        ests.push(p == null ? est : { ...est, numFmt: Z_PCT, font: { ...(est.font || {}), sz: 9, color: { rgb: '64748B' } }, alignment: { horizontal: 'right' } });
       });
-      aoa.push(row);
+      meteFila(row, ests);
     };
     filas.forEach(mete);
-    if (conKpis) { aoa.push([]); D.kpis.forEach(k => mete({ ...k, clase: 'KPI' })); }
+    if (conKpis) { meteFila([''], [null]); D.kpis.forEach(k => mete({ ...k, clase: 'KPI' })); }
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [{ wch: 42 }, ...Array(D.columnas.length * 2).fill(0).map((_, i) => ({ wch: i % 2 ? 6 : 14 }))];
+    // aplicar estilos celda a celda
+    aoa.forEach((row, r) => row.forEach((_, c) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      const e = estilos[r] && estilos[r][c];
+      if (ws[ref] && e) { ws[ref].s = e; if (e.numFmt) ws[ref].z = e.numFmt; }
+    }));
+    ws['!cols'] = [{ wch: 42 }, ...Array(D.columnas.length * 2).fill(0).map((_, i) => ({ wch: i % 2 ? 7 : 14 }))];
+    ws['!rows'] = [{ hpt: 18 }, { hpt: 16 }];
     XLSX.utils.book_append_sheet(wb, ws, nombre);
   };
   hoja('Balance Cluster', 'BALANCE GENERAL ' + D.anio, D.balance, false);
