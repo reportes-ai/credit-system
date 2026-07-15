@@ -176,7 +176,9 @@ async function cargar(){
     const r = await fetch('/api/dealer-incorporacion/fichas', { headers:H });
     const j = await r.json(); if (j.success) FICHAS = j.data.rows||[];
   } catch(e){}
-  if (tiene('dealer_mantener')) { try { const r=await fetch('/api/dealers?limit=500',{headers:H}); const j=await r.json(); if(j.success) DEALERS=j.data.rows||[]; } catch(e){} }
+  // limit alto: carga TODOS los dealers (la búsqueda de la pestaña es client-side).
+  // Con 500 los dealers de número alto (>500) quedaban fuera y "no aparecían".
+  if (tiene('dealer_mantener')) { try { const r=await fetch('/api/dealers?limit=5000',{headers:H}); const j=await r.json(); if(j.success) DEALERS=j.data.rows||[]; } catch(e){} }
   pintarTabs(); render();
 }
 

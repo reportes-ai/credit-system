@@ -1092,6 +1092,10 @@ function ensureDealersCols() {
 async function finalizarDealer(f) {
   await ensureDealersCols();
   const partPor = f.part_especial_por || null, partFecha = f.part_especial_fecha || null;
+  // ccs_parque: una ficha GENERAL es dealer de CALLE (convención del sistema, 622 dealers);
+  // PARQUE/AMBOS toman el nombre del parque. Antes quedaba NULL para las GENERAL → salían sin
+  // parque en el mantenedor (dealers 907 y 908). Se deriva aquí para creación y modificación.
+  const ccsParque = f.tipo === 'GENERAL' ? 'CALLE' : (f.nombre_parque || null);
   // MODIFICACIÓN: ACTUALIZA el dealer de origen (no crea uno nuevo; el RUT es UNIQUE). ccs_parque se preserva.
   if (f.id_dealer_origen) {
     const [[dl]] = await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
@@ -1105,7 +1109,7 @@ async function finalizarDealer(f) {
            direccion_parque=?, comuna_parque=?,
            cuenta_tipo=?, tipo_cuenta=?, nombre_cuenta=?, num_cuenta=?, banco=?, rut_pago=?,
            tiene_factura=?, observaciones=?, part_especial_por=?, part_especial_fecha=? WHERE id_dealer=?`,
-        [RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, f.nombre_parque || null, f.direccion,
+        [RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.tipo, ccsParque, f.direccion,
          f.comuna, f.provincia, f.region, f.cc_nombre, f.cc_telefono, f.cc_email,
          f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
          f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
@@ -1128,7 +1132,7 @@ async function finalizarDealer(f) {
        cuenta_tipo, tipo_cuenta, nombre_cuenta, num_cuenta, banco, rut_pago,
        activo, tiene_factura, observaciones, part_especial_por, part_especial_fecha)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?)`,
-    [maxN, RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, f.nombre_parque || null, f.tipo, f.direccion,
+    [maxN, RUT.normalizar(f.rut) || f.rut, f.nombre_fantasia || f.nombre_razon, f.nombre_razon, ccsParque, f.tipo, f.direccion,
      f.comuna, f.provincia, f.region, f.fecha_solicitud, f.cc_nombre, f.cc_telefono, f.cc_email,
      f.cf_nombre, f.cf_telefono, f.cf_email, f.rl_nombre, f.rl_telefono, f.rl_email,
      f.com_6_12, f.com_13_24, f.com_25_36, f.com_37,
