@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aumento de Renta — AutoFácil</title>
-  <!-- v1.1 — calculadora de aumento de renta + anexo de contrato por persona sobre el motor único de liquidaciones (alcance líquido) -->
+  <!-- v1.2 — calculadora de aumento de renta + anexo de contrato por persona sobre el motor único de liquidaciones (alcance líquido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,9 +87,20 @@
       <div style="text-align:right;margin-top:10px;display:flex;gap:10px;justify-content:flex-end">
         <button class="btn-navy" style="background:#475569" onclick="copiar()"><i class="bi bi-clipboard me-1"></i>Copiar resumen</button>
         <button class="btn-navy" onclick="generarAnexo()"><i class="bi bi-file-earmark-text me-1"></i>Generar anexo de contrato</button>
+        <button class="btn-navy" style="background:#0f766e" onclick="abrirPromocion()"><i class="bi bi-award me-1"></i>Con promoción</button>
       </div>
     </div>
   </div>
+
+  <dialog id="dlgProm" style="border:none;border-radius:14px;padding:22px 26px;width:420px;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.25)">
+    <div style="font-weight:800;color:#0141A2;font-size:1.05rem;margin-bottom:4px"><i class="bi bi-award me-1"></i>Anexo con promoción</div>
+    <div style="font-size:.82rem;color:#64748b;margin-bottom:14px">Cargo actual: <b id="promActual">—</b></div>
+    <div class="fld"><label>Nuevo cargo</label><input type="text" id="promCargo" placeholder="Ej: Jefe de Operaciones" onkeydown="if(event.key==='Enter')confirmarPromocion()"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button class="btn-navy" style="background:#94a3b8" onclick="document.getElementById('dlgProm').close()">Cancelar</button>
+      <button class="btn-navy" style="background:#0f766e" onclick="confirmarPromocion()"><i class="bi bi-file-earmark-text me-1"></i>Generar anexo</button>
+    </div>
+  </dialog>
 
   <div class="footer-afecta">
     <div style="font-weight:700;color:#0141A2;margin-bottom:6px"><i class="bi bi-diagram-3 me-1"></i>Qué usa esta calculadora</div>
@@ -188,9 +199,25 @@ function copiar(){
   navigator.clipboard.writeText(t).then(() => alert('Resumen copiado'));
 }
 
+/* ═════════ ANEXO CON PROMOCIÓN — popup para el nuevo cargo ═════════ */
+function abrirPromocion(){
+  if (!ULT) return alert('Primero calcula el aumento');
+  document.getElementById('promCargo').value = '';
+  document.getElementById('promActual').textContent = ULT.persona.cargo || '—';
+  document.getElementById('dlgProm').showModal();
+  setTimeout(()=>document.getElementById('promCargo').focus(), 50);
+}
+function confirmarPromocion(){
+  const cargo = document.getElementById('promCargo').value.trim();
+  if (!cargo) return alert('Ingresa el nuevo cargo');
+  document.getElementById('dlgProm').close();
+  generarAnexo(cargo);
+}
+
 /* ═════════ ANEXO DE CONTRATO (imprimible) ═════════
-   Los campos punteados son editables en pantalla antes de imprimir. */
-function generarAnexo(){
+   Los campos punteados son editables en pantalla antes de imprimir.
+   Con nuevoCargo → anexo de PROMOCIÓN (cambio de cargo + remuneración). */
+function generarAnexo(nuevoCargo){
   if (!ULT) return alert('Primero calcula el aumento');
   const p = ULT.persona, n = ULT.nuevo;
   const hoy = new Date();
@@ -217,7 +244,7 @@ function generarAnexo(){
     <div id="hint">✏️ Los campos punteados se pueden corregir haciendo clic antes de imprimir (Ctrl+P).</div>
     <img class="logo" src="${location.origin}/img/logo.png" alt="AutoFácil">
     <h1>Anexo de Contrato de Trabajo</h1>
-    <div class="sub">Modificación de remuneración</div>
+    <div class="sub">${nuevoCargo ? 'Promoción y modificación de remuneración' : 'Modificación de remuneración'}</div>
     <p>En Santiago de Chile, a ${fLarga(hoy)}, entre ${ed('AUTO FACIL SpA',150)}, RUT ${ed('',110)},
     representada legalmente por don <b>Leonardo Sevilla</b>, cédula de identidad N° ${ed('',110)}, ambos
     domiciliados en ${ed('',220)}, en adelante "el Empleador"; y don(ña) <b>${esc(p.nombre_completo||p.nombre)}</b>,
@@ -226,6 +253,19 @@ function generarAnexo(){
     ${p.direccion?esc(p.direccion)+(p.comuna?', comuna de '+esc(p.comuna):''):ed('',220)},
     en adelante "el Trabajador", se ha convenido el siguiente anexo al contrato de trabajo
     ${p.fecha_ingreso?'suscrito con fecha <b>'+fLarga(new Date(p.fecha_ingreso+'T12:00:00'))+'</b>':ed('',130)}:</p>
+    ${nuevoCargo ? `
+    <p><b>PRIMERO:</b> Las partes acuerdan que, a contar del <b>${fLarga(vig)}</b>, el Trabajador, quien
+    hasta esa fecha se desempeña en el cargo de <b>${esc(p.cargo||'')}</b>, pasará a desempeñar el cargo de
+    <b>${esc(nuevoCargo)}</b>, asumiendo las funciones y responsabilidades propias de dicho cargo, manteniendo
+    su lugar de trabajo y jornada, salvo acuerdo distinto de las partes.</p>
+    <p><b>SEGUNDO:</b> En razón de la promoción anterior, a contar de la misma fecha el sueldo base mensual
+    del Trabajador será de <b>${enPalabras(n.sueldo_base)}</b>, más la gratificación legal pactada conforme
+    al artículo 50 del Código del Trabajo y las demás asignaciones vigentes.</p>
+    <p><b>TERCERO:</b> En todo lo no modificado por el presente anexo, permanecen plenamente vigentes
+    las estipulaciones del contrato de trabajo y sus anexos anteriores, las que las partes declaran
+    conocer y ratificar en este acto.</p>
+    <p><b>CUARTO:</b> El presente anexo se firma en dos ejemplares del mismo tenor y fecha, quedando
+    uno en poder de cada parte.</p>` : `
     <p><b>PRIMERO:</b> Las partes acuerdan que, a contar del <b>${fLarga(vig)}</b>, el sueldo base mensual
     del Trabajador, quien se desempeña en el cargo de <b>${esc(p.cargo||'')}</b>, será de
     <b>${enPalabras(n.sueldo_base)}</b>, más la gratificación legal pactada conforme al artículo 50 del
@@ -234,7 +274,7 @@ function generarAnexo(){
     las estipulaciones del contrato de trabajo y sus anexos anteriores, las que las partes declaran
     conocer y ratificar en este acto.</p>
     <p><b>TERCERO:</b> El presente anexo se firma en dos ejemplares del mismo tenor y fecha, quedando
-    uno en poder de cada parte.</p>
+    uno en poder de cada parte.</p>`}
     <div class="firmas">
       <div><b>Leonardo Sevilla</b><br>p.p. AUTO FACIL SpA<br>El Empleador</div>
       <div><b>${esc(p.nombre_completo||p.nombre)}</b><br>RUT ${esc(p.rut||'')}<br>El Trabajador</div>
