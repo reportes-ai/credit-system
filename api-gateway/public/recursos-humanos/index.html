@@ -90,6 +90,12 @@
       <p>Pide tus días de vacaciones (fechas y comentario), haz seguimiento de la aprobación y revisa tu historial.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/concurso/" class="module-card" id="cardConc" style="display:none">
+      <div class="card-icon"><i class="bi bi-controller"></i></div>
+      <h5>¿Qué Dice AutoFácil?</h5>
+      <p>El concurso de capacitación: tablero de respuestas ocultas con puntos, para el onboarding y jugar en equipo. ¡A ver si está!</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/antiguedad/" class="module-card" id="cardAnt" style="display:none">
       <div class="card-icon"><i class="bi bi-award"></i></div>
       <h5>Certificado de Antigüedad</h5>
@@ -117,6 +123,7 @@
     if (tiene('rh_aprobar')) document.getElementById('cardLic').style.display='';
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
+    if (tiene('concurso')) document.getElementById('cardConc').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>
