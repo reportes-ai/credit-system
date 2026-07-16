@@ -71,6 +71,7 @@
     <span id="indBar" style="font-size:.76rem;color:#64748b"></span>
     <div style="flex:1"></div>
     <button class="btn-ghost" onclick="exportCSV()"><i class="bi bi-filetype-csv me-1"></i>Libro CSV</button>
+    <button class="btn-ghost" onclick="archivoPrevired()" title="Archivo oficial 105 campos para pagar las cotizaciones en previred.com"><i class="bi bi-bank me-1"></i>Archivo Previred</button>
     <button class="btn-navy" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
     <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
   </div>
@@ -293,6 +294,18 @@ function exportCSV(){
   const lines = rows.map(r=>[r.nombre,r.rut,r.cargo,r.sueldo_base,r.comisiones,r.otros_imponibles,r.gratificacion,r.total_imponible,r.colacion||0,r.movilizacion||0,r.otros_no_imponibles||0,r.total_haberes,r.afp||'',r.desc_afp,r.desc_salud,r.desc_afc,r.impuesto,r.otros_descuentos,r.total_descuentos,r.liquido,r.estado].map(v=>String(v??'').replace(/;/g,',')).join(sep));
   const blob = new Blob(['﻿'+[head.join(sep),...lines].join('\n')], {type:'text/csv'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'libro-remuneraciones-'+document.getElementById('mes').value+'.csv'; a.click();
+}
+async function archivoPrevired(){
+  const mes = document.getElementById('mes').value;
+  const j = await (await fetch('/api/rrhh/remuneraciones/previred?mes='+mes, { headers:H })).json();
+  if (!j.success) return alert(j.error);
+  const d = j.data;
+  let msg = `Archivo Previred ${mesPalabras(mes)}: ${d.trabajadores} trabajador(es).`;
+  if (d.avisos?.length) msg += '\n\nAVISOS (revisa antes de subir a Previred):\n• ' + d.avisos.join('\n• ');
+  msg += '\n\n¿Descargar el archivo? Se sube en previred.com → Ingreso Electrónico → Remuneraciones → formato "Estándar de largo variable".';
+  if (!confirm(msg)) return;
+  const blob = new Blob([d.contenido], { type:'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = d.archivo; a.click();
 }
 document.getElementById('mes').value = new Date().toISOString().slice(0,7);
 cargar();

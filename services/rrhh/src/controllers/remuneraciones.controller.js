@@ -984,6 +984,146 @@ const aumentoRenta = async (req, res) => {
   } catch (e) { console.error('[rrhh aumento renta]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* ── ARCHIVO PREVIRED (formato oficial "Estándar de Largo Variable", v96 jul-2026) ──
+   105 campos separados por ';', un registro por trabajador, desde las
+   liquidaciones EMITIDAS del mes. Campos no aplicables: 0 (numéricos) /
+   blanco (alfanuméricos), como exige la especificación de Previred.
+   Códigos: Tabla 10 (AFP), 16 (Salud), 18 (CCAF), 19 (Mutual), 7 (Movimiento). */
+const PREV_AFP = { CUPRUM: '03', HABITAT: '05', PROVIDA: '08', PLANVITAL: '29', 'PLAN VITAL': '29', CAPITAL: '33', MODELO: '34', UNO: '35' };
+const PREV_SALUD = { FONASA: '07', BANMEDICA: '01', 'BANMÉDICA': '01', CONSALUD: '02', 'VIDA TRES': '03', VIDATRES: '03', COLMENA: '04',
+  'CRUZ BLANCA': '05', 'ISAPRE CRUZ BLANCA S.A.': '05', 'NUEVA MASVIDA': '10', 'NUEVA MAS VIDA': '10', ISALUD: '11',
+  FUNDACION: '12', 'FUNDACIÓN': '12', 'CRUZ DEL NORTE': '25', ESENCIAL: '28', ESCENCIAL: '28' };
+
+require('../../../../shared/migrate').enFila('previred-config', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_previred_config (
+    id TINYINT PRIMARY KEY, ccaf VARCHAR(2) DEFAULT '00', mutual VARCHAR(2) DEFAULT '02', sucursal_mutual VARCHAR(3) DEFAULT ''
+  )`);
+  await pool.query(`INSERT IGNORE INTO rh_previred_config (id, ccaf, mutual) VALUES (1, '00', '02')`);
+});
+
+async function getPrevired(req, res) {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes obligatorio (YYYY-MM)', 400);
+    const [liqs] = await pool.query(
+      `SELECT l.*, u.rut urut, u.nombre unombre, u.apellido, u.apellido_materno, u.sexo, u.fecha_ingreso,
+              f.nacionalidad, f.jornada, f.tipo_contrato ftc
+         FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
+         LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
+        WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
+    if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
+    const [[cfg]] = await pool.query('SELECT * FROM rh_previred_config WHERE id=1');
+    // Licencias del mes (movimiento de personal 3 = Subsidios)
+    const [lics] = await pool.query(
+      `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_ausencias
+        WHERE tipo='LICENCIA MEDICA' AND estado='APROBADA'
+          AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
+    const licMap = {}; lics.forEach(l => { licMap[l.id_usuario] = licMap[l.id_usuario] || l; });
+
+    const per = mes.slice(5, 7) + mes.slice(0, 4);                       // mmaaaa
+    const fch = f => { const s = isoF(f); return s ? s.split('-').reverse().join('-') : ''; };  // dd-mm-aaaa
+    const N = v => String(Math.max(0, Math.round(Number(v) || 0)));
+    const avisos = [];
+    const lineas = [];
+
+    for (const l of liqs) {
+      let d = {}; try { d = typeof l.detalle === 'string' ? JSON.parse(l.detalle) : (l.detalle || {}); } catch (_) {}
+      const rutFull = String(l.rut || l.urut || '').replace(/\./g, '').toUpperCase();
+      const [rutNum, dv] = rutFull.split('-');
+      const nombreCompleto = `${l.unombre || ''}`.trim();
+      const afpCod = PREV_AFP[String(d.afp || '').toUpperCase().trim()];
+      const saludCod = PREV_SALUD[String(d.salud || '').toUpperCase().trim()];
+      const esFonasa = saludCod === '07';
+      const esIsapre = saludCod && !esFonasa;
+      if (!rutNum || !dv) { avisos.push(`${l.nombre}: RUT inválido — línea omitida`); continue; }
+      if (!afpCod) avisos.push(`${l.nombre}: AFP "${d.afp || '(vacía)'}" sin código Previred (campo 26 quedará 00)`);
+      if (!saludCod) avisos.push(`${l.nombre}: salud "${d.salud || '(vacía)'}" sin código (campos de salud en 0)`);
+      if (!l.sexo) avisos.push(`${l.nombre}: falta el sexo en la ficha (campo obligatorio)`);
+
+      // Bases: la de cotización (tope 87,8 UF) viene del motor; la de AFC se
+      // reconstruye exacta desde el propio descuento (misma matemática del motor)
+      const baseCot = Math.round(d.base_cotizacion || d.total_imponible || 0);
+      const esIndef = String(d.tipo_contrato || l.ftc || '').toUpperCase() === 'INDEFINIDO';
+      let baseAfc = 0;
+      if (d.desc_afc > 0 && d.afc_pct > 0) baseAfc = Math.round(d.desc_afc * 100 / d.afc_pct);
+      else if (d.aporte_afc_emp > 0) baseAfc = Math.round(d.total_imponible || 0) ? Math.min(Math.round(d.total_imponible), Math.round(d.aporte_afc_emp * 100 / (esIndef ? 2.4 : 3))) : 0;
+      if (!baseAfc) baseAfc = Math.round(d.total_imponible || 0);
+      // deriva de redondeo al reconstruir desde el descuento → anclar al imponible
+      if (Math.abs(baseAfc - Math.round(d.total_imponible || 0)) < 500) baseAfc = Math.round(d.total_imponible || 0);
+
+      const lic = licMap[l.id_usuario];
+      const mov = lic ? '3' : '0';
+      if (lic) avisos.push(`${l.nombre}: licencia médica en el mes — revisa la línea (movimiento 3, campo 92 renta mes anterior va en 0)`);
+
+      const planUF = Number(d.plan_isapre_uf) || 0;
+      const pactada = esIsapre ? Math.round((d.desc_salud || 0) + (d.desc_salud_adicional || 0)) : 0;
+
+      const c = [];
+      c[1] = rutNum; c[2] = dv;
+      c[3] = String(l.apellido || '').toUpperCase(); c[4] = String(l.apellido_materno || '').toUpperCase();
+      c[5] = nombreCompleto.toUpperCase();
+      c[6] = String(l.sexo || 'M').toUpperCase().startsWith('F') ? 'F' : 'M';
+      c[7] = /extranjer/i.test(l.nacionalidad || '') ? '1' : '0';
+      c[8] = '01'; c[9] = per; c[10] = per;
+      c[11] = 'AFP'; c[12] = '0'; c[13] = String(d.dias ?? 30);
+      c[14] = '00'; c[15] = mov;
+      c[16] = lic ? fch(lic.fecha_desde) : ''; c[17] = lic ? fch(lic.fecha_hasta) : '';
+      c[18] = 'D'; c[19] = '0'; c[20] = '0'; c[21] = '0'; c[22] = '0'; c[23] = '0'; c[24] = '0'; c[25] = 'N';
+      c[26] = afpCod || '00'; c[27] = N(baseCot); c[28] = N(d.desc_afp); c[29] = N(d.aporte_sis);
+      for (let i = 30; i <= 39; i++) c[i] = '0'; c[35] = ''; c[36] = ''; c[37] = '';
+      c[40] = '000'; c[41] = ''; c[42] = '0'; c[43] = '0'; c[44] = '0';
+      c[45] = '000'; c[46] = ''; c[47] = '0'; c[48] = '0'; c[49] = '0';
+      c[50] = '0'; c[51] = ''; c[52] = ''; c[53] = ''; c[54] = '';
+      c[55] = '0'; c[56] = ''; c[57] = ''; c[58] = '0'; c[59] = '0'; c[60] = '0'; c[61] = '0';
+      c[62] = '0000'; c[63] = '0';
+      c[64] = esFonasa || cfg.mutual === '00' ? N(baseCot) : '0';
+      c[65] = '0'; c[66] = '0'; c[67] = '0000'; c[68] = '0'; c[69] = '0';
+      c[70] = esFonasa ? N(d.desc_salud) : '0';
+      c[71] = cfg.mutual === '00' ? N(d.aporte_mutual) : '0';
+      c[72] = '0'; c[73] = '0'; c[74] = '0';
+      c[75] = saludCod || '00'; c[76] = '';
+      c[77] = esIsapre ? N(baseCot) : '0';
+      c[78] = esIsapre ? (planUF > 0 ? '2' : '1') : '0';
+      c[79] = esIsapre ? (planUF > 0 ? String(planUF).replace('.', ',') : N(pactada)) : '0';
+      c[80] = esIsapre ? N(d.desc_salud) : '0';
+      c[81] = esIsapre ? N(d.desc_salud_adicional) : '0';
+      c[82] = '0';
+      c[83] = cfg.ccaf || '00';
+      c[84] = cfg.ccaf !== '00' ? N(baseCot) : '0';
+      c[85] = '0'; c[86] = '0'; c[87] = '0'; c[88] = '0'; c[89] = '0';
+      c[90] = cfg.ccaf !== '00' && esFonasa ? N(baseCot * 0.042) : '0';
+      c[91] = '0'; c[92] = '0';
+      c[93] = /parcial|part/i.test(l.jornada || '') ? '2' : '1';
+      c[94] = '0'; c[95] = '';
+      c[96] = cfg.mutual || '00';
+      c[97] = cfg.mutual !== '00' ? N(baseCot) : '0';
+      c[98] = cfg.mutual !== '00' ? N(d.aporte_mutual) : '0';
+      c[99] = cfg.sucursal_mutual || '0';
+      c[100] = N(baseAfc); c[101] = N(d.desc_afc); c[102] = N(d.aporte_afc_emp);
+      c[103] = '0'; c[104] = ''; c[105] = '';
+      lineas.push(c.slice(1).join(';'));
+    }
+
+    // CCAF adherida: Fonasa se divide 2,8% Fonasa + resto CCAF — avisar si aplica
+    if (cfg.ccaf !== '00') avisos.push('Empresa con CCAF configurada: verifica en Previred la distribución Fonasa 2,8% / CCAF (campo 70 va con el 7% completo).');
+
+    ok(res, {
+      mes, archivo: `previred_${per}.txt`, contenido: lineas.join('\r\n'),
+      trabajadores: lineas.length, avisos,
+      config: { ccaf: cfg.ccaf, mutual: cfg.mutual },
+    });
+  } catch (e) { console.error('[previred]', e.message); fail(res, e.message); }
+}
+
+async function putPreviredConfig(req, res) {
+  try {
+    const { ccaf, mutual, sucursal_mutual } = req.body || {};
+    await pool.query('UPDATE rh_previred_config SET ccaf=?, mutual=?, sucursal_mutual=? WHERE id=1',
+      [String(ccaf || '00').slice(0, 2), String(mutual || '00').slice(0, 2), String(sucursal_mutual || '').slice(0, 3)]);
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+}
+
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
-  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas };
+  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, putPreviredConfig };

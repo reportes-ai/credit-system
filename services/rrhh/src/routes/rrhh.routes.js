@@ -32,6 +32,8 @@ router.get('/remuneraciones',                 verifyToken, requireFunc('rh_remun
 router.post('/remuneraciones/guardar',        verifyToken, requireFunc('rh_remuneraciones'), rem.guardar);
 router.post('/remuneraciones/emitir',         verifyToken, requireFunc('rh_remuneraciones'), rem.emitir);
 router.get('/remuneraciones/mias',            verifyToken, rem.misLiquidaciones);
+router.get('/remuneraciones/previred',        verifyToken, requireFunc('rh_remuneraciones'), rem.getPrevired);
+router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
