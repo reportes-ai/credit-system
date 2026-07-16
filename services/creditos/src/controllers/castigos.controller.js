@@ -383,6 +383,30 @@ async function ejecutarCierreMes(mes, usuario) {
     }).catch(() => {});
   }
   await guardarDetalleProvision(mes).catch(e => console.error('[provisiones detalle]', e.message));
+  // ── PROVISIÓN DE VACACIONES: mismo esquema (snapshot + asiento por la variación).
+  // Motor único: la misma matemática de RRHH → Vacaciones → Saldos del equipo.
+  try {
+    const vc = require('../../../rrhh/src/controllers/vac-cuenta.controller');
+    const { total_provision } = await vc.calcularSaldosEquipo();
+    const prevVac = (await snapshot(mesAnterior(mes), 'PROVISION_VACACIONES')) || 0;
+    await pool.query(
+      `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre, numero_transaccion)
+       VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_at=NOW()`,
+      [mes, 'PROVISION_VACACIONES', total_provision, usuario.id_usuario, usuario.nombre, numero_transaccion]);
+    const deltaVac = total_provision - prevVac;
+    const motorV = require('../../../contabilidad/src/motor-asientos');
+    if (deltaVac > 0) {
+      await motorV.contabilizar({
+        evento: 'PROVISION_VACACIONES', fecha: ultimoDiaMes(mes), glosa: `Provisión de vacaciones ${mes} (saldo ${total_provision.toLocaleString('es-CL')})`,
+        ref: `PROVAC-${mes}`, montos: { constitucion: deltaVac },
+      }).catch(() => {});
+    } else if (deltaVac < 0) {
+      await motorV.contabilizar({
+        evento: 'PROVISION_VAC_LIBERACION', fecha: ultimoDiaMes(mes), glosa: `Liberación provisión de vacaciones ${mes}`,
+        ref: `PROVACLIB-${mes}`, montos: { liberacion: -deltaVac },
+      }).catch(() => {});
+    }
+  } catch (e) { console.error('[provision vacaciones cierre]', e.message); }
   return { mes, provisiones: payload.provisiones, castigos: payload.castigos, numero_transaccion };
 }
 

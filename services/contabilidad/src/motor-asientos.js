@@ -82,6 +82,14 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['1104050', 'DEBE', 'liberacion', 'Liberación de provisión'],
         ['4001190', 'HABER', 'liberacion', 'Abono gasto provisión incobrables'],
       ]],
+      ['PROVISION_VACACIONES', 'Provisión de vacaciones (cierre de mes)', 'Se dispara en el cierre de mes cuando la provisión de vacaciones del equipo (días disponibles × remuneración diaria, motor de la cuenta corriente de vacaciones) SUBIÓ respecto del mes anterior. Campos: constitucion (variación).', 'TRASPASO', 1, [
+        ['4002030', 'DEBE', 'constitucion', 'Gasto provisión de vacaciones'],
+        ['2106030', 'HABER', 'constitucion', 'Provisión de vacaciones por pagar'],
+      ]],
+      ['PROVISION_VAC_LIBERACION', 'Liberación provisión de vacaciones (cierre de mes)', 'Se dispara en el cierre de mes cuando la provisión de vacaciones BAJÓ (se tomaron o pagaron días): reversa el exceso. Campos: liberacion (variación).', 'TRASPASO', 1, [
+        ['2106030', 'DEBE', 'liberacion', 'Rebaja provisión de vacaciones'],
+        ['4002030', 'HABER', 'liberacion', 'Abono gasto provisión de vacaciones'],
+      ]],
       ['REMUNERACIONES', 'Emisión de liquidaciones del mes', 'Se dispara al EMITIR las liquidaciones en RRHH. Campos: haberes (total haberes), liquido (líquidos a pagar), descuentos (AFP+salud+AFC+impuesto+otros).', 'TRASPASO', 1, [
         ['4001060', 'DEBE', 'haberes', 'Gasto remuneraciones del mes'],
         ['2104010', 'HABER', 'liquido', 'Líquidos por pagar'],

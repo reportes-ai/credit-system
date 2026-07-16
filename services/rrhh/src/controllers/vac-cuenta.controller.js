@@ -224,10 +224,10 @@ exports.getCuenta = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-/* GET /api/rrhh/vacaciones/saldos — saldos de TODO el equipo (RRHH) */
-exports.getSaldos = async (req, res) => {
-  try {
-    const [users] = await pool.query(
+/* MOTOR ÚNICO del cálculo de saldos+provisión del equipo — lo usan la pestaña
+   "Saldos del equipo" y la contabilización al cierre de mes. */
+async function calcularSaldosEquipo() {
+  const [users] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
               DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
@@ -249,12 +249,19 @@ exports.getSaldos = async (req, res) => {
     for (const u of users) {
       const s = await saldoCuenta(u.id_usuario);
       const bl = baseMap[u.id_usuario];
-      const base = bl?.length ? Math.round(bl.reduce((a, b) => a + b, 0) / bl.length) : Math.round(sbMap[u.id_usuario] * 1.25);
+      const base = bl?.length ? Math.round(bl.reduce((a, b) => a + b, 0) / bl.length) : Math.round((sbMap[u.id_usuario] || 0) * 1.25);
       const provision = Math.max(0, Math.round(s.disponibles * 1.4 * base / 30));
       totDias += s.disponibles; totProv += provision;
       filas.push({ ...u, ...s, base, provision });
     }
-    ok(res, { saldos: filas, total_dias: Math.round(totDias * 10) / 10, total_provision: totProv });
+    return { saldos: filas, total_dias: Math.round(totDias * 10) / 10, total_provision: totProv };
+}
+exports.calcularSaldosEquipo = calcularSaldosEquipo;
+
+/* GET /api/rrhh/vacaciones/saldos — saldos de TODO el equipo (RRHH) */
+exports.getSaldos = async (req, res) => {
+  try {
+    ok(res, await calcularSaldosEquipo());
   } catch (e) { fail(res, e.message); }
 };
 
