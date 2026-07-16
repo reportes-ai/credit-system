@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros Cobranza — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v1.5 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -106,6 +106,11 @@
     <div class="lbl">Provisiones (sobre el capital insoluto, por días de mora)</div>
     <div class="form-text mb-2">Cada crédito se clasifica por los <b>días de mora de su cuota impaga más antigua</b> y se provisiona el <b>%</b> del tramo sobre su capital insoluto. Define el <b>límite superior (días)</b> y el <b>%</b>; el último tramo es el resto (desde 181 días → 100%).</div>
     <div id="tramosProv"></div>
+    <div class="row g-2 mt-2 align-items-center">
+      <div class="col-auto"><label class="form-label mb-0" for="provAutoDia"><b>Cierre automático</b> — día del mes:</label></div>
+      <div class="col-auto"><input type="number" id="provAutoDia" class="form-control form-control-sm" style="width:90px" min="1" max="28" placeholder="—"></div>
+      <div class="col"><span class="form-text">A partir de ese día, si el mes anterior no tiene cierre de provisiones, el sistema lo cierra solo (snapshot + asiento contable + detalle por crédito). Vacío = desactivado.</span></div>
+    </div>
   </div>
 
   <!-- Probar cálculo -->
@@ -173,6 +178,7 @@
       <li><b>Interés por mora</b> → usa las <a href="/mantenedores/tasas/">Tasas (TMC)</a> por tramo; tasa diaria = TMC mensual/30 sobre la cuota original. Los valores dependen del mantenedor de Tasas.</li>
       <li><b>Modo de tasa del interés por mora</b> (fija al otorgamiento / variable) → TODO cálculo de mora: <a href="/cobranza/">Cobranza</a>, Caja (pago de cuotas y condonación), <b>prepago/certificados</b> (motor <code>calcularPrepago</code>), Aplicación de Fondos y Portal del Cliente.</li>
       <li><b>Tramos de provisión</b> → la pestaña <b>Provisiones</b> del CRM de <a href="/cobranza/">Cobranza</a> (<code>GET /api/cobranza/provisiones</code>): % por tramo de días de mora sobre el capital insoluto de la cartera propia (AutoFácil + AFA). Desde 181 días se provisiona el 100%.</li>
+      <li><b>Cierre automático (día del mes)</b> → <a href="/tesoreria/castigos">Provisiones + Castigos</a> (Tesorería): desde ese día, si el mes anterior no fue cerrado a mano, el sistema guarda el cierre solo, genera el asiento (constitución <code>PROVISION_CIERRE</code> o liberación <code>PROVISION_LIBERACION</code> en <a href="/contabilidad/">Contabilidad</a>) y deja el detalle por crédito auditable.</li>
     </ul>
   </div>
 </div>
@@ -251,6 +257,7 @@ async function cargar(){
     TRAMOS_PROV = Array.isArray(d.tramos_provision) && d.tramos_provision.length ? d.tramos_provision
       : [{hasta_dias:15,pct:1},{hasta_dias:30,pct:5},{hasta_dias:60,pct:20},{hasta_dias:90,pct:40},{hasta_dias:180,pct:80},{hasta_dias:null,pct:100}];
     pintarTramosProv();
+    document.getElementById('provAutoDia').value = d.provision_auto_dia ?? '1';
   } catch(e){ toast('Error al cargar: '+e.message, true); }
 }
 
@@ -272,6 +279,7 @@ async function guardar(){
     gastos_dias: document.getElementById('gastosDias').value || '0',
     mora_tasa_modo: document.getElementById('moraTasaModo').value,
     tramos_provision: TRAMOS_PROV,
+    provision_auto_dia: document.getElementById('provAutoDia').value || '',
     datos_transferencia: document.getElementById('datosTransf').value,
     texto_whatsapp: document.getElementById('txtWhatsapp').value,
     texto_sms: document.getElementById('txtSms').value,

@@ -9,6 +9,7 @@ router.get('/resolver/:numop',  verifyToken, ctrl.resolver);
 router.get('/',                 verifyToken, ctrl.historial);
 router.get('/contable',         verifyToken, ctrl.contable);
 router.post('/contable/cierre', verifyToken, requireFunc('castigos_historial'), ctrl.cerrarMesContable);
+router.get('/contable/detalle', verifyToken, ctrl.detalleProvision);
 
 // Escritura
 router.post('/',            verifyToken, requireFunc('castigo_solicitar'), ctrl.solicitar);

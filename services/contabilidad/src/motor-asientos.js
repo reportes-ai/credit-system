@@ -78,6 +78,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['4001190', 'DEBE', 'constitucion', 'Gasto provisión incobrables'],
         ['1104050', 'HABER', 'constitucion', 'Constitución de provisión'],
       ]],
+      ['PROVISION_LIBERACION', 'Liberación de provisión (cierre de mes)', 'Se dispara al cerrar el mes de Provisiones y Castigos cuando la provisión requerida BAJÓ (mejora de la mora): reversa el gasto por el exceso. Campos: liberacion (monto liberado).', 'TRASPASO', 1, [
+        ['1104050', 'DEBE', 'liberacion', 'Liberación de provisión'],
+        ['4001190', 'HABER', 'liberacion', 'Abono gasto provisión incobrables'],
+      ]],
       ['REMUNERACIONES', 'Emisión de liquidaciones del mes', 'Se dispara al EMITIR las liquidaciones en RRHH. Campos: haberes (total haberes), liquido (líquidos a pagar), descuentos (AFP+salud+AFC+impuesto+otros).', 'TRASPASO', 1, [
         ['4001060', 'DEBE', 'haberes', 'Gasto remuneraciones del mes'],
         ['2104010', 'HABER', 'liquido', 'Líquidos por pagar'],

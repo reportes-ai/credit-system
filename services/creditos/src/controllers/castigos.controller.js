@@ -101,6 +101,23 @@ require('../../../../shared/migrate').enFila('castigos', async () => {
     await pool.query(`ALTER TABLE castigos_contables ADD COLUMN numero_transaccion INT NULL`).catch(() => {});
     await pool.query(`ALTER TABLE contab_saldos_mensuales ADD COLUMN numero_transaccion INT NULL`).catch(() => {});
 
+    // Detalle auditable de la provisión de cada cierre: cómo se compuso, crédito a crédito.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS provisiones_detalle (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        mes           CHAR(7) NOT NULL,
+        id_credito    INT NOT NULL,
+        num_op        VARCHAR(20) NULL,
+        cliente       VARCHAR(200) NULL,
+        dias_mora     INT NOT NULL,
+        tramo         VARCHAR(20) NULL,
+        saldo_insoluto DECIMAL(16,2) NOT NULL,
+        pct           DECIMAL(6,2) NOT NULL,
+        provision     DECIMAL(16,2) NOT NULL,
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_mes_credito (mes, id_credito), INDEX ix_mes (mes)
+      )`);
+
     console.log('[castigos] módulo listo');
   } catch (e) { console.error('[castigos migration]', e.message); }
 });
@@ -334,35 +351,115 @@ const contable = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* Motor único del cierre de provisiones y castigos del mes. Lo usan el botón
+   manual (cerrarMesContable) y el cierre AUTOMÁTICO (tick de más abajo).
+   usuario = { id_usuario, nombre }. Devuelve el resumen del cierre. */
+async function ejecutarCierreMes(mes, usuario) {
+  // Recalcula los saldos finales del mes con la misma lógica del cuadro
+  let payload = null;
+  await contable({ query: { mes } }, { json: d => { payload = d.data; }, status: () => ({ json: () => {} }) });
+  if (!payload) throw new Error('No se pudo calcular el cuadro para cerrar.');
+  // Un TRX por evento de cierre (ambas cuentas del mes comparten el número).
+  const numero_transaccion = await nuevaTransaccion();
+  for (const cuenta of CUENTAS) {
+    const saldo = cuenta === 'PROVISIONES' ? payload.provisiones.saldo_final : payload.castigos.saldo_final;
+    await pool.query(
+      `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre, numero_transaccion)
+       VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_por=VALUES(guardado_por), guardado_por_nombre=VALUES(guardado_por_nombre), guardado_at=NOW(), numero_transaccion=VALUES(numero_transaccion)`,
+      [mes, cuenta, saldo, usuario.id_usuario, usuario.nombre, numero_transaccion]);
+  }
+  // Centralización: constitución si la provisión requerida SUBIÓ; liberación si BAJÓ.
+  const haber = Number(payload.provisiones.haber);
+  const motor = require('../../../contabilidad/src/motor-asientos');
+  if (haber > 0) {
+    await motor.contabilizar({
+      evento: 'PROVISION_CIERRE', fecha: ultimoDiaMes(mes), glosa: `Constitución provisión incobrables ${mes}`,
+      ref: `PROV-${mes}`, montos: { constitucion: haber },
+    }).catch(() => {});
+  } else if (haber < 0) {
+    await motor.contabilizar({
+      evento: 'PROVISION_LIBERACION', fecha: ultimoDiaMes(mes), glosa: `Liberación provisión incobrables ${mes} (mejora de mora)`,
+      ref: `PROVLIB-${mes}`, montos: { liberacion: -haber },
+    }).catch(() => {});
+  }
+  await guardarDetalleProvision(mes).catch(e => console.error('[provisiones detalle]', e.message));
+  return { mes, provisiones: payload.provisiones, castigos: payload.castigos, numero_transaccion };
+}
+
+/* Snapshot del detalle por crédito (auditable): con qué mora, tramo y % se
+   provisionó cada operación en el cierre del mes. */
+async function guardarDetalleProvision(mes) {
+  const cob = require('../../../cobranza/src/controllers/cobranza.controller')._motor;
+  const [rows] = await pool.query(
+    `SELECT id_credito, num_op, nombre_cliente, dias_mora, saldo_insoluto FROM ( ${cob.MORA_SQL()} ) _m`);
+  const cfg = await cob.getCobranzaConfig();
+  let tp = [];
+  try { tp = JSON.parse(cfg.tramos_provision); } catch (_) {}
+  if (!Array.isArray(tp) || !tp.length) return;
+  let prev = 0;
+  const tramos = tp.map(t => {
+    const max = (t.hasta_dias == null || t.hasta_dias === '') ? Infinity : Number(t.hasta_dias);
+    const r = { label: max === Infinity ? `${prev + 1}+` : `${prev + 1}-${max}`, min: prev + 1, max, pct: Number(t.pct) || 0 };
+    prev = max;
+    return r;
+  });
+  await pool.query('DELETE FROM provisiones_detalle WHERE mes=?', [mes]);
+  for (const r of rows) {
+    const t = tramos.find(x => Number(r.dias_mora) >= x.min && Number(r.dias_mora) <= x.max);
+    if (!t) continue;
+    const cap = Number(r.saldo_insoluto) || 0;
+    await pool.query(
+      `INSERT INTO provisiones_detalle (mes, id_credito, num_op, cliente, dias_mora, tramo, saldo_insoluto, pct, provision)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [mes, r.id_credito, r.num_op || null, r.nombre_cliente || null, r.dias_mora, t.label, cap, t.pct, Math.round(cap * t.pct / 100)]);
+  }
+}
+
 // Guarda el snapshot de saldos finales del mes (para que el mes siguiente tenga saldo inicial).
 const cerrarMesContable = async (req, res) => {
   try {
     const mes = /^\d{4}-\d{2}$/.test(req.body.mes || '') ? req.body.mes : new Date().toISOString().slice(0, 7);
-    // Recalcula los saldos finales del mes con la misma lógica del cuadro
-    req.query = { mes };
-    let payload = null;
-    await contable(req, { json: d => { payload = d.data; }, status: () => ({ json: () => {} }) });
-    if (!payload) return fail(res, 'No se pudo calcular el cuadro para cerrar.');
-    // Un TRX por evento de cierre (ambas cuentas del mes comparten el número).
-    const numero_transaccion = await nuevaTransaccion();
-    for (const cuenta of CUENTAS) {
-      const saldo = cuenta === 'PROVISIONES' ? payload.provisiones.saldo_final : payload.castigos.saldo_final;
-      await pool.query(
-        `INSERT INTO contab_saldos_mensuales (mes, cuenta, saldo, guardado_por, guardado_por_nombre, numero_transaccion)
-         VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE saldo=VALUES(saldo), guardado_por=VALUES(guardado_por), guardado_por_nombre=VALUES(guardado_por_nombre), guardado_at=NOW(), numero_transaccion=VALUES(numero_transaccion)`,
-        [mes, cuenta, saldo, req.usuario.id_usuario, nombreUsuario(req), numero_transaccion]);
-    }
-    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${payload.provisiones.saldo_final}, castigo ${payload.castigos.saldo_final}) TRX-${String(numero_transaccion).padStart(6, '0')}` });
-    // Centralización: constitución de provisión del período (haber_prov = cargo a resultado)
-    if (Number(payload.provisiones.haber) > 0) {
-      require('../../../contabilidad/src/motor-asientos').contabilizar({
-        evento: 'PROVISION_CIERRE', fecha: ultimoDiaMes(mes), glosa: `Constitución provisión incobrables ${mes}`,
-        ref: `PROV-${mes}`, montos: { constitucion: Number(payload.provisiones.haber) },
-      }).catch(() => {});
-    }
-    ok(res, { mes, guardado: true, provisiones: payload.provisiones.saldo_final, castigos: payload.castigos.saldo_final, numero_transaccion });
+    const r = await ejecutarCierreMes(mes, { id_usuario: req.usuario.id_usuario, nombre: nombreUsuario(req) });
+    auditar({ req, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales', detalle: `Cerró saldos contables ${mes} (prov ${r.provisiones.saldo_final}, castigo ${r.castigos.saldo_final}) TRX-${String(r.numero_transaccion).padStart(6, '0')}` });
+    ok(res, { mes, guardado: true, provisiones: r.provisiones.saldo_final, castigos: r.castigos.saldo_final, numero_transaccion: r.numero_transaccion });
   } catch (e) { fail(res, e.message); }
 };
+
+// Detalle por crédito de un cierre: GET /contable/detalle?mes=YYYY-MM
+const detalleProvision = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    const [rows] = await pool.query(
+      'SELECT num_op, cliente, dias_mora, tramo, saldo_insoluto, pct, provision FROM provisiones_detalle WHERE mes=? ORDER BY provision DESC', [mes]);
+    ok(res, { mes, creditos: rows.length, provision_total: rows.reduce((s, r) => s + Number(r.provision), 0), detalle: rows });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── CIERRE AUTOMÁTICO ──────────────────────────────────────────────────────────
+   Paramétrico (cobranza_config.provision_auto_dia, mantenedor Parámetros Cobranza):
+   a partir de ese día del mes, si el MES ANTERIOR aún no tiene cierre de
+   provisiones, se cierra solo (snapshot + asiento + detalle). '' = desactivado.
+   Nota: el stock de mora se mide al día en que corre; por eso conviene un día
+   temprano del mes (default 1). Si alguien ya cerró a mano, no hace nada. */
+async function tickCierreAutomatico() {
+  try {
+    const cob = require('../../../cobranza/src/controllers/cobranza.controller')._motor;
+    const cfg = await cob.getCobranzaConfig();
+    const dia = parseInt(cfg.provision_auto_dia, 10);
+    if (!dia || dia < 1) return;                                   // desactivado
+    const hoy = new Date();
+    if (hoy.getDate() < dia) return;                               // aún no toca
+    const mesAnt = mesAnterior(hoy.toISOString().slice(0, 7));
+    const yaCerrado = await snapshot(mesAnt, 'PROVISIONES');
+    if (yaCerrado != null) return;                                 // ya lo cerró alguien
+    const r = await ejecutarCierreMes(mesAnt, { id_usuario: null, nombre: 'Sistema (cierre automático)' });
+    auditar({ usuario: { id_usuario: null, nombre: 'Sistema' }, accion: 'CARGA_MASIVA', modulo: 'tesoreria', entidad: 'contab_saldos_mensuales',
+      detalle: `CIERRE AUTOMÁTICO de provisiones ${mesAnt} (prov ${r.provisiones.saldo_final}, castigo ${r.castigos.saldo_final}) TRX-${String(r.numero_transaccion).padStart(6, '0')}` });
+    console.log(`[provisiones] cierre automático ${mesAnt}: prov ${r.provisiones.saldo_final}`);
+  } catch (e) { console.error('[provisiones tick]', e.message); }
+}
+setTimeout(tickCierreAutomatico, 90 * 1000);                       // al boot (tras las migraciones)
+setInterval(tickCierreAutomatico, 6 * 60 * 60 * 1000);             // y cada 6 horas
 
 // Resuelve num_op → id de crédito (para el atajo "CASTIGAR SALDO" en Tesorería).
 const resolver = async (req, res) => {
@@ -378,4 +475,4 @@ function nombreUsuario(req) {
   return `${u.nombre || ''} ${u.apellido || ''}`.trim() || u.email || ('Usuario ' + u.id_usuario);
 }
 
-module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable };
+module.exports = { solicitar, aprobar, anular, porOperacion, historial, resolver, contable, cerrarMesContable, detalleProvision };

@@ -62,6 +62,9 @@ const COB_DEFAULTS = {
     { hasta_dias: 15, pct: 1 }, { hasta_dias: 30, pct: 5 }, { hasta_dias: 60, pct: 20 },
     { hasta_dias: 90, pct: 40 }, { hasta_dias: 180, pct: 80 }, { hasta_dias: null, pct: 100 },
   ]),
+  // Cierre AUTOMÁTICO de provisiones: día del mes desde el que se cierra solo el
+  // mes anterior si nadie lo cerró a mano ('' = desactivado). Tick en castigos.controller.
+  provision_auto_dia: '1',
   // Modo de tasa del interés por mora: 'fija_otorgamiento' (TMC al otorgar, per contrato 6.1)
   // o 'variable' (TMC vigente de cada día de mora — Ley 18.010 art. 16 sin pacto).
   mora_tasa_modo: 'fija_otorgamiento',
@@ -1006,7 +1009,7 @@ exports.getParametros = async (req, res) => {
 exports.setParametros = async (req, res) => {
   try {
     const body = req.body || {};
-    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf', 'tramos_provision', 'mora_tasa_modo'];
+    const permitidas = ['datos_transferencia', 'texto_whatsapp', 'texto_sms', 'texto_email_asunto', 'texto_email', 'gastos_dias', 'tramos_uf', 'tramos_provision', 'mora_tasa_modo', 'provision_auto_dia'];
     for (const clave of permitidas) {
       if (body[clave] === undefined) continue;
       let valor = body[clave];
