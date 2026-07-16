@@ -196,6 +196,7 @@ async function abrir(id){
       ${inp('f_cargas_invalidas','Cargas inválidas',f.cargas_invalidas??0,'number')}
       ${inp('f_anos_trabajados_previos','Años trabajados ANTES de AutoFácil (feriado progresivo art. 68, máx 10)',f.anos_trabajados_previos??0,'number')}
     </div>
+    ${Number(f.anos_trabajados_previos)>0 && !(FICHA.documentos||[]).some(d=>String(d.tipo||'').startsWith('CERTIFICADO AFP'))?'<div style="background:#fef2f2;border-left:4px solid #dc2626;border-radius:8px;padding:8px 12px;font-size:.8rem;margin-bottom:8px"><i class="bi bi-exclamation-triangle-fill me-1"></i><b>Años previos sin respaldo:</b> sube el certificado de cotizaciones de la AFP a la carpeta digital (tipo "CERTIFICADO AFP") — el sistema lo recordará a diario.</div>':''}
     <div style="font-size:.75rem;color:#64748b;margin:-4px 0 6px">Tramo D = sin derecho a asignación. Los campos con <span style="color:#dc2626;font-weight:800">*</span> son obligatorios para el archivo Previred y el LRE.</div>
     <div class="fld" style="margin-top:10px"><label>Observaciones</label><input id="f_observaciones" value="${esc(f.observaciones||'')}"></div>
     <div class="sec">Carpeta digital</div>

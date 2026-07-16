@@ -37,8 +37,40 @@ require('../../../../shared/migrate').enFila('rrhh-vac-cuenta', async () => {
   const [[t]] = await pool.query("SELECT valor FROM rh_config WHERE clave='ausencia_tipos'");
   if (t && !t.valor.includes('AUSENCIA INJUSTIFICADA'))
     await pool.query("UPDATE rh_config SET valor=CONCAT(valor, ',AUSENCIA INJUSTIFICADA') WHERE clave='ausencia_tipos'");
+  // tipo de documento para respaldar los años previos (feriado progresivo)
+  const [[dt]] = await pool.query("SELECT valor FROM rh_config WHERE clave='doc_tipos'");
+  if (dt && !dt.valor.includes('CERTIFICADO AFP'))
+    await pool.query("UPDATE rh_config SET valor=CONCAT(valor, ',CERTIFICADO AFP (AÑOS COTIZADOS)') WHERE clave='doc_tipos'");
   console.log('[rrhh-vac-cuenta] listo');
 });
+
+/* ── Alegato: años previos declarados SIN certificado AFP en la carpeta ─────── */
+async function alegarSinCertificadoAFP() {
+  try {
+    const [pend] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, f.anos_trabajados_previos
+         FROM rh_fichas f JOIN usuarios u ON u.id_usuario=f.id_usuario AND u.estado='activo'
+        WHERE f.anos_trabajados_previos > 0
+          AND NOT EXISTS (SELECT 1 FROM rh_documentos d WHERE d.id_usuario=f.id_usuario AND d.tipo LIKE 'CERTIFICADO AFP%')`);
+    if (!pend.length) return;
+    const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+    const [rr] = await pool.query(
+      `SELECT DISTINCT u.id_usuario FROM usuarios u
+        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+        JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+       WHERE f.codigo='rh_colaboradores' AND u.estado='activo'`);
+    const lista = pend.slice(0, 5).map(p => `${p.nombre} (${p.anos_trabajados_previos} años)`).join(', ') + (pend.length > 5 ? '…' : '');
+    notificar(rr.map(x => x.id_usuario), {
+      tipo: 'RRHH', prioridad: 'alta',
+      titulo: `${pend.length} colaborador(es) con años previos SIN certificado AFP`,
+      mensaje: `El feriado progresivo declara años trabajados que deben respaldarse con el certificado de cotizaciones de la AFP: ${lista}. Súbelo a la carpeta digital (tipo "CERTIFICADO AFP").`,
+      href: '/recursos-humanos/colaboradores/',
+      clave: 'afp_cert_pendiente_' + new Date().toISOString().slice(0, 10),
+    });
+  } catch (e) { console.error('[alegato cert AFP]', e.message); }
+}
+setTimeout(alegarSinCertificadoAFP, 140 * 1000);
+setInterval(alegarSinCertificadoAFP, 24 * 60 * 60 * 1000);
 
 /* ── Generación de devengos: cada aniversario cumplido deposita su período ──── */
 function progresivoDelPeriodo(previos, periodoN) {
