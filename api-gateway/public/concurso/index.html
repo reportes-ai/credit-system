@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Qué Dice AutoFácil?</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --azul:#0a2a7a; --azul2:#1442b8; --cel:#19b8ff; --oro:#ffd23e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; color:#fff;
+    background:radial-gradient(1300px 700px at 50% -10%, #1a3fae 0%, #0a2a7a 55%, #051745 100%); min-height:100vh; }
+  .top { display:flex; align-items:center; gap:14px; padding:14px 22px; }
+  .top h1 { font-size:1.5rem; margin:0; font-weight:900; letter-spacing:.5px; text-shadow:0 3px 8px rgba(0,0,0,.4); }
+  .top h1 b { color:var(--oro); }
+  .top .volver { margin-left:auto; color:#bcd2ff; text-decoration:none; font-size:.85rem; }
+  .top .btn-edit { border:1.5px solid #bcd2ff55; background:none; color:#bcd2ff; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:.82rem; }
+  .esc { max-width:900px; margin:0 auto; padding:6px 16px 70px; }
+  /* selector */
+  .lobby { text-align:center; padding:30px 10px; }
+  .lobby .cat { display:inline-block; margin:8px; background:linear-gradient(180deg,var(--azul2),var(--azul)); border:2px solid #4a7ae0;
+    border-radius:14px; padding:20px 30px; font-size:1.1rem; font-weight:800; cursor:pointer; box-shadow:0 8px 22px rgba(0,0,0,.35); transition:.15s; }
+  .lobby .cat:hover { transform:translateY(-3px); border-color:var(--oro); }
+  .lobby .cat small { display:block; font-weight:400; color:#bcd2ff; font-size:.75rem; margin-top:4px; }
+  /* juego */
+  .marcador { display:flex; align-items:center; justify-content:center; gap:22px; margin:8px 0 14px; }
+  .marcador .pts { background:#051745; border:3px solid var(--oro); border-radius:14px; padding:8px 26px; font-size:1.9rem; font-weight:900; color:var(--oro); font-family:Consolas,monospace; box-shadow:0 0 24px rgba(255,210,62,.25); }
+  .marcador .strikes { font-size:2rem; letter-spacing:8px; color:#ff4d4d; text-shadow:0 0 12px rgba(255,0,0,.5); min-width:130px; }
+  .pregunta { text-align:center; background:linear-gradient(180deg,#123a9e,#0a2a7a); border:2px solid #4a7ae0; border-radius:16px;
+    padding:16px 22px; font-size:1.25rem; font-weight:800; margin-bottom:16px; box-shadow:0 10px 26px rgba(0,0,0,.35); }
+  .tablero { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:640px){ .tablero { grid-template-columns:1fr; } .marcador { gap:12px; } }
+  .panel { position:relative; height:64px; border-radius:12px; cursor:pointer; perspective:600px; }
+  .panel .cara { position:absolute; inset:0; border-radius:12px; display:flex; align-items:center; justify-content:space-between;
+    padding:0 18px; font-weight:900; font-size:1.05rem; backface-visibility:hidden; transition:transform .5s; border:2px solid #4a7ae0; }
+  .panel .oculta { background:linear-gradient(180deg,#1c4ecb,#123a9e); }
+  .panel .oculta .num { width:38px; height:38px; border-radius:50%; background:#0a2a7a; border:2px solid #6f9aff; display:flex; align-items:center; justify-content:center; margin:0 auto; font-size:1.1rem; }
+  .panel .revelada { background:linear-gradient(180deg,#fff,#dbe6ff); color:#0a2a7a; transform:rotateX(180deg); border-color:#fff; }
+  .panel.rev .oculta { transform:rotateX(-180deg); }
+  .panel.rev .revelada { transform:rotateX(0); }
+  .panel .revelada .pts { background:var(--azul); color:var(--oro); border-radius:8px; padding:3px 12px; font-family:Consolas,monospace; }
+  .respuesta-zone { display:flex; gap:10px; margin:18px 0 8px; }
+  .respuesta-zone input { flex:1; border:2px solid #4a7ae0; background:#051745; color:#fff; border-radius:12px; padding:13px 18px; font-size:1.05rem; font-weight:700; }
+  .respuesta-zone input:focus { outline:none; border-color:var(--oro); }
+  .respuesta-zone button { background:linear-gradient(180deg,var(--oro),#e0b012); color:#4a3500; border:none; border-radius:12px; padding:0 26px; font-weight:900; font-size:1rem; cursor:pointer; }
+  .acciones { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+  .acciones button { background:none; border:1.5px solid #4a7ae0; color:#bcd2ff; border-radius:10px; padding:8px 16px; cursor:pointer; font-size:.85rem; font-weight:700; }
+  .acciones button:hover { border-color:var(--oro); color:var(--oro); }
+  .flash { position:fixed; inset:0; display:none; align-items:center; justify-content:center; font-size:9rem; font-weight:900; color:#ff3b3b; text-shadow:0 0 60px rgba(255,0,0,.8); pointer-events:none; z-index:99; }
+  .fin { text-align:center; padding:26px; }
+  .fin .total { font-size:3.4rem; font-weight:900; color:var(--oro); font-family:Consolas,monospace; }
+  /* editor */
+  dialog { border:none; border-radius:16px; padding:0; width:min(680px,95vw); max-height:92vh; }
+  dialog::backdrop { background:rgba(0,0,0,.65); }
+  .dlg { padding:20px 24px; color:#1e293b; }
+  .dlg h5 { margin:0 0 12px; color:var(--azul); }
+  .dlg table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .dlg th { text-align:left; color:#64748b; padding:4px; } .dlg td { padding:3px; }
+  .dlg input, .dlg select { width:100%; border:1.5px solid #d5d9e0; border-radius:8px; padding:7px 10px; font:inherit; }
+  .dlg .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  .btn-azul { background:var(--azul2); color:#fff; border:none; border-radius:8px; padding:9px 20px; font-weight:800; cursor:pointer; }
+  .btn-gris { background:#e4e6eb; color:#333; border:none; border-radius:8px; padding:9px 16px; font-weight:700; cursor:pointer; }
+  .lista-preg { max-height:300px; overflow:auto; margin-bottom:12px; }
+  .lista-preg .fila { display:flex; align-items:center; gap:8px; padding:6px 8px; border-bottom:1px solid #eef2f7; font-size:.86rem; }
+  .lista-preg .fila:hover { background:#f6f9ff; }
+  .lista-preg .cat { background:#e7f0ff; color:var(--azul); border-radius:6px; padding:1px 8px; font-size:.72rem; font-weight:800; }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>¿Qué Dice <b>AutoFácil</b>?</h1>
+  <button class="btn-edit" id="btnEditor" style="display:none" onclick="abrirEditor()"><i class="bi bi-pencil"></i> Preguntas</button>
+  <a class="volver" href="/recursos-humanos/"><i class="bi bi-arrow-left"></i> Volver</a>
+</div>
+
+<div class="esc">
+  <!-- LOBBY -->
+  <div class="lobby" id="lobby">
+    <p style="color:#bcd2ff">Elige una categoría y responde como lo haría el equipo. Cada respuesta correcta suma los puntos de la encuesta. Tres ✖ y se acaba la ronda. 🎤</p>
+    <div id="cats"></div>
+  </div>
+
+  <!-- JUEGO -->
+  <div id="juego" style="display:none">
+    <div class="marcador">
+      <div class="strikes" id="strikes"></div>
+      <div class="pts" id="pts">0</div>
+    </div>
+    <div class="pregunta" id="preg"></div>
+    <div class="tablero" id="tablero"></div>
+    <div class="respuesta-zone">
+      <input id="guess" placeholder="¡Tu respuesta!" autocomplete="off" onkeydown="if(event.key==='Enter')responder()">
+      <button onclick="responder()">¡A VER SI ESTÁ!</button>
+    </div>
+    <div class="acciones">
+      <button onclick="rendirse()"><i class="bi bi-eye"></i> Revelar todo (animador)</button>
+      <button onclick="siguiente()"><i class="bi bi-skip-forward"></i> Siguiente pregunta</button>
+      <button onclick="volverLobby()"><i class="bi bi-grid"></i> Categorías</button>
+    </div>
+  </div>
+
+  <!-- FIN -->
+  <div class="fin" id="fin" style="display:none">
+    <h2 id="finTitulo"></h2>
+    <div class="total" id="finPts"></div>
+    <div class="acciones" style="margin-top:20px">
+      <button onclick="volverLobby()"><i class="bi bi-arrow-repeat"></i> Jugar otra categoría</button>
+    </div>
+  </div>
+</div>
+
+<div class="flash" id="flash">✖</div>
+
+<dialog id="dlgEd"><div class="dlg">
+  <h5><i class="bi bi-pencil-square"></i> Preguntas del concurso</h5>
+  <div class="lista-preg" id="listaPreg"></div>
+  <button class="btn-azul" onclick="editarPregunta(null)">+ Nueva pregunta</button>
+  <div class="pie"><button class="btn-gris" onclick="dlgEd.close()">Cerrar</button></div>
+</div></dialog>
+
+<dialog id="dlgPreg"><div class="dlg">
+  <h5 id="dlgPregTit">Nueva pregunta</h5>
+  <label style="font-size:.78rem;font-weight:700;color:#64748b">Categoría</label>
+  <input id="edCat" placeholder="Onboarding, Crédito, Cobranza…" list="catsList"><datalist id="catsList"></datalist>
+  <label style="font-size:.78rem;font-weight:700;color:#64748b;margin-top:8px;display:block">Pregunta</label>
+  <input id="edPreg" maxlength="300" placeholder="Nombra un…">
+  <table style="margin-top:10px">
+    <tr><th style="width:46%">Respuesta</th><th>Sinónimos (separados por |)</th><th style="width:70px">Puntos</th></tr>
+    <tbody id="edResps"></tbody>
+  </table>
+  <button class="btn-gris" style="margin-top:6px" onclick="addRespFila()">+ respuesta</button>
+  <label style="display:block;margin-top:10px;font-size:.85rem"><input type="checkbox" id="edActiva" checked style="width:auto"> Activa</label>
+  <div class="pie">
+    <button class="btn-gris" id="btnDelPreg" style="color:#dc3545" onclick="eliminarPregunta()">Eliminar</button>
+    <button class="btn-gris" onclick="dlgPreg.close()">Cancelar</button>
+    <button class="btn-azul" onclick="guardarPregunta()">Guardar</button>
+  </div>
+</div></dialog>
+
+<script>
+const TK = sessionStorage.getItem('token');
+if (!TK) location.href = '/login';
+const H = { 'Authorization': 'Bearer ' + TK, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+let DATA = [], CAT = null, COLA = [], Q = null, PTS = 0, STRIKES = 0, EDITOR = false, ED_ID = null;
+
+(async () => {
+  const j = await fetch('/api/concurso/preguntas', { headers: H }).then(r => r.json());
+  DATA = j?.data?.preguntas || [];
+  EDITOR = !!j?.data?.editor;
+  if (EDITOR) $('btnEditor').style.display = 'inline-block';
+  pintarLobby();
+})();
+
+function pintarLobby() {
+  $('lobby').style.display = 'block'; $('juego').style.display = 'none'; $('fin').style.display = 'none';
+  const cats = {};
+  DATA.forEach(p => { cats[p.categoria] = (cats[p.categoria] || 0) + 1; });
+  $('cats').innerHTML = Object.entries(cats).map(([c, n]) =>
+    `<div class="cat" onclick="jugar('${esc(c)}')">${esc(c)}<small>${n} pregunta${n > 1 ? 's' : ''}</small></div>`).join('')
+    || '<p>No hay preguntas activas. ' + (EDITOR ? 'Crea la primera con el botón Preguntas.' : 'Pídele a RRHH que cargue preguntas.') + '</p>';
+}
+function volverLobby() { pintarLobby(); }
+
+/* ── partida ── */
+function jugar(cat) {
+  CAT = cat; PTS = 0;
+  COLA = DATA.filter(p => p.categoria === cat).sort(() => Math.random() - .5);
+  siguiente(true);
+}
+function siguiente(primera) {
+  if (!primera && Q) COLA = COLA.filter(p => p.id !== Q.id);
+  if (!COLA.length) return fin();
+  Q = COLA[0]; STRIKES = 0;
+  Q.respuestas.forEach(r => r._rev = false);
+  $('lobby').style.display = 'none'; $('fin').style.display = 'none'; $('juego').style.display = 'block';
+  $('preg').textContent = Q.pregunta;
+  pintarTablero(); pintarMarcador();
+  $('guess').value = ''; $('guess').focus();
+}
+function pintarTablero() {
+  $('tablero').innerHTML = Q.respuestas.map((r, i) => `
+    <div class="panel ${r._rev ? 'rev' : ''}" onclick="revelar(${i}, true)">
+      <div class="cara oculta"><div class="num" style="margin:0 auto">${i + 1}</div></div>
+      <div class="cara revelada"><span>${esc(r.texto)}</span><span class="pts">${r.puntos}</span></div>
+    </div>`).join('');
+}
+function pintarMarcador() {
+  $('pts').textContent = PTS.toLocaleString('es-CL');
+  $('strikes').textContent = '✖'.repeat(STRIKES) + '·'.repeat(Math.max(0, 3 - STRIKES)).replace(/·/g, ' ');
+}
+function responder() {
+  const g = norm($('guess').value);
+  $('guess').value = ''; $('guess').focus();
+  if (!g || !Q) return;
+  const idx = Q.respuestas.findIndex(r => {
+    if (r._rev) return false;
+    const cands = [norm(r.texto), ...String(r.sinonimos || '').split('|').map(norm)].filter(x => x.length >= 3);
+    return cands.some(c => c === g || c.includes(g) && g.length >= 4 || g.includes(c));
+  });
+  if (idx >= 0) { PTS += Q.respuestas[idx].puntos; revelar(idx); pintarMarcador(); dingg(880); chequearRonda(); }
+  else strike();
+}
+function revelar(i, manual) {
+  if (manual && !EDITOR) return;           // clic directo en panel = solo animador/editor
+  Q.respuestas[i]._rev = true;
+  document.querySelectorAll('.panel')[i]?.classList.add('rev');
+  if (manual) chequearRonda();
+}
+function chequearRonda() {
+  if (Q.respuestas.every(r => r._rev)) setTimeout(() => { dingg(1320); }, 300);
+}
+function strike() {
+  STRIKES++; pintarMarcador(); dingg(140, 'sawtooth');
+  const f = $('flash'); f.style.display = 'flex'; f.textContent = '✖'.repeat(STRIKES);
+  setTimeout(() => f.style.display = 'none', 700);
+  if (STRIKES >= 3) setTimeout(rendirse, 800);
+}
+function rendirse() { Q.respuestas.forEach((r, i) => revelarSinPerm(i)); }
+function revelarSinPerm(i) { Q.respuestas[i]._rev = true; document.querySelectorAll('.panel')[i]?.classList.add('rev'); }
+function fin() {
+  $('juego').style.display = 'none'; $('fin').style.display = 'block';
+  $('finTitulo').textContent = `¡Terminó "${CAT}"!`;
+  $('finPts').textContent = PTS.toLocaleString('es-CL') + ' pts';
+}
+function dingg(freq, tipo) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = tipo || 'sine'; o.frequency.value = freq;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(.25, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, ctx.currentTime + .5);
+    o.start(); o.stop(ctx.currentTime + .5);
+  } catch (_) {}
+}
+
+/* ── editor ── */
+function abrirEditor() {
+  $('listaPreg').innerHTML = DATA.map(p => `
+    <div class="fila">
+      <span class="cat">${esc(p.categoria)}</span>
+      <span style="flex:1">${esc(p.pregunta)}</span>
+      <span style="color:#94a3b8;font-size:.75rem">${p.respuestas.length} resp.</span>
+      <button class="btn-gris" style="padding:2px 10px" onclick='editarPregunta(${p.id})'><i class="bi bi-pencil"></i></button>
+    </div>`).join('') || '<p class="text-muted">Sin preguntas.</p>';
+  dlgEd.showModal();
+}
+function editarPregunta(id) {
+  ED_ID = id;
+  const p = DATA.find(x => x.id === id);
+  $('dlgPregTit').textContent = p ? 'Editar pregunta' : 'Nueva pregunta';
+  $('edCat').value = p?.categoria || '';
+  $('edPreg').value = p?.pregunta || '';
+  $('edActiva').checked = true;
+  $('btnDelPreg').style.display = p ? 'inline-block' : 'none';
+  $('catsList').innerHTML = [...new Set(DATA.map(x => x.categoria))].map(c => `<option value="${esc(c)}">`).join('');
+  $('edResps').innerHTML = '';
+  (p?.respuestas?.length ? p.respuestas : [{}, {}, {}]).forEach(r => addRespFila(r));
+  dlgPreg.showModal();
+}
+function addRespFila(r) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input class="rTexto" maxlength="160" value="${esc(r?.texto || '')}"></td>
+    <td><input class="rSin" maxlength="300" value="${esc(r?.sinonimos || '')}"></td>
+    <td><input class="rPts" type="number" min="1" value="${r?.puntos || 10}"></td>`;
+  $('edResps').appendChild(tr);
+}
+async function guardarPregunta() {
+  const respuestas = [...$('edResps').querySelectorAll('tr')].map(tr => ({
+    texto: tr.querySelector('.rTexto').value.trim(),
+    sinonimos: tr.querySelector('.rSin').value.trim(),
+    puntos: parseInt(tr.querySelector('.rPts').value) || 10,
+  })).filter(r => r.texto);
+  const r = await fetch('/api/concurso/preguntas', { method: 'POST', headers: H, body: JSON.stringify({
+    id: ED_ID, categoria: $('edCat').value.trim() || 'General', pregunta: $('edPreg').value.trim(),
+    activa: $('edActiva').checked, respuestas }) }).then(r => r.json());
+  if (!r.success) return alert(r.error);
+  dlgPreg.close(); dlgEd.close(); recargar();
+}
+async function eliminarPregunta() {
+  if (!ED_ID || !confirm('¿Eliminar la pregunta completa?')) return;
+  await fetch('/api/concurso/preguntas/' + ED_ID, { method: 'DELETE', headers: H });
+  dlgPreg.close(); dlgEd.close(); recargar();
+}
+async function recargar() {
+  const j = await fetch('/api/concurso/preguntas', { headers: H }).then(r => r.json());
+  DATA = j?.data?.preguntas || [];
+  pintarLobby();
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

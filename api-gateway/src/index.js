@@ -261,6 +261,7 @@ app.use('/api/banco',                require('../../services/tesoreria/src/route
 app.use('/api/conciliacion',         require('../../services/tesoreria/src/routes/conciliacion.routes'));
 app.use('/api/cierre-mes',           require('../../services/tesoreria/src/routes/cierre-mes.routes'));
 app.use('/api/facilbook',            require('../../services/facilbook/src/routes/facilbook.routes'));
+app.use('/api/concurso',             require('../../services/rrhh/src/routes/concurso.routes'));
 app.use('/api/trx-bitacora',         require('../../services/tesoreria/src/routes/trx-bitacora.routes'));
 
 // Cartas de Aprobación
@@ -365,6 +366,7 @@ app.get('/health', async (req, res) => {
 const PAGINAS = [
   ['/cafe', 'cafe/index.html'],
   ['/facilbook', 'facilbook/index.html'],
+  ['/concurso', 'concurso/index.html'],
   ['/simulador-rapido', 'simulador-rapido/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
