@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.2 — ficha: conyuge (misma direccion opcional), hijos dinamicos con carga, 2 contactos de emergencia -->
+  <!-- v1.3 — tipo de contrato NO MOSTRAR oculta al colaborador de la lista; lista solo activos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -134,7 +134,7 @@ async function abrir(id){
       ${inp('f_cargo','Cargo',u.cargo)}
       ${inp('f_fecha_ingreso','Fecha de ingreso',iso(u.fecha_ingreso),'date')}
       ${inp('f_centro_costo','Centro de costo',u.centro_costo)}
-      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'])}
+      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA','NO MOSTRAR'])}
       ${inp('f_jornada','Jornada',f.jornada)}
       ${inp('f_telefono','Teléfono corporativo',u.telefono)}
     </div>

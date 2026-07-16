@@ -228,7 +228,8 @@ const listarColaboradores = async (req, res) => {
          FROM usuarios u
          LEFT JOIN perfiles p ON p.id_perfil = u.id_perfil
          LEFT JOIN rh_fichas f ON f.id_usuario = u.id_usuario
-        ORDER BY u.estado = 'activo' DESC, nombre LIMIT 800`);
+        WHERE u.estado = 'activo' AND COALESCE(f.tipo_contrato,'') <> 'NO MOSTRAR'
+        ORDER BY nombre LIMIT 800`);
     ok(res, rows);
   } catch (e) { console.error('[rrhh listarColaboradores]', e.message); fail(res, 'Error interno del servidor'); }
 };
