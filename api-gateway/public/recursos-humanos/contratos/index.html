@@ -181,6 +181,8 @@ function fqPintarLista(){
     <td><button class="btn-mini" onclick="imprimirFiniquito(${f.id})"><i class="bi bi-printer"></i></button></td></tr>`).join('')
     || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px">Sin finiquitos guardados.</td></tr>';
 }
+function fqFmt(el){ const n=parseInt(String(el.value).replace(/\D/g,''))||0; el.value=n?CLP(n):'$0'; }
+function fqVal(id){ return parseInt(String($(id).value).replace(/\D/g,''))||0; }
 async function fqCalcular(){
   const q = new URLSearchParams({ id_usuario:$('fqU').value, causal:$('fqCausal').value, fecha_termino:$('fqFecha').value, avisado:$('fqAvisado').checked?'1':'0' });
   const j = await (await fetch('/api/rrhh/finiquitos/calcular?'+q,{headers:H})).json();
@@ -188,11 +190,11 @@ async function fqCalcular(){
   FQ_CALC = j.data;
   const d = j.data;
   const fila = (lbl, id, val, nota) => `<tr><td>${lbl}${nota?`<br><span style="color:#94a3b8;font-size:.74rem">${nota}</span>`:''}</td>
-    <td style="text-align:right"><input id="${id}" type="number" value="${val}" style="width:150px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" oninput="fqTotal()"></td></tr>`;
+    <td style="text-align:right"><input id="${id}" inputmode="numeric" value="${CLP(val)}" style="width:160px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px;font-weight:700" oninput="fqFmt(this);fqTotal()"></td></tr>`;
   $('fqResultado').innerHTML = `
     ${d.avisos.length?`<div class="rojo" style="background:#fffbeb;border-color:#d97706">${d.avisos.map(a=>'• '+esc(a)).join('<br>')}</div>`:''}
     <table style="max-width:640px">
-      <tr><td>Base (última remuneración)</td><td style="text-align:right"><input id="fqBase" type="number" value="${d.base}" style="width:150px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" disabled></td></tr>
+      <tr><td>Base (última remuneración)</td><td style="text-align:right"><input id="fqBase" value="${CLP(d.base)}" style="width:160px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" disabled></td></tr>
       ${fila(`Indemnización años de servicio (${d.anos_servicio} año/s × base topada)`, 'fqIA', d.indemnizacion_anos)}
       ${fila('Indemnización sustitutiva del aviso previo', 'fqMA', d.mes_aviso)}
       ${fila(`Feriado proporcional (${d.vac_dias_habiles} hábiles ≈ ${d.vac_dias_corridos} corridos)`, 'fqVac', d.vac_monto)}
@@ -204,11 +206,10 @@ async function fqCalcular(){
   fqTotal();
 }
 function fqTotal(){
-  const v = id => parseInt($(id).value)||0;
-  $('fqTotalCell').textContent = CLP(v('fqIA')+v('fqMA')+v('fqVac')+v('fqOtros')-v('fqDesc'));
+  $('fqTotalCell').textContent = CLP(fqVal('fqIA')+fqVal('fqMA')+fqVal('fqVac')+fqVal('fqOtros')-fqVal('fqDesc'));
 }
 async function fqGuardar(){
-  const v = id => parseInt($(id).value)||0;
+  const v = fqVal;
   const d = FQ_CALC;
   const body = { id_usuario:d.colaborador.id_usuario, trabajador:d.colaborador.nombre, rut:d.colaborador.rut, cargo:d.colaborador.cargo,
     fecha_ingreso:d.colaborador.fecha_ingreso, fecha_termino:$('fqFecha').value, causal:d.causal.articulo, causal_glosa:d.causal.glosa,
