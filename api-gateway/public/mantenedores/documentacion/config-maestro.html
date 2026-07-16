@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 -->
+<!-- v1.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -98,6 +98,26 @@
   <table>
     <tr><th>Mantenedor</th><th>Qué configura</th></tr>
     <tr><td>Inteligencia Artificial</td><td>Interruptor general y por funcionalidad (bot WhatsApp, informes crediticios, liquidaciones, revisor de plantillas…), modelo asignado a cada una y tracking de tokens y costo USD. Cada función IA nace apagada: se enciende aquí.</td></tr>
+  </table>
+
+  <h2>Otros mantenedores</h2>
+  <table>
+    <tr><th>Mantenedor</th><th>Qué configura</th></tr>
+    <tr><td>Comunas</td><td>Catálogo geográfico (regiones/provincias/comunas) que usan direcciones de clientes y dealers.</td></tr>
+    <tr><td>Cuentas Bancarias</td><td>Las cuentas del negocio: dónde se recauda y desde dónde se paga (las leen Caja, ODP, Conciliación y el aviso de pago a clientes).</td></tr>
+    <tr><td>Actividades Económicas</td><td>Catálogo de los 674 códigos de actividad del SII (pendiente cablearlo a los giros de clientes/dealers).</td></tr>
+    <tr><td>Carrera / Ranking de Colocaciones</td><td>La carrera y el ranking de ejecutivos que se muestran al entrar al Suite.</td></tr>
+    <tr><td>Definiciones</td><td>Documentos y definiciones operativas del negocio (incluye la guía de restauración de respaldos de BD).</td></tr>
+    <tr><td>Mantenedor DealerNet / Productos DealerNet</td><td>Credenciales y parámetros del WS + qué informes existen, su costo y cuáles pide la ficha de dealer (empresa/socios).</td></tr>
+    <tr><td>Mantenedor Compras / Tickets TI</td><td>Catálogo de compras por perfil; motivos, SLA y escalamiento de los tickets a TI.</td></tr>
+    <tr><td>Panel Mi Día</td><td>Qué widgets ve cada perfil en Mi Día.</td></tr>
+    <tr><td>Hora del Servidor</td><td>Verificación de la hora/zona horaria del servidor (crítica para vencimientos y mora).</td></tr>
+    <tr><td>Vehículos</td><td>Catálogo de marcas/modelos (módulo Vehículos hoy inactivo).</td></tr>
+    <tr><td>Backups del Sistema / SOLO DIOS / Punto de Restauración</td><td>Suplencias por ausencia; el landing de herramientas de administración total (editores BD, consola SQL); y la marca de restauración para pruebas UAT.</td></tr>
+    <tr><td>Alertas Saldos Precio</td><td>Alertas de las etapas Post Venta (saldos precio y comisión).</td></tr>
+    <tr><td>Pagarés Autofacil</td><td>Plantillas del texto del pagaré (editable, con reset al default); las usa la generación de pagarés.</td></tr>
+    <tr><td>Documentos a Validar Brokers</td><td>Ítems del checklist de validación documental al cargar respaldos, por financiera (AUTOFIN/Unidad).</td></tr>
+    <tr><td>Horarios Analistas de Crédito</td><td>Horario de cobertura del análisis; sin analista conectado dentro del horario, el Cuadro de Mando alerta.</td></tr>
   </table>
 
   <div class="nota"><b>Reglas de oro del Usuario Maestro:</b><br>

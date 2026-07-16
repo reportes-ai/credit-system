@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.2 -->
+<!-- v4.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,6 +15,8 @@
   .toc a { color:var(--accent); text-decoration:none; display:block; margin-bottom:5px; }
   .paso { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:10px 0; font-size:.92rem; }
   .tip { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:.88rem; }
+  .rev { background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:.88rem; }
+  .rev b.tag { background:#d97706; color:#fff; border-radius:4px; padding:1px 8px; font-size:.75rem; margin-right:6px; }
   ol, ul { padding-left:22px; } li { margin-bottom:5px; }
   code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
   figure.shot { margin:16px 0 22px; }
@@ -49,6 +51,9 @@
     <a href="#soporte">15. RRHH, Compras y Tickets</a>
     <a href="#reporteria">16. Reportería, BI y bitácora</a>
     <a href="#contabilidad">17. Contabilidad (reemplazo de AVSOFT)</a>
+    <a href="#clientes-cot">18. Clientes y Cotizaciones</a>
+    <a href="#dealers-inc">19. Incorporación de Dealers y Plan Liquidez</a>
+    <a href="#admin">20. Administración y control del sistema</a>
   </div>
 
   <h2 id="acceso">1. Acceso y navegación</h2>
@@ -75,6 +80,11 @@
   <figure class="shot"><img src="img/creditos.png" alt="Gestión de Créditos" loading="lazy"><figcaption>Gestión de Créditos: contadores por etapa y estado, filtros por financiera y búsqueda (datos de clientes difuminados).</figcaption></figure>
   <h3>Carga masiva</h3>
   <div class="paso">Créditos → Carga Masiva → sube el Excel → el validador (con IA) marca anomalías (RUT, montos, dealers, fechas) antes de insertar → confirma. Los créditos que quedaron incompletos entran a la cola de <b>Digitación de Datos Faltantes</b>: se toman de a uno (bloqueo de 20 min por usuario), los campos faltantes en rojo.</div>
+  <ul>
+    <li><b>Equivalencia de Ejecutivos:</b> (dentro de Carga Masiva) traduce los nombres de ejecutivos que vienen en el Excel a los usuarios reales del Suite, para que las colocaciones se atribuyan bien. Prerrequisito de cualquier carga: si aparece un ejecutivo nuevo en el archivo, primero se agrega aquí.</li>
+    <li><b>Historial de Cargas:</b> cada importación queda registrada (quién, cuándo, cuántas filas) para trazar de dónde vino cada operación.</li>
+  </ul>
+  <div class="rev"><b class="tag">REVISAR</b><b>Carga Trinidad y Equivalencias Trinidad</b> (dentro de Carga Masiva): cargador para el formato de archivo "Trinidad" con su propia tabla de equivalencia de estados. Documentar: qué archivo espera, quién lo carga, con qué frecuencia y qué estados mapea — pendiente de levantar con quien opera esa carga.</div>
 
   <h2 id="cartas">3. Cartas de Aprobación</h2>
   <ol>
@@ -92,6 +102,10 @@
     <li>Si los antecedentes tienen más de 30 días, carga información nueva (ocupación + documentos; las liquidaciones se validan con IA).</li>
     <li><b>Evaluar</b> → la IA cruza todo (incluye informes DealerNet en vivo) y entrega el análisis para tu decisión.</li>
   </ol>
+  <ul>
+    <li><b>Repositorio de Preaprobaciones:</b> todas las preevaluaciones automáticas (portal del dealer y Facilito por WhatsApp) quedan guardadas aquí — con veredicto, fecha y origen — para seguimiento comercial y auditoría de la política aplicada.</li>
+    <li><b>Score de Mora (histórico):</b> mide la tasa de mora histórica de la cartera por segmento (parque/calle, tramo de monto, plazo, pie %) y entrega un índice relativo para un perfil nuevo (1 = promedio de la cartera). Es paramétrico (qué carteras, desde qué fecha, cuántos días definen "mora"). <i>Limitación vigente:</i> solo tiene historial de pagos de la cartera judicial; se poblará completo cuando se cargue el calendario histórico de INDEXA (Etapa 3).</li>
+  </ul>
   <figure class="shot"><img src="img/evaluacion.png" alt="Evaluación Crediticia" loading="lazy"><figcaption>Evaluación Crediticia: todo parte por el RUT del cliente.</figcaption></figure>
 
   <h2 id="postventa">5. Post Venta y cartolas</h2>
@@ -119,6 +133,16 @@
     <li><b>Provisiones + Castigos:</b> el cuadro contable del mes muestra saldos, constitución y castigos. El cierre de provisiones ahora es <b>automático</b>: si nadie lo guarda a mano, el sistema lo hace solo a comienzos del mes siguiente (día configurable en Parámetros Cobranza), genera el asiento (constitución o <b>liberación</b> si la mora mejoró) y deja el <b>detalle por crédito</b> auditable (botón "Detalle por crédito": op, días de mora, tramo, % y provisión).</li>
     <li><b>Cierre de Mes</b> (card en Tesorería): checklist obligatorio con <b>responsable por punto</b> (provisiones, castigos, conciliación, transitorias, pagos pendientes, comisiones, cartolas — editable). Varios puntos se chequean solos (semáforo automático); cada responsable recibe un <b>correo diario</b> con sus puntos vencidos hasta que dé el OK. Con todos los obligatorios en verde, quien tiene la atribución presiona <b>CERRAR MES</b>: se activa el candado contable, se congela el acta (quién dio cada OK y cuándo) y se envía por correo a los destinatarios configurados.</li>
   </ul>
+  <h3>Otras cards de Tesorería</h3>
+  <ul>
+    <li><b>Administración de Cajas y Cierre de Caja:</b> Tesorería crea las cajas y asigna cajeros; cada cajero cierra su caja al final del día (cuadratura de lo recaudado). Prerrequisito de la operación de Caja: sin caja asignada no se puede cobrar.</li>
+    <li><b>Cuentas Transitorias:</b> los abonos bancarios que llegan sin identificar se registran aquí y se van aplicando a su crédito cuando se aclara el pagador. Es uno de los puntos con chequeo automático del <b>Cierre de Mes</b> (no deben quedar transitorias antiguas sin aplicar).</li>
+    <li><b>Aplicación de Fondos:</b> cuando un cliente paga su crédito completo con descuento negociado, aquí se arma la propuesta ítem por ítem (capital, intereses, gastos — sobre el mismo motor del prepago) y recorre la cadena de firmas HECHO → APROBADO → PROCESADO antes de aplicarse. El capital nunca se condona; el orden de condonación es primero gastos, luego intereses.</li>
+    <li><b>Bitácora de Transacciones:</b> el registro cronológico de todos los movimientos de dinero del Suite (pagos, reversas, ODP), para investigar cualquier transacción.</li>
+    <li><b>Cierre Contable:</b> el informe mensual de Tesorería para la matriz en Ecuador — saldos y flujos del mes en su formato. Distinto del "Informe Cierre Mensual" de Contabilidad (ese sale de los libros); este es el cuadre de tesorería.</li>
+    <li><b>Venta de Cartera:</b> venta de créditos AUTOFACIL a otra financiera (típicamente CFC). El motor propone el precio (= capital vigente, suma de amortizaciones impagas) y el usuario puede ajustarlo; cada venta registra si es <b>con administración</b> (seguimos cobrando nosotros) y/o <b>con responsabilidad</b> (si el cliente no paga, la cuota del mes se le paga al comprador). Reportes de stock por categoría y pestaña "Cuotas del Mes" con lo comprometido por responsabilidad. El crédito queda estampado como vendido (una sola fuente) y lo ven todos los módulos.</li>
+    <li><b>Conexiones Bancarias:</b> la integración con Fintoc para traer saldos y cartolas automáticamente. Está lista en sandbox; se activa cuando se contrate el plan. Mientras tanto, la cartola se carga a mano en Conciliación Bancaria (misma pantalla de destino).</li>
+  </ul>
   <figure class="shot"><img src="img/caja.png" alt="Caja de Tesorería" loading="lazy"><figcaption>Resumen de Cajas: cada cajero ve su caja, con pagos, reversiones y los botones Pagar órdenes / Pagar cuotas.</figcaption></figure>
 
   <h2 id="cobranza">8. Cobranza</h2>
@@ -127,6 +151,8 @@
     <li><b>Automatizaciones de Cobranza</b> (card en Cobranza → mantenedor unificado): dos motores automáticos para la cartera en mora. <b>Correo por tramo</b> — plantillas según los días de atraso, con cooldown y tope de envíos. <b>WhatsApp por secuencia numerada</b> — cada crédito recibe el siguiente mensaje de la lista (N°1, luego N°2…), nunca se repite el mismo; usa plantillas HSM aprobadas por Meta (el estatus APROBADA/PENDIENTE se ve ahí mismo) y el resultado evoluciona con la confirmación de Meta: <b>Enviado → Entregado → Leído</b>. Toda gestión de ambos motores queda registrada en la <b>bitácora del cliente (CRM)</b> con su resultado. Ambos nacen desactivados y respetan Modo Desarrollo. Además se pueden lanzar <b>campañas WhatsApp puntuales</b> a la cartera en mora desde el módulo WhatsApp o Campañas Masivas.</li>
     <li><b>Ley del Consumidor — el sistema la hace cumplir solo:</b> los gastos de cobranza se cobran recién desde el <b>día 21</b> de atraso (tramos marginales en UF, con la UF fijada ese día), y las gestiones tienen tope semanal — <b>1 telefónica o presencial y 2 remotas por semana</b>: al alcanzar el límite, el sistema bloquea la gestión de más. El panel de disponibilidad semanal se ve en Pre-judicial y Judicial.</li>
     <li>Las gestiones se registran en CRM; los compromisos de pago quedan en la bitácora del crédito.</li>
+    <li><b>Judicial:</b> la cartera demandada, con los catálogos paramétricos de la cobranza judicial (abogados, tribunales, etapas procesales) y el seguimiento de cada causa. El paso a incobrable/castigo contable es una <b>acción manual con doble firma gerencial</b> (Tesorería → Provisiones + Castigos), nunca automático.</li>
+    <li><b>Reportería Cobranzas:</b> los reportes propios del área (mora por tramo, recuperación, gestión) sin salir del módulo.</li>
   </ul>
   <figure class="shot"><img src="img/cobranza.png" alt="Módulo Cobranza" loading="lazy"><figcaption>Cobranza: aviso del día, y la cartera separada en Pre-judicial (Ley del Consumidor) y Judicial.</figcaption></figure>
 
@@ -138,6 +164,7 @@
     <li><b>Fuera de horario</b> o si el cliente prefiere que lo llamen: la oportunidad llega por <b>correo</b> al ejecutivo de turno (round-robin) con la cotización y copia al Jefe Comercial — hay que reportar el resultado, se revisa en comité.</li>
     <li><b>Campañas:</b> mensajes masivos a cartera en mora, vigentes o lista manual. Para escribir fuera de la ventana 24h se usan <b>plantillas</b> aprobadas por Meta (pestaña Plantillas, con revisión IA obligatoria antes de enviar).</li>
     <li><b>Aviso de vencimiento automático:</b> con el interruptor activado (Configuración), el sistema envía solo — todos los días a las 10:00 — un WhatsApp a cada cliente cuya cuota AutoFácil vence en <b>N días</b> (configurable, default 2), usando la plantilla aprobada <code>aviso_vencimiento</code>; si además tiene cuotas impagas usa <code>aviso_vencimiento_mora</code> con el monto <b>al día de hoy</b> (mora y gastos del motor de cobranza) y la suma total. Los datos bancarios salen de la fuente única, cada envío queda como gestión en el CRM y nunca se avisa dos veces la misma cuota. El botón "Probar ahora" muestra quiénes recibirían el aviso sin enviar nada. Nace desactivado.</li>
+    <li><b>Seguimiento de Cartas (Facilito):</b> un día antes de que venza una carta de aprobación, Facilito le escribe al dealer por WhatsApp preguntando por el negocio; la IA tabula la respuesta (vigente / perdido + motivo) y el panel muestra el resultado por carta — inteligencia comercial sin llamar uno a uno. <i>Prerrequisito pendiente:</i> aprobación de la plantilla en Meta.</li>
   </ul>
   <figure class="shot"><img src="img/whatsapp.png" alt="Módulo WhatsApp" loading="lazy"><figcaption>La bandeja WhatsApp: conversaciones a la izquierda (difuminadas), chat a la derecha, y las pestañas Campañas, Plantillas, Respuestas, Triggers y Configuración.</figcaption></figure>
 
@@ -326,7 +353,47 @@
     <li><b>Pregúntale a Finanzas (IA):</b> pregunta en lenguaje natural sobre el ámbito financiero — ingresos, gastos, presupuesto, márgenes, balance, proveedores, honorarios, remuneraciones — y la IA responde con las cifras, la tabla de respaldo y el SQL usado (transparencia total). Usa los <b>motores del módulo como herramientas</b> (P&G por rubros con PPTO y año anterior, balance general, estado de resultados, presupuesto anual) y SQL de solo lectura sobre las tablas contables, con un glosario financiero para que entienda conceptos como "desviación contra presupuesto" o "deuda con la matriz". Ideal: "¿cómo vamos contra el presupuesto?", "top proveedores del año", "evolución de gastos de personal". Solo lectura, blindado y acotado a contabilidad. Corre con el modelo más potente (Opus) y tiene <b>educación paramétrica</b>: si una respuesta sale mala, presiona <b>👎 Corregir</b> y escribe qué estuvo mal — la corrección queda como <b>lección permanente</b> que la IA obedece en todas las preguntas siguientes (botón <b>Lecciones</b> para verlas y desactivarlas), sin necesidad de programador. Además viene <b>pre-entrenada con un banco de 10.000 preguntas</b> generadas desde 3 perfiles (analista de finanzas, director de empresa y persona sin conocimientos financieros): adapta el tono a quien pregunta, conoce los hitos contables (extraordinarios de jun-2025, ajustes de cierre de dic-2025, capitalización de jun-2026), calcula punto de equilibrio con operaciones reales por canal y advierte cuando un dato no existe en vez de inventarlo.</li>
     <li><b>Punto de Restauración</b> (solo Admin): antes de algo arriesgado — importar un libro, digitación masiva, probar reglas — fija la marca; si sale mal, Restaurar borra todos los asientos posteriores (con sus líneas, respaldos y log) escribiendo RESTAURAR. El plan, las reglas, las plantillas y los candados no se tocan.</li>
   </ul>
-  <div class="tip"><b>Rutina para no contadores:</b> (1) opera normal en el Suite — caja, ODP, castigos, remuneraciones: la contabilidad se anota sola; (2) el contador digita a mano solo lo excepcional (un ajuste, una factura fuera de proceso) en Comprobantes; (3) a fin de mes: Balance de Comprobación para verificar y Estados Financieros para leer cómo va el negocio. Si un asiento automático salió con la cuenta equivocada: se corrige la REGLA en el mantenedor (arregla el futuro) y se anula y redigita el comprobante puntual (arregla el pasado).</div>
+  <div class="tip" id="tip-contab"><b>Rutina para no contadores:</b> (1) opera normal en el Suite — caja, ODP, castigos, remuneraciones: la contabilidad se anota sola; (2) el contador digita a mano solo lo excepcional (un ajuste, una factura fuera de proceso) en Comprobantes; (3) a fin de mes: Balance de Comprobación para verificar y Estados Financieros para leer cómo va el negocio. Si un asiento automático salió con la cuenta equivocada: se corrige la REGLA en el mantenedor (arregla el futuro) y se anula y redigita el comprobante puntual (arregla el pasado).</div>
+
+  <h2 id="clientes-cot">18. Clientes y Cotizaciones</h2>
+  <ul>
+    <li><b>Clientes:</b> la fuente única de los datos personales (RUT es la llave — nombre, dirección, contacto). Todos los módulos (cobranza, cartas, portal, certificados) leen de aquí: si un dato está malo, se corrige UNA vez en la ficha y queda bien en todas partes.</li>
+    <li><b>Antecedentes Laborales:</b> la situación laboral del cliente (ocupación, empleador, renta, documentos de respaldo). Si tienen más de 30 días, Evaluación Crediticia pide cargar información fresca. Las liquidaciones de sueldo se validan con IA.</li>
+    <li><b>Información Comercial:</b> el perfil de deudas del cliente (informes comerciales, clasificación Bueno/Regular/Malo/Grave). La alimentan las consultas DealerNet + IA y la lee la evaluación y la preaprobación.</li>
+    <li><b>Cotizaciones:</b> el simulador completo de créditos — precio del auto, pie, plazo → cuota con gastos, seguros y CAE, calculado con el motor único (tasas por tramo 200 UF + Parámetros de Crédito). Las cotizaciones guardadas quedan asociadas al RUT y las usa Evaluación Crediticia (define la cuota que se evalúa contra la renta) y Facilito cuando cotiza por WhatsApp. Las versiones express: <b>Simulador Rápido</b> (popup en la Home) y el simulador del Portal del Dealer — mismo motor.</li>
+  </ul>
+
+  <h2 id="dealers-inc">19. Incorporación de Dealers y Plan Liquidez</h2>
+  <ul>
+    <li><b>Para qué:</b> ningún dealer opera sin ficha aprobada. La ficha define SUS comisiones (la tabla individual del dealer es la que rige sus operaciones; la pizarra de Parques es el default y el umbral).</li>
+    <li><b>Flujo de la ficha:</b> el ejecutivo la llena (datos, banco, tabla de comisiones, socios) → <b>Enviar a autorización</b> → recorre la <b>cadena de niveles paramétrica</b> (N°1 Análisis siempre; N°2 Gerencia solo si la comisión supera la pizarra) → AUTORIZADA → se imprime (con las autorizaciones en letra chica), el cliente firma → se sube firmada → el analista <b>Cierra</b> y el dealer queda creado/actualizado. El orden importa: se autorizan los términos ANTES de firmar.</li>
+    <li><b>Informes automáticos:</b> al enviar, el sistema pide solo los informes DealerNet de la empresa y hasta 3 socios (qué informe pide cada entidad es paramétrico), corre el análisis IA y alerta en grave (registros penales). Aprobar sin abrir la revisión queda marcado "⚠ aprobado sin revisión".</li>
+    <li><b>Tipos:</b> GENERAL (calle), PARQUE o AMBOS (dos tablas de comisión; el cálculo elige por operación según dónde se cursó). Modificar un dealer existente usa la misma ficha: las diferencias salen en rojo para el aprobador.</li>
+    <li><b>Plan Liquidez (Super Partner):</b> anticipo de comisiones con tope (default $5M), respaldado por contrato + pagaré. Cada mes se genera la <b>Hoja de Liquidación</b> (comisión, deuda, descuento, pago neto) que recorre su cadena: Jefe/Gerente Comercial → Gerente General → Finanzas toma conocimiento (48h por nivel, auto-avanza). Aprobada la hoja se emiten las ODP con el descuento; al pagarse, el abono queda en la cuenta corriente del dealer. La cartola siempre va por el 100% — el descuento vive solo en la ODP.</li>
+    <li><b>Categorías (Socio/Partner/Super Partner):</b> segmento por ventas, propuesto automáticamente cada mes y asignable a mano en su mantenedor. Es un eje distinto a Parque/Calle.</li>
+  </ul>
+
+  <h2 id="admin">20. Administración y control del sistema</h2>
+  <ul>
+    <li><b>Usuarios y Perfiles:</b> altas, reseteo de claves, suspensión, y la matriz de permisos por perfil. El detalle completo de qué se parametriza está en la guía <a href="config-maestro.html">Configuración — Usuario Maestro</a>. El login se bloquea tras 3 intentos fallidos (paramétrico); se desbloquea desde Usuarios.</li>
+    <li><b>Auditoría de Movimientos:</b> quién hizo qué y cuándo — logins y todas las acciones críticas (aprobar comisión/carta, pagar, reversar, cargar masivo, cerrar mes, cambiar permisos, editar mantenedores…), con filtros, export a Excel y marca especial para acciones del "Sistema" (automáticas) y para documentos "validados sin ver".</li>
+    <li><b>Editores BD (Solo Dios):</b> edición directa de las tablas clientes/operaciones/antecedentes/info comercial. Dos niveles: <b>Solo Dios</b> (Admin: cualquier mes + eliminar) y <b>Analista</b> (solo modificar, solo meses abiertos, sin eliminar) — la restricción es del backend, no solo visual. Todo queda auditado.</li>
+    <li><b>Consola SQL:</b> consultas de solo lectura sobre la BD, exclusiva de Solo Dios y auditada.</li>
+    <li><b>Punto de Restauración (UAT):</b> antes de una prueba masiva se fija la marca; Restaurar borra los créditos y tablas hijas posteriores a ella. Contabilidad tiene su propio punto de restauración.</li>
+    <li><b>Modo Desarrollo:</b> con el interruptor activo, TODO el correo del sistema se desvía a las casillas de prueba — para probar procesos sin escribirle a clientes reales.</li>
+    <li><b>Backups / Suplencias:</b> quién hereda funciones, alertas y correos de un titular ausente (hoy desactivado).</li>
+    <li><b>Respaldo de BD:</b> TiDB respalda a diario (retención 1 día) + dump nocturno propio a GitHub con 30 días de retención. La guía de restauración está en Mantenedores → Definiciones.</li>
+    <li><b>Documentación Business Suite:</b> los 4 documentos vivos (este manual, Configuración Maestro, Técnica y Brochure). Por máxima del sistema, cada proceso nuevo nace documentado aquí en el mismo trabajo que lo crea.</li>
+  </ul>
+  <h3>Otros módulos</h3>
+  <ul>
+    <li><b>Política de Crédito</b> (módulo del Home): la política vigente en 5 paneles — <b>Flujo de Crédito</b> (etapas del proceso, perfiles por etapa y escalamiento automático), <b>Carga Mensual</b> (factores % sobre cada tipo de deuda para medir capacidad de pago), <b>Política de Aprobación</b> (edad, renta, pie, plazo, antigüedad y montos máximos por tipo de cliente, con restricciones), <b>Documentos de Respaldo</b> (qué documentos validan renta, antigüedad, domicilio, estado civil y residencia) y <b>Política V3.0</b> (scorecard de 1.000 pts en 4 bloques, reglas K1–K11, PD por segmento, quintiles y matriz de decisión). La consumen la Evaluación Crediticia, la Pre-Aprobación del dealer y el análisis de crédito de las Campañas Masivas.</li>
+    <li><b>Credenciales Corporativas</b> (bajo Usuarios): genera la credencial de identificación de cada colaborador (nombre, cargo, foto, con fecha de expiración) con <b>QR que guarda el contacto</b> al escanearlo (teléfono y datos van dentro del contacto, no impresos).</li>
+    <li><b>Documentos a Validar Brokers</b> (mantenedor): los ítems del <b>checklist de validación documental</b> que aparece al cargar respaldos de créditos, con lista separada por financiera (AUTOFIN / Unidad de Crédito). Agregar o reordenar un ítem cambia el checklist que ven Operaciones al validar.</li>
+    <li><b>Horarios Analistas de Crédito</b> (mantenedor): el horario de cobertura del análisis — si dentro del horario no hay ningún Analista de Crédito ni el Supervisor conectado, el <b>Cuadro de Mando</b> lo alerta (refresco cada 45 s). Marcar un día "sin servicio" silencia la alerta ese día.</li>
+    <li><b>Pagarés Autofacil</b> (mantenedor): las <b>plantillas de documento</b> del pagaré — texto editable con reset al formato por defecto; lo consume la generación de pagarés del curse.</li>
+    <li><b>Café:</b> el único módulo sin propósito de negocio — la máquina de café virtual ("Business Suite Barista 3000"). Único módulo de la suite que no es paramétrico: el café siempre sale cargado. ☕</li>
+  </ul>
 </div>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
