@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 -->
+<!-- v1.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -98,6 +98,18 @@
   <table>
     <tr><th>Mantenedor</th><th>Qué configura</th></tr>
     <tr><td>Inteligencia Artificial</td><td>Interruptor general y por funcionalidad (bot WhatsApp, informes crediticios, liquidaciones, revisor de plantillas…), modelo asignado a cada una y tracking de tokens y costo USD. Cada función IA nace apagada: se enciende aquí.</td></tr>
+  </table>
+
+  <h2>Recursos Humanos</h2>
+  <table>
+    <tr><th>Dónde</th><th>Qué configura</th></tr>
+    <tr><td>Indicadores de Remuneraciones</td><td>Tasas AFP (+ <b>código Previred</b> por AFP), topes imponibles, IMM, tramos del impuesto único, aportes del empleador (SIS, AFC, mutual). UF/UTM se actualizan solas; Previred se revisa con IA los días 1-3.</td></tr>
+    <tr><td>Contratos → Cargos</td><td>Catálogo de cargos con su <b>descripción de cargo</b> (obligatoria: sin ella el sistema alega a diario). La descripción entra al contrato como parte integrante.</td></tr>
+    <tr><td>Contratos → Catálogo de beneficios</td><td>Los beneficios disponibles como checkbox en las cartas oferta (título, cláusula con {monto}, monto default). Lo ofertado pasa tal cual al contrato.</td></tr>
+    <tr><td>Finiquitos (causales)</td><td>Causales art. 159/160/161 con sus flags (¿indemniza años? ¿mes de aviso?) en <code>rh_finiquito_causales</code>; topes <code>finiq_tope_anos</code> (11) y <code>finiq_tope_uf</code> (90) en rh_config.</td></tr>
+    <tr><td>Cuenta corriente de vacaciones</td><td>Días anuales (<code>vac_dias_anuales</code>, 15); años previos por colaborador (ficha, con certificado AFP) para el feriado progresivo; ajustes históricos por RRHH.</td></tr>
+    <tr><td>Archivo Previred</td><td>CCAF y mutualidad de la empresa (<code>rh_previred_config</code>, hoy sin UI: defaults sin CCAF / Mutual CCHC — pedir cambio si aplica).</td></tr>
+    <tr><td>Ausencias (tipos)</td><td><code>ausencia_tipos</code> en rh_config — incluye AUSENCIA INJUSTIFICADA (activa la vigilancia art. 160 N°3).</td></tr>
   </table>
 
   <h2>Otros mantenedores</h2>
