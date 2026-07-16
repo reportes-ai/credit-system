@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conciliación Bancaria — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1400px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; display:flex; align-items:center; gap:8px; }
+    .panel-body { padding:20px 22px; }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .btn-primary2:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-ghost:hover { background:#f9fafb; }
+    .btn-mini { border:none; border-radius:7px; padding:4px 10px; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .btn-ok { background:#dcfce7; color:#15803d; } .btn-ok:hover { background:#bbf7d0; }
+    .btn-warn { background:#fef3c7; color:#92400e; } .btn-warn:hover { background:#fde68a; }
+    .btn-undo { background:#fee2e2; color:#991b1b; } .btn-undo:hover { background:#fecaca; }
+    label.f { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .form-control, .form-select { font-size:.88rem; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:22px; }
+    .stat { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .stat .v { font-size:1.45rem; font-weight:800; color:#111827; }
+    .stat .l { font-size:.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; }
+    .stat.pend .v { color:#b45309; } .stat.conc .v { color:#15803d; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:9px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:top; }
+    .text-right { text-align:right; }
+    .amt-neg { color:#dc2626; font-weight:700; white-space:nowrap; }
+    .amt-pos { color:#15803d; font-weight:700; white-space:nowrap; }
+    .empty-state { text-align:center; color:#9ca3af; padding:40px 0; }
+    .sug { display:flex; flex-direction:column; gap:5px; }
+    .sug-chip { display:flex; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:5px 9px; font-size:.76rem; color:#1e3a5f; }
+    .sug-chip .tipo { background:var(--navy); color:#fff; border-radius:5px; padding:1px 7px; font-size:.68rem; font-weight:700; }
+    .tag-tipo { border-radius:5px; padding:1px 8px; font-size:.7rem; font-weight:700; }
+    .t-TRX { background:#dbeafe; color:#1d4ed8; } .t-CUOTA { background:#dcfce7; color:#15803d; }
+    .t-ODP { background:#fce7f3; color:#be185d; } .t-MANUAL { background:#f3f4f6; color:#374151; }
+    .tabs { display:flex; gap:6px; }
+    .tab-btn { border:none; background:#e5e7eb; color:#374151; border-radius:8px 8px 0 0; padding:8px 18px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .tab-btn.act { background:#fff; color:var(--navy); }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; color:#111827; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; font-size:.83rem; color:#1e3a5f; margin-bottom:18px; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:560px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog .dlg-head { padding:16px 22px; border-bottom:1px solid #e5e7eb; font-weight:700; }
+    dialog .dlg-body { padding:20px 22px; max-height:60vh; overflow:auto; }
+    dialog .dlg-foot { padding:14px 22px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+    @media(max-width:640px){ .main-content{padding:16px;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-check2-square me-1"></i>Conciliación Bancaria</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-check2-square"></i>
+    <div>
+      <h2>Conciliación Bancaria</h2>
+      <p>Matchea la cartola del banco contra pagos de cuotas y órdenes de pago del sistema</p>
+    </div>
+  </div>
+
+  <div class="info-box"><i class="bi bi-lightbulb me-1"></i>
+    Mientras Fintoc no esté contratado, la cartola se carga <b>manualmente desde el Excel del banco</b>.
+    El sistema detecta las columnas (Fecha, Cargo/Abono, Descripción) y no duplica al re-cargar el mismo archivo.
+    Cuando Fintoc se active, los movimientos llegarán solos y esta pantalla no cambia.
+  </div>
+
+  <!-- Selección de cuenta + carga -->
+  <div class="panel">
+    <div class="panel-header">
+      <h5><i class="bi bi-wallet2"></i> Cuenta bancaria</h5>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-ghost" onclick="abrirCuenta()"><i class="bi bi-plus-lg"></i> Nueva cuenta manual</button>
+        <button class="btn-primary2" onclick="document.getElementById('fileCartola').click()" id="btnCargar" disabled>
+          <i class="bi bi-upload"></i> Cargar cartola Excel</button>
+        <input type="file" id="fileCartola" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewCartola(this)">
+      </div>
+    </div>
+    <div class="panel-body" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="min-width:280px;"><label class="f">Cuenta</label>
+        <select id="selCuenta" class="form-select" onchange="cambiarCuenta()"></select></div>
+      <div><label class="f">Desde</label><input type="date" id="fDesde" class="form-control" onchange="cargarTodo()"></div>
+      <div><label class="f">Hasta</label><input type="date" id="fHasta" class="form-control" onchange="cargarTodo()"></div>
+    </div>
+  </div>
+
+  <div class="stats" id="statsWrap" style="display:none;">
+    <div class="stat pend"><div class="v" id="stPend">—</div><div class="l">Pendientes</div></div>
+    <div class="stat conc"><div class="v" id="stConc">—</div><div class="l">Conciliados</div></div>
+    <div class="stat"><div class="v" id="stAbonos">—</div><div class="l">Total abonos</div></div>
+    <div class="stat"><div class="v" id="stCargos">—</div><div class="l">Total cargos</div></div>
+    <div class="stat pend"><div class="v" id="stMontoPend">—</div><div class="l">$ sin conciliar</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn act" id="tbPend" onclick="setTab('pend')">Pendientes</button>
+    <button class="tab-btn" id="tbConc" onclick="setTab('conc')">Conciliados</button>
+  </div>
+  <div class="panel" style="border-top-left-radius:0;">
+    <div class="panel-body" style="overflow-x:auto;">
+      <div id="tablaWrap"><div class="empty-state">Selecciona una cuenta y carga su cartola</div></div>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este módulo</h6>
+    <ul style="margin:0;">
+      <li><b>Conciliar / desconciliar</b> → solo marca el movimiento bancario; nunca modifica los <a href="/cobranza/">pagos de cuotas</a> ni las <a href="/ordenes-pago/">órdenes de pago</a>.</li>
+      <li><b>Cuentas manuales</b> → viven en la misma tabla que las <a href="/tesoreria/banco-conexiones">Conexiones Bancarias (Fintoc)</a>; al contratar Fintoc los movimientos llegan solos.</li>
+      <li><b>Cargas de cartola</b> → quedan registradas en <a href="/auditoria/">Auditoría</a> (acciones IMPORTAR / CONCILIAR / DESCONCILIAR).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Dialog: nueva cuenta manual -->
+<dialog id="dlgCuenta">
+  <div class="dlg-head"><i class="bi bi-bank me-1"></i> Nueva cuenta manual</div>
+  <div class="dlg-body">
+    <label class="f">Banco</label><input id="cBanco" class="form-control mb-2" placeholder="Banco de Chile">
+    <label class="f">N° de cuenta</label><input id="cNumero" class="form-control mb-2" placeholder="00-123-45678-90">
+    <label class="f">Alias (opcional)</label><input id="cAlias" class="form-control" placeholder="Cuenta corriente principal">
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgCuenta.close()">Cancelar</button>
+    <button class="btn-primary2" onclick="crearCuenta()">Crear</button>
+  </div>
+</dialog>
+
+<!-- Dialog: preview cartola -->
+<dialog id="dlgPrev">
+  <div class="dlg-head"><i class="bi bi-file-earmark-excel me-1"></i> Vista previa de la cartola</div>
+  <div class="dlg-body" id="prevBody"></div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgPrev.close()">Cancelar</button>
+    <button class="btn-primary2" id="btnImportar" onclick="importarCartola()"><i class="bi bi-check-lg"></i> Importar</button>
+  </div>
+</dialog>
+
+<!-- Dialog: conciliación manual -->
+<dialog id="dlgManual">
+  <div class="dlg-head"><i class="bi bi-pencil me-1"></i> Conciliación manual</div>
+  <div class="dlg-body">
+    <div id="manInfo" style="font-size:.85rem;color:#374151;margin-bottom:10px;"></div>
+    <label class="f">Glosa / justificación (obligatoria)</label>
+    <textarea id="manGlosa" class="form-control" rows="3" placeholder="Ej: abono corresponde a transferencia dealer X por comisión factura 123"></textarea>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgManual.close()">Cancelar</button>
+    <button class="btn-primary2" onclick="confirmarManual()">Conciliar</button>
+  </div>
+</dialog>
+
+<script src="/js/app-version.js"></script>
+<script>
+const token = localStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Authorization': 'Bearer ' + token };
+const HJ = { ...H, 'Content-Type': 'application/json' };
+function logout(){ localStorage.clear(); location.href='/login'; }
+const $ = id => document.getElementById(id);
+const fmt = n => '$' + Math.round(Number(n||0)).toLocaleString('es-CL');
+const fFecha = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
+
+let CUENTAS = [], TAB = 'pend', archivoSel = null, movManual = null;
+
+(async function init(){
+  try {
+    const me = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
+    const u = me.data && me.data.usuario || me.usuario || {};
+    $('navNombre').textContent = u.nombre || '—';
+    $('navPerfil').textContent = u.perfil || '—';
+    $('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
+  } catch {}
+  // Mes en curso por defecto
+  const hoy = new Date(), y = hoy.getFullYear(), m = hoy.getMonth();
+  $('fDesde').value = new Date(y, m, 1).toISOString().slice(0,10);
+  $('fHasta').value = new Date(y, m+1, 0).toISOString().slice(0,10);
+  await cargarCuentas();
+})();
+
+async function cargarCuentas(){
+  const j = await (await fetch('/api/conciliacion/cuentas', { headers: H })).json();
+  CUENTAS = j.data || [];
+  const sel = $('selCuenta');
+  sel.innerHTML = CUENTAS.length
+    ? CUENTAS.map(c => `<option value="${c.id}">${c.banco} ${c.numero||''} ${c.alias?('— '+c.alias):''} ${c.es_manual?'(manual)':'(Fintoc)'} · ${c.pendientes||0} pend.</option>`).join('')
+    : '<option value="">— crea una cuenta manual —</option>';
+  $('btnCargar').disabled = !CUENTAS.length;
+  if (CUENTAS.length) cambiarCuenta();
+}
+function cuentaId(){ return $('selCuenta').value; }
+function cambiarCuenta(){ cargarTodo(); }
+
+async function cargarTodo(){
+  if (!cuentaId()) return;
+  await Promise.all([cargarResumen(), TAB==='pend' ? cargarPendientes() : cargarConciliados()]);
+}
+function rango(){ return `desde=${$('fDesde').value}&hasta=${$('fHasta').value}`; }
+
+async function cargarResumen(){
+  const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/resumen?${rango()}`, { headers: H })).json();
+  const r = j.data || {};
+  $('statsWrap').style.display = '';
+  $('stPend').textContent = Number(r.pendientes||0).toLocaleString('es-CL');
+  $('stConc').textContent = Number(r.conciliados||0).toLocaleString('es-CL');
+  $('stAbonos').textContent = fmt(r.abonos);
+  $('stCargos').textContent = fmt(r.cargos);
+  $('stMontoPend').textContent = fmt(r.monto_pendiente);
+}
+
+function setTab(t){
+  TAB = t;
+  $('tbPend').classList.toggle('act', t==='pend');
+  $('tbConc').classList.toggle('act', t==='conc');
+  t==='pend' ? cargarPendientes() : cargarConciliados();
+}
+
+async function cargarPendientes(){
+  $('tablaWrap').innerHTML = '<div class="empty-state">Cargando…</div>';
+  const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/pendientes?${rango()}`, { headers: H })).json();
+  const movs = (j.data && j.data.movimientos) || [];
+  if (!movs.length) { $('tablaWrap').innerHTML = '<div class="empty-state"><i class="bi bi-check-circle" style="font-size:2rem;color:#15803d"></i><br>No hay movimientos pendientes en el rango 🎉</div>'; return; }
+  $('tablaWrap').innerHTML = `<table><thead><tr>
+      <th>Fecha</th><th>Descripción</th><th class="text-right">Monto</th><th>Sugerencias de match</th><th></th>
+    </tr></thead><tbody>` + movs.map(m => `
+    <tr>
+      <td style="white-space:nowrap">${fFecha(m.fecha)}</td>
+      <td>${(m.descripcion||'—')}${m.tipo?`<div style="font-size:.72rem;color:#9ca3af">${m.tipo}</div>`:''}</td>
+      <td class="text-right ${m.monto<0?'amt-neg':'amt-pos'}">${fmt(m.monto)}</td>
+      <td>${m.sugerencias.length ? `<div class="sug">` + m.sugerencias.map(s => `
+        <div class="sug-chip"><span class="tipo">${s.tipo}</span>
+          <span style="flex:1">${s.detalle} · ${fFecha(s.fecha)}</span>
+          <button class="btn-mini btn-ok" onclick='conciliar(${m.id}, ${JSON.stringify(s.tipo)}, ${JSON.stringify(String(s.ref))}, ${JSON.stringify(s.detalle)})'>
+            <i class="bi bi-check-lg"></i> Conciliar</button>
+        </div>`).join('') + `</div>` : '<span style="color:#9ca3af;font-size:.78rem">sin match automático</span>'}</td>
+      <td><button class="btn-mini btn-warn" onclick='abrirManual(${m.id}, ${JSON.stringify(fFecha(m.fecha))}, ${JSON.stringify(fmt(m.monto))}, ${JSON.stringify(m.descripcion||"")})'>
+        <i class="bi bi-pencil"></i> Manual</button></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+async function cargarConciliados(){
+  $('tablaWrap').innerHTML = '<div class="empty-state">Cargando…</div>';
+  const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/conciliados?${rango()}`, { headers: H })).json();
+  const rows = j.data || [];
+  if (!rows.length) { $('tablaWrap').innerHTML = '<div class="empty-state">Sin conciliados en el rango</div>'; return; }
+  $('tablaWrap').innerHTML = `<table><thead><tr>
+      <th>Fecha</th><th>Descripción</th><th class="text-right">Monto</th><th>Match</th><th>Por</th><th></th>
+    </tr></thead><tbody>` + rows.map(m => `
+    <tr>
+      <td style="white-space:nowrap">${fFecha(m.fecha)}</td>
+      <td>${m.descripcion||'—'}</td>
+      <td class="text-right ${m.monto<0?'amt-neg':'amt-pos'}">${fmt(m.monto)}</td>
+      <td><span class="tag-tipo t-${m.match_tipo}">${m.match_tipo}</span>
+          <div style="font-size:.76rem;color:#6b7280;margin-top:2px">${m.match_detalle||m.match_ref||''}</div></td>
+      <td style="font-size:.78rem;color:#6b7280">${m.conciliado_por||'—'}<br>${fFecha(m.fecha_conciliacion)}</td>
+      <td><button class="btn-mini btn-undo" onclick="desconciliar(${m.id})"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</button></td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+/* ── Acciones ── */
+async function conciliar(id_mov, match_tipo, match_ref, detalle){
+  const r = await fetch('/api/conciliacion/conciliar', { method:'POST', headers: HJ,
+    body: JSON.stringify({ id_mov, match_tipo, match_ref, detalle }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarTodo();
+}
+function abrirManual(id, fecha, monto, desc){
+  movManual = id;
+  $('manInfo').innerHTML = `<b>${fecha}</b> · ${desc||'(sin descripción)'} · <b>${monto}</b>`;
+  $('manGlosa').value = '';
+  dlgManual.showModal();
+}
+async function confirmarManual(){
+  const glosa = $('manGlosa').value.trim();
+  if (!glosa) return alert('La glosa es obligatoria');
+  dlgManual.close();
+  const r = await fetch('/api/conciliacion/conciliar', { method:'POST', headers: HJ,
+    body: JSON.stringify({ id_mov: movManual, match_tipo:'MANUAL', detalle: glosa }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarTodo();
+}
+async function desconciliar(id_mov){
+  if (!confirm('¿Deshacer esta conciliación?')) return;
+  const r = await fetch('/api/conciliacion/desconciliar', { method:'POST', headers: HJ, body: JSON.stringify({ id_mov }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  cargarTodo();
+}
+
+/* ── Cuenta manual ── */
+function abrirCuenta(){ dlgCuenta.showModal(); }
+async function crearCuenta(){
+  const body = { banco: $('cBanco').value.trim(), numero: $('cNumero').value.trim(), alias: $('cAlias').value.trim() };
+  if (!body.banco || !body.numero) return alert('Banco y número son obligatorios');
+  const j = await (await fetch('/api/conciliacion/cuentas-manuales', { method:'POST', headers: HJ, body: JSON.stringify(body) })).json();
+  if (!j.success) return alert(j.error);
+  dlgCuenta.close();
+  await cargarCuentas();
+  $('selCuenta').value = j.data.id;
+  cambiarCuenta();
+}
+
+/* ── Cartola ── */
+async function previewCartola(input){
+  if (!input.files.length) return;
+  archivoSel = input.files[0];
+  input.value = '';
+  const fd = new FormData(); fd.append('archivo', archivoSel);
+  $('prevBody').innerHTML = 'Analizando…'; dlgPrev.showModal();
+  const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/cartola/preview`, { method:'POST', headers: H, body: fd })).json();
+  if (!j.success) { $('prevBody').innerHTML = `<div style="color:#991b1b">${j.error}</div>`; $('btnImportar').disabled = true; return; }
+  const d = j.data;
+  $('btnImportar').disabled = !d.nuevas;
+  $('prevBody').innerHTML = `
+    <div style="font-size:.86rem;margin-bottom:12px;">
+      <b>${archivoSel.name}</b> · ${fFecha(d.desde)} → ${fFecha(d.hasta)}<br>
+      ${d.filas} movimientos (${d.abonos} abonos, ${d.cargos} cargos) ·
+      <b style="color:#15803d">${d.nuevas} nuevos</b> · <span style="color:#9ca3af">${d.duplicadas} ya cargados</span>
+    </div>
+    <table><thead><tr><th>Fecha</th><th>Descripción</th><th class="text-right">Monto</th><th></th></tr></thead><tbody>` +
+    d.muestra.map(m => `<tr>
+      <td>${fFecha(m.fecha)}</td><td>${m.descripcion||'—'}</td>
+      <td class="text-right ${m.monto<0?'amt-neg':'amt-pos'}">${fmt(m.monto)}</td>
+      <td>${m.duplicado?'<span style="color:#9ca3af;font-size:.72rem">ya cargado</span>':''}</td></tr>`).join('') +
+    `</tbody></table>${d.filas>15?`<div style="color:#9ca3af;font-size:.78rem;margin-top:6px">… y ${d.filas-15} más</div>`:''}`;
+}
+async function importarCartola(){
+  if (!archivoSel) return;
+  $('btnImportar').disabled = true;
+  const fd = new FormData(); fd.append('archivo', archivoSel);
+  const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/cartola/importar`, { method:'POST', headers: H, body: fd })).json();
+  dlgPrev.close();
+  if (!j.success) return alert(j.error);
+  alert(`Cartola importada: ${j.data.nuevas} movimientos nuevos (${j.data.duplicadas} ya existían).`);
+  await cargarCuentas();
+  cargarTodo();
+}
+</script>
+</body>
+</html>
