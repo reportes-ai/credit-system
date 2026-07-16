@@ -6,6 +6,7 @@
   <title>Vacaciones — RRHH</title>
   <!-- v1.2 — saldo de vacaciones (devengado proporcional vs usados) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <script src="/js/xlsx-style.min.js" defer></script>
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
@@ -47,6 +48,9 @@
     <table><thead><tr><th>Solicitante</th><th>Desde</th><th>Hasta</th><th>Días</th><th>Estado</th><th id="thAcc"></th></tr></thead><tbody id="tb"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
   </div>
   <div id="secSaldos" class="card-box" style="display:none">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+      <button class="btn-navy" onclick="exportSaldos()"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+    </div>
     <table><thead><tr><th>Colaborador</th><th>Ingreso</th><th style="text-align:right">Abonado</th><th style="text-align:right">Tomado</th><th style="text-align:right">Proporcional</th><th style="text-align:right">Disponible</th><th style="text-align:right">Provisión $</th><th></th></tr></thead>
     <tbody id="tbSaldos"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
     <p style="font-size:.76rem;color:#64748b;margin:10px 0 0">Disponible = saldo de períodos cumplidos + proporcional del período en curso. <b>Provisión $</b> = lo que habría que pagar por feriado si la persona se va hoy (días hábiles ×1,4 corridos × remuneración diaria — misma matemática del finiquito). "Cuenta" abre la cartola; "Ajustar" registra un movimiento manual (±) con glosa.</p>
@@ -68,10 +72,42 @@
     document.getElementById('secCrear').style.display=t==='crear'?'':'none';
     document.getElementById('secSaldos').style.display=t==='saldos'?'':'none';
     document.getElementById('secLista').style.display=(t==='crear'||t==='saldos')?'none':'';
+    document.querySelector('.main').style.maxWidth = t==='saldos' ? '1500px' : '980px';   // saldos a lo ancho
     if(t==='saldos') cargarSaldos(); else if(t!=='crear'){VISTA=t; cargar();} }
+  let SALDOS_DATA=null;
+  function exportSaldos(){
+    if (!SALDOS_DATA || typeof XLSX==='undefined') return alert('Aún cargando…');
+    const B={style:'thin',color:{rgb:'B7C4D6'}}, bordes={top:B,bottom:B,left:B,right:B};
+    const HEAD={font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb:'012D70'}},border:bordes};
+    const TIT={font:{bold:true,sz:13,color:{rgb:'012D70'}}};
+    const CEL={border:bordes}, NUM={border:bordes,alignment:{horizontal:'right'}};
+    const TOT={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'012D70'}},border:bordes,alignment:{horizontal:'right'}};
+    const ZD='#,##0.0', ZP='#,##0';
+    const aoa=[], est=[];
+    const hoy=new Date().toLocaleDateString('es-CL');
+    aoa.push(['SALDOS DE VACACIONES DEL EQUIPO — '+hoy]); est.push([TIT]);
+    aoa.push(['']); est.push([null]);
+    aoa.push(['Colaborador','RUT','Fecha ingreso','Años previos','Abonado (días)','Tomado (días)','Proporcional (días)','Disponible (días)','Base mensual $','Provisión $']);
+    est.push(Array(10).fill(HEAD));
+    for (const s of SALDOS_DATA.saldos){
+      aoa.push([s.nombre, s.rut||'', s.fecha_ingreso?fd(s.fecha_ingreso):'S/I', s.previos||0,
+        Number(s.abonos), Number(s.cargos), Number(s.proporcional), Number(s.disponibles), Number(s.base), Number(s.provision)]);
+      est.push([CEL,CEL,CEL,{...NUM},{...NUM,numFmt:ZD},{...NUM,numFmt:ZD},{...NUM,numFmt:ZD},{...NUM,numFmt:ZD,font:{bold:true}},{...NUM,numFmt:ZP},{...NUM,numFmt:ZP,font:{bold:true}}]);
+    }
+    aoa.push(['TOTAL','','','','','','',Number(SALDOS_DATA.total_dias),'',Number(SALDOS_DATA.total_provision)]);
+    est.push([{...TOT,alignment:{horizontal:'left'}},TOT,TOT,TOT,TOT,TOT,TOT,{...TOT,numFmt:ZD},TOT,{...TOT,numFmt:ZP}]);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    aoa.forEach((row,r)=>row.forEach((_,c)=>{ const ref=XLSX.utils.encode_cell({r,c}); const e=est[r]&&est[r][c];
+      if(ws[ref]&&e){ws[ref].s=e; if(e.numFmt)ws[ref].z=e.numFmt;} }));
+    ws['!cols']=[{wch:32},{wch:13},{wch:13},{wch:11},{wch:13},{wch:13},{wch:15},{wch:14},{wch:14},{wch:14}];
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Saldos Vacaciones');
+    XLSX.writeFile(wb,'saldos-vacaciones-'+new Date().toISOString().slice(0,10)+'.xlsx');
+  }
   async function cargarPendientes(){ try{ const j=await(await fetch('/api/rrhh/pendientes',{headers:H})).json(); if(j.data?.es_rrhh){ ['t3','t4','t5'].forEach(id=>document.getElementById(id).style.display=''); const b=document.getElementById('bandejaCount'); const c=j.data.vacaciones||0; if(c>0){b.textContent=c;b.style.display='';}else b.style.display='none'; } }catch(e){} }
   async function cargarSaldos(){ const tb=document.getElementById('tbSaldos'); tb.innerHTML='<tr><td colspan="7" class="empty">Calculando saldos…</td></tr>';
-    const j=await(await fetch('/api/rrhh/vacaciones/saldos',{headers:H})).json(); if(!j.success){tb.innerHTML=`<tr><td colspan="7" class="empty">${esc(j.error)}</td></tr>`;return;}
+    const j=await(await fetch('/api/rrhh/vacaciones/saldos',{headers:H})).json(); if(!j.success){tb.innerHTML=`<tr><td colspan="8" class="empty">${esc(j.error)}</td></tr>`;return;}
+    SALDOS_DATA=j.data;
     const co=n=>Number(n||0).toLocaleString('es-CL',{maximumFractionDigits:1});
     const clp=n=>'$'+Number(n||0).toLocaleString('es-CL');
     tb.innerHTML=((j.data.saldos||[]).map(s=>`<tr>
