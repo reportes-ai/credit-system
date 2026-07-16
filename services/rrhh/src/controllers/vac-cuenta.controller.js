@@ -60,13 +60,17 @@ async function alegarSinCertificadoAFP() {
         JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
         JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
        WHERE f.codigo='rh_colaboradores' AND u.estado='activo'`);
+    // la clave NO deduplica en notificar(): chequear aquí para no repetir en la semana
+    const _clave = 'afp_cert_pendiente_' + _w(new Date());
+    const [[_ya]] = await pool.query('SELECT 1 ok FROM notificaciones WHERE clave=? LIMIT 1', [_clave]);
+    if (_ya) return;
     const lista = pend.slice(0, 5).map(p => `${p.nombre} (${p.anos_trabajados_previos} años)`).join(', ') + (pend.length > 5 ? '…' : '');
     notificar(rr.map(x => x.id_usuario), {
       tipo: 'RRHH', prioridad: 'alta',
       titulo: `${pend.length} colaborador(es) con años previos SIN certificado AFP`,
       mensaje: `El feriado progresivo declara años trabajados que deben respaldarse con el certificado de cotizaciones de la AFP: ${lista}. Súbelo a la carpeta digital (tipo "CERTIFICADO AFP").`,
       href: '/recursos-humanos/colaboradores/',
-      clave: 'afp_cert_pendiente_' + _w(new Date()),
+      clave: _clave,
     });
   } catch (e) { console.error('[alegato cert AFP]', e.message); }
 }

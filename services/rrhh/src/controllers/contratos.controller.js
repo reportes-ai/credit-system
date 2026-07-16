@@ -134,13 +134,17 @@ async function alegarCargosSinDescripcion() {
        WHERE f.codigo='rh_colaboradores' AND u.estado='activo'`);
     const ids = new Set(dest.map(d => d.id_usuario));
     cargos.forEach(c => { if (c.creado_por) ids.add(c.creado_por); });
+    // la clave NO deduplica en notificar(): chequear aquí para no repetir en la semana
+    const _clave = 'cargos_sin_descripcion_' + _w(new Date());
+    const [[_ya]] = await pool.query('SELECT 1 ok FROM notificaciones WHERE clave=? LIMIT 1', [_clave]);
+    if (_ya) return;
     const nombres = cargos.map(c => c.nombre).slice(0, 5).join(', ') + (cargos.length > 5 ? '…' : '');
     await notificar([...ids], {
       tipo: 'RRHH', prioridad: 'alta', sonar: true,
       titulo: `${cargos.length} cargo(s) sin descripción de cargo`,
       mensaje: `Falta la descripción de: ${nombres}. Sin descripción no se pueden generar cartas oferta ni contratos prolijos. Cárgala en Contratos → Cargos.`,
       href: '/recursos-humanos/contratos/',
-      clave: 'cargos_sin_descripcion_' + _w(new Date()),   // 1 vez por semana
+      clave: _clave,   // 1 vez por semana
     });
   } catch (e) { console.error('[alegato cargos]', e.message); }
 }
