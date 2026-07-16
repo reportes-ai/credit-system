@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.0 — ficha del colaborador + carpeta digital (Fase 1 módulo RRHH) -->
+  <!-- v1.1 — ficha propia: conyuge + hijos + 2 emergencias editables por el colaborador -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,6 +62,11 @@
       <span><button class="btn-ghost" id="btnEditar" onclick="modoEdicion(true)"><i class="bi bi-pencil me-1"></i>Editar</button>
       <button class="btn-navy" id="btnGuardar" style="display:none" onclick="guardar()"><i class="bi bi-check2 me-1"></i>Guardar</button></span></h5>
     <div class="grid3" id="gContacto"></div>
+    <h5 style="margin-top:16px"><i class="bi bi-heart"></i> Cónyuge / Conviviente</h5>
+    <div class="grid3" id="gConyuge"></div>
+    <h5 style="margin-top:16px;justify-content:space-between"><span><i class="bi bi-emoji-smile"></i> Hijos</span>
+      <button class="btn-ghost" id="btnHijo" style="display:none;padding:3px 12px;font-size:.78rem" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar hijo</button></h5>
+    <div id="gHijos"></div>
   </div>
 
   <div class="panel">
@@ -98,8 +103,10 @@ let DATA = null, EDIT = false;
 const CONTACTO = [
   ['direccion','Dirección'],['comuna','Comuna'],['ciudad','Ciudad'],
   ['email_personal','Email personal'],['telefono_personal','Teléfono personal'],['estado_civil','Estado civil'],
-  ['nacionalidad','Nacionalidad'],['emergencia_nombre','Contacto de emergencia'],['emergencia_fono','Fono emergencia'],
+  ['nacionalidad','Nacionalidad'],['emergencia_nombre','Emergencia 1 — nombre'],['emergencia_fono','Emergencia 1 — fono'],
+  ['emergencia2_nombre','Emergencia 2 — nombre'],['emergencia2_fono','Emergencia 2 — fono'],
 ];
+const CONYUGE = [['conyuge_nombre','Nombre'],['conyuge_rut','RUT'],['conyuge_telefono','Teléfono']];
 
 function fld(label, val){ return `<div class="fld"><label>${label}</label><div class="val">${val!=null&&val!==''?esc(val):'—'}</div></div>`; }
 
@@ -128,14 +135,66 @@ function renderContacto(){
   document.getElementById('gContacto').innerHTML = CONTACTO.map(([k,lbl]) => EDIT
     ? `<div class="fld"><label>${lbl}</label><input id="c_${k}" value="${esc(f[k]||'')}"></div>`
     : fld(lbl, f[k])).join('');
+  // Cónyuge (misma edición que contacto)
+  const dirCony = f.conyuge_misma_dir ? '(misma dirección particular)' : (f.conyuge_direccion||'');
+  document.getElementById('gConyuge').innerHTML = CONYUGE.map(([k,lbl]) => EDIT
+    ? `<div class="fld"><label>${lbl}</label><input id="c_${k}" value="${esc(f[k]||'')}"></div>`
+    : fld(lbl, f[k])).join('') + (EDIT
+    ? `<div class="fld" style="grid-column:span 2"><label>Dirección</label>
+         <input id="c_conyuge_direccion" value="${esc(f.conyuge_misma_dir?'':(f.conyuge_direccion||''))}" ${f.conyuge_misma_dir?'disabled placeholder="(misma dirección particular)"':''}></div>
+       <div class="fld" style="display:flex;align-items:end;padding-bottom:6px">
+         <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:.78rem;text-transform:none;color:#334155;cursor:pointer">
+           <input type="checkbox" id="c_conyuge_misma_dir" style="width:auto" ${f.conyuge_misma_dir?'checked':''}
+             onchange="const d=document.getElementById('c_conyuge_direccion'); d.disabled=this.checked; d.placeholder=this.checked?'(misma dirección particular)':''; if(this.checked)d.value='';">
+           Misma dirección particular</label></div>`
+    : fld('Dirección', dirCony));
+  renderHijos();
+}
+function renderHijos(){
+  const hijos = DATA.hijos || [];
+  document.getElementById('btnHijo').style.display = EDIT ? '' : 'none';
+  const box = document.getElementById('gHijos');
+  if (!EDIT){
+    box.innerHTML = hijos.length ? `<table><thead><tr><th>Nombre</th><th>RUT</th><th>Nacimiento</th><th>Carga</th></tr></thead><tbody>${
+      hijos.map(h=>`<tr><td>${esc(h.nombre||'—')}</td><td>${esc(h.rut||'—')}</td><td>${fD(h.fecha_nacimiento)}</td><td>${h.es_carga?'✔ Carga familiar':'—'}</td></tr>`).join('')
+    }</tbody></table>` : '<div style="font-size:.82rem;color:#94a3b8">Sin hijos registrados.</div>';
+    return;
+  }
+  box.innerHTML = hijos.length ? hijos.map(filaHijo).join('') : '<div style="font-size:.82rem;color:#94a3b8;margin-bottom:6px">Sin hijos registrados — usa "Agregar hijo".</div>';
+}
+function filaHijo(h={}){
+  return `<div class="hijo-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:10px 16px;align-items:end;margin-bottom:8px">
+    <div class="fld"><label>Nombre</label><input class="h_nombre" value="${esc(h.nombre||'')}"></div>
+    <div class="fld"><label>RUT</label><input class="h_rut" value="${esc(h.rut||'')}"></div>
+    <div class="fld"><label>Fecha de nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#334155;padding-bottom:8px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Es carga familiar</label>
+    <button class="btn-ghost" style="padding:4px 10px;color:#b91c1c;margin-bottom:4px" title="Quitar" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
+  </div>`;
+}
+function agregarHijo(){
+  const box = document.getElementById('gHijos');
+  if (!box.querySelector('.hijo-row')) box.innerHTML = '';
+  box.insertAdjacentHTML('beforeend', filaHijo());
+  box.lastElementChild.querySelector('.h_nombre').focus();
 }
 function modoEdicion(on){ EDIT = on; document.getElementById('btnEditar').style.display = on?'none':''; document.getElementById('btnGuardar').style.display = on?'':'none'; renderContacto(); }
 async function guardar(){
   const body = {}; CONTACTO.forEach(([k]) => body[k] = document.getElementById('c_'+k).value.trim());
+  CONYUGE.forEach(([k]) => body[k] = document.getElementById('c_'+k).value.trim());
+  body.conyuge_misma_dir = document.getElementById('c_conyuge_misma_dir')?.checked ? 1 : 0;
+  body.conyuge_direccion = body.conyuge_misma_dir ? '' : (document.getElementById('c_conyuge_direccion')?.value.trim() || '');
+  body.hijos = [...document.querySelectorAll('#gHijos .hijo-row')].map(r => ({
+    nombre: r.querySelector('.h_nombre').value.trim(),
+    rut: r.querySelector('.h_rut').value.trim(),
+    fecha_nacimiento: r.querySelector('.h_fnac').value,
+    es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
+  })).filter(h => h.nombre || h.rut || h.fecha_nacimiento);
   const j = await (await fetch('/api/rrhh/ficha/'+DATA.usuario.id_usuario, { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');
   Object.assign(DATA.ficha = DATA.ficha||{}, body);
-  modoEdicion(false); toast('✓ Datos de contacto actualizados');
+  DATA.hijos = body.hijos;
+  modoEdicion(false); toast('✓ Datos actualizados');
 }
 async function abrirDoc(id){
   try {
