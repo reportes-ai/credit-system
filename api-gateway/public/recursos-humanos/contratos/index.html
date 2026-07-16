@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contratos y Cartas Oferta — AutoFácil</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --bg:#f0f4f8; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
+  .main { max-width:1150px; margin:0 auto; padding:24px 20px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 60%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; gap:14px; align-items:center; }
+  .banner i { font-size:2rem; opacity:.85; } .banner h2 { margin:0 0 3px; font-size:1.2rem; } .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .tabs { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; }
+  .tabs button { border:none; background:#fff; border-radius:10px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; color:#475569; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .tabs button.on { background:var(--navy); color:#fff; }
+  .tabs .warn { background:#fef2f2; color:#b91c1c; }
+  .panel { background:#fff; border-radius:14px; box-shadow:0 1px 5px rgba(0,0,0,.07); padding:18px 20px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; font-size:.84rem; }
+  th { text-align:left; background:#f8fafc; padding:8px 10px; color:#475569; border-bottom:2px solid #e5e7eb; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  .btn { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:8px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+  .btn-g { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:9px; padding:7px 12px; font-weight:600; font-size:.82rem; cursor:pointer; }
+  .btn-mini { border:none; background:#eef2ff; color:var(--navy); border-radius:7px; padding:3px 10px; cursor:pointer; font-size:.78rem; font-weight:700; }
+  .chip { display:inline-block; border-radius:6px; padding:2px 9px; font-size:.72rem; font-weight:800; }
+  .c-BORRADOR { background:#f1f5f9; color:#475569; } .c-EMITIDA { background:#dbeafe; color:#1d4ed8; }
+  .c-ACEPTADA { background:#dcfce7; color:#15803d; } .c-RECHAZADA,.c-ANULADA { background:#fee2e2; color:#b91c1c; }
+  .c-CONTRATADA { background:#fef3c7; color:#92400e; }
+  .fld { margin-bottom:10px; } .fld label { display:block; font-size:.74rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px; }
+  .fld input, .fld select, .fld textarea { width:100%; border:1.5px solid #e2e8f0; border-radius:9px; padding:8px 12px; font:inherit; font-size:.88rem; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } @media(max-width:800px){ .grid3 { grid-template-columns:1fr; } }
+  .benef { display:flex; align-items:center; gap:10px; padding:7px 10px; border:1.5px solid #e2e8f0; border-radius:10px; margin-bottom:7px; }
+  .benef input[type=checkbox] { width:18px; height:18px; }
+  .benef .tit { flex:1; font-size:.86rem; font-weight:600; }
+  .benef input.monto { width:120px; border:1.5px solid #e2e8f0; border-radius:8px; padding:5px 10px; font-size:.84rem; text-align:right; }
+  .benef .un { font-size:.74rem; color:#94a3b8; width:70px; }
+  .rojo { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:10px 14px; font-size:.86rem; margin-bottom:12px; }
+  dialog { border:none; border-radius:14px; padding:0; width:min(760px,95vw); max-height:92vh; }
+  dialog::backdrop { background:rgba(0,0,0,.55); }
+  .dlg { padding:20px 24px; }
+  .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  @media print { body * { visibility:hidden; } #docPrint, #docPrint * { visibility:visible; } #docPrint { position:absolute; inset:0; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Contratos y Cartas Oferta',icon:'bi-file-earmark-text',current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-file-earmark-text"></i><div><h2>Contratos y Cartas Oferta</h2><p>La carta oferta define los beneficios con un check — y el contrato hereda exactamente lo ofertado. Cada cargo debe tener su descripción de cargo.</p></div></div>
+
+  <div id="alertaCargos" class="rojo" style="display:none"></div>
+
+  <div class="tabs">
+    <button class="on" id="tCartas" onclick="verTab('cartas')"><i class="bi bi-envelope-paper me-1"></i>Cartas Oferta</button>
+    <button id="tContratos" onclick="verTab('contratos')"><i class="bi bi-file-earmark-check me-1"></i>Contratos</button>
+    <button id="tCargos" onclick="verTab('cargos')"><i class="bi bi-person-badge me-1"></i>Cargos y descripciones</button>
+    <button id="tBenef" onclick="verTab('benef')"><i class="bi bi-gift me-1"></i>Catálogo de beneficios</button>
+  </div>
+
+  <div class="panel" id="pCartas">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <b>Cartas oferta</b><button class="btn" onclick="nuevaCarta()">+ Nueva carta oferta</button>
+    </div>
+    <table><thead><tr><th>Candidato</th><th>Cargo</th><th>Sueldo base</th><th>Beneficios</th><th>Estado</th><th></th></tr></thead><tbody id="tbCartas"></tbody></table>
+  </div>
+
+  <div class="panel" id="pContratos" style="display:none">
+    <b>Contratos generados</b>
+    <table style="margin-top:10px"><thead><tr><th>Trabajador</th><th>Cargo</th><th>Sueldo</th><th>Ingreso</th><th>Origen</th><th></th></tr></thead><tbody id="tbContratos"></tbody></table>
+    <p style="font-size:.78rem;color:#64748b">El contrato nace de la carta oferta ACEPTADA (botón Contratar en la carta) — así lo ofertado y lo contratado nunca se contradicen.</p>
+  </div>
+
+  <div class="panel" id="pCargos" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <b>Cargos</b><button class="btn" onclick="editCargo(null)">+ Nuevo cargo</button>
+    </div>
+    <table><thead><tr><th>Cargo</th><th>Descripción de cargo</th><th></th></tr></thead><tbody id="tbCargos"></tbody></table>
+  </div>
+
+  <div class="panel" id="pBenef" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <b>Catálogo de beneficios</b> <span style="font-size:.78rem;color:#64748b;flex:1;margin-left:10px">La cláusula usa {monto} donde va el valor.</span>
+      <button class="btn" onclick="editBenef(null)">+ Nuevo beneficio</button>
+    </div>
+    <table><thead><tr><th>Beneficio</th><th>Cláusula</th><th>Monto default</th><th></th></tr></thead><tbody id="tbBenef"></tbody></table>
+  </div>
+
+  <div class="panel" style="background:#f8fafc;border-left:4px solid var(--navy)">
+    <div style="font-weight:700;margin-bottom:6px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+    <ul style="font-size:.82rem;margin:0;padding-left:20px">
+      <li><b>Cargos y descripciones</b> → cartas oferta y contratos de esta página; un cargo sin descripción genera un recordatorio diario (campana) hasta que se cargue.</li>
+      <li><b>Catálogo de beneficios</b> → los checkbox disponibles al armar cada <b>carta oferta</b>, y las cláusulas que hereda el <b>contrato</b>.</li>
+      <li><b>Carta ACEPTADA → Contratar</b> → crea el contrato con lo ofertado (fuente única) y deja el documento imprimible para firma.</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlgCarta"><div class="dlg" id="dlgCartaBody"></div></dialog>
+<dialog id="dlgCargo"><div class="dlg">
+  <h5 style="color:var(--navy);margin:0 0 12px" id="dlgCargoTit">Cargo</h5>
+  <div class="fld"><label>Nombre del cargo *</label><input id="cgNombre" maxlength="120"></div>
+  <div class="fld"><label>Descripción de cargo (misión, funciones, requisitos)</label><textarea id="cgDesc" rows="10" placeholder="MISIÓN DEL CARGO:&#10;...&#10;&#10;FUNCIONES PRINCIPALES:&#10;1. ...&#10;2. ...&#10;&#10;REQUISITOS:&#10;- ..."></textarea></div>
+  <div class="pie"><button class="btn-g" onclick="dlgCargo.close()">Cancelar</button><button class="btn" onclick="guardarCargo()">Guardar</button></div>
+</div></dialog>
+<dialog id="dlgBenef"><div class="dlg">
+  <h5 style="color:var(--navy);margin:0 0 12px">Beneficio</h5>
+  <div class="fld"><label>Título *</label><input id="bfTitulo" maxlength="120"></div>
+  <div class="fld"><label>Cláusula (texto que va en carta y contrato; usa {monto}) *</label><textarea id="bfClausula" rows="4"></textarea></div>
+  <div class="grid3">
+    <div class="fld"><label>Monto default $</label><input id="bfMonto" type="number"></div>
+    <div class="fld"><label>Unidad</label><input id="bfUnidad" placeholder="mensuales / diarios / anual"></div>
+  </div>
+  <div class="pie"><button class="btn-g" onclick="dlgBenef.close()">Cancelar</button><button class="btn" onclick="guardarBenef()">Guardar</button></div>
+</div></dialog>
+<div id="docPrint" style="display:none"></div>
+
+<script src="/js/topnav.js"></script>
+<script>
+const TK = sessionStorage.getItem('token'); if (!TK) location.href='/login.html';
+const H = { Authorization:'Bearer '+TK }, HJ = { ...H, 'Content-Type':'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CLP = n => '$' + Number(n||0).toLocaleString('es-CL');
+const fmtF = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '';
+let CARGOS = [], BENEF = [], CARTAS = [], CONTRATOS = [], ED_CARGO = null, ED_BENEF = null, ED_CARTA = null;
+
+async function cargarTodo(){
+  const [jc, jb, jca, jco] = await Promise.all([
+    fetch('/api/rrhh/contratos/cargos',{headers:H}).then(r=>r.json()),
+    fetch('/api/rrhh/contratos/beneficios',{headers:H}).then(r=>r.json()),
+    fetch('/api/rrhh/contratos/cartas',{headers:H}).then(r=>r.json()),
+    fetch('/api/rrhh/contratos',{headers:H}).then(r=>r.json()),
+  ]);
+  CARGOS = jc?.data?.cargos||[]; BENEF = jb?.data?.beneficios||[];
+  CARTAS = jca?.data?.cartas||[]; CONTRATOS = jco?.data?.contratos||[];
+  const sin = jc?.data?.sin_descripcion||0;
+  $('alertaCargos').style.display = sin ? 'block' : 'none';
+  if (sin) $('alertaCargos').innerHTML = `<i class="bi bi-exclamation-triangle-fill me-1"></i><b>${sin} cargo(s) sin descripción de cargo.</b> El sistema seguirá recordándolo a diario hasta que se carguen — pestaña <a href="#" onclick="verTab('cargos');return false">Cargos</a>.`;
+  pintar();
+}
+function verTab(t){
+  ['cartas','contratos','cargos','benef'].forEach(k=>{
+    $('p'+k[0].toUpperCase()+k.slice(1)).style.display = k===t?'block':'none';
+    $('t'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on', k===t);
+  });
+}
+function pintar(){
+  $('tbCartas').innerHTML = CARTAS.map(c=>{
+    const bens = (typeof c.beneficios==='string'?JSON.parse(c.beneficios||'[]'):c.beneficios)||[];
+    return `<tr><td><b>${esc(c.candidato)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(c.rut||'')}</span></td>
+    <td>${esc(c.cargo)}</td><td>${CLP(c.sueldo_base)}</td><td>${bens.length}</td>
+    <td><span class="chip c-${c.estado}">${c.estado}</span></td>
+    <td style="white-space:nowrap">
+      ${c.estado==='BORRADOR'?`<button class="btn-mini" onclick="nuevaCarta(${c.id})"><i class="bi bi-pencil"></i></button>
+        <button class="btn-mini" onclick="estadoCarta(${c.id},'EMITIDA')">Emitir</button>`:''}
+      <button class="btn-mini" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Carta</button>
+      ${c.estado==='EMITIDA'?`<button class="btn-mini" style="background:#dcfce7;color:#15803d" onclick="estadoCarta(${c.id},'ACEPTADA')">Aceptada ✓</button>
+        <button class="btn-mini" style="background:#fee2e2;color:#b91c1c" onclick="estadoCarta(${c.id},'RECHAZADA')">Rechazada</button>`:''}
+      ${c.estado==='ACEPTADA'?`<button class="btn-mini" style="background:#fef3c7;color:#92400e" onclick="contratar(${c.id})"><i class="bi bi-file-earmark-check"></i> Contratar</button>`:''}
+    </td></tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:22px">Sin cartas oferta. Crea la primera.</td></tr>';
+
+  $('tbContratos').innerHTML = CONTRATOS.map(c=>`<tr>
+    <td><b>${esc(c.trabajador)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(c.rut||'')}</span></td>
+    <td>${esc(c.cargo)}</td><td>${CLP(c.sueldo_base)}</td><td>${fmtF(c.fecha_ingreso)}</td>
+    <td>${c.id_carta?'Carta #'+c.id_carta:'—'}</td>
+    <td><button class="btn-mini" onclick="imprimirContrato(${c.id})"><i class="bi bi-printer"></i> Contrato</button></td></tr>`)
+    .join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:22px">Aún no hay contratos.</td></tr>';
+
+  $('tbCargos').innerHTML = CARGOS.map(c=>`<tr>
+    <td style="font-weight:700">${esc(c.nombre)}</td>
+    <td>${String(c.descripcion||'').trim()?esc(c.descripcion).slice(0,140)+(c.descripcion.length>140?'…':''):'<span style="color:#dc2626;font-weight:700"><i class="bi bi-exclamation-triangle me-1"></i>SIN DESCRIPCIÓN — el sistema alega a diario</span>'}</td>
+    <td style="white-space:nowrap"><button class="btn-mini" onclick="editCargo(${c.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn-mini" style="background:#fee2e2;color:#b91c1c" onclick="delCargo(${c.id})"><i class="bi bi-trash"></i></button></td></tr>`).join('');
+
+  $('tbBenef').innerHTML = BENEF.map(b=>`<tr>
+    <td style="font-weight:700">${esc(b.titulo)}</td><td style="font-size:.8rem;color:#475569">${esc(b.clausula)}</td>
+    <td>${b.monto_default?CLP(b.monto_default)+' '+esc(b.unidad||''):'—'}</td>
+    <td><button class="btn-mini" onclick="editBenef(${b.id})"><i class="bi bi-pencil"></i></button></td></tr>`).join('');
+}
+
+/* ── carta oferta: editor con checkboxes ── */
+function nuevaCarta(id){
+  ED_CARTA = id ? CARTAS.find(c=>c.id===id) : null;
+  const c = ED_CARTA||{}, bens = (typeof c.beneficios==='string'?JSON.parse(c.beneficios||'[]'):c.beneficios)||[];
+  const benMap = {}; bens.forEach(b=>benMap[b.codigo]=b);
+  $('dlgCartaBody').innerHTML = `
+    <h5 style="color:var(--navy);margin:0 0 12px">${c.id?'Editar':'Nueva'} carta oferta</h5>
+    <div class="grid3">
+      <div class="fld"><label>Candidato *</label><input id="coNombre" value="${esc(c.candidato||'')}"></div>
+      <div class="fld"><label>RUT</label><input id="coRut" value="${esc(c.rut||'')}"></div>
+      <div class="fld"><label>Email</label><input id="coEmail" value="${esc(c.email||'')}"></div>
+      <div class="fld"><label>Cargo *</label><select id="coCargo">${CARGOS.map(x=>`<option value="${x.id}"${x.id===c.id_cargo?' selected':''}>${esc(x.nombre)}${String(x.descripcion||'').trim()?'':' ⚠ sin descripción'}</option>`).join('')}</select></div>
+      <div class="fld"><label>Sueldo base $ *</label><input id="coSueldo" type="number" value="${c.sueldo_base||''}"></div>
+      <div class="fld"><label>Fecha ingreso propuesta</label><input id="coFecha" type="date" value="${c.fecha_ingreso?String(c.fecha_ingreso).slice(0,10):''}"></div>
+      <div class="fld"><label>Tipo contrato</label><select id="coTipo">${['INDEFINIDO','PLAZO FIJO'].map(t=>`<option${t===(c.tipo_contrato||'INDEFINIDO')?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="fld"><label>Jornada</label><select id="coJornada">${['COMPLETA','PARCIAL'].map(t=>`<option${t===(c.jornada||'COMPLETA')?' selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="fld"><label>Vigencia oferta (días)</label><input id="coVigencia" type="number" value="${c.vigencia_dias||7}"></div>
+    </div>
+    <div style="font-weight:700;font-size:.8rem;color:#64748b;text-transform:uppercase;margin:8px 0 6px">Beneficios incluidos (marca lo que aplica)</div>
+    ${BENEF.map(b=>{ const on=benMap[b.codigo]; return `
+      <div class="benef"><input type="checkbox" data-bcod="${b.codigo}" ${on?'checked':''}>
+        <span class="tit">${esc(b.titulo)}</span>
+        ${b.monto_default!=null?`<input class="monto" type="number" data-bmonto="${b.codigo}" value="${on?on.monto??b.monto_default:b.monto_default}"><span class="un">${esc(b.unidad||'')}</span>`:''}
+      </div>`; }).join('')}
+    <div class="fld" style="margin-top:8px"><label>Otros beneficios / condiciones (texto libre, una por línea)</label><textarea id="coOtros" rows="3">${esc(c.otros||'')}</textarea></div>
+    <div class="pie"><button class="btn-g" onclick="dlgCarta.close()">Cancelar</button><button class="btn" onclick="guardarCarta()">Guardar</button></div>`;
+  dlgCarta.showModal();
+}
+async function guardarCarta(){
+  const beneficios = [...document.querySelectorAll('[data-bcod]')].filter(ch=>ch.checked).map(ch=>{
+    const b = BENEF.find(x=>x.codigo===ch.dataset.bcod);
+    const mEl = document.querySelector(`[data-bmonto="${b.codigo}"]`);
+    const monto = mEl ? parseInt(mEl.value)||null : null;
+    return { codigo:b.codigo, titulo:b.titulo, monto,
+      clausula: b.clausula.replace('{monto}', monto!=null ? CLP(monto) : '') };
+  });
+  const body = { id: ED_CARTA?.id, candidato:$('coNombre').value, rut:$('coRut').value, email:$('coEmail').value,
+    id_cargo:$('coCargo').value, sueldo_base:$('coSueldo').value, fecha_ingreso:$('coFecha').value||null,
+    tipo_contrato:$('coTipo').value, jornada:$('coJornada').value, vigencia_dias:$('coVigencia').value,
+    beneficios, otros:$('coOtros').value };
+  const j = await (await fetch('/api/rrhh/contratos/cartas',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+  if (!j.success) return alert(j.error);
+  if (j.data.aviso_cargo) alert('⚠ '+j.data.aviso_cargo);
+  dlgCarta.close(); cargarTodo();
+}
+async function estadoCarta(id, estado){
+  if (estado==='RECHAZADA' && !confirm('¿Marcar la carta como rechazada por el candidato?')) return;
+  const j = await (await fetch(`/api/rrhh/contratos/cartas/${id}/estado`,{method:'PUT',headers:HJ,body:JSON.stringify({estado})})).json();
+  if (!j.success) return alert(j.error); cargarTodo();
+}
+async function contratar(id){
+  if (!confirm('Generar el CONTRATO con exactamente lo ofertado en esta carta?')) return;
+  const j = await (await fetch(`/api/rrhh/contratos/cartas/${id}/contratar`,{method:'POST',headers:HJ})).json();
+  if (!j.success) return alert(j.error);
+  alert('Contrato #'+j.data.id+' generado — pestaña Contratos para imprimirlo.'); cargarTodo();
+}
+
+/* ── cargos / beneficios ── */
+function editCargo(id){ ED_CARGO=id; const c=CARGOS.find(x=>x.id===id)||{};
+  $('dlgCargoTit').textContent = id?'Editar cargo':'Nuevo cargo';
+  $('cgNombre').value=c.nombre||''; $('cgDesc').value=c.descripcion||''; dlgCargo.showModal(); }
+async function guardarCargo(){
+  const j = await (await fetch('/api/rrhh/contratos/cargos',{method:'POST',headers:HJ,
+    body:JSON.stringify({id:ED_CARGO,nombre:$('cgNombre').value,descripcion:$('cgDesc').value})})).json();
+  if (!j.success) return alert(j.error);
+  if (j.data.alerta) alert('⚠ Cargo creado SIN descripción — el sistema se lo recordará a diario a RRHH hasta que la cargues.');
+  dlgCargo.close(); cargarTodo();
+}
+async function delCargo(id){ if(!confirm('¿Desactivar el cargo?'))return;
+  const j = await (await fetch('/api/rrhh/contratos/cargos/'+id,{method:'DELETE',headers:H})).json();
+  if (!j.success) return alert(j.error); cargarTodo(); }
+function editBenef(id){ ED_BENEF=id; const b=BENEF.find(x=>x.id===id)||{};
+  $('bfTitulo').value=b.titulo||''; $('bfClausula').value=b.clausula||''; $('bfMonto').value=b.monto_default||''; $('bfUnidad').value=b.unidad||'';
+  dlgBenef.showModal(); }
+async function guardarBenef(){
+  const j = await (await fetch('/api/rrhh/contratos/beneficios',{method:'POST',headers:HJ,
+    body:JSON.stringify({id:ED_BENEF,titulo:$('bfTitulo').value,clausula:$('bfClausula').value,monto_default:$('bfMonto').value,unidad:$('bfUnidad').value})})).json();
+  if (!j.success) return alert(j.error); dlgBenef.close(); cargarTodo(); }
+
+/* ── documentos imprimibles (carta y contrato) ── */
+const HOY = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
+function bloqueDoc(inner){
+  $('docPrint').innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:50px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
+  $('docPrint').style.display='block'; window.print(); $('docPrint').style.display='none';
+}
+const cabecera = `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:26px">
+  <div style="font-size:22px;font-weight:800;color:#012d70">AutoFácil <span style="font-weight:400;font-size:13px;color:#555">Crédito Automotriz</span></div>
+  <div style="font-size:12px;color:#555">Santiago, ${HOY}</div></div>`;
+function listaBeneficios(c){
+  const bens = (typeof c.beneficios==='string'?JSON.parse(c.beneficios||'[]'):c.beneficios)||[];
+  const otros = String(c.otros||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  return [...bens.map(b=>b.clausula), ...otros];
+}
+function imprimirCarta(id){
+  const c = CARTAS.find(x=>x.id===id); if(!c) return;
+  const bens = listaBeneficios(c);
+  bloqueDoc(`${cabecera}
+    <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">CARTA OFERTA LABORAL</div>
+    <p>Estimado/a <b>${esc(c.candidato)}</b>${c.rut?` (RUT ${esc(c.rut)})`:''}:</p>
+    <p>Tenemos el agrado de extenderle una oferta para incorporarse a <b>AutoFácil SpA</b> en el cargo de <b>${esc(c.cargo)}</b>, bajo contrato <b>${esc(c.tipo_contrato)}</b> con jornada <b>${esc(c.jornada==='COMPLETA'?'completa':'parcial')}</b>${c.fecha_ingreso?`, con fecha de ingreso propuesta el <b>${fmtF(c.fecha_ingreso)}</b>`:''}.</p>
+    <p><b>Renta:</b> sueldo base bruto mensual de <b>${CLP(c.sueldo_base)}</b>, más gratificación legal conforme al artículo 50 del Código del Trabajo.</p>
+    ${bens.length?`<p><b>Beneficios incluidos:</b></p><ul>${bens.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
+    <p>Esta oferta tiene una vigencia de <b>${c.vigencia_dias||7} días</b> a contar de esta fecha y está sujeta a la presentación de los antecedentes de rigor.</p>
+    <p style="margin-top:40px">Esperamos contar con usted en nuestro equipo.</p>
+    <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">AUTOFÁCIL SpA<br>Gerencia</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(c.candidato)}<br>Acepto la oferta — fecha y firma</div>
+    </div>`);
+}
+function imprimirContrato(id){
+  const c = CONTRATOS.find(x=>x.id===id); if(!c) return;
+  const bens = listaBeneficios(c);
+  bloqueDoc(`${cabecera}
+    <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">CONTRATO INDIVIDUAL DE TRABAJO</div>
+    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b>, en adelante "el Empleador", y don/doña <b>${esc(c.trabajador)}</b>${c.rut?`, cédula de identidad N° <b>${esc(c.rut)}</b>`:''}, en adelante "el Trabajador", se ha convenido el siguiente contrato de trabajo:</p>
+    <p><b>PRIMERO — Del cargo.</b> El Trabajador se desempeñará como <b>${esc(c.cargo)}</b>, obligándose a ejecutar las labores propias del cargo según la descripción de cargo que declara conocer y que forma parte integrante de este contrato.</p>
+    ${String(c.cargo_desc||'').trim()?`<div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;font-size:12.5px;white-space:pre-wrap;margin-bottom:14px">${esc(c.cargo_desc)}</div>`:'<p style="color:#b00"><b>⚠ Falta la descripción de cargo — cargarla en la pestaña Cargos antes de firmar.</b></p>'}
+    <p><b>SEGUNDO — De la jornada.</b> Jornada de trabajo <b>${esc(c.jornada==='COMPLETA'?'completa':'parcial')}</b>${bens.some(b=>/40 horas/.test(b))?'':', conforme a la legislación vigente'}.</p>
+    <p><b>TERCERO — De la remuneración.</b> El Empleador pagará al Trabajador un sueldo base bruto mensual de <b>${CLP(c.sueldo_base)}</b>, más gratificación legal conforme al artículo 50 del Código del Trabajo, pagadera por períodos mensuales vencidos.</p>
+    ${bens.length?`<p><b>CUARTO — De los beneficios.</b> Conforme a la carta oferta aceptada${c.id_carta?` (N° ${c.id_carta})`:''}, el Trabajador tendrá derecho a los siguientes beneficios:</p><ul>${bens.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
+    <p><b>${bens.length?'QUINTO':'CUARTO'} — De la duración.</b> El presente contrato es de carácter <b>${esc(c.tipo_contrato)}</b>${c.fecha_ingreso?` y regirá a contar del <b>${fmtF(c.fecha_ingreso)}</b>`:''}.</p>
+    <p><b>${bens.length?'SEXTO':'QUINTO'} — Ejemplares.</b> El presente contrato se firma en dos ejemplares del mismo tenor, quedando uno en poder de cada parte.</p>
+    <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>AUTOFÁCIL SpA</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(c.trabajador)}</div>
+    </div>
+    <p style="font-size:11px;color:#777;margin-top:30px">Documento generado por el Business Suite desde la carta oferta — revisar con asesoría legal antes de firmar.</p>`);
+}
+
+cargarTodo();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -368,6 +368,7 @@ const PAGINAS = [
   ['/facilbook', 'facilbook/index.html'],
   ['/concurso', 'concurso/index.html'],
   ['/recursos-humanos/concurso', 'concurso/index.html'],
+  ['/recursos-humanos/contratos', 'recursos-humanos/contratos/index.html'],
   ['/simulador-rapido', 'simulador-rapido/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],

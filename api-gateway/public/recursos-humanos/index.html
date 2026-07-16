@@ -90,6 +90,12 @@
       <p>Pide tus días de vacaciones (fechas y comentario), haz seguimiento de la aprobación y revisa tu historial.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/contratos/" class="module-card" id="cardContr" style="display:none">
+      <div class="card-icon"><i class="bi bi-file-earmark-text"></i></div>
+      <h5>Contratos y Cartas Oferta <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Cartas oferta con beneficios por checkbox, contratos que heredan lo ofertado, y descripciones de cargo obligatorias.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/concurso/" class="module-card" id="cardConc" style="display:none">
       <div class="card-icon"><i class="bi bi-controller"></i></div>
       <h5>¿Qué Dice AutoFácil?</h5>
@@ -124,6 +130,7 @@
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
     if (tiene('concurso')) document.getElementById('cardConc').style.display='';
+    if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>

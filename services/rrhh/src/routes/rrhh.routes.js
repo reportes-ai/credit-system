@@ -33,6 +33,17 @@ router.post('/remuneraciones/guardar',        verifyToken, requireFunc('rh_remun
 router.post('/remuneraciones/emitir',         verifyToken, requireFunc('rh_remuneraciones'), rem.emitir);
 router.get('/remuneraciones/mias',            verifyToken, rem.misLiquidaciones);
 router.get('/remuneraciones/previred',        verifyToken, requireFunc('rh_remuneraciones'), rem.getPrevired);
+const con = require('../controllers/contratos.controller');
+router.get('/contratos/cargos',        verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getCargos);
+router.post('/contratos/cargos',       verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.guardarCargo);
+router.delete('/contratos/cargos/:id', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.eliminarCargo);
+router.get('/contratos/beneficios',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getBeneficios);
+router.post('/contratos/beneficios',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.guardarBeneficio);
+router.get('/contratos/cartas',        verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getCartas);
+router.post('/contratos/cartas',       verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.guardarCarta);
+router.put('/contratos/cartas/:id/estado', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.cambiarEstadoCarta);
+router.post('/contratos/cartas/:id/contratar', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.contratarDesdeCarta);
+router.get('/contratos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getContratos);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);

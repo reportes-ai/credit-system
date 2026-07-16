@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -53,6 +53,7 @@
     <a href="#p12">12. Comisiones de ejecutivos → Remuneraciones</a>
     <a href="#p13">13. Venta de cartera</a>
     <a href="#p14">14. Campaña masiva</a>
+    <a href="#p15">15. Contratación de un colaborador</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -254,6 +255,21 @@
   </ol>
   <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">ENVIADA</span><span class="ar">→</span><span class="st fin">CONVERSIÓN MEDIDA</span></div>
   <div class="afecta"><b>Afecta:</b> CRM (gestiones), originación si convierte (§1), recaudación si es cobranza (§5). <b>Depende de:</b> datos de contacto, plantillas Meta, política de crédito.</div>
+
+  <h2 id="p15">15. Contratación de un colaborador</h2>
+  <p><b>Qué y para qué:</b> del candidato al contrato firmado sin que lo ofertado y lo contratado se contradigan jamás (la carta oferta es la fuente única del contrato).</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>RRHH o jefatura con permiso (arma carta y contrato) · Gerencia firma · el candidato acepta.</div>
+    <div><b class="lbl">Prerequisitos</b>Cargo creado CON descripción de cargo (sin ella el sistema alega a diario) · catálogo de beneficios al día.</div>
+  </div>
+  <ol>
+    <li><b>Carta oferta</b> (RRHH → Contratos y Cartas Oferta): candidato, cargo, sueldo, beneficios por checkbox (+ otros libres) → Emitir → imprimir/enviar.</li>
+    <li><b>Respuesta del candidato:</b> marcar Aceptada o Rechazada.</li>
+    <li><b>Contratar</b> (solo con carta ACEPTADA): genera el contrato con la descripción de cargo y las cláusulas de lo ofertado → imprimir y firmar.</li>
+    <li><b>Alta</b>: crear el usuario (Usuarios) y completar la ficha (Colaboradores) — los campos con * son los que exige Previred.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">EMITIDA</span><span class="ar">→</span><span class="st">ACEPTADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span><span class="ar">→</span><span class="st fin">CONTRATADA</span></div>
+  <div class="afecta"><b>Afecta:</b> ficha del colaborador, remuneraciones (sueldo/beneficios), onboarding. <b>Depende de:</b> catálogo de cargos con descripción, catálogo de beneficios.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
