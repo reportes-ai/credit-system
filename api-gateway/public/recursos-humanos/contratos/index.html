@@ -55,6 +55,7 @@
     <button id="tContratos" onclick="verTab('contratos')"><i class="bi bi-file-earmark-check me-1"></i>Contratos</button>
     <button id="tCargos" onclick="verTab('cargos')"><i class="bi bi-person-badge me-1"></i>Cargos y descripciones</button>
     <button id="tBenef" onclick="verTab('benef')"><i class="bi bi-gift me-1"></i>Catálogo de beneficios</button>
+    <button id="tFiniq" onclick="verTab('finiq')"><i class="bi bi-door-open me-1"></i>Finiquitos</button>
   </div>
 
   <div class="panel" id="pCartas">
@@ -83,6 +84,21 @@
       <button class="btn" onclick="editBenef(null)">+ Nuevo beneficio</button>
     </div>
     <table><thead><tr><th>Beneficio</th><th>Cláusula</th><th>Monto default</th><th></th></tr></thead><tbody id="tbBenef"></tbody></table>
+  </div>
+
+  <div class="panel" id="pFiniq" style="display:none">
+    <b>Calcular finiquito</b>
+    <div class="grid3" style="margin-top:10px">
+      <div class="fld"><label>Colaborador *</label><select id="fqU"></select></div>
+      <div class="fld"><label>Causal *</label><select id="fqCausal"></select></div>
+      <div class="fld"><label>Fecha de término *</label><input id="fqFecha" type="date"></div>
+    </div>
+    <label style="font-size:.82rem;display:flex;align-items:center;gap:8px;margin-bottom:10px"><input type="checkbox" id="fqAvisado" style="width:auto"> Se avisó con 30 días de anticipación (no corresponde mes de aviso)</label>
+    <button class="btn" onclick="fqCalcular()"><i class="bi bi-calculator me-1"></i>Calcular</button>
+    <div id="fqResultado" style="margin-top:14px"></div>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0">
+    <b>Finiquitos guardados</b>
+    <table style="margin-top:8px"><thead><tr><th>Trabajador</th><th>Causal</th><th>Término</th><th>Total</th><th></th></tr></thead><tbody id="tbFiniq"></tbody></table>
   </div>
 
   <div class="panel" style="background:#f8fafc;border-left:4px solid var(--navy)">
@@ -139,10 +155,97 @@ async function cargarTodo(){
   pintar();
 }
 function verTab(t){
-  ['cartas','contratos','cargos','benef'].forEach(k=>{
+  ['cartas','contratos','cargos','benef','finiq'].forEach(k=>{
     $('p'+k[0].toUpperCase()+k.slice(1)).style.display = k===t?'block':'none';
     $('t'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on', k===t);
   });
+  if (t==='finiq' && !FQ_INIT) fqInit();
+}
+
+/* ── finiquitos ── */
+let FQ_INIT = false, FQ_CALC = null, FINIQ = [];
+async function fqInit(){
+  FQ_INIT = true;
+  const [jc, jf] = await Promise.all([
+    fetch('/api/rrhh/finiquitos/colaboradores',{headers:H}).then(r=>r.json()),
+    fetch('/api/rrhh/finiquitos',{headers:H}).then(r=>r.json()),
+  ]);
+  $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(c.rut):''}</option>`).join('');
+  $('fqCausal').innerHTML = (jc?.data?.causales||[]).map(c=>`<option value="${esc(c.articulo)}">Art. ${esc(c.articulo)} — ${esc(c.glosa)}</option>`).join('');
+  $('fqFecha').value = new Date().toISOString().slice(0,10);
+  FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();
+}
+function fqPintarLista(){
+  $('tbFiniq').innerHTML = FINIQ.map(f=>`<tr><td><b>${esc(f.trabajador)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(f.rut||'')}</span></td>
+    <td>Art. ${esc(f.causal)}</td><td>${fmtF(f.fecha_termino)}</td><td style="font-weight:800">${CLP(f.total)}</td>
+    <td><button class="btn-mini" onclick="imprimirFiniquito(${f.id})"><i class="bi bi-printer"></i></button></td></tr>`).join('')
+    || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px">Sin finiquitos guardados.</td></tr>';
+}
+async function fqCalcular(){
+  const q = new URLSearchParams({ id_usuario:$('fqU').value, causal:$('fqCausal').value, fecha_termino:$('fqFecha').value, avisado:$('fqAvisado').checked?'1':'0' });
+  const j = await (await fetch('/api/rrhh/finiquitos/calcular?'+q,{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  FQ_CALC = j.data;
+  const d = j.data;
+  const fila = (lbl, id, val, nota) => `<tr><td>${lbl}${nota?`<br><span style="color:#94a3b8;font-size:.74rem">${nota}</span>`:''}</td>
+    <td style="text-align:right"><input id="${id}" type="number" value="${val}" style="width:150px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" oninput="fqTotal()"></td></tr>`;
+  $('fqResultado').innerHTML = `
+    ${d.avisos.length?`<div class="rojo" style="background:#fffbeb;border-color:#d97706">${d.avisos.map(a=>'• '+esc(a)).join('<br>')}</div>`:''}
+    <table style="max-width:640px">
+      <tr><td>Base (última remuneración)</td><td style="text-align:right"><input id="fqBase" type="number" value="${d.base}" style="width:150px;text-align:right;border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 10px" disabled></td></tr>
+      ${fila(`Indemnización años de servicio (${d.anos_servicio} año/s × base topada)`, 'fqIA', d.indemnizacion_anos)}
+      ${fila('Indemnización sustitutiva del aviso previo', 'fqMA', d.mes_aviso)}
+      ${fila(`Feriado proporcional (${d.vac_dias_habiles} hábiles ≈ ${d.vac_dias_corridos} corridos)`, 'fqVac', d.vac_monto)}
+      ${fila('Otros haberes (bonos pendientes, etc.)', 'fqOtros', 0)}
+      ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', 0, 'se resta')}
+      <tr><td style="font-weight:800">TOTAL FINIQUITO</td><td style="text-align:right;font-weight:800;font-size:1.1rem" id="fqTotalCell"></td></tr>
+    </table>
+    <div class="pie" style="justify-content:flex-start"><button class="btn" onclick="fqGuardar()"><i class="bi bi-save me-1"></i>Guardar finiquito</button></div>`;
+  fqTotal();
+}
+function fqTotal(){
+  const v = id => parseInt($(id).value)||0;
+  $('fqTotalCell').textContent = CLP(v('fqIA')+v('fqMA')+v('fqVac')+v('fqOtros')-v('fqDesc'));
+}
+async function fqGuardar(){
+  const v = id => parseInt($(id).value)||0;
+  const d = FQ_CALC;
+  const body = { id_usuario:d.colaborador.id_usuario, trabajador:d.colaborador.nombre, rut:d.colaborador.rut, cargo:d.colaborador.cargo,
+    fecha_ingreso:d.colaborador.fecha_ingreso, fecha_termino:$('fqFecha').value, causal:d.causal.articulo, causal_glosa:d.causal.glosa,
+    detalle:{ base:d.base, base_topada:d.base_topada, anos:d.anos_servicio, uf:d.uf,
+      indemnizacion_anos:v('fqIA'), mes_aviso:v('fqMA'), vac_monto:v('fqVac'),
+      vac_dias_habiles:d.vac_dias_habiles, vac_dias_corridos:d.vac_dias_corridos,
+      otros_haberes:v('fqOtros'), descuentos:v('fqDesc') } };
+  const j = await (await fetch('/api/rrhh/finiquitos',{method:'POST',headers:HJ,body:JSON.stringify(body)})).json();
+  if (!j.success) return alert(j.error);
+  alert('Finiquito guardado — total '+CLP(j.data.total)+'. Imprímelo desde la lista.');
+  const jf = await (await fetch('/api/rrhh/finiquitos',{headers:H})).json();
+  FINIQ = jf?.data?.finiquitos||[]; fqPintarLista(); $('fqResultado').innerHTML='';
+}
+function imprimirFiniquito(id){
+  const f = FINIQ.find(x=>x.id===id); if(!f) return;
+  const d = typeof f.detalle==='string'?JSON.parse(f.detalle||'{}'):(f.detalle||{});
+  const li = (lbl,m)=> m ? `<tr><td style="padding:4px 0">${lbl}</td><td style="text-align:right">${CLP(m)}</td></tr>` : '';
+  bloqueDoc(`${cabecera}
+    <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
+    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(f.trabajador)}</b>${f.rut?`, cédula de identidad N° <b>${esc(f.rut)}</b>`:''}, quien se desempeñó como <b>${esc(f.cargo||'')}</b>${f.fecha_ingreso?` desde el <b>${fmtF(f.fecha_ingreso)}</b>`:''} hasta el <b>${fmtF(f.fecha_termino)}</b>, se deja constancia de lo siguiente:</p>
+    <p><b>PRIMERO.</b> El contrato de trabajo terminó por la causal del artículo <b>${esc(f.causal)}</b> del Código del Trabajo: <b>${esc(f.causal_glosa||'')}</b>.</p>
+    <p><b>SEGUNDO.</b> El Empleador paga al Trabajador, quien declara recibir a su entera satisfacción, las siguientes sumas:</p>
+    <table style="width:100%;max-width:520px;margin:0 auto 14px;font-size:13.5px">
+      ${li('Indemnización por años de servicio ('+(d.anos||0)+' años)', d.indemnizacion_anos)}
+      ${li('Indemnización sustitutiva del aviso previo', d.mes_aviso)}
+      ${li('Feriado proporcional ('+(d.vac_dias_corridos||0)+' días corridos)', d.vac_monto)}
+      ${li('Otros haberes', d.otros_haberes)}
+      ${d.descuentos?`<tr><td style="padding:4px 0">Descuentos</td><td style="text-align:right">−${CLP(d.descuentos)}</td></tr>`:''}
+      <tr style="border-top:2px solid #333"><td style="padding:6px 0;font-weight:800">TOTAL</td><td style="text-align:right;font-weight:800">${CLP(f.total)}</td></tr>
+    </table>
+    <p><b>TERCERO.</b> El Trabajador declara que durante la vigencia del contrato recibió oportunamente sus remuneraciones y que nada se le adeuda por los conceptos indicados ni por ningún otro, otorgando el más amplio y total finiquito.</p>
+    <p><b>CUARTO.</b> El presente finiquito se firma y ratifica ante ministro de fe, conforme al artículo 177 del Código del Trabajo.</p>
+    <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>AUTOFÁCIL SpA</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(f.trabajador)}</div>
+    </div>
+    <p style="font-size:11px;color:#777;margin-top:30px">Generado por el Business Suite — el finiquito debe ratificarse ante notario o inspección del trabajo; revisar con asesoría legal.</p>`);
 }
 function pintar(){
   $('tbCartas').innerHTML = CARTAS.map(c=>{

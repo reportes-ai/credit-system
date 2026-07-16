@@ -289,3 +289,164 @@ exports.getContratos = async (req, res) => {
     ok(res, { contratos });
   } catch (e) { fail(res, e.message); }
 };
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FINIQUITOS (anti-Buk #3) — cálculo sobre los motores existentes:
+   · Base = última remuneración imponible (promedio 3 últimas EMITIDAS si hay
+     variables), topada a 90 UF (art. 172 CT) — la propuesta es de fórmula y
+     RRHH la puede ajustar antes de guardar (filosofía campos forzados).
+   · Indemnización años de servicio: 1 mes por año, fracción ≥6 meses = 1 año,
+     tope paramétrico (default 11) — solo si la causal la lleva.
+   · Mes de aviso: si la causal lo lleva y NO se avisó con 30 días.
+   · Feriado proporcional: devengado − usado (misma matemática del módulo
+     Vacaciones), en días corridos (hábiles × 1,4), valor día = base/30.
+   ───────────────────────────────────────────────────────────────────────────── */
+const { getUF } = require('../../../../shared/uf');
+
+require('../../../../shared/migrate').enFila('rrhh-finiquitos', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_finiquito_causales (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    articulo VARCHAR(20) NOT NULL UNIQUE,
+    glosa VARCHAR(200) NOT NULL,
+    indemniza_anos TINYINT(1) DEFAULT 0,
+    mes_aviso TINYINT(1) DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1
+  )`);
+  const C = [
+    ['159-1', 'Mutuo acuerdo de las partes', 0, 0],
+    ['159-2', 'Renuncia voluntaria del trabajador', 0, 0],
+    ['159-4', 'Vencimiento del plazo convenido', 0, 0],
+    ['159-5', 'Conclusión del trabajo o servicio', 0, 0],
+    ['159-6', 'Caso fortuito o fuerza mayor', 0, 0],
+    ['160', 'Caducidad (art. 160: causales imputables al trabajador)', 0, 0],
+    ['161-1', 'Necesidades de la empresa', 1, 1],
+    ['161-2', 'Desahucio escrito del empleador', 1, 1],
+  ];
+  for (const c of C) await pool.query(`INSERT IGNORE INTO rh_finiquito_causales (articulo, glosa, indemniza_anos, mes_aviso) VALUES (?,?,?,?)`, c);
+  await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES ('finiq_tope_anos', '11'), ('finiq_tope_uf', '90')`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_finiquitos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    trabajador VARCHAR(160), rut VARCHAR(15), cargo VARCHAR(120),
+    fecha_ingreso DATE NULL, fecha_termino DATE NOT NULL,
+    causal VARCHAR(20) NOT NULL, causal_glosa VARCHAR(200),
+    detalle JSON NULL, total BIGINT DEFAULT 0,
+    estado VARCHAR(15) DEFAULT 'BORRADOR',
+    creado_por INT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  console.log('[rrhh-finiquitos] listo');
+});
+
+exports.finiquitoColaboradores = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.rut, u.cargo,
+              DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, f.sueldo_base
+         FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
+    const [causales] = await pool.query(`SELECT * FROM rh_finiquito_causales WHERE activo=1 ORDER BY articulo`);
+    ok(res, { colaboradores: rows, causales });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.finiquitoCalcular = async (req, res) => {
+  try {
+    const idU = parseInt(req.query.id_usuario);
+    const causal = String(req.query.causal || '');
+    const fechaT = String(req.query.fecha_termino || '').slice(0, 10);
+    const avisado = String(req.query.avisado || '') === '1';
+    if (!idU || !/^\d{4}-\d{2}-\d{2}$/.test(fechaT)) return fail(res, 'Faltan colaborador o fecha de término', 400);
+    const [[cau]] = await pool.query(`SELECT * FROM rh_finiquito_causales WHERE articulo=?`, [causal]);
+    if (!cau) return fail(res, 'Causal inválida', 400);
+    const [[u]] = await pool.query(
+      `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.rut, u.cargo,
+              DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, f.sueldo_base
+         FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.id_usuario=?`, [idU]);
+    if (!u) return fail(res, 'Colaborador no existe', 404);
+    const avisos = [];
+
+    const [liqs] = await pool.query(
+      `SELECT total_imponible FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' ORDER BY mes DESC LIMIT 3`, [idU]);
+    let base;
+    if (liqs.length) {
+      base = Math.round(liqs.reduce((s, l) => s + Number(l.total_imponible), 0) / liqs.length);
+      if (liqs.length > 1) avisos.push(`Base = promedio de las últimas ${liqs.length} liquidaciones emitidas (rentas variables).`);
+    } else {
+      base = Math.round((Number(u.sueldo_base) || 0) * 1.25);
+      avisos.push('Sin liquidaciones emitidas: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
+    }
+    const [[cfgA]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_anos'");
+    const [[cfgU]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_uf'");
+    const topeAnos = parseInt(cfgA?.valor) || 11, topeUFn = parseFloat(cfgU?.valor) || 90;
+    const uf = (await getUF(fechaT)) || (await getUF(new Date().toISOString().slice(0, 10))) || 0;
+    const topeUF = Math.round(topeUFn * uf);
+    const baseTopada = Math.min(base, topeUF || base);
+    if (topeUF && base > topeUF) avisos.push(`Base ${CLP(base)} supera el tope de ${topeUFn} UF (${CLP(topeUF)}) — se indemniza con el tope (art. 172).`);
+
+    let anos = 0, meses = 0;
+    if (u.fecha_ingreso) {
+      const fi = new Date(u.fecha_ingreso + 'T12:00:00'), ft = new Date(fechaT + 'T12:00:00');
+      meses = (ft.getFullYear() - fi.getFullYear()) * 12 + (ft.getMonth() - fi.getMonth());
+      if (ft.getDate() < fi.getDate()) meses--;
+      meses = Math.max(0, meses);
+      anos = Math.floor(meses / 12) + ((meses % 12) >= 6 ? 1 : 0);
+      if (anos > topeAnos) { avisos.push(`${anos} años de servicio — se aplica el tope de ${topeAnos} años.`); anos = topeAnos; }
+    } else avisos.push('Sin fecha de ingreso registrada: años de servicio en 0. Corrige la ficha del colaborador.');
+
+    const indemAnos = cau.indemniza_anos ? anos * baseTopada : 0;
+    const mesAviso = cau.mes_aviso && !avisado ? baseTopada : 0;
+
+    let vacHabiles = 0;
+    if (u.fecha_ingreso) {
+      const [[cfgV]] = await pool.query("SELECT valor FROM rh_config WHERE clave='vac_dias_anuales'");
+      const anuales = parseFloat(cfgV?.valor) || 15;
+      const devengados = Math.round(meses * (anuales / 12) * 10) / 10;
+      const [vacs] = await pool.query("SELECT fecha_desde, fecha_hasta FROM rh_vacaciones WHERE id_usuario=? AND estado='APROBADA'", [idU]);
+      let usados = 0;
+      for (const v of vacs) {
+        let d = new Date(String(v.fecha_desde).slice(0, 10) + 'T12:00:00');
+        const h = new Date(String(v.fecha_hasta).slice(0, 10) + 'T12:00:00');
+        for (; d <= h; d.setDate(d.getDate() + 1)) if (d.getDay() >= 1 && d.getDay() <= 5) usados++;
+      }
+      vacHabiles = Math.max(0, Math.round((devengados - usados) * 10) / 10);
+    }
+    const vacCorridos = Math.round(vacHabiles * 1.4 * 10) / 10;
+    const vacMonto = Math.round(vacCorridos * base / 30);
+
+    ok(res, {
+      colaborador: u, causal: cau, uf, base, base_topada: baseTopada,
+      anos_servicio: anos, meses_servicio: meses,
+      indemnizacion_anos: indemAnos, mes_aviso: mesAviso,
+      vac_dias_habiles: vacHabiles, vac_dias_corridos: vacCorridos, vac_monto: vacMonto,
+      total: indemAnos + mesAviso + vacMonto,
+      avisos,
+    });
+  } catch (e) { console.error('[finiquito calc]', e.message); fail(res, e.message); }
+};
+
+exports.finiquitoGuardar = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const idU = parseInt(b.id_usuario);
+    if (!idU || !b.fecha_termino || !b.causal) return fail(res, 'Faltan datos', 400);
+    const detalle = b.detalle || {};
+    const total = ['indemnizacion_anos', 'mes_aviso', 'vac_monto', 'otros_haberes'].reduce((s, k) => s + (parseInt(detalle[k]) || 0), 0)
+      - (parseInt(detalle.descuentos) || 0);
+    const [r] = await pool.query(
+      `INSERT INTO rh_finiquitos (id_usuario, trabajador, rut, cargo, fecha_ingreso, fecha_termino, causal, causal_glosa, detalle, total, creado_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [idU, String(b.trabajador || '').slice(0, 160), String(b.rut || '').slice(0, 15), String(b.cargo || '').slice(0, 120),
+       b.fecha_ingreso || null, b.fecha_termino, String(b.causal).slice(0, 20), String(b.causal_glosa || '').slice(0, 200),
+       JSON.stringify(detalle), total, req.usuario.id_usuario]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: r.insertId,
+      detalle: `Finiquito ${b.trabajador} (${b.causal}) total ${CLP(total)}` });
+    ok(res, { id: r.insertId, total });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.finiquitoLista = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`SELECT * FROM rh_finiquitos ORDER BY id DESC LIMIT 100`);
+    ok(res, { finiquitos: rows });
+  } catch (e) { fail(res, e.message); }
+};

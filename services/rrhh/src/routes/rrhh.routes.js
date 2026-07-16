@@ -44,6 +44,10 @@ router.post('/contratos/cartas',       verifyToken, requireFunc('rh_contratos', 
 router.put('/contratos/cartas/:id/estado', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.cambiarEstadoCarta);
 router.post('/contratos/cartas/:id/contratar', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.contratarDesdeCarta);
 router.get('/contratos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getContratos);
+router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoColaboradores);
+router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);
+router.post('/finiquitos',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoGuardar);
+router.get('/finiquitos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoLista);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);
