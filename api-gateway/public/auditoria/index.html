@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v2.0 — fix: logins/movimientos en hora Chile (America/Santiago), no UTC -->
+  <!-- v2.1 — pestañas Aprobaciones y Excepciones (casos escalados) + buscador en todas las pestañas -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,6 +89,8 @@
   <div class="tabs">
     <div class="tab on" id="tabLogins" onclick="setTab('logins')"><i class="bi bi-box-arrow-in-right"></i>Logins</div>
     <div class="tab" id="tabMov" onclick="setTab('mov')"><i class="bi bi-list-columns-reverse"></i>Movimientos</div>
+    <div class="tab" id="tabAprob" onclick="setTab('aprob')"><i class="bi bi-check2-circle"></i>Aprobaciones</div>
+    <div class="tab" id="tabExcep" onclick="setTab('excep')"><i class="bi bi-exclamation-triangle"></i>Excepciones</div>
     <div class="tab" id="tabDealers" onclick="setTab('dealers')"><i class="bi bi-shop"></i>Dealers</div>
     <div class="tab" id="tabBackups" onclick="setTab('backups')"><i class="bi bi-people"></i>BackUps <b style="color:#ef4444">*</b></div>
   </div>
@@ -100,7 +102,7 @@
     <div class="fld" id="wrapAccion" style="display:none"><label>Acción</label><select id="f-accion" style="min-width:140px"><option value="">— Todas —</option></select></div>
     <div class="fld" id="wrapModulo" style="display:none"><label>Módulo</label><select id="f-modulo" style="min-width:130px"><option value="">— Todos —</option></select></div>
     <div class="fld" id="wrapCategoria" style="display:none"><label>Tipo</label><select id="f-categoria" style="min-width:140px"><option value="">— Todos —</option><option>Acceso</option><option>Acción</option><option>Asistente IA</option></select></div>
-    <div class="fld" id="wrapQ" style="display:none"><label>Buscar (detalle/RUT)</label><input id="f-q" type="text" placeholder="texto, rut, n° op…" style="width:180px"></div>
+    <div class="fld" id="wrapQ" style="display:none"><label>Buscar</label><input id="f-q" type="text" placeholder="OP, RUT, cliente, dealer…" style="width:180px"></div>
     <button class="btn btn-f" onclick="aplicar()"><i class="bi bi-funnel"></i>Filtrar</button>
     <button class="btn btn-clear" onclick="limpiar()"><i class="bi bi-x-circle"></i>Limpiar</button>
     <button class="btn btn-x" id="btnExport" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i>Exportar Excel</button>
@@ -145,14 +147,12 @@ let TAB = 'logins', PAGE = 1, PAGES = 1;
 
 function setTab(t){
   TAB = t; PAGE = 1;
-  document.getElementById('tabLogins').classList.toggle('on', t==='logins');
-  document.getElementById('tabMov').classList.toggle('on', t==='mov');
-  document.getElementById('tabDealers').classList.toggle('on', t==='dealers');
-  document.getElementById('tabBackups').classList.toggle('on', t==='backups');
-  const mov = t==='mov', bk = t==='backups', dl = t==='dealers';
+  for (const [id, key] of [['tabLogins','logins'],['tabMov','mov'],['tabAprob','aprob'],['tabExcep','excep'],['tabDealers','dealers'],['tabBackups','backups']])
+    document.getElementById(id).classList.toggle('on', t===key);
+  const mov = t==='mov', bk = t==='backups', dl = t==='dealers', grp = (t==='aprob'||t==='excep');
   document.getElementById('wrapAccion').style.display = mov?'':'none';
-  document.getElementById('wrapModulo').style.display = mov?'':'none';
-  document.getElementById('wrapQ').style.display      = (mov||dl)?'':'none';
+  document.getElementById('wrapModulo').style.display = (mov||grp)?'':'none';
+  document.getElementById('wrapQ').style.display      = bk?'none':'';       // buscador en todas las pestañas
   document.getElementById('wrapCategoria').style.display = dl?'':'none';
   document.getElementById('f-usuario').parentElement.style.display = dl?'none':'';
   document.getElementById('btnExport').style.display = (bk||dl)?'none':'';
@@ -160,15 +160,23 @@ function setTab(t){
   document.querySelector('.pager').style.display   = bk?'none':'';
   cargar();
 }
+const esGrupo = () => TAB==='aprob'||TAB==='excep';
 
 function qs(extra){
   const p = new URLSearchParams();
   const d = document.getElementById('f-desde').value, h = document.getElementById('f-hasta').value;
   if (d) p.set('desde', d); if (h) p.set('hasta', h);
   if (TAB!=='dealers'){ const u = document.getElementById('f-usuario').value; if (u) p.set('usuario', u); }
+  const qTxt = document.getElementById('f-q').value.trim();
+  if (TAB==='logins' && qTxt) p.set('q', qTxt);
   if (TAB==='mov'){
-    const a = document.getElementById('f-accion').value, m = document.getElementById('f-modulo').value, q = document.getElementById('f-q').value.trim();
-    if (a) p.set('accion', a); if (m) p.set('modulo', m); if (q) p.set('q', q);
+    const a = document.getElementById('f-accion').value, m = document.getElementById('f-modulo').value;
+    if (a) p.set('accion', a); if (m) p.set('modulo', m); if (qTxt) p.set('q', qTxt);
+  }
+  if (esGrupo()){
+    p.set('grupo', TAB==='aprob'?'aprobaciones':'excepciones');
+    const m = document.getElementById('f-modulo').value;
+    if (m) p.set('modulo', m); if (qTxt) p.set('q', qTxt);
   }
   if (TAB==='dealers'){
     const cat = document.getElementById('f-categoria').value, q = document.getElementById('f-q').value.trim();
@@ -220,17 +228,19 @@ async function cargar(){
     } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
     return;
   }
-  const url = (TAB==='mov'?'/api/auditoria-mov/movimientos?':'/api/auditoria-mov/logins?') + qs({ page:PAGE, limit:100 }).toString();
+  const esMovLike = TAB==='mov' || esGrupo();
+  const url = (esMovLike?'/api/auditoria-mov/movimientos?':'/api/auditoria-mov/logins?') + qs({ page:PAGE, limit:100 }).toString();
   try {
     const r = await fetch(url, { headers:H });
     const j = await r.json();
     if (!j.success){ tb.innerHTML = '<tr><td class="vacio">Error al cargar</td></tr>'; return; }
     PAGES = j.data.pages || 1;
-    document.getElementById('resumen').textContent = `${j.data.total} registro(s)` + (TAB==='mov'?' de movimientos':' de ingreso');
+    const tipo = TAB==='mov'?' de movimientos':TAB==='aprob'?' de aprobaciones/rechazos':TAB==='excep'?' de excepciones (casos escalados)':' de ingreso';
+    document.getElementById('resumen').textContent = `${j.data.total} registro(s)` + tipo;
     document.getElementById('pgInfo').textContent = `Página ${j.data.page} de ${PAGES}`;
     document.getElementById('pgPrev').disabled = j.data.page<=1;
     document.getElementById('pgNext').disabled = j.data.page>=PAGES;
-    TAB==='mov' ? renderMov(j.data.rows) : renderLogins(j.data.rows);
+    esMovLike ? renderMov(j.data.rows) : renderLogins(j.data.rows);
   } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
 }
 
@@ -337,7 +347,7 @@ function limpiar(){
 }
 function exportar(){
   if (TAB==='dealers' || TAB==='backups') return;
-  const base = TAB==='mov' ? '/api/auditoria-mov/movimientos/export?' : '/api/auditoria-mov/logins/export?';
+  const base = (TAB==='mov'||esGrupo()) ? '/api/auditoria-mov/movimientos/export?' : '/api/auditoria-mov/logins/export?';
   const p = qs({ token });
   window.location.href = base + p.toString();
   toast('Generando Excel…');

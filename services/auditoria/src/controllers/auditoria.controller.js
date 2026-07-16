@@ -34,6 +34,11 @@ function whereMovimientos(qy) {
   }
   if (qy.accion) { where.push('accion = ?'); vals.push(qy.accion); }
   if (qy.modulo) { where.push('modulo = ?'); vals.push(qy.modulo); }
+  // Grupos de bitácora: APROBACIONES (decisiones) y EXCEPCIONES (casos escalados / fuera de flujo)
+  if (qy.grupo === 'aprobaciones')
+    where.push("(accion LIKE 'APROBAR%' OR accion LIKE 'RECHAZAR%' OR accion LIKE 'VALIDAR%' OR accion IN ('DEVOLVER','APELAR','OTORGAR','DESISTIR'))");
+  if (qy.grupo === 'excepciones')
+    where.push("(accion LIKE 'CONDONAR%' OR accion LIKE 'ANULAR%' OR accion LIKE 'REVERSAR%' OR accion LIKE 'CASTIGAR%' OR accion LIKE 'RESTAURAR%' OR accion LIKE 'DESBLOQUEAR%' OR accion LIKE 'FORZAR%' OR accion = 'APELAR' OR detalle LIKE '%escalad%' OR detalle LIKE '%excepci%' OR detalle LIKE '%comité%' OR detalle LIKE '%comite%')");
   if (qy.q) {
     where.push('(detalle LIKE ? OR rut LIKE ? OR usuario LIKE ? OR entidad_id LIKE ?)');
     const like = '%' + qy.q + '%'; vals.push(like, like, like, like);
@@ -48,6 +53,7 @@ function whereLogins(qy) {
     if (/^\d+$/.test(qy.usuario)) { where.push('id_usuario = ?'); vals.push(parseInt(qy.usuario)); }
     else { where.push('nombre LIKE ?'); vals.push('%' + qy.usuario + '%'); }
   }
+  if (qy.q) { where.push('(nombre LIKE ? OR perfil LIKE ?)'); const like = '%' + qy.q + '%'; vals.push(like, like); }
   return { whereStr: where.length ? 'WHERE ' + where.join(' AND ') : '', vals };
 }
 
