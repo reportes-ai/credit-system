@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.1 -->
+<!-- v3.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -60,6 +60,7 @@
     <li><b>Mi Día:</b> tu panel personal — pendientes reales según tu rol, colocaciones del mes y tu calendario.</li>
     <li><b>Ayuda contextual:</b> el botón "?" flotante explica la página donde estás (si tiene ayuda cargada).</li>
     <li><b>Cambiar contraseña:</b> clic en tu nombre (arriba a la derecha) → Cambiar contraseña.</li>
+    <li><b>Apps móviles (PWA):</b> el Suite y sus apps (Terreno para ejecutivos en la calle, WhatsApp) se instalan en el teléfono <b>sin App Store ni Google Play</b> y se actualizan solas. Todo está en <b>Soporte → Aplicaciones Móviles</b>: qué es cada app, QR para escanear y la guía de instalación paso a paso (iPhone: Safari → Compartir → Añadir a pantalla de inicio · Android: Chrome → Instalar aplicación).</li>
   </ul>
   <figure class="shot"><img src="img/home.png" alt="Home del Suite" loading="lazy"><figcaption>El Home: solo los módulos que tu perfil puede usar, con indicadores UF/TMC y la campana de alertas arriba.</figcaption></figure>
   <figure class="shot"><img src="img/mi-dia.png" alt="Panel Mi Día" loading="lazy"><figcaption>Mi Día: tus pendientes reales según tu rol, de un vistazo.</figcaption></figure>
@@ -114,6 +115,9 @@
     <li><b>Orden de pago de cuotas (ODP):</b> si el pago requiere aprobación, se emite ODP desde la caja o la ficha; Tesorería la aprueba y el pago se registra con correo de respaldo automático.</li>
     <li><b>Prepago:</b> desde la caja, botón Prepago — usa el mismo motor del certificado (cuotas + comisión + interés corriente) y permite condonar según atribuciones. El crédito queda PREPAGADO.</li>
     <li><b>Órdenes de pago a proveedores:</b> módulo Órdenes de Pago — emisión con correlativo único OP-, historial y base de proveedores.</li>
+    <li><b>Conciliación Bancaria</b> (card en Tesorería): carga la <b>cartola Excel del banco</b> (detecta solas las columnas Fecha/Cargo/Abono, no duplica al recargar) y el sistema <b>sugiere el match</b> de cada movimiento: abonos contra pagos de cuotas (TRX de caja o calendario) y cargos contra órdenes de pago pagadas, por monto exacto y fecha cercana. Un clic concilia; lo que no calza se concilia manual con glosa obligatoria. Cuando se contrate Fintoc, los movimientos llegarán solos a la misma pantalla.</li>
+    <li><b>Provisiones + Castigos:</b> el cuadro contable del mes muestra saldos, constitución y castigos. El cierre de provisiones ahora es <b>automático</b>: si nadie lo guarda a mano, el sistema lo hace solo a comienzos del mes siguiente (día configurable en Parámetros Cobranza), genera el asiento (constitución o <b>liberación</b> si la mora mejoró) y deja el <b>detalle por crédito</b> auditable (botón "Detalle por crédito": op, días de mora, tramo, % y provisión).</li>
+    <li><b>Cierre de Mes</b> (card en Tesorería): checklist obligatorio con <b>responsable por punto</b> (provisiones, castigos, conciliación, transitorias, pagos pendientes, comisiones, cartolas — editable). Varios puntos se chequean solos (semáforo automático); cada responsable recibe un <b>correo diario</b> con sus puntos vencidos hasta que dé el OK. Con todos los obligatorios en verde, quien tiene la atribución presiona <b>CERRAR MES</b>: se activa el candado contable, se congela el acta (quién dio cada OK y cuándo) y se envía por correo a los destinatarios configurados.</li>
   </ul>
   <figure class="shot"><img src="img/caja.png" alt="Caja de Tesorería" loading="lazy"><figcaption>Resumen de Cajas: cada cajero ve su caja, con pagos, reversiones y los botones Pagar órdenes / Pagar cuotas.</figcaption></figure>
 
@@ -265,7 +269,8 @@
     <li><b>Comisiones:</b> Comisiones → Revisión — el cálculo mensual por ejecutivo sale solo (piso, incentivo, ajustes). Los supervisores ven a sus asignados.</li>
     <li><b>Metas y bonos en línea:</b> revisa tu avance de cumplimiento del mes y qué te falta para la meta (colocaciones, mix de financieras, calidad) — así sabes dónde empujar para maximizar tu comisión antes del cierre.</li>
     <li><b>Simulador de Rentabilidad (negociación avanzada):</b> antes de negociar una comisión especial con un dealer, simula ingresos, comisión y cuota por financiera en tiempo real, y consulta el cuadro de <b>Financieras Preferentes</b> para saber con cuál conviene cursar. En Cartas, el botón Rentabilidad (permiso especial) compara AutoFin vs Unidad para esa operación.</li>
-    <li><b>Visitas a dealers:</b> agenda tu visita (cupos diarios configurados), registra la gestión Positivo/Negativo y el seguimiento. El mapa de dealers ayuda a planificar la ruta.</li>
+    <li><b>Visitas a dealers:</b> agenda tu visita (cupos diarios configurados), registra la gestión Positivo/Negativo y el seguimiento. El mapa de dealers ayuda a planificar la ruta. La <b>asignación masiva ordena cada día por cercanía</b> (ruta óptima, no orden alfabético) y la Ficha diaria se imprime con mapa y ruta numerada.</li>
+    <li><b>App AutoFácil Terreno (teléfono):</b> app instalable para el ejecutivo en la calle — su ruta del día con mapa y paradas numeradas, botón <b>Ir</b> (navegación Google Maps), <b>Llamar</b>, <b>Llegué</b> (check-in GPS: queda la hora y a cuántos metros del dealer) y <b>Registrar</b> (👍/👎, comentarios, seguimiento y hasta 6 fotos). Si se corta la señal muestra lo último cargado. Se instala desde <b>Soporte → Aplicaciones Móviles</b> (QR + guía para iPhone y Android).</li>
     <li><b>Informe diario de ventas:</b> llega solo al correo (L-S 8:30). El ranking y la carrera de colocaciones aparecen al entrar al Suite.</li>
   </ul>
 

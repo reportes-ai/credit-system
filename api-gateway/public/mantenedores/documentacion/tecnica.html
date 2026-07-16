@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 -->
+<!-- v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -58,6 +58,10 @@
     <tr><td>auditoria_movimientos</td><td>Bitácora central (shared/audit.js): acción, módulo, entidad, detalle, usuario, IP.</td></tr>
     <tr><td>documentos_verificables</td><td>Núcleo de certificados + firma electrónica (hash SHA-256, verificación pública /verificar QR).</td></tr>
     <tr><td>uf / utm / tasas</td><td>Indicadores; UF se carga completa en memoria (getUF(fecha)).</td></tr>
+    <tr><td>banco_conexiones / banco_movimientos / banco_cartola_cargas</td><td>Cartola bancaria: cuentas (Fintoc con link_token, o manuales con link_token='MANUAL') y movimientos (+abono/−cargo, idempotencia fintoc_id; carga manual = 'MAN-'+sha1). Conciliación: cols conciliado/match_tipo (TRX|CUOTA|ODP|MANUAL)/match_ref — solo MARCA, nunca toca pagos ni ODP. API /api/conciliacion; una referencia no se concilia dos veces (409).</td></tr>
+    <tr><td>provisiones_detalle / contab_saldos_mensuales</td><td>Provisiones: snapshot por mes de saldos PROVISIONES/CASTIGOS (cierre manual o AUTOMÁTICO — tick en castigos.controller, día paramétrico cobranza_config.provision_auto_dia) y detalle auditable crédito a crédito (días mora, tramo, %, provisión). Asientos: PROVISION_CIERRE (constitución) / PROVISION_LIBERACION (reverso si la mora mejoró), ref PROV-mes idempotente.</td></tr>
+    <tr><td>cierre_checklist_items / cierre_mes_checks / cierre_mes_actas / cierre_mes_config</td><td>Cierre de Mes (Tesorería): puntos paramétricos (responsable USUARIO/PERFIL, día hábil límite vía shared/feriados, check_auto PROVISIONES/CONCILIACION/TRANSITORIAS/ODP_PENDIENTES), OKs por mes, acta congelada (JSON) al cerrar + candado ctb_meses_cerrados + correo del acta. Recordatorio diario a responsables con puntos vencidos. API /api/cierre-mes; permisos cierre_mes / cierre_mes_cerrar / cierre_mes_config.</td></tr>
+    <tr><td>visitas_dealers / visitas_fotos</td><td>Visitas a dealers: agenda (asignación masiva ordena cada día por cercanía — tour nearest-neighbor con lat/lng del dealer), gestión 👍/👎, check-in GPS de la PWA Terreno (checkin_at/lat/lng/dist_m con distancia haversine real al dealer) y fotos de visita (MEDIUMBLOB, máx 6, comprimidas en el teléfono). API móvil /api/terreno (solo visitas propias).</td></tr>
     <tr><td>ctb_cuentas / ctb_comprobantes / ctb_movimientos</td><td>Contabilidad (reemplazo AVSOFT): plan de cuentas real (176 ctas, 7 dígitos), comprobantes I/E/T con partida doble y correlativo por tipo+año, líneas Debe/Haber con num_op/rut. Libro 2025 de AVSOFT importado (origen='AVSOFT'). Anular = estado ANULADO, nunca DELETE.</td></tr>
     <tr><td>ctb_reglas / ctb_reglas_lineas / ctb_eventos_log</td><td>Centralización automática: reglas paramétricas evento→cuentas (mantenedor Reglas de Centralización) y log de cada ejecución del motor (incluye estado MES_CERRADO cuando el candado bloquea un evento).</td></tr>
     <tr><td>ctb_plantillas / ctb_guardian_reglas / ctb_meses_cerrados / ctb_adjuntos</td><td>Digitación pro: plantillas de asientos recurrentes (cuentas+lado, montos al aplicar); reglas del Guardián Contable (COMBINACION por prefijos y SISTEMA con lógica propia, severidad BLOQUEA/ADVIERTE, evaluadas en crearComprobante); candado de mes reportado (bloquea digitar/anular/motor, HTTP 423); respaldos adjuntos por comprobante (MEDIUMBLOB, máx 5MB). También ctb_cierre_comentarios y ctb_cierres_bitacora (comentarios e informes IA del cierre mensual).</td></tr>
@@ -114,6 +118,7 @@ DEALERNET_USR / DEALERNET_PWD                         → informes comerciales</
     <tr><td>afbs.autofacilchile.cl</td><td>Business Suite (login interno).</td></tr>
     <tr><td>clientes.autofacilchile.cl</td><td>La raíz sirve el Portal del Cliente (enrutamiento por hostname en api-gateway/src/index.js).</td></tr>
     <tr><td>dealers.autofacilchile.cl</td><td>La raíz sirve el Portal del Dealer.</td></tr>
+    <tr><td>/terreno/ y /whatsapp/</td><td>PWA instalables con manifest y scope propios (Terreno además con service worker cache-first del shell e íconos propios). Catálogo e instrucciones de instalación en Soporte → Aplicaciones Móviles.</td></tr>
     <tr><td>/api/whatsapp/webhook</td><td>Único endpoint público sin JWT (verify token de Meta).</td></tr>
     <tr><td>/verificar/:codigo</td><td>Verificación pública de documentos (QR).</td></tr>
   </table>
