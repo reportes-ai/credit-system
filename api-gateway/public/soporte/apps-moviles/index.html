@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aplicaciones Móviles — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; font-size:.85rem; color:#1e3a5f; margin-bottom:22px; }
+
+    .apps { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:18px; }
+    .app-card { background:#fff; border-radius:16px; box-shadow:0 1px 5px rgba(0,0,0,.08); padding:22px; display:flex; flex-direction:column; }
+    .app-head { display:flex; gap:14px; align-items:center; margin-bottom:10px; }
+    .app-ico { width:52px; height:52px; flex:0 0 auto; border-radius:14px; background:linear-gradient(135deg,var(--navy-dark),var(--accent)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+    .app-head h5 { margin:0; font-weight:800; font-size:1.02rem; }
+    .app-head .quien { font-size:.76rem; color:#6b7280; }
+    .app-desc { font-size:.85rem; color:#374151; flex:1; }
+    .app-desc ul { margin:6px 0 0; padding-left:18px; }
+    .app-qr { display:flex; gap:16px; align-items:center; margin-top:14px; background:#f8fafc; border-radius:12px; padding:12px 14px; }
+    .app-qr .qr { background:#fff; padding:6px; border-radius:8px; border:1px solid #e5e7eb; line-height:0; }
+    .app-qr .url { font-family:monospace; font-size:.74rem; color:var(--navy); word-break:break-all; }
+    .app-qr .hint { font-size:.72rem; color:#9ca3af; margin-top:4px; }
+    .app-acts { display:flex; gap:8px; margin-top:12px; }
+    .btn-mini { border:none; border-radius:8px; padding:8px 14px; font-size:.8rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .b-copy { background:#e0e7ff; color:#3730a3; } .b-copy:hover { background:#c7d2fe; }
+    .b-open { background:var(--navy); color:#fff; } .b-open:hover { background:var(--navy-light); }
+
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-top:26px; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; display:flex; align-items:center; gap:8px; }
+    .panel-body { padding:20px 22px; }
+    .os-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:18px; }
+    .os { border:1px solid #e5e7eb; border-radius:12px; padding:18px; }
+    .os h6 { font-weight:800; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+    .paso { display:flex; gap:12px; margin-bottom:12px; font-size:.86rem; color:#374151; }
+    .paso .n { width:26px; height:26px; flex:0 0 auto; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.78rem; }
+    .paso b { color:#111827; }
+    .os .nota { background:#fef3c7; color:#92400e; border-radius:8px; padding:8px 12px; font-size:.76rem; margin-top:6px; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    @media(max-width:640px){ .main-content{padding:16px;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/soporte/">Soporte</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-phone me-1"></i>Aplicaciones Móviles</span>
+    </div>
+  </div>
+  <button class="btn-logout" onclick="localStorage.clear();location.href='/login'"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-phone"></i>
+    <div>
+      <h2>Aplicaciones Móviles</h2>
+      <p>Las apps del ecosistema AutoFácil: qué son y cómo instalarlas en tu teléfono</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <i class="bi bi-lightbulb me-1"></i>
+    Nuestras apps son <b>PWA (Progressive Web App)</b>: se instalan directo desde el navegador,
+    <b>sin App Store ni Google Play</b>, y se actualizan solas con cada mejora del sistema.
+    Escanea el QR con la cámara del teléfono y sigue los pasos de instalación de más abajo.
+  </div>
+
+  <div class="apps" id="appsWrap"></div>
+
+  <!-- Instrucciones de instalación -->
+  <div class="panel">
+    <div class="panel-header"><h5><i class="bi bi-download"></i> Cómo instalar una app en tu teléfono</h5></div>
+    <div class="panel-body">
+      <div class="os-grid">
+        <div class="os">
+          <h6><i class="bi bi-apple"></i> iPhone / iPad (Safari)</h6>
+          <div class="paso"><div class="n">1</div><div>Escanea el QR de la app (o escribe la dirección) y ábrela en <b>Safari</b> — en iPhone la instalación solo funciona desde Safari.</div></div>
+          <div class="paso"><div class="n">2</div><div>Toca el botón <b>Compartir</b> <i class="bi bi-box-arrow-up"></i> (el cuadrado con flecha, abajo al centro).</div></div>
+          <div class="paso"><div class="n">3</div><div>Desliza y elige <b>"Añadir a pantalla de inicio"</b>.</div></div>
+          <div class="paso"><div class="n">4</div><div>Toca <b>Añadir</b>. El ícono queda en tu pantalla como una app más.</div></div>
+          <div class="nota"><i class="bi bi-exclamation-triangle me-1"></i>Si abriste el link desde WhatsApp o Gmail, toca "abrir en Safari" primero: desde el navegador integrado no se puede instalar.</div>
+        </div>
+        <div class="os">
+          <h6><i class="bi bi-android2"></i> Android (Chrome)</h6>
+          <div class="paso"><div class="n">1</div><div>Escanea el QR de la app (o escribe la dirección) y ábrela en <b>Chrome</b>.</div></div>
+          <div class="paso"><div class="n">2</div><div>Toca el menú <b>⋮</b> (arriba a la derecha).</div></div>
+          <div class="paso"><div class="n">3</div><div>Elige <b>"Instalar aplicación"</b> (o "Añadir a pantalla de inicio", según la versión).</div></div>
+          <div class="paso"><div class="n">4</div><div>Confirma con <b>Instalar</b>. El ícono queda en tu pantalla y en el cajón de apps.</div></div>
+          <div class="nota"><i class="bi bi-info-circle me-1"></i>En algunos teléfonos Chrome ofrece la instalación solo con un aviso "Agregar Terreno a la pantalla principal" — tócalo y listo.</div>
+        </div>
+      </div>
+      <div style="font-size:.82rem;color:#6b7280;margin-top:16px;">
+        <b>Después de instalar:</b> la app abre a pantalla completa con su propio ícono, pide tu <b>mismo usuario y clave del sistema</b>,
+        y se actualiza automáticamente — nunca hay que "bajar una versión nueva". Para desinstalarla, mantén presionado el ícono → Eliminar app.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta esta página</h6>
+    <ul style="margin:0;">
+      <li><b>Solo informativa</b> — no modifica datos; centraliza los accesos móviles del ecosistema.</li>
+      <li><b>Apps listadas</b> → cada una tiene su módulo: <a href="/dealers-visitas/">Ruta AutoFácil (visitas)</a>, <a href="/whatsapp/">WhatsApp</a>, y el propio Business Suite.</li>
+      <li><b>Al crear una PWA nueva</b> → agregarla a la lista <code>APPS</code> de esta página (nombre, ruta, descripción) para que el equipo sepa instalarla.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/app-version.js"></script>
+<script src="/js/qrcode-generator.js"></script>
+<script>
+if (!localStorage.getItem('token')) location.href = '/login';
+
+/* Catálogo de apps móviles del ecosistema. Al crear una PWA nueva, agregarla aquí. */
+const APPS = [
+  {
+    icono: 'bi-geo-alt-fill',
+    nombre: 'AutoFácil Terreno',
+    quien: 'Ejecutivos comerciales en la calle',
+    ruta: '/terreno/',
+    desc: `La app de las visitas a dealers. Muestra la <b>ruta del día en orden de cercanía</b> con mapa
+           y permite trabajar todo desde el teléfono:
+           <ul><li>Check-in GPS al llegar al dealer (queda la hora y distancia)</li>
+           <li>Navegar al dealer con Google Maps y llamar con un toque</li>
+           <li>Registrar el resultado 👍/👎, comentarios, seguimiento y fotos</li>
+           <li>Si se corta la señal, muestra lo último cargado</li></ul>`,
+  },
+  {
+    icono: 'bi-whatsapp',
+    nombre: 'AutoFácil WhatsApp',
+    quien: 'Equipo comercial y cobranza',
+    ruta: '/whatsapp/',
+    desc: `La bandeja del bot <b>Facilito</b> (+56 9 3246 9071) como app: conversaciones con clientes y
+           dealers, respuestas del asistente IA y campañas de WhatsApp, desde el teléfono o el PC.`,
+  },
+  {
+    icono: 'bi-briefcase-fill',
+    nombre: 'Business Suite (completo)',
+    quien: 'Todos los usuarios del sistema',
+    ruta: '/login.html',
+    desc: `El sistema completo también se puede instalar como app: dashboard, créditos, cartas, cobranza,
+           tesorería y todos tus módulos según tu perfil. Ideal para tener el suite a un toque en el
+           teléfono o como ícono en el escritorio del PC.`,
+  },
+];
+
+const wrap = document.getElementById('appsWrap');
+APPS.forEach(a => {
+  const url = location.origin + a.ruta;
+  // QR local (sin servicios externos)
+  const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+  const img = qr.createImgTag(3, 6);
+  const el = document.createElement('div');
+  el.className = 'app-card';
+  el.innerHTML = `
+    <div class="app-head">
+      <div class="app-ico"><i class="bi ${a.icono}"></i></div>
+      <div><h5>${a.nombre}</h5><div class="quien"><i class="bi bi-people me-1"></i>${a.quien}</div></div>
+    </div>
+    <div class="app-desc">${a.desc}</div>
+    <div class="app-qr">
+      <div class="qr">${img}</div>
+      <div><div class="url">${url}</div><div class="hint">Escanea con la cámara del teléfono</div></div>
+    </div>
+    <div class="app-acts">
+      <button class="btn-mini b-copy" onclick="copiar('${url}', this)"><i class="bi bi-clipboard"></i> Copiar link</button>
+      <a class="btn-mini b-open" href="${a.ruta}" target="_blank" style="text-decoration:none"><i class="bi bi-box-arrow-up-right"></i> Abrir</a>
+    </div>`;
+  wrap.appendChild(el);
+});
+function copiar(url, btn){
+  navigator.clipboard.writeText(url).then(() => {
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Copiado';
+    setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i> Copiar link', 1800);
+  });
+}
+</script>
+</body>
+</html>
