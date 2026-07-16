@@ -44,7 +44,8 @@ require('../../../../shared/migrate').enFila('rrhh-vac-cuenta', async () => {
   console.log('[rrhh-vac-cuenta] listo');
 });
 
-/* ── Alegato: años previos declarados SIN certificado AFP en la carpeta ─────── */
+/* ── Alegato SEMANAL: años previos declarados SIN certificado AFP ───────────── */
+const _w = d => { const t = new Date(d); t.setHours(0,0,0,0); t.setDate(t.getDate()+3-((t.getDay()+6)%7)); const w1 = new Date(t.getFullYear(),0,4); return t.getFullYear()+'-S'+String(1+Math.round(((t-w1)/86400000-3+((w1.getDay()+6)%7))/7)).padStart(2,'0'); };
 async function alegarSinCertificadoAFP() {
   try {
     const [pend] = await pool.query(
@@ -65,7 +66,7 @@ async function alegarSinCertificadoAFP() {
       titulo: `${pend.length} colaborador(es) con años previos SIN certificado AFP`,
       mensaje: `El feriado progresivo declara años trabajados que deben respaldarse con el certificado de cotizaciones de la AFP: ${lista}. Súbelo a la carpeta digital (tipo "CERTIFICADO AFP").`,
       href: '/recursos-humanos/colaboradores/',
-      clave: 'afp_cert_pendiente_' + new Date().toISOString().slice(0, 10),
+      clave: 'afp_cert_pendiente_' + _w(new Date()),
     });
   } catch (e) { console.error('[alegato cert AFP]', e.message); }
 }

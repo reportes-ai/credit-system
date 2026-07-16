@@ -119,7 +119,8 @@ require('../../../../shared/migrate').enFila('rrhh-contratos', async () => {
   console.log('[rrhh-contratos] listo');
 });
 
-/* ── El ALEGATO: cargos sin descripción → campana diaria a RRHH y al creador ── */
+/* ── El ALEGATO: cargos sin descripción → campana SEMANAL a RRHH y al creador ── */
+const _w = d => { const t = new Date(d); t.setHours(0,0,0,0); t.setDate(t.getDate()+3-((t.getDay()+6)%7)); const w1 = new Date(t.getFullYear(),0,4); return t.getFullYear()+'-S'+String(1+Math.round(((t-w1)/86400000-3+((w1.getDay()+6)%7))/7)).padStart(2,'0'); };
 async function alegarCargosSinDescripcion() {
   try {
     const [cargos] = await pool.query(
@@ -139,7 +140,7 @@ async function alegarCargosSinDescripcion() {
       titulo: `${cargos.length} cargo(s) sin descripción de cargo`,
       mensaje: `Falta la descripción de: ${nombres}. Sin descripción no se pueden generar cartas oferta ni contratos prolijos. Cárgala en Contratos → Cargos.`,
       href: '/recursos-humanos/contratos/',
-      clave: 'cargos_sin_descripcion_' + new Date().toISOString().slice(0, 10),   // 1 vez al día
+      clave: 'cargos_sin_descripcion_' + _w(new Date()),   // 1 vez por semana
     });
   } catch (e) { console.error('[alegato cargos]', e.message); }
 }
