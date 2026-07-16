@@ -131,13 +131,29 @@ require('../../../../shared/migrate').enFila('rrhh-no-mostrar', async () => {
   } catch (e) { console.error('[rrhh-no-mostrar migration]', e.message); }
 });
 
+/* ── Migración: datos Previred (tramo asignación familiar + cargas no-hijos) ──
+   Cargas simples = hijos marcados "es carga" (rh_hijos, fuente única) + cargas_otras
+   (cónyuge/ascendientes). Maternales e inválidas se declaran aparte. */
+require('../../../../shared/migrate').enFila('rrhh-ficha-previred', async () => {
+  try {
+    for (const col of [
+      "tramo_asignacion CHAR(1) NULL",
+      "cargas_otras TINYINT NOT NULL DEFAULT 0",
+      "cargas_maternales TINYINT NOT NULL DEFAULT 0",
+      "cargas_invalidas TINYINT NOT NULL DEFAULT 0",
+    ]) await pool.query(`ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    console.log('[rrhh-ficha-previred] listo');
+  } catch (e) { console.error('[rrhh-ficha-previred migration]', e.message); }
+});
+
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',
   'emergencia_nombre', 'emergencia_fono', 'emergencia2_nombre', 'emergencia2_fono',
   'estado_civil', 'nacionalidad',
   'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
 const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
-  'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones'];
+  'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
+  'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
 const CAMPOS_USUARIO = ['cargo', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
 

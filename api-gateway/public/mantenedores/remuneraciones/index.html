@@ -75,7 +75,7 @@
 
   <div class="panel">
     <h5><i class="bi bi-bank me-1"></i>Tasas AFP (cotización 10% + comisión, % del imponible)</h5>
-    <table><thead><tr><th>AFP</th><th>Tasa trabajador %</th></tr></thead><tbody id="tbAfp"></tbody></table>
+    <table><thead><tr><th>AFP</th><th>Tasa trabajador %</th><th>Código Previred <span style="font-weight:400;color:#94a3b8">(Tabla N°10)</span></th></tr></thead><tbody id="tbAfp"></tbody></table>
   </div>
 
   <div class="panel">
@@ -90,6 +90,7 @@
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul style="margin:6px 0 0;padding-left:18px">
       <li><b>Tasas AFP</b> → descuento AFP de cada liquidación en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a> (según la AFP de la <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>).</li>
+      <li><b>Código Previred por AFP</b> → campo 26 del <b>Archivo Previred</b> que se descarga en <a href="/recursos-humanos/remuneraciones/liquidaciones/">Liquidaciones de Sueldo</a> para pagar las cotizaciones; un código errado hace que Previred rechace la línea.</li>
       <li><b>IMM y tope gratificación</b> → tope de la gratificación legal (25%, máx 4,75 IMM ÷ 12) en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</li>
       <li><b>Topes imponibles UF y AFC</b> → base de cotización AFP/Salud/AFC de las liquidaciones (usa la UF del mes del mantenedor <a href="/mantenedores/uf/">UF</a>).</li>
       <li><b>Salud legal %</b> → descuento de salud (Fonasa/Isapre 7% base) en las liquidaciones.</li>
@@ -118,7 +119,8 @@ async function cargar(){
   document.getElementById('refInd').textContent = `(referencia hoy: UF ${Number(d.uf).toLocaleString('es-CL',{maximumFractionDigits:2})} · UTM ${Number(d.utm).toLocaleString('es-CL')})`;
   document.getElementById('tbAfp').innerHTML = (d.afps||[]).map(a=>`<tr>
     <td style="font-weight:600">${a.afp}</td>
-    <td><input type="number" step="0.01" data-afp="${a.afp}" value="${a.tasa_pct}"></td></tr>`).join('');
+    <td><input type="number" step="0.01" data-afp="${a.afp}" value="${a.tasa_pct}"></td>
+    <td><input maxlength="2" data-afpcod="${a.afp}" value="${a.codigo_previred||''}" placeholder="ej. 34" style="width:80px"></td></tr>`).join('');
   document.getElementById('tbTramos').innerHTML = (d.tramos||[]).map((t,i)=>`<tr>
     <td><input type="number" step="0.01" class="tr-d" value="${t.desde_utm}"></td>
     <td><input type="number" step="0.01" class="tr-h" value="${t.hasta_utm==null?'':t.hasta_utm}"></td>
@@ -128,7 +130,8 @@ async function cargar(){
 async function guardar(){
   const body = {};
   CFG.forEach(k => body[k] = document.getElementById(k).value);
-  body.afps = [...document.querySelectorAll('[data-afp]')].map(el=>({ afp: el.dataset.afp, tasa_pct: el.value }));
+  body.afps = [...document.querySelectorAll('[data-afp]')].map(el=>({ afp: el.dataset.afp, tasa_pct: el.value,
+    codigo_previred: (document.querySelector(`[data-afpcod="${el.dataset.afp}"]`)||{}).value||'' }));
   const d=[...document.querySelectorAll('.tr-d')], h=[...document.querySelectorAll('.tr-h')], f=[...document.querySelectorAll('.tr-f')], r=[...document.querySelectorAll('.tr-r')];
   body.tramos = d.map((el,i)=>({ desde_utm: el.value, hasta_utm: h[i].value, factor: f[i].value, rebaja_utm: r[i].value }));
   const j = await (await fetch('/api/rrhh/remuneraciones/indicadores', { method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();

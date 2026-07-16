@@ -357,7 +357,7 @@ async function indicadores(mes) {
   const uf = (await getUF(finMes)) || (await getUF(new Date().toISOString().slice(0, 10))) || 0;
   const [[utmRow]] = await pool.query('SELECT valor FROM utm WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [finMes + ' 23:59:59']);
   const utm = parseFloat(utmRow?.valor) || 0;
-  const [afps] = await pool.query('SELECT afp, tasa_pct FROM rh_afp_tasas ORDER BY afp');
+  const [afps] = await pool.query('SELECT afp, tasa_pct, codigo_previred FROM rh_afp_tasas ORDER BY afp');
   const [tramos] = await pool.query('SELECT desde_utm, hasta_utm, factor, rebaja_utm FROM rh_impuesto_tramos ORDER BY desde_utm');
   return { ...cfg, uf, utm, afps, tramos };
 }
@@ -850,7 +850,8 @@ const putIndicadores = async (req, res) => {
     if (Array.isArray(b.afps)) for (const a of b.afps) {
       const nombre = String(a.afp || '').toUpperCase().trim(); const tasa = parseFloat(a.tasa_pct);
       if (!nombre || isNaN(tasa) || tasa <= 0 || tasa > 20) continue;
-      await pool.query('INSERT INTO rh_afp_tasas (afp, tasa_pct) VALUES (?,?) ON DUPLICATE KEY UPDATE tasa_pct=VALUES(tasa_pct)', [nombre, tasa]);
+      const cod = /^\d{2}$/.test(String(a.codigo_previred || '')) ? String(a.codigo_previred) : null;
+      await pool.query('INSERT INTO rh_afp_tasas (afp, tasa_pct, codigo_previred) VALUES (?,?,?) ON DUPLICATE KEY UPDATE tasa_pct=VALUES(tasa_pct), codigo_previred=COALESCE(VALUES(codigo_previred), codigo_previred)', [nombre, tasa, cod]);
     }
     // Tramos de impuesto: reemplazo completo si vienen (validados)
     if (Array.isArray(b.tramos) && b.tramos.length >= 2) {
@@ -999,6 +1000,10 @@ require('../../../../shared/migrate').enFila('previred-config', async () => {
     id TINYINT PRIMARY KEY, ccaf VARCHAR(2) DEFAULT '00', mutual VARCHAR(2) DEFAULT '02', sucursal_mutual VARCHAR(3) DEFAULT ''
   )`);
   await pool.query(`INSERT IGNORE INTO rh_previred_config (id, ccaf, mutual) VALUES (1, '00', '02')`);
+  // Código Previred por AFP (Tabla N°10) — editable en el mantenedor Indicadores
+  await pool.query(`ALTER TABLE rh_afp_tasas ADD COLUMN IF NOT EXISTS codigo_previred VARCHAR(2) NULL`).catch(() => {});
+  for (const [afp, cod] of Object.entries(PREV_AFP))
+    await pool.query(`UPDATE rh_afp_tasas SET codigo_previred=? WHERE afp=? AND (codigo_previred IS NULL OR codigo_previred='')`, [cod, afp]);
 });
 
 async function getPrevired(req, res) {
@@ -1013,6 +1018,15 @@ async function getPrevired(req, res) {
         WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
     if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
     const [[cfg]] = await pool.query('SELECT * FROM rh_previred_config WHERE id=1');
+    // Códigos AFP desde el mantenedor (rh_afp_tasas), fallback a la tabla oficial
+    const [afpsCod] = await pool.query('SELECT afp, codigo_previred FROM rh_afp_tasas');
+    const afpCodDe = n => { const k = String(n || '').toUpperCase().trim();
+      return (afpsCod.find(a => a.afp === k) || {}).codigo_previred || PREV_AFP[k]; };
+    // Cargas familiares: tramo y cargas de la ficha + hijos marcados como carga (fuente única)
+    const [cargasHijos] = await pool.query('SELECT id_usuario, COUNT(*) n FROM rh_hijos WHERE es_carga=1 GROUP BY id_usuario');
+    const hijosDe = id => (cargasHijos.find(h => h.id_usuario === id) || {}).n || 0;
+    const [fichasCargas] = await pool.query('SELECT id_usuario, tramo_asignacion, cargas_otras, cargas_maternales, cargas_invalidas FROM rh_fichas');
+    const cargasDe = id => fichasCargas.find(f => f.id_usuario === id) || {};
     // Licencias del mes (movimiento de personal 3 = Subsidios)
     const [lics] = await pool.query(
       `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_ausencias
@@ -1031,7 +1045,7 @@ async function getPrevired(req, res) {
       const rutFull = String(l.rut || l.urut || '').replace(/\./g, '').toUpperCase();
       const [rutNum, dv] = rutFull.split('-');
       const nombreCompleto = `${l.unombre || ''}`.trim();
-      const afpCod = PREV_AFP[String(d.afp || '').toUpperCase().trim()];
+      const afpCod = afpCodDe(d.afp);
       const saludCod = PREV_SALUD[String(d.salud || '').toUpperCase().trim()];
       const esFonasa = saludCod === '07';
       const esIsapre = saludCod && !esFonasa;
@@ -1068,7 +1082,13 @@ async function getPrevired(req, res) {
       c[11] = 'AFP'; c[12] = '0'; c[13] = String(d.dias ?? 30);
       c[14] = '00'; c[15] = mov;
       c[16] = lic ? fch(lic.fecha_desde) : ''; c[17] = lic ? fch(lic.fecha_hasta) : '';
-      c[18] = 'D'; c[19] = '0'; c[20] = '0'; c[21] = '0'; c[22] = '0'; c[23] = '0'; c[24] = '0'; c[25] = 'N';
+      const cg = cargasDe(l.id_usuario);
+      const simples = hijosDe(l.id_usuario) + (Number(cg.cargas_otras) || 0);
+      c[18] = /^[ABC]$/.test(cg.tramo_asignacion || '') ? cg.tramo_asignacion : 'D';
+      c[19] = String(simples); c[20] = String(Number(cg.cargas_maternales) || 0); c[21] = String(Number(cg.cargas_invalidas) || 0);
+      c[22] = '0'; c[23] = '0'; c[24] = '0'; c[25] = 'N';
+      if (c[18] !== 'D' && (simples + Number(cg.cargas_maternales || 0) + Number(cg.cargas_invalidas || 0)) > 0)
+        avisos.push(`${l.nombre}: tiene cargas con tramo ${c[18]} — el monto de asignación familiar (campo 22) va en 0 porque el motor aún no la paga en la liquidación; complétalo en Previred si corresponde`);
       c[26] = afpCod || '00'; c[27] = N(baseCot); c[28] = N(d.desc_afp); c[29] = N(d.aporte_sis);
       for (let i = 30; i <= 39; i++) c[i] = '0'; c[35] = ''; c[36] = ''; c[37] = '';
       c[40] = '000'; c[41] = ''; c[42] = '0'; c[43] = '0'; c[44] = '0';

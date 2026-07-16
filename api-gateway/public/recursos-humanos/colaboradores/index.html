@@ -119,8 +119,10 @@ function render(){
   </tr>`).join('') : '<tr><td colspan="9" class="empty">Sin resultados.</td></tr>';
 }
 
-const inp = (id, lbl, val, type='text') => `<div class="fld"><label>${lbl}</label><input id="${id}" type="${type}" value="${esc(val==null?'':val)}"></div>`;
-const sel = (id, lbl, val, ops) => `<div class="fld"><label>${lbl}</label><select id="${id}"><option value=""></option>${ops.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select></div>`;
+// req=true marca el campo como OBLIGATORIO (lo exige el archivo Previred / LRE)
+const REQ = '<span style="color:#dc2626;font-weight:800" title="Obligatorio para Previred"> *</span>';
+const inp = (id, lbl, val, type='text', req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><input id="${id}" type="${type}" value="${esc(val==null?'':val)}" ${req&&(val==null||val==='')?'style="border-color:#fca5a5"':''}></div>`;
+const sel = (id, lbl, val, ops, req) => `<div class="fld"><label>${lbl}${req?REQ:''}</label><select id="${id}" ${req&&!val?'style="border-color:#fca5a5"':''}><option value=""></option>${ops.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select></div>`;
 
 async function abrir(id){
   const j = await (await fetch('/api/rrhh/ficha/'+id, { headers:H })).json();
@@ -132,18 +134,18 @@ async function abrir(id){
     <div class="sec">Datos laborales</div>
     <div class="grid3">
       ${inp('f_cargo','Cargo',u.cargo)}
-      ${inp('f_fecha_ingreso','Fecha de ingreso',iso(u.fecha_ingreso),'date')}
+      ${inp('f_fecha_ingreso','Fecha de ingreso',iso(u.fecha_ingreso),'date',1)}
       ${inp('f_centro_costo','Centro de costo',u.centro_costo)}
-      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'])}
-      ${inp('f_jornada','Jornada',f.jornada)}
+      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'],1)}
+      ${sel('f_jornada','Jornada',f.jornada,['COMPLETA','PARCIAL'],1)}
       ${inp('f_telefono','Teléfono corporativo',u.telefono)}
     </div>
     <div class="sec">Datos personales</div>
     <div class="grid3">
       ${inp('f_fecha_nacimiento','Fecha de nacimiento',iso(u.fecha_nacimiento),'date')}
-      ${sel('f_sexo','Sexo',u.sexo,['M','F'])}
+      ${sel('f_sexo','Sexo',u.sexo,['M','F'],1)}
       ${sel('f_estado_civil','Estado civil',f.estado_civil,['SOLTERO/A','CASADO/A','CONVIVIENTE CIVIL','DIVORCIADO/A','VIUDO/A'])}
-      ${inp('f_nacionalidad','Nacionalidad',f.nacionalidad)}
+      ${inp('f_nacionalidad','Nacionalidad',f.nacionalidad,'text',1)}
       ${inp('f_direccion','Dirección',f.direccion)}
       ${inp('f_comuna','Comuna',f.comuna)}
       ${inp('f_ciudad','Ciudad',f.ciudad)}
@@ -177,14 +179,23 @@ async function abrir(id){
     </div>
     <div class="sec">Previsión y pago (confidencial)</div>
     <div class="grid3">
-      ${sel('f_afp','AFP',f.afp,['CAPITAL','CUPRUM','HABITAT','MODELO','PLANVITAL','PROVIDA','UNO'])}
-      ${inp('f_salud','Salud (Fonasa / Isapre)',f.salud)}
+      ${sel('f_afp','AFP',f.afp,['CAPITAL','CUPRUM','HABITAT','MODELO','PLANVITAL','PROVIDA','UNO'],1)}
+      ${sel('f_salud','Salud',f.salud,['FONASA','BANMEDICA','COLMENA','CONSALUD','CRUZ BLANCA','ESENCIAL','NUEVA MASVIDA','VIDA TRES','ISALUD','FUNDACION','CRUZ DEL NORTE'],1)}
       ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
-      ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number')}
+      ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number',1)}
       ${inp('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago)}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
       ${inp('f_num_cuenta_pago','N° de cuenta',f.num_cuenta_pago)}
     </div>
+    <div class="sec">Cargas familiares (Previred)</div>
+    <div class="grid3">
+      ${sel('f_tramo_asignacion','Tramo asignación familiar',f.tramo_asignacion,['A','B','C','D'],1)}
+      <div class="fld"><label>Cargas simples — hijos</label><input disabled value="${(FICHA.hijos||[]).filter(h=>h.es_carga).length} (marcados como carga en Hijos)"></div>
+      ${inp('f_cargas_otras','Cargas simples — otras (cónyuge, ascendientes)',f.cargas_otras??0,'number')}
+      ${inp('f_cargas_maternales','Cargas maternales',f.cargas_maternales??0,'number')}
+      ${inp('f_cargas_invalidas','Cargas inválidas',f.cargas_invalidas??0,'number')}
+    </div>
+    <div style="font-size:.75rem;color:#64748b;margin:-4px 0 6px">Tramo D = sin derecho a asignación. Los campos con <span style="color:#dc2626;font-weight:800">*</span> son obligatorios para el archivo Previred y el LRE.</div>
     <div class="fld" style="margin-top:10px"><label>Observaciones</label><input id="f_observaciones" value="${esc(f.observaciones||'')}"></div>
     <div class="sec">Carpeta digital</div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
@@ -248,6 +259,7 @@ async function guardarFicha(){
     conyuge_direccion: document.getElementById('f_conyuge_misma_dir')?.checked ? '' : g('f_conyuge_direccion'),
     hijos: leerHijos(),
     afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'),
+    tramo_asignacion:g('f_tramo_asignacion'), cargas_otras:g('f_cargas_otras'), cargas_maternales:g('f_cargas_maternales'), cargas_invalidas:g('f_cargas_invalidas'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),
   };
