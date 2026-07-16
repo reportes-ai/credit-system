@@ -220,6 +220,23 @@ exports.getCuenta = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* GET /api/rrhh/vacaciones/saldos — saldos de TODO el equipo (RRHH) */
+exports.getSaldos = async (req, res) => {
+  try {
+    const [users] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
+              DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, COALESCE(f.anos_trabajados_previos,0) previos
+         FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
+        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
+    const filas = [];
+    for (const u of users) {
+      const s = await saldoCuenta(u.id_usuario);
+      filas.push({ ...u, ...s });
+    }
+    ok(res, { saldos: filas });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.ajuste = async (req, res) => {
   try {
     const { id_usuario, dias, glosa } = req.body || {};
