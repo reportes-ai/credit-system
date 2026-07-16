@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.0 — auxiliares de compras y honorarios (import AVSOFT): filtros, totales por mes, export Excel -->
+  <!-- v1.1 — auxiliares de compras y honorarios (import AVSOFT): filtros, totales por mes, export Excel -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,7 +54,9 @@
     <span class="flex-grow-1"></span>
     <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
       <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
+    <button class="btn btn-sm btn-outline-primary" id="btnRcv" onclick="rcvSync()"><i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)</button>
   </div>
+  <div id="rcvEstado" class="small text-muted mb-2" style="display:none"></div>
 
   <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis" style="display:none"></div>
 
@@ -349,6 +351,38 @@ async function eliminarDoc(tipo, id){
   if (j.data.id_comprobante) alert(`Documento eliminado. Recuerda anular su asiento (id ${j.data.id_comprobante}) en Comprobantes si corresponde.`);
   consultar();
 }
+
+/* ── RCV SII (SimpleAPI): sincronización manual + estado ── */
+async function rcvSync(){
+  const btn = document.getElementById('btnRcv');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Sincronizando con el SII…';
+  try {
+    const r = await fetch('/api/contabilidad/rcv/sincronizar', { method:'POST', headers:H, body:'{}' });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error);
+    const meses = Array.isArray(j.data?.meses) ? j.data.meses : [j.data];
+    const partes = meses.filter(Boolean).map(m => m.ok === false
+      ? `${m.mes || ''}: ERROR — ${m.motivo || 'sin detalle'}`
+      : `${m.mes || ''}: ${fmt(m.registros || 0)} documentos del SII (IVA $${fmt(m.iva_total || 0)})`);
+    alert('Sincronización RCV terminada.\n' + partes.join('\n'));
+    rcvEstadoCargar(); consultar();
+  } catch (e) { alert('RCV: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)';
+}
+async function rcvEstadoCargar(){
+  try {
+    const j = await (await fetch('/api/contabilidad/rcv/estado', { headers:H })).json();
+    if (!j.success) return;
+    const d = j.data, el = document.getElementById('rcvEstado');
+    el.style.display = 'block';
+    if (!d.configurado) { el.innerHTML = '<i class="bi bi-cloud-slash text-danger me-1"></i>RCV SII sin configurar (faltan env vars en Render).'; return; }
+    const ult = (d.logs || [])[0];
+    el.innerHTML = `<i class="bi bi-cloud-check text-success me-1"></i>RCV SII conectado · ${d.mes}: <b>${fmt(d.sii?.docs||0)}</b> docs del SII (IVA $${fmt(d.sii?.iva||0)})` +
+      (d.auxiliar ? ` vs auxiliar <b>${fmt(d.auxiliar.docs||0)}</b> docs` : '') +
+      (ult ? ` · última sync ${String(ult.created_at||'').slice(0,16).replace('T',' ')} ${ult.resultado==='ERROR'?'<span class="text-danger">ERROR: '+(ult.detalle||'')+'</span>':'OK'}` : ' · aún sin sincronizaciones');
+  } catch (_) {}
+}
+rcvEstadoCargar();
 </script>
 <script src="/js/app-version.js"></script>
 </body>
