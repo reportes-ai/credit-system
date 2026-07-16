@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de Procesos — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .doc { max-width:940px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:44px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  h3 { color:#0f172a; margin-top:20px; font-size:1rem; }
+  .toc { background:#f8fafc; border-radius:12px; padding:18px 24px; column-count:2; font-size:.9rem; }
+  .toc a { color:var(--accent); text-decoration:none; display:block; margin-bottom:5px; }
+  ol, ul { padding-left:22px; } li { margin-bottom:5px; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
+  a { color:var(--accent); }
+  .meta { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+  .meta > div { background:#f8fafc; border-radius:10px; padding:10px 14px; font-size:.86rem; }
+  .meta b.lbl { display:block; color:var(--navy); font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+  .flujo { display:flex; flex-wrap:wrap; align-items:center; gap:6px; background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 14px; margin:12px 0; font-size:.82rem; }
+  .flujo .st { background:#fff; border:1.5px solid #cbd5e1; border-radius:999px; padding:2px 12px; font-weight:700; color:#0f172a; white-space:nowrap; }
+  .flujo .st.ini { border-color:var(--accent); color:var(--accent); }
+  .flujo .st.fin { border-color:#16a34a; color:#15803d; }
+  .flujo .st.mal { border-color:#dc2626; color:#b91c1c; }
+  .flujo .ar { color:#94a3b8; }
+  .afecta { background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:10px 14px; margin:12px 0; font-size:.85rem; }
+  .paso { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:10px 0; font-size:.92rem; }
+  @media print { #af-topnav { display:none; } .toc { column-count:1; } }
+  @media (max-width:640px){ .toc { column-count:1; } .meta { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Manual de Procesos",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
+<div class="doc">
+  <h1><i class="bi bi-diagram-3 me-2"></i>Manual de Procesos</h1>
+  <p>Los procesos del negocio de punta a punta — cruzando módulos. Cada capítulo responde lo mismo: <b>qué hace y para qué</b>, <b>quién</b> lo hace, <b>prerequisitos</b>, el <b>paso a paso</b> (con la pantalla de cada paso), el <b>flujo</b> de estados y <b>qué procesos afecta / de cuáles depende</b>. El detalle de cada pantalla está en el <a href="manual-usuario.html">Manual de Usuario</a>.</p>
+
+  <div class="toc">
+    <a href="#p1">1. Originación de un crédito</a>
+    <a href="#p2">2. Curse y fundantes</a>
+    <a href="#p3">3. Post Venta: cartola → factura → pago comisión</a>
+    <a href="#p4">4. Pago de saldos precio</a>
+    <a href="#p5">5. Recaudación: pago de cuotas</a>
+    <a href="#p6">6. Prepago y Aplicación de Fondos</a>
+    <a href="#p7">7. Cobranza: mora → judicial → castigo</a>
+    <a href="#p8">8. Provisiones y Cierre de Mes</a>
+    <a href="#p9">9. Carga masiva y digitación de faltantes</a>
+    <a href="#p10">10. Incorporación de un dealer</a>
+    <a href="#p11">11. Liquidación Plan Liquidez</a>
+    <a href="#p12">12. Comisiones de ejecutivos → Remuneraciones</a>
+    <a href="#p13">13. Venta de cartera</a>
+    <a href="#p14">14. Campaña masiva</a>
+  </div>
+
+  <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
+  <p><b>Qué y para qué:</b> convertir un interesado en un crédito otorgado, con la financiera correcta y dentro de la política. Es el proceso que genera el ingreso del negocio.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Ejecutivo comercial (cotiza y arma la carta) · Analista de Crédito (evalúa y aprueba) · el dealer o Facilito pueden originar la punta.</div>
+    <div><b class="lbl">Prerequisitos</b>Dealer con ficha aprobada · cliente en la BD (o se crea) · tasas y parámetros vigentes · Preferencia Financiera configurada.</div>
+  </div>
+  <ol>
+    <li><b>Cotizar</b> (Cotizaciones, Simulador Rápido, portal del dealer o Facilito): precio, pie, plazo → cuota con gastos, seguros y CAE. La cotización queda guardada al RUT.</li>
+    <li><b>Evaluar</b> (Evaluación Crediticia): RUT → ficha; si los antecedentes tienen +30 días se cargan nuevos; la IA cruza renta, informes DealerNet y política, y entrega el análisis para la decisión.</li>
+    <li><b>Emitir la carta</b> (Cartas de Aprobación): autocompleta desde el PDF de la financiera; la Preferencia Financiera bloquea combinaciones fuera de política; Rentabilidad compara AutoFin vs UAC (permiso especial). Pasa por el pool de analistas.</li>
+    <li><b>Otorgar o desistir</b> (Cartas Vigentes): la carta vive 5 días (configurable). Otorgar crea el crédito OTORGADO con todo congelado (comisión de la carta manda) y su cartola.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">COTIZACIÓN</span><span class="ar">→</span><span class="st">EVALUACIÓN</span><span class="ar">→</span><span class="st">CARTA APROBADA</span><span class="ar">→</span><span class="st fin">OTORGADO</span><span class="ar">/</span><span class="st mal">DESISTIDA</span> <span style="color:#64748b">(la máquina de estados completa vive en el mantenedor Estado Créditos)</span></div>
+  <div class="afecta"><b>Afecta:</b> Post Venta (nace la cartola), Fundantes, Comisiones (ejecutivo y dealer), Dashboard, Contabilidad. <b>Depende de:</b> ficha del dealer (§10), mantenedores de tasas/parámetros/preferencia.</div>
+
+  <h2 id="p2">2. Curse y fundantes</h2>
+  <p><b>Qué y para qué:</b> respaldar documentalmente la operación otorgada para que la financiera libere los fondos. Sin fundantes cerrados no hay plata.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Ejecutivo comercial (sube documentos) · Analista de Operaciones (valida).</div>
+    <div><b class="lbl">Prerequisitos</b>Crédito OTORGADO · matriz de documentos por financiera (mantenedor Tipos de Documento).</div>
+  </div>
+  <ol>
+    <li><b>Subir</b> (Seguimiento Fundantes — Ejecutivo): los documentos que exige la matriz; el sistema los renombra automático (tipo + operación) → Enviar.</li>
+    <li><b>Validar</b> (Seguimiento Fundantes — Operaciones): CERRADO aprueba; RECHAZADO con comentario avisa al ejecutivo para corregir y reenviar.</li>
+    <li><b>Seguir los fondos:</b> cada etapa queda con fecha — alimenta el flujo de caja y marca sola la etapa FUNDANTES RECIBIDOS del Post Venta.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">RECIBIDOS</span><span class="ar">→</span><span class="st">ENVIADOS</span><span class="ar">→</span><span class="st">FONDOS LIBERADOS</span><span class="ar">→</span><span class="st fin">FONDOS RECIBIDOS</span></div>
+  <div class="afecta"><b>Afecta:</b> Post Venta (etapas), flujo de caja. <b>Depende de:</b> originación (§1), matriz de tipos de documento.</div>
+
+  <h2 id="p3">3. Post Venta: cartola → factura → pago de comisión</h2>
+  <p><b>Qué y para qué:</b> pagarle al dealer su comisión, con respaldo tributario y cuadratura exacta.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Post Venta / Operaciones (cartolas y cuadre) · el dealer (factura) · Tesorería (paga la ODP).</div>
+    <div><b class="lbl">Prerequisitos</b>Créditos otorgados con comisión calculada (la carta manda) · datos bancarios del dealer en su ficha.</div>
+  </div>
+  <ol>
+    <li><b>Cartola</b> (Post Venta): se genera acumulativa por estado A PAGAR y se envía automática al dealer con copia al ejecutivo; al enviarse estampa el Mes Cartola.</li>
+    <li><b>Factura</b> (Post Venta → Facturación): el dealer factura el TOTAL de la cartola; el sistema la registra y cuadra contra la cartola — si no calza, rojo.</li>
+    <li><b>Pagar</b> (Órdenes de Pago): se emite la ODP; si el dealer tiene Plan Liquidez, el descuento va en la ODP (§11), nunca en la cartola.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">A PAGAR</span><span class="ar">→</span><span class="st">CARTOLA ENVIADA</span><span class="ar">→</span><span class="st">FACTURA CUADRADA</span><span class="ar">→</span><span class="st">ODP</span><span class="ar">→</span><span class="st fin">PAGADA</span></div>
+  <div class="afecta"><b>Afecta:</b> Plan Liquidez (§11), Contabilidad (asiento automático al pagar), Cierre de Mes (punto Cartolas). <b>Depende de:</b> originación (§1), motor único de comisión del dealer.</div>
+
+  <h2 id="p4">4. Pago de saldos precio</h2>
+  <p><b>Qué y para qué:</b> pagarle al dealer el saldo del precio del vehículo una vez recibidos los fondos de la financiera.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Post Venta define fondos y nómina · Tesorería emite y paga.</div>
+    <div><b class="lbl">Prerequisitos</b>Fondos recibidos (§2) · etapas de Saldo Precio al día.</div>
+  </div>
+  <ol>
+    <li><b>Definir fondos → seleccionar saldos → generar nómina → emitir orden de pago</b> (Post Venta).</li>
+    <li>Al pagarse, el <b>informe de saldos pagados</b> se envía solo a Operaciones y al ejecutivo de cada operación.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">SALDO PENDIENTE</span><span class="ar">→</span><span class="st">EN NÓMINA</span><span class="ar">→</span><span class="st">ORDEN EMITIDA</span><span class="ar">→</span><span class="st fin">PAGADO</span></div>
+  <div class="afecta"><b>Afecta:</b> etapas Post Venta, flujo de caja, Contabilidad. <b>Depende de:</b> fundantes (§2).</div>
+
+  <h2 id="p5">5. Recaudación: pago de cuotas</h2>
+  <p><b>Qué y para qué:</b> cobrar la cartera propia — cada peso que entra queda registrado, timbrado y contabilizado una sola vez.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cajero (cobra) · Tesorería (aprueba ODP y aplica transitorias).</div>
+    <div><b class="lbl">Prerequisitos</b>Caja creada y asignada (Administración de Cajas) · calendario de cuotas del crédito.</div>
+  </div>
+  <ol>
+    <li><b>En caja</b> (Tesorería → Caja): buscar el crédito → pagar cuotas individuales o en lote → comprobante con timbre PAGADO. La mora y gastos salen del motor único (mismos valores que portal y certificados).</li>
+    <li><b>Con aprobación</b>: se emite ODP de cuotas; Tesorería aprueba y el pago se registra con correo de respaldo.</li>
+    <li><b>Abono no identificado</b>: entra a Cuentas Transitorias y se aplica al crédito cuando se aclara el pagador.</li>
+    <li><b>Cierre de caja</b> al final del día: cuadratura de lo recaudado.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">CUOTA VIGENTE</span><span class="ar">→</span><span class="st">PAGADA</span><span class="ar">·</span><span class="st">TRANSITORIA</span><span class="ar">→</span><span class="st fin">APLICADA</span></div>
+  <div class="afecta"><b>Afecta:</b> mora del crédito, Cobranza, Conciliación Bancaria (el abono debe calzar con la cartola), Contabilidad (asiento automático), Cierre de Mes. <b>Depende de:</b> calendario congelado al otorgar (créditos otorgados son inmutables).</div>
+
+  <h2 id="p6">6. Prepago y Aplicación de Fondos</h2>
+  <p><b>Qué y para qué:</b> saldar un crédito completo antes de plazo — al valor del motor (prepago) o con descuento negociado (aplicación de fondos, con firmas).</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cajero (prepago simple) · Tesorería + cadena de firmas (aplicación con descuento).</div>
+    <div><b class="lbl">Prerequisitos</b>Crédito vigente de cartera propia · atribuciones de condonación configuradas.</div>
+  </div>
+  <ol>
+    <li><b>Prepago en caja</b> (Caja → botón Prepago): mismo motor del certificado (capital + accesorios); condonación según atribuciones. Crédito queda PREPAGADO.</li>
+    <li><b>Aplicación de Fondos</b> (Tesorería): propuesta ítem por ítem sobre el motor de prepago — el orden de condonación es <b>primero gastos, luego intereses; capital nunca</b> — y recorre HECHO → APROBADO → PROCESADO antes de aplicarse; lo condonado queda registrado.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">HECHO</span><span class="ar">→</span><span class="st">APROBADO</span><span class="ar">→</span><span class="st">PROCESADO</span><span class="ar">→</span><span class="st fin">PREPAGADO</span></div>
+  <div class="afecta"><b>Afecta:</b> cartera (sale del stock), Cobranza, Contabilidad, provisiones (§8). <b>Depende de:</b> motor único de prepago (certificados).</div>
+
+  <h2 id="p7">7. Cobranza: mora → prejudicial → judicial → castigo</h2>
+  <p><b>Qué y para qué:</b> recuperar la cartera morosa cumpliendo la Ley del Consumidor, con cada gestión trazada.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Analista de cobranza (gestiona) · los motores automáticos (correo/WhatsApp) · abogados (judicial) · Gerencia (castigo, doble firma).</div>
+    <div><b class="lbl">Prerequisitos</b>Parámetros Cobranza configurados (tramos, gastos, tasa mora TMC fija al otorgamiento) · automatizaciones activadas si se quieren.</div>
+  </div>
+  <ol>
+    <li><b>Mora temprana:</b> los motores automáticos actúan solos (correo por tramo + WhatsApp por secuencia, §Manual Usuario 8); todo queda en la bitácora CRM. Los gastos de cobranza corren recién desde el día 21; tope semanal de gestiones bloqueado por sistema.</li>
+    <li><b>Pre-judicial</b> (Cobranza → Pre-judicial): gestión humana con compromisos de pago en la bitácora.</li>
+    <li><b>Judicial</b> (Cobranza → Judicial): demanda con abogado, tribunal y etapa procesal (catálogos paramétricos).</li>
+    <li><b>Castigo</b> (Tesorería → Provisiones + Castigos): baja contable de la operación, acción manual con doble firma gerencial. Nunca automático.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">VIGENTE</span><span class="ar">→</span><span class="st">MORA</span><span class="ar">→</span><span class="st">VENCIDO</span><span class="ar">→</span><span class="st mal">JUDICIAL</span><span class="ar">→</span><span class="st mal">CASTIGADO</span><span class="ar">·</span><span class="st fin">AL DÍA</span> <span style="color:#64748b">(estados de cartera, mantenedor Estado Cartera)</span></div>
+  <div class="afecta"><b>Afecta:</b> provisiones (§8), Score de Mora, Contabilidad (asiento de castigo). <b>Depende de:</b> recaudación (§5), motor único de mora.</div>
+
+  <h2 id="p8">8. Provisiones y Cierre de Mes</h2>
+  <p><b>Qué y para qué:</b> cerrar el mes con todos los controles dados y las cifras congeladas — el candado que hace confiable la contabilidad y los informes a la matriz.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cada responsable de punto (checklist) · quien tiene la atribución CERRAR MES · el sistema (provisiones automáticas y chequeos).</div>
+    <div><b class="lbl">Prerequisitos</b>Checklist configurado (responsables, días hábiles) · tramos de provisión en Parámetros Cobranza.</div>
+  </div>
+  <ol>
+    <li><b>Provisiones</b>: si nadie las guarda a mano, el sistema cierra solo el mes anterior (día configurable), genera el asiento (constitución o liberación por la variación) y deja el detalle por crédito auditable.</li>
+    <li><b>Checklist</b> (Tesorería → Cierre de Mes): cada responsable da su OK (varios puntos se chequean solos); correo diario con los vencidos hasta cumplir.</li>
+    <li><b>CERRAR MES</b>: con los obligatorios en verde — candado contable + acta congelada (quién dio cada OK) + correo del acta a los destinatarios.</li>
+    <li><b>Contabilidad</b>: Informe Cierre Mensual a la matriz y Bitácora de Cierres con análisis IA.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">MES ABIERTO</span><span class="ar">→</span><span class="st">PUNTOS EN VERDE</span><span class="ar">→</span><span class="st">CERRADO (candado)</span><span class="ar">→</span><span class="st fin">ACTA ENVIADA</span></div>
+  <div class="afecta"><b>Afecta:</b> todo lo retroactivo queda bloqueado (recálculo respeta meses cerrados), estados financieros. <b>Depende de:</b> conciliación, transitorias, cartolas, comisiones, castigos (§3, §5, §7).</div>
+
+  <h2 id="p9">9. Carga masiva y digitación de faltantes</h2>
+  <p><b>Qué y para qué:</b> ingresar la producción del brokerage por Excel sin errores y completar lo que venga incompleto.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Operaciones (carga) · digitadores (cola de faltantes).</div>
+    <div><b class="lbl">Prerequisitos</b>Equivalencia de Ejecutivos al día (si el archivo trae uno nuevo, agregarlo primero).</div>
+  </div>
+  <ol>
+    <li><b>Cargar</b> (Carga Masiva → Cargar): el validador con IA marca anomalías (RUT, montos, dealers, fechas) ANTES de insertar → confirmar.</li>
+    <li><b>Completar</b> (Digitación de Datos Faltantes): los incompletos entran a la cola; se toman de a uno (bloqueo 20 min), campos faltantes en rojo.</li>
+    <li>Cada carga queda en el <b>Historial de Cargas</b> y en Auditoría; el recálculo de comisiones corre solo.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">EXCEL</span><span class="ar">→</span><span class="st">VALIDADO</span><span class="ar">→</span><span class="st">INSERTADO</span><span class="ar">→</span><span class="st">COLA FALTANTES</span><span class="ar">→</span><span class="st fin">COMPLETO</span></div>
+  <div class="afecta"><b>Afecta:</b> Dashboard, comisiones, todo lo aguas abajo de un crédito. <b>Depende de:</b> equivalencias, mantenedores de dealers/estados.</div>
+
+  <h2 id="p10">10. Incorporación (o modificación) de un dealer</h2>
+  <p><b>Qué y para qué:</b> que ningún dealer opere sin ficha aprobada — sus comisiones, banco e informes revisados por la cadena que corresponde.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Ejecutivo (ficha) · Análisis (nivel 1) · Gerencia (nivel 2, solo sobre pizarra) · el cliente firma.</div>
+    <div><b class="lbl">Prerequisitos</b>Pizarra de comisiones vigente (mantenedor Parques) · saldo DealerNet para informes.</div>
+  </div>
+  <ol>
+    <li><b>Ficha</b> (Incorporación de Dealers → Nueva): datos, banco, tabla de comisiones (default pizarra), socios. Si el RUT existe → modo Modificación con diferencias en rojo.</li>
+    <li><b>Enviar a autorización</b>: el sistema pide solo los informes DealerNet (empresa + socios) + análisis IA; alerta grave si hay antecedentes penales.</li>
+    <li><b>Cadena de niveles</b> (paramétrica): autorizar ANTES de firmar. Aprobar sin abrir la revisión queda marcado.</li>
+    <li><b>Imprimir → firma del cliente → subir firmada → Cerrar</b>: el dealer queda creado/actualizado; su tabla de comisiones rige sus operaciones desde ese momento.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">PEND. AUTORIZACIÓN</span><span class="ar">→</span><span class="st">AUTORIZADA</span><span class="ar">→</span><span class="st">FIRMADA</span><span class="ar">→</span><span class="st fin">APROBADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span></div>
+  <div class="afecta"><b>Afecta:</b> comisión de cada operación del dealer, originación (§1), Plan Liquidez. <b>Depende de:</b> pizarra, DealerNet, categorías.</div>
+
+  <h2 id="p11">11. Liquidación mensual del Plan Liquidez</h2>
+  <p><b>Qué y para qué:</b> renovar cada mes el anticipo de comisiones de los dealers Super Partner, descontando por ODP sin tocar la cartola.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Jefe/Gerente Comercial (N1 aprueba o modifica) · Gerente General (N2) · Finanzas (toma conocimiento) · Tesorería paga.</div>
+    <div><b class="lbl">Prerequisitos</b>Plan creado (contrato + pagaré) · cartolas del mes enviadas (la comisión C sale de ahí).</div>
+  </div>
+  <ol>
+    <li><b>Generar la Hoja de Liquidación</b> (Dealers → Plan Liquidez → Hojas): una línea por dealer con comisión C, deuda D, adelanto A = min(C, tope), descuento D−A y pago neto.</li>
+    <li><b>Cadena N1 → N2 → N3</b> (48h por nivel, auto-avanza al vencer; N1 puede modificar líneas con motivo).</li>
+    <li><b>Emitir ODP</b>: con el descuento aplicado (o la 2ª ODP si es aumento). Al pagarse, el abono queda en la cuenta corriente y la deuda pasa a A.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">HOJA GENERADA</span><span class="ar">→</span><span class="st">N1</span><span class="ar">→</span><span class="st">N2</span><span class="ar">→</span><span class="st">CONOCIMIENTO N3</span><span class="ar">→</span><span class="st">ODP</span><span class="ar">→</span><span class="st fin">PAGADA / ABONADA</span></div>
+  <div class="afecta"><b>Afecta:</b> pago de comisiones (§3), cuenta corriente del dealer. <b>Depende de:</b> cartolas del mes, categoría Super Partner.</div>
+
+  <h2 id="p12">12. Comisiones de ejecutivos → Remuneraciones</h2>
+  <p><b>Qué y para qué:</b> del cálculo de la comisión mensual a la liquidación de sueldo emitida — sin digitar dos veces (una sola fuente).</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El motor calcula solo · supervisores revisan y aprueban · RRHH emite el libro.</div>
+    <div><b class="lbl">Prerequisitos</b>Mes de colocaciones completo · Comisiones Variables configuradas · indicadores de remuneraciones al día (Previred/CMF).</div>
+  </div>
+  <ol>
+    <li><b>Cálculo automático</b> (recálculo programado): piso + incentivo + ajustes por cumplimiento/calidad, por ejecutivo.</li>
+    <li><b>Revisión y aprobación</b> (Comisiones → Revisión): supervisor revisa a los suyos; la aprobación queda auditada. <b>Sin comisiones APROBADAS no se puede emitir el libro</b> (avisa en rojo).</li>
+    <li><b>Libro de liquidaciones</b> (RRHH → Remuneraciones): todo llega solo — comisiones, días trabajados desde ingreso/licencias, adicionales y descuentos; vista previa por persona.</li>
+    <li><b>EMITIR</b>: congela, envía cada liquidación por correo y alimenta LRE, F29 (código 048) y la contabilidad.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">CALCULADA</span><span class="ar">→</span><span class="st">APROBADA</span><span class="ar">→</span><span class="st">EN LIBRO</span><span class="ar">→</span><span class="st fin">EMITIDA</span></div>
+  <div class="afecta"><b>Afecta:</b> remuneraciones, LRE, F29, Contabilidad, Cierre de Mes (punto Comisiones). <b>Depende de:</b> colocaciones del mes (§1, §9), indicadores.</div>
+
+  <h2 id="p13">13. Venta de cartera</h2>
+  <p><b>Qué y para qué:</b> vender créditos AUTOFACIL a otra financiera (CFC) generando liquidez, con las marcas de administración y responsabilidad claras.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Tesorería/Finanzas con la atribución <code>venta_cartera</code>.</div>
+    <div><b class="lbl">Prerequisitos</b>Créditos AUTOFACIL otorgados no vendidos · precio del motor (= capital vigente) como referencia.</div>
+  </div>
+  <ol>
+    <li><b>Seleccionar elegibles</b> (Tesorería → Venta de Cartera): el motor propone el precio; se ajusta si la negociación lo requiere.</li>
+    <li><b>Vender</b>: registrar comprador, precio y marcas — <b>con administración</b> (seguimos cobrando) y/o <b>con responsabilidad</b> (recourse: si el cliente no paga, la cuota del mes se paga al comprador).</li>
+    <li><b>Seguir</b>: stock por categoría y pestaña Cuotas del Mes con lo comprometido.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">ELEGIBLE</span><span class="ar">→</span><span class="st fin">VENDIDO</span> <span style="color:#64748b">(estampado en el crédito — fuente única; deshacer solo con permiso)</span></div>
+  <div class="afecta"><b>Afecta:</b> stock de cartera, recaudación (si es con administración seguimos cobrando), provisiones. <b>Depende de:</b> calendario de cuotas, Score de Mora (valorización).</div>
+
+  <h2 id="p14">14. Campaña masiva (venta o cobranza)</h2>
+  <p><b>Qué y para qué:</b> contactar masivamente con mensajes personalizados y <b>medir con grupo de control</b> si la campaña realmente movió la aguja.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Marketing/Comercial (venta) · Cobranza (mora). Perfil con acceso a Campañas Masivas.</div>
+    <div><b class="lbl">Prerequisitos</b>Data de contacto (propia o CSV) · para WhatsApp frío: plantilla HSM aprobada por Meta.</div>
+  </div>
+  <ol>
+    <li><b>Crear</b> (Campañas Masivas → Mail o WhatsApp): objetivo VENTA/COBRANZA → variables → data (CSV o desde la BD por parámetros) → deciles de control → contenido → vista previa uno a uno → enviar por lotes.</li>
+    <li><b>Analizar antes de enviar</b> (opcional): análisis de crédito (política) y de informes (DealerNet+IA) con exclusión de los que no cumplen.</li>
+    <li><b>Medir</b>: Recalcular conversión cada 2–3 días — tasa campaña vs control = uplift. Cada mensaje queda como gestión CRM.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">ENVIADA</span><span class="ar">→</span><span class="st fin">CONVERSIÓN MEDIDA</span></div>
+  <div class="afecta"><b>Afecta:</b> CRM (gestiones), originación si convierte (§1), recaudación si es cobranza (§5). <b>Depende de:</b> datos de contacto, plantillas Meta, política de crédito.</div>
+
+  <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
+</div>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

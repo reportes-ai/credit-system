@@ -135,9 +135,10 @@ Reglas de diseño que se derivan de este principio:
   4. **Prerequisitos** (qué debe existir/estar hecho antes)
   5. **Qué procesos afecta** (aguas abajo) y **qué procesos dependen de él** (aguas arriba)
   6. **El flujo** (estados, decisiones, caminos de reversa)
-- **Dónde**: los 4 documentos vivos de `/mantenedores/documentacion/` (manual-usuario,
-  config-maestro, tecnica, brochure) — actualizar el que corresponda en el MISMO commit
-  del feature cuando sea razonable, o al cierre de la sesión. Nunca dejarlo "para después".
+- **Dónde**: los 5 documentos vivos de `/mantenedores/documentacion/` (manual-usuario,
+  **procesos** —un capítulo por proceso end-to-end con los 6 puntos—, config-maestro,
+  tecnica, brochure) — actualizar el que corresponda en el MISMO commit del feature
+  cuando sea razonable, o al cierre de la sesión. Nunca dejarlo "para después".
 - El footer "Qué afecta este mantenedor" es la versión in-situ de esta máxima.
 
 ## Reglas Anti-Hardcode (NO negociables)
