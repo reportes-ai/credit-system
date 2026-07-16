@@ -2,8 +2,8 @@
    La app guarda por sí misma el último día cargado en localStorage, así que
    aquí solo cacheamos el cascarón para que abra al instante y funcione
    como app instalada aunque la señal sea mala. */
-const CACHE = 'terreno-v1';
-const SHELL = ['/terreno/', '/terreno/manifest.json', '/img/logo.png', '/img/favicon.png'];
+const CACHE = 'terreno-v2';
+const SHELL = ['/terreno/', '/terreno/manifest.json', '/terreno/icon-192.png', '/terreno/icon-512.png', '/img/logo.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
