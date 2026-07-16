@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -203,11 +203,11 @@
 
 <script src="/js/app-version.js"></script>
 <script>
-const token = localStorage.getItem('token');
+const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login';
 const H = { 'Authorization': 'Bearer ' + token };
 const HJ = { ...H, 'Content-Type': 'application/json' };
-function logout(){ localStorage.clear(); location.href='/login'; }
+function logout(){ sessionStorage.clear(); location.href='/login'; }
 const $ = id => document.getElementById(id);
 const fmt = n => '$' + Math.round(Number(n||0)).toLocaleString('es-CL');
 const fFecha = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
