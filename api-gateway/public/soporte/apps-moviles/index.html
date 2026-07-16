@@ -7,7 +7,7 @@
   <title>Aplicaciones Móviles — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -171,9 +171,11 @@ const APPS = [
   },
 ];
 
+// Dominio oficial para links y QR (la URL de Render también funciona, pero se difunde esta)
+const DOMINIO = 'https://afbs.autofacilchile.cl';
 const wrap = document.getElementById('appsWrap');
 APPS.forEach(a => {
-  const url = location.origin + a.ruta;
+  const url = DOMINIO + a.ruta;
   // QR local (sin servicios externos)
   const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
   const img = qr.createImgTag(3, 6);
