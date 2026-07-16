@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>facilbook</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --fb:#3b5998; --fb2:#4867ad; --bg:#f0f2f5; --txt:#1c1e21; --mut:#65676b; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',Helvetica,Arial,sans-serif; background:var(--bg); color:var(--txt); }
+  /* header azul facilbook */
+  .fbbar { background:var(--fb); position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:14px; padding:6px 16px; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  .fbbar img.logo { height:34px; display:block; }
+  .fbbar .tabs { display:flex; gap:6px; margin-left:8px; flex:1; }
+  .fbbar .tab { color:#c9d4ef; border:none; background:none; font-weight:700; font-size:.9rem; padding:8px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:7px; }
+  .fbbar .tab.on { background:rgba(255,255,255,.18); color:#fff; }
+  .fbbar .volver { color:#c9d4ef; text-decoration:none; font-size:.82rem; white-space:nowrap; }
+  .wrap { max-width:680px; margin:0 auto; padding:16px 10px 80px; }
+  .card { background:#fff; border-radius:10px; box-shadow:0 1px 2px rgba(0,0,0,.1); margin-bottom:14px; }
+  /* composer */
+  .composer { padding:12px 14px; }
+  .composer .row1 { display:flex; gap:10px; align-items:center; }
+  .avatar { width:40px; height:40px; border-radius:50%; background:var(--fb); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; overflow:hidden; flex-shrink:0; }
+  .avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+  .composer textarea { flex:1; border:none; background:var(--bg); border-radius:20px; padding:10px 16px; font:inherit; resize:none; min-height:42px; }
+  .composer textarea:focus { outline:none; }
+  .composer .acciones { display:flex; align-items:center; gap:8px; margin-top:10px; border-top:1px solid #e4e6eb; padding-top:8px; }
+  .btn-foto { border:none; background:none; color:#41b35d; font-weight:700; font-size:.88rem; padding:6px 10px; border-radius:8px; cursor:pointer; }
+  .btn-foto:hover { background:var(--bg); }
+  .btn-pub { margin-left:auto; background:var(--fb); color:#fff; border:none; border-radius:8px; padding:8px 22px; font-weight:800; cursor:pointer; }
+  .btn-pub:disabled { opacity:.5; }
+  .previews { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  .previews .pv { position:relative; }
+  .previews img { width:84px; height:84px; object-fit:cover; border-radius:8px; }
+  .previews button { position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:50%; border:none; background:#333; color:#fff; cursor:pointer; font-size:.7rem; }
+  /* post */
+  .post { padding:12px 14px 4px; }
+  .post .head { display:flex; gap:10px; align-items:center; margin-bottom:8px; }
+  .post .head .quien b { display:block; font-size:.92rem; }
+  .post .head .quien span { color:var(--mut); font-size:.75rem; }
+  .post .head .del { margin-left:auto; border:none; background:none; color:var(--mut); cursor:pointer; }
+  .post .texto { white-space:pre-wrap; font-size:.95rem; margin-bottom:8px; }
+  .post .pics { display:grid; gap:4px; border-radius:8px; overflow:hidden; margin:0 -14px; }
+  .post .pics.n1 { grid-template-columns:1fr; } .post .pics.n2, .post .pics.n4 { grid-template-columns:1fr 1fr; } .post .pics.n3 { grid-template-columns:1fr 1fr 1fr; }
+  .post .pics img { width:100%; max-height:420px; object-fit:cover; display:block; cursor:pointer; }
+  .post .contadores { display:flex; justify-content:space-between; color:var(--mut); font-size:.8rem; padding:8px 2px; }
+  .post .botones { display:flex; border-top:1px solid #e4e6eb; }
+  .post .botones button { flex:1; border:none; background:none; padding:9px; color:var(--mut); font-weight:700; font-size:.86rem; cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center; gap:7px; }
+  .post .botones button:hover { background:var(--bg); }
+  .post .botones button.liked { color:var(--fb); }
+  .coms { padding:6px 0 10px; }
+  .com { display:flex; gap:8px; margin-bottom:6px; }
+  .com .avatar { width:30px; height:30px; font-size:.75rem; }
+  .com .burbuja { background:var(--bg); border-radius:14px; padding:6px 12px; font-size:.86rem; max-width:85%; }
+  .com .burbuja b { font-size:.8rem; display:block; }
+  .com .delc { border:none; background:none; color:#bbb; cursor:pointer; font-size:.7rem; }
+  .comInput { display:flex; gap:8px; align-items:center; padding-bottom:10px; }
+  .comInput input { flex:1; border:none; background:var(--bg); border-radius:16px; padding:8px 14px; font:inherit; }
+  .comInput input:focus { outline:none; }
+  /* marketplace */
+  .mk-head { display:flex; align-items:center; gap:12px; padding:14px; }
+  .mk-head img { width:54px; height:54px; border-radius:12px; }
+  .mk-head h5 { margin:0; } .mk-head p { margin:0; color:var(--mut); font-size:.8rem; }
+  .mk-head .btn-pub { padding:8px 16px; }
+  .mk-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .mk-item { background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.1); cursor:pointer; }
+  .mk-item .ph { width:100%; aspect-ratio:1; background:#e4e6eb url('img/marketplace.png') center/60% no-repeat; }
+  .mk-item .ph img { width:100%; height:100%; object-fit:cover; display:block; }
+  .mk-item .inf { padding:8px 10px 10px; }
+  .mk-item .precio { font-weight:800; }
+  .mk-item .tit { font-size:.86rem; margin:2px 0; }
+  .mk-item .who { color:var(--mut); font-size:.74rem; }
+  .mk-item .vendido { display:inline-block; background:#dc3545; color:#fff; border-radius:4px; font-size:.68rem; font-weight:800; padding:1px 7px; }
+  dialog { border:none; border-radius:14px; padding:0; width:min(480px,94vw); }
+  dialog::backdrop { background:rgba(0,0,0,.5); }
+  .dlg { padding:18px 20px; }
+  .dlg h5 { margin:0 0 12px; color:var(--fb); }
+  .dlg label { display:block; font-size:.78rem; font-weight:700; color:var(--mut); margin:10px 0 3px; }
+  .dlg input, .dlg textarea { width:100%; border:1.5px solid #d5d9e0; border-radius:8px; padding:8px 12px; font:inherit; }
+  .dlg .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+  .btn-gris { background:#e4e6eb; border:none; border-radius:8px; padding:8px 16px; font-weight:700; cursor:pointer; }
+  .vacio { text-align:center; color:var(--mut); padding:40px 10px; }
+  .vacio img { height:60px; opacity:.5; margin-bottom:10px; }
+  #verFotoDlg img { width:100%; display:block; border-radius:14px; }
+  @media (max-width:560px){ .fbbar .tab span { display:none; } }
+</style>
+</head>
+<body>
+<div class="fbbar">
+  <img class="logo" src="img/logo.png" alt="facilbook" title="facilbook — la red social de AutoFácil">
+  <div class="tabs">
+    <button class="tab on" id="tabMuro" onclick="verTab('muro')"><i class="bi bi-house-door-fill"></i><span>Muro</span></button>
+    <button class="tab" id="tabMarket" onclick="verTab('market')"><i class="bi bi-shop"></i><span>Marketplace</span></button>
+  </div>
+  <a class="volver" href="/"><i class="bi bi-arrow-left"></i> Volver al Suite</a>
+</div>
+
+<div class="wrap">
+  <!-- MURO -->
+  <div id="vMuro">
+    <div class="card composer">
+      <div class="row1">
+        <div class="avatar" id="miAvatar">?</div>
+        <textarea id="txtPost" placeholder="¿Qué estás pensando?" oninput="chkPub()"></textarea>
+      </div>
+      <div class="previews" id="pvPost"></div>
+      <div class="acciones">
+        <button class="btn-foto" onclick="pickFotos('post')"><i class="bi bi-image-fill"></i> Foto</button>
+        <button class="btn-pub" id="btnPub" disabled onclick="publicar()">Publicar</button>
+      </div>
+    </div>
+    <div id="feed"></div>
+    <div style="text-align:center"><button class="btn-gris" id="btnMas" style="display:none" onclick="cargarFeed(true)">Ver más</button></div>
+  </div>
+
+  <!-- MARKETPLACE -->
+  <div id="vMarket" style="display:none">
+    <div class="card mk-head">
+      <img src="img/marketplace.png" alt="">
+      <div style="flex:1"><h5>Marketplace</h5><p>Compra y vende con tus compañeros de AutoFácil</p></div>
+      <button class="btn-pub" onclick="dlgItem.showModal()">+ Vender</button>
+    </div>
+    <div style="margin:0 0 10px; text-align:right"><label style="font-size:.8rem;color:var(--mut);cursor:pointer"><input type="checkbox" id="chkTodos" onchange="cargarMarket()"> ver también vendidos</label></div>
+    <div class="mk-grid" id="market"></div>
+  </div>
+</div>
+
+<input type="file" id="fileInp" accept="image/*" multiple style="display:none">
+
+<dialog id="dlgItem"><div class="dlg">
+  <h5><i class="bi bi-shop"></i> Vender en Marketplace</h5>
+  <label>¿Qué vendes? *</label><input id="itTitulo" maxlength="120" placeholder="Ej: Bicicleta aro 29 casi nueva">
+  <label>Precio $</label><input id="itPrecio" inputmode="numeric" placeholder="50.000">
+  <label>Descripción</label><textarea id="itDesc" rows="3" placeholder="Estado, detalles, dónde se entrega…"></textarea>
+  <div class="previews" id="pvItem"></div>
+  <div class="pie">
+    <button class="btn-foto" onclick="pickFotos('item')"><i class="bi bi-image-fill"></i> Fotos</button>
+    <button class="btn-gris" onclick="dlgItem.close()">Cancelar</button>
+    <button class="btn-pub" onclick="crearItem()">Publicar</button>
+  </div>
+</div></dialog>
+
+<dialog id="dlgVer"><div class="dlg" id="dlgVerBody"></div></dialog>
+<dialog id="verFotoDlg" onclick="this.close()"><img id="verFotoImg" alt=""></dialog>
+
+<script>
+const TK = sessionStorage.getItem('token');
+if (!TK) location.href = '/login';
+const H = { 'Authorization': 'Bearer ' + TK, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const CLP = n => '$' + Number(n || 0).toLocaleString('es-CL');
+const fecha = d => { const t = new Date(d), diff = (Date.now() - t) / 60000;
+  if (diff < 60) return Math.max(1, Math.round(diff)) + ' min';
+  if (diff < 1440) return Math.round(diff / 60) + ' h';
+  return t.toLocaleDateString('es-CL', { day:'numeric', month:'short' }) + (diff > 525600 ? ' ' + t.getFullYear() : ''); };
+
+let FOTOS_PERFIL = {}, YO = null, FOTOS_TMP = { post: [], item: [] }, PICK = 'post', ULTIMO_ID = 0;
+
+function avatarHTML(nombre, idU, cls) {
+  const src = idU && FOTOS_PERFIL[idU];
+  return `<div class="avatar ${cls||''}">${src ? `<img src="${src}" alt="">` : esc((nombre||'?')[0].toUpperCase())}</div>`;
+}
+
+/* ── init ── */
+YO = JSON.parse(sessionStorage.getItem('usuario') || 'null') || {};
+(async () => {
+  try {
+    const jf = await fetch('/api/credenciales/fotos', { headers: H }).then(r => r.json());
+    (jf?.data || []).forEach(f => { if (f.foto) FOTOS_PERFIL[f.id_usuario] = f.foto; });
+  } catch (e) {}
+  $('miAvatar').outerHTML = avatarHTML(YO.nombre, YO.id_usuario);
+  cargarFeed();
+})();
+
+/* ── fotos (comprime a 1280px JPEG) ── */
+function pickFotos(destino) { PICK = destino; $('fileInp').value = ''; $('fileInp').click(); }
+$('fileInp').addEventListener('change', async e => {
+  for (const f of Array.from(e.target.files).slice(0, 4 - FOTOS_TMP[PICK].length)) {
+    const url = await comprimir(f);
+    if (url) FOTOS_TMP[PICK].push(url);
+  }
+  pintarPreviews(PICK); if (PICK === 'post') chkPub();
+});
+function comprimir(file) { return new Promise(res => {
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    res(c.toDataURL('image/jpeg', .82));
+  };
+  img.onerror = () => res(null);
+  img.src = URL.createObjectURL(file);
+}); }
+function pintarPreviews(d) {
+  const el = d === 'post' ? $('pvPost') : $('pvItem');
+  el.innerHTML = FOTOS_TMP[d].map((u, i) =>
+    `<div class="pv"><img src="${u}"><button onclick="FOTOS_TMP['${d}'].splice(${i},1);pintarPreviews('${d}');chkPub()">✕</button></div>`).join('');
+}
+
+/* ── muro ── */
+function chkPub() { $('btnPub').disabled = !$('txtPost').value.trim() && !FOTOS_TMP.post.length; }
+
+async function publicar() {
+  $('btnPub').disabled = true;
+  const r = await fetch('/api/facilbook/posts', { method:'POST', headers:H,
+    body: JSON.stringify({ texto: $('txtPost').value, fotos: FOTOS_TMP.post }) }).then(r => r.json());
+  if (!r.success) { alert(r.error); $('btnPub').disabled = false; return; }
+  $('txtPost').value = ''; FOTOS_TMP.post = []; pintarPreviews('post');
+  ULTIMO_ID = 0; cargarFeed();
+}
+
+async function cargarFeed(mas) {
+  const q = mas && ULTIMO_ID ? '?antes_id=' + ULTIMO_ID : '';
+  const r = await fetch('/api/facilbook/feed' + q, { headers:H }).then(r => r.json());
+  const posts = r?.data?.posts || [];
+  const html = posts.map(postHTML).join('');
+  if (mas) $('feed').insertAdjacentHTML('beforeend', html);
+  else $('feed').innerHTML = html || `<div class="card vacio"><img src="img/icon-192.png"><br>Nadie ha publicado aún. ¡Estrena el muro!</div>`;
+  if (posts.length) ULTIMO_ID = posts[posts.length - 1].id;
+  $('btnMas').style.display = posts.length >= 20 ? 'inline-block' : 'none';
+}
+
+function postHTML(p) {
+  const pics = p.fotos.length ? `<div class="pics n${p.fotos.length}">${p.fotos.map(id =>
+    `<img loading="lazy" src="/api/facilbook/fotos/${id}?token=${TK}" onclick="verFoto(this.src)">`).join('')}</div>` : '';
+  const coms = p.comentarios.map(c => `
+    <div class="com">${avatarHTML(c.autor, c.id_usuario)}<div class="burbuja"><b>${esc(c.autor)}</b>${esc(c.texto)}</div>
+    ${c.mio ? `<button class="delc" onclick="delCom(${c.id})"><i class="bi bi-trash"></i></button>` : ''}</div>`).join('');
+  return `<div class="card post" id="post${p.id}">
+    <div class="head">${avatarHTML(p.autor, p.id_usuario)}
+      <div class="quien"><b>${esc(p.autor)}</b><span>${fecha(p.created_at)}</span></div>
+      ${p.mio ? `<button class="del" onclick="delPost(${p.id})"><i class="bi bi-trash"></i></button>` : ''}</div>
+    ${p.texto ? `<div class="texto">${esc(p.texto)}</div>` : ''}${pics}
+    <div class="contadores"><span>${p.likes ? '👍 ' + p.likes.toLocaleString('es-CL') : ''}</span><span>${p.comentarios.length ? p.comentarios.length.toLocaleString('es-CL') + ' comentarios' : ''}</span></div>
+    <div class="botones">
+      <button class="${p.me_gusta ? 'liked' : ''}" onclick="like(${p.id},this)"><i class="bi bi-hand-thumbs-up${p.me_gusta ? '-fill' : ''}"></i> Me gusta</button>
+      <button onclick="this.closest('.post').querySelector('.comInput input').focus()"><i class="bi bi-chat-left"></i> Comentar</button>
+    </div>
+    <div class="coms">${coms}</div>
+    <div class="comInput">${avatarHTML(YO?.nombre, YO?.id_usuario)}
+      <input placeholder="Escribe un comentario…" onkeydown="if(event.key==='Enter')comentar(${p.id},this)"></div>
+  </div>`;
+}
+
+async function like(id, btn) {
+  const r = await fetch(`/api/facilbook/posts/${id}/like`, { method:'POST', headers:H }).then(r => r.json());
+  if (!r.success) return;
+  btn.classList.toggle('liked', r.data.me_gusta);
+  btn.innerHTML = `<i class="bi bi-hand-thumbs-up${r.data.me_gusta ? '-fill' : ''}"></i> Me gusta`;
+  document.querySelector(`#post${id} .contadores span`).textContent = r.data.likes ? '👍 ' + r.data.likes.toLocaleString('es-CL') : '';
+}
+async function comentar(id, inp) {
+  const texto = inp.value.trim(); if (!texto) return;
+  const r = await fetch(`/api/facilbook/posts/${id}/comentarios`, { method:'POST', headers:H, body: JSON.stringify({ texto }) }).then(r => r.json());
+  if (r.success) { ULTIMO_ID = 0; cargarFeed(); }
+}
+async function delPost(id) { if (!confirm('¿Eliminar la publicación?')) return;
+  await fetch(`/api/facilbook/posts/${id}`, { method:'DELETE', headers:H }); ULTIMO_ID = 0; cargarFeed(); }
+async function delCom(id) { await fetch(`/api/facilbook/comentarios/${id}`, { method:'DELETE', headers:H }); ULTIMO_ID = 0; cargarFeed(); }
+function verFoto(src) { $('verFotoImg').src = src; verFotoDlg.showModal(); }
+
+/* ── marketplace ── */
+function verTab(t) {
+  $('vMuro').style.display = t === 'muro' ? 'block' : 'none';
+  $('vMarket').style.display = t === 'market' ? 'block' : 'none';
+  $('tabMuro').classList.toggle('on', t === 'muro');
+  $('tabMarket').classList.toggle('on', t === 'market');
+  if (t === 'market') cargarMarket();
+}
+
+$('itPrecio').addEventListener('input', e => {
+  const n = parseInt(e.target.value.replace(/\D/g, '')) || 0;
+  e.target.value = n ? n.toLocaleString('es-CL') : '';
+});
+
+async function cargarMarket() {
+  const r = await fetch('/api/facilbook/market' + ($('chkTodos').checked ? '?todos=1' : ''), { headers:H }).then(r => r.json());
+  const items = r?.data?.items || [];
+  $('market').innerHTML = items.map(i => `
+    <div class="mk-item" onclick='verItem(${JSON.stringify(i).replace(/'/g, "&#39;")})'>
+      <div class="ph">${i.fotos.length ? `<img loading="lazy" src="/api/facilbook/market-fotos/${i.fotos[0]}?token=${TK}">` : ''}</div>
+      <div class="inf">
+        <div class="precio">${CLP(i.precio)} ${i.estado === 'VENDIDO' ? '<span class="vendido">VENDIDO</span>' : ''}</div>
+        <div class="tit">${esc(i.titulo)}</div>
+        <div class="who">${esc(i.vendedor)} · ${fecha(i.created_at)}</div>
+      </div>
+    </div>`).join('') || `<div class="card vacio" style="grid-column:1/-1"><img src="img/marketplace.png"><br>Nada a la venta todavía. ¡Publica lo primero!</div>`;
+}
+
+function verItem(i) {
+  $('dlgVerBody').innerHTML = `
+    <h5>${esc(i.titulo)}</h5>
+    ${i.fotos.map(f => `<img src="/api/facilbook/market-fotos/${f}?token=${TK}" style="width:100%;border-radius:10px;margin-bottom:8px" onclick="verFoto(this.src)">`).join('')}
+    <div style="font-size:1.3rem;font-weight:800">${CLP(i.precio)} ${i.estado === 'VENDIDO' ? '<span class="vendido">VENDIDO</span>' : ''}</div>
+    ${i.descripcion ? `<p style="white-space:pre-wrap">${esc(i.descripcion)}</p>` : ''}
+    <p style="color:var(--mut);font-size:.85rem"><i class="bi bi-person-circle"></i> Vende ${esc(i.vendedor)} · ${fecha(i.created_at)}</p>
+    <div class="pie">
+      ${i.mio && i.estado === 'DISPONIBLE' ? `<button class="btn-gris" onclick="marcarItem(${i.id},'VENDIDO')">Marcar VENDIDO</button>` : ''}
+      ${i.mio && i.estado === 'VENDIDO' ? `<button class="btn-gris" onclick="marcarItem(${i.id},'DISPONIBLE')">Volver a publicar</button>` : ''}
+      ${i.mio ? `<button class="btn-gris" style="color:#dc3545" onclick="borrarItem(${i.id})">Eliminar</button>` : ''}
+      <button class="btn-pub" onclick="dlgVer.close()">Cerrar</button>
+    </div>`;
+  dlgVer.showModal();
+}
+async function marcarItem(id, estado) {
+  await fetch(`/api/facilbook/market/${id}`, { method:'PUT', headers:H, body: JSON.stringify({ estado }) });
+  dlgVer.close(); cargarMarket();
+}
+async function borrarItem(id) { if (!confirm('¿Eliminar la publicación?')) return;
+  await fetch(`/api/facilbook/market/${id}`, { method:'PUT', headers:H, body: JSON.stringify({ eliminar: true }) });
+  dlgVer.close(); cargarMarket(); }
+
+async function crearItem() {
+  const titulo = $('itTitulo').value.trim();
+  if (!titulo) return alert('Ponle un título');
+  const r = await fetch('/api/facilbook/market', { method:'POST', headers:H, body: JSON.stringify({
+    titulo, precio: parseInt($('itPrecio').value.replace(/\D/g, '')) || 0,
+    descripcion: $('itDesc').value, fotos: FOTOS_TMP.item }) }).then(r => r.json());
+  if (!r.success) return alert(r.error);
+  $('itTitulo').value = $('itPrecio').value = $('itDesc').value = '';
+  FOTOS_TMP.item = []; pintarPreviews('item');
+  dlgItem.close(); cargarMarket();
+}
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

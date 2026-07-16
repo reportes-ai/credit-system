@@ -112,6 +112,24 @@ app.get('/api/health', async (req, res) => {
   } catch (e) { console.error('[cafe seed]', e.message); }
 })();
 
+// Facilbook — la red social interna (muro + marketplace), card para todos los perfiles
+(async () => {
+  try {
+    const pool = require('../../shared/config/database');
+    const MOD = 990003;
+    await pool.query(`INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden) VALUES (?, 'Facilbook', 'La red social de AutoFácil: comparte con el equipo y vende tus cosas en el Marketplace.', 'bi-facebook', '/facilbook/', 998)`, [MOD]);
+    let [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='facilbook' LIMIT 1`);
+    if (!f) {
+      const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Facilbook', 'facilbook', '/facilbook/', 'bi-facebook')`, [MOD]);
+      f = { id_funcionalidad: r.insertId };
+    }
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                      SELECT p.id_perfil, ?, 1 FROM perfiles p
+                      WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                     [f.id_funcionalidad, f.id_funcionalidad]);
+  } catch (e) { console.error('[facilbook seed]', e.message); }
+})();
+
 // Simulador Rápido de Cuotas — card Home para todos los perfiles (popup /simulador-rapido/)
 (async () => {
   try {
@@ -242,6 +260,7 @@ app.use('/api/venta-cartera',        require('../../services/tesoreria/src/route
 app.use('/api/banco',                require('../../services/tesoreria/src/routes/banco-conexiones.routes'));
 app.use('/api/conciliacion',         require('../../services/tesoreria/src/routes/conciliacion.routes'));
 app.use('/api/cierre-mes',           require('../../services/tesoreria/src/routes/cierre-mes.routes'));
+app.use('/api/facilbook',            require('../../services/facilbook/src/routes/facilbook.routes'));
 app.use('/api/trx-bitacora',         require('../../services/tesoreria/src/routes/trx-bitacora.routes'));
 
 // Cartas de Aprobación
@@ -345,6 +364,7 @@ app.get('/health', async (req, res) => {
 // la URL (ej. /dealers vive en mantenedores/dealers/). Agregar página = 1 línea.
 const PAGINAS = [
   ['/cafe', 'cafe/index.html'],
+  ['/facilbook', 'facilbook/index.html'],
   ['/simulador-rapido', 'simulador-rapido/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
