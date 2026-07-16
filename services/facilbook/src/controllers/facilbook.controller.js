@@ -66,6 +66,44 @@ require('../../../../shared/migrate').enFila('facilbook', async () => {
   )`);
 });
 
+/* ── Moderador invisible (IA) ───────────────────────────────────────────────────
+   Revisa el texto ANTES de publicar: groserías, insultos, descalificaciones,
+   discriminación, acoso. Si no pasa, se responde con un mensaje amable (el
+   usuario nunca ve "IA"). Si la IA está apagada o falla → se publica igual
+   (fail-open: la comunidad no se cae porque el moderador durmió). */
+const { analizar } = require('../../../../shared/anthropic');
+try {
+  require('../../../../shared/ia').registrarFuncionalidad({
+    codigo: 'facilbook_moderador',
+    nombre: 'Moderador de Facilbook',
+    descripcion: 'Revisa publicaciones, comentarios y avisos del Marketplace antes de publicarse (groserías, insultos, discriminación). Invisible para el usuario.',
+    modelo: 'claude-haiku-4-5',
+  }).catch(() => {});
+} catch (_) {}
+
+const MENSAJES_AMABLES = [
+  'No le hagas a otros lo que no te gustaría que te hicieran a ti 💙 Dale una vuelta al texto y publícalo de nuevo.',
+  'Ese tono no refleja el espíritu de nuestra comunidad. Facilbook es un espacio de buena convivencia — reformúlalo y será bienvenido.',
+  'Aquí nos tratamos como nos gusta que nos traten. Suaviza el mensaje y vuelve a intentarlo 🤝',
+];
+
+async function moderar(texto) {
+  const t = String(texto || '').trim();
+  if (!t) return { apto: true };
+  try {
+    const { datos } = await analizar({
+      codigo: 'facilbook_moderador',
+      system: 'Eres el moderador de la red social interna de una empresa chilena. Evalúa si el texto es apto para publicarse. NO es apto si contiene: groserías u ordinarieces, insultos o descalificaciones a personas, discriminación de cualquier tipo (género, orientación, religión, nacionalidad, apariencia, etc.), acoso o burlas hirientes. SÍ es apto: humor sano, tallas sin víctima, críticas respetuosas, jerga chilena inofensiva. Ante la duda leve, aprueba (no seas puritano).',
+      prompt: `Texto a evaluar:\n"""${t.slice(0, 4000)}"""\n\nResponde {"apto": true|false, "motivo": "breve"}`,
+      json: true, max_tokens: 150,
+    });
+    if (datos && datos.apto === false) {
+      return { apto: false, mensaje: MENSAJES_AMABLES[Math.floor(Math.random() * MENSAJES_AMABLES.length)] };
+    }
+    return { apto: true };
+  } catch (e) { return { apto: true }; }   // IA apagada o caída → no bloquear
+}
+
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 const MAX_FOTO = 2 * 1024 * 1024;   // 2 MB por foto (el frontend comprime a 1280px)
 const MAX_FOTOS_POST = 4;
@@ -129,6 +167,8 @@ exports.crearPost = async (req, res) => {
     const texto = String(req.body.texto || '').trim().slice(0, 5000);
     const fotos = Array.isArray(req.body.fotos) ? req.body.fotos.slice(0, MAX_FOTOS_POST) : [];
     if (!texto && !fotos.length) return fail(res, 'Escribe algo o sube una foto', 400);
+    const mod = await moderar(texto);
+    if (!mod.apto) return fail(res, mod.mensaje, 422);
     const [r] = await pool.query(`INSERT INTO fb_posts (id_usuario, texto) VALUES (?, ?)`,
       [req.usuario.id_usuario, texto]);
     for (const f of fotos) {
@@ -175,6 +215,8 @@ exports.comentar = async (req, res) => {
   try {
     const texto = String(req.body.texto || '').trim().slice(0, 1000);
     if (!texto) return fail(res, 'Comentario vacío', 400);
+    const mod = await moderar(texto);
+    if (!mod.apto) return fail(res, mod.mensaje, 422);
     const [r] = await pool.query(`INSERT INTO fb_comentarios (id_post, id_usuario, texto) VALUES (?,?,?)`,
       [parseInt(req.params.id), req.usuario.id_usuario, texto]);
     ok(res, { id: r.insertId });
@@ -217,6 +259,8 @@ exports.crearItem = async (req, res) => {
     const titulo = String(req.body.titulo || '').trim().slice(0, 120);
     const precio = Math.max(0, parseInt(req.body.precio) || 0);
     if (!titulo) return fail(res, 'Falta el título', 400);
+    const mod = await moderar(titulo + '\n' + (req.body.descripcion || ''));
+    if (!mod.apto) return fail(res, mod.mensaje, 422);
     const [r] = await pool.query(
       `INSERT INTO fb_market_items (id_usuario, titulo, descripcion, precio) VALUES (?,?,?,?)`,
       [req.usuario.id_usuario, titulo, String(req.body.descripcion || '').trim().slice(0, 2000), precio]);

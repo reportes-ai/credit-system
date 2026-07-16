@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 -->
+<!-- v1.2 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -262,6 +262,7 @@ async function comentar(id, inp) {
   const texto = inp.value.trim(); if (!texto) return;
   const r = await fetch(`/api/facilbook/posts/${id}/comentarios`, { method:'POST', headers:H, body: JSON.stringify({ texto }) }).then(r => r.json());
   if (r.success) { ULTIMO_ID = 0; cargarFeed(); }
+  else alert(r.error);   // el comentario queda escrito en el input para reformularlo
 }
 async function delPost(id) { if (!confirm('¿Eliminar la publicación?')) return;
   await fetch(`/api/facilbook/posts/${id}`, { method:'DELETE', headers:H }); ULTIMO_ID = 0; cargarFeed(); }
