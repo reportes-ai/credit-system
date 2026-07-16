@@ -37,7 +37,7 @@ require('../../../../shared/migrate').enFila('concurso-quedice', async () => {
     let [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='concurso' LIMIT 1`);
     if (!f) {
       const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
-        VALUES (?, '¿Qué Dice AutoFácil?', 'concurso', '/concurso/', 'bi-controller')`, [modRRHH.id_modulo]);
+        VALUES (?, '¿Qué Dice AutoFácil?', 'concurso', '/recursos-humanos/concurso/', 'bi-controller')`, [modRRHH.id_modulo]);
       f = { id_funcionalidad: r.insertId };
       await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
                         SELECT p.id_perfil, ?, 1 FROM perfiles p`, [f.id_funcionalidad]);
