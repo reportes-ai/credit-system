@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.1 — fix: tr class row chocaba con .row de Bootstrap (tabla apilada) -->
+  <!-- v1.2 — ficha: conyuge (misma direccion opcional), hijos dinamicos con carga, 2 contactos de emergencia -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -149,8 +149,31 @@ async function abrir(id){
       ${inp('f_ciudad','Ciudad',f.ciudad)}
       ${inp('f_email_personal','Email personal',f.email_personal)}
       ${inp('f_telefono_personal','Teléfono personal',f.telefono_personal)}
-      ${inp('f_emergencia_nombre','Contacto de emergencia',f.emergencia_nombre)}
-      ${inp('f_emergencia_fono','Fono emergencia',f.emergencia_fono)}
+    </div>
+    <div class="sec">Cónyuge / conviviente</div>
+    <div class="grid3">
+      ${inp('f_conyuge_nombre','Nombre',f.conyuge_nombre)}
+      ${inp('f_conyuge_rut','RUT',f.conyuge_rut)}
+      ${inp('f_conyuge_telefono','Teléfono',f.conyuge_telefono)}
+      <div class="fld" style="grid-column:span 2"><label>Dirección</label>
+        <input id="f_conyuge_direccion" value="${esc(f.conyuge_misma_dir?'':(f.conyuge_direccion||''))}" ${f.conyuge_misma_dir?'disabled placeholder="(misma dirección del colaborador)"':''}></div>
+      <div class="fld" style="display:flex;align-items:end;padding-bottom:6px">
+        <label style="display:flex;align-items:center;gap:7px;margin:0;font-size:.78rem;text-transform:none;color:#334155;cursor:pointer">
+          <input type="checkbox" id="f_conyuge_misma_dir" style="width:auto" ${f.conyuge_misma_dir?'checked':''}
+            onchange="const d=document.getElementById('f_conyuge_direccion'); d.disabled=this.checked; d.placeholder=this.checked?'(misma dirección del colaborador)':''; if(this.checked)d.value='';">
+          Misma dirección particular del colaborador
+        </label>
+      </div>
+    </div>
+    <div class="sec">Hijos <button class="btn-ghost" style="padding:2px 10px;font-size:.74rem;margin-left:8px" onclick="agregarHijo()"><i class="bi bi-plus-lg me-1"></i>Agregar hijo</button></div>
+    <div id="hijosBox"></div>
+    <div class="sec">Contactos de emergencia</div>
+    <div class="grid3">
+      ${inp('f_emergencia_nombre','Contacto 1 — nombre',f.emergencia_nombre)}
+      ${inp('f_emergencia_fono','Contacto 1 — fono',f.emergencia_fono)}
+      <div></div>
+      ${inp('f_emergencia2_nombre','Contacto 2 — nombre',f.emergencia2_nombre)}
+      ${inp('f_emergencia2_fono','Contacto 2 — fono',f.emergencia2_fono)}
     </div>
     <div class="sec">Previsión y pago (confidencial)</div>
     <div class="grid3">
@@ -158,7 +181,7 @@ async function abrir(id){
       ${inp('f_salud','Salud (Fonasa / Isapre)',f.salud)}
       ${inp('f_plan_isapre_uf','Plan Isapre pactado (UF, vacío si Fonasa)',f.plan_isapre_uf,'number')}
       ${inp('f_sueldo_base','Sueldo base ($)',f.sueldo_base,'number')}
-      ${inp('f_banco_pago','Banco de pago',f.banco_pago)}
+      ${inp('f_banco_pago','Banco (depósito de sueldo)',f.banco_pago)}
       ${sel('f_tipo_cuenta_pago','Tipo de cuenta',f.tipo_cuenta_pago,['CUENTA CORRIENTE','CUENTA VISTA','CUENTA RUT','CHEQUERA ELECTRONICA'])}
       ${inp('f_num_cuenta_pago','N° de cuenta',f.num_cuenta_pago)}
     </div>
@@ -175,6 +198,38 @@ async function abrir(id){
         <td style="white-space:nowrap"><a href="#" onclick="return verDoc(${d.id})" style="font-weight:700;margin-right:8px"><i class="bi bi-download"></i></a>
         <button class="btn-mini del" onclick="borrarDoc(${d.id})"><i class="bi bi-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sin documentos.</td></tr>'}</tbody></table>`;
   dlg.showModal();
+  pintarHijos(FICHA.hijos || []);
+}
+
+/* ── Hijos (filas dinámicas) ── */
+function filaHijo(h={}){
+  return `<div class="hijo-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto auto;gap:10px 16px;align-items:end;margin-bottom:8px">
+    <div class="fld"><label>Nombre</label><input class="h_nombre" value="${esc(h.nombre||'')}"></div>
+    <div class="fld"><label>RUT</label><input class="h_rut" value="${esc(h.rut||'')}"></div>
+    <div class="fld"><label>Fecha de nacimiento</label><input type="date" class="h_fnac" value="${esc(h.fecha_nacimiento||'')}"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:#334155;padding-bottom:8px;cursor:pointer;white-space:nowrap">
+      <input type="checkbox" class="h_carga" ${h.es_carga?'checked':''}> Es carga familiar</label>
+    <button class="btn-mini del" style="margin-bottom:6px" title="Quitar" onclick="this.closest('.hijo-row').remove()"><i class="bi bi-trash"></i></button>
+  </div>`;
+}
+function pintarHijos(hijos){
+  document.getElementById('hijosBox').innerHTML = hijos.length
+    ? hijos.map(filaHijo).join('')
+    : '<div style="font-size:.8rem;color:#94a3b8;margin-bottom:6px">Sin hijos registrados.</div>';
+}
+function agregarHijo(){
+  const box = document.getElementById('hijosBox');
+  if (!box.querySelector('.hijo-row')) box.innerHTML = '';
+  box.insertAdjacentHTML('beforeend', filaHijo());
+  box.lastElementChild.querySelector('.h_nombre').focus();
+}
+function leerHijos(){
+  return [...document.querySelectorAll('#hijosBox .hijo-row')].map(r => ({
+    nombre: r.querySelector('.h_nombre').value.trim(),
+    rut: r.querySelector('.h_rut').value.trim(),
+    fecha_nacimiento: r.querySelector('.h_fnac').value,
+    es_carga: r.querySelector('.h_carga').checked ? 1 : 0,
+  })).filter(h => h.nombre || h.rut || h.fecha_nacimiento);
 }
 
 async function guardarFicha(){
@@ -187,6 +242,11 @@ async function guardarFicha(){
     direccion:g('f_direccion'), comuna:g('f_comuna'), ciudad:g('f_ciudad'),
     email_personal:g('f_email_personal'), telefono_personal:g('f_telefono_personal'),
     emergencia_nombre:g('f_emergencia_nombre'), emergencia_fono:g('f_emergencia_fono'),
+    emergencia2_nombre:g('f_emergencia2_nombre'), emergencia2_fono:g('f_emergencia2_fono'),
+    conyuge_nombre:g('f_conyuge_nombre'), conyuge_rut:g('f_conyuge_rut'), conyuge_telefono:g('f_conyuge_telefono'),
+    conyuge_misma_dir: document.getElementById('f_conyuge_misma_dir')?.checked ? 1 : 0,
+    conyuge_direccion: document.getElementById('f_conyuge_misma_dir')?.checked ? '' : g('f_conyuge_direccion'),
+    hijos: leerHijos(),
     afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),

@@ -98,9 +98,35 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
   } catch (e) { console.error('[rrhh-ficha migration]', e.message); }
 });
 
+/* ── Migración: familia (cónyuge + hijos) y 2° contacto de emergencia ───────── */
+require('../../../../shared/migrate').enFila('rrhh-ficha-familia', async () => {
+  try {
+    for (const col of [
+      "conyuge_nombre VARCHAR(160) NULL", "conyuge_rut VARCHAR(15) NULL",
+      "conyuge_telefono VARCHAR(30) NULL", "conyuge_direccion VARCHAR(300) NULL",
+      "conyuge_misma_dir TINYINT NOT NULL DEFAULT 0",
+      "emergencia2_nombre VARCHAR(150) NULL", "emergencia2_fono VARCHAR(30) NULL",
+    ]) await pool.query(`ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rh_hijos (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario INT NOT NULL,
+        nombre VARCHAR(160) NULL,
+        rut VARCHAR(15) NULL,
+        fecha_nacimiento DATE NULL,
+        es_carga TINYINT NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_usuario (id_usuario)
+      )`);
+    console.log('[rrhh-ficha-familia] listo');
+  } catch (e) { console.error('[rrhh-ficha-familia migration]', e.message); }
+});
+
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',
-  'emergencia_nombre', 'emergencia_fono', 'estado_civil', 'nacionalidad'];
+  'emergencia_nombre', 'emergencia_fono', 'emergencia2_nombre', 'emergencia2_fono',
+  'estado_civil', 'nacionalidad',
+  'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
 const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
@@ -122,7 +148,9 @@ async function armarFicha(idUsuario, conSueldo) {
   if (!conSueldo) delete ficha.sueldo_base;
   const [docs] = await pool.query(
     'SELECT id, tipo, nombre_archivo, mime_type, subido_por, created_at FROM rh_documentos WHERE id_usuario=? ORDER BY created_at DESC', [idUsuario]);
-  return { usuario: u, ficha, documentos: docs };
+  const [hijos] = await pool.query(
+    "SELECT id, nombre, rut, DATE_FORMAT(fecha_nacimiento,'%Y-%m-%d') fecha_nacimiento, es_carga FROM rh_hijos WHERE id_usuario=? ORDER BY fecha_nacimiento, id", [idUsuario]);
+  return { usuario: u, ficha, documentos: docs, hijos };
 }
 
 /* GET /api/rrhh/ficha        → la mía
@@ -163,6 +191,19 @@ const putFicha = async (req, res) => {
          VALUES (?${', ?'.repeat(sets.length)}, ?)
          ON DUPLICATE KEY UPDATE ${sets.join(', ')}, updated_by = ?`,
         [objetivo, ...vals, nombreDe(u), ...vals, nombreDe(u)]);
+    }
+    // Hijos: reemplazo completo del set (viene el arreglo entero desde la ficha)
+    if (Array.isArray(b.hijos)) {
+      const hijos = b.hijos
+        .map(h => ({ nombre: String(h.nombre || '').trim().slice(0, 160), rut: String(h.rut || '').trim().slice(0, 15),
+                     fecha_nacimiento: /^\d{4}-\d{2}-\d{2}$/.test(String(h.fecha_nacimiento || '')) ? h.fecha_nacimiento : null,
+                     es_carga: h.es_carga ? 1 : 0 }))
+        .filter(h => h.nombre || h.rut || h.fecha_nacimiento)
+        .slice(0, 20);
+      await pool.query('DELETE FROM rh_hijos WHERE id_usuario=?', [objetivo]);
+      for (const h of hijos)
+        await pool.query('INSERT INTO rh_hijos (id_usuario, nombre, rut, fecha_nacimiento, es_carga) VALUES (?,?,?,?,?)',
+          [objetivo, h.nombre || null, h.rut || null, h.fecha_nacimiento, h.es_carga]);
     }
     // Identidad (usuarios) solo RRHH
     if (rrhh) {
