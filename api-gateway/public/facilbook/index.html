@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,10 @@
   * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',Helvetica,Arial,sans-serif; background:var(--bg); color:var(--txt); }
   /* header azul facilbook */
   .fbbar { background:var(--fb); position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:14px; padding:6px 16px; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+  .fbbar .marca { display:flex; flex-direction:column; gap:1px; }
   .fbbar img.logo { height:34px; display:block; }
+  .fbbar .lema { color:#c9d4ef; font-size:.68rem; font-style:italic; white-space:nowrap; }
+  @media (max-width:760px){ .fbbar .lema { display:none; } }
   .fbbar .tabs { display:flex; gap:6px; margin-left:8px; flex:1; }
   .fbbar .tab { color:#c9d4ef; border:none; background:none; font-weight:700; font-size:.9rem; padding:8px 14px; border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:7px; }
   .fbbar .tab.on { background:rgba(255,255,255,.18); color:#fff; }
@@ -87,7 +90,10 @@
 </head>
 <body>
 <div class="fbbar">
-  <img class="logo" src="img/logo.png" alt="facilbook" title="facilbook — la red social de AutoFácil">
+  <div class="marca">
+    <img class="logo" src="img/logo.png" alt="facilbook" title="facilbook — la red social de AutoFácil">
+    <span class="lema">En Equipo se trabaja mejor… en Comunidad se Vive aún mejor</span>
+  </div>
   <div class="tabs">
     <button class="tab on" id="tabMuro" onclick="verTab('muro')"><i class="bi bi-house-door-fill"></i><span>Muro</span></button>
     <button class="tab" id="tabMarket" onclick="verTab('market')"><i class="bi bi-shop"></i><span>Marketplace</span></button>
