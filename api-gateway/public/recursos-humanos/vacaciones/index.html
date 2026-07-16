@@ -47,9 +47,9 @@
     <table><thead><tr><th>Solicitante</th><th>Desde</th><th>Hasta</th><th>Días</th><th>Estado</th><th id="thAcc"></th></tr></thead><tbody id="tb"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
   </div>
   <div id="secSaldos" class="card-box" style="display:none">
-    <table><thead><tr><th>Colaborador</th><th>Ingreso</th><th style="text-align:right">Abonado</th><th style="text-align:right">Tomado</th><th style="text-align:right">Proporcional</th><th style="text-align:right">Disponible</th><th></th></tr></thead>
-    <tbody id="tbSaldos"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
-    <p style="font-size:.76rem;color:#64748b;margin:10px 0 0">Disponible = saldo de períodos cumplidos + proporcional del período en curso. "Cuenta" abre la cartola del colaborador; "Ajustar" registra un movimiento manual (±) con glosa.</p>
+    <table><thead><tr><th>Colaborador</th><th>Ingreso</th><th style="text-align:right">Abonado</th><th style="text-align:right">Tomado</th><th style="text-align:right">Proporcional</th><th style="text-align:right">Disponible</th><th style="text-align:right">Provisión $</th><th></th></tr></thead>
+    <tbody id="tbSaldos"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
+    <p style="font-size:.76rem;color:#64748b;margin:10px 0 0">Disponible = saldo de períodos cumplidos + proporcional del período en curso. <b>Provisión $</b> = lo que habría que pagar por feriado si la persona se va hoy (días hábiles ×1,4 corridos × remuneración diaria — misma matemática del finiquito). "Cuenta" abre la cartola; "Ajustar" registra un movimiento manual (±) con glosa.</p>
   </div>
 </div>
 <script src="/js/auth-guard.js"></script>
@@ -73,16 +73,22 @@
   async function cargarSaldos(){ const tb=document.getElementById('tbSaldos'); tb.innerHTML='<tr><td colspan="7" class="empty">Calculando saldos…</td></tr>';
     const j=await(await fetch('/api/rrhh/vacaciones/saldos',{headers:H})).json(); if(!j.success){tb.innerHTML=`<tr><td colspan="7" class="empty">${esc(j.error)}</td></tr>`;return;}
     const co=n=>Number(n||0).toLocaleString('es-CL',{maximumFractionDigits:1});
-    tb.innerHTML=(j.data.saldos||[]).map(s=>`<tr>
+    const clp=n=>'$'+Number(n||0).toLocaleString('es-CL');
+    tb.innerHTML=((j.data.saldos||[]).map(s=>`<tr>
       <td><b>${esc(s.nombre)}</b>${s.previos?` <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px" title="años previos (progresivo art. 68)">+${s.previos}a prev</span>`:''}<br><span style="font-size:.72rem;color:#94a3b8">${esc(s.rut||'')}</span></td>
       <td>${s.fecha_ingreso?fd(s.fecha_ingreso):'<span style="color:#dc2626;font-weight:700">S/I</span>'}</td>
       <td style="text-align:right">${co(s.abonos)}</td>
       <td style="text-align:right;color:#b91c1c">${co(s.cargos)}</td>
       <td style="text-align:right;color:#92400e">${co(s.proporcional)}</td>
       <td style="text-align:right;font-weight:800;color:${s.disponibles<0?'#b91c1c':'#15803d'}">${co(s.disponibles)}</td>
+      <td style="text-align:right;font-weight:700;color:#0141A2" title="base ${clp(s.base)}/mes">${clp(s.provision)}</td>
       <td style="white-space:nowrap"><button class="btn-mini" onclick="verCuenta(${s.id_usuario})">Cuenta</button>
         <button class="btn-mini" onclick="ajustar(${s.id_usuario},'${esc(s.nombre).replace(/'/g,'')}')">Ajustar</button></td></tr>`).join('')
-      || '<tr><td colspan="7" class="empty">Sin colaboradores.</td></tr>'; }
+      + `<tr style="background:#012d70;color:#fff;font-weight:800">
+        <td colspan="5" style="padding:10px">TOTAL</td>
+        <td style="text-align:right;padding:10px">${co(j.data.total_dias)} días</td>
+        <td style="text-align:right;padding:10px">${clp(j.data.total_provision)}</td><td></td></tr>`)
+      || '<tr><td colspan="8" class="empty">Sin colaboradores.</td></tr>'; }
   async function ajustar(idU,nombre){ const dias=parseFloat(String(prompt(`Ajuste para ${nombre} (días hábiles, ej: -3 o 2,5):`)||'').replace(',','.')); if(!dias)return;
     const glosa=prompt('Glosa del ajuste (obligatoria):'); if(!glosa)return;
     const j=await(await fetch('/api/rrhh/vacaciones/cuenta/ajuste',{method:'POST',headers:HJ,body:JSON.stringify({id_usuario:idU,dias,glosa})})).json();

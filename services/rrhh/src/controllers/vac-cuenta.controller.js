@@ -228,12 +228,29 @@ exports.getSaldos = async (req, res) => {
               DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
         WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
+    // Provisión de vacaciones (lo que habría que pagar si la persona se va):
+    // misma matemática del finiquito — días hábiles ×1,4 corridos × (base/30);
+    // base = promedio 3 últimas liquidaciones EMITIDAS o sueldo base ×1,25.
+    const [fichas] = await pool.query(`SELECT id_usuario, sueldo_base FROM rh_fichas`);
+    const sbMap = {}; fichas.forEach(f => sbMap[f.id_usuario] = Number(f.sueldo_base) || 0);
+    const [liqs] = await pool.query(
+      `SELECT id_usuario, total_imponible, mes FROM rh_liquidaciones WHERE estado='EMITIDA' ORDER BY mes DESC`);
+    const baseMap = {};
+    for (const l of liqs) {
+      (baseMap[l.id_usuario] = baseMap[l.id_usuario] || []);
+      if (baseMap[l.id_usuario].length < 3) baseMap[l.id_usuario].push(Number(l.total_imponible));
+    }
     const filas = [];
+    let totDias = 0, totProv = 0;
     for (const u of users) {
       const s = await saldoCuenta(u.id_usuario);
-      filas.push({ ...u, ...s });
+      const bl = baseMap[u.id_usuario];
+      const base = bl?.length ? Math.round(bl.reduce((a, b) => a + b, 0) / bl.length) : Math.round(sbMap[u.id_usuario] * 1.25);
+      const provision = Math.max(0, Math.round(s.disponibles * 1.4 * base / 30));
+      totDias += s.disponibles; totProv += provision;
+      filas.push({ ...u, ...s, base, provision });
     }
-    ok(res, { saldos: filas });
+    ok(res, { saldos: filas, total_dias: Math.round(totDias * 10) / 10, total_provision: totProv });
   } catch (e) { fail(res, e.message); }
 };
 
