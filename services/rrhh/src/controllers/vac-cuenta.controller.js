@@ -89,8 +89,9 @@ async function generarDevengos() {
         WHERE u.estado='activo' AND u.fecha_ingreso IS NOT NULL`);
     for (const u of users) {
       const [devs] = await pool.query(
-        `SELECT DATE_FORMAT(periodo_desde,'%Y-%m-%d') pd FROM rh_vac_movimientos WHERE id_usuario=? AND tipo='DEVENGO'`, [u.id_usuario]);
-      const existentes = new Set(devs.map(d => d.pd));
+        `SELECT tipo, DATE_FORMAT(periodo_desde,'%Y-%m-%d') pd FROM rh_vac_movimientos WHERE id_usuario=? AND tipo IN ('DEVENGO','PROGRESIVO')`, [u.id_usuario]);
+      const tieneDev = new Set(devs.filter(d => d.tipo === 'DEVENGO').map(d => d.pd));
+      const tieneProg = new Set(devs.filter(d => d.tipo === 'PROGRESIVO').map(d => d.pd));
       const fi = new Date(u.fi + 'T12:00:00');
       // el período N se DEPOSITA al cumplirse (aniversario N): períodos cuyo fin ya pasó o hoy
       for (let n = 1; n < 60; n++) {
@@ -99,12 +100,14 @@ async function generarDevengos() {
         const finPeriodo = new Date(fi); finPeriodo.setFullYear(fi.getFullYear() + n);   // aniversario N
         if (isoF(finPeriodo) > hoy) break;                        // período aún no cumplido
         const pdIso = isoF(pd);
-        if (existentes.has(pdIso)) continue;
-        await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, periodo_desde, periodo_hasta, glosa)
-          VALUES (?,?,?,?,?,?)`, [u.id_usuario, 'DEVENGO', anuales, pdIso, isoF(ph), `Período ${n} (${pdIso} → ${isoF(ph)})`]);
+        if (!tieneDev.has(pdIso))
+          await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, periodo_desde, periodo_hasta, glosa)
+            VALUES (?,?,?,?,?,?)`, [u.id_usuario, 'DEVENGO', anuales, pdIso, isoF(ph), `Período ${n} (${pdIso} → ${isoF(ph)})`]);
+        // el progresivo se backfillea aparte (ej: al cargar los años previos después)
         const prog = progresivoDelPeriodo(u.previos, n);
-        if (prog > 0) await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, periodo_desde, periodo_hasta, glosa)
-          VALUES (?,?,?,?,?,?)`, [u.id_usuario, 'PROGRESIVO', prog, pdIso, isoF(ph), `Feriado progresivo período ${n} (art. 68)`]);
+        if (prog > 0 && !tieneProg.has(pdIso))
+          await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, periodo_desde, periodo_hasta, glosa)
+            VALUES (?,?,?,?,?,?)`, [u.id_usuario, 'PROGRESIVO', prog, pdIso, isoF(ph), `Feriado progresivo período ${n} (art. 68)`]);
       }
     }
   } catch (e) { console.error('[vac devengos]', e.message); }
@@ -172,7 +175,34 @@ exports.getCuenta = async (req, res) => {
       `SELECT id, tipo, dias, DATE_FORMAT(periodo_desde,'%Y-%m-%d') periodo_desde, DATE_FORMAT(periodo_hasta,'%Y-%m-%d') periodo_hasta,
               glosa, DATE_FORMAT(created_at,'%Y-%m-%d') fecha FROM rh_vac_movimientos WHERE id_usuario=? ORDER BY COALESCE(periodo_desde, created_at), id`, [objetivo]);
     const saldo = await saldoCuenta(objetivo);
-    ok(res, { movimientos: movs, ...saldo });
+
+    // Vista cuenta corriente: los CARGOS se consumen FIFO desde el período más
+    // antiguo — cada consumo se muestra DEBAJO del período que lo financió.
+    const periodos = [];
+    for (const m of movs.filter(x => x.dias > 0 && x.periodo_desde)) {
+      let p = periodos.find(x => x.desde === m.periodo_desde);
+      if (!p) { p = { desde: m.periodo_desde, hasta: m.periodo_hasta, abonos: 0, detalle_abono: [], consumos: [], saldo: 0 }; periodos.push(p); }
+      p.abonos += Number(m.dias); p.saldo += Number(m.dias);
+      p.detalle_abono.push({ tipo: m.tipo, dias: Number(m.dias) });
+    }
+    periodos.sort((a, b) => a.desde < b.desde ? -1 : 1);
+    const sueltosAbono = movs.filter(x => x.dias > 0 && !x.periodo_desde)
+      .map(m => ({ tipo: m.tipo, dias: Number(m.dias), glosa: m.glosa, fecha: m.fecha }));
+    const cargos = movs.filter(x => x.dias < 0).map(m => ({ tipo: m.tipo, dias: -Number(m.dias), glosa: m.glosa, fecha: m.fecha }));
+    const sinPeriodo = [];
+    for (const c of cargos) {
+      let resto = c.dias;
+      for (const p of periodos) {
+        if (resto <= 0) break;
+        if (p.saldo <= 0) continue;
+        const usa = Math.min(p.saldo, resto);
+        p.saldo = Math.round((p.saldo - usa) * 10) / 10;
+        resto = Math.round((resto - usa) * 10) / 10;
+        p.consumos.push({ tipo: c.tipo, dias: usa, glosa: c.glosa, fecha: c.fecha });
+      }
+      if (resto > 0) sinPeriodo.push({ ...c, dias: resto });   // sobregiro: cargo sin período que lo cubra
+    }
+    ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo, ...saldo });
   } catch (e) { fail(res, e.message); }
 };
 

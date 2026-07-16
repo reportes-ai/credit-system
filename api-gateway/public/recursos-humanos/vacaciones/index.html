@@ -85,18 +85,38 @@
     const j = await (await fetch('/api/rrhh/vacaciones/cuenta'+q,{headers:H})).json();
     if (!j.success) return alert(j.error);
     const d = j.data, co=n=>Number(n).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:1});
-    const filas = (d.movimientos||[]).map(m=>`<tr>
-      <td style="padding:4px 8px">${m.periodo_desde?m.periodo_desde.split('-').reverse().join('-')+' → '+(m.periodo_hasta||'').split('-').reverse().join('-'):m.fecha.split('-').reverse().join('-')}</td>
-      <td style="padding:4px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:${m.tipo==='TOMADO'?'#fee2e2':m.tipo==='AJUSTE'?'#fef3c7':'#dcfce7'};color:${m.tipo==='TOMADO'?'#b91c1c':m.tipo==='AJUSTE'?'#92400e':'#15803d'}">${m.tipo}</span></td>
-      <td style="padding:4px 8px;font-size:.8rem;color:#475569">${m.glosa||''}</td>
-      <td style="padding:4px 8px;text-align:right;font-weight:700;color:${m.dias<0?'#b91c1c':'#15803d'}">${m.dias>0?'+':''}${co(m.dias)}</td></tr>`).join('');
-    const w = window.open('','_blank','width=760,height=640');
+    const fmt = s => s ? s.split('-').reverse().join('-') : 'S/I';
+    let filas = '';
+    for (const p of (d.periodos||[])) {
+      const prog = p.detalle_abono.filter(a=>a.tipo==='PROGRESIVO').reduce((s,a)=>s+a.dias,0);
+      filas += `<tr style="background:#eff6ff;font-weight:700">
+        <td style="padding:6px 8px">${fmt(p.desde)} → ${fmt(p.hasta)}</td>
+        <td style="padding:6px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:#dcfce7;color:#15803d">ABONO</span></td>
+        <td style="padding:6px 8px;font-size:.8rem;color:#475569">Período (${co(p.abonos-prog)} legales${prog?` + ${co(prog)} progresivo art. 68`:''})</td>
+        <td style="padding:6px 8px;text-align:right;color:#15803d">+${co(p.abonos)}</td>
+        <td style="padding:6px 8px;text-align:right"></td></tr>`;
+      for (const c of p.consumos) filas += `<tr>
+        <td style="padding:3px 8px 3px 26px;color:#94a3b8;font-size:.8rem">↳</td>
+        <td style="padding:3px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:${c.tipo==='AJUSTE'?'#fef3c7':'#fee2e2'};color:${c.tipo==='AJUSTE'?'#92400e':'#b91c1c'}">${c.tipo}</span></td>
+        <td style="padding:3px 8px;font-size:.8rem;color:#475569">${c.glosa||''}</td>
+        <td style="padding:3px 8px;text-align:right;color:#b91c1c">−${co(c.dias)}</td>
+        <td style="padding:3px 8px"></td></tr>`;
+      filas += `<tr><td colspan="3" style="padding:2px 8px;text-align:right;font-size:.78rem;color:#64748b">saldo del período</td>
+        <td style="padding:2px 8px;text-align:right;font-weight:800;color:${p.saldo>0?'#15803d':'#94a3b8'}">${co(p.saldo)}</td><td></td></tr>
+        <tr><td colspan="5" style="border-bottom:1px solid #e5e7eb"></td></tr>`;
+    }
+    for (const c of (d.cargos_sin_periodo||[])) filas += `<tr>
+      <td style="padding:3px 8px;color:#b91c1c;font-weight:700">SOBREGIRO</td>
+      <td style="padding:3px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:#fee2e2;color:#b91c1c">${c.tipo}</span></td>
+      <td style="padding:3px 8px;font-size:.8rem">${c.glosa||''}</td>
+      <td style="padding:3px 8px;text-align:right;color:#b91c1c">−${co(c.dias)}</td><td></td></tr>`;
+    const w = window.open('','_blank','width=820,height=680');
     w.document.write(`<html><head><title>Cuenta corriente de vacaciones</title></head>
       <body style="font-family:Segoe UI,sans-serif;padding:24px;color:#1e293b">
       <h3 style="color:#012d70">Cuenta corriente de vacaciones</h3>
-      <p><b>Disponibles: ${co(d.disponibles)} días hábiles</b> &nbsp;·&nbsp; saldo de períodos cerrados ${co(d.saldo_periodos)} + proporcional del período en curso ${co(d.proporcional)}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:.85rem"><tr style="background:#f1f5f9;text-align:left"><th style="padding:6px 8px">Período / fecha</th><th style="padding:6px 8px">Tipo</th><th style="padding:6px 8px">Detalle</th><th style="padding:6px 8px;text-align:right">Días</th></tr>${filas||'<tr><td colspan=4 style="padding:14px;text-align:center;color:#94a3b8">Sin movimientos aún (los períodos se depositan automáticamente cada aniversario).</td></tr>'}</table>
-      <p style="font-size:.75rem;color:#64748b">Abonos: 15 días legales por período cumplido + feriado progresivo (art. 68). Cargos: vacaciones aprobadas. Ajustes: regularización histórica de RRHH.</p>
+      <p><b>Disponibles: ${co(d.disponibles)} días hábiles</b> &nbsp;·&nbsp; saldo de períodos cumplidos ${co(d.saldo_periodos)} + proporcional del período en curso ${co(d.proporcional)}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">${filas||'<tr><td style="padding:14px;text-align:center;color:#94a3b8">Sin movimientos aún (los períodos se depositan automáticamente cada aniversario).</td></tr>'}</table>
+      <p style="font-size:.75rem;color:#64748b">Los días tomados se descuentan desde el período más antiguo hacia los más nuevos (FIFO). Abonos: 15 días legales por período cumplido + feriado progresivo (art. 68). Histórico AVSOFT cargado con fechas S/I.</p>
       </body></html>`);
   }
   (async()=>{ await cargarPendientes(); cargarSaldo(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
