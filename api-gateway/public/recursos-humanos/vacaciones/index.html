@@ -119,9 +119,9 @@
     filas += `<tr style="background:#012d70;color:#fff;font-weight:800">
       <td colspan="3" style="padding:8px">SALDO DISPONIBLE (suma de saldos de períodos + proporcional en curso)</td>
       <td style="padding:8px;text-align:right;font-size:1.05rem">${co(d.disponibles)}</td><td></td></tr>`;
-    const w = window.open('','_blank','width=1000,height=700');
+    const w = window.open('','_blank','width=1100,height=700');
     w.document.write(`<html><head><title>Cuenta corriente de vacaciones</title>
-      <style>td:first-child{white-space:nowrap} td{white-space:nowrap} td:nth-child(3){white-space:normal;min-width:380px}</style></head>
+      <style>td{white-space:nowrap}</style></head>
       <body style="font-family:Segoe UI,sans-serif;padding:24px;color:#1e293b">
       <h3 style="color:#012d70">Cuenta corriente de vacaciones</h3>
       <p><b>Disponibles: ${co(d.disponibles)} días hábiles</b> &nbsp;·&nbsp; saldo de períodos cumplidos ${co(d.saldo_periodos)} + proporcional del período en curso ${co(d.proporcional)}</p>
