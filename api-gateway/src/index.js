@@ -174,6 +174,7 @@ app.use('/api/rrhh',                 require('../../services/rrhh/src/routes/rrh
 app.use('/api/contabilidad',         require('../../services/contabilidad/src/routes/contabilidad.routes'));
 app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/routes/dealer-categorias.routes'));
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
+app.use('/api/terreno',              require('../../services/mantenedores/src/routes/visitas-terreno.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
 app.use('/api/definiciones',       require('../../services/mantenedores/src/routes/definiciones.routes'));
 app.use('/api/feriados',           require('../../services/mantenedores/src/routes/feriados.routes'));
