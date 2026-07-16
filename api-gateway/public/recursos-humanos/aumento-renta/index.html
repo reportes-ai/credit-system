@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Aumento de Renta — AutoFácil</title>
-  <!-- v1.0 — calculadora de aumento de renta por persona sobre el motor único de liquidaciones (alcance líquido) -->
+  <!-- v1.1 — calculadora de aumento de renta + anexo de contrato por persona sobre el motor único de liquidaciones (alcance líquido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -84,7 +84,10 @@
         <thead><tr><th>Concepto</th><th>Actual</th><th>Nuevo</th><th>Diferencia</th></tr></thead>
         <tbody id="tb"></tbody>
       </table>
-      <div style="text-align:right;margin-top:10px"><button class="btn-navy" style="background:#475569" onclick="copiar()"><i class="bi bi-clipboard me-1"></i>Copiar resumen</button></div>
+      <div style="text-align:right;margin-top:10px;display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn-navy" style="background:#475569" onclick="copiar()"><i class="bi bi-clipboard me-1"></i>Copiar resumen</button>
+        <button class="btn-navy" onclick="generarAnexo()"><i class="bi bi-file-earmark-text me-1"></i>Generar anexo de contrato</button>
+      </div>
     </div>
   </div>
 
@@ -184,6 +187,89 @@ function copiar(){
   ].join('\n');
   navigator.clipboard.writeText(t).then(() => alert('Resumen copiado'));
 }
+
+/* ═════════ ANEXO DE CONTRATO (imprimible) ═════════
+   Los campos punteados son editables en pantalla antes de imprimir. */
+function generarAnexo(){
+  if (!ULT) return alert('Primero calcula el aumento');
+  const p = ULT.persona, n = ULT.nuevo;
+  const hoy = new Date();
+  const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const fLarga = d => `${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;
+  const vig = new Date(hoy.getFullYear(), hoy.getMonth()+1, 1);           // 1° del mes siguiente
+  const enPalabras = v => fmt(v) + ' (' + numeroALetras(Math.round(v)) + ' pesos)';
+  const ed = (v, w) => `<span class="ed" contenteditable="true" style="min-width:${w||90}px">${v||'____________'}</span>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Anexo de contrato — ${esc(p.nombre)}</title>
+    <style>
+      @page{ size:letter portrait; margin:22mm 24mm }
+      *{ print-color-adjust:exact; -webkit-print-color-adjust:exact }
+      body{ font-family:'Times New Roman',serif; font-size:12.5pt; color:#111; line-height:1.55; margin:0 }
+      h1{ text-align:center; font-size:14pt; margin:0 0 2px; text-transform:uppercase; letter-spacing:.5px }
+      .sub{ text-align:center; font-size:10.5pt; color:#444; margin-bottom:26px }
+      p{ text-align:justify; margin:0 0 13px }
+      .ed{ border-bottom:1px dotted #94a3b8; display:inline-block; padding:0 2px }
+      @media print { .ed{ border-bottom:none } #hint{ display:none } }
+      .firmas{ display:grid; grid-template-columns:1fr 1fr; gap:60px; margin-top:90px; text-align:center; font-size:11.5pt }
+      .firmas div{ border-top:1.5px solid #111; padding-top:6px }
+      #hint{ background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:8px 14px; font-size:10pt; color:#9a3412; font-family:'Segoe UI',sans-serif; margin-bottom:18px }
+      img.logo{ height:34px; float:right; margin-top:-6px }
+    </style></head><body>
+    <div id="hint">✏️ Los campos punteados se pueden corregir haciendo clic antes de imprimir (Ctrl+P).</div>
+    <img class="logo" src="${location.origin}/img/logo.png" alt="AutoFácil">
+    <h1>Anexo de Contrato de Trabajo</h1>
+    <div class="sub">Modificación de remuneración</div>
+    <p>En Santiago de Chile, a ${fLarga(hoy)}, entre ${ed('AUTO FACIL SpA',150)}, RUT ${ed('',110)},
+    representada legalmente por don <b>Leonardo Sevilla</b>, cédula de identidad N° ${ed('',110)}, ambos
+    domiciliados en ${ed('',220)}, en adelante "el Empleador"; y don(ña) <b>${esc(p.nombre_completo||p.nombre)}</b>,
+    cédula de identidad N° <b>${esc(p.rut||'')}</b>, ${p.nacionalidad?esc(p.nacionalidad):ed('',90)},
+    ${p.estado_civil?esc(String(p.estado_civil).toLowerCase()):ed('',90)}, domiciliado(a) en
+    ${p.direccion?esc(p.direccion)+(p.comuna?', comuna de '+esc(p.comuna):''):ed('',220)},
+    en adelante "el Trabajador", se ha convenido el siguiente anexo al contrato de trabajo
+    ${p.fecha_ingreso?'suscrito con fecha <b>'+fLarga(new Date(p.fecha_ingreso+'T12:00:00'))+'</b>':ed('',130)}:</p>
+    <p><b>PRIMERO:</b> Las partes acuerdan que, a contar del <b>${fLarga(vig)}</b>, el sueldo base mensual
+    del Trabajador, quien se desempeña en el cargo de <b>${esc(p.cargo||'')}</b>, será de
+    <b>${enPalabras(n.sueldo_base)}</b>, más la gratificación legal pactada conforme al artículo 50 del
+    Código del Trabajo y las demás asignaciones vigentes.</p>
+    <p><b>SEGUNDO:</b> En todo lo no modificado por el presente anexo, permanecen plenamente vigentes
+    las estipulaciones del contrato de trabajo y sus anexos anteriores, las que las partes declaran
+    conocer y ratificar en este acto.</p>
+    <p><b>TERCERO:</b> El presente anexo se firma en dos ejemplares del mismo tenor y fecha, quedando
+    uno en poder de cada parte.</p>
+    <div class="firmas">
+      <div><b>Leonardo Sevilla</b><br>p.p. AUTO FACIL SpA<br>El Empleador</div>
+      <div><b>${esc(p.nombre_completo||p.nombre)}</b><br>RUT ${esc(p.rut||'')}<br>El Trabajador</div>
+    </div>
+    </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return alert('Permite las ventanas emergentes para generar el anexo.');
+  w.document.write(html); w.document.close();
+}
+
+// Monto en palabras (es-CL) para documentos legales
+function numeroALetras(n){
+  if (!isFinite(n) || n < 0) return '';
+  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte'];
+  const D=['','','veinti','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const tres = x => {
+    if (x===0) return ''; if (x===100) return 'cien';
+    let s = C[Math.floor(x/100)]; const r = x%100;
+    if (r===0) return s;
+    if (s) s += ' ';
+    if (r<=20) return s+U[r];
+    const d=Math.floor(r/10), u=r%10;
+    if (d===2) return s+'veinti'+(u===1?'ún':U[u]);
+    return s+D[d]+(u?' y '+(u===1?'un':U[u]):'');
+  };
+  if (n===0) return 'cero';
+  const mm=Math.floor(n/1000000), mil=Math.floor(n%1000000/1000), un=n%1000;
+  let out='';
+  if (mm) out += (mm===1?'un millón':tres(mm)+' millones');
+  if (mil) out += (out?' ':'')+(mil===1?'mil':tres(mil)+' mil');
+  if (un) out += (out?' ':'')+tres(un);
+  return out;
+}
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 </script>
 <script src="/js/app-version.js"></script>
 </body>

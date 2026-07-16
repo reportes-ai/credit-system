@@ -934,7 +934,10 @@ const aumentoRenta = async (req, res) => {
     if (valor <= 0) return fail(res, 'Ingresa un monto mayor a 0', 400);
 
     const [[p]] = await pool.query(`
-      SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo,
+      SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre,
+             TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) nombre_completo,
+             u.rut, u.cargo, DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso,
+             f.direccion, f.comuna, f.nacionalidad, f.estado_civil,
              f.sueldo_base, f.colacion, f.movilizacion, f.afp, f.salud, f.plan_isapre_uf, f.tipo_contrato
       FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
       WHERE u.id_usuario=? LIMIT 1`, [idU]);
@@ -962,7 +965,9 @@ const aumentoRenta = async (req, res) => {
       advertencias.push(`El imponible supera el tope de cotización (${ind.rem_tope_imponible_uf} UF): sobre el tope solo crecen impuesto y líquido, no las cotizaciones.`);
 
     ok(res, {
-      persona: { id_usuario: p.id_usuario, nombre: p.nombre, cargo: p.cargo, afp: p.afp, tipo_contrato: p.tipo_contrato },
+      persona: { id_usuario: p.id_usuario, nombre: p.nombre, nombre_completo: p.nombre_completo, rut: p.rut,
+                 cargo: p.cargo, afp: p.afp, tipo_contrato: p.tipo_contrato, fecha_ingreso: p.fecha_ingreso,
+                 direccion: p.direccion, comuna: p.comuna, nacionalidad: p.nacionalidad, estado_civil: p.estado_civil },
       indicadores: { uf: ind.uf, utm: ind.utm, imm: ind.rem_imm, tope_imponible_uf: ind.rem_tope_imponible_uf },
       modo, valor, actual, nuevo,
       delta: {
