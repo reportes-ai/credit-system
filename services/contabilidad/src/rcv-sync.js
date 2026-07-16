@@ -75,12 +75,12 @@ const fechaYmd = v => { const s = String(v || '').slice(0, 10); return /^\d{4}-\
 
 async function consultarComprasSII(mes, anio) {
   const c = cfg();
-  const input = { RutUsuario: c.rutUsuario, PasswordSII: c.clave, RutEmpresa: c.rutEmpresa, Ambiente: 1 };
+  // La API valida RutCertificado SIEMPRE (aunque no viaje el .pfx): va el RUT del usuario.
+  const input = { RutUsuario: c.rutUsuario, PasswordSII: c.clave, RutEmpresa: c.rutEmpresa,
+                  Ambiente: 1, RutCertificado: c.rutUsuario, Password: c.certPass || '' };
   const form = new FormData();
-  if (c.certB64) {
-    input.RutCertificado = c.rutUsuario; input.Password = c.certPass;
+  if (c.certB64)
     form.append('certificado', new Blob([Buffer.from(c.certB64, 'base64')], { type: 'application/x-pkcs12' }), 'certificado.pfx');
-  }
   form.append('input', JSON.stringify(input));
   const res = await fetch(`${BASE}rcv/compras/${mes}/${anio}`, {
     method: 'POST', body: form,
