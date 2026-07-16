@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cierre de Mes — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --ok:#15803d; --warn:#b45309; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1200px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .toolbar { display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap; margin-bottom:18px; }
+    .toolbar label { font-size:.78rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .prog-strip { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 22px; margin-bottom:18px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+    .prog-bar { flex:1; min-width:220px; background:#e5e7eb; border-radius:99px; height:14px; overflow:hidden; }
+    .prog-bar > div { height:100%; background:linear-gradient(90deg,#0141A2,#009AFE); border-radius:99px; transition:width .4s; }
+    .prog-bar.full > div { background:var(--ok); }
+    .btn-cerrar { background:linear-gradient(135deg,#15803d,#22c55e); color:#fff; border:none; border-radius:10px; padding:11px 26px; font-weight:800; font-size:.95rem; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .btn-cerrar:disabled { background:#d1d5db; cursor:not-allowed; }
+    .cerrado-banner { background:#f0fdf4; border:1.5px solid #bbf7d0; color:#166534; border-radius:12px; padding:14px 20px; font-weight:600; margin-bottom:18px; display:none; }
+    .item { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 22px; margin-bottom:12px; display:flex; gap:16px; align-items:flex-start; }
+    .item .sem { width:38px; height:38px; flex:0 0 auto; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+    .sem.ok { background:#dcfce7; color:var(--ok); }
+    .sem.pend { background:#fef3c7; color:var(--warn); }
+    .sem.atraso { background:#fee2e2; color:#b91c1c; }
+    .item .cuerpo { flex:1; min-width:0; }
+    .item h6 { margin:0; font-weight:800; font-size:.95rem; color:#111827; }
+    .item .desc { font-size:.82rem; color:#6b7280; margin-top:2px; }
+    .item .meta { font-size:.76rem; color:#6b7280; margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; }
+    .item .meta b { color:#374151; }
+    .auto-chip { font-size:.74rem; border-radius:7px; padding:2px 9px; font-weight:700; display:inline-block; margin-top:6px; }
+    .auto-ok { background:#dcfce7; color:var(--ok); }
+    .auto-bad { background:#fee2e2; color:#b91c1c; }
+    .item .acciones { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+    .btn-ok { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 16px; font-size:.83rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    .btn-ok:hover { background:var(--navy-light); }
+    .btn-undo { background:#fff; border:1.5px solid #fca5a5; color:#b91c1c; border-radius:8px; padding:5px 12px; font-size:.75rem; font-weight:700; cursor:pointer; }
+    .btn-link { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:5px 12px; font-size:.75rem; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
+    .okinfo { font-size:.76rem; color:var(--ok); font-weight:600; text-align:right; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:520px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog .dlg-head { padding:16px 22px; border-bottom:1px solid #e5e7eb; font-weight:700; }
+    dialog .dlg-body { padding:20px 22px; }
+    dialog .dlg-foot { padding:14px 22px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    @media(max-width:640px){ .main-content{padding:16px;} .item{flex-direction:column;} .item .acciones{align-items:flex-start;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v1.0</span></a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-calendar2-check me-1"></i>Cierre de Mes</span>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <a id="lnkConfig" href="#" onclick="abrirConfig();return false" style="display:none;color:rgba(255,255,255,.85);font-size:.82rem;text-decoration:none;border:1px solid rgba(255,255,255,.25);border-radius:6px;padding:5px 10px"><i class="bi bi-gear me-1"></i>Configurar</a>
+    <button class="btn-logout" onclick="sessionStorage.clear();location.href='/login'"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-calendar2-check"></i>
+    <div>
+      <h2>Cierre de Mes</h2>
+      <p>Checklist obligatorio con responsables: cuando todos los puntos están en verde, el mes se cierra y queda con candado contable</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div><label>Mes a cerrar</label><input type="month" id="fMes" class="form-control" onchange="cargar()"></div>
+  </div>
+
+  <div class="cerrado-banner" id="cerradoBanner"></div>
+
+  <div class="prog-strip">
+    <div style="font-weight:800;color:#111827" id="progTxt">—</div>
+    <div class="prog-bar" id="progBar"><div style="width:0%"></div></div>
+    <button class="btn-cerrar" id="btnCerrar" onclick="cerrarMesTotal()" disabled><i class="bi bi-lock-fill"></i> CERRAR MES</button>
+  </div>
+
+  <div id="lista"></div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este módulo</h6>
+    <ul style="margin:0;">
+      <li><b>CERRAR MES</b> → activa el candado contable (<code>ctb_meses_cerrados</code>): <a href="/contabilidad/">Contabilidad</a> rechaza comprobantes con fecha del mes cerrado; el acta se envía por correo a los destinatarios configurados.</li>
+      <li><b>OK de cada punto</b> → queda en <a href="/auditoria/">Auditoría</a> (quién, cuándo, comentario) y se congela en el acta.</li>
+      <li><b>Recordatorios</b> → correo diario a cada responsable con puntos pendientes vencidos (desde su día hábil límite).</li>
+      <li><b>Checklist e ítems</b> → se configuran en esta misma página (botón Configurar, requiere permiso <code>cierre_mes_config</code>).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- OK con comentario -->
+<dialog id="dlgOk">
+  <div class="dlg-head"><i class="bi bi-check2-circle me-1"></i> Dar OK — <span id="okNombre"></span></div>
+  <div class="dlg-body">
+    <div id="okAuto" style="font-size:.82rem;margin-bottom:10px;"></div>
+    <label style="font-size:.82rem;font-weight:600;color:#374151">Comentario (opcional)</label>
+    <textarea id="okComent" class="form-control" rows="2" placeholder="Ej: conciliado todo salvo 1 mov justificado con..."></textarea>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgOk.close()">Cancelar</button>
+    <button class="btn-ok" onclick="confirmarOk()"><i class="bi bi-check-lg"></i> Confirmar OK</button>
+  </div>
+</dialog>
+
+<!-- Configuración -->
+<dialog id="dlgCfg" style="max-width:760px">
+  <div class="dlg-head"><i class="bi bi-gear me-1"></i> Configurar Checklist de Cierre</div>
+  <div class="dlg-body" style="max-height:65vh;overflow:auto">
+    <div class="mb-3">
+      <label style="font-size:.82rem;font-weight:600">Correos que reciben el ACTA al cerrar el mes (separados por coma)</label>
+      <input id="cfgCorreos" class="form-control" placeholder="gerencia@..., ecuador@...">
+    </div>
+    <table class="table table-sm" style="font-size:.8rem">
+      <thead><tr><th>#</th><th>Punto</th><th>Responsable</th><th>Día hábil</th><th>Oblig.</th><th>Activo</th><th></th></tr></thead>
+      <tbody id="cfgItems"></tbody>
+    </table>
+    <button class="btn-ghost" onclick="editarItem(null)"><i class="bi bi-plus-lg"></i> Nuevo punto</button>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgCfg.close()">Cerrar</button>
+    <button class="btn-ok" onclick="guardarCorreos()"><i class="bi bi-floppy"></i> Guardar correos</button>
+  </div>
+</dialog>
+
+<!-- Editor de ítem -->
+<dialog id="dlgItem">
+  <div class="dlg-head"><i class="bi bi-pencil me-1"></i> <span id="itTitulo">Punto del checklist</span></div>
+  <div class="dlg-body">
+    <input type="hidden" id="itId">
+    <label class="lblf">Nombre</label><input id="itNombre" class="form-control mb-2">
+    <label class="lblf">Descripción</label><input id="itDesc" class="form-control mb-2">
+    <label class="lblf">Link a la pantalla donde se verifica (opcional)</label><input id="itHref" class="form-control mb-2" placeholder="/tesoreria/...">
+    <div class="row g-2 mb-2">
+      <div class="col-4"><label class="lblf">Orden</label><input id="itOrden" type="number" class="form-control"></div>
+      <div class="col-4"><label class="lblf">Día hábil límite</label><input id="itDia" type="number" min="1" max="15" class="form-control"></div>
+      <div class="col-4"><label class="lblf">Chequeo automático</label><select id="itAuto" class="form-select"><option value="">— ninguno —</option></select></div>
+    </div>
+    <div class="row g-2 mb-2">
+      <div class="col-4"><label class="lblf">Responsable</label><select id="itTipo" class="form-select" onchange="toggleResp()"><option value="PERFIL">Perfil</option><option value="USUARIO">Usuario</option></select></div>
+      <div class="col-8"><label class="lblf">&nbsp;</label>
+        <select id="itPerfil" class="form-select"></select>
+        <select id="itUsuario" class="form-select" style="display:none"></select></div>
+    </div>
+    <div class="form-check"><input type="checkbox" class="form-check-input" id="itOblig"><label class="form-check-label" style="font-size:.85rem" for="itOblig">Obligatorio para cerrar el mes</label></div>
+    <div class="form-check"><input type="checkbox" class="form-check-input" id="itActivo"><label class="form-check-label" style="font-size:.85rem" for="itActivo">Activo</label></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn-ghost" onclick="dlgItem.close()">Cancelar</button>
+    <button class="btn-ok" onclick="guardarItem()"><i class="bi bi-floppy"></i> Guardar</button>
+  </div>
+</dialog>
+
+<style>.lblf{font-size:.78rem;font-weight:600;color:#374151;display:block;margin-bottom:3px}</style>
+<script src="/js/app-version.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const fF = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
+const fDT = f => f ? new Date(f).toLocaleString('es-CL', {dateStyle:'short', timeStyle:'short'}) : '';
+
+let EST = null, ITEM_OK = null, CFG = null, PUEDO_CERRAR = false, PUEDO_CFG = false, MI_ID = null;
+
+(async function init(){
+  try {
+    const j = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
+    const fns = j.funcionalidades || [];
+    PUEDO_CERRAR = fns.includes('cierre_mes_cerrar');
+    PUEDO_CFG = fns.includes('cierre_mes_config');
+    MI_ID = (j.data && j.data.usuario && j.data.usuario.id_usuario) || null;
+    if (PUEDO_CFG) $('lnkConfig').style.display = '';
+  } catch {}
+  // default: mes anterior
+  const d = new Date(); d.setMonth(d.getMonth() - 1);
+  $('fMes').value = d.toISOString().slice(0, 7);
+  cargar();
+})();
+
+async function cargar(){
+  const j = await (await fetch('/api/cierre-mes/estado?mes=' + $('fMes').value, { headers: H })).json();
+  if (!j.success) { $('lista').innerHTML = `<div style="color:#b91c1c">${j.error}</div>`; return; }
+  EST = j.data;
+  render();
+}
+
+function render(){
+  const hoy = new Date().toISOString().slice(0, 10);
+  const items = EST.items;
+  const okN = items.filter(i => i.estado === 'OK').length;
+  const oblig = items.filter(i => i.obligatorio);
+  const obligOk = oblig.filter(i => i.estado === 'OK').length;
+
+  $('progTxt').textContent = `${okN} de ${items.length} puntos OK (${obligOk}/${oblig.length} obligatorios)`;
+  const pct = items.length ? Math.round(okN / items.length * 100) : 0;
+  $('progBar').classList.toggle('full', EST.obligatorios_ok);
+  $('progBar').firstElementChild.style.width = pct + '%';
+  $('btnCerrar').disabled = !(EST.obligatorios_ok && PUEDO_CERRAR && !EST.cerrado);
+  $('btnCerrar').innerHTML = EST.cerrado ? '<i class="bi bi-lock-fill"></i> MES CERRADO' : '<i class="bi bi-lock-fill"></i> CERRAR MES';
+
+  const cb = $('cerradoBanner');
+  if (EST.cerrado && EST.acta) {
+    cb.style.display = '';
+    cb.innerHTML = `<i class="bi bi-patch-check-fill me-1"></i> Mes ${EST.mes} CERRADO por ${EST.acta.cerrado_nombre} el ${fDT(EST.acta.cerrado_at)}. El checklist quedó congelado en el acta${EST.acta.correo_a ? ' (enviada a ' + EST.acta.correo_a + ')' : ''}.`;
+  } else cb.style.display = 'none';
+
+  $('lista').innerHTML = items.map(i => {
+    const atrasado = i.estado !== 'OK' && i.limite < hoy;
+    const soyResp = (i.responsables || []).some(r => r.id_usuario === MI_ID);
+    const puedoOk = !EST.cerrado && (soyResp || PUEDO_CERRAR);
+    return `<div class="item">
+      <div class="sem ${i.estado === 'OK' ? 'ok' : (atrasado ? 'atraso' : 'pend')}">
+        <i class="bi ${i.estado === 'OK' ? 'bi-check-lg' : (atrasado ? 'bi-exclamation-lg' : 'bi-hourglass-split')}"></i></div>
+      <div class="cuerpo">
+        <h6>${i.nombre} ${i.obligatorio ? '' : '<span style="font-weight:400;color:#9ca3af;font-size:.78rem">(opcional)</span>'}</h6>
+        <div class="desc">${i.descripcion || ''}</div>
+        <div class="meta">
+          <span><b>Responsable:</b> ${i.responsable_txt}${soyResp ? ' (tú)' : ''}</span>
+          <span><b>Límite:</b> ${fF(i.limite)}${atrasado ? ' <b style="color:#b91c1c">· VENCIDO</b>' : ''}</span>
+        </div>
+        ${i.auto ? `<span class="auto-chip ${i.auto.ok ? 'auto-ok' : 'auto-bad'}"><i class="bi bi-robot me-1"></i>${i.auto.detalle}</span>` : ''}
+        ${i.estado === 'OK' && i.comentario ? `<div style="font-size:.78rem;color:#374151;margin-top:6px"><i class="bi bi-chat-left-text me-1"></i>${i.comentario}</div>` : ''}
+      </div>
+      <div class="acciones">
+        ${i.estado === 'OK'
+          ? `<div class="okinfo"><i class="bi bi-check-circle-fill me-1"></i>OK de ${i.ok_nombre}<br><span style="color:#6b7280;font-weight:400">${fDT(i.ok_at)}</span></div>
+             ${puedoOk ? `<button class="btn-undo" onclick="deshacerOk(${i.id})"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</button>` : ''}`
+          : (puedoOk ? `<button class="btn-ok" onclick="abrirOk(${i.id})"><i class="bi bi-check-lg"></i> Dar OK</button>` : '')}
+        ${i.href ? `<a class="btn-link" href="${i.href}" target="_blank"><i class="bi bi-box-arrow-up-right"></i> Revisar</a>` : ''}
+      </div>
+    </div>`;
+  }).join('') || '<div style="color:#9ca3af;text-align:center;padding:40px">Sin puntos configurados</div>';
+}
+
+function abrirOk(id){
+  ITEM_OK = EST.items.find(i => i.id === id);
+  $('okNombre').textContent = ITEM_OK.nombre;
+  $('okComent').value = '';
+  $('okAuto').innerHTML = ITEM_OK.auto
+    ? `<span class="auto-chip ${ITEM_OK.auto.ok ? 'auto-ok' : 'auto-bad'}"><i class="bi bi-robot me-1"></i>${ITEM_OK.auto.detalle}</span>
+       ${!ITEM_OK.auto.ok ? '<div style="color:#b45309;font-size:.78rem;margin-top:6px">El chequeo automático aún detecta pendientes — si igual das el OK, deja un comentario que lo justifique.</div>' : ''}` : '';
+  dlgOk.showModal();
+}
+async function confirmarOk(){
+  const j = await (await fetch('/api/cierre-mes/ok', { method: 'POST', headers: H,
+    body: JSON.stringify({ mes: EST.mes, id_item: ITEM_OK.id, comentario: $('okComent').value.trim() }) })).json();
+  dlgOk.close();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+async function deshacerOk(id){
+  if (!confirm('¿Deshacer el OK de este punto?')) return;
+  const j = await (await fetch('/api/cierre-mes/ok', { method: 'POST', headers: H,
+    body: JSON.stringify({ mes: EST.mes, id_item: id, deshacer: true }) })).json();
+  if (!j.success) return alert(j.error);
+  cargar();
+}
+async function cerrarMesTotal(){
+  if (!confirm(`¿CERRAR el mes ${EST.mes}?\n\nSe activará el candado contable (no se podrán registrar movimientos de ese mes) y se enviará el acta por correo. Esta acción queda auditada.`)) return;
+  const j = await (await fetch('/api/cierre-mes/cerrar', { method: 'POST', headers: H, body: JSON.stringify({ mes: EST.mes }) })).json();
+  if (!j.success) return alert(j.error);
+  alert(`Mes ${EST.mes} cerrado ✔${j.data.correos_acta ? '\nActa enviada a ' + j.data.correos_acta + ' destinatario(s).' : '\n(No hay correos de acta configurados)'}`);
+  cargar();
+}
+
+/* ── Configuración ── */
+async function abrirConfig(){
+  const j = await (await fetch('/api/cierre-mes/config', { headers: H })).json();
+  if (!j.success) return alert(j.error);
+  CFG = j.data;
+  $('cfgCorreos').value = CFG.correos_acta || '';
+  $('cfgItems').innerHTML = CFG.items.map(i => `
+    <tr style="${i.activo ? '' : 'opacity:.5'}">
+      <td>${i.orden}</td><td>${i.nombre}${i.check_auto ? ' <i class="bi bi-robot" title="chequeo automático"></i>' : ''}</td>
+      <td>${i.resp_tipo === 'USUARIO' ? (CFG.usuarios.find(u => u.id_usuario === i.id_usuario)?.nombre || '—') : (CFG.perfiles.find(p => p.id_perfil === i.id_perfil)?.nombre || '—')}</td>
+      <td>día ${i.dia_habil}</td><td>${i.obligatorio ? 'Sí' : 'No'}</td><td>${i.activo ? 'Sí' : 'No'}</td>
+      <td><button class="btn-ghost" style="padding:2px 8px" onclick="editarItem(${i.id})"><i class="bi bi-pencil"></i></button></td>
+    </tr>`).join('');
+  const selA = $('itAuto');
+  selA.innerHTML = '<option value="">— ninguno —</option>' + CFG.checks_auto.map(c => `<option>${c}</option>`).join('');
+  $('itPerfil').innerHTML = CFG.perfiles.map(p => `<option value="${p.id_perfil}">${p.nombre}</option>`).join('');
+  $('itUsuario').innerHTML = CFG.usuarios.map(u => `<option value="${u.id_usuario}">${u.nombre}</option>`).join('');
+  dlgCfg.showModal();
+}
+function toggleResp(){
+  const u = $('itTipo').value === 'USUARIO';
+  $('itUsuario').style.display = u ? '' : 'none';
+  $('itPerfil').style.display = u ? 'none' : '';
+}
+function editarItem(id){
+  const i = id ? CFG.items.find(x => x.id === id) : null;
+  $('itTitulo').textContent = i ? 'Editar punto' : 'Nuevo punto';
+  $('itId').value = i ? i.id : '';
+  $('itNombre').value = i ? i.nombre : '';
+  $('itDesc').value = i ? (i.descripcion || '') : '';
+  $('itHref').value = i ? (i.href || '') : '';
+  $('itOrden').value = i ? i.orden : (CFG.items.length + 1);
+  $('itDia').value = i ? i.dia_habil : 5;
+  $('itAuto').value = i ? (i.check_auto || '') : '';
+  $('itTipo').value = i ? i.resp_tipo : 'PERFIL';
+  toggleResp();
+  if (i && i.resp_tipo === 'USUARIO' && i.id_usuario) $('itUsuario').value = i.id_usuario;
+  if (i && i.id_perfil) $('itPerfil').value = i.id_perfil;
+  $('itOblig').checked = i ? !!i.obligatorio : true;
+  $('itActivo').checked = i ? !!i.activo : true;
+  dlgItem.showModal();
+}
+async function guardarItem(){
+  const body = {
+    id: $('itId').value ? Number($('itId').value) : null,
+    nombre: $('itNombre').value.trim(), descripcion: $('itDesc').value.trim(), href: $('itHref').value.trim() || null,
+    orden: Number($('itOrden').value) || 0, dia_habil: Number($('itDia').value) || 5,
+    check_auto: $('itAuto').value || null,
+    resp_tipo: $('itTipo').value,
+    id_usuario: $('itTipo').value === 'USUARIO' ? Number($('itUsuario').value) : null,
+    id_perfil: $('itTipo').value === 'PERFIL' ? Number($('itPerfil').value) : null,
+    obligatorio: $('itOblig').checked ? 1 : 0, activo: $('itActivo').checked ? 1 : 0,
+  };
+  if (!body.nombre) return alert('Nombre obligatorio');
+  const j = await (await fetch('/api/cierre-mes/items', { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
+  if (!j.success) return alert(j.error);
+  dlgItem.close();
+  abrirConfig();
+  cargar();
+}
+async function guardarCorreos(){
+  const j = await (await fetch('/api/cierre-mes/config', { method: 'PUT', headers: H,
+    body: JSON.stringify({ correos_acta: $('cfgCorreos').value.trim() }) })).json();
+  if (!j.success) return alert(j.error);
+  dlgCfg.close();
+}
+</script>
+</body>
+</html>
