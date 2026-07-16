@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.1 — saldo de vacaciones (devengado proporcional vs usados) -->
+  <!-- v1.2 — saldo de vacaciones (devengado proporcional vs usados) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -78,8 +78,27 @@
   async function cargarSaldo(){ try{ const j=await(await fetch('/api/rrhh/vacaciones/saldo',{headers:H})).json(); if(!j.success)return; const d=j.data;
     const el=document.getElementById('saldoBox'); const co=n=>String(n).replace('.',',');
     if(d.sin_fecha){ el.innerHTML='<i class="bi bi-info-circle me-1"></i>'+d.mensaje; el.style.display=''; return; }
-    el.innerHTML=`<i class="bi bi-sun me-1"></i><b>Tu saldo de vacaciones:</b> ${co(d.disponibles)} día(s) hábil(es) disponibles &nbsp;·&nbsp; devengados ${co(d.devengados)} (${d.meses} meses × ${co(Math.round(d.dias_anuales/12*100)/100)}/mes) &nbsp;·&nbsp; usados ${co(d.usados)}`;
+    el.innerHTML=`<i class="bi bi-sun me-1"></i><b>Tu saldo de vacaciones:</b> ${co(d.disponibles)} día(s) hábil(es) disponibles &nbsp;·&nbsp; abonados ${co(d.devengados)} (períodos + progresivo + proporcional del año en curso) &nbsp;·&nbsp; tomados ${co(d.usados)} &nbsp;·&nbsp; <a href="#" onclick="verCuenta();return false">ver cuenta corriente</a>`;
     el.style.display=''; }catch(e){} }
+  async function verCuenta(idU){
+    const q = idU ? '?id_usuario='+idU : '';
+    const j = await (await fetch('/api/rrhh/vacaciones/cuenta'+q,{headers:H})).json();
+    if (!j.success) return alert(j.error);
+    const d = j.data, co=n=>Number(n).toLocaleString('es-CL',{minimumFractionDigits:0,maximumFractionDigits:1});
+    const filas = (d.movimientos||[]).map(m=>`<tr>
+      <td style="padding:4px 8px">${m.periodo_desde?m.periodo_desde.split('-').reverse().join('-')+' → '+(m.periodo_hasta||'').split('-').reverse().join('-'):m.fecha.split('-').reverse().join('-')}</td>
+      <td style="padding:4px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:${m.tipo==='TOMADO'?'#fee2e2':m.tipo==='AJUSTE'?'#fef3c7':'#dcfce7'};color:${m.tipo==='TOMADO'?'#b91c1c':m.tipo==='AJUSTE'?'#92400e':'#15803d'}">${m.tipo}</span></td>
+      <td style="padding:4px 8px;font-size:.8rem;color:#475569">${m.glosa||''}</td>
+      <td style="padding:4px 8px;text-align:right;font-weight:700;color:${m.dias<0?'#b91c1c':'#15803d'}">${m.dias>0?'+':''}${co(m.dias)}</td></tr>`).join('');
+    const w = window.open('','_blank','width=760,height=640');
+    w.document.write(`<html><head><title>Cuenta corriente de vacaciones</title></head>
+      <body style="font-family:Segoe UI,sans-serif;padding:24px;color:#1e293b">
+      <h3 style="color:#012d70">Cuenta corriente de vacaciones</h3>
+      <p><b>Disponibles: ${co(d.disponibles)} días hábiles</b> &nbsp;·&nbsp; saldo de períodos cerrados ${co(d.saldo_periodos)} + proporcional del período en curso ${co(d.proporcional)}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem"><tr style="background:#f1f5f9;text-align:left"><th style="padding:6px 8px">Período / fecha</th><th style="padding:6px 8px">Tipo</th><th style="padding:6px 8px">Detalle</th><th style="padding:6px 8px;text-align:right">Días</th></tr>${filas||'<tr><td colspan=4 style="padding:14px;text-align:center;color:#94a3b8">Sin movimientos aún (los períodos se depositan automáticamente cada aniversario).</td></tr>'}</table>
+      <p style="font-size:.75rem;color:#64748b">Abonos: 15 días legales por período cumplido + feriado progresivo (art. 68). Cargos: vacaciones aprobadas. Ajustes: regularización histórica de RRHH.</p>
+      </body></html>`);
+  }
   (async()=>{ await cargarPendientes(); cargarSaldo(); const qid=new URLSearchParams(location.search).get('id'); if(qid){tab('mias');} else tab('crear'); })();
 </script>
 <script src="/js/app-version.js"></script>

@@ -203,6 +203,8 @@ const resolverVacaciones = async (req, res) => {
     await pool.query('UPDATE rh_vacaciones SET estado=?, resuelto_por=?, resuelto_nombre=?, motivo_rechazo=? WHERE id=?',
       [estado, u.id_usuario || null, nombreDe(u), estado === 'RECHAZADA' ? (norm((req.body || {}).motivo_rechazo) || null) : null, s.id]);
     if (s.id_usuario) notificar([s.id_usuario], { tipo: 'RH_VACACIONES', titulo: `🌴 Vacaciones ${estado === 'APROBADA' ? 'aprobadas' : 'rechazadas'}`, mensaje: `${s.fecha_desde} al ${s.fecha_hasta} (${s.dias}d)`, href: '/recursos-humanos/vacaciones/?id=' + s.id });
+    // Cuenta corriente: la aprobación descuenta los días hábiles del saldo
+    if (estado === 'APROBADA') try { await require('./vac-cuenta.controller').registrarTomado(s); } catch (_) {}
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: s.id, detalle: `Vacaciones #${s.id} → ${estado}` });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }

@@ -153,7 +153,7 @@ const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'tel
   'conyuge_nombre', 'conyuge_rut', 'conyuge_telefono', 'conyuge_direccion', 'conyuge_misma_dir'];
 const CAMPOS_LABORAL = ['tipo_contrato', 'jornada', 'afp', 'salud', 'plan_isapre_uf', 'sueldo_base',
   'banco_pago', 'tipo_cuenta_pago', 'num_cuenta_pago', 'observaciones',
-  'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas'];
+  'tramo_asignacion', 'cargas_otras', 'cargas_maternales', 'cargas_invalidas', 'anos_trabajados_previos'];
 // Identidad en usuarios que RRHH puede actualizar desde la ficha
 const CAMPOS_USUARIO = ['cargo', 'fecha_ingreso', 'fecha_nacimiento', 'sexo', 'telefono', 'centro_costo'];
 

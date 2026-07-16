@@ -446,9 +446,11 @@ function diasTrabajadosMes(mes, fechaIngreso, licencias) {
 }
 
 async function licenciasDelMes(mes) {
+  // Descuentan días trabajados: licencias (paga el subsidio la isapre/Fonasa),
+  // permisos SIN goce y ausencias injustificadas. Vacaciones NO descuentan (pagadas).
   const [rows] = await pool.query(
     `SELECT id_usuario, fecha_desde, fecha_hasta FROM rh_ausencias
-      WHERE tipo='LICENCIA MEDICA' AND estado='APROBADA'
+      WHERE tipo IN ('LICENCIA MEDICA','PERMISO SIN GOCE','AUSENCIA INJUSTIFICADA') AND estado='APROBADA'
         AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
   const m = {};
   rows.forEach(r => { (m[r.id_usuario] = m[r.id_usuario] || []).push(r); });

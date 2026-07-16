@@ -48,6 +48,9 @@ router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos',
 router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);
 router.post('/finiquitos',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoGuardar);
 router.get('/finiquitos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoLista);
+const vc = require('../controllers/vac-cuenta.controller');
+router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
+router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);

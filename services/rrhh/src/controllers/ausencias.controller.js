@@ -122,6 +122,27 @@ const crear = async (req, res) => {
       adjMime = b.adjunto_mime || null;
     }
 
+    if (tipo === 'AUSENCIA INJUSTIFICADA') {
+      // La registra RRHH o la jefatura directa a nombre del colaborador; queda
+      // APROBADA de inmediato y se evalúa el patrón del art. 160 N°3.
+      const idColab = Number(b.id_colaborador);
+      if (!idColab) return fail(res, 'Indica el colaborador de la ausencia', 400);
+      const rrhh = (u.perfil === 'Administrador') || await esRRHH(u.id_usuario);
+      if (!rrhh && !(await esJefeDe(u.id_usuario, idColab)))
+        return fail(res, 'Las ausencias injustificadas las registra RRHH o la jefatura directa', 403);
+      const [[colab]] = await pool.query(
+        `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.id_supervisor FROM usuarios u WHERE u.id_usuario=?`, [idColab]);
+      if (!colab) return fail(res, 'Colaborador no encontrado', 404);
+      const [r] = await pool.query(
+        `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, estado, resuelto_por, resuelto_nombre)
+         VALUES (?,?,?,?,?,0,?,?,'APROBADA',?,?)`,
+        [colab.id_usuario, colab.nombre, tipo, fd, fh, diasHabilesLV(fd, fh), norm(b.comentario) || null, u.id_usuario, nombreDe(u)]);
+      auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'ausencia', entidad_id: r.insertId,
+        detalle: `Ausencia INJUSTIFICADA de ${colab.nombre} ${fd} al ${fh}` });
+      const alerta = await evaluarArt160(colab);
+      return ok(res, { id: r.insertId, alerta_160: alerta });
+    }
+
     if (esLicencia) {
       // LICENCIA MÉDICA: no es una solicitud — la INGRESA solo RRHH (o Admin) a
       // nombre del colaborador, sin medio día, queda APROBADA de inmediato y se
@@ -247,6 +268,66 @@ const ausentesHoy = async (req, res) => {
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
 
+/* ── Art. 160 N°3: patrón de ausencias injustificadas que configura causal ────
+   Dos días seguidos, dos LUNES en el mes, o tres o más días en el mes →
+   correo a RRHH con copia al supervisor + campana. */
+async function evaluarArt160(colab) {
+  try {
+    const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+    const mes = hoy.slice(0, 7);
+    const [aus] = await pool.query(
+      `SELECT fecha_desde, fecha_hasta FROM rh_ausencias
+        WHERE id_usuario=? AND tipo='AUSENCIA INJUSTIFICADA' AND estado='APROBADA'
+          AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [colab.id_usuario, mes, mes]);
+    const dias = new Set();
+    for (const a of aus) {
+      let d = new Date(isoF(a.fecha_desde) + 'T12:00:00');
+      const h = new Date(isoF(a.fecha_hasta) + 'T12:00:00');
+      for (; d <= h; d.setDate(d.getDate() + 1)) { const s = isoF(d); if (s.slice(0, 7) === mes) dias.add(s); }
+    }
+    const lista = [...dias].sort();
+    const lunes = lista.filter(s => new Date(s + 'T12:00:00').getDay() === 1);
+    let seguidos = false;
+    for (let i = 1; i < lista.length; i++) {
+      const prev = new Date(lista[i - 1] + 'T12:00:00'); prev.setDate(prev.getDate() + 1);
+      if (isoF(prev) === lista[i]) { seguidos = true; break; }
+    }
+    const motivos = [];
+    if (seguidos) motivos.push('dos días seguidos sin causa justificada');
+    if (lunes.length >= 2) motivos.push(`${lunes.length} lunes en el mes (${lunes.map(l => l.slice(8)).join(' y ')})`);
+    if (lista.length >= 3) motivos.push(`${lista.length} días en el mes`);
+    if (!motivos.length) return null;
+
+    const detalle = `${colab.nombre} registra ausencias injustificadas que configuran la causal de despido del artículo 160 N°3 del Código del Trabajo (sin derecho a indemnización): ${motivos.join('; ')}. Días del mes: ${lista.map(s => s.slice(8) + '/' + s.slice(5, 7)).join(', ')}.`;
+    // campana a RRHH + supervisor
+    const [rr] = await pool.query(
+      `SELECT DISTINCT u.id_usuario, u.email, u.nombre FROM usuarios u
+        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+        JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+       WHERE f.codigo='rh_aprobar' AND u.estado='activo'`);
+    const ids = rr.map(x => x.id_usuario);
+    if (colab.id_supervisor) ids.push(colab.id_supervisor);
+    notificar([...new Set(ids)], { tipo: 'RH_AUSENCIA', prioridad: 'alta', sonar: true,
+      titulo: `⚠️ Causal art. 160 N°3 — ${colab.nombre}`, mensaje: detalle, href: '/recursos-humanos/ausencias/' });
+    // correo a RRHH con copia al supervisor
+    try {
+      const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+      const to = rr.map(x => x.email).filter(Boolean);
+      let cc = [];
+      if (colab.id_supervisor) {
+        const [[sup]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=?', [colab.id_supervisor]);
+        if (sup?.email) cc = [sup.email];
+      }
+      if (to.length) await enviarCorreo({
+        to: to.join(','), cc: cc.join(',') || undefined,
+        subject: `⚠️ Ausencias injustificadas de ${colab.nombre} — causal art. 160 N°3`,
+        html: envolverHTML ? envolverHTML(`<p>${detalle}</p><p>Revisa el detalle en <a href="https://afbs.autofacilchile.cl/recursos-humanos/ausencias/">Ausencias y Permisos</a> y evalúa los pasos a seguir con asesoría legal.</p>`) : `<p>${detalle}</p>`,
+      });
+    } catch (e) { console.error('[art160 mail]', e.message); }
+    return detalle;
+  } catch (e) { console.error('[art160]', e.message); return null; }
+}
+
 /* ── GET /api/rrhh/vacaciones/saldo — devengado proporcional − usados ─────────
    Devengo: vac_dias_anuales/12 por mes completo trabajado (default 15/año = 1,25/mes).
    Usados: días HÁBILES L-V de las vacaciones APROBADAS (el feriado legal se
@@ -263,20 +344,10 @@ const saldoVacaciones = async (req, res) => {
     const [[emp]] = await pool.query('SELECT fecha_ingreso FROM usuarios WHERE id_usuario=?', [objetivo]);
     if (!emp) return fail(res, 'Colaborador no encontrado', 404);
     if (!emp.fecha_ingreso) return ok(res, { sin_fecha: true, mensaje: 'RRHH aún no registra tu fecha de ingreso.' });
-    const [[cfg]] = await pool.query("SELECT valor FROM rh_config WHERE clave='vac_dias_anuales'");
-    const anuales = parseFloat(cfg?.valor) || 15;
-    // meses completos trabajados
-    const fi = new Date(isoF(emp.fecha_ingreso) + 'T12:00:00');
-    const hoy = new Date(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date()) + 'T12:00:00');
-    let meses = (hoy.getFullYear() - fi.getFullYear()) * 12 + (hoy.getMonth() - fi.getMonth());
-    if (hoy.getDate() < fi.getDate()) meses--;
-    meses = Math.max(0, meses);
-    const devengados = Math.round(meses * (anuales / 12) * 10) / 10;
-    // usados: hábiles L-V de vacaciones aprobadas
-    const [vacs] = await pool.query("SELECT fecha_desde, fecha_hasta FROM rh_vacaciones WHERE id_usuario=? AND estado='APROBADA'", [objetivo]);
-    let usados = 0;
-    for (const v of vacs) usados += diasHabilesLV(isoF(v.fecha_desde), isoF(v.fecha_hasta));
-    ok(res, { devengados, usados, disponibles: Math.round((devengados - usados) * 10) / 10, meses, dias_anuales: anuales, fecha_ingreso: isoF(emp.fecha_ingreso) });
+    // MOTOR ÚNICO: cuenta corriente de vacaciones (períodos + progresivo + tomados + ajustes)
+    const s = await require('./vac-cuenta.controller').saldoCuenta(objetivo);
+    ok(res, { devengados: Math.round((s.abonos + s.proporcional) * 10) / 10, usados: s.cargos,
+      disponibles: s.disponibles, proporcional: s.proporcional, fecha_ingreso: isoF(emp.fecha_ingreso) });
   } catch (e) { console.error('[rrhh saldoVacaciones]', e.message); fail(res, 'Error interno del servidor'); }
 };
 

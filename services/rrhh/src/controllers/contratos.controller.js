@@ -396,19 +396,11 @@ exports.finiquitoCalcular = async (req, res) => {
     const indemAnos = cau.indemniza_anos ? anos * baseTopada : 0;
     const mesAviso = cau.mes_aviso && !avisado ? baseTopada : 0;
 
+    // MOTOR ÚNICO: la misma cuenta corriente de vacaciones que usa el formulario
     let vacHabiles = 0;
     if (u.fecha_ingreso) {
-      const [[cfgV]] = await pool.query("SELECT valor FROM rh_config WHERE clave='vac_dias_anuales'");
-      const anuales = parseFloat(cfgV?.valor) || 15;
-      const devengados = Math.round(meses * (anuales / 12) * 10) / 10;
-      const [vacs] = await pool.query("SELECT fecha_desde, fecha_hasta FROM rh_vacaciones WHERE id_usuario=? AND estado='APROBADA'", [idU]);
-      let usados = 0;
-      for (const v of vacs) {
-        let d = new Date(String(v.fecha_desde).slice(0, 10) + 'T12:00:00');
-        const h = new Date(String(v.fecha_hasta).slice(0, 10) + 'T12:00:00');
-        for (; d <= h; d.setDate(d.getDate() + 1)) if (d.getDay() >= 1 && d.getDay() <= 5) usados++;
-      }
-      vacHabiles = Math.max(0, Math.round((devengados - usados) * 10) / 10);
+      const s = await require('./vac-cuenta.controller').saldoCuenta(idU, fechaT);
+      vacHabiles = Math.max(0, s.disponibles);
     }
     const vacCorridos = Math.round(vacHabiles * 1.4 * 10) / 10;
     const vacMonto = Math.round(vacCorridos * base / 30);

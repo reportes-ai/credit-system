@@ -194,6 +194,7 @@ async function abrir(id){
       ${inp('f_cargas_otras','Cargas simples — otras (cónyuge, ascendientes)',f.cargas_otras??0,'number')}
       ${inp('f_cargas_maternales','Cargas maternales',f.cargas_maternales??0,'number')}
       ${inp('f_cargas_invalidas','Cargas inválidas',f.cargas_invalidas??0,'number')}
+      ${inp('f_anos_trabajados_previos','Años trabajados ANTES de AutoFácil (feriado progresivo art. 68, máx 10)',f.anos_trabajados_previos??0,'number')}
     </div>
     <div style="font-size:.75rem;color:#64748b;margin:-4px 0 6px">Tramo D = sin derecho a asignación. Los campos con <span style="color:#dc2626;font-weight:800">*</span> son obligatorios para el archivo Previred y el LRE.</div>
     <div class="fld" style="margin-top:10px"><label>Observaciones</label><input id="f_observaciones" value="${esc(f.observaciones||'')}"></div>
@@ -259,7 +260,7 @@ async function guardarFicha(){
     conyuge_direccion: document.getElementById('f_conyuge_misma_dir')?.checked ? '' : g('f_conyuge_direccion'),
     hijos: leerHijos(),
     afp:g('f_afp'), salud:g('f_salud'), plan_isapre_uf:g('f_plan_isapre_uf'), sueldo_base:g('f_sueldo_base'),
-    tramo_asignacion:g('f_tramo_asignacion'), cargas_otras:g('f_cargas_otras'), cargas_maternales:g('f_cargas_maternales'), cargas_invalidas:g('f_cargas_invalidas'),
+    tramo_asignacion:g('f_tramo_asignacion'), cargas_otras:g('f_cargas_otras'), cargas_maternales:g('f_cargas_maternales'), cargas_invalidas:g('f_cargas_invalidas'), anos_trabajados_previos:g('f_anos_trabajados_previos'),
     banco_pago:g('f_banco_pago'), tipo_cuenta_pago:g('f_tipo_cuenta_pago'), num_cuenta_pago:g('f_num_cuenta_pago'),
     observaciones:g('f_observaciones'),
   };
