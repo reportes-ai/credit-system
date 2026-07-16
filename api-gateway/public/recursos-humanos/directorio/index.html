@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.2 — Configurar: columna No mostrar (Colaboradores) + link a ficha -->
+  <!-- v2.3 — Configurar: checkbox FICHA en positivo (marcado = aparece en Colaboradores) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -91,7 +91,7 @@
   <div id="pane-cfg" style="display:none">
     <div class="cfg-box">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
-        <div style="font-size:.83rem;color:#475569">Marca quién aparece en el <b>Directorio</b> y en el <b>Organigrama</b>. Los cambios afectan a todos los usuarios.</div>
+        <div style="font-size:.83rem;color:#475569">Marca quién aparece en el <b>Directorio</b>, en el <b>Organigrama</b> y en las <b>Fichas de Colaboradores</b>. Los cambios afectan a todos los usuarios.</div>
         <button class="btn-navy" onclick="guardarCfg()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button>
       </div>
       <div style="overflow-x:auto">
@@ -100,8 +100,8 @@
             <th>Colaborador</th><th>Cargo</th>
             <th class="c">Directorio <input type="checkbox" id="allDir" onchange="toggleAll('dir',this.checked)"></th>
             <th class="c">Organigrama <input type="checkbox" id="allOrg" onchange="toggleAll('org',this.checked)"></th>
-            <th class="c" title="Oculto de la lista de Colaboradores (RRHH)">No mostrar</th>
-            <th class="c">Ficha</th>
+            <th class="c" title="Marcado = aparece en la lista de Colaboradores (RRHH)">Ficha <input type="checkbox" id="allFic" onchange="toggleAll('fic',this.checked)"></th>
+            <th class="c">Abrir</th>
           </tr></thead>
           <tbody id="cfgBody"></tbody>
         </table>
@@ -207,18 +207,18 @@ async function cargarCfg(){
       <td style="color:#0141A2;font-weight:600">${esc(r.cargo||'—')}</td>
       <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="dir" ${r.en_directorio?'checked':''}></td>
       <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="org" ${r.en_organigrama?'checked':''}></td>
-      <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="nom" ${r.no_mostrar?'checked':''}></td>
-      <td class="c"><a href="/recursos-humanos/colaboradores/?id=${r.id_usuario}" title="Abrir ficha"><i class="bi bi-person-vcard" style="font-size:1.05rem"></i></a></td>
+      <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="fic" ${r.no_mostrar?'':'checked'}></td>
+      <td class="c"><a href="/recursos-humanos/colaboradores/?id=${r.id_usuario}" title="Abrir la ficha"><i class="bi bi-person-vcard" style="font-size:1.05rem"></i></a></td>
     </tr>`).join('');
     syncAll();
   } catch(e){ document.getElementById('cfgBody').innerHTML = `<tr><td colspan="6" style="color:#ef4444;padding:14px">Error: ${esc(e.message)}</td></tr>`; }
 }
 function toggleAll(k, val){ document.querySelectorAll(`#cfgBody input[data-k="${k}"]`).forEach(c=>c.checked=val); }
 function syncAll(){
-  ['dir','org'].forEach(k=>{
+  ['dir','org','fic'].forEach(k=>{
     const all = document.querySelectorAll(`#cfgBody input[data-k="${k}"]`);
     const marc = document.querySelectorAll(`#cfgBody input[data-k="${k}"]:checked`);
-    const box = document.getElementById(k==='dir'?'allDir':'allOrg');
+    const box = document.getElementById(k==='dir'?'allDir':k==='org'?'allOrg':'allFic');
     box.checked = all.length && marc.length===all.length;
     box.indeterminate = marc.length>0 && marc.length<all.length;
   });
@@ -231,7 +231,7 @@ async function guardarCfg(){
     map[id] = map[id] || { id_usuario:Number(id), en_directorio:0, en_organigrama:0, no_mostrar:0 };
     if (c.dataset.k==='dir') map[id].en_directorio = c.checked?1:0;
     if (c.dataset.k==='org') map[id].en_organigrama = c.checked?1:0;
-    if (c.dataset.k==='nom') map[id].no_mostrar = c.checked?1:0;
+    if (c.dataset.k==='fic') map[id].no_mostrar = c.checked?0:1;   // marcado = SÍ aparece
   });
   try {
     const r = await fetch('/api/rrhh/directorio/config', { method:'PUT', headers:{...H,'Content-Type':'application/json'}, body:JSON.stringify({ items:Object.values(map) }) });
