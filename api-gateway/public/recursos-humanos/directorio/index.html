@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.1 — full width + organigrama escalera indentado + configuración de visibilidad (pestañas) -->
+  <!-- v2.2 — Configurar: columna No mostrar (Colaboradores) + link a ficha -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -100,6 +100,8 @@
             <th>Colaborador</th><th>Cargo</th>
             <th class="c">Directorio <input type="checkbox" id="allDir" onchange="toggleAll('dir',this.checked)"></th>
             <th class="c">Organigrama <input type="checkbox" id="allOrg" onchange="toggleAll('org',this.checked)"></th>
+            <th class="c" title="Oculto de la lista de Colaboradores (RRHH)">No mostrar</th>
+            <th class="c">Ficha</th>
           </tr></thead>
           <tbody id="cfgBody"></tbody>
         </table>
@@ -205,9 +207,11 @@ async function cargarCfg(){
       <td style="color:#0141A2;font-weight:600">${esc(r.cargo||'—')}</td>
       <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="dir" ${r.en_directorio?'checked':''}></td>
       <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="org" ${r.en_organigrama?'checked':''}></td>
+      <td class="c"><input type="checkbox" data-id="${r.id_usuario}" data-k="nom" ${r.no_mostrar?'checked':''}></td>
+      <td class="c"><a href="/recursos-humanos/colaboradores/?id=${r.id_usuario}" title="Abrir ficha"><i class="bi bi-person-vcard" style="font-size:1.05rem"></i></a></td>
     </tr>`).join('');
     syncAll();
-  } catch(e){ document.getElementById('cfgBody').innerHTML = `<tr><td colspan="4" style="color:#ef4444;padding:14px">Error: ${esc(e.message)}</td></tr>`; }
+  } catch(e){ document.getElementById('cfgBody').innerHTML = `<tr><td colspan="6" style="color:#ef4444;padding:14px">Error: ${esc(e.message)}</td></tr>`; }
 }
 function toggleAll(k, val){ document.querySelectorAll(`#cfgBody input[data-k="${k}"]`).forEach(c=>c.checked=val); }
 function syncAll(){
@@ -224,9 +228,10 @@ async function guardarCfg(){
   const map = {};
   document.querySelectorAll('#cfgBody input[type=checkbox]').forEach(c=>{
     const id = c.dataset.id; if (!id) return;
-    map[id] = map[id] || { id_usuario:Number(id), en_directorio:0, en_organigrama:0 };
+    map[id] = map[id] || { id_usuario:Number(id), en_directorio:0, en_organigrama:0, no_mostrar:0 };
     if (c.dataset.k==='dir') map[id].en_directorio = c.checked?1:0;
     if (c.dataset.k==='org') map[id].en_organigrama = c.checked?1:0;
+    if (c.dataset.k==='nom') map[id].no_mostrar = c.checked?1:0;
   });
   try {
     const r = await fetch('/api/rrhh/directorio/config', { method:'PUT', headers:{...H,'Content-Type':'application/json'}, body:JSON.stringify({ items:Object.values(map) }) });

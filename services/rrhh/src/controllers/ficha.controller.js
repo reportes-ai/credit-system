@@ -122,6 +122,15 @@ require('../../../../shared/migrate').enFila('rrhh-ficha-familia', async () => {
   } catch (e) { console.error('[rrhh-ficha-familia migration]', e.message); }
 });
 
+/* ── Migración: flag no_mostrar (oculta de Colaboradores sin pisar el contrato) ── */
+require('../../../../shared/migrate').enFila('rrhh-no-mostrar', async () => {
+  try {
+    await pool.query('ALTER TABLE rh_fichas ADD COLUMN IF NOT EXISTS no_mostrar TINYINT NOT NULL DEFAULT 0').catch(() => {});
+    await pool.query("UPDATE rh_fichas SET no_mostrar=1, tipo_contrato=NULL WHERE tipo_contrato='NO MOSTRAR'");
+    console.log('[rrhh-no-mostrar] listo');
+  } catch (e) { console.error('[rrhh-no-mostrar migration]', e.message); }
+});
+
 /* ── Campos de la ficha ─────────────────────────────────────────────────────── */
 const CAMPOS_CONTACTO = ['direccion', 'comuna', 'ciudad', 'email_personal', 'telefono_personal',
   'emergencia_nombre', 'emergencia_fono', 'emergencia2_nombre', 'emergencia2_fono',
@@ -228,7 +237,7 @@ const listarColaboradores = async (req, res) => {
          FROM usuarios u
          LEFT JOIN perfiles p ON p.id_perfil = u.id_perfil
          LEFT JOIN rh_fichas f ON f.id_usuario = u.id_usuario
-        WHERE u.estado = 'activo' AND COALESCE(f.tipo_contrato,'') <> 'NO MOSTRAR'
+        WHERE u.estado = 'activo' AND COALESCE(f.no_mostrar,0) = 0
         ORDER BY nombre LIMIT 800`);
     ok(res, rows);
   } catch (e) { console.error('[rrhh listarColaboradores]', e.message); fail(res, 'Error interno del servidor'); }
@@ -272,12 +281,14 @@ const directorioConfig = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) AS nombre, u.cargo,
               COALESCE(c.en_directorio, 1)  AS en_directorio,
-              COALESCE(c.en_organigrama, 1) AS en_organigrama
+              COALESCE(c.en_organigrama, 1) AS en_organigrama,
+              COALESCE(f.no_mostrar, 0)     AS no_mostrar
          FROM usuarios u
          LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
+         LEFT JOIN rh_fichas f ON f.id_usuario = u.id_usuario
         WHERE u.estado = 'activo'
         ORDER BY nombre LIMIT 800`);
-    ok(res, rows.map(r => ({ ...r, en_directorio: !!r.en_directorio, en_organigrama: !!r.en_organigrama })));
+    ok(res, rows.map(r => ({ ...r, en_directorio: !!r.en_directorio, en_organigrama: !!r.en_organigrama, no_mostrar: !!r.no_mostrar })));
   } catch (e) { console.error('[rrhh directorioConfig]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -292,6 +303,10 @@ const guardarDirectorioConfig = async (req, res) => {
         `INSERT INTO rh_directorio_config (id_usuario, en_directorio, en_organigrama) VALUES (?,?,?)
          ON DUPLICATE KEY UPDATE en_directorio=VALUES(en_directorio), en_organigrama=VALUES(en_organigrama)`,
         [id, it.en_directorio ? 1 : 0, it.en_organigrama ? 1 : 0]);
+      if ('no_mostrar' in it)
+        await pool.query(
+          `INSERT INTO rh_fichas (id_usuario, no_mostrar) VALUES (?,?)
+           ON DUPLICATE KEY UPDATE no_mostrar=VALUES(no_mostrar)`, [id, it.no_mostrar ? 1 : 0]);
       n++;
     }
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'directorio_config', detalle: `Actualizó visibilidad de ${n} colaborador(es) en directorio/organigrama` });

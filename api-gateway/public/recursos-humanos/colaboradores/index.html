@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.3 — tipo de contrato NO MOSTRAR oculta al colaborador de la lista; lista solo activos -->
+  <!-- v1.4 — flag no_mostrar propio (sin pisar contrato) + apertura directa ?id= -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -134,7 +134,7 @@ async function abrir(id){
       ${inp('f_cargo','Cargo',u.cargo)}
       ${inp('f_fecha_ingreso','Fecha de ingreso',iso(u.fecha_ingreso),'date')}
       ${inp('f_centro_costo','Centro de costo',u.centro_costo)}
-      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA','NO MOSTRAR'])}
+      ${sel('f_tipo_contrato','Tipo de contrato',f.tipo_contrato,['INDEFINIDO','PLAZO FIJO','HONORARIOS','PRACTICA'])}
       ${inp('f_jornada','Jornada',f.jornada)}
       ${inp('f_telefono','Teléfono corporativo',u.telefono)}
     </div>
@@ -277,7 +277,11 @@ async function borrarDoc(id){
   if (!j.success) return alert(j.error||'No se pudo eliminar');
   toast('Documento eliminado'); abrir(FICHA.usuario.id_usuario);
 }
-cargar();
+cargar().then(()=>{
+  // ?id=N — abre directo una ficha (incluye ocultos "No mostrar"; se llega desde Directorio › Configurar)
+  const idQ = new URLSearchParams(location.search).get('id');
+  if (idQ) abrir(Number(idQ));
+});
 </script>
 <script src="/js/app-version.js"></script>
 </body>
