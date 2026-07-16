@@ -125,6 +125,21 @@ Reglas de diseño que se derivan de este principio:
 - Objetivo: que el mismo nombre / dirección / comisión sea idéntico en cobranza, cartas,
   dashboard y reportería porque todos leen del mismo origen.
 
+### 3. Todo proceso nace documentado (documentar NO es opcional)
+> Cada funcionalidad/proceso que se crea o modifica se documenta EN EL MISMO momento,
+> como parte del mismo trabajo — no "después". Un proceso sin documentar está incompleto.
+- **Qué se documenta de cada proceso** (mínimo):
+  1. **Qué hace y para qué** (el objetivo de negocio, no solo la mecánica)
+  2. **Cómo se hace** (paso a paso, indicando SIEMPRE el módulo/pantalla de cada paso)
+  3. **Quién lo hace** (rol/perfil responsable de cada paso)
+  4. **Prerequisitos** (qué debe existir/estar hecho antes)
+  5. **Qué procesos afecta** (aguas abajo) y **qué procesos dependen de él** (aguas arriba)
+  6. **El flujo** (estados, decisiones, caminos de reversa)
+- **Dónde**: los 4 documentos vivos de `/mantenedores/documentacion/` (manual-usuario,
+  config-maestro, tecnica, brochure) — actualizar el que corresponda en el MISMO commit
+  del feature cuando sea razonable, o al cierre de la sesión. Nunca dejarlo "para después".
+- El footer "Qué afecta este mantenedor" es la versión in-situ de esta máxima.
+
 ## Reglas Anti-Hardcode (NO negociables)
 1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
    - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)
