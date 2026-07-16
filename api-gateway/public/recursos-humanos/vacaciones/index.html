@@ -110,6 +110,15 @@
       <td style="padding:3px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:#fee2e2;color:#b91c1c">${c.tipo}</span></td>
       <td style="padding:3px 8px;font-size:.8rem">${c.glosa||''}</td>
       <td style="padding:3px 8px;text-align:right;color:#b91c1c">−${co(c.dias)}</td><td></td></tr>`;
+    if (d.periodo_en_curso) filas += `<tr style="background:#fffbeb;font-weight:700">
+      <td style="padding:6px 8px">${fmt(d.periodo_en_curso.desde)} → ${fmt(d.periodo_en_curso.hasta)}</td>
+      <td style="padding:6px 8px"><span style="font-size:.72rem;font-weight:800;border-radius:5px;padding:1px 7px;background:#fef3c7;color:#92400e">EN CURSO</span></td>
+      <td style="padding:6px 8px;font-size:.8rem;color:#475569">Período en curso — proporcional devengado a hoy</td>
+      <td style="padding:6px 8px;text-align:right;color:#92400e">+${co(d.periodo_en_curso.proporcional)}</td><td></td></tr>
+      <tr><td colspan="5" style="border-bottom:1px solid #e5e7eb"></td></tr>`;
+    filas += `<tr style="background:#012d70;color:#fff;font-weight:800">
+      <td colspan="3" style="padding:8px">SALDO DISPONIBLE (suma de saldos de períodos + proporcional en curso)</td>
+      <td style="padding:8px;text-align:right;font-size:1.05rem">${co(d.disponibles)}</td><td></td></tr>`;
     const w = window.open('','_blank','width=820,height=680');
     w.document.write(`<html><head><title>Cuenta corriente de vacaciones</title></head>
       <body style="font-family:Segoe UI,sans-serif;padding:24px;color:#1e293b">

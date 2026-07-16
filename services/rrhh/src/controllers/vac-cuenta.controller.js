@@ -202,7 +202,20 @@ exports.getCuenta = async (req, res) => {
       }
       if (resto > 0) sinPeriodo.push({ ...c, dias: resto });   // sobregiro: cargo sin período que lo cubra
     }
-    ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo, ...saldo });
+    // Período EN CURSO (aún no cumplido): fechas + días proporcionales a hoy
+    let enCurso = null;
+    const [[uf]] = await pool.query(`SELECT DATE_FORMAT(fecha_ingreso,'%Y-%m-%d') fi FROM usuarios WHERE id_usuario=?`, [objetivo]);
+    if (uf?.fi && saldo.proporcional >= 0) {
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+      const fi = new Date(uf.fi + 'T12:00:00'), h = new Date(hoy + 'T12:00:00');
+      let anios = h.getFullYear() - fi.getFullYear();
+      const aniv = new Date(fi); aniv.setFullYear(fi.getFullYear() + anios);
+      if (aniv > h) anios--;
+      const pd = new Date(fi); pd.setFullYear(fi.getFullYear() + anios);
+      const ph = new Date(fi); ph.setFullYear(fi.getFullYear() + anios + 1); ph.setDate(ph.getDate() - 1);
+      enCurso = { desde: isoF(pd), hasta: isoF(ph), proporcional: saldo.proporcional };
+    }
+    ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo, periodo_en_curso: enCurso, ...saldo });
   } catch (e) { fail(res, e.message); }
 };
 
