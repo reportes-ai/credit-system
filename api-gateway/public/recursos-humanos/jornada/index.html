@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.8 — Calendario de turnos respeta feriados (motor shared/feriados): día feriado = no se trabaja, marcado en rojo -->
+  <!-- v1.9 — botón PDF por persona: imprime solo su calendario con nombre de archivo "calendario turnos <nombre> — AutoFácil" -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -256,12 +256,13 @@ function calMesHTML(c,anio,mes){   // calendario de UN mes para un colaborador
       <thead><tr>${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<th style="font-size:.68rem;color:#64748b;text-align:center;padding:3px;border:1px solid #e2e8f0;background:#f1f5f9">${d}</th>`).join('')}</tr></thead>
       <tbody>${celdas}</tbody></table></div>`;
 }
-function calPersonaHTML(c){
+function calPersonaHTML(c,idx){
   const meses=[...new Set(c.dias.map(d=>d.fecha.slice(0,7)))].sort();
-  return `<div class="cal-persona" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:16px;page-break-after:always">
+  return `<div class="cal-persona" id="calP${idx}" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:16px;page-break-after:always">
     <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #0141A2;padding-bottom:6px;margin-bottom:10px">
       <div><b style="font-size:1rem;color:#012d70">${c.nombre}</b> <span style="font-size:.75rem;color:#64748b">· ${c.cargo||''}</span></div>
-      <div style="font-size:.75rem;color:#0141A2;font-weight:700">${c.turno}</div>
+      <div style="display:flex;gap:10px;align-items:center"><span style="font-size:.75rem;color:#0141A2;font-weight:700">${c.turno}</span>
+        <button class="tab no-print" style="padding:2px 10px;font-size:.7rem" onclick="calImprimir(${idx})"><i class="bi bi-printer"></i> PDF</button></div>
     </div>
     ${meses.map(m=>calMesHTML(c,Number(m.slice(0,4)),Number(m.slice(5,7))-1)).join('')}
     <div style="font-size:.66rem;color:#94a3b8">AutoFácil — calendario de turnos. Horario indicado = entrada–salida (incluye 1 hr de colación).</div>
@@ -274,7 +275,7 @@ async function calPreview(){
     const r=await fetch(`/api/rrhh/turnos-calendario/preview?desde=${de}&hasta=${ha}`,{headers:H});
     const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
     CAL=j.data; CAL_RANGO={desde:de,hasta:ha};
-    $('calPrev').innerHTML=CAL.length?CAL.map(calPersonaHTML).join(''):'<div class="empty">Nadie tiene turno y semana de inicio asignados.</div>';
+    $('calPrev').innerHTML=CAL.length?CAL.map((c,i)=>calPersonaHTML(c,i)).join(''):'<div class="empty">Nadie tiene turno y semana de inicio asignados.</div>';
     $('btnCalGrabar').style.display=CAL.length?'':'none';
     $('btnCalImp').style.display=CAL.length?'':'none';
   }catch(e){ alert(e.message); }
@@ -287,10 +288,13 @@ async function calGrabar(){
     alert(`Calendario grabado: ${j.data.colaboradores} colaborador(es), ${j.data.dias} día(s).`);
   }catch(e){ alert('No se pudo grabar: '+e.message); }
 }
-function calImprimir(){
-  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Calendario de turnos</title>
-    <style>body{font-family:'Segoe UI',system-ui,sans-serif;margin:18px}@media print{.cal-persona{page-break-after:always;border:none!important}}</style>
-    </head><body>${$('calPrev').innerHTML}</body></html>`;
+function calImprimir(idx){
+  const uno=idx!=null?CAL[idx]:null;
+  const titulo=uno?`calendario turnos ${uno.nombre.toLowerCase()} — AutoFácil`:'calendario turnos — AutoFácil';
+  const cuerpo=uno?$('calP'+idx).outerHTML:$('calPrev').innerHTML;
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title>
+    <style>body{font-family:'Segoe UI',system-ui,sans-serif;margin:18px}.no-print{display:none}@media print{.cal-persona{page-break-after:always;border:none!important}}</style>
+    </head><body>${cuerpo}</body></html>`;
   const f=document.createElement('iframe'); f.style.display='none'; document.body.appendChild(f);
   f.contentDocument.write(html); f.contentDocument.close();
   setTimeout(()=>{ try{ f.contentWindow.print(); }catch(_){} setTimeout(()=>f.remove(),2000); },400);
