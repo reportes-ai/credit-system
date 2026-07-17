@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.4 — Horarios y Turnos: días trabajados (L-D) + columna horas semanales -->
+  <!-- v1.5 — Hrs/semana descuenta 1 hr de colación diaria -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -129,6 +129,7 @@ function hrsSemana(c){
   if(!(c.hora_entrada&&c.hora_salida)) return '<span class="pill p-mut">—</span>';
   const [h1,m1]=c.hora_entrada.split(':').map(Number),[h2,m2]=c.hora_salida.split(':').map(Number);
   let min=(h2*60+m2)-(h1*60+m1); if(min<=0) min+=24*60;   // turno que cruza medianoche
+  min=Math.max(min-60,0);                                  // 1 hr de colación diaria (no es tiempo trabajado)
   const tot=min*diasDe(c).length;
   return `<b>${(tot/60).toLocaleString('es-CL',{maximumFractionDigits:1})} hrs</b>`;
 }
