@@ -174,6 +174,16 @@ const crearVacaciones = async (req, res) => {
     const dias = diasEntre(fd, fh);
     const [r] = await pool.query('INSERT INTO rh_vacaciones (id_usuario, nombre, fecha_desde, fecha_hasta, dias, comentario) VALUES (?,?,?,?,?,?)',
       [u.id_usuario || null, nombreDe(u), fd, fh, dias, norm(b.comentario) || null]);
+    // Firma FES del solicitante (misma tabla rh_firmas de contratos/finiquitos)
+    try {
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update(JSON.stringify({
+        id: r.insertId, id_usuario: u.id_usuario, fecha_desde: fd, fecha_hasta: fh, dias })).digest('hex');
+      const [[uf]] = await pool.query('SELECT cargo FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
+      const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+      await pool.query(`INSERT IGNORE INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc)
+        VALUES ('VACACIONES', ?, 'TRABAJADOR', ?, ?, ?, ?, ?)`, [r.insertId, u.id_usuario, nombreDe(u), uf?.cargo || '', ip, hash]);
+    } catch (e) { console.error('[vacaciones firma FES]', e.message); }
     const ids = await poolRRHH(u.id_usuario);
     if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones', mensaje: `${nombreDe(u)} solicitó ${dias} día(s): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: r.insertId, detalle: `Solicitó vacaciones ${fd}→${fh} (${dias}d)` });
@@ -202,6 +212,16 @@ const resolverVacaciones = async (req, res) => {
     if (!s) return res.status(404).json({ success: false, data: null, error: 'Solicitud no encontrada' });
     await pool.query('UPDATE rh_vacaciones SET estado=?, resuelto_por=?, resuelto_nombre=?, motivo_rechazo=? WHERE id=?',
       [estado, u.id_usuario || null, nombreDe(u), estado === 'RECHAZADA' ? (norm((req.body || {}).motivo_rechazo) || null) : null, s.id]);
+    // Firma FES de la resolución (mismo registro que contratos/finiquitos: rh_firmas)
+    try {
+      const crypto = require('crypto');
+      const hash = crypto.createHash('sha256').update(JSON.stringify({
+        id: s.id, id_usuario: s.id_usuario, fecha_desde: s.fecha_desde, fecha_hasta: s.fecha_hasta, dias: s.dias, estado })).digest('hex');
+      const [[uf]] = await pool.query('SELECT cargo FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
+      const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+      await pool.query(`INSERT IGNORE INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc)
+        VALUES ('VACACIONES', ?, 'EMPLEADOR', ?, ?, ?, ?, ?)`, [s.id, u.id_usuario, nombreDe(u), uf?.cargo || '', ip, hash]);
+    } catch (e) { console.error('[vacaciones firma FES]', e.message); }
     if (s.id_usuario) notificar([s.id_usuario], { tipo: 'RH_VACACIONES', titulo: `🌴 Vacaciones ${estado === 'APROBADA' ? 'aprobadas' : 'rechazadas'}`, mensaje: `${s.fecha_desde} al ${s.fecha_hasta} (${s.dias}d)`, href: '/recursos-humanos/vacaciones/?id=' + s.id });
     // Cuenta corriente: la aprobación descuenta los días hábiles del saldo
     if (estado === 'APROBADA') try { await require('./vac-cuenta.controller').registrarTomado(s); } catch (_) {}
