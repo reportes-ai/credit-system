@@ -70,9 +70,12 @@ async function cargar() {
 }
 
 require('../shared/migrate').enFila('feriados', async () => {
-  try { await migrarYsembrar(); await cargar(); console.log('[feriados] CL cargados:', _set.size); }
+  try { await migrarYsembrar(); console.log('[feriados] CL sembrados'); }
   catch (e) { console.error('[feriados init]', e.message); }
 });
+// Cargar SIEMPRE al boot (la migración corre una sola vez en la vida del sistema;
+// sin esta carga el set quedaba vacío hasta el primer refresco de 6 h)
+cargar().then(() => console.log('[feriados] cargados:', _set.size));
 setInterval(cargar, 6 * 60 * 60 * 1000);   // refresca cada 6 h por si el Admin edita la tabla
 
 const esFinde   = d => d.getDay() === 0 || d.getDay() === 6;
@@ -94,6 +97,17 @@ function proximosDiasHabiles(fromISO, n) {
   return out;
 }
 
+// Días hábiles entre dos fechas INCLUSIVE (L-V y descontando feriados de la tabla
+// paramétrica). MOTOR ÚNICO de "días hábiles de un rango": vacaciones (cargo en
+// cuenta), ausencias y cualquier consumidor nuevo. Acepta Date o 'YYYY-MM-DD'.
+function diasHabilesEntre(desde, hasta) {
+  const d = typeof desde === 'string' ? new Date(desde.slice(0, 10) + 'T12:00:00') : new Date(desde);
+  const h = typeof hasta === 'string' ? new Date(hasta.slice(0, 10) + 'T12:00:00') : new Date(hasta);
+  let n = 0;
+  for (; d <= h; d.setDate(d.getDate() + 1)) if (esHabil(d)) n++;
+  return n;
+}
+
 // Si la fecha no es hábil, avanza hasta el siguiente día hábil (Date in/out)
 function siguienteHabil(fecha) {
   const d = new Date(fecha);
@@ -101,4 +115,4 @@ function siguienteHabil(fecha) {
   return d;
 }
 
-module.exports = { sumarDiasHabiles, proximosDiasHabiles, siguienteHabil, esHabil, esFeriado, cargarFeriados: cargar, feriadosDeAnio };
+module.exports = { sumarDiasHabiles, proximosDiasHabiles, siguienteHabil, esHabil, esFeriado, diasHabilesEntre, cargarFeriados: cargar, feriadosDeAnio };

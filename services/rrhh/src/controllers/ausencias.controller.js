@@ -67,8 +67,8 @@ require('../../../../shared/migrate').enFila('rrhh-ausencias', async () => {
 });
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
-// Días hábiles L-V — MOTOR ÚNICO rrhh-core (el mismo de vacaciones)
-const diasHabilesLV = (desde, hasta) => require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(desde, hasta);
+// Días hábiles — MOTOR ÚNICO shared/feriados (L-V y descuenta feriados legales, mismo de vacaciones)
+const diasHabilesLV = (desde, hasta) => require('../../../../shared/feriados').diasHabilesEntre(desde, hasta);
 async function tiposAusencia() {
   try {
     const [[r]] = await pool.query("SELECT valor FROM rh_config WHERE clave='ausencia_tipos'");

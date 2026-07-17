@@ -391,10 +391,8 @@ exports.finiquitoCalcular = async (req, res) => {
 
     let anos = 0, meses = 0;
     if (u.fecha_ingreso) {
-      const fi = new Date(u.fecha_ingreso + 'T12:00:00'), ft = new Date(fechaT + 'T12:00:00');
-      meses = (ft.getFullYear() - fi.getFullYear()) * 12 + (ft.getMonth() - fi.getMonth());
-      if (ft.getDate() < fi.getDate()) meses--;
-      meses = Math.max(0, meses);
+      // MOTOR ÚNICO rrhh-core.mesesAntiguedad (mismo del certificado de antigüedad)
+      meses = require('../../../../api-gateway/public/js/rrhh-core').mesesAntiguedad(u.fecha_ingreso, fechaT);
       anos = Math.floor(meses / 12) + ((meses % 12) >= 6 ? 1 : 0);
       if (anos > topeAnos) { avisos.push(`${anos} años de servicio — se aplica el tope de ${topeAnos} años.`); anos = topeAnos; }
     } else avisos.push('Sin fecha de ingreso registrada: años de servicio en 0. Corrige la ficha del colaborador.');

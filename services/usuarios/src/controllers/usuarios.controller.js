@@ -349,7 +349,8 @@ const deleteUsuario = async (req, res) => {
     if (await esProtegido(id)) {
       return res.status(403).json({ success: false, data: null, error: 'Cuenta protegida: no puede suspenderse ni eliminarse.' });
     }
-    await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['inactivo', id]);
+    // fecha_baja = fuente única del evento "egresó" (la leen rotación/egresos de Indicadores RRHH)
+    await pool.query("UPDATE usuarios SET estado = ?, fecha_baja = COALESCE(fecha_baja, CURDATE()) WHERE id_usuario = ?", ['inactivo', id]);
     auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario suspendido (baja lógica)' });
     res.json({ success: true, data: { mensaje: 'Usuario suspendido correctamente' }, error: null });
   } catch (error) {
@@ -395,7 +396,7 @@ const eliminarDefinitivo = async (req, res) => {
 const reactivarUsuario = async (req, res) => {
   try {
     const { id } = req.params;
-    const [r] = await pool.query('UPDATE usuarios SET estado = ? WHERE id_usuario = ?', ['activo', id]);
+    const [r] = await pool.query('UPDATE usuarios SET estado = ?, fecha_baja = NULL WHERE id_usuario = ?', ['activo', id]);
     if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario reactivado' });
     res.json({ success: true, data: { mensaje: 'Usuario reactivado correctamente' }, error: null });

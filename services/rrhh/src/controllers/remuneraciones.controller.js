@@ -417,7 +417,7 @@ function calcLiquidacion(inp, ind) {
     afp: inp.afp || null, afp_pct: afpPct, desc_afp: descAfp,
     salud: inp.salud || null, salud_pct: ind.rem_salud_pct, desc_salud: descSalud,
     plan_isapre_uf: planUF || null, desc_salud_adicional: descSaludAdicional,
-    afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc,
+    afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc, base_afc: baseAfc,
     base_tributable: baseTrib, impuesto,
     otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
     liquido: totalHaberes - totalDescuentos,
@@ -1069,16 +1069,19 @@ async function getPrevired(req, res) {
       if (!saludCod) avisos.push(`${l.nombre}: salud "${d.salud || '(vacía)'}" sin código (campos de salud en 0)`);
       if (!l.sexo) avisos.push(`${l.nombre}: falta el sexo en la ficha (campo obligatorio)`);
 
-      // Bases: la de cotización (tope 87,8 UF) viene del motor; la de AFC se
-      // reconstruye exacta desde el propio descuento (misma matemática del motor)
+      // Bases: ambas vienen del motor calcLiquidacion vía el snapshot detalle
+      // (base_afc se persiste desde v140.4); la reconstrucción desde el descuento
+      // queda SOLO como fallback para liquidaciones emitidas antes de esa versión.
       const baseCot = Math.round(d.base_cotizacion || d.total_imponible || 0);
       const esIndef = String(d.tipo_contrato || l.ftc || '').toUpperCase() === 'INDEFINIDO';
-      let baseAfc = 0;
-      if (d.desc_afc > 0 && d.afc_pct > 0) baseAfc = Math.round(d.desc_afc * 100 / d.afc_pct);
-      else if (d.aporte_afc_emp > 0) baseAfc = Math.round(d.total_imponible || 0) ? Math.min(Math.round(d.total_imponible), Math.round(d.aporte_afc_emp * 100 / (esIndef ? 2.4 : 3))) : 0;
-      if (!baseAfc) baseAfc = Math.round(d.total_imponible || 0);
-      // deriva de redondeo al reconstruir desde el descuento → anclar al imponible
-      if (Math.abs(baseAfc - Math.round(d.total_imponible || 0)) < 500) baseAfc = Math.round(d.total_imponible || 0);
+      let baseAfc = Math.round(d.base_afc || 0);
+      if (!baseAfc) {
+        if (d.desc_afc > 0 && d.afc_pct > 0) baseAfc = Math.round(d.desc_afc * 100 / d.afc_pct);
+        else if (d.aporte_afc_emp > 0) baseAfc = Math.round(d.total_imponible || 0) ? Math.min(Math.round(d.total_imponible), Math.round(d.aporte_afc_emp * 100 / (esIndef ? 2.4 : 3))) : 0;
+        if (!baseAfc) baseAfc = Math.round(d.total_imponible || 0);
+        // deriva de redondeo al reconstruir desde el descuento → anclar al imponible
+        if (Math.abs(baseAfc - Math.round(d.total_imponible || 0)) < 500) baseAfc = Math.round(d.total_imponible || 0);
+      }
 
       const lic = licMap[l.id_usuario];
       const retiro = retMap[l.id_usuario];

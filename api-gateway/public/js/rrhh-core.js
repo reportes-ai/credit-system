@@ -11,20 +11,9 @@
     return i > 0 ? Math.round(M * i / (1 - Math.pow(1 + i, -n))) : Math.round(M / n);
   }
 
-  // Días hábiles L-V entre dos fechas inclusive (sin feriados legales — si algún día
-  // se incorporan, se agregan AQUÍ y todos los consumidores quedan corregidos).
-  // Acepta Date o 'YYYY-MM-DD'. La usan: vacaciones (cargo en cuenta y solicitud),
-  // ausencias y compliance (plazos).
-  function diasHabiles(desde, hasta) {
-    const d0 = typeof desde === 'string' ? new Date(desde + 'T12:00:00') : new Date(desde);
-    const d1 = typeof hasta === 'string' ? new Date(hasta + 'T12:00:00') : new Date(hasta);
-    let n = 0;
-    for (const d = new Date(d0); d <= d1; d.setDate(d.getDate() + 1)) {
-      const w = d.getDay();
-      if (w !== 0 && w !== 6) n++;
-    }
-    return n;
-  }
+  // NOTA: los días hábiles de un rango NO viven aquí — su motor único es
+  // shared/feriados.diasHabilesEntre (backend), porque descuenta los feriados
+  // legales de la tabla paramétrica y este módulo es puro (sin BD).
 
   // Provisión / valorización de feriado en pesos: días hábiles ×1,4 corridos ×
   // remuneración diaria (base/30) — la matemática del finiquito (feriado proporcional).
@@ -33,7 +22,20 @@
     return Math.max(0, Math.round((Number(diasHab) || 0) * 1.4 * (Number(base) || 0) / 30));
   }
 
-  const api = { cuotaFrancesa, diasHabiles, provisionVacaciones };
+  // Meses de antigüedad COMPLETOS entre dos fechas (descuenta el mes en curso si el
+  // día aún no llega). La usan: certificado de antigüedad, años de servicio del
+  // finiquito y analytics (TIMESTAMPDIFF de MySQL tiene la misma semántica).
+  function mesesAntiguedad(fechaIngreso, hasta) {
+    const iso = f => f instanceof Date
+      ? `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`
+      : String(f || '').slice(0, 10);
+    const a = new Date(iso(fechaIngreso) + 'T00:00:00'), b = new Date(iso(hasta) + 'T00:00:00');
+    let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+    if (b.getDate() < a.getDate()) m--;
+    return Math.max(0, m);
+  }
+
+  const api = { cuotaFrancesa, provisionVacaciones, mesesAntiguedad };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AF_RRHH = api;
 })(typeof self !== 'undefined' ? self : this);

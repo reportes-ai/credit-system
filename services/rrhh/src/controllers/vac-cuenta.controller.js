@@ -159,8 +159,8 @@ async function registrarTomado(solicitud) {
   try {
     const [[ya]] = await pool.query(`SELECT id FROM rh_vac_movimientos WHERE tipo='TOMADO' AND id_ref=?`, [solicitud.id]);
     if (ya) return;
-    // días hábiles del rango — motor único rrhh-core (mismo de solicitud y ausencias)
-    const habiles = require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(isoF(solicitud.fecha_desde), isoF(solicitud.fecha_hasta));
+    // días hábiles del rango — MOTOR ÚNICO shared/feriados (L-V y descuenta feriados legales)
+    const habiles = require('../../../../shared/feriados').diasHabilesEntre(isoF(solicitud.fecha_desde), isoF(solicitud.fecha_hasta));
     await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, glosa, id_ref)
       VALUES (?,?,?,?,?)`, [solicitud.id_usuario, 'TOMADO', -habiles,
       `Vacaciones ${isoF(solicitud.fecha_desde)} al ${isoF(solicitud.fecha_hasta)} (${habiles} hábiles)`, solicitud.id]);

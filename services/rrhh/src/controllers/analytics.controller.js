@@ -19,6 +19,15 @@ require('../../../../shared/migrate').enFila('rrhh-analytics-card', async () => 
   console.log('[rrhh-analytics] card creada');
 });
 
+// fecha_baja en usuarios: fuente única del evento "egresó" (se estampa al suspender,
+// se limpia al reactivar; backfill desde los finiquitos existentes)
+require('../../../../shared/migrate').enFila('usuarios-fecha-baja', async () => {
+  try { await pool.query('ALTER TABLE usuarios ADD COLUMN fecha_baja DATE NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+  await pool.query(`UPDATE usuarios u JOIN rh_finiquitos fq ON fq.id_usuario=u.id_usuario
+    SET u.fecha_baja=fq.fecha_termino WHERE u.estado='inactivo' AND u.fecha_baja IS NULL`);
+  console.log('[rrhh-analytics] fecha_baja lista');
+});
+
 const meses12 = () => {
   const out = [];
   const d = new Date();
@@ -45,7 +54,12 @@ exports.resumen = async (req, res) => {
       pool.query(`SELECT COALESCE(NULLIF(u.cargo,''),'(sin cargo)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k ORDER BY n DESC LIMIT 10`).then(r => r[0]),
       pool.query(`SELECT COALESCE(NULLIF(u.centro_costo,''),'(sin área)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k ORDER BY n DESC`).then(r => r[0]),
       pool.query(`SELECT DATE_FORMAT(u.fecha_ingreso,'%Y-%m') m, COUNT(*) n FROM ${UNIV} WHERE ${WU} AND u.fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
-      pool.query(`SELECT DATE_FORMAT(fecha_termino,'%Y-%m') m, COUNT(*) n FROM rh_finiquitos WHERE fecha_termino >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
+      // Egresos = usuarios dados de baja (fecha_baja, la vigencia manda en usuarios);
+      // fallback fecha_termino del finiquito para bajas antiguas sin estampa
+      pool.query(`SELECT DATE_FORMAT(COALESCE(u.fecha_baja, fq.fecha_termino),'%Y-%m') m, COUNT(*) n
+                    FROM usuarios u LEFT JOIN rh_finiquitos fq ON fq.id_usuario=u.id_usuario
+                   WHERE u.estado='inactivo' AND COALESCE(u.fecha_baja, fq.fecha_termino) >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                   GROUP BY m`).then(r => r[0]),
       // Máxima 1 (un solo motor): saldo disponible y provisión vienen del MISMO motor
       // de la cartola de Vacaciones (saldo períodos cumplidos + proporcional en curso;
       // provisión = días hábiles ×1,4 corridos × remuneración diaria, matemática del finiquito)

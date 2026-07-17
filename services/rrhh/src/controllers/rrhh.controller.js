@@ -171,10 +171,9 @@ const crearVacaciones = async (req, res) => {
     const fd = norm(b.fecha_desde), fh = norm(b.fecha_hasta);
     if (!fd || !fh) return res.status(400).json({ success: false, data: null, error: 'Indica las fechas desde y hasta' });
     if (fh < fd) return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a desde' });
-    // MOTOR ÚNICO rrhh-core.diasHabiles: se guardan los mismos días HÁBILES que
-    // después carga la cuenta corriente (antes se guardaban corridos y el colaborador
-    // veía "10 días" en la solicitud y −8 en su cartola por el mismo rango)
-    const dias = Math.max(1, require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(fd, fh));
+    // La solicitud registra días CALENDARIO (ambas fechas inclusive) — definición del
+    // negocio; la cuenta corriente descuenta solo los HÁBILES (motor shared/feriados)
+    const dias = diasEntre(fd, fh);
     const [r] = await pool.query('INSERT INTO rh_vacaciones (id_usuario, nombre, fecha_desde, fecha_hasta, dias, comentario) VALUES (?,?,?,?,?,?)',
       [u.id_usuario || null, nombreDe(u), fd, fh, dias, norm(b.comentario) || null]);
     // Firma FES del solicitante (misma tabla rh_firmas de contratos/finiquitos)
@@ -190,7 +189,7 @@ const crearVacaciones = async (req, res) => {
     // Flujo: aprueba el SUPERVISOR directo (sin supervisor definido → RRHH)
     const [[sup]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
     const ids = sup?.id_supervisor ? [sup.id_supervisor] : await poolRRHH(u.id_usuario);
-    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones por aprobar', mensaje: `${nombreDe(u)} solicitó ${dias} día(s) hábil(es): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
+    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones por aprobar', mensaje: `${nombreDe(u)} solicitó ${dias} día(s): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: r.insertId, detalle: `Solicitó vacaciones ${fd}→${fh} (${dias}d)` });
     res.status(201).json({ success: true, data: { id: r.insertId, dias }, error: null });
   } catch (e) { console.error('[rrhh crearVacaciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -315,13 +314,9 @@ function isoFecha(f) {
   if (f instanceof Date) return `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
   return String(f || '').slice(0, 10);
 }
-function mesesAntiguedad(fechaIngreso, hasta) {
-  const a = new Date(isoFecha(fechaIngreso) + 'T00:00:00');
-  const b = new Date((hasta || hoyChile()) + 'T00:00:00');
-  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-  if (b.getDate() < a.getDate()) m--;
-  return Math.max(0, m);
-}
+// MOTOR ÚNICO rrhh-core.mesesAntiguedad (mismo del finiquito)
+const mesesAntiguedad = (fechaIngreso, hasta) =>
+  require('../../../../api-gateway/public/js/rrhh-core').mesesAntiguedad(isoFecha(fechaIngreso), hasta || hoyChile());
 function antiguedadTexto(meses) {
   const y = Math.floor(meses / 12), m = meses % 12;
   const py = y === 1 ? '1 año' : y + ' años', pm = m === 1 ? '1 mes' : m + ' meses';
