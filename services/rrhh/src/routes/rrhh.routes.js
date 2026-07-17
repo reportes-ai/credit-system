@@ -73,6 +73,16 @@ router.get('/desempeno/evaluaciones/:id/360',  verifyToken, des.get360);     // 
 router.post('/desempeno/evaluaciones/:id/360', verifyToken, des.asignar360); // valida jefatura/RRHH adentro
 router.get('/desempeno/competencias',      verifyToken, des.competencias);
 router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
+// Encuestas de Clima / Pulso / eNPS — responder cualquiera; gestión/resultados validan RRHH adentro
+const enc = require('../controllers/encuestas.controller');
+router.get('/encuestas/pendientes',       verifyToken, enc.pendientes);
+router.post('/encuestas/responder',       verifyToken, enc.responder);
+router.get('/encuestas',                  verifyToken, enc.lista);
+router.post('/encuestas',                 verifyToken, enc.guardar);
+router.post('/encuestas/:id/abrir',       verifyToken, enc.abrir);
+router.post('/encuestas/:id/cerrar',      verifyToken, enc.cerrar);
+router.delete('/encuestas/:id',           verifyToken, enc.eliminar);
+router.get('/encuestas/:id/resultados',   verifyToken, enc.resultados);
 // Canal de Compliance — crear/seguimiento cualquiera logueado; gestión valida compliance_gestionar adentro
 const compl = require('../controllers/compliance.controller');
 router.post('/compliance/denuncias',            verifyToken, compl.crear);

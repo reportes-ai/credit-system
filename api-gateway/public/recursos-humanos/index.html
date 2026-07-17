@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.4 — card Canal de Compliance -->
+  <!-- v2.5 — card Encuestas de Clima -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,12 @@
       <p>Cartas oferta con beneficios por checkbox, contratos que heredan lo ofertado, y descripciones de cargo obligatorias.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/encuestas/" class="module-card" id="cardEnc" style="display:none">
+      <div class="card-icon"><i class="bi bi-emoji-smile"></i></div>
+      <h5>Encuestas de Clima</h5>
+      <p>Clima, pulso y eNPS — 100% anónimas. Responde en un minuto; RRHH ve solo resultados agregados (promedios, distribución y comentarios sin autor).</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/compliance/" class="module-card" id="cardCompl" style="display:none">
       <div class="card-icon"><i class="bi bi-shield-exclamation"></i></div>
       <h5>Canal de Compliance</h5>
@@ -151,6 +157,7 @@
     if (tiene('rh_desempeno')) document.getElementById('cardDes').style.display='';
     if (tiene('rh_cursos','rh_colaboradores','rh_aprobar')) document.getElementById('cardCur').style.display='';
     if (tiene('compliance')) document.getElementById('cardCompl').style.display='';
+    if (tiene('rh_encuestas')) document.getElementById('cardEnc').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>
