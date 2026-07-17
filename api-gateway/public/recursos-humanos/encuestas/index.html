@@ -4,10 +4,10 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Encuestas de Clima — RRHH</title>
-  <!-- v1.3 — colores por tipo de encuesta -->
+  <!-- v1.4 — colores corporativos (azul AutoFácil) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
-    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; --teal:#0d9488; }
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; --teal:#0141A2; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
     .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
     .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
@@ -15,7 +15,7 @@
     .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main { padding:28px 34px; max-width:960px; margin:0 auto; }
-    .page-banner { background:linear-gradient(135deg,#134e4a,#0d9488 55%,#2dd4bf); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,#3b82f6); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
     .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; } .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; } .tab.active { background:var(--teal); color:#fff; border-color:var(--teal); }
     .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:16px; }
     .fld { margin-bottom:12px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input, .fld textarea, .fld select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
@@ -23,7 +23,7 @@
     .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; font-weight:600; }
     table { width:100%; border-collapse:collapse; font-size:.85rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
     .empty { text-align:center; color:#94a3b8; padding:30px 0; }
-    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; } .BORRADOR { background:#f1f5f9; color:#64748b; } .ABIERTA { background:#ccfbf1; color:#115e59; } .CERRADA { background:#f1f5f9; color:#64748b; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; } .BORRADOR { background:#f1f5f9; color:#64748b; } .ABIERTA { background:#dbeafe; color:#1e40af; } .CERRADA { background:#f1f5f9; color:#64748b; }
     .preg { padding:14px 0; border-bottom:1px solid #f1f5f9; } .preg b { font-size:.92rem; }
     .escala { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
     .escala button { min-width:40px; height:40px; border-radius:9px; border:1.5px solid #cbd5e1; background:#fff; font-weight:800; cursor:pointer; color:#64748b; }
