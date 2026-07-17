@@ -12,6 +12,28 @@ require('../../../../shared/migrate').enFila('rrhh-jornada-2', async () => {
   console.log('[rrhh-jornada] columnas especial/externo listas');
 });
 
+require('../../../../shared/migrate').enFila('rrhh-turnos', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_turnos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre  VARCHAR(80) NOT NULL,
+    semanas TEXT NOT NULL,            -- JSON: [ { L:["10:00","18:00"], ..., S:[...] }, ... ] una entrada por semana del ciclo
+    activo  TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  for (const col of ['turno_id INT NULL', 'turno_semana_inicio DATE NULL']) {
+    try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
+  }
+  const [[ex]] = await pool.query('SELECT id FROM rh_turnos LIMIT 1');
+  if (!ex) {
+    const semanas = [
+      { L: ['10:00', '18:00'], M: ['10:00', '18:00'], X: ['10:00', '18:00'], J: ['10:00', '18:00'], V: ['10:00', '18:00'] },
+      { L: ['10:00', '17:30'], M: ['10:00', '17:30'], X: ['10:00', '17:30'], J: ['10:00', '17:30'], V: ['10:00', '17:30'], S: ['10:00', '19:00'] },
+    ];
+    await pool.query('INSERT INTO rh_turnos (nombre, semanas) VALUES (?,?)', ['Rotativo con sábado', JSON.stringify(semanas)]);
+  }
+  console.log('[rrhh-turnos] listo');
+});
+
 require('../../../../shared/migrate').enFila('rrhh-jornada-4', async () => {
   try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN horario_dias VARCHAR(10) NULL`); } catch (e) { if (e.errno !== 1060) throw e; }
   console.log('[rrhh-jornada] columna dias lista');
@@ -51,7 +73,8 @@ exports.listar = async (req, res) => {
               COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40,
               unm.jornada_especial_hrs especial_hrs, COALESCE(unm.jornada_externo, 0) externo,
               TIME_FORMAT(unm.horario_entrada,'%H:%i') hora_entrada, TIME_FORMAT(unm.horario_salida,'%H:%i') hora_salida,
-              COALESCE(unm.por_turnos, 0) por_turnos, unm.horario_dias dias
+              COALESCE(unm.por_turnos, 0) por_turnos, unm.horario_dias dias,
+              unm.turno_id, DATE_FORMAT(unm.turno_semana_inicio,'%Y-%m-%d') turno_semana_inicio
          FROM ${UNIV} WHERE ${WU} ORDER BY nombre`);
     res.json({ success: true, error: null, data: rows });
   } catch (e) { console.error('[rrhh jornada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -71,12 +94,63 @@ exports.guardar = async (req, res) => {
     if (hIn === undefined || hOut === undefined) return res.status(400).json({ success: false, data: null, error: 'Horario inválido (formato HH:MM)' });
     let dias = req.body.dias == null || req.body.dias === '' ? null : String(req.body.dias).toUpperCase();
     if (dias != null && !/^[LMXJVSD]{0,7}$/.test(dias)) return res.status(400).json({ success: false, data: null, error: 'Días inválidos (letras LMXJVSD)' });
-    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=?, jornada_especial_hrs=?, jornada_externo=?, horario_entrada=?, horario_salida=?, por_turnos=?, horario_dias=? WHERE id_usuario=?',
-      [art22, h40, esp, externo, hIn, hOut, porTurnos, dias, idU]);
-    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h, jornada_especial_hrs, jornada_externo, horario_entrada, horario_salida, por_turnos, horario_dias) VALUES (?,?,?,?,?,?,?,?,?)',
-      [idU, art22, h40, esp, externo, hIn, hOut, porTurnos, dias]);
+    const turnoId = req.body.turno_id ? Number(req.body.turno_id) : null;
+    const turnoIni = /^\d{4}-\d{2}-\d{2}$/.test(req.body.turno_semana_inicio || '') ? req.body.turno_semana_inicio : null;
+    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=?, jornada_especial_hrs=?, jornada_externo=?, horario_entrada=?, horario_salida=?, por_turnos=?, horario_dias=?, turno_id=?, turno_semana_inicio=? WHERE id_usuario=?',
+      [art22, h40, esp, externo, hIn, hOut, porTurnos, dias, turnoId, turnoIni, idU]);
+    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h, jornada_especial_hrs, jornada_externo, horario_entrada, horario_salida, por_turnos, horario_dias, turno_id, turno_semana_inicio) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [idU, art22, h40, esp, externo, hIn, hOut, porTurnos, dias, turnoId, turnoIni]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'jornada', entidad_id: idU,
       detalle: `Jornada: art.22=${art22 ? 'SÍ' : 'no'}, 40hrs=${h40 ? 'SÍ' : 'no'}, especial=${esp != null ? esp + ' hrs' : 'no'}, externo=${externo ? 'SÍ' : 'no'}, horario=${porTurnos ? 'POR TURNOS' : ((hIn || '—') + '-' + (hOut || '—'))}` });
-    res.json({ success: true, error: null, data: { art22, h40, especial_hrs: esp, externo, hora_entrada: hIn && hIn.slice(0, 5), hora_salida: hOut && hOut.slice(0, 5), por_turnos: porTurnos, dias } });
+    res.json({ success: true, error: null, data: { art22, h40, especial_hrs: esp, externo, hora_entrada: hIn && hIn.slice(0, 5), hora_salida: hOut && hOut.slice(0, 5), por_turnos: porTurnos, dias, turno_id: turnoId, turno_semana_inicio: turnoIni } });
   } catch (e) { console.error('[rrhh jornada guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── Turnos rotativos: definición paramétrica (rh_turnos) ───────────────────── */
+const HHMM = v => /^\d{2}:\d{2}$/.test(String(v || ''));
+function validarSemanas(semanas) {
+  if (!Array.isArray(semanas) || !semanas.length || semanas.length > 8) return 'El turno debe tener entre 1 y 8 semanas';
+  for (const s of semanas) {
+    if (!s || typeof s !== 'object') return 'Semana inválida';
+    for (const [dia, par] of Object.entries(s)) {
+      if (!'LMXJVSD'.includes(dia)) return `Día inválido: ${dia}`;
+      if (!Array.isArray(par) || par.length !== 2 || !HHMM(par[0]) || !HHMM(par[1])) return `Horario inválido en ${dia} (HH:MM)`;
+    }
+  }
+  return null;
+}
+
+exports.turnosListar = async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT id, nombre, semanas FROM rh_turnos WHERE activo=1 ORDER BY nombre');
+    res.json({ success: true, error: null, data: rows.map(r => ({ id: r.id, nombre: r.nombre, semanas: JSON.parse(r.semanas) })) });
+  } catch (e) { console.error('[rrhh turnos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+exports.turnoGuardar = async (req, res) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ success: false, data: null, error: 'Falta el nombre del turno' });
+    const err = validarSemanas(req.body.semanas);
+    if (err) return res.status(400).json({ success: false, data: null, error: err });
+    const semanas = JSON.stringify(req.body.semanas);
+    let id = Number(req.params.id) || null;
+    const esNuevo = !id;
+    if (id) await pool.query('UPDATE rh_turnos SET nombre=?, semanas=? WHERE id=?', [nombre, semanas, id]);
+    else { const [r] = await pool.query('INSERT INTO rh_turnos (nombre, semanas) VALUES (?,?)', [nombre, semanas]); id = r.insertId; }
+    auditar({ req, accion: esNuevo ? 'CREAR' : 'EDITAR', modulo: 'rrhh', entidad: 'turno', entidad_id: id, detalle: `Turno "${nombre}" (${req.body.semanas.length} semana(s))` });
+    res.json({ success: true, error: null, data: { id } });
+  } catch (e) { console.error('[rrhh turno guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+exports.turnoEliminar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Turno inválido' });
+    const [[uso]] = await pool.query('SELECT COUNT(*) n FROM rh_fichas WHERE turno_id=?', [id]);
+    if (uso.n) return res.status(400).json({ success: false, data: null, error: `Hay ${uso.n} colaborador(es) asignado(s) a este turno — reasígnalos primero` });
+    await pool.query('UPDATE rh_turnos SET activo=0 WHERE id=?', [id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'turno', entidad_id: id, detalle: 'Turno desactivado' });
+    res.json({ success: true, error: null, data: null });
+  } catch (e) { console.error('[rrhh turno eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

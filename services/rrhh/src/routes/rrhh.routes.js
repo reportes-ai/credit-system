@@ -72,6 +72,10 @@ router.get('/asistencia/resumen', verifyToken, requireFunc('rh_asistencia', 'rh_
 const jor = require('../controllers/jornada.controller');
 router.get('/jornada',     verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.listar);
 router.put('/jornada/:id', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.guardar);
+router.get('/turnos',      verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnosListar);
+router.post('/turnos',     verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoGuardar);
+router.put('/turnos/:id',  verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoGuardar);
+router.delete('/turnos/:id', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoEliminar);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);

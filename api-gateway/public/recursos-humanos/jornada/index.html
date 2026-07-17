@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.5 — Hrs/semana descuenta 1 hr de colación diaria -->
+  <!-- v1.6 — pestaña Turnos: turnos rotativos paramétricos (rh_turnos, semanas con horario por día) + asignación con semana de inicio del ciclo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -49,6 +49,20 @@
   <div class="tabs">
     <button class="tab on" id="tabJor" onclick="verTab('jor')"><i class="bi bi-clock-history"></i> Jornada</button>
     <button class="tab" id="tabHor" onclick="verTab('hor')"><i class="bi bi-calendar-week"></i> Horarios y Turnos</button>
+    <button class="tab" id="tabTur" onclick="verTab('tur')"><i class="bi bi-arrow-repeat"></i> Turnos</button>
+  </div>
+  <div id="boxTur" style="display:none">
+    <div id="turnosDefs"></div>
+    <div class="box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b style="font-size:.9rem;color:#012d70"><i class="bi bi-people"></i> Asignación de turnos</b>
+        <button class="tab" onclick="nuevoTurno()"><i class="bi bi-plus-circle"></i> Nuevo turno</button>
+      </div>
+      <p style="font-size:.78rem;color:#64748b;margin:0 0 10px">Colaboradores marcados <b>por turnos</b> en Horarios. La <b>semana de inicio</b> es el lunes en que a esa persona le parte la Semana 1 del ciclo (con eso se sabe qué semana le toca en cualquier fecha).</p>
+      <table class="t"><thead><tr>
+        <th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Semana 1 parte el lunes</th><th style="text-align:center">Semana actual</th><th></th>
+      </tr></thead><tbody id="tbT"></tbody></table>
+    </div>
   </div>
   <div class="box" id="boxHor" style="display:none">
     <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Horario de cada colaborador. Si trabaja <b>por turnos</b>, márcalo aquí y su turno se define en la pestaña Turnos.</p>
@@ -77,6 +91,7 @@
     <b>Especial</b> → jornada parcial o pactada: las horas semanales digitadas mandan sobre 40/44 ·
     <b>Externo</b> → presta servicios sin sujeción a horario: en Asistencia queda EXTERNO y no genera faltas ·
     <b>Horarios y Turnos</b> → horario fijo (entrada/salida) de cada colaborador o marca "por turnos" (el turno se define en la pestaña Turnos); referencia para atrasos en <a href="/recursos-humanos/asistencia/">Asistencia</a> cuando Workera no tiene turno asignado ·
+    <b>Turnos</b> → turnos rotativos paramétricos (<code>rh_turnos</code>): cada turno define N semanas con horario por día; a cada colaborador "por turnos" se le asigna el turno y el lunes en que le parte la Semana 1 del ciclo ·
     todos los flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
 </div>
 <script src="/js/auth-guard.js"></script>
@@ -112,8 +127,100 @@ function kpis(){
 function verTab(t){
   $('boxJor').style.display=t==='jor'?'':'none';
   $('boxHor').style.display=t==='hor'?'':'none';
+  $('boxTur').style.display=t==='tur'?'':'none';
   $('tabJor').classList.toggle('on',t==='jor');
   $('tabHor').classList.toggle('on',t==='hor');
+  $('tabTur').classList.toggle('on',t==='tur');
+}
+/* ── Turnos rotativos ─────────────────────────────────────────── */
+let TURNOS=[];
+function hrsSemanaTurno(sem){   // suma de la semana descontando 1 hr de colación por día
+  let tot=0;
+  for(const par of Object.values(sem)){
+    const [h1,m1]=par[0].split(':').map(Number),[h2,m2]=par[1].split(':').map(Number);
+    let min=(h2*60+m2)-(h1*60+m1); if(min<=0) min+=24*60;
+    tot+=Math.max(min-60,0);
+  }
+  return (tot/60).toLocaleString('es-CL',{maximumFractionDigits:1});
+}
+function pintaTurnos(){
+  $('turnosDefs').innerHTML=TURNOS.map((t,ti)=>`<div class="box">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input style="border:1px solid #cbd5e1;border-radius:8px;padding:5px 10px;font-weight:700;font-size:.88rem" value="${t.nombre}" onchange="TURNOS[${ti}].nombre=this.value">
+      <button class="tab" onclick="addSemana(${ti})"><i class="bi bi-plus"></i> Semana</button>
+      <button class="tab" onclick="guardarTurno(${ti})" style="background:#166534;border-color:#166534;color:#fff"><i class="bi bi-floppy"></i> Guardar turno</button>
+      ${t.id?`<button class="tab" onclick="borrarTurno(${ti})" style="color:#b91c1c"><i class="bi bi-trash"></i></button>`:''}
+      <span class="saved" id="svt${ti}"><i class="bi bi-check2"></i> guardado</span>
+    </div>
+    <table class="t"><thead><tr><th></th>${DSEM.map(d=>`<th style="text-align:center">${d}</th>`).join('')}<th style="text-align:center">Hrs sem.</th><th></th></tr></thead><tbody>
+    ${t.semanas.map((s,si)=>`<tr>
+      <td><b style="font-size:.78rem">Semana ${si+1}</b></td>
+      ${DSEM.map(d=>{const p=s[d];return `<td style="text-align:center"><input style="width:96px;border:1px solid #cbd5e1;border-radius:7px;padding:2px 4px;font-size:.74rem;text-align:center;${p?'':'background:#f8fafc'}" placeholder="libre" value="${p?p[0]+'-'+p[1]:''}" onchange="setCelda(${ti},${si},'${d}',this.value)"></td>`;}).join('')}
+      <td style="text-align:center"><b>${hrsSemanaTurno(s)}</b></td>
+      <td style="text-align:right">${t.semanas.length>1?`<button class="tab" style="padding:2px 8px;font-size:.68rem;color:#b91c1c" onclick="delSemana(${ti},${si})"><i class="bi bi-x"></i></button>`:''}</td>
+    </tr>`).join('')}
+    </tbody></table>
+    <div style="font-size:.72rem;color:#94a3b8;margin-top:6px">Formato de cada celda: <code>HH:MM-HH:MM</code> (vacío = día libre). Las horas semanales descuentan 1 hr de colación diaria.</div>
+  </div>`).join('')||'<div class="box empty">Sin turnos definidos — crea uno con "Nuevo turno".</div>';
+  pintaAsig();
+}
+function setCelda(ti,si,d,val){
+  const s=TURNOS[ti].semanas[si]; val=val.trim();
+  if(!val){ delete s[d]; pintaTurnos(); return; }
+  const m=val.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+  if(!m){ alert('Formato: HH:MM-HH:MM (ej. 10:00-18:00)'); pintaTurnos(); return; }
+  const pad=x=>x.length===4?'0'+x:x;
+  s[d]=[pad(m[1]),pad(m[2])]; pintaTurnos();
+}
+function addSemana(ti){ TURNOS[ti].semanas.push({L:['10:00','18:00'],M:['10:00','18:00'],X:['10:00','18:00'],J:['10:00','18:00'],V:['10:00','18:00']}); pintaTurnos(); }
+function delSemana(ti,si){ TURNOS[ti].semanas.splice(si,1); pintaTurnos(); }
+function nuevoTurno(){ TURNOS.push({id:null,nombre:'Nuevo turno',semanas:[{L:['10:00','18:00'],M:['10:00','18:00'],X:['10:00','18:00'],J:['10:00','18:00'],V:['10:00','18:00']}]}); pintaTurnos(); }
+async function guardarTurno(ti){
+  const t=TURNOS[ti];
+  try{
+    const r=await fetch('/api/rrhh/turnos'+(t.id?'/'+t.id:''),{method:t.id?'PUT':'POST',headers:H,body:JSON.stringify({nombre:t.nombre,semanas:t.semanas})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    if(!t.id) t.id=j.data.id;
+    const s=$('svt'+ti); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);
+    pintaAsig();
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+async function borrarTurno(ti){
+  const t=TURNOS[ti];
+  if(!confirm(`¿Eliminar el turno "${t.nombre}"?`)) return;
+  try{
+    const r=await fetch('/api/rrhh/turnos/'+t.id,{method:'DELETE',headers:H});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    TURNOS.splice(ti,1); pintaTurnos();
+  }catch(e){ alert(e.message); }
+}
+function lunesDe(f){ const d=new Date(f+'T12:00:00'); d.setDate(d.getDate()-((d.getDay()+6)%7)); return d.toISOString().slice(0,10); }
+function semanaActualDe(c,t){
+  if(!c.turno_semana_inicio||!t) return null;
+  const dif=Math.round((new Date(lunesDe(new Date().toISOString().slice(0,10)))-new Date(c.turno_semana_inicio))/(7*86400000));
+  return ((dif%t.semanas.length)+t.semanas.length)%t.semanas.length+1;
+}
+function pintaAsig(){
+  const rot=D.map((c,i)=>[c,i]).filter(([c])=>+c.por_turnos&&debeMarcar(c));
+  $('tbT').innerHTML=rot.map(([c,i])=>{
+    const t=TURNOS.find(x=>x.id==c.turno_id);
+    const sa=semanaActualDe(c,t);
+    return `<tr>
+    <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
+    <td style="color:#475569">${c.cargo||''}</td>
+    <td><select style="border:1px solid #cbd5e1;border-radius:7px;padding:3px 6px;font-size:.78rem" onchange="asigna(${i},'turno_id',this.value)">
+      <option value="">— sin turno —</option>
+      ${TURNOS.filter(x=>x.id).map(x=>`<option value="${x.id}" ${x.id==c.turno_id?'selected':''}>${x.nombre}</option>`).join('')}
+    </select></td>
+    <td><input type="date" style="border:1px solid #cbd5e1;border-radius:7px;padding:3px 6px;font-size:.78rem" value="${c.turno_semana_inicio||''}" onchange="asigna(${i},'turno_semana_inicio',this.value?lunesDe(this.value):'')"></td>
+    <td style="text-align:center">${sa?`<span class="pill p-nav">Semana ${sa} de ${t.semanas.length}</span>`:'<span class="pill p-mut">—</span>'}</td>
+    <td style="text-align:right"><span class="saved" id="sva${i}"><i class="bi bi-check2"></i> guardado</span></td>
+  </tr>`;}).join('')||'<tr><td colspan="6" class="empty">Nadie está marcado "por turnos" en la pestaña Horarios y Turnos.</td></tr>';
+}
+async function asigna(i,campo,val){
+  D[i][campo]=val||null;
+  try{ await guardar(i); pintaAsig(); const s=$('sva'+i); if(s){s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);} }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 function horarioTxt(c){
   if(!debeMarcar(c)) return '<span class="pill p-mut">no aplica</span>';
@@ -163,7 +270,7 @@ async function cambiaHora(i,campo,val){
 }
 async function cambiaTurnos(i,val){
   D[i].por_turnos=val?1:0;
-  try{ await guardar(i); pintaHor(); }
+  try{ await guardar(i); pintaHor(); pintaAsig(); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 function pinta(){
@@ -185,7 +292,8 @@ async function guardar(i){
   const c=D[i];
   const r=await fetch('/api/rrhh/jornada/'+c.id_usuario,{method:'PUT',headers:H,
     body:JSON.stringify({art22:+c.art22,h40:+c.h40,especial_hrs:c.especial_hrs===''?null:c.especial_hrs,externo:+c.externo,
-      hora_entrada:c.hora_entrada||null,hora_salida:c.hora_salida||null,por_turnos:+c.por_turnos||0,dias:c.dias??null})});
+      hora_entrada:c.hora_entrada||null,hora_salida:c.hora_salida||null,por_turnos:+c.por_turnos||0,dias:c.dias??null,
+      turno_id:c.turno_id||null,turno_semana_inicio:c.turno_semana_inicio||null})});
   const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
   $('dm'+i).innerHTML=marcarTxt(c);
   $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(c)}</span>`;
@@ -202,9 +310,10 @@ async function cambiaHrs(i,val){
 }
 (async()=>{
   try{
-    const r=await fetch('/api/rrhh/jornada',{headers:H}); const j=await r.json();
-    if(!j.success) throw new Error(j.error||'Error');
-    D=j.data; pinta();
+    const [r,rt]=await Promise.all([fetch('/api/rrhh/jornada',{headers:H}),fetch('/api/rrhh/turnos',{headers:H})]);
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    const jt=await rt.json(); TURNOS=jt.success?jt.data:[];
+    D=j.data; pinta(); pintaTurnos();
   }catch(e){ $('tb').innerHTML=`<tr><td colspan="7" class="empty">⚠️ ${e.message}</td></tr>`; }
 })();
 </script>
