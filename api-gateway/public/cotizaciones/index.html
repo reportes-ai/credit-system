@@ -439,7 +439,7 @@
       <button class="nav-link" data-tab="seguros"><i class="bi bi-shield-check me-1"></i>Seguros</button>
     </li>
     <li class="nav-item">
-      <button class="nav-link" data-tab="rentabilidades"><i class="bi bi-graph-up-arrow me-1"></i>Rentabilidades</button>
+      <button class="nav-link" data-tab="rentabilidades" id="btnTabRent" style="display:none"><i class="bi bi-graph-up-arrow me-1"></i>Rentabilidades</button>
     </li>
   </ul>
 
@@ -769,6 +769,15 @@ try {
   document.getElementById('navNombre').textContent = ((_u.nombre||'') + ' ' + (_u.apellido||'')).trim();
   document.getElementById('navPerfil').textContent = _u.perfil || _u.nombre_perfil || '—';
 } catch(e) {}
+
+// Pestaña Rentabilidades solo con permiso aprob_rentabilidad (Admin bypass) — muestra márgenes del negocio
+(async()=>{ try {
+  const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
+  if (u.perfil === 'Administrador') { document.getElementById('btnTabRent').style.display=''; return; }
+  const r = await fetch('/api/auth/mis-permisos', { headers:{ Authorization:'Bearer '+sessionStorage.getItem('token') } });
+  const j = await r.json();
+  if ((j.funcionalidades||[]).includes('aprob_rentabilidad')) document.getElementById('btnTabRent').style.display='';
+} catch(e){} })();
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TOAST

@@ -84,8 +84,8 @@
       </button>
     </div>
 
-    <!-- Ingreso (derecha) -->
-    <button class="tab-card" data-tab="ingreso" onclick="cambiarTab('ingreso')">
+    <!-- Ingreso (derecha) — solo con permiso creditos.crear -->
+    <button class="tab-card" data-tab="ingreso" id="tabIngreso" style="display:none" onclick="cambiarTab('ingreso')">
       <div class="card-icon"><i class="bi bi-plus-circle"></i></div>
       <h6>Ingreso de Créditos</h6>
     </button>
@@ -693,6 +693,16 @@
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script>
+// Pestaña Ingreso solo con permiso creditos.crear (Admin bypass)
+(async()=>{ try {
+  const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
+  if (u.perfil === 'Administrador') { document.getElementById('tabIngreso').style.display=''; return; }
+  const r = await fetch('/api/auth/mis-permisos', { headers:{ Authorization:'Bearer '+sessionStorage.getItem('token') } });
+  const j = await r.json();
+  if ((j.funcionalidades||[]).includes('creditos.crear')) document.getElementById('tabIngreso').style.display='';
+} catch(e){} })();
+</script>
 <script src="/js/rentabilidad-core.js"></script>
 <script src="/js/cae-core.js"></script>
 <script src="app.js" defer></script>
