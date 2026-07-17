@@ -1,0 +1,164 @@
+'use strict';
+/* ─────────────────────────────────────────────────────────────────────────────
+   FIRMA ELECTRÓNICA SIMPLE (FES, Ley 19.799) de CONTRATOS y FINIQUITOS.
+   · Dos firmas por documento: TRABAJADOR (el propio usuario, desde Mi Ficha)
+     y EMPLEADOR (quien tenga rh_aprobar). Con ambas → estado FIRMADO.
+   · Cada firma registra usuario, nombre, cargo, IP, fecha y el hash SHA-256
+     del contenido del documento al momento de firmar; si el documento se
+     altera después, la verificación marca "no íntegro".
+   · El documento queda CONGELADO al enviarse a firma (no se edita más).
+   ───────────────────────────────────────────────────────────────────────────── */
+const crypto = require('crypto');
+const pool = require('../../../../shared/config/database');
+const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const { auditar } = require('../../../../shared/audit');
+
+const ok   = (res, data) => res.json({ success: true, data, error: null });
+const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
+
+require('../../../../shared/migrate').enFila('rrhh-firmas', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_firmas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    entidad VARCHAR(12) NOT NULL,
+    entidad_id INT NOT NULL,
+    rol VARCHAR(12) NOT NULL,
+    id_usuario INT NOT NULL,
+    nombre VARCHAR(160), cargo VARCHAR(120), ip VARCHAR(45),
+    hash_doc CHAR(64) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_doc_rol (entidad, entidad_id, rol)
+  )`);
+  console.log('[rrhh-firmas] listo');
+});
+
+const TABLAS = { CONTRATO: 'rh_contratos', FINIQUITO: 'rh_finiquitos' };
+
+/* Snapshot canónico del documento (los campos de fondo, en orden fijo) → SHA-256.
+   Debe dar idéntico en cada firma y en cada verificación mientras nadie lo altere. */
+async function docYHash(entidad, id) {
+  const t = TABLAS[entidad];
+  if (!t) return null;
+  const [[d]] = await pool.query(`SELECT * FROM ${t} WHERE id=?`, [id]);
+  if (!d) return null;
+  const campos = entidad === 'CONTRATO'
+    ? ['id', 'trabajador', 'rut', 'id_cargo', 'sueldo_base', 'fecha_ingreso', 'tipo_contrato', 'jornada', 'beneficios', 'otros']
+    : ['id', 'trabajador', 'rut', 'cargo', 'fecha_ingreso', 'fecha_termino', 'causal', 'causal_glosa', 'detalle', 'total'];
+  const snap = {};
+  for (const c of campos) snap[c] = d[c] instanceof Date ? d[c].toISOString().slice(0, 10) : d[c];
+  const hash = crypto.createHash('sha256').update(JSON.stringify(snap)).digest('hex');
+  return { doc: d, hash };
+}
+
+const esRRHH = req => tieneFunc(req.usuario.id_usuario, 'rh_contratos', 'rh_colaboradores', 'rh_aprobar').catch(() => false);
+
+/* ── Enviar a firma (RRHH) — congela el doc y avisa al trabajador ───────────── */
+exports.enviar = async (req, res) => {
+  try {
+    if (!await esRRHH(req)) return fail(res, 'Sin permiso', 403);
+    const entidad = String(req.body?.entidad || '');
+    const id = parseInt(req.body?.id);
+    const dh = await docYHash(entidad, id);
+    if (!dh) return fail(res, 'Documento no existe', 404);
+    const { doc } = dh;
+    if (!['BORRADOR', 'EMITIDO', 'EN_FIRMA'].includes(doc.estado)) return fail(res, `El documento está ${doc.estado}`, 409);
+    // El trabajador necesita cuenta para firmar: si el contrato no la trae, se vincula por RUT
+    let idTrab = doc.id_usuario;
+    if (!idTrab && doc.rut) {
+      const [[u]] = await pool.query(`SELECT id_usuario FROM usuarios WHERE rut=? AND estado='activo' LIMIT 1`, [doc.rut]);
+      if (u) { idTrab = u.id_usuario; await pool.query(`UPDATE ${TABLAS[entidad]} SET id_usuario=? WHERE id=?`, [idTrab, id]); }
+    }
+    if (!idTrab) return fail(res, 'El trabajador aún no tiene cuenta en el sistema — créala primero (la firma FES requiere sesión propia)', 400);
+    await pool.query(`UPDATE ${TABLAS[entidad]} SET estado='EN_FIRMA' WHERE id=?`, [id]);
+    notificar([idTrab], {
+      tipo: 'RRHH', prioridad: 'alta', sonar: true,
+      titulo: `Tienes un ${entidad === 'CONTRATO' ? 'contrato' : 'finiquito'} por firmar`,
+      mensaje: 'Revísalo y fírmalo electrónicamente en Mi Ficha → Documentos por firmar',
+      href: '/recursos-humanos/mi-ficha/', clave: `firma_env_${entidad}_${id}` });
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_firma', entidad_id: id, detalle: `${entidad} #${id} enviado a firma FES` });
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Pendientes de MI firma (trabajador, Mi Ficha) ──────────────────────────── */
+exports.pendientes = async (req, res) => {
+  try {
+    const me = req.usuario.id_usuario;
+    const [cts] = await pool.query(
+      `SELECT ct.id, 'CONTRATO' entidad, ct.trabajador, ct.sueldo_base, ct.tipo_contrato, ct.jornada,
+              DATE_FORMAT(ct.fecha_ingreso,'%Y-%m-%d') fecha, c.nombre cargo, ct.beneficios, ct.otros
+         FROM rh_contratos ct JOIN rh_cargos c ON c.id=ct.id_cargo
+        WHERE ct.estado='EN_FIRMA' AND ct.id_usuario=?
+          AND NOT EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='CONTRATO' AND f.entidad_id=ct.id AND f.rol='TRABAJADOR')`, [me]);
+    const [fqs] = await pool.query(
+      `SELECT fq.id, 'FINIQUITO' entidad, fq.trabajador, fq.cargo, fq.causal, fq.causal_glosa, fq.total,
+              DATE_FORMAT(fq.fecha_termino,'%Y-%m-%d') fecha, fq.detalle
+         FROM rh_finiquitos fq
+        WHERE fq.estado='EN_FIRMA' AND fq.id_usuario=?
+          AND NOT EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='FINIQUITO' AND f.entidad_id=fq.id AND f.rol='TRABAJADOR')`, [me]);
+    ok(res, { pendientes: [...cts, ...fqs] });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Firmar (TRABAJADOR = el titular · EMPLEADOR = rh_aprobar) ──────────────── */
+exports.firmar = async (req, res) => {
+  try {
+    const entidad = String(req.body?.entidad || '');
+    const id = parseInt(req.body?.id);
+    const rol = String(req.body?.rol || 'TRABAJADOR');
+    if (!['TRABAJADOR', 'EMPLEADOR'].includes(rol)) return fail(res, 'Rol inválido', 400);
+    const dh = await docYHash(entidad, id);
+    if (!dh) return fail(res, 'Documento no existe', 404);
+    if (dh.doc.estado !== 'EN_FIRMA') return fail(res, `El documento está ${dh.doc.estado}, no en firma`, 409);
+    const me = req.usuario.id_usuario;
+    if (rol === 'TRABAJADOR' && dh.doc.id_usuario !== me) return fail(res, 'Solo el titular puede firmar como trabajador', 403);
+    if (rol === 'EMPLEADOR' && !await tieneFunc(me, 'rh_aprobar').catch(() => false)) return fail(res, 'La firma del empleador requiere permiso rh_aprobar', 403);
+    const [[u]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre, cargo FROM usuarios WHERE id_usuario=?`, [me]);
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+    try {
+      await pool.query(`INSERT INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc) VALUES (?,?,?,?,?,?,?,?)`,
+        [entidad, id, rol, me, u?.nombre || '', u?.cargo || '', ip, dh.hash]);
+    } catch (e) { if (e.errno === 1062) return fail(res, `Ya existe la firma ${rol} de este documento`, 409); throw e; }
+    // ¿Están las dos? → FIRMADO + aviso
+    const [[n]] = await pool.query(`SELECT COUNT(*) n FROM rh_firmas WHERE entidad=? AND entidad_id=?`, [entidad, id]);
+    if (n.n >= 2) {
+      await pool.query(`UPDATE ${TABLAS[entidad]} SET estado='FIRMADO' WHERE id=?`, [id]);
+      const avisar = [dh.doc.id_usuario, dh.doc.creado_por].filter(x => x && x !== me);
+      if (avisar.length) notificar(avisar, {
+        tipo: 'RRHH', prioridad: 'media',
+        titulo: `${entidad === 'CONTRATO' ? 'Contrato' : 'Finiquito'} #${id} firmado por ambas partes`,
+        mensaje: `${dh.doc.trabajador} — documento FIRMADO con FES (Ley 19.799)`,
+        href: '/recursos-humanos/contratos/', clave: `firma_ok_${entidad}_${id}` });
+    } else if (rol === 'TRABAJADOR') {
+      // avisar a los que pueden firmar por la empresa
+      const [emp] = await pool.query(
+        `SELECT DISTINCT u.id_usuario FROM usuarios u
+          JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+          JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+         WHERE f.codigo='rh_aprobar' AND u.estado='activo'`);
+      if (emp.length) notificar(emp.map(x => x.id_usuario), {
+        tipo: 'RRHH', prioridad: 'alta', sonar: true,
+        titulo: `${entidad === 'CONTRATO' ? 'Contrato' : 'Finiquito'} #${id} firmado por el trabajador`,
+        mensaje: `${dh.doc.trabajador} ya firmó — falta la firma del empleador (Contratos → Firmas)`,
+        href: '/recursos-humanos/contratos/', clave: `firma_trab_${entidad}_${id}` });
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_firma', entidad_id: id, detalle: `Firma FES ${rol} de ${entidad} #${id} (hash ${dh.hash.slice(0, 12)}…)` });
+    ok(res, { ok: true, firmado: n.n >= 2 });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Firmas de un documento + verificación de integridad ────────────────────── */
+exports.deDocumento = async (req, res) => {
+  try {
+    const entidad = String(req.params.entidad || '').toUpperCase();
+    const id = parseInt(req.params.id);
+    const dh = await docYHash(entidad, id);
+    if (!dh) return fail(res, 'Documento no existe', 404);
+    // lo ve RRHH o el propio titular
+    if (dh.doc.id_usuario !== req.usuario.id_usuario && !await esRRHH(req)) return fail(res, 'Sin permiso', 403);
+    const [firmas] = await pool.query(
+      `SELECT rol, nombre, cargo, ip, hash_doc, DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') fecha
+         FROM rh_firmas WHERE entidad=? AND entidad_id=? ORDER BY created_at`, [entidad, id]);
+    ok(res, { estado: dh.doc.estado, firmas: firmas.map(f => ({ ...f, integro: f.hash_doc === dh.hash })) });
+  } catch (e) { fail(res, e.message); }
+};

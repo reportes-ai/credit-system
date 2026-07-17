@@ -53,6 +53,12 @@ router.post('/onboarding',             verifyToken, requireFunc('rh_contratos', 
 router.put('/onboarding/items/:id',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbMarcar);
 router.get('/onboarding/plantilla',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantilla);
 router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantillaGuardar);
+// Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
+const fir = require('../controllers/firmas.controller');
+router.post('/firmas/enviar',            verifyToken, fir.enviar);
+router.get('/firmas/pendientes',         verifyToken, fir.pendientes);
+router.post('/firmas/firmar',            verifyToken, fir.firmar);
+router.get('/firmas/:entidad/:id',       verifyToken, fir.deDocumento);
 // Evaluaciones de Desempeño — mi/autoeval/conocimiento validan dueño adentro; equipo/evaluar validan jefatura o RRHH adentro
 const des = require('../controllers/desempeno.controller');
 router.get('/desempeno/mi',                verifyToken, des.mi);

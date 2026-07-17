@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.2 — ficha propia: conyuge + hijos + 2 emergencias editables por el colaborador -->
+  <!-- v1.3 — panel Documentos por firmar (FES) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -79,6 +79,11 @@
     <table><thead><tr><th>Mes</th><th>Total Haberes</th><th>Descuentos</th><th>Líquido</th><th></th></tr></thead><tbody id="tbLiq"></tbody></table>
   </div>
 
+  <div class="panel" id="pFirmas" style="display:none;border:1.5px solid #f59e0b;background:#fffbeb">
+    <h5 style="color:#92400e"><i class="bi bi-pen"></i> Documentos por firmar</h5>
+    <div id="listFirmas"></div>
+  </div>
+
   <div class="panel" id="pCursos" style="display:none">
     <h5><i class="bi bi-mortarboard"></i> Mis Cursos y Capacitaciones <span id="cursosTot" style="font-size:.72rem;background:#eff6ff;color:#0141A2;border-radius:10px;padding:2px 10px;font-weight:800"></span></h5>
     <table><thead><tr><th>Fecha</th><th>Curso</th><th>Relator</th><th style="text-align:center">Horas</th><th style="text-align:center">Asistencia</th><th style="text-align:center">Nota</th></tr></thead><tbody id="tbCursos"></tbody></table>
@@ -150,6 +155,34 @@ async function cargarCursos(){
   }catch(e){}
 }
 cargarCursos();
+async function cargarFirmas(){
+  try{
+    const j = await (await fetch('/api/rrhh/firmas/pendientes',{headers:H})).json();
+    const ps = (j.data||{}).pendientes||[];
+    if(!ps.length){ document.getElementById('pFirmas').style.display='none'; return; }
+    document.getElementById('pFirmas').style.display='';
+    document.getElementById('listFirmas').innerHTML = ps.map(p=>{
+      const det = p.entidad==='CONTRATO'
+        ? `Cargo <b>${esc(p.cargo)}</b> · Sueldo base <b>${fP(p.sueldo_base)}</b> · ${esc(p.tipo_contrato)} · Jornada ${esc(p.jornada)} · Ingreso ${fD(p.fecha)}`
+        : `Causal <b>${esc(p.causal)}</b> (${esc(p.causal_glosa)}) · Término ${fD(p.fecha)} · Total finiquito <b>${fP(p.total)}</b>`;
+      return `<div style="background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:10px">
+        <b>${p.entidad==='CONTRATO'?'Contrato de trabajo':'Finiquito'} #${p.id}</b>
+        <div style="font-size:.86rem;color:#475569;margin:5px 0 10px">${det}</div>
+        <div style="font-size:.76rem;color:#94a3b8;margin-bottom:10px">Al firmar se registra tu nombre, fecha, IP y la huella (hash SHA-256) del documento — Firma Electrónica Simple, Ley 19.799. Revisa el documento con RRHH antes si tienes dudas.</div>
+        <button onclick="firmarDoc('${p.entidad}',${p.id},this)" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;cursor:pointer"><i class="bi bi-pen me-1"></i>Firmar electrónicamente</button></div>`;
+    }).join('');
+  }catch(e){}
+}
+window.firmarDoc = async (entidad,id,btn)=>{
+  if(!confirm(`¿Firmar electrónicamente este ${entidad==='CONTRATO'?'contrato':'finiquito'}? La firma queda registrada con validez de Firma Electrónica Simple.`)) return;
+  btn.disabled=true;
+  const r = await fetch('/api/rrhh/firmas/firmar',{method:'POST',headers:HJ,body:JSON.stringify({entidad,id,rol:'TRABAJADOR'})});
+  const j = await r.json();
+  if(!j.success){ alert(j.error); btn.disabled=false; return; }
+  toast('Documento firmado ✔ — se avisó a la empresa para su contrafirma');
+  cargarFirmas();
+};
+cargarFirmas();
 function renderContacto(){
   const f = DATA.ficha || {};
   document.getElementById('gContacto').innerHTML = CONTACTO.map(([k,lbl]) => EDIT

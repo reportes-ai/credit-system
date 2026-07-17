@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 -->
+<!-- v1.1 — firma electronica FES de contratos y finiquitos -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -267,7 +267,9 @@ async function fqInit(){
 function fqPintarLista(){
   $('tbFiniq').innerHTML = FINIQ.map(f=>`<tr><td><b>${esc(f.trabajador)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(f.rut||'')}</span></td>
     <td>Art. ${esc(f.causal)}</td><td>${fmtF(f.fecha_termino)}</td><td style="font-weight:800">${CLP(f.total)}</td>
-    <td><button class="btn-mini" onclick="imprimirFiniquito(${f.id})"><i class="bi bi-printer"></i></button></td></tr>`).join('')
+    <td style="white-space:nowrap"><button class="btn-mini" onclick="imprimirFiniquito(${f.id})"><i class="bi bi-printer"></i></button>
+      ${f.estado==='BORRADOR'?`<button class="btn-mini" style="background:#0141A2;color:#fff" onclick="enviarFirma('FINIQUITO',${f.id})"><i class="bi bi-pen"></i> A firma</button>`:''}
+      ${f.estado==='EN_FIRMA'||f.estado==='FIRMADO'?`<button class="btn-mini" onclick="verFirmas('FINIQUITO',${f.id})"><i class="bi bi-patch-check"></i> Firmas</button>`:''} ${pillFirma(f.estado)}</td></tr>`).join('')
     || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px">Sin finiquitos guardados.</td></tr>';
 }
 function fqFmt(el){ const n=parseInt(String(el.value).replace(/\D/g,''))||0; el.value=n?CLP(n):'$0'; }
@@ -356,8 +358,10 @@ function pintar(){
   $('tbContratos').innerHTML = CONTRATOS.map(c=>`<tr>
     <td><b>${esc(c.trabajador)}</b><br><span style="color:#94a3b8;font-size:.75rem">${esc(c.rut||'')}</span></td>
     <td>${esc(c.cargo)}</td><td>${CLP(c.sueldo_base)}</td><td>${fmtF(c.fecha_ingreso)}</td>
-    <td>${c.id_carta?'Carta #'+c.id_carta:'—'}</td>
-    <td><button class="btn-mini" onclick="imprimirContrato(${c.id})"><i class="bi bi-printer"></i> Contrato</button></td></tr>`)
+    <td>${c.id_carta?'Carta #'+c.id_carta:'—'} ${pillFirma(c.estado)}</td>
+    <td style="white-space:nowrap"><button class="btn-mini" onclick="imprimirContrato(${c.id})"><i class="bi bi-printer"></i> Contrato</button>
+      ${c.estado==='BORRADOR'?`<button class="btn-mini" style="background:#0141A2;color:#fff" onclick="enviarFirma('CONTRATO',${c.id})"><i class="bi bi-pen"></i> A firma</button>`:''}
+      ${c.estado==='EN_FIRMA'||c.estado==='FIRMADO'?`<button class="btn-mini" onclick="verFirmas('CONTRATO',${c.id})"><i class="bi bi-patch-check"></i> Firmas</button>`:''}</td></tr>`)
     .join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:22px">Aún no hay contratos.</td></tr>';
 
   $('tbCargos').innerHTML = CARGOS.map(c=>`<tr>
@@ -370,6 +374,45 @@ function pintar(){
     <td style="font-weight:700">${esc(b.titulo)}</td><td style="font-size:.8rem;color:#475569">${esc(b.clausula)}</td>
     <td>${b.monto_default?CLP(b.monto_default)+' '+esc(b.unidad||''):'—'}</td>
     <td><button class="btn-mini" onclick="editBenef(${b.id})"><i class="bi bi-pencil"></i></button></td></tr>`).join('');
+}
+
+/* ── Firma FES: enviar / ver firmas / contrafirma empleador ── */
+function pillFirma(e){
+  if(e==='EN_FIRMA') return '<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:1px 8px;font-size:.68rem;font-weight:800">EN FIRMA</span>';
+  if(e==='FIRMADO')  return '<span style="background:#dcfce7;color:#166534;border-radius:10px;padding:1px 8px;font-size:.68rem;font-weight:800">✔ FIRMADO</span>';
+  return '';
+}
+async function enviarFirma(entidad,id){
+  if(!confirm('¿Enviar a firma electrónica? El documento queda congelado y el trabajador recibe el aviso para firmarlo en Mi Ficha.')) return;
+  const j = await (await fetch('/api/rrhh/firmas/enviar',{method:'POST',headers:HJ,body:JSON.stringify({entidad,id})})).json();
+  if(!j.success) return alert(j.error);
+  alert('Enviado a firma — el trabajador fue avisado por la campana.');
+  entidad==='CONTRATO'?cargarTodo():fqInit();
+}
+async function verFirmas(entidad,id){
+  const j = await (await fetch(`/api/rrhh/firmas/${entidad}/${id}`,{headers:H})).json();
+  if(!j.success) return alert(j.error);
+  const d=j.data, tiene=r=>d.firmas.find(f=>f.rol===r);
+  const linea=r=>{ const f=tiene(r);
+    return f?`<div style="margin:6px 0"><b>${r==='TRABAJADOR'?'Trabajador':'Empleador'}:</b> ${esc(f.nombre)} ${f.cargo?'('+esc(f.cargo)+')':''} — ${f.fecha} · IP ${esc(f.ip||'—')} ${f.integro?'<span style="color:#166534;font-weight:700">✔ íntegro</span>':'<span style="color:#b91c1c;font-weight:800">⚠ DOCUMENTO ALTERADO tras la firma</span>'}</div>`
+      :`<div style="margin:6px 0;color:#94a3b8"><b>${r==='TRABAJADOR'?'Trabajador':'Empleador'}:</b> pendiente</div>`; };
+  let extra='';
+  if(d.estado==='EN_FIRMA' && tiene('TRABAJADOR') && !tiene('EMPLEADOR'))
+    extra=`<button class="btn-mini" style="background:#0141A2;color:#fff;margin-top:8px" onclick="contraFirmar('${entidad}',${id})"><i class="bi bi-pen"></i> Firmar por la empresa (requiere rh_aprobar)</button>`;
+  const dlg=document.createElement('dialog'); dlg.style.cssText='border:none;border-radius:14px;max-width:560px;width:92%;padding:22px';
+  dlg.innerHTML=`<h6 style="margin:0 0 10px;color:#0141A2"><i class="bi bi-patch-check me-1"></i>Firmas FES — ${entidad} #${id} ${pillFirma(d.estado)}</h6>
+    ${linea('TRABAJADOR')}${linea('EMPLEADOR')}
+    <div style="font-size:.74rem;color:#94a3b8;margin-top:8px">Firma Electrónica Simple (Ley 19.799): cada firma guarda la huella SHA-256 del documento; "íntegro" = el contenido no ha cambiado desde que se firmó.</div>
+    ${extra}<div style="text-align:right;margin-top:12px"><button class="btn-mini" onclick="this.closest('dialog').close()">Cerrar</button></div>`;
+  document.body.appendChild(dlg); dlg.showModal(); dlg.addEventListener('close',()=>dlg.remove());
+}
+async function contraFirmar(entidad,id){
+  if(!confirm('¿Firmar este documento en representación de la empresa?')) return;
+  const j = await (await fetch('/api/rrhh/firmas/firmar',{method:'POST',headers:HJ,body:JSON.stringify({entidad,id,rol:'EMPLEADOR'})})).json();
+  if(!j.success) return alert(j.error);
+  document.querySelector('dialog')?.close();
+  alert('Documento FIRMADO por ambas partes ✔');
+  entidad==='CONTRATO'?cargarTodo():fqInit();
 }
 
 /* ── carta oferta: editor con checkboxes ── */
