@@ -275,6 +275,11 @@ const createUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'RUT, nombre, apellido, email y perfil son requeridos' });
     }
 
+    // "Solo otorgas lo que tienes": no-Admin no puede asignar un perfil con permisos que él no tenga
+    if (!(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
+      return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
+    }
+
     // La clave se genera automáticamente y se envía por correo; el usuario debe cambiarla en su primer ingreso.
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
@@ -315,6 +320,14 @@ const updateUsuario = async (req, res) => {
 
     if (!nombre || !apellido || !email || !id_perfil) {
       return res.status(400).json({ success: false, data: null, error: 'Nombre, apellido, email y perfil son requeridos' });
+    }
+
+    // "Solo otorgas lo que tienes": si el editor no-Admin CAMBIA el perfil, el nuevo
+    // perfil debe estar contenido en sus propios permisos (mantener el actual sí se permite).
+    const [[act]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario=?', [id]);
+    if (act && Number(act.id_perfil) !== Number(id_perfil) &&
+        !(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
+      return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
     }
 
     // Cuenta protegida (break-glass): nunca se suspende ni se degrada de Administrador.
@@ -491,11 +504,20 @@ const updatePermisosUsuario = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Formato inválido' });
     }
 
-    // Eliminar todos los overrides actuales del usuario
-    await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ?', [id]);
+    // "Solo otorgas lo que tienes": no-Admin solo puede tocar overrides de
+    // funcionalidades que él mismo tenga habilitadas; el resto se conserva intacto.
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    if (otorgables === null) {
+      // Administrador: reemplaza todos los overrides
+      await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ?', [id]);
+    } else {
+      const ids = [...otorgables];
+      if (ids.length) await pool.query('DELETE FROM permisos_usuario WHERE id_usuario = ? AND id_funcionalidad IN (?)', [id, ids]);
+    }
 
     // Insertar solo los que difieren del base (es_override = true) — un solo INSERT masivo
-    const inserts = permisos.filter(p => p.es_override && p.id_funcionalidad != null);
+    const inserts = permisos.filter(p => p.es_override && p.id_funcionalidad != null &&
+      (otorgables === null || otorgables.has(Number(p.id_funcionalidad))));
     if (inserts.length) {
       await pool.query(
         'INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES ?',

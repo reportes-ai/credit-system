@@ -648,10 +648,22 @@ const updatePermisosPerfil = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Formato de permisos inválido' });
     }
 
+    // "Solo otorgas lo que tienes": no-Admin no puede tocar el perfil Administrador
+    // ni conceder/quitar funcionalidades que él mismo no tenga habilitadas.
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    let omitidas = 0;
+    let filtrados = permisos.filter(p => p && p.id_funcionalidad != null);
+    if (otorgables !== null) {
+      const [[dest]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil=?', [id]);
+      if (dest && dest.nombre === 'Administrador')
+        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede modificar el perfil Administrador' });
+      const antes = filtrados.length;
+      filtrados = filtrados.filter(p => otorgables.has(Number(p.id_funcionalidad)));
+      omitidas = antes - filtrados.length;
+    }
+
     // Un solo INSERT masivo (antes era 1 query por funcionalidad → lento/timeout en BD remota)
-    const valores = permisos
-      .filter(p => p && p.id_funcionalidad != null)
-      .map(p => [id, p.id_funcionalidad, p.habilitado ? 1 : 0]);
+    const valores = filtrados.map(p => [id, p.id_funcionalidad, p.habilitado ? 1 : 0]);
     if (valores.length) {
       await pool.query(
         `INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
@@ -662,8 +674,8 @@ const updatePermisosPerfil = async (req, res) => {
     }
     limpiarCachePermisos();   // efecto inmediato en las APIs
 
-    auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Actualizó permisos del perfil #${id} (${valores.length} funcionalidades)` });
-    res.json({ success: true, data: { mensaje: 'Permisos actualizados' }, error: null });
+    auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Actualizó permisos del perfil #${id} (${valores.length} funcionalidades${omitidas ? `; ${omitidas} omitidas por no tenerlas quien edita` : ''})` });
+    res.json({ success: true, data: { mensaje: omitidas ? `Permisos actualizados (${omitidas} no aplicados: solo puedes otorgar permisos que tú tienes)` : 'Permisos actualizados' }, error: null });
   } catch (error) {
     console.error('[updatePermisosPerfil]', error.message);
     res.status(500).json({ success: false, data: null, error: error.message });
@@ -689,6 +701,13 @@ const masivoPermisos = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Indica un módulo o un submódulo' });
     }
     if (!funcs.length) return res.status(400).json({ success: false, data: null, error: 'No hay funcionalidades para aplicar' });
+
+    // "Solo otorgas lo que tienes" (no-Admin)
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    if (otorgables !== null) {
+      funcs = funcs.filter(f => otorgables.has(Number(f)));
+      if (!funcs.length) return res.status(403).json({ success: false, data: null, error: 'Solo puedes asignar masivamente permisos que tú tienes' });
+    }
 
     // Perfiles destino: todos menos Administrador (que siempre tiene acceso total)
     const [perfiles] = await pool.query("SELECT id_perfil FROM perfiles WHERE nombre <> 'Administrador'");
