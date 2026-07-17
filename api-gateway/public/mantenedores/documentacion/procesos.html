@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 -->
+<!-- v1.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -55,6 +55,8 @@
     <a href="#p14">14. Campaña masiva</a>
     <a href="#p15">15. Contratación de un colaborador</a>
     <a href="#p16">16. Desvinculación (finiquito)</a>
+    <a href="#p17">17. Vacaciones y su provisión contable</a>
+    <a href="#p18">18. Préstamos y anticipos al personal</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -287,6 +289,37 @@
   </ol>
   <div class="flujo"><span class="st ini">CÁLCULO</span><span class="ar">→</span><span class="st">AJUSTE RRHH</span><span class="ar">→</span><span class="st">GUARDADO</span><span class="ar">→</span><span class="st fin">RATIFICADO Y PAGADO</span></div>
   <div class="afecta"><b>Afecta:</b> remuneraciones (sale del libro), Previred/LRE (retiro), contabilidad. <b>Depende de:</b> contratación (§15), cuenta de vacaciones, liquidaciones (§12). Si hubo ausencias art. 160 N°3, el sistema ya avisó por correo a RRHH y supervisor.</div>
+
+  <h2 id="p17">17. Vacaciones y su provisión contable</h2>
+  <p><b>Qué y para qué:</b> que cada colaborador tome sus vacaciones con saldo claro, que la cuenta corriente sea la única verdad (formulario, saldos de RRHH y finiquito leen lo mismo) y que la deuda de vacaciones quede provisionada mes a mes en la contabilidad.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El colaborador solicita · su jefatura directa o RRHH aprueba · RRHH administra ajustes y años previos · el cierre de mes contabiliza solo.</div>
+    <div><b class="lbl">Prerequisitos</b>Ficha con fecha de ingreso · años previos declarados con certificado AFP en la carpeta (para el feriado progresivo) · ajuste histórico de AVSOFT hecho una sola vez.</div>
+  </div>
+  <ol>
+    <li><b>Devengo automático</b>: al cumplir cada aniversario se abonan 15 días hábiles + el feriado progresivo si corresponde (art. 68: +10 años trabajados, 1 día extra por cada 3 nuevos). Sin intervención de nadie.</li>
+    <li><b>Solicitar</b> (RRHH → Vacaciones): el formulario muestra los días disponibles (cuenta corriente + proporcional del período en curso) antes de pedir.</li>
+    <li><b>Aprobar</b> (jefatura directa o RRHH): al aprobarse, los días hábiles se cargan solos a la cuenta, descontando del período más antiguo (FIFO).</li>
+    <li><b>Consultar</b>: cada uno ve su cuenta corriente ("ver cuenta corriente"); RRHH ve <b>Saldos del equipo</b> con la provisión en pesos por persona y el total, exportable a Excel.</li>
+    <li><b>Provisión al cierre</b> (automático, Cierre de Mes): se guarda el snapshot del total y se contabiliza la variación contra el mes anterior — constitución 4002030→2106030 o liberación si bajó.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">DEVENGO</span><span class="ar">→</span><span class="st">SOLICITUD</span><span class="ar">→</span><span class="st">APROBADA (cargo FIFO)</span><span class="ar">→</span><span class="st fin">PROVISIÓN AL CIERRE</span></div>
+  <div class="afecta"><b>Afecta:</b> remuneraciones (las vacaciones se pagan normal), finiquito (feriado proporcional = este mismo saldo), Contabilidad (2106030), Cierre de Mes. <b>Depende de:</b> ficha (fecha ingreso, años previos + certificado AFP), liquidaciones emitidas (base del cálculo en pesos).</div>
+
+  <h2 id="p18">18. Préstamos y anticipos al personal</h2>
+  <p><b>Qué y para qué:</b> prestar o anticipar al colaborador con respaldo firmado, cuotas que se descuentan solas de la liquidación y saldo que se recupera hasta en el finiquito.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>RRHH registra (permiso <code>rh_remuneraciones</code>) · el colaborador firma el convenio · el libro descuenta solo.</div>
+    <div><b class="lbl">Prerequisitos</b>Colaborador activo · para préstamo: tasa ≤ TMC vigente (el sistema la valida).</div>
+  </div>
+  <ol>
+    <li><b>Registrar</b> (RRHH → Remuneraciones → Descuentos): Anticipo (capital ÷ N meses) o Préstamo (tasa mensual + cuotas, cuota francesa con preview). Las cuotas parten en la próxima remuneración.</li>
+    <li><b>Convenio firmado</b>: al guardar se ofrece imprimir el <b>convenio de descuento</b> (con logo y detalle de cuotas); el colaborador lo firma y RRHH lo sube — queda en su carpeta digital (tipo CONVENIO DESCUENTO). La columna Convenio marca en rojo "SIN FIRMA" hasta subirlo.</li>
+    <li><b>Descuento automático</b>: cada cuota cae sola en "Otros Dcto." del libro de liquidaciones; pestañas Cuotas del mes y Todos los descuentos, exportables. Anular detiene las cuotas futuras sin tocar lo descontado.</li>
+    <li><b>Si la persona se va</b>: el finiquito precarga el saldo pendiente (cuotas restantes × valor cuota) como descuento, con el detalle en los avisos.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">REGISTRADO</span><span class="ar">→</span><span class="st">CONVENIO FIRMADO</span><span class="ar">→</span><span class="st">CUOTAS EN EL LIBRO</span><span class="ar">→</span><span class="st fin">SALDADO (o al finiquito)</span></div>
+  <div class="afecta"><b>Afecta:</b> liquidaciones (Otros Dcto.), finiquito (§16, saldo precargado), carpeta digital. <b>Depende de:</b> TMC vigente (mantenedor Tasas), libro de liquidaciones (§12).</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
