@@ -149,7 +149,7 @@
     <div class="topnav-left">
       <a href="/" class="topnav-brand">
         <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v116.16</span>
+        <span class="version-badge" id="versionBadge">v116.17</span>
       </a>
       <div class="breadcrumb-nav">
         <a href="/">Inicio</a><span class="sep">›</span>
@@ -1476,10 +1476,12 @@
 
     function renderGridPerfil() {
       const grid = document.getElementById('permisosGrid');
-      grid.innerHTML = modulosData.map(mod => `
+      grid.innerHTML = modulosData.map((mod, mi) => `
         <div class="permisos-modulo">
           <div class="permisos-modulo-header">
             <i class="bi ${mod.icono || 'bi-grid'}"></i>${mod.nombre}
+            ${puedeEditarPermisos ? `<label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;color:#64748b;cursor:pointer" title="Marcar o desmarcar todas las funcionalidades de ${mod.nombre}">
+              <input type="checkbox" ${mod.funcionalidades.every(f => permisosActuales[f.id_funcionalidad]) ? 'checked' : ''} onchange="toggleModuloPerfil(${mi}, this.checked)"> Todo</label>` : ''}
           </div>
           <div class="permisos-modulo-body">
             ${mod.funcionalidades.map(f => {
@@ -1504,6 +1506,16 @@
       permisosActuales[id] = val;
       const lbl = document.getElementById(`pc-${id}`);
       lbl.classList.toggle('checked', val);
+    }
+
+    // Marca/desmarca TODAS las funcionalidades de un módulo de una vez
+    function toggleModuloPerfil(mi, val) {
+      (modulosData[mi]?.funcionalidades || []).forEach(f => { permisosActuales[f.id_funcionalidad] = val; });
+      renderGridPerfil();
+    }
+    function toggleModuloUsuario(mi, val) {
+      (modulosData[mi]?.funcionalidades || []).forEach(f => { permisosUsuarioDelta[f.id_funcionalidad] = val; });
+      renderGridUsuario();
     }
 
     async function guardarPermisos() {
@@ -1616,10 +1628,12 @@
 
     function renderGridUsuario() {
       const grid = document.getElementById('permisosGrid');
-      grid.innerHTML = modulosData.map(mod => `
+      grid.innerHTML = modulosData.map((mod, mi) => `
         <div class="permisos-modulo">
           <div class="permisos-modulo-header">
             <i class="bi ${mod.icono || 'bi-grid'}"></i>${mod.nombre}
+            ${puedeEditarPermisos ? `<label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:600;color:#64748b;cursor:pointer" title="Marcar o desmarcar todas las funcionalidades de ${mod.nombre}">
+              <input type="checkbox" ${mod.funcionalidades.every(f => permisosUsuarioDelta[f.id_funcionalidad]) ? 'checked' : ''} onchange="toggleModuloUsuario(${mi}, this.checked)"> Todo</label>` : ''}
           </div>
           <div class="permisos-modulo-body">
             ${mod.funcionalidades.map(f => {
