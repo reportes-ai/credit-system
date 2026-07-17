@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 -->
+<!-- v2.7 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -407,6 +407,18 @@
   </ol>
   <div class="flujo"><span class="st ini">SOLICITADA</span><span class="ar">→</span><span class="st">JEFATURA</span><span class="ar">→</span><span class="st">GERENCIA (si aplica)</span><span class="ar">→</span><span class="st">RRHH</span><span class="ar">→</span><span class="st fin">APROBADA + EJECUTADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span></div>
   <div class="afecta"><b>Afecta:</b> Remuneraciones (descuentos y sueldo base), ficha del colaborador (cargo), auditoría. <b>Depende de:</b> organigrama de la ficha ("reporta a"), permisos rh_aprobar/rh_colaboradores, TMC vigente.</div>
+
+  <h3 style="margin-top:26px">Respaldo legal del ciclo laboral paperless (§15, §16, §17, §23)</h3>
+  <ul>
+    <li><b>Ley 19.799 sobre documentos electrónicos y firma electrónica</b> — es la base de todo el esquema. Art. 3°: los actos y contratos suscritos por medio de firma electrónica <b>valen de la misma manera y producen los mismos efectos</b> que los celebrados por escrito en papel. Art. 5°: la firma electrónica simple (FES) es <b>admisible como prueba en juicio</b> (la FEA de proveedor acreditado hace plena prueba; la FES se pondera). Nuestra FES fortalece esa ponderación con evidencia técnica: identidad por sesión JWT del firmante, nombre, cargo, fecha/hora, IP y <b>hash SHA-256 del contenido</b> que permite demostrar que el documento no fue alterado después de firmado.</li>
+    <li><b>Contrato de trabajo (art. 9 Código del Trabajo)</b> — debe "constar por escrito"; por la equivalencia funcional de la Ley 19.799, escrito no significa papel. La Dirección del Trabajo ha aceptado la suscripción electrónica de documentos laborales en la medida que se garantice la identidad de las partes y la integridad del documento (criterio de sus dictámenes sobre documentación laboral electrónica) — exactamente lo que registra rh_firmas. Recomendación práctica: conservar también el PDF impreso/firmado cuando un tercero lo exija (bancos, visas).</li>
+    <li><b>Finiquito (art. 177 CT)</b> — la firma FES entre las partes deja constancia del acuerdo, pero para que el finiquito sea <b>invocable y tenga poder liberatorio</b> el art. 177 exige ratificación ante ministro de fe (notario, inspector del trabajo) o el <b>finiquito laboral electrónico de la Dirección del Trabajo</b> (Ley 21.327 de Modernización de la DT), que es el equivalente 100% digital oficial. Nuestro flujo cubre el cálculo, el acuerdo firmado y la trazabilidad; la ratificación se hace por cualquiera de esos dos canales.</li>
+    <li><b>Anticipos y préstamos al personal (art. 58 CT)</b> — los descuentos "acordados por escrito" entre trabajador y empleador tienen tope legal del <b>15% de la remuneración total</b> del trabajador. La solicitud aprobada con firmas FES de ambas partes (trabajador solicita, empleador aprueba) constituye ese acuerdo escrito; el convenio de descuento imprimible sigue disponible en Descuentos Remuneración como respaldo adicional. La tasa del préstamo queda topada a la <b>TMC vigente</b> (Ley 18.010) y el sistema la valida al aprobar.</li>
+    <li><b>Vacaciones (arts. 67 a 73 CT)</b> — 15 días hábiles anuales, feriado progresivo del art. 68, y la solicitud/aprobación firmada FES deja la constancia escrita del uso del feriado (el "comprobante de feriado" que la fiscalización pide). La cuenta corriente es el registro auditable de devengos y usos.</li>
+    <li><b>Aumentos y ascensos (art. 11 CT)</b> — toda modificación del contrato debe consignarse por escrito y firmarse por ambas partes ("actualización del contrato" o anexo). La solicitud aprobada con las firmas FES de la cadena documenta el acuerdo; para el anexo formal, generar el documento desde Contratos y enviarlo <b>A firma</b> (trabajador + empleador) — mismo motor rh_firmas.</li>
+    <li><b>Respaldo contable-tributario</b> — cada desembolso queda con su ODP correlativa única (libro central, nunca se reutiliza un número), el asiento automático a cuentas por cobrar al personal (1105010/1105020, Código Tributario art. 17: contabilidad fidedigna), el snapshot congelado del documento pagado y la pista completa en Auditoría (quién, cuándo, desde qué IP).</li>
+    <li><b>Regla transversal</b> — nadie aprueba ni firma su propia solicitud (control de conflicto de interés), y toda decisión queda en la bitácora de Auditoría además de la firma FES.</li>
+  </ul>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
