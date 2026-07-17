@@ -12,6 +12,13 @@ require('../../../../shared/migrate').enFila('rrhh-jornada-2', async () => {
   console.log('[rrhh-jornada] columnas especial/externo listas');
 });
 
+require('../../../../shared/migrate').enFila('rrhh-jornada-3', async () => {
+  for (const col of ['horario_entrada TIME NULL', 'horario_salida TIME NULL', 'por_turnos TINYINT(1) NOT NULL DEFAULT 0']) {
+    try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
+  }
+  console.log('[rrhh-jornada] columnas horario/turnos listas');
+});
+
 require('../../../../shared/migrate').enFila('rrhh-jornada', async () => {
   for (const col of ['jornada_art22 TINYINT(1) NOT NULL DEFAULT 0', 'jornada_40h TINYINT(1) NOT NULL DEFAULT 0']) {
     try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
@@ -37,7 +44,9 @@ exports.listar = async (req, res) => {
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
               COALESCE(u.cargo, '') cargo,
               COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40,
-              unm.jornada_especial_hrs especial_hrs, COALESCE(unm.jornada_externo, 0) externo
+              unm.jornada_especial_hrs especial_hrs, COALESCE(unm.jornada_externo, 0) externo,
+              TIME_FORMAT(unm.horario_entrada,'%H:%i') hora_entrada, TIME_FORMAT(unm.horario_salida,'%H:%i') hora_salida,
+              COALESCE(unm.por_turnos, 0) por_turnos
          FROM ${UNIV} WHERE ${WU} ORDER BY nombre`);
     res.json({ success: true, error: null, data: rows });
   } catch (e) { console.error('[rrhh jornada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -51,12 +60,16 @@ exports.guardar = async (req, res) => {
     let esp = req.body.especial_hrs == null || req.body.especial_hrs === '' ? null : Number(req.body.especial_hrs);
     if (esp != null && (!(esp > 0) || esp > 45)) return res.status(400).json({ success: false, data: null, error: 'Horas de jornada especial inválidas (1 a 45)' });
     if (!idU) return res.status(400).json({ success: false, data: null, error: 'Colaborador inválido' });
-    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=?, jornada_especial_hrs=?, jornada_externo=? WHERE id_usuario=?',
-      [art22, h40, esp, externo, idU]);
-    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h, jornada_especial_hrs, jornada_externo) VALUES (?,?,?,?,?)',
-      [idU, art22, h40, esp, externo]);
+    const porTurnos = req.body.por_turnos ? 1 : 0;
+    const hora = v => (v == null || v === '') ? null : (/^\d{2}:\d{2}$/.test(String(v)) ? String(v) + ':00' : undefined);
+    const hIn = hora(req.body.hora_entrada), hOut = hora(req.body.hora_salida);
+    if (hIn === undefined || hOut === undefined) return res.status(400).json({ success: false, data: null, error: 'Horario inválido (formato HH:MM)' });
+    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=?, jornada_especial_hrs=?, jornada_externo=?, horario_entrada=?, horario_salida=?, por_turnos=? WHERE id_usuario=?',
+      [art22, h40, esp, externo, hIn, hOut, porTurnos, idU]);
+    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h, jornada_especial_hrs, jornada_externo, horario_entrada, horario_salida, por_turnos) VALUES (?,?,?,?,?,?,?,?)',
+      [idU, art22, h40, esp, externo, hIn, hOut, porTurnos]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'jornada', entidad_id: idU,
-      detalle: `Jornada: art.22=${art22 ? 'SÍ' : 'no'}, 40hrs=${h40 ? 'SÍ' : 'no'}, especial=${esp != null ? esp + ' hrs' : 'no'}, externo=${externo ? 'SÍ' : 'no'}` });
-    res.json({ success: true, error: null, data: { art22, h40, especial_hrs: esp, externo } });
+      detalle: `Jornada: art.22=${art22 ? 'SÍ' : 'no'}, 40hrs=${h40 ? 'SÍ' : 'no'}, especial=${esp != null ? esp + ' hrs' : 'no'}, externo=${externo ? 'SÍ' : 'no'}, horario=${porTurnos ? 'POR TURNOS' : ((hIn || '—') + '-' + (hOut || '—'))}` });
+    res.json({ success: true, error: null, data: { art22, h40, especial_hrs: esp, externo, hora_entrada: hIn && hIn.slice(0, 5), hora_salida: hOut && hOut.slice(0, 5), por_turnos: porTurnos } });
   } catch (e) { console.error('[rrhh jornada guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

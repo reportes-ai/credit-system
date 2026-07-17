@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.2 — topnav común + badge de versión -->
+  <!-- v1.3 — pestaña Horarios y Turnos: horario fijo entrada/salida o marca "por turnos" (turno se define en pestaña Turnos) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -31,6 +31,11 @@
     .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#475569; }
     .foot b { color:var(--navy-dark); }
     .saved { color:#166534; font-size:.72rem; font-weight:700; opacity:0; transition:opacity .3s; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+    .tab { border:1px solid #cbd5e1; background:#fff; border-radius:10px; padding:7px 16px; font-size:.82rem; font-weight:700; color:#475569; cursor:pointer; }
+    .tab.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .t input[type=time] { padding:2px 6px; border:1px solid #cbd5e1; border-radius:7px; font-size:.8rem; }
+    .t input[type=time]:disabled { background:#f1f5f9; color:#94a3b8; }
   </style>
 </head>
 <body>
@@ -41,7 +46,20 @@
     <div><h2>Jornada laboral</h2>
       <p>Marca quién está excluido de jornada (art. 22 CT) y quién ya migró a 40 hrs (Ley 21.561). Con eso Asistencia sabe quiénes deben marcar y cuál es su jornada normal.</p></div></div>
   <div class="kpis" id="kpis"></div>
-  <div class="box">
+  <div class="tabs">
+    <button class="tab on" id="tabJor" onclick="verTab('jor')"><i class="bi bi-clock-history"></i> Jornada</button>
+    <button class="tab" id="tabHor" onclick="verTab('hor')"><i class="bi bi-calendar-week"></i> Horarios y Turnos</button>
+  </div>
+  <div class="box" id="boxHor" style="display:none">
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Horario de cada colaborador. Si trabaja <b>por turnos</b>, márcalo aquí y su turno se define en la pestaña Turnos.</p>
+    <table class="t"><thead><tr>
+      <th>Colaborador</th><th>Cargo</th>
+      <th style="text-align:center">Entrada</th><th style="text-align:center">Salida</th>
+      <th style="text-align:center" title="Trabaja con turnos rotativos: su horario se define por turno, no fijo">Por turnos</th>
+      <th style="text-align:center">Horario</th><th></th>
+    </tr></thead><tbody id="tbH"></tbody></table>
+  </div>
+  <div class="box" id="boxJor">
     <table class="t"><thead><tr>
       <th>Colaborador</th><th>Cargo</th>
       <th style="text-align:center" title="Art. 22 CT: excluido de limitación de jornada, no registra asistencia">Art. 22</th>
@@ -56,6 +74,7 @@
     <b>40 hrs</b> → define la jornada normal informativa (40 hrs semanales / 8 hrs diarias L-V; el resto 44 hrs / 8 hrs 48 min según la gradualidad vigente de la Ley 21.561) ·
     <b>Especial</b> → jornada parcial o pactada: las horas semanales digitadas mandan sobre 40/44 ·
     <b>Externo</b> → presta servicios sin sujeción a horario: en Asistencia queda EXTERNO y no genera faltas ·
+    <b>Horarios y Turnos</b> → horario fijo (entrada/salida) de cada colaborador o marca "por turnos" (el turno se define en la pestaña Turnos); referencia para atrasos en <a href="/recursos-humanos/asistencia/">Asistencia</a> cuando Workera no tiene turno asignado ·
     todos los flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
 </div>
 <script src="/js/auth-guard.js"></script>
@@ -88,8 +107,44 @@ function kpis(){
     ['Externos',D.filter(c=>+c.externo).length],
   ].map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 }
+function verTab(t){
+  $('boxJor').style.display=t==='jor'?'':'none';
+  $('boxHor').style.display=t==='hor'?'':'none';
+  $('tabJor').classList.toggle('on',t==='jor');
+  $('tabHor').classList.toggle('on',t==='hor');
+}
+function horarioTxt(c){
+  if(!debeMarcar(c)) return '<span class="pill p-mut">no aplica</span>';
+  if(+c.por_turnos) return '<span class="pill p-nav">POR TURNOS</span>';
+  if(c.hora_entrada&&c.hora_salida) return `<span class="pill p-ok">${c.hora_entrada} – ${c.hora_salida}</span>`;
+  return '<span class="pill p-mut">sin definir</span>';
+}
+function pintaHor(){
+  $('tbH').innerHTML=D.map((c,i)=>{
+    const na=!debeMarcar(c), pt=+c.por_turnos;
+    return `<tr>
+    <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
+    <td style="color:#475569">${c.cargo||''}</td>
+    <td style="text-align:center"><input type="time" id="he${i}" value="${c.hora_entrada||''}" ${na||pt?'disabled':''} onchange="cambiaHora(${i},'hora_entrada',this.value)"></td>
+    <td style="text-align:center"><input type="time" id="hs${i}" value="${c.hora_salida||''}" ${na||pt?'disabled':''} onchange="cambiaHora(${i},'hora_salida',this.value)"></td>
+    <td style="text-align:center"><input type="checkbox" ${pt?'checked':''} ${na?'disabled':''} onchange="cambiaTurnos(${i},this.checked)"></td>
+    <td style="text-align:center" id="ht${i}">${horarioTxt(c)}</td>
+    <td style="text-align:right"><span class="saved" id="svh${i}"><i class="bi bi-check2"></i> guardado</span></td>
+  </tr>`;}).join('')||'<tr><td colspan="7" class="empty">Sin colaboradores</td></tr>';
+}
+async function cambiaHora(i,campo,val){
+  D[i][campo]=val||null;
+  try{ await guardar(i); $('ht'+i).innerHTML=horarioTxt(D[i]); const s=$('svh'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+async function cambiaTurnos(i,val){
+  D[i].por_turnos=val?1:0;
+  try{ await guardar(i); pintaHor(); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+}
 function pinta(){
   kpis();
+  pintaHor();
   $('tb').innerHTML=D.map((c,i)=>`<tr>
     <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
     <td style="color:#475569">${c.cargo||''}</td>
@@ -105,7 +160,8 @@ function pinta(){
 async function guardar(i){
   const c=D[i];
   const r=await fetch('/api/rrhh/jornada/'+c.id_usuario,{method:'PUT',headers:H,
-    body:JSON.stringify({art22:+c.art22,h40:+c.h40,especial_hrs:c.especial_hrs===''?null:c.especial_hrs,externo:+c.externo})});
+    body:JSON.stringify({art22:+c.art22,h40:+c.h40,especial_hrs:c.especial_hrs===''?null:c.especial_hrs,externo:+c.externo,
+      hora_entrada:c.hora_entrada||null,hora_salida:c.hora_salida||null,por_turnos:+c.por_turnos||0})});
   const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
   $('dm'+i).innerHTML=marcarTxt(c);
   $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(c)}</span>`;
@@ -114,7 +170,7 @@ async function guardar(i){
 }
 async function cambia(i,campo,val){
   D[i][campo]=val?1:0;
-  try{ await guardar(i); }catch(e){ alert('No se pudo guardar: '+e.message); }
+  try{ await guardar(i); pintaHor(); }catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 async function cambiaHrs(i,val){
   D[i].especial_hrs=val===''?null:val;
