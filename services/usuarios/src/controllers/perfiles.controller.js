@@ -542,7 +542,17 @@ const getAllPerfiles = async (req, res) => {
     const [perfiles] = await pool.query(
       "SELECT * FROM perfiles ORDER BY nombre ASC"
     );
-    res.json({ success: true, data: perfiles, error: null });
+    // "Solo ves lo que tienes": un no-Admin solo ve perfiles cuyos permisos estén
+    // contenidos en los suyos — así no descubre módulos que aún no salen a producción
+    // (el perfil Administrador queda oculto de inmediato).
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    if (otorgables === null) return res.json({ success: true, data: perfiles, error: null });
+    const [pp] = await pool.query('SELECT id_perfil, id_funcionalidad FROM permisos_perfil WHERE habilitado=1');
+    const porPerfil = {};
+    pp.forEach(x => (porPerfil[x.id_perfil] = porPerfil[x.id_perfil] || []).push(x.id_funcionalidad));
+    const visibles = perfiles.filter(p => p.nombre !== 'Administrador' &&
+      (porPerfil[p.id_perfil] || []).every(f => otorgables.has(f)));
+    res.json({ success: true, data: visibles, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }
@@ -618,7 +628,14 @@ const getModulosConFuncionalidades = async (req, res) => {
       }
     } catch(e) { console.error('[ver_dashboard inject]', e.message); }
 
-    res.json({ success: true, data: agrupado, error: null });
+    // "Solo ves lo que tienes": la matriz de un no-Admin solo muestra las
+    // funcionalidades que él tiene — los módulos no liberados no aparecen.
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    const visible = otorgables === null ? agrupado
+      : agrupado.map(g => ({ ...g, funcionalidades: g.funcionalidades.filter(f => otorgables.has(f.id_funcionalidad)) }))
+                .filter(g => g.funcionalidades.length);
+
+    res.json({ success: true, data: visible, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
   }
@@ -632,7 +649,10 @@ const getPermisosPerfil = async (req, res) => {
       [id]
     );
     const mapa = {};
-    permisos.forEach(p => { mapa[p.id_funcionalidad] = p.habilitado === 1; });
+    // "Solo ves lo que tienes": a un no-Admin no se le revelan permisos de
+    // funcionalidades fuera de su alcance (módulos no liberados).
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    permisos.forEach(p => { if (otorgables === null || otorgables.has(p.id_funcionalidad)) mapa[p.id_funcionalidad] = p.habilitado === 1; });
     res.json({ success: true, data: mapa, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
