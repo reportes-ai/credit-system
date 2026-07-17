@@ -216,6 +216,9 @@ exports.evaluar = async (req, res) => {
     const rrhh = await esRRHH(req);
     if (ev.id_evaluador !== req.usuario.id_usuario && !rrhh) return fail(res, 'Solo la jefatura directa o RRHH puede evaluar', 403);
     if (ev.estado === 'CERRADA') return fail(res, 'La evaluación ya está cerrada', 400);
+    // La autoevaluación va PRIMERO: sin ella la jefatura puede guardar borrador, pero no finalizar
+    if (b.finalizar !== false && ev.estado === 'PENDIENTE' && !(b.forzar_sin_autoeval && rrhh))
+      return fail(res, 'La persona aún no completa su autoevaluación. Puedes guardar borrador y finalizar cuando la termine (el sistema te avisará por la campana).', 409);
     for (const nRaw of (b.notas || [])) {
       const jefe = Math.min(5, Math.max(1, parseInt(nRaw.jefe) || 0)) || null;
       if (!jefe) continue;
@@ -280,9 +283,44 @@ exports.crearCiclo = async (req, res) => {
       tipo: 'RRHH', prioridad: 'media', titulo: `Evaluación de desempeño: ${String(b.nombre).trim()}`,
       mensaje: 'Se abrió el ciclo — completa tu autoevaluación en Desempeño',
       href: '/recursos-humanos/desempeno/', clave: `des_ciclo_${r.insertId}` });
+    // Correo de apertura: cómo funciona, a quién evalúa cada uno y los plazos
+    correoAperturaCiclo(r.insertId).catch(e => console.error('[desempeño correo apertura]', e.message));
     ok(res, { id: r.insertId, creadas, sin_jefatura: sinJefe.length });
   } catch (e) { fail(res, e.message); }
 };
+
+/* Correo de apertura del ciclo: explica el proceso, a quién evalúa cada uno y los plazos */
+async function correoAperturaCiclo(idCiclo) {
+  const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
+  const [[ciclo]] = await pool.query(`SELECT * FROM rh_des_ciclos WHERE id=?`, [idCiclo]);
+  if (!ciclo) return;
+  const [evals] = await pool.query(
+    `SELECT e.id_usuario, e.id_evaluador, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) colaborador,
+            u.email, TRIM(CONCAT_WS(' ', j.nombre, j.apellido)) jefatura
+       FROM rh_des_evaluaciones e JOIN usuarios u ON u.id_usuario=e.id_usuario
+       LEFT JOIN usuarios j ON j.id_usuario=e.id_evaluador WHERE e.id_ciclo=?`, [idCiclo]);
+  const fch = f => String(f instanceof Date ? f.toISOString() : f).slice(0, 10).split('-').reverse().join('-');
+  const ini = fch(ciclo.fecha_inicio), fin = fch(ciclo.fecha_cierre);
+  for (const e of evals) {
+    if (!e.email) continue;
+    const aCargo = evals.filter(x => x.id_evaluador === e.id_usuario).map(x => x.colaborador);
+    const html = `
+      <p>Hola ${e.colaborador.split(' ')[0]},</p>
+      <p>Se abrió el ciclo de evaluación de desempeño <b>${ciclo.nombre}</b> (del ${ini} al ${fin}). Así funciona:</p>
+      <ol>
+        <li><b>Autoevaluación</b> (primer paso, hazla cuanto antes): entra a <a href="https://app.autofacilchile.cl/recursos-humanos/desempeno/">Desempeño → Mi Evaluación</a> y evalúate 1–5 en cada competencia. Queda guardada a la espera de tu jefatura.</li>
+        <li><b>Evaluación de tu jefatura</b> (${e.jefatura || 'por asignar'}): con tu autoevaluación a la vista, evalúa las mismas competencias y tus objetivos del período.</li>
+        <li><b>Feedback</b>: conversarán el resultado comparado cara a cara, y luego tomas conocimiento en el sistema.</li>
+      </ol>
+      ${aCargo.length ? `<p><b>Además, como jefatura te toca evaluar a:</b> ${aCargo.join(', ')} — pestaña <b>Mi Equipo</b>. Recuerda: cada evaluación se habilita cuando la persona termina su autoevaluación, y el resultado se conversa en una reunión de feedback antes de la toma de conocimiento.</p>` : ''}
+      <p>Si te invitan como evaluador <b>360</b> (par, reporte o cliente interno) te avisará la campana: tu mirada es anónima y se agrega por dimensión.</p>
+      <p><b>Plazo: todo el proceso debe estar cerrado el ${fin}.</b> La escala y las preguntas están en el botón "¿Cómo funciona?" de la página.</p>
+      <p style="font-size:12px;color:#64748b">La nota final considera competencias (${ciclo.peso_competencias}%) y objetivos (${100 - ciclo.peso_competencias}%). La autoevaluación y el 360 no suman nota: son insumo de la conversación.</p>`;
+    try {
+      await enviarCorreo({ to: e.email, subject: `📊 Evaluación de Desempeño — ${ciclo.nombre} (hasta el ${fin})`, html: envolverHTML ? envolverHTML(html) : html });
+    } catch (err) { console.error('[desempeño correo]', e.email, err.message); }
+  }
+}
 
 exports.cerrarCiclo = async (req, res) => {
   try {

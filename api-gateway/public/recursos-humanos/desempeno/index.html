@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluaciones de Desempeño — RRHH</title>
-  <!-- v1.4 — guía ¿Cómo funciona? con catálogo vivo de competencias -->
+  <!-- v1.5 — correo de apertura + candado autoevaluación primero -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -294,7 +294,12 @@
     const notas=MI.competencias.map(c=>({id_competencia:c.id,jefe:getStar('je_'+c.id)})).filter(n=>n.jefe);
     if(finalizar&&notas.length<MI.competencias.length&&!confirm('Faltan competencias por evaluar. ¿Finalizar igual?')) return;
     const objetivos=[...document.querySelectorAll('#objBox .obj-row')].map(r=>({objetivo:r.querySelector('.ob-t').value,peso:r.querySelector('.ob-p').value,cumplimiento:r.querySelector('.ob-c').value})).filter(o=>o.objetivo.trim());
-    const r=await (await fetch('/api/rrhh/desempeno/evaluar',{method:'POST',headers:HJ,body:JSON.stringify({id_evaluacion:id,notas,objetivos,fortalezas:document.getElementById('evF').value,oportunidades:document.getElementById('evO').value,finalizar})})).json();
+    const body={id_evaluacion:id,notas,objetivos,fortalezas:document.getElementById('evF').value,oportunidades:document.getElementById('evO').value,finalizar};
+    let rq=await fetch('/api/rrhh/desempeno/evaluar',{method:'POST',headers:HJ,body:JSON.stringify(body)});
+    let r=await rq.json();
+    if(!r.success&&rq.status===409&&ES_RRHH&&confirm(r.error+'\n\nEres RRHH: ¿finalizar igual SIN autoevaluación?')){
+      rq=await fetch('/api/rrhh/desempeno/evaluar',{method:'POST',headers:HJ,body:JSON.stringify({...body,forzar_sin_autoeval:true})}); r=await rq.json();
+    }
     if(!r.success) return alert(r.error);
     alert(finalizar?`Evaluación finalizada ✔ Nota final: ${nota(r.data.nota_final)}\nConversa el resultado con la persona (feedback).`:'Borrador guardado ✔');
     cargarEquipo();
