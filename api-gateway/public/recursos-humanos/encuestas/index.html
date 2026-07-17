@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Encuestas de Clima — RRHH</title>
-  <!-- v1.2 — plantilla Compromiso (Q12 + intención de permanencia) -->
+  <!-- v1.3 — colores por tipo de encuesta -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; --teal:#0d9488; }
@@ -32,6 +32,13 @@
     .enps-big { font-size:2.6rem; font-weight:900; font-family:Consolas,monospace; }
     .preg-row { display:grid; grid-template-columns:1fr 130px 34px; gap:8px; margin-bottom:8px; }
     .preg-row input, .preg-row select { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:.84rem; }
+    .btp-clima { background:#0d9488; border-color:#0d9488; color:#fff; }
+    .btp-pulso { background:#0284c7; border-color:#0284c7; color:#fff; }
+    .btp-enps  { background:#d97706; border-color:#d97706; color:#fff; }
+    .btp-comp  { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+    .btp-otra  { background:#64748b; border-color:#64748b; color:#fff; }
+    .tp { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; color:#fff; }
+    .tp-CLIMA { background:#0d9488; } .tp-PULSO { background:#0284c7; } .tp-ENPS { background:#d97706; } .tp-COMPROMISO { background:#7c3aed; } .tp-OTRA { background:#64748b; }
     .inf-ia { background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid #c2410c; border-radius:10px; padding:14px 18px; margin-top:8px; font-size:.87rem; line-height:1.55; color:#3f2d20; }
   </style>
 </head>
@@ -55,11 +62,11 @@
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
         <h6 style="color:var(--teal);margin:0">Encuestas</h6>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn-mini" onclick="nueva('CLIMA')"><i class="bi bi-plus"></i> Clima anual</button>
-          <button class="btn-mini" onclick="nueva('PULSO')"><i class="bi bi-plus"></i> Pulso</button>
-          <button class="btn-mini" onclick="nueva('ENPS')"><i class="bi bi-plus"></i> eNPS</button>
-          <button class="btn-mini" onclick="nueva('COMPROMISO')"><i class="bi bi-plus"></i> Compromiso</button>
-          <button class="btn-mini" onclick="nueva('OTRA')"><i class="bi bi-plus"></i> Otra</button>
+          <button class="btn-mini btp-clima" onclick="nueva('CLIMA')"><i class="bi bi-plus"></i> Clima anual</button>
+          <button class="btn-mini btp-pulso" onclick="nueva('PULSO')"><i class="bi bi-plus"></i> Pulso</button>
+          <button class="btn-mini btp-enps" onclick="nueva('ENPS')"><i class="bi bi-plus"></i> eNPS</button>
+          <button class="btn-mini btp-comp" onclick="nueva('COMPROMISO')"><i class="bi bi-plus"></i> Compromiso</button>
+          <button class="btn-mini btp-otra" onclick="nueva('OTRA')"><i class="bi bi-plus"></i> Otra</button>
         </div></div>
       <table><thead><tr><th>Encuesta</th><th>Tipo</th><th>Cierre</th><th style="text-align:center">Respuestas</th><th>Estado</th><th></th></tr></thead>
       <tbody id="tbEnc"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
@@ -135,7 +142,7 @@
     LISTA=(j.data||{}).encuestas||[]; PLANTILLAS=(j.data||{}).plantillas||{}; ACTIVOS=(j.data||{}).activos||0;
     const tb=document.getElementById('tbEnc');
     if(!LISTA.length){ tb.innerHTML='<tr><td colspan="6" class="empty">Crea la primera con los botones de arriba (traen plantilla editable).</td></tr>'; return; }
-    tb.innerHTML=LISTA.map(e=>`<tr><td><b>${esc(e.titulo)}</b></td><td>${e.tipo}</td><td>${fd(e.fecha_cierre)}</td>
+    tb.innerHTML=LISTA.map(e=>`<tr><td><b>${esc(e.titulo)}</b></td><td><span class="tp tp-${e.tipo}">${e.tipo}</span></td><td>${fd(e.fecha_cierre)}</td>
       <td style="text-align:center">${e.respuestas}/${ACTIVOS}</td><td><span class="pill ${e.estado}">${e.estado}</span></td>
       <td style="white-space:nowrap">
         ${e.estado==='BORRADOR'?`<button class="btn-mini" onclick="abrirEnc(${e.id})">▶ Abrir</button> <button class="btn-mini" onclick="elimEnc(${e.id})">✕</button>`:''}
