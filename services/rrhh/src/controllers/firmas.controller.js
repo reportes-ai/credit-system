@@ -147,6 +147,45 @@ exports.firmar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── MIS documentos firmados (repositorio del colaborador, Mi Ficha) ────────── */
+exports.misDocumentos = async (req, res) => {
+  try {
+    const me = parseInt(req.params.idUsuario) || req.usuario.id_usuario;
+    if (me !== req.usuario.id_usuario && !await esRRHH(req)) return fail(res, 'Sin permiso', 403);
+    const docs = [];
+    const [cts] = await pool.query(
+      `SELECT ct.id, ct.estado, c.nombre cargo, DATE_FORMAT(ct.fecha_ingreso,'%Y-%m-%d') fecha
+         FROM rh_contratos ct JOIN rh_cargos c ON c.id=ct.id_cargo WHERE ct.id_usuario=?`, [me]);
+    cts.forEach(c => docs.push({ entidad: 'CONTRATO', id: c.id, glosa: `Contrato de trabajo — ${c.cargo}`, fecha: c.fecha, estado: c.estado }));
+    const [fqs] = await pool.query(
+      `SELECT id, estado, causal_glosa, DATE_FORMAT(fecha_termino,'%Y-%m-%d') fecha FROM rh_finiquitos WHERE id_usuario=?`, [me]);
+    fqs.forEach(f => docs.push({ entidad: 'FINIQUITO', id: f.id, glosa: `Finiquito — ${f.causal_glosa || ''}`, fecha: f.fecha, estado: f.estado }));
+    const [vcs] = await pool.query(
+      `SELECT v.id, v.estado, v.dias, DATE_FORMAT(v.fecha_desde,'%Y-%m-%d') fecha
+         FROM rh_vacaciones v WHERE v.id_usuario=? AND EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='VACACIONES' AND f.entidad_id=v.id)`, [me]);
+    vcs.forEach(v => docs.push({ entidad: 'VACACIONES', id: v.id, glosa: `Vacaciones — ${v.dias} día(s) desde ${v.fecha}`, fecha: v.fecha, estado: v.estado }));
+    const [sols] = await pool.query(`SELECT id, tipo, estado, DATE_FORMAT(created_at,'%Y-%m-%d') fecha FROM rh_solicitudes WHERE id_usuario=?`, [me]);
+    sols.forEach(s => docs.push({ entidad: 'SOLICITUD', id: s.id, glosa: `Solicitud ${s.tipo}`, fecha: s.fecha, estado: s.estado }));
+    // firmas de cada documento (rh_firmas para docs; rh_sol_firmas para solicitudes)
+    const [fd] = await pool.query(
+      `SELECT entidad, entidad_id, rol, nombre, cargo, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') fecha
+         FROM rh_firmas WHERE (entidad, entidad_id) IN (
+           SELECT 'CONTRATO', id FROM rh_contratos WHERE id_usuario=? UNION
+           SELECT 'FINIQUITO', id FROM rh_finiquitos WHERE id_usuario=? UNION
+           SELECT 'VACACIONES', id FROM rh_vacaciones WHERE id_usuario=?) ORDER BY created_at`, [me, me, me]);
+    const [fs] = await pool.query(
+      `SELECT f.id_solicitud, f.rol, f.nombre, f.cargo, f.decision, DATE_FORMAT(f.created_at,'%d-%m-%Y %H:%i') fecha
+         FROM rh_sol_firmas f JOIN rh_solicitudes s ON s.id=f.id_solicitud WHERE s.id_usuario=? ORDER BY f.created_at`, [me]);
+    docs.forEach(d => {
+      d.firmas = d.entidad === 'SOLICITUD'
+        ? fs.filter(x => x.id_solicitud === d.id)
+        : fd.filter(x => x.entidad === d.entidad && x.entidad_id === d.id);
+    });
+    docs.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+    ok(res, { documentos: docs.filter(d => d.firmas.length) });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Firmas de un documento + verificación de integridad ────────────────────── */
 exports.deDocumento = async (req, res) => {
   try {

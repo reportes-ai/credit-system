@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.3 — panel Documentos por firmar (FES) -->
+  <!-- v1.4 — repositorio Mis Documentos Firmados -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,6 +87,12 @@
   <div class="panel" id="pCursos" style="display:none">
     <h5><i class="bi bi-mortarboard"></i> Mis Cursos y Capacitaciones <span id="cursosTot" style="font-size:.72rem;background:#eff6ff;color:#0141A2;border-radius:10px;padding:2px 10px;font-weight:800"></span></h5>
     <table><thead><tr><th>Fecha</th><th>Curso</th><th>Relator</th><th style="text-align:center">Horas</th><th style="text-align:center">Asistencia</th><th style="text-align:center">Nota</th></tr></thead><tbody id="tbCursos"></tbody></table>
+  </div>
+
+  <div class="panel" id="pFirmados" style="display:none">
+    <h5><i class="bi bi-patch-check"></i> Mis Documentos Firmados (FES)</h5>
+    <div id="listFirmados"></div>
+    <p style="font-size:.74rem;color:#94a3b8;margin:8px 0 0">Firma Electrónica Simple (Ley 19.799): cada firma registra nombre, cargo, fecha, IP y la huella SHA-256 del documento. Este es tu repositorio permanente — nada de esto se puede borrar ni alterar sin que se note.</p>
   </div>
 
   <div class="panel">
@@ -180,9 +186,28 @@ window.firmarDoc = async (entidad,id,btn)=>{
   const j = await r.json();
   if(!j.success){ alert(j.error); btn.disabled=false; return; }
   toast('Documento firmado ✔ — se avisó a la empresa para su contrafirma');
-  cargarFirmas();
+  cargarFirmas(); cargarFirmados();
 };
 cargarFirmas();
+async function cargarFirmados(){
+  try{
+    const j = await (await fetch('/api/rrhh/firmas/mis-documentos',{headers:H})).json();
+    const ds = (j.data||{}).documentos||[];
+    if(!ds.length) return;
+    document.getElementById('pFirmados').style.display='';
+    const ICO={CONTRATO:'bi-file-earmark-text',FINIQUITO:'bi-door-open',VACACIONES:'bi-airplane',SOLICITUD:'bi-send-check'};
+    const EST=e=>({FIRMADO:'#166534',APROBADA:'#166534',EN_FIRMA:'#92400e',PENDIENTE:'#92400e',RECHAZADA:'#b91c1c'}[e]||'#64748b');
+    document.getElementById('listFirmados').innerHTML = ds.map(d=>`
+      <div style="border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <b style="font-size:.88rem"><i class="bi ${ICO[d.entidad]||'bi-file'} me-1" style="color:#0141A2"></i>${esc(d.glosa)} <small style="color:#94a3b8">#${d.id}</small></b>
+          <span style="font-size:.7rem;font-weight:800;color:${EST(d.estado)}">${esc(d.estado)}</span></div>
+        <div style="font-size:.76rem;color:#475569;margin-top:4px">${d.firmas.map(f=>
+          `✍ <b>${esc(f.rol)}</b>${f.decision?' ('+esc(f.decision)+')':''}: ${esc(f.nombre)} · ${f.fecha}`).join('<br>')}</div>
+      </div>`).join('');
+  }catch(e){}
+}
+cargarFirmados();
 function renderContacto(){
   const f = DATA.ficha || {};
   document.getElementById('gContacto').innerHTML = CONTACTO.map(([k,lbl]) => EDIT

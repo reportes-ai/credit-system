@@ -66,6 +66,8 @@ router.post('/solicitudes/resolver',    verifyToken, sol.resolver);
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);
 router.get('/firmas/pendientes',         verifyToken, fir.pendientes);
+router.get('/firmas/mis-documentos',     verifyToken, fir.misDocumentos);
+router.get('/firmas/documentos/:idUsuario', verifyToken, fir.misDocumentos);
 router.post('/firmas/firmar',            verifyToken, fir.firmar);
 router.get('/firmas/:entidad/:id',       verifyToken, fir.deDocumento);
 // Evaluaciones de Desempeño — mi/autoeval/conocimiento validan dueño adentro; equipo/evaluar validan jefatura o RRHH adentro
