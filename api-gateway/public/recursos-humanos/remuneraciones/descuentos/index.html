@@ -207,6 +207,8 @@ async function guardar(){
 }
 
 /* ── Convenio de anticipo/préstamo: imprimir para firma + subir firmado ── */
+const MESES_CONV=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesPalabras = m => { const [y,mm]=String(m).split('-'); return `${MESES_CONV[Number(mm)]||m} de ${y}`; };
 function imprimirConvenio(d){
   const esP = d.tipo==='PRESTAMO';
   const hoy = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
@@ -215,12 +217,12 @@ function imprimirConvenio(d){
   w.document.write(`<html><head><title>Convenio ${esP?'de préstamo':'de anticipo'}</title></head>
   <body style="font-family:Georgia,serif;max-width:720px;margin:0 auto;padding:46px 36px;color:#111;line-height:1.7;font-size:14px">
     <div style="display:flex;justify-content:space-between;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:24px">
-      <div style="font-size:20px;font-weight:800;color:#012d70">AutoFácil <span style="font-weight:400;font-size:12px;color:#555">Crédito Automotriz</span></div>
+      <img src="/img/logo-autofacil.png" alt="AutoFácil" style="height:42px">
       <div style="font-size:12px;color:#555">Santiago, ${hoy}</div></div>
     <div style="text-align:center;font-weight:800;font-size:16px;margin-bottom:20px">CONVENIO DE ${esP?'PRÉSTAMO AL PERSONAL':'ANTICIPO DE REMUNERACIÓN'}<br><span style="font-size:12px;font-weight:400">y autorización de descuento por planilla (art. 58 Código del Trabajo)</span></div>
     <p>Entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(d.nombre_actual||d.nombre)}</b>${d.rut?`, RUT <b>${esc(d.rut)}</b>`:''}, se acuerda:</p>
     <p><b>PRIMERO.</b> La empresa ${esP?'otorga al trabajador un PRÉSTAMO':'anticipa al trabajador'} por la suma de <b>$${fmt(d.monto_total)}</b>${esP&&d.tasa_pct?`, con un interés del <b>${String(Number(d.tasa_pct)).replace('.',',')}% mensual</b> (bajo la TMC vigente)`:''}.</p>
-    <p><b>SEGUNDO.</b> El trabajador AUTORIZA expresamente el descuento por planilla de <b>${cuotas} cuota(s)</b> de <b>$${fmt(vc)}</b> cada una (total <b>$${fmt(total)}</b>), a contar de la remuneración de <b>${d.mes_inicio}</b> y en los meses sucesivos hasta su total extinción.</p>
+    <p><b>SEGUNDO.</b> El trabajador AUTORIZA expresamente el descuento por planilla de <b>${cuotas} cuota(s)</b> de <b>$${fmt(vc)}</b> cada una (total <b>$${fmt(total)}</b>), a contar de la remuneración de <b>${mesPalabras(d.mes_inicio)}</b> y en los meses sucesivos hasta su total extinción.</p>
     <p><b>TERCERO.</b> En caso de término de la relación laboral por cualquier causa, el saldo pendiente se descontará del finiquito, lo que el trabajador acepta expresamente.</p>
     <p><b>CUARTO.</b> El presente convenio se firma en dos ejemplares; el original firmado se archiva en la carpeta personal del trabajador.</p>
     <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
