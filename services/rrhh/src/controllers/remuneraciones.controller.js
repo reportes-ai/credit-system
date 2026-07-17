@@ -1038,6 +1038,16 @@ async function getPrevired(req, res) {
         WHERE tipo='LICENCIA MEDICA' AND estado='APROBADA'
           AND fecha_desde <= LAST_DAY(CONCAT(?, '-01')) AND fecha_hasta >= CONCAT(?, '-01')`, [mes, mes]);
     const licMap = {}; lics.forEach(l => { licMap[l.id_usuario] = licMap[l.id_usuario] || l; });
+    // Movimiento de personal 11 = Retiro (desde los finiquitos del mes) y 1 = Contratación
+    // (ingresos dentro del mes). Si no se informa el retiro, la AFP presume deuda (DNP).
+    const [finiqs] = await pool.query(
+      `SELECT id_usuario, DATE_FORMAT(fecha_termino,'%Y-%m-%d') ft FROM rh_finiquitos
+        WHERE fecha_termino BETWEEN CONCAT(?, '-01') AND LAST_DAY(CONCAT(?, '-01'))`, [mes, mes]);
+    const retMap = {}; finiqs.forEach(f => { retMap[f.id_usuario] = retMap[f.id_usuario] || f.ft; });
+    const [ingresos] = await pool.query(
+      `SELECT id_usuario, DATE_FORMAT(fecha_ingreso,'%Y-%m-%d') fi FROM usuarios
+        WHERE fecha_ingreso BETWEEN CONCAT(?, '-01') AND LAST_DAY(CONCAT(?, '-01'))`, [mes, mes]);
+    const ingMap = {}; ingresos.forEach(i => { ingMap[i.id_usuario] = i.fi; });
 
     const per = mes.slice(5, 7) + mes.slice(0, 4);                       // mmaaaa
     const fch = f => { const s = isoF(f); return s ? s.split('-').reverse().join('-') : ''; };  // dd-mm-aaaa
@@ -1071,8 +1081,14 @@ async function getPrevired(req, res) {
       if (Math.abs(baseAfc - Math.round(d.total_imponible || 0)) < 500) baseAfc = Math.round(d.total_imponible || 0);
 
       const lic = licMap[l.id_usuario];
-      const mov = lic ? '3' : '0';
-      if (lic) avisos.push(`${l.nombre}: licencia médica en el mes — revisa la línea (movimiento 3, campo 92 renta mes anterior va en 0)`);
+      const retiro = retMap[l.id_usuario];
+      const ingreso = ingMap[l.id_usuario];
+      // Prioridad: retiro (2) manda sobre licencia (3) y contratación (1) — Tabla N°7 Previred
+      const mov = retiro ? '2' : (lic ? '3' : (ingreso ? '1' : '0'));
+      let movDesde = '', movHasta = '';
+      if (retiro) { movHasta = fch(retiro); avisos.push(`${l.nombre}: RETIRO informado (movimiento 2, término ${fch(retiro)}) — con esto la AFP no presume deuda por los meses siguientes`); }
+      else if (lic) { movDesde = fch(lic.fecha_desde); movHasta = fch(lic.fecha_hasta); avisos.push(`${l.nombre}: licencia médica en el mes — revisa la línea (movimiento 3, campo 92 renta mes anterior va en 0)`); }
+      else if (ingreso) { movDesde = fch(ingreso); avisos.push(`${l.nombre}: CONTRATACIÓN informada (movimiento 1, ingreso ${fch(ingreso)})`); }
 
       const planUF = Number(d.plan_isapre_uf) || 0;
       const pactada = esIsapre ? Math.round((d.desc_salud || 0) + (d.desc_salud_adicional || 0)) : 0;
@@ -1086,7 +1102,7 @@ async function getPrevired(req, res) {
       c[8] = '01'; c[9] = per; c[10] = per;
       c[11] = 'AFP'; c[12] = '0'; c[13] = String(d.dias ?? 30);
       c[14] = '00'; c[15] = mov;
-      c[16] = lic ? fch(lic.fecha_desde) : ''; c[17] = lic ? fch(lic.fecha_hasta) : '';
+      c[16] = movDesde; c[17] = movHasta;
       const cg = cargasDe(l.id_usuario);
       const simples = hijosDe(l.id_usuario) + (Number(cg.cargas_otras) || 0);
       c[18] = /^[ABC]$/.test(cg.tramo_asignacion || '') ? cg.tramo_asignacion : 'D';
