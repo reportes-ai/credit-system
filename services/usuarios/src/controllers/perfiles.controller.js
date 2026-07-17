@@ -50,6 +50,28 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b01', async () => {
   }
 });
 
+/* ─── Perfil "Administrador de Sistema": sub-administrador con el alcance de la
+   Fase 1 (Sistema Base) — Créditos, Clientes, Carga Masiva, mantenedores base
+   (UF, tasas, dealers, vehículos, productos financiera, fórmulas, parámetros,
+   comunas, estado créditos) y Usuarios completo para asignar funciones/permisos. ── */
+require('../../../../shared/migrate').migrarAuto('perfil-admin-sistema', async () => {
+  await pool.query(`INSERT IGNORE INTO perfiles (nombre, descripcion) VALUES
+    ('Administrador de Sistema', 'Sub-administrador del Sistema Base (Fase 1): créditos, clientes, carga masiva, mantenedores base y gestión de usuarios y permisos')`);
+  const [[perf]] = await pool.query(`SELECT id_perfil FROM perfiles WHERE nombre='Administrador de Sistema'`);
+  if (!perf) return;
+  // Módulos completos de la Fase 1
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT ?, f.id_funcionalidad, 1 FROM funcionalidades f JOIN modulos m ON m.id_modulo=f.id_modulo
+     WHERE m.ruta IN ('/creditos/','/clientes/','/carga-masiva/','/usuarios/')`, [perf.id_perfil]);
+  // Mantenedores base de la Fase 1 (solo los del Sistema Base, no toda la sección)
+  const MANT_F1 = ['mantenedores.ver', 'mantenedores_uf', 'mantenedores_tasas', 'mantenedores_dealers',
+    'mantenedores_vehiculos', 'mant_productos_financiera', 'mantenedores_financieras', 'mantenedores_parametros',
+    'mantenedores_comunas', 'mantenedores_estado_creditos', 'mantenedores_feriados', 'mantenedores_tipos_doc'];
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT ?, id_funcionalidad, 1 FROM funcionalidades WHERE codigo IN (?)`, [perf.id_perfil, MANT_F1]);
+  console.log('[perfil-admin-sistema] listo');
+});
+
 /* ─── Migración: agregar funcionalidades faltantes en todos los módulos ──── */
 require('../../../../shared/migrate').migrarAuto('perfiles_b02', async () => {
   try {
