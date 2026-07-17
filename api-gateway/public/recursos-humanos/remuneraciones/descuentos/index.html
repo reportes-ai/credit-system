@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.0 — anticipos, préstamos al personal (cuota francesa, tope TMC), pagos en exceso y descuentos permanentes -->
+  <!-- v1.1 — anticipos, préstamos al personal (cuota francesa, tope TMC), pagos en exceso y descuentos permanentes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -92,7 +92,7 @@
   <div id="secT" style="display:none">
     <div class="d-flex justify-content-end mb-2"><button class="btn btn-sm btn-outline-success" onclick="exportar('T')"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button></div>
     <div class="panel" style="padding:0;overflow:auto">
-      <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Detalle</th><th class="text-right">Capital</th><th>Tasa</th><th>Cuotas</th><th class="text-right">Valor cuota</th><th>Inicio</th><th>Estado</th><th></th></tr></thead>
+      <table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Detalle</th><th class="text-right">Capital</th><th>Tasa</th><th>Cuotas</th><th class="text-right">Valor cuota</th><th>Inicio</th><th>Estado</th><th>Convenio</th><th></th></tr></thead>
       <tbody id="tbTodos"><tr><td colspan="10" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
     </div>
   </div>
@@ -182,8 +182,12 @@ function render(){
     <td class="text-right num">$${fmt(d.valor_cuota)}</td>
     <td>${d.mes_inicio}</td>
     <td>${d.estado==='ANULADO'?`<span class="pill ANULADO">ANULADO</span><div style="font-size:.64rem;color:#94a3b8">${esc(d.anulado_por||'')}</div>`:'<span class="pill" style="background:#dcfce7;color:#15803d">VIGENTE</span>'}</td>
+    <td style="white-space:nowrap">${['ANTICIPO','PRESTAMO'].includes(d.tipo)?`
+      <i class="bi bi-printer" style="cursor:pointer" title="Imprimir convenio para firma" onclick='imprimirConvenio(${JSON.stringify(d).replace(/'/g,"&#39;")})'></i>
+      ${d.tiene_convenio?'<i class="bi bi-patch-check-fill text-success" title="Convenio firmado en la carpeta digital"></i>'
+        :`<i class="bi bi-upload text-primary" style="cursor:pointer" title="Subir convenio FIRMADO (va a la carpeta digital)" onclick="subirConvenio(${d.id})"></i> <span style="color:#dc2626;font-size:.68rem;font-weight:700">SIN FIRMA</span>`}`:''}</td>
     <td>${d.estado==='VIGENTE'?`<i class="bi bi-x-circle text-danger" style="cursor:pointer" title="Anular (detiene cuotas futuras)" onclick="anular(${d.id})"></i>`:''}</td></tr>`).join('')
-    || '<tr><td colspan="10" class="text-center text-muted py-3">Sin descuentos registrados</td></tr>';
+    || '<tr><td colspan="11" class="text-center text-muted py-3">Sin descuentos registrados</td></tr>';
 }
 
 async function guardar(){
@@ -193,11 +197,51 @@ async function guardar(){
   if (!body.monto) return alert('Ingresa el monto');
   const r = await fetch('/api/rrhh/remuneraciones/descuentos',{method:'POST',headers:H,body:JSON.stringify(body)});
   const j = await r.json(); if (!j.success) return alert(j.error);
-  alert(`Descuento guardado: ${j.data.cuotas||'mensual'} cuota(s) de $${fmt(j.data.valor_cuota)} desde ${j.data.mes_inicio}.`);
+  if (['ANTICIPO','PRESTAMO'].includes(body.tipo) && confirm(`Descuento guardado: ${j.data.cuotas||'mensual'} cuota(s) de $${fmt(j.data.valor_cuota)} desde ${j.data.mes_inicio}.\n\n¿Imprimir el CONVENIO para la firma del colaborador? (el firmado se sube después con el botón 📤 de la columna Convenio)`)) {
+    imprimirConvenio({ id: j.data.id, tipo: body.tipo, nombre_actual: fColab.options[fColab.selectedIndex]?.text || '',
+      monto_total: body.monto, tasa_pct: body.tasa_pct || null, cuotas: j.data.cuotas, valor_cuota: j.data.valor_cuota, mes_inicio: j.data.mes_inicio });
+  } else if (!['ANTICIPO','PRESTAMO'].includes(body.tipo))
+    alert(`Descuento guardado: ${j.data.cuotas||'mensual'} cuota(s) de $${fmt(j.data.valor_cuota)} desde ${j.data.mes_inicio}.`);
   fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; fColab.focus();
   cargar();
 }
 
+/* ── Convenio de anticipo/préstamo: imprimir para firma + subir firmado ── */
+function imprimirConvenio(d){
+  const esP = d.tipo==='PRESTAMO';
+  const hoy = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
+  const cuotas = Number(d.cuotas)||1, vc = Number(d.valor_cuota), total = vc*cuotas;
+  const w = window.open('','_blank','width=860,height=700');
+  w.document.write(`<html><head><title>Convenio ${esP?'de préstamo':'de anticipo'}</title></head>
+  <body style="font-family:Georgia,serif;max-width:720px;margin:0 auto;padding:46px 36px;color:#111;line-height:1.7;font-size:14px">
+    <div style="display:flex;justify-content:space-between;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:24px">
+      <div style="font-size:20px;font-weight:800;color:#012d70">AutoFácil <span style="font-weight:400;font-size:12px;color:#555">Crédito Automotriz</span></div>
+      <div style="font-size:12px;color:#555">Santiago, ${hoy}</div></div>
+    <div style="text-align:center;font-weight:800;font-size:16px;margin-bottom:20px">CONVENIO DE ${esP?'PRÉSTAMO AL PERSONAL':'ANTICIPO DE REMUNERACIÓN'}<br><span style="font-size:12px;font-weight:400">y autorización de descuento por planilla (art. 58 Código del Trabajo)</span></div>
+    <p>Entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(d.nombre_actual||d.nombre)}</b>${d.rut?`, RUT <b>${esc(d.rut)}</b>`:''}, se acuerda:</p>
+    <p><b>PRIMERO.</b> La empresa ${esP?'otorga al trabajador un PRÉSTAMO':'anticipa al trabajador'} por la suma de <b>$${fmt(d.monto_total)}</b>${esP&&d.tasa_pct?`, con un interés del <b>${String(Number(d.tasa_pct)).replace('.',',')}% mensual</b> (bajo la TMC vigente)`:''}.</p>
+    <p><b>SEGUNDO.</b> El trabajador AUTORIZA expresamente el descuento por planilla de <b>${cuotas} cuota(s)</b> de <b>$${fmt(vc)}</b> cada una (total <b>$${fmt(total)}</b>), a contar de la remuneración de <b>${d.mes_inicio}</b> y en los meses sucesivos hasta su total extinción.</p>
+    <p><b>TERCERO.</b> En caso de término de la relación laboral por cualquier causa, el saldo pendiente se descontará del finiquito, lo que el trabajador acepta expresamente.</p>
+    <p><b>CUARTO.</b> El presente convenio se firma en dos ejemplares; el original firmado se archiva en la carpeta personal del trabajador.</p>
+    <div style="display:flex;justify-content:space-between;margin-top:90px;text-align:center;font-size:13px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">AUTOFÁCIL SpA<br>Empleador</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(d.nombre_actual||d.nombre)}<br>Trabajador — acepto y autorizo</div>
+    </div>
+    <p style="font-size:10px;color:#777;margin-top:26px">Descuento N° ${d.id} · Generado por el Business Suite. Una vez firmado, subir el escaneado con el botón 📤 de la columna Convenio — quedará en la carpeta digital del colaborador.</p>
+    <script>print()</'+'script></body></html>`);
+}
+function subirConvenio(id){
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='.pdf,image/*';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 10*1024*1024) return alert('Máximo 10 MB');
+    const b64 = await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(String(fr.result).split(',')[1]); fr.readAsDataURL(f); });
+    const j = await (await fetch(`/api/rrhh/remuneraciones/descuentos/${id}/convenio`,{method:'POST',headers:H,body:JSON.stringify({nombre:f.name,mime:f.type,data:b64})})).json();
+    if (!j.success) return alert(j.error);
+    alert('Convenio firmado guardado en la carpeta digital del colaborador ✓'); cargar();
+  };
+  inp.click();
+}
 async function anular(id){
   if (!confirm('¿Anular este descuento? Deja de descontarse desde ahora (lo ya descontado no se toca).')) return;
   const r = await fetch(`/api/rrhh/remuneraciones/descuentos/${id}/anular`,{method:'POST',headers:H});

@@ -273,7 +273,10 @@ const getDescuentos = async (req, res) => {
   try {
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
     const [rows] = await pool.query(
-      `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual FROM rh_descuentos d
+      `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual, u.rut,
+              EXISTS(SELECT 1 FROM rh_documentos rd WHERE rd.id_usuario=d.id_usuario
+                     AND rd.tipo='CONVENIO DESCUENTO' AND rd.nombre_archivo LIKE CONCAT('DESC-', d.id, '-%')) tiene_convenio
+         FROM rh_descuentos d
         LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario ORDER BY d.created_at DESC LIMIT 500`);
     const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes) != null)
       .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
@@ -1137,6 +1140,37 @@ async function getPrevired(req, res) {
   } catch (e) { console.error('[previred]', e.message); fail(res, e.message); }
 }
 
+/* ── Convenio firmado de anticipo/préstamo → carpeta digital del colaborador ──
+   El documento se imprime desde la página de Descuentos, el colaborador lo
+   firma, y el escaneado se sube aquí: queda en rh_documentos con tipo
+   'CONVENIO DESCUENTO' y nombre DESC-{id}-... (ligado al descuento). */
+require('../../../../shared/migrate').enFila('descuentos-convenio', async () => {
+  const [[dt]] = await pool.query("SELECT valor FROM rh_config WHERE clave='doc_tipos'");
+  if (dt && !dt.valor.includes('CONVENIO DESCUENTO'))
+    await pool.query("UPDATE rh_config SET valor=CONCAT(valor, ',CONVENIO DESCUENTO') WHERE clave='doc_tipos'");
+});
+
+async function subirConvenioDescuento(req, res) {
+  try {
+    const id = parseInt(req.params.id);
+    const b = req.body || {};
+    const [[d]] = await pool.query('SELECT id_usuario, tipo FROM rh_descuentos WHERE id=?', [id]);
+    if (!d) return fail(res, 'Descuento no existe', 404);
+    if (!b.data) return fail(res, 'Falta el archivo', 400);
+    const buf = Buffer.from(b.data, 'base64');
+    if (buf.length > 10 * 1024 * 1024) return fail(res, 'Archivo supera 10 MB', 400);
+    const nombre = `DESC-${id}-${String(b.nombre || 'convenio.pdf').slice(0, 180)}`;
+    await pool.query(
+      `INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, subido_por)
+       VALUES (?,?,?,?,?,?)`,
+      [d.id_usuario, 'CONVENIO DESCUENTO', nombre, b.mime || 'application/pdf', buf,
+       `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim()]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'convenio_descuento', entidad_id: id,
+      detalle: `Convenio firmado subido para descuento #${id} (${d.tipo})` });
+    ok(res, { ok: true });
+  } catch (e) { console.error('[convenio descuento]', e.message); fail(res, e.message); }
+}
+
 async function putPreviredConfig(req, res) {
   try {
     const { ccaf, mutual, sucursal_mutual } = req.body || {};
@@ -1148,4 +1182,4 @@ async function putPreviredConfig(req, res) {
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
-  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, putPreviredConfig };
+  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, putPreviredConfig, subirConvenioDescuento };

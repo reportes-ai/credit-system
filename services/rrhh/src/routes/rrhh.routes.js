@@ -58,6 +58,7 @@ router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_re
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);
 router.post('/remuneraciones/descuentos',        verifyToken, requireFunc('rh_remuneraciones'), rem.crearDescuento);
+router.post('/remuneraciones/descuentos/:id/convenio', verifyToken, requireFunc('rh_remuneraciones'), rem.subirConvenioDescuento);
 router.post('/remuneraciones/descuentos/:id/anular', verifyToken, requireFunc('rh_remuneraciones'), rem.anularDescuento);
 router.get('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones', 'rh_remuneraciones'), rem.getIndicadores);
 router.put('/remuneraciones/indicadores',     verifyToken, requireFunc('mant_remuneraciones'), rem.putIndicadores);
