@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentos Firmados — RRHH</title>
+  <!-- v1.0 — repositorio central FES: pestañas por tipo, buscador, subida de firmados en papel -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:1080px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,#3b82f6); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; } .tab { padding:7px 15px; border-radius:20px; font-size:.82rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; } .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .tab .n { background:#eef2ff; color:var(--navy); border-radius:10px; padding:0 7px; font-size:.7rem; margin-left:5px; } .tab.active .n { background:rgba(255,255,255,.25); color:#fff; }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:16px; }
+    .buscador { width:100%; border:1.5px solid #cbd5e1; border-radius:10px; padding:11px 14px; font-size:.9rem; box-sizing:border-box; margin-bottom:14px; }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.68rem; font-weight:800; } .FIRMADO,.APROBADA { background:#dcfce7; color:#166534; } .EN_FIRMA,.PENDIENTE { background:#fef3c7; color:#92400e; } .RECHAZADA,.ANULADA { background:#fee2e2; color:#b91c1c; } .BORRADOR { background:#f1f5f9; color:#64748b; }
+    .tp { border-radius:8px; padding:2px 8px; font-size:.66rem; font-weight:800; color:#fff; background:#64748b; }
+    .tp-CONTRATO { background:#0141A2; } .tp-FINIQUITO { background:#b91c1c; } .tp-VACACIONES { background:#0d9488; } .tp-SOLICITUD { background:#7c3aed; } .tp-ANEXO { background:#d97706; }
+    .firma-line { font-size:.74rem; color:#475569; }
+    .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:4px 10px; font-size:.76rem; cursor:pointer; font-weight:600; text-decoration:none; color:#0141A2; }
+    .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+    .fld { margin-bottom:12px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input, .fld select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:.88rem; cursor:pointer; }
+    .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; } @media(max-width:760px){ .grid3 { grid-template-columns:1fr; } }
+    .drop { border:2px dashed #cbd5e1; border-radius:12px; padding:26px; text-align:center; color:#64748b; cursor:pointer; } .drop.ok { border-color:#16a34a; color:#166534; background:#f0fdf4; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-patch-check me-1"></i>Documentos Firmados</span></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-patch-check"></i><div><h2>Documentos Firmados</h2><p>Repositorio central FES (Ley 19.799): contratos, finiquitos, vacaciones, solicitudes, anexos y documentos escaneados — todo con firma, hash e historial.</p></div></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="card-box" id="secLista">
+    <input class="buscador" id="q" placeholder="🔎 Buscar por empleado, tipo, fecha (aaaa-mm-dd), estado, glosa, firmante…" oninput="pintar()">
+    <table><thead><tr><th>Tipo</th><th>Documento</th><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Firmas</th><th></th></tr></thead>
+    <tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
+  </div>
+  <div class="card-box" id="secSubir" style="display:none">
+    <h6 style="color:var(--navy)">Subir documento firmado (papel escaneado)</h6>
+    <p style="font-size:.8rem;color:#64748b">El archivo se renombra automáticamente a <b>TIPO_Nombre-Apellido_fecha</b>, queda visible y descargable en este repositorio y en la carpeta del colaborador, y se registra su <b>huella SHA-256</b> — si alguien cambia el archivo después, se nota.</p>
+    <div class="grid3">
+      <div class="fld"><label>Empleado *</label><select id="sEmp"></select></div>
+      <div class="fld"><label>Tipo de documento *</label><select id="sTipo"></select></div>
+      <div class="fld"><label>Fecha de firma *</label><input type="date" id="sFecha"></div>
+    </div>
+    <div class="drop" id="drop" onclick="document.getElementById('sFile').click()">
+      <i class="bi bi-cloud-arrow-up" style="font-size:1.6rem"></i><div id="dropTxt">Haz clic para elegir el archivo (PDF o imagen, máx. 15 MB)</div>
+    </div>
+    <input type="file" id="sFile" accept=".pdf,image/*" style="display:none" onchange="filePick()">
+    <div style="text-align:right;margin-top:14px"><button class="btn-navy" id="btnSubir" onclick="subir()"><i class="bi bi-upload me-1"></i>Subir al repositorio</button></div>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+const TK=sessionStorage.getItem('token'), YO=JSON.parse(sessionStorage.getItem('usuario')||'null');
+if(!TK||!YO) location.href='/login.html';
+document.getElementById('navNombre').textContent=`${YO?.nombre||''} ${YO?.apellido||''}`.trim();
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+const H={Authorization:'Bearer '+TK}, HJ={...H,'Content-Type':'application/json'};
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fd=s=>s?new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL'):'—';
+let DOCS=[], TAB='TODOS', FILE=null;
+
+async function cargar(){
+  const j=await (await fetch('/api/rrhh/firmas/repositorio',{headers:H})).json();
+  if(!j.success){ document.getElementById('tb').innerHTML=`<tr><td colspan="7" class="empty">${esc(j.error)}</td></tr>`; return; }
+  DOCS=j.data.documentos||[];
+  document.getElementById('sEmp').innerHTML=(j.data.empleados||[]).map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)}</option>`).join('');
+  document.getElementById('sTipo').innerHTML=(j.data.tipos||[]).map(t=>`<option>${esc(t)}</option>`).join('');
+  document.getElementById('sFecha').value=new Date().toISOString().slice(0,10);
+  pintarTabs(); pintar();
+}
+function pintarTabs(){
+  const tipos=['TODOS',...new Set(DOCS.map(d=>d.tipo))];
+  document.getElementById('tabs').innerHTML=tipos.map(t=>{
+    const n=t==='TODOS'?DOCS.length:DOCS.filter(d=>d.tipo===t).length;
+    return `<div class="tab ${TAB===t?'active':''}" onclick="setTab('${t}')">${t==='TODOS'?'<i class=\'bi bi-collection me-1\'></i>Todos':esc(t)}<span class="n">${n}</span></div>`;
+  }).join('')+`<div class="tab ${TAB==='SUBIR'?'active':''}" style="border-style:dashed" onclick="setTab('SUBIR')"><i class="bi bi-upload me-1"></i>Subir documento</div>`;
+}
+window.setTab=t=>{ TAB=t; pintarTabs();
+  document.getElementById('secLista').style.display=t==='SUBIR'?'none':'';
+  document.getElementById('secSubir').style.display=t==='SUBIR'?'':'none';
+  if(t!=='SUBIR') pintar(); };
+function pintar(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const rows=DOCS.filter(d=>TAB==='TODOS'||d.tipo===TAB)
+    .filter(d=>!q||[d.tipo,d.glosa,d.empleado,d.fecha,fd(d.fecha),d.estado,...(d.firmas||[]).map(f=>f.nombre+' '+(f.rol||''))].join(' ').toLowerCase().includes(q));
+  document.getElementById('tb').innerHTML=rows.map(d=>`<tr>
+    <td><span class="tp tp-${esc(d.tipo)}">${esc(d.tipo)}</span></td>
+    <td><b>${esc(d.glosa)}</b> <small style="color:#94a3b8">#${d.id}</small></td>
+    <td>${esc(d.empleado||'—')}</td><td>${fd(d.fecha)}</td>
+    <td><span class="pill ${esc(d.estado)}">${esc(d.estado)}</span></td>
+    <td>${(d.firmas||[]).map(f=>`<div class="firma-line">✍ <b>${esc(f.rol)}</b>${f.decision?' ('+esc(f.decision)+')':''}: ${esc(f.nombre)} · ${f.ff||f.fecha||''}</div>`).join('')||'<small style="color:#94a3b8">—</small>'}</td>
+    <td>${d.doc_id?`<a class="btn-mini" href="#" onclick="return descargar(${d.doc_id})"><i class="bi bi-download"></i> Ver</a>`:''}</td></tr>`).join('')
+    ||'<tr><td colspan="7" class="empty">Sin documentos que calcen con la búsqueda.</td></tr>';
+}
+window.descargar=async id=>{
+  const r=await fetch('/api/rrhh/docs/archivo/'+id,{headers:H});
+  if(!r.ok){ alert('No se pudo descargar'); return false; }
+  const blob=await r.blob(); const url=URL.createObjectURL(blob);
+  window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url),60000); return false;
+};
+window.filePick=()=>{ const f=document.getElementById('sFile').files[0]; if(!f) return;
+  if(f.size>15*1024*1024){ alert('El archivo supera 15 MB'); return; }
+  FILE=f; const d=document.getElementById('drop'); d.classList.add('ok');
+  document.getElementById('dropTxt').textContent='✔ '+f.name+' ('+Math.round(f.size/1024)+' KB)'; };
+window.subir=async()=>{
+  if(!FILE) return alert('Elige el archivo');
+  const btn=document.getElementById('btnSubir'); btn.disabled=true;
+  const b64=await new Promise(res=>{ const r=new FileReader(); r.onload=()=>res(r.result.split(',')[1]); r.readAsDataURL(FILE); });
+  const j=await (await fetch('/api/rrhh/firmas/subir',{method:'POST',headers:HJ,body:JSON.stringify({
+    id_usuario:document.getElementById('sEmp').value, tipo:document.getElementById('sTipo').value,
+    fecha_firma:document.getElementById('sFecha').value, archivo_nombre:FILE.name, mime_type:FILE.type, archivo_data:b64 })})).json();
+  btn.disabled=false;
+  if(!j.success) return alert(j.error);
+  alert('Documento subido como "'+j.data.nombre_archivo+'" ✔');
+  FILE=null; document.getElementById('sFile').value=''; document.getElementById('drop').classList.remove('ok');
+  document.getElementById('dropTxt').textContent='Haz clic para elegir el archivo (PDF o imagen, máx. 15 MB)';
+  setTab('TODOS'); cargar();
+};
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

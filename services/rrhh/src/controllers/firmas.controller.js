@@ -29,6 +29,21 @@ require('../../../../shared/migrate').enFila('rrhh-firmas', async () => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_doc_rol (entidad, entidad_id, rol)
   )`);
+  // Repositorio: documentos externos subidos (papel escaneado) también con huella FES
+  for (const col of ['fecha_firma DATE NULL', 'firmado_fes TINYINT(1) DEFAULT 0'])
+    try { await pool.query('ALTER TABLE rh_documentos ADD COLUMN ' + col); } catch (e) { if (e.errno !== 1060) throw e; }
+  const [[modRRHH]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
+  if (modRRHH) {
+    const [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_docs_firmados' LIMIT 1`);
+    if (!f) {
+      const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+        VALUES (?, 'Documentos Firmados', 'rh_docs_firmados', '/recursos-humanos/documentos-firmados/', 'bi-patch-check')`, [modRRHH.id_modulo]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+        SELECT pp.id_perfil, ?, 1 FROM permisos_perfil pp JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+        WHERE f2.codigo='rh_colaboradores' AND pp.habilitado=1`, [r.insertId]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)`, [r.insertId]);
+    }
+  }
   console.log('[rrhh-firmas] listo');
 });
 
@@ -183,6 +198,82 @@ exports.misDocumentos = async (req, res) => {
     });
     docs.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
     ok(res, { documentos: docs.filter(d => d.firmas.length) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── REPOSITORIO central (RRHH): todos los documentos firmados FES ──────────── */
+exports.repositorio = async (req, res) => {
+  try {
+    if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
+    const docs = [];
+    const [cts] = await pool.query(
+      `SELECT ct.id, ct.estado, ct.id_usuario, ct.trabajador, c.nombre cargo, DATE_FORMAT(ct.fecha_ingreso,'%Y-%m-%d') fecha
+         FROM rh_contratos ct JOIN rh_cargos c ON c.id=ct.id_cargo
+        WHERE EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='CONTRATO' AND f.entidad_id=ct.id) LIMIT 1000`);
+    cts.forEach(c => docs.push({ tipo: 'CONTRATO', id: c.id, empleado: c.trabajador, glosa: `Contrato — ${c.cargo}`, fecha: c.fecha, estado: c.estado }));
+    const [fqs] = await pool.query(
+      `SELECT id, estado, trabajador, causal_glosa, DATE_FORMAT(fecha_termino,'%Y-%m-%d') fecha FROM rh_finiquitos
+        WHERE EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='FINIQUITO' AND f.entidad_id=rh_finiquitos.id) LIMIT 1000`);
+    fqs.forEach(f => docs.push({ tipo: 'FINIQUITO', id: f.id, empleado: f.trabajador, glosa: `Finiquito — ${f.causal_glosa || ''}`, fecha: f.fecha, estado: f.estado }));
+    const [vcs] = await pool.query(
+      `SELECT v.id, v.estado, v.nombre, v.dias, DATE_FORMAT(v.fecha_desde,'%Y-%m-%d') fecha FROM rh_vacaciones v
+        WHERE EXISTS (SELECT 1 FROM rh_firmas f WHERE f.entidad='VACACIONES' AND f.entidad_id=v.id) LIMIT 1000`);
+    vcs.forEach(v => docs.push({ tipo: 'VACACIONES', id: v.id, empleado: v.nombre, glosa: `Vacaciones — ${v.dias} día(s)`, fecha: v.fecha, estado: v.estado }));
+    const [sols] = await pool.query(`SELECT id, tipo, estado, nombre, DATE_FORMAT(created_at,'%Y-%m-%d') fecha FROM rh_solicitudes
+        WHERE EXISTS (SELECT 1 FROM rh_sol_firmas f WHERE f.id_solicitud=rh_solicitudes.id) LIMIT 1000`);
+    sols.forEach(s => docs.push({ tipo: 'SOLICITUD', id: s.id, empleado: s.nombre, glosa: `Solicitud ${s.tipo}`, fecha: s.fecha, estado: s.estado }));
+    const [subs] = await pool.query(
+      `SELECT d.id, d.tipo doc_tipo, d.nombre_archivo, DATE_FORMAT(d.fecha_firma,'%Y-%m-%d') fecha,
+              TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) empleado
+         FROM rh_documentos d LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario
+        WHERE d.firmado_fes=1 LIMIT 1000`);
+    subs.forEach(s => docs.push({ tipo: s.doc_tipo || 'OTRO', id: s.id, empleado: s.empleado, glosa: s.nombre_archivo, fecha: s.fecha, estado: 'FIRMADO', doc_id: s.id }));
+    // firmas de todo
+    const [fd] = await pool.query(`SELECT entidad, entidad_id, rol, nombre, cargo, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_firmas ORDER BY created_at`);
+    const [fs] = await pool.query(`SELECT id_solicitud, rol, nombre, decision, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_sol_firmas ORDER BY created_at`);
+    docs.forEach(d => {
+      if (d.tipo === 'SOLICITUD') d.firmas = fs.filter(x => x.id_solicitud === d.id);
+      else if (d.doc_id) d.firmas = fd.filter(x => x.entidad === 'ARCHIVO' && x.entidad_id === d.doc_id);
+      else d.firmas = fd.filter(x => x.entidad === d.tipo && x.entidad_id === d.id);
+    });
+    docs.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+    // catálogos para la pestaña Subir
+    const [[t]] = await pool.query(`SELECT valor FROM rh_config WHERE clave='doc_tipos'`);
+    const tipos = String(t?.valor || 'CONTRATO,ANEXO,OTRO').split(',').map(s => s.trim()).filter(Boolean);
+    const [emps] = await pool.query(`SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0 ORDER BY nombre`);
+    ok(res, { documentos: docs, tipos, empleados: emps });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Subir documento firmado en papel (escaneado) — queda con huella FES ────── */
+exports.subirFirmado = async (req, res) => {
+  try {
+    if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
+    const b = req.body || {};
+    const idU = parseInt(b.id_usuario);
+    const tipo = String(b.tipo || '').toUpperCase().slice(0, 40);
+    const fecha = String(b.fecha_firma || '').slice(0, 10);
+    if (!idU || !tipo || !fecha || !b.archivo_data) return fail(res, 'Empleado, tipo, fecha de firma y archivo son requeridos', 400);
+    const buffer = Buffer.from(b.archivo_data, 'base64');
+    if (buffer.length > 15 * 1024 * 1024) return fail(res, 'Archivo supera 15 MB', 400);
+    const [[u]] = await pool.query(`SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, rut FROM usuarios WHERE id_usuario=?`, [idU]);
+    if (!u) return fail(res, 'Empleado no existe', 404);
+    // Renombrado canónico: TIPO_Nombre-Apellido_fecha.ext
+    const ext = (String(b.archivo_nombre || '').match(/\.[a-z0-9]+$/i) || ['.pdf'])[0];
+    const nombreCanon = `${tipo}_${u.nombre.replace(/\s+/g, '-')}_${fecha}${ext}`.slice(0, 255);
+    const [[yo]] = await pool.query(`SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, cargo FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
+    const [r] = await pool.query(
+      `INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, subido_por, fecha_firma, firmado_fes)
+       VALUES (?,?,?,?,?,?,?,1)`,
+      [idU, tipo, nombreCanon, b.mime_type || null, buffer, yo?.nombre || '', fecha]);
+    // Huella FES del ARCHIVO: hash del binario — cualquier alteración posterior se detecta
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 45);
+    await pool.query(`INSERT IGNORE INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc)
+      VALUES ('ARCHIVO', ?, 'EMPLEADOR', ?, ?, ?, ?, ?)`, [r.insertId, req.usuario.id_usuario, yo?.nombre || '', yo?.cargo || '', ip, hash]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'documento', entidad_id: r.insertId,
+      detalle: `Subió ${tipo} firmado de ${u.nombre} (fecha firma ${fecha}) al repositorio — hash ${hash.slice(0, 12)}…` });
+    ok(res, { id: r.insertId, nombre_archivo: nombreCanon });
   } catch (e) { fail(res, e.message); }
 };
 

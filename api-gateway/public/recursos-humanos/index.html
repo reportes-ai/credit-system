@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.6 — card Solicitudes (paperless) -->
+  <!-- v2.7 — card Documentos Firmados (repositorio FES) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,12 @@
       <p>Cartas oferta con beneficios por checkbox, contratos que heredan lo ofertado, y descripciones de cargo obligatorias.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/documentos-firmados/" class="module-card" id="cardDocsF" style="display:none">
+      <div class="card-icon"><i class="bi bi-patch-check"></i></div>
+      <h5>Documentos Firmados <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Repositorio central FES: contratos, finiquitos, vacaciones, solicitudes y escaneados — pestañas por tipo, buscador por cualquier variable y subida de firmados en papel con huella digital.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/solicitudes/" class="module-card" id="cardSol" style="display:none">
       <div class="card-icon"><i class="bi bi-send-check"></i></div>
       <h5>Solicitudes</h5>
@@ -165,6 +171,7 @@
     if (tiene('compliance')) document.getElementById('cardCompl').style.display='';
     if (tiene('rh_encuestas')) document.getElementById('cardEnc').style.display='';
     if (tiene('rh_solicitudes')) document.getElementById('cardSol').style.display='';
+    if (tiene('rh_docs_firmados')) document.getElementById('cardDocsF').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>
