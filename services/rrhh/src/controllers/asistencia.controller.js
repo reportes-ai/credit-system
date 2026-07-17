@@ -46,6 +46,22 @@ require('../../../../shared/migrate').enFila('rrhh-workera-cache', async () => {
   console.log('[rrhh-asistencia] caché workera lista');
 });
 
+require('../../../../shared/migrate').enFila('rrhh-workera-horarios', async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rh_workera_horarios (
+      id     INT AUTO_INCREMENT PRIMARY KEY,
+      rut    VARCHAR(12) NOT NULL,
+      fecha  DATE NOT NULL,
+      inicio TIME NULL,
+      fin    TIME NULL,
+      turno  VARCHAR(120) NULL,
+      UNIQUE KEY uq_horario (rut, fecha)
+    )`);
+  // los horarios se sincronizan por día: forzar resync del caché existente
+  await pool.query('DELETE FROM rh_workera_sync');
+  console.log('[rrhh-asistencia] horarios workera listos');
+});
+
 // Parámetros de atraso (hora de entrada de referencia + tolerancia) — paramétricos
 require('../../../../shared/migrate').enFila('rrhh-asistencia-config', async () => {
   await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
@@ -73,7 +89,10 @@ async function sincronizar(desde, hasta) {
     if (hace == null || (iso >= refresco && hace >= 15)) faltan.push(iso);
   }
   if (!faltan.length) return;
-  const marcas = await workera.marcaciones(faltan[0], faltan[faltan.length - 1]);
+  const [marcas, horarios] = await Promise.all([
+    workera.marcaciones(faltan[0], faltan[faltan.length - 1]),
+    workera.horarios(faltan[0], faltan[faltan.length - 1]).catch(e => { console.error('[workera horarios]', e.message); return []; }),
+  ]);
   const filas = [];
   for (const m of marcas) {
     const rut = rutNorm(m.employee?.identification);
@@ -82,6 +101,19 @@ async function sincronizar(desde, hasta) {
   }
   if (filas.length)
     await pool.query('INSERT IGNORE INTO rh_workera_marcas (rut, fecha, hora, tipo, origen) VALUES ?', [filas]);
+  // Turnos del día por trabajador (workshift/schedules: cada registro trae employee + schedules[])
+  const filasHor = [];
+  for (const t of horarios) {
+    const rut = rutNorm(t.employee?.identification);
+    for (const s of (t.schedules || [])) {
+      const dia = String(s.date || '').slice(0, 10);
+      const ini = String(s.start || '').split('T')[1], fin = String(s.end || '').split('T')[1];
+      if (rut && dia && ini) filasHor.push([rut, dia, ini.slice(0, 8), fin ? fin.slice(0, 8) : null, String(s.scheduleName || s.workshiftName || '').trim().slice(0, 120)]);
+    }
+  }
+  if (filasHor.length)
+    await pool.query(`INSERT INTO rh_workera_horarios (rut, fecha, inicio, fin, turno) VALUES ?
+      ON DUPLICATE KEY UPDATE inicio=VALUES(inicio), fin=VALUES(fin), turno=VALUES(turno)`, [filasHor]);
   await pool.query('INSERT INTO rh_workera_sync (dia) VALUES ' + faltan.map(() => '(?)').join(',') +
     ' ON DUPLICATE KEY UPDATE synced_at=NOW()', faltan);
 }
@@ -115,13 +147,20 @@ exports.resumen = async (req, res) => {
 
     // 2) Marcaciones del período: sincroniza los días que faltan y lee del caché
     await sincronizar(desde, hasta);
-    const [marcas] = await pool.query(
-      `SELECT rut, DATE_FORMAT(fecha,'%Y-%m-%d') dia, MIN(hora) entrada, MAX(hora) salida, COUNT(*) n
-         FROM rh_workera_marcas WHERE fecha BETWEEN ? AND ? GROUP BY rut, dia`, [desde, hasta]);
+    const [[marcas], [hors]] = await Promise.all([
+      pool.query(
+        `SELECT rut, DATE_FORMAT(fecha,'%Y-%m-%d') dia, MIN(hora) entrada, MAX(hora) salida, COUNT(*) n
+           FROM rh_workera_marcas WHERE fecha BETWEEN ? AND ? GROUP BY rut, dia`, [desde, hasta]),
+      pool.query(
+        `SELECT rut, DATE_FORMAT(fecha,'%Y-%m-%d') dia, MIN(inicio) inicio
+           FROM rh_workera_horarios WHERE fecha BETWEEN ? AND ? GROUP BY rut, dia`, [desde, hasta]),
+    ]);
+    const horIni = {};
+    for (const h of hors) if (h.inicio) (horIni[h.rut] = horIni[h.rut] || {})[h.dia] = String(h.inicio);
     const porRut = {};
     for (const m of marcas) {
       (porRut[m.rut] = porRut[m.rut] || {})[m.dia] =
-        { entrada: String(m.entrada), salida: String(m.salida), n: m.n };
+        { entrada: String(m.entrada), salida: String(m.salida), n: m.n, horario: (horIni[m.rut] || {})[m.dia] || null };
     }
 
     // 3) Días hábiles transcurridos del mes (motor único shared/feriados)
@@ -139,7 +178,7 @@ exports.resumen = async (req, res) => {
       for (const h of habiles) {
         if (c.fecha_ingreso && h < c.fecha_ingreso) continue;
         const reg = dias[h];
-        if (reg) { marcados++; detalle.push({ dia: h, entrada: reg.entrada, salida: reg.salida, marcas: reg.n }); continue; }
+        if (reg) { marcados++; detalle.push({ dia: h, entrada: reg.entrada, salida: reg.salida, marcas: reg.n, horario: reg.horario }); continue; }
         const aus = ausencias.find(a => a.id_usuario === c.id_usuario && a.fd <= h && a.fh >= h);
         if (aus) { cubiertos++; detalle.push({ dia: h, cubierto: aus.tipo }); continue; }
         if (cubierto(c.id_usuario, h, vacaciones)) { cubiertos++; detalle.push({ dia: h, cubierto: 'VACACIONES' }); continue; }

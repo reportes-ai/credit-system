@@ -38,6 +38,9 @@ const marcaciones = (start, end) => getTodas('attendanceData', { start, end });
 // Trabajadores registrados en Workera
 const trabajadores = () => getTodas('employee');
 
+// Horarios/turnos asignados por trabajador y día (workshift/schedules)
+const horarios = (start, end) => getTodas('workshift/schedules', { start, end });
+
 const configurado = () => !!(process.env.WORKERA_API_USER && process.env.WORKERA_API_KEY);
 
-module.exports = { marcaciones, trabajadores, configurado };
+module.exports = { marcaciones, trabajadores, horarios, configurado };

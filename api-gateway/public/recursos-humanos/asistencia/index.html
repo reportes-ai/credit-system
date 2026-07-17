@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia (Workera) — AutoFácil</title>
-  <!-- v1.3 — pestañas No enrolados / Atrasos / Ausencias con detalle por usuario -->
+  <!-- v1.4 — atrasos contra el TURNO real de Workera (workshift/schedules) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -136,16 +136,20 @@ function verTab(t){
   for(const [k,id] of [['resumen','pResumen'],['noenrol','pNoenrol'],['atrasos','pAtrasos'],['ausencias','pAusencias']])
     $(id).style.display=k===t?'':'none';
 }
-// Atrasos: entrada posterior a hora_entrada + tolerancia (paramétrico en rh_config)
+// Atrasos: entrada posterior al TURNO del día en Workera (+ tolerancia);
+// si el día no tiene turno asignado, se usa la hora de referencia paramétrica.
 function atrasosDe(c){
   const [hh,mm]=(DATA.hora_entrada||'09:00').split(':').map(Number);
-  const limite=hh*60+mm+(DATA.tolerancia_min||0);
+  const tol=DATA.tolerancia_min||0;
   const out=[];
   for(const d of c.detalle){
     if(!d.entrada) continue;
+    const ref=d.horario||null;
+    const [rh,rm]=(ref||DATA.hora_entrada||'09:00').split(':').map(Number);
+    const limite=rh*60+rm+tol;
     const [eh,em]=d.entrada.split(':').map(Number);
     const min=eh*60+em-limite;
-    if(min>0) out.push({dia:d.dia, entrada:d.entrada.slice(0,5), min});
+    if(min>0) out.push({dia:d.dia, entrada:d.entrada.slice(0,5), min, ref:(ref||DATA.hora_entrada).slice(0,5), conTurno:!!ref});
   }
   return out;
 }
@@ -165,10 +169,10 @@ function pintaTabs(){
   const conAt=DATA.colaboradores.map(c=>({c,at:atrasosDe(c)})).filter(x=>x.at.length)
     .sort((a,b)=>b.at.reduce((s,x)=>s+x.min,0)-a.at.reduce((s,x)=>s+x.min,0));
   $('cAt').textContent=conAt.reduce((s,x)=>s+x.at.length,0);
-  $('atInfo').textContent=`Entrada de referencia ${DATA.hora_entrada} + ${DATA.tolerancia_min} min de tolerancia (configurable por RRHH). Se cuenta la primera marca del día.`;
+  $('atInfo').textContent=`Se compara la primera marca del día contra el TURNO asignado en Workera (+ ${DATA.tolerancia_min} min de tolerancia). Si el día no tiene turno, se usa la referencia ${DATA.hora_entrada}.`;
   $('tbAt').innerHTML=conAt.length?conAt.map((x,i)=>{
     const tot=x.at.reduce((s,a)=>s+a.min,0);
-    const html=x.at.map(a=>`<span class="dia f">${dl(a.dia)} · llegó ${a.entrada} (+${a.min} min)</span>`).join('');
+    const html=x.at.map(a=>`<span class="dia f">${dl(a.dia)} · turno ${a.ref}${a.conTurno?'':' (ref.)'} · llegó ${a.entrada} (+${a.min} min)</span>`).join('');
     return `<tr class="cli" onclick="togDet('at${i}',${JSON.stringify(html).replace(/"/g,'&quot;')})">
       <td><b>${x.c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${x.c.rut||''}</div></td>
       <td style="text-align:center"><span class="pill p-warn">${x.at.length}</span></td>
