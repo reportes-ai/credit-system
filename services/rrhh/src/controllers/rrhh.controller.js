@@ -171,7 +171,10 @@ const crearVacaciones = async (req, res) => {
     const fd = norm(b.fecha_desde), fh = norm(b.fecha_hasta);
     if (!fd || !fh) return res.status(400).json({ success: false, data: null, error: 'Indica las fechas desde y hasta' });
     if (fh < fd) return res.status(400).json({ success: false, data: null, error: 'La fecha hasta no puede ser anterior a desde' });
-    const dias = diasEntre(fd, fh);
+    // MOTOR ÚNICO rrhh-core.diasHabiles: se guardan los mismos días HÁBILES que
+    // después carga la cuenta corriente (antes se guardaban corridos y el colaborador
+    // veía "10 días" en la solicitud y −8 en su cartola por el mismo rango)
+    const dias = Math.max(1, require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(fd, fh));
     const [r] = await pool.query('INSERT INTO rh_vacaciones (id_usuario, nombre, fecha_desde, fecha_hasta, dias, comentario) VALUES (?,?,?,?,?,?)',
       [u.id_usuario || null, nombreDe(u), fd, fh, dias, norm(b.comentario) || null]);
     // Firma FES del solicitante (misma tabla rh_firmas de contratos/finiquitos)
@@ -187,7 +190,7 @@ const crearVacaciones = async (req, res) => {
     // Flujo: aprueba el SUPERVISOR directo (sin supervisor definido → RRHH)
     const [[sup]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
     const ids = sup?.id_supervisor ? [sup.id_supervisor] : await poolRRHH(u.id_usuario);
-    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones por aprobar', mensaje: `${nombreDe(u)} solicitó ${dias} día(s): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
+    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones por aprobar', mensaje: `${nombreDe(u)} solicitó ${dias} día(s) hábil(es): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: r.insertId, detalle: `Solicitó vacaciones ${fd}→${fh} (${dias}d)` });
     res.status(201).json({ success: true, data: { id: r.insertId, dias }, error: null });
   } catch (e) { console.error('[rrhh crearVacaciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -428,7 +431,7 @@ const listarEmpleados = async (req, res) => {
   try {
     const u = req.usuario || {};
     if (!(await esRRHH(u.id_usuario))) return res.status(403).json({ success: false, data: null, error: 'Solo RRHH/Admin' });
-    const [rows] = await pool.query("SELECT id_usuario, CONCAT_WS(' ', nombre, apellido, apellido_materno) nombre, cargo, fecha_ingreso FROM usuarios WHERE estado='activo' ORDER BY nombre LIMIT 500");
+    const [rows] = await pool.query("SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno) nombre, u.cargo, u.fecha_ingreso FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0 ORDER BY nombre LIMIT 500");
     res.json({ success: true, data: rows, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -446,8 +449,9 @@ async function cumplesEnVentana(tope, soloId) {
   const params = []; let extra = '';
   if (soloId) { extra = ' AND id_usuario=?'; params.push(soloId); }
   const [rows] = await pool.query(
-    `SELECT id_usuario, CONCAT_WS(' ', nombre, apellido) nombre, nombre nombre_pila, sexo, fecha_nacimiento
-       FROM usuarios WHERE fecha_nacimiento IS NOT NULL AND estado='activo'${extra} LIMIT 600`, params);
+    `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.nombre nombre_pila, u.sexo, u.fecha_nacimiento
+       FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario
+      WHERE u.fecha_nacimiento IS NOT NULL AND u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0${extra} LIMIT 600`, params);
   const out = [];
   for (const r of rows) {
     const fn = isoFecha(r.fecha_nacimiento); // YYYY-MM-DD

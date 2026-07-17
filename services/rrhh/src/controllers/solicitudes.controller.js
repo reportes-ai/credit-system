@@ -228,7 +228,7 @@ exports.todas = async (req, res) => {
 
 /* ── EJECUCIÓN al aprobar el último paso — contra los motores existentes ────── */
 const mesProximo = () => { const d = new Date(); const y = d.getFullYear(), m = d.getMonth() + 2; return `${m > 12 ? y + 1 : y}-${String(m > 12 ? m - 12 : m).padStart(2, '0')}`; };
-const cuotaFrancesa = (M, iPct, n) => { const i = iPct / 100; return i > 0 ? Math.round(M * i / (1 - Math.pow(1 + i, -n))) : Math.round(M / n); };
+const { cuotaFrancesa } = require('../../../../api-gateway/public/js/rrhh-core'); // motor único (mismo de Descuentos y su preview)
 
 /* ODP del desembolso (anticipo/préstamo): correlativo del libro central + aviso
    a Tesorería (ordenes_pago_pagar) para que deposite al colaborador. */

@@ -164,7 +164,7 @@ exports.responder = async (req, res) => {
 exports.lista = async (req, res) => {
   try {
     if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
-    const [[act]] = await pool.query(`SELECT COUNT(*) n FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0`);
+    const [[act]] = await pool.query(`SELECT COUNT(*) n FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0`);
     const [encs] = await pool.query(
       `SELECT e.*, (SELECT COUNT(*) FROM rh_enc_participaciones p WHERE p.id_encuesta=e.id) respuestas
          FROM rh_enc_encuestas e ORDER BY e.id DESC LIMIT 200`);
@@ -207,7 +207,7 @@ exports.abrir = async (req, res) => {
     const [[enc]] = await pool.query(`SELECT * FROM rh_enc_encuestas WHERE id=?`, [id]);
     if (!enc) return fail(res, 'No encontrada', 404);
     await pool.query(`UPDATE rh_enc_encuestas SET estado='ABIERTA' WHERE id=?`, [id]);
-    const [us] = await pool.query(`SELECT id_usuario FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0`);
+    const [us] = await pool.query(`SELECT u.id_usuario FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0`);
     notificar(us.map(u => u.id_usuario), {
       tipo: 'RRHH', prioridad: 'media', titulo: `Encuesta: ${enc.titulo}`,
       mensaje: 'Tu opinión es anónima y ayuda a mejorar — respóndela en Encuestas de Clima',
@@ -313,7 +313,8 @@ async function recordarPendientes() {
     if (ya) return;
     const [pend] = await pool.query(
       `SELECT DISTINCT u.id_usuario FROM usuarios u
-        WHERE u.estado='activo' AND COALESCE(u.protegido,0)=0
+        LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario
+        WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0
           AND EXISTS (SELECT 1 FROM rh_enc_encuestas e WHERE e.estado='ABIERTA'
                        AND NOT EXISTS (SELECT 1 FROM rh_enc_participaciones p WHERE p.id_encuesta=e.id AND p.id_usuario=u.id_usuario))`);
     if (!pend.length) return;

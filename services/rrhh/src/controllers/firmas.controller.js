@@ -246,7 +246,7 @@ exports.repositorio = async (req, res) => {
     // catálogos para la pestaña Subir
     const [[t]] = await pool.query(`SELECT valor FROM rh_config WHERE clave='doc_tipos'`);
     const tipos = String(t?.valor || 'CONTRATO,ANEXO,OTRO').split(',').map(s => s.trim()).filter(Boolean);
-    const [emps] = await pool.query(`SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0 ORDER BY nombre`);
+    const [emps] = await pool.query(`SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0 ORDER BY nombre`);
     ok(res, { documentos: docs, tipos, empleados: emps });
   } catch (e) { fail(res, e.message); }
 };

@@ -88,10 +88,11 @@ async function generarDevengos() {
     const [[cfgV]] = await pool.query("SELECT valor FROM rh_config WHERE clave='vac_dias_anuales'");
     const anuales = parseFloat(cfgV?.valor) || 15;
     const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago' }).format(new Date());
+    // Universo canónico (mismo de toda RRHH): no devengar a cuentas técnicas/externos
     const [users] = await pool.query(
       `SELECT u.id_usuario, DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fi, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-        WHERE u.estado='activo' AND u.fecha_ingreso IS NOT NULL`);
+        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 AND u.fecha_ingreso IS NOT NULL`);
     for (const u of users) {
       const [devs] = await pool.query(
         `SELECT tipo, DATE_FORMAT(periodo_desde,'%Y-%m-%d') pd FROM rh_vac_movimientos WHERE id_usuario=? AND tipo IN ('DEVENGO','PROGRESIVO')`, [u.id_usuario]);
@@ -158,11 +159,8 @@ async function registrarTomado(solicitud) {
   try {
     const [[ya]] = await pool.query(`SELECT id FROM rh_vac_movimientos WHERE tipo='TOMADO' AND id_ref=?`, [solicitud.id]);
     if (ya) return;
-    // días hábiles L-V del rango
-    let d = new Date(isoF(solicitud.fecha_desde) + 'T12:00:00');
-    const h = new Date(isoF(solicitud.fecha_hasta) + 'T12:00:00');
-    let habiles = 0;
-    for (; d <= h; d.setDate(d.getDate() + 1)) if (d.getDay() >= 1 && d.getDay() <= 5) habiles++;
+    // días hábiles del rango — motor único rrhh-core (mismo de solicitud y ausencias)
+    const habiles = require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(isoF(solicitud.fecha_desde), isoF(solicitud.fecha_hasta));
     await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, glosa, id_ref)
       VALUES (?,?,?,?,?)`, [solicitud.id_usuario, 'TOMADO', -habiles,
       `Vacaciones ${isoF(solicitud.fecha_desde)} al ${isoF(solicitud.fecha_hasta)} (${habiles} hábiles)`, solicitud.id]);
@@ -233,24 +231,16 @@ async function calcularSaldosEquipo() {
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
         WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
     // Provisión de vacaciones (lo que habría que pagar si la persona se va):
-    // misma matemática del finiquito — días hábiles ×1,4 corridos × (base/30);
-    // base = promedio 3 últimas liquidaciones EMITIDAS o sueldo base ×1,25.
-    const [fichas] = await pool.query(`SELECT id_usuario, sueldo_base FROM rh_fichas`);
-    const sbMap = {}; fichas.forEach(f => sbMap[f.id_usuario] = Number(f.sueldo_base) || 0);
-    const [liqs] = await pool.query(
-      `SELECT id_usuario, total_imponible, mes FROM rh_liquidaciones WHERE estado='EMITIDA' ORDER BY mes DESC`);
-    const baseMap = {};
-    for (const l of liqs) {
-      (baseMap[l.id_usuario] = baseMap[l.id_usuario] || []);
-      if (baseMap[l.id_usuario].length < 3) baseMap[l.id_usuario].push(Number(l.total_imponible));
-    }
+    // motores únicos — base desde base-remuneracion.js y fórmula desde rrhh-core.js
+    // (los mismos que usa el finiquito para el feriado proporcional).
+    const baseDe = await require('../base-remuneracion').remuneracionBaseMapa();
+    const { provisionVacaciones } = require('../../../../api-gateway/public/js/rrhh-core');
     const filas = [];
     let totDias = 0, totProv = 0;
     for (const u of users) {
       const s = await saldoCuenta(u.id_usuario);
-      const bl = baseMap[u.id_usuario];
-      const base = bl?.length ? Math.round(bl.reduce((a, b) => a + b, 0) / bl.length) : Math.round((sbMap[u.id_usuario] || 0) * 1.25);
-      const provision = Math.max(0, Math.round(s.disponibles * 1.4 * base / 30));
+      const base = baseDe(u.id_usuario);
+      const provision = provisionVacaciones(s.disponibles, base);
       totDias += s.disponibles; totProv += provision;
       filas.push({ ...u, ...s, base, provision });
     }

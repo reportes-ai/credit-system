@@ -31,10 +31,9 @@ const meses12 = () => {
 
 exports.resumen = async (req, res) => {
   try {
-    // Universo = el MISMO del Directorio: activos y visibles (excluye cuentas técnicas
-    // y externos marcados con en_directorio=0 en rh_directorio_config)
-    const UNIV = `usuarios u LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario`;
-    const WU = `u.estado='activo' AND COALESCE(dc.en_directorio,1)=1`;
+    // Universo canónico de colaboradores (services/rrhh/src/universo.js) — el MISMO
+    // de la cartola de Vacaciones, Colaboradores y selectores (activo + no_mostrar=0)
+    const { UNIVERSO_FROM: UNIV, UNIVERSO_WHERE: WU } = require('../universo');
     const [
       [act], porSexo, porContrato, porCargo, porCC,
       ingresosMes, egresosMes, vacEquipo,

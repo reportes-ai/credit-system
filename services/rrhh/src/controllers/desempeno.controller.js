@@ -269,7 +269,7 @@ exports.crearCiclo = async (req, res) => {
        Math.min(100, Math.max(0, parseInt(b.peso_competencias) ?? 70)), req.usuario.id_usuario]);
     // Una evaluación por colaborador activo; evaluador = su jefatura directa
     const [usuarios] = await pool.query(
-      `SELECT id_usuario, id_supervisor FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0`);
+      `SELECT u.id_usuario, u.id_supervisor FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0`);
     const sinJefe = [];
     let creadas = 0;
     for (const u of usuarios) {
@@ -512,7 +512,7 @@ exports.auto360 = async (req, res) => {
          FROM rh_des_evaluaciones e JOIN usuarios u ON u.id_usuario=e.id_usuario
         WHERE e.id_ciclo=?`, [idCiclo]);
     const [activos] = await pool.query(
-      `SELECT id_usuario, id_supervisor FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0`);
+      `SELECT u.id_usuario, u.id_supervisor FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0`);
     const [[ciclo]] = await pool.query(`SELECT nombre FROM rh_des_ciclos WHERE id=?`, [idCiclo]);
     let creadas = 0; const avisar = new Set();
     for (const e of evals) {
@@ -537,8 +537,8 @@ exports.auto360 = async (req, res) => {
 exports.usuarios360 = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, cargo
-         FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0 ORDER BY nombre LIMIT 500`);
+      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.cargo
+         FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario WHERE u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0 ORDER BY nombre LIMIT 500`);
     ok(res, { usuarios: rows });
   } catch (e) { fail(res, e.message); }
 };

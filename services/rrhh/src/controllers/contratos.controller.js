@@ -374,16 +374,13 @@ exports.finiquitoCalcular = async (req, res) => {
     if (!u) return fail(res, 'Colaborador no existe', 404);
     const avisos = [];
 
+    // MOTOR ÚNICO base-remuneracion.js (el mismo de la provisión de Vacaciones):
+    // promedio 3 últimas liquidaciones EMITIDAS o sueldo base ×1,25
     const [liqs] = await pool.query(
-      `SELECT total_imponible FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' ORDER BY mes DESC LIMIT 3`, [idU]);
-    let base;
-    if (liqs.length) {
-      base = Math.round(liqs.reduce((s, l) => s + Number(l.total_imponible), 0) / liqs.length);
-      if (liqs.length > 1) avisos.push(`Base = promedio de las últimas ${liqs.length} liquidaciones emitidas (rentas variables).`);
-    } else {
-      base = Math.round((Number(u.sueldo_base) || 0) * 1.25);
-      avisos.push('Sin liquidaciones emitidas: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
-    }
+      `SELECT 1 FROM rh_liquidaciones WHERE id_usuario=? AND estado='EMITIDA' LIMIT 3`, [idU]);
+    const base = await require('../base-remuneracion').remuneracionBase(idU);
+    if (liqs.length > 1) avisos.push(`Base = promedio de las últimas ${liqs.length} liquidaciones emitidas (rentas variables).`);
+    else if (!liqs.length) avisos.push('Sin liquidaciones emitidas: base estimada = sueldo base + 25% de gratificación. Revísala y ajústala.');
     const [[cfgA]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_anos'");
     const [[cfgU]] = await pool.query("SELECT valor FROM rh_config WHERE clave='finiq_tope_uf'");
     const topeAnos = parseInt(cfgA?.valor) || 11, topeUFn = parseFloat(cfgU?.valor) || 90;
@@ -412,7 +409,8 @@ exports.finiquitoCalcular = async (req, res) => {
       vacHabiles = Math.max(0, s.disponibles);
     }
     const vacCorridos = Math.round(vacHabiles * 1.4 * 10) / 10;
-    const vacMonto = Math.round(vacCorridos * base / 30);
+    // MOTOR ÚNICO rrhh-core.provisionVacaciones (misma fórmula de la cartola de Vacaciones)
+    const vacMonto = require('../../../../api-gateway/public/js/rrhh-core').provisionVacaciones(vacHabiles, base);
 
     // Saldo pendiente de anticipos/préstamos: se descuenta del finiquito
     // (cláusula del convenio firmado). Cuotas cobradas = meses transcurridos

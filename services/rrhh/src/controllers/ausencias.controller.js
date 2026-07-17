@@ -67,16 +67,8 @@ require('../../../../shared/migrate').enFila('rrhh-ausencias', async () => {
 });
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
-// Días hábiles L-V entre dos fechas (feriado legal chileno: sábado NO es hábil)
-function diasHabilesLV(desde, hasta) {
-  const a = new Date(desde + 'T12:00:00'), b = new Date(hasta + 'T12:00:00');
-  let n = 0;
-  for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) n++;
-  }
-  return n;
-}
+// Días hábiles L-V — MOTOR ÚNICO rrhh-core (el mismo de vacaciones)
+const diasHabilesLV = (desde, hasta) => require('../../../../api-gateway/public/js/rrhh-core').diasHabiles(desde, hasta);
 async function tiposAusencia() {
   try {
     const [[r]] = await pool.query("SELECT valor FROM rh_config WHERE clave='ausencia_tipos'");

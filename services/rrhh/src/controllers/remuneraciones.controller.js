@@ -253,8 +253,8 @@ require('../../../../shared/migrate').enFila('rrhh-descuentos', async () => {
 
 const mesMas = (mes, n) => { const [y, m] = mes.split('-').map(Number); const d = new Date(y, m - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
 const difMeses = (a, b) => { const [ya, ma] = a.split('-').map(Number), [yb, mb] = b.split('-').map(Number); return (yb - ya) * 12 + (mb - ma); };
-// Cuota francesa (solo capital + interés)
-const cuotaFrancesa = (M, iPct, n) => { const i = iPct / 100; return i > 0 ? Math.round(M * i / (1 - Math.pow(1 + i, -n))) : Math.round(M / n); };
+// Cuota francesa: motor único isomorfo (mismo del preview frontend y de Solicitudes)
+const { cuotaFrancesa } = require('../../../../api-gateway/public/js/rrhh-core');
 const tmcVigente = async () => {
   const [[t]] = await pool.query('SELECT tasa_mensual_menor FROM tasas ORDER BY fecha_desde DESC LIMIT 1').catch(() => [[null]]);
   return t ? parseFloat(t.tasa_mensual_menor) : null;

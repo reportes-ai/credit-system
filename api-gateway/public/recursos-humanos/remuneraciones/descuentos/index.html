@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.1 — anticipos, préstamos al personal (cuota francesa, tope TMC), pagos en exceso y descuentos permanentes -->
+  <!-- v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -104,6 +104,7 @@
 </div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/rrhh-core.js"></script>
 <script>
 const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
@@ -132,7 +133,7 @@ function tipoUI(){
   preview();
 }
 
-const cuotaFr = (M,i,n) => i>0 ? Math.round(M*(i/100)/(1-Math.pow(1+i/100,-n))) : Math.round(M/n);
+const cuotaFr = (M,i,n) => AF_RRHH.cuotaFrancesa(M,i,n); // motor único (rrhh-core.js) — el mismo que graba el backend
 function preview(){
   const t = fTipo.value, M = montoVal(), n = Math.max(1,Number(fCuotas.value)||1);
   const el = document.getElementById('prev');
