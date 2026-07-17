@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.8 -->
+<!-- v2.9 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -62,6 +62,7 @@
     <a href="#p21">21. Denuncia por el Canal de Compliance</a>
     <a href="#p22">22. Encuesta de clima / pulso / eNPS</a>
     <a href="#p23">23. Solicitudes del colaborador (paperless)</a>
+    <a href="#p24">24. Asistencia y jornada (Workera)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -420,6 +421,21 @@
     <li><b>Respaldo contable-tributario</b> — cada desembolso queda con su ODP correlativa única (libro central, nunca se reutiliza un número), el asiento automático a cuentas por cobrar al personal (1105010/1105020, Código Tributario art. 17: contabilidad fidedigna), el snapshot congelado del documento pagado y la pista completa en Auditoría (quién, cuándo, desde qué IP).</li>
     <li><b>Regla transversal</b> — nadie aprueba ni firma su propia solicitud (control de conflicto de interés), y toda decisión queda en la bitácora de Auditoría además de la firma FES.</li>
   </ul>
+
+  <h2 id="p24">24. Asistencia y jornada (Workera)</h2>
+  <div class="paso">
+    <div><b class="lbl">Qué / para qué</b>Controlar la asistencia real del equipo sin digitación: las marcaciones del <b>reloj control Workera</b> (biométrico + app móvil) se consultan por API y se cruzan con lo que el propio sistema sabe (ausencias, vacaciones, jornada) para detectar <b>posibles faltas y atrasos verificados</b> antes de pagar remuneraciones.</div>
+    <div><b class="lbl">Quién</b>RRHH (permisos <code>rh_asistencia</code> y <code>rh_jornada</code>, heredados de Remuneraciones) revisa y configura · los colaboradores solo marcan en Workera · los turnos y el enrolamiento (huella/rostro) se administran en el panel de Workera.</div>
+    <div><b class="lbl">Prerequisitos</b>Credenciales de la API de Workera en Render (<code>WORKERA_API_USER/KEY</code>) · jornada configurada por colaborador (§ paso 1) · turnos asignados en Workera · feriados al día en su mantenedor.</div>
+  </div>
+  <ol>
+    <li><b>Configurar la jornada</b> (RRHH → Jornada): por colaborador se marca <b>Art. 22 CT</b> (excluido de jornada: no marca), <b>40 hrs</b> (Ley 21.561), <b>Especial</b> (horas semanales digitadas, p. ej. part-time) o <b>Externo</b> (sin sujeción a horario). Con eso queda definido <b>quién debe marcar</b> y su jornada normal. Guardado al tildar, con auditoría.</li>
+    <li><b>Revisar el mes</b> (RRHH → Asistencia): la página trae las marcas desde Workera (caché incremental, carga en segundos) y muestra SOLO a quienes deben marcar. Pestañas: <b>Resumen</b> (días con marca / cubiertos / posibles faltas por persona, con detalle al pinchar), <b>No enrolados</b> (deben marcar y no registran marca → llevarlos al reloj), <b>Atrasos</b> (primera marca del día vs el <b>turno real asignado en Workera</b> + tolerancia paramétrica; total y minutos acumulados por persona con detalle) y <b>Ausencias</b> (posibles faltas por persona con su detalle).</li>
+    <li><b>Verificar antes de descontar</b>: una "posible falta" es un día hábil sin marca y sin ausencia/vacación aprobada que lo cubra — se confirma con la persona y, si corresponde, se registra la ausencia (§ ausencias) o se descuenta en Remuneraciones.</li>
+    <li><b>Espejo automático hacia Workera</b>: al aprobarse una vacación (§17), ingresar una licencia o aprobarse un permiso, el sistema crea la <b>salida especial equivalente en Workera</b> (los reportes del reloj dejan de mostrar inasistencia esos días). Requiere que el tipo tenga código en el panel de Workera (mapeo paramétrico en <code>rh_config</code>); las injustificadas no se espejan.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">MARCA EN WORKERA</span><span class="ar">→</span><span class="st">SYNC API (caché)</span><span class="ar">→</span><span class="st">CRUCE jornada + ausencias + vacaciones + feriados</span><span class="ar">→</span><span class="st">POSIBLES FALTAS / ATRASOS</span><span class="ar">→</span><span class="st fin">VERIFICACIÓN RRHH → REMUNERACIONES</span></div>
+  <div class="afecta"><b>Afecta:</b> Remuneraciones (verificación de días antes de emitir, §12), reportes de asistencia de Workera (espejo de permisos). <b>Depende de:</b> API Workera (credenciales + turnos + enrolamiento), Jornada (quién marca), Ausencias y Vacaciones aprobadas (§17), mantenedor de Feriados, universo del Directorio.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
