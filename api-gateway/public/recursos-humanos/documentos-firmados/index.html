@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Documentos Firmados — RRHH</title>
-  <!-- v1.0 — repositorio central FES: pestañas por tipo, buscador, subida de firmados en papel -->
+  <!-- v1.1 — pestañas fijas por tipo (visibles aunque no haya documentos) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -71,19 +71,20 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 const H={Authorization:'Bearer '+TK}, HJ={...H,'Content-Type':'application/json'};
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 const fd=s=>s?new Date(String(s).slice(0,10)+'T12:00:00').toLocaleDateString('es-CL'):'—';
-let DOCS=[], TAB='TODOS', FILE=null;
+let DOCS=[], TAB='TODOS', FILE=null, TIPOS_CAT=[];
 
 async function cargar(){
   const j=await (await fetch('/api/rrhh/firmas/repositorio',{headers:H})).json();
   if(!j.success){ document.getElementById('tb').innerHTML=`<tr><td colspan="7" class="empty">${esc(j.error)}</td></tr>`; return; }
-  DOCS=j.data.documentos||[];
+  DOCS=j.data.documentos||[]; TIPOS_CAT=j.data.tipos||[];
   document.getElementById('sEmp').innerHTML=(j.data.empleados||[]).map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)}</option>`).join('');
   document.getElementById('sTipo').innerHTML=(j.data.tipos||[]).map(t=>`<option>${esc(t)}</option>`).join('');
   document.getElementById('sFecha').value=new Date().toISOString().slice(0,10);
   pintarTabs(); pintar();
 }
 function pintarTabs(){
-  const tipos=['TODOS',...new Set(DOCS.map(d=>d.tipo))];
+  // pestañas fijas (tipos FES del sistema + catálogo doc_tipos) + los que traigan documentos
+  const tipos=['TODOS',...new Set(['CONTRATO','FINIQUITO','VACACIONES','SOLICITUD','ANEXO',...TIPOS_CAT,...DOCS.map(d=>d.tipo)])];
   document.getElementById('tabs').innerHTML=tipos.map(t=>{
     const n=t==='TODOS'?DOCS.length:DOCS.filter(d=>d.tipo===t).length;
     return `<div class="tab ${TAB===t?'active':''}" onclick="setTab('${t}')">${t==='TODOS'?'<i class=\'bi bi-collection me-1\'></i>Todos':esc(t)}<span class="n">${n}</span></div>`;
