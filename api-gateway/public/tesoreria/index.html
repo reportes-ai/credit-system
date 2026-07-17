@@ -161,7 +161,8 @@
         const seg = f.href.replace('/tesoreria/', '').replace(/\//g, '');
         const sec = sectionOf(KEY[seg]);
         if (sec && sec !== 'tesoreria') return null; // fue movido a otra sección
-        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: '' };
+        const desc = (typeof PLACEMENT_DESCS !== 'undefined' && (PLACEMENT_DESCS[KEY[seg]] || PLACEMENT_DESCS[seg])) || '';
+        return { id: seg || f.codigo, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc };
       }).filter(Boolean);
 
       // Extras de otras secciones movidos aquí via placement (sub-ítems del manifiesto)
