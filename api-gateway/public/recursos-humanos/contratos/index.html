@@ -56,6 +56,7 @@
     <button id="tCargos" onclick="verTab('cargos')"><i class="bi bi-person-badge me-1"></i>Cargos y descripciones</button>
     <button id="tBenef" onclick="verTab('benef')"><i class="bi bi-gift me-1"></i>Catálogo de beneficios</button>
     <button id="tFiniq" onclick="verTab('finiq')"><i class="bi bi-door-open me-1"></i>Finiquitos</button>
+    <button id="tOnb" onclick="verTab('onb')"><i class="bi bi-person-check me-1"></i>Onboarding</button>
   </div>
 
   <div class="panel" id="pCartas">
@@ -99,6 +100,18 @@
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0">
     <b>Finiquitos guardados</b>
     <table style="margin-top:8px"><thead><tr><th>Trabajador</th><th>Causal</th><th>Término</th><th>Total</th><th></th></tr></thead><tbody id="tbFiniq"></tbody></table>
+  </div>
+
+  <div class="panel" id="pOnb" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <b>Onboarding / Offboarding</b>
+      <div style="display:flex;gap:8px">
+        <button class="btn-g" onclick="onbNuevoManual()">+ Proceso manual</button>
+        <button class="btn-g" onclick="onbVerPlantilla()"><i class="bi bi-list-check"></i> Plantilla de tareas</button>
+      </div>
+    </div>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 10px">Se crean solos: al <b>Contratar</b> desde una carta aceptada (onboarding, plazos desde el ingreso) y al <b>guardar un finiquito</b> (offboarding, desde el término). Tareas vencidas → recordatorio semanal a RRHH.</p>
+    <div id="onbLista"></div>
   </div>
 
   <div class="panel" style="background:#f8fafc;border-left:4px solid var(--navy)">
@@ -155,11 +168,87 @@ async function cargarTodo(){
   pintar();
 }
 function verTab(t){
-  ['cartas','contratos','cargos','benef','finiq'].forEach(k=>{
+  ['cartas','contratos','cargos','benef','finiq','onb'].forEach(k=>{
     $('p'+k[0].toUpperCase()+k.slice(1)).style.display = k===t?'block':'none';
     $('t'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on', k===t);
   });
   if (t==='finiq' && !FQ_INIT) fqInit();
+  if (t==='onb') onbCargar();
+}
+
+/* ── onboarding / offboarding ── */
+async function onbCargar(){
+  const j = await (await fetch('/api/rrhh/onboarding',{headers:H})).json();
+  if (!j.success) return $('onbLista').innerHTML = '<p style="color:#b91c1c">'+esc(j.error)+'</p>';
+  const fmtD = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '';
+  $('onbLista').innerHTML = (j.data.procesos||[]).map(p=>{
+    const done = p.items.filter(i=>i.ok).length, tot = p.items.length;
+    const pct = tot ? Math.round(done/tot*100) : 0;
+    return `<div style="border:1.5px solid ${p.estado==='CERRADO'?'#bbf7d0':'#e2e8f0'};border-radius:12px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
+        <span class="chip" style="background:${p.tipo==='ONBOARDING'?'#dbeafe':'#fee2e2'};color:${p.tipo==='ONBOARDING'?'#1d4ed8':'#b91c1c'}">${p.tipo}</span>
+        <b>${esc(p.persona)}</b><span style="color:#94a3b8;font-size:.78rem">${esc(p.rut||'')} · base ${fmtD(p.fecha_base)}</span>
+        <div style="flex:1;min-width:120px;background:#f1f5f9;border-radius:99px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${pct===100?'#16a34a':'#0141A2'}"></div></div>
+        <span style="font-weight:800;font-size:.82rem">${done}/${tot}</span>
+        ${p.estado==='CERRADO'?'<span class="chip" style="background:#dcfce7;color:#15803d">CERRADO ✓</span>':''}
+      </div>
+      <div style="display:${p.estado==='CERRADO'?'none':'block'};margin-top:10px">
+        ${p.items.map(i=>`<div style="display:flex;align-items:center;gap:9px;padding:5px 4px;border-bottom:1px solid #f1f5f9;font-size:.86rem">
+          <input type="checkbox" ${i.ok?'checked':''} onchange="onbMarcar(${i.id},this.checked)" style="width:17px;height:17px">
+          <span style="flex:1;${i.ok?'text-decoration:line-through;color:#94a3b8':''}">${esc(i.tarea)}</span>
+          <span style="color:#64748b;font-size:.74rem">${esc(i.responsable||'')}</span>
+          <span style="font-size:.74rem;font-weight:700;color:${i.vencido?'#dc2626':'#94a3b8'}">${fmtD(i.fecha_limite)}${i.vencido?' ⚠':''}</span>
+          ${i.ok?`<span style="font-size:.68rem;color:#16a34a" title="${esc(i.ok_por||'')}">✓</span>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('') || '<p style="color:#94a3b8;text-align:center;padding:20px">Sin procesos. Se crean solos al Contratar o al guardar un finiquito — o con "+ Proceso manual".</p>';
+}
+async function onbMarcar(id, ok){
+  const j = await (await fetch('/api/rrhh/onboarding/items/'+id,{method:'PUT',headers:HJ,body:JSON.stringify({ok})})).json();
+  if (!j.success) return alert(j.error);
+  if (j.data.cerrado) alert('🎉 ¡Proceso completado!');
+  onbCargar();
+}
+async function onbNuevoManual(){
+  const persona = prompt('Nombre de la persona:'); if (!persona) return;
+  const tipo = confirm('¿Es ONBOARDING (ingreso)?\nAceptar = Onboarding · Cancelar = Offboarding') ? 'ONBOARDING' : 'OFFBOARDING';
+  const fecha = prompt('Fecha base (YYYY-MM-DD):', new Date().toISOString().slice(0,10)); if (!fecha) return;
+  const j = await (await fetch('/api/rrhh/onboarding',{method:'POST',headers:HJ,body:JSON.stringify({persona,tipo,fecha_base:fecha})})).json();
+  if (!j.success) return alert(j.error);
+  onbCargar();
+}
+async function onbVerPlantilla(){
+  const j = await (await fetch('/api/rrhh/onboarding/plantilla',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  const filas = (j.data.plantilla||[]).map(p=>`<tr>
+    <td style="padding:4px 6px"><span class="chip" style="background:${p.tipo==='ONBOARDING'?'#dbeafe':'#fee2e2'};color:${p.tipo==='ONBOARDING'?'#1d4ed8':'#b91c1c'};font-size:.66rem">${p.tipo[0]}${p.tipo==='ONBOARDING'?'N':'FF'}</span></td>
+    <td style="padding:4px 6px;font-size:.84rem">${esc(p.tarea)}</td>
+    <td style="padding:4px 6px;font-size:.8rem;color:#64748b">${esc(p.responsable||'')}</td>
+    <td style="padding:4px 6px;text-align:right">${p.dias_plazo}d</td>
+    <td><button class="btn-mini" onclick="onbEditarTarea(${p.id},'${esc(p.tarea).replace(/'/g,'')}','${esc(p.responsable||'')}',${p.dias_plazo})"><i class="bi bi-pencil"></i></button></td></tr>`).join('');
+  $('dlgVerBody').innerHTML = `<h5 style="color:var(--navy)">Plantilla de tareas</h5>
+    <p style="font-size:.78rem;color:#64748b">Los cambios aplican a los procesos NUEVOS. Plazo = días corridos desde la fecha base.</p>
+    <div style="max-height:380px;overflow:auto"><table>${filas}</table></div>
+    <div class="pie"><button class="btn-g" onclick="onbNuevaTarea()">+ Tarea</button><button class="btn" onclick="dlgVer.close()">Cerrar</button></div>`;
+  dlgVer.showModal();
+}
+async function onbEditarTarea(id, tarea, resp, dias){
+  const t = prompt('Tarea (vacío = desactivar):', tarea); if (t===null) return;
+  if (!t.trim()){ if(confirm('¿Desactivar esta tarea de la plantilla?')) await fetch('/api/rrhh/onboarding/plantilla',{method:'POST',headers:HJ,body:JSON.stringify({id,eliminar:true})}); }
+  else {
+    const r = prompt('Responsable:', resp)||''; const d = prompt('Días de plazo:', dias)||0;
+    await fetch('/api/rrhh/onboarding/plantilla',{method:'POST',headers:HJ,body:JSON.stringify({id,tarea:t,responsable:r,dias_plazo:d,orden:0})});
+  }
+  dlgVer.close(); onbVerPlantilla();
+}
+async function onbNuevaTarea(){
+  const tipo = confirm('¿Tarea de ONBOARDING?\nAceptar = Onboarding · Cancelar = Offboarding') ? 'ONBOARDING' : 'OFFBOARDING';
+  const t = prompt('Tarea:'); if (!t) return;
+  const r = prompt('Responsable (RRHH / TI / Jefatura / Tesorería…):')||'';
+  const d = prompt('Días de plazo desde la fecha base:', '0')||0;
+  await fetch('/api/rrhh/onboarding/plantilla',{method:'POST',headers:HJ,body:JSON.stringify({tipo,tarea:t,responsable:r,dias_plazo:d})});
+  dlgVer.close(); onbVerPlantilla();
 }
 
 /* ── finiquitos ── */

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 -->
+<!-- v1.3 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -267,7 +267,7 @@
     <li><b>Carta oferta</b> (RRHH → Contratos y Cartas Oferta): candidato, cargo, sueldo, beneficios por checkbox (+ otros libres) → Emitir → imprimir/enviar.</li>
     <li><b>Respuesta del candidato:</b> marcar Aceptada o Rechazada.</li>
     <li><b>Contratar</b> (solo con carta ACEPTADA): genera el contrato con la descripción de cargo y las cláusulas de lo ofertado → imprimir y firmar.</li>
-    <li><b>Alta</b>: crear el usuario (Usuarios) y completar la ficha (Colaboradores) — los campos con * son los que exige Previred.</li>
+    <li><b>Alta</b>: al Contratar se crea solo el <b>checklist de onboarding</b> (pestaña Onboarding: usuario, correo, Workera, Edenred, credencial, ficha Previred, inducción) con responsables y plazos; crear el usuario (Usuarios) y completar la ficha (Colaboradores) — los campos con * son los que exige Previred.</li>
   </ol>
   <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">EMITIDA</span><span class="ar">→</span><span class="st">ACEPTADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span><span class="ar">→</span><span class="st fin">CONTRATADA</span></div>
   <div class="afecta"><b>Afecta:</b> ficha del colaborador, remuneraciones (sueldo/beneficios), onboarding. <b>Depende de:</b> catálogo de cargos con descripción, catálogo de beneficios.</div>
@@ -282,7 +282,7 @@
     <li><b>Calcular</b> (RRHH → Contratos y Cartas Oferta → Finiquitos): colaborador + causal + fecha de término → el motor propone indemnización por años (topes 11 años / 90 UF), mes de aviso y feriado proporcional (desde la cuenta corriente de vacaciones).</li>
     <li><b>Ajustar</b>: cada monto es editable; se agregan otros haberes y se descuentan anticipos/préstamos pendientes (módulo Descuentos).</li>
     <li><b>Guardar e imprimir</b>: el documento cita la causal y el detalle; se ratifica ante notario o inspección del trabajo.</li>
-    <li><b>Cierre administrativo</b>: suspender el usuario (Usuarios), pagar el finiquito (Tesorería) y archivar en la carpeta digital.</li>
+    <li><b>Cierre administrativo</b>: al guardar el finiquito se crea solo el <b>checklist de offboarding</b> (equipos, suspender usuario, bajas Workera/Edenred, pago, archivo) y el asiento contable FINIQUITO_EMITIDO; los saldos de préstamos vienen precargados en el cálculo.</li>
   </ol>
   <div class="flujo"><span class="st ini">CÁLCULO</span><span class="ar">→</span><span class="st">AJUSTE RRHH</span><span class="ar">→</span><span class="st">GUARDADO</span><span class="ar">→</span><span class="st fin">RATIFICADO Y PAGADO</span></div>
   <div class="afecta"><b>Afecta:</b> remuneraciones (sale del libro), Previred/LRE (retiro), contabilidad. <b>Depende de:</b> contratación (§15), cuenta de vacaciones, liquidaciones (§12). Si hubo ausencias art. 160 N°3, el sistema ya avisó por correo a RRHH y supervisor.</div>

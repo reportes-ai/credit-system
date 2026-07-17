@@ -281,6 +281,10 @@ exports.contratarDesdeCarta = async (req, res) => {
       SELECT id, candidato, rut, id_cargo, sueldo_base, fecha_ingreso, tipo_contrato, jornada, beneficios, otros, ?
         FROM rh_cartas_oferta WHERE id=?`, [req.usuario.id_usuario, id]);
     await pool.query(`UPDATE rh_cartas_oferta SET estado='CONTRATADA' WHERE id=?`, [id]);
+    // Onboarding automático desde la fecha de ingreso (o hoy)
+    try { await crearProceso({ tipo: 'ONBOARDING', persona: c.candidato, rut: c.rut, id_ref: r.insertId,
+      fecha_base: c.fecha_ingreso ? String(c.fecha_ingreso).slice(0, 10) : new Date().toISOString().slice(0, 10),
+      creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[onb auto]', e.message); }
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_contrato', entidad_id: r.insertId, detalle: `Contrato desde carta oferta #${id} (${c.candidato})` });
     ok(res, { id: r.insertId });
   } catch (e) { fail(res, e.message); }
@@ -466,6 +470,9 @@ exports.finiquitoGuardar = async (req, res) => {
         });
       } catch (e) { console.error('[finiquito asiento]', e.message); }
     }
+    // Offboarding automático desde la fecha de término
+    try { await crearProceso({ tipo: 'OFFBOARDING', persona: b.trabajador, rut: b.rut, id_usuario: idU,
+      id_ref: r.insertId, fecha_base: b.fecha_termino, creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[offb auto]', e.message); }
     ok(res, { id: r.insertId, total });
   } catch (e) { fail(res, e.message); }
 };
@@ -476,3 +483,182 @@ exports.finiquitoLista = async (req, res) => {
     ok(res, { finiquitos: rows });
   } catch (e) { fail(res, e.message); }
 };
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   ONBOARDING / OFFBOARDING (anti-Buk #4) — checklist automático del ciclo:
+   · Al CONTRATAR (contrato desde carta aceptada) se crea el proceso ONBOARDING
+     con las tareas de la plantilla paramétrica (responsable + plazo en días
+     desde el ingreso).
+   · Al GUARDAR un finiquito se crea el OFFBOARDING (plazos desde el término).
+   · Recordatorio semanal por campana a RRHH con las tareas vencidas.
+   ───────────────────────────────────────────────────────────────────────────── */
+require('../../../../shared/migrate').enFila('rrhh-onboarding', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_onb_plantilla (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(12) NOT NULL,
+    orden INT DEFAULT 0,
+    tarea VARCHAR(250) NOT NULL,
+    responsable VARCHAR(80) NULL,
+    dias_plazo INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_onb_procesos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(12) NOT NULL,
+    persona VARCHAR(160) NOT NULL,
+    rut VARCHAR(15) NULL,
+    id_usuario INT NULL,
+    id_ref INT NULL,
+    fecha_base DATE NOT NULL,
+    estado VARCHAR(12) DEFAULT 'ABIERTO',
+    creado_por INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_onb_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_proceso INT NOT NULL,
+    orden INT DEFAULT 0,
+    tarea VARCHAR(250) NOT NULL,
+    responsable VARCHAR(80) NULL,
+    fecha_limite DATE NULL,
+    ok TINYINT(1) DEFAULT 0,
+    ok_por VARCHAR(160) NULL,
+    ok_at DATETIME NULL,
+    INDEX idx_proc (id_proceso)
+  )`);
+  const [[n]] = await pool.query('SELECT COUNT(*) n FROM rh_onb_plantilla');
+  if (!n.n) {
+    const ON = [
+      ['Contrato firmado y archivado en la carpeta digital', 'RRHH', 0],
+      ['Usuario creado en el Business Suite con su perfil', 'Administrador', 0],
+      ['Correo corporativo creado', 'TI', 0],
+      ['Presentación del nuevo integrante en Facilbook', 'RRHH', 1],
+      ['Alta en Workera (reloj control)', 'RRHH', 2],
+      ['Tarjeta Edenred solicitada', 'RRHH', 3],
+      ['Credencial corporativa con foto', 'RRHH', 3],
+      ['Ficha completa: AFP, salud, cargas, datos Previred (campos *)', 'RRHH', 5],
+      ['Inducción: jugar ¿Qué Dice AutoFácil? con la jefatura', 'Jefatura', 7],
+      ['Reunión de feedback primera semana', 'Jefatura', 7],
+    ];
+    const OFF = [
+      ['Notificación de la causal / carta de aviso entregada', 'RRHH', 0],
+      ['Devolución de equipos, llaves y credencial', 'TI', 0],
+      ['Usuario del Suite suspendido', 'Administrador', 0],
+      ['Baja en Workera y Edenred', 'RRHH', 1],
+      ['Finiquito calculado, firmado y ratificado', 'RRHH', 10],
+      ['Finiquito pagado', 'Tesorería', 10],
+      ['Convenios de préstamo saldados en el finiquito', 'RRHH', 10],
+      ['Carpeta digital archivada (contrato, anexos, finiquito)', 'RRHH', 15],
+    ];
+    let i = 0;
+    for (const [t, r, d] of ON) await pool.query('INSERT INTO rh_onb_plantilla (tipo, orden, tarea, responsable, dias_plazo) VALUES (?,?,?,?,?)', ['ONBOARDING', i++, t, r, d]);
+    i = 0;
+    for (const [t, r, d] of OFF) await pool.query('INSERT INTO rh_onb_plantilla (tipo, orden, tarea, responsable, dias_plazo) VALUES (?,?,?,?,?)', ['OFFBOARDING', i++, t, r, d]);
+    console.log('✓ onboarding: plantillas sembradas');
+  }
+});
+
+async function crearProceso({ tipo, persona, rut, id_usuario, id_ref, fecha_base, creado_por }) {
+  if (id_ref) {
+    const [[ya]] = await pool.query('SELECT id FROM rh_onb_procesos WHERE tipo=? AND id_ref=?', [tipo, id_ref]);
+    if (ya) return ya.id;
+  }
+  const [r] = await pool.query(
+    `INSERT INTO rh_onb_procesos (tipo, persona, rut, id_usuario, id_ref, fecha_base, creado_por) VALUES (?,?,?,?,?,?,?)`,
+    [tipo, persona, rut || null, id_usuario || null, id_ref || null, fecha_base, creado_por || null]);
+  const [plan] = await pool.query('SELECT * FROM rh_onb_plantilla WHERE tipo=? AND activo=1 ORDER BY orden', [tipo]);
+  for (const p of plan) {
+    const fl = new Date(fecha_base + 'T12:00:00'); fl.setDate(fl.getDate() + (Number(p.dias_plazo) || 0));
+    await pool.query('INSERT INTO rh_onb_items (id_proceso, orden, tarea, responsable, fecha_limite) VALUES (?,?,?,?,?)',
+      [r.insertId, p.orden, p.tarea, p.responsable, fl.toISOString().slice(0, 10)]);
+  }
+  return r.insertId;
+}
+exports._crearProcesoOnb = crearProceso;
+
+exports.onbLista = async (req, res) => {
+  try {
+    const [procesos] = await pool.query(`SELECT * FROM rh_onb_procesos ORDER BY estado='ABIERTO' DESC, id DESC LIMIT 100`);
+    const ids = procesos.map(p => p.id);
+    const [items] = ids.length ? await pool.query(`SELECT * FROM rh_onb_items WHERE id_proceso IN (?) ORDER BY orden`, [ids]) : [[]];
+    const hoy = new Date().toISOString().slice(0, 10);
+    ok(res, { procesos: procesos.map(p => ({
+      ...p,
+      items: items.filter(i => i.id_proceso === p.id).map(i => ({ ...i, vencido: !i.ok && i.fecha_limite && String(i.fecha_limite).slice(0, 10) < hoy })),
+    })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.onbCrearManual = async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (!String(b.persona || '').trim() || !b.fecha_base || !['ONBOARDING', 'OFFBOARDING'].includes(b.tipo))
+      return fail(res, 'Faltan persona, tipo o fecha', 400);
+    const id = await crearProceso({ tipo: b.tipo, persona: String(b.persona).trim().slice(0, 160), rut: b.rut,
+      id_usuario: parseInt(b.id_usuario) || null, id_ref: null, fecha_base: b.fecha_base, creado_por: req.usuario.id_usuario });
+    ok(res, { id });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.onbMarcar = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const okFlag = req.body?.ok !== false;
+    await pool.query('UPDATE rh_onb_items SET ok=?, ok_por=?, ok_at=? WHERE id=?',
+      [okFlag ? 1 : 0, okFlag ? `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim() : null, okFlag ? new Date() : null, id]);
+    const [[it]] = await pool.query('SELECT id_proceso FROM rh_onb_items WHERE id=?', [id]);
+    const [[pend]] = await pool.query('SELECT COUNT(*) n FROM rh_onb_items WHERE id_proceso=? AND ok=0', [it.id_proceso]);
+    await pool.query('UPDATE rh_onb_procesos SET estado=? WHERE id=?', [pend.n ? 'ABIERTO' : 'CERRADO', it.id_proceso]);
+    ok(res, { ok: okFlag, cerrado: !pend.n });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.onbPlantilla = async (req, res) => {
+  try {
+    const [items] = await pool.query('SELECT * FROM rh_onb_plantilla WHERE activo=1 ORDER BY tipo, orden');
+    ok(res, { plantilla: items });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.onbPlantillaGuardar = async (req, res) => {
+  try {
+    const b = req.body || {};
+    if (parseInt(b.id)) {
+      if (b.eliminar) await pool.query('UPDATE rh_onb_plantilla SET activo=0 WHERE id=?', [parseInt(b.id)]);
+      else await pool.query('UPDATE rh_onb_plantilla SET tarea=?, responsable=?, dias_plazo=?, orden=? WHERE id=?',
+        [String(b.tarea || '').slice(0, 250), String(b.responsable || '').slice(0, 80), parseInt(b.dias_plazo) || 0, parseInt(b.orden) || 0, parseInt(b.id)]);
+    } else {
+      if (!String(b.tarea || '').trim()) return fail(res, 'Falta la tarea', 400);
+      await pool.query('INSERT INTO rh_onb_plantilla (tipo, orden, tarea, responsable, dias_plazo) VALUES (?,?,?,?,?)',
+        [b.tipo === 'OFFBOARDING' ? 'OFFBOARDING' : 'ONBOARDING', parseInt(b.orden) || 99, String(b.tarea).slice(0, 250), String(b.responsable || '').slice(0, 80), parseInt(b.dias_plazo) || 0]);
+    }
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Recordatorio semanal: tareas vencidas de procesos abiertos → campana RRHH */
+async function alegarOnbVencidos() {
+  try {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const [venc] = await pool.query(
+      `SELECT p.persona, p.tipo, COUNT(*) n FROM rh_onb_items i JOIN rh_onb_procesos p ON p.id=i.id_proceso
+        WHERE p.estado='ABIERTO' AND i.ok=0 AND i.fecha_limite < ? GROUP BY p.id, p.persona, p.tipo LIMIT 10`, [hoy]);
+    if (!venc.length) return;
+    const _clave = 'onb_vencidos_' + _w(new Date());
+    const [[_ya]] = await pool.query('SELECT 1 ok FROM notificaciones WHERE clave=? LIMIT 1', [_clave]);
+    if (_ya) return;
+    const [rr] = await pool.query(
+      `SELECT DISTINCT u.id_usuario FROM usuarios u
+        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+        JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+       WHERE f.codigo='rh_colaboradores' AND u.estado='activo'`);
+    notificar(rr.map(x => x.id_usuario), {
+      tipo: 'RRHH', prioridad: 'alta',
+      titulo: 'Tareas de onboarding/offboarding vencidas',
+      mensaje: venc.map(v => `${v.persona} (${v.tipo.toLowerCase()}): ${v.n} tarea(s) atrasada(s)`).join(' · '),
+      href: '/recursos-humanos/contratos/', clave: _clave,
+    });
+  } catch (e) { console.error('[alegato onb]', e.message); }
+}
+setTimeout(alegarOnbVencidos, 160 * 1000);
+setInterval(alegarOnbVencidos, 24 * 60 * 60 * 1000);

@@ -48,6 +48,11 @@ router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos',
 router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);
 router.post('/finiquitos',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoGuardar);
 router.get('/finiquitos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoLista);
+router.get('/onboarding',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbLista);
+router.post('/onboarding',             verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbCrearManual);
+router.put('/onboarding/items/:id',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbMarcar);
+router.get('/onboarding/plantilla',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantilla);
+router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantillaGuardar);
 const vc = require('../controllers/vac-cuenta.controller');
 router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
 router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);
