@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores RRHH — AutoFácil</title>
-  <!-- v1.1 — universo = Directorio (en_directorio=1) + línea de stock de dotación mensual -->
+  <!-- v1.2 — vacaciones y provisión desde el motor único de la cartola (calcularSaldosEquipo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -106,14 +106,14 @@ function hbars(el, rows){ const max=Math.max(1,...rows.map(r=>Number(r.n)));
     <div class="kpi"><div class="l">Dotación activa</div><div class="v">${fmt(d.dotacion)}</div><div class="s">${d.porSexo.map(x=>`${x.k}: ${x.n}`).join(' · ')}</div></div>
     <div class="kpi"><div class="l">Rotación anual</div><div class="v">${fmt1(d.rotacion)}%</div><div class="s">${fmt(d.egresos12)} egreso(s) en 12 meses</div></div>
     <div class="kpi"><div class="l">Antigüedad promedio</div><div class="v">${antA}</div><div class="s">edad promedio ${d.edad_promedio!=null?fmt1(d.edad_promedio)+' años':'—'}</div></div>
-    <div class="kpi"><div class="l">Saldo vacaciones</div><div class="v">${fmt1(d.vacaciones.saldo_total)} d</div><div class="s">pasivo estimado $${fmt(d.vacaciones.pasivo)}</div></div>
+    <div class="kpi"><div class="l">Saldo vacaciones</div><div class="v">${fmt1(d.vacaciones.saldo_total)} d</div><div class="s">provisión $${fmt(d.vacaciones.pasivo)} (motor cartola)</div></div>
     <div class="kpi"><div class="l">Contratos</div><div class="v">${fmt((d.porContrato[0]||{}).n||0)}</div><div class="s">${d.porContrato.map(x=>`${x.k}: ${x.n}`).join(' · ')}</div></div>`;
   comboIE($('chIE'), d.ingresos, d.egresos, d.stock||[]);
   barras($('chAus'), d.ausentismo.map(x=>({m:x.m, vals:[x.licencias, x.otros]})), ['','c']);
   hbars($('chCC'), d.porCC); hbars($('chCargo'), d.porCargo);
   $('vac').innerHTML = (d.vacaciones.top||[]).length
     ? '<table class="mini"><tr><th>Mayor saldo acumulado</th><th style="text-align:right">Días</th></tr>'+d.vacaciones.top.map(t=>`<tr><td>${t.nombre}</td><td style="text-align:right;font-weight:700">${fmt1(t.dias)}</td></tr>`).join('')+`</table>
-       <div class="leyenda" style="margin-top:10px">Pasivo total estimado (saldo × sueldo base ÷ 30): <b style="color:var(--navy-dark)">$${fmt(d.vacaciones.pasivo)}</b></div>`
+       <div class="leyenda" style="margin-top:10px">Provisión total (mismo motor de la cartola de Vacaciones: días hábiles ×1,4 corridos × remuneración diaria): <b style="color:var(--navy-dark)">$${fmt(d.vacaciones.pasivo)}</b></div>`
     : '<div class="empty">Sin saldos positivos.</div>';
   $('chLiq').innerHTML = (d.planilla||[]).length
     ? '<table class="mini"><tr><th>Mes</th><th style="text-align:right">Total haberes</th><th style="text-align:right">Líquido</th><th style="text-align:right">Liq.</th></tr>'+

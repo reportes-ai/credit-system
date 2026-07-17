@@ -37,7 +37,7 @@ exports.resumen = async (req, res) => {
     const WU = `u.estado='activo' AND COALESCE(dc.en_directorio,1)=1`;
     const [
       [act], porSexo, porContrato, porCargo, porCC,
-      ingresosMes, egresosMes, [vacSaldos], topVac,
+      ingresosMes, egresosMes, vacEquipo,
       ausMes, liqMes, solTipo, edadesAnt,
     ] = await Promise.all([
       pool.query(`SELECT COUNT(*) n FROM ${UNIV} WHERE ${WU}`).then(r => r[0]),
@@ -47,18 +47,10 @@ exports.resumen = async (req, res) => {
       pool.query(`SELECT COALESCE(NULLIF(u.centro_costo,''),'(sin área)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k ORDER BY n DESC`).then(r => r[0]),
       pool.query(`SELECT DATE_FORMAT(u.fecha_ingreso,'%Y-%m') m, COUNT(*) n FROM ${UNIV} WHERE ${WU} AND u.fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
       pool.query(`SELECT DATE_FORMAT(fecha_termino,'%Y-%m') m, COUNT(*) n FROM rh_finiquitos WHERE fecha_termino >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
-      pool.query(`SELECT COALESCE(SUM(v.dias),0) saldo_total,
-                         COALESCE(SUM(GREATEST(v.dias,0) * COALESCE(f.sueldo_base,0) / 30),0) pasivo
-                    FROM (SELECT id_usuario, SUM(dias) dias FROM rh_vac_movimientos GROUP BY id_usuario) v
-                    JOIN usuarios u ON u.id_usuario=v.id_usuario
-                    LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario
-                    LEFT JOIN rh_fichas f ON f.id_usuario=v.id_usuario
-                   WHERE ${WU}`).then(r => r[0]),
-      pool.query(`SELECT MAX(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, SUM(v.dias) dias
-                    FROM rh_vac_movimientos v
-                    JOIN usuarios u ON u.id_usuario=v.id_usuario
-                    LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario
-                   WHERE ${WU} GROUP BY v.id_usuario HAVING dias > 0 ORDER BY dias DESC LIMIT 5`).then(r => r[0]),
+      // Máxima 1 (un solo motor): saldo disponible y provisión vienen del MISMO motor
+      // de la cartola de Vacaciones (saldo períodos cumplidos + proporcional en curso;
+      // provisión = días hábiles ×1,4 corridos × remuneración diaria, matemática del finiquito)
+      require('./vac-cuenta.controller').calcularSaldosEquipo(),
       pool.query(`SELECT DATE_FORMAT(fecha_desde,'%Y-%m') m, tipo, SUM(COALESCE(dias_habiles, DATEDIFF(fecha_hasta, fecha_desde)+1)) d
                     FROM rh_ausencias WHERE estado IN ('APROBADA','REGISTRADA') AND fecha_desde >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
                    GROUP BY m, tipo`).then(r => r[0]),
@@ -95,7 +87,12 @@ exports.resumen = async (req, res) => {
       edad_promedio: edadesAnt?.edad != null ? Math.round(Number(edadesAnt.edad) * 10) / 10 : null,
       antiguedad_meses: edadesAnt?.ant_meses != null ? Math.round(Number(edadesAnt.ant_meses)) : null,
       ingresos, egresos, egresos12, rotacion, stock,
-      vacaciones: { saldo_total: Number(vacSaldos?.saldo_total) || 0, pasivo: Math.round(Number(vacSaldos?.pasivo) || 0), top: topVac },
+      vacaciones: {
+        saldo_total: vacEquipo.total_dias,
+        pasivo: vacEquipo.total_provision,
+        top: vacEquipo.saldos.filter(s => s.disponibles > 0).sort((a, b) => b.disponibles - a.disponibles).slice(0, 5)
+          .map(s => ({ nombre: s.nombre, dias: Math.round(s.disponibles * 10) / 10 })),
+      },
       ausentismo,
       planilla: liqMes.reverse(),
       solicitudes: solTipo,
