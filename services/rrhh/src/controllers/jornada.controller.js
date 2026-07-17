@@ -138,9 +138,11 @@ require('../../../../shared/migrate').enFila('rrhh-turnos-2', async () => {
 const DSEM_JS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];   // getDay() 0-6
 function lunesDe(f) { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
 function diasDeTurno(semanas, semanaInicio, desde, hasta) {
+  const feriados = require('../../../../shared/feriados');
   const out = [], ini = lunesDe(semanaInicio);
   for (let d = new Date(desde + 'T12:00:00'); d.toISOString().slice(0, 10) <= hasta; d.setDate(d.getDate() + 1)) {
     const fecha = d.toISOString().slice(0, 10);
+    if (feriados.esFeriado(d)) { out.push({ fecha, feriado: true, inicio: null, fin: null }); continue; } // feriado = no se trabaja
     const idx = ((Math.round((lunesDe(fecha) - ini) / (7 * 86400000)) % semanas.length) + semanas.length) % semanas.length;
     const par = semanas[idx][DSEM_JS[d.getDay()]] || null;
     out.push({ fecha, semana: idx + 1, inicio: par ? par[0] : null, fin: par ? par[1] : null });

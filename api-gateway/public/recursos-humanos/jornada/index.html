@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.7 — Calendario de turnos: vista previa por meses, grabar (rh_turno_calendario) e imprimir/PDF una hoja por persona -->
+  <!-- v1.8 — Calendario de turnos respeta feriados (motor shared/feriados): día feriado = no se trabaja, marcado en rojo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -243,10 +243,10 @@ function calMesHTML(c,anio,mes){   // calendario de UN mes para un colaborador
   for(let dd=1;dd<=ult.getDate();dd++){
     const f=`${anio}-${String(mes+1).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
     const d=byF[f];
-    const lib=!d||!d.inicio;
-    fila+=`<td style="border:1px solid #e2e8f0;padding:4px 5px;vertical-align:top;height:52px;${lib?'background:#f8fafc':''}">
-      <div style="font-weight:700;font-size:.72rem;color:#334155">${dd}</div>
-      <div style="font-size:.68rem;color:${lib?'#94a3b8':'#0141A2'};font-weight:${lib?'400':'700'}">${lib?'libre':d.inicio+'–'+d.fin}</div></td>`;
+    const fer=d&&d.feriado, lib=!d||!d.inicio;
+    fila+=`<td style="border:1px solid #e2e8f0;padding:4px 5px;vertical-align:top;height:52px;${fer?'background:#fef2f2':lib?'background:#f8fafc':''}">
+      <div style="font-weight:700;font-size:.72rem;color:${fer?'#b91c1c':'#334155'}">${dd}</div>
+      <div style="font-size:.68rem;color:${fer?'#b91c1c':lib?'#94a3b8':'#0141A2'};font-weight:${fer||!lib?'700':'400'}">${fer?'feriado':lib?'libre':d.inicio+'–'+d.fin}</div></td>`;
     if(new Date(anio,mes,dd).getDay()===0){ celdas+=`<tr>${fila}</tr>`; fila=''; }
   }
   if(fila){ for(let i=(ult.getDay()+6)%7+1;i<7;i++) fila+='<td></td>'; celdas+=`<tr>${fila}</tr>`; }
