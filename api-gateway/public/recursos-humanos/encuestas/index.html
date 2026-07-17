@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Encuestas de Clima — RRHH</title>
-  <!-- v1.1 — informe IA (Opus) permanente por encuesta -->
+  <!-- v1.2 — plantilla Compromiso (Q12 + intención de permanencia) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; --teal:#0d9488; }
@@ -58,6 +58,7 @@
           <button class="btn-mini" onclick="nueva('CLIMA')"><i class="bi bi-plus"></i> Clima anual</button>
           <button class="btn-mini" onclick="nueva('PULSO')"><i class="bi bi-plus"></i> Pulso</button>
           <button class="btn-mini" onclick="nueva('ENPS')"><i class="bi bi-plus"></i> eNPS</button>
+          <button class="btn-mini" onclick="nueva('COMPROMISO')"><i class="bi bi-plus"></i> Compromiso</button>
           <button class="btn-mini" onclick="nueva('OTRA')"><i class="bi bi-plus"></i> Otra</button>
         </div></div>
       <table><thead><tr><th>Encuesta</th><th>Tipo</th><th>Cierre</th><th style="text-align:center">Respuestas</th><th>Estado</th><th></th></tr></thead>
@@ -143,7 +144,7 @@
   }
   window.nueva=tipo=>{
     const pl=PLANTILLAS[tipo]||[['',''+'ESCALA']];
-    const nombres={CLIMA:'Encuesta de Clima '+new Date().getFullYear(),PULSO:'Pulso semanal',ENPS:'eNPS '+new Date().getFullYear(),OTRA:''};
+    const nombres={CLIMA:'Encuesta de Clima '+new Date().getFullYear(),PULSO:'Pulso semanal',ENPS:'eNPS '+new Date().getFullYear(),COMPROMISO:'Encuesta de Compromiso '+new Date().getFullYear(),OTRA:''};
     let h=`<div class="card-box"><h6 style="color:var(--teal)">Nueva encuesta ${tipo}</h6>
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
         <div class="fld"><label>Título</label><input id="nTit" value="${esc(nombres[tipo]||'')}"></div>

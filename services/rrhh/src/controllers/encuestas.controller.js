@@ -90,6 +90,22 @@ const PLANTILLAS = {
     ['¿Tuviste lo necesario para hacer bien tu trabajo?', 'ESCALA'],
     ['¿Algo que quieras comentar?', 'TEXTO'],
   ],
+  COMPROMISO: [
+    ['Sé lo que se espera de mí en mi trabajo', 'ESCALA'],
+    ['Tengo los materiales, sistemas y herramientas que necesito para hacer bien mi trabajo', 'ESCALA'],
+    ['En mi trabajo tengo la oportunidad de hacer lo que mejor sé hacer todos los días', 'ESCALA'],
+    ['En la última semana recibí reconocimiento o elogio por hacer un buen trabajo', 'ESCALA'],
+    ['Mi jefatura, o alguien en el trabajo, se preocupa por mí como persona', 'ESCALA'],
+    ['Hay alguien en el trabajo que estimula mi desarrollo', 'ESCALA'],
+    ['En el trabajo mis opiniones cuentan', 'ESCALA'],
+    ['La misión y propósito de AutoFácil hacen que mi trabajo se sienta importante', 'ESCALA'],
+    ['Mis compañeros están comprometidos con hacer un trabajo de calidad', 'ESCALA'],
+    ['Tengo un buen amigo(a) en el trabajo', 'ESCALA'],
+    ['En los últimos 6 meses alguien me habló sobre mi progreso', 'ESCALA'],
+    ['Este último año tuve oportunidades de aprender y crecer', 'ESCALA'],
+    ['Me veo trabajando en AutoFácil dentro de un año', 'SI_NO'],
+    ['¿Qué aumentaría tu compromiso con la empresa?', 'TEXTO'],
+  ],
   ENPS: [
     ['En una escala de 0 a 10, ¿qué tan probable es que recomiendes AutoFácil como lugar para trabajar?', 'ENPS'],
     ['¿Por qué esa nota?', 'TEXTO'],
@@ -163,7 +179,7 @@ exports.guardar = async (req, res) => {
     if (!String(b.titulo || '').trim()) return fail(res, 'Falta el título', 400);
     const preguntas = (b.preguntas || []).filter(p => String(p.texto || '').trim());
     if (!preguntas.length) return fail(res, 'Agrega al menos una pregunta', 400);
-    const tipo = ['CLIMA', 'PULSO', 'ENPS', 'OTRA'].includes(b.tipo) ? b.tipo : 'CLIMA';
+    const tipo = ['CLIMA', 'PULSO', 'ENPS', 'COMPROMISO', 'OTRA'].includes(b.tipo) ? b.tipo : 'CLIMA';
     let id = parseInt(b.id) || 0;
     if (id) {
       const [[enc]] = await pool.query(`SELECT estado FROM rh_enc_encuestas WHERE id=?`, [id]);
