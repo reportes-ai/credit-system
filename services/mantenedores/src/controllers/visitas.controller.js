@@ -782,6 +782,36 @@ const fichaDia = async (req, res) => {
   } catch (e) { console.error('[visitas fichaDia]', e); err(res, 500, 'Error interno del servidor'); }
 };
 
+/* ─── GET /api/visitas/ficha-rango?usuario= — ficha completa: todas las visitas
+       PROGRAMADAS futuras del ejecutivo, agrupadas por día (para PDF/impresión) ── */
+const fichaRango = async (req, res) => {
+  try {
+    const uid = req.usuario.id_usuario;
+    const esRevisor = await tieneFunc(uid, 'visitas_supervisar');
+    const idU = esRevisor && req.query.usuario ? (parseInt(req.query.usuario) || uid) : uid;
+    const [rows] = await pool.query(
+      `SELECT v.*, DATE_FORMAT(v.fecha_programada,'%Y-%m-%d') fecha,
+              d.direccion, d.direccion_parque, d.geo_dir, d.contacto, d.telefono, d.correo,
+              d.cf_nombre, d.cf_telefono, d.categoria_asignada, d.lat, d.lng,
+              d.com_6_12, d.com_13_24, d.com_25_36, d.com_37
+         FROM visitas_dealers v LEFT JOIN dealers d ON d.id_dealer=v.id_dealer
+        WHERE v.id_usuario=? AND v.estado='PROGRAMADA' AND v.fecha_programada>=CURDATE()
+        ORDER BY v.fecha_programada, v.id`, [idU]);
+    let ult = [];
+    try {
+      [ult] = await pool.query(
+        `SELECT rut_dealer, MAX(fecha_otorgado) ultima, COUNT(*) n FROM creditos
+          WHERE rut_dealer IS NOT NULL AND fecha_otorgado IS NOT NULL GROUP BY rut_dealer`);
+    } catch (_) {}
+    const norm = s => String(s || '').replace(/[.\-\s]/g, '').toUpperCase();
+    const mU = new Map(ult.map(r => [norm(r.rut_dealer), r]));
+    const data = rows.map(v => ({ ...v, direccion_visita: (v.geo_dir || v.direccion || v.direccion_parque || '').trim(),
+      ultima_venta: mU.get(norm(v.rut_dealer))?.ultima || null, creditos_total: mU.get(norm(v.rut_dealer))?.n || 0 }));
+    const [[u]] = await pool.query("SELECT CONCAT(nombre,' ',apellido) nombre FROM usuarios WHERE id_usuario=?", [idU]);
+    ok(res, { usuario: u?.nombre || '', visitas: data });
+  } catch (e) { console.error('[visitas fichaRango]', e); err(res, 500, 'Error interno del servidor'); }
+};
+
 /* ─── GET /api/visitas/stats?plan=&desde=&hasta= (supervisar: grupal) ── */
 const stats = async (req, res) => {
   try {
@@ -877,4 +907,4 @@ const asignados = async (_req, res) => {
 
 module.exports = { getConfig, putConfig, getDealers, planificador, listar, crear, gestionar, eliminar,
   ejecutivos, zonasCartera, zonasMapa, asignacionMasiva, listarAsignaciones, crearAsignacion, cerrarAsignacion,
-  listarPlanes, cerrarPlan, fichaDia, stats, informes, borrarDia, asignados };
+  listarPlanes, cerrarPlan, fichaDia, fichaRango, stats, informes, borrarDia, asignados };

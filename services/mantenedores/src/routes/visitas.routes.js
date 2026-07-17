@@ -21,6 +21,7 @@ router.delete('/asignaciones/:id', verifyToken, supervisar, c.cerrarAsignacion);
 router.get('/planes',          verifyToken, supervisar, c.listarPlanes);
 router.put('/planes/:id/cerrar', verifyToken, supervisar, c.cerrarPlan);
 router.get('/ficha-dia',       verifyToken, verVisitas, c.fichaDia);
+router.get('/ficha-rango',     verifyToken, verVisitas, c.fichaRango);
 router.get('/stats',           verifyToken, verVisitas, c.stats);
 router.get('/informes',        verifyToken, requireFunc('visitas_informes'), c.informes);
 router.get('/asignados',       verifyToken, supervisar, c.asignados);

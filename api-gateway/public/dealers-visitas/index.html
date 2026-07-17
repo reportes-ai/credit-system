@@ -119,7 +119,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v2.2</span>
+      <span class="version-badge" id="versionBadge">v2.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -225,6 +225,7 @@
       <span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">
         <input type="date" id="fichaFecha" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:5px 8px;font-size:.8rem">
         <button class="btn btn-soft" onclick="imprimirFicha()" title="Ficha diaria de visitas con datos de los dealers y mapa"><i class="bi bi-printer"></i> Ficha del día</button>
+        <button class="btn btn-soft" onclick="imprimirFichaCompleta()" title="Todas las visitas programadas del ejecutivo, un día por página con su mapa — guardar como PDF"><i class="bi bi-file-earmark-pdf"></i> Ficha completa (PDF)</button>
       </span>
       <span class="stat" id="calInfo">—</span>
     </div>
@@ -1570,6 +1571,67 @@ async function imprimirFicha(){
   document.body.appendChild(fr);
   fr.srcdoc = html;
   fr.onload = () => setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){} }, 250);
+}
+
+/* ── Ficha completa: TODAS las visitas programadas del ejecutivo, un día por
+      página con su mapa (mismo formato de la ficha diaria) → imprimir/guardar PDF ── */
+function cardFichaHTML(v,i){
+  return `<div class="card"><h4>${i+1}. ${esc(v.nombre_dealer||'—')} ${v.categoria_asignada?'· Cat. '+esc(v.categoria_asignada):''}</h4>
+    <div class="g">
+      <div><b>RUT:</b> ${esc(v.rut_dealer||'—')}</div>
+      <div><b>Comuna:</b> ${esc(v.comuna||'—')}</div>
+      <div><b>Teléfono:</b> ${esc(v.telefono||v.cf_telefono||'—')}</div>
+      <div style="grid-column:span 2"><b>Dirección:</b> ${esc(v.direccion_visita||'—')}</div>
+      <div><b>Contacto:</b> ${esc(v.contacto||v.cf_nombre||'—')}</div>
+      <div><b>Última venta:</b> ${v.ultima_venta?fFecha(String(v.ultima_venta).slice(0,10)):'nunca'}</div>
+      <div><b>Créditos históricos:</b> ${v.creditos_total||0}</div>
+      <div><b>Comisiones:</b> ${[v.com_6_12,v.com_13_24,v.com_25_36,v.com_37].map(x=>x==null?'—':Number(x).toLocaleString('es-CL')+'%').join(' / ')}</div>
+    </div>
+    <div class="obs"><b>Resultado / observaciones:</b></div>
+  </div>`;
+}
+async function imprimirFichaCompleta(){
+  const usuario = (ES_REVISOR && SCOPE==='todos') ? document.getElementById('scUser').value : '';
+  const r = await fetch(`/api/visitas/ficha-rango${usuario?'?usuario='+usuario:''}`,{headers:hdr()});
+  const j = await r.json();
+  if (!j.success) return alert(j.error);
+  const vs = j.data.visitas;
+  if (!vs.length) return alert('El ejecutivo no tiene visitas programadas.');
+  const porDia = {};
+  vs.forEach(v=>{ (porDia[v.fecha]=porDia[v.fecha]||[]).push(v); });
+  const fechas = Object.keys(porDia).sort();
+  let cuerpo = '';
+  for (let f = 0; f < fechas.length; f++){
+    const dia = porDia[fechas[f]];
+    const conGeo = dia.filter(v=>v.lat!=null&&v.lng!=null).map(v=>({lat:+v.lat,lng:+v.lng}));
+    let mapaImg = '';
+    if (conGeo.length){ try{ mapaImg = await mapaEstaticoPNG(conGeo, 760, 380); }catch(e){} }
+    cuerpo += `<div${f?' style="page-break-before:always"':''}>
+      <img src="${location.origin}/img/logo.png" alt="AutoFácil" style="float:right;height:34px;margin:2px 0 0 12px">
+      <h2>Ficha diaria de visitas — ${fFecha(fechas[f])}</h2>
+      <div class="sub">Ejecutivo: <b>${esc(j.data.usuario)}</b> · ${dia.length} visita(s) · los números del mapa siguen el orden de la ruta</div>
+      ${mapaImg?`<img class="mapa" src="${mapaImg}" alt="Mapa de la ruta">`:''}
+      ${dia.map((v,i)=>cardFichaHTML(v,i)).join('')}
+    </div>`;
+  }
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ficha de Visitas - ${esc(j.data.usuario)}</title>
+    <style>
+      @page{ size:letter portrait; margin:12mm }
+      *{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
+      body{font-family:'Segoe UI',sans-serif;margin:0;color:#1e293b}
+      h2{margin:0 0 2px;color:#012d70} .sub{color:#64748b;font-size:.9rem;margin-bottom:12px}
+      .mapa{width:100%;border-radius:12px;margin-bottom:14px;border:1.5px solid #e2e8f0}
+      .card{border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin-bottom:10px;page-break-inside:avoid}
+      .card h4{margin:0 0 6px;color:#0141A2} .g{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;font-size:.85rem}
+      .g b{color:#012d70} .obs{border-top:1px dashed #cbd5e1;margin-top:8px;padding-top:6px;font-size:.8rem;color:#64748b;min-height:44px}
+    </style></head><body>${cuerpo}</body></html>`;
+  let fr = document.getElementById('fichaPrintFrame');
+  if (fr) fr.remove();
+  fr = document.createElement('iframe');
+  fr.id='fichaPrintFrame'; fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(fr);
+  fr.srcdoc = html;
+  fr.onload = () => setTimeout(()=>{ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){} }, 400);
 }
 
 /* ── Init ── */
