@@ -1,0 +1,94 @@
+'use strict';
+// People Analytics (anti-Buk #5): indicadores de RRHH calculados SIEMPRE desde las
+// fuentes únicas (usuarios, rh_fichas, rh_vac_movimientos, rh_ausencias, rh_liquidaciones,
+// rh_finiquitos, rh_solicitudes) — nada se re-almacena, todo se agrega al vuelo.
+const pool = require('../../../../shared/config/database');
+
+// ── Migración: card Indicadores RRHH (permisos heredados de rh_colaboradores) ──
+require('../../../../shared/migrate').enFila('rrhh-analytics-card', async () => {
+  const [[modRRHH]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
+  if (!modRRHH) return;
+  const [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_analytics' LIMIT 1`);
+  if (f) return;
+  const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+    VALUES (?, 'Indicadores RRHH', 'rh_analytics', '/recursos-humanos/analytics/', 'bi-bar-chart-line')`, [modRRHH.id_modulo]);
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+    SELECT pp.id_perfil, ?, 1 FROM permisos_perfil pp JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+    WHERE f2.codigo='rh_colaboradores' AND pp.habilitado=1`, [r.insertId]);
+  await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)`, [r.insertId]);
+  console.log('[rrhh-analytics] card creada');
+});
+
+const meses12 = () => {
+  const out = [];
+  const d = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const x = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    out.push(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+};
+
+exports.resumen = async (req, res) => {
+  try {
+    const [
+      [act], porSexo, porContrato, porCargo, porCC,
+      ingresosMes, egresosMes, [vacSaldos], topVac,
+      ausMes, liqMes, solTipo, edadesAnt,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*) n FROM usuarios WHERE estado='activo'`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(sexo,''),'(sin dato)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(f.tipo_contrato,''),'(sin dato)') k, COUNT(*) n FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.estado='activo' GROUP BY k ORDER BY n DESC`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(cargo,''),'(sin cargo)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k ORDER BY n DESC LIMIT 10`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(centro_costo,''),'(sin área)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k ORDER BY n DESC`).then(r => r[0]),
+      pool.query(`SELECT DATE_FORMAT(fecha_ingreso,'%Y-%m') m, COUNT(*) n FROM usuarios WHERE fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
+      pool.query(`SELECT DATE_FORMAT(fecha_termino,'%Y-%m') m, COUNT(*) n FROM rh_finiquitos WHERE fecha_termino >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(SUM(v.dias),0) saldo_total,
+                         COALESCE(SUM(GREATEST(v.dias,0) * COALESCE(f.sueldo_base,0) / 30),0) pasivo
+                    FROM (SELECT id_usuario, SUM(dias) dias FROM rh_vac_movimientos GROUP BY id_usuario) v
+                    JOIN usuarios u ON u.id_usuario=v.id_usuario AND u.estado='activo'
+                    LEFT JOIN rh_fichas f ON f.id_usuario=v.id_usuario`).then(r => r[0]),
+      pool.query(`SELECT CONCAT_WS(' ', u.nombre, u.apellido) nombre, SUM(v.dias) dias
+                    FROM rh_vac_movimientos v JOIN usuarios u ON u.id_usuario=v.id_usuario AND u.estado='activo'
+                   GROUP BY v.id_usuario HAVING dias > 0 ORDER BY dias DESC LIMIT 5`).then(r => r[0]),
+      pool.query(`SELECT DATE_FORMAT(fecha_desde,'%Y-%m') m, tipo, SUM(COALESCE(dias_habiles, DATEDIFF(fecha_hasta, fecha_desde)+1)) d
+                    FROM rh_ausencias WHERE estado IN ('APROBADA','REGISTRADA') AND fecha_desde >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                   GROUP BY m, tipo`).then(r => r[0]),
+      pool.query(`SELECT mes m, SUM(total_haberes) haberes, SUM(liquido) liquido, COUNT(*) n
+                    FROM rh_liquidaciones WHERE estado='EMITIDA' GROUP BY mes ORDER BY mes DESC LIMIT 12`).then(r => r[0]),
+      pool.query(`SELECT tipo k, estado, COUNT(*) n FROM rh_solicitudes WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY tipo, estado`).then(r => r[0]),
+      pool.query(`SELECT AVG(TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())) edad,
+                         AVG(TIMESTAMPDIFF(MONTH, fecha_ingreso, CURDATE())) ant_meses
+                    FROM usuarios WHERE estado='activo'`).then(r => r[0][0]),
+    ]);
+
+    const mm = meses12();
+    const serie = rows => mm.map(m => ({ m, n: Number((rows.find(r => r.m === m) || {}).n) || 0 }));
+    const ingresos = serie(ingresosMes);
+    const egresos = serie(egresosMes);
+    const egresos12 = egresos.reduce((s, x) => s + x.n, 0);
+    const dotacion = Number(act.n) || 0;
+    // Rotación anual: egresos últimos 12m / dotación promedio aproximada
+    const rotacion = dotacion ? Math.round((egresos12 / dotacion) * 1000) / 10 : 0;
+
+    const ausentismo = mm.map(m => ({
+      m,
+      licencias: Number(ausMes.filter(r => r.m === m && /LICENCIA/i.test(r.tipo)).reduce((s, r) => s + Number(r.d || 0), 0)),
+      otros: Number(ausMes.filter(r => r.m === m && !/LICENCIA/i.test(r.tipo)).reduce((s, r) => s + Number(r.d || 0), 0)),
+    }));
+
+    res.json({ success: true, error: null, data: {
+      dotacion, porSexo, porContrato, porCargo, porCC,
+      edad_promedio: edadesAnt?.edad != null ? Math.round(Number(edadesAnt.edad) * 10) / 10 : null,
+      antiguedad_meses: edadesAnt?.ant_meses != null ? Math.round(Number(edadesAnt.ant_meses)) : null,
+      ingresos, egresos, egresos12, rotacion,
+      vacaciones: { saldo_total: Number(vacSaldos?.saldo_total) || 0, pasivo: Math.round(Number(vacSaldos?.pasivo) || 0), top: topVac },
+      ausentismo,
+      planilla: liqMes.reverse(),
+      solicitudes: solTipo,
+    }});
+  } catch (e) {
+    console.error('[rrhh analytics]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error calculando indicadores' });
+  }
+};

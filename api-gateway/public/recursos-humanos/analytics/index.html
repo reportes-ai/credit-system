@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indicadores RRHH — AutoFácil</title>
+  <!-- v1.0 — People Analytics: dotación, rotación, ausentismo, vacaciones y planilla -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { max-width:1150px; margin:0 auto; padding:26px 24px 60px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:26px; display:flex; align-items:center; gap:18px; }
+    .banner i { font-size:2.6rem; opacity:.85; } .banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; } .banner p { opacity:.85; margin:0; font-size:.85rem; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:22px; }
+    .kpi { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .kpi .l { font-size:.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+    .kpi .v { font-size:1.55rem; font-weight:800; color:var(--navy-dark); margin-top:2px; }
+    .kpi .s { font-size:.72rem; color:#94a3b8; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; } @media(max-width:900px){ .grid2{grid-template-columns:1fr;} }
+    .box { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+    .box h6 { font-weight:700; color:var(--navy-dark); font-size:.92rem; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .bars { display:flex; align-items:flex-end; gap:5px; height:120px; }
+    .bar { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:3px; min-width:0; }
+    .bar .col { width:100%; border-radius:4px 4px 0 0; background:var(--navy); min-height:2px; }
+    .bar .col.b { background:#ef4444; } .bar .col.c { background:#f59e0b; }
+    .bar .lb { font-size:.58rem; color:#94a3b8; white-space:nowrap; transform:rotate(-40deg); margin-top:6px; }
+    .bar .n { font-size:.62rem; color:#475569; font-weight:700; }
+    .hrow { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:.8rem; }
+    .hrow .nm { width:44%; color:#334155; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .hrow .tr { flex:1; background:#eef2f7; border-radius:6px; height:14px; overflow:hidden; }
+    .hrow .fl { height:100%; background:linear-gradient(90deg,var(--navy),var(--accent)); border-radius:6px; }
+    .hrow .ct { width:38px; text-align:right; font-weight:700; color:var(--navy-dark); font-size:.78rem; }
+    .leyenda { font-size:.7rem; color:#64748b; display:flex; gap:14px; margin-top:8px; }
+    .dot { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:middle; }
+    .empty { color:#94a3b8; font-size:.85rem; padding:12px 0; }
+    table.mini { width:100%; font-size:.8rem; border-collapse:collapse; } .mini td,.mini th { padding:5px 8px; border-bottom:1px solid #f1f5f9; } .mini th { color:#64748b; text-align:left; font-size:.72rem; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Recursos Humanos",href:"/recursos-humanos/"},{label:"Indicadores RRHH",current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-bar-chart-line"></i><div><h2>Indicadores RRHH (People Analytics)</h2><p>Dotación, rotación, ausentismo, pasivo de vacaciones y costo de planilla — calculados en vivo desde las fuentes únicas.</p></div></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid2">
+    <div class="box"><h6><i class="bi bi-arrow-left-right"></i>Ingresos vs egresos (12 meses)</h6><div id="chIE"></div>
+      <div class="leyenda"><span><span class="dot" style="background:var(--navy)"></span>Ingresos</span><span><span class="dot" style="background:#ef4444"></span>Egresos (finiquitos)</span></div></div>
+    <div class="box"><h6><i class="bi bi-thermometer-half"></i>Ausentismo — días por mes (12 meses)</h6><div id="chAus"></div>
+      <div class="leyenda"><span><span class="dot" style="background:var(--navy)"></span>Licencias médicas</span><span><span class="dot" style="background:#f59e0b"></span>Permisos y otros</span></div></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><h6><i class="bi bi-diagram-3"></i>Dotación por área</h6><div id="chCC"></div></div>
+    <div class="box"><h6><i class="bi bi-person-badge"></i>Dotación por cargo (top 10)</h6><div id="chCargo"></div></div>
+  </div>
+  <div class="grid2">
+    <div class="box"><h6><i class="bi bi-airplane"></i>Vacaciones — pasivo acumulado</h6><div id="vac"></div></div>
+    <div class="box"><h6><i class="bi bi-cash-stack"></i>Costo de planilla (meses emitidos)</h6><div id="chLiq"></div></div>
+  </div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script>
+const H={Authorization:'Bearer '+sessionStorage.getItem('token')};
+const $=id=>document.getElementById(id);
+const fmt=n=>Number(n||0).toLocaleString('es-CL');
+const fmt1=n=>Number(n||0).toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1});
+const mesLb=m=>({'01':'ene','02':'feb','03':'mar','04':'abr','05':'may','06':'jun','07':'jul','08':'ago','09':'sep','10':'oct','11':'nov','12':'dic'}[m.slice(5)]+"'"+m.slice(2,4));
+function barras(el, series, colores){ // series: [{m, vals:[a,b]}]
+  const max=Math.max(1,...series.map(s=>Math.max(...s.vals)));
+  el.innerHTML='<div class="bars">'+series.map(s=>`<div class="bar"><div class="n">${s.vals.reduce((a,b)=>a+b,0)||''}</div>${
+    s.vals.map((v,i)=>`<div class="col ${colores[i]||''}" style="height:${Math.round(v/max*95)}px" title="${fmt(v)}"></div>`).join('')
+  }<div class="lb">${mesLb(s.m)}</div></div>`).join('')+'</div>';
+}
+function hbars(el, rows){ const max=Math.max(1,...rows.map(r=>Number(r.n)));
+  el.innerHTML=rows.length?rows.map(r=>`<div class="hrow"><div class="nm" title="${r.k}">${r.k}</div><div class="tr"><div class="fl" style="width:${Math.round(r.n/max*100)}%"></div></div><div class="ct">${fmt(r.n)}</div></div>`).join(''):'<div class="empty">Sin datos.</div>';
+}
+(async()=>{
+  const r=await fetch('/api/rrhh/analytics/resumen',{headers:H});
+  if(r.status===403){ document.querySelector('.main').innerHTML='<div class="box empty">No tienes permiso para ver los indicadores de RRHH.</div>'; return; }
+  const j=await r.json(); if(!j.success) return alert(j.error);
+  const d=j.data;
+  const antA=d.antiguedad_meses!=null?Math.floor(d.antiguedad_meses/12)+'a '+(d.antiguedad_meses%12)+'m':'—';
+  $('kpis').innerHTML=`
+    <div class="kpi"><div class="l">Dotación activa</div><div class="v">${fmt(d.dotacion)}</div><div class="s">${d.porSexo.map(x=>`${x.k}: ${x.n}`).join(' · ')}</div></div>
+    <div class="kpi"><div class="l">Rotación anual</div><div class="v">${fmt1(d.rotacion)}%</div><div class="s">${fmt(d.egresos12)} egreso(s) en 12 meses</div></div>
+    <div class="kpi"><div class="l">Antigüedad promedio</div><div class="v">${antA}</div><div class="s">edad promedio ${d.edad_promedio!=null?fmt1(d.edad_promedio)+' años':'—'}</div></div>
+    <div class="kpi"><div class="l">Saldo vacaciones</div><div class="v">${fmt1(d.vacaciones.saldo_total)} d</div><div class="s">pasivo estimado $${fmt(d.vacaciones.pasivo)}</div></div>
+    <div class="kpi"><div class="l">Contratos</div><div class="v">${fmt((d.porContrato[0]||{}).n||0)}</div><div class="s">${d.porContrato.map(x=>`${x.k}: ${x.n}`).join(' · ')}</div></div>`;
+  barras($('chIE'), d.ingresos.map((x,i)=>({m:x.m, vals:[x.n, d.egresos[i].n]})), ['','b']);
+  barras($('chAus'), d.ausentismo.map(x=>({m:x.m, vals:[x.licencias, x.otros]})), ['','c']);
+  hbars($('chCC'), d.porCC); hbars($('chCargo'), d.porCargo);
+  $('vac').innerHTML = (d.vacaciones.top||[]).length
+    ? '<table class="mini"><tr><th>Mayor saldo acumulado</th><th style="text-align:right">Días</th></tr>'+d.vacaciones.top.map(t=>`<tr><td>${t.nombre}</td><td style="text-align:right;font-weight:700">${fmt1(t.dias)}</td></tr>`).join('')+`</table>
+       <div class="leyenda" style="margin-top:10px">Pasivo total estimado (saldo × sueldo base ÷ 30): <b style="color:var(--navy-dark)">$${fmt(d.vacaciones.pasivo)}</b></div>`
+    : '<div class="empty">Sin saldos positivos.</div>';
+  $('chLiq').innerHTML = (d.planilla||[]).length
+    ? '<table class="mini"><tr><th>Mes</th><th style="text-align:right">Total haberes</th><th style="text-align:right">Líquido</th><th style="text-align:right">Liq.</th></tr>'+
+      d.planilla.map(p=>`<tr><td>${p.m}</td><td style="text-align:right">$${fmt(p.haberes)}</td><td style="text-align:right">$${fmt(p.liquido)}</td><td style="text-align:right">${p.n}</td></tr>`).join('')+'</table>'
+    : '<div class="empty">Aún no hay meses emitidos en Remuneraciones — esta tabla se llena sola al emitir.</div>';
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

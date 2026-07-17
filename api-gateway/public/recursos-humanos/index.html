@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.7 — card Documentos Firmados (repositorio FES) -->
+  <!-- v2.8 — card Indicadores RRHH (People Analytics) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -138,6 +138,12 @@
       <p>El concurso de capacitación: tablero de respuestas ocultas con puntos, para el onboarding y jugar en equipo. ¡A ver si está!</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/analytics/" class="module-card" id="cardAna" style="display:none">
+      <div class="card-icon"><i class="bi bi-bar-chart-line"></i></div>
+      <h5>Indicadores RRHH <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>People Analytics en vivo: dotación por área y cargo, rotación anual, ausentismo mensual, pasivo de vacaciones y costo de planilla.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/antiguedad/" class="module-card" id="cardAnt" style="display:none">
       <div class="card-icon"><i class="bi bi-award"></i></div>
       <h5>Certificado de Antigüedad</h5>
@@ -172,6 +178,7 @@
     if (tiene('rh_encuestas')) document.getElementById('cardEnc').style.display='';
     if (tiene('rh_solicitudes')) document.getElementById('cardSol').style.display='';
     if (tiene('rh_docs_firmados')) document.getElementById('cardDocsF').style.display='';
+    if (tiene('rh_analytics','rh_colaboradores')) document.getElementById('cardAna').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>

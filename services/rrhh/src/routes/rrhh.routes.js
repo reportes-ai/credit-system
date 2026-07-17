@@ -62,6 +62,9 @@ router.get('/solicitudes/por-aprobar',  verifyToken, sol.porAprobar);
 router.get('/solicitudes/todas',        verifyToken, sol.todas);
 router.post('/solicitudes',             verifyToken, sol.crear);
 router.post('/solicitudes/resolver',    verifyToken, sol.resolver);
+// People Analytics — indicadores agregados de RRHH (solo gestión)
+const ana = require('../controllers/analytics.controller');
+router.get('/analytics/resumen', verifyToken, requireFunc('rh_analytics', 'rh_colaboradores'), ana.resumen);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);
