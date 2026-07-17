@@ -10,6 +10,14 @@ function credenciales() {
   return { API_USER: user, API_KEY: key };
 }
 
+async function post(path, body) {
+  const r = await fetch(`${BASE}/${path}`, { method: 'POST', headers: { ...credenciales(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || j.result === 'ADVERTENCIA' || j.result === 'ERROR')
+    throw new Error(`Workera ${path}: ${(j.messages || []).join('; ') || 'HTTP ' + r.status}`);
+  return j;
+}
+
 async function get(path, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const r = await fetch(`${BASE}/${path}${qs ? '?' + qs : ''}`, { headers: credenciales() });
@@ -41,6 +49,15 @@ const trabajadores = () => getTodas('employee');
 // Horarios/turnos asignados por trabajador y día (workshift/schedules)
 const horarios = (start, end) => getTodas('workshift/schedules', { start, end });
 
+// Espejo de permisos: crear/eliminar "salida especial" en Workera.
+// OJO: solo funcionan los tipos que tienen CÓDIGO asignado en el panel de Workera.
+const crearPermiso = ({ employeeCode, permissionCode, start, end, comment }) =>
+  post('permission', { employeeCode, permissionCode, start, end, comment: comment || null });
+const eliminarPermiso = async id => {
+  const r = await fetch(`${BASE}/permission/${id}`, { method: 'DELETE', headers: credenciales() });
+  return r.json();
+};
+
 const configurado = () => !!(process.env.WORKERA_API_USER && process.env.WORKERA_API_KEY);
 
-module.exports = { marcaciones, trabajadores, horarios, configurado };
+module.exports = { marcaciones, trabajadores, horarios, crearPermiso, eliminarPermiso, configurado };

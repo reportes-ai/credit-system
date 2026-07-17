@@ -166,6 +166,9 @@ const crear = async (req, res) => {
         } catch (e) { console.error('[licencia correo supervisor]', e.message); }
       }
       auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'licencia_medica', entidad_id: r.insertId, detalle: `Licencia de ${colab.nombre} ${fd}→${fh} (${dias}d hábiles), supervisor informado` });
+      // Espejo Workera: la licencia ingresada se informa al reloj control (no bloquea)
+      require('../workera-espejo').espejar({ idUsuario: colab.id_usuario, tipo: 'LICENCIA MEDICA',
+        desde: fd, hasta: fh, comentario: `Licencia médica ingresada por ${nombreDe(u)}`, tabla: 'rh_ausencias', id: r.insertId }).catch(() => {});
       return ok(res, { id: r.insertId, dias, licencia: true });
     }
 
@@ -228,6 +231,10 @@ const resolver = async (req, res) => {
       [estado, u.id_usuario, nombreDe(u), estado === 'RECHAZADA' ? (norm((req.body || {}).motivo_rechazo) || null) : null, s.id]);
     notificar([s.id_usuario], { tipo: 'RH_AUSENCIA', titulo: `📋 ${s.tipo} ${estado === 'APROBADA' ? 'aprobada' : 'rechazada'}`,
       mensaje: `${isoF(s.fecha_desde)} al ${isoF(s.fecha_hasta)} — por ${nombreDe(u)}`, href: '/recursos-humanos/ausencias/?id=' + s.id });
+    // Espejo Workera: el permiso aprobado se informa al reloj control (no bloquea)
+    if (estado === 'APROBADA') require('../workera-espejo').espejar({
+      idUsuario: s.id_usuario, tipo: s.tipo, desde: s.fecha_desde, hasta: s.fecha_hasta,
+      comentario: `${s.tipo} aprobada por ${nombreDe(u)}`, tabla: 'rh_ausencias', id: s.id }).catch(() => {});
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'ausencia', entidad_id: s.id, detalle: `Ausencia #${s.id} (${s.tipo} de ${s.nombre}) → ${estado}` });
     ok(res, { ok: true });
   } catch (e) { console.error('[rrhh ausencias resolver]', e.message); fail(res, 'Error interno del servidor'); }

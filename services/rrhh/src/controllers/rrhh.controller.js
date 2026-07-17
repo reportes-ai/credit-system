@@ -251,6 +251,10 @@ const resolverVacaciones = async (req, res) => {
     } catch (_) {}
     // Cuenta corriente: la aprobación descuenta los días hábiles del saldo
     if (estado === 'APROBADA') try { await require('./vac-cuenta.controller').registrarTomado(s); } catch (_) {}
+    // Espejo Workera: la vacación aprobada se informa al reloj control (no bloquea)
+    if (estado === 'APROBADA') require('../workera-espejo').espejar({
+      idUsuario: s.id_usuario, tipo: 'VACACIONES', desde: s.fecha_desde, hasta: s.fecha_hasta,
+      comentario: `Vacaciones aprobadas por ${nombreDe(u)}`, tabla: 'rh_vacaciones', id: s.id }).catch(() => {});
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: s.id, detalle: `Vacaciones #${s.id} → ${estado}` });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
