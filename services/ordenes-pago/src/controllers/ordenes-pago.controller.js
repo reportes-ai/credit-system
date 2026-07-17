@@ -611,10 +611,17 @@ const cambiarEstadoOrden = async (req, res) => {
     auditar({ req, accion: estado === 'PAGADA' ? 'PAGAR' : (estado === 'ANULADA' ? 'ANULAR' : 'EDITAR'), modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `${o.numero || id}: ${o.estado} → ${estado}` });
     // Centralización contable: asiento automático al pagar la ODP (nunca bloquea)
     if (estado === 'PAGADA') {
-      pool.query('SELECT numero, concepto, proveedor_nombre, proveedor_rut, monto FROM ordenes_pago WHERE id=?', [id]).then(([[od]]) => {
+      pool.query('SELECT numero, concepto, proveedor_nombre, proveedor_rut, monto, categoria FROM ordenes_pago WHERE id=?', [id]).then(([[od]]) => {
         if (!od) return;
+        // Anticipos/préstamos al personal (Solicitudes RRHH) NO son gasto a proveedor:
+        // van a cuenta por cobrar al personal (1105010 / 1105020) con su evento propio.
+        let evento = 'ODP_PAGADA';
+        if (od.categoria === 'REMUNERACIONES') {
+          if (/^anticipo/i.test(od.concepto || '')) evento = 'ANTICIPO_PERSONAL';
+          else if (/^pr[eé]stamo/i.test(od.concepto || '')) evento = 'PRESTAMO_PERSONAL';
+        }
         return require('../../../contabilidad/src/motor-asientos').contabilizar({
-          evento: 'ODP_PAGADA', fecha: fechaPago,
+          evento, fecha: fechaPago,
           glosa: `Pago ODP ${od.numero || id} — ${od.proveedor_nombre || od.concepto}`.slice(0, 300),
           ref: `ODP-${od.numero || id}`, montos: { monto: Math.round(Number(od.monto) || 0) }, rut: od.proveedor_rut || null,
         });

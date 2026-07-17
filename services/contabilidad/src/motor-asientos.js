@@ -70,6 +70,14 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2102022', 'DEBE', 'monto', 'Pago a proveedor'],
         ['1101090', 'HABER', 'monto', 'Salida de banco'],
       ]],
+      ['ANTICIPO_PERSONAL', 'Anticipo de sueldo depositado', 'Se dispara al marcar PAGADA la ODP de un anticipo de sueldo (Solicitudes RRHH). Es cuenta por cobrar al personal, NO gasto. Campos: monto (anticipo).', 'EGRESO', 1, [
+        ['1105010', 'DEBE', 'monto', 'Anticipo de remuneraciones'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
+      ['PRESTAMO_PERSONAL', 'Préstamo al personal depositado', 'Se dispara al marcar PAGADA la ODP de un préstamo al personal (Solicitudes RRHH). Es cuenta por cobrar al personal, NO gasto. Campos: monto (capital prestado).', 'EGRESO', 1, [
+        ['1105020', 'DEBE', 'monto', 'Préstamo a empleados'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       ['CASTIGO', 'Castigo de saldo aprobado', 'Se dispara cuando el castigo recibe ambas firmas gerenciales. Campos: monto (saldo castigado).', 'TRASPASO', 1, [
         ['1104050', 'DEBE', 'monto', 'Uso de provisión por castigo'],
         ['1104020', 'HABER', 'monto', 'Baja del contrato'],
