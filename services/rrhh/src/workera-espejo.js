@@ -40,7 +40,8 @@ async function espejar({ idUsuario, tipo, desde, hasta, comentario, tabla, id })
     const code = (cfg?.valor || '').trim();
     if (!code) { console.log(`[workera-espejo] sin código para ${tipo} (${clave} vacía) — no se espeja`); return null; }
     const [[u]] = await pool.query('SELECT rut FROM usuarios WHERE id_usuario=?', [idUsuario]);
-    const employeeCode = String(u?.rut || '').replace(/[.\s-]/g, '').slice(0, -1); // rut sin DV = código de ficha Workera
+    const rutW = await require('./workera-alias').rutWorkera(u?.rut); // alias si el RUT difiere del de Workera
+    const employeeCode = rutW.slice(0, -1); // rut sin DV = código de ficha Workera
     if (!employeeCode) return null;
     const iso = f => String(f instanceof Date ? f.toISOString() : f).slice(0, 10);
     const r = await workera.crearPermiso({

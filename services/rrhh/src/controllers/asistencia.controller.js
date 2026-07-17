@@ -169,10 +169,12 @@ exports.resumen = async (req, res) => {
       if (feriados.esHabil(d)) habiles.push(d.toISOString().slice(0, 10));
     }
 
-    // 4) Cruce por colaborador
+    // 4) Cruce por colaborador (con alias de RUT hacia Workera si difiere)
+    const aliasMap = await require('../workera-alias').mapa();
+    const rutW = r => { const n = rutNorm(r); return aliasMap[n] || n; };
     const cubierto = (idU, dia, lista) => lista.some(a => a.id_usuario === idU && a.fd <= dia && a.fh >= dia);
     const colaboradores = colabs.map(c => {
-      const dias = porRut[rutNorm(c.rut)] || {};
+      const dias = porRut[rutW(c.rut)] || {};
       const detalle = [], faltas = [];
       let marcados = 0, cubiertos = 0;
       for (const h of habiles) {
@@ -184,7 +186,7 @@ exports.resumen = async (req, res) => {
         if (cubierto(c.id_usuario, h, vacaciones)) { cubiertos++; detalle.push({ dia: h, cubierto: 'VACACIONES' }); continue; }
         faltas.push(h); detalle.push({ dia: h, falta: true });
       }
-      const enWorkera = !!porRut[rutNorm(c.rut)];
+      const enWorkera = !!porRut[rutW(c.rut)];
       return { id_usuario: c.id_usuario, nombre: c.nombre, rut: c.rut, en_workera: enWorkera,
                dias_marcados: marcados, dias_cubiertos: cubiertos, faltas, detalle };
     });
