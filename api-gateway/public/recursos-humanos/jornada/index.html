@@ -5,13 +5,14 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.0 — art. 22 y 40 hrs por colaborador; define quién debe marcar y su jornada normal -->
+  <!-- v1.1 — jornada especial (horas digitables) + externo sin horario; full width -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
-    .main { max-width:1000px; margin:0 auto; padding:26px 24px 60px; }
+    .main { width:100%; margin:0 auto; padding:26px 32px 60px; }
+    .t input[type=number] { width:64px; padding:2px 6px; border:1px solid #cbd5e1; border-radius:7px; font-size:.8rem; }
     .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
     .banner i { font-size:2.6rem; opacity:.85; } .banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; } .banner p { opacity:.85; margin:0; font-size:.85rem; }
     .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:20px; }
@@ -45,26 +46,44 @@
       <th>Colaborador</th><th>Cargo</th>
       <th style="text-align:center" title="Art. 22 CT: excluido de limitación de jornada, no registra asistencia">Art. 22</th>
       <th style="text-align:center" title="Ley 21.561: jornada semanal de 40 horas">40 hrs</th>
+      <th style="text-align:center" title="Jornada parcial o pactada distinta: digita las horas semanales">Especial (hrs/sem)</th>
+      <th style="text-align:center" title="Externo: presta servicios sin sujeción a horario ni registro de asistencia">Externo</th>
       <th style="text-align:center">¿Debe marcar?</th><th style="text-align:center">Jornada normal</th><th></th>
     </tr></thead><tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
   </div>
   <div class="foot"><i class="bi bi-diagram-3"></i> <b>Qué afecta esta página:</b>
     <b>Art. 22</b> → en <a href="/recursos-humanos/asistencia/">Asistencia (Workera)</a> el colaborador queda EXENTO: los días sin marca no cuentan como posibles faltas ·
     <b>40 hrs</b> → define la jornada normal informativa (40 hrs semanales / 8 hrs diarias L-V; el resto 44 hrs / 8 hrs 48 min según la gradualidad vigente de la Ley 21.561) ·
-    ambos flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
+    <b>Especial</b> → jornada parcial o pactada: las horas semanales digitadas mandan sobre 40/44 ·
+    <b>Externo</b> → presta servicios sin sujeción a horario: en Asistencia queda EXTERNO y no genera faltas ·
+    todos los flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
 </div>
 <script src="/js/auth-guard.js"></script>
 <script>
 const H={Authorization:'Bearer '+sessionStorage.getItem('token'),'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 let D=[];
-function jornadaTxt(c){ return c.art22?'—':(c.h40?'40 hrs/sem · 8:00 diarias':'44 hrs/sem · 8:48 diarias'); }
+const hrsFmt=h=>{ const m=Math.round(Number(h)/5*60); return `${Math.floor(m/60)}:${String(m%60).padStart(2,'0')} diarias`; };
+function debeMarcar(c){ return !(+c.art22||+c.externo); }
+function jornadaTxt(c){
+  if(+c.externo) return 'sin horario';
+  if(+c.art22) return '—';
+  if(c.especial_hrs!=null&&c.especial_hrs!=='') return `${Number(c.especial_hrs).toLocaleString('es-CL')} hrs/sem · ${hrsFmt(c.especial_hrs)}`;
+  return c.h40?'40 hrs/sem · 8:00 diarias':'44 hrs/sem · 8:48 diarias';
+}
+function marcarTxt(c){
+  if(+c.externo) return '<span class="pill p-mut">NO — EXTERNO</span>';
+  if(+c.art22) return '<span class="pill p-mut">NO — ART. 22</span>';
+  return '<span class="pill p-ok">SÍ</span>';
+}
 function kpis(){
   $('kpis').innerHTML=[
     ['Colaboradores',D.length],
-    ['Deben marcar',D.filter(c=>!c.art22).length],
+    ['Deben marcar',D.filter(debeMarcar).length],
     ['Art. 22 (exentos)',D.filter(c=>+c.art22).length],
-    ['Con 40 hrs',D.filter(c=>+c.h40).length],
+    ['Con 40 hrs',D.filter(c=>+c.h40&&!+c.art22&&!+c.externo&&(c.especial_hrs==null||c.especial_hrs==='')).length],
+    ['Jornada especial',D.filter(c=>c.especial_hrs!=null&&c.especial_hrs!==''&&!+c.art22&&!+c.externo).length],
+    ['Externos',D.filter(c=>+c.externo).length],
   ].map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 }
 function pinta(){
@@ -74,21 +93,30 @@ function pinta(){
     <td style="color:#475569">${c.cargo||''}</td>
     <td style="text-align:center"><input type="checkbox" ${+c.art22?'checked':''} onchange="cambia(${i},'art22',this.checked)"></td>
     <td style="text-align:center"><input type="checkbox" ${+c.h40?'checked':''} onchange="cambia(${i},'h40',this.checked)"></td>
-    <td style="text-align:center" id="dm${i}">${+c.art22?'<span class="pill p-mut">NO — ART. 22</span>':'<span class="pill p-ok">SÍ</span>'}</td>
+    <td style="text-align:center"><input type="number" min="1" max="45" step="0.5" id="eh${i}" value="${c.especial_hrs??''}" placeholder="—" onchange="cambiaHrs(${i},this.value)"></td>
+    <td style="text-align:center"><input type="checkbox" ${+c.externo?'checked':''} onchange="cambia(${i},'externo',this.checked)"></td>
+    <td style="text-align:center" id="dm${i}">${marcarTxt(c)}</td>
     <td style="text-align:center" id="jn${i}"><span class="pill p-nav">${jornadaTxt(c)}</span></td>
     <td style="text-align:right"><span class="saved" id="sv${i}"><i class="bi bi-check2"></i> guardado</span></td>
   </tr>`).join('');
 }
+async function guardar(i){
+  const c=D[i];
+  const r=await fetch('/api/rrhh/jornada/'+c.id_usuario,{method:'PUT',headers:H,
+    body:JSON.stringify({art22:+c.art22,h40:+c.h40,especial_hrs:c.especial_hrs===''?null:c.especial_hrs,externo:+c.externo})});
+  const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+  $('dm'+i).innerHTML=marcarTxt(c);
+  $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(c)}</span>`;
+  kpis();
+  const s=$('sv'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);
+}
 async function cambia(i,campo,val){
   D[i][campo]=val?1:0;
-  try{
-    const r=await fetch('/api/rrhh/jornada/'+D[i].id_usuario,{method:'PUT',headers:H,body:JSON.stringify({art22:+D[i].art22,h40:+D[i].h40})});
-    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
-    $('dm'+i).innerHTML=+D[i].art22?'<span class="pill p-mut">NO — ART. 22</span>':'<span class="pill p-ok">SÍ</span>';
-    $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(D[i])}</span>`;
-    kpis();
-    const s=$('sv'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);
-  }catch(e){ alert('No se pudo guardar: '+e.message); }
+  try{ await guardar(i); }catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+async function cambiaHrs(i,val){
+  D[i].especial_hrs=val===''?null:val;
+  try{ await guardar(i); }catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 (async()=>{
   try{

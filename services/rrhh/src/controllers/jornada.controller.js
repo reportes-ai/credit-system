@@ -5,6 +5,13 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
+require('../../../../shared/migrate').enFila('rrhh-jornada-2', async () => {
+  for (const col of ['jornada_especial_hrs DECIMAL(4,1) NULL', 'jornada_externo TINYINT(1) NOT NULL DEFAULT 0']) {
+    try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
+  }
+  console.log('[rrhh-jornada] columnas especial/externo listas');
+});
+
 require('../../../../shared/migrate').enFila('rrhh-jornada', async () => {
   for (const col of ['jornada_art22 TINYINT(1) NOT NULL DEFAULT 0', 'jornada_40h TINYINT(1) NOT NULL DEFAULT 0']) {
     try { await pool.query(`ALTER TABLE rh_fichas ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
@@ -29,7 +36,8 @@ exports.listar = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
               COALESCE(u.cargo, '') cargo,
-              COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40
+              COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40,
+              unm.jornada_especial_hrs especial_hrs, COALESCE(unm.jornada_externo, 0) externo
          FROM ${UNIV} WHERE ${WU} ORDER BY nombre`);
     res.json({ success: true, error: null, data: rows });
   } catch (e) { console.error('[rrhh jornada]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -39,12 +47,16 @@ exports.listar = async (req, res) => {
 exports.guardar = async (req, res) => {
   try {
     const idU = Number(req.params.id);
-    const art22 = req.body.art22 ? 1 : 0, h40 = req.body.h40 ? 1 : 0;
+    const art22 = req.body.art22 ? 1 : 0, h40 = req.body.h40 ? 1 : 0, externo = req.body.externo ? 1 : 0;
+    let esp = req.body.especial_hrs == null || req.body.especial_hrs === '' ? null : Number(req.body.especial_hrs);
+    if (esp != null && (!(esp > 0) || esp > 45)) return res.status(400).json({ success: false, data: null, error: 'Horas de jornada especial inválidas (1 a 45)' });
     if (!idU) return res.status(400).json({ success: false, data: null, error: 'Colaborador inválido' });
-    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=? WHERE id_usuario=?', [art22, h40, idU]);
-    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h) VALUES (?,?,?)', [idU, art22, h40]);
+    const [r] = await pool.query('UPDATE rh_fichas SET jornada_art22=?, jornada_40h=?, jornada_especial_hrs=?, jornada_externo=? WHERE id_usuario=?',
+      [art22, h40, esp, externo, idU]);
+    if (!r.affectedRows) await pool.query('INSERT INTO rh_fichas (id_usuario, jornada_art22, jornada_40h, jornada_especial_hrs, jornada_externo) VALUES (?,?,?,?,?)',
+      [idU, art22, h40, esp, externo]);
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'jornada', entidad_id: idU,
-      detalle: `Jornada: art.22=${art22 ? 'SÍ' : 'no'}, 40hrs=${h40 ? 'SÍ' : 'no'}` });
-    res.json({ success: true, error: null, data: { art22, h40 } });
+      detalle: `Jornada: art.22=${art22 ? 'SÍ' : 'no'}, 40hrs=${h40 ? 'SÍ' : 'no'}, especial=${esp != null ? esp + ' hrs' : 'no'}, externo=${externo ? 'SÍ' : 'no'}` });
+    res.json({ success: true, error: null, data: { art22, h40, especial_hrs: esp, externo } });
   } catch (e) { console.error('[rrhh jornada guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

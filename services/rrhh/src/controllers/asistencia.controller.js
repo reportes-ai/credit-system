@@ -96,7 +96,8 @@ exports.resumen = async (req, res) => {
     const [colabs, [ausencias], [vacaciones]] = await Promise.all([
       pool.query(`SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
                          DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso,
-                         COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40
+                         COALESCE(unm.jornada_art22, 0) art22, COALESCE(unm.jornada_40h, 0) h40,
+                         COALESCE(unm.jornada_externo, 0) externo
                     FROM ${UNIV} WHERE ${WU} AND u.rut IS NOT NULL ORDER BY nombre`).then(r => r[0]),
       pool.query(`SELECT id_usuario, tipo, DATE_FORMAT(fecha_desde,'%Y-%m-%d') fd, DATE_FORMAT(fecha_hasta,'%Y-%m-%d') fh
                     FROM rh_ausencias WHERE estado='APROBADA' AND fecha_desde <= ? AND fecha_hasta >= ?`, [hasta, desde]),
@@ -134,13 +135,13 @@ exports.resumen = async (req, res) => {
         const aus = ausencias.find(a => a.id_usuario === c.id_usuario && a.fd <= h && a.fh >= h);
         if (aus) { cubiertos++; detalle.push({ dia: h, cubierto: aus.tipo }); continue; }
         if (cubierto(c.id_usuario, h, vacaciones)) { cubiertos++; detalle.push({ dia: h, cubierto: 'VACACIONES' }); continue; }
-        // Art. 22 CT: excluido de limitación de jornada — un día sin marca NO es falta
-        if (c.art22) { detalle.push({ dia: h, exento: true }); continue; }
+        // Art. 22 CT (excluido de jornada) o externo (sin horario): sin marca NO es falta
+        if (c.art22 || c.externo) { detalle.push({ dia: h, exento: true }); continue; }
         faltas.push(h); detalle.push({ dia: h, falta: true });
       }
       const enWorkera = !!porRut[rutNorm(c.rut)];
       return { id_usuario: c.id_usuario, nombre: c.nombre, rut: c.rut, en_workera: enWorkera,
-               art22: !!c.art22, h40: !!c.h40,
+               art22: !!c.art22, h40: !!c.h40, externo: !!c.externo,
                dias_marcados: marcados, dias_cubiertos: cubiertos, faltas, detalle };
     });
 

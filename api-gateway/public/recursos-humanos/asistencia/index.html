@@ -82,7 +82,8 @@ function pinta(d){
   if(!d.colaboradores.length){ tb.innerHTML='<tr><td colspan="6" class="empty">Sin días transcurridos en el mes elegido.</td></tr>'; return; }
   tb.innerHTML=d.colaboradores.map((c,i)=>{
     const hab=c.dias_marcados+c.dias_cubiertos+c.faltas.length;
-    const st=c.art22?'<span class="pill p-mut">EXENTO ART. 22</span>'
+    const st=c.externo?'<span class="pill p-mut">EXTERNO</span>'
+      :c.art22?'<span class="pill p-mut">EXENTO ART. 22</span>'
       :!c.en_workera?'<span class="pill p-mut">SIN ENROLAR</span>'
       :c.faltas.length?`<span class="pill p-bad">${c.faltas.length} falta/s</span>`
       :c.dias_cubiertos?'<span class="pill p-warn">CON AUSENCIAS</span>':'<span class="pill p-ok">COMPLETO</span>';
