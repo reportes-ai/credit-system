@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.1 — ficha propia: conyuge + hijos + 2 emergencias editables por el colaborador -->
+  <!-- v1.2 — ficha propia: conyuge + hijos + 2 emergencias editables por el colaborador -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -79,6 +79,11 @@
     <table><thead><tr><th>Mes</th><th>Total Haberes</th><th>Descuentos</th><th>Líquido</th><th></th></tr></thead><tbody id="tbLiq"></tbody></table>
   </div>
 
+  <div class="panel" id="pCursos" style="display:none">
+    <h5><i class="bi bi-mortarboard"></i> Mis Cursos y Capacitaciones <span id="cursosTot" style="font-size:.72rem;background:#eff6ff;color:#0141A2;border-radius:10px;padding:2px 10px;font-weight:800"></span></h5>
+    <table><thead><tr><th>Fecha</th><th>Curso</th><th>Relator</th><th style="text-align:center">Horas</th><th style="text-align:center">Asistencia</th><th style="text-align:center">Nota</th></tr></thead><tbody id="tbCursos"></tbody></table>
+  </div>
+
   <div class="panel">
     <h5><i class="bi bi-folder2-open"></i> Mi Carpeta Digital</h5>
     <table><thead><tr><th>Tipo</th><th>Documento</th><th>Subido por</th><th>Fecha</th><th></th></tr></thead><tbody id="tbDocs"></tbody></table>
@@ -130,6 +135,21 @@ function render(){
     <td>${esc(d.subido_por||'—')}</td><td>${fD(d.created_at)}</td>
     <td><a href="/api/rrhh/docs/archivo/${d.id}?token=" onclick="return abrirDoc(${d.id})" style="font-weight:700"><i class="bi bi-download me-1"></i>Ver</a></td></tr>`).join('');
 }
+async function cargarCursos(){
+  try{
+    const j = await (await fetch('/api/rrhh/cursos/mios',{headers:H})).json();
+    const cs = (j.data||{}).cursos||[];
+    if(!cs.length) return;
+    document.getElementById('pCursos').style.display='';
+    document.getElementById('cursosTot').textContent = `${(j.data.horas_totales||0).toLocaleString('es-CL')} horas acumuladas`;
+    document.getElementById('tbCursos').innerHTML = cs.map(c=>`<tr>
+      <td>${fD(c.fecha)}</td><td><b>${esc(c.nombre)}</b></td><td>${esc(c.relator||'—')}</td>
+      <td style="text-align:center">${Number(c.horas).toLocaleString('es-CL')}</td>
+      <td style="text-align:center">${c.asistio?'<span style="color:#16a34a;font-weight:700">✓</span>':'<span style="color:#dc2626;font-weight:700">✗</span>'}</td>
+      <td style="text-align:center;font-weight:800">${c.con_nota&&c.nota!=null?String(Number(c.nota).toFixed(1)).replace('.',','):'—'}</td></tr>`).join('');
+  }catch(e){}
+}
+cargarCursos();
 function renderContacto(){
   const f = DATA.ficha || {};
   document.getElementById('gContacto').innerHTML = CONTACTO.map(([k,lbl]) => EDIT

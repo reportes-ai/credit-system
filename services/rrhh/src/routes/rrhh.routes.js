@@ -73,6 +73,15 @@ router.get('/desempeno/evaluaciones/:id/360',  verifyToken, des.get360);     // 
 router.post('/desempeno/evaluaciones/:id/360', verifyToken, des.asignar360); // valida jefatura/RRHH adentro
 router.get('/desempeno/competencias',      verifyToken, des.competencias);
 router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
+// Cursos y Capacitaciones — gestión RRHH; /cursos/mios lo ve cada uno (valida adentro)
+const cur = require('../controllers/cursos.controller');
+router.get('/cursos/mios',            verifyToken, cur.deUsuario);
+router.get('/cursos/de/:idUsuario',   verifyToken, cur.deUsuario);
+router.get('/cursos',                 verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.lista);
+router.get('/cursos/:id',             verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.detalle);
+router.post('/cursos',                verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.guardar);
+router.put('/cursos/asistentes/:id',  verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.marcarAsistente);
+router.delete('/cursos/:id',          verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.eliminar);
 const vc = require('../controllers/vac-cuenta.controller');
 router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
 router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);
