@@ -31,35 +31,43 @@ const meses12 = () => {
 
 exports.resumen = async (req, res) => {
   try {
+    // Universo = el MISMO del Directorio: activos y visibles (excluye cuentas técnicas
+    // y externos marcados con en_directorio=0 en rh_directorio_config)
+    const UNIV = `usuarios u LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario`;
+    const WU = `u.estado='activo' AND COALESCE(dc.en_directorio,1)=1`;
     const [
       [act], porSexo, porContrato, porCargo, porCC,
       ingresosMes, egresosMes, [vacSaldos], topVac,
       ausMes, liqMes, solTipo, edadesAnt,
     ] = await Promise.all([
-      pool.query(`SELECT COUNT(*) n FROM usuarios WHERE estado='activo'`).then(r => r[0]),
-      pool.query(`SELECT COALESCE(NULLIF(sexo,''),'(sin dato)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k`).then(r => r[0]),
-      pool.query(`SELECT COALESCE(NULLIF(f.tipo_contrato,''),'(sin dato)') k, COUNT(*) n FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE u.estado='activo' GROUP BY k ORDER BY n DESC`).then(r => r[0]),
-      pool.query(`SELECT COALESCE(NULLIF(cargo,''),'(sin cargo)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k ORDER BY n DESC LIMIT 10`).then(r => r[0]),
-      pool.query(`SELECT COALESCE(NULLIF(centro_costo,''),'(sin área)') k, COUNT(*) n FROM usuarios WHERE estado='activo' GROUP BY k ORDER BY n DESC`).then(r => r[0]),
-      pool.query(`SELECT DATE_FORMAT(fecha_ingreso,'%Y-%m') m, COUNT(*) n FROM usuarios WHERE fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
+      pool.query(`SELECT COUNT(*) n FROM ${UNIV} WHERE ${WU}`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(u.sexo,''),'(sin dato)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(f.tipo_contrato,''),'(sin dato)') k, COUNT(*) n FROM ${UNIV} LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario WHERE ${WU} GROUP BY k ORDER BY n DESC`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(u.cargo,''),'(sin cargo)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k ORDER BY n DESC LIMIT 10`).then(r => r[0]),
+      pool.query(`SELECT COALESCE(NULLIF(u.centro_costo,''),'(sin área)') k, COUNT(*) n FROM ${UNIV} WHERE ${WU} GROUP BY k ORDER BY n DESC`).then(r => r[0]),
+      pool.query(`SELECT DATE_FORMAT(u.fecha_ingreso,'%Y-%m') m, COUNT(*) n FROM ${UNIV} WHERE ${WU} AND u.fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
       pool.query(`SELECT DATE_FORMAT(fecha_termino,'%Y-%m') m, COUNT(*) n FROM rh_finiquitos WHERE fecha_termino >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY m`).then(r => r[0]),
       pool.query(`SELECT COALESCE(SUM(v.dias),0) saldo_total,
                          COALESCE(SUM(GREATEST(v.dias,0) * COALESCE(f.sueldo_base,0) / 30),0) pasivo
                     FROM (SELECT id_usuario, SUM(dias) dias FROM rh_vac_movimientos GROUP BY id_usuario) v
-                    JOIN usuarios u ON u.id_usuario=v.id_usuario AND u.estado='activo'
-                    LEFT JOIN rh_fichas f ON f.id_usuario=v.id_usuario`).then(r => r[0]),
-      pool.query(`SELECT CONCAT_WS(' ', u.nombre, u.apellido) nombre, SUM(v.dias) dias
-                    FROM rh_vac_movimientos v JOIN usuarios u ON u.id_usuario=v.id_usuario AND u.estado='activo'
-                   GROUP BY v.id_usuario HAVING dias > 0 ORDER BY dias DESC LIMIT 5`).then(r => r[0]),
+                    JOIN usuarios u ON u.id_usuario=v.id_usuario
+                    LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario
+                    LEFT JOIN rh_fichas f ON f.id_usuario=v.id_usuario
+                   WHERE ${WU}`).then(r => r[0]),
+      pool.query(`SELECT MAX(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, SUM(v.dias) dias
+                    FROM rh_vac_movimientos v
+                    JOIN usuarios u ON u.id_usuario=v.id_usuario
+                    LEFT JOIN rh_directorio_config dc ON dc.id_usuario=u.id_usuario
+                   WHERE ${WU} GROUP BY v.id_usuario HAVING dias > 0 ORDER BY dias DESC LIMIT 5`).then(r => r[0]),
       pool.query(`SELECT DATE_FORMAT(fecha_desde,'%Y-%m') m, tipo, SUM(COALESCE(dias_habiles, DATEDIFF(fecha_hasta, fecha_desde)+1)) d
                     FROM rh_ausencias WHERE estado IN ('APROBADA','REGISTRADA') AND fecha_desde >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
                    GROUP BY m, tipo`).then(r => r[0]),
       pool.query(`SELECT mes m, SUM(total_haberes) haberes, SUM(liquido) liquido, COUNT(*) n
                     FROM rh_liquidaciones WHERE estado='EMITIDA' GROUP BY mes ORDER BY mes DESC LIMIT 12`).then(r => r[0]),
       pool.query(`SELECT tipo k, estado, COUNT(*) n FROM rh_solicitudes WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) GROUP BY tipo, estado`).then(r => r[0]),
-      pool.query(`SELECT AVG(TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE())) edad,
-                         AVG(TIMESTAMPDIFF(MONTH, fecha_ingreso, CURDATE())) ant_meses
-                    FROM usuarios WHERE estado='activo'`).then(r => r[0][0]),
+      pool.query(`SELECT AVG(TIMESTAMPDIFF(YEAR, u.fecha_nacimiento, CURDATE())) edad,
+                         AVG(TIMESTAMPDIFF(MONTH, u.fecha_ingreso, CURDATE())) ant_meses
+                    FROM ${UNIV} WHERE ${WU}`).then(r => r[0][0]),
     ]);
 
     const mm = meses12();
@@ -68,6 +76,11 @@ exports.resumen = async (req, res) => {
     const egresos = serie(egresosMes);
     const egresos12 = egresos.reduce((s, x) => s + x.n, 0);
     const dotacion = Number(act.n) || 0;
+    // Stock de dotación al cierre de cada mes: se reconstruye hacia atrás desde la
+    // dotación actual restando los ingresos y sumando los egresos posteriores al mes
+    const stock = mm.map(() => 0);
+    let s = dotacion;
+    for (let i = mm.length - 1; i >= 0; i--) { stock[i] = s; s = s - ingresos[i].n + egresos[i].n; }
     // Rotación anual: egresos últimos 12m / dotación promedio aproximada
     const rotacion = dotacion ? Math.round((egresos12 / dotacion) * 1000) / 10 : 0;
 
@@ -81,7 +94,7 @@ exports.resumen = async (req, res) => {
       dotacion, porSexo, porContrato, porCargo, porCC,
       edad_promedio: edadesAnt?.edad != null ? Math.round(Number(edadesAnt.edad) * 10) / 10 : null,
       antiguedad_meses: edadesAnt?.ant_meses != null ? Math.round(Number(edadesAnt.ant_meses)) : null,
-      ingresos, egresos, egresos12, rotacion,
+      ingresos, egresos, egresos12, rotacion, stock,
       vacaciones: { saldo_total: Number(vacSaldos?.saldo_total) || 0, pasivo: Math.round(Number(vacSaldos?.pasivo) || 0), top: topVac },
       ausentismo,
       planilla: liqMes.reverse(),

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indicadores RRHH — AutoFácil</title>
-  <!-- v1.0 — People Analytics: dotación, rotación, ausentismo, vacaciones y planilla -->
+  <!-- v1.1 — universo = Directorio (en_directorio=1) + línea de stock de dotación mensual -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -47,7 +47,7 @@
   <div class="kpis" id="kpis"></div>
   <div class="grid2">
     <div class="box"><h6><i class="bi bi-arrow-left-right"></i>Ingresos vs egresos (12 meses)</h6><div id="chIE"></div>
-      <div class="leyenda"><span><span class="dot" style="background:var(--navy)"></span>Ingresos</span><span><span class="dot" style="background:#ef4444"></span>Egresos (finiquitos)</span></div></div>
+      <div class="leyenda"><span><span class="dot" style="background:var(--navy)"></span>Línea: dotación al cierre del mes (stock)</span><span><span class="dot" style="background:var(--navy)"></span>Ingresos</span><span><span class="dot" style="background:#ef4444"></span>Egresos (finiquitos)</span></div></div>
     <div class="box"><h6><i class="bi bi-thermometer-half"></i>Ausentismo — días por mes (12 meses)</h6><div id="chAus"></div>
       <div class="leyenda"><span><span class="dot" style="background:var(--navy)"></span>Licencias médicas</span><span><span class="dot" style="background:#f59e0b"></span>Permisos y otros</span></div></div>
   </div>
@@ -74,6 +74,25 @@ function barras(el, series, colores){ // series: [{m, vals:[a,b]}]
     s.vals.map((v,i)=>`<div class="col ${colores[i]||''}" style="height:${Math.round(v/max*95)}px" title="${fmt(v)}"></div>`).join('')
   }<div class="lb">${mesLb(s.m)}</div></div>`).join('')+'</div>';
 }
+function comboIE(el, ing, egr, stock){ // barras ingresos/egresos + línea de stock (dotación al cierre)
+  const W=560, HB=90, HT=70, n=ing.length, cw=W/n;
+  const maxB=Math.max(1,...ing.map(x=>x.n),...egr.map(x=>x.n));
+  const maxS=Math.max(1,...stock), minS=Math.min(...stock,maxS-1);
+  const sy=v=>HT-6-((v-minS)/(maxS-minS||1))*(HT-24);
+  const pts=stock.map((v,i)=>`${Math.round(i*cw+cw/2)},${Math.round(sy(v))}`).join(' ');
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${HT}" style="width:100%;display:block">
+    <polyline points="${pts}" fill="none" stroke="#0141A2" stroke-width="2.5"/>
+    ${stock.map((v,i)=>`<circle cx="${Math.round(i*cw+cw/2)}" cy="${Math.round(sy(v))}" r="3" fill="#0141A2"/>
+      <text x="${Math.round(i*cw+cw/2)}" y="${Math.round(sy(v))-7}" font-size="10" font-weight="700" fill="#012d70" text-anchor="middle">${v}</text>`).join('')}
+  </svg>
+  <div class="bars" style="height:${HB}px">${ing.map((x,i)=>`<div class="bar">
+    <div style="display:flex;align-items:flex-end;gap:2px;width:100%;height:${HB-24}px">
+      <div class="col" style="height:${Math.max(2,Math.round(x.n/maxB*(HB-28)))}px" title="Ingresos ${x.n}"></div>
+      <div class="col b" style="height:${Math.max(2,Math.round(egr[i].n/maxB*(HB-28)))}px" title="Egresos ${egr[i].n}"></div>
+    </div>
+    <div class="n">${x.n||egr[i].n?`${x.n||0}/${egr[i].n||0}`:''}</div>
+    <div class="lb">${mesLb(x.m)}</div></div>`).join('')}</div>`;
+}
 function hbars(el, rows){ const max=Math.max(1,...rows.map(r=>Number(r.n)));
   el.innerHTML=rows.length?rows.map(r=>`<div class="hrow"><div class="nm" title="${r.k}">${r.k}</div><div class="tr"><div class="fl" style="width:${Math.round(r.n/max*100)}%"></div></div><div class="ct">${fmt(r.n)}</div></div>`).join(''):'<div class="empty">Sin datos.</div>';
 }
@@ -89,7 +108,7 @@ function hbars(el, rows){ const max=Math.max(1,...rows.map(r=>Number(r.n)));
     <div class="kpi"><div class="l">Antigüedad promedio</div><div class="v">${antA}</div><div class="s">edad promedio ${d.edad_promedio!=null?fmt1(d.edad_promedio)+' años':'—'}</div></div>
     <div class="kpi"><div class="l">Saldo vacaciones</div><div class="v">${fmt1(d.vacaciones.saldo_total)} d</div><div class="s">pasivo estimado $${fmt(d.vacaciones.pasivo)}</div></div>
     <div class="kpi"><div class="l">Contratos</div><div class="v">${fmt((d.porContrato[0]||{}).n||0)}</div><div class="s">${d.porContrato.map(x=>`${x.k}: ${x.n}`).join(' · ')}</div></div>`;
-  barras($('chIE'), d.ingresos.map((x,i)=>({m:x.m, vals:[x.n, d.egresos[i].n]})), ['','b']);
+  comboIE($('chIE'), d.ingresos, d.egresos, d.stock||[]);
   barras($('chAus'), d.ausentismo.map(x=>({m:x.m, vals:[x.licencias, x.otros]})), ['','c']);
   hbars($('chCC'), d.porCC); hbars($('chCargo'), d.porCargo);
   $('vac').innerHTML = (d.vacaciones.top||[]).length
