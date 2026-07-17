@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 -->
+<!-- v2.6 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -300,13 +300,13 @@
   <h2 id="p17">17. Vacaciones y su provisión contable</h2>
   <p><b>Qué y para qué:</b> que cada colaborador tome sus vacaciones con saldo claro, que la cuenta corriente sea la única verdad (formulario, saldos de RRHH y finiquito leen lo mismo) y que la deuda de vacaciones quede provisionada mes a mes en la contabilidad.</p>
   <div class="meta">
-    <div><b class="lbl">Quién</b>El colaborador solicita · su jefatura directa o RRHH aprueba · RRHH administra ajustes y años previos · el cierre de mes contabiliza solo.</div>
+    <div><b class="lbl">Quién</b>El colaborador solicita (firma FES) · su <b>supervisor directo</b> aprueba desde la Bandeja de aprobación (RRHH solo como respaldo o si no hay jefe definido) · <b>RRHH queda notificado</b> de cada resolución · el cierre de mes contabiliza solo.</div>
     <div><b class="lbl">Prerequisitos</b>Ficha con fecha de ingreso · años previos declarados con certificado AFP en la carpeta (para el feriado progresivo) · ajuste histórico de AVSOFT hecho una sola vez.</div>
   </div>
   <ol>
     <li><b>Devengo automático</b>: al cumplir cada aniversario se abonan 15 días hábiles + el feriado progresivo si corresponde (art. 68: +10 años trabajados, 1 día extra por cada 3 nuevos). Sin intervención de nadie.</li>
     <li><b>Solicitar</b> (RRHH → Vacaciones): el formulario muestra los días disponibles (cuenta corriente + proporcional del período en curso) antes de pedir.</li>
-    <li><b>Aprobar</b> (jefatura directa o RRHH): al aprobarse, los días hábiles se cargan solos a la cuenta, descontando del período más antiguo (FIFO).</li>
+    <li><b>Aprobar</b> (el <b>supervisor directo</b>, avisado por campana; su decisión queda firmada FES con hash — RRHH puede resolver como respaldo y toma el paso si la persona no tiene jefe definido; nadie resuelve su propia solicitud): al aprobarse, los días hábiles se cargan solos a la cuenta, descontando del período más antiguo (FIFO), y <b>RRHH recibe la notificación</b> para planilla y reemplazos.</li>
     <li><b>Consultar</b>: cada uno ve su cuenta corriente ("ver cuenta corriente"); RRHH ve <b>Saldos del equipo</b> con la provisión en pesos por persona y el total, exportable a Excel.</li>
     <li><b>Provisión al cierre</b> (automático, Cierre de Mes): se guarda el snapshot del total y se contabiliza la variación contra el mes anterior — constitución 4002030→2106030 o liberación si bajó.</li>
   </ol>

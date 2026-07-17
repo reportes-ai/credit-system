@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacaciones — RRHH</title>
-  <!-- v1.2 — saldo de vacaciones (devengado proporcional vs usados) -->
+  <!-- v1.3 — aprueba el supervisor directo; RRHH notificado y respaldo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx-style.min.js" defer></script>
   <style>
@@ -37,7 +37,7 @@
 <div class="main">
   <div class="page-banner"><i class="bi bi-airplane"></i><div><h2>Solicitudes de Vacaciones</h2><p>Pide tus días, sigue la aprobación y revisa tu historial.</p></div></div>
   <div id="saldoBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 16px;font-size:.84rem;color:#1e3a8a;margin-bottom:14px"></div>
-  <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div><div class="tab" id="t5" onclick="tab('saldos')" style="display:none"><i class="bi bi-cash-stack me-1"></i>Saldos del equipo</div></div>
+  <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja de aprobación<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div><div class="tab" id="t5" onclick="tab('saldos')" style="display:none"><i class="bi bi-cash-stack me-1"></i>Saldos del equipo</div></div>
   <div id="secCrear" class="card-box">
     <div class="grid2"><div class="fld"><label>Desde</label><input type="date" id="fD"></div><div class="fld"><label>Hasta</label><input type="date" id="fH"></div></div>
     <div class="fld"><label>Comentario (opcional)</label><textarea id="fC" rows="3" placeholder="Motivo o detalle"></textarea></div>
@@ -104,7 +104,10 @@
     XLSX.utils.book_append_sheet(wb,ws,'Saldos Vacaciones');
     XLSX.writeFile(wb,'saldos-vacaciones-'+new Date().toISOString().slice(0,10)+'.xlsx');
   }
-  async function cargarPendientes(){ try{ const j=await(await fetch('/api/rrhh/pendientes',{headers:H})).json(); if(j.data?.es_rrhh){ ['t3','t4','t5'].forEach(id=>document.getElementById(id).style.display=''); const b=document.getElementById('bandejaCount'); const c=j.data.vacaciones||0; if(c>0){b.textContent=c;b.style.display='';}else b.style.display='none'; } }catch(e){} }
+  async function cargarPendientes(){ try{ const j=await(await fetch('/api/rrhh/pendientes',{headers:H})).json();
+    if(j.data?.es_rrhh){ ['t3','t4','t5'].forEach(id=>document.getElementById(id).style.display=''); }
+    else if(j.data?.es_jefe){ document.getElementById('t3').style.display=''; }
+    if(j.data?.es_rrhh||j.data?.es_jefe){ const b=document.getElementById('bandejaCount'); const c=j.data.vacaciones||0; if(c>0){b.textContent=c;b.style.display='';}else b.style.display='none'; } }catch(e){} }
   async function cargarSaldos(){ const tb=document.getElementById('tbSaldos'); tb.innerHTML='<tr><td colspan="7" class="empty">Calculando saldos…</td></tr>';
     const j=await(await fetch('/api/rrhh/vacaciones/saldos',{headers:H})).json(); if(!j.success){tb.innerHTML=`<tr><td colspan="8" class="empty">${esc(j.error)}</td></tr>`;return;}
     SALDOS_DATA=j.data;
@@ -133,12 +136,13 @@
     const j=await(await fetch('/api/rrhh/vacaciones',{method:'POST',headers:HJ,body:JSON.stringify({fecha_desde:fD,fecha_hasta:fH,comentario:document.getElementById('fC').value})})).json();
     if(!j.success)return alert(j.error); alert(`Solicitud enviada (${j.data.dias} día/s)`); document.getElementById('fC').value=''; tab('mias'); }
   async function cargar(){ const tb=document.getElementById('tb'); tb.innerHTML='<tr><td colspan="6" class="empty">Cargando…</td></tr>';
-    const j=await(await fetch('/api/rrhh/vacaciones?vista='+VISTA,{headers:H})).json(); const rows=j.data?.solicitudes||[]; ES_RRHH=j.data?.es_rrhh; document.getElementById('t3').style.display=ES_RRHH?'':'none'; document.getElementById('t4').style.display=ES_RRHH?'':'none'; cargarPendientes();
+    const j=await(await fetch('/api/rrhh/vacaciones?vista='+VISTA,{headers:H})).json(); const rows=j.data?.solicitudes||[]; ES_RRHH=j.data?.es_rrhh; const ES_JEFE=j.data?.es_jefe;
+    document.getElementById('t3').style.display=(ES_RRHH||ES_JEFE)?'':'none'; document.getElementById('t4').style.display=ES_RRHH?'':'none'; cargarPendientes();
     document.getElementById('thAcc').textContent = VISTA==='bandeja'?'Acción':'';
     if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="empty">Sin solicitudes.</td></tr>';return;}
     tb.innerHTML=rows.map(s=>`<tr><td>${esc(s.nombre||'')}</td><td>${fd(s.fecha_desde)}</td><td>${fd(s.fecha_hasta)}</td><td><b>${s.dias}</b></td>
       <td><span class="pill ${s.estado}">${s.estado}</span>${s.motivo_rechazo?`<div style="font-size:.7rem;color:#b91c1c">${esc(s.motivo_rechazo)}</div>`:''}</td>
-      <td>${(VISTA==='bandeja'&&ES_RRHH&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="resolver(${s.id},'APROBADA')">Aprobar</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}</td></tr>`).join('');
+      <td>${(VISTA==='bandeja'&&s.estado==='PENDIENTE')?`<button class="btn-mini ok" onclick="resolver(${s.id},'APROBADA')">Aprobar</button> <button class="btn-mini no" onclick="resolver(${s.id},'RECHAZADA')">Rechazar</button>`:''}</td></tr>`).join('');
   }
   async function resolver(id,estado){ let mot=null; if(estado==='RECHAZADA'){ mot=prompt('Motivo del rechazo:')||''; }
     const j=await(await fetch(`/api/rrhh/vacaciones/${id}/resolver`,{method:'POST',headers:HJ,body:JSON.stringify({estado,motivo_rechazo:mot})})).json();

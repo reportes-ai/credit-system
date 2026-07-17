@@ -184,8 +184,10 @@ const crearVacaciones = async (req, res) => {
       await pool.query(`INSERT IGNORE INTO rh_firmas (entidad, entidad_id, rol, id_usuario, nombre, cargo, ip, hash_doc)
         VALUES ('VACACIONES', ?, 'TRABAJADOR', ?, ?, ?, ?, ?)`, [r.insertId, u.id_usuario, nombreDe(u), uf?.cargo || '', ip, hash]);
     } catch (e) { console.error('[vacaciones firma FES]', e.message); }
-    const ids = await poolRRHH(u.id_usuario);
-    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones', mensaje: `${nombreDe(u)} solicitó ${dias} día(s): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
+    // Flujo: aprueba el SUPERVISOR directo (sin supervisor definido → RRHH)
+    const [[sup]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [u.id_usuario]);
+    const ids = sup?.id_supervisor ? [sup.id_supervisor] : await poolRRHH(u.id_usuario);
+    if (ids.length) notificar(ids, { tipo: 'RH_VACACIONES', titulo: '🌴 Solicitud de vacaciones por aprobar', mensaje: `${nombreDe(u)} solicitó ${dias} día(s): ${fd} al ${fh}`, href: '/recursos-humanos/vacaciones/?id=' + r.insertId });
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: r.insertId, detalle: `Solicitó vacaciones ${fd}→${fh} (${dias}d)` });
     res.status(201).json({ success: true, data: { id: r.insertId, dias }, error: null });
   } catch (e) { console.error('[rrhh crearVacaciones]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -193,23 +195,37 @@ const crearVacaciones = async (req, res) => {
 const listarVacaciones = async (req, res) => {
   try {
     const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
+    const [[j]] = await pool.query("SELECT COUNT(*) c FROM usuarios WHERE id_supervisor=? AND estado='activo'", [u.id_usuario]);
+    const esJefe = j.c > 0;
     let vista = req.query.vista || 'mias';
-    if ((vista === 'bandeja' || vista === 'historicas') && !rrhh) vista = 'mias';
+    if (vista === 'bandeja' && !rrhh && !esJefe) vista = 'mias';
+    if (vista === 'historicas' && !rrhh) vista = 'mias';
     const params = []; let where = '';
-    if (vista === 'mias') { where = 'WHERE id_usuario=?'; params.push(u.id_usuario); }
-    else if (vista === 'bandeja') where = "WHERE estado='PENDIENTE'";
-    else if (vista === 'historicas') where = "WHERE estado<>'PENDIENTE'";
-    const [rows] = await pool.query(`SELECT * FROM rh_vacaciones ${where} ORDER BY FIELD(estado,'PENDIENTE','APROBADA','RECHAZADA'), created_at DESC LIMIT 300`, params);
-    res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh }, error: null });
+    if (vista === 'mias') { where = 'WHERE v.id_usuario=?'; params.push(u.id_usuario); }
+    else if (vista === 'bandeja') {
+      // el supervisor ve las de SU equipo; RRHH ve todas (respaldo y gente sin jefe)
+      if (rrhh) where = "WHERE v.estado='PENDIENTE'";
+      else { where = "WHERE v.estado='PENDIENTE' AND u.id_supervisor=?"; params.push(u.id_usuario); }
+    }
+    else if (vista === 'historicas') where = "WHERE v.estado<>'PENDIENTE'";
+    const [rows] = await pool.query(
+      `SELECT v.* FROM rh_vacaciones v LEFT JOIN usuarios u ON u.id_usuario=v.id_usuario
+        ${where} ORDER BY FIELD(v.estado,'PENDIENTE','APROBADA','RECHAZADA'), v.created_at DESC LIMIT 300`, params);
+    res.json({ success: true, data: { solicitudes: rows, es_rrhh: rrhh, es_jefe: esJefe }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 const resolverVacaciones = async (req, res) => {
   try {
-    const u = req.usuario || {}; if (!(await esRRHH(u.id_usuario))) return res.status(403).json({ success: false, data: null, error: 'Solo RRHH resuelve' });
+    const u = req.usuario || {};
     const estado = String((req.body || {}).estado || '').toUpperCase();
     if (!['APROBADA', 'RECHAZADA'].includes(estado)) return res.status(400).json({ success: false, data: null, error: 'Estado inválido' });
     const [[s]] = await pool.query('SELECT * FROM rh_vacaciones WHERE id=?', [req.params.id]);
     if (!s) return res.status(404).json({ success: false, data: null, error: 'Solicitud no encontrada' });
+    // Resuelve el SUPERVISOR directo del solicitante; RRHH como respaldo (y para gente sin jefe)
+    const [[sol]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [s.id_usuario]);
+    const soySupervisor = sol?.id_supervisor === u.id_usuario;
+    if (!soySupervisor && !(await esRRHH(u.id_usuario))) return res.status(403).json({ success: false, data: null, error: 'Resuelve el supervisor directo (o RRHH como respaldo)' });
+    if (s.id_usuario === u.id_usuario) return res.status(403).json({ success: false, data: null, error: 'No puedes resolver tu propia solicitud' });
     await pool.query('UPDATE rh_vacaciones SET estado=?, resuelto_por=?, resuelto_nombre=?, motivo_rechazo=? WHERE id=?',
       [estado, u.id_usuario || null, nombreDe(u), estado === 'RECHAZADA' ? (norm((req.body || {}).motivo_rechazo) || null) : null, s.id]);
     // Firma FES de la resolución (mismo registro que contratos/finiquitos: rh_firmas)
@@ -223,6 +239,14 @@ const resolverVacaciones = async (req, res) => {
         VALUES ('VACACIONES', ?, 'EMPLEADOR', ?, ?, ?, ?, ?)`, [s.id, u.id_usuario, nombreDe(u), uf?.cargo || '', ip, hash]);
     } catch (e) { console.error('[vacaciones firma FES]', e.message); }
     if (s.id_usuario) notificar([s.id_usuario], { tipo: 'RH_VACACIONES', titulo: `🌴 Vacaciones ${estado === 'APROBADA' ? 'aprobadas' : 'rechazadas'}`, mensaje: `${s.fecha_desde} al ${s.fecha_hasta} (${s.dias}d)`, href: '/recursos-humanos/vacaciones/?id=' + s.id });
+    // RRHH queda NOTIFICADO de la resolución (para planilla, reemplazos y cuenta corriente)
+    try {
+      const rrhhIds = (await poolRRHH(u.id_usuario)).filter(x => x !== s.id_usuario);
+      if (rrhhIds.length) notificar(rrhhIds, { tipo: 'RH_VACACIONES', prioridad: 'media',
+        titulo: `🌴 Vacaciones ${estado === 'APROBADA' ? 'APROBADAS' : 'rechazadas'}: ${s.nombre}`,
+        mensaje: `${s.fecha_desde} al ${s.fecha_hasta} (${s.dias}d) — resuelto por ${nombreDe(u)}`,
+        href: '/recursos-humanos/vacaciones/?id=' + s.id, clave: `vac_res_${s.id}` });
+    } catch (_) {}
     // Cuenta corriente: la aprobación descuenta los días hábiles del saldo
     if (estado === 'APROBADA') try { await require('./vac-cuenta.controller').registrarTomado(s); } catch (_) {}
     auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'vacaciones', entidad_id: s.id, detalle: `Vacaciones #${s.id} → ${estado}` });
@@ -480,13 +504,21 @@ const cumpleHoy = async (req, res) => {
 const pendientes = async (req, res) => {
   try {
     const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
-    let vac = 0, ant = 0;
+    let vac = 0, ant = 0, esJefe = false;
     if (rrhh) {
       const [[a]] = await pool.query("SELECT COUNT(*) c FROM rh_vacaciones WHERE estado='PENDIENTE'");
       const [[b]] = await pool.query("SELECT COUNT(*) c FROM rh_antiguedad WHERE estado='PENDIENTE'");
       vac = a.c; ant = b.c;
+    } else {
+      // supervisor: pendientes de SU equipo
+      const [[a]] = await pool.query(
+        `SELECT COUNT(*) c FROM rh_vacaciones v JOIN usuarios x ON x.id_usuario=v.id_usuario
+          WHERE v.estado='PENDIENTE' AND x.id_supervisor=?`, [u.id_usuario]);
+      vac = a.c;
+      const [[j]] = await pool.query("SELECT COUNT(*) c FROM usuarios WHERE id_supervisor=? AND estado='activo'", [u.id_usuario]);
+      esJefe = j.c > 0;
     }
-    res.json({ success: true, data: { es_rrhh: rrhh, vacaciones: vac, antiguedad: ant, count: vac + ant }, error: null });
+    res.json({ success: true, data: { es_rrhh: rrhh, es_jefe: esJefe, vacaciones: vac, antiguedad: ant, count: vac + ant }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: { count: 0 }, error: 'Error' }); }
 };
 
