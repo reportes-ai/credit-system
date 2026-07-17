@@ -199,7 +199,7 @@ async function fqCalcular(){
       ${fila('Indemnización sustitutiva del aviso previo', 'fqMA', d.mes_aviso)}
       ${fila(`Feriado proporcional (${d.vac_dias_habiles} hábiles ≈ ${d.vac_dias_corridos} corridos)`, 'fqVac', d.vac_monto)}
       ${fila('Otros haberes (bonos pendientes, etc.)', 'fqOtros', 0)}
-      ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', 0, 'se resta')}
+      ${fila('Descuentos (anticipos, préstamos pendientes)', 'fqDesc', d.descuentos_prestamos||0, 'se resta — precargado desde los convenios vigentes')}
       <tr><td style="font-weight:800">TOTAL FINIQUITO</td><td style="text-align:right;font-weight:800;font-size:1.1rem" id="fqTotalCell"></td></tr>
     </table>
     <div class="pie" style="justify-content:flex-start"><button class="btn" onclick="fqGuardar()"><i class="bi bi-save me-1"></i>Guardar finiquito</button></div>`;

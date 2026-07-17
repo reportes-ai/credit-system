@@ -410,7 +410,26 @@ exports.finiquitoCalcular = async (req, res) => {
     const vacCorridos = Math.round(vacHabiles * 1.4 * 10) / 10;
     const vacMonto = Math.round(vacCorridos * base / 30);
 
+    // Saldo pendiente de anticipos/préstamos: se descuenta del finiquito
+    // (cláusula del convenio firmado). Cuotas cobradas = meses transcurridos
+    // desde mes_inicio hasta el mes del término, tope el total de cuotas.
+    const [descs] = await pool.query(
+      `SELECT id, tipo, cuotas, valor_cuota, mes_inicio FROM rh_descuentos
+        WHERE id_usuario=? AND estado='VIGENTE' AND tipo IN ('ANTICIPO','PRESTAMO','PAGO_EXCESO')`, [idU]);
+    const mesFin = fechaT.slice(0, 7);
+    const difM = (a, b) => (Number(b.slice(0, 4)) - Number(a.slice(0, 4))) * 12 + (Number(b.slice(5, 7)) - Number(a.slice(5, 7)));
+    let saldoPrestamos = 0;
+    const prestamosDetalle = [];
+    for (const d of descs) {
+      const cobradas = Math.max(0, Math.min(Number(d.cuotas), difM(d.mes_inicio, mesFin) + 1));
+      const saldo = Math.max(0, (Number(d.cuotas) - cobradas) * Number(d.valor_cuota));
+      if (saldo > 0) { saldoPrestamos += saldo; prestamosDetalle.push({ id: d.id, tipo: d.tipo, saldo, cuotas_pendientes: Number(d.cuotas) - cobradas }); }
+    }
+    if (saldoPrestamos > 0)
+      avisos.push(`Tiene ${prestamosDetalle.length} anticipo/préstamo vigente con saldo pendiente de ${CLP(saldoPrestamos)} (${prestamosDetalle.map(p => p.tipo + ' #' + p.id + ': ' + CLP(p.saldo)).join(', ')}) — precargado en Descuentos según el convenio firmado.`);
+
     ok(res, {
+      descuentos_prestamos: saldoPrestamos, prestamos_detalle: prestamosDetalle,
       colaborador: u, causal: cau, uf, base, base_topada: baseTopada,
       anos_servicio: anos, meses_servicio: meses,
       indemnizacion_anos: indemAnos, mes_aviso: mesAviso,
@@ -437,6 +456,16 @@ exports.finiquitoGuardar = async (req, res) => {
        JSON.stringify(detalle), total, req.usuario.id_usuario]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_finiquito', entidad_id: r.insertId,
       detalle: `Finiquito ${b.trabajador} (${b.causal}) total ${CLP(total)}` });
+    // Contabilización automática: gasto finiquito → finiquitos por pagar
+    if (total > 0) {
+      try {
+        await require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: 'FINIQUITO_EMITIDO', fecha: b.fecha_termino,
+          glosa: `Finiquito ${b.trabajador} (art. ${b.causal})`, ref: `FINIQ-${r.insertId}`,
+          montos: { total },
+        });
+      } catch (e) { console.error('[finiquito asiento]', e.message); }
+    }
     ok(res, { id: r.insertId, total });
   } catch (e) { fail(res, e.message); }
 };

@@ -52,6 +52,7 @@ const vc = require('../controllers/vac-cuenta.controller');
 router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
 router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);
 router.get('/vacaciones/saldos',         verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.getSaldos);
+router.get('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.getPreviredConfig);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);

@@ -72,6 +72,7 @@
     <div style="flex:1"></div>
     <button class="btn-ghost" onclick="exportCSV()"><i class="bi bi-filetype-csv me-1"></i>Libro CSV</button>
     <button class="btn-ghost" onclick="archivoPrevired()" title="Archivo oficial 105 campos para pagar las cotizaciones en previred.com"><i class="bi bi-bank me-1"></i>Archivo Previred</button>
+    <button class="btn-ghost" onclick="configPrevired()" title="CCAF y mutualidad de la empresa (archivo Previred)"><i class="bi bi-gear"></i></button>
     <button class="btn-navy" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
     <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
   </div>
@@ -306,6 +307,24 @@ async function archivoPrevired(){
   if (!confirm(msg)) return;
   const blob = new Blob([d.contenido], { type:'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = d.archivo; a.click();
+}
+async function configPrevired(){
+  const j = await (await fetch('/api/rrhh/remuneraciones/previred-config',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  const c = j.data;
+  const CCAF = {'00':'Sin CCAF','01':'Los Andes','02':'La Araucana','03':'Los Héroes','04':'18 de Septiembre'};
+  const MUT = {'00':'Sin mutual (cotiza al ISL)','01':'ACHS','02':'Mutual de Seguridad CChC','03':'IST'};
+  const pedir = (titulo, mapa, actual) => {
+    const op = Object.entries(mapa).map(([k,v])=>`${k} = ${v}`).join('\n');
+    const r = prompt(`${titulo}\n\n${op}\n\nCódigo actual: ${actual}`, actual);
+    return r===null ? null : (mapa[String(r).padStart(2,'0')] ? String(r).padStart(2,'0') : actual);
+  };
+  const ccaf = pedir('CCAF de la empresa (Tabla N°18 Previred):', CCAF, c.ccaf); if (ccaf===null) return;
+  const mutual = pedir('Mutualidad de la empresa (Tabla N°19):', MUT, c.mutual); if (mutual===null) return;
+  const r = await fetch('/api/rrhh/remuneraciones/previred-config',{method:'PUT',headers:H,
+    body:JSON.stringify({ccaf,mutual,sucursal_mutual:c.sucursal_mutual||''})}).then(r=>r.json());
+  if (!r.success) return alert(r.error);
+  alert(`Guardado: CCAF ${CCAF[ccaf]} · Mutual ${MUT[mutual]}. Aplica al próximo archivo Previred.`);
 }
 document.getElementById('mes').value = new Date().toISOString().slice(0,7);
 cargar();

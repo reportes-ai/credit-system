@@ -86,6 +86,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['4002030', 'DEBE', 'constitucion', 'Gasto provisión de vacaciones'],
         ['2106030', 'HABER', 'constitucion', 'Provisión de vacaciones por pagar'],
       ]],
+      ['FINIQUITO_EMITIDO', 'Finiquito emitido (RRHH)', 'Se dispara al GUARDAR un finiquito en RRHH → Contratos → Finiquitos: reconoce el gasto y deja el monto en Finiquitos por Pagar (el pago posterior banco contra 2106070 se registra al pagar). Campos: total.', 'TRASPASO', 1, [
+        ['4002050', 'DEBE', 'total', 'Gasto finiquito'],
+        ['2106070', 'HABER', 'total', 'Finiquito por pagar'],
+      ]],
       ['PROVISION_VAC_LIBERACION', 'Liberación provisión de vacaciones (cierre de mes)', 'Se dispara en el cierre de mes cuando la provisión de vacaciones BAJÓ (se tomaron o pagaron días): reversa el exceso. Campos: liberacion (variación).', 'TRASPASO', 1, [
         ['2106030', 'DEBE', 'liberacion', 'Rebaja provisión de vacaciones'],
         ['4002030', 'HABER', 'liberacion', 'Abono gasto provisión de vacaciones'],

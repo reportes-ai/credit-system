@@ -1171,6 +1171,13 @@ async function subirConvenioDescuento(req, res) {
   } catch (e) { console.error('[convenio descuento]', e.message); fail(res, e.message); }
 }
 
+async function getPreviredConfig(req, res) {
+  try {
+    const [[cfg]] = await pool.query('SELECT ccaf, mutual, sucursal_mutual FROM rh_previred_config WHERE id=1');
+    ok(res, cfg || { ccaf: '00', mutual: '02', sucursal_mutual: '' });
+  } catch (e) { fail(res, e.message); }
+}
+
 async function putPreviredConfig(req, res) {
   try {
     const { ccaf, mutual, sucursal_mutual } = req.body || {};
@@ -1182,4 +1189,4 @@ async function putPreviredConfig(req, res) {
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
-  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, putPreviredConfig, subirConvenioDescuento };
+  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento };
