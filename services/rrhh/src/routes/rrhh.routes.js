@@ -64,6 +64,11 @@ router.get('/desempeno/ciclos',            verifyToken, requireFunc('rh_colabora
 router.post('/desempeno/ciclos',           verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.crearCiclo);
 router.post('/desempeno/ciclos/:id/cerrar', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.cerrarCiclo);
 router.put('/desempeno/evaluaciones/:id/evaluador', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.asignarEvaluador);
+router.get('/desempeno/360/mias',          verifyToken, des.mis360);
+router.post('/desempeno/360/responder',    verifyToken, des.responder360);
+router.get('/desempeno/360/usuarios',      verifyToken, des.usuarios360);
+router.get('/desempeno/evaluaciones/:id/360',  verifyToken, des.get360);     // valida jefatura/RRHH adentro
+router.post('/desempeno/evaluaciones/:id/360', verifyToken, des.asignar360); // valida jefatura/RRHH adentro
 router.get('/desempeno/competencias',      verifyToken, des.competencias);
 router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
 const vc = require('../controllers/vac-cuenta.controller');

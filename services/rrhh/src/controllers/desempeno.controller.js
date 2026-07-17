@@ -139,18 +139,22 @@ async function cargarEvals(where, params) {
        JOIN rh_des_competencias k ON k.id=n.id_competencia
       WHERE n.id_evaluacion IN (?) ORDER BY k.orden`, [ids]);
   const [objs] = await pool.query(`SELECT * FROM rh_des_objetivos WHERE id_evaluacion IN (?) ORDER BY id`, [ids]);
-  return evals.map(e => ({ ...e,
+  const out = evals.map(e => ({ ...e,
     notas: notas.filter(x => x.id_evaluacion === e.id),
     objetivos: objs.filter(x => x.id_evaluacion === e.id) }));
+  for (const e of out) e.r360 = await resumen360(e.id).catch(() => null);
+  return out;
 }
 
 /* ── Colaborador: mi evaluación + historial ─────────────────────────────────── */
 exports.mi = async (req, res) => {
   try {
     const evals = await cargarEvals('e.id_usuario=?', [req.usuario.id_usuario]);
-    // en las abiertas sin evaluar, el colaborador no ve las notas de la jefatura
-    for (const e of evals) if (e.estado === 'PENDIENTE' || e.estado === 'AUTOEVAL')
+    // en las abiertas sin evaluar, el colaborador no ve las notas de la jefatura ni el 360
+    for (const e of evals) if (e.estado === 'PENDIENTE' || e.estado === 'AUTOEVAL') {
       e.notas = e.notas.map(x => ({ ...x, jefe: null }));
+      e.r360 = null;
+    }
     const [comps] = await pool.query(`SELECT * FROM rh_des_competencias WHERE activa=1 ORDER BY orden`);
     ok(res, { evaluaciones: evals, competencias: comps });
   } catch (e) { fail(res, e.message); }
@@ -293,6 +297,157 @@ exports.asignarEvaluador = async (req, res) => {
     if (!idJefe) return fail(res, 'Falta el evaluador', 400);
     await pool.query(`UPDATE rh_des_evaluaciones SET id_evaluador=? WHERE id=? AND estado!='CERRADA'`, [idJefe, idEval]);
     ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── EVALUACIÓN 360 ─────────────────────────────────────────────────────────────
+   Además de la evaluación formal de la jefatura, cada evaluación puede tener
+   evaluadores 360 por DIMENSIÓN (PAR, REPORTE DIRECTO, CLIENTE INTERNO, OTRA).
+   Quién evalúa a quién lo define la jefatura o RRHH. El resultado se agrega
+   ANÓNIMO por dimensión (promedio por competencia); es feedback: NO entra en
+   la nota final (que sigue siendo jefatura + objetivos).
+   ───────────────────────────────────────────────────────────────────────────── */
+require('../../../../shared/migrate').enFila('rrhh-desempeno-360', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_des_360 (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_evaluacion INT NOT NULL,
+    id_evaluador INT NOT NULL,
+    dimension VARCHAR(20) NOT NULL,
+    estado VARCHAR(12) DEFAULT 'PENDIENTE',
+    comentario TEXT NULL,
+    respondida_at DATETIME NULL,
+    UNIQUE KEY uq_eval_evaluador (id_evaluacion, id_evaluador),
+    INDEX idx_evaluador (id_evaluador)
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_des_360_notas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_360 INT NOT NULL,
+    id_competencia INT NOT NULL,
+    nota TINYINT NOT NULL,
+    UNIQUE KEY uq_360_comp (id_360, id_competencia)
+  )`);
+});
+
+const DIMENSIONES = ['PAR', 'REPORTE', 'CLIENTE_INTERNO', 'OTRA'];
+
+/* Resumen anónimo por dimensión: promedio por competencia + comentarios sin autor */
+async function resumen360(idEval) {
+  const [regs] = await pool.query(`SELECT id, dimension, estado, comentario FROM rh_des_360 WHERE id_evaluacion=?`, [idEval]);
+  if (!regs.length) return null;
+  const listas = regs.filter(r => r.estado === 'LISTA');
+  const [notas] = listas.length
+    ? await pool.query(`SELECT n.id_360, n.id_competencia, n.nota, k.nombre competencia
+                          FROM rh_des_360_notas n JOIN rh_des_competencias k ON k.id=n.id_competencia
+                         WHERE n.id_360 IN (?)`, [listas.map(r => r.id)])
+    : [[]];
+  const dims = {};
+  for (const r of listas) {
+    const d = dims[r.dimension] = dims[r.dimension] || { dimension: r.dimension, respondidas: 0, comentarios: [], comps: {} };
+    d.respondidas++;
+    if (r.comentario) d.comentarios.push(r.comentario);
+    for (const n of notas.filter(x => x.id_360 === r.id)) {
+      const c = d.comps[n.id_competencia] = d.comps[n.id_competencia] || { competencia: n.competencia, suma: 0, n: 0 };
+      c.suma += n.nota; c.n++;
+    }
+  }
+  return {
+    invitados: regs.length, respondidas: listas.length,
+    dimensiones: Object.values(dims).map(d => ({
+      dimension: d.dimension, respondidas: d.respondidas, comentarios: d.comentarios,
+      competencias: Object.values(d.comps).map(c => ({ competencia: c.competencia, promedio: round2(c.suma / c.n) })),
+    })),
+  };
+}
+exports._resumen360 = resumen360;
+
+/* Asignación (jefatura de la evaluación o RRHH): quién evalúa a quién y en qué dimensión */
+exports.get360 = async (req, res) => {
+  try {
+    const idEval = parseInt(req.params.id);
+    const [[ev]] = await pool.query(`SELECT * FROM rh_des_evaluaciones WHERE id=?`, [idEval]);
+    if (!ev) return fail(res, 'Evaluación no encontrada', 404);
+    const rrhh = await esRRHH(req);
+    if (ev.id_evaluador !== req.usuario.id_usuario && !rrhh) return fail(res, 'Solo la jefatura o RRHH', 403);
+    const [regs] = await pool.query(
+      `SELECT r.id, r.id_evaluador, r.dimension, r.estado, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) evaluador, u.cargo
+         FROM rh_des_360 r JOIN usuarios u ON u.id_usuario=r.id_evaluador WHERE r.id_evaluacion=? ORDER BY r.dimension, evaluador`, [idEval]);
+    ok(res, { evaluadores: regs, resumen: await resumen360(idEval) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.asignar360 = async (req, res) => {
+  try {
+    const idEval = parseInt(req.params.id);
+    const b = req.body || {};
+    const [[ev]] = await pool.query(
+      `SELECT e.*, c.nombre ciclo FROM rh_des_evaluaciones e JOIN rh_des_ciclos c ON c.id=e.id_ciclo WHERE e.id=?`, [idEval]);
+    if (!ev) return fail(res, 'Evaluación no encontrada', 404);
+    const rrhh = await esRRHH(req);
+    if (ev.id_evaluador !== req.usuario.id_usuario && !rrhh) return fail(res, 'Solo la jefatura o RRHH puede asignar el 360', 403);
+    if (b.quitar) { // quitar un evaluador (solo si no respondió)
+      await pool.query(`DELETE FROM rh_des_360 WHERE id=? AND id_evaluacion=? AND estado='PENDIENTE'`, [parseInt(b.quitar), idEval]);
+      return ok(res, { ok: true });
+    }
+    const idEvaluador = parseInt(b.id_evaluador);
+    const dim = DIMENSIONES.includes(b.dimension) ? b.dimension : 'PAR';
+    if (!idEvaluador) return fail(res, 'Falta el evaluador', 400);
+    if (idEvaluador === ev.id_usuario) return fail(res, 'La persona no puede ser su propio evaluador 360 (para eso está la autoevaluación)', 400);
+    await pool.query(`INSERT INTO rh_des_360 (id_evaluacion, id_evaluador, dimension) VALUES (?,?,?)
+                      ON DUPLICATE KEY UPDATE dimension=VALUES(dimension)`, [idEval, idEvaluador, dim]);
+    notificar([idEvaluador], {
+      tipo: 'RRHH', prioridad: 'media', titulo: 'Te invitaron a una evaluación 360',
+      mensaje: `Evalúa a un compañero en el ciclo ${ev.ciclo} — pestaña 360 en Desempeño`,
+      href: '/recursos-humanos/desempeno/', clave: `des360_${idEval}_${idEvaluador}` });
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Lo que me toca responder como evaluador 360 (y lo ya respondido) */
+exports.mis360 = async (req, res) => {
+  try {
+    const [regs] = await pool.query(
+      `SELECT r.id, r.dimension, r.estado, r.comentario, e.id id_evaluacion, c.nombre ciclo, c.estado estado_ciclo,
+              TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) colaborador, u.cargo
+         FROM rh_des_360 r
+         JOIN rh_des_evaluaciones e ON e.id=r.id_evaluacion
+         JOIN rh_des_ciclos c ON c.id=e.id_ciclo
+         JOIN usuarios u ON u.id_usuario=e.id_usuario
+        WHERE r.id_evaluador=? ORDER BY r.estado='PENDIENTE' DESC, r.id DESC LIMIT 100`, [req.usuario.id_usuario]);
+    const ids = regs.filter(r => r.estado === 'LISTA').map(r => r.id);
+    const [notas] = ids.length ? await pool.query(`SELECT id_360, id_competencia, nota FROM rh_des_360_notas WHERE id_360 IN (?)`, [ids]) : [[]];
+    ok(res, { pendientes: regs.map(r => ({ ...r, notas: notas.filter(n => n.id_360 === r.id) })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.responder360 = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const [[reg]] = await pool.query(`SELECT r.*, c.estado estado_ciclo FROM rh_des_360 r
+      JOIN rh_des_evaluaciones e ON e.id=r.id_evaluacion JOIN rh_des_ciclos c ON c.id=e.id_ciclo WHERE r.id=?`, [parseInt(b.id_360)]);
+    if (!reg || reg.id_evaluador !== req.usuario.id_usuario) return fail(res, 'Invitación no encontrada', 404);
+    if (reg.estado_ciclo !== 'ABIERTO') return fail(res, 'El ciclo ya está cerrado', 400);
+    let alguna = false;
+    for (const nRaw of (b.notas || [])) {
+      const nota = Math.min(5, Math.max(1, parseInt(nRaw.nota) || 0)) || null;
+      if (!nota) continue;
+      alguna = true;
+      await pool.query(`INSERT INTO rh_des_360_notas (id_360, id_competencia, nota) VALUES (?,?,?)
+                        ON DUPLICATE KEY UPDATE nota=VALUES(nota)`, [reg.id, parseInt(nRaw.id_competencia), nota]);
+    }
+    if (!alguna) return fail(res, 'Evalúa al menos una competencia', 400);
+    await pool.query(`UPDATE rh_des_360 SET estado='LISTA', respondida_at=NOW(), comentario=? WHERE id=?`,
+      [String(b.comentario || '').slice(0, 2000) || null, reg.id]);
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Usuarios activos para el selector de evaluadores (solo datos de directorio) */
+exports.usuarios360 = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_usuario, TRIM(CONCAT_WS(' ', nombre, apellido)) nombre, cargo
+         FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0 ORDER BY nombre LIMIT 500`);
+    ok(res, { usuarios: rows });
   } catch (e) { fail(res, e.message); }
 };
 
