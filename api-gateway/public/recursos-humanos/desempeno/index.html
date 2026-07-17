@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluaciones de Desempeño — RRHH</title>
-  <!-- v1.1 — evaluación 360 por dimensiones -->
+  <!-- v1.2 — pestaña 360 siempre visible con guía -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -50,7 +50,7 @@
   <div class="tabs">
     <div class="tab active" id="t1" onclick="tab('mi')"><i class="bi bi-person me-1"></i>Mi Evaluación</div>
     <div class="tab" id="t2" onclick="tab('equipo')" style="display:none"><i class="bi bi-people me-1"></i>Mi Equipo</div>
-    <div class="tab" id="t3" onclick="tab('t360')" style="display:none"><i class="bi bi-arrow-repeat me-1"></i>360<span id="badge360" style="background:#dc2626;color:#fff;border-radius:10px;padding:0 6px;font-size:.68rem;margin-left:6px;display:none">0</span></div>
+    <div class="tab" id="t3" onclick="tab('t360')"><i class="bi bi-arrow-repeat me-1"></i>360<span id="badge360" style="background:#dc2626;color:#fff;border-radius:10px;padding:0 6px;font-size:.68rem;margin-left:6px;display:none">0</span></div>
     <div class="tab" id="t4" onclick="tab('ciclos')" style="display:none"><i class="bi bi-calendar-range me-1"></i>Ciclos</div>
     <div class="tab" id="t5" onclick="tab('comps')" style="display:none"><i class="bi bi-list-check me-1"></i>Competencias</div>
   </div>
@@ -211,9 +211,10 @@
     const j=await (await fetch('/api/rrhh/desempeno/360/mias',{headers:H})).json();
     const regs=(j.data||{}).pendientes||[];
     const pend=regs.filter(x=>x.estado==='PENDIENTE'&&x.estado_ciclo==='ABIERTO').length;
-    if(regs.length){ document.getElementById('t3').style.display=''; if(pend){ const b=document.getElementById('badge360'); b.textContent=pend; b.style.display=''; } }
+    if(pend){ const b=document.getElementById('badge360'); b.textContent=pend; b.style.display=''; }
     let h='';
-    if(!regs.length) h='<div class="card-box empty">No te han invitado a evaluaciones 360.</div>';
+    if(!regs.length) h=`<div class="card-box"><div class="empty">Aún no te han invitado a evaluaciones 360.</div>
+      <p style="font-size:.8rem;color:#64748b;margin:0;text-align:center">¿Cómo funciona? La jefatura o RRHH abre la evaluación de una persona en <b>Mi Equipo → Evaluar</b> y en la sección <b>Evaluación 360</b> invita evaluadores por dimensión (par, reporte directo, cliente interno). A los invitados les llega la campana y responden aquí, en forma anónima.</p></div>`;
     regs.forEach(x=>{
       const abierta=x.estado==='PENDIENTE'&&x.estado_ciclo==='ABIERTO';
       h+=`<div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
