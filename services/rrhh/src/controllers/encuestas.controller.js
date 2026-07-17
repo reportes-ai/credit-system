@@ -12,6 +12,8 @@
 const pool = require('../../../../shared/config/database');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
+const anthropic = require('../../../../shared/anthropic');
+const ia = require('../../../../shared/ia');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -52,6 +54,11 @@ require('../../../../shared/migrate').enFila('rrhh-encuestas', async () => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_enc_usuario (id_encuesta, id_usuario)
   )`);
+  for (const col of ['informe_ia LONGTEXT NULL', 'informe_ia_fecha DATETIME NULL', 'informe_ia_modelo VARCHAR(60) NULL'])
+    try { await pool.query('ALTER TABLE rh_enc_encuestas ADD COLUMN ' + col); } catch (e) { if (e.errno !== 1060) throw e; }
+  await ia.registrarFuncionalidad({ codigo: 'enc_clima_informe', nombre: 'Informe Encuestas de Clima',
+    descripcion: 'Redacta un informe ejecutivo de los resultados agregados de una encuesta de clima/pulso/eNPS (se guarda permanente en la encuesta)',
+    modelo: 'claude-opus-4-8' });
   const [[modRRHH]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
   if (modRRHH) {
     const [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_encuestas' LIMIT 1`);
@@ -214,17 +221,14 @@ exports.eliminar = async (req, res) => {
 };
 
 /* ── Resultados agregados (RRHH; mínimo 3 respuestas) ───────────────────────── */
-exports.resultados = async (req, res) => {
-  try {
-    if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
-    const id = parseInt(req.params.id);
-    const [[enc]] = await pool.query(`SELECT * FROM rh_enc_encuestas WHERE id=?`, [id]);
-    if (!enc) return fail(res, 'No encontrada', 404);
-    const [[part]] = await pool.query(`SELECT COUNT(*) n FROM rh_enc_participaciones WHERE id_encuesta=?`, [id]);
-    if (part.n < MIN_RESPUESTAS) return ok(res, { encuesta: enc, participantes: part.n, minimo: MIN_RESPUESTAS, preguntas: null });
-    const [pregs] = await pool.query(`SELECT * FROM rh_enc_preguntas WHERE id_encuesta=? ORDER BY orden`, [id]);
-    const [resp] = await pool.query(`SELECT id_pregunta, valor, texto FROM rh_enc_respuestas WHERE id_encuesta=?`, [id]);
-    const out = pregs.map(p => {
+async function agregados(id) {
+  const [[enc]] = await pool.query(`SELECT * FROM rh_enc_encuestas WHERE id=?`, [id]);
+  if (!enc) return null;
+  const [[part]] = await pool.query(`SELECT COUNT(*) n FROM rh_enc_participaciones WHERE id_encuesta=?`, [id]);
+  if (part.n < MIN_RESPUESTAS) return { encuesta: enc, participantes: part.n, minimo: MIN_RESPUESTAS, preguntas: null };
+  const [pregs] = await pool.query(`SELECT * FROM rh_enc_preguntas WHERE id_encuesta=? ORDER BY orden`, [id]);
+  const [resp] = await pool.query(`SELECT id_pregunta, valor, texto FROM rh_enc_respuestas WHERE id_encuesta=?`, [id]);
+  const out = pregs.map(p => {
       const rs = resp.filter(r => r.id_pregunta === p.id);
       if (p.tipo === 'TEXTO') return { ...p, n: rs.length, comentarios: rs.map(r => r.texto).filter(Boolean) };
       const vals = rs.map(r => r.valor).filter(v => v != null);
@@ -238,9 +242,48 @@ exports.resultados = async (req, res) => {
       }
       if (p.tipo === 'SI_NO' && vals.length) base.pct_si = Math.round(vals.filter(v => v === 1).length / vals.length * 100);
       return base;
-    });
-    ok(res, { encuesta: enc, participantes: part.n, preguntas: out });
+  });
+  return { encuesta: enc, participantes: part.n, preguntas: out };
+}
+
+exports.resultados = async (req, res) => {
+  try {
+    if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
+    const data = await agregados(parseInt(req.params.id));
+    if (!data) return fail(res, 'No encontrada', 404);
+    ok(res, data);
   } catch (e) { fail(res, e.message); }
+};
+
+/* ── Informe IA (Opus) — se redacta sobre los agregados anónimos y queda
+      guardado PERMANENTE en la encuesta (informe_ia). Solo RRHH. ─────────────── */
+exports.informeIA = async (req, res) => {
+  try {
+    if (!await esRRHH(req)) return fail(res, 'Solo RRHH', 403);
+    const id = parseInt(req.params.id);
+    const data = await agregados(id);
+    if (!data) return fail(res, 'No encontrada', 404);
+    if (!data.preguntas) return fail(res, `Se necesitan al menos ${MIN_RESPUESTAS} respuestas para analizar`, 400);
+    // Solo agregados anónimos van a la IA: promedios, distribuciones y comentarios sin autor
+    const cuerpo = data.preguntas.map(p => {
+      if (p.tipo === 'TEXTO') return `PREGUNTA (texto libre): ${p.texto}\nComentarios (${p.n}):\n` + (p.comentarios || []).map(c => `- ${c}`).join('\n');
+      let l = `PREGUNTA (${p.tipo}): ${p.texto}\n  n=${p.n}, promedio=${p.promedio}, distribución=${JSON.stringify(p.dist)}`;
+      if (p.enps != null) l += `, eNPS=${p.enps} (promotores ${p.promotores}, pasivos ${p.pasivos}, detractores ${p.detractores})`;
+      if (p.pct_si != null) l += `, %Sí=${p.pct_si}%`;
+      return l;
+    }).join('\n\n');
+    const { texto, modelo } = await anthropic.analizar({
+      codigo: 'enc_clima_informe', id_usuario: req.usuario.id_usuario, max_tokens: 3000,
+      system: 'Eres un consultor senior de clima organizacional. Redactas informes ejecutivos en español de Chile, claros y accionables, para la gerencia de una financiera automotriz chilena (AutoFácil). Formato: títulos en **negrita**, sin tablas. Estructura: 1) Resumen ejecutivo (3-4 líneas), 2) Fortalezas, 3) Focos de atención (lo más bajo/crítico), 4) Lectura de los comentarios (temas recurrentes, sin citar textual identificable), 5) Recomendaciones concretas priorizadas. Sé honesto: si hay señales de alerta, dilo.',
+      prompt: `Encuesta "${data.encuesta.titulo}" (tipo ${data.encuesta.tipo}), ${data.participantes} participantes. Resultados agregados:\n\n${cuerpo}` });
+    if (!texto) return fail(res, 'La IA no devolvió informe', 502);
+    await pool.query(`UPDATE rh_enc_encuestas SET informe_ia=?, informe_ia_fecha=NOW(), informe_ia_modelo=? WHERE id=?`, [texto, modelo, id]);
+    ok(res, { informe: texto, modelo });
+  } catch (e) {
+    if (e.code === 'IA_OFF') return fail(res, 'La IA para informes de encuestas está desactivada — actívala en el mantenedor Subsistema IA', 400);
+    if (e.code === 'NO_KEY') return fail(res, 'IA no configurada en el servidor (falta ANTHROPIC_API_KEY)', 400);
+    fail(res, e.message);
+  }
 };
 
 /* Recordatorio semanal a quienes no han respondido encuestas abiertas */

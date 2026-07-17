@@ -83,6 +83,7 @@ router.post('/encuestas/:id/abrir',       verifyToken, enc.abrir);
 router.post('/encuestas/:id/cerrar',      verifyToken, enc.cerrar);
 router.delete('/encuestas/:id',           verifyToken, enc.eliminar);
 router.get('/encuestas/:id/resultados',   verifyToken, enc.resultados);
+router.post('/encuestas/:id/informe-ia',  verifyToken, enc.informeIA);
 // Canal de Compliance — crear/seguimiento cualquiera logueado; gestión valida compliance_gestionar adentro
 const compl = require('../controllers/compliance.controller');
 router.post('/compliance/denuncias',            verifyToken, compl.crear);

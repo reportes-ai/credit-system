@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Encuestas de Clima — RRHH</title>
-  <!-- v1.0 — clima / pulso / eNPS anónimas -->
+  <!-- v1.1 — informe IA (Opus) permanente por encuesta -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; --teal:#0d9488; }
@@ -32,6 +32,7 @@
     .enps-big { font-size:2.6rem; font-weight:900; font-family:Consolas,monospace; }
     .preg-row { display:grid; grid-template-columns:1fr 130px 34px; gap:8px; margin-bottom:8px; }
     .preg-row input, .preg-row select { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:.84rem; }
+    .inf-ia { background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid #c2410c; border-radius:10px; padding:14px 18px; margin-top:8px; font-size:.87rem; line-height:1.55; color:#3f2d20; }
   </style>
 </head>
 <body>
@@ -200,9 +201,33 @@
           <div style="flex:1"><div class="bar"><div style="width:${(p.promedio||0)/max*100}%"></div></div>
           <small style="color:#94a3b8">${[1,2,3,4,5].map(v=>`${v}:${p.dist[v]||0}`).join(' · ')}</small></div></div>`; }
       h+='</div>'; });
+    // Informe IA (Opus) — permanente por encuesta
+    h+=`<div style="margin-top:16px;border-top:1px solid #eef2f7;padding-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <b style="color:#9a3412"><i class="bi bi-stars me-1"></i>Informe IA</b>
+        <button class="btn-mini" id="btnIA" onclick="analizarIA(${id})" style="background:#c2410c;color:#fff;border-color:#c2410c">
+          <i class="bi bi-stars me-1"></i>${d.encuesta.informe_ia?'Volver a analizar con Opus':'Analizar con Opus'}</button></div>
+      <div id="infIA">${d.encuesta.informe_ia
+        ? `<small style="color:#94a3b8">Generado el ${new Date(d.encuesta.informe_ia_fecha).toLocaleString('es-CL')} · ${esc(d.encuesta.informe_ia_modelo||'')}</small>
+           <div class="inf-ia">${fmtIA(d.encuesta.informe_ia)}</div>`
+        : `<small style="color:#94a3b8">Aún sin informe — Opus redacta un análisis ejecutivo de estos resultados y queda guardado permanente en la encuesta.</small>`}</div></div>`;
     h+='</div>';
     document.getElementById('panelG').innerHTML=h;
     document.getElementById('panelG').scrollIntoView({behavior:'smooth'});
+  };
+
+  // Markdown mínimo (negritas + saltos) para el informe
+  window.fmtIA=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+
+  window.analizarIA=async id=>{
+    const btn=document.getElementById('btnIA');
+    btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Opus analizando…';
+    try{
+      const r=await fetch(`/api/rrhh/encuestas/${id}/informe-ia`,{method:'POST',headers:H});
+      const j=await r.json();
+      if(!j.success) throw new Error(j.error||'No se pudo analizar');
+      verRes(id);
+    }catch(e){ alert(e.message); btn.disabled=false; btn.innerHTML='<i class="bi bi-stars me-1"></i>Analizar con Opus'; }
   };
 
   cargarPendientes(); cargarGestion();
