@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia (Workera) — AutoFácil</title>
-  <!-- v1.0 — conector Workera: marcaciones del reloj control cruzadas con ausencias y vacaciones -->
+  <!-- v1.1 — exentos art. 22 desde la página Jornada (sin marca ≠ falta) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -56,7 +56,8 @@
     marcas → API Workera (fuente única, no se re-almacenan) · días hábiles → mantenedor de <a href="/mantenedores/feriados/">Feriados</a> ·
     cubiertos → <a href="/recursos-humanos/ausencias/">Ausencias</a> y <a href="/recursos-humanos/vacaciones/">Vacaciones</a> aprobadas ·
     universo → colaboradores activos del <a href="/recursos-humanos/colaboradores/">Directorio</a>.
-    Una <b>posible falta</b> es un día hábil sin marca y sin ausencia/vacación que lo cubra: verifícala antes de descontar en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.</div>
+    Una <b>posible falta</b> es un día hábil sin marca y sin ausencia/vacación que lo cubra: verifícala antes de descontar en <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>.
+    Los excluidos de jornada (art. 22 CT) se configuran en <a href="/recursos-humanos/jornada/">Jornada</a> y no generan faltas.</div>
 </div>
 <script src="/js/auth-guard.js"></script>
 <script src="/js/topnav.js"></script>
@@ -81,7 +82,8 @@ function pinta(d){
   if(!d.colaboradores.length){ tb.innerHTML='<tr><td colspan="6" class="empty">Sin días transcurridos en el mes elegido.</td></tr>'; return; }
   tb.innerHTML=d.colaboradores.map((c,i)=>{
     const hab=c.dias_marcados+c.dias_cubiertos+c.faltas.length;
-    const st=!c.en_workera?'<span class="pill p-mut">SIN ENROLAR</span>'
+    const st=c.art22?'<span class="pill p-mut">EXENTO ART. 22</span>'
+      :!c.en_workera?'<span class="pill p-mut">SIN ENROLAR</span>'
       :c.faltas.length?`<span class="pill p-bad">${c.faltas.length} falta/s</span>`
       :c.dias_cubiertos?'<span class="pill p-warn">CON AUSENCIAS</span>':'<span class="pill p-ok">COMPLETO</span>';
     return `<tr class="cli" onclick="det(${i})"><td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
@@ -97,6 +99,7 @@ function det(i){
     $('detc'+i).innerHTML=c.detalle.map(x=>{
       const dl=x.dia.slice(8,10)+'/'+x.dia.slice(5,7);
       if(x.falta) return `<span class="dia f">${dl} — sin marca</span>`;
+      if(x.exento) return `<span class="dia">${dl} — sin marca (art. 22)</span>`;
       if(x.cubierto) return `<span class="dia c">${dl} — ${x.cubierto}</span>`;
       return `<span class="dia">${dl} · ${String(x.entrada||'').slice(0,5)}–${String(x.salida||'').slice(0,5)}</span>`;
     }).join('')||'<span class="empty">Sin días.</span>';

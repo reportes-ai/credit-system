@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.9 — card Asistencia (conector Workera) -->
+  <!-- v3.0 — card Jornada Laboral (art. 22 / 40 hrs) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -150,6 +150,12 @@
       <p>Marcaciones del reloj control en vivo desde la API de Workera, cruzadas con ausencias y vacaciones: entradas, salidas y posibles faltas del mes.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/jornada/" class="module-card" id="cardJor" style="display:none">
+      <div class="card-icon"><i class="bi bi-clock-history"></i></div>
+      <h5>Jornada Laboral <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Configura por colaborador la exclusión de jornada (art. 22 CT) y la migración a 40 hrs: define quiénes deben marcar asistencia y su jornada normal.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/antiguedad/" class="module-card" id="cardAnt" style="display:none">
       <div class="card-icon"><i class="bi bi-award"></i></div>
       <h5>Certificado de Antigüedad</h5>
@@ -187,6 +193,7 @@
     if (tiene('rh_analytics','rh_colaboradores')) document.getElementById('cardAna').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
     if (tiene('rh_asistencia','rh_remuneraciones')) document.getElementById('cardAsi').style.display='';
+    if (tiene('rh_jornada','rh_remuneraciones')) document.getElementById('cardJor').style.display='';
   })();
 </script>
 <script src="/js/app-version.js"></script>

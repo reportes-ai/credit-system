@@ -68,6 +68,10 @@ router.get('/analytics/resumen', verifyToken, requireFunc('rh_analytics', 'rh_co
 // Asistencia — marcaciones Workera cruzadas con ausencias/vacaciones (solo gestión RRHH)
 const asi = require('../controllers/asistencia.controller');
 router.get('/asistencia/resumen', verifyToken, requireFunc('rh_asistencia', 'rh_remuneraciones'), asi.resumen);
+// Jornada laboral — art. 22 y 40 hrs por colaborador (solo gestión RRHH)
+const jor = require('../controllers/jornada.controller');
+router.get('/jornada',     verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.listar);
+router.put('/jornada/:id', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.guardar);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);

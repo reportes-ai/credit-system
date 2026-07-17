@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jornada Laboral — AutoFácil</title>
+  <!-- v1.0 — art. 22 y 40 hrs por colaborador; define quién debe marcar y su jornada normal -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { max-width:1000px; margin:0 auto; padding:26px 24px 60px; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
+    .banner i { font-size:2.6rem; opacity:.85; } .banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; } .banner p { opacity:.85; margin:0; font-size:.85rem; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:20px; }
+    .kpi { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+    .kpi .l { font-size:.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; font-weight:700; }
+    .kpi .v { font-size:1.55rem; font-weight:800; color:var(--navy-dark); margin-top:2px; }
+    .box { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+    table.t { width:100%; font-size:.84rem; border-collapse:collapse; }
+    .t th { color:#64748b; text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; padding:7px 8px; border-bottom:2px solid #e2e8f0; }
+    .t td { padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .t input[type=checkbox] { width:17px; height:17px; cursor:pointer; }
+    .pill { display:inline-block; border-radius:20px; padding:2px 10px; font-size:.7rem; font-weight:700; }
+    .p-ok { background:#dcfce7; color:#166534; } .p-mut { background:#f1f5f9; color:#64748b; }
+    .p-nav { background:#dbeafe; color:#1e40af; }
+    .empty { color:#94a3b8; font-size:.85rem; padding:12px 0; }
+    .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#475569; }
+    .foot b { color:var(--navy-dark); }
+    .saved { color:#166534; font-size:.72rem; font-weight:700; opacity:0; transition:opacity .3s; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Recursos Humanos",href:"/recursos-humanos/"},{label:"Jornada",current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-clock-history"></i>
+    <div><h2>Jornada laboral</h2>
+      <p>Marca quién está excluido de jornada (art. 22 CT) y quién ya migró a 40 hrs (Ley 21.561). Con eso Asistencia sabe quiénes deben marcar y cuál es su jornada normal.</p></div></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="box">
+    <table class="t"><thead><tr>
+      <th>Colaborador</th><th>Cargo</th>
+      <th style="text-align:center" title="Art. 22 CT: excluido de limitación de jornada, no registra asistencia">Art. 22</th>
+      <th style="text-align:center" title="Ley 21.561: jornada semanal de 40 horas">40 hrs</th>
+      <th style="text-align:center">¿Debe marcar?</th><th style="text-align:center">Jornada normal</th><th></th>
+    </tr></thead><tbody id="tb"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody></table>
+  </div>
+  <div class="foot"><i class="bi bi-diagram-3"></i> <b>Qué afecta esta página:</b>
+    <b>Art. 22</b> → en <a href="/recursos-humanos/asistencia/">Asistencia (Workera)</a> el colaborador queda EXENTO: los días sin marca no cuentan como posibles faltas ·
+    <b>40 hrs</b> → define la jornada normal informativa (40 hrs semanales / 8 hrs diarias L-V; el resto 44 hrs / 8 hrs 48 min según la gradualidad vigente de la Ley 21.561) ·
+    ambos flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+const H={Authorization:'Bearer '+sessionStorage.getItem('token'),'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+let D=[];
+function jornadaTxt(c){ return c.art22?'—':(c.h40?'40 hrs/sem · 8:00 diarias':'44 hrs/sem · 8:48 diarias'); }
+function kpis(){
+  $('kpis').innerHTML=[
+    ['Colaboradores',D.length],
+    ['Deben marcar',D.filter(c=>!c.art22).length],
+    ['Art. 22 (exentos)',D.filter(c=>+c.art22).length],
+    ['Con 40 hrs',D.filter(c=>+c.h40).length],
+  ].map(([l,v])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+}
+function pinta(){
+  kpis();
+  $('tb').innerHTML=D.map((c,i)=>`<tr>
+    <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
+    <td style="color:#475569">${c.cargo||''}</td>
+    <td style="text-align:center"><input type="checkbox" ${+c.art22?'checked':''} onchange="cambia(${i},'art22',this.checked)"></td>
+    <td style="text-align:center"><input type="checkbox" ${+c.h40?'checked':''} onchange="cambia(${i},'h40',this.checked)"></td>
+    <td style="text-align:center" id="dm${i}">${+c.art22?'<span class="pill p-mut">NO — ART. 22</span>':'<span class="pill p-ok">SÍ</span>'}</td>
+    <td style="text-align:center" id="jn${i}"><span class="pill p-nav">${jornadaTxt(c)}</span></td>
+    <td style="text-align:right"><span class="saved" id="sv${i}"><i class="bi bi-check2"></i> guardado</span></td>
+  </tr>`).join('');
+}
+async function cambia(i,campo,val){
+  D[i][campo]=val?1:0;
+  try{
+    const r=await fetch('/api/rrhh/jornada/'+D[i].id_usuario,{method:'PUT',headers:H,body:JSON.stringify({art22:+D[i].art22,h40:+D[i].h40})});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    $('dm'+i).innerHTML=+D[i].art22?'<span class="pill p-mut">NO — ART. 22</span>':'<span class="pill p-ok">SÍ</span>';
+    $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(D[i])}</span>`;
+    kpis();
+    const s=$('sv'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+(async()=>{
+  try{
+    const r=await fetch('/api/rrhh/jornada',{headers:H}); const j=await r.json();
+    if(!j.success) throw new Error(j.error||'Error');
+    D=j.data; pinta();
+  }catch(e){ $('tb').innerHTML=`<tr><td colspan="7" class="empty">⚠️ ${e.message}</td></tr>`; }
+})();
+</script>
+</body>
+</html>
