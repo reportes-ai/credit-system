@@ -46,6 +46,13 @@ require('../../../../shared/migrate').enFila('rrhh-workera-cache', async () => {
   console.log('[rrhh-asistencia] caché workera lista');
 });
 
+// Parámetros de atraso (hora de entrada de referencia + tolerancia) — paramétricos
+require('../../../../shared/migrate').enFila('rrhh-asistencia-config', async () => {
+  await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
+    ('asistencia_hora_entrada', '09:00'), ('asistencia_tolerancia_min', '5')`);
+  console.log('[rrhh-asistencia] config atrasos lista');
+});
+
 const rutNorm = r => String(r || '').replace(/[.\s-]/g, '').toUpperCase().replace(/K$/, 'K'); // 18.088.259-6 → 180882596
 
 // Trae de Workera solo los días del rango que faltan en el caché (o los últimos
@@ -143,7 +150,10 @@ exports.resumen = async (req, res) => {
                dias_marcados: marcados, dias_cubiertos: cubiertos, faltas, detalle };
     });
 
-    res.json({ success: true, error: null, data: { mes, desde, hasta, dias_habiles: habiles, colaboradores } });
+    const [cfgRows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave IN ('asistencia_hora_entrada','asistencia_tolerancia_min')");
+    const cfg = {}; cfgRows.forEach(r => cfg[r.clave] = r.valor);
+    res.json({ success: true, error: null, data: { mes, desde, hasta, dias_habiles: habiles, colaboradores,
+      hora_entrada: cfg.asistencia_hora_entrada || '09:00', tolerancia_min: Number(cfg.asistencia_tolerancia_min) || 0 } });
   } catch (e) {
     console.error('[rrhh asistencia]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error consultando Workera: ' + e.message });

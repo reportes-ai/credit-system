@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia (Workera) — AutoFácil</title>
-  <!-- v1.2 — lista solo a quienes deben marcar según Jornada (art. 22 y externos fuera) -->
+  <!-- v1.3 — pestañas No enrolados / Atrasos / Ausencias con detalle por usuario -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -31,6 +31,11 @@
     .dia.f { background:#fee2e2; border-color:#fecaca; color:#991b1b; font-weight:700; }
     .dia.c { background:#e0f2fe; border-color:#bae6fd; color:#075985; }
     .empty { color:#94a3b8; font-size:.85rem; padding:12px 0; }
+    .tabs { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+    .tab { border:1px solid #dbe4f0; background:#fff; border-radius:10px; padding:7px 16px; font-size:.82rem; font-weight:600; color:#475569; cursor:pointer; }
+    .tab.active { background:var(--navy); border-color:var(--navy); color:#fff; }
+    .tab .cnt { background:rgba(0,0,0,.12); border-radius:10px; padding:1px 8px; font-size:.72rem; margin-left:4px; }
+    .tab.active .cnt { background:rgba(255,255,255,.25); }
     .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#475569; }
     .foot b { color:var(--navy-dark); }
   </style>
@@ -46,11 +51,33 @@
     <input type="month" id="mes" class="form-control" style="max-width:170px">
   </div>
   <div class="kpis" id="kpis"></div>
-  <div class="box">
+  <div class="tabs">
+    <button class="tab active" data-t="resumen" onclick="verTab('resumen')"><i class="bi bi-table"></i> Resumen</button>
+    <button class="tab" data-t="noenrol" onclick="verTab('noenrol')"><i class="bi bi-person-x"></i> No enrolados <span class="cnt" id="cNo"></span></button>
+    <button class="tab" data-t="atrasos" onclick="verTab('atrasos')"><i class="bi bi-alarm"></i> Atrasos <span class="cnt" id="cAt"></span></button>
+    <button class="tab" data-t="ausencias" onclick="verTab('ausencias')"><i class="bi bi-calendar-x"></i> Ausencias <span class="cnt" id="cAu"></span></button>
+  </div>
+  <div class="box" id="pResumen">
     <table class="t"><thead><tr>
       <th>Colaborador</th><th style="text-align:center">Días hábiles</th><th style="text-align:center">Con marca</th>
       <th style="text-align:center">Cubiertos</th><th style="text-align:center">Posibles faltas</th><th></th>
     </tr></thead><tbody id="tb"><tr><td colspan="6" class="empty">Cargando marcaciones desde Workera…</td></tr></tbody></table>
+  </div>
+  <div class="box" id="pNoenrol" style="display:none">
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Deben marcar según Jornada pero no registran ninguna marcación en Workera este mes — hay que enrolarlos en el reloj (huella/rostro o app).</p>
+    <table class="t"><thead><tr><th>Colaborador</th><th>RUT</th></tr></thead><tbody id="tbNo"></tbody></table>
+  </div>
+  <div class="box" id="pAtrasos" style="display:none">
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px" id="atInfo"></p>
+    <table class="t"><thead><tr>
+      <th>Colaborador</th><th style="text-align:center">Atrasos</th><th style="text-align:center">Minutos acumulados</th><th></th>
+    </tr></thead><tbody id="tbAt"></tbody></table>
+  </div>
+  <div class="box" id="pAusencias" style="display:none">
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Días hábiles sin marca y sin ausencia/vacación aprobada que los cubra. Verifícalas antes de descontar.</p>
+    <table class="t"><thead><tr>
+      <th>Colaborador</th><th style="text-align:center">Posibles faltas</th><th style="text-align:center">Días cubiertos</th><th></th>
+    </tr></thead><tbody id="tbAu"></tbody></table>
   </div>
   <div class="foot"><i class="bi bi-diagram-3"></i> <b>De dónde sale cada dato:</b>
     marcas → API Workera (fuente única, no se re-almacenan) · días hábiles → mantenedor de <a href="/mantenedores/feriados/">Feriados</a> ·
@@ -104,13 +131,74 @@ function det(i){
     tr.style.display='';
   } else tr.style.display='none';
 }
+function verTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.t===t));
+  for(const [k,id] of [['resumen','pResumen'],['noenrol','pNoenrol'],['atrasos','pAtrasos'],['ausencias','pAusencias']])
+    $(id).style.display=k===t?'':'none';
+}
+// Atrasos: entrada posterior a hora_entrada + tolerancia (paramétrico en rh_config)
+function atrasosDe(c){
+  const [hh,mm]=(DATA.hora_entrada||'09:00').split(':').map(Number);
+  const limite=hh*60+mm+(DATA.tolerancia_min||0);
+  const out=[];
+  for(const d of c.detalle){
+    if(!d.entrada) continue;
+    const [eh,em]=d.entrada.split(':').map(Number);
+    const min=eh*60+em-limite;
+    if(min>0) out.push({dia:d.dia, entrada:d.entrada.slice(0,5), min});
+  }
+  return out;
+}
+function togDet(id,html){
+  const tr=$(id);
+  if(tr.style.display==='none'){ tr.querySelector('.det').innerHTML=html; tr.style.display=''; }
+  else tr.style.display='none';
+}
+function pintaTabs(){
+  const dl=d=>d.slice(8,10)+'/'+d.slice(5,7);
+  // No enrolados
+  const noEnr=DATA.colaboradores.filter(c=>!c.en_workera);
+  $('cNo').textContent=noEnr.length;
+  $('tbNo').innerHTML=noEnr.length?noEnr.map(c=>`<tr><td><b>${c.nombre}</b></td><td style="color:#64748b">${c.rut||''}</td></tr>`).join('')
+    :'<tr><td colspan="2" class="empty">Todos los que deben marcar están enrolados. 🎉</td></tr>';
+  // Atrasos
+  const conAt=DATA.colaboradores.map(c=>({c,at:atrasosDe(c)})).filter(x=>x.at.length)
+    .sort((a,b)=>b.at.reduce((s,x)=>s+x.min,0)-a.at.reduce((s,x)=>s+x.min,0));
+  $('cAt').textContent=conAt.reduce((s,x)=>s+x.at.length,0);
+  $('atInfo').textContent=`Entrada de referencia ${DATA.hora_entrada} + ${DATA.tolerancia_min} min de tolerancia (configurable por RRHH). Se cuenta la primera marca del día.`;
+  $('tbAt').innerHTML=conAt.length?conAt.map((x,i)=>{
+    const tot=x.at.reduce((s,a)=>s+a.min,0);
+    const html=x.at.map(a=>`<span class="dia f">${dl(a.dia)} · llegó ${a.entrada} (+${a.min} min)</span>`).join('');
+    return `<tr class="cli" onclick="togDet('at${i}',${JSON.stringify(html).replace(/"/g,'&quot;')})">
+      <td><b>${x.c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${x.c.rut||''}</div></td>
+      <td style="text-align:center"><span class="pill p-warn">${x.at.length}</span></td>
+      <td style="text-align:center;font-weight:700;color:#92400e">${tot.toLocaleString('es-CL')} min</td>
+      <td style="text-align:right;color:#94a3b8"><i class="bi bi-chevron-down"></i></td></tr>
+      <tr id="at${i}" style="display:none"><td colspan="4"><div class="det"></div></td></tr>`;
+  }).join(''):'<tr><td colspan="4" class="empty">Sin atrasos en el período. 🎉</td></tr>';
+  // Ausencias (posibles faltas)
+  const conAu=DATA.colaboradores.filter(c=>c.en_workera&&c.faltas.length)
+    .sort((a,b)=>b.faltas.length-a.faltas.length);
+  $('cAu').textContent=conAu.reduce((s,c)=>s+c.faltas.length,0);
+  $('tbAu').innerHTML=conAu.length?conAu.map((c,i)=>{
+    const html=c.detalle.filter(d=>d.falta||d.cubierto).map(d=>d.falta
+      ?`<span class="dia f">${dl(d.dia)} — sin marca</span>`
+      :`<span class="dia c">${dl(d.dia)} — ${d.cubierto}</span>`).join('');
+    return `<tr class="cli" onclick="togDet('au${i}',${JSON.stringify(html).replace(/"/g,'&quot;')})">
+      <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
+      <td style="text-align:center"><span class="pill p-bad">${c.faltas.length}</span></td>
+      <td style="text-align:center">${c.dias_cubiertos||''}</td>
+      <td style="text-align:right;color:#94a3b8"><i class="bi bi-chevron-down"></i></td></tr>
+      <tr id="au${i}" style="display:none"><td colspan="4"><div class="det"></div></td></tr>`;
+  }).join(''):'<tr><td colspan="4" class="empty">Sin posibles faltas entre los enrolados. 🎉</td></tr>';
+}
 async function cargar(){
   $('tb').innerHTML='<tr><td colspan="6" class="empty">Cargando marcaciones desde Workera…</td></tr>';
   try{
     const r=await fetch('/api/rrhh/asistencia/resumen?mes='+$('mes').value,{headers:H});
     const j=await r.json();
     if(!j.success) throw new Error(j.error||'Error');
-    DATA=j.data; pinta(DATA);
+    DATA=j.data; pinta(DATA); pintaTabs();
   }catch(e){ $('tb').innerHTML=`<tr><td colspan="6" class="empty">⚠️ ${e.message}</td></tr>`; }
 }
 $('mes').value=new Date().toISOString().slice(0,7);
