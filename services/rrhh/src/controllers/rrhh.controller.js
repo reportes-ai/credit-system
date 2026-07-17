@@ -55,11 +55,10 @@ require('../../../../shared/migrate').enFila('rrhh', async () => {
       ['Certificado de Antigüedad',   'rh_antiguedad',  '/recursos-humanos/antiguedad/', 'bi-award',       MOD_SOPORTE],
       ['Aprobar/Gestionar RRHH',      'rh_aprobar',     null,                            null,             MOD_SOPORTE],
     ];
-    // Migración: si ya se sembró como módulo Home (v77.49), reubicarlo en Soporte y apagar el módulo suelto.
-    await pool.query("UPDATE funcionalidades SET id_modulo=500001, href='/soporte/recursos-humanos/' WHERE codigo='rh_ver'");
-    await pool.query("UPDATE funcionalidades SET id_modulo=500001 WHERE codigo IN ('rh_vacaciones','rh_antiguedad','rh_aprobar')");
+    // (v142.2) Se eliminó la reubicación legada hacia Soporte: peleaba en cada boot con
+    // ficha.controller, que promueve RRHH a módulo propio (500002) — la card del Home
+    // aparecía o desaparecía según qué seed corriera último. RRHH es módulo propio.
     await pool.query("UPDATE funcionalidades SET nombre='Certificado de Antigüedad' WHERE codigo='rh_antiguedad'"); // v78.6: renombrado
-    await pool.query("UPDATE modulos SET estado='inactivo' WHERE id_modulo=500002");
     const idFunc = {};
     for (const [nombre, codigo, href, icono, idmod] of funcs) {
       const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
