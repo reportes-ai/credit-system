@@ -53,6 +53,19 @@ router.post('/onboarding',             verifyToken, requireFunc('rh_contratos', 
 router.put('/onboarding/items/:id',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbMarcar);
 router.get('/onboarding/plantilla',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantilla);
 router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantillaGuardar);
+// Evaluaciones de Desempeño — mi/autoeval/conocimiento validan dueño adentro; equipo/evaluar validan jefatura o RRHH adentro
+const des = require('../controllers/desempeno.controller');
+router.get('/desempeno/mi',                verifyToken, des.mi);
+router.post('/desempeno/autoeval',         verifyToken, des.autoeval);
+router.post('/desempeno/conocimiento',     verifyToken, des.conocimiento);
+router.get('/desempeno/equipo',            verifyToken, des.equipo);
+router.post('/desempeno/evaluar',          verifyToken, des.evaluar);
+router.get('/desempeno/ciclos',            verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.ciclos);
+router.post('/desempeno/ciclos',           verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.crearCiclo);
+router.post('/desempeno/ciclos/:id/cerrar', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.cerrarCiclo);
+router.put('/desempeno/evaluaciones/:id/evaluador', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.asignarEvaluador);
+router.get('/desempeno/competencias',      verifyToken, des.competencias);
+router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
 const vc = require('../controllers/vac-cuenta.controller');
 router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
 router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluaciones de Desempeño — RRHH</title>
+  <!-- v1.0 — ciclos + autoevaluación + evaluación jefatura + objetivos -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-left { display:flex; align-items:center; gap:16px; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); } .topnav-brand { text-decoration:none; display:flex; gap:8px; align-items:center; }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; } .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:1080px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; } .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
+    .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; } .tab { padding:8px 16px; border-radius:20px; font-size:.84rem; font-weight:700; cursor:pointer; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; } .tab.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:16px; }
+    .fld { margin-bottom:12px; } .fld label { display:block; font-size:.78rem; font-weight:600; color:#475569; margin-bottom:5px; } .fld input, .fld textarea, .fld select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 11px; font-size:.88rem; box-sizing:border-box; }
+    .btn-navy { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-weight:700; font-size:.88rem; cursor:pointer; }
+    .btn-mini { border:1px solid #cbd5e1; background:#fff; border-radius:7px; padding:5px 10px; font-size:.78rem; cursor:pointer; font-weight:600; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:10px 12px; border-bottom:1px solid #f1f5f9; }
+    .empty { text-align:center; color:#94a3b8; padding:30px 0; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.7rem; font-weight:700; white-space:nowrap; }
+    .PENDIENTE { background:#fef9c3; color:#854d0e; } .AUTOEVAL { background:#e0f2fe; color:#075985; } .EVALUADA { background:#ede9fe; color:#5b21b6; } .CERRADA { background:#dcfce7; color:#166534; }
+    .comp { padding:12px 0; border-bottom:1px solid #f1f5f9; }
+    .comp b { font-size:.9rem; color:#0f172a; } .comp small { display:block; color:#64748b; font-size:.78rem; margin:2px 0 8px; }
+    .stars { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+    .stars .st { width:36px; height:36px; border-radius:8px; border:1.5px solid #cbd5e1; background:#fff; font-weight:800; cursor:pointer; color:#64748b; }
+    .stars .st.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+    .stars .st:disabled { cursor:default; opacity:.9; }
+    .stars .etq { font-size:.72rem; color:#94a3b8; margin-left:6px; }
+    .nota-big { font-size:2.4rem; font-weight:900; color:var(--navy); font-family:Consolas,monospace; }
+    .esc5 { font-size:.72rem; color:#64748b; background:#f8fafc; border-radius:8px; padding:8px 12px; margin-bottom:12px; }
+    .obj-row { display:grid; grid-template-columns:1fr 90px 110px 34px; gap:8px; margin-bottom:8px; }
+    .obj-row input { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:.84rem; }
+    .cmp-bar { background:#eef2f7; border-radius:6px; height:8px; overflow:hidden; } .cmp-bar > div { height:100%; background:var(--navy); }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left"><a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/recursos-humanos/">Recursos Humanos</a> › <span style="color:#fff;font-weight:600"><i class="bi bi-graph-up-arrow me-1"></i>Desempeño</span></div></div>
+  <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
+</nav>
+<div class="main">
+  <div class="page-banner"><i class="bi bi-graph-up-arrow"></i><div><h2>Evaluaciones de Desempeño</h2><p>Autoevaluación, evaluación de tu jefatura y objetivos — el historial queda en tu ficha.</p></div></div>
+  <div class="tabs">
+    <div class="tab active" id="t1" onclick="tab('mi')"><i class="bi bi-person me-1"></i>Mi Evaluación</div>
+    <div class="tab" id="t2" onclick="tab('equipo')" style="display:none"><i class="bi bi-people me-1"></i>Mi Equipo</div>
+    <div class="tab" id="t3" onclick="tab('ciclos')" style="display:none"><i class="bi bi-arrow-repeat me-1"></i>Ciclos</div>
+    <div class="tab" id="t4" onclick="tab('comps')" style="display:none"><i class="bi bi-list-check me-1"></i>Competencias</div>
+  </div>
+  <div id="secMi"></div>
+  <div id="secEquipo" style="display:none"></div>
+  <div id="secCiclos" style="display:none"></div>
+  <div id="secComps" style="display:none"></div>
+</div>
+<script src="/js/auth-guard.js"></script>
+<script>
+  const token=sessionStorage.getItem('token'), yo=JSON.parse(sessionStorage.getItem('usuario')||'null');
+  if(!token||!yo) location.href='/login.html';
+  document.getElementById('navNombre').textContent=`${yo?.nombre||''} ${yo?.apellido||''}`.trim();
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  const fd=s=>s?String(s).slice(0,10).split('-').reverse().join('-'):'';
+  const nota=n=>n==null?'—':Number(n).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const ESCALA='Escala: 1 Muy bajo lo esperado · 2 Bajo lo esperado · 3 Cumple lo esperado · 4 Sobre lo esperado · 5 Excepcional';
+  let ES_RRHH=false, ES_JEFE=false, MI={}, EQUIPO=[], SEL={};
+
+  function tab(v){ ['mi','equipo','ciclos','comps'].forEach((k,i)=>{ document.getElementById('sec'+k[0].toUpperCase()+k.slice(1)).style.display=k===v?'':'none'; document.getElementById('t'+(i+1)).classList.toggle('active',k===v); }); }
+
+  /* ── rating widget ── */
+  function stars(id,val,dis){ let h=`<div class="stars" id="${id}">`; for(let i=1;i<=5;i++) h+=`<button class="st ${val>=i?'on':''}" ${dis?'disabled':''} onclick="setStar('${id}',${i})">${i}</button>`; return h+`<span class="etq" id="${id}_v">${val?val+'/5':''}</span></div>`; }
+  window.setStar=(id,v)=>{ const box=document.getElementById(id); box.dataset.v=v; [...box.querySelectorAll('.st')].forEach((b,i)=>b.classList.toggle('on',i<v)); document.getElementById(id+'_v').textContent=v+'/5'; };
+  const getStar=id=>parseInt(document.getElementById(id)?.dataset.v||[...document.querySelectorAll('#'+id+' .st.on')].length)||0;
+
+  /* ── MI EVALUACIÓN ── */
+  async function cargarMi(){
+    const j=await (await fetch('/api/rrhh/desempeno/mi',{headers:H})).json();
+    MI=j.data||{evaluaciones:[],competencias:[]};
+    const box=document.getElementById('secMi');
+    const abierta=MI.evaluaciones.find(e=>e.estado_ciclo==='ABIERTO'&&e.estado!=='CERRADA');
+    let h='';
+    if(!abierta){ h+=`<div class="card-box empty">No tienes evaluaciones abiertas. ${MI.evaluaciones.length?'Revisa tu historial abajo.':'RRHH abrirá el próximo ciclo.'}</div>`; }
+    else if(abierta.estado==='PENDIENTE'||abierta.estado==='AUTOEVAL'){
+      h+=`<div class="card-box"><h5 style="color:var(--navy)"><i class="bi bi-pencil-square me-1"></i>Autoevaluación — ${esc(abierta.ciclo)}</h5>
+        <p style="font-size:.82rem;color:#64748b">Evalúate con honestidad en cada competencia; tu jefatura (${esc(abierta.evaluador||'por asignar')}) hará su evaluación después y conversarán las diferencias.</p>
+        <div class="esc5">${ESCALA}</div>`;
+      MI.competencias.forEach(c=>{ const n=(abierta.notas||[]).find(x=>x.id_competencia===c.id);
+        h+=`<div class="comp"><b>${esc(c.nombre)}</b><small>${esc(c.descripcion||'')}</small>${stars('au_'+c.id,n?.auto||0,false)}</div>`; });
+      h+=`<div class="fld" style="margin-top:14px"><label>Comentario (opcional): logros del período, dificultades, qué necesitas</label><textarea id="miCom" rows="3">${esc(abierta.comentario_colaborador||'')}</textarea></div>
+        <div style="text-align:right"><button class="btn-navy" onclick="enviarAuto(${abierta.id})"><i class="bi bi-send me-1"></i>${abierta.estado==='AUTOEVAL'?'Actualizar autoevaluación':'Enviar autoevaluación'}</button></div></div>`;
+    } else { h+=cardResultado(abierta,true); }
+    const hist=MI.evaluaciones.filter(e=>e!==abierta);
+    if(hist.length){ h+=`<div class="card-box"><h6 style="color:var(--navy)">Historial</h6><table><thead><tr><th>Ciclo</th><th>Evaluador</th><th>Estado</th><th style="text-align:right">Nota final</th><th></th></tr></thead><tbody>`;
+      hist.forEach(e=>{ h+=`<tr><td>${esc(e.ciclo)}</td><td>${esc(e.evaluador||'—')}</td><td><span class="pill ${e.estado}">${e.estado}</span></td><td style="text-align:right;font-weight:800">${nota(e.nota_final)}</td><td>${['EVALUADA','CERRADA'].includes(e.estado)?`<button class="btn-mini" onclick="verHist(${e.id})">Ver</button>`:''}</td></tr>`; });
+      h+='</tbody></table></div><div id="histDetalle"></div>'; }
+    box.innerHTML=h;
+  }
+  function cardResultado(e,conConocimiento){
+    let h=`<div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <h5 style="color:var(--navy);margin:0"><i class="bi bi-clipboard-check me-1"></i>${esc(e.ciclo)} — resultado</h5>
+      <div style="text-align:right"><span class="nota-big">${nota(e.nota_final)}</span><div style="font-size:.7rem;color:#94a3b8">NOTA FINAL (1–5)</div></div></div>
+      <div class="esc5">${ESCALA}</div><table><thead><tr><th>Competencia</th><th style="text-align:center">Tu autoeval</th><th style="text-align:center">Jefatura</th></tr></thead><tbody>`;
+    (e.notas||[]).forEach(n=>{ h+=`<tr><td>${esc(n.competencia)}</td><td style="text-align:center">${n.auto??'—'}</td><td style="text-align:center;font-weight:800">${n.jefe??'—'}</td></tr>`; });
+    h+='</tbody></table>';
+    if((e.objetivos||[]).length){ h+=`<h6 style="color:var(--navy);margin-top:16px">Objetivos</h6><table><thead><tr><th>Objetivo</th><th style="text-align:right">Peso</th><th style="width:180px">Cumplimiento</th></tr></thead><tbody>`;
+      e.objetivos.forEach(o=>{ h+=`<tr><td>${esc(o.objetivo)}</td><td style="text-align:right">${o.peso||0}%</td><td>${o.cumplimiento==null?'—':`<div class="cmp-bar"><div style="width:${Math.min(100,o.cumplimiento)}%"></div></div><small>${o.cumplimiento}%</small>`}</td></tr>`; });
+      h+='</tbody></table>'; }
+    if(e.fortalezas) h+=`<div class="fld" style="margin-top:12px"><label>Fortalezas</label><div style="font-size:.86rem">${esc(e.fortalezas)}</div></div>`;
+    if(e.oportunidades) h+=`<div class="fld"><label>Oportunidades de mejora</label><div style="font-size:.86rem">${esc(e.oportunidades)}</div></div>`;
+    if(conConocimiento&&e.estado==='EVALUADA') h+=`<div class="fld"><label>Tu comentario (opcional)</label><textarea id="conCom" rows="2"></textarea></div>
+      <div style="text-align:right"><button class="btn-navy" onclick="tomarConocimiento(${e.id})"><i class="bi bi-check2-circle me-1"></i>Tomar conocimiento</button></div>`;
+    if(e.estado==='CERRADA') h+=`<p style="font-size:.76rem;color:#16a34a;margin:10px 0 0"><i class="bi bi-check-circle me-1"></i>Conocimiento tomado el ${fd(e.cerrada_at)}.</p>`;
+    return h+'</div>';
+  }
+  window.verHist=id=>{ const e=MI.evaluaciones.find(x=>x.id===id); document.getElementById('histDetalle').innerHTML=cardResultado(e,false); };
+  async function enviarAuto(id){
+    const notas=MI.competencias.map(c=>({id_competencia:c.id,auto:getStar('au_'+c.id)})).filter(n=>n.auto);
+    if(notas.length<MI.competencias.length&&!confirm('No evaluaste todas las competencias. ¿Enviar igual?')) return;
+    const r=await (await fetch('/api/rrhh/desempeno/autoeval',{method:'POST',headers:HJ,body:JSON.stringify({id_evaluacion:id,notas,comentario:document.getElementById('miCom').value})})).json();
+    if(!r.success) return alert(r.error); alert('Autoevaluación enviada ✔'); cargarMi();
+  }
+  async function tomarConocimiento(id){
+    const r=await (await fetch('/api/rrhh/desempeno/conocimiento',{method:'POST',headers:HJ,body:JSON.stringify({id_evaluacion:id,comentario:document.getElementById('conCom')?.value})})).json();
+    if(!r.success) return alert(r.error); cargarMi();
+  }
+
+  /* ── MI EQUIPO ── */
+  async function cargarEquipo(){
+    const j=await (await fetch('/api/rrhh/desempeno/equipo'+(ES_RRHH&&SEL.todos?'?todos=1':''),{headers:H})).json();
+    EQUIPO=(j.data||{}).evaluaciones||[]; ES_RRHH=(j.data||{}).rrhh||ES_RRHH;
+    if(EQUIPO.length||ES_RRHH){ document.getElementById('t2').style.display=''; ES_JEFE=true; }
+    const box=document.getElementById('secEquipo');
+    let h=`<div class="card-box">`;
+    if(ES_RRHH) h+=`<label style="font-size:.8rem;color:#475569"><input type="checkbox" ${SEL.todos?'checked':''} onchange="SEL.todos=this.checked;cargarEquipo()"> Ver todas las evaluaciones (RRHH)</label>`;
+    h+=`<table><thead><tr><th>Colaborador</th><th>Ciclo</th><th>Evaluador</th><th>Estado</th><th style="text-align:right">Nota</th><th></th></tr></thead><tbody>`;
+    if(!EQUIPO.length) h+='<tr><td colspan="6" class="empty">Sin evaluaciones a tu cargo.</td></tr>';
+    EQUIPO.forEach(e=>{ h+=`<tr><td><b>${esc(e.colaborador)}</b><br><small style="color:#94a3b8">${esc(e.cargo||'')}</small></td><td>${esc(e.ciclo)}</td><td>${esc(e.evaluador||'—')}</td>
+      <td><span class="pill ${e.estado}">${e.estado}</span>${e.estado==='PENDIENTE'?'<br><small style="color:#94a3b8">esperando autoeval</small>':''}</td>
+      <td style="text-align:right;font-weight:800">${nota(e.nota_final)}</td>
+      <td>${e.estado!=='CERRADA'&&e.estado_ciclo==='ABIERTO'?`<button class="btn-mini" onclick="abrirEvaluar(${e.id})"><i class="bi bi-pencil"></i> Evaluar</button>`:`<button class="btn-mini" onclick="abrirEvaluar(${e.id})">Ver</button>`}</td></tr>`; });
+    h+='</tbody></table></div><div id="evalPanel"></div>';
+    box.innerHTML=h;
+  }
+  window.abrirEvaluar=id=>{
+    const e=EQUIPO.find(x=>x.id===id); if(!e) return;
+    const soloVer=e.estado==='CERRADA'||e.estado_ciclo!=='ABIERTO';
+    let h=`<div class="card-box"><h5 style="color:var(--navy)"><i class="bi bi-person-check me-1"></i>${esc(e.colaborador)} — ${esc(e.ciclo)}</h5>
+      ${e.comentario_colaborador?`<div style="background:#eff6ff;border-radius:8px;padding:8px 12px;font-size:.82rem;margin-bottom:10px"><b>Comentario del colaborador:</b> ${esc(e.comentario_colaborador)}</div>`:''}
+      <div class="esc5">${ESCALA}</div>`;
+    (MI.competencias.length?MI.competencias:e.notas.map(n=>({id:n.id_competencia,nombre:n.competencia,descripcion:n.descripcion}))).forEach(c=>{
+      const n=(e.notas||[]).find(x=>x.id_competencia===c.id)||{};
+      h+=`<div class="comp"><b>${esc(c.nombre)}</b><small>${esc(c.descripcion||'')} · Autoeval: <b>${n.auto??'—'}</b></small>${stars('je_'+c.id,n.jefe||0,soloVer)}</div>`; });
+    h+=`<h6 style="color:var(--navy);margin-top:16px">Objetivos del período <small style="color:#94a3b8;font-weight:400">(peso % entre todos; cumplimiento 0–100%)</small></h6><div id="objBox">`;
+    (e.objetivos&&e.objetivos.length?e.objetivos:[{}]).forEach(o=>{ h+=filaObj(o,soloVer); });
+    h+=`</div>${soloVer?'':'<button class="btn-mini" onclick="agregarObj()"><i class="bi bi-plus"></i> Objetivo</button>'}
+      <div class="fld" style="margin-top:14px"><label>Fortalezas</label><textarea id="evF" rows="2" ${soloVer?'disabled':''}>${esc(e.fortalezas||'')}</textarea></div>
+      <div class="fld"><label>Oportunidades de mejora</label><textarea id="evO" rows="2" ${soloVer?'disabled':''}>${esc(e.oportunidades||'')}</textarea></div>`;
+    if(!soloVer) h+=`<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-mini" onclick="guardarEval(${e.id},false)">Guardar borrador</button>
+      <button class="btn-navy" onclick="guardarEval(${e.id},true)"><i class="bi bi-check2-circle me-1"></i>Finalizar evaluación</button></div>`;
+    document.getElementById('evalPanel').innerHTML=h;
+    document.getElementById('evalPanel').scrollIntoView({behavior:'smooth'});
+  };
+  const filaObj=(o,dis)=>`<div class="obj-row"><input placeholder="Objetivo" value="${esc(o.objetivo||'')}" ${dis?'disabled':''} class="ob-t">
+    <input type="number" placeholder="Peso %" min="0" max="100" value="${o.peso??''}" ${dis?'disabled':''} class="ob-p">
+    <input type="number" placeholder="Cumpl. %" min="0" max="100" value="${o.cumplimiento??''}" ${dis?'disabled':''} class="ob-c">
+    ${dis?'<span></span>':'<button class="btn-mini" onclick="this.parentElement.remove()">✕</button>'}</div>`;
+  window.agregarObj=()=>document.getElementById('objBox').insertAdjacentHTML('beforeend',filaObj({},false));
+  window.guardarEval=async(id,finalizar)=>{
+    const notas=MI.competencias.map(c=>({id_competencia:c.id,jefe:getStar('je_'+c.id)})).filter(n=>n.jefe);
+    if(finalizar&&notas.length<MI.competencias.length&&!confirm('Faltan competencias por evaluar. ¿Finalizar igual?')) return;
+    const objetivos=[...document.querySelectorAll('#objBox .obj-row')].map(r=>({objetivo:r.querySelector('.ob-t').value,peso:r.querySelector('.ob-p').value,cumplimiento:r.querySelector('.ob-c').value})).filter(o=>o.objetivo.trim());
+    const r=await (await fetch('/api/rrhh/desempeno/evaluar',{method:'POST',headers:HJ,body:JSON.stringify({id_evaluacion:id,notas,objetivos,fortalezas:document.getElementById('evF').value,oportunidades:document.getElementById('evO').value,finalizar})})).json();
+    if(!r.success) return alert(r.error);
+    alert(finalizar?`Evaluación finalizada ✔ Nota final: ${nota(r.data.nota_final)}\nConversa el resultado con la persona (feedback).`:'Borrador guardado ✔');
+    cargarEquipo();
+  };
+
+  /* ── CICLOS (RRHH) ── */
+  async function cargarCiclos(){
+    const j=await (await fetch('/api/rrhh/desempeno/ciclos',{headers:H})).json();
+    if(!j.success) return;
+    document.getElementById('t3').style.display=''; document.getElementById('t4').style.display=''; ES_RRHH=true;
+    const cs=(j.data||{}).ciclos||[];
+    let h=`<div class="card-box"><h6 style="color:var(--navy)">Nuevo ciclo <small style="color:#94a3b8;font-weight:400">— genera una evaluación por colaborador activo con jefatura asignada</small></h6>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+        <div class="fld"><label>Nombre</label><input id="cNom" placeholder="Ej: 2026 Segundo Semestre"></div>
+        <div class="fld"><label>Inicio</label><input type="date" id="cIni"></div>
+        <div class="fld"><label>Cierre</label><input type="date" id="cFin"></div>
+        <div class="fld"><label>Peso competencias %</label><input type="number" id="cPeso" value="70" min="0" max="100"></div>
+        <div class="fld"><button class="btn-navy" onclick="crearCiclo()">Crear ciclo</button></div></div>
+      <p style="font-size:.74rem;color:#64748b;margin:0">La nota final = peso% promedio de competencias (jefatura) + resto% objetivos. Quien no tenga jefatura ("reporta a" en la ficha) queda fuera y se avisa.</p></div>
+      <div class="card-box"><table><thead><tr><th>Ciclo</th><th>Período</th><th>Estado</th><th style="text-align:right">Evaluaciones</th><th style="text-align:right">Avance</th><th style="text-align:right">Promedio</th><th></th></tr></thead><tbody>`;
+    if(!cs.length) h+='<tr><td colspan="7" class="empty">Sin ciclos aún.</td></tr>';
+    cs.forEach(c=>{ const done=(Number(c.evaluadas)||0)+(Number(c.cerradas)||0);
+      h+=`<tr><td><b>${esc(c.nombre)}</b></td><td>${fd(c.fecha_inicio)} – ${fd(c.fecha_cierre)}</td><td><span class="pill ${c.estado==='ABIERTO'?'AUTOEVAL':'CERRADA'}">${c.estado}</span></td>
+        <td style="text-align:right">${c.total||0}</td><td style="text-align:right">${done}/${c.total||0} evaluadas</td><td style="text-align:right;font-weight:800">${nota(c.promedio)}</td>
+        <td>${c.estado==='ABIERTO'?`<button class="btn-mini" onclick="cerrarCiclo(${c.id})">Cerrar ciclo</button>`:''}</td></tr>`; });
+    h+='</tbody></table></div>';
+    document.getElementById('secCiclos').innerHTML=h;
+  }
+  window.crearCiclo=async()=>{
+    const b={nombre:document.getElementById('cNom').value,fecha_inicio:document.getElementById('cIni').value,fecha_cierre:document.getElementById('cFin').value,peso_competencias:document.getElementById('cPeso').value};
+    if(!b.nombre.trim()||!b.fecha_inicio||!b.fecha_cierre) return alert('Completa nombre y fechas');
+    if(!confirm(`Crear el ciclo "${b.nombre}" y generar las evaluaciones de todos los colaboradores activos?`)) return;
+    const r=await (await fetch('/api/rrhh/desempeno/ciclos',{method:'POST',headers:HJ,body:JSON.stringify(b)})).json();
+    if(!r.success) return alert(r.error);
+    alert(`Ciclo creado ✔ ${r.data.creadas} evaluaciones generadas${r.data.sin_jefatura?` · ${r.data.sin_jefatura} persona(s) sin jefatura quedaron fuera (asigna "reporta a" en la ficha y recrea o asígnalas a mano)`:''}`);
+    cargarCiclos(); cargarEquipo(); cargarMi();
+  };
+  window.cerrarCiclo=async id=>{ if(!confirm('¿Cerrar el ciclo? Las evaluaciones abiertas quedan como están.')) return;
+    await fetch(`/api/rrhh/desempeno/ciclos/${id}/cerrar`,{method:'POST',headers:H}); cargarCiclos(); };
+
+  /* ── COMPETENCIAS (RRHH) ── */
+  async function cargarComps(){
+    const j=await (await fetch('/api/rrhh/desempeno/competencias',{headers:H})).json();
+    const cs=(j.data||{}).competencias||[];
+    let h=`<div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h6 style="color:var(--navy);margin:0">Catálogo de competencias</h6><button class="btn-mini" onclick="editComp()"><i class="bi bi-plus"></i> Nueva</button></div>
+      <table><thead><tr><th>#</th><th>Competencia</th><th>Descripción</th><th></th></tr></thead><tbody>`;
+    cs.forEach(c=>{ h+=`<tr><td>${c.orden}</td><td><b>${esc(c.nombre)}</b></td><td style="font-size:.8rem;color:#64748b">${esc(c.descripcion||'')}</td>
+      <td style="white-space:nowrap"><button class="btn-mini" onclick='editComp(${JSON.stringify(c).replace(/'/g,"&#39;")})'>Editar</button>
+      <button class="btn-mini" onclick="delComp(${c.id})">✕</button></td></tr>`; });
+    h+='</tbody></table><p style="font-size:.74rem;color:#64748b;margin:10px 0 0">Los cambios aplican a las evaluaciones futuras; las notas ya puestas no se tocan.</p></div>';
+    document.getElementById('secComps').innerHTML=h;
+  }
+  window.editComp=async c=>{
+    const nombre=prompt('Competencia:',c?.nombre||''); if(nombre===null||!nombre.trim()) return;
+    const descripcion=prompt('Descripción (qué significa cumplirla):',c?.descripcion||''); if(descripcion===null) return;
+    const orden=prompt('Orden:',c?.orden??99); if(orden===null) return;
+    await fetch('/api/rrhh/desempeno/competencias',{method:'POST',headers:HJ,body:JSON.stringify({id:c?.id,nombre,descripcion,orden})});
+    cargarComps();
+  };
+  window.delComp=async id=>{ if(!confirm('¿Eliminar la competencia? (deja de aparecer en evaluaciones nuevas)')) return;
+    await fetch('/api/rrhh/desempeno/competencias',{method:'POST',headers:HJ,body:JSON.stringify({id,eliminar:true})}); cargarComps(); };
+
+  cargarMi(); cargarEquipo(); cargarCiclos(); cargarComps();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

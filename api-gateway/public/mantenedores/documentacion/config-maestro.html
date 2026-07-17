@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.8 -->
+<!-- v1.9 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -107,6 +107,7 @@
     <tr><td>Contratos → Cargos</td><td>Catálogo de cargos con su <b>descripción de cargo</b> (obligatoria: sin ella el sistema alega a diario). La descripción entra al contrato como parte integrante.</td></tr>
     <tr><td>Contratos → Catálogo de beneficios</td><td>Los beneficios disponibles como checkbox en las cartas oferta (título, cláusula con {monto}, monto default). Lo ofertado pasa tal cual al contrato.</td></tr>
     <tr><td>Finiquitos (causales)</td><td>Causales art. 159/160/161 con sus flags (¿indemniza años? ¿mes de aviso?) en <code>rh_finiquito_causales</code>; topes <code>finiq_tope_anos</code> (11) y <code>finiq_tope_uf</code> (90) en rh_config.</td></tr>
+    <tr><td>Evaluaciones de Desempeño</td><td>Catálogo de competencias (nombre, descripción, orden) y ciclos con su peso competencias/objetivos — todo desde la misma página Desempeño (permiso <code>rh_colaboradores</code>).</td></tr>
     <tr><td>Cuenta corriente de vacaciones</td><td>Días anuales (<code>vac_dias_anuales</code>, 15); años previos por colaborador (ficha, con certificado AFP) para el feriado progresivo; ajustes históricos por RRHH.</td></tr>
     <tr><td>Archivo Previred</td><td>CCAF y mutualidad de la empresa — botón ⚙ junto a "Archivo Previred" en Liquidaciones (<code>rh_previred_config</code>). El movimiento de personal sale solo: retiro (2) desde los finiquitos del mes, contratación (1) desde los ingresos, subsidio (3) desde las licencias.</td></tr>
     <tr><td>Ausencias (tipos)</td><td><code>ausencia_tipos</code> en rh_config — incluye AUSENCIA INJUSTIFICADA (activa la vigilancia art. 160 N°3).</td></tr>

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.1 — card Aumento de Renta (calculadora sobre el motor de liquidaciones) -->
+  <!-- v2.2 — card Evaluaciones de Desempeño -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,12 @@
       <p>Cartas oferta con beneficios por checkbox, contratos que heredan lo ofertado, y descripciones de cargo obligatorias.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/desempeno/" class="module-card" id="cardDes" style="display:none">
+      <div class="card-icon"><i class="bi bi-graph-up-arrow"></i></div>
+      <h5>Evaluaciones de Desempeño</h5>
+      <p>Ciclos de evaluación con autoevaluación, evaluación de jefatura por competencias y objetivos con peso. El historial queda en tu ficha.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/concurso/" class="module-card" id="cardConc" style="display:none">
       <div class="card-icon"><i class="bi bi-controller"></i></div>
       <h5>¿Qué Dice AutoFácil?</h5>
@@ -130,6 +136,7 @@
     if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
     if (tiene('concurso')) document.getElementById('cardConc').style.display='';
+    if (tiene('rh_desempeno')) document.getElementById('cardDes').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>
