@@ -47,6 +47,12 @@ require('../../../../shared/migrate').enFila('rrhh-firmas', async () => {
   console.log('[rrhh-firmas] listo');
 });
 
+// LIQUIDACION fuera del catálogo doc_tipos: las liquidaciones se obtienen del módulo
+// Remuneraciones (emitidas y enviadas por correo) — no se archivan escaneadas.
+require('../../../../shared/migrate').enFila('rrhh-doc-tipos-sin-liquidacion', async () => {
+  await pool.query(`UPDATE rh_config SET valor=TRIM(BOTH ',' FROM REPLACE(CONCAT(',', valor, ','), ',LIQUIDACION,', ',')) WHERE clave='doc_tipos'`);
+});
+
 const TABLAS = { CONTRATO: 'rh_contratos', FINIQUITO: 'rh_finiquitos' };
 
 /* Snapshot canónico del documento (los campos de fondo, en orden fijo) → SHA-256.

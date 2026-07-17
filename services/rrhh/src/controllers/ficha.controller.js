@@ -60,7 +60,7 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
         INDEX idx_usuario (id_usuario, created_at)
       )`);
     // Tipos de documento paramétricos (mantenedor rh_config)
-    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES ('doc_tipos', 'CONTRATO,ANEXO,LIQUIDACION,CERTIFICADO,AMONESTACION,TITULO,OTRO')`);
+    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES ('doc_tipos', 'CONTRATO,ANEXO,CERTIFICADO,AMONESTACION,TITULO,OTRO')`);
 
     // ── Promover Recursos Humanos a MÓDULO propio del Home (antes vivía en Soporte) ──
     const [[mod]] = await pool.query('SELECT id_modulo, estado FROM modulos WHERE id_modulo=500002');
