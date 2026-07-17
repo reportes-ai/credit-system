@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.3 — pestaña Horarios y Turnos: horario fijo entrada/salida o marca "por turnos" (turno se define en pestaña Turnos) -->
+  <!-- v1.4 — Horarios y Turnos: días trabajados (L-D) + columna horas semanales -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,9 +54,11 @@
     <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Horario de cada colaborador. Si trabaja <b>por turnos</b>, márcalo aquí y su turno se define en la pestaña Turnos.</p>
     <table class="t"><thead><tr>
       <th>Colaborador</th><th>Cargo</th>
+      <th style="text-align:center">Días</th>
       <th style="text-align:center">Entrada</th><th style="text-align:center">Salida</th>
       <th style="text-align:center" title="Trabaja con turnos rotativos: su horario se define por turno, no fijo">Por turnos</th>
-      <th style="text-align:center">Horario</th><th></th>
+      <th style="text-align:center">Horario</th>
+      <th style="text-align:center">Hrs/semana</th><th></th>
     </tr></thead><tbody id="tbH"></tbody></table>
   </div>
   <div class="box" id="boxJor">
@@ -119,22 +121,43 @@ function horarioTxt(c){
   if(c.hora_entrada&&c.hora_salida) return `<span class="pill p-ok">${c.hora_entrada} – ${c.hora_salida}</span>`;
   return '<span class="pill p-mut">sin definir</span>';
 }
+const DSEM=['L','M','X','J','V','S','D'];
+const diasDe=c=>c.dias!=null?c.dias:'LMXJV';  // sin definir → L-V por defecto
+function hrsSemana(c){
+  if(!debeMarcar(c)) return '<span class="pill p-mut">—</span>';
+  if(+c.por_turnos) return '<span class="pill p-nav">según turno</span>';
+  if(!(c.hora_entrada&&c.hora_salida)) return '<span class="pill p-mut">—</span>';
+  const [h1,m1]=c.hora_entrada.split(':').map(Number),[h2,m2]=c.hora_salida.split(':').map(Number);
+  let min=(h2*60+m2)-(h1*60+m1); if(min<=0) min+=24*60;   // turno que cruza medianoche
+  const tot=min*diasDe(c).length;
+  return `<b>${(tot/60).toLocaleString('es-CL',{maximumFractionDigits:1})} hrs</b>`;
+}
 function pintaHor(){
   $('tbH').innerHTML=D.map((c,i)=>{
-    const na=!debeMarcar(c), pt=+c.por_turnos;
+    const na=!debeMarcar(c), pt=+c.por_turnos, ds=diasDe(c);
+    const diasHtml=DSEM.map(d=>`<label style="font-size:.66rem;color:#64748b;display:inline-flex;flex-direction:column;align-items:center;margin:0 1px;cursor:pointer">${d}<input type="checkbox" style="width:14px;height:14px" ${ds.includes(d)?'checked':''} ${na?'disabled':''} onchange="cambiaDia(${i},'${d}',this.checked)"></label>`).join('');
     return `<tr>
     <td><b>${c.nombre}</b><div style="font-size:.68rem;color:#94a3b8">${c.rut||''}</div></td>
     <td style="color:#475569">${c.cargo||''}</td>
+    <td style="text-align:center;white-space:nowrap">${diasHtml}</td>
     <td style="text-align:center"><input type="time" id="he${i}" value="${c.hora_entrada||''}" ${na||pt?'disabled':''} onchange="cambiaHora(${i},'hora_entrada',this.value)"></td>
     <td style="text-align:center"><input type="time" id="hs${i}" value="${c.hora_salida||''}" ${na||pt?'disabled':''} onchange="cambiaHora(${i},'hora_salida',this.value)"></td>
     <td style="text-align:center"><input type="checkbox" ${pt?'checked':''} ${na?'disabled':''} onchange="cambiaTurnos(${i},this.checked)"></td>
     <td style="text-align:center" id="ht${i}">${horarioTxt(c)}</td>
+    <td style="text-align:center" id="hw${i}">${hrsSemana(c)}</td>
     <td style="text-align:right"><span class="saved" id="svh${i}"><i class="bi bi-check2"></i> guardado</span></td>
-  </tr>`;}).join('')||'<tr><td colspan="7" class="empty">Sin colaboradores</td></tr>';
+  </tr>`;}).join('')||'<tr><td colspan="9" class="empty">Sin colaboradores</td></tr>';
+}
+async function cambiaDia(i,d,val){
+  const c=D[i]; let ds=diasDe(c);
+  ds=val?(ds.includes(d)?ds:DSEM.filter(x=>ds.includes(x)||x===d).join('')):ds.replace(d,'');
+  c.dias=ds;
+  try{ await guardar(i); $('hw'+i).innerHTML=hrsSemana(c); const s=$('svh'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 async function cambiaHora(i,campo,val){
   D[i][campo]=val||null;
-  try{ await guardar(i); $('ht'+i).innerHTML=horarioTxt(D[i]); const s=$('svh'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400); }
+  try{ await guardar(i); $('ht'+i).innerHTML=horarioTxt(D[i]); $('hw'+i).innerHTML=hrsSemana(D[i]); const s=$('svh'+i); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400); }
   catch(e){ alert('No se pudo guardar: '+e.message); }
 }
 async function cambiaTurnos(i,val){
@@ -161,7 +184,7 @@ async function guardar(i){
   const c=D[i];
   const r=await fetch('/api/rrhh/jornada/'+c.id_usuario,{method:'PUT',headers:H,
     body:JSON.stringify({art22:+c.art22,h40:+c.h40,especial_hrs:c.especial_hrs===''?null:c.especial_hrs,externo:+c.externo,
-      hora_entrada:c.hora_entrada||null,hora_salida:c.hora_salida||null,por_turnos:+c.por_turnos||0})});
+      hora_entrada:c.hora_entrada||null,hora_salida:c.hora_salida||null,por_turnos:+c.por_turnos||0,dias:c.dias??null})});
   const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
   $('dm'+i).innerHTML=marcarTxt(c);
   $('jn'+i).innerHTML=`<span class="pill p-nav">${jornadaTxt(c)}</span>`;
