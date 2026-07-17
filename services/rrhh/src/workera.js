@@ -17,16 +17,18 @@ async function get(path, params = {}) {
   return r.json();
 }
 
-// Todas las páginas de un endpoint paginado ({page,totalPages,data})
+// Todas las páginas de un endpoint paginado ({page,totalPages,data}).
+// La página 1 revela totalPages; el resto se trae EN PARALELO (lotes de 6)
+// porque la API es lenta (~20 registros/página) y en serie tarda minutos.
 async function getTodas(path, params = {}) {
-  const out = [];
-  let page = 1, total = 1;
-  do {
-    const j = await get(path, { ...params, page });
-    out.push(...(j.data || []));
-    total = Number(j.totalPages) || 1;
-    page++;
-  } while (page <= total && page <= 100);
+  const p1 = await get(path, { ...params, page: 1 });
+  const out = [...(p1.data || [])];
+  const total = Math.min(Number(p1.totalPages) || 1, 100);
+  for (let desde = 2; desde <= total; desde += 6) {
+    const lote = [];
+    for (let p = desde; p < desde + 6 && p <= total; p++) lote.push(get(path, { ...params, page: p }));
+    (await Promise.all(lote)).forEach(j => out.push(...(j.data || [])));
+  }
   return out;
 }
 

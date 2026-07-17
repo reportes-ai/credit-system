@@ -23,7 +23,61 @@ require('../../../../shared/migrate').enFila('rrhh-asistencia-card', async () =>
   console.log('[rrhh-asistencia] card creada');
 });
 
+// ── Caché de sincronización: las marcas de días pasados no cambian, así que se
+// guardan una vez y cada carga solo consulta a Workera los últimos 3 días.
+// (Workera sigue siendo la fuente única; esto es caché, como dealernet_informes.)
+require('../../../../shared/migrate').enFila('rrhh-workera-cache', async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rh_workera_marcas (
+      id        INT AUTO_INCREMENT PRIMARY KEY,
+      rut       VARCHAR(12) NOT NULL,
+      fecha     DATE NOT NULL,
+      hora      TIME NOT NULL,
+      tipo      TINYINT NULL,
+      origen    VARCHAR(80) NULL,
+      UNIQUE KEY uq_marca (rut, fecha, hora),
+      INDEX idx_fecha (fecha)
+    )`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rh_workera_sync (
+      dia       DATE PRIMARY KEY,
+      synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+  console.log('[rrhh-asistencia] caché workera lista');
+});
+
 const rutNorm = r => String(r || '').replace(/[.\s-]/g, '').toUpperCase().replace(/K$/, 'K'); // 18.088.259-6 → 180882596
+
+// Trae de Workera solo los días del rango que faltan en el caché (o los últimos
+// 3 días, que se refrescan siempre por si un reloj sincroniza tarde) y los guarda.
+async function sincronizar(desde, hasta) {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const refresco = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+  const [sync] = await pool.query(
+    `SELECT DATE_FORMAT(dia,"%Y-%m-%d") dia, TIMESTAMPDIFF(MINUTE, synced_at, NOW()) hace_min
+       FROM rh_workera_sync WHERE dia BETWEEN ? AND ?`, [desde, hasta]);
+  const listos = new Map(sync.map(s => [s.dia, s.hace_min]));
+  const faltan = [];
+  for (let d = new Date(desde + 'T12:00:00'); ; d.setDate(d.getDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10);
+    if (iso > hasta) break;
+    const hace = listos.get(iso);
+    // día sin sincronizar, o día reciente cuya última sync tiene más de 15 min
+    if (hace == null || (iso >= refresco && hace >= 15)) faltan.push(iso);
+  }
+  if (!faltan.length) return;
+  const marcas = await workera.marcaciones(faltan[0], faltan[faltan.length - 1]);
+  const filas = [];
+  for (const m of marcas) {
+    const rut = rutNorm(m.employee?.identification);
+    const [dia, hora] = String(m.attendanceDate || '').split('T');
+    if (rut && dia && hora) filas.push([rut, dia, hora.slice(0, 8), m.attendanceType ?? null, String(m.origin || '').slice(0, 80)]);
+  }
+  if (filas.length)
+    await pool.query('INSERT IGNORE INTO rh_workera_marcas (rut, fecha, hora, tipo, origen) VALUES ?', [filas]);
+  await pool.query('INSERT INTO rh_workera_sync (dia) VALUES ' + faltan.map(() => '(?)').join(',') +
+    ' ON DUPLICATE KEY UPDATE synced_at=NOW()', faltan);
+}
 
 /* ── GET /api/rrhh/asistencia/resumen?mes=YYYY-MM ───────────────────────────── */
 exports.resumen = async (req, res) => {
@@ -49,18 +103,15 @@ exports.resumen = async (req, res) => {
                     FROM rh_vacaciones WHERE estado='APROBADA' AND fecha_desde <= ? AND fecha_hasta >= ?`, [hasta, desde]),
     ]);
 
-    // 2) Marcaciones Workera del período, agrupadas por RUT y día (primera y última)
-    const marcas = await workera.marcaciones(desde, hasta);
+    // 2) Marcaciones del período: sincroniza los días que faltan y lee del caché
+    await sincronizar(desde, hasta);
+    const [marcas] = await pool.query(
+      `SELECT rut, DATE_FORMAT(fecha,'%Y-%m-%d') dia, MIN(hora) entrada, MAX(hora) salida, COUNT(*) n
+         FROM rh_workera_marcas WHERE fecha BETWEEN ? AND ? GROUP BY rut, dia`, [desde, hasta]);
     const porRut = {};
     for (const m of marcas) {
-      const rut = rutNorm(m.employee?.identification);
-      const [dia, hora] = String(m.attendanceDate || '').split('T');
-      if (!rut || !dia) continue;
-      const d = (porRut[rut] = porRut[rut] || {});
-      const reg = (d[dia] = d[dia] || { entrada: null, salida: null, n: 0 });
-      reg.n++;
-      if (!reg.entrada || hora < reg.entrada) reg.entrada = hora;
-      if (!reg.salida || hora > reg.salida) reg.salida = hora;
+      (porRut[m.rut] = porRut[m.rut] || {})[m.dia] =
+        { entrada: String(m.entrada), salida: String(m.salida), n: m.n };
     }
 
     // 3) Días hábiles transcurridos del mes (motor único shared/feriados)
