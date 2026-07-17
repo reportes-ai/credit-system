@@ -147,6 +147,10 @@ exports.resumen = async (req, res) => {
 
     // 2) Marcaciones del período: sincroniza los días que faltan y lee del caché
     await sincronizar(desde, hasta);
+    // Enrolado = tiene FICHA en Workera (aparece en Personas), no "tiene marcas".
+    let fichas = null;
+    try { fichas = new Set((await workera.trabajadores()).filter(t => String(t.employeeStatus).toUpperCase() === 'ACTIVO').map(t => rutNorm(t.identification)).filter(Boolean)); }
+    catch (e) { console.error('[rrhh asistencia] empleados Workera:', e.message); }
     const [[marcas], [hors]] = await Promise.all([
       pool.query(
         `SELECT rut, DATE_FORMAT(fecha,'%Y-%m-%d') dia, MIN(hora) entrada, MAX(hora) salida, COUNT(*) n
@@ -186,7 +190,7 @@ exports.resumen = async (req, res) => {
         if (cubierto(c.id_usuario, h, vacaciones)) { cubiertos++; detalle.push({ dia: h, cubierto: 'VACACIONES' }); continue; }
         faltas.push(h); detalle.push({ dia: h, falta: true });
       }
-      const enWorkera = !!porRut[rutW(c.rut)];
+      const enWorkera = fichas ? fichas.has(rutW(c.rut)) : !!porRut[rutW(c.rut)];
       return { id_usuario: c.id_usuario, nombre: c.nombre, rut: c.rut, en_workera: enWorkera,
                dias_marcados: marcados, dias_cubiertos: cubiertos, faltas, detalle };
     });

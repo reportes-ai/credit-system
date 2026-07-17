@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Asistencia (Workera) — AutoFácil</title>
-  <!-- v1.4 — atrasos contra el TURNO real de Workera (workshift/schedules) -->
+  <!-- v1.5 — "enrolado" = tiene ficha ACTIVA en Workera (Personas), ya no "tiene marcas del mes" -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -64,7 +64,7 @@
     </tr></thead><tbody id="tb"><tr><td colspan="6" class="empty">Cargando marcaciones desde Workera…</td></tr></tbody></table>
   </div>
   <div class="box" id="pNoenrol" style="display:none">
-    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Deben marcar según Jornada pero no registran ninguna marcación en Workera este mes — hay que enrolarlos en el reloj (huella/rostro o app).</p>
+    <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Deben marcar según Jornada pero no tienen ficha activa en Workera (no aparecen en Personas) — hay que crearlos y enrolarlos en el reloj (huella/rostro o app).</p>
     <table class="t"><thead><tr><th>Colaborador</th><th>RUT</th></tr></thead><tbody id="tbNo"></tbody></table>
   </div>
   <div class="box" id="pAtrasos" style="display:none">
