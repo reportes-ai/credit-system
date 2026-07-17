@@ -543,10 +543,13 @@ const getAllPerfiles = async (req, res) => {
       "SELECT * FROM perfiles ORDER BY nombre ASC"
     );
     // Un no-Admin ve todos los perfiles para gestionarlos, EXCEPTO Administrador
-    // (su matriz revelaría los módulos aún no liberados). Dentro de cada perfil,
-    // la matriz y el guardado ya se filtran a "solo lo que él tiene".
+    // (su matriz revelaría los módulos aún no liberados) y SU PROPIO perfil
+    // (nadie edita sus propios permisos). La matriz y el guardado ya se filtran
+    // a "solo lo que él tiene".
     const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
-    const visibles = otorgables === null ? perfiles : perfiles.filter(p => p.nombre !== 'Administrador');
+    if (otorgables === null) return res.json({ success: true, data: perfiles, error: null });
+    const [[yo]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario=?', [req.usuario.id_usuario]);
+    const visibles = perfiles.filter(p => p.nombre !== 'Administrador' && p.id_perfil !== yo?.id_perfil);
     res.json({ success: true, data: visibles, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: error.message });
