@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.1 — jornada especial (horas digitables) + externo sin horario; full width -->
+  <!-- v1.2 — topnav común + badge de versión -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -59,6 +59,8 @@
     todos los flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
 </div>
 <script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
 <script>
 const H={Authorization:'Bearer '+sessionStorage.getItem('token'),'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
