@@ -303,7 +303,7 @@ exports.informeIA = async (req, res) => {
 };
 
 /* Recordatorio semanal a quienes no han respondido encuestas abiertas */
-const _w = d => { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const dn = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - dn); const y1 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return x.getUTCFullYear() + '_' + Math.ceil((((x - y1) / 86400000) + 1) / 7); };
+const _w = require('../../../../api-gateway/public/js/rrhh-core').semanaISO; // motor único (la clave cambia de formato una vez; solo dedup semanal)
 async function recordarPendientes() {
   try {
     const [encs] = await pool.query(`SELECT id, titulo FROM rh_enc_encuestas WHERE estado='ABIERTA'`);

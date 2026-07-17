@@ -172,7 +172,7 @@ exports.gestionar = async (req, res) => {
 };
 
 /* Alegato semanal: denuncias abiertas con plazo vencido */
-const _w = d => { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const dn = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - dn); const y1 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return x.getUTCFullYear() + '_' + Math.ceil((((x - y1) / 86400000) + 1) / 7); };
+const _w = require('../../../../api-gateway/public/js/rrhh-core').semanaISO; // motor único (la clave cambia de formato una vez; solo dedup semanal)
 async function alegarVencidas() {
   try {
     const hoy = new Date().toISOString().slice(0, 10);

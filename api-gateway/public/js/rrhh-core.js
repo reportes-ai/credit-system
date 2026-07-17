@@ -35,7 +35,16 @@
     return Math.max(0, m);
   }
 
-  const api = { cuotaFrancesa, provisionVacaciones, mesesAntiguedad };
+  // Semana ISO-8601 como clave 'YYYY-Sxx' — para deduplicar avisos semanales
+  // (certificados AFP, cargos sin descripción, onboarding vencido, compliance, encuestas).
+  function semanaISO(d) {
+    const t = new Date(d); t.setHours(0, 0, 0, 0);
+    t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+    const w1 = new Date(t.getFullYear(), 0, 4);
+    return t.getFullYear() + '-S' + String(1 + Math.round(((t - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7)).padStart(2, '0');
+  }
+
+  const api = { cuotaFrancesa, provisionVacaciones, mesesAntiguedad, semanaISO };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.AF_RRHH = api;
 })(typeof self !== 'undefined' ? self : this);

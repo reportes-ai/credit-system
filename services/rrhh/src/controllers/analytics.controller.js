@@ -64,7 +64,8 @@ exports.resumen = async (req, res) => {
       // de la cartola de Vacaciones (saldo períodos cumplidos + proporcional en curso;
       // provisión = días hábiles ×1,4 corridos × remuneración diaria, matemática del finiquito)
       require('./vac-cuenta.controller').calcularSaldosEquipo(),
-      pool.query(`SELECT DATE_FORMAT(fecha_desde,'%Y-%m') m, tipo, SUM(COALESCE(dias_habiles, DATEDIFF(fecha_hasta, fecha_desde)+1)) d
+      // Ausentismo SIEMPRE en días HÁBILES (dias_habiles se calcula al registrar con shared/feriados)
+      pool.query(`SELECT DATE_FORMAT(fecha_desde,'%Y-%m') m, tipo, SUM(dias_habiles) d
                     FROM rh_ausencias WHERE estado IN ('APROBADA','REGISTRADA') AND fecha_desde >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
                    GROUP BY m, tipo`).then(r => r[0]),
       pool.query(`SELECT mes m, SUM(total_haberes) haberes, SUM(liquido) liquido, COUNT(*) n

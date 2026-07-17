@@ -190,8 +190,8 @@ const crearAdicional = async (req, res) => {
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
     if (!colab) return fail(res, 'Colaborador no encontrado', 404);
     const [r] = await pool.query(
-      'INSERT INTO rh_adicionales (mes, id_usuario, nombre, causal, causal_texto, imponible, es_liquido, monto, creado_por) VALUES (?,?,?,?,?,?,?,?,?)',
-      [mes, idU, colab.nombre, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, nombreDe(u)]);
+      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, monto, creado_por) VALUES (?,?,?,?,?,?,?,?)',
+      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, nombreDe(u)]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
       detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}` });
     ok(res, { id: r.insertId, imponible, es_liquido: esLiquido });
@@ -200,11 +200,13 @@ const crearAdicional = async (req, res) => {
 
 const eliminarAdicional = async (req, res) => {
   try {
-    const [[a]] = await pool.query('SELECT * FROM rh_adicionales WHERE id=?', [req.params.id]);
+    const [[a]] = await pool.query(
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual
+       FROM rh_adicionales a LEFT JOIN usuarios u ON u.id_usuario = a.id_usuario WHERE a.id=?`, [req.params.id]);
     if (!a) return fail(res, 'No existe', 404);
     if (await mesEmitido(a.mes)) return fail(res, 'El mes ya fue emitido: no se puede eliminar', 423);
     await pool.query('DELETE FROM rh_adicionales WHERE id=?', [req.params.id]);
-    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: Number(req.params.id), detalle: `Eliminó adicional ${a.mes} ${a.nombre} ${a.causal} $${Number(a.monto).toLocaleString('es-CL')}` });
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: Number(req.params.id), detalle: `Eliminó adicional ${a.mes} ${a.nombre_actual || a.nombre} ${a.causal} $${Number(a.monto).toLocaleString('es-CL')}` });
     ok(res, { eliminado: true });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };
@@ -321,9 +323,9 @@ const crearDescuento = async (req, res) => {
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
     }
     const [r] = await pool.query(
-      `INSERT INTO rh_descuentos (id_usuario, nombre, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [idU, colab.nombre, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u)]);
+      `INSERT INTO rh_descuentos (id_usuario, tipo, subtipo, detalle_texto, mes_referencia, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [idU, tipo, subtipo, detalle, mesRef, monto, tasa, cuotas, valorCuota, mesInicio, nombreDe(u)]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: r.insertId,
       detalle: `${tipo}${subtipo ? '/' + subtipo : ''} ${colab.nombre}: $${monto.toLocaleString('es-CL')}${tasa != null ? ` al ${tasa}% mensual` : ''} en ${cuotas || '∞'} cuota(s) de $${valorCuota.toLocaleString('es-CL')} desde ${mesInicio}` });
     ok(res, { id: r.insertId, valor_cuota: valorCuota, cuotas, mes_inicio: mesInicio });
@@ -333,10 +335,12 @@ const crearDescuento = async (req, res) => {
 const anularDescuento = async (req, res) => {
   try {
     const u = req.usuario || {};
-    const [[d]] = await pool.query("SELECT * FROM rh_descuentos WHERE id=? AND estado='VIGENTE'", [req.params.id]);
+    const [[d]] = await pool.query(
+      `SELECT d.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual
+       FROM rh_descuentos d LEFT JOIN usuarios u ON u.id_usuario = d.id_usuario WHERE d.id=? AND d.estado='VIGENTE'`, [req.params.id]);
     if (!d) return fail(res, 'No existe o ya está anulado', 404);
     await pool.query("UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW() WHERE id=?", [nombreDe(u), d.id]);
-    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: d.id, detalle: `Anuló ${d.tipo} de ${d.nombre} ($${Number(d.valor_cuota).toLocaleString('es-CL')}/mes) — deja de descontarse desde ahora` });
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'descuento', entidad_id: d.id, detalle: `Anuló ${d.tipo} de ${d.nombre_actual || d.nombre} ($${Number(d.valor_cuota).toLocaleString('es-CL')}/mes) — deja de descontarse desde ahora` });
     ok(res, { anulado: true });
   } catch (e) { fail(res, 'Error interno del servidor'); }
 };

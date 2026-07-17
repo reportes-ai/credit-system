@@ -120,7 +120,7 @@ require('../../../../shared/migrate').enFila('rrhh-contratos', async () => {
 });
 
 /* ── El ALEGATO: cargos sin descripción → campana SEMANAL a RRHH y al creador ── */
-const _w = d => { const t = new Date(d); t.setHours(0,0,0,0); t.setDate(t.getDate()+3-((t.getDay()+6)%7)); const w1 = new Date(t.getFullYear(),0,4); return t.getFullYear()+'-S'+String(1+Math.round(((t-w1)/86400000-3+((w1.getDay()+6)%7))/7)).padStart(2,'0'); };
+const _w = require('../../../../api-gateway/public/js/rrhh-core').semanaISO; // motor único
 async function alegarCargosSinDescripcion() {
   try {
     const [cargos] = await pool.query(

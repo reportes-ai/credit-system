@@ -126,9 +126,9 @@ const crear = async (req, res) => {
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.id_supervisor FROM usuarios u WHERE u.id_usuario=?`, [idColab]);
       if (!colab) return fail(res, 'Colaborador no encontrado', 404);
       const [r] = await pool.query(
-        `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, estado, resuelto_por, resuelto_nombre)
-         VALUES (?,?,?,?,?,0,?,?,'APROBADA',?,?)`,
-        [colab.id_usuario, colab.nombre, tipo, fd, fh, diasHabilesLV(fd, fh), norm(b.comentario) || null, u.id_usuario, nombreDe(u)]);
+        `INSERT INTO rh_ausencias (id_usuario, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, estado, resuelto_por, resuelto_nombre)
+         VALUES (?,?,?,?,0,?,?,'APROBADA',?,?)`,
+        [colab.id_usuario, tipo, fd, fh, diasHabilesLV(fd, fh), norm(b.comentario) || null, u.id_usuario, nombreDe(u)]);
       auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'ausencia', entidad_id: r.insertId,
         detalle: `Ausencia INJUSTIFICADA de ${colab.nombre} ${fd} al ${fh}` });
       const alerta = await evaluarArt160(colab);
@@ -148,9 +148,9 @@ const crear = async (req, res) => {
       if (!colab) return fail(res, 'Colaborador no encontrado', 404);
       const dias = diasHabilesLV(fd, fh);
       const [r] = await pool.query(
-        `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data, estado, resuelto_por, resuelto_nombre)
-         VALUES (?,?,?,?,?,0,?,?,?,?,?,'APROBADA',?,?)`,
-        [colab.id_usuario, colab.nombre, tipo, fd, fh, dias, norm(b.comentario) || null, adjNombre, adjMime, adjData, u.id_usuario, nombreDe(u)]);
+        `INSERT INTO rh_ausencias (id_usuario, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data, estado, resuelto_por, resuelto_nombre)
+         VALUES (?,?,?,?,0,?,?,?,?,?,'APROBADA',?,?)`,
+        [colab.id_usuario, tipo, fd, fh, dias, norm(b.comentario) || null, adjNombre, adjMime, adjData, u.id_usuario, nombreDe(u)]);
       // Correo informativo al supervisor directo (+ notificación campana)
       const fmtF = f => new Date(f + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
       const msg = `Se ha ingresado licencia médica a nombre de ${colab.nombre} entre los días ${fmtF(fd)} y ${fmtF(fh)}, ambas fechas inclusive.`;
@@ -172,9 +172,9 @@ const crear = async (req, res) => {
     const medioDia = b.medio_dia ? 1 : 0;
     const dias = medioDia ? 0.5 : diasHabilesLV(fd, fh);
     const [r] = await pool.query(
-      `INSERT INTO rh_ausencias (id_usuario, nombre, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-      [u.id_usuario, nombreDe(u), tipo, fd, fh, medioDia, dias, norm(b.comentario) || null, adjNombre, adjMime, adjData]);
+      `INSERT INTO rh_ausencias (id_usuario, tipo, fecha_desde, fecha_hasta, medio_dia, dias_habiles, comentario, adjunto_nombre, adjunto_mime, adjunto_data)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [u.id_usuario, tipo, fd, fh, medioDia, dias, norm(b.comentario) || null, adjNombre, adjMime, adjData]);
     const ids = await poolAprobadores(u.id_usuario);
     if (ids.length) notificar(ids, { tipo: 'RH_AUSENCIA', titulo: '📋 Solicitud de ausencia',
       mensaje: `${nombreDe(u)} solicitó ${tipo} (${fd} al ${fh}, ${dias} día/s hábil/es)`, href: '/recursos-humanos/ausencias/?id=' + r.insertId });
@@ -202,7 +202,7 @@ const listar = async (req, res) => {
       else { where = `WHERE ${estadoW} AND us.id_supervisor=?`; params.push(u.id_usuario); }
     }
     const [rows] = await pool.query(
-      `SELECT a.id, a.id_usuario, a.nombre, a.tipo, a.fecha_desde, a.fecha_hasta, a.medio_dia, a.dias_habiles,
+      `SELECT a.id, a.id_usuario, TRIM(CONCAT_WS(' ', us.nombre, us.apellido)) nombre, a.tipo, a.fecha_desde, a.fecha_hasta, a.medio_dia, a.dias_habiles,
               a.comentario, a.estado, a.resuelto_nombre, a.motivo_rechazo, a.created_at,
               a.adjunto_nombre IS NOT NULL AS tiene_adjunto
          FROM rh_ausencias a JOIN usuarios us ON us.id_usuario = a.id_usuario
@@ -361,14 +361,16 @@ const licenciasResumen = async (req, res) => {
          FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
         GROUP BY mes ORDER BY mes DESC LIMIT 36`, p);
     const [porPersona] = await pool.query(
-      `SELECT a.id_usuario, a.nombre, COUNT(*) licencias, SUM(a.dias_habiles) dias,
+      `SELECT a.id_usuario, MAX(TRIM(CONCAT_WS(' ', us.nombre, us.apellido))) nombre, COUNT(*) licencias, SUM(a.dias_habiles) dias,
               MIN(a.fecha_desde) primera, MAX(a.fecha_hasta) ultima
-         FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
-        GROUP BY a.id_usuario, a.nombre ORDER BY dias DESC`, p);
+         FROM rh_ausencias a JOIN usuarios us ON us.id_usuario = a.id_usuario
+        WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
+        GROUP BY a.id_usuario ORDER BY dias DESC`, p);
     const [detalle] = await pool.query(
-      `SELECT a.id, a.nombre, a.fecha_desde, a.fecha_hasta, a.dias_habiles, a.comentario,
+      `SELECT a.id, TRIM(CONCAT_WS(' ', us.nombre, us.apellido)) nombre, a.fecha_desde, a.fecha_hasta, a.dias_habiles, a.comentario,
               a.adjunto_nombre IS NOT NULL tiene_adjunto, a.resuelto_nombre, a.created_at
-         FROM rh_ausencias a WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
+         FROM rh_ausencias a JOIN usuarios us ON us.id_usuario = a.id_usuario
+        WHERE a.tipo='LICENCIA MEDICA' AND a.estado='APROBADA' ${wEq}
         ORDER BY a.fecha_desde DESC LIMIT 300`, p);
     ok(res, { por_mes: porMes, por_persona: porPersona, detalle });
   } catch (e) { console.error('[rrhh licenciasResumen]', e.message); fail(res, 'Error interno del servidor'); }

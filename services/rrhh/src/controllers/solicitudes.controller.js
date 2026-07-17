@@ -280,9 +280,9 @@ async function ejecutar(sol, datos, req) {
   const mes = mesProximo();
   if (sol.tipo === 'ANTICIPO') {
     await validarTope15(sol.id_usuario, Math.round(datos.monto / datos.cuotas));
-    await pool.query(`INSERT INTO rh_descuentos (id_usuario, nombre, tipo, monto_total, cuotas, valor_cuota, mes_inicio, creado_por)
-      VALUES (?,?,?,?,?,?,?,?)`,
-      [sol.id_usuario, sol.nombre, 'ANTICIPO', datos.monto, datos.cuotas, Math.round(datos.monto / datos.cuotas), mes, `Solicitud #${sol.id}`]);
+    await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, monto_total, cuotas, valor_cuota, mes_inicio, creado_por)
+      VALUES (?,?,?,?,?,?,?)`,
+      [sol.id_usuario, 'ANTICIPO', datos.monto, datos.cuotas, Math.round(datos.monto / datos.cuotas), mes, `Solicitud #${sol.id}`]);
     const odp = await generarODP(sol, datos, req);
     return `Anticipo de $${datos.monto.toLocaleString('es-CL')} en ${datos.cuotas} cuota(s) desde ${mes}. ODP ${odp} emitida — Tesorería avisada para el depósito`;
   }
@@ -293,9 +293,9 @@ async function ejecutar(sol, datos, req) {
     if (tmc != null && tasa > tmc) throw new Error(`La tasa ${tasa}% supera la TMC vigente (${tmc}%) — ajústala antes de aprobar`);
     const vc = cuotaFrancesa(datos.monto, tasa, datos.cuotas);
     await validarTope15(sol.id_usuario, vc);
-    await pool.query(`INSERT INTO rh_descuentos (id_usuario, nombre, tipo, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
-      VALUES (?,?,?,?,?,?,?,?,?)`,
-      [sol.id_usuario, sol.nombre, 'PRESTAMO', datos.monto, tasa, datos.cuotas, vc, mes, `Solicitud #${sol.id}`]);
+    await pool.query(`INSERT INTO rh_descuentos (id_usuario, tipo, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
+      VALUES (?,?,?,?,?,?,?,?)`,
+      [sol.id_usuario, 'PRESTAMO', datos.monto, tasa, datos.cuotas, vc, mes, `Solicitud #${sol.id}`]);
     const odp = await generarODP(sol, datos, req);
     return `Préstamo de $${datos.monto.toLocaleString('es-CL')} al ${tasa}% en ${datos.cuotas} cuotas de $${vc.toLocaleString('es-CL')} desde ${mes}. ODP ${odp} emitida — Tesorería avisada para el depósito`;
   }
