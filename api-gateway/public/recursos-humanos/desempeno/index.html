@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluaciones de Desempeño — RRHH</title>
-  <!-- v1.5 — correo de apertura + candado autoevaluación primero -->
+  <!-- v1.6 — pestaña Historial: matriz persona × ciclo con promedio y tendencia -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -103,12 +103,14 @@
     <div class="tab" id="t3" onclick="tab('t360')"><i class="bi bi-arrow-repeat me-1"></i>360<span id="badge360" style="background:#dc2626;color:#fff;border-radius:10px;padding:0 6px;font-size:.68rem;margin-left:6px;display:none">0</span></div>
     <div class="tab" id="t4" onclick="tab('ciclos')" style="display:none"><i class="bi bi-calendar-range me-1"></i>Ciclos</div>
     <div class="tab" id="t5" onclick="tab('comps')" style="display:none"><i class="bi bi-list-check me-1"></i>Competencias</div>
+    <div class="tab" id="t6" onclick="tab('hist')" style="display:none"><i class="bi bi-clock-history me-1"></i>Historial</div>
   </div>
   <div id="secMi"></div>
   <div id="secEquipo" style="display:none"></div>
   <div id="secT360" style="display:none"></div>
   <div id="secCiclos" style="display:none"></div>
   <div id="secComps" style="display:none"></div>
+  <div id="secHist" style="display:none"></div>
 </div>
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -123,7 +125,7 @@
   const ESCALA='Escala: 1 Muy bajo lo esperado · 2 Bajo lo esperado · 3 Cumple lo esperado · 4 Sobre lo esperado · 5 Excepcional';
   let ES_RRHH=false, ES_JEFE=false, MI={}, EQUIPO=[], SEL={};
 
-  function tab(v){ ['mi','equipo','t360','ciclos','comps'].forEach((k,i)=>{ document.getElementById('sec'+k[0].toUpperCase()+k.slice(1)).style.display=k===v?'':'none'; document.getElementById('t'+(i+1)).classList.toggle('active',k===v); }); }
+  function tab(v){ ['mi','equipo','t360','ciclos','comps','hist'].forEach((k,i)=>{ document.getElementById('sec'+k[0].toUpperCase()+k.slice(1)).style.display=k===v?'':'none'; document.getElementById('t'+(i+1)).classList.toggle('active',k===v); }); if(v==='hist') cargarHist(); }
   const DIM_ETQ={PAR:'Par / compañero',REPORTE:'Reporte directo',CLIENTE_INTERNO:'Cliente interno',OTRA:'Otra',JEFATURA:'Jefatura'};
 
   /* ── rating widget ── */
@@ -309,7 +311,7 @@
   async function cargarCiclos(){
     const j=await (await fetch('/api/rrhh/desempeno/ciclos',{headers:H})).json();
     if(!j.success) return;
-    document.getElementById('t4').style.display=''; document.getElementById('t5').style.display=''; ES_RRHH=true;
+    document.getElementById('t4').style.display=''; document.getElementById('t5').style.display=''; document.getElementById('t6').style.display=''; ES_RRHH=true;
     const cs=(j.data||{}).ciclos||[];
     let h=`<div class="card-box"><h6 style="color:var(--navy)">Nuevo ciclo <small style="color:#94a3b8;font-weight:400">— genera una evaluación por colaborador activo con jefatura asignada</small></h6>
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
@@ -377,6 +379,36 @@
 
   window.cerrarCiclo=async id=>{ if(!confirm('¿Cerrar el ciclo? Las evaluaciones abiertas quedan como están.')) return;
     await fetch(`/api/rrhh/desempeno/ciclos/${id}/cerrar`,{method:'POST',headers:H}); cargarCiclos(); };
+
+  /* ── HISTORIAL por persona (RRHH): matriz colaborador × ciclo ── */
+  let HIST=null;
+  async function cargarHist(){
+    const j=await (await fetch('/api/rrhh/desempeno/equipo?todos=1',{headers:H})).json();
+    if(!j.success) return;
+    HIST=(j.data||{}).evaluaciones||[];
+    const ciclos=[...new Map(HIST.map(e=>[e.id_ciclo,{id:e.id_ciclo,nombre:e.ciclo,fi:e.fecha_inicio}])).values()].sort((a,b)=>String(a.fi)<String(b.fi)?-1:1);
+    const personas={};
+    HIST.forEach(e=>{ (personas[e.id_usuario]=personas[e.id_usuario]||{nombre:e.colaborador,cargo:e.cargo,evals:{}}).evals[e.id_ciclo]=e; });
+    const filas=Object.values(personas).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    let h=`<div class="card-box"><h6 style="color:var(--navy)">Historial de evaluaciones por persona <small style="color:#94a3b8;font-weight:400">— nota final por ciclo (clic para ver el detalle); las abiertas se muestran con su estado</small></h6>
+      <div style="overflow-x:auto"><table><thead><tr><th>Colaborador</th>${ciclos.map(c=>`<th style="text-align:center">${esc(c.nombre)}</th>`).join('')}<th style="text-align:center">Promedio</th><th style="text-align:center">Tendencia</th></tr></thead><tbody>`;
+    if(!filas.length) h+=`<tr><td colspan="${ciclos.length+3}" class="empty">Sin evaluaciones aún.</td></tr>`;
+    filas.forEach(p=>{
+      const notas=ciclos.map(c=>p.evals[c.id]?.nota_final).filter(n=>n!=null).map(Number);
+      const prom=notas.length?notas.reduce((s,x)=>s+x,0)/notas.length:null;
+      const tend=notas.length>=2?(notas[notas.length-1]>notas[notas.length-2]?'<span style="color:#16a34a">▲</span>':notas[notas.length-1]<notas[notas.length-2]?'<span style="color:#dc2626">▼</span>':'＝'):'—';
+      h+=`<tr><td><b>${esc(p.nombre)}</b><br><small style="color:#94a3b8">${esc(p.cargo||'')}</small></td>`;
+      ciclos.forEach(c=>{ const e=p.evals[c.id];
+        h+=`<td style="text-align:center">${!e?'<span style="color:#e2e8f0">·</span>':e.nota_final!=null?`<a href="javascript:void(0)" onclick="verHistDet(${e.id})" style="font-weight:800;text-decoration:none">${nota(e.nota_final)}</a>`:`<span class="pill ${e.estado}" style="cursor:pointer" onclick="verHistDet(${e.id})">${e.estado}</span>`}</td>`; });
+      h+=`<td style="text-align:center;font-weight:800;color:var(--navy)">${nota(prom)}</td><td style="text-align:center">${tend}</td></tr>`;
+    });
+    h+='</tbody></table></div></div><div id="histDet"></div>';
+    document.getElementById('secHist').innerHTML=h;
+  }
+  window.verHistDet=id=>{ const e=HIST.find(x=>x.id===id); if(!e) return;
+    document.getElementById('histDet').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h6 style="color:var(--navy);margin:0">${esc(e.colaborador)} — ${esc(e.ciclo)}</h6><button class="btn-mini" onclick="document.getElementById('histDet').innerHTML=''">✕ Cerrar</button></div>`+cardResultado(e,false);
+    document.getElementById('histDet').scrollIntoView({behavior:'smooth'});
+  };
 
   /* ── COMPETENCIAS (RRHH) ── */
   async function cargarComps(){
