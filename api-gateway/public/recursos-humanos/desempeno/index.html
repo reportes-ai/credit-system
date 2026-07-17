@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluaciones de Desempeño — RRHH</title>
-  <!-- v1.3 — Armar 360 masivo por ciclo + propuesta automática -->
+  <!-- v1.4 — guía ¿Cómo funciona? con catálogo vivo de competencias -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -46,7 +46,57 @@
   <div style="display:flex;gap:10px;align-items:center"><span class="user-chip" id="navNombre">—</span><button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button></div>
 </nav>
 <div class="main">
-  <div class="page-banner"><i class="bi bi-graph-up-arrow"></i><div><h2>Evaluaciones de Desempeño</h2><p>Autoevaluación, evaluación de tu jefatura y objetivos — el historial queda en tu ficha.</p></div></div>
+  <div class="page-banner"><i class="bi bi-graph-up-arrow"></i><div style="flex:1"><h2>Evaluaciones de Desempeño</h2><p>Autoevaluación, evaluación de tu jefatura y objetivos — el historial queda en tu ficha.</p></div>
+    <button onclick="document.getElementById('dlgGuia').showModal()" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.4);color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:.84rem;cursor:pointer;white-space:nowrap"><i class="bi bi-question-circle me-1"></i>¿Cómo funciona?</button></div>
+
+  <dialog id="dlgGuia" style="border:none;border-radius:16px;padding:0;width:min(760px,95vw);max-height:92vh">
+    <div style="padding:22px 26px;color:#1e293b;font-size:.88rem;line-height:1.55">
+      <div style="display:flex;justify-content:space-between;align-items:center"><h5 style="color:var(--navy);margin:0"><i class="bi bi-question-circle me-1"></i>Cómo funciona la Evaluación de Desempeño</h5>
+        <button class="btn-mini" onclick="document.getElementById('dlgGuia').close()">✕ Cerrar</button></div>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">¿Qué es y para qué sirve?</h6>
+      <p style="margin:0">Es la conversación formal, una vez por ciclo, sobre <b>cómo estás trabajando y qué resultados lograste</b>. No es para castigar: sirve para reconocer lo bueno, detectar dónde apoyar (capacitación, herramientas) y fundamentar decisiones de desarrollo y renta con datos y no con impresiones.</p>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">¿Qué mide? Dos cosas distintas</h6>
+      <ul style="margin:0;padding-left:20px">
+        <li><b>Competencias (el CÓMO):</b> comportamientos observables en el día a día. Son las "preguntas" de la evaluación — cada una se responde con la escala 1–5 pensando en ejemplos concretos del período, no en la simpatía. El catálogo vigente está abajo.</li>
+        <li><b>Objetivos (el QUÉ):</b> resultados concretos comprometidos para el período (ej: "cerrar 3 dealers nuevos", "mora del tramo bajo X%"). Cada uno tiene un <b>peso</b> y se califica con <b>% de cumplimiento</b> real.</li>
+      </ul>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">La escala 1–5 (usarla igual para todos)</h6>
+      <table style="font-size:.82rem"><tbody>
+        <tr><td style="width:30px;text-align:center"><b>1</b></td><td>Muy bajo lo esperado — necesita corrección inmediata y plan de apoyo</td></tr>
+        <tr><td style="text-align:center"><b>2</b></td><td>Bajo lo esperado — cumple a medias, requiere seguimiento</td></tr>
+        <tr><td style="text-align:center"><b>3</b></td><td>Cumple lo esperado — hace bien su trabajo (esta es la nota NORMAL, no es mala)</td></tr>
+        <tr><td style="text-align:center"><b>4</b></td><td>Sobre lo esperado — destaca consistentemente</td></tr>
+        <tr><td style="text-align:center"><b>5</b></td><td>Excepcional — referente del equipo; reservarla para casos realmente notables</td></tr>
+      </tbody></table>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">¿Cómo se calcula la nota final?</h6>
+      <p style="margin:0">Nota final (1–5) = <b>peso%</b> × promedio de competencias puesto por la jefatura + <b>resto%</b> × objetivos (el % de cumplimiento ponderado por peso, llevado a escala 1–5). El peso lo define RRHH al crear cada ciclo (típico 70/30). La <b>autoevaluación no suma nota</b>: sirve para comparar miradas y conversar las diferencias. La <b>Mirada 360 tampoco</b>: es feedback.</p>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">¿Y el 360? Las cuatro miradas</h6>
+      <ul style="margin:0;padding-left:20px">
+        <li><b>Yo mismo</b> — la autoevaluación.</li>
+        <li><b>Mi jefatura</b> — la evaluación formal (la única que da nota).</li>
+        <li><b>Mis pares</b> — compañeros que comparten jefatura conmigo.</li>
+        <li><b>Mis reportes directos</b> (si tengo equipo) y <b>clientes internos</b> (áreas que dependen de mi trabajo).</li>
+      </ul>
+      <p style="margin:6px 0 0">Los invitados responden las mismas competencias 1–5 y el resultado se muestra <b>anónimo y agregado por dimensión</b> (nunca se ve quién puso qué). Sirve para contrastar: si la jefatura ve un 4 en comunicación y los pares un 2, ahí hay una conversación pendiente.</p>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">Las preguntas: catálogo de competencias vigente</h6>
+      <div id="guiaComps" style="background:#f8fafc;border-radius:10px;padding:10px 14px"><small style="color:#94a3b8">Cargando…</small></div>
+      <p style="font-size:.76rem;color:#64748b;margin:6px 0 0">Este catálogo es paramétrico: RRHH lo edita en la pestaña Competencias y esta guía se actualiza sola.</p>
+
+      <h6 style="color:var(--navy);margin:16px 0 6px">Buenas prácticas al evaluar</h6>
+      <ul style="margin:0;padding-left:20px">
+        <li>Evalúa el <b>período completo</b>, no las últimas dos semanas (efecto recencia).</li>
+        <li>Piensa en <b>ejemplos concretos</b> por competencia; si no tienes ninguno, probablemente es un 3.</li>
+        <li>No pongas todo igual (todo 3 o todo 5): diferencia lo fuerte de lo mejorable — eso es lo útil.</li>
+        <li>El resultado se <b>conversa cara a cara</b> (feedback) antes de que la persona tome conocimiento.</li>
+      </ul>
+    </div>
+  </dialog>
   <div class="tabs">
     <div class="tab active" id="t1" onclick="tab('mi')"><i class="bi bi-person me-1"></i>Mi Evaluación</div>
     <div class="tab" id="t2" onclick="tab('equipo')" style="display:none"><i class="bi bi-people me-1"></i>Mi Equipo</div>
@@ -103,6 +153,7 @@
       hist.forEach(e=>{ h+=`<tr><td>${esc(e.ciclo)}</td><td>${esc(e.evaluador||'—')}</td><td><span class="pill ${e.estado}">${e.estado}</span></td><td style="text-align:right;font-weight:800">${nota(e.nota_final)}</td><td>${['EVALUADA','CERRADA'].includes(e.estado)?`<button class="btn-mini" onclick="verHist(${e.id})">Ver</button>`:''}</td></tr>`; });
       h+='</tbody></table></div><div id="histDetalle"></div>'; }
     box.innerHTML=h;
+    document.getElementById('guiaComps').innerHTML=MI.competencias.map(c=>`<div style="padding:5px 0;border-bottom:1px solid #eef2f7"><b>${esc(c.nombre)}</b><br><small style="color:#64748b">${esc(c.descripcion||'')}</small></div>`).join('')||'<small style="color:#94a3b8">Sin competencias configuradas.</small>';
   }
   function cardResultado(e,conConocimiento){
     let h=`<div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
