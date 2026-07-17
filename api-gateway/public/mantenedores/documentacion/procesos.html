@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 -->
+<!-- v2.5 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -61,6 +61,7 @@
     <a href="#p20">20. Capacitación del equipo</a>
     <a href="#p21">21. Denuncia por el Canal de Compliance</a>
     <a href="#p22">22. Encuesta de clima / pulso / eNPS</a>
+    <a href="#p23">23. Solicitudes del colaborador (paperless)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -391,6 +392,21 @@
   </ol>
   <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">ABIERTA</span><span class="ar">→</span><span class="st fin">CERRADA (resultados)</span></div>
   <div class="afecta"><b>Afecta:</b> plan de acción de RRHH, clima y retención; insumo para desempeño (§19) y beneficios. <b>Depende de:</b> usuarios activos, campana.</div>
+
+  <h2 id="p23">23. Solicitudes del colaborador (paperless)</h2>
+  <p><b>Qué y para qué:</b> que anticipos, préstamos, aumentos de sueldo, ascensos y otras peticiones formales viajen sin papel: solicitud → cadena de aprobación con firma electrónica → ejecución automática contra el motor que corresponde.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cualquier colaborador solicita · aprueban por pasos: JEFATURA (el "reporta a" de la ficha), GERENCIA (permiso <code>rh_aprobar</code>) y RRHH (<code>rh_colaboradores</code>). Nadie se aprueba a sí mismo.</div>
+    <div><b class="lbl">Prerequisitos</b>"Reporta a" definido en la ficha (sin jefatura el paso lo toma RRHH) · para préstamos, tasas vigentes (tope TMC). Las <b>vacaciones</b> tienen su módulo propio (§17).</div>
+  </div>
+  <ol>
+    <li><b>Solicitar</b> (RRHH → Solicitudes → Mis Solicitudes): botón por tipo con su formulario (anticipo/préstamo: monto y cuotas; aumento: sueldo propuesto; ascenso: cargo y sueldo; otra: texto libre) + fundamento.</li>
+    <li><b>Aprobar por pasos</b> (pestaña Por Aprobar, con badge y campana a cada eslabón): cada aprobación/rechazo queda <b>firmada FES</b> (nombre, cargo, fecha, IP y hash SHA-256). En el paso RRHH se pueden ajustar condiciones (tasa del préstamo — tope TMC —, cuotas).</li>
+    <li><b>Ejecución automática al aprobar el último paso</b>: anticipo/préstamo → <b>Descuentos Remuneración</b> (cuotas desde la próxima liquidación, préstamo con cuota francesa); aumento → sueldo base de la ficha; ascenso → cargo (y sueldo si se propuso). El solicitante recibe el resultado por campana; un rechazo llega con su motivo.</li>
+    <li><b>Configurar cadenas</b> (RRHH, pestaña Todas y Configuración): qué pasos lleva cada tipo — paramétrico.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">SOLICITADA</span><span class="ar">→</span><span class="st">JEFATURA</span><span class="ar">→</span><span class="st">GERENCIA (si aplica)</span><span class="ar">→</span><span class="st">RRHH</span><span class="ar">→</span><span class="st fin">APROBADA + EJECUTADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span></div>
+  <div class="afecta"><b>Afecta:</b> Remuneraciones (descuentos y sueldo base), ficha del colaborador (cargo), auditoría. <b>Depende de:</b> organigrama de la ficha ("reporta a"), permisos rh_aprobar/rh_colaboradores, TMC vigente.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v137.0';
+const APP_VERSION = 'v138.0';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura

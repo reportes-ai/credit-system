@@ -53,6 +53,15 @@ router.post('/onboarding',             verifyToken, requireFunc('rh_contratos', 
 router.put('/onboarding/items/:id',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbMarcar);
 router.get('/onboarding/plantilla',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantilla);
 router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.onbPlantillaGuardar);
+// Solicitudes del colaborador — permisos por rol validados adentro (jefatura/RRHH/gerencia)
+const sol = require('../controllers/solicitudes.controller');
+router.get('/solicitudes/tipos',        verifyToken, sol.tipos);
+router.post('/solicitudes/tipos',       verifyToken, sol.tipoGuardar);
+router.get('/solicitudes/mias',         verifyToken, sol.mias);
+router.get('/solicitudes/por-aprobar',  verifyToken, sol.porAprobar);
+router.get('/solicitudes/todas',        verifyToken, sol.todas);
+router.post('/solicitudes',             verifyToken, sol.crear);
+router.post('/solicitudes/resolver',    verifyToken, sol.resolver);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);
