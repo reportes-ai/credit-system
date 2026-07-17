@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.0 — liquidaciones de sueldo: motor único chileno + comisiones automáticas (Fase 3 módulo RRHH) -->
+  <!-- v1.1 — liquidaciones de sueldo: motor único chileno + comisiones automáticas (Fase 3 módulo RRHH) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -72,6 +72,7 @@
     <div style="flex:1"></div>
     <button class="btn-ghost" onclick="exportCSV()"><i class="bi bi-filetype-csv me-1"></i>Libro CSV</button>
     <button class="btn-ghost" onclick="archivoPrevired()" title="Archivo oficial 105 campos para pagar las cotizaciones en previred.com"><i class="bi bi-bank me-1"></i>Archivo Previred</button>
+    <button class="btn-ghost" onclick="nominaBanco()" title="Archivo de transferencias en lote para pagar todos los sueldos del mes desde el portal del banco"><i class="bi bi-cash-coin me-1"></i>Nómina Banco</button>
     <button class="btn-ghost" onclick="configPrevired()" title="CCAF y mutualidad de la empresa (archivo Previred)"><i class="bi bi-gear"></i></button>
     <button class="btn-navy" onclick="guardar()"><i class="bi bi-save me-1"></i>Guardar borrador</button>
     <button class="btn-verde" onclick="emitir()"><i class="bi bi-patch-check me-1"></i>Emitir mes</button>
@@ -307,6 +308,20 @@ async function archivoPrevired(){
   if (!confirm(msg)) return;
   const blob = new Blob([d.contenido], { type:'text/plain' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = d.archivo; a.click();
+}
+async function nominaBanco(){
+  const mes = document.getElementById('mes').value;
+  const j = await (await fetch('/api/rrhh/remuneraciones/nomina-banco?mes='+mes, { headers:H })).json();
+  if (!j.success) return alert(j.error);
+  const d = j.data;
+  let msg = `Nómina de sueldos ${mesPalabras(mes)}: ${d.filas.length} transferencia(s), total $${Number(d.total).toLocaleString('es-CL')}.`;
+  if (d.avisos?.length) msg += '\n\nAVISOS (corrige en la ficha antes de pagar):\n• ' + d.avisos.join('\n• ');
+  msg += '\n\n¿Descargar el archivo CSV? Se carga en el portal del banco como pago masivo / transferencias en lote.';
+  if (!confirm(msg)) return;
+  const head = 'RUT;NOMBRE;BANCO;COD BANCO;TIPO CUENTA;N° CUENTA;MONTO;EMAIL;GLOSA';
+  const cuerpo = d.filas.map(f=>[f.rut,f.nombre,f.banco,f.banco_cod,f.tipo_cuenta,f.cuenta,f.monto,f.email,f.glosa].join(';')).join('\n');
+  const blob = new Blob(['﻿'+head+'\n'+cuerpo], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'nomina-sueldos-'+mes+'.csv'; a.click();
 }
 async function configPrevired(){
   const j = await (await fetch('/api/rrhh/remuneraciones/previred-config',{headers:H})).json();

@@ -1203,6 +1203,47 @@ async function putPreviredConfig(req, res) {
   } catch (e) { fail(res, e.message); }
 }
 
+/* ── Nómina bancaria: archivo para pagar los sueldos del mes de una sola vez ──
+   Toma las liquidaciones EMITIDAS y la cuenta de pago de la ficha (fuente
+   única). Entrega las filas + avisos; el frontend arma el CSV para el portal
+   del banco (pago masivo / transferencias en lote). */
+const BANCOS_SBIF = { 'BANCO DE CHILE': '001', 'CHILE': '001', 'EDWARDS': '001', 'INTERNACIONAL': '009',
+  'BANCOESTADO': '012', 'BANCO ESTADO': '012', 'ESTADO': '012', 'SCOTIABANK': '014', 'BCI': '016',
+  'ITAU': '039', 'ITAÚ': '039', 'SANTANDER': '037', 'SECURITY': '049', 'FALABELLA': '051',
+  'RIPLEY': '053', 'CONSORCIO': '055', 'BICE': '028', 'HSBC': '031', 'COOPEUCH': '672', 'TENPO': '730', 'MERCADO PAGO': '730' };
+async function getNominaBanco(req, res) {
+  try {
+    const mes = String(req.query.mes || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(mes)) return fail(res, 'Mes inválido', 400);
+    const [liqs] = await pool.query(
+      `SELECT l.id_usuario, l.liquido, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut, u.email,
+              f.banco_pago, f.tipo_cuenta_pago, f.num_cuenta_pago
+         FROM rh_liquidaciones l JOIN usuarios u ON u.id_usuario=l.id_usuario
+         LEFT JOIN rh_fichas f ON f.id_usuario=l.id_usuario
+        WHERE l.mes=? AND l.estado='EMITIDA' ORDER BY u.apellido, u.nombre`, [mes]);
+    if (!liqs.length) return fail(res, `No hay liquidaciones EMITIDAS para ${mes}. Emite el mes primero.`, 404);
+    const avisos = [], filas = [];
+    let total = 0;
+    for (const l of liqs) {
+      const liquido = Math.round(Number(l.liquido) || 0);
+      if (liquido <= 0) { avisos.push(`${l.nombre}: líquido $0 — omitido`); continue; }
+      const bancoNom = String(l.banco_pago || '').toUpperCase().trim();
+      const bancoCod = Object.keys(BANCOS_SBIF).find(k => bancoNom.includes(k));
+      const cuenta = String(l.num_cuenta_pago || '').replace(/[.\s-]/g, '');
+      if (!bancoNom || !cuenta) avisos.push(`${l.nombre}: falta ${!bancoNom ? 'banco' : 'N° de cuenta'} en la ficha — completa Colaboradores → Previsión y Pago`);
+      else if (!bancoCod) avisos.push(`${l.nombre}: banco "${l.banco_pago}" sin código SBIF conocido — revisa el nombre en la ficha`);
+      // CuentaRUT: el número es el RUT sin DV
+      const esRut = /RUT/i.test(String(l.tipo_cuenta_pago || '')) || /RUT/i.test(bancoNom);
+      filas.push({ rut: String(l.rut || '').replace(/\./g, '').toUpperCase(), nombre: l.nombre,
+        banco: l.banco_pago || '', banco_cod: bancoCod ? BANCOS_SBIF[bancoCod] : '',
+        tipo_cuenta: esRut ? 'CUENTA RUT' : String(l.tipo_cuenta_pago || 'CORRIENTE').toUpperCase(),
+        cuenta, monto: liquido, email: l.email || '', glosa: `SUELDO ${mes}` });
+      total += liquido;
+    }
+    ok(res, { mes, filas, total, avisos });
+  } catch (e) { fail(res, e.message); }
+}
+
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
-  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento };
+  getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
