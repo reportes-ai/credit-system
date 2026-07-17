@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.7 -->
+<!-- v2.8 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -287,10 +287,11 @@
     <div><b class="lbl">Prerequisitos</b>Ficha al día (fecha ingreso, sueldo) · cuenta corriente de vacaciones cuadrada (ajuste histórico hecho) · liquidaciones emitidas para la base.</div>
   </div>
   <ol>
+    <li><b>Baja inmediata en Usuarios (seguridad)</b>: al renunciar o ser desvinculada, la persona se <b>suspende de inmediato</b> en Usuarios (queda su <code>fecha_baja</code> — hasta ese día fue empleado). Aunque esté dada de baja, <b>sigue apareciendo</b> en el libro de Remuneraciones del mes (liquidación proporcional por los días trabajados hasta la fecha de baja, en 30avos) y en el selector de Finiquitos.</li>
     <li><b>Calcular</b> (RRHH → Contratos y Cartas Oferta → Finiquitos): colaborador + causal + fecha de término → el motor propone indemnización por años (topes 11 años / 90 UF), mes de aviso y feriado proporcional (desde la cuenta corriente de vacaciones).</li>
     <li><b>Ajustar</b>: cada monto es editable; se agregan otros haberes y se descuentan anticipos/préstamos pendientes (módulo Descuentos).</li>
     <li><b>Guardar e imprimir</b>: el documento cita la causal y el detalle; se ratifica ante notario o inspección del trabajo.</li>
-    <li><b>Cierre administrativo</b>: al guardar el finiquito se crea solo el <b>checklist de offboarding</b> (equipos, suspender usuario, bajas Workera/Edenred, pago, archivo) y el asiento contable FINIQUITO_EMITIDO; los saldos de préstamos vienen precargados en el cálculo.</li>
+    <li><b>Cierre administrativo (automático al guardar)</b>: checklist de <b>offboarding</b> (equipos, bajas Workera/Edenred, archivo), asiento FINIQUITO_EMITIDO (gasto → Finiquitos por Pagar), <b>baja de sus créditos internos</b> (las cuotas futuras de anticipos/préstamos se anulan — el saldo ya vino descontado del finiquito), si seguía activo se suspende con la fecha de término, y se genera la <b>ODP del pago</b> (correlativo central) con campana a Tesorería: pagar tras la ratificación y marcar PAGADA → asiento FINIQUITO_PAGADO (rebaja Finiquitos por Pagar contra banco).</li>
     <li><b>Firma (opcional FES)</b>: el finiquito guardado puede enviarse a <b>firma electrónica</b> igual que el contrato (trabajador en Mi Ficha + contrafirma empresa); la ratificación ante ministro de fe sigue siendo presencial o con FEA de proveedor acreditado.</li>
     <li><b>Aviso a Previred (automático)</b>: el Archivo Previred del último mes informa el <b>retiro (movimiento 2)</b> con la fecha de término — obligatorio: si no se informa, la AFP asume que la persona sigue trabajando y presume deuda previsional (DNP). Solo si el término se hizo fuera del módulo de Finiquitos hay que marcarlo a mano en previred.com.</li>
   </ol>

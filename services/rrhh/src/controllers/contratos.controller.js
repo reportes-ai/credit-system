@@ -348,11 +348,17 @@ require('../../../../shared/migrate').enFila('rrhh-finiquitos', async () => {
 
 exports.finiquitoColaboradores = async (req, res) => {
   try {
+    // Flujo de desvinculación: la baja en Usuarios es INMEDIATA (seguridad), así que
+    // el selector también ofrece a los dados de baja que aún no tienen finiquito
     const [rows] = await pool.query(
       `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.rut, u.cargo,
-              DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, f.sueldo_base
+              DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, DATE_FORMAT(u.fecha_baja,'%Y-%m-%d') fecha_baja,
+              u.estado, f.sueldo_base
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
-        WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
+        WHERE COALESCE(f.no_mostrar,0)=0
+          AND (u.estado='activo'
+               OR (u.fecha_baja IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rh_finiquitos fq WHERE fq.id_usuario=u.id_usuario)))
+        ORDER BY u.apellido, u.nombre`);
     const [causales] = await pool.query(`SELECT * FROM rh_finiquito_causales WHERE activo=1 ORDER BY articulo`);
     ok(res, { colaboradores: rows, causales });
   } catch (e) { fail(res, e.message); }
@@ -469,7 +475,48 @@ exports.finiquitoGuardar = async (req, res) => {
     // Offboarding automático desde la fecha de término
     try { await crearProceso({ tipo: 'OFFBOARDING', persona: b.trabajador, rut: b.rut, id_usuario: idU,
       id_ref: r.insertId, fecha_base: b.fecha_termino, creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[offb auto]', e.message); }
-    ok(res, { id: r.insertId, total });
+    // Baja de sus créditos internos: el saldo pendiente de anticipos/préstamos ya vino
+    // descontado en el finiquito → las cuotas futuras se anulan para no seguir cobrando
+    try {
+      const [rd] = await pool.query(
+        `UPDATE rh_descuentos SET estado='ANULADO', anulado_por=?, anulado_at=NOW()
+          WHERE id_usuario=? AND estado='VIGENTE'`, [`Finiquito #${r.insertId}`, idU]);
+      if (rd.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'rh_descuentos', entidad_id: idU,
+        detalle: `${rd.affectedRows} descuento(s) interno(s) dado(s) de baja por finiquito #${r.insertId} (saldo cobrado en el finiquito)` });
+    } catch (e) { console.error('[finiquito baja descuentos]', e.message); }
+    // Seguridad: si la persona sigue activa en Usuarios, se da de baja con la fecha de término
+    try {
+      await pool.query(`UPDATE usuarios SET estado='inactivo', fecha_baja=COALESCE(fecha_baja, ?)
+        WHERE id_usuario=? AND estado='activo' AND COALESCE(protegido,0)=0`, [b.fecha_termino, idU]);
+    } catch (e) { console.error('[finiquito baja usuario]', e.message); }
+    // Pago: ODP automática del finiquito (correlativo central) + campana a Tesorería
+    let odp = null;
+    if (total > 0) {
+      try {
+        const concepto = `Finiquito — ${b.trabajador} (art. ${b.causal})`;
+        const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
+        const [ro] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
+          VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
+          [b.trabajador, b.rut || null, concepto, 'REMUNERACIONES', total, req.usuario.id_usuario, ap?.nombre || '',
+           `Generada automáticamente al guardar el finiquito #${r.insertId}. Pagar tras la ratificación (art. 177 CT).`]);
+        try {
+          const num = (await require('../../../../shared/ordenes-pago').emitirCorrelativo({ origen: 'GENERAL', origen_id: ro.insertId,
+            concepto, monto: total, id_usuario: req.usuario.id_usuario, usuario_nombre: ap?.nombre || '' }))?.numero || null;
+          if (num) { await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [num, ro.insertId]); odp = num; }
+        } catch (e) { console.error('[finiquito correlativo ODP]', e.message); }
+        const [tes] = await pool.query(
+          `SELECT DISTINCT u.id_usuario FROM usuarios u
+            JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+            JOIN funcionalidades f2 ON f2.id_funcionalidad=pp.id_funcionalidad
+           WHERE f2.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`);
+        if (tes.length) notificar(tes.map(x => x.id_usuario), {
+          tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
+          titulo: `ODP ${odp || ''} por pagar: finiquito de ${b.trabajador}`,
+          mensaje: `${CLP(total)} — pagar tras la ratificación y marcar la ODP pagada`,
+          href: '/ordenes-pago/', clave: `finiq_odp_${r.insertId}` });
+      } catch (e) { console.error('[finiquito ODP]', e.message); }
+    }
+    ok(res, { id: r.insertId, total, odp });
   } catch (e) { fail(res, e.message); }
 };
 

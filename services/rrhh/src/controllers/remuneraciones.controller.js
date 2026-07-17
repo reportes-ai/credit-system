@@ -431,13 +431,19 @@ function calcLiquidacion(inp, ind) {
 const isoF = f => f == null ? null
   : (f instanceof Date ? new Date(f.getTime() - f.getTimezoneOffset() * 60000).toISOString() : String(f)).slice(0, 10);
 
-function diasTrabajadosMes(mes, fechaIngreso, licencias) {
+function diasTrabajadosMes(mes, fechaIngreso, licencias, fechaBaja) {
   let dias = 30;
   const ini = mes + '-01', finStr = mes + '-31';
   const fi = isoF(fechaIngreso);
   if (fi) {
     if (fi > finStr) return 0;                                   // ingresó después del mes
     if (fi >= ini) dias = 30 - (Number(fi.slice(8, 10)) - 1);    // ingresó dentro del mes
+  }
+  // Dado de baja: trabajó hasta su fecha_baja inclusive (liquidación proporcional)
+  const fb = isoF(fechaBaja);
+  if (fb) {
+    if (fb < ini) return 0;                                      // baja antes del mes
+    if (fb <= finStr) dias -= 30 - Math.min(30, Number(fb.slice(8, 10)));
   }
   let lic = 0;
   for (const l of licencias || []) {
@@ -488,10 +494,11 @@ const getMes = async (req, res) => {
     const [emps] = await pool.query(
       `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
               CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-              u.rut, u.cargo, u.fecha_ingreso, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
+              u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja, f.sueldo_base, f.afp, f.salud, f.tipo_contrato, f.colacion, f.movilizacion, f.plan_isapre_uf
          FROM usuarios u JOIN rh_fichas f ON f.id_usuario = u.id_usuario
-        WHERE u.estado='activo' AND COALESCE(f.sueldo_base,0) > 0
-        ORDER BY nombre`);
+        WHERE (u.estado='activo' OR DATE_FORMAT(u.fecha_baja,'%Y-%m') >= ?)
+          AND COALESCE(f.sueldo_base,0) > 0
+        ORDER BY nombre`, [mes]);
     const [guardadas] = await pool.query('SELECT * FROM rh_liquidaciones WHERE mes = ?', [mes]);
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
     const comis = await comisionesDelMes(mes);
@@ -512,7 +519,7 @@ const getMes = async (req, res) => {
       const inp = {
         sueldo_base: e.sueldo_base, afp: e.afp, salud: e.salud, tipo_contrato: e.tipo_contrato,
         plan_isapre_uf: e.plan_isapre_uf,
-        dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario]),
+        dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
         comisiones: comis[String(e.nombre_corto).trim()] || 0,
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
@@ -547,7 +554,7 @@ const guardar = async (req, res) => {
       const [[emp]] = await pool.query(
         `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno)) AS nombre,
                 CONCAT(UPPER(COALESCE(u.nombre,'')), ' ', UPPER(COALESCE(u.apellido,''))) AS nombre_corto,
-                u.rut, u.cargo, u.fecha_ingreso,
+                u.rut, u.cargo, u.fecha_ingreso, u.fecha_baja,
                 fi.sueldo_base, fi.afp, fi.salud, fi.tipo_contrato, fi.colacion, fi.movilizacion, fi.plan_isapre_uf
            FROM usuarios u JOIN rh_fichas fi ON fi.id_usuario = u.id_usuario WHERE u.id_usuario = ?`, [f.id_usuario]);
       if (!emp) continue;
@@ -556,7 +563,7 @@ const guardar = async (req, res) => {
       const inp = {
         sueldo_base: emp.sueldo_base, afp: emp.afp, salud: emp.salud, tipo_contrato: emp.tipo_contrato,
         plan_isapre_uf: emp.plan_isapre_uf,
-        dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario]),
+        dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
         comisiones: comis[String(emp.nombre_corto).trim()] || 0,
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,

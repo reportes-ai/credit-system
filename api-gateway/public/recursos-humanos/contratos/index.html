@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — firma electronica FES de contratos y finiquitos -->
+<!-- v1.2 — selector de finiquitos incluye dados de baja (fecha_baja) y marca DADO DE BAJA -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -259,7 +259,7 @@ async function fqInit(){
     fetch('/api/rrhh/finiquitos/colaboradores',{headers:H}).then(r=>r.json()),
     fetch('/api/rrhh/finiquitos',{headers:H}).then(r=>r.json()),
   ]);
-  $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(c.rut):''}</option>`).join('');
+  $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(c.rut):''}${c.estado==='inactivo'?' — DADO DE BAJA'+(c.fecha_baja?' el '+c.fecha_baja:''):''}</option>`).join('');
   $('fqCausal').innerHTML = (jc?.data?.causales||[]).map(c=>`<option value="${esc(c.articulo)}">Art. ${esc(c.articulo)} — ${esc(c.glosa)}</option>`).join('');
   $('fqFecha').value = new Date().toISOString().slice(0,10);
   FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();

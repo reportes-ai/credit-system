@@ -619,6 +619,7 @@ const cambiarEstadoOrden = async (req, res) => {
         if (od.categoria === 'REMUNERACIONES') {
           if (/^anticipo/i.test(od.concepto || '')) evento = 'ANTICIPO_PERSONAL';
           else if (/^pr[eé]stamo/i.test(od.concepto || '')) evento = 'PRESTAMO_PERSONAL';
+          else if (/^finiquito/i.test(od.concepto || '')) evento = 'FINIQUITO_PAGADO'; // rebaja 2106070 (el gasto ya se reconoció al emitir)
         }
         return require('../../../contabilidad/src/motor-asientos').contabilizar({
           evento, fecha: fechaPago,

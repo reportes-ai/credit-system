@@ -98,6 +98,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['4002050', 'DEBE', 'total', 'Gasto finiquito'],
         ['2106070', 'HABER', 'total', 'Finiquito por pagar'],
       ]],
+      ['FINIQUITO_PAGADO', 'Finiquito pagado (ODP)', 'Se dispara al marcar PAGADA la ODP de un finiquito (generada al guardar el finiquito en RRHH): rebaja Finiquitos por Pagar contra banco. Campos: monto.', 'EGRESO', 1, [
+        ['2106070', 'DEBE', 'monto', 'Rebaja finiquito por pagar'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       ['PROVISION_VAC_LIBERACION', 'Liberación provisión de vacaciones (cierre de mes)', 'Se dispara en el cierre de mes cuando la provisión de vacaciones BAJÓ (se tomaron o pagaron días): reversa el exceso. Campos: liberacion (variación).', 'TRASPASO', 1, [
         ['2106030', 'DEBE', 'liberacion', 'Rebaja provisión de vacaciones'],
         ['4002030', 'HABER', 'liberacion', 'Abono gasto provisión de vacaciones'],
