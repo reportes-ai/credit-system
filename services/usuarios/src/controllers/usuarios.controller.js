@@ -221,7 +221,11 @@ const getAllUsuarios = async (req, res) => {
   try {
     const { where, params } = await buildFiltroUsuario(req.usuario);
     // Ocultar la cuenta break-glass (protegida) de toda la lista.
-    const wProt = where ? where + ' AND u.protegido = 0' : 'WHERE u.protegido = 0';
+    let wProt = where ? where + ' AND u.protegido = 0' : 'WHERE u.protegido = 0';
+    // "Solo ves lo que tienes": a un no-Admin no se le listan los usuarios con
+    // perfil Administrador (su existencia delata el alcance total del sistema).
+    const otorgables = await require('../otorgables').funcsOtorgables(req.usuario.id_usuario);
+    if (otorgables !== null) wProt += " AND p.nombre <> 'Administrador'";
     const [usuarios] = await pool.query(
       `SELECT u.id_usuario, u.rut, u.nombre, u.apellido, u.apellido_materno, u.centro_costo, u.email, u.telefono,
               u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo,
