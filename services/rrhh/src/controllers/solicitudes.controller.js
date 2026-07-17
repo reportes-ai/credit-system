@@ -230,13 +230,47 @@ exports.todas = async (req, res) => {
 const mesProximo = () => { const d = new Date(); const y = d.getFullYear(), m = d.getMonth() + 2; return `${m > 12 ? y + 1 : y}-${String(m > 12 ? m - 12 : m).padStart(2, '0')}`; };
 const cuotaFrancesa = (M, iPct, n) => { const i = iPct / 100; return i > 0 ? Math.round(M * i / (1 - Math.pow(1 + i, -n))) : Math.round(M / n); };
 
+/* ODP del desembolso (anticipo/préstamo): correlativo del libro central + aviso
+   a Tesorería (ordenes_pago_pagar) para que deposite al colaborador. */
+async function generarODP(sol, datos, req) {
+  const { emitirCorrelativo } = require('../../../../shared/ordenes-pago');
+  const [[trab]] = await pool.query(`SELECT rut FROM usuarios WHERE id_usuario=?`, [sol.id_usuario]);
+  const concepto = `${sol.tipo === 'ANTICIPO' ? 'Anticipo de sueldo' : 'Préstamo al personal'} — ${sol.nombre} (Solicitud #${sol.id})`;
+  const [[ap]] = await pool.query(`SELECT CONCAT_WS(' ', nombre, apellido) nombre FROM usuarios WHERE id_usuario=?`, [req.usuario.id_usuario]);
+  const [r] = await pool.query(`INSERT INTO ordenes_pago (proveedor_nombre, proveedor_rut, concepto, categoria, monto, fecha_emision, estado, id_usuario, usuario_nombre, observaciones)
+    VALUES (?,?,?,?,?,CURDATE(),'EMITIDA',?,?,?)`,
+    [sol.nombre, trab?.rut || null, concepto, 'REMUNERACIONES', datos.monto, req.usuario.id_usuario, ap?.nombre || '',
+     `Generada automáticamente al aprobarse la solicitud #${sol.id}. El descuento por planilla ya quedó programado.`]);
+  let numero = null;
+  try {
+    numero = (await emitirCorrelativo({ origen: 'GENERAL', origen_id: r.insertId, concepto, monto: datos.monto,
+      id_usuario: req.usuario.id_usuario, usuario_nombre: ap?.nombre || '' }))?.numero || null;
+    if (numero) await pool.query(`UPDATE ordenes_pago SET numero=? WHERE id=?`, [numero, r.insertId]);
+  } catch (e) { console.error('[solicitudes correlativo ODP]', e.message); }
+  // Campana a Tesorería (quienes pagan ODP) para el depósito
+  try {
+    const [tes] = await pool.query(
+      `SELECT DISTINCT u.id_usuario FROM usuarios u
+        JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+        JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+       WHERE f.codigo IN ('ordenes_pago_pagar','ordenes_pago_emitir') AND u.estado='activo'`);
+    if (tes.length) notificar(tes.map(x => x.id_usuario), {
+      tipo: 'TESORERIA', prioridad: 'alta', sonar: true,
+      titulo: `ODP ${numero || ''} por depositar: ${sol.tipo === 'ANTICIPO' ? 'anticipo' : 'préstamo'} de ${sol.nombre}`,
+      mensaje: `$${Number(datos.monto).toLocaleString('es-CL')} — aprobado por toda la cadena; deposítalo y marca la ODP pagada`,
+      href: '/ordenes-pago/', clave: `sol_odp_${sol.id}` });
+  } catch (e) { console.error('[solicitudes aviso tesoreria]', e.message); }
+  return numero || `#${r.insertId}`;
+}
+
 async function ejecutar(sol, datos, req) {
   const mes = mesProximo();
   if (sol.tipo === 'ANTICIPO') {
     await pool.query(`INSERT INTO rh_descuentos (id_usuario, nombre, tipo, monto_total, cuotas, valor_cuota, mes_inicio, creado_por)
       VALUES (?,?,?,?,?,?,?,?)`,
       [sol.id_usuario, sol.nombre, 'ANTICIPO', datos.monto, datos.cuotas, Math.round(datos.monto / datos.cuotas), mes, `Solicitud #${sol.id}`]);
-    return `Anticipo de $${datos.monto.toLocaleString('es-CL')} en ${datos.cuotas} cuota(s) desde ${mes} (Descuentos Remuneración)`;
+    const odp = await generarODP(sol, datos, req);
+    return `Anticipo de $${datos.monto.toLocaleString('es-CL')} en ${datos.cuotas} cuota(s) desde ${mes}. ODP ${odp} emitida — Tesorería avisada para el depósito`;
   }
   if (sol.tipo === 'PRESTAMO') {
     const tasa = parseFloat(datos.tasa_pct) || 0;
@@ -247,7 +281,8 @@ async function ejecutar(sol, datos, req) {
     await pool.query(`INSERT INTO rh_descuentos (id_usuario, nombre, tipo, monto_total, tasa_pct, cuotas, valor_cuota, mes_inicio, creado_por)
       VALUES (?,?,?,?,?,?,?,?,?)`,
       [sol.id_usuario, sol.nombre, 'PRESTAMO', datos.monto, tasa, datos.cuotas, vc, mes, `Solicitud #${sol.id}`]);
-    return `Préstamo de $${datos.monto.toLocaleString('es-CL')} al ${tasa}% en ${datos.cuotas} cuotas de $${vc.toLocaleString('es-CL')} desde ${mes}`;
+    const odp = await generarODP(sol, datos, req);
+    return `Préstamo de $${datos.monto.toLocaleString('es-CL')} al ${tasa}% en ${datos.cuotas} cuotas de $${vc.toLocaleString('es-CL')} desde ${mes}. ODP ${odp} emitida — Tesorería avisada para el depósito`;
   }
   if (sol.tipo === 'AUMENTO') {
     await pool.query(`UPDATE rh_fichas SET sueldo_base=? WHERE id_usuario=?`, [datos.sueldo_propuesto, sol.id_usuario]);
