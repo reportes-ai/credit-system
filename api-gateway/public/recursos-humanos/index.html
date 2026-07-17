@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v2.3 — card Cursos y Capacitaciones -->
+  <!-- v2.4 — card Canal de Compliance -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,12 @@
       <p>Cartas oferta con beneficios por checkbox, contratos que heredan lo ofertado, y descripciones de cargo obligatorias.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/compliance/" class="module-card" id="cardCompl" style="display:none">
+      <div class="card-icon"><i class="bi bi-shield-exclamation"></i></div>
+      <h5>Canal de Compliance</h5>
+      <p>Canal confidencial de denuncias — acoso, violencia (Ley Karin), fraude e irregularidades. Puedes denunciar en forma anónima con código de seguimiento.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/cursos/" class="module-card" id="cardCur" style="display:none">
       <div class="card-icon"><i class="bi bi-mortarboard"></i></div>
       <h5>Cursos y Capacitaciones <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
@@ -144,6 +150,7 @@
     if (tiene('concurso')) document.getElementById('cardConc').style.display='';
     if (tiene('rh_desempeno')) document.getElementById('cardDes').style.display='';
     if (tiene('rh_cursos','rh_colaboradores','rh_aprobar')) document.getElementById('cardCur').style.display='';
+    if (tiene('compliance')) document.getElementById('cardCompl').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
   })();
 </script>

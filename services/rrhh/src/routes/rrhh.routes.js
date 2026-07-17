@@ -73,6 +73,12 @@ router.get('/desempeno/evaluaciones/:id/360',  verifyToken, des.get360);     // 
 router.post('/desempeno/evaluaciones/:id/360', verifyToken, des.asignar360); // valida jefatura/RRHH adentro
 router.get('/desempeno/competencias',      verifyToken, des.competencias);
 router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
+// Canal de Compliance — crear/seguimiento cualquiera logueado; gestión valida compliance_gestionar adentro
+const compl = require('../controllers/compliance.controller');
+router.post('/compliance/denuncias',            verifyToken, compl.crear);
+router.get('/compliance/seguimiento/:codigo',   verifyToken, compl.seguimiento);
+router.get('/compliance/denuncias',             verifyToken, compl.lista);
+router.post('/compliance/denuncias/:id/gestionar', verifyToken, compl.gestionar);
 // Cursos y Capacitaciones — gestión RRHH; /cursos/mios lo ve cada uno (valida adentro)
 const cur = require('../controllers/cursos.controller');
 router.get('/cursos/mios',            verifyToken, cur.deUsuario);

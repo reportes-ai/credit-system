@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.9 -->
+<!-- v2.0 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -59,6 +59,7 @@
     <a href="#p18">18. Préstamos y anticipos al personal</a>
     <a href="#p19">19. Evaluación de desempeño</a>
     <a href="#p20">20. Capacitación del equipo</a>
+    <a href="#p21">21. Denuncia por el Canal de Compliance</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -354,6 +355,22 @@
   </ol>
   <div class="flujo"><span class="st ini">CURSO CREADO</span><span class="ar">→</span><span class="st">REALIZADO (asistencia/notas)</span><span class="ar">→</span><span class="st fin">EN BITÁCORA Y FICHA</span></div>
   <div class="afecta"><b>Afecta:</b> ficha del colaborador (historial y horas), evaluación de desempeño (§19, insumo de la conversación), onboarding (§15). <b>Depende de:</b> usuarios activos.</div>
+
+  <h2 id="p21">21. Denuncia por el Canal de Compliance</h2>
+  <p><b>Qué y para qué:</b> recibir e investigar denuncias de acoso, violencia, fraude e irregularidades en forma confidencial y dentro de los plazos legales (Ley Karin 21.643 y Ley 20.393). Protege a las personas y a la empresa.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cualquier colaborador denuncia (anónimo o identificado) · solo los <b>gestores designados</b> del canal investigan y resuelven (permiso <code>compliance_gestionar</code>) · asesoría legal cuando corresponda.</div>
+    <div><b class="lbl">Prerequisitos</b>Gestores del canal definidos en la matriz de permisos (personas de confianza, idealmente ajenas a la línea denunciada).</div>
+  </div>
+  <ol>
+    <li><b>Denunciar</b> (RRHH → Canal de Compliance): tipo, contra quién (opcional) y el relato de los hechos; checkbox <b>anónima</b> (no se guarda el usuario). Se entrega un <b>código de seguimiento</b> — guardarlo, es la única llave para consultar.</li>
+    <li><b>Recepción</b> (automática): correo y campana a los gestores con el tipo y el plazo — el relato solo se lee dentro del canal. Plazo de investigación: <b>30 días hábiles</b> (obligatorio en Ley Karin; el canal lo aplica a todas).</li>
+    <li><b>Investigar</b> (pestaña Gestión): pasar a EN INVESTIGACIÓN, registrar comentarios internos o <b>visibles al denunciante</b> (aparecen en su seguimiento); denuncias vencidas se marcan ⚠ y alegan semanalmente.</li>
+    <li><b>Resolver</b>: RESUELTA o DESESTIMADA exige registrar la <b>resolución</b>, que queda visible para el denunciante al consultar su código. Todo gestionado queda en la auditoría.</li>
+    <li><b>Si es Ley Karin</b>: seguir además el protocolo legal (medidas de resguardo inmediatas, informe a la Dirección del Trabajo cuando corresponda) con asesoría legal.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">RECIBIDA</span><span class="ar">→</span><span class="st">EN INVESTIGACIÓN</span><span class="ar">→</span><span class="st fin">RESUELTA</span><span class="ar">/</span><span class="st mal">DESESTIMADA</span> <span style="color:#64748b">(plazo 30 días hábiles)</span></div>
+  <div class="afecta"><b>Afecta:</b> eventuales medidas laborales (desvinculación §16 si la investigación lo amerita), clima y cumplimiento legal. <b>Depende de:</b> matriz de permisos (gestores), correo del sistema.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
