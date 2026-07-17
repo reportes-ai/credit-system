@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Evaluaciones de Desempeño — RRHH</title>
-  <!-- v1.2 — pestaña 360 siempre visible con guía -->
+  <!-- v1.3 — Armar 360 masivo por ciclo + propuesta automática -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -268,8 +268,8 @@
     cs.forEach(c=>{ const done=(Number(c.evaluadas)||0)+(Number(c.cerradas)||0);
       h+=`<tr><td><b>${esc(c.nombre)}</b></td><td>${fd(c.fecha_inicio)} – ${fd(c.fecha_cierre)}</td><td><span class="pill ${c.estado==='ABIERTO'?'AUTOEVAL':'CERRADA'}">${c.estado}</span></td>
         <td style="text-align:right">${c.total||0}</td><td style="text-align:right">${done}/${c.total||0} evaluadas</td><td style="text-align:right;font-weight:800">${nota(c.promedio)}</td>
-        <td>${c.estado==='ABIERTO'?`<button class="btn-mini" onclick="cerrarCiclo(${c.id})">Cerrar ciclo</button>`:''}</td></tr>`; });
-    h+='</tbody></table></div>';
+        <td style="white-space:nowrap">${c.estado==='ABIERTO'?`<button class="btn-mini" onclick="armar360(${c.id},'${esc(c.nombre)}')"><i class="bi bi-people"></i> Armar 360</button> <button class="btn-mini" onclick="cerrarCiclo(${c.id})">Cerrar ciclo</button>`:''}</td></tr>`; });
+    h+='</tbody></table></div><div id="panel360Ciclo"></div>';
     document.getElementById('secCiclos').innerHTML=h;
   }
   window.crearCiclo=async()=>{
@@ -281,6 +281,44 @@
     alert(`Ciclo creado ✔ ${r.data.creadas} evaluaciones generadas${r.data.sin_jefatura?` · ${r.data.sin_jefatura} persona(s) sin jefatura quedaron fuera (asigna "reporta a" en la ficha y recrea o asígnalas a mano)`:''}`);
     cargarCiclos(); cargarEquipo(); cargarMi();
   };
+  /* ── Armado 360 masivo del ciclo (RRHH) ── */
+  window.armar360=async(idCiclo,nombre)=>{
+    if(!USUARIOS){ const ju=await (await fetch('/api/rrhh/desempeno/360/usuarios',{headers:H})).json(); USUARIOS=(ju.data||{}).usuarios||[]; }
+    const j=await (await fetch(`/api/rrhh/desempeno/ciclos/${idCiclo}/360`,{headers:H})).json();
+    if(!j.success) return alert(j.error);
+    const evs=(j.data||{}).evaluaciones||[];
+    let h=`<div class="card-box"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <h6 style="color:var(--navy);margin:0"><i class="bi bi-diagram-3 me-1"></i>Armado 360 — ${esc(nombre)}</h6>
+      <button class="btn-navy" onclick="auto360(${idCiclo},'${esc(nombre)}')"><i class="bi bi-magic me-1"></i>Proponer automático</button></div>
+      <p style="font-size:.76rem;color:#64748b;margin:0 0 10px">El automático invita hasta 3 <b>pares</b> (comparten la misma jefatura) y hasta 3 <b>reportes directos</b> por persona — no toca lo ya armado a mano. Abajo puedes agregar o quitar caso a caso. La jefatura evalúa aparte (evaluación formal).</p>
+      <table><thead><tr><th>Colaborador</th><th>Jefatura (formal)</th><th>Invitados 360</th><th style="min-width:280px">Agregar</th></tr></thead><tbody>`;
+    if(!evs.length) h+='<tr><td colspan="4" class="empty">El ciclo no tiene evaluaciones.</td></tr>';
+    evs.forEach(e=>{
+      const chips=(e.invitados||[]).map(x=>`<span class="pill ${x.estado==='LISTA'?'CERRADA':'PENDIENTE'}" style="margin:1px">${esc(x.evaluador)} · ${(DIM_ETQ[x.dimension]||x.dimension).split(' ')[0]}${x.estado==='PENDIENTE'?` <a href="javascript:void(0)" onclick="quitar360c(${idCiclo},'${esc(nombre)}',${e.id},${x.id})" style="text-decoration:none;color:inherit">✕</a>`:''}</span>`).join(' ')||'<small style="color:#94a3b8">—</small>';
+      h+=`<tr><td><b>${esc(e.colaborador)}</b><br><small style="color:#94a3b8">${esc(e.cargo||'')}</small></td><td>${esc(e.jefatura||'—')}</td><td>${chips}</td>
+        <td><div style="display:grid;grid-template-columns:1fr auto auto;gap:6px">
+          <select id="au_${e.id}" class="form-select form-select-sm">${USUARIOS.filter(u=>u.id_usuario!==e.id_usuario).map(u=>`<option value="${u.id_usuario}">${esc(u.nombre)}</option>`).join('')}</select>
+          <select id="ad_${e.id}" class="form-select form-select-sm"><option value="PAR">Par</option><option value="REPORTE">Reporte</option><option value="CLIENTE_INTERNO">Cliente int.</option><option value="OTRA">Otra</option></select>
+          <button class="btn-mini" onclick="agregar360c(${idCiclo},'${esc(nombre)}',${e.id})">+</button></div></td></tr>`; });
+    h+='</tbody></table></div>';
+    document.getElementById('panel360Ciclo').innerHTML=h;
+    document.getElementById('panel360Ciclo').scrollIntoView({behavior:'smooth'});
+  };
+  window.auto360=async(idCiclo,nombre)=>{
+    if(!confirm('¿Proponer evaluadores automáticos (pares y reportes directos) para todo el ciclo?')) return;
+    const r=await (await fetch(`/api/rrhh/desempeno/ciclos/${idCiclo}/360-auto`,{method:'POST',headers:H})).json();
+    if(!r.success) return alert(r.error);
+    alert(`${r.data.creadas} invitaciones creadas · ${r.data.personas_avisadas} persona(s) avisadas por la campana`);
+    armar360(idCiclo,nombre);
+  };
+  window.agregar360c=async(idCiclo,nombre,idEval)=>{
+    const r=await (await fetch(`/api/rrhh/desempeno/evaluaciones/${idEval}/360`,{method:'POST',headers:HJ,body:JSON.stringify({id_evaluador:document.getElementById('au_'+idEval).value,dimension:document.getElementById('ad_'+idEval).value})})).json();
+    if(!r.success) return alert(r.error); armar360(idCiclo,nombre);
+  };
+  window.quitar360c=async(idCiclo,nombre,idEval,id)=>{
+    await fetch(`/api/rrhh/desempeno/evaluaciones/${idEval}/360`,{method:'POST',headers:HJ,body:JSON.stringify({quitar:id})}); armar360(idCiclo,nombre);
+  };
+
   window.cerrarCiclo=async id=>{ if(!confirm('¿Cerrar el ciclo? Las evaluaciones abiertas quedan como están.')) return;
     await fetch(`/api/rrhh/desempeno/ciclos/${id}/cerrar`,{method:'POST',headers:H}); cargarCiclos(); };
 

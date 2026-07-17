@@ -63,6 +63,8 @@ router.post('/desempeno/evaluar',          verifyToken, des.evaluar);
 router.get('/desempeno/ciclos',            verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.ciclos);
 router.post('/desempeno/ciclos',           verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.crearCiclo);
 router.post('/desempeno/ciclos/:id/cerrar', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.cerrarCiclo);
+router.get('/desempeno/ciclos/:id/360',    verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.get360Ciclo);
+router.post('/desempeno/ciclos/:id/360-auto', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.auto360);
 router.put('/desempeno/evaluaciones/:id/evaluador', verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.asignarEvaluador);
 router.get('/desempeno/360/mias',          verifyToken, des.mis360);
 router.post('/desempeno/360/responder',    verifyToken, des.responder360);

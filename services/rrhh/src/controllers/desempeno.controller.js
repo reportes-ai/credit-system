@@ -441,6 +441,60 @@ exports.responder360 = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Armado 360 del ciclo completo (RRHH) ───────────────────────────────────── */
+/* Vista: todas las evaluaciones del ciclo con sus invitados 360 */
+exports.get360Ciclo = async (req, res) => {
+  try {
+    const idCiclo = parseInt(req.params.id);
+    const [evals] = await pool.query(
+      `SELECT e.id, e.id_usuario, e.id_evaluador, e.estado,
+              TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) colaborador, u.cargo,
+              TRIM(CONCAT_WS(' ', j.nombre, j.apellido)) jefatura
+         FROM rh_des_evaluaciones e JOIN usuarios u ON u.id_usuario=e.id_usuario
+         LEFT JOIN usuarios j ON j.id_usuario=e.id_evaluador
+        WHERE e.id_ciclo=? ORDER BY colaborador`, [idCiclo]);
+    const ids = evals.map(e => e.id);
+    const [regs] = ids.length ? await pool.query(
+      `SELECT r.id, r.id_evaluacion, r.id_evaluador, r.dimension, r.estado,
+              TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) evaluador
+         FROM rh_des_360 r JOIN usuarios u ON u.id_usuario=r.id_evaluador
+        WHERE r.id_evaluacion IN (?) ORDER BY r.dimension`, [ids]) : [[]];
+    ok(res, { evaluaciones: evals.map(e => ({ ...e, invitados: regs.filter(r => r.id_evaluacion === e.id) })) });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Propuesta automática: PARES = mismos que reportan a la misma jefatura;
+   REPORTE = quienes reportan al evaluado. Máx 3 por dimensión; INSERT IGNORE
+   respeta lo ya armado a mano. */
+exports.auto360 = async (req, res) => {
+  try {
+    const idCiclo = parseInt(req.params.id);
+    const [evals] = await pool.query(
+      `SELECT e.id, e.id_usuario, u.id_supervisor
+         FROM rh_des_evaluaciones e JOIN usuarios u ON u.id_usuario=e.id_usuario
+        WHERE e.id_ciclo=?`, [idCiclo]);
+    const [activos] = await pool.query(
+      `SELECT id_usuario, id_supervisor FROM usuarios WHERE estado='activo' AND COALESCE(protegido,0)=0`);
+    const [[ciclo]] = await pool.query(`SELECT nombre FROM rh_des_ciclos WHERE id=?`, [idCiclo]);
+    let creadas = 0; const avisar = new Set();
+    for (const e of evals) {
+      const pares = activos.filter(a => a.id_supervisor && a.id_supervisor === e.id_supervisor && a.id_usuario !== e.id_usuario).slice(0, 3);
+      const reportes = activos.filter(a => a.id_supervisor === e.id_usuario).slice(0, 3);
+      for (const [lista, dim] of [[pares, 'PAR'], [reportes, 'REPORTE']])
+        for (const p of lista) {
+          const [r] = await pool.query(`INSERT IGNORE INTO rh_des_360 (id_evaluacion, id_evaluador, dimension) VALUES (?,?,?)`,
+            [e.id, p.id_usuario, dim]);
+          if (r.affectedRows) { creadas++; avisar.add(p.id_usuario); }
+        }
+    }
+    if (avisar.size) notificar([...avisar], {
+      tipo: 'RRHH', prioridad: 'media', titulo: 'Te invitaron a evaluaciones 360',
+      mensaje: `Ciclo ${ciclo?.nombre || ''}: tienes compañeros por evaluar — pestaña 360 en Desempeño`,
+      href: '/recursos-humanos/desempeno/', clave: `des360auto_${idCiclo}` });
+    ok(res, { creadas, personas_avisadas: avisar.size });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* Usuarios activos para el selector de evaluadores (solo datos de directorio) */
 exports.usuarios360 = async (req, res) => {
   try {
