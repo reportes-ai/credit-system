@@ -120,6 +120,86 @@ function validarSemanas(semanas) {
   return null;
 }
 
+require('../../../../shared/migrate').enFila('rrhh-turnos-2', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_turno_calendario (
+    id_usuario INT NOT NULL,
+    fecha      DATE NOT NULL,
+    inicio     TIME NULL,               -- NULL = día libre
+    fin        TIME NULL,
+    turno_id   INT NOT NULL,
+    generado_por VARCHAR(160) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id_usuario, fecha)
+  )`);
+  console.log('[rrhh-turnos] calendario listo');
+});
+
+/* Motor único: días de un rango según el turno rotativo y el lunes de inicio del ciclo */
+const DSEM_JS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];   // getDay() 0-6
+function lunesDe(f) { const d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; }
+function diasDeTurno(semanas, semanaInicio, desde, hasta) {
+  const out = [], ini = lunesDe(semanaInicio);
+  for (let d = new Date(desde + 'T12:00:00'); d.toISOString().slice(0, 10) <= hasta; d.setDate(d.getDate() + 1)) {
+    const fecha = d.toISOString().slice(0, 10);
+    const idx = ((Math.round((lunesDe(fecha) - ini) / (7 * 86400000)) % semanas.length) + semanas.length) % semanas.length;
+    const par = semanas[idx][DSEM_JS[d.getDay()]] || null;
+    out.push({ fecha, semana: idx + 1, inicio: par ? par[0] : null, fin: par ? par[1] : null });
+  }
+  return out;
+}
+
+async function calendarioCalcular(desde, hasta) {
+  const { UNIVERSO_FROM: UNIV, UNIVERSO_WHERE: WU } = require('../universo');
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, COALESCE(u.cargo,'') cargo,
+            unm.turno_id, DATE_FORMAT(unm.turno_semana_inicio,'%Y-%m-%d') semana_inicio
+       FROM ${UNIV} WHERE ${WU} AND COALESCE(unm.por_turnos,0)=1 AND unm.turno_id IS NOT NULL AND unm.turno_semana_inicio IS NOT NULL
+      ORDER BY nombre`);
+  const [turnos] = await pool.query('SELECT id, nombre, semanas FROM rh_turnos WHERE activo=1');
+  const tMap = new Map(turnos.map(t => [t.id, { nombre: t.nombre, semanas: JSON.parse(t.semanas) }]));
+  return rows.filter(r => tMap.has(r.turno_id)).map(r => {
+    const t = tMap.get(r.turno_id);
+    return { id_usuario: r.id_usuario, nombre: r.nombre, cargo: r.cargo, turno_id: r.turno_id,
+             turno: t.nombre, dias: diasDeTurno(t.semanas, r.semana_inicio, desde, hasta) };
+  });
+}
+
+const rangoMeses = q => {
+  const m = /^\d{4}-\d{2}$/;
+  if (!m.test(q.desde || '') || !m.test(q.hasta || '') || q.hasta < q.desde) return null;
+  const fin = new Date(Number(q.hasta.slice(0, 4)), Number(q.hasta.slice(5, 7)), 0);
+  return { desde: q.desde + '-01', hasta: fin.toISOString().slice(0, 10) };
+};
+
+/* GET /api/rrhh/turnos-calendario/preview?desde=YYYY-MM&hasta=YYYY-MM */
+exports.calendarioPreview = async (req, res) => {
+  try {
+    const r = rangoMeses(req.query);
+    if (!r) return res.status(400).json({ success: false, data: null, error: 'Rango de meses inválido' });
+    res.json({ success: true, error: null, data: await calendarioCalcular(r.desde, r.hasta) });
+  } catch (e) { console.error('[rrhh calendario]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /api/rrhh/turnos-calendario  { desde:'YYYY-MM', hasta:'YYYY-MM' } — graba el calendario del rango */
+exports.calendarioGrabar = async (req, res) => {
+  try {
+    const r = rangoMeses(req.body);
+    if (!r) return res.status(400).json({ success: false, data: null, error: 'Rango de meses inválido' });
+    const data = await calendarioCalcular(r.desde, r.hasta);
+    if (!data.length) return res.status(400).json({ success: false, data: null, error: 'Nadie tiene turno y semana de inicio asignados' });
+    const quien = req.usuario?.nombre || req.usuario?.email || '';
+    let n = 0;
+    for (const c of data) {
+      await pool.query('DELETE FROM rh_turno_calendario WHERE id_usuario=? AND fecha BETWEEN ? AND ?', [c.id_usuario, r.desde, r.hasta]);
+      const filas = c.dias.map(d => [c.id_usuario, d.fecha, d.inicio, d.fin, c.turno_id, quien]);
+      if (filas.length) { await pool.query('INSERT INTO rh_turno_calendario (id_usuario, fecha, inicio, fin, turno_id, generado_por) VALUES ?', [filas]); n += filas.length; }
+    }
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'turno_calendario', entidad_id: null,
+      detalle: `Calendario de turnos ${req.body.desde} a ${req.body.hasta}: ${data.length} colaborador(es), ${n} día(s)` });
+    res.json({ success: true, error: null, data: { colaboradores: data.length, dias: n } });
+  } catch (e) { console.error('[rrhh calendario grabar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 exports.turnosListar = async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, nombre, semanas FROM rh_turnos WHERE activo=1 ORDER BY nombre');

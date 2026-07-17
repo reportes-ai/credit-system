@@ -76,6 +76,8 @@ router.get('/turnos',      verifyToken, requireFunc('rh_jornada', 'rh_remuneraci
 router.post('/turnos',     verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoGuardar);
 router.put('/turnos/:id',  verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoGuardar);
 router.delete('/turnos/:id', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.turnoEliminar);
+router.get('/turnos-calendario/preview', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.calendarioPreview);
+router.post('/turnos-calendario', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.calendarioGrabar);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
 router.post('/firmas/enviar',            verifyToken, fir.enviar);

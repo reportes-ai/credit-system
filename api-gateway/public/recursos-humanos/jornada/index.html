@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jornada Laboral — AutoFácil</title>
-  <!-- v1.6 — pestaña Turnos: turnos rotativos paramétricos (rh_turnos, semanas con horario por día) + asignación con semana de inicio del ciclo -->
+  <!-- v1.7 — Calendario de turnos: vista previa por meses, grabar (rh_turno_calendario) e imprimir/PDF una hoja por persona -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -63,6 +63,18 @@
         <th>Colaborador</th><th>Cargo</th><th>Turno</th><th>Semana 1 parte el lunes</th><th style="text-align:center">Semana actual</th><th></th>
       </tr></thead><tbody id="tbT"></tbody></table>
     </div>
+    <div class="box">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <b style="font-size:.9rem;color:#012d70"><i class="bi bi-calendar3"></i> Calendario de turnos</b>
+        <label style="font-size:.78rem;color:#475569">Desde <input type="month" id="calDesde" style="border:1px solid #cbd5e1;border-radius:7px;padding:3px 6px;font-size:.78rem"></label>
+        <label style="font-size:.78rem;color:#475569">Hasta <input type="month" id="calHasta" style="border:1px solid #cbd5e1;border-radius:7px;padding:3px 6px;font-size:.78rem"></label>
+        <button class="tab" onclick="calPreview()"><i class="bi bi-eye"></i> Vista previa</button>
+        <button class="tab" id="btnCalGrabar" onclick="calGrabar()" style="display:none;background:#166534;border-color:#166534;color:#fff"><i class="bi bi-floppy"></i> Grabar</button>
+        <button class="tab" id="btnCalImp" onclick="calImprimir()" style="display:none"><i class="bi bi-printer"></i> Imprimir / PDF</button>
+      </div>
+      <p style="font-size:.78rem;color:#64748b;margin:0 0 10px">Genera el calendario de los colaboradores con turno asignado para los meses elegidos. Revisa la vista previa, <b>Grabar</b> lo deja registrado y con <b>Imprimir / PDF</b> se lo haces llegar a cada uno (una hoja por persona).</p>
+      <div id="calPrev"></div>
+    </div>
   </div>
   <div class="box" id="boxHor" style="display:none">
     <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Horario de cada colaborador. Si trabaja <b>por turnos</b>, márcalo aquí y su turno se define en la pestaña Turnos.</p>
@@ -92,6 +104,7 @@
     <b>Externo</b> → presta servicios sin sujeción a horario: en Asistencia queda EXTERNO y no genera faltas ·
     <b>Horarios y Turnos</b> → horario fijo (entrada/salida) de cada colaborador o marca "por turnos" (el turno se define en la pestaña Turnos); referencia para atrasos en <a href="/recursos-humanos/asistencia/">Asistencia</a> cuando Workera no tiene turno asignado ·
     <b>Turnos</b> → turnos rotativos paramétricos (<code>rh_turnos</code>): cada turno define N semanas con horario por día; a cada colaborador "por turnos" se le asigna el turno y el lunes en que le parte la Semana 1 del ciclo ·
+    <b>Calendario de turnos</b> → genera, graba (<code>rh_turno_calendario</code>, fuente única del horario grabado por día) e imprime el calendario mensual de cada colaborador con turno ·
     todos los flags viven en la <b>ficha del colaborador</b> (<code>rh_fichas</code>, fuente única).</div>
 </div>
 <script src="/js/auth-guard.js"></script>
@@ -216,6 +229,71 @@ function pintaAsig(){
     <td style="text-align:center">${sa?`<span class="pill p-nav">Semana ${sa} de ${t.semanas.length}</span>`:'<span class="pill p-mut">—</span>'}</td>
     <td style="text-align:right"><span class="saved" id="sva${i}"><i class="bi bi-check2"></i> guardado</span></td>
   </tr>`;}).join('')||'<tr><td colspan="6" class="empty">Nadie está marcado "por turnos" en la pestaña Horarios y Turnos.</td></tr>';
+}
+/* ── Calendario de turnos ─────────────────────────────────────── */
+let CAL=null, CAL_RANGO=null;
+const MESN=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function calMesHTML(c,anio,mes){   // calendario de UN mes para un colaborador
+  const dias=c.dias.filter(d=>d.fecha.startsWith(`${anio}-${String(mes+1).padStart(2,'0')}`));
+  if(!dias.length) return '';
+  const byF=Object.fromEntries(dias.map(d=>[d.fecha,d]));
+  const prim=new Date(anio,mes,1), ult=new Date(anio,mes+1,0);
+  let celdas='', fila='';
+  for(let i=0;i<(prim.getDay()+6)%7;i++) fila+='<td></td>';
+  for(let dd=1;dd<=ult.getDate();dd++){
+    const f=`${anio}-${String(mes+1).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+    const d=byF[f];
+    const lib=!d||!d.inicio;
+    fila+=`<td style="border:1px solid #e2e8f0;padding:4px 5px;vertical-align:top;height:52px;${lib?'background:#f8fafc':''}">
+      <div style="font-weight:700;font-size:.72rem;color:#334155">${dd}</div>
+      <div style="font-size:.68rem;color:${lib?'#94a3b8':'#0141A2'};font-weight:${lib?'400':'700'}">${lib?'libre':d.inicio+'–'+d.fin}</div></td>`;
+    if(new Date(anio,mes,dd).getDay()===0){ celdas+=`<tr>${fila}</tr>`; fila=''; }
+  }
+  if(fila){ for(let i=(ult.getDay()+6)%7+1;i<7;i++) fila+='<td></td>'; celdas+=`<tr>${fila}</tr>`; }
+  return `<div style="margin-bottom:14px">
+    <div style="font-weight:700;font-size:.85rem;color:#012d70;margin-bottom:4px;text-transform:capitalize">${MESN[mes]} ${anio}</div>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+      <thead><tr>${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(d=>`<th style="font-size:.68rem;color:#64748b;text-align:center;padding:3px;border:1px solid #e2e8f0;background:#f1f5f9">${d}</th>`).join('')}</tr></thead>
+      <tbody>${celdas}</tbody></table></div>`;
+}
+function calPersonaHTML(c){
+  const meses=[...new Set(c.dias.map(d=>d.fecha.slice(0,7)))].sort();
+  return `<div class="cal-persona" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:16px;page-break-after:always">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #0141A2;padding-bottom:6px;margin-bottom:10px">
+      <div><b style="font-size:1rem;color:#012d70">${c.nombre}</b> <span style="font-size:.75rem;color:#64748b">· ${c.cargo||''}</span></div>
+      <div style="font-size:.75rem;color:#0141A2;font-weight:700">${c.turno}</div>
+    </div>
+    ${meses.map(m=>calMesHTML(c,Number(m.slice(0,4)),Number(m.slice(5,7))-1)).join('')}
+    <div style="font-size:.66rem;color:#94a3b8">AutoFácil — calendario de turnos. Horario indicado = entrada–salida (incluye 1 hr de colación).</div>
+  </div>`;
+}
+async function calPreview(){
+  const de=$('calDesde').value, ha=$('calHasta').value||$('calDesde').value;
+  if(!de) return alert('Elige el mes de inicio');
+  try{
+    const r=await fetch(`/api/rrhh/turnos-calendario/preview?desde=${de}&hasta=${ha}`,{headers:H});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    CAL=j.data; CAL_RANGO={desde:de,hasta:ha};
+    $('calPrev').innerHTML=CAL.length?CAL.map(calPersonaHTML).join(''):'<div class="empty">Nadie tiene turno y semana de inicio asignados.</div>';
+    $('btnCalGrabar').style.display=CAL.length?'':'none';
+    $('btnCalImp').style.display=CAL.length?'':'none';
+  }catch(e){ alert(e.message); }
+}
+async function calGrabar(){
+  if(!CAL_RANGO) return;
+  try{
+    const r=await fetch('/api/rrhh/turnos-calendario',{method:'POST',headers:H,body:JSON.stringify(CAL_RANGO)});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'Error');
+    alert(`Calendario grabado: ${j.data.colaboradores} colaborador(es), ${j.data.dias} día(s).`);
+  }catch(e){ alert('No se pudo grabar: '+e.message); }
+}
+function calImprimir(){
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Calendario de turnos</title>
+    <style>body{font-family:'Segoe UI',system-ui,sans-serif;margin:18px}@media print{.cal-persona{page-break-after:always;border:none!important}}</style>
+    </head><body>${$('calPrev').innerHTML}</body></html>`;
+  const f=document.createElement('iframe'); f.style.display='none'; document.body.appendChild(f);
+  f.contentDocument.write(html); f.contentDocument.close();
+  setTimeout(()=>{ try{ f.contentWindow.print(); }catch(_){} setTimeout(()=>f.remove(),2000); },400);
 }
 async function asigna(i,campo,val){
   D[i][campo]=val||null;
