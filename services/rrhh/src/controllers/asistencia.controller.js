@@ -57,8 +57,9 @@ require('../../../../shared/migrate').enFila('rrhh-workera-horarios', async () =
       turno  VARCHAR(120) NULL,
       UNIQUE KEY uq_horario (rut, fecha)
     )`);
-  // los horarios se sincronizan por día: forzar resync del caché existente
-  await pool.query('DELETE FROM rh_workera_sync');
+  // (v143.6) Se quitó el DELETE de rh_workera_sync que forzaba el resync inicial de
+  // horarios: al correr en cada boot, cada deploy borraba el caché y la primera carga
+  // de Asistencia re-sincronizaba el mes completo. El resync ya ocurrió en producción.
   console.log('[rrhh-asistencia] horarios workera listos');
 });
 
