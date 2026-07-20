@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test de Kuder — AutoFácil</title>
+<!-- v1.0 — inventario de intereses Kuder (10 áreas): rendir (anual/selección), perfil por cargo, resultados y match -->
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root{--navy:#0141A2;--navy-d:#012d70;--accent:#009AFE;--bg:#f0f4f8}
+  body{background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;margin:0}
+  .main{width:100%;margin:0 auto;padding:24px 30px 60px}
+  .banner{background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);border-radius:16px;color:#fff;padding:22px 28px;margin-bottom:20px;display:flex;align-items:center;gap:16px}
+  .banner i{font-size:2.4rem;opacity:.85}.banner h2{font-weight:700;margin:0 0 3px;font-size:1.25rem}.banner p{opacity:.9;margin:0;font-size:.84rem}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:7px 16px;font-size:.82rem;font-weight:700;color:#475569;cursor:pointer}
+  .tab.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .box{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 6px rgba(0,0,0,.07);margin-bottom:16px}
+  table{width:100%;font-size:.84rem;border-collapse:collapse}
+  th{color:#64748b;text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;padding:7px 8px;border-bottom:2px solid #e2e8f0}
+  td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+  .pill{display:inline-block;border-radius:20px;padding:2px 11px;font-size:.72rem;font-weight:700}
+  .p-ok{background:#dcfce7;color:#166534}.p-mid{background:#fef9c3;color:#854d0e}.p-low{background:#fee2e2;color:#991b1b}.p-mut{background:#f1f5f9;color:#64748b}
+  .empty{color:#94a3b8;font-size:.85rem;padding:14px 0;text-align:center}
+  .bar-wrap{background:#eef2f7;border-radius:6px;height:20px;position:relative;overflow:hidden}
+  .bar{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--navy),var(--accent))}
+  .item-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:9px;margin:6px 0;font-size:.9rem}
+  .opt b{color:#334155;font-weight:500}
+  .btn{border:none;border-radius:9px;padding:8px 18px;font-size:.85rem;font-weight:700;cursor:pointer}
+  .btn-nav{background:var(--navy);color:#fff}.btn-out{background:#fff;border:1px solid #cbd5e1;color:#475569}
+  input[type=number]{width:58px;padding:2px 5px;border:1px solid #cbd5e1;border-radius:7px;font-size:.8rem;text-align:center}
+  select,input[type=text]{border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;font-size:.83rem}
+  .mas{background:#dcfce7;border-color:#86efac}.menos{background:#fee2e2;border-color:#fca5a5}
+  .radio-mm{display:flex;gap:4px}
+  .foot{background:#f8fafc;border-left:4px solid var(--navy);border-radius:10px;padding:14px 18px;font-size:.8rem;color:#475569;margin-top:8px}
+  .foot b{color:var(--navy-d)}
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Recursos Humanos",href:"/recursos-humanos/"},{label:"Test de Kuder",current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-compass"></i>
+    <div><h2>Test de Kuder — Intereses vocacionales</h2>
+      <p>Inventario de 10 áreas de interés. Se usa en selección (candidatos) y una vez al año en los colaboradores; el resultado se compara con el perfil esperado del cargo.</p></div></div>
+
+  <div class="tabs">
+    <button class="tab on" id="tRendir" onclick="verTab('rendir')"><i class="bi bi-pencil-square"></i> Rendir mi test</button>
+    <button class="tab" id="tMi" onclick="verTab('mi')"><i class="bi bi-person-badge"></i> Mi resultado</button>
+    <button class="tab gestion" id="tCargos" onclick="verTab('cargos')" style="display:none"><i class="bi bi-diagram-3"></i> Perfil por cargo</button>
+    <button class="tab gestion" id="tResult" onclick="verTab('result')" style="display:none"><i class="bi bi-bar-chart-line"></i> Resultados</button>
+    <button class="tab gestion" id="tSelec" onclick="verTab('selec')" style="display:none"><i class="bi bi-link-45deg"></i> Selección</button>
+  </div>
+
+  <div id="secRendir"></div>
+  <div id="secMi" style="display:none"></div>
+  <div id="secCargos" style="display:none"></div>
+  <div id="secResult" style="display:none"></div>
+  <div id="secSelec" style="display:none"></div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+<script>
+const H={Authorization:'Bearer '+sessionStorage.getItem('token'),'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+let AREAS=[], ITEMS=[], puedeGestion=false;
+
+const nombreArea=c=>(AREAS.find(a=>a.codigo===c)||{}).nombre||c;
+const pillMatch=v=>v==null?'<span class="pill p-mut">sin perfil</span>':
+  `<span class="pill ${v>=75?'p-ok':v>=50?'p-mid':'p-low'}">${Number(v).toLocaleString('es-CL')}% match</span>`;
+
+function verTab(v){
+  ['rendir','mi','cargos','result','selec'].forEach(k=>{
+    $('sec'+k[0].toUpperCase()+k.slice(1)).style.display=k===v?'':'none';
+    $('t'+({rendir:'Rendir',mi:'Mi',cargos:'Cargos',result:'Result',selec:'Selec'}[k])).classList.toggle('on',k===v);
+  });
+  if(v==='mi') cargarMi();
+  if(v==='cargos') cargarCargos();
+  if(v==='result') cargarResultados();
+  if(v==='selec') cargarSelec();
+}
+
+/* ── Perfil (barras 0-100) ── */
+function barras(perfil){
+  return `<table>${AREAS.map(a=>{const v=perfil[a.codigo]||0;return `<tr>
+    <td style="width:170px"><b>${a.nombre}</b></td>
+    <td><div class="bar-wrap"><div class="bar" style="width:${v}%"></div></div></td>
+    <td style="width:44px;text-align:right;font-weight:700;color:#334155">${v}</td></tr>`;}).join('')}</table>`;
+}
+
+/* ── RENDIR (self anual) ── */
+let RESP={};
+function pintaRendir(){
+  RESP={};
+  $('secRendir').innerHTML=`<div class="box">
+    <p style="font-size:.86rem;color:#475569;margin:0 0 4px">En cada fila marca <span class="pill p-ok">Más</span> en la actividad que MÁS te gustaría hacer y <span class="pill p-low">Menos</span> en la que MENOS. Las 30 son obligatorias.</p>
+    <div id="preg"></div>
+    <div style="text-align:right;margin-top:12px"><button class="btn btn-nav" onclick="enviarRendir()"><i class="bi bi-check2-circle"></i> Enviar test</button></div>
+    <div id="rendirMsg" style="text-align:right;font-size:.8rem;color:#991b1b;margin-top:6px"></div>
+  </div>`;
+  $('preg').innerHTML=ITEMS.map((it,i)=>`<div class="item-card">
+    <div style="font-size:.72rem;color:#94a3b8;font-weight:700;margin-bottom:4px">${i+1} de ${ITEMS.length}</div>
+    ${['a','b','c'].map(k=>`<div class="opt" id="o${it.id}${k}">
+      <div class="radio-mm">
+        <label style="cursor:pointer"><input type="radio" name="mas${it.id}" onchange="setMM(${it.id},'mas','${k}')"> <span style="color:#166534;font-weight:700;font-size:.72rem">Más</span></label>
+        <label style="cursor:pointer;margin-left:6px"><input type="radio" name="menos${it.id}" onchange="setMM(${it.id},'menos','${k}')"> <span style="color:#991b1b;font-weight:700;font-size:.72rem">Menos</span></label>
+      </div>
+      <b>${it[k+'_texto']}</b></div>`).join('')}
+  </div>`).join('');
+}
+function setMM(item,tipo,k){
+  RESP[item]=RESP[item]||{};
+  if(tipo==='mas'&&RESP[item].menos===k){ RESP[item].menos=null; const rn=document.querySelector(`input[name=menos${item}]:checked`); if(rn)rn.checked=false; }
+  if(tipo==='menos'&&RESP[item].mas===k){ RESP[item].mas=null; const rm=document.querySelector(`input[name=mas${item}]:checked`); if(rm)rm.checked=false; }
+  RESP[item][tipo]=k;
+  ['a','b','c'].forEach(x=>{const el=$('o'+item+x);el.classList.remove('mas','menos');
+    if(RESP[item].mas===x)el.classList.add('mas'); if(RESP[item].menos===x)el.classList.add('menos');});
+}
+function respArray(){
+  return ITEMS.filter(it=>RESP[it.id]&&RESP[it.id].mas&&RESP[it.id].menos)
+    .map(it=>({item:it.id,mas:RESP[it.id].mas,menos:RESP[it.id].menos}));
+}
+async function enviarRendir(){
+  const arr=respArray();
+  if(arr.length<ITEMS.length){ $('rendirMsg').textContent=`Faltan ${ITEMS.length-arr.length} respuestas (marca Más y Menos en cada fila).`; return; }
+  const r=await fetch('/api/rrhh/kuder/rendir',{method:'POST',headers:H,body:JSON.stringify({respuestas:arr})});
+  const j=await r.json(); if(!j.success){ $('rendirMsg').textContent=j.error||'Error'; return; }
+  verTab('mi');
+}
+
+/* ── MI RESULTADO ── */
+async function cargarMi(){
+  const r=await fetch('/api/rrhh/kuder/mi',{headers:H}); const j=await r.json();
+  if(!j.success){ $('secMi').innerHTML='<div class="box empty">Error</div>'; return; }
+  const u=j.data.ultimo;
+  if(!u){ $('secMi').innerHTML='<div class="box empty">Aún no has rendido el test. Ve a "Rendir mi test".</div>'; return; }
+  const top=AREAS.map(a=>({n:a.nombre,v:u.perfil[a.codigo]||0})).sort((x,y)=>y.v-x.v).slice(0,3);
+  $('secMi').innerHTML=`<div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="color:#012d70">Mi perfil de intereses</b>
+      <span style="font-size:.78rem;color:#64748b">Rendido el ${u.fecha} · ${pillMatch(u.match_pct)}</span></div>
+    <p style="font-size:.83rem;color:#475569;margin:0 0 12px">Tus áreas de mayor interés: <b>${top.map(t=>t.n).join(' · ')}</b></p>
+    ${barras(u.perfil)}
+    ${j.data.historial.length>1?`<div style="font-size:.76rem;color:#94a3b8;margin-top:10px">Tienes ${j.data.historial.length} tests rendidos; se muestra el más reciente.</div>`:''}
+  </div>`;
+}
+
+/* ── PERFIL POR CARGO (gestión) ── */
+let CARGOS=[];
+async function cargarCargos(){
+  const r=await fetch('/api/rrhh/kuder/cargos',{headers:H}); const j=await r.json();
+  if(!j.success){ $('secCargos').innerHTML='<div class="box empty">Sin permiso o error</div>'; return; }
+  CARGOS=j.data.cargos;
+  $('secCargos').innerHTML=`<div class="box">
+    <p style="font-size:.84rem;color:#475569;margin:0 0 10px">Define, por cargo, el <b>nivel esperado (0-100)</b> en cada área. Deja en blanco las que no apliquen. El match del candidato/colaborador se calcula solo contra las áreas que completes. El perfil vive junto a la descripción de cargo.</p>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+      <label style="font-size:.83rem;color:#475569">Cargo</label>
+      <select id="selCargo" onchange="pintaCargoPerfil()">${CARGOS.map(c=>`<option value="${c.id}">${c.nombre}${c.tiene_desc?'':' (sin descripción)'}</option>`).join('')}</select>
+    </div>
+    <div id="cargoPerfil"></div>
+  </div>`;
+  pintaCargoPerfil();
+}
+function pintaCargoPerfil(){
+  const c=CARGOS.find(x=>x.id==$('selCargo').value); if(!c) return;
+  $('cargoPerfil').innerHTML=`<table>
+    <thead><tr><th>Área</th><th>Descripción</th><th style="text-align:center">Nivel esperado (0-100)</th></tr></thead>
+    <tbody>${AREAS.map(a=>`<tr>
+      <td style="width:170px"><b>${a.nombre}</b></td>
+      <td style="color:#64748b;font-size:.8rem">${a.descripcion||''}</td>
+      <td style="text-align:center"><input type="number" min="0" max="100" id="cp_${a.codigo}" value="${c.perfil[a.codigo]??''}" placeholder="—"></td>
+    </tr>`).join('')}</tbody></table>
+    <div style="text-align:right;margin-top:12px"><button class="btn btn-nav" onclick="guardarCargoPerfil()"><i class="bi bi-floppy"></i> Guardar perfil del cargo</button>
+      <span class="saved" id="cpSaved" style="color:#166534;font-size:.78rem;font-weight:700;opacity:0;transition:.3s;margin-left:8px"><i class="bi bi-check2"></i> guardado</span></div>`;
+}
+async function guardarCargoPerfil(){
+  const c=CARGOS.find(x=>x.id==$('selCargo').value); const perfil={};
+  AREAS.forEach(a=>{const v=$('cp_'+a.codigo).value;if(v!=='')perfil[a.codigo]=Number(v);});
+  const r=await fetch('/api/rrhh/kuder/cargos/'+c.id,{method:'PUT',headers:H,body:JSON.stringify({perfil})});
+  const j=await r.json(); if(!j.success){ alert(j.error||'Error'); return; }
+  c.perfil=j.data.perfil; const s=$('cpSaved'); s.style.opacity=1; setTimeout(()=>s.style.opacity=0,1400);
+}
+
+/* ── RESULTADOS (gestión) ── */
+async function cargarResultados(){
+  const r=await fetch('/api/rrhh/kuder/resultados',{headers:H}); const j=await r.json();
+  if(!j.success){ $('secResult').innerHTML='<div class="box empty">Sin permiso o error</div>'; return; }
+  const rs=j.data.resultados;
+  $('secResult').innerHTML=`<div class="box">
+    <b style="color:#012d70">Resultados (${rs.length})</b>
+    <table style="margin-top:10px"><thead><tr><th>Nombre</th><th>Tipo</th><th>Cargo</th><th>Estado</th><th style="text-align:center">Match</th><th>Fecha</th><th></th></tr></thead>
+    <tbody>${rs.map(x=>`<tr>
+      <td><b>${x.nombre||'—'}</b></td>
+      <td><span class="pill ${x.tipo==='SELECCION'?'p-mid':'p-mut'}">${x.tipo}</span></td>
+      <td style="color:#475569">${x.cargo||'—'}</td>
+      <td>${x.estado==='COMPLETADO'?'<span class="pill p-ok">Completado</span>':'<span class="pill p-mut">Pendiente</span>'}</td>
+      <td style="text-align:center">${x.estado==='COMPLETADO'?pillMatch(x.match_pct):'—'}</td>
+      <td style="font-size:.8rem;color:#64748b">${x.completado||x.creado||''}</td>
+      <td>${x.perfil?`<button class="btn btn-out" style="padding:3px 10px;font-size:.72rem" onclick='verDetalle(${JSON.stringify(x).replace(/'/g,"&#39;")})'>Ver</button>`:''}</td>
+    </tr>`).join('')||'<tr><td colspan="7" class="empty">Sin resultados aún</td></tr>'}</tbody></table>
+  </div><div id="detalleKuder"></div>`;
+}
+function verDetalle(x){
+  const dt=x.detalle;
+  $('detalleKuder').innerHTML=`<div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="color:#012d70">${x.nombre} — ${x.cargo||'sin cargo'}</b><span>${pillMatch(x.match_pct)}</span></div>
+    ${barras(x.perfil)}
+    ${dt?`<div style="font-size:.78rem;color:#64748b;margin-top:12px"><b>Ajuste al perfil del cargo</b> (real − esperado; verde = por sobre lo esperado):</div>
+    <table style="margin-top:6px"><thead><tr><th>Área</th><th style="text-align:center">Esperado</th><th style="text-align:center">Real</th><th style="text-align:center">Gap</th></tr></thead>
+    <tbody>${dt.map(d=>`<tr><td><b>${nombreArea(d.area)}</b></td><td style="text-align:center">${d.esperado}</td><td style="text-align:center">${d.real}</td>
+      <td style="text-align:center"><span class="pill ${d.gap>=0?'p-ok':'p-low'}">${d.gap>0?'+':''}${d.gap}</span></td></tr>`).join('')}</tbody></table>`:'<div style="font-size:.78rem;color:#94a3b8;margin-top:10px">El cargo no tiene perfil Kuder definido — sin match. Defínelo en "Perfil por cargo".</div>'}
+  </div>`;
+  $('detalleKuder').scrollIntoView({behavior:'smooth'});
+}
+
+/* ── SELECCIÓN (gestión): generar link candidato ── */
+async function cargarSelec(){
+  const rc=await fetch('/api/rrhh/kuder/cargos',{headers:H}); const jc=await rc.json();
+  const cargos=jc.success?jc.data.cargos:[];
+  $('secSelec').innerHTML=`<div class="box">
+    <b style="color:#012d70">Generar link para un candidato</b>
+    <p style="font-size:.83rem;color:#475569;margin:6px 0 12px">El candidato rinde el test desde el link, sin necesidad de cuenta. El resultado queda en Resultados, con su match contra el cargo.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:640px">
+      <div><label style="font-size:.78rem;color:#64748b">Nombre del candidato *</label><br><input type="text" id="cNombre" style="width:100%"></div>
+      <div><label style="font-size:.78rem;color:#64748b">RUT (opcional)</label><br><input type="text" id="cRut" style="width:100%"></div>
+      <div><label style="font-size:.78rem;color:#64748b">Email (opcional)</label><br><input type="text" id="cEmail" style="width:100%"></div>
+      <div><label style="font-size:.78rem;color:#64748b">Cargo al que postula *</label><br><select id="cCargo" style="width:100%">${cargos.map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn btn-nav" onclick="generarLink()"><i class="bi bi-link-45deg"></i> Generar link</button></div>
+    <div id="linkOut" style="margin-top:14px"></div>
+  </div>`;
+}
+async function generarLink(){
+  const body={nombre:$('cNombre').value.trim(),rut:$('cRut').value.trim(),email:$('cEmail').value.trim(),id_cargo:$('cCargo').value};
+  if(!body.nombre){ alert('El nombre es obligatorio'); return; }
+  const r=await fetch('/api/rrhh/kuder/link',{method:'POST',headers:H,body:JSON.stringify(body)});
+  const j=await r.json(); if(!j.success){ alert(j.error||'Error'); return; }
+  const url=location.origin+j.data.url;
+  $('linkOut').innerHTML=`<div class="foot"><b>Link generado para ${body.nombre}:</b><br>
+    <input type="text" readonly value="${url}" style="width:100%;margin-top:6px" onclick="this.select()">
+    <button class="btn btn-out" style="margin-top:8px;padding:5px 12px;font-size:.75rem" onclick="navigator.clipboard.writeText('${url}');this.textContent='¡Copiado!'"><i class="bi bi-clipboard"></i> Copiar link</button></div>`;
+}
+
+/* ── init ── */
+(async()=>{
+  const rt=await fetch('/api/rrhh/kuder/test',{headers:H}); const jt=await rt.json();
+  if(jt.success){ AREAS=jt.data.areas; ITEMS=jt.data.items; pintaRendir(); }
+  // ¿tiene gestión? probamos el endpoint de cargos
+  const rp=await fetch('/api/rrhh/kuder/cargos',{headers:H});
+  puedeGestion=rp.ok && (await rp.json().catch(()=>({}))).success;
+  if(puedeGestion) document.querySelectorAll('.tab.gestion').forEach(t=>t.style.display='');
+})();
+</script>
+</body>
+</html>

@@ -551,6 +551,8 @@ const PAGINAS = [
   ['/contabilidad/finanzas-ia', 'contabilidad/finanzas-ia/index.html'],
   ['/recursos-humanos', 'recursos-humanos/index.html'],
   ['/soporte/recursos-humanos', 'recursos-humanos/index.html'],
+  // Página PÚBLICA del candidato (Kuder por token, sin login)
+  [['/kuder-test', '/kuder-test/'], 'kuder-test/index.html'],
   ['/recursos-humanos/vacaciones', 'recursos-humanos/vacaciones/index.html'],
   ['/recursos-humanos/antiguedad', 'recursos-humanos/antiguedad/index.html'],
   ['/recursos-humanos/mi-ficha', 'recursos-humanos/mi-ficha/index.html'],

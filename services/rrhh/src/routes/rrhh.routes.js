@@ -108,6 +108,23 @@ router.get('/desempeno/evaluaciones/:id/360',  verifyToken, des.get360);     // 
 router.post('/desempeno/evaluaciones/:id/360', verifyToken, des.asignar360); // valida jefatura/RRHH adentro
 router.get('/desempeno/competencias',      verifyToken, des.competencias);
 router.post('/desempeno/competencias',     verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), des.guardarCompetencia);
+// Test de Kuder (intereses vocacionales) — self rinde logueado; gestión requiere rh_kuder|rh_desempeno; público por token
+const kud = require('../controllers/kuder.controller');
+router.get('/kuder/test',              verifyToken, kud.test);
+router.post('/kuder/rendir',           verifyToken, kud.rendir);
+router.get('/kuder/mi',                verifyToken, kud.mi);
+router.post('/kuder/link',             verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.generarLink);
+router.get('/kuder/resultados',        verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.resultados);
+router.get('/kuder/cargos',            verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.cargos);
+router.put('/kuder/cargos/:id',        verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.guardarCargoPerfil);
+router.get('/kuder/items',             verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.items);
+router.post('/kuder/items',            verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.guardarItem);
+router.delete('/kuder/items/:id',      verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.eliminarItem);
+// Públicos (candidato de selección, sin login) — solo lectura del test + envío por token
+router.get('/kuder/publico/test',      kud.test);
+router.get('/kuder/publico/:token',    kud.publicoInfo);
+router.post('/kuder/publico/:token',   kud.publicoEnviar);
+
 // Encuestas de Clima / Pulso / eNPS — responder cualquiera; gestión/resultados validan RRHH adentro
 const enc = require('../controllers/encuestas.controller');
 router.get('/encuestas/pendientes',       verifyToken, enc.pendientes);

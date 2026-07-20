@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test de intereses — AutoFácil</title>
+<!-- v1.0 — página pública del candidato (Kuder por token, sin login) -->
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root{--navy:#0141A2;--navy-d:#012d70;--accent:#009AFE;--bg:#f0f4f8}
+  body{background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;margin:0}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 70px}
+  .head{background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE);border-radius:16px;color:#fff;padding:24px 26px;margin-bottom:18px}
+  .head img{height:34px;margin-bottom:12px;filter:brightness(0) invert(1)}
+  .head h2{font-weight:700;margin:0 0 4px;font-size:1.2rem}.head p{opacity:.92;margin:0;font-size:.85rem}
+  .box{background:#fff;border-radius:14px;padding:20px 22px;box-shadow:0 1px 6px rgba(0,0,0,.07);margin-bottom:14px}
+  .item-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:9px;margin:6px 0;font-size:.92rem}
+  .opt b{color:#334155;font-weight:500}
+  .mas{background:#dcfce7;border-color:#86efac}.menos{background:#fee2e2;border-color:#fca5a5}
+  .radio-mm{display:flex;gap:6px;white-space:nowrap}
+  .btn{border:none;border-radius:9px;padding:11px 26px;font-size:.92rem;font-weight:700;cursor:pointer;background:var(--navy);color:#fff}
+  .pill{display:inline-block;border-radius:20px;padding:2px 11px;font-size:.72rem;font-weight:700}
+  .p-ok{background:#dcfce7;color:#166534}.p-low{background:#fee2e2;color:#991b1b}
+  .prog{position:sticky;top:0;background:var(--bg);padding:10px 0;z-index:5;font-size:.82rem;color:#475569;font-weight:700}
+  .prog .bar-wrap{background:#e2e8f0;border-radius:6px;height:8px;margin-top:5px}.prog .bar{height:100%;border-radius:6px;background:var(--accent);transition:width .2s}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <img src="/img/logo-bs.png" alt="AutoFácil">
+    <h2>Test de intereses</h2>
+    <p id="sub">Cargando…</p>
+  </div>
+  <div id="cont"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const T=new URLSearchParams(location.search).get('t');
+let AREAS=[],ITEMS=[],RESP={};
+
+async function init(){
+  if(!T){ $('cont').innerHTML=msg('Link inválido','Falta el código del test.'); $('sub').textContent=''; return; }
+  const ri=await fetch('/api/rrhh/kuder/publico/'+encodeURIComponent(T)); const ji=await ri.json();
+  if(!ji.success){ $('cont').innerHTML=msg('Link inválido','Este enlace no es válido o expiró.'); $('sub').textContent=''; return; }
+  if(ji.data.ya){ $('cont').innerHTML=gracias(); $('sub').textContent='Ya completado'; return; }
+  $('sub').textContent=`${ji.data.nombre||''}${ji.data.cargo?' · postulación: '+ji.data.cargo:''}`;
+  const rt=await fetch('/api/rrhh/kuder/publico/test'); const jt=await rt.json();
+  AREAS=jt.data.areas; ITEMS=jt.data.items; pinta();
+}
+function msg(t,s){ return `<div class="box" style="text-align:center;padding:36px"><i class="bi bi-exclamation-circle" style="font-size:2.4rem;color:#94a3b8"></i><h3 style="color:#334155;margin:12px 0 4px">${t}</h3><p style="color:#64748b">${s}</p></div>`; }
+function gracias(){ return `<div class="box" style="text-align:center;padding:40px"><i class="bi bi-check-circle-fill" style="font-size:3rem;color:#22c55e"></i><h3 style="color:#166534;margin:14px 0 4px">¡Gracias!</h3><p style="color:#475569">Tu test fue enviado correctamente. Ya puedes cerrar esta ventana.</p></div>`; }
+
+function pinta(){
+  $('cont').innerHTML=`<div class="prog" id="prog"></div>
+    <div class="box"><p style="font-size:.88rem;color:#475569;margin:0">En cada grupo, marca <span class="pill p-ok">Más</span> en la actividad que MÁS te gustaría hacer y <span class="pill p-low">Menos</span> en la que MENOS. No hay respuestas buenas o malas.</p></div>
+    <div id="preg"></div>
+    <div style="text-align:center;margin-top:8px"><button class="btn" onclick="enviar()"><i class="bi bi-send"></i> Enviar test</button>
+      <div id="err" style="color:#991b1b;font-size:.84rem;margin-top:8px"></div></div>`;
+  $('preg').innerHTML=ITEMS.map((it,i)=>`<div class="item-card">
+    <div style="font-size:.74rem;color:#94a3b8;font-weight:700;margin-bottom:4px">${i+1} de ${ITEMS.length}</div>
+    ${['a','b','c'].map(k=>`<div class="opt" id="o${it.id}${k}">
+      <div class="radio-mm">
+        <label style="cursor:pointer"><input type="radio" name="mas${it.id}" onchange="mm(${it.id},'mas','${k}')"> <span style="color:#166534;font-weight:700;font-size:.74rem">Más</span></label>
+        <label style="cursor:pointer"><input type="radio" name="menos${it.id}" onchange="mm(${it.id},'menos','${k}')"> <span style="color:#991b1b;font-weight:700;font-size:.74rem">Menos</span></label>
+      </div><b>${it[k+'_texto']}</b></div>`).join('')}</div>`).join('');
+  actualizaProg();
+}
+function mm(item,tipo,k){
+  RESP[item]=RESP[item]||{};
+  if(tipo==='mas'&&RESP[item].menos===k){RESP[item].menos=null;const r=document.querySelector(`input[name=menos${item}]:checked`);if(r)r.checked=false;}
+  if(tipo==='menos'&&RESP[item].mas===k){RESP[item].mas=null;const r=document.querySelector(`input[name=mas${item}]:checked`);if(r)r.checked=false;}
+  RESP[item][tipo]=k;
+  ['a','b','c'].forEach(x=>{const el=$('o'+item+x);el.classList.remove('mas','menos');if(RESP[item].mas===x)el.classList.add('mas');if(RESP[item].menos===x)el.classList.add('menos');});
+  actualizaProg();
+}
+function completas(){ return ITEMS.filter(it=>RESP[it.id]&&RESP[it.id].mas&&RESP[it.id].menos); }
+function actualizaProg(){ const n=completas().length,t=ITEMS.length; $('prog').innerHTML=`${n} de ${t} respondidas<div class="bar-wrap"><div class="bar" style="width:${n/t*100}%"></div></div>`; }
+async function enviar(){
+  const arr=completas().map(it=>({item:it.id,mas:RESP[it.id].mas,menos:RESP[it.id].menos}));
+  if(arr.length<ITEMS.length){ $('err').textContent=`Faltan ${ITEMS.length-arr.length} grupos por responder.`; window.scrollTo({top:document.querySelector('.item-card:has(.opt:not(.mas):not(.menos))')?.offsetTop||0,behavior:'smooth'}); return; }
+  const r=await fetch('/api/rrhh/kuder/publico/'+encodeURIComponent(T),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({respuestas:arr})});
+  const j=await r.json(); if(!j.success){ $('err').textContent=j.error||'Error al enviar'; return; }
+  $('cont').innerHTML=gracias(); window.scrollTo({top:0,behavior:'smooth'});
+}
+init();
+</script>
+</body>
+</html>
