@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.0 -->
+<!-- v3.1 -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -63,6 +63,7 @@
     <a href="#p22">22. Encuesta de clima / pulso / eNPS</a>
     <a href="#p23">23. Solicitudes del colaborador (paperless)</a>
     <a href="#p24">24. Asistencia y jornada (Workera)</a>
+    <a href="#p25">25. Test de Kuder (intereses vocacionales)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -438,6 +439,21 @@
   </ol>
   <div class="flujo"><span class="st ini">MARCA EN WORKERA</span><span class="ar">→</span><span class="st">SYNC API (caché)</span><span class="ar">→</span><span class="st">CRUCE jornada + ausencias + vacaciones + feriados</span><span class="ar">→</span><span class="st">POSIBLES FALTAS / ATRASOS</span><span class="ar">→</span><span class="st fin">VERIFICACIÓN RRHH → REMUNERACIONES</span></div>
   <div class="afecta"><b>Afecta:</b> Remuneraciones (verificación de días antes de emitir, §12), reportes de asistencia de Workera (espejo de permisos). <b>Depende de:</b> API Workera (credenciales + turnos + enrolamiento), Jornada (quién marca), Ausencias y Vacaciones aprobadas (§17), mantenedor de Feriados, universo del Directorio.</div>
+
+  <h2 id="p25">25. Test de Kuder (intereses vocacionales)</h2>
+  <div class="paso">
+    <div><b class="lbl">Qué / para qué</b>Medir los <b>intereses vocacionales</b> de una persona en 10 áreas y contrastarlos con el <b>perfil esperado del cargo</b>, tanto al <b>seleccionar</b> un candidato como en la revisión <b>anual</b> de los colaboradores.</div>
+    <div><b class="lbl">Quién</b>RRHH (permiso <code>rh_kuder</code>, heredado de Desempeño) define el perfil por cargo, genera los links de selección y lee los resultados · el candidato o el colaborador rinde el test.</div>
+    <div><b class="lbl">Prerequisitos</b>Cargos creados en RRHH → Contratos → Cargos · para que haya match, el cargo debe tener su perfil Kuder definido (junto a la descripción de cargo).</div>
+  </div>
+  <ol>
+    <li><b>Definir el perfil del cargo</b> (RRHH → Test de Kuder → Perfil por cargo): para cada cargo, el nivel esperado 0–100 en las áreas que apliquen. Se deja en blanco lo que no aplica; el match se calcula solo contra lo definido.</li>
+    <li><b>Selección</b> (pestaña Selección): RRHH ingresa nombre + cargo al que postula → el sistema genera un <b>link con token</b>. El candidato lo abre (sin cuenta), marca en cada grupo la actividad que MÁS y la que MENOS le gusta, y envía. El resultado queda con su match contra el cargo.</li>
+    <li><b>Anual</b> (pestaña Rendir mi test): cada colaborador rinde las 30 triadas; su perfil y match quedan en "Mi resultado" y en su ficha.</li>
+    <li><b>Lectura</b> (pestaña Resultados, RRHH): perfil 0–100 por área, % de match y el detalle de brechas (real − esperado) por área, para apoyar la decisión de selección o el plan de desarrollo.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">PERFIL DEL CARGO</span><span class="ar">→</span><span class="st">RINDE (candidato o colaborador)</span><span class="ar">→</span><span class="st">MOTOR ÚNICO (10 áreas 0-100)</span><span class="ar">→</span><span class="st">MATCH vs CARGO</span><span class="ar">→</span><span class="st fin">DECISIÓN RRHH</span></div>
+  <div class="afecta"><b>Afecta:</b> Selección de personal y Evaluaciones de Desempeño (§ desempeño). <b>Depende de:</b> Cargos y sus descripciones (RRHH → Contratos), catálogo paramétrico de áreas e ítems.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>
