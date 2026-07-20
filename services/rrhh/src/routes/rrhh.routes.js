@@ -120,6 +120,8 @@ router.put('/kuder/cargos/:id',        verifyToken, requireFunc('rh_kuder', 'rh_
 router.get('/kuder/items',             verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.items);
 router.post('/kuder/items',            verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.guardarItem);
 router.delete('/kuder/items/:id',      verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.eliminarItem);
+router.get('/kuder/:id/informe-ia',    verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.informeGet);
+router.post('/kuder/:id/informe-ia',   verifyToken, requireFunc('rh_kuder', 'rh_desempeno'), kud.informeGenerar);
 // Públicos (candidato de selección, sin login) — solo lectura del test + envío por token
 router.get('/kuder/publico/test',      kud.test);
 router.get('/kuder/publico/:token',    kud.publicoInfo);

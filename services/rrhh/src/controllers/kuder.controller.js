@@ -15,6 +15,8 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const crypto = require('crypto');
+const anthropic = require('../../../../shared/anthropic');
+const ia = require('../../../../shared/ia');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -92,6 +94,12 @@ require('../../../../shared/migrate').enFila('rrhh-kuder', async () => {
     INDEX idx_usuario (id_usuario), INDEX idx_cargo (id_cargo), INDEX idx_estado (estado))`);
   // Perfil Kuder esperado por cargo (junto a la descripción de cargo)
   try { await pool.query(`ALTER TABLE rh_cargos ADD COLUMN kuder_perfil TEXT NULL`); } catch (e) { if (e.errno !== 1060) throw e; }
+  // Informe IA cacheado por test
+  for (const col of ['informe_ia MEDIUMTEXT NULL', 'informe_ia_at DATETIME NULL']) {
+    try { await pool.query(`ALTER TABLE rh_kuder_tests ADD COLUMN ${col}`); } catch (e) { if (e.errno !== 1060) throw e; }
+  }
+  try { await ia.registrarFuncionalidad({ codigo: 'kuder_informe', nombre: 'Informe IA — Test de Kuder',
+    descripcion: 'Interpreta el perfil de intereses y su ajuste al cargo (selección o desarrollo)', modelo: 'claude-haiku-4-5' }); } catch (_) {}
 
   // Seeds idempotentes
   for (const [c, n, d, o] of AREAS)
@@ -310,6 +318,72 @@ exports.guardarItem = async (req, res) => {
 exports.eliminarItem = async (req, res) => {
   try { await pool.query(`DELETE FROM rh_kuder_items WHERE id=?`, [Number(req.params.id)]); ok(res, {}); }
   catch (e) { console.error('[kuder delitem]', e.message); fail(res, 'Error interno'); }
+};
+
+/* ── Informe IA (bajo demanda, cacheado) ─────────────────────────────────────── */
+// GET /api/rrhh/kuder/:id/informe-ia — devuelve el informe cacheado (o null)
+exports.informeGet = async (req, res) => {
+  try {
+    const [[t]] = await pool.query(`SELECT informe_ia FROM rh_kuder_tests WHERE id=?`, [Number(req.params.id)]);
+    if (!t) return fail(res, 'Test no encontrado', 404);
+    ok(res, { informe: safeJSON(t.informe_ia) });
+  } catch (e) { console.error('[kuder informeGet]', e.message); fail(res, 'Error interno'); }
+};
+
+// POST /api/rrhh/kuder/:id/informe-ia — genera (o regenera si ?force=1) el informe
+exports.informeGenerar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [[t]] = await pool.query(`SELECT k.tipo, k.estado, k.resultado, k.informe_ia,
+        COALESCE(TRIM(CONCAT_WS(' ',u.nombre,u.apellido)), k.candidato_nombre) nombre,
+        c.nombre cargo, c.descripcion cargo_desc, c.kuder_perfil
+      FROM rh_kuder_tests k LEFT JOIN usuarios u ON u.id_usuario=k.id_usuario
+      LEFT JOIN rh_cargos c ON c.id=k.id_cargo WHERE k.id=?`, [id]);
+    if (!t) return fail(res, 'Test no encontrado', 404);
+    if (t.estado !== 'COMPLETADO') return fail(res, 'El test aún no está completado', 400);
+    if (t.informe_ia && !req.query.force) return ok(res, { informe: safeJSON(t.informe_ia), cacheado: true });
+
+    const perfil = safeJSON(t.resultado) || {};
+    const perfilCargo = safeJSON(t.kuder_perfil);
+    const m = matchCargo(perfil, perfilCargo);
+    const nom = c => (AREAS.find(a => a[0] === c) || [null, c])[1];
+    const perfilTxt = AREAS.map(a => `${a[1]}: ${perfil[a[0]] ?? 0}/100`).join(', ');
+    const gapsTxt = m ? m.detalle.map(d => `${nom(d.area)}: esperado ${d.esperado}, real ${d.real} (${d.gap >= 0 ? '+' : ''}${d.gap})`).join('; ') : 'El cargo no tiene perfil Kuder definido.';
+    const esSeleccion = t.tipo === 'SELECCION';
+
+    const system = `Eres psicólogo laboral experto en el Test de Kuder de intereses vocacionales. Interpretas resultados de forma profesional, prudente y útil, en español de Chile. Un puntaje alto en un área = mayor interés/gusto por ese tipo de actividad (NO es aptitud ni capacidad). El test es ipsativo (intereses relativos). ${esSeleccion ? 'Contexto: SELECCIÓN de un candidato para un cargo — evalúa idoneidad de intereses vs lo que el cargo requiere, sin descartar por un solo dato.' : 'Contexto: revisión ANUAL de un colaborador — enfócate en desarrollo, motivación y posibles ajustes de rol o tareas.'} No inventes datos que no estén en el input. Sé concreto y breve.`;
+    const prompt = `Persona: ${t.nombre || 'sin nombre'}
+Cargo ${esSeleccion ? 'al que postula' : 'actual'}: ${t.cargo || 'no especificado'}
+${t.cargo_desc ? 'Descripción del cargo: ' + String(t.cargo_desc).slice(0, 1500) : 'El cargo no tiene descripción cargada.'}
+
+Perfil de intereses (0-100 por área): ${perfilTxt}
+Match global vs perfil esperado del cargo: ${m ? m.match + '%' : 'sin perfil definido'}
+Brechas por área (esperado vs real): ${gapsTxt}
+
+Redacta un informe con estos campos JSON:
+{
+ "sintesis": "2-3 frases: qué tipo de trabajo disfruta según sus áreas dominantes",
+ "areas_dominantes": ["área 1","área 2","área 3"],
+ "ajuste_cargo": "párrafo interpretando el match y las brechas frente a lo que el cargo requiere",
+ "fortalezas": ["punto donde sus intereses calzan bien con el cargo", "..."],
+ "brechas": ["área donde su interés es menor al que el cargo pide y qué implica", "..."],
+ "${esSeleccion ? 'recomendacion_seleccion' : 'recomendacion_desarrollo'}": "${esSeleccion ? 'lectura de idoneidad y qué explorar en entrevista' : 'sugerencias de desarrollo, motivación o ajuste de tareas/rol'}",
+ "semaforo": "VERDE|AMARILLO|ROJO (idoneidad global de intereses para el cargo)"
+}`;
+
+    let out;
+    try {
+      out = await anthropic.analizar({ codigo: 'kuder_informe', system, prompt, json: true, max_tokens: 1400, id_usuario: req.usuario.id_usuario });
+    } catch (e) {
+      if (e.code === 'IA_OFF') return fail(res, 'La IA está desactivada para esta funcionalidad', 400);
+      if (!anthropic.disponible()) return fail(res, 'Falta configurar ANTHROPIC_API_KEY', 400);
+      throw e;
+    }
+    const informe = out.datos;
+    if (!informe) return fail(res, 'La IA no devolvió un informe válido, reintenta', 502);
+    await pool.query(`UPDATE rh_kuder_tests SET informe_ia=?, informe_ia_at=NOW() WHERE id=?`, [JSON.stringify(informe), id]);
+    ok(res, { informe, cacheado: false });
+  } catch (e) { console.error('[kuder informe]', e.message); fail(res, 'Error generando el informe'); }
 };
 
 function safeJSON(s) { try { return s ? JSON.parse(s) : null; } catch { return null; } }

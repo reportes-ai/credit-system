@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Test de Kuder — AutoFácil</title>
-<!-- v1.0 — inventario de intereses Kuder (10 áreas): rendir (anual/selección), perfil por cargo, resultados y match -->
+<!-- v1.1 — informe IA por resultado (bajo demanda, enfoque selección/desarrollo, cacheado) -->
 <link href="/css/bootstrap.min.css" rel="stylesheet">
 <link href="/css/bootstrap-icons.css" rel="stylesheet">
 <style>
@@ -205,11 +205,14 @@ async function cargarResultados(){
     </tr>`).join('')||'<tr><td colspan="7" class="empty">Sin resultados aún</td></tr>'}</tbody></table>
   </div><div id="detalleKuder"></div>`;
 }
+let DET=null;
 function verDetalle(x){
-  const dt=x.detalle;
+  DET=x; const dt=x.detalle;
   $('detalleKuder').innerHTML=`<div class="box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <b style="color:#012d70">${x.nombre} — ${x.cargo||'sin cargo'}</b><span>${pillMatch(x.match_pct)}</span></div>
+      <b style="color:#012d70">${x.nombre} — ${x.cargo||'sin cargo'}</b>
+      <span>${pillMatch(x.match_pct)} <button class="btn" style="background:#c2410c;color:#fff;padding:5px 12px;font-size:.75rem;margin-left:8px" onclick="informeIA(${x.id})"><i class="bi bi-stars"></i> Informe IA</button></span></div>
+    <div id="infIA"></div>
     ${barras(x.perfil)}
     ${dt?`<div style="font-size:.78rem;color:#64748b;margin-top:12px"><b>Ajuste al perfil del cargo</b> (real − esperado; verde = por sobre lo esperado):</div>
     <table style="margin-top:6px"><thead><tr><th>Área</th><th style="text-align:center">Esperado</th><th style="text-align:center">Real</th><th style="text-align:center">Gap</th></tr></thead>
@@ -217,6 +220,34 @@ function verDetalle(x){
       <td style="text-align:center"><span class="pill ${d.gap>=0?'p-ok':'p-low'}">${d.gap>0?'+':''}${d.gap}</span></td></tr>`).join('')}</tbody></table>`:'<div style="font-size:.78rem;color:#94a3b8;margin-top:10px">El cargo no tiene perfil Kuder definido — sin match. Defínelo en "Perfil por cargo".</div>'}
   </div>`;
   $('detalleKuder').scrollIntoView({behavior:'smooth'});
+  // si ya hay informe cacheado, mostrarlo
+  fetch('/api/rrhh/kuder/'+x.id+'/informe-ia',{headers:H}).then(r=>r.json()).then(j=>{ if(j.success&&j.data.informe) pintaInforme(j.data.informe,false); });
+}
+const SEM={VERDE:{c:'#166534',b:'#dcfce7',t:'Buen ajuste'},AMARILLO:{c:'#854d0e',b:'#fef9c3',t:'Ajuste parcial'},ROJO:{c:'#991b1b',b:'#fee2e2',t:'Bajo ajuste'}};
+function pintaInforme(inf,esNuevo){
+  const s=SEM[String(inf.semaforo||'').toUpperCase()]||{c:'#475569',b:'#f1f5f9',t:'—'};
+  const rec=inf.recomendacion_seleccion||inf.recomendacion_desarrollo||'';
+  const lst=(a)=>Array.isArray(a)&&a.length?'<ul style="margin:4px 0 0;padding-left:18px">'+a.map(x=>`<li>${x}</li>`).join('')+'</ul>':'<span style="color:#94a3b8">—</span>';
+  $('infIA').innerHTML=`<div style="border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;padding:16px 18px;margin:8px 0 14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <b style="color:#9a3412"><i class="bi bi-stars"></i> Informe IA</b>
+      <span style="font-size:.72rem;font-weight:800;color:${s.c};background:${s.b};border-radius:8px;padding:3px 10px">${s.t}</span></div>
+    <div style="font-size:.86rem;margin-bottom:8px"><b>Síntesis:</b> ${inf.sintesis||'—'}</div>
+    ${inf.areas_dominantes?`<div style="font-size:.84rem;margin-bottom:8px"><b>Áreas dominantes:</b> ${(inf.areas_dominantes||[]).join(' · ')}</div>`:''}
+    <div style="font-size:.86rem;margin-bottom:8px"><b>Ajuste al cargo:</b> ${inf.ajuste_cargo||'—'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="font-size:.84rem"><b style="color:#166534">Fortalezas</b>${lst(inf.fortalezas)}</div>
+      <div style="font-size:.84rem"><b style="color:#991b1b">Brechas</b>${lst(inf.brechas)}</div></div>
+    <div style="font-size:.86rem;margin-top:10px;background:#fff;border-radius:8px;padding:10px 12px"><b>Recomendación:</b> ${rec||'—'}</div>
+    <div style="text-align:right;margin-top:8px"><button class="btn btn-out" style="padding:4px 10px;font-size:.72rem" onclick="informeIA(${DET.id},true)"><i class="bi bi-arrow-repeat"></i> Regenerar</button></div>
+  </div>`;
+}
+async function informeIA(id,force){
+  $('infIA').innerHTML='<div style="color:#9a3412;font-size:.85rem;padding:10px 0"><i class="bi bi-hourglass-split"></i> Generando informe con IA…</div>';
+  const r=await fetch('/api/rrhh/kuder/'+id+'/informe-ia'+(force?'?force=1':''),{method:'POST',headers:H});
+  const j=await r.json();
+  if(!j.success){ $('infIA').innerHTML=`<div style="color:#991b1b;font-size:.84rem;padding:8px 0">${j.error||'Error'}</div>`; return; }
+  pintaInforme(j.data.informe,!j.data.cacheado);
 }
 
 /* ── SELECCIÓN (gestión): generar link candidato ── */
