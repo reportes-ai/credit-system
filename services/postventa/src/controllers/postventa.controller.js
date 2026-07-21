@@ -1349,14 +1349,16 @@ const consultaSaldos = async (req, res) => {
     const PAGADO = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO'`;
     const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo,
-             s.fecha_otorgado, s.saldo_precio,
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
+             COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
+             s.ejecutivo, s.fecha_otorgado, s.saldo_precio,
              COALESCE(NULLIF(cr.parque,''), cr.nombre_parque_mgmt) AS parque,
              (SELECT op.num_orden FROM postventa_ordenes op WHERE op.id_seguimiento = s.id ORDER BY op.fecha DESC LIMIT 1) AS orden_pago
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
+      LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
       ${tablaWhere}
-      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
       LIMIT ?`, [...fp, limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
@@ -1396,14 +1398,18 @@ const consultaFacturas = async (req, res) => {
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
     const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo, s.comision,
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
+             COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
+             s.ejecutivo, s.comision,
              f.fecha_factura, f.numero_factura, f.monto_bruto, f.monto_liquido, f.es_terceros, f.es_boleta,
              DATE_FORMAT(f.fecha_factura,'%Y-%m') AS mes_fact,
              (SELECT oc.num_orden FROM postventa_ordenes_comision oc WHERE oc.id_seguimiento = s.id ORDER BY oc.fecha DESC LIMIT 1) AS orden_comision
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      LEFT JOIN creditos cr ON cr.id = s.id_credito
+      LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
       ${tablaWhere}
-      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
       LIMIT ?`, [...fp, limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'COMISION', ORDEN_COMISION);
@@ -1442,13 +1448,15 @@ const consultaFundantes = async (req, res) => {
     // Por defecto: fundantes pendientes (aún sin recibir). Toggle: recibidos en los últimos 7 días.
     const tablaWhere = baseWhere + (recibido7 ? ' AND ' + RECIBIDO + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : ' AND NOT ' + RECIBIDO + ')');
     const [rows] = await pool.query(`
-      SELECT s.id, s.num_op, s.financiera, s.rut_dealer, s.nombre_dealer, s.ejecutivo,
-             s.fecha_otorgado, s.saldo_precio,
+      SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
+             COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
+             s.ejecutivo, s.fecha_otorgado, s.saldo_precio,
              COALESCE(NULLIF(cr.parque,''), cr.nombre_parque_mgmt) AS parque
       FROM postventa_seguimiento s
       LEFT JOIN creditos cr ON cr.id = s.id_credito
+      LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
       ${tablaWhere}
-      ORDER BY s.fecha_otorgado ASC, s.num_op ASC
+      ORDER BY s.fecha_otorgado DESC, s.num_op DESC
       LIMIT ?`, [...fp, limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'SALDO', ORDEN_SALDO);
