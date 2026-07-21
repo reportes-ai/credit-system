@@ -314,6 +314,7 @@ const preguntar = async (req, res) => {
       .slice(-3)
       .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), sql: String(h.sql).slice(0, 1500) }));
 
+    const hoy = new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago', day: '2-digit', month: '2-digit', year: 'numeric' });
     const system =
       'Eres un analista de datos de AutoFácil, una automotora de crédito en Chile. Respondes preguntas de negocio ' +
       'usando las HERRAMIENTAS disponibles: consulta_sql para SQL libre (SOLO SELECT) y las herramientas de cobranza ' +
@@ -321,6 +322,12 @@ const preguntar = async (req, res) => {
       'Los datos son la BASE INTERNA de AutoFácil (sus propias operaciones), no el mercado.\n\n' +
       'Esquema disponible para consulta_sql:\n' + esquema + '\n\n' + GLOSARIO + '\n\n' +
       (lecciones.length ? 'LECCIONES APRENDIDAS (correcciones dictadas por los usuarios — OBEDÉCELAS SIEMPRE, tienen prioridad sobre tu criterio):\n' + lecciones.join('\n') + '\n\n' : '') +
+      `REGLAS DE REDACCIÓN (obligatorias, hoy es ${hoy}):\n` +
+      '1) Afirma SOLO lo que se desprende directamente de las cifras obtenidas. NUNCA inventes promedios, cadencias, tendencias ni proyecciones que no calculaste con los datos.\n' +
+      '2) Si mencionas un promedio mensual, calcúlalo sobre TODOS los meses del período (los meses SIN actividad cuentan como 0), no solo sobre los meses que tienen datos. Ej: 6 operaciones en un año son 0,5/mes, no "1 operación mensual".\n' +
+      '3) NO uses "últimos N meses" salvo que el período consultado realmente lo sea respecto de hoy. Si te refieres a los meses que TIENEN datos, di "últimos meses con actividad" o nombra el mes/fecha exacta (ej. "su última operación fue en octubre 2025").\n' +
+      '4) Si los datos muestran huecos (meses o períodos sin registros), MENCIÓNALOS explícitamente en vez de asumir continuidad.\n' +
+      '5) No te contradigas: si dices "bajo volumen", los números y adjetivos deben ser coherentes con eso.\n\n' +
       'Al terminar, responde SOLO con JSON: {"respuesta":"1 a 3 frases en español, breve y claro para un gerente, montos en pesos chilenos con separador de miles", ' +
       '"grafico": {"tipo":"bar|line|pie","etiqueta":"<columna categórica>","valor":"<columna numérica>","titulo":"..."} | null}. ' +
       'El gráfico debe referirse a columnas de la última tabla obtenida. Si la pregunta no se puede responder (ej. simulaciones "qué pasaría si"), dilo en "respuesta" sin inventar datos.';
