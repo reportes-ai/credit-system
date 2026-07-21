@@ -359,6 +359,7 @@ const sync = async (req, res) => {
              DATE(c.fecha_otorgado), c.saldo_precio, c.comdea_real
       FROM creditos c
       WHERE c.fecha_otorgado IS NOT NULL
+        AND c.estado_credito = 'OTORGADO'   -- Post Venta es SOLO post-otorgamiento: un rechazado/digitado/aprobado con fecha_otorgado NO debe generar seguimiento
         AND NOT EXISTS (SELECT 1 FROM postventa_seguimiento s WHERE s.id_credito = c.id)
     `);
     // Backfill de filas ya creadas sin N° Operación (los créditos de carta nacen sin num_op)
