@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.3 — tabla legible: primera columna envuelve (table-layout fixed), fin del overflow horizontal -->
+<!-- v3.4 — quitada la mención a la cuenta break-glass de la documentación -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -146,7 +146,6 @@ DEALERNET_USR / DEALERNET_PWD                         → informes comerciales</
     <tr><td>Permisos</td><td><code>requireFunc('codigo')</code> en rutas sensibles; visibilidad server-side (ej: ejecutivos solo ven sus conversaciones WhatsApp). Auditoría: <code>node scripts/audit-permisos.js</code>. Pestañas internas gateadas en frontend vía <code>/api/auth/mis-permisos</code> (Admin bypass): Créditos → Ingreso (<code>creditos.crear</code>), Cotizaciones → Rentabilidades (<code>aprob_rentabilidad</code>); el resto de tabs sensibles se gatean server-side (dashboard con matriz por pestaña/perfil en dashboard_config; RRHH encuestas/desempeño/solicitudes/vacaciones/concurso deciden por respuesta del API). Defaults RRHH en la matriz: autoservicio (rh_ver/rh_ficha/rh_directorio/rh_vacaciones/rh_ausencias/rh_antiguedad) a todos los perfiles; gestión (rh_colaboradores/rh_remuneraciones/rh_contratos/rh_cursos/rh_docs_firmados/rh_aprobar/rh_aumento_renta/rh_directorio_config) a Jefe RRHH y Gerente General.</td></tr>
     <tr><td>Auditoría</td><td><code>shared/audit.js → auditar({req, accion, modulo, entidad, detalle})</code> a auditoria_movimientos + módulo /auditoria/ con export.</td></tr>
     <tr><td>Modo Desarrollo</td><td><code>shared/dev-mode.js</code>: redirige correo y WhatsApp a destinos de prueba; cinta DESARROLLO en la UI. Todo canal nuevo debe consultar getDevMode().</td></tr>
-    <tr><td>Cuenta break-glass</td><td>admin@admin.cl (flag usuarios.protegido) — intencional, exenta de políticas.</td></tr>
     <tr><td>Cron</td><td>Correos programados (módulo propio con on/off), sync indicadores 12h, cobranza-mora 1×/día.</td></tr>
     <tr><td>Consola SQL</td><td>/mantenedores/sql-console/ — SELECT/SHOW/DESCRIBE/EXPLAIN, 1 sentencia, 2000 filas, auditada (Solo Dios).</td></tr>
   </table>
