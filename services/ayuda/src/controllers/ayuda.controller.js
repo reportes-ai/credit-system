@@ -300,12 +300,15 @@ require('../../../../shared/migrate').enFila('academia', async () => {
       idFunc = r.insertId;
     }
     // Habilitar la card para todos los perfiles que aún no la tengan (capacitación abierta).
-    await pool.query(
-      `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
-       SELECT p.id_perfil, ?, 1 FROM perfiles p
-       WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
-      [idFunc, idFunc]);
-    console.log('[academia] módulo + progreso OK');
+    // OJO: NO usar "INSERT ... SELECT ... WHERE NOT EXISTS(SELECT FROM permisos_perfil)" —
+    // referenciar la tabla destino en el subquery lanza error 1093 en MySQL/TiDB y deja el
+    // módulo sin permiso (card invisible). Se hace por perfil, como Auditoría.
+    const [perfilesRows] = await pool.query('SELECT id_perfil FROM perfiles');
+    for (const { id_perfil } of perfilesRows) {
+      const [[has]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [id_perfil, idFunc]);
+      if (!has) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [id_perfil, idFunc]);
+    }
+    console.log('[academia] módulo + progreso OK (perfiles:', perfilesRows.length, ')');
   } catch (e) { console.error('[academia migration]', e.message); }
 });
 
