@@ -103,8 +103,9 @@
   <div class="card-af">
     <h3><i class="bi bi-robot"></i> Motor de correo (programación)</h3>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-      <label class="sw"><input type="checkbox" id="mActivo"><span class="sl"></span></label>
+      <label class="sw" title="Interruptor GENERAL del motor de correo. Si está apagado NO sale ningún correo, aunque los tramos de abajo estén verdes."><input type="checkbox" id="mActivo"><span class="sl"></span></label>
       <span id="mActivoLbl" style="font-weight:700">—</span>
+      <span class="muted">= interruptor general (apaga TODO el correo)</span>
       <span class="muted" style="margin-left:auto" id="mUlt"></span>
     </div>
     <div class="grid">
@@ -128,6 +129,7 @@
   <div class="card-af">
     <h3><i class="bi bi-envelope-paper"></i> Plantillas por tramo de mora</h3>
     <div class="vars">Variables disponibles: <code>{trato}</code> <code>{nombre}</code> <code>{numero}</code> <code>{dias}</code> <code>{cuotas}</code> <code>{monto}</code> <code>{datos}</code></div>
+    <p class="muted" style="margin:0 0 12px"><b>El toggle verde de cada tramo</b> activa/desactiva <b>solo ese tramo</b>. Para apagar TODOS los correos de una vez usa el interruptor general del <i>Motor de correo</i> (arriba).</p>
     <div id="plantillas"></div>
   </div>
 
@@ -152,7 +154,7 @@
   <div class="card-af" style="border:1.5px solid #bae6fd">
     <h3 style="color:#0369a1"><i class="bi bi-bell"></i> Aviso de Vencimiento (antes de vencer)</h3>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-      <label class="sw"><input type="checkbox" id="avActivo" onchange="guardarAvisoVenc()"><span class="sl"></span></label>
+      <label class="sw" title="Enciende/apaga este motor de aviso previo (independiente del de mora)."><input type="checkbox" id="avActivo" onchange="guardarAvisoVenc()"><span class="sl"></span></label>
       <span id="avActivoLbl" style="font-weight:700">—</span>
       <span class="muted" style="margin-left:auto" id="avPl"></span>
     </div>
@@ -171,8 +173,9 @@
   <div class="card-af" style="border:1.5px solid #bbf7d0">
     <h3 style="color:var(--wsp)"><i class="bi bi-whatsapp"></i> Motor de WhatsApp (secuencia numerada)</h3>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-      <label class="sw"><input type="checkbox" id="wActivo" onchange="guardarWspActivo()"><span class="sl"></span></label>
+      <label class="sw" title="Interruptor GENERAL del motor de WhatsApp. Si está apagado NO sale ningún WhatsApp, aunque las plantillas de abajo estén verdes."><input type="checkbox" id="wActivo" onchange="guardarWspActivo()"><span class="sl"></span></label>
       <span id="wActivoLbl" style="font-weight:700">—</span>
+      <span class="muted">= interruptor general (apaga TODO el WhatsApp)</span>
       <span class="muted" style="margin-left:auto" id="wUlt"></span>
     </div>
     <p class="muted" style="margin:0 0 12px">Corre 1 vez al día a la hora y días configurados (Chile). A cada crédito AutoFácil en mora <b>que cumpla los filtros de abajo</b> le envía el <b>siguiente N°</b> de la secuencia — el que ya recibió el N°1 recibe el N°2, y así; <b>nunca se repite el mismo mensaje</b> y al agotarse la secuencia no se le envía más. Usa el mismo motor de mora que Pre-judicial. Cada envío queda en la bitácora de cobranzas del crédito y su resultado se actualiza solo: <b>Enviado → Entregado → Leído</b> (confirmación de Meta).</p>
@@ -305,7 +308,7 @@ function renderPlantillas(){
     <div class="pl">
       <div class="pl-head">
         <b><i class="bi bi-bookmark-fill"></i> ${esc(p.nombre)} <span class="muted">(${esc(p.codigo)})</span></b>
-        <label class="sw"><input type="checkbox" id="pa_${i}" ${p.activo?'checked':''}><span class="sl"></span></label>
+        <label class="sw" title="Activa/desactiva SÓLO este tramo. El interruptor general del Motor de correo debe estar encendido."><input type="checkbox" id="pa_${i}" ${p.activo?'checked':''}><span class="sl"></span></label>
       </div>
       <div class="grid" style="margin-bottom:10px">
         <div><label>Nombre</label><input id="pn_${i}" value="${esc(p.nombre)}"></div>
@@ -481,7 +484,7 @@ function renderSeq(){
         <b style="display:flex;align-items:center;gap:10px"><span class="seq-num">${p.orden||'—'}</span> ${esc(p.name)}</b>
         <span style="display:flex;gap:8px;align-items:center">
           <span class="chip" style="background:${col}">${txt}</span>
-          <label class="sw" title="Activa en la secuencia"><input type="checkbox" id="wa_${i}" ${p.activo_auto?'checked':''}><span class="sl"></span></label>
+          <label class="sw" title="Activa/desactiva SÓLO esta plantilla en la secuencia. El interruptor general del Motor de WhatsApp debe estar encendido."><input type="checkbox" id="wa_${i}" ${p.activo_auto?'checked':''}><span class="sl"></span></label>
         </span>
       </div>
       <div class="tpl-body">${esc(bodyOf(p))}</div>
