@@ -299,10 +299,9 @@ require('../../../../shared/migrate').enFila('academia', async () => {
          VALUES (520001, 'Academia AutoFácil', 'academia_ver', '/academia/', 'bi-mortarboard-fill')`);
       idFunc = r.insertId;
     }
-    // Habilitar la card para todos los perfiles que aún no la tengan (capacitación abierta).
-    // OJO: NO usar "INSERT ... SELECT ... WHERE NOT EXISTS(SELECT FROM permisos_perfil)" —
-    // referenciar la tabla destino en el subquery lanza error 1093 en MySQL/TiDB y deja el
-    // módulo sin permiso (card invisible). Se hace por perfil, como Auditoría.
+    // Habilitar la card para TODOS los perfiles (capacitación abierta). Sin permiso en
+    // permisos_perfil la card no aparece en el Home (mis-permisos no tiene bypass de Admin).
+    // Se hace por perfil (idempotente), como Auditoría.
     const [perfilesRows] = await pool.query('SELECT id_perfil FROM perfiles');
     for (const { id_perfil } of perfilesRows) {
       const [[has]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [id_perfil, idFunc]);
