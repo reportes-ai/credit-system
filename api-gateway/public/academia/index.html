@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Academia AutoFácil — Autocapacitación</title>
+  <!-- v1.0 — MVP navegable: cursos por módulo (sembrados desde la ayuda), reproductor slide a slide con progreso por persona -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --blue2:#0255c5; --ice:#90caf9; }
+    * { box-sizing:border-box; }
+    body { background:#eef3f9; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:var(--ice); border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:var(--ice); border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .wrap { max-width:1200px; margin:0 auto; padding:22px 22px 70px; }
+
+    /* Banner */
+    .hero { background:linear-gradient(135deg,#012d70,#0141A2 60%,#0255c5); border-radius:18px; color:#fff; padding:26px 30px; display:flex; align-items:center; gap:20px; margin-bottom:22px; box-shadow:0 8px 26px rgba(1,45,112,.25); }
+    .hero .ico { font-size:2.6rem; opacity:.95; }
+    .hero h2 { margin:0 0 4px; font-weight:800; font-size:1.5rem; }
+    .hero p { margin:0; opacity:.9; font-size:.95rem; max-width:760px; }
+
+    /* Progreso global */
+    .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+    .stat { background:#fff; border:1px solid #e2e8f0; border-radius:13px; padding:14px 20px; flex:1; min-width:150px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .stat .n { font-size:1.7rem; font-weight:800; color:var(--navy); }
+    .stat .l { font-size:.78rem; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+
+    /* Grid de cursos */
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .curso { background:#fff; border:1px solid #e4eaf2; border-radius:14px; padding:18px; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; position:relative; overflow:hidden; }
+    .curso:hover { transform:translateY(-3px); box-shadow:0 10px 26px rgba(1,65,162,.16); border-color:var(--blue2); }
+    .curso .top { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+    .curso .cico { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg,#e8f0fe,#d3e3ff); color:var(--blue); display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex:0 0 auto; }
+    .curso h3 { margin:0; font-size:1.02rem; font-weight:800; color:var(--navy); line-height:1.25; }
+    .curso .res { font-size:.83rem; color:#64748b; line-height:1.5; min-height:38px; }
+    .curso .meta { display:flex; align-items:center; justify-content:space-between; margin-top:12px; font-size:.78rem; color:#64748b; }
+    .curso .lecc { display:inline-flex; align-items:center; gap:5px; font-weight:600; }
+    .bar { height:7px; background:#eef2f7; border-radius:5px; overflow:hidden; margin-top:10px; }
+    .bar > span { display:block; height:100%; background:linear-gradient(90deg,#0141A2,#0255c5); border-radius:5px; transition:width .4s; }
+    .badge-done { position:absolute; top:12px; right:12px; background:#16a34a; color:#fff; font-size:.66rem; font-weight:800; border-radius:20px; padding:3px 10px; display:flex; align-items:center; gap:4px; }
+    .badge-cont { position:absolute; top:12px; right:12px; background:#f59e0b; color:#fff; font-size:.66rem; font-weight:800; border-radius:20px; padding:3px 10px; }
+
+    /* ── Reproductor (overlay tipo Flash) ── */
+    .player { position:fixed; inset:0; background:rgba(3,12,30,.72); backdrop-filter:blur(3px); z-index:1000; display:none; align-items:center; justify-content:center; padding:20px; }
+    .player.show { display:flex; }
+    .stage { background:#fff; width:100%; max-width:860px; border-radius:20px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.5); display:flex; flex-direction:column; max-height:92vh; animation:pop .25s ease; }
+    @keyframes pop { from { opacity:0; transform:scale(.94); } to { opacity:1; transform:scale(1); } }
+    .p-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:14px; }
+    .p-head .hico { font-size:1.5rem; }
+    .p-head h3 { margin:0; font-size:1.05rem; font-weight:800; flex:1; }
+    .p-head .x { background:rgba(255,255,255,.15); border:none; color:#fff; width:34px; height:34px; border-radius:9px; cursor:pointer; font-size:1.1rem; }
+    .p-prog { height:6px; background:#e9eef5; }
+    .p-prog > span { display:block; height:100%; background:linear-gradient(90deg,#0141A2,#0255c5); transition:width .35s; }
+    .p-body { padding:34px 40px; overflow-y:auto; flex:1; min-height:280px; }
+    .slide { animation:slideIn .3s ease; }
+    @keyframes slideIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+    .slide.back { animation:slideInB .3s ease; }
+    @keyframes slideInB { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:translateX(0); } }
+    .s-kick { font-size:.74rem; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--blue); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+    .s-num { background:var(--blue); color:#fff; width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.8rem; }
+    .s-title { font-size:1.55rem; font-weight:800; color:var(--navy); margin:0 0 14px; line-height:1.2; }
+    .s-text { font-size:1.02rem; color:#334155; line-height:1.7; }
+    .s-hero-ico { font-size:3.4rem; color:var(--blue); margin-bottom:14px; }
+    .s-sub { border:1px solid #e6edf6; border-left:4px solid var(--blue); border-radius:10px; padding:13px 16px; margin-top:12px; background:#f8fbff; }
+    .s-sub b { color:var(--navy); font-size:.95rem; }
+    .s-sub span { display:block; font-size:.87rem; color:#64748b; margin-top:3px; line-height:1.5; }
+    .s-next { background:#eff6ff; border-radius:12px; padding:18px 20px; font-size:1rem; color:#1e3a5f; line-height:1.65; border:1px solid #dbeafe; }
+    .s-cta { margin-top:18px; }
+    .s-cta a { display:inline-flex; align-items:center; gap:8px; background:var(--blue); color:#fff; text-decoration:none; padding:10px 20px; border-radius:10px; font-weight:700; font-size:.92rem; }
+    .p-foot { border-top:1px solid #eef2f7; padding:14px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#fbfcfe; }
+    .dots { display:flex; gap:6px; flex-wrap:wrap; }
+    .dot { width:9px; height:9px; border-radius:50%; background:#d5dded; transition:background .2s, transform .2s; }
+    .dot.on { background:var(--blue); transform:scale(1.25); }
+    .dot.seen { background:#93b4e6; }
+    .p-btn { border:none; border-radius:10px; padding:9px 20px; font-weight:700; font-size:.9rem; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+    .p-prev { background:#eef2f7; color:#475569; }
+    .p-prev:disabled { opacity:.4; cursor:default; }
+    .p-next { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; }
+    .fin-ico { font-size:4rem; color:#16a34a; }
+
+    .empty { text-align:center; color:#64748b; padding:60px 20px; }
+    @media (max-width:560px){ .p-body{ padding:24px; } .s-title{ font-size:1.3rem; } }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><span style="color:#fff;font-weight:600">Academia</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="user-chip" style="display:inline-flex"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></span>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="hero">
+    <i class="bi bi-mortarboard-fill ico"></i>
+    <div>
+      <h2>Academia AutoFácil</h2>
+      <p>Aprende a usar la suite a tu ritmo. Cada curso te lleva paso a paso por un módulo — como una presentación: avanzas, lees, y tu progreso se guarda solo. Retoma cuando quieras donde lo dejaste.</p>
+    </div>
+  </div>
+
+  <div class="resumen" id="resumen"></div>
+
+  <div id="grid" class="grid"></div>
+  <div id="vacio" class="empty" style="display:none"><i class="bi bi-mortarboard" style="font-size:2.4rem;opacity:.4"></i><p style="margin-top:10px">Aún no hay cursos disponibles.</p></div>
+</div>
+
+<!-- Reproductor -->
+<div class="player" id="player">
+  <div class="stage">
+    <div class="p-head">
+      <i class="bi bi-mortarboard-fill hico" id="pIco"></i>
+      <h3 id="pTitulo">—</h3>
+      <button class="x" onclick="cerrarPlayer()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="p-prog"><span id="pProg" style="width:0%"></span></div>
+    <div class="p-body" id="pBody"></div>
+    <div class="p-foot">
+      <button class="p-btn p-prev" id="pPrev" onclick="mover(-1)"><i class="bi bi-arrow-left"></i> Anterior</button>
+      <div class="dots" id="pDots"></div>
+      <button class="p-btn p-next" id="pNext" onclick="mover(1)">Siguiente <i class="bi bi-arrow-right"></i></button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app-version.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const YO = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = ((YO.nombre||'') + ' ' + (YO.apellido||'')).trim() || '—';
+document.getElementById('navPerfil').textContent = YO.perfil || '';
+document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href = '/login.html'; }
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+let CURSOS = [];
+
+/* ── Catálogo ── */
+async function cargar(){
+  try {
+    const j = await (await fetch('/api/ayuda/academia/cursos', { headers:H })).json();
+    CURSOS = j.data || [];
+    pintarResumen();
+    pintarGrid();
+  } catch(e){ console.error(e); }
+}
+
+function pintarResumen(){
+  const tot = CURSOS.length;
+  const done = CURSOS.filter(c=>c.completado).length;
+  const enCurso = CURSOS.filter(c=>!c.completado && c.vistos>0).length;
+  const lecc = CURSOS.reduce((a,c)=>a+c.lecciones,0);
+  document.getElementById('resumen').innerHTML = `
+    <div class="stat"><div class="n">${tot}</div><div class="l">Cursos</div></div>
+    <div class="stat"><div class="n">${lecc}</div><div class="l">Lecciones</div></div>
+    <div class="stat"><div class="n" style="color:#f59e0b">${enCurso}</div><div class="l">En curso</div></div>
+    <div class="stat"><div class="n" style="color:#16a34a">${done}</div><div class="l">Completados</div></div>`;
+}
+
+function pintarGrid(){
+  const g = document.getElementById('grid');
+  if (!CURSOS.length){ g.innerHTML=''; document.getElementById('vacio').style.display='block'; return; }
+  g.innerHTML = CURSOS.map((c,i)=>`
+    <div class="curso" onclick="abrir(${i})">
+      ${c.completado ? '<span class="badge-done"><i class="bi bi-check-circle-fill"></i> Completado</span>'
+        : (c.vistos>0 ? '<span class="badge-cont">Continuar</span>' : '')}
+      <div class="top">
+        <div class="cico"><i class="bi ${esc(c.icono)}"></i></div>
+        <h3>${esc(c.titulo)}</h3>
+      </div>
+      <div class="res">${esc(c.resumen)}${c.resumen.length>=130?'…':''}</div>
+      <div class="bar"><span style="width:${c.pct}%"></span></div>
+      <div class="meta">
+        <span class="lecc"><i class="bi bi-collection-play"></i> ${c.lecciones} lección${c.lecciones===1?'':'es'}</span>
+        <span>${c.pct}%</span>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Reproductor ── */
+let CUR = null, SLIDES = [], IDX = 0, MAXVISTO = 0;
+
+async function abrir(i){
+  const c = CURSOS[i];
+  CUR = c;
+  try {
+    const j = await (await fetch('/api/ayuda?ruta='+encodeURIComponent(c.ruta), { headers:H })).json();
+    const d = j.data;
+    if (!d){ return; }
+    SLIDES = construirSlides(d);
+    // Retomar donde quedó (si no está completado)
+    IDX = (!c.completado && c.vistos>0) ? Math.min(c.vistos-1, SLIDES.length-1) : 0;
+    MAXVISTO = IDX;
+    document.getElementById('pIco').className = 'bi '+(d.icono||'bi-mortarboard-fill')+' hico';
+    document.getElementById('pTitulo').textContent = d.titulo;
+    document.getElementById('player').classList.add('show');
+    render(0);
+  } catch(e){ console.error(e); }
+}
+
+/* Arma las lecciones-slide de un curso a partir del contenido de la ayuda. */
+function construirSlides(d){
+  const s = [];
+  // 1) Portada
+  s.push({ tipo:'intro', html:`
+    <div class="slide" style="text-align:center">
+      <div class="s-hero-ico"><i class="bi ${esc(d.icono||'bi-mortarboard-fill')}"></i></div>
+      <div class="s-kick" style="justify-content:center"><i class="bi bi-play-circle"></i> Curso</div>
+      <h2 class="s-title">${esc(d.titulo)}</h2>
+      <div class="s-text">${esc(d.descripcion||'')}</div>
+    </div>` });
+  // 2) Un slide por paso
+  (d.pasos||[]).forEach((p,i)=>{
+    s.push({ tipo:'paso', html:`
+      <div class="slide">
+        <div class="s-kick"><span class="s-num">${i+1}</span> Paso ${i+1} de ${(d.pasos||[]).length}</div>
+        <h2 class="s-title">${esc(p.titulo)}</h2>
+        <div class="s-text">${esc(p.detalle)}</div>
+      </div>` });
+  });
+  // 3) Submódulos (si hay)
+  if ((d.submodulos||[]).length){
+    s.push({ tipo:'subs', html:`
+      <div class="slide">
+        <div class="s-kick"><i class="bi bi-grid-3x3-gap-fill"></i> Qué encontrarás aquí</div>
+        <h2 class="s-title">Submódulos</h2>
+        ${d.submodulos.map(x=>`<div class="s-sub"><b>${esc(x.nombre)}</b><span>${esc(x.para_que)}</span></div>`).join('')}
+      </div>` });
+  }
+  // 4) Cierre / ¿y después?
+  if (d.siguiente){
+    s.push({ tipo:'fin', html:`
+      <div class="slide" style="text-align:center">
+        <div class="fin-ico"><i class="bi bi-check-circle-fill"></i></div>
+        <h2 class="s-title">¡Listo!</h2>
+        <div class="s-kick" style="justify-content:center"><i class="bi bi-signpost-2"></i> ¿Y después?</div>
+        <div class="s-next">${esc(d.siguiente)}</div>
+        <div class="s-cta"><a href="${esc(d.ruta)}"><i class="bi bi-box-arrow-up-right"></i> Ir a ${esc(d.titulo)}</a></div>
+      </div>` });
+  } else {
+    s.push({ tipo:'fin', html:`
+      <div class="slide" style="text-align:center">
+        <div class="fin-ico"><i class="bi bi-check-circle-fill"></i></div>
+        <h2 class="s-title">¡Listo!</h2>
+        <div class="s-text">Completaste el curso <b>${esc(d.titulo)}</b>.</div>
+      </div>` });
+  }
+  return s;
+}
+
+function render(dir){
+  const sl = SLIDES[IDX];
+  const body = document.getElementById('pBody');
+  body.innerHTML = sl.html.replace('class="slide"', 'class="slide'+(dir<0?' back':'')+'"');
+  // progreso
+  const pct = Math.round((IDX+1)/SLIDES.length*100);
+  document.getElementById('pProg').style.width = pct+'%';
+  // dots
+  document.getElementById('pDots').innerHTML = SLIDES.map((_,k)=>
+    `<div class="dot ${k===IDX?'on':(k<=MAXVISTO?'seen':'')}"></div>`).join('');
+  // botones
+  document.getElementById('pPrev').disabled = IDX===0;
+  const ultima = IDX===SLIDES.length-1;
+  document.getElementById('pNext').innerHTML = ultima
+    ? 'Finalizar <i class="bi bi-check-lg"></i>'
+    : 'Siguiente <i class="bi bi-arrow-right"></i>';
+}
+
+function mover(dir){
+  const ultima = IDX===SLIDES.length-1;
+  if (dir>0 && ultima){ finalizar(); return; }
+  const next = IDX+dir;
+  if (next<0 || next>=SLIDES.length) return;
+  IDX = next;
+  MAXVISTO = Math.max(MAXVISTO, IDX);
+  render(dir);
+  guardar(false);
+}
+
+async function guardar(completado){
+  if (!CUR) return;
+  try {
+    await fetch('/api/ayuda/academia/progreso', { method:'POST', headers:H,
+      body: JSON.stringify({ ruta:CUR.ruta, slide_idx:MAXVISTO, completado:completado?1:0 }) });
+  } catch(e){}
+}
+
+async function finalizar(){
+  await guardar(true);
+  // refresca el estado local para el catálogo
+  const c = CURSOS.find(x=>x.ruta===CUR.ruta);
+  if (c){ c.completado=true; c.vistos=c.lecciones; c.pct=100; }
+  cerrarPlayer();
+  pintarResumen(); pintarGrid();
+}
+
+function cerrarPlayer(){
+  document.getElementById('player').classList.remove('show');
+  CUR=null;
+}
+
+// Teclado: ← → y Esc
+document.addEventListener('keydown', e=>{
+  if (!document.getElementById('player').classList.contains('show')) return;
+  if (e.key==='ArrowRight') mover(1);
+  else if (e.key==='ArrowLeft') mover(-1);
+  else if (e.key==='Escape') cerrarPlayer();
+});
+// Click fuera del escenario cierra
+document.getElementById('player').addEventListener('click', e=>{ if (e.target.id==='player') cerrarPlayer(); });
+
+cargar();
+</script>
+</body>
+</html>

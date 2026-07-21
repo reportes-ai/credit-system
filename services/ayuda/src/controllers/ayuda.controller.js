@@ -270,8 +270,99 @@ require('../../../../shared/migrate').enFila('ayuda', async () => {
   } catch (e) { console.error('[ayuda migration]', e.message); }
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   ACADEMIA AutoFácil — autocapacitación estilo curso Flash.
+   Reutiliza el MISMO contenido de ayuda_paginas (una página = un curso;
+   cada "paso" = una lección/slide). Solo agrega: registro del módulo
+   (card) y persistencia de progreso por persona.
+   ══════════════════════════════════════════════════════════════════ */
+require('../../../../shared/migrate').enFila('academia', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS academia_progreso (
+        id_usuario  INT          NOT NULL,
+        ruta        VARCHAR(150) NOT NULL,
+        slide_idx   INT          NOT NULL DEFAULT 0,   /* última lección vista */
+        completado  TINYINT(1)   NOT NULL DEFAULT 0,
+        updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id_usuario, ruta)
+      )`);
+    // Card en el menú (idempotente). Se habilita para TODOS los perfiles: es capacitación.
+    await pool.query(
+      `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
+       VALUES (520001, 'Academia AutoFácil', 'Cursos de autocapacitación paso a paso por módulo', 'bi-mortarboard-fill', '/academia/', 107, 'activo')`);
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='academia_ver' LIMIT 1");
+    let idFunc = ex && ex.id_funcionalidad;
+    if (!idFunc) {
+      const [r] = await pool.query(
+        `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+         VALUES (520001, 'Academia AutoFácil', 'academia_ver', '/academia/', 'bi-mortarboard-fill')`);
+      idFunc = r.insertId;
+    }
+    // Habilitar la card para todos los perfiles que aún no la tengan (capacitación abierta).
+    await pool.query(
+      `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+       SELECT p.id_perfil, ?, 1 FROM perfiles p
+       WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+      [idFunc, idFunc]);
+    console.log('[academia] módulo + progreso OK');
+  } catch (e) { console.error('[academia migration]', e.message); }
+});
+
 const parse = (s, def) => { try { return JSON.parse(s); } catch { return def; } };
 const normRuta = r => { let x = String(r || '').split('?')[0].split('#')[0]; if (!x.endsWith('/')) x += '/'; return x; };
+
+/* Nº de lecciones (slides) de un curso: intro + pasos + submódulos + cierre. */
+function nLecciones(row) {
+  const pasos = parse(row.pasos, []), subs = parse(row.submodulos, []);
+  return 1 /*intro*/ + pasos.length + (subs.length ? 1 : 0) + (row.siguiente ? 1 : 0);
+}
+
+/* ── GET /api/ayuda/academia/cursos — catálogo + mi progreso (solo verifyToken) ── */
+const academiaCursos = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT ruta, titulo, icono, descripcion, pasos, submodulos, siguiente FROM ayuda_paginas ORDER BY titulo');
+    const [prog] = await pool.query('SELECT ruta, slide_idx, completado FROM academia_progreso WHERE id_usuario=?', [req.user.id_usuario]);
+    const pMap = {}; prog.forEach(p => pMap[p.ruta] = p);
+    const cursos = rows.map(r => {
+      const total = nLecciones(r);
+      const p = pMap[r.ruta];
+      const vistos = p ? Math.min(p.slide_idx + 1, total) : 0;
+      return {
+        ruta: r.ruta, titulo: r.titulo, icono: r.icono || 'bi-mortarboard',
+        resumen: (r.descripcion || '').slice(0, 130),
+        lecciones: total,
+        vistos, completado: p ? !!p.completado : false,
+        pct: total ? Math.round((p && p.completado ? total : vistos) / total * 100) : 0,
+      };
+    });
+    res.json({ success: true, data: cursos, error: null });
+  } catch (e) {
+    console.error('[academia cursos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/ayuda/academia/progreso {ruta, slide_idx, completado} ── */
+const academiaProgreso = async (req, res) => {
+  try {
+    const ruta = normRuta(req.body.ruta);
+    const slide = Math.max(0, parseInt(req.body.slide_idx) || 0);
+    const comp = req.body.completado ? 1 : 0;
+    if (!ruta) return res.status(400).json({ success: false, data: null, error: 'ruta requerida' });
+    await pool.query(
+      `INSERT INTO academia_progreso (id_usuario, ruta, slide_idx, completado)
+       VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+         slide_idx  = GREATEST(slide_idx, VALUES(slide_idx)),
+         completado = GREATEST(completado, VALUES(completado))`,
+      [req.user.id_usuario, ruta, slide, comp]);
+    res.json({ success: true, data: { ruta }, error: null });
+  } catch (e) {
+    console.error('[academia progreso]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
 
 /* ── GET /api/ayuda?ruta=/postventa/ ─────────────────────────────── */
 const getAyuda = async (req, res) => {
@@ -326,4 +417,4 @@ const upsertAyuda = async (req, res) => {
   }
 };
 
-module.exports = { getAyuda, listAyuda, upsertAyuda };
+module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso };
