@@ -148,3 +148,5 @@ vite.config.ts.timestamp-*
 # Docker — volcado BD (datos sensibles, no subir a git)
 docker/init/dump.sql
 uploads/
+_*.js
+_fund_run.js
