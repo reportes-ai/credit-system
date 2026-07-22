@@ -126,6 +126,7 @@
         <button class="artc-c" id="artc-cam" title="Apagar cámara"><i class="bi bi-camera-video-fill"></i></button>
         <button class="artc-c" id="artc-screen" title="Compartir pantalla"><i class="bi bi-display"></i></button>
         <button class="artc-c" id="artc-pip" title="Ventana flotante (otra app)"><i class="bi bi-pip"></i></button>
+        <button class="artc-c off" id="artc-fondo" title="Fondo: sin fondo"><i class="bi bi-image"></i></button>
         <button class="artc-c end" id="artc-hang" title="Colgar"><i class="bi bi-telephone-x-fill"></i></button>
       </div>`;
     document.body.appendChild(win);
@@ -146,7 +147,8 @@
       remoteName: win.querySelector('#artc-remotename'), wait: win.querySelector('#artc-wait'),
       wtitle: win.querySelector('#artc-wtitle'), wst: win.querySelector('#artc-wst'),
       mic: win.querySelector('#artc-mic'), cam: win.querySelector('#artc-cam'),
-      screen: win.querySelector('#artc-screen'), pip: win.querySelector('#artc-pip'), hang: win.querySelector('#artc-hang'),
+      screen: win.querySelector('#artc-screen'), pip: win.querySelector('#artc-pip'),
+      fondo: win.querySelector('#artc-fondo'), hang: win.querySelector('#artc-hang'),
     };
 
     test.querySelector('#artc-testcancel').onclick = cancelTest;
@@ -155,6 +157,7 @@
     inc.querySelector('#artc-increject').onclick = reject;
     ui.mic.onclick = toggleMic; ui.cam.onclick = toggleCam;
     ui.screen.onclick = toggleScreen; ui.pip.onclick = togglePip; ui.hang.onclick = hangup;
+    if (ui.fondo) { ui.fondo.onclick = toggleFondo; if (!(window.AF_FONDO && AF_FONDO.disponible())) ui.fondo.style.display = 'none'; }
     makeDraggable(win, win.querySelector('#artc-whead'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && S.state === 'incall' && ui.remote.srcObject && !document.pictureInPictureElement)
@@ -172,7 +175,12 @@
   }
   async function getMedia() {
     if (S.local) return S.local;
-    S.local = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    const raw = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    // Fondo virtual (desenfoque / imagen): procesa el stream si la librería está cargada.
+    if (window.AF_FONDO && AF_FONDO.disponible()) {
+      try { S.local = await AF_FONDO.iniciar(raw, S.fondo || 'ninguno'); }
+      catch (_) { S.local = raw; }
+    } else S.local = raw;
     ui.localVid.srcObject = S.local;
     return S.local;
   }
@@ -275,6 +283,17 @@
   }
   function toggleMic() { if (!S.local) return; S.micOn = !S.micOn; S.local.getAudioTracks().forEach(t => t.enabled = S.micOn); ui.mic.classList.toggle('off', !S.micOn); ui.mic.innerHTML = `<i class="bi bi-mic${S.micOn ? '-fill' : '-mute-fill'}"></i>`; }
   function toggleCam() { if (!S.local) return; S.camOn = !S.camOn; S.local.getVideoTracks().forEach(t => t.enabled = S.camOn); ui.cam.classList.toggle('off', !S.camOn); ui.cam.innerHTML = `<i class="bi bi-camera-video${S.camOn ? '-fill' : '-off-fill'}"></i>`; }
+  // Fondo virtual: cicla sin fondo → desenfoque → oficina AutoFácil (en vivo, sin renegociar).
+  function toggleFondo() {
+    if (!window.AF_FONDO || !AF_FONDO.disponible()) return;
+    const orden = ['ninguno', 'blur', 'imagen'];
+    const next = orden[(orden.indexOf(AF_FONDO.getModo()) + 1) % orden.length];
+    AF_FONDO.setModo(next); S.fondo = next;
+    const lbl = { ninguno: 'sin fondo', blur: 'desenfocado', imagen: 'oficina AutoFácil' }[next];
+    ui.fondo.classList.toggle('off', next === 'ninguno');
+    ui.fondo.title = 'Fondo: ' + lbl;
+    ui.fondo.innerHTML = `<i class="bi bi-${next === 'imagen' ? 'building' : (next === 'blur' ? 'circle-half' : 'image')}"></i>`;
+  }
   async function toggleScreen() {
     if (!S.pc) return;
     if (!S.screen) {
@@ -360,6 +379,7 @@
     try { if ('mediaSession' in navigator) navigator.mediaSession.metadata = null; } catch (_) {}
     if (S.pc) { try { S.pc.close(); } catch (_) {} S.pc = null; }
     if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
+    try { if (window.AF_FONDO) AF_FONDO.detener(); } catch (_) {}
     if (S.local) { S.local.getTracks().forEach(t => t.stop()); S.local = null; }
     if (ui.remote) ui.remote.srcObject = null;
     if (ui.localVid) ui.localVid.srcObject = null;
