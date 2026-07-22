@@ -47,11 +47,14 @@ const CAMPOS = [
 ];
 
 // Campos obligatorios que definen si un crédito está "incompleto" (entra a la cola).
-// NO se piden: 'cuota' (se calcula sola con la fórmula francesa desde monto/tasa/plazo) ni
-// 'seguros' (opcional — 0 es válido; además el agregado suele venir nulo aunque los seguros
-// individuales estén cargados, lo que generaba un falso "primas falta").
+// NO se pide 'cuota' (se calcula sola con la fórmula francesa desde monto/tasa/plazo).
+// REGLA DE NEGOCIO (2026-07-22): en otorgados se digita TODO lo que afecta ingresos —
+// colocación (monto, tasa, plazo, comisión dealer, parque/calle) y seguros (primas).
+// Si la carta de aprobación lo trae, viene precargado; si no, se exige aquí. Para
+// comisión y primas el 0 explícito es válido (se exige solo cuando están NULL).
 const REQUERIDOS = {
-  otorgados: ['fecha_otorgado','fecha_primera_cuota','tascli_real','plazo',
+  otorgados: ['fecha_otorgado','fecha_primera_cuota','monto_financiado','tascli_real','plazo',
+              'comdea_real','seguros','tipo_ubicacion',
               'automotora','rut_dealer','vendedor','id_financiera',
               'tipo_vehiculo','marca','modelo','anio','patente'],
   // 'otros' (no otorgados): tasa y plazo NO son requeridos — un rechazado/desistido sin
@@ -96,7 +99,9 @@ function estadoCond(tipo) {
 }
 function colVacioSQL(col) {
   const c = CAMPO[col] || {};
-  if (col === 'seguros') return `(ob.${col} IS NULL)`;                       // 0 = sin seguro, válido
+  // primas: falta solo si NI el agregado NI los seguros individuales están digitados (0 = válido)
+  if (col === 'seguros') return `(ob.seguros IS NULL AND ob.seguro_rdh IS NULL AND ob.seguro_cesantia IS NULL AND ob.seguro_rep_menor IS NULL)`;
+  if (col === 'comdea_real') return `(ob.${col} IS NULL)`;                   // 0 = sin comisión, válido si se digitó
   if (col === 'anio')    return `(ob.${col} IS NULL)`;                       // 0 = "S/I", válido
   if (c.tipo === 'text' || c.tipo === 'select') return `(ob.${col} IS NULL OR ob.${col} = '')`;
   if (c.tipo === 'date' || c.tipo === 'month')  return `(ob.${col} IS NULL)`;
@@ -119,7 +124,8 @@ function pendingWhere(tipo) {
 function esVacio(col, v) {
   if (v === null || v === undefined) return true;
   const c = CAMPO[col] || {};
-  if (col === 'seguros') return false;
+  if (col === 'seguros') return false;      // ya digitado (0 válido); el NULL cayó en la línea de arriba
+  if (col === 'comdea_real') return false;  // ídem: 0 = sin comisión
   if (col === 'anio') return false;   // 0 = "S/I" (backfill jun-2026 hacia atrás): cuenta como completado
   if (c.tipo === 'text' || c.tipo === 'select') return String(v).trim() === '';
   if (c.tipo === 'date' || c.tipo === 'month') return false;
