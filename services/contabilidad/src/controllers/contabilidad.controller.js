@@ -2087,6 +2087,27 @@ exports.sincronizarMercado = async (req, res) => {
   }
 };
 
+/* Sincronización AUTOMÁTICA CAVEM: una vez al día (a partir del día 4 del mes,
+   cuando CAVEM suele publicar) intenta leer el informe del MES ANTERIOR si aún
+   no está guardado. Idempotente: si ya existe la fila, no hace nada. */
+async function tickCavem() {
+  try {
+    const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    if (hoy.getDate() < 4) return;                       // CAVEM publica los primeros días
+    const ant = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+    const mes = `${ant.getFullYear()}-${String(ant.getMonth() + 1).padStart(2, '0')}`;
+    const [[ya]] = await pool.query('SELECT mes FROM ctb_mercado_automotor WHERE mes=? AND nuevos_mes IS NOT NULL', [mes]);
+    if (ya) return;
+    // simula el request del endpoint (mismo motor único, sin duplicar lógica)
+    await exports.sincronizarMercado(
+      { body: { mes }, usuario: {} },
+      { json: j => { if (j && j.success) console.log('[cavem auto] informe', mes, 'sincronizado'); },
+        status: () => ({ json: j => console.log('[cavem auto]', mes, '—', (j && j.error) || 'sin datos aún') }) });
+  } catch (e) { console.error('[cavem auto]', e.message); }
+}
+setTimeout(tickCavem, 90 * 1000);                        // al arrancar (tras el boot)
+{ const _t = setInterval(tickCavem, 24 * 60 * 60 * 1000); if (_t.unref) _t.unref(); }  // y cada 24 h
+
 exports.hechosDirectorioIA = async (req, res) => {
   try {
     const { mes, seccion, datos, modo } = req.body || {};
