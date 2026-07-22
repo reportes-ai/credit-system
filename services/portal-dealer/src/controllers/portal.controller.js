@@ -427,7 +427,7 @@ async function datosDelDealer(req) {
   if (!sc.hasScope) return null;
   const [ops] = await pool.query(
     `SELECT COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS num_op,
-            COALESCE(cl.nombre_completo,'') AS cliente, COALESCE(cl.rut,'') AS rut_cliente,
+            COALESCE(cl.nombre_completo,'') AS cliente,   -- solo como etiqueta para identificar la operación; el RUT NO se expone
             ob.financiera, ob.marca, ob.modelo, ob.anio, ob.patente,
             DATE(ob.fecha_otorgado) AS fecha_otorgado, ob.monto_financiado, ob.plazo,
             ob.comdea_real AS comision,
@@ -484,7 +484,9 @@ exports.ia = async (req, res) => {
     const restantes = limite > 0 ? Math.max(0, limite - Number(u.c) - 1) : null;
 
     const ctx = await datosDelDealer(req);
-    const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista (las operaciones y cartolas de ESTE dealer). Si la respuesta no está en los datos, dilo con claridad y sugiere escribir al ejecutivo. Nunca inventes datos ni menciones a otros dealers ni a otros clientes. Responde en español, en tono cercano, breve y claro. Los montos están en pesos chilenos.`;
+    const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista (las operaciones y cartolas de ESTE dealer).
+PRIVACIDAD DEL CLIENTE (regla estricta, no negociable): puedes informar el ESTADO OPERATIVO de las operaciones del dealer — créditos preaprobados, cartas de aprobación, estado del crédito, saldo precio, comisiones, cartolas, facturas, fechas de pago y qué documentos faltan. Está TERMINANTEMENTE PROHIBIDO entregar datos PERSONALES, FINANCIEROS o COMERCIALES del cliente: RUT o cédula, domicilio, teléfono, correo, renta o ingresos, deudas, informes comerciales, capacidad de pago o comportamiento crediticio. Si te preguntan por cualquiera de esos datos del cliente, responde que por privacidad no puedes entregar información personal del cliente y sugiere escribir al ejecutivo. Puedes nombrar al cliente ÚNICAMENTE para identificar de qué operación se habla, nada más.
+Si la respuesta no está en los datos, dilo con claridad y sugiere escribir al ejecutivo. Nunca inventes datos ni menciones a otros dealers ni a otros clientes. Responde en español, en tono cercano, breve y claro. Los montos están en pesos chilenos.`;
     const prompt = `Datos del dealer (JSON):\n${JSON.stringify(ctx)}\n\nPregunta del dealer: ${pregunta}`;
 
     let r;
