@@ -184,7 +184,17 @@
   }
   async function getMedia() {
     if (S.local) return S.local;
-    S.local = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    try {
+      S.local = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    } catch (e) {
+      // Si la cámara falla (ocupada por otra pestaña/app, ausente, etc.) pero hay micrófono,
+      // la llamada igual conecta SOLO CON AUDIO en vez de quedar sin conectar.
+      const camFalla = ['NotReadableError', 'NotFoundError', 'OverconstrainedError', 'AbortError', 'TrackStartError', 'NotAllowedError'].includes(e && e.name);
+      if (!camFalla) throw e;
+      S.local = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });  // si tampoco hay audio, lanza y se muestra el motivo
+      S.camOn = false;
+      if (ui.cam) { ui.cam.classList.add('off'); ui.cam.innerHTML = '<i class="bi bi-camera-video-off-fill"></i>'; ui.cam.title = 'Sin cámara disponible'; }
+    }
     ui.localVid.srcObject = S.local;
     return S.local;
   }
