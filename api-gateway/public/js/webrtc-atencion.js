@@ -175,12 +175,7 @@
   }
   async function getMedia() {
     if (S.local) return S.local;
-    const raw = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    // Fondo virtual (desenfoque / imagen): procesa el stream si la librería está cargada.
-    if (window.AF_FONDO && AF_FONDO.disponible()) {
-      try { S.local = await AF_FONDO.iniciar(raw, S.fondo || 'ninguno'); }
-      catch (_) { S.local = raw; }
-    } else S.local = raw;
+    S.local = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     ui.localVid.srcObject = S.local;
     return S.local;
   }
@@ -283,12 +278,28 @@
   }
   function toggleMic() { if (!S.local) return; S.micOn = !S.micOn; S.local.getAudioTracks().forEach(t => t.enabled = S.micOn); ui.mic.classList.toggle('off', !S.micOn); ui.mic.innerHTML = `<i class="bi bi-mic${S.micOn ? '-fill' : '-mute-fill'}"></i>`; }
   function toggleCam() { if (!S.local) return; S.camOn = !S.camOn; S.local.getVideoTracks().forEach(t => t.enabled = S.camOn); ui.cam.classList.toggle('off', !S.camOn); ui.cam.innerHTML = `<i class="bi bi-camera-video${S.camOn ? '-fill' : '-off-fill'}"></i>`; }
-  // Fondo virtual: cicla sin fondo → desenfoque → oficina AutoFácil (en vivo, sin renegociar).
-  function toggleFondo() {
-    if (!window.AF_FONDO || !AF_FONDO.disponible()) return;
+  // Fondo virtual: cicla sin fondo → desenfoque → oficina AutoFácil, reemplazando el
+  // track de video EN VIVO (no toca la cámara base ni renegocia la llamada).
+  async function toggleFondo() {
+    if (!window.AF_FONDO || !AF_FONDO.disponible() || !S.local) return;
     const orden = ['ninguno', 'blur', 'imagen'];
-    const next = orden[(orden.indexOf(AF_FONDO.getModo()) + 1) % orden.length];
-    AF_FONDO.setModo(next); S.fondo = next;
+    const next = orden[(orden.indexOf(S.fondo || 'ninguno') + 1) % orden.length];
+    const rawTrack = S.local.getVideoTracks()[0];
+    const sender = S.pc && S.pc.getSenders().find(x => x.track && x.track.kind === 'video');
+    try {
+      if (next === 'ninguno') {
+        AF_FONDO.detener(); S.fondoTrack = null;
+        if (sender && rawTrack) await sender.replaceTrack(rawTrack);
+        ui.localVid.srcObject = S.local;
+      } else if (AF_FONDO.activo()) {
+        AF_FONDO.setModo(next);                 // ya procesando: solo cambia el modo (mismo track)
+      } else {
+        S.fondoTrack = await AF_FONDO.iniciar(rawTrack, next);
+        if (sender && S.fondoTrack) await sender.replaceTrack(S.fondoTrack);
+        if (S.fondoTrack) ui.localVid.srcObject = new MediaStream([S.fondoTrack, ...S.local.getAudioTracks()]);
+      }
+    } catch (_) {}
+    S.fondo = next;
     const lbl = { ninguno: 'sin fondo', blur: 'desenfocado', imagen: 'oficina AutoFácil' }[next];
     ui.fondo.classList.toggle('off', next === 'ninguno');
     ui.fondo.title = 'Fondo: ' + lbl;
@@ -380,6 +391,7 @@
     if (S.pc) { try { S.pc.close(); } catch (_) {} S.pc = null; }
     if (S.screenStream) { S.screenStream.getTracks().forEach(t => t.stop()); S.screenStream = null; }
     try { if (window.AF_FONDO) AF_FONDO.detener(); } catch (_) {}
+    S.fondo = 'ninguno'; S.fondoTrack = null;
     if (S.local) { S.local.getTracks().forEach(t => t.stop()); S.local = null; }
     if (ui.remote) ui.remote.srcObject = null;
     if (ui.localVid) ui.localVid.srcObject = null;
