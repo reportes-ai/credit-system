@@ -28,7 +28,8 @@ function relayRoom(id, obj, exceptWs) { for (const w of roomSet(id)) if (w !== e
 
 async function broadcastCola() {
   const espera = await C.colaEspera();
-  for (const set of execs.values()) for (const w of set) send(w, { t: 'cola', espera });
+  const ejecutivos = execs.size;   // ejecutivos conectados (para habilitar "Saltar" en el pop-up)
+  for (const set of execs.values()) for (const w of set) send(w, { t: 'cola', espera, ejecutivos });
 }
 async function enviarActivas(id_usuario) {
   const activas = await C.activasDe(id_usuario);
@@ -65,8 +66,9 @@ function initAtencionWS(server) {
     if (ident.tipo === 'user') {
       if (!execs.has(ident.id)) execs.set(ident.id, new Set());
       execs.get(ident.id).add(ws);
-      send(ws, { t: 'cola', espera: await C.colaEspera() });
+      send(ws, { t: 'cola', espera: await C.colaEspera(), ejecutivos: execs.size });
       await enviarActivas(ident.id);
+      await broadcastCola();   // avisa a los demás que hay un ejecutivo más (actualiza "Saltar")
     } else {
       // Bitácora de sesión WS del dealer (no bloquea: el helper traga sus errores).
       C.logAcceso({ tipo: 'ws', email: ident.email, id_cuenta: ident.id_cuenta, resultado: 'OK', req });
@@ -168,6 +170,16 @@ async function handle(ws, m) {
     return;
   }
   if (m.t === 'leave') { leaveRoom(m.id, ws); return; }
+
+  // ── Respuesta rápida a un dealer EN ESPERA sin tomar el chat (pop-up "estoy ocupado") ──
+  if (m.t === 'quickreply' && I.tipo === 'user') {
+    const c = await C.getConversacion(m.id);
+    if (!c || c.estado !== 'ESPERA') { send(ws, { t: 'error', msg: 'La conversación ya no está en espera' }); return; }
+    const cuerpo = String(m.cuerpo || '').slice(0, 1000).trim(); if (!cuerpo) return;
+    const mensaje = await C.persistMensaje({ id_conversacion: c.id, emisor: 'EJECUTIVO', id_usuario: I.id, autor_nombre: I.nombre, cuerpo, tipo: 'TEXTO' });
+    relayRoom(c.id, { t: 'mensaje', id_conversacion: c.id, mensaje }, null);   // llega al dealer; sigue en la cola
+    return;
+  }
 
   // ── Validación de pertenencia para chat / typing / rtc / close ──
   const conv = await C.getConversacion(m.id);

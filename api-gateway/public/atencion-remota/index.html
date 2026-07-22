@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v2.2 — el ejecutivo guarda su preferencia "Permitir video" entre recargas y reanuncia disponibilidad cuando el dealer (re)conecta → el botón de video aparece confiable en el dealer -->
+  <!-- v2.3 — pop-up grande con sonido al llegar un dealer en espera: Atender / Estoy ocupado (avisa al dealer sin tomar) / Saltar (si hay otro ejecutivo); re-avisa cada 2 min -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -146,6 +146,27 @@
     .toast-af { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:11px 20px; border-radius:10px; font-size:.86rem; z-index:9999; display:none; }
     .toast-af.err { background:#b91c1c; }
     .hidden { display:none !important; }
+    /* Pop-up grande de dealer en espera */
+    #callPop { position:fixed; inset:0; background:rgba(3,12,30,.55); backdrop-filter:blur(3px); z-index:9000; display:none; align-items:center; justify-content:center; }
+    #callPop.show { display:flex; }
+    .cp-card { background:#fff; width:100%; max-width:440px; border-radius:22px; box-shadow:0 30px 80px rgba(0,0,0,.5); overflow:hidden; animation:cpIn .25s ease; }
+    @keyframes cpIn { from{opacity:0; transform:scale(.9)} to{opacity:1; transform:scale(1)} }
+    @keyframes cpPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+    .cp-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:26px 24px 22px; text-align:center; }
+    .cp-ico { width:74px; height:74px; border-radius:50%; background:rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:2.2rem; animation:cpPulse 1s ease-in-out infinite; }
+    .cp-head h3 { margin:0; font-size:1.35rem; font-weight:800; }
+    .cp-head p { margin:6px 0 0; opacity:.9; font-size:.9rem; }
+    .cp-body { padding:20px 24px; }
+    .cp-dealer { text-align:center; margin-bottom:16px; }
+    .cp-dealer b { font-size:1.1rem; color:#012d70; display:block; }
+    .cp-dealer span { font-size:.85rem; color:#64748b; }
+    .cp-asunto { background:#f1f5f9; border-radius:10px; padding:10px 14px; font-size:.86rem; color:#334155; font-style:italic; margin-top:8px; }
+    .cp-acts { display:flex; flex-direction:column; gap:10px; }
+    .cp-btn { border:none; border-radius:12px; padding:13px; font-size:.96rem; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .cp-atender { background:#16a34a; color:#fff; }
+    .cp-ocupado { background:#eef2f7; color:#334155; }
+    .cp-saltar  { background:#fff; color:#dc2626; border:1.5px solid #fecaca; }
+    .cp-timer { text-align:center; font-size:.74rem; color:#94a3b8; margin-top:12px; }
   </style>
 </head>
 <body>
@@ -298,6 +319,30 @@
 
 <div class="toast-af" id="toast"></div>
 
+<!-- Pop-up de dealer en espera -->
+<div id="callPop">
+  <div class="cp-card">
+    <div class="cp-head">
+      <div class="cp-ico"><i class="bi bi-headset"></i></div>
+      <h3>Dealer esperando</h3>
+      <p>Un dealer quiere atención</p>
+    </div>
+    <div class="cp-body">
+      <div class="cp-dealer">
+        <b id="cpNombre">Dealer</b>
+        <span id="cpRut"></span>
+        <div class="cp-asunto" id="cpAsunto" style="display:none"></div>
+      </div>
+      <div class="cp-acts">
+        <button class="cp-btn cp-atender" onclick="popAtender()"><i class="bi bi-hand-index-thumb"></i> Atender ahora</button>
+        <button class="cp-btn cp-ocupado" onclick="popOcupado()"><i class="bi bi-clock-history"></i> Estoy ocupado — avisarle</button>
+        <button class="cp-btn cp-saltar" id="cpSaltar" style="display:none" onclick="popSaltar()"><i class="bi bi-skip-forward"></i> Saltar (que lo tome otro)</button>
+      </div>
+      <div class="cp-timer">Volverá a avisar en 2 minutos si nadie lo atiende.</div>
+    </div>
+  </div>
+</div>
+
 <script src="/js/auth-guard.js"></script>
 <script src="/js/webrtc-atencion.js"></script>
 <script src="/js/qrcode-generator.js"></script>
@@ -393,7 +438,7 @@ document.getElementById('videoChk').addEventListener('change', function(){
 function onMsg(m){
   switch(m.t){
     case 'ready':   maxChats=m.max_chats||3; document.getElementById('chipsMax').textContent=maxChats; break;
-    case 'cola':    renderCola(m.espera||[]); break;
+    case 'cola':    EJEC_ONLINE=m.ejecutivos||1; renderCola(m.espera||[]); revisarPop(m.espera||[]); break;
     case 'activas': (m.activas||[]).forEach(c=>openPanel(c)); break;
     case 'asignada': openPanel(m.conversacion); break;
     case 'mensaje': addMessage(m.id_conversacion, m.mensaje); break;
@@ -421,7 +466,46 @@ function renderCola(espera){
       <button class="btn-atender" onclick="claim(${c.id})"><i class="bi bi-hand-index-thumb me-1"></i>Atender</button>
     </div>`).join('');
 }
-function claim(id){ wsSend({ t:'claim', id }); }
+function claim(id){ cerrarPop(); wsSend({ t:'claim', id }); }
+
+/* ── Pop-up de dealer en espera (grande + sonido, re-avisa cada 2 min) ── */
+let EJEC_ONLINE=1, lastEspera=[], popConvId=null, popSnooze={};
+const OCUPADO_MSG='En estos momentos estoy en otra llamada, en un momento te atiendo.';
+function ringPop(){
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const ding=(t0,f)=>{ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(.5,t0); g.gain.exponentialRampToValueAtTime(.001,t0+.5);
+      o.connect(g).connect(ctx.destination); o.start(t0); o.stop(t0+.55); };
+    const t=ctx.currentTime; ding(t,880); ding(t+.28,1175); ding(t+.56,880);
+    setTimeout(()=>ctx.close(),1900);
+  }catch(_){}
+}
+function revisarPop(espera){
+  lastEspera=espera||[];
+  const now=Date.now();
+  const cand=lastEspera.find(c=>!popSnooze[c.id]||popSnooze[c.id]<=now);
+  if(!cand){ if(popConvId && !lastEspera.some(c=>c.id===popConvId)) cerrarPop(); return; }
+  if(popConvId===cand.id) return;
+  mostrarPop(cand);
+}
+function mostrarPop(c){
+  popConvId=c.id;
+  document.getElementById('cpNombre').textContent=c.dealer_nombre||'Dealer';
+  document.getElementById('cpRut').textContent=c.dealer_rut||'';
+  const as=document.getElementById('cpAsunto');
+  if(c.asunto){ as.style.display='block'; as.textContent='"'+c.asunto+'"'; } else as.style.display='none';
+  document.getElementById('cpSaltar').style.display = EJEC_ONLINE>1 ? 'flex':'none';
+  document.getElementById('callPop').classList.add('show');
+  ringPop();
+}
+function cerrarPop(){ document.getElementById('callPop').classList.remove('show'); popConvId=null; }
+function snoozePop(id){ popSnooze[id]=Date.now()+120000; }   // 2 min
+function popAtender(){ const id=popConvId; cerrarPop(); if(id) wsSend({ t:'claim', id }); }
+function popOcupado(){ const id=popConvId; if(id){ wsSend({t:'quickreply', id, cuerpo:OCUPADO_MSG}); snoozePop(id); toast('Aviso enviado al dealer'); } cerrarPop(); }
+function popSaltar(){ if(popConvId) snoozePop(popConvId); cerrarPop(); }
+// Re-chequeo: si el dealer sigue en espera y venció su snooze de 2 min, vuelve a saltar el pop.
+setInterval(()=>revisarPop(lastEspera), 20000);
 
 /* ── Paneles de chat ── */
 function refreshChips(){ document.getElementById('chipsActivas').textContent = panels.size; document.getElementById('noPanels').style.display = panels.size?'none':'block'; }
