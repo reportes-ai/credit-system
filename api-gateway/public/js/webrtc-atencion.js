@@ -157,7 +157,7 @@
     inc.querySelector('#artc-increject').onclick = reject;
     ui.mic.onclick = toggleMic; ui.cam.onclick = toggleCam;
     ui.screen.onclick = toggleScreen; ui.pip.onclick = togglePip; ui.hang.onclick = hangup;
-    if (ui.fondo) { ui.fondo.onclick = toggleFondo; if (!(window.AF_FONDO && AF_FONDO.disponible())) ui.fondo.style.display = 'none'; }
+    if (ui.fondo) ui.fondo.onclick = toggleFondo;
     makeDraggable(win, win.querySelector('#artc-whead'));
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && S.state === 'incall' && ui.remote.srcObject && !document.pictureInPictureElement)
@@ -172,6 +172,15 @@
       const j = await r.json();
       return (j.success && j.data.iceServers) || [{ urls: 'stun:stun.l.google.com:19302' }];
     } catch (_) { return [{ urls: 'stun:stun.l.google.com:19302' }]; }
+  }
+  // Traduce el error de getUserMedia a un motivo claro (para diagnosticar).
+  function motivoMedia(e) {
+    const n = e && e.name || '';
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Permiso denegado — habilita la cámara en el candado de la URL.';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'La cámara está ocupada por otra app o pestaña (Zoom/Meet/otra pestaña). Ciérrala y reintenta.';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No se encontró cámara o micrófono conectado.';
+    if (n === 'OverconstrainedError') return 'La cámara no soporta la configuración pedida.';
+    return n ? '(' + n + ')' : '';
   }
   async function getMedia() {
     if (S.local) return S.local;
@@ -200,12 +209,12 @@
     try {
       await getMedia(); ui.testVid.srcObject = S.local; startMeter(S.local);
       show(ui.test);
-    } catch (e) { ui.testErr.textContent = 'No se pudo acceder a la cámara/micrófono.'; show(ui.test); }
+    } catch (e) { ui.testErr.textContent = 'No se pudo acceder a la cámara/micrófono. ' + motivoMedia(e); show(ui.test); }
   }
   function cancelTest() { stopMeter(); hide(ui.test); cleanup(); }
   async function ring() {
     stopMeter(); hide(ui.test);
-    if (!S.local) { try { await getMedia(); } catch (_) { alert('No hay acceso a la cámara o el micrófono.'); return cleanup(); } }
+    if (!S.local) { try { await getMedia(); } catch (e) { alert('No hay acceso a la cámara o el micrófono. ' + motivoMedia(e)); return cleanup(); } }
     S.state = 'calling';
     openCallWindow('Llamando a ' + S.peerName + '…', S.peerName);
     ui.wait.textContent = 'Llamando…';
@@ -234,7 +243,7 @@
   }
   async function accept() {
     hide(ui.inc);
-    try { await getMedia(); } catch (e) { alert('No se pudo acceder a la cámara/micrófono.'); reject(); return; }
+    try { await getMedia(); } catch (e) { alert('No se pudo acceder a la cámara/micrófono. ' + motivoMedia(e)); reject(); return; }
     S.pc = await newPc();
     S.local.getTracks().forEach(t => S.pc.addTrack(t, S.local));
     S.state = 'incall';
@@ -278,10 +287,34 @@
   }
   function toggleMic() { if (!S.local) return; S.micOn = !S.micOn; S.local.getAudioTracks().forEach(t => t.enabled = S.micOn); ui.mic.classList.toggle('off', !S.micOn); ui.mic.innerHTML = `<i class="bi bi-mic${S.micOn ? '-fill' : '-mute-fill'}"></i>`; }
   function toggleCam() { if (!S.local) return; S.camOn = !S.camOn; S.local.getVideoTracks().forEach(t => t.enabled = S.camOn); ui.cam.classList.toggle('off', !S.camOn); ui.cam.innerHTML = `<i class="bi bi-camera-video${S.camOn ? '-fill' : '-off-fill'}"></i>`; }
+  // Carga MediaPipe + el módulo de fondo SOLO cuando se usa (no en el arranque de la página).
+  let fondoLibProm = null;
+  function cargarFondoLib() {
+    if (window.AF_FONDO && AF_FONDO.disponible()) return Promise.resolve(true);
+    if (fondoLibProm) return fondoLibProm;
+    fondoLibProm = new Promise(resolve => {
+      const s1 = document.createElement('script'); s1.src = '/js/mediapipe/selfie_segmentation.js';
+      s1.onerror = () => resolve(false);
+      s1.onload = () => {
+        const s2 = document.createElement('script'); s2.src = '/js/fondo-virtual.js';
+        s2.onload = () => resolve(!!(window.AF_FONDO && AF_FONDO.disponible()));
+        s2.onerror = () => resolve(false);
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s1);
+    });
+    return fondoLibProm;
+  }
   // Fondo virtual: cicla sin fondo → desenfoque → oficina AutoFácil, reemplazando el
   // track de video EN VIVO (no toca la cámara base ni renegocia la llamada).
   async function toggleFondo() {
-    if (!window.AF_FONDO || !AF_FONDO.disponible() || !S.local) return;
+    if (!S.local) return;
+    if (!(window.AF_FONDO && AF_FONDO.disponible())) {
+      ui.fondo.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+      const ok = await cargarFondoLib();
+      ui.fondo.innerHTML = '<i class="bi bi-image"></i>';
+      if (!ok) { alert('No se pudo cargar el fondo virtual.'); return; }
+    }
     const orden = ['ninguno', 'blur', 'imagen'];
     const next = orden[(orden.indexOf(S.fondo || 'ninguno') + 1) % orden.length];
     const rawTrack = S.local.getVideoTracks()[0];
