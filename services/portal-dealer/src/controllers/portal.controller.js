@@ -445,7 +445,51 @@ async function datosDelDealer(req) {
        ORDER BY fecha_envio DESC LIMIT 24`, [rut, rut]);
     cart = c;
   } catch (_) {}
-  return { dealer: (req.dealer && req.dealer.nombre) || 'Dealer', operaciones: ops, cartolas: cart };
+
+  const idd = (req.dealer && req.dealer.id_dealer) || null;
+  const RUTNORM = "REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ','')";
+
+  // ── Post Venta: estado del saldo precio y de la comisión + fechas de pago + qué falta ──
+  // (scopeado por rut_dealer; sin datos del cliente). Se calcula la etapa MÁS AVANZADA por pista.
+  const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
+  const ORDEN_COMISION = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','CARTOLA APROBADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+  let postventa = [];
+  try {
+    const [pv] = await pool.query(
+      `SELECT s.num_op, s.saldo_precio, s.comision, e.track, e.etapa, DATE(e.fecha) AS fecha
+       FROM postventa_seguimiento s JOIN postventa_etapas e ON e.id_seguimiento = s.id
+       WHERE ? <> '' AND ${RUTNORM} = ?`, [rut, rut]);
+    const byOp = {};
+    for (const r of pv) {
+      const o = byOp[r.num_op] || (byOp[r.num_op] = { num_op: r.num_op, saldo_precio: r.saldo_precio, comision: r.comision, _sp: -1, _com: -1 });
+      if (r.track === 'SALDO')    { const i = ORDEN_SALDO.indexOf(r.etapa);    if (i > o._sp)  { o._sp = i;  o.estado_saldo_precio = r.etapa; o.fecha_saldo_precio = r.fecha; } }
+      if (r.track === 'COMISION') { const i = ORDEN_COMISION.indexOf(r.etapa); if (i > o._com) { o._com = i; o.estado_comision = r.etapa;     o.fecha_comision = r.fecha; } }
+    }
+    postventa = Object.values(byOp).map(o => { delete o._sp; delete o._com; return o; }).slice(0, 120);
+  } catch (_) {}
+
+  // ── Facturas de comisión (nº, monto, fecha) ──
+  let facturas = [];
+  try {
+    const [f] = await pool.query(
+      `SELECT num_op, numero_factura, DATE(fecha_factura) AS fecha, monto_bruto, monto_liquido, es_boleta
+       FROM postventa_facturas_comision
+       WHERE ? <> '' AND ${RUTNORM} = ? ORDER BY fecha_factura DESC LIMIT 60`, [rut, rut]);
+    facturas = f;
+  } catch (_) {}
+
+  // ── Preaprobaciones: SOLO datos operativos (código, terms, veredicto, cuotas). NUNCA rut/renta/informes/motivos/contacto del cliente ──
+  let preaprobaciones = [];
+  try {
+    const [p] = await pool.query(
+      `SELECT codigo, precio, pie, anio, resultado, opciones AS cuotas_ofrecidas, DATE(created_at) AS fecha
+       FROM portal_preaprobaciones
+       WHERE (? IS NOT NULL AND id_dealer = ?) OR (? <> '' AND ${RUTNORM} = ?)
+       ORDER BY created_at DESC LIMIT 40`, [idd, idd, rut, rut]);
+    preaprobaciones = p;
+  } catch (_) {}
+
+  return { dealer: (req.dealer && req.dealer.nombre) || 'Dealer', operaciones: ops, cartolas: cart, postventa, facturas, preaprobaciones };
 }
 
 // ── POST /api/portal-dealer/ia ─────────────────────────────────────────────
@@ -484,7 +528,7 @@ exports.ia = async (req, res) => {
     const restantes = limite > 0 ? Math.max(0, limite - Number(u.c) - 1) : null;
 
     const ctx = await datosDelDealer(req);
-    const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista (las operaciones y cartolas de ESTE dealer).
+    const system = `Eres el asistente virtual de AutoFácil para el dealer "${ctx.dealer}". Respondes ÚNICAMENTE con la información provista de ESTE dealer: "operaciones" (créditos, estado, comisión, vehículo), "postventa" (estado del saldo precio y de la comisión, con sus fechas — sirve para "¿cuándo me pagan?" y "¿qué me falta?"), "facturas" (nº, monto, fecha), "cartolas" (mes, total, envío) y "preaprobaciones" (código, terms, veredicto y cuotas ofrecidas).
 PRIVACIDAD DEL CLIENTE (regla estricta, no negociable): puedes informar el ESTADO OPERATIVO de las operaciones del dealer — créditos preaprobados, cartas de aprobación, estado del crédito, saldo precio, comisiones, cartolas, facturas, fechas de pago y qué documentos faltan. Está TERMINANTEMENTE PROHIBIDO entregar datos PERSONALES, FINANCIEROS o COMERCIALES del cliente: RUT o cédula, domicilio, teléfono, correo, renta o ingresos, deudas, informes comerciales, capacidad de pago o comportamiento crediticio. Si te preguntan por cualquiera de esos datos del cliente, responde que por privacidad no puedes entregar información personal del cliente y sugiere escribir al ejecutivo. Puedes nombrar al cliente ÚNICAMENTE para identificar de qué operación se habla, nada más.
 Si la respuesta no está en los datos, dilo con claridad y sugiere escribir al ejecutivo. Nunca inventes datos ni menciones a otros dealers ni a otros clientes. Responde en español, en tono cercano, breve y claro. Los montos están en pesos chilenos.`;
     const prompt = `Datos del dealer (JSON):\n${JSON.stringify(ctx)}\n\nPregunta del dealer: ${pregunta}`;
