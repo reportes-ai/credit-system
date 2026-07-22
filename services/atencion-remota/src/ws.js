@@ -92,7 +92,23 @@ function initAtencionWS(server) {
         relayRoom(id, { t: 'presencia', id_conversacion: id, parte, online: false }, ws);
         const s = rooms.get(id); if (s) { s.delete(ws); if (!s.size) rooms.delete(id); }
       }
-      if (ident.tipo === 'user') { const set = execs.get(ident.id); if (set) { set.delete(ws); if (!set.size) execs.delete(ident.id); } }
+      if (ident.tipo === 'user') {
+        const set = execs.get(ident.id); if (set) { set.delete(ws); if (!set.size) execs.delete(ident.id); }
+        // Si el ejecutivo se fue del todo (sin conexiones), tras una gracia devuelve sus chats ACTIVOS a la
+        // cola para que no queden huérfanos (el dealer seguiría escribiendo sin que nadie lo vea). Un refresh
+        // reconecta dentro de la gracia y no dispara nada.
+        if (!execs.has(ident.id)) {
+          setTimeout(async () => {
+            if (execs.has(ident.id)) return;   // reconectó (refresh): no requeue
+            try {
+              const [r] = await pool.query(
+                "UPDATE ar_conversaciones SET estado='ESPERA', id_ejecutivo=NULL, ejecutivo_nombre=NULL WHERE id_ejecutivo=? AND estado='ACTIVA'",
+                [ident.id]);
+              if (r.affectedRows) await broadcastCola();
+            } catch (e) { console.error('[ws requeue ejecutivo]', e.message); }
+          }, 8000);
+        }
+      }
     });
   });
 
