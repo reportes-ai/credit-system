@@ -419,11 +419,25 @@ const importar = async (req, res) => {
                  WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
                    AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')
               )
-            WHERE (c.rut_dealer IS NULL OR c.rut_dealer = '')
+            WHERE (c.rut_dealer IS NULL OR c.rut_dealer = '' OR UPPER(c.rut_dealer) = 'S/I')
               AND c.automotora IS NOT NULL AND c.automotora <> ''
               AND (SELECT COUNT(*) FROM dealers d
                     WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
                       AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')) = 1`);
+        // Homologar el NOMBRE al del mantenedor de dealers (una sola fuente): el Excel
+        // de INDEXA concatena "PARQUE X " antes del nombre — si el crédito quedó ligado
+        // al dealer y su automotora contiene el nombre oficial, se reemplaza por este.
+        await pool.query(
+          `UPDATE creditos c JOIN dealers d ON d.rut = c.rut_dealer
+              SET c.automotora = d.nombre_indexa
+            WHERE d.nombre_indexa IS NOT NULL AND d.nombre_indexa <> ''
+              AND UPPER(TRIM(c.automotora)) <> UPPER(TRIM(d.nombre_indexa))
+              AND UPPER(TRIM(c.automotora)) LIKE CONCAT('%', UPPER(TRIM(d.nombre_indexa)), '%')`);
+        // Parque/Calle: si la columna parque trae un nombre real de parque → PARQUE
+        await pool.query(
+          `UPDATE creditos SET tipo_ubicacion='PARQUE'
+            WHERE (tipo_ubicacion IS NULL OR tipo_ubicacion='') AND parque IS NOT NULL
+              AND UPPER(TRIM(parque)) NOT IN ('','NO APLICA','S/I','CALLE')`);
       } catch (e) { console.error('[carga-masiva match dealer por nombre]', e.message); }
     }
 
