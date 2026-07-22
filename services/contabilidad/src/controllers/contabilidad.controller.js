@@ -1996,7 +1996,8 @@ exports.directorioMes = async (req, res) => {
 };
 
 const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS',
-                       'RES_BAL', 'RES_EERR', 'RES_RRHH', 'RES_OP'];  // láminas resumen ejecutivo (v148.1)
+                       'RES_BAL', 'RES_EERR', 'RES_RRHH', 'RES_OP',   // láminas resumen ejecutivo (v148.1)
+                       'MERCADO'];                                    // lámina mercado CAVEM (v148.3)
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
@@ -2014,12 +2015,84 @@ exports.guardarHechoDirectorio = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Mercado Automotor (CAVEM) ────────────────────────────────────────────────
+   CAVEM no tiene API: el informe mensual es una página HTML
+   (https://www.cavem.cl/informesmercado/informe-<mes>-<año>). Patrón Previred:
+   el servidor la lee, la IA extrae las cifras a JSON y quedan guardadas por mes
+   en ctb_mercado_automotor (fuente única para la lámina MERCADO del directorio). */
+require('../../../../shared/migrate').enFila('ctb-mercado-automotor', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ctb_mercado_automotor (
+        mes         CHAR(7) PRIMARY KEY,          -- YYYY-MM
+        nuevos_mes  INT NULL,  nuevos_acum INT NULL,  var_nuevos DECIMAL(6,1) NULL,
+        usados_mes  INT NULL,  usados_acum INT NULL,  var_usados DECIMAL(6,1) NULL,
+        relacion    DECIMAL(5,1) NULL,             -- usados por cada nuevo (acum)
+        comentario  VARCHAR(600) NULL,
+        fuente_url  VARCHAR(300) NULL,
+        updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+  } catch (e) { console.error('[ctb-mercado migration]', e.message); }
+});
+
+const MESES_URL = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+exports.getMercadoAutomotor = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [serie] = await pool.query(
+      'SELECT * FROM ctb_mercado_automotor WHERE mes <= ? ORDER BY mes DESC LIMIT 13', [mes]);
+    ok(res, { actual: serie.find(x => x.mes === mes) || null, serie: serie.reverse() });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.sincronizarMercado = async (req, res) => {
+  try {
+    const mes = req.body?.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const url = `https://www.cavem.cl/informesmercado/informe-${MESES_URL[m]}-${y}`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (AutoFacil Suite)' } });
+    if (!r.ok) return fail(res, `CAVEM aún no publica el informe de ${MESES_URL[m]} ${y} (HTTP ${r.status})`, 404);
+    const html = await r.text();
+    // texto plano acotado para la IA
+    const texto = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').slice(0, 14000);
+    const { analizar } = require('../../../../shared/anthropic');
+    const out = await analizar({
+      codigo: 'ctb_mercado_cavem',
+      id_usuario: (req.usuario || {}).id_usuario || null,
+      system: 'Extraes cifras del informe mensual del mercado automotor chileno de CAVEM. Respondes SOLO un JSON válido, sin texto adicional.',
+      prompt: `Informe CAVEM de ${MESES_URL[m]} ${y} (texto de la página):\n${texto}\n\nDevuelve SOLO este JSON (números sin puntos de miles; null si una cifra no aparece):\n{"nuevos_mes":unidades vehículos livianos y medianos NUEVOS del mes,"nuevos_acum":acumulado año nuevos,"var_nuevos":variación % del mes vs año anterior,"usados_mes":transferencias USADOS del mes,"usados_acum":acumulado año usados,"var_usados":variación % usados,"relacion":usados por cada nuevo (ej 3.6),"comentario":"1 frase con la lectura clave del informe"}`,
+      max_tokens: 400,
+    });
+    if (!out || !out.texto) return fail(res, 'La IA no devolvió datos', 502);
+    let d;
+    try { d = JSON.parse(out.texto.replace(/```json|```/g, '').trim()); }
+    catch (_) { return fail(res, 'No se pudo interpretar la respuesta de la IA', 502); }
+    await pool.query(
+      `INSERT INTO ctb_mercado_automotor (mes, nuevos_mes, nuevos_acum, var_nuevos, usados_mes, usados_acum, var_usados, relacion, comentario, fuente_url)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE nuevos_mes=VALUES(nuevos_mes), nuevos_acum=VALUES(nuevos_acum), var_nuevos=VALUES(var_nuevos),
+         usados_mes=VALUES(usados_mes), usados_acum=VALUES(usados_acum), var_usados=VALUES(var_usados),
+         relacion=VALUES(relacion), comentario=VALUES(comentario), fuente_url=VALUES(fuente_url)`,
+      [mes, d.nuevos_mes, d.nuevos_acum, d.var_nuevos, d.usados_mes, d.usados_acum, d.var_usados, d.relacion,
+       String(d.comentario || '').slice(0, 600), url]);
+    const [[row]] = await pool.query('SELECT * FROM ctb_mercado_automotor WHERE mes=?', [mes]);
+    ok(res, row);
+  } catch (e) {
+    console.error('[ctb mercado cavem]', e.message);
+    fail(res, 'No se pudo leer CAVEM: ' + e.message, 502);
+  }
+};
+
 exports.hechosDirectorioIA = async (req, res) => {
   try {
     const { mes, seccion, datos, modo } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
-    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)' };
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)', MERCADO: 'Mercado automotor chileno (CAVEM: nuevos vs usados)', RES_BAL: 'Resumen ejecutivo del Balance', RES_EERR: 'Resumen ejecutivo de Resultados', RES_RRHH: 'Gastos de Personal', RES_OP: 'Gastos de Operación' };
     const { analizar } = require('../../../../shared/anthropic');
     const esAnalisis = modo === 'analisis';
     const out = await analizar({

@@ -69,6 +69,8 @@ router.delete('/meses-cerrados/:mes', verifyToken, requireFunc('ctb_cierre_mes')
 // Presentación Directorio
 router.get('/directorio',            verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes', 'ctb_estados'), ctrl.directorioMes);
 router.get('/directorio/cuadros',    verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes', 'ctb_estados'), ctrl.directorioCuadros);
+router.get('/mercado-automotor',       verifyToken, requireFunc('ctb_directorio', 'ctb_cierre_mes', 'ctb_estados'), ctrl.getMercadoAutomotor);
+router.post('/mercado-automotor/sincronizar', verifyToken, requireFunc('ctb_directorio'), ctrl.sincronizarMercado);
 router.get('/directorio/rubros',       verifyToken, requireFunc('ctb_directorio'), ctrl.getDirRubros);
 router.post('/directorio/rubros',      verifyToken, requireFunc('ctb_directorio'), ctrl.crearDirRubro);
 router.put('/directorio/rubros/:id',   verifyToken, requireFunc('ctb_directorio'), ctrl.putDirRubro);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.5 — Láminas de resumen ejecutivo (réplica cuadros PPT directorio): Balance, EERR, Personal, Operación -->
+  <!-- v1.6 — Lámina Mercado Automotor conectada a CAVEM (fetch + IA extrae cifras, serie mensual) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -184,19 +184,28 @@ function descargarCuadro(btn, titulo){
 }
 
 function generar(){ consultar(); }
-let Q = null, C = null, HN = null, RU = null; // cuadros estilo Excel + auxiliares + rubros (prefijos)
+let Q = null, C = null, HN = null, RU = null, MK = null; // cuadros + auxiliares + rubros + mercado CAVEM
 async function consultar(){
-  const [j, jq, jc, jh, jr] = await Promise.all([
+  const [j, jq, jc, jh, jr, jm] = await Promise.all([
     fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/compras-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/honorarios-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/directorio/rubros',{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
+    fetch('/api/contabilidad/mercado-automotor?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
   ]);
   if (!j.success) return alert(j.error);
   if (!jq.success) return alert(jq.error);
   D = j.data; Q = jq.data; C = jc.success ? jc.data : null; HN = jh.success ? jh.data : null;
-  RU = jr.success ? jr.data : []; render();
+  RU = jr.success ? jr.data : []; MK = jm.success ? jm.data : null; render();
+}
+async function sincronizarCavem(btn){
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Leyendo CAVEM…';
+  try {
+    const r = await fetch('/api/contabilidad/mercado-automotor/sincronizar',{method:'POST',headers:H,body:JSON.stringify({mes:fMes.value})});
+    const j = await r.json(); if (!j.success) return alert(j.error);
+    await consultar();
+  } finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Actualizar desde CAVEM'; }
 }
 /* cuentas del EERR (D.eerr) que caen en un rubro del cuadro, por sus prefijos */
 function cuentasDeRubro(etiqueta){
@@ -381,6 +390,35 @@ function lamResumenRubro(etiqueta, kicker, titulo, sec, y){
     </tbody></table>`, sec, titulo);
 }
 
+function lamMercado(nomMes){
+  const uds = n => n==null?'—':Number(n).toLocaleString('es-CL');
+  const vpc = v => v==null?'':`<span class="${v<0?'neg':'pos'}">${v>0?'+':''}${Number(v).toLocaleString('es-CL',{maximumFractionDigits:1})}% vs año ant.</span>`;
+  const a = MK && MK.actual;
+  const btnSync = `<button class="btn btn-sm btn-outline-primary no-print mb-2" onclick="sincronizarCavem(this)"><i class="bi bi-cloud-download me-1"></i>Actualizar desde CAVEM</button>`;
+  if (!a) return lamina('MERCADO', `MERCADO AUTOMOTOR — ${nomMes}`,
+    `${btnSync}<div class="text-muted small">Sin datos de CAVEM para este mes. Presiona "Actualizar desde CAVEM": el sistema lee el informe mensual publicado en cavem.cl y la IA extrae las cifras.</div>`,
+    'MERCADO', 'Mercado automotor');
+  const serie = (MK.serie||[]).slice(-12);
+  const maxU = Math.max(...serie.map(x=>x.usados_mes||0), 1);
+  const bar = (v,color) => `<div style="background:${color};height:10px;border-radius:3px;width:${Math.max(2,(v||0)/maxU*100)}%"></div>`;
+  return lamina('MERCADO', `MERCADO AUTOMOTOR NACIONAL — ${nomMes} (CAVEM)`, `
+    ${btnSync}
+    <div class="ejec-grid">
+      <div class="ejec-card"><div class="l">Nuevos livianos y medianos (mes)</div><div class="v">${uds(a.nuevos_mes)}</div><div class="s">${vpc(a.var_nuevos)}</div><div class="s">Acum. año: ${uds(a.nuevos_acum)}</div></div>
+      <div class="ejec-card"><div class="l">Usados transferidos (mes)</div><div class="v">${uds(a.usados_mes)}</div><div class="s">${vpc(a.var_usados)}</div><div class="s">Acum. año: ${uds(a.usados_acum)}</div></div>
+      <div class="ejec-card"><div class="l">Relación usados : nuevos</div><div class="v">${a.relacion!=null?Number(a.relacion).toLocaleString('es-CL',{maximumFractionDigits:1})+' – 1':'—'}</div><div class="s">acumulado del año</div></div>
+      <div class="ejec-card"><div class="l">Operaciones totales (mes)</div><div class="v">${uds((a.nuevos_mes||0)+(a.usados_mes||0))}</div><div class="s">nuevos + usados</div></div>
+    </div>
+    ${a.comentario?`<div class="small" style="background:#eff6ff;border-left:4px solid var(--navy);border-radius:8px;padding:10px 14px;margin-bottom:12px">${esc(a.comentario)}</div>`:''}
+    <table class="xls"><thead><tr><th colspan="5" class="tit">SERIE MENSUAL (unidades)</th></tr>
+      <tr><th>Mes</th><th>Nuevos</th><th></th><th>Usados</th><th></th></tr></thead><tbody>
+      ${serie.map(x=>`<tr><td class="n">${x.mes}</td><td class="n">${uds(x.nuevos_mes)}</td><td style="width:22%">${bar(x.nuevos_mes,'#0141A2')}</td>
+        <td class="n">${uds(x.usados_mes)}</td><td style="width:22%">${bar(x.usados_mes,'#009AFE')}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="small text-muted mt-1">Fuente: CAVEM (Cámara Nacional de Comercio Automotriz de Chile) — ${a.fuente_url?`<a href="${esc(a.fuente_url)}" target="_blank">informe del mes</a>`:'informe mensual'} · leído ${String(a.updated_at).slice(0,10)}.</div>`,
+    'MERCADO', 'Mercado automotor');
+}
+
 function render(){
   const [y,m] = D.mes.split('-').map(Number);
   const nomMes = MESES[m].toUpperCase()+' '+y;
@@ -485,6 +523,7 @@ function render(){
         <div class="kpi"><div class="v" style="color:#fff">${mm(resAcum)}</div><div class="l">Resultado acumulado</div></div>
       </div>
     </div>
+    ${lamMercado(nomMes)}
     ${lamResumenBalance(nomMes, m>1?MESES[m-1].slice(0,3).toUpperCase()+'-'+String(y).slice(2):'DIC-'+String(y-1).slice(2))}
     ${lamResumenEERR(nomMes, y)}
     ${lamResumenRubro('Gastos de Personal','RRHH',`GASTOS DE PERSONAL — ACUM. A ${nomMes}`,'RES_RRHH',y)}
@@ -565,6 +604,7 @@ async function guardarHechos(sec){
 function datosSeccion(sec){
   const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
   if (sec==='BALANCE') return { balance: D.balance };
+  if (sec==='MERCADO') return MK ? { mercado_mes: MK.actual, serie_12m: (MK.serie||[]).slice(-12) } : {};
   if (sec==='RES_BAL') return { balance_resumen: Q.balance.grupos.map(g=>({grupo:g.grupo,tipo:g.tipo,actual:g.subtotal[g.subtotal.length-1],anterior:g.subtotal[Math.max(0,g.subtotal.length-2)]})), caja: D.caja };
   if (sec==='RES_EERR') return { eerr_rubros: Q.eerr.map(x=>({rubro:x.etiqueta,clase:x.clase,acum:x.valores[0],acum_aa:x.valores[1],ppto:x.ppto?x.ppto[0]:null})) };
   if (sec==='RES_RRHH') return { gasto_personal: cuentasDeRubro('Gastos de Personal').map(x=>({cuenta:x.cuenta,nombre:x.nombre,acum:x.acum_actual,acum_aa:x.acum_aa})) };
@@ -596,6 +636,7 @@ async function analizarIA(sec, silencioso){
 async function analizarTodo(){
   if (!D) return alert('Genera primero la presentación.');
   const secs = ['RES_BAL','RES_EERR','RES_RRHH','RES_OP','BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
+  if (MK && MK.actual) secs.unshift('MERCADO');
   if (C && C.total_mes.docs) secs.push('COMPRAS');
   if (HN && HN.total_mes.docs) secs.push('HONORARIOS');
   const btn = event.target.closest('button'); btn.disabled = true;
