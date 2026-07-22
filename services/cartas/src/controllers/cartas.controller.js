@@ -13,11 +13,19 @@ async function generarNumeroCreditoDesdeCartas() {
   const yy = String(hoy.getFullYear()).slice(-2);
   const mm = String(hoy.getMonth() + 1).padStart(2, '0');
   const prefix = `${yy}${mm}`;
+  // Máximo NUMÉRICO del mes mirando numero_credito Y num_op (no "el último por id":
+  // tras una restauración el último id puede no ser el número mayor y se generaban
+  // duplicados / choques de num_op que hacían fallar el INSERT en silencio).
   const [[row]] = await pool.query(
-    `SELECT numero_credito FROM creditos WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
-    [prefix + '%']
+    `SELECT GREATEST(
+        COALESCE((SELECT MAX(CAST(numero_credito AS UNSIGNED)) FROM creditos
+                   WHERE numero_credito REGEXP '^[0-9]+$' AND numero_credito LIKE ?), 0),
+        COALESCE((SELECT MAX(num_op) FROM creditos WHERE num_op BETWEEN ? AND ?), 0)
+      ) mx`,
+    [prefix + '%', Number(prefix) * 1000, Number(prefix) * 1000 + 999]
   );
-  const seq = row ? parseInt(row.numero_credito.slice(4)) + 1 : 1;
+  const mx = Number(row.mx) || 0;
+  const seq = mx > 0 ? (mx % 1000) + 1 : 1;
   return prefix + String(seq).padStart(3, '0');
 }
 
