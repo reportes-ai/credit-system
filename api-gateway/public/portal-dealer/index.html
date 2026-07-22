@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v2.9 — "Sí, contáctame" abre el chat y envía solo el detalle de la simulación al ejecutivo -->
+  <!-- v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -803,7 +803,23 @@ function onMsg(m){
   }
 }
 
-function iniciar(){ const asunto=document.getElementById('preAsunto').value.trim(); wsSend({ t:'start', asunto }); }
+function iniciar(){
+  const asunto=document.getElementById('preAsunto').value.trim();
+  if(!dToken){ iniciarDemo(asunto); return; }   // Vista demo: sin token/WS → simula la conversación
+  wsSend({ t:'start', asunto });
+}
+// Simulación de chat para la vista demo (no hay backend WS).
+function iniciarDemo(asunto){
+  conv={ id:'demo', ejecutivo_nombre:'Camila (demo)' };
+  document.getElementById('prechat').classList.add('hidden');
+  document.getElementById('chat').classList.add('show');
+  document.getElementById('msgs').innerHTML='<div class="wrapw" id="wrapw"></div>'; seen.clear();
+  document.getElementById('hdEstado2').textContent='Te atiende Camila (demo)';
+  addMessage({ emisor:'SISTEMA', cuerpo:'MODO DEMO — conversación de ejemplo. En la versión real te conectamos al instante con tu ejecutivo.' });
+  if(asunto) addMessage({ emisor:'DEALER', cuerpo:asunto, created_at:new Date().toISOString() });
+  showTyping(true);
+  setTimeout(()=>{ showTyping(false); addMessage({ emisor:'EJECUTIVO', cuerpo:'¡Hola! Soy Camila de AutoFácil 👋 ¿En qué te ayudo con tus operaciones?', created_at:new Date().toISOString() }); }, 1400);
+}
 function solicitarVideo(){
   if(!conv){ toast('Aún no estás en una conversación', true); return; }
   if(window.ARTC && ARTC.busy()){ toast('Ya hay una llamada en curso', true); return; }
@@ -845,7 +861,14 @@ function addMessage(msg){
   }
   box.scrollTop=box.scrollHeight;
 }
-function enviar(){ const inp=document.getElementById('inp'); const v=inp.value.trim(); if(!v||!conv) return; wsSend({ t:'chat', id:conv.id, cuerpo:v }); inp.value=''; wsSend({t:'typing',id:conv.id,on:false}); }
+function enviar(){ const inp=document.getElementById('inp'); const v=inp.value.trim(); if(!v||!conv) return;
+  if(!dToken){ // Vista demo: eco local + respuesta simulada
+    addMessage({ emisor:'DEALER', cuerpo:v, created_at:new Date().toISOString() }); inp.value='';
+    showTyping(true);
+    setTimeout(()=>{ showTyping(false); addMessage({ emisor:'EJECUTIVO', cuerpo:'(demo) Perfecto. En la versión real tu ejecutivo te responde aquí mismo y pueden compartir documentos e incluso videollamada.', created_at:new Date().toISOString() }); }, 1200);
+    return;
+  }
+  wsSend({ t:'chat', id:conv.id, cuerpo:v }); inp.value=''; wsSend({t:'typing',id:conv.id,on:false}); }
 document.getElementById('inp').addEventListener('keydown', e=>{ if(e.key==='Enter') enviar(); });
 let tto=null;
 document.getElementById('inp').addEventListener('input', ()=>{ if(!conv) return; wsSend({t:'typing',id:conv.id,on:true}); clearTimeout(tto); tto=setTimeout(()=>wsSend({t:'typing',id:conv.id,on:false}),1200); });
