@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.7 — Lámina Resumen Macroeconómico desde CMF (dólar+gráfico, IPC, TMC, UF/UTM) -->
+  <!-- v1.8 — Lámina Gerencia Comercial (ops/montos por mes vs año anterior + bróker por financiera) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -184,9 +184,9 @@ function descargarCuadro(btn, titulo){
 }
 
 function generar(){ consultar(); }
-let Q = null, C = null, HN = null, RU = null, MK = null, MA = null; // + macro CMF
+let Q = null, C = null, HN = null, RU = null, MK = null, MA = null, CO = null; // + macro CMF + comercial
 async function consultar(){
-  const [j, jq, jc, jh, jr, jm, jmac] = await Promise.all([
+  const [j, jq, jc, jh, jr, jm, jmac, jco] = await Promise.all([
     fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/compras-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
@@ -194,11 +194,12 @@ async function consultar(){
     fetch('/api/contabilidad/directorio/rubros',{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/mercado-automotor?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/macro-directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
+    fetch('/api/contabilidad/comercial-directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
   ]);
   if (!j.success) return alert(j.error);
   if (!jq.success) return alert(jq.error);
   D = j.data; Q = jq.data; C = jc.success ? jc.data : null; HN = jh.success ? jh.data : null;
-  RU = jr.success ? jr.data : []; MK = jm.success ? jm.data : null; MA = jmac.success ? jmac.data : null; render();
+  RU = jr.success ? jr.data : []; MK = jm.success ? jm.data : null; MA = jmac.success ? jmac.data : null; CO = jco.success ? jco.data : null; render();
 }
 async function sincronizarCavem(btn){
   btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Leyendo CAVEM…';
@@ -391,6 +392,44 @@ function lamResumenRubro(etiqueta, kicker, titulo, sec, y){
     </tbody></table>`, sec, titulo);
 }
 
+function lamComercial(nomMes, y, m){
+  if (!CO || !CO.serie) return '';
+  const S = new Map(CO.serie.map(x=>[x.mes, x]));
+  const g = (yy,mm) => S.get(`${yy}-${String(mm).padStart(2,'0')}`) || {ops:0, monto:0, prom:0};
+  const act = g(y,m), aa = g(y-1,m);
+  const acum = (yy) => { let o=0,mt=0; for(let k=1;k<=m;k++){ const x=g(yy,k); o+=Number(x.ops); mt+=Number(x.monto);} return {ops:o, monto:mt}; };
+  const A = acum(y), AA = acum(y-1);
+  if (!A.ops && !AA.ops) return '';
+  const vv = (a,b) => !b?'':`<span class="${a>=b?'pos':'neg'}">${a>=b?'+':''}${((a-b)/Math.abs(b)*100).toLocaleString('es-CL',{maximumFractionDigits:1})}% vs ${y-1}</span>`;
+  const maxOps = Math.max(...[...Array(12)].map((_,i)=>Math.max(g(y,i+1).ops, g(y-1,i+1).ops)), 1);
+  const bar = (v,c) => `<div style="background:${c};height:9px;border-radius:3px;width:${Math.max(1,v/maxOps*100)}%"></div>`;
+  const MESL = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return lamina('COMERCIAL', `GERENCIA COMERCIAL — RESULTADOS ${y-1}–${y} A ${nomMes}`, `
+    <div class="ejec-grid">
+      <div class="ejec-card"><div class="l">Operaciones del mes</div><div class="v">${Number(act.ops).toLocaleString('es-CL')}</div><div class="s">${vv(act.ops, aa.ops)} (${Number(aa.ops).toLocaleString('es-CL')})</div></div>
+      <div class="ejec-card"><div class="l">Monto otorgado del mes</div><div class="v">${M$(act.monto)}</div><div class="s">${vv(act.monto, aa.monto)}</div></div>
+      <div class="ejec-card"><div class="l">Crédito promedio del mes</div><div class="v">${clp(act.prom||0)}</div><div class="s">${y-1}: ${clp(aa.prom||0)}</div></div>
+      <div class="ejec-card"><div class="l">Acumulado ${y}</div><div class="v">${Number(A.ops).toLocaleString('es-CL')} ops</div><div class="s">${M$(A.monto)} · ${vv(A.ops, AA.ops)}</div></div>
+    </div>
+    <table class="xls"><thead><tr><th colspan="6" class="tit">N° OPERACIONES Y MONTO OTORGADO POR MES — ${y} VS ${y-1}</th></tr>
+      <tr><th>Mes</th><th>Ops ${y}</th><th></th><th>Ops ${y-1}</th><th>Monto ${y}</th><th>Monto ${y-1}</th></tr></thead><tbody>
+      ${[...Array(12)].map((_,i)=>{ const a=g(y,i+1), b=g(y-1,i+1); if(!a.ops&&!b.ops) return '';
+        return `<tr><td>${MESL[i+1]}</td><td class="n">${Number(a.ops).toLocaleString('es-CL')}</td>
+          <td style="width:18%">${bar(a.ops,'#0141A2')}${bar(b.ops,'#94a3b8')}</td>
+          <td class="n">${Number(b.ops).toLocaleString('es-CL')}</td>
+          <td class="n">${pesos(a.monto)}</td><td class="n">${pesos(b.monto)}</td></tr>`;}).join('')}
+      <tr class="margen"><td>ACUM ${MESL[m]}</td><td class="n">${Number(A.ops).toLocaleString('es-CL')}</td><td></td>
+        <td class="n">${Number(AA.ops).toLocaleString('es-CL')}</td><td class="n">${pesos(A.monto)}</td><td class="n">${pesos(AA.monto)}</td></tr>
+    </tbody></table>
+    ${(CO.broker||[]).length ? `<table class="xls" style="margin-top:12px"><thead><tr><th colspan="5" class="tit">RESULTADOS BRÓKER — POR FINANCIERA (ACUM. ${y})</th></tr>
+      <tr><th>Financiera</th><th>Ops acum.</th><th>Ops mes</th><th>Monto financiado</th><th>Comisión financiera</th></tr></thead><tbody>
+      ${CO.broker.map(b=>`<tr><td>${esc(b.financiera)}</td><td class="n">${Number(b.ops_anio).toLocaleString('es-CL')}</td>
+        <td class="n">${Number(b.ops_mes).toLocaleString('es-CL')}</td><td class="n">${pesos(b.monto_anio)}</td><td class="n">${pesos(b.comision_anio)}</td></tr>`).join('')}
+    </tbody></table>`:''}
+    <div class="small text-muted mt-1">Fuente: tabla de créditos del sistema (estado OTORGADO por fecha de curse). Barras: azul ${y}, gris ${y-1}.</div>`,
+    'COMERCIAL', 'Gerencia Comercial');
+}
+
 function lamMacro(nomMes){
   if (!MA || !MA.dolar || !MA.dolar.cierre) return '';
   const d = MA.dolar, t = MA.tmc, ipc = MA.ipc;
@@ -564,6 +603,7 @@ function render(){
     </div>
     ${lamMacro(nomMes)}
     ${lamMercado(nomMes)}
+    ${lamComercial(nomMes, y, m)}
     ${lamResumenBalance(nomMes, m>1?MESES[m-1].slice(0,3).toUpperCase()+'-'+String(y).slice(2):'DIC-'+String(y-1).slice(2))}
     ${lamResumenEERR(nomMes, y)}
     ${lamResumenRubro('Gastos de Personal','RRHH',`GASTOS DE PERSONAL — ACUM. A ${nomMes}`,'RES_RRHH',y)}
@@ -645,6 +685,7 @@ function datosSeccion(sec){
   const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
   if (sec==='BALANCE') return { balance: D.balance };
   if (sec==='MERCADO') return MK ? { mercado_mes: MK.actual, serie_12m: (MK.serie||[]).slice(-12) } : {};
+  if (sec==='COMERCIAL') return CO ? { serie_mensual: CO.serie, broker_por_financiera: CO.broker } : {};
   if (sec==='MACRO') return MA ? { dolar_cierre: MA.dolar.cierre, dolar_mes_anterior: MA.dolar.anterior, ipc: MA.ipc, tmc: MA.tmc, uf: MA.uf, utm: MA.utm } : {};
   if (sec==='RES_BAL') return { balance_resumen: Q.balance.grupos.map(g=>({grupo:g.grupo,tipo:g.tipo,actual:g.subtotal[g.subtotal.length-1],anterior:g.subtotal[Math.max(0,g.subtotal.length-2)]})), caja: D.caja };
   if (sec==='RES_EERR') return { eerr_rubros: Q.eerr.map(x=>({rubro:x.etiqueta,clase:x.clase,acum:x.valores[0],acum_aa:x.valores[1],ppto:x.ppto?x.ppto[0]:null})) };
@@ -679,6 +720,7 @@ async function analizarTodo(){
   const secs = ['RES_BAL','RES_EERR','RES_RRHH','RES_OP','BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
   if (MK && MK.actual) secs.unshift('MERCADO');
   if (MA && MA.dolar && MA.dolar.cierre) secs.unshift('MACRO');
+  if (CO && CO.serie && CO.serie.length) secs.push('COMERCIAL');
   if (C && C.total_mes.docs) secs.push('COMPRAS');
   if (HN && HN.total_mes.docs) secs.push('HONORARIOS');
   const btn = event.target.closest('button'); btn.disabled = true;

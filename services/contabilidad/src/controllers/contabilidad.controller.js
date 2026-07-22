@@ -1997,7 +1997,7 @@ exports.directorioMes = async (req, res) => {
 
 const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS',
                        'RES_BAL', 'RES_EERR', 'RES_RRHH', 'RES_OP',   // láminas resumen ejecutivo (v148.1)
-                       'MERCADO', 'MACRO'];                           // láminas mercado CAVEM y macro CMF
+                       'MERCADO', 'MACRO', 'COMERCIAL'];              // mercado CAVEM, macro CMF, gerencia comercial
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
@@ -2087,6 +2087,35 @@ exports.sincronizarMercado = async (req, res) => {
   }
 };
 
+/* ── Gerencia Comercial (láminas 3-5 de la PPT del directorio) ───────────────
+   Fuente única: tabla creditos (estado OTORGADO, fecha_otorgado, monto_financiado).
+   Serie mensual del año y del año anterior + desglose por financiera (bróker). */
+exports.getComercialDirectorio = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const fin = finDeMes(mes);
+    const [serie] = await pool.query(
+      `SELECT DATE_FORMAT(fecha_otorgado,'%Y-%m') mes, COUNT(*) ops,
+              SUM(COALESCE(monto_financiado,0)) monto, AVG(NULLIF(monto_financiado,0)) prom
+         FROM creditos
+        WHERE estado_credito='OTORGADO' AND fecha_otorgado BETWEEN ? AND ?
+        GROUP BY 1 ORDER BY 1`, [`${y - 1}-01-01`, fin]);
+    const [broker] = await pool.query(
+      `SELECT COALESCE(NULLIF(TRIM(financiera),''),'(SIN FINANCIERA)') financiera,
+              SUM(CASE WHEN fecha_otorgado BETWEEN ? AND ? THEN 1 ELSE 0 END) ops_anio,
+              SUM(CASE WHEN fecha_otorgado BETWEEN ? AND ? THEN COALESCE(monto_financiado,0) ELSE 0 END) monto_anio,
+              SUM(CASE WHEN fecha_otorgado BETWEEN ? AND ? THEN COALESCE(monto_comision_fin,0) ELSE 0 END) comision_anio,
+              SUM(CASE WHEN fecha_otorgado BETWEEN ? AND ? THEN 1 ELSE 0 END) ops_mes
+         FROM creditos
+        WHERE estado_credito='OTORGADO' AND fecha_otorgado BETWEEN ? AND ?
+        GROUP BY 1 ORDER BY ops_anio DESC`,
+      [`${y}-01-01`, fin, `${y}-01-01`, fin, `${y}-01-01`, fin, `${mes}-01`, fin, `${y}-01-01`, fin]);
+    ok(res, { mes, serie, broker });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Resumen macroeconómico (lámina MACRO del directorio) ────────────────────
    Fuente única: las tablas ya sincronizadas desde la API CMF (indicadores-sync):
    dolar (diario), uf (diario), utm/ipc (mensual), tasas (TMC con vigencias).
@@ -2159,7 +2188,7 @@ exports.hechosDirectorioIA = async (req, res) => {
     const { mes, seccion, datos, modo } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
-    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)', MERCADO: 'Mercado automotor chileno (CAVEM: nuevos vs usados)', MACRO: 'Resumen macroeconómico (dólar, IPC, UF, TMC — fuente CMF)', RES_BAL: 'Resumen ejecutivo del Balance', RES_EERR: 'Resumen ejecutivo de Resultados', RES_RRHH: 'Gastos de Personal', RES_OP: 'Gastos de Operación' };
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)', MERCADO: 'Mercado automotor chileno (CAVEM: nuevos vs usados)', MACRO: 'Resumen macroeconómico (dólar, IPC, UF, TMC — fuente CMF)', COMERCIAL: 'Gerencia Comercial: operaciones otorgadas, montos y bróker', RES_BAL: 'Resumen ejecutivo del Balance', RES_EERR: 'Resumen ejecutivo de Resultados', RES_RRHH: 'Gastos de Personal', RES_OP: 'Gastos de Operación' };
     const { analizar } = require('../../../../shared/anthropic');
     const esAnalisis = modo === 'analisis';
     const out = await analizar({
