@@ -1997,7 +1997,7 @@ exports.directorioMes = async (req, res) => {
 
 const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS',
                        'RES_BAL', 'RES_EERR', 'RES_RRHH', 'RES_OP',   // láminas resumen ejecutivo (v148.1)
-                       'MERCADO'];                                    // lámina mercado CAVEM (v148.3)
+                       'MERCADO', 'MACRO'];                           // láminas mercado CAVEM y macro CMF
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
@@ -2087,6 +2087,52 @@ exports.sincronizarMercado = async (req, res) => {
   }
 };
 
+/* ── Resumen macroeconómico (lámina MACRO del directorio) ────────────────────
+   Fuente única: las tablas ya sincronizadas desde la API CMF (indicadores-sync):
+   dolar (diario), uf (diario), utm/ipc (mensual), tasas (TMC con vigencias).
+   Nada se pide de nuevo a la CMF aquí: se lee lo que el mantenedor ya guarda. */
+exports.getMacroDirectorio = async (req, res) => {
+  try {
+    const mes = req.query.mes;
+    if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes (YYYY-MM) obligatorio', 400);
+    const [y, m] = mes.split('-').map(Number);
+    const fin = finDeMes(mes);
+    const mesAnt = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const finAnt = finDeMes(mesAnt);
+    const ult = async (tabla, hasta) => {
+      const [[r]] = await pool.query(`SELECT fecha, valor FROM ${tabla} WHERE fecha<=? ORDER BY fecha DESC LIMIT 1`, [hasta]);
+      return r ? { fecha: r.fecha, valor: Number(r.valor) } : null;
+    };
+    const [dolarM, dolarA, ufM, ufA, utmM] = await Promise.all([
+      ult('dolar', fin), ult('dolar', finAnt), ult('uf', fin), ult('uf', finAnt), ult('utm', fin)]);
+    // Serie diaria del dólar del año (para el gráfico)
+    const [serieDolar] = await pool.query(
+      'SELECT fecha, valor FROM dolar WHERE fecha BETWEEN ? AND ? ORDER BY fecha', [`${y}-01-01`, fin]);
+    // IPC: mes, acumulado año, 12 meses
+    const [ipcs] = await pool.query(
+      'SELECT fecha, valor FROM ipc WHERE fecha BETWEEN ? AND ? ORDER BY fecha', [`${y - 1}-01-01`, fin]);
+    const ipcMes = ipcs.find(x => String(x.fecha).slice(0, 7) === mes) || null;
+    const ipcAcum = ipcs.filter(x => String(x.fecha).slice(0, 4) === String(y)).reduce((s, x) => s + Number(x.valor), 0);
+    const ini12 = `${y - 1}-${String(m).padStart(2, '0')}-02`;
+    const ipc12 = ipcs.filter(x => x.fecha > new Date(ini12)).reduce((s, x) => s + Number(x.valor), 0);
+    // TMC vigente al cierre del mes + período anterior (comparación en puntos)
+    const [[tmc]] = await pool.query('SELECT * FROM tasas WHERE fecha_desde<=? ORDER BY fecha_desde DESC LIMIT 1', [fin]);
+    const [[tmcAnt]] = await pool.query('SELECT * FROM tasas WHERE fecha_desde<? ORDER BY fecha_desde DESC LIMIT 1', [tmc ? tmc.fecha_desde : fin]);
+    ok(res, {
+      mes,
+      dolar: { cierre: dolarM, anterior: dolarA, serie: serieDolar.map(x => ({ f: String(x.fecha).slice(0, 10), v: Number(x.valor) })) },
+      uf: { cierre: ufM, anterior: ufA },
+      utm: utmM,
+      ipc: { mes: ipcMes ? Number(ipcMes.valor) : null, acum_anio: ipcAcum, doce_meses: ipc12 },
+      tmc: tmc ? {
+        desde: tmc.fecha_desde, hasta: tmc.fecha_hasta,
+        menor: Number(tmc.tasa_anual_menor), mayor: Number(tmc.tasa_anual_mayor),
+        menor_ant: tmcAnt ? Number(tmcAnt.tasa_anual_menor) : null, mayor_ant: tmcAnt ? Number(tmcAnt.tasa_anual_mayor) : null,
+      } : null,
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* Sincronización AUTOMÁTICA CAVEM: una vez al día (a partir del día 4 del mes,
    cuando CAVEM suele publicar) intenta leer el informe del MES ANTERIOR si aún
    no está guardado. Idempotente: si ya existe la fila, no hace nada. */
@@ -2113,7 +2159,7 @@ exports.hechosDirectorioIA = async (req, res) => {
     const { mes, seccion, datos, modo } = req.body || {};
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'mes inválido', 400);
     if (!SECCIONES_DIR.includes(seccion)) return fail(res, 'Sección inválida', 400);
-    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)', MERCADO: 'Mercado automotor chileno (CAVEM: nuevos vs usados)', RES_BAL: 'Resumen ejecutivo del Balance', RES_EERR: 'Resumen ejecutivo de Resultados', RES_RRHH: 'Gastos de Personal', RES_OP: 'Gastos de Operación' };
+    const NOMBRES = { BALANCE: 'Balance General', CXC: 'Cuentas por Cobrar', CXP: 'Cuentas por Pagar', EERR_MES: 'Resultados del mes', EERR_ACUM: 'Resultados acumulados vs año anterior', CAJA: 'Caja y bancos', COMPRAS: 'Compras del mes (facturas de proveedores)', HONORARIOS: 'Honorarios del mes (boletas de profesionales)', MERCADO: 'Mercado automotor chileno (CAVEM: nuevos vs usados)', MACRO: 'Resumen macroeconómico (dólar, IPC, UF, TMC — fuente CMF)', RES_BAL: 'Resumen ejecutivo del Balance', RES_EERR: 'Resumen ejecutivo de Resultados', RES_RRHH: 'Gastos de Personal', RES_OP: 'Gastos de Operación' };
     const { analizar } = require('../../../../shared/anthropic');
     const esAnalisis = modo === 'analisis';
     const out = await analizar({

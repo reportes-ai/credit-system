@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.6 — Lámina Mercado Automotor conectada a CAVEM (sincronización automática diaria) -->
+  <!-- v1.7 — Lámina Resumen Macroeconómico desde CMF (dólar+gráfico, IPC, TMC, UF/UTM) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -184,20 +184,21 @@ function descargarCuadro(btn, titulo){
 }
 
 function generar(){ consultar(); }
-let Q = null, C = null, HN = null, RU = null, MK = null; // cuadros + auxiliares + rubros + mercado CAVEM
+let Q = null, C = null, HN = null, RU = null, MK = null, MA = null; // + macro CMF
 async function consultar(){
-  const [j, jq, jc, jh, jr, jm] = await Promise.all([
+  const [j, jq, jc, jh, jr, jm, jmac] = await Promise.all([
     fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/compras-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/honorarios-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/directorio/rubros',{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/mercado-automotor?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
+    fetch('/api/contabilidad/macro-directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
   ]);
   if (!j.success) return alert(j.error);
   if (!jq.success) return alert(jq.error);
   D = j.data; Q = jq.data; C = jc.success ? jc.data : null; HN = jh.success ? jh.data : null;
-  RU = jr.success ? jr.data : []; MK = jm.success ? jm.data : null; render();
+  RU = jr.success ? jr.data : []; MK = jm.success ? jm.data : null; MA = jmac.success ? jmac.data : null; render();
 }
 async function sincronizarCavem(btn){
   btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Leyendo CAVEM…';
@@ -390,6 +391,44 @@ function lamResumenRubro(etiqueta, kicker, titulo, sec, y){
     </tbody></table>`, sec, titulo);
 }
 
+function lamMacro(nomMes){
+  if (!MA || !MA.dolar || !MA.dolar.cierre) return '';
+  const d = MA.dolar, t = MA.tmc, ipc = MA.ipc;
+  const f1 = n => n==null?'—':Number(n).toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1});
+  const f2 = n => n==null?'—':Number(n).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pp = (a,b) => (a==null||b==null)?'':`Var.: ${(a-b)>=0?'+':''}${f2(a-b)} pp`;
+  // Sparkline SVG del dólar (serie diaria del año)
+  let chart = '';
+  if (d.serie && d.serie.length > 2){
+    const vs = d.serie.map(x=>x.v), min = Math.min(...vs), max = Math.max(...vs), rg = (max-min)||1;
+    const W = 900, Hh = 150;
+    const pts = d.serie.map((x,i)=>`${(i/(d.serie.length-1)*W).toFixed(1)},${(Hh-14-((x.v-min)/rg*(Hh-28))).toFixed(1)}`).join(' ');
+    chart = `<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;margin-top:12px">
+      <div style="font-size:.72rem;font-weight:800;color:#64748b;letter-spacing:.08em">DÓLAR OBSERVADO ${MA.mes.slice(0,4)} — cierre ${esc(String(d.cierre.fecha).slice(0,10))}: $${f2(d.cierre.valor)}</div>
+      <svg viewBox="0 0 ${W} ${Hh}" style="width:100%;height:110px" preserveAspectRatio="none">
+        <polyline points="${pts}" fill="none" stroke="#0141A2" stroke-width="2.5"/>
+        <text x="4" y="12" font-size="11" fill="#94a3b8">$${f1(max)}</text>
+        <text x="4" y="${Hh-2}" font-size="11" fill="#94a3b8">$${f1(min)}</text>
+      </svg></div>`;
+  }
+  const varTC = d.anterior ? (d.cierre.valor-d.anterior.valor)/d.anterior.valor*100 : null;
+  return lamina('MERCADO', `RESUMEN MACROECONÓMICO Y FINANCIERO — ${nomMes}`, `
+    <div class="ejec-grid">
+      <div class="ejec-card"><div class="l">Tipo de cambio (cierre mes)</div><div class="v">$${f2(d.cierre.valor)}</div>
+        <div class="s">Mes anterior: $${d.anterior?f2(d.anterior.valor):'—'}</div>
+        ${varTC!=null?`<span class="tag ${varTC>0?'tag-bad':'tag-ok'}">${varTC>0?'+':''}${f1(varTC)}%</span>`:''}</div>
+      <div class="ejec-card"><div class="l">IPC</div><div class="v">${ipc.mes!=null?f1(ipc.mes)+'%':'—'}</div>
+        <div class="s">del mes · Acum. año: ${f1(ipc.acum_anio)}% · 12 meses: ${f1(ipc.doce_meses)}%</div></div>
+      <div class="ejec-card"><div class="l">TMC 50–200 UF (anual)</div><div class="v">${t?f2(t.menor)+'%':'—'}</div>
+        <div class="s">${t?`Vigente ${String(t.desde).slice(0,10)} → ${String(t.hasta).slice(0,10)} · ${pp(t.menor,t.menor_ant)}`:''}</div></div>
+      <div class="ejec-card"><div class="l">TMC 200–5.000 UF (anual)</div><div class="v">${t?f2(t.mayor)+'%':'—'}</div>
+        <div class="s">${t?pp(t.mayor,t.mayor_ant):''} · UF cierre: $${MA.uf.cierre?f2(MA.uf.cierre.valor):'—'}${MA.utm?` · UTM: $${Math.round(MA.utm.valor).toLocaleString('es-CL')}`:''}</div></div>
+    </div>
+    ${chart}
+    <div class="small text-muted mt-1">Fuente: API oficial CMF (sincronización automática del mantenedor de indicadores). PIB y expectativas de inflación (IPoM Banco Central) no están en la CMF: anótalas en los Hechos Relevantes si el directorio las pide.</div>`,
+    'MACRO', 'Resumen macroeconómico');
+}
+
 function lamMercado(nomMes){
   const uds = n => n==null?'—':Number(n).toLocaleString('es-CL');
   const vpc = v => v==null?'':`<span class="${v<0?'neg':'pos'}">${v>0?'+':''}${Number(v).toLocaleString('es-CL',{maximumFractionDigits:1})}% vs año ant.</span>`;
@@ -523,6 +562,7 @@ function render(){
         <div class="kpi"><div class="v" style="color:#fff">${mm(resAcum)}</div><div class="l">Resultado acumulado</div></div>
       </div>
     </div>
+    ${lamMacro(nomMes)}
     ${lamMercado(nomMes)}
     ${lamResumenBalance(nomMes, m>1?MESES[m-1].slice(0,3).toUpperCase()+'-'+String(y).slice(2):'DIC-'+String(y-1).slice(2))}
     ${lamResumenEERR(nomMes, y)}
@@ -605,6 +645,7 @@ function datosSeccion(sec){
   const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
   if (sec==='BALANCE') return { balance: D.balance };
   if (sec==='MERCADO') return MK ? { mercado_mes: MK.actual, serie_12m: (MK.serie||[]).slice(-12) } : {};
+  if (sec==='MACRO') return MA ? { dolar_cierre: MA.dolar.cierre, dolar_mes_anterior: MA.dolar.anterior, ipc: MA.ipc, tmc: MA.tmc, uf: MA.uf, utm: MA.utm } : {};
   if (sec==='RES_BAL') return { balance_resumen: Q.balance.grupos.map(g=>({grupo:g.grupo,tipo:g.tipo,actual:g.subtotal[g.subtotal.length-1],anterior:g.subtotal[Math.max(0,g.subtotal.length-2)]})), caja: D.caja };
   if (sec==='RES_EERR') return { eerr_rubros: Q.eerr.map(x=>({rubro:x.etiqueta,clase:x.clase,acum:x.valores[0],acum_aa:x.valores[1],ppto:x.ppto?x.ppto[0]:null})) };
   if (sec==='RES_RRHH') return { gasto_personal: cuentasDeRubro('Gastos de Personal').map(x=>({cuenta:x.cuenta,nombre:x.nombre,acum:x.acum_actual,acum_aa:x.acum_aa})) };
@@ -637,6 +678,7 @@ async function analizarTodo(){
   if (!D) return alert('Genera primero la presentación.');
   const secs = ['RES_BAL','RES_EERR','RES_RRHH','RES_OP','BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
   if (MK && MK.actual) secs.unshift('MERCADO');
+  if (MA && MA.dolar && MA.dolar.cierre) secs.unshift('MACRO');
   if (C && C.total_mes.docs) secs.push('COMPRAS');
   if (HN && HN.total_mes.docs) secs.push('HONORARIOS');
   const btn = event.target.closest('button'); btn.disabled = true;
