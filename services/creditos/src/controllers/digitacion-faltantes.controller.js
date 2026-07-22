@@ -99,8 +99,11 @@ function estadoCond(tipo) {
 }
 function colVacioSQL(col) {
   const c = CAMPO[col] || {};
-  // primas: falta solo si NI el agregado NI los seguros individuales están digitados (0 = válido)
-  if (col === 'seguros') return `(ob.seguros IS NULL AND ob.seguro_rdh IS NULL AND ob.seguro_cesantia IS NULL AND ob.seguro_rep_menor IS NULL)`;
+  // primas: falta solo si NI el agregado NI los seguros individuales están digitados (0 = válido).
+  // Regla negocio (rentabilidad-calc.js): UNIDAD DE CREDITO no paga comisión de seguros →
+  // las primas NO son ingreso ahí y no se exigen.
+  if (col === 'seguros') return `(UPPER(COALESCE(ob.financiera,'')) <> 'UNIDAD DE CREDITO'
+    AND ob.seguros IS NULL AND ob.seguro_rdh IS NULL AND ob.seguro_cesantia IS NULL AND ob.seguro_rep_menor IS NULL)`;
   if (col === 'comdea_real') return `(ob.${col} IS NULL)`;                   // 0 = sin comisión, válido si se digitó
   if (col === 'anio')    return `(ob.${col} IS NULL)`;                       // 0 = "S/I", válido
   if (c.tipo === 'text' || c.tipo === 'select') return `(ob.${col} IS NULL OR ob.${col} = '')`;
@@ -121,11 +124,17 @@ function pendingWhere(tipo) {
     AND ${faltanteCond(tipo)}`;
 }
 
-function esVacio(col, v) {
+function esVacio(col, v, row) {
+  // primas: UNIDAD no paga comisión de seguros (no es ingreso) y los seguros
+  // individuales digitados también cuentan como completado
+  if (col === 'seguros') {
+    if (String((row || {}).financiera || '').toUpperCase() === 'UNIDAD DE CREDITO') return false;
+    if (row && (row.seguro_rdh != null || row.seguro_cesantia != null || row.seguro_rep_menor != null)) return false;
+    return v === null || v === undefined;   // 0 explícito = válido
+  }
   if (v === null || v === undefined) return true;
   const c = CAMPO[col] || {};
-  if (col === 'seguros') return false;      // ya digitado (0 válido); el NULL cayó en la línea de arriba
-  if (col === 'comdea_real') return false;  // ídem: 0 = sin comisión
+  if (col === 'comdea_real') return false;  // 0 = sin comisión, válido
   if (col === 'anio') return false;   // 0 = "S/I" (backfill jun-2026 hacia atrás): cuenta como completado
   if (c.tipo === 'text' || c.tipo === 'select') return String(v).trim() === '';
   if (c.tipo === 'date' || c.tipo === 'month') return false;
@@ -207,7 +216,7 @@ exports.siguiente = async (req, res) => {
       }
     }
     const reqs = REQUERIDOS[tipo];
-    const faltantes = reqs.filter(c => esVacio(c, cr[c]));
+    const faltantes = reqs.filter(c => esVacio(c, cr[c], cr));
     res.json({ success:true, data:{ credito:cr, campos:CAMPOS, requeridos:reqs, faltantes, pendientes, tipo }, error:null });
   } catch (e) { errSrv(res, e, 'digit siguiente'); }
 };
@@ -254,8 +263,8 @@ exports.guardar = async (req, res) => {
 
     // Métrica: requeridos faltantes, completados y tiempo (desde que cayó hasta grabar).
     const reqs = REQUERIDOS[tipo];
-    const faltAntes = reqs.filter(c => esVacio(c, antes[c]));
-    const llenados = faltAntes.filter(c => !esVacio(c, campos[c] === '' ? null : campos[c])).length;
+    const faltAntes = reqs.filter(c => esVacio(c, antes[c], antes));
+    const llenados = faltAntes.filter(c => !esVacio(c, campos[c] === '' ? null : campos[c], antes)).length;
     const seg = (antes.lock_seg != null && antes.lock_seg >= 0 && antes.lock_seg < 7200) ? antes.lock_seg : null;  // cap 2h
     pool.query(`INSERT INTO digitacion_log (id_credito, num_op, tipo, id_usuario, usuario, campos_llenados, requeridos_faltantes, accion, segundos)
                 VALUES (?,?,?,?,?,?,?, 'guardar', ?)`,
