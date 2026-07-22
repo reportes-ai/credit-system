@@ -1995,7 +1995,8 @@ exports.directorioMes = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS'];
+const SECCIONES_DIR = ['BALANCE', 'CXC', 'CXP', 'EERR_MES', 'EERR_ACUM', 'CAJA', 'COMPRAS', 'HONORARIOS',
+                       'RES_BAL', 'RES_EERR', 'RES_RRHH', 'RES_OP'];  // láminas resumen ejecutivo (v148.1)
 
 exports.guardarHechoDirectorio = async (req, res) => {
   try {
