@@ -39,6 +39,29 @@ require('../../../../shared/migrate').enFila('notificaciones', async () => {
         INDEX idx_created (created_at)
       )
     `);
+    // Avisos en Línea (Soporte): mensaje broadcast a todos los conectados
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS avisos_linea (
+        id           INT AUTO_INCREMENT PRIMARY KEY,
+        mensaje      TEXT NOT NULL,
+        sonido       VARCHAR(20) NOT NULL DEFAULT 'anuncio',
+        retardo_seg  INT NOT NULL DEFAULT 0,
+        duracion_seg INT NOT NULL DEFAULT 20,
+        id_usuario   INT DEFAULT NULL,
+        autor        VARCHAR(120) DEFAULT NULL,
+        created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_created (created_at)
+      )
+    `);
+    // Card en Soporte + permiso para administradores (asignable a otros perfiles en Usuarios)
+    await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono)
+                      VALUES (4960001, 500001, 'Avisos en Línea', 'avisos_linea', '/soporte/avisos/', 'bi-megaphone')`);
+    for (const idPerfil of [1, 210001]) {
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                        SELECT ?, 4960001, 1 FROM DUAL
+                        WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=4960001)`,
+                       [idPerfil, idPerfil]).catch(() => {});
+    }
     console.log('[notif] tablas OK');
   } catch (e) { console.error('[notif migration]', e.message); }
 });
@@ -177,4 +200,51 @@ const borrarTodas = async (req, res) => {
   }
 };
 
-module.exports = { notificar, getVapidKey, subscribe, getMias, marcarLeidas, borrarUna, borrarTodas };
+/* ── Avisos en Línea (Soporte): broadcast a todos los conectados ── */
+const SONIDOS_AVISO = ['campana', 'dingdong', 'alarma', 'aplausos', 'anuncio'];
+
+const enviarAviso = async (req, res) => {
+  try {
+    const mensaje = String(req.body?.mensaje || '').trim();
+    if (!mensaje) return res.status(400).json({ success: false, data: null, error: 'El mensaje es obligatorio' });
+    if (mensaje.length > 500) return res.status(400).json({ success: false, data: null, error: 'Máximo 500 caracteres' });
+    const sonido  = SONIDOS_AVISO.includes(req.body?.sonido) ? req.body.sonido : 'anuncio';
+    const retardo = Math.min(120, Math.max(0, parseInt(req.body?.retardo_seg) || 0));
+    const duracion = Math.min(300, Math.max(5, parseInt(req.body?.duracion_seg) || 20));
+    const autor = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || null;
+    const [r] = await pool.query(
+      'INSERT INTO avisos_linea (mensaje, sonido, retardo_seg, duracion_seg, id_usuario, autor) VALUES (?,?,?,?,?,?)',
+      [mensaje, sonido, retardo, duracion, req.usuario.id_usuario, autor]
+    );
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) {
+    console.error('[aviso-linea enviar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+// Avisos "vigentes" = de los últimos 10 minutos; el cliente descarta los ya mostrados.
+const avisosVigentes = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, mensaje, sonido, retardo_seg, duracion_seg, autor, created_at
+       FROM avisos_linea WHERE created_at >= NOW() - INTERVAL 10 MINUTE
+       ORDER BY id DESC LIMIT 5`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+const avisosHistorial = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, mensaje, sonido, retardo_seg, duracion_seg, autor, created_at FROM avisos_linea ORDER BY id DESC LIMIT 30');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { notificar, getVapidKey, subscribe, getMias, marcarLeidas, borrarUna, borrarTodas,
+                   enviarAviso, avisosVigentes, avisosHistorial };

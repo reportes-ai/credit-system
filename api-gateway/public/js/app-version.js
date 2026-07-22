@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v147.2';
+const APP_VERSION = 'v148.0';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -60,7 +60,7 @@ const APP_VERSION = 'v147.2';
 (function () {
   try {
     if (!sessionStorage.getItem('token')) return;
-    ['/js/cumple-popup.js', '/js/ranking-popup.js', '/js/carrera-popup.js', '/js/mi-dia-popup.js'].forEach(src => {
+    ['/js/cumple-popup.js', '/js/ranking-popup.js', '/js/carrera-popup.js', '/js/mi-dia-popup.js', '/js/aviso-linea.js'].forEach(src => {
       if (document.querySelector('script[src="' + src + '"]')) return;
       const s = document.createElement('script');
       s.src = src;
