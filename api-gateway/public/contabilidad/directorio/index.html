@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentación Directorio — AutoFácil</title>
-  <!-- v1.4 — Análisis del Analista IA por lámina (guardado por mes, sobre los Hechos Relevantes) -->
+  <!-- v1.5 — Láminas de resumen ejecutivo (réplica cuadros PPT directorio): Balance, EERR, Personal, Operación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js" defer></script>
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
@@ -43,6 +43,15 @@
     .xls .grupo td { background:#efefef; font-weight:800; }
     .xls .margen td { background:#dce6f1; color:#1F4E79; font-weight:800; }
     .xls .neg { color:#b91c1c; }
+    /* Tarjetas resumen ejecutivo (estilo PPT directorio) */
+    .ejec-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+    @media (max-width:900px){ .ejec-grid { grid-template-columns:repeat(2,1fr); } }
+    .ejec-card { border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; background:#fbfdff; }
+    .ejec-card .l { font-size:.68rem; font-weight:800; letter-spacing:.08em; color:#64748b; text-transform:uppercase; }
+    .ejec-card .v { font-size:1.35rem; font-weight:800; color:#0f172a; margin:2px 0; font-family:Consolas,monospace; }
+    .ejec-card .s { font-size:.72rem; color:#64748b; }
+    .ejec-card .tag { display:inline-block; margin-top:6px; font-size:.66rem; font-weight:800; border-radius:8px; padding:1px 8px; }
+    .tag-ok { background:#dcfce7; color:#166534; } .tag-bad { background:#fee2e2; color:#b91c1c; } .tag-neu { background:#e2e8f0; color:#475569; }
     @media print {
       body { background:#fff; } .main-content { padding:0; max-width:none; }
       .no-print, #af-topnav, .toolbar { display:none !important; }
@@ -175,17 +184,26 @@ function descargarCuadro(btn, titulo){
 }
 
 function generar(){ consultar(); }
-let Q = null, C = null, HN = null; // cuadros estilo Excel + auxiliares compras/honorarios
+let Q = null, C = null, HN = null, RU = null; // cuadros estilo Excel + auxiliares + rubros (prefijos)
 async function consultar(){
-  const [j, jq, jc, jh] = await Promise.all([
+  const [j, jq, jc, jh, jr] = await Promise.all([
     fetch('/api/contabilidad/directorio?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/directorio/cuadros?mes='+fMes.value,{headers:H}).then(r=>r.json()),
     fetch('/api/contabilidad/compras-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
     fetch('/api/contabilidad/honorarios-aux?mes='+fMes.value,{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
+    fetch('/api/contabilidad/directorio/rubros',{headers:H}).then(r=>r.json()).catch(()=>({success:false})),
   ]);
   if (!j.success) return alert(j.error);
   if (!jq.success) return alert(jq.error);
-  D = j.data; Q = jq.data; C = jc.success ? jc.data : null; HN = jh.success ? jh.data : null; render();
+  D = j.data; Q = jq.data; C = jc.success ? jc.data : null; HN = jh.success ? jh.data : null;
+  RU = jr.success ? jr.data : []; render();
+}
+/* cuentas del EERR (D.eerr) que caen en un rubro del cuadro, por sus prefijos */
+function cuentasDeRubro(etiqueta){
+  const r = (RU||[]).find(x=>x.cuadro==='EERR' && x.etiqueta===etiqueta && x.activo);
+  if (!r) return [];
+  const prefs = String(r.prefijos||'').split(',').map(s=>s.trim()).filter(Boolean);
+  return D.eerr.filter(x=>prefs.some(p=>String(x.cuenta).startsWith(p)));
 }
 async function importarCompras(inp){
   const f = inp.files[0]; if (!f) return; inp.value='';
@@ -285,6 +303,82 @@ function cuadroEERR(fV, fAA, titulo, lblA, lblAA){
       <td class="n">${pesos(varV)}</td><td class="n">${varP===null?'':`<span class="${varP<0?'neg':''}">${varP.toLocaleString('es-CL',{maximumFractionDigits:1})}%</span>`}</td><td></td></tr>`;
   });
   return html + `</tbody></table><div class="small text-muted mt-1">${hayPpto?'PPTO: presupuesto anual de finanzas importado (mismo corte que la columna actual).':'Columna PPTO vacía: importa el Excel de presupuesto con el botón de la barra.'}</div>`;
+}
+
+/* ── Láminas resumen ejecutivo (réplica de los cuadros de la PPT del directorio) ── */
+const M$ = n => { const v = Math.round((Number(n)||0)/1e6); return `<span class="${v<0?'neg':''}">M$${v.toLocaleString('es-CL')}</span>`; };
+const pctTxt = (a,b) => !b ? '—' : ((a-b)/Math.abs(b)*100).toLocaleString('es-CL',{maximumFractionDigits:1})+'%';
+function tarjeta(lbl, val, sub, tag, tagCls){
+  return `<div class="ejec-card"><div class="l">${lbl}</div><div class="v">${M$(val)}</div>
+    <div class="s">${sub}</div>${tag?`<span class="tag ${tagCls||'tag-neu'}">${tag}</span>`:''}</div>`;
+}
+function lamResumenBalance(nomMes, mAntLbl){
+  const b = Q.balance, i = b.columnas.length-1, ia = Math.max(0, i-1);
+  const sT = (t,idx) => b.grupos.filter(g=>g.tipo===t).reduce((s,g)=>s+g.subtotal[idx],0);
+  const A=[sT('ACTIVO',i),sT('ACTIVO',ia)], P=[sT('PASIVO',i),sT('PASIVO',ia)];
+  const Pat=[A[0]-P[0], A[1]-P[1]];   // patrimonio económico (incluye resultado)
+  const cajaFin = D.caja.reduce((s,x)=>s+x.saldo_ini+x.entradas-x.salidas,0);
+  const cajaIni = D.caja.reduce((s,x)=>s+x.saldo_ini,0);
+  const g = nom => { const x = b.grupos.find(z=>z.grupo.toLowerCase()===nom.toLowerCase()); return x?x.subtotal[i]:0; };
+  const comp = [['Activo Corriente',g('Activo Corriente')],['Activo no Corriente',g('Activo no Corriente')],
+                ['Pasivo Corriente',g('Pasivo Corriente')],['Pasivo no Corriente',g('Pasivo no Corriente')],['Patrimonio',Pat[0]]];
+  return lamina('BALANCE', `RESUMEN EJECUTIVO — BALANCE AL ${nomMes}`, `
+    <div class="ejec-grid">
+      ${tarjeta('Activo Total', A[0], `${mAntLbl}: ${M$(A[1])} · Var.: ${pctTxt(A[0],A[1])}`)}
+      ${tarjeta('Pasivo Total', P[0], `${mAntLbl}: ${M$(P[1])} · Var.: ${pctTxt(P[0],P[1])}`, P[0]<P[1]?'Menor presión':'Al alza', P[0]<P[1]?'tag-ok':'tag-bad')}
+      ${tarjeta('Patrimonio', Pat[0], `${mAntLbl}: ${M$(Pat[1])}`, Pat[0]>=Pat[1]?'Mejora':'Deterioro', Pat[0]>=Pat[1]?'tag-ok':'tag-bad')}
+      ${tarjeta('Caja', cajaFin, `Inicio de mes: ${M$(cajaIni)} · Var.: ${pctTxt(cajaFin,cajaIni)}`, cajaFin>=cajaIni?'Mejora':'Baja', cajaFin>=cajaIni?'tag-ok':'tag-bad')}
+    </div>
+    <table class="xls"><thead><tr><th colspan="2" class="tit">COMPOSICIÓN DEL BALANCE (miles de $)</th></tr></thead><tbody>
+      ${comp.filter(c=>Math.abs(c[1])>500).map(c=>`<tr><td>${c[0]}</td><td class="n">${miles(c[1])}</td></tr>`).join('')}
+    </tbody></table>`, 'RES_BAL', 'Resumen ejecutivo Balance');
+}
+function eerrFila(etq){ return Q.eerr.find(x=>x.etiqueta===etq); }
+function lamResumenEERR(nomMes, y){
+  const margenes = Q.eerr.filter(x=>x.clase==='MARGEN');
+  const ing = eerrFila('Ingresos Operativos'), gp = eerrFila('Gastos de Personal'), go = eerrFila('Gastos de Operación');
+  const mb = margenes[0], uai = margenes[margenes.length-1];
+  if (!ing || !mb) return '';
+  const gg = [ (gp?.valores[0]||0)+(go?.valores[0]||0), (gp?.valores[1]||0)+(go?.valores[1]||0), (gp?.ppto?.[0]||0)+(go?.ppto?.[0]||0) ];
+  const card = (lbl,row,invBueno) => {
+    if (!row) return '';
+    const a=row.valores[0], aa=row.valores[1], p=row.ppto?row.ppto[0]:0;
+    const dvP = p ? (a-p)/Math.abs(p)*100 : null;
+    const bueno = invBueno ? (dvP!==null && dvP<=0) : (dvP!==null && dvP>=0);
+    return tarjeta(lbl, a, `Ppto: ${M$(p)} · ${y-1}: ${M$(aa)}`,
+      dvP===null?'Sin ppto':`${dvP>0?'+':''}${dvP.toLocaleString('es-CL',{maximumFractionDigits:1})}% vs ppto`, dvP===null?'tag-neu':(bueno?'tag-ok':'tag-bad'));
+  };
+  return lamina('EERR', `RESUMEN EJECUTIVO — RESULTADOS ACUMULADOS A ${nomMes}`, `
+    <div class="ejec-grid">
+      ${card('Ingresos Operativos', ing)}
+      ${card('Margen: '+mb.etiqueta, mb)}
+      ${tarjeta('Gastos Personal + Operación', gg[0], `Ppto: ${M$(gg[2])} · ${y-1}: ${M$(gg[1])}`, gg[2]?`${((gg[0]-gg[2])/Math.abs(gg[2])*100).toLocaleString('es-CL',{maximumFractionDigits:1})}% vs ppto`:'Sin ppto', gg[2]&&gg[0]<=gg[2]?'tag-ok':'tag-bad')}
+      ${card('Resultado (UAI): '+uai.etiqueta, uai)}
+    </div>
+    <table class="xls"><thead><tr><th colspan="4" class="tit">ACTUAL VS PRESUPUESTO VS ${y-1} (pesos)</th></tr>
+      <tr><th></th><th>Acum ${y}</th><th>Ppto</th><th>Acum ${y-1}</th></tr></thead><tbody>
+      ${[ing,mb,gp,go,uai].filter(Boolean).map(r=>`<tr class="${r.clase==='MARGEN'?'margen':''}"><td>${esc(r.etiqueta)}</td>
+        <td class="n">${pesos(r.valores[0])}</td><td class="n">${r.ppto?pesos(r.ppto[0]):'—'}</td><td class="n">${pesos(r.valores[1])}</td></tr>`).join('')}
+    </tbody></table>`, 'RES_EERR', 'Resumen ejecutivo Resultados');
+}
+function lamResumenRubro(etiqueta, kicker, titulo, sec, y){
+  const r = eerrFila(etiqueta); if (!r) return '';
+  const a=r.valores[0], aa=r.valores[1], p=r.ppto?r.ppto[0]:0;
+  const ctas = cuentasDeRubro(etiqueta).map(x=>({...x, dif: x.acum_actual-x.acum_aa}))
+    .filter(x=>Math.abs(x.acum_actual)>500||Math.abs(x.acum_aa)>500)
+    .sort((q,w)=>Math.abs(w.acum_actual)-Math.abs(q.acum_actual));
+  return lamina(kicker, titulo, `
+    <div class="ejec-grid">
+      ${tarjeta(etiqueta+' acum.', a, `Ppto: ${M$(p)} · ${y-1}: ${M$(aa)}`)}
+      ${tarjeta('Variación vs Ppto', a-p, p?`${pctTxt(a,p)} del presupuesto`:'Sin presupuesto cargado', p?(a<=p?'Bajo ppto':'Sobre ppto'):'—', p?(a<=p?'tag-ok':'tag-bad'):'tag-neu')}
+      ${tarjeta('Variación vs '+(y-1), a-aa, `${y-1}: ${M$(aa)} · ${pctTxt(a,aa)}`, a<=aa?'Favorable':'Al alza', a<=aa?'tag-ok':'tag-bad')}
+      <div class="ejec-card"><div class="l">N° cuentas con movimiento</div><div class="v">${ctas.length}</div><div class="s">cuentas del rubro</div></div>
+    </div>
+    <table class="xls"><thead><tr><th colspan="5" class="tit">DETALLE POR CUENTA — ACUMULADO (pesos)</th></tr>
+      <tr><th>Cuenta</th><th></th><th>Acum ${y}</th><th>Acum ${y-1}</th><th>Var</th></tr></thead><tbody>
+      ${ctas.map(x=>`<tr><td class="n">${esc(x.cuenta)}</td><td>${esc(x.nombre||'')}</td>
+        <td class="n">${pesos(x.acum_actual)}</td><td class="n">${pesos(x.acum_aa)}</td><td class="n">${pesos(x.dif)}</td></tr>`).join('')}
+    </tbody></table>`, sec, titulo);
 }
 
 function render(){
@@ -391,6 +485,10 @@ function render(){
         <div class="kpi"><div class="v" style="color:#fff">${mm(resAcum)}</div><div class="l">Resultado acumulado</div></div>
       </div>
     </div>
+    ${lamResumenBalance(nomMes, m>1?MESES[m-1].slice(0,3).toUpperCase()+'-'+String(y).slice(2):'DIC-'+String(y-1).slice(2))}
+    ${lamResumenEERR(nomMes, y)}
+    ${lamResumenRubro('Gastos de Personal','RRHH',`GASTOS DE PERSONAL — ACUM. A ${nomMes}`,'RES_RRHH',y)}
+    ${lamResumenRubro('Gastos de Operación','OPERATIVOS',`GASTOS DE OPERACIÓN — ACUM. A ${nomMes}`,'RES_OP',y)}
     ${lamBal}${lamCxC}${lamCxP}${lamCompras}${lamHon}${lamEERRMes}${lamEERRAcum}${lamCaja}
     <div class="lamina"><div class="lam-head"><span>CIERRE</span><span class="kicker">AUTOFÁCIL</span></div>
       <div class="lam-body" style="text-align:center;padding:70px 20px"><h3 class="fw-bold" style="color:var(--navy)">¿Preguntas?</h3>
@@ -467,6 +565,10 @@ async function guardarHechos(sec){
 function datosSeccion(sec){
   const esCxC = c => /^110[3-9]/.test(c.cuenta) && !/^1101|^1102/.test(c.cuenta);
   if (sec==='BALANCE') return { balance: D.balance };
+  if (sec==='RES_BAL') return { balance_resumen: Q.balance.grupos.map(g=>({grupo:g.grupo,tipo:g.tipo,actual:g.subtotal[g.subtotal.length-1],anterior:g.subtotal[Math.max(0,g.subtotal.length-2)]})), caja: D.caja };
+  if (sec==='RES_EERR') return { eerr_rubros: Q.eerr.map(x=>({rubro:x.etiqueta,clase:x.clase,acum:x.valores[0],acum_aa:x.valores[1],ppto:x.ppto?x.ppto[0]:null})) };
+  if (sec==='RES_RRHH') return { gasto_personal: cuentasDeRubro('Gastos de Personal').map(x=>({cuenta:x.cuenta,nombre:x.nombre,acum:x.acum_actual,acum_aa:x.acum_aa})) };
+  if (sec==='RES_OP') return { gasto_operacion: cuentasDeRubro('Gastos de Operación').map(x=>({cuenta:x.cuenta,nombre:x.nombre,acum:x.acum_actual,acum_aa:x.acum_aa})) };
   if (sec==='CXC') return { cxc: D.balance.filter(x=>x.tipo==='ACTIVO'&&esCxC(x)) };
   if (sec==='CXP') return { cxp: D.balance.filter(x=>x.tipo==='PASIVO'&&/^21/.test(x.cuenta)) };
   if (sec==='EERR_MES') return { eerr_mes: D.eerr.map(x=>({cuenta:x.cuenta,nombre:x.nombre,tipo:x.tipo,mes_actual:x.mes_actual,mes_anio_anterior:x.mes_aa})) };
@@ -493,7 +595,7 @@ async function analizarIA(sec, silencioso){
 }
 async function analizarTodo(){
   if (!D) return alert('Genera primero la presentación.');
-  const secs = ['BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
+  const secs = ['RES_BAL','RES_EERR','RES_RRHH','RES_OP','BALANCE','CXC','CXP','EERR_MES','EERR_ACUM','CAJA'];
   if (C && C.total_mes.docs) secs.push('COMPRAS');
   if (HN && HN.total_mes.docs) secs.push('HONORARIOS');
   const btn = event.target.closest('button'); btn.disabled = true;
