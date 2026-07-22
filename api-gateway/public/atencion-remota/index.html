@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v2.1 — Adjuntos del chat por header Authorization (sin JWT en la URL) -->
+  <!-- v2.2 — el ejecutivo guarda su preferencia "Permitir video" entre recargas y reanuncia disponibilidad cuando el dealer (re)conecta → el botón de video aparece confiable en el dealer -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -380,8 +380,12 @@ function connect(){
 function wsSend(o){ try{ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }catch(_){} }
 function sendPresence(){ wsSend({ t:'presence', disponible: document.getElementById('dispChk').checked }); }
 document.getElementById('dispChk').addEventListener('change', sendPresence);
+// Restaurar la preferencia de video (persiste entre recargas) y sincronizar el checkbox.
+videoAvail = localStorage.getItem('ar_video') === '1';
+document.getElementById('videoChk').checked = videoAvail;
 document.getElementById('videoChk').addEventListener('change', function(){
   videoAvail=this.checked;
+  localStorage.setItem('ar_video', videoAvail?'1':'0');
   panels.forEach((p,id)=>wsSend({ t:'rtc', id, kind:'avail', payload:{on:videoAvail} }));
   toast(videoAvail?'Los dealers ahora pueden llamarte por video':'Videollamadas de dealers desactivadas');
 });
@@ -394,7 +398,10 @@ function onMsg(m){
     case 'asignada': openPanel(m.conversacion); break;
     case 'mensaje': addMessage(m.id_conversacion, m.mensaje); break;
     case 'typing':  showTyping(m.id_conversacion, m.on); break;
-    case 'presencia': setPresencia(m.id_conversacion, m.online); break;
+    case 'presencia': setPresencia(m.id_conversacion, m.online);
+      // Dealer (re)conectó: reanuncia la disponibilidad de video para que le aparezca el botón.
+      if(m.online && videoAvail && panels.has(m.id_conversacion)) wsSend({ t:'rtc', id:m.id_conversacion, kind:'avail', payload:{on:true} });
+      break;
     case 'cerrada': removePanel(m.id_conversacion, true); break;
     case 'rtc':     ARTC.onRtc(m.id_conversacion, m.kind, m.payload, m.from); break;
     case 'error':   toast(m.msg||'Error', true); break;
