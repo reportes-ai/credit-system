@@ -71,8 +71,8 @@ function inputHTML(c, val){
     const ops = (c.ops||[]).map(o => `<option value="${esc(o)}" ${String(o)===String(v)?'selected':''}>${esc(o)}</option>`).join('');
     return `<select id="${id}"><option value="">—</option>${ops}</select>`;
   }
-  if (c.pct) {   // tasa: se guarda como fracción (0,0285); se muestra como % (2,850)
-    const pv = (v === '' ? '' : (Number(v) * 100).toFixed(3));
+  if (c.pct) {   // tasa: en creditos.tascli_real se guarda EN PORCENTAJE (2,870) — sin conversión
+    const pv = (v === '' ? '' : Number(v).toFixed(3));
     return `<div style="position:relative"><input id="${id}" type="number" step="0.001" inputmode="decimal" data-pct="1" value="${esc(pv)}" placeholder="0,000" style="padding-right:26px"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem">%</span></div>`;
   }
   if (c.money) {
@@ -176,7 +176,7 @@ function recolectar(){
   const campos = {};
   document.querySelectorAll('[id^="f_"]').forEach(el => {
     let v = el.value;
-    if (el.dataset.pct) { const n = parseFloat(String(v).replace(',','.')); v = isNaN(n) ? '' : String(n/100); } // % → fracción
+    if (el.dataset.pct) { const n = parseFloat(String(v).replace(',','.')); v = isNaN(n) ? '' : String(n); }     // % tal cual (convención BD)
     else if (el.dataset.money) { const d = String(v).replace(/[^\d]/g,''); v = d === '' ? '' : d; }              // $ → entero
     else if (el.type === 'month' && v) v = v + '-01';                                                            // mes → fecha válida
     campos[el.id.slice(2)] = v;

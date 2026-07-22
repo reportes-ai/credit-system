@@ -79,6 +79,22 @@ async function crearCreditoDesdeCartas(c) {
     (c.ejecutivo_nombre || c.ejecutivoNombre || null),
     (c.part_bruto || c.partBruto || null),
   ]);
+  // Parque/Calle desde el mantenedor de dealers (por RUT): la carta no lo trae y
+  // dejaba el campo vacío en la cola de digitación (mismo criterio de dealerBuscar).
+  try {
+    const rutD = (c.rut_conc || c.rutConc || '').trim();
+    if (rutD) {
+      const rd = rutD.replace(/\D/g, '');
+      const [[dl]] = await pool.query(
+        `SELECT ccs_parque FROM dealers WHERE REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') = ? LIMIT 1`, [rd]);
+      if (dl && dl.ccs_parque) {
+        const t = String(dl.ccs_parque).toUpperCase();
+        const tipoU = t.includes('PARQUE') ? 'PARQUE' : 'CALLE';
+        await pool.query('UPDATE creditos SET tipo_ubicacion=?, parque=COALESCE(NULLIF(parque,\'\'), ?) WHERE id=?',
+          [tipoU, tipoU, r.insertId]);
+      }
+    }
+  } catch (e) { console.error('[carta→parque]', e.message); }
   // La participación de la carta (part_bruto) es una negociación especial: si difiere
   // del cálculo, comdea_real queda forzado (no se sobrescribe en el recálculo).
   const partCarta = c.part_bruto ?? c.partBruto;
