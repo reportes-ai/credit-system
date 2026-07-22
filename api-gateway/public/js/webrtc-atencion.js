@@ -199,10 +199,26 @@
     return S.local;
   }
   async function newPc() {
-    const pc = new RTCPeerConnection({ iceServers: await getIce() });
-    pc.onicecandidate = e => { if (e.candidate) S.signal(S.convId, 'ice', e.candidate.toJSON()); };
-    pc.ontrack = e => { ui.remote.srcObject = e.streams[0]; ui.wait.style.display = 'none'; ui.wst.classList.add('on'); ui.remoteName.textContent = S.peerName || ui.remoteName.textContent; };
+    const ice = await getIce();
+    console.log('[ARTC] iceServers:', ice.map(s => s.urls));
+    const pc = new RTCPeerConnection({ iceServers: ice });
+    pc.onicecandidate = e => {
+      if (e.candidate) { console.log('[ARTC] cand local:', e.candidate.type, e.candidate.protocol, e.candidate.address || ''); S.signal(S.convId, 'ice', e.candidate.toJSON()); }
+    };
+    pc.onicecandidateerror = e => console.warn('[ARTC] ICE cand error:', e.errorCode, e.url || '');
+    pc.ontrack = e => { ui.remote.srcObject = e.streams[0]; ui.wst.classList.add('on'); ui.remoteName.textContent = S.peerName || ui.remoteName.textContent; };
+    // Estado de conexión visible (diagnóstico): checking → connected → failed.
+    pc.oniceconnectionstatechange = () => {
+      const st = pc.iceConnectionState;
+      console.log('[ARTC] iceConnectionState:', st);
+      if (!ui.wait) return;
+      if (st === 'checking') { ui.wait.style.display = 'flex'; ui.wait.textContent = 'Conectando el video…'; }
+      else if (st === 'connected' || st === 'completed') { ui.wait.style.display = 'none'; }
+      else if (st === 'failed') { ui.wait.style.display = 'flex'; ui.wait.textContent = 'No se pudo establecer el video (firewall/red). Se necesita un servidor TURN.'; }
+      else if (st === 'disconnected') { ui.wait.style.display = 'flex'; ui.wait.textContent = 'Reconectando el video…'; }
+    };
     pc.onconnectionstatechange = () => {
+      console.log('[ARTC] connectionState:', pc.connectionState);
       if (['failed', 'closed', 'disconnected'].includes(pc.connectionState) && S.state === 'incall') setTimeout(() => { if (pc.connectionState !== 'connected') endLocal(); }, 1500);
     };
     return pc;
