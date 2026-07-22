@@ -8,7 +8,7 @@
    La imagen de reemplazo vive en /img/fondo-videollamada.jpg.
    ───────────────────────────────────────────────────────────────────────── */
 window.AF_FONDO = (function () {
-  const BG_URL = '/img/fondo-videollamada.png';
+  const BG_URL = '/img/fondo-videollamada.jpg';
   let seg = null, modo = 'ninguno', bgImg = null, rawVideo = null,
       canvas = null, ctx = null, running = false, raf = null, out = null;
 
