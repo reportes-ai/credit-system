@@ -190,10 +190,18 @@ async function handle(ws, m) {
   if (m.t === 'chat') {
     const cuerpo = String(m.cuerpo || '').slice(0, 4000).trim();
     if (!cuerpo) return;
+    // Si el dealer escribe a una conversación CERRADA, se reabre y vuelve a la cola:
+    // así nunca queda "escribiendo a la nada" y un ejecutivo recibe el aviso de nuevo.
+    let reencolar = false;
+    if (I.tipo === 'dealer' && conv.estado === 'CERRADA') {
+      await pool.query("UPDATE ar_conversaciones SET estado='ESPERA', id_ejecutivo=NULL, ejecutivo_nombre=NULL WHERE id=?", [conv.id]);
+      conv.estado = 'ESPERA'; reencolar = true;
+    }
     const emisor = I.tipo === 'dealer' ? 'DEALER' : 'EJECUTIVO';
     const mensaje = await C.persistMensaje({ id_conversacion: conv.id, emisor, id_usuario: I.tipo === 'user' ? I.id : null, autor_nombre: I.nombre, cuerpo, tipo: 'TEXTO' });
     send(ws, { t: 'mensaje', id_conversacion: conv.id, mensaje });
     relayRoom(conv.id, { t: 'mensaje', id_conversacion: conv.id, mensaje }, ws);
+    if (reencolar) await broadcastCola();
     return;
   }
 
