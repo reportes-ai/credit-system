@@ -52,15 +52,9 @@
       <tr><td class="lbl">RUT</td><td class="val">${rutF(c.rutConc || '')}</td><td class="lbl">VENDEDOR</td><td class="val">${esc(c.vendedor || '')}</td></tr>
     </table>`;
 
-    const excepcionesSec = (Array.isArray(c.excepciones) && c.excepciones.length) ? (() => {
-      const LBL = { TASA_BAJO_PIZARRA: 'Tasa bajo pizarra', CAMBIO_PARTICIPACION: 'Cambio de participación manual',
-                    PARTICIPACION_SOBRE_PIZARRA: 'Participación sobre pizarra', FINANCIERA_NO_PREFERENTE: 'Financiera distinta a la preferente' };
-      const coms = c.excepcionesComentarios || {};
-      return `<div class="sec-title" style="background:#fde68a;color:#7c2d12">APROBADA CON EXCEPCIONES (${c.excepciones.length})</div>
-      <table class="data-tbl">
-        ${c.excepciones.map(e => `<tr><td class="lbl" style="width:32%">${esc(LBL[e] || e)}</td><td class="val">${esc(coms[e] || '(sin justificación registrada)')}</td></tr>`).join('')}
-      </table>`;
-    })() : '';
+    // Excepciones: NO van en la carta que se firma y entrega (tema interno, decisión
+    // 2026-07-23). Siguen visibles en la revisión del analista y en el listado ("E").
+    const excepcionesSec = '';
 
     const qrHTML = opts.qr && opts.qr.qrHTML ? opts.qr.qrHTML : '';
     const fesTxt = opts.qr && opts.qr.fes ? esc(opts.qr.fes) : '';
