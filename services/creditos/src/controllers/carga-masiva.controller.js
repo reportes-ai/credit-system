@@ -185,7 +185,10 @@ function mapRow(row, mesOverride) {
     // si no (placeholder de INDEXA en otro mes), se usa el último día del mes contable.
     fecha_otorgado: (() => {
       if (mesOverride && (!fOtorgRaw || fOtorgRaw.slice(0, 7) !== mesOverride.slice(0, 7))) {
-        return finDeMes(mesOverride);
+        // Comodín = DÍA 01 del mes contable (misma convención de la columna `mes`).
+        // Antes era el último día: con el mes EN CURSO el 31 aún era futuro y el
+        // filtro anti-futuras botaba toda la carga.
+        return mesOverride.slice(0, 7) + '-01';
       }
       return fOtorgRaw;
     })(),
