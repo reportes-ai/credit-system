@@ -445,7 +445,7 @@ async function cumplesEnVentana(tope, soloId) {
     fechas.push({ iso: isoFecha(f), dias: d });
   }
   const params = []; let extra = '';
-  if (soloId) { extra = ' AND id_usuario=?'; params.push(soloId); }
+  if (soloId) { extra = ' AND u.id_usuario=?'; params.push(soloId); }   // con alias: rh_fichas también tiene id_usuario (columna ambigua → 500)
   const [rows] = await pool.query(
     `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.nombre nombre_pila, u.sexo, u.fecha_nacimiento
        FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario
