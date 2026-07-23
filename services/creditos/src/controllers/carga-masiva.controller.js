@@ -438,8 +438,29 @@ const importar = async (req, res) => {
         // Misma operación (mismo num_op) sí se actualiza (re-cargas de estados).
         if (obj.id_financiera && duenosIdFin.has(String(obj.id_financiera))
             && String(duenosIdFin.get(String(obj.id_financiera))) !== String(obj.num_op)) {
+          const dueno = duenosIdFin.get(String(obj.id_financiera));
           omitidosYaDigitados++;
-          errores.push({ op: obj.num_op, error: `Omitido: ID financiera ${obj.id_financiera} ya se encuentra ingresado (crédito ${duenosIdFin.get(String(obj.id_financiera))})` });
+          // La fila NO se inserta, pero sí COMPLETA los campos vacíos del crédito ya
+          // digitado (COALESCE: nunca pisa lo existente) — primas, gastos, fechas, etc.
+          // que la carta de aprobación no trae pero el Excel sí.
+          try {
+            const ENRIQUECIBLES = ['seguro_rdh','seguro_cesantia','seguro_rep_menor','gastos','gps','comision_seguro',
+              'valor_vehiculo','pie','saldo_precio','pct_financiado','monto_financiado','plazo','tascli_real',
+              'comdea_real','comej','monto_comision_fin','com_rdh','com_cesantia','com_reparaciones','com_parque',
+              'fecha_primera_cuota','fecha_estado','estado_sp','fecha_pago_sp','fecha_recep_doc','vendedor','producto'];
+            const setCols = ENRIQUECIBLES.filter(c => obj[c] !== undefined && obj[c] !== null);
+            if (setCols.length) {
+              await pool.query(
+                `UPDATE creditos SET ${setCols.map(c => `\`${c}\` = COALESCE(\`${c}\`, ?)`).join(', ')} WHERE num_op = ?`,
+                [...setCols.map(c => obj[c]), dueno]);
+            }
+            // Post Venta del crédito dueño (etapas por estado SP / fundantes / comisión)
+            auxPostventa.push({ num_op: dueno, estado_sp: obj.estado_sp, fecha_pago_sp: obj.fecha_pago_sp,
+              estado_pago_com: obj.estado_pago_com, comdea_real: obj.comdea_real, rut_dealer: obj.rut_dealer,
+              automotora: obj.automotora, _fecha_fundante: obj._fecha_fundante, _fecha_factura: obj._fecha_factura,
+              _fecha_pago_com: obj._fecha_pago_com, _nro_factura: obj._nro_factura });
+          } catch (e) { console.error('[carga-masiva completar dueño]', e.message); }
+          errores.push({ op: obj.num_op, error: `Omitido: ID financiera ${obj.id_financiera} ya digitado (crédito ${dueno}) — se completaron sus campos vacíos` });
           continue;
         }
 
@@ -555,7 +576,7 @@ const importar = async (req, res) => {
 
     // ── Post Venta: estado saldo precio / fundantes / comisión del Excel → etapas ──
     let postventaMarcados = 0;
-    if (insertados > 0) {
+    if (insertados > 0 || auxPostventa.length) {
       try { postventaMarcados = await marcarPostventaDesdeCarga(auxPostventa); }
       catch (e) { console.error('[carga-masiva postventa]', e.message); }
     }
