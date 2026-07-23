@@ -947,7 +947,12 @@ const getOtorgadosIncompletos = async (req, res) => {
       FROM creditos
       WHERE estado_eval = 'OTORGADO'
         AND estado_credito NOT IN ('RECHAZADO','ANULADO')
-        AND (plazo IS NULL OR plazo = 0 OR tascli_real IS NULL OR tascli_real = 0)
+        AND (plazo IS NULL OR plazo = 0 OR tascli_real IS NULL OR tascli_real = 0
+             -- primas nunca digitadas (misma regla que la cola de digitación): afectan el
+             -- ingreso por seguros SALVO en UNIDAD DE CREDITO (UAC no paga comisión de
+             -- seguros — rentabilidad-calc.js). 0 explícito = válido.
+             OR (UPPER(COALESCE(financiera,'')) <> 'UNIDAD DE CREDITO'
+                 AND seguros IS NULL AND seguro_rdh IS NULL AND seguro_cesantia IS NULL AND seguro_rep_menor IS NULL))
       ORDER BY mes DESC, num_op DESC
       LIMIT 2000 -- LIMIT defensivo (cola de digitacion faltantes)
     `);
