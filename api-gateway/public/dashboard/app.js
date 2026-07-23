@@ -4404,8 +4404,14 @@ async function cargarAlertaIncompletos() {
     if (!el) return;
     if (lista.length === 0) { el.style.display = 'none'; return; }
     el.style.display = 'flex';
+    // Desglose real de lo que falta (tasa/plazo ≠ primas: mensajes distintos)
+    const sinTasa   = lista.filter(c => !c.plazo || !Number(c.tascli_real)).length;
+    const sinPrimas = lista.length - sinTasa;
+    const partes = [];
+    if (sinTasa)   partes.push(`${sinTasa} sin plazo/tasa (ingreso colocación sin calcular)`);
+    if (sinPrimas) partes.push(`${sinPrimas} sin primas de seguro digitadas`);
     document.getElementById('alerta-incompletos-txt').textContent =
-      `${lista.length} crédito${lista.length>1?'s':''} OTORGADO${lista.length>1?'S':''} sin plazo/tasa — ingreso colocación sin calcular`;
+      `${lista.length} crédito${lista.length>1?'s':''} OTORGADO${lista.length>1?'S':''} con datos de ingresos faltantes — ${partes.join(' · ')}`;
     window._incompletos = lista;
   } catch(e) { console.warn('[incompletos]', e.message); }
 }
