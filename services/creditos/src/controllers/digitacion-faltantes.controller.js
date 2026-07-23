@@ -239,6 +239,13 @@ exports.guardar = async (req, res) => {
     for (const [col, raw] of Object.entries(campos)) {
       if (!valid.has(col)) continue;
       let v = (raw === '' || raw === undefined) ? null : raw;
+      // Regla: ID de la financiera único — si ya existe en otro crédito, se detiene
+      if (col === 'id_financiera' && v != null && String(v).trim() !== '') {
+        const [[dup]] = await pool.query(
+          'SELECT num_op, numero_credito FROM creditos WHERE id_financiera = ? AND id <> ? LIMIT 1', [String(v).trim(), id]);
+        if (dup) return res.status(409).json({ success:false, data:null,
+          error: `El ID de la financiera ${String(v).trim()} ya se encuentra ingresado (crédito ${dup.num_op || dup.numero_credito}).` });
+      }
       // Tasa cliente siempre en % mensual (motor único: fracción <0,2 → ×100)
       if (col === 'tascli_real' && v != null) {
         const core = require('../../../../api-gateway/public/js/rentabilidad-core');

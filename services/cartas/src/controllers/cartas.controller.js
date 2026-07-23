@@ -699,6 +699,22 @@ const upsert = async (req, res) => {
         return res.status(400).json({ success: false, data: null,
           error: `La carta está vencida (${dias} días corridos desde su fecha) y no puede aprobarse.` });
     }
+    // Regla de negocio (2026-07-23): el ID de la financiera es ÚNICO por operación.
+    // Si ya existe en otra carta viva o en un crédito, se detiene la digitación
+    // (evita cartas gemelas KT/DI y choques con uq_id_financiera al crear el crédito).
+    if (c.opOrigen) {
+      const [[caDup]] = await pool.query(
+        `SELECT op_carta FROM cartas_aprobacion
+          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA')
+            AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.id || null]);
+      if (caDup) return res.status(409).json({ success: false, data: null,
+        error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
+      const [[crDup]] = await pool.query(
+        `SELECT num_op, numero_credito FROM creditos WHERE id_financiera = ?
+            AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]);
+      if (crDup) return res.status(409).json({ success: false, data: null,
+        error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
+    }
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
