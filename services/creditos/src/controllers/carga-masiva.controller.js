@@ -268,6 +268,21 @@ async function getExistentes(ids) {
   return set;
 }
 
+/* Map id_financiera → num_op del crédito que ya lo tiene (para detectar que la
+   operación YA fue digitada por otra vía — carta de aprobación o digitación manual). */
+async function getDuenosIdFin(ids) {
+  const map = new Map();
+  if (!ids.length) return map;
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+    const [rows] = await pool.query(
+      `SELECT id_financiera, num_op, numero_credito FROM creditos WHERE id_financiera IN (${chunk.map(()=>'?').join(',')})`,
+      chunk);
+    rows.forEach(r => map.set(String(r.id_financiera), r.num_op ?? r.numero_credito));
+  }
+  return map;
+}
+
 /* ── POST /api/carga-masiva/preview ─────────────────────────────────────── */
 const preview = async (req, res) => {
   try {
@@ -331,8 +346,11 @@ const importar = async (req, res) => {
     // Todos los registros se procesan — el upsert decide insert o update
     const mesOverride = req.body.mes_override || null;
 
+    const duenosIdFin = await getDuenosIdFin(ids);   // ID financiera → num_op ya digitado
+
     let insertados = 0;
     let omitidosFuturo = 0;   // filas saltadas por fecha futura
+    let omitidosYaDigitados = 0;   // ID financiera ya ingresado en otra operación
     let errores    = [];
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
@@ -347,6 +365,16 @@ const importar = async (req, res) => {
         if (esFechaFutura(obj.fecha_otorgado) || esFechaFutura(obj.mes)) {
           omitidosFuturo++;
           errores.push({ op: obj.num_op, error: `Omitido: fecha futura (${obj.fecha_otorgado || obj.mes})` });
+          continue;
+        }
+
+        // Regla (2026-07-23): ID de la financiera ÚNICO — si ya está digitado en OTRA
+        // operación (carta de aprobación o digitación manual), la fila queda fuera.
+        // Misma operación (mismo num_op) sí se actualiza (re-cargas de estados).
+        if (obj.id_financiera && duenosIdFin.has(String(obj.id_financiera))
+            && String(duenosIdFin.get(String(obj.id_financiera))) !== String(obj.num_op)) {
+          omitidosYaDigitados++;
+          errores.push({ op: obj.num_op, error: `Omitido: ID financiera ${obj.id_financiera} ya se encuentra ingresado (crédito ${duenosIdFin.get(String(obj.id_financiera))})` });
           continue;
         }
 
@@ -488,8 +516,8 @@ const importar = async (req, res) => {
     }
 
     auditar({ req, accion: 'CARGA_MASIVA', modulo: 'creditos', entidad: 'carga', entidad_id: req.file?.originalname || null,
-      detalle: `Carga masiva AutoFácil: ${insertados} operación(es) insertada(s) de ${data.length} del archivo${omitidosFuturo ? ` · ${omitidosFuturo} omitida(s) por fecha futura` : ''}${errores.length ? ` · ${errores.length} con error` : ''}`,
-      meta: { insertados, total: data.length, errores: errores.length, omitidos_futuro: omitidosFuturo, recalculados } });
+      detalle: `Carga masiva AutoFácil: ${insertados} operación(es) insertada(s) de ${data.length} del archivo${omitidosFuturo ? ` · ${omitidosFuturo} omitida(s) por fecha futura` : ''}${omitidosYaDigitados ? ` · ${omitidosYaDigitados} omitida(s) por ID financiera ya digitado` : ''}${errores.length ? ` · ${errores.length} con error` : ''}`,
+      meta: { insertados, total: data.length, errores: errores.length, omitidos_futuro: omitidosFuturo, omitidos_ya_digitados: omitidosYaDigitados, recalculados } });
     res.json({
       success: true,
       data: {
@@ -498,6 +526,7 @@ const importar = async (req, res) => {
         nuevos_intentados: data.length,
         insertados,
         omitidos_futuro:   omitidosFuturo,
+        omitidos_ya_digitados: omitidosYaDigitados,
         recalculados_comisiones: recalculados,
         errores,
       },
