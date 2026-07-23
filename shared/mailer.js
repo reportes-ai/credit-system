@@ -61,7 +61,7 @@ function remitentePorClave(clave) {
 }
 
 // URL base para imágenes/enlaces de los correos
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');   // dominio oficial de la Suite
 
 // Envuelve el contenido en la plantilla corporativa: barra superior, cierre "Saludos,"
 // y el logo de Business Suite al pie. `cuerpoHtml` es el contenido específico del correo.
