@@ -86,6 +86,12 @@
       <p>Detalle del cálculo de incentivos por ejecutivo comercial con filtro de mes. Incluye incentivo base, cruces de seguros, factor de ajuste e incentivo final. Aprueba o rechaza por ejecutivo.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/comisiones/bono-jefe/" class="module-card" id="cardBonoJefe" style="display:none">
+      <div class="card-icon"><i class="bi bi-trophy"></i></div>
+      <h5>Bono Jefe Comercial</h5>
+      <p>BSC del equipo comercial: créditos, montos y nuevos dealers del mes, con curva exponencial del premio sobre el sueldo fijo. Incluye pestaña de variables paramétricas.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/comisiones/variables/" class="module-card" id="cardVariablesCom" style="display:none">
       <div class="card-icon"><i class="bi bi-sliders"></i></div>
       <h5>Mantenedor Variables Comisiones</h5>
@@ -122,6 +128,7 @@
     let alguna = false;
     if (tiene('comisiones_revision'))  { document.getElementById('cardRevisionCom').style.display = '';  alguna = true; }
     if (tiene('comisiones_variables')) { document.getElementById('cardVariablesCom').style.display = ''; alguna = true; }
+    if (tiene('bono_jefe'))            { document.getElementById('cardBonoJefe').style.display = '';     alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
   })();
 </script>

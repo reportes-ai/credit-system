@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- v1.2 — informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bono Jefe Comercial — AutoFácil</title>
+<link rel="stylesheet" href="/css/bootstrap-icons.css">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --border:#e2e8f0; --muted:#64748b; --gold:#b45309; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
+  .page{ max-width:1180px; margin:0 auto; padding:24px 16px 80px; }
+  .banner{ background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:18px; }
+  .banner i{ font-size:2.4rem; opacity:.85; }
+  .banner h1{ font-size:1.25rem; margin:0 0 2px; }
+  .banner p{ opacity:.8; font-size:.85rem; margin:0; }
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tab{ padding:8px 18px; border-radius:20px; font-size:.86rem; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:#fff; color:var(--muted); }
+  .tab.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  .card{ background:#fff; border:1px solid var(--border); border-radius:14px; padding:18px 20px; box-shadow:0 2px 10px rgba(0,0,0,.05); margin-bottom:18px; }
+  .filtros{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .filtros label{ font-weight:700; font-size:.82rem; color:var(--navy); }
+  .filtros input[type=month]{ border:1.5px solid #cbd5e1; border-radius:9px; padding:7px 10px; font-size:.9rem; }
+  .btn{ border:none; border-radius:9px; padding:9px 18px; font-size:.86rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-navy{ background:var(--navy); color:#fff; }
+  .btn-line{ background:#fff; border:1.5px solid var(--border); color:#334155; }
+  table{ width:100%; border-collapse:collapse; font-size:.83rem; }
+  th,td{ padding:7px 9px; border-bottom:1px solid #f1f5f9; text-align:right; }
+  th{ background:#f8fafc; color:var(--navy); font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; }
+  td:first-child, th:first-child, td.nom, th.nom{ text-align:left; }
+  .grp-c{ background:#eff6ff !important; } .grp-m{ background:#f0fdf4 !important; } .grp-d{ background:#fdf4ff !important; }
+  tr.prom td{ background:#fffbeb; font-weight:800; border-top:2px solid #f59e0b; }
+  .ptj{ font-weight:700; color:#0369a1; }
+  .score{ font-weight:900; color:var(--navy); font-size:.92rem; }
+  .premio-box{ background:linear-gradient(135deg,#0f2d6b,#1e40af); color:#fff; border-radius:14px; padding:20px 26px; display:flex; flex-wrap:wrap; gap:26px; align-items:center; justify-content:space-between; }
+  .premio-box .big{ font-size:1.9rem; font-weight:900; }
+  .premio-box .lbl{ font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; opacity:.75; }
+  .premio-kpi{ text-align:center; }
+  .premio-kpi .v{ font-size:1.05rem; font-weight:800; }
+  .umbrales{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-bottom:16px; }
+  .umb{ border:1px solid var(--border); border-radius:12px; padding:12px 14px; background:#fff; }
+  .umb h6{ font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .umb .fila{ display:flex; justify-content:space-between; font-size:.82rem; padding:2px 0; }
+  .umb .fila b{ color:#0f172a; }
+  /* Informe */
+  #informe{ display:none; }
+  .paso{ display:flex; gap:14px; padding:13px 0; border-bottom:1px dashed #e2e8f0; }
+  .paso .num{ min-width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; }
+  .paso h6{ font-size:.9rem; color:var(--navy); margin-bottom:3px; }
+  .paso p{ font-size:.85rem; color:#334155; line-height:1.55; margin:0; }
+  /* Variables */
+  .vars-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
+  .var-item label{ display:block; font-weight:700; font-size:.78rem; color:var(--navy); margin-bottom:4px; }
+  .var-item input{ width:100%; border:1.5px solid #cbd5e1; border-radius:9px; padding:8px 10px; font-size:.9rem; text-align:right; }
+  .var-item .hint{ font-size:.7rem; color:var(--muted); margin-top:2px; }
+  .var-sec{ font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#6b7280; margin:18px 0 10px; display:flex; align-items:center; gap:8px; }
+  .var-sec::after{ content:''; flex:1; height:1px; background:#e5e7eb; }
+  .no-data{ text-align:center; color:#94a3b8; padding:40px 0; }
+  .toast{ position:fixed; bottom:24px; right:24px; background:#16a34a; color:#fff; border-radius:10px; padding:12px 20px; font-weight:700; display:none; z-index:99; box-shadow:0 8px 30px rgba(0,0,0,.25); }
+  @media print{
+    body{ background:#fff; } #af-topnav,.tabs,.filtros,.btn,#vVars{ display:none !important; }
+    .card{ border:none; box-shadow:none; } #informe{ display:block !important; }
+  }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Comisión Ejecutivos', href:'/comisiones/' },
+    { label:'Bono Jefe Comercial', icon:'bi-trophy', current:true }
+  ] };
+</script>
+
+<div class="page">
+  <div class="banner">
+    <i class="bi bi-trophy"></i>
+    <div>
+      <h1>Bono Jefe Comercial — Balanced Scorecard</h1>
+      <p>Score del equipo comercial (Créditos · Montos · Nuevos Dealers) y premio del mes según la curva de incentivo</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabBsc" onclick="verTab('bsc')"><i class="bi bi-clipboard-data me-1"></i> BSC del mes</div>
+    <div class="tab" id="tabVars" onclick="verTab('vars')" style="display:none"><i class="bi bi-sliders me-1"></i> Variables (restringido)</div>
+  </div>
+
+  <!-- ══ TAB BSC ══ -->
+  <div id="vBsc">
+    <div class="card filtros">
+      <label><i class="bi bi-calendar3 me-1"></i>Mes:</label>
+      <input type="month" id="mes" onchange="cargarBSC()">
+      <span style="flex:1"></span>
+      <button class="btn btn-line" onclick="toggleInforme()"><i class="bi bi-journal-text"></i> Informe paso a paso</button>
+      <button class="btn btn-navy" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
+      <button class="btn btn-navy" style="background:#15803d" id="btnMail" onclick="enviarInforme()"><i class="bi bi-envelope-paper"></i> Enviar por correo</button>
+    </div>
+
+    <div class="umbrales" id="umbrales"></div>
+
+    <div class="card" style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th class="nom">#</th><th class="nom">Ejecutivo Comercial</th>
+            <th class="grp-c">Otorgados</th><th class="grp-c">Puntaje</th>
+            <th class="grp-m">Monto Aprobado</th><th class="grp-m">Puntaje</th>
+            <th class="grp-d">Dealers Nuevos</th><th class="grp-d">Puntaje</th>
+            <th>Score Final</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="9" class="no-data">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="premio-box" id="premioBox" style="display:none">
+      <div>
+        <div class="lbl">Score del equipo</div>
+        <div class="big" id="pScore">—</div>
+      </div>
+      <div class="premio-kpi"><div class="lbl">% adicional</div><div class="v" id="pPct">—</div></div>
+      <div class="premio-kpi"><div class="lbl">Premio variable</div><div class="v" id="pVar">—</div></div>
+      <div class="premio-kpi"><div class="lbl">Semana corrida</div><div class="v" id="pSem">—</div></div>
+      <div class="premio-kpi"><div class="lbl">Total variable</div><div class="v" id="pTot">—</div></div>
+      <div>
+        <div class="lbl">Renta total del mes</div>
+        <div class="big" style="color:#7dd3fc" id="pRenta">—</div>
+      </div>
+    </div>
+
+    <div class="card" id="informe">
+      <h5 style="color:var(--navy);margin-bottom:6px"><i class="bi bi-journal-text me-1"></i> Informe — cómo se calculó el bono, paso a paso</h5>
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px" id="infMes"></div>
+      <div id="pasos"></div>
+    </div>
+  </div>
+
+  <!-- ══ TAB VARIABLES ══ -->
+  <div id="vVars" style="display:none">
+    <div class="card">
+      <h5 style="color:var(--navy);margin-bottom:4px"><i class="bi bi-sliders me-1"></i> Variables del modelo</h5>
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Solo usuarios con el permiso <b>Variables Bono Jefe Comercial</b> pueden ver y editar esta pestaña. Los cambios rigen de inmediato para el cálculo del mes.</div>
+
+      <div class="var-sec"><i class="bi bi-clipboard-data"></i> Pilares del scorecard</div>
+      <div class="vars-grid">
+        <div class="var-item"><label>Créditos — mínimo</label><input id="v_creditos_min" type="number" step="1"><div class="hint">Bajo esto el pilar Créditos vale 0</div></div>
+        <div class="var-item"><label>Créditos — esperado</label><input id="v_creditos_esperado" type="number" step="1"><div class="hint">Con esto se alcanza el máximo del pilar</div></div>
+        <div class="var-item"><label>Ponderación Créditos</label><input id="v_pond_creditos" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
+        <div class="var-item"><label>Monto por operación</label><input id="v_monto_por_op" type="text" class="fmt-peso" onblur="fmtPesoIn(this)"><div class="hint">Umbral montos = ops × este monto</div></div>
+        <div class="var-item"><label>Ponderación Montos</label><input id="v_pond_montos" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
+        <div class="var-item"><label>Dealers — mínimo</label><input id="v_dealers_min" type="number" step="1"></div>
+        <div class="var-item"><label>Dealers — esperado</label><input id="v_dealers_esperado" type="number" step="1"></div>
+        <div class="var-item"><label>Ponderación Dealers</label><input id="v_pond_dealers" type="text" class="fmt-pct" onblur="fmtPctIn(this)"></div>
+      </div>
+
+      <div class="var-sec"><i class="bi bi-graph-up-arrow"></i> Curva del premio</div>
+      <div class="vars-grid">
+        <div class="var-item"><label>Score mínimo (parte a pagar)</label><input id="v_score_min" type="number" step="1"><div class="hint">Bajo este puntaje el premio es $0</div></div>
+        <div class="var-item"><label>Score máximo</label><input id="v_score_max" type="number" step="1"><div class="hint">Donde el % variable llega a su tope</div></div>
+        <div class="var-item"><label>% variable máximo</label><input id="v_pct_variable" type="text" class="fmt-pct" onblur="fmtPctIn(this)"><div class="hint">% del sueldo fijo en el máximo</div></div>
+        <div class="var-item"><label>k (curvatura exponencial)</label><input id="v_k" type="number" step="0.05"><div class="hint">Mayor k = curva más cargada al final</div></div>
+        <div class="var-item"><label>Sueldo fijo</label><input id="v_sueldo_fijo" type="text" class="fmt-peso" onblur="fmtPesoIn(this)"></div>
+        <div class="var-item"><label>Semana corrida</label><input id="v_factor_semana" type="text" class="fmt-pct" onblur="fmtPctIn(this)"><div class="hint">% sobre el premio variable (Ej. 16,67%)</div></div>
+      </div>
+
+      <div class="var-sec"><i class="bi bi-envelope"></i> Informe mensual por correo</div>
+      <div class="vars-grid">
+        <div class="var-item"><label>Para (destinatarios)</label><input id="v_informe_para" type="text" style="text-align:left" placeholder="correo1@..., correo2@..."><div class="hint">Separados por coma</div></div>
+        <div class="var-item"><label>CC (con copia)</label><input id="v_informe_cc" type="text" style="text-align:left" placeholder="correo3@..."><div class="hint">Separados por coma (opcional)</div></div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button class="btn btn-navy" onclick="guardarVars()"><i class="bi bi-check2"></i> Guardar variables</button>
+        <button class="btn btn-line" onclick="cargarVars()"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h5 style="color:var(--navy);margin-bottom:8px"><i class="bi bi-table me-1"></i> Curva resultante (score → premio)</h5>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Score</th><th>% adicional</th><th>Premio variable</th><th>Semana corrida</th><th>Total variable</th><th>Renta total</th></tr></thead>
+        <tbody id="curvaBody"></tbody>
+      </table></div>
+      <div id="curvaChart" style="margin-top:18px"></div>
+    </div>
+
+    <!-- Qué afecta este mantenedor -->
+    <div class="card" style="background:#f8fafc;border-left:4px solid var(--navy)">
+      <h6 style="color:var(--navy)"><i class="bi bi-diagram-3 me-1"></i> Qué afecta esta configuración</h6>
+      <ul style="font-size:.82rem;color:#334155;margin:8px 0 0 18px">
+        <li><b>Pilares y ponderaciones</b> → puntajes del <a href="/comisiones/bono-jefe/">BSC Bono Jefe Comercial</a> (pestaña BSC del mes)</li>
+        <li><b>Curva del premio (mín/máx/%/k/fijo)</b> → premio variable y renta total del Jefe Comercial en el mismo BSC e informe paso a paso</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/topnav.js"></script>
+<script>
+const H = () => ({ 'Content-Type':'application/json', Authorization:'Bearer '+sessionStorage.getItem('token') });
+const clp = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+const n2 = v => Number(v||0).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct2 = v => n2(v*100)+'%';
+const esc = s => String(s??'').replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+let DATA = null;
+
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+function verTab(t){
+  document.getElementById('tabBsc').classList.toggle('active', t==='bsc');
+  document.getElementById('tabVars').classList.toggle('active', t==='vars');
+  document.getElementById('vBsc').style.display = t==='bsc' ? '' : 'none';
+  document.getElementById('vVars').style.display = t==='vars' ? '' : 'none';
+  if (t==='vars') { cargarVars(); cargarCurva(); }
+}
+
+/* ── BSC ── */
+async function cargarBSC(){
+  const mes = document.getElementById('mes').value;
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '<tr><td colspan="9" class="no-data"><i class="bi bi-hourglass-split"></i> Calculando…</td></tr>';
+  let j; try { j = await (await fetch('/api/bono-jefe/bsc?mes='+mes, {headers:H()})).json(); }
+  catch(e){ tb.innerHTML = '<tr><td colspan="9" class="no-data">Error de red</td></tr>'; return; }
+  if (!j.success){ tb.innerHTML = `<tr><td colspan="9" class="no-data">${esc(j.error||'Sin acceso')}</td></tr>`; return; }
+  DATA = j.data;
+  const p = DATA.params;
+  document.getElementById('umbrales').innerHTML = `
+    <div class="umb"><h6><i class="bi bi-check2-circle" style="color:#0369a1"></i> Créditos otorgados · pondera ${Math.round(p.pond_creditos*100)}%</h6>
+      <div class="fila"><span>Mínimo</span><b>${p.creditos_min}</b></div><div class="fila"><span>Esperado</span><b>${p.creditos_esperado}</b></div></div>
+    <div class="umb"><h6><i class="bi bi-cash-coin" style="color:#15803d"></i> Montos aprobados · pondera ${Math.round(p.pond_montos*100)}%</h6>
+      <div class="fila"><span>Mínimo</span><b>${clp(p.min_montos)}</b></div><div class="fila"><span>Esperado</span><b>${clp(p.esperado_montos)}</b></div></div>
+    <div class="umb"><h6><i class="bi bi-building-add" style="color:#7c3aed"></i> Nuevos dealers · pondera ${Math.round(p.pond_dealers*100)}%</h6>
+      <div class="fila"><span>Mínimo</span><b>${p.dealers_min}</b></div><div class="fila"><span>Esperado</span><b>${p.dealers_esperado}</b></div></div>
+    <div class="umb"><h6><i class="bi bi-graph-up-arrow" style="color:#b45309"></i> Curva del premio</h6>
+      <div class="fila"><span>Score mínimo</span><b>${p.score_min} pts</b></div><div class="fila"><span>% variable máx (en ${p.score_max})</span><b>${Math.round(p.pct_variable*100)}%</b></div></div>`;
+
+  const filas = DATA.ejecutivos.map((f,i)=>`<tr>
+    <td>${i+1}</td><td class="nom"><b>${esc(f.ejecutivo)}</b></td>
+    <td class="grp-c">${f.otorgados}</td><td class="grp-c ptj">${n2(f.ptj_creditos)}</td>
+    <td class="grp-m">${clp(f.monto_aprobado)}</td><td class="grp-m ptj">${n2(f.ptj_montos)}</td>
+    <td class="grp-d">${f.dealers_nuevos}</td><td class="grp-d ptj">${n2(f.ptj_dealers)}</td>
+    <td class="score">${n2(f.score)}</td></tr>`).join('');
+  const a = DATA.promedio;
+  tb.innerHTML = (filas || '<tr><td colspan="9" class="no-data">Sin ejecutivos comerciales activos</td></tr>') + `
+    <tr class="prom"><td></td><td class="nom"><i class="bi bi-people-fill me-1"></i>PROMEDIO DEL EQUIPO</td>
+    <td class="grp-c">${n2(a.otorgados)}</td><td class="grp-c ptj">${n2(a.ptj_creditos)}</td>
+    <td class="grp-m">${clp(a.monto_aprobado)}</td><td class="grp-m ptj">${n2(a.ptj_montos)}</td>
+    <td class="grp-d">${n2(a.dealers_nuevos)}</td><td class="grp-d ptj">${n2(a.ptj_dealers)}</td>
+    <td class="score">${n2(a.score)}</td></tr>`;
+
+  const pr = DATA.premio;
+  document.getElementById('premioBox').style.display = 'flex';
+  document.getElementById('pScore').textContent = n2(a.score)+' pts';
+  document.getElementById('pPct').textContent = pct2(pr.pct_adicional);
+  document.getElementById('pVar').textContent = clp(pr.variable);
+  document.getElementById('pSem').textContent = clp(pr.semana_corrida);
+  document.getElementById('pTot').textContent = clp(pr.total_variable);
+  document.getElementById('pRenta').textContent = clp(pr.renta_total);
+
+  document.getElementById('infMes').textContent = 'Mes evaluado: '+DATA.mes;
+  document.getElementById('pasos').innerHTML = DATA.pasos.map((s,i)=>`
+    <div class="paso"><div class="num">${i+1}</div><div><h6>${esc(s.titulo)}</h6><p>${esc(s.detalle)}</p></div></div>`).join('');
+}
+async function enviarInforme(){
+  const mes = document.getElementById('mes').value;
+  if (!confirm('¿Enviar el informe de '+mes+' a los destinatarios configurados?')) return;
+  const btn = document.getElementById('btnMail'); btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Enviando…';
+  let j; try { j = await (await fetch('/api/bono-jefe/enviar-informe',{method:'POST',headers:H(),body:JSON.stringify({mes})})).json(); }
+  catch(e){ j = { success:false, error:'Error de red' }; }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-envelope-paper"></i> Enviar por correo';
+  if (!j.success) return alert(j.error||'No se pudo enviar');
+  toast('✓ Informe enviado a '+j.data.enviado_a.join(', ')+(j.data.cc.length?' (CC: '+j.data.cc.join(', ')+')':''));
+}
+function toggleInforme(){
+  const el = document.getElementById('informe');
+  el.style.display = el.style.display==='block' ? 'none' : 'block';
+  if (el.style.display==='block') el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ── Variables (restringido) ── */
+const VKEYS = ['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos','dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana','informe_para','informe_cc'];
+const TXT_KEYS = new Set(['informe_para','informe_cc']);
+const PESO_KEYS = new Set(['monto_por_op','sueldo_fijo']);
+const PCT_KEYS  = new Set(['pond_creditos','pond_montos','pond_dealers','pct_variable','factor_semana']); // factor_semana se guarda como factor (0,1667) pero se muestra en %
+const parsePeso = v => Math.round(Number(String(v??'').replace(/[^\d]/g,''))||0);
+const parsePct  = v => Number(String(v??'').replace(/[^\d,.-]/g,'').replace(/\./g,'').replace(',','.'))||0;
+function fmtPesoIn(el){ el.value = clp(parsePeso(el.value)); }
+function fmtPctIn(el){ el.value = n2(parsePct(el.value))+'%'; }
+async function cargarVars(){
+  const j = await (await fetch('/api/bono-jefe/variables',{headers:H()})).json();
+  if (!j.success) return;
+  const raw = {}; j.data.forEach(r=>raw[r.clave]=r.valor);
+  const map = {}; j.data.forEach(r=>map[r.clave]=parseFloat(r.valor));
+  VKEYS.forEach(k=>{
+    const el=document.getElementById('v_'+k); if(!el) return;
+    if (TXT_KEYS.has(k)) { el.value = raw[k] || ''; return; }
+    const v = map[k];
+    if (v==null || !Number.isFinite(v)) { el.value=''; return; }
+    if (PESO_KEYS.has(k)) el.value = clp(v);
+    else if (k==='factor_semana') el.value = n2(v*100)+'%';
+    else if (PCT_KEYS.has(k)) el.value = n2(v)+'%';
+    else el.value = v;
+  });
+}
+async function guardarVars(){
+  const variables = {};
+  VKEYS.forEach(k=>{
+    const el=document.getElementById('v_'+k); if(!el) return;
+    if (TXT_KEYS.has(k)) { variables[k] = el.value.trim(); return; }   // se permite vaciar
+    if (el.value==='') return;
+    if (PESO_KEYS.has(k)) variables[k] = parsePeso(el.value);
+    else if (k==='factor_semana') variables[k] = parsePct(el.value)/100;   // 16,67% → 0,1667
+    else if (PCT_KEYS.has(k)) variables[k] = parsePct(el.value);
+    else variables[k] = String(el.value).replace(',','.');
+  });
+  const j = await (await fetch('/api/bono-jefe/variables',{method:'PUT',headers:H(),body:JSON.stringify({variables})})).json();
+  if (!j.success) return alert(j.error||'No se pudo guardar');
+  toast('✓ Variables guardadas'); cargarVars(); cargarCurva(); cargarBSC();
+}
+async function cargarCurva(){
+  const j = await (await fetch('/api/bono-jefe/curva',{headers:H()})).json();
+  if (!j.success) return;
+  document.getElementById('curvaBody').innerHTML = j.data.filas.map(f=>`
+    <tr ${f.score===j.data.cfg.score_min?'style="border-top:2px solid #f59e0b"':''}>
+      <td style="text-align:left;font-weight:700">${f.score}</td>
+      <td>${pct2(f.pct_adicional)}</td><td>${clp(f.variable)}</td>
+      <td>${clp(f.semana_corrida)}</td><td>${clp(f.total_variable)}</td>
+      <td style="font-weight:700">${clp(f.renta_total)}</td></tr>`).join('');
+  dibujarCurva(j.data);
+}
+
+/* ── Gráfico de la curva (SVG): premio vs score ── */
+function dibujarCurva(data){
+  const filas = data.filas, cfg = data.cfg;
+  if (!filas.length) return;
+  const W=980, Hh=340, mL=90, mR=20, mT=24, mB=44;
+  const xMin = filas[0].score, xMax = filas[filas.length-1].score;
+  const yMax = Math.max(...filas.map(f=>f.total_variable)) * 1.08 || 1;
+  const X = s => mL + (s-xMin)/(xMax-xMin) * (W-mL-mR);
+  const Y = v => Hh-mB - (v/yMax) * (Hh-mT-mB);
+  const path = (key,color,ancho) => `<path d="${filas.map((f,i)=>(i?'L':'M')+X(f.score).toFixed(1)+' '+Y(f[key]).toFixed(1)).join(' ')}" fill="none" stroke="${color}" stroke-width="${ancho}" stroke-linejoin="round"/>`;
+  let grid='';
+  for (let i=0;i<=4;i++){
+    const v = yMax/4*i, y = Y(v);
+    grid += `<line x1="${mL}" y1="${y}" x2="${W-mR}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="3 3"/>
+             <text x="${mL-8}" y="${y+4}" text-anchor="end" font-size="11" fill="#64748b">${clp(v)}</text>`;
+  }
+  let ejeX='';
+  for (let s2=Math.ceil(xMin/5)*5; s2<=xMax; s2+=5)
+    ejeX += `<text x="${X(s2)}" y="${Hh-mB+18}" text-anchor="middle" font-size="11" fill="#64748b">${s2}</text>`;
+  const xm = X(cfg.score_min);
+  const marcaMin = `<line x1="${xm}" y1="${mT}" x2="${xm}" y2="${Hh-mB}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="${xm+5}" y="${mT+12}" font-size="11" fill="#b45309" font-weight="700">mínimo ${cfg.score_min}</text>`;
+  document.getElementById('curvaChart').innerHTML = `
+    <svg viewBox="0 0 ${W} ${Hh}" style="width:100%;height:auto">
+      ${grid}${ejeX}${marcaMin}
+      ${path('total_variable','#009AFE',2)}
+      ${path('variable','#0141A2',3)}
+      <line x1="${mL}" y1="${Hh-mB}" x2="${W-mR}" y2="${Hh-mB}" stroke="#94a3b8"/>
+      <text x="${(mL+W-mR)/2}" y="${Hh-6}" text-anchor="middle" font-size="12" fill="#334155" font-weight="700">Score del equipo</text>
+      <g font-size="12">
+        <rect x="${mL+10}" y="${mT}" width="14" height="4" fill="#0141A2"/><text x="${mL+30}" y="${mT+5}" fill="#334155">Premio variable</text>
+        <rect x="${mL+160}" y="${mT}" width="14" height="4" fill="#009AFE"/><text x="${mL+180}" y="${mT+5}" fill="#334155">Total variable (con semana corrida)</text>
+      </g>
+    </svg>`;
+}
+
+/* ── Init ── */
+(async function init(){
+  const hoy = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit'}).format(new Date()).slice(0,7);
+  document.getElementById('mes').value = hoy;
+  // Pestaña Variables solo con permiso (Admin la ve por bypass)
+  try {
+    const jm = await (await fetch('/api/auth/mis-permisos',{headers:H()})).json();
+    const codes = new Set((jm.funcionalidadesInfo||[]).map(f=>f.codigo));
+    const yo = JSON.parse(sessionStorage.getItem('usuario')||'{}');
+    if (yo.perfil==='Administrador' || codes.has('bono_jefe_variables'))
+      document.getElementById('tabVars').style.display = '';
+  } catch(_){}
+  cargarBSC();
+})();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

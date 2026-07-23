@@ -39,7 +39,7 @@ require('../../../../shared/migrate').enFila('bono-jefe', async () => {
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/soporte/' LIMIT 1");
     if (mod) {
       await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
-        SELECT ?, 'bono_jefe', 'Bono Jefe Comercial', '/soporte/bono-jefe/', 'bi-trophy'
+        SELECT ?, 'bono_jefe', 'Bono Jefe Comercial', '/comisiones/bono-jefe/', 'bi-trophy'
         WHERE NOT EXISTS (SELECT 1 FROM funcionalidades WHERE codigo='bono_jefe')`, [mod.id_modulo]);
       await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
         SELECT ?, 'bono_jefe_variables', 'Variables Bono Jefe Comercial', NULL, NULL
