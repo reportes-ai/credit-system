@@ -233,7 +233,68 @@ function mapRow(row, mesOverride) {
     com_cesantia:       i('COM.CESANTIA'),
     com_reparaciones:   i('COM.REPARACIONES'),
     com_parque:         i('COM PARQUE'),
+    // Post Venta (v150.3): estado del saldo precio y del pago de comisión — además de
+    // guardarse en creditos, marcan las etapas del seguimiento Post Venta al importar.
+    estado_sp:          s('ESTADO SP', 'ESTADO SALDO PRECIO'),
+    fecha_pago_sp:      d('FECHA PAGO SALDO PRECIO', 'FECHA PAGO SP'),
+    // columnas auxiliares (no van a creditos: se usan para las etapas y la factura)
+    _fecha_fundante:    d('FECHA FUNDANTE', 'FECHA FUNDANTES'),
+    _fecha_factura:     d('FECHA FACTURA', 'FECHA FACTURA COM', 'FECHA RECEPCION DOCUMENTO', 'FECHA RECEPCIÓN DOCUMENTO'),
+    _fecha_pago_com:    d('FECHA PAGO COMISION', 'FECHA PAGO COMISIÓN', 'FECHA DE PAGO COMISION DEALER'),
+    _nro_factura:       s('N° FACTURA O BOLETA', 'N FACTURA O BOLETA', 'N° FACTURA COM DEA.', 'N FACTURA COM DEA'),
   };
+}
+
+/* ── Post Venta desde la carga (v150.3): con las columnas de estado SP / fundantes /
+   comisión del Excel, crea el seguimiento si falta (solo OTORGADOS, igual que el sync)
+   y marca las etapas: FUNDANTES RECIBIDOS, SALDO PRECIO PAGADO, FACTURA RECIBIDA
+   (+ registro en postventa_facturas_comision) y COMISION PAGADA. Idempotente. ── */
+async function marcarPostventaDesdeCarga(objs) {
+  const conDatos = objs.filter(o => o.num_op && (o._fecha_fundante || o.estado_sp || o._fecha_factura || o._nro_factura || o._fecha_pago_com || o.estado_pago_com));
+  if (!conDatos.length) return 0;
+  const ops = [...new Set(conDatos.map(o => o.num_op))];
+  // Seguimiento + etapas base para estos créditos (mismas queries del sync de Post Venta)
+  await pool.query(`
+    INSERT INTO postventa_seguimiento (id_credito, num_op, financiera, nombre_dealer, ejecutivo, fecha_otorgado, saldo_precio, comision)
+    SELECT c.id, c.num_op, c.financiera, c.automotora, c.ejecutivo, DATE(c.fecha_otorgado), c.saldo_precio, c.comdea_real
+    FROM creditos c
+    WHERE c.num_op IN (?) AND c.fecha_otorgado IS NOT NULL AND c.estado_credito='OTORGADO'
+      AND NOT EXISTS (SELECT 1 FROM postventa_seguimiento s WHERE s.id_credito = c.id)`, [ops]).catch(() => {});
+  for (const [track, etapa] of [['SALDO', 'FUNDANTES PENDIENTES'], ['COMISION', 'COMISION A PAGAR']]) {
+    await pool.query(`
+      INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+      SELECT s.id, ?, ?, 'Sistema', COALESCE(s.fecha_otorgado, NOW())
+      FROM postventa_seguimiento s WHERE s.num_op IN (?)
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track=? AND e.etapa=?)`,
+      [track, etapa, ops, track, etapa]).catch(() => {});
+  }
+  const [segs] = await pool.query('SELECT id, num_op, rut_dealer, nombre_dealer FROM postventa_seguimiento WHERE num_op IN (?)', [ops]);
+  const porOp = new Map(segs.map(s => [Number(s.num_op), s]));
+  let marcados = 0;
+  const marcar = (idSeg, track, etapa, fecha) => pool.query(
+    `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+     SELECT ?,?,?,?,COALESCE(?, NOW()) FROM DUAL WHERE NOT EXISTS
+       (SELECT 1 FROM postventa_etapas WHERE id_seguimiento=? AND track=? AND etapa=?)`,
+    [idSeg, track, etapa, 'Carga Masiva', fecha, idSeg, track, etapa]).catch(() => {});
+  for (const o of conDatos) {
+    const seg = porOp.get(Number(o.num_op)); if (!seg) continue;
+    if (o._fecha_fundante) await marcar(seg.id, 'SALDO', 'FUNDANTES RECIBIDOS', o._fecha_fundante);
+    if (String(o.estado_sp || '').toUpperCase() === 'PAGADO')
+      await marcar(seg.id, 'SALDO', 'SALDO PRECIO PAGADO', o.fecha_pago_sp || o._fecha_fundante);
+    if (o._fecha_factura || o._nro_factura) {
+      await marcar(seg.id, 'COMISION', 'FACTURA RECIBIDA', o._fecha_factura);
+      if (o._nro_factura) await pool.query(
+        `INSERT INTO postventa_facturas_comision (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, usuario)
+         SELECT ?,?,?,?,?,?,?, 'Carga Masiva' FROM DUAL
+         WHERE NOT EXISTS (SELECT 1 FROM postventa_facturas_comision WHERE id_seguimiento=?)`,
+        [seg.id, o.num_op, seg.rut_dealer || o.rut_dealer || null, seg.nombre_dealer || o.automotora || null,
+         o._fecha_factura || null, o._nro_factura, o.comdea_real || null, seg.id]).catch(() => {});
+    }
+    if (String(o.estado_pago_com || '').toUpperCase() === 'PAGADO' || o._fecha_pago_com)
+      await marcar(seg.id, 'COMISION', 'COMISION PAGADA', o._fecha_pago_com || o._fecha_factura);
+    marcados++;
+  }
+  return marcados;
 }
 
 /* ── Helpers de búsqueda de columnas en el Excel ─────────────────────────── */
@@ -351,6 +412,7 @@ const importar = async (req, res) => {
     let insertados = 0;
     let omitidosFuturo = 0;   // filas saltadas por fecha futura
     let omitidosYaDigitados = 0;   // ID financiera ya ingresado en otra operación
+    const auxPostventa = [];  // columnas de saldo precio / fundantes / comisión → etapas Post Venta
     let errores    = [];
     const clienteCache   = {};
     const detallesLog    = [];   // para log historial
@@ -405,6 +467,12 @@ const importar = async (req, res) => {
         // Se usaron para resolver id_cliente — eliminarlos para evitar error de columna inexistente.
         delete obj.rut_cliente;
         delete obj.nombre_cliente;
+        // Auxiliares Post Venta (no son columnas de creditos): apartar para marcar etapas al final
+        auxPostventa.push({ num_op: obj.num_op, estado_sp: obj.estado_sp, fecha_pago_sp: obj.fecha_pago_sp,
+          estado_pago_com: obj.estado_pago_com, comdea_real: obj.comdea_real, rut_dealer: obj.rut_dealer,
+          automotora: obj.automotora, _fecha_fundante: obj._fecha_fundante, _fecha_factura: obj._fecha_factura,
+          _fecha_pago_com: obj._fecha_pago_com, _nro_factura: obj._nro_factura });
+        delete obj._fecha_fundante; delete obj._fecha_factura; delete obj._fecha_pago_com; delete obj._nro_factura;
 
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
         const vals   = cols.map(k => obj[k]);
@@ -482,6 +550,13 @@ const importar = async (req, res) => {
       } catch (e) { console.error('[carga-masiva id_dealer]', e.message); }
     }
 
+    // ── Post Venta: estado saldo precio / fundantes / comisión del Excel → etapas ──
+    let postventaMarcados = 0;
+    if (insertados > 0) {
+      try { postventaMarcados = await marcarPostventaDesdeCarga(auxPostventa); }
+      catch (e) { console.error('[carga-masiva postventa]', e.message); }
+    }
+
     // ── Recálculo completo de comisiones para todos los meses afectados ──
     // Incluye: monto_comision_fin, comdea_real, com_parque, arriendo_parque,
     //          com_rdh/cesantia/reparaciones, ingreso_neto_total
@@ -527,6 +602,7 @@ const importar = async (req, res) => {
         insertados,
         omitidos_futuro:   omitidosFuturo,
         omitidos_ya_digitados: omitidosYaDigitados,
+        postventa_marcados: postventaMarcados,
         recalculados_comisiones: recalculados,
         errores,
       },
