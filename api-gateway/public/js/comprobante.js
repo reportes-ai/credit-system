@@ -20,7 +20,14 @@ const _cHora = p => {
   if (p.hora_pago_fmt) return p.hora_pago_fmt;
   const s = p.created_at || p.fecha_pago;
   if (!s) return '';
-  if (typeof s === 'string') { const t = s.slice(11, 19); return /^\d/.test(t) ? t : ''; }
+  // ISO con zona (…T21:33:25.000Z = UTC) → convertir a hora de Chile; el slice directo
+  // solo vale para strings planos sin zona ("YYYY-MM-DD HH:MM:SS")
+  if (typeof s === 'string') {
+    if (/Z$|[+-]\d{2}:?\d{2}$/.test(s)) {
+      try { return new Date(s).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }); } catch (_) { return ''; }
+    }
+    const t = s.slice(11, 19); return /^\d/.test(t) ? t : '';
+  }
   try { return new Date(s).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour12: false }); } catch (_) { return ''; }
 };
 
