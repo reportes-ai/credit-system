@@ -438,8 +438,24 @@ const importar = async (req, res) => {
         // Misma operación (mismo num_op) sí se actualiza (re-cargas de estados).
         if (obj.id_financiera && duenosIdFin.has(String(obj.id_financiera))
             && String(duenosIdFin.get(String(obj.id_financiera))) !== String(obj.num_op)) {
-          const dueno = duenosIdFin.get(String(obj.id_financiera));
+          let dueno = duenosIdFin.get(String(obj.id_financiera));
           omitidosYaDigitados++;
+          // Regla (2026-07-23): el N° INDEXA manda. Si el crédito dueño tiene número
+          // NUESTRO (generado por carta: formato YYMM###) y el Excel trae el N° oficial,
+          // se renumera al de INDEXA (crédito + Post Venta + carta enlazada).
+          try {
+            if (/^\d{2}(0[1-9]|1[0-2])\d{3}$/.test(String(dueno)) && obj.num_op &&
+                !/^\d{2}(0[1-9]|1[0-2])\d{3}$/.test(String(obj.num_op))) {
+              const [[ya]] = await pool.query('SELECT id FROM creditos WHERE num_op=? LIMIT 1', [obj.num_op]);
+              if (!ya) {
+                await pool.query('UPDATE creditos SET num_op=? WHERE num_op=? AND id_financiera=?', [obj.num_op, dueno, obj.id_financiera]);
+                await pool.query('UPDATE postventa_seguimiento s JOIN creditos c ON c.id=s.id_credito SET s.num_op=? WHERE c.num_op=?', [obj.num_op, obj.num_op]).catch(() => {});
+                await pool.query('UPDATE cartas_aprobacion ca JOIN creditos c ON c.id=ca.id_credito_creado SET ca.numero_credito_creado=? WHERE c.num_op=?', [String(obj.num_op), obj.num_op]).catch(() => {});
+                errores.push({ op: obj.num_op, error: `Renumerado: crédito ${dueno} → N° INDEXA ${obj.num_op} (mismo ID financiera ${obj.id_financiera})` });
+                dueno = obj.num_op;
+              }
+            }
+          } catch (e) { console.error('[carga-masiva renumerar]', e.message); }
           // La fila NO se inserta, pero sí COMPLETA los campos vacíos del crédito ya
           // digitado (COALESCE: nunca pisa lo existente) — primas, gastos, fechas, etc.
           // que la carta de aprobación no trae pero el Excel sí.
