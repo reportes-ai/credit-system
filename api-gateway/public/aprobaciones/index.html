@@ -1708,6 +1708,7 @@ async function guardarCarta(){
 
   const carta = {
     ...(base ? sanitizarCarta(base) : {}),
+    ...(window._autofinSeg || {}),   // primas reales escaneadas de la ficha AutoFin
     id: editandoId || undefined,
     opCarta:  document.getElementById('cOpCarta').value,
     opOrigen: document.getElementById('cOpOrigen').value.trim(),
@@ -1941,6 +1942,10 @@ async function onAutofinDoc(input){
     const j = await r.json();
     if(!j.success){ udMsg(j.error||'No se pudo leer la carta.','err','autofinDocsMsg'); return; }
     await udFill(j.data.fields);
+    // primas reales de la ficha AutoFin (el formulario no tiene campos: viajan aparte al guardar)
+    const f = j.data.fields || {};
+    window._autofinSeg = { segDesgravamen: f.segDesgravamen, segCesantia: f.segCesantia,
+                           segRdh: f.segRdh, segRep: f.segRep, gps: f.gps };
     const warn = (j.data.warnings||[]).join(' ');
     udMsg('✓ Datos cargados desde Autofin. Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok','autofinDocsMsg');
   } catch(e){ console.error('onAutofinDoc',e); udMsg('Error al procesar la carta.','err','autofinDocsMsg'); }
@@ -1954,7 +1959,7 @@ async function udSubir(idCarta){
   }
 }
 function udLimpiar(){
-  window._unidadDocs={};
+  window._unidadDocs={}; window._autofinSeg=null;
   ['docCompromisoName','docCotizacionName','docAutofinName'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
   ['docCompromiso','docCotizacion','docAutofin'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   ['unidadDocsMsg','autofinDocsMsg'].forEach(id=>{ const m=document.getElementById(id); if(m) m.style.display='none'; });

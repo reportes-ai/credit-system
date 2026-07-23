@@ -53,12 +53,21 @@ async function crearCreditoDesdeCartas(c) {
   const pie = c.pie || null;
   const pct = (precio && saldo) ? saldo / precio : null;
 
+  // Primas reales de la ficha AutoFin (si vinieron del escaneo): RDH incluye el
+  // desgravamen (modelo 2026-07); 0 explícito = digitado (empresas sin seguros).
+  const segRdhTot = (c.segRdh != null || c.segDesgravamen != null)
+    ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
+  const segCes = c.segCesantia != null ? Number(c.segCesantia) : null;
+  const segRep = c.segRep != null ? Number(c.segRep) : null;
+  const segTotal = (segRdhTot != null || segCes != null || segRep != null)
+    ? (Number(segRdhTot || 0) + Number(segCes || 0) + Number(segRep || 0)) : null;
   const [r] = await pool.query(`
     INSERT INTO creditos
       (numero_credito, num_op, financiera, id_financiera, estado_eval, estado,
        id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
+       seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps,
        tipo_vehiculo, marca, modelo, anio, patente,
        automotora, ejecutivo, comdea_real,
        created_at, updated_at)
@@ -67,6 +76,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
             ?,?,?,
+            ?,?,?,?,?,
             ?,?,?,?,?,
             ?,?,?,
             NOW(),NOW())
@@ -81,6 +91,7 @@ async function crearCreditoDesdeCartas(c) {
     (c.monto_credito_clp || c.montoCreditoCLP || null),
     (c.plazo || null),
     (c.tasa_credito || c.tasaCredito || null),
+    segRdhTot, segCes, segRep, segTotal, (c.gps != null ? Number(c.gps) : null),
     (c.tipo_vehiculo || c.tipoVehiculo || null),
     (c.marca || null), (c.modelo || null), (c.anio || null), (c.patente || null),
     (c.concesionario || null),
@@ -1045,7 +1056,19 @@ function parseCartaAutofin(t) {
   // Total pagaré (monto del crédito) = valor tras el RUT y el saldo (en el PDF va pegado al total de recargos).
   const totalPagare = _numU(g(/\d{7,8}-[\dkK]\n[\d.]+\n(\d{1,3}(?:\.\d{3})+)/));
   const fechaRaw = g(/(\d{2}\/\d{2}\/\d{4})/);
+  // ── PRIMAS DE SEGURO (bloque posicional del encabezado): el PDF aplanado parte con
+  //    rut / monto solicitado / total pagaré / total recargos / DESGRAVAMEN / CESANTÍA /
+  //    impuesto timbre / tasa / cuotas / fecha curse (orden de la columna de valores).
+  const blk1 = t.match(/(\d{7,8}-[\dkK])\n([\d.]+)\n([\d.]+)\n([\d.]+)\n([\d.]*)\n([\d.]*)\n([\d.]*)\n(\d{1,2},\d{1,4})\n(\d{1,3})\n(\d{2}\/\d{2}\/\d{4})/);
+  const segDesgravamen = blk1 ? _numU(blk1[5]) : null;
+  const segCesantia    = blk1 ? _numU(blk1[6]) : null;
+  // Segundo bloque de valores (antes de "Nº Crédito"): RDH+E / Reparaciones Menores / GPS / …
+  const blk2 = t.match(/\n([\d.]*)\n([\d.]*)\n([\d.]*)\n([\d.]*)\n([\d.]*)\nNº Crédito/);
+  const segRdh = blk2 ? _numU(blk2[1]) : null;
+  const segRep = blk2 ? _numU(blk2[2]) : null;
+  const gps    = blk2 ? _numU(blk2[3]) : null;
   return {
+    segDesgravamen, segCesantia, segRdh, segRep, gps,
     opOrigen: nameOp ? nameOp[2] : null,
     fecha: fechaRaw ? fechaRaw.split('/').reverse().join('-') : null,
     rutCliente: g(/(\d{7,8}-[\dkK])/),
@@ -1114,6 +1137,9 @@ const parseAutofin = async (req, res) => {
       precioVenta: c.precioVenta || null, pie: c.pie || null, saldo: c.saldo || null,
       plazo: c.plazo || null, tasaCredito: c.tasaCredito || null, montoCreditoCLP: c.montoCreditoCLP || null,
       ejecutivo: c.ejecutivo || null,
+      // primas reales de la ficha AutoFin (0 explícito es válido — ej. empresas sin desgravamen)
+      segDesgravamen: c.segDesgravamen, segCesantia: c.segCesantia,
+      segRdh: c.segRdh, segRep: c.segRep, gps: c.gps,
     };
     res.json({ success: true, data: out, error: null });
   } catch (e) { console.error('[parseAutofin]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo procesar la carta' }); }
