@@ -31,7 +31,7 @@ const centralizado = () => !!(SA && SA.client_email && SA.private_key);
 // ── OAuth por usuario (modo respaldo) ──
 const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || '';
 const CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || '';
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 const REDIRECT_URI = APP_URL + '/api/mi-dia/google/callback';
 const oauthConfig = () => !!(CLIENT_ID && CLIENT_SECRET);
 

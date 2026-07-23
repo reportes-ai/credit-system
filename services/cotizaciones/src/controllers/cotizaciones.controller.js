@@ -190,7 +190,7 @@ function resumenCotizacion(cot) {
     `lo que da un valor a financiar de ${_fmt(cot.monto_financiado)}, con una cuota a ${cot.plazo} meses de ${_fmt(cot.cuota)}.`;
 }
 
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 
 const DISCLAIMER = 'Los datos adjuntos son solo informativos y aproximados, pudiendo variar, por lo que la presente ' +
   'cotización no obliga a AutoFácil en ninguna manera. La aprobación del crédito está sujeta a la presentación de la ' +

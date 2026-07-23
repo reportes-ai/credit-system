@@ -19,7 +19,7 @@ const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { clientIp } = require('../../../../shared/middleware/rate-limit');
 const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
 const crypto = require('crypto');
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const genToken = () => crypto.randomBytes(24).toString('hex');

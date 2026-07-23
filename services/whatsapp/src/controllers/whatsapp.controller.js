@@ -552,8 +552,8 @@ async function enviarOportunidad(conv, texto) {
     <p>Hola <b>${nombreEje.split(' ')[0] || 'ejecutivo'}</b>, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
     <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}${conv.preaprob_codigo ? ` · <b>N° Preaprobación:</b> ${conv.preaprob_codigo}` : ''}</p>
     ${detalle}
-    ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://credit-system-45em.onrender.com/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}
-    <p>💬 Continúa la conversación desde la <a href="https://credit-system-45em.onrender.com/whatsapp/?conv=${conv.id}">bandeja de WhatsApp</a> — el cliente sigue en el mismo chat.</p>
+    ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://afbs.autofacilchile.cl/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}
+    <p>💬 Continúa la conversación desde la <a href="https://afbs.autofacilchile.cl/whatsapp/?conv=${conv.id}">bandeja de WhatsApp</a> — el cliente sigue en el mismo chat.</p>
     <p style="background:#eff6ff;border-left:4px solid #0141A2;padding:10px 14px;border-radius:8px">
       <b>Importante:</b> debes reportar el resultado de esta gestión a tu jefe, ya que será revisado en el comité.
       Y recuerda: <b>en la medida que curses estos créditos, tendrás más oportunidades</b> como esta. 🚀</p>

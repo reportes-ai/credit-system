@@ -14,7 +14,7 @@ const { enviarCorreo, remitentePorClave, envolverHTML, cuentasRemitente } = requ
 const cob = require('./cobranza.controller');
 const { MORA_SQL, getCobranzaConfig, rellenar, tratamiento, titleCase } = cob._motor;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // Email "pro" de cobranza: shell con branding AutoFácil. Mismo render para envío y vista previa.

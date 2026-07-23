@@ -11,7 +11,7 @@
 const pool = require('../../../../shared/config/database');
 const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
 
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 const DIAS_AVISO_DEFAULT = 5; // días de anticipación por defecto (configurable en Seguridad)
 
 require('../../../../shared/migrate').enFila('aviso-vencimiento-clave', async () => {

@@ -494,7 +494,7 @@ function merge(texto, d) {
 }
 /* Píxel de lectura: token = id + HMAC corto (no expone nada; solo marca LEIDO) */
 const crypto = require('crypto');
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 const firmaPixel = id => crypto.createHmac('sha256', process.env.JWT_SECRET || 'af').update('px' + id).digest('hex').slice(0, 12);
 
 exports.pixel = async (req, res) => {

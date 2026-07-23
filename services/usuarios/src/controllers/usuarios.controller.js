@@ -8,7 +8,7 @@ const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
 require('../jobs/aviso-vencimiento-clave');
 
 // URL base para los enlaces de los correos (configurable por env, fallback a producción)
-const APP_URL = (process.env.APP_URL || 'https://credit-system-45em.onrender.com').replace(/\/+$/, '');
+const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 
 // Clave temporal aleatoria (alta entropía, sin caracteres ambiguos)
 const generarClaveTemporal = () => {
