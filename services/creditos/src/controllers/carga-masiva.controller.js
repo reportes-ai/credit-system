@@ -501,9 +501,18 @@ const importar = async (req, res) => {
         const cols   = Object.keys(obj).filter(k => obj[k] !== undefined && obj[k] !== null);
         const vals   = cols.map(k => obj[k]);
         const placeholders = cols.map(() => '?').join(',');
-        // ON DUPLICATE KEY UPDATE — si ya existe (num_op+mes+financiera), actualiza en vez de fallar
+        // ON DUPLICATE KEY UPDATE — si ya existe (num_op+mes+financiera), actualiza en vez de fallar.
+        // ANTI-DEGRADACIÓN (2026-07-23): un crédito OTORGADO en el sistema NO retrocede a un
+        // estado anterior por una base atrasada (la carta se otorgó aquí antes de que INDEXA
+        // exporte el estado nuevo). Solo ANULADO/PREPAGADO pueden pisar un OTORGADO.
         const updateCols = cols.filter(k => !['num_op','mes','financiera'].includes(k));
-        const updateSet  = updateCols.map(k => `\`${k}\` = VALUES(\`${k}\`)`).join(', ');
+        const updateSet  = updateCols.map(k => {
+          if (k === 'estado_credito' || k === 'estado_eval' || k === 'estado')
+            return `\`${k}\` = CASE WHEN creditos.estado_credito='OTORGADO'
+                      AND UPPER(COALESCE(VALUES(estado_credito),'')) NOT IN ('OTORGADO','ANULADO','PREPAGADO')
+                      THEN \`${k}\` ELSE VALUES(\`${k}\`) END`;
+          return `\`${k}\` = VALUES(\`${k}\`)`;
+        }).join(', ');
 
         await pool.query(
           `INSERT INTO creditos (${cols.map(k=>`\`${k}\``).join(',')}) VALUES (${placeholders})
