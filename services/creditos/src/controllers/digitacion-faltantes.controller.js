@@ -243,6 +243,9 @@ exports.guardar = async (req, res) => {
       if (col === 'tascli_real' && v != null) {
         const core = require('../../../../api-gateway/public/js/rentabilidad-core');
         v = core.normTasaMensualPct(v) || v;
+        // Regla: la tasa no puede superar la TMC vigente del período (validador único)
+        const errTMC = await require('./creditos.controller').validarTasaTMC(id, v);
+        if (errTMC) return res.status(400).json({ success:false, data:null, error: errTMC });
       }
       // No pisar un dato existente con vacío: si el form llegó con el campo en blanco
       // pero la BD ya tiene valor (ej. lo llenó una carga posterior), se conserva.

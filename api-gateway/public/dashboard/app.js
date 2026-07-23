@@ -4421,7 +4421,7 @@ window.abrirModalIncompletos = function abrirModalIncompletos() {
 
   const filas = lista.map(c => {
     const tipoDeal = c.parque ? 'PATIO' : 'CALLE';
-    const tasaMen  = c.tascli_real ? (c.tascli_real * 100).toFixed(4) : '';
+    const tasaMen  = c.tascli_real ? Number(c.tascli_real).toFixed(3) : '';   // tascli_real ya viene EN % mensual (convención BD)
     return `
     <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb;font-size:.78rem">
       <td style="padding:7px 8px;font-weight:700;white-space:nowrap">${c.num_op}</td>
@@ -4505,7 +4505,7 @@ window.guardarIncompletos = async function guardarIncompletos() {
     } else if (val === '') {
       // skip empty numeric fields
     } else if (el.dataset.campo === 'tascli_pct') {
-      mapa[id]['tascli_real'] = parseFloat(val) / 100; // % mensual → decimal
+      mapa[id]['tascli_real'] = parseFloat(String(val).replace(',', '.')); // % mensual tal cual (convención BD)
     } else {
       mapa[id][el.dataset.campo] = parseFloat(val);
     }

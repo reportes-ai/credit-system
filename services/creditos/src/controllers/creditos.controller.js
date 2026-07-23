@@ -962,9 +962,36 @@ const getOtorgadosIncompletos = async (req, res) => {
   }
 };
 
+/* Regla de negocio (2026-07-23): NINGUNA tasa de crédito puede superar la Tasa Máxima
+   Convencional vigente del mes de la operación. Se valida contra el tramo MÁS ALTO
+   (50-200 UF = tasa_mensual_menor) — fuente única: tabla `tasas` (sync API CMF).
+   tasaPct viene EN % mensual (convención de creditos.tascli_real). */
+async function validarTasaTMC(idCredito, tasaPct) {
+  const t = parseFloat(tasaPct);
+  if (!t || t <= 0) return null;                       // vacío/0: lo resuelven las reglas de faltantes
+  const [[cr]] = await pool.query(
+    'SELECT COALESCE(fecha_otorgado, mes, CURDATE()) f FROM creditos WHERE id=?', [idCredito]);
+  // Los períodos TMC rigen del 15 al 14: cuando solo se conoce el MES de la operación se
+  // compara contra la TMC MÁS ALTA que rigió durante ese mes (evita falsos rechazos).
+  const [[tmc]] = await pool.query(
+    `SELECT MAX(tasa_mensual_menor) mx FROM tasas
+      WHERE fecha_desde <= LAST_DAY(COALESCE(?, CURDATE()))
+        AND COALESCE(fecha_hasta, '9999-12-31') >= DATE_FORMAT(COALESCE(?, CURDATE()), '%Y-%m-01')`,
+    [cr ? cr.f : null, cr ? cr.f : null]);
+  if (!tmc || !Number(tmc.mx)) return null;   // sin TMC cargada: no bloquear
+  const max = Number(tmc.mx);
+  if (t > max + 0.0005)
+    return `Tasa ${t.toLocaleString('es-CL', { maximumFractionDigits: 3 })}% mensual supera la TMC vigente del período (${max.toLocaleString('es-CL', { maximumFractionDigits: 3 })}% mensual, tramo 50-200 UF). Revisa el valor.`;
+  return null;
+}
+
 const patchDatosIngresos = async (req, res) => {
   try {
     const { id } = req.params;
+    if (req.body.tascli_real !== undefined) {
+      const errTMC = await validarTasaTMC(id, req.body.tascli_real);
+      if (errTMC) return res.status(400).json({ success: false, data: null, error: errTMC });
+    }
     // Verificar mes cerrado
     const _mesPatch = await getMesDeOp(id);
     if (_mesPatch && await isMesCerrado(_mesPatch))
@@ -995,4 +1022,4 @@ const patchDatosIngresos = async (req, res) => {
   }
 };
 
-module.exports = { create, getAll, getById, update, getReporteria, getOtorgadosIncompletos, patchDatosIngresos };
+module.exports = { create, getAll, getById, update, getReporteria, getOtorgadosIncompletos, patchDatosIngresos, validarTasaTMC };
