@@ -788,6 +788,19 @@ const upsert = async (req, res) => {
       // Sincronizar estado del crédito vinculado
       if (c.idCreditoCreado || c.id_credito_creado) {
         const idCred = c.idCreditoCreado || c.id_credito_creado;
+        // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
+        if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined) {
+          const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
+          const ces  = c.segCesantia != null ? Number(c.segCesantia) : null;
+          const rep  = c.segRep != null ? Number(c.segRep) : null;
+          const tot  = (rdhT != null || ces != null || rep != null) ? (Number(rdhT || 0) + Number(ces || 0) + Number(rep || 0)) : null;
+          pool.query(`UPDATE creditos SET
+              seguro_rdh = COALESCE(?, seguro_rdh), seguro_cesantia = COALESCE(?, seguro_cesantia),
+              seguro_rep_menor = COALESCE(?, seguro_rep_menor), seguros = COALESCE(?, seguros),
+              gps = COALESCE(?, gps), updated_at = NOW() WHERE id = ?`,
+            [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null), idCred]
+          ).catch(e => console.error('[carta→credito primas]', e.message));
+        }
         if (c.status === 'APROBADA') {
           pool.query(`UPDATE creditos SET estado='CARTA_APROBACION', updated_at=NOW() WHERE id=? AND estado='INGRESO'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
         } else if (c.status === 'RECHAZADA') {

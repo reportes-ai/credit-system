@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.16 — campo Dealer: buscador arriba con etiqueta propia y el select DEALER* abajo con el nombre -->
+  <!-- v4.17 — sección Primas de seguro y gastos (captura interna: obligatorias en AUTOFIN, 0 válido; NO salen en la carta) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -381,6 +381,13 @@
       <div class="ff fg-2"><label>Financiera / acreedor</label><select id="cAcreedor" onchange="avisoFinanciera()"></select>
         <div id="finMsg" style="font-size:.72rem;margin-top:3px;font-weight:700"></div></div>
 
+      <div class="sec-form">Primas de seguro y gastos <span style="font-weight:400;color:#94a3b8;font-size:.72rem">(uso interno — NO salen en la carta · obligatorias en AUTOFIN, 0 si no aplica)</span></div>
+      <div class="ff"><label>Prima Desgravamen <span id="reqSeg1" style="color:#dc2626">*</span></label><input id="cSegDesg" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
+      <div class="ff"><label>Prima RDH+E <span id="reqSeg2" style="color:#dc2626">*</span></label><input id="cSegRdh" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
+      <div class="ff"><label>Prima Cesantía <span id="reqSeg3" style="color:#dc2626">*</span></label><input id="cSegCes" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
+      <div class="ff"><label>Prima Rep. Menores <span id="reqSeg4" style="color:#dc2626">*</span></label><input id="cSegRep" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
+      <div class="ff"><label>GPS</label><input id="cGps" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (opcional)"></div>
+
       <div class="sec-form">Parque y concesionario</div>
       <div class="ff fg-2" id="wrapParque"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
       <div class="ff fg-2">
@@ -742,6 +749,11 @@ const toTitle = s => String(s||'').toLowerCase().replace(/(^|\s)\S/g, c=>c.toUpp
 const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
 const fmtFecha = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
 function fmtMoney(input){ const raw=input.value.replace(/[^0-9]/g,''); const n=parseInt(raw,10)||0; input.dataset.raw=n; input.value=n?'$'+n.toLocaleString('es-CL'):''; }
+/* Variante que respeta el 0 EXPLÍCITO (primas: 0 digitado ≠ vacío) */
+function fmtMoneyZ(input){ const s=input.value.replace(/[^0-9]/g,''); if(s===''){ input.dataset.raw=''; input.value=''; return; } const n=parseInt(s,10); input.dataset.raw=n; input.value='$'+n.toLocaleString('es-CL'); }
+/* Valor de un campo con 0 válido: null = sin digitar */
+function moneyZ(id){ const el=document.getElementById(id); if(!el) return null; const s=String(el.value||'').replace(/[^0-9]/g,''); return s==='' ? null : parseInt(s,10); }
+function setMoneyZ(id, v){ const el=document.getElementById(id); if(!el) return; if(v===null||v===undefined||v===''){ el.value=''; el.dataset.raw=''; } else { el.value='$'+Number(v).toLocaleString('es-CL'); el.dataset.raw=Number(v); } }
 const rawMoney = id => parseInt(document.getElementById(id).dataset.raw||'0',10)||0;
 function setMoney(id, v){ const el=document.getElementById(id); el.dataset.raw=v||0; el.value=v?'$'+parseInt(v).toLocaleString('es-CL'):''; }
 // Fechas: normalizar para round-trip BD (mysql no acepta ISO con T/Z en strict)
@@ -1592,6 +1604,9 @@ function renderFinancierasSelect(){
 function avisoFinanciera(){
   const sel = document.getElementById('cAcreedor').value;
   const msg = document.getElementById('finMsg');
+  // Asterisco de primas: obligatorias solo en AUTOFIN (UNIDAD no paga por seguros)
+  const esAF = String(sel||'').toUpperCase().includes('AUTOFIN');
+  ['reqSeg1','reqSeg2','reqSeg3','reqSeg4'].forEach(id => { const e=document.getElementById(id); if(e) e.style.display = esAF ? '' : 'none'; });
   const f = FINANCIERAS.find(x=>x.nombre===sel);
   if (f?.estado === 'bloqueada') {
     msg.style.color='#dc2626';
@@ -1632,7 +1647,8 @@ function limpiarForm(){
   editandoId = null;
   montoCredManual = false;
   document.getElementById('tituloForm').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación';
-  ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cNombres','cApPat','cApMat','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cMontoCred','cMontoUF','cTasa','cTasaPizarra','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartPct','cPartNeto','cPartIVA']
+  ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cNombres','cApPat','cApMat','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cMontoCred','cMontoUF','cTasa','cTasaPizarra','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartPct','cPartNeto','cPartIVA',
+   'cSegDesg','cSegRdh','cSegCes','cSegRep','cGps']
     .forEach(id => { const el=document.getElementById(id); if(!el) return; el.value=''; if(el.dataset) el.dataset.raw=0; el.style.borderColor=''; });
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('cPrenda').value = 'SI';
@@ -1656,6 +1672,13 @@ async function guardarCarta(){
     if (!document.getElementById(id).value) { setFormAlert('Falta: ' + label); return; }
   }
   if (!rawMoney('cPrecio')) { setFormAlert('Falta: Precio venta'); return; }
+  // Primas de seguro: obligatorias en AUTOFIN (0 explícito válido). UNIDAD no paga por
+  // seguros (rentabilidad-calc.js) → opcionales.
+  if (String(document.getElementById('cAcreedor').value || '').toUpperCase().includes('AUTOFIN')) {
+    const faltaSeg = [['cSegDesg','Prima Desgravamen'],['cSegRdh','Prima RDH+E'],['cSegCes','Prima Cesantía'],['cSegRep','Prima Rep. Menores']]
+      .find(([id]) => moneyZ(id) === null);
+    if (faltaSeg) { setFormAlert('Falta: ' + faltaSeg[1] + ' (digita 0 si no aplica) — obligatoria en AUTOFIN'); return; }
+  }
   if (!rutValido()) { setFormAlert('El RUT del cliente no es válido (dígito verificador incorrecto)'); return; }
   if (!editandoId && !document.getElementById('cApPat').value) { setFormAlert('Falta: Apellido paterno del cliente'); return; }
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
@@ -1715,7 +1738,9 @@ async function guardarCarta(){
 
   const carta = {
     ...(base ? sanitizarCarta(base) : {}),
-    ...(window._autofinSeg || {}),   // primas reales escaneadas de la ficha AutoFin
+    // primas y GPS desde el formulario (escaneadas o digitadas; null = sin digitar)
+    segDesgravamen: moneyZ('cSegDesg'), segRdh: moneyZ('cSegRdh'),
+    segCesantia: moneyZ('cSegCes'), segRep: moneyZ('cSegRep'), gps: moneyZ('cGps'),
     id: editandoId || undefined,
     opCarta:  document.getElementById('cOpCarta').value,
     opOrigen: document.getElementById('cOpOrigen').value.trim(),
@@ -1949,10 +1974,11 @@ async function onAutofinDoc(input){
     const j = await r.json();
     if(!j.success){ udMsg(j.error||'No se pudo leer la carta.','err','autofinDocsMsg'); return; }
     await udFill(j.data.fields);
-    // primas reales de la ficha AutoFin (el formulario no tiene campos: viajan aparte al guardar)
+    // primas reales de la ficha AutoFin → a los campos del formulario (0 explícito válido)
     const f = j.data.fields || {};
-    window._autofinSeg = { segDesgravamen: f.segDesgravamen, segCesantia: f.segCesantia,
-                           segRdh: f.segRdh, segRep: f.segRep, gps: f.gps };
+    setMoneyZ('cSegDesg', f.segDesgravamen); setMoneyZ('cSegRdh', f.segRdh);
+    setMoneyZ('cSegCes', f.segCesantia);     setMoneyZ('cSegRep', f.segRep);
+    setMoneyZ('cGps', f.gps);
     const warn = (j.data.warnings||[]).join(' ');
     udMsg('✓ Datos cargados desde Autofin. Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok','autofinDocsMsg');
   } catch(e){ console.error('onAutofinDoc',e); udMsg('Error al procesar la carta.','err','autofinDocsMsg'); }
