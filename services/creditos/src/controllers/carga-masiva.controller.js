@@ -360,7 +360,15 @@ const preview = async (req, res) => {
 
     // Llave: ID FINANCIERA
     const ids = data.map(r => String(r[colIdFin] || '').trim()).filter(v => v && v !== '' && v.toUpperCase() !== 'NO APLICA');
-    if (!ids.length) return res.status(400).json({ success: false, data: null, error: `No se encontró la columna "ID FINANCIERA" en el archivo. Columnas detectadas: ${Object.keys(data[0]).slice(0,8).join(', ')}` });
+    if (!ids.length) {
+      // ¿Es el export de Trinidad (AutoFin)? Su encabezado trae "Fecha Curse"/"REVISIONFIRMA"
+      // en las primeras filas — ese archivo se carga en la card Carga Trinidad.
+      const muestra = JSON.stringify(data.slice(0, 6));
+      if (/Fecha Curse|REVISIONFIRMA|TRISolicitud/i.test(muestra))
+        return res.status(400).json({ success: false, data: null,
+          error: 'Este archivo es el export de TRINIDAD (AutoFin). Cárgalo en Carga Masiva → Carga Trinidad (/carga-masiva/trinidad/), no aquí — esta card es para el Excel calculado AutoFácil.' });
+      return res.status(400).json({ success: false, data: null, error: `No se encontró la columna "ID FINANCIERA" en el archivo. Columnas detectadas: ${Object.keys(data[0]).slice(0,8).join(', ')}` });
+    }
 
     const setExistentes = await getExistentes(ids);
 
