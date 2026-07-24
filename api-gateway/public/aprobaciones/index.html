@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.14 — Impresión: columna N° Operación con fallback al ID de la carta (opOrigen) y subtítulo cuando difieren -->
+  <!-- v4.15 — selector de dealer: con parque elegido muestra también los demás dealers en "Otros" (el parque lo define la operación) + primas AutoFin escaneadas viajan al crédito -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1351,13 +1351,18 @@ function cargarAnios(){
 function filtrarConcesionarios(){
   const parque = document.getElementById('cParque').value;
   const txt = (document.getElementById('cConcFiltro')?.value || '').toLowerCase().trim();
-  let list = parque ? DEALERS.filter(d=>d.parque===parque) : DEALERS;
-  // Filtro por cualquier parte del nombre (subcadena, sin importar el orden)
-  if (txt) list = list.filter(d => (d.nombre||'').toLowerCase().includes(txt));
+  // Con parque elegido: primero los dealers de ese parque, y ABAJO el resto (un dealer
+  // puede vender en un parque distinto al de su ficha — el parque lo define la operación).
+  let delParque = parque ? DEALERS.filter(d=>d.parque===parque) : DEALERS;
+  let otros     = parque ? DEALERS.filter(d=>d.parque!==parque) : [];
+  const matcher = d => (d.nombre||'').toLowerCase().includes(txt);
+  if (txt) { delParque = delParque.filter(matcher); otros = otros.filter(matcher); }
+  let list = delParque.concat(otros);
   const sel = document.getElementById('cConc');
   const actual = sel.value;
-  sel.innerHTML = '<option value="">— Seleccione —</option>' +
-    list.map((d,i)=>`<option value="${escH(d.nombre)}" data-rut="${escH(d.rut)}">${escH(d.nombre)}</option>`).join('');
+  const opt = d => `<option value="${escH(d.nombre)}" data-rut="${escH(d.rut)}">${escH(d.nombre)}</option>`;
+  sel.innerHTML = '<option value="">— Seleccione —</option>' + delParque.map(opt).join('') +
+    (otros.length ? `<optgroup label="── Otros dealers (fuera de este parque) ──">${otros.map(opt).join('')}</optgroup>` : '');
   // Conservar la selección si sigue en la lista; con match único, auto-seleccionar
   if (actual && list.some(d=>d.nombre===actual)) { sel.value = actual; onConcesionario(); return; }
   if (txt && list.length === 1) { sel.value = list[0].nombre; onConcesionario(); return; }
