@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendedores por Dealer — AutoFácil</title>
+  <!-- v1.0 — base de vendedores por concesionario: importación CCS + alta desde la carta -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#012d70; --blue:#0141A2; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { max-width:1180px; margin:0 auto; padding:32px 24px; }
+    .af-banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .af-banner i { font-size:2.4rem; opacity:.85; }
+    .af-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .af-banner p { opacity:.82; margin:0; font-size:.88rem; }
+    .panel { background:#fff; border-radius:16px; padding:22px 24px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:20px; }
+    table { width:100%; font-size:.82rem; }
+    th { font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; border-bottom:2px solid #e2e8f0; padding:8px 10px; text-align:left; }
+    td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    tr:hover td { background:#f8fafc; }
+    .sin-dealer td { background:#fff7ed; }
+    input, select { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 10px; font-size:.82rem; }
+    .btn-af { background:var(--blue); color:#fff; border:none; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; }
+    .btn-lite { background:#e5e7eb; color:#374151; border:none; border-radius:8px; padding:6px 12px; font-size:.78rem; font-weight:600; cursor:pointer; }
+    .badge-o { border-radius:6px; padding:1px 7px; font-size:.7rem; font-weight:700; }
+    .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:24px; }
+    .afecta ul { margin:8px 0 0; padding-left:18px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="af-banner"><i class="bi bi-person-badge"></i><div>
+    <h2>Vendedores por Dealer</h2>
+    <p>Base única de vendedores de cada concesionario — alimenta el selector de Vendedor del Generador de Cartas</p>
+  </div></div>
+
+  <div class="panel">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <input id="fTexto" placeholder="🔍 Buscar vendedor, RUT o dealer…" style="flex:1;min-width:240px" oninput="render()">
+      <select id="fDealer" onchange="render()" style="max-width:320px"><option value="">Todos los dealers</option></select>
+      <label style="font-size:.8rem;color:#475569"><input type="checkbox" id="fSin" onchange="render()"> Solo sin dealer asignado</label>
+      <label style="font-size:.8rem;color:#475569"><input type="checkbox" id="fInact" onchange="cargar()"> Ver inactivos</label>
+      <button class="btn-af" onclick="nuevo()"><i class="bi bi-plus-lg me-1"></i>Agregar vendedor</button>
+    </div>
+    <div id="resumen" style="font-size:.8rem;color:#64748b;margin-bottom:8px"></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Vendedor</th><th>RUT</th><th>Mail</th><th>Dealer</th><th>Origen</th><th></th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Vendedor (nombre, RUT, mail)</b> → selector "Vendedor" al digitar una carta en el <a href="/aprobaciones/">Generador de Cartas</a>; el nombre elegido se graba en la carta y viaja al crédito.</li>
+      <li><b>Dealer asignado</b> → determina qué vendedores se ofrecen al elegir cada concesionario en la carta. Los marcados <b>sin dealer</b> (naranjo) no aparecen en ningún selector hasta asignarlos.</li>
+      <li><b>Activo/Inactivo</b> → un vendedor inactivo deja de aparecer en el selector de la carta (las cartas antiguas conservan su nombre).</li>
+    </ul>
+  </div>
+</div>
+
+<dialog id="dlg" style="border:none;border-radius:16px;padding:24px 26px;max-width:520px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <h5 style="font-weight:700;color:var(--navy)" id="dlgTitulo">Vendedor</h5>
+  <div style="display:grid;gap:10px;margin-top:14px">
+    <div><label style="font-size:.75rem;font-weight:700;color:#374151">NOMBRE *</label><input id="eNombre" style="width:100%"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label style="font-size:.75rem;font-weight:700;color:#374151">RUT *</label><input id="eRut" style="width:100%" placeholder="12345678-9"></div>
+      <div><label style="font-size:.75rem;font-weight:700;color:#374151">MAIL</label><input id="eMail" type="email" style="width:100%"></div>
+    </div>
+    <div><label style="font-size:.75rem;font-weight:700;color:#374151">DEALER *</label><select id="eDealer" style="width:100%"></select></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+    <button class="btn-lite" onclick="document.getElementById('dlg').close()">Cancelar</button>
+    <button class="btn-af" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+  </div>
+</dialog>
+
+<script src="/js/rut-core.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/';
+const H = { Authorization: 'Bearer ' + token };
+let DATA = [], DEALERS = [], editId = null;
+
+async function cargar(){
+  const inc = document.getElementById('fInact').checked ? '?incluir_inactivos=1' : '';
+  const j = await fetch('/api/vendedores-dealer' + inc, { headers: H }).then(r => r.json());
+  DATA = (j.success && j.data) || [];
+  if (!DEALERS.length) {
+    const jd = await fetch('/api/dealers?limit=3000', { headers: H }).then(r => r.json()).catch(() => null);
+    DEALERS = ((jd && jd.success && (jd.data?.rows || jd.data?.dealers || jd.data)) || []).map(d => ({ rut: d.rut, nombre: d.nombre_indexa || d.nombre_razon || d.rut }))
+      .filter(d => d.rut).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    const opts = DEALERS.map(d => `<option value="${d.rut}">${d.nombre}</option>`).join('');
+    document.getElementById('fDealer').innerHTML = '<option value="">Todos los dealers</option>' + opts;
+    document.getElementById('eDealer').innerHTML = '<option value="">— Seleccione —</option>' + opts;
+  }
+  render();
+}
+
+function render(){
+  const txt = document.getElementById('fTexto').value.toLowerCase();
+  const fd = document.getElementById('fDealer').value;
+  const soloSin = document.getElementById('fSin').checked;
+  const rows = DATA.filter(v => {
+    if (fd && v.rut_dealer !== fd) return false;
+    if (soloSin && v.rut_dealer !== 'SIN-DEALER') return false;
+    if (txt && !((v.nombre || '') + (v.rut || '') + (v.dealer_nombre || '') + (v.mail || '')).toLowerCase().includes(txt)) return false;
+    return true;
+  });
+  const sinD = DATA.filter(v => v.rut_dealer === 'SIN-DEALER').length;
+  document.getElementById('resumen').innerHTML =
+    `${rows.length} de ${DATA.length} vendedores` + (sinD ? ` · <b style="color:#c2410c">${sinD} sin dealer asignado</b>` : '');
+  document.getElementById('tbody').innerHTML = rows.map(v => `
+    <tr class="${v.rut_dealer === 'SIN-DEALER' ? 'sin-dealer' : ''}" style="${v.activo ? '' : 'opacity:.5'}">
+      <td><b>${v.nombre}</b></td>
+      <td>${v.rut ? AF_RUT.formatear(v.rut) : '—'}</td>
+      <td style="font-size:.76rem">${v.mail || '—'}</td>
+      <td>${v.rut_dealer === 'SIN-DEALER' ? '<span class="badge-o" style="background:#ffedd5;color:#c2410c">SIN DEALER</span>' : (v.dealer_nombre || v.rut_dealer)}</td>
+      <td><span class="badge-o" style="background:${v.origen === 'IMPORT' ? '#eef2ff;color:#3730a3' : '#dcfce7;color:#15803d'}">${v.origen}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-lite" onclick="editar(${v.id})" title="Editar"><i class="bi bi-pencil"></i></button>
+        <button class="btn-lite" onclick="toggleActivo(${v.id}, ${v.activo ? 0 : 1})" title="${v.activo ? 'Desactivar' : 'Reactivar'}"><i class="bi bi-${v.activo ? 'x-circle' : 'arrow-counterclockwise'}"></i></button>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px">Sin resultados</td></tr>';
+}
+
+function nuevo(){
+  editId = null;
+  document.getElementById('dlgTitulo').textContent = 'Agregar vendedor';
+  ['eNombre', 'eRut', 'eMail'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('eDealer').value = document.getElementById('fDealer').value || '';
+  document.getElementById('dlg').showModal();
+}
+function editar(id){
+  const v = DATA.find(x => x.id === id); if (!v) return;
+  editId = id;
+  document.getElementById('dlgTitulo').textContent = 'Editar vendedor';
+  document.getElementById('eNombre').value = v.nombre || '';
+  document.getElementById('eRut').value = v.rut || '';
+  document.getElementById('eMail').value = v.mail || '';
+  document.getElementById('eDealer').value = v.rut_dealer === 'SIN-DEALER' ? '' : v.rut_dealer;
+  document.getElementById('dlg').showModal();
+}
+async function guardar(){
+  const nombre = document.getElementById('eNombre').value.trim();
+  const rut = document.getElementById('eRut').value.trim();
+  const mail = document.getElementById('eMail').value.trim();
+  const rut_dealer = document.getElementById('eDealer').value;
+  if (!nombre) return alert('Falta el nombre');
+  if (!rut || !AF_RUT.validar(rut)) return alert('RUT inválido');
+  if (!rut_dealer) return alert('Selecciona el dealer');
+  const body = { nombre, rut, mail, rut_dealer };
+  const j = editId
+    ? await fetch('/api/vendedores-dealer/' + editId, { method: 'PUT', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+    : await fetch('/api/vendedores-dealer', { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
+  if (!j.success) return alert(j.error || 'Error al guardar');
+  document.getElementById('dlg').close();
+  cargar();
+}
+async function toggleActivo(id, activo){
+  const j = await fetch('/api/vendedores-dealer/' + id, { method: 'PUT', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ activo }) }).then(r => r.json());
+  if (!j.success) return alert(j.error || 'Error');
+  cargar();
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

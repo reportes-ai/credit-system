@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.17 — sección Primas de seguro y gastos (captura interna: obligatorias en AUTOFIN, 0 válido; NO salen en la carta) -->
+  <!-- v4.18 — Vendedores por Dealer: el campo Vendedor pasa a selector desde la base vendedores_dealer; si no está, el ejecutivo lo agrega (nombre+RUT+mail) desde la misma carta; card nueva de mantenedor -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -255,6 +255,11 @@
       <h6>Carga Masiva de Cartas</h6><p>Sube el Excel mensual (hoja DETALLE MES) y carga las cartas en bloque, enlazando a los créditos existentes</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
+    <button class="ap-card" id="cardVendedores" onclick="location.href='/aprobaciones/vendedores/'" style="display:none">
+      <div class="card-icon"><i class="bi bi-person-badge"></i></div>
+      <h6>Vendedores por Dealer</h6><p>Base de vendedores de cada concesionario: asigna dealer, corrige datos y agrega nuevos (alimenta el selector de la carta)</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
   </div>
 </div>
 
@@ -396,7 +401,17 @@
         <label>Dealer *</label>
         <select id="cConc" onchange="onConcesionario()"><option value="">Cargando…</option></select></div>
       <div class="ff"><label>RUT concesionario</label><input id="cRutConc" readonly></div>
-      <div class="ff fg-2"><label>Vendedor</label><input id="cVendedor" placeholder="Nombre vendedor"></div>
+      <div class="ff fg-2"><label>Vendedor</label>
+        <select id="cVendedorSel" onchange="onVendedorSel()"><option value="">— Seleccione dealer primero —</option></select>
+        <input id="cVendedor" type="hidden"></div>
+      <div id="vendNuevoWrap" style="display:none;grid-column:1/-1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px 14px">
+        <b style="font-size:.78rem;color:#0141A2">➕ Vendedor nuevo — se agrega a la base de este dealer</b>
+        <div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:10px;margin-top:8px">
+          <div class="ff"><label>Nombre *</label><input id="vnNombre" placeholder="Nombre y apellido"></div>
+          <div class="ff"><label>RUT *</label><input id="vnRut" placeholder="12345678-9"></div>
+          <div class="ff"><label>Mail *</label><input id="vnMail" type="email" placeholder="correo@dominio.cl"></div>
+        </div>
+      </div>
 
       <div class="sec-form">Participación dealer
         <span id="comisionPizarra" style="font-weight:600;font-size:.72rem;color:#0141A2;text-transform:none;margin-left:8px"></span>
@@ -852,6 +867,7 @@ async function cargarPermisos(){
   if (can('aprob_desempeno')) document.getElementById('cardDesempeno').style.display = '';
   if (can('aprob_mantenedor')) document.getElementById('cardMantenedor').style.display = '';
   if (can('aprob_carga_masiva')) document.getElementById('cardCargaMasiva').style.display = '';
+  if (can('aprob_vendedores')) document.getElementById('cardVendedores').style.display = '';
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
@@ -1386,6 +1402,62 @@ function onConcesionario(){
   const sel = document.getElementById('cConc');
   const opt = sel.options[sel.selectedIndex];
   document.getElementById('cRutConc').value = opt?.dataset?.rut || '';
+  cargarVendedores(opt?.dataset?.rut || '');
+}
+
+/* ── Vendedores por dealer (base vendedores_dealer) ── */
+let VEND_CACHE = [];
+async function cargarVendedores(rutDealer){
+  const sel = document.getElementById('cVendedorSel');
+  const actual = document.getElementById('cVendedor').value;
+  VEND_CACHE = [];
+  if (!rutDealer) { sel.innerHTML = '<option value="">— Seleccione dealer primero —</option>'; onVendedorSel(); return; }
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  try {
+    const j = await fetch('/api/vendedores-dealer?rut_dealer=' + encodeURIComponent(rutDealer), { headers: hdr() }).then(r => r.json());
+    VEND_CACHE = (j.success && j.data) || [];
+  } catch (e) {}
+  sel.innerHTML = '<option value="">— Seleccione —</option>' +
+    VEND_CACHE.map(v => `<option value="${v.nombre}">${v.nombre}</option>`).join('') +
+    '<option value="__NUEVO__">➕ No está en la lista — agregar vendedor…</option>';
+  // si la carta traía un vendedor que no está en la base, conservarlo como opción
+  if (actual && !VEND_CACHE.some(v => v.nombre === actual)) {
+    const o = document.createElement('option'); o.value = o.textContent = actual;
+    sel.insertBefore(o, sel.lastElementChild);
+  }
+  if (actual) sel.value = actual;
+  onVendedorSel();
+}
+function onVendedorSel(){
+  const sel = document.getElementById('cVendedorSel');
+  const nuevo = sel.value === '__NUEVO__';
+  document.getElementById('vendNuevoWrap').style.display = nuevo ? '' : 'none';
+  document.getElementById('cVendedor').value = nuevo ? '' : sel.value;
+}
+// Si eligió "agregar", valida y graba el vendedor en la base ANTES de guardar la carta.
+// Devuelve true si está ok para seguir.
+async function resolverVendedorNuevo(){
+  const sel = document.getElementById('cVendedorSel');
+  if (sel.value !== '__NUEVO__') return true;
+  const nombre = document.getElementById('vnNombre').value.trim();
+  const rut = document.getElementById('vnRut').value.trim();
+  const mail = document.getElementById('vnMail').value.trim();
+  const rutDealer = document.getElementById('cRutConc').value.trim();
+  if (!nombre || !rut || !mail) { alert('Vendedor nuevo: completa Nombre, RUT y Mail para agregarlo a la base.'); return false; }
+  if (window.AF_RUT && !AF_RUT.validar(rut)) { alert('El RUT del vendedor no es válido.'); return false; }
+  if (!rutDealer) { alert('Selecciona primero el dealer.'); return false; }
+  try {
+    const j = await fetch('/api/vendedores-dealer', { method: 'POST',
+      headers: { ...hdr(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rut_dealer: rutDealer, nombre, rut, mail }) }).then(r => r.json());
+    if (!j.success) { alert(j.error || 'No se pudo agregar el vendedor.'); return false; }
+  } catch (e) { alert('No se pudo agregar el vendedor: ' + e.message); return false; }
+  document.getElementById('cVendedor').value = nombre.toUpperCase();
+  await cargarVendedores(rutDealer);
+  document.getElementById('cVendedorSel').value = nombre.toUpperCase();
+  onVendedorSel();
+  document.getElementById('cVendedor').value = nombre.toUpperCase();
+  return true;
 }
 function onTipoCarta(){
   const tipo = document.getElementById('cTipo').value;
@@ -1680,6 +1752,7 @@ async function guardarCarta(){
     if (faltaSeg) { setFormAlert('Falta: ' + faltaSeg[1] + ' (digita 0 si no aplica) — obligatoria en AUTOFIN'); return; }
   }
   if (!rutValido()) { setFormAlert('El RUT del cliente no es válido (dígito verificador incorrecto)'); return; }
+  if (!(await resolverVendedorNuevo())) return;   // vendedor nuevo → primero a la base
   if (!editandoId && !document.getElementById('cApPat').value) { setFormAlert('Falta: Apellido paterno del cliente'); return; }
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
   const tasaIngresada = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
@@ -2058,6 +2131,7 @@ function editarCarta(id){
   document.getElementById('cConc').value = c.concesionario||'';
   document.getElementById('cRutConc').value = c.rutConc||'';
   document.getElementById('cVendedor').value = c.vendedor||'';
+  cargarVendedores(c.rutConc||'');   // llena el selector y preserva el vendedor de la carta
   if (c.montoCreditoCLP) { setMoney('cMontoCred', c.montoCreditoCLP); montoCredManual = true; }
   if (c.tasaCredito) document.getElementById('cTasa').value = String(c.tasaCredito).replace('.',',');
   setMoney('cPartBruto', c.partBruto); setMoney('cPartNeto', c.partNeto); setMoney('cPartIVA', c.partIVA);

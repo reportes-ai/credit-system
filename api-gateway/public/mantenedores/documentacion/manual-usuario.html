@@ -94,6 +94,7 @@
     <li><b>Vigencia:</b> la carta aprobada vive 5 días corridos (configurable). En <b>Cartas Vigentes</b> se decide: <b>Otorgar</b> (crea el crédito OTORGADO y cartola) o <b>Desistir</b>. Si vence sola, pasa a DESISTIDA y ya no se puede imprimir.</li>
   </ol>
   <div class="tip">La comisión del dealer que rige es la de la carta (negociación especial). Si la carta no la trae, se calcula por parámetros.</div>
+  <p><b>Vendedores por Dealer:</b> el campo Vendedor de la carta es un <b>selector</b> que muestra los vendedores registrados del dealer elegido (base única <code>vendedores_dealer</code>, importada de la planilla CCS). Si el vendedor no está en la lista, el ejecutivo elige "➕ Agregar vendedor" y completa <b>Nombre, RUT y Mail</b> — queda agregado a la base al guardar la carta. La card <b>Vendedores por Dealer</b> (permiso <code>aprob_vendedores</code>, Administrador) permite corregir datos, reasignar dealer (los importados "sin dealer" se marcan en naranjo) y desactivar vendedores.</p>
   <figure class="shot"><img src="img/cartas.png" alt="Módulo Cartas de Aprobación" loading="lazy"><figcaption>El módulo de Cartas: generar, revisar (pool de analistas), Cartas Vigentes para Otorgar/Desistir, impresión y carga masiva.</figcaption></figure>
 
   <h2 id="evaluacion">4. Evaluación Crediticia</h2>

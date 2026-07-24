@@ -179,6 +179,7 @@ app.use('/api/ipc',             require('../../services/mantenedores/src/routes/
 app.use('/api/geografico',      require('../../services/mantenedores/src/routes/geografico.routes'));
 app.use('/api/vehiculos',       require('../../services/mantenedores/src/routes/vehiculos.routes'));
 app.use('/api/dealers',         require('../../services/mantenedores/src/routes/dealers.routes'));
+app.use('/api/vendedores-dealer', require('../../services/mantenedores/src/routes/vendedores-dealer.routes'));
 app.use('/api/dealer-potencial', require('../../services/mantenedores/src/routes/dealer-potencial.routes'));
 app.use('/api/mantenimiento',    require('../../services/mantenedores/src/routes/mantenimiento.routes'));
 app.use('/api/ia-config',        require('../../services/mantenedores/src/routes/ia-config.routes'));
