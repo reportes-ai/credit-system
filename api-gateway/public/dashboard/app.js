@@ -2652,9 +2652,9 @@ function buildVProy2() {
     <div class="kpi-box"><div class="kpi-label">Día hábil</div><div class="kpi-val big">${dHoy} / ${D}</div><div class="kpi-sub">${(tHoy).toFixed(0)}% del mes transcurrido</div></div>
     <div class="kpi-box"><div class="kpi-label">Avance esperado (mediana)</div><div class="kpi-val big">${(medM * 100).toFixed(1)}%</div><div class="kpi-sub">p25 ${(p25M*100).toFixed(0)}% · p75 ${(p75M*100).toFixed(0)}%</div></div>
     <div class="kpi-box"><div class="kpi-label">Peso curva vs tendencia</div><div class="kpi-val big">${(w*100).toFixed(0)}% / ${((1-w)*100).toFixed(0)}%</div><div class="kpi-sub">la curva pesa más al avanzar el mes</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Q cierre (mezcla)</div><div class="kpi-val big">${mzQ ? Math.round(mzQ) : '—'}</div><div class="kpi-sub">hoy: ${tot.q} ops</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Monto cierre (mezcla)</div><div class="kpi-val big">${mzM ? fM(mzM) : '—'}</div><div class="kpi-sub">${rgM ? 'banda ' + fM(rgM[0]) + '–' + fM(rgM[1]) : ''}</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Facturación cierre (mezcla)</div><div class="kpi-val big">${mzF ? fM(mzF) : '—'}</div><div class="kpi-sub">hoy: ${fM(tot.f)}</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label" id="kpi-proy2-q-lbl">Q cierre (mezcla)</div><div class="kpi-val big" id="kpi-proy2-q">${mzQ ? Math.round(mzQ) : '—'}</div><div class="kpi-sub">hoy: ${tot.q} ops</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label" id="kpi-proy2-m-lbl">Monto cierre (mezcla)</div><div class="kpi-val big" id="kpi-proy2-m">${mzM ? fM(mzM) : '—'}</div><div class="kpi-sub">${rgM ? 'banda ' + fM(rgM[0]) + '–' + fM(rgM[1]) : ''}</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label" id="kpi-proy2-f-lbl">Facturación cierre (mezcla)</div><div class="kpi-val big" id="kpi-proy2-f">${mzF ? fM(mzF) : '—'}</div><div class="kpi-sub">hoy: ${fM(tot.f)}</div></div>
     <div class="kpi-box highlight" style="background:#f0fdf4;border-color:#86efac"><div class="kpi-label">Ingreso Neto proyectado</div><div class="kpi-val big" id="kpi-proy2-neto">…</div><div class="kpi-sub" id="kpi-proy2-neto-sub">calculando…</div></div>`;
 
   // ── Ingreso Neto proyectado: neto operacional (motor, incluye arriendo prorrateado
@@ -2691,27 +2691,66 @@ function buildVProy2() {
     } catch (e) { kv.textContent = '—'; ks.textContent = 'sin datos suficientes'; }
   })();
 
-  // ── Tabla por institución (mezcla, repartida proporcional al actual) ──
+  // ── Tabla por institución (repartida proporcional al actual) ──
   const parte = (total, a, t) => t > 0 ? total * (a / t) : 0;
-  const fila = (nom, a) => `<tr><td><b>${nom}</b></td>
-    <td>${a.q}</td><td><b>${mzQ ? Math.round(parte(mzQ, a.q, tot.q)) : '—'}</b></td>
-    <td>${fM(a.m)}</td><td><b>${mzM ? fM(parte(mzM, a.m, tot.m)) : '—'}</b></td>
-    <td>${fM(a.f)}</td><td><b>${mzF ? fM(parte(mzF, a.f, tot.f)) : '—'}</b></td></tr>`;
-  document.getElementById('t-proy2').innerHTML = `
-    <thead><tr><th>Institución</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
-    <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
-    <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${mzF ? fM(mzF) : '—'}</b></td></tr></tfoot>`;
+  const renderTablaProy2 = (pQ, pM, pF) => {
+    const fila = (nom, a) => `<tr><td><b>${nom}</b></td>
+      <td>${a.q}</td><td><b>${pQ ? Math.round(parte(pQ, a.q, tot.q)) : '—'}</b></td>
+      <td>${fM(a.m)}</td><td><b>${pM ? fM(parte(pM, a.m, tot.m)) : '—'}</b></td>
+      <td>${fM(a.f)}</td><td><b>${pF ? fM(parte(pF, a.f, tot.f)) : '—'}</b></td></tr>`;
+    document.getElementById('t-proy2').innerHTML = `
+      <thead><tr><th>Institución</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
+      <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
+      <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${pQ ? Math.round(pQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${pM ? fM(pM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${pF ? fM(pF) : '—'}</b></td></tr></tfoot>`;
+  };
+  renderTablaProy2(mzQ, mzM, mzF);
   document.getElementById('proy2-nota').innerHTML =
     `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución es proporcional al avance real de cada una.`;
 
   // ── Tabla comparativa de métodos (monto) ──
-  document.getElementById('t-proy2-met').innerHTML = `
+  const renderMetodos = (extraFila) => {
+    document.getElementById('t-proy2-met').innerHTML = `
     <thead><tr><th>Método</th><th>Monto cierre</th><th>Q cierre</th><th>Facturación</th><th>Cómo funciona</th></tr></thead>
     <tbody>
       <tr><td>Curva hábil (mediana)</td><td>${pcM ? fM(pcM) : '—'}</td><td>${pcQ ? Math.round(pcQ) : '—'}</td><td>${pcF ? fM(pcF) : '—'}</td><td style="font-size:.74rem;color:#64748b">actual ÷ avance mediano histórico al día hábil ${dHoy}</td></tr>
       <tr><td>Tendencia (últimos ${MESES_TREND})</td><td>${fM(ptM)}</td><td>${Math.round(ptQ)}</td><td>${fM(ptF)}</td><td style="font-size:.74rem;color:#64748b">regresión lineal de los cierres previos, sin mirar el mes en curso</td></tr>
-      <tr style="background:#eff6ff"><td><b>Mezcla (recomendada)</b></td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td><b>${mzF ? fM(mzF) : '—'}</b></td><td style="font-size:.74rem;color:#64748b">pondera ambas según cuánto mes ha transcurrido</td></tr>
+      ${extraFila || `<tr style="background:#eff6ff"><td><b>Mezcla (recomendada)</b></td><td><b>${mzM ? fM(mzM) : '—'}</b></td><td><b>${mzQ ? Math.round(mzQ) : '—'}</b></td><td><b>${mzF ? fM(mzF) : '—'}</b></td><td style="font-size:.74rem;color:#64748b">pondera ambas según cuánto mes ha transcurrido</td></tr>`}
     </tbody>`;
+  };
+  renderMetodos();
+
+  // ── Método 3: CLIMA + CALENDARIO (bottom-up): al actual se le suma la proyección
+  //    día a día del resto del mes — feriados, vísperas, lluvia/seco (pronóstico
+  //    Open-Meteo) y sáb/dom con su rendimiento histórico. Es el modelo más fino
+  //    porque mira el calendario REAL que queda, no un promedio de avance.
+  (async () => {
+    try {
+      const H = { Authorization: 'Bearer ' + (sessionStorage.getItem('token') || '') };
+      const r = await fetch('/api/dashboard/clima-correlacion', { headers: H }).then(x => x.json());
+      const p = r.success && r.data && r.data.proyeccion;
+      if (!p || p.q_restante_exacto == null) return;
+      const clQ = tot.q + p.q_restante_exacto;
+      const clM = tot.m + (p.m_restante || 0);
+      const clF = tot.m > 0 ? tot.f + (p.m_restante || 0) * (tot.f / tot.m) : tot.f;
+      // FINAL: promedio de la mezcla estadística y el modelo clima/calendario —
+      // dos familias independientes (top-down vs bottom-up), el promedio es más robusto.
+      const fQ = mzQ ? (mzQ + clQ) / 2 : clQ;
+      const fMz = mzM ? (mzM + clM) / 2 : clM;
+      const fF = mzF ? (mzF + clF) / 2 : clF;
+      document.getElementById('kpi-proy2-q-lbl').textContent = 'Q cierre (final)';
+      document.getElementById('kpi-proy2-m-lbl').textContent = 'Monto cierre (final)';
+      document.getElementById('kpi-proy2-f-lbl').textContent = 'Facturación cierre (final)';
+      document.getElementById('kpi-proy2-q').textContent = Math.round(fQ);
+      document.getElementById('kpi-proy2-m').textContent = fM(fMz);
+      document.getElementById('kpi-proy2-f').textContent = fM(fF);
+      renderTablaProy2(fQ, fMz, fF);
+      renderMetodos(`
+        <tr><td>Clima + calendario</td><td>${fM(clM)}</td><td>${Math.round(clQ)}</td><td>${fM(clF)}</td><td style="font-size:.74rem;color:#64748b">día a día lo que queda del mes: feriados, lluvia/seco (pronóstico) y sáb/dom con su rendimiento histórico</td></tr>
+        <tr style="background:#eff6ff"><td><b>Final (recomendada)</b></td><td><b>${fM(fMz)}</b></td><td><b>${Math.round(fQ)}</b></td><td><b>${fM(fF)}</b></td><td style="font-size:.74rem;color:#64748b">promedio entre la mezcla estadística (${mzQ ? Math.round(mzQ) : '—'} ops) y el modelo clima/calendario (${Math.round(clQ)} ops)</td></tr>`);
+      document.getElementById('proy2-nota').innerHTML =
+        `<i class="bi bi-info-circle me-1"></i><b>Proyección final</b> = promedio entre la <b>mezcla estadística</b> (${(w*100).toFixed(0)}% curva hábil + ${((1-w)*100).toFixed(0)}% tendencia) y el <b>modelo clima/calendario</b>, que proyecta día a día lo que queda del mes con feriados, pronóstico de lluvia y el rendimiento histórico de sábados y domingos. La distribución por institución es proporcional al avance real de cada una.`;
+    } catch (e) { /* sin clima: queda la mezcla */ }
+  })();
 
   // ── Gráficos: histórico mensual (12m) + mes actual real+proyección, en Q y monto ──
   const meses12 = [...new Set(rows.map(r => r.mes))].sort().filter(m => m < mesAct).slice(-12);

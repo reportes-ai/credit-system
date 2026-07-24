@@ -480,7 +480,7 @@ exports.getClimaCorrelacion = async (req, res) => {
       const fc = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=-33.45&longitude=-70.66&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago&forecast_days=16')).json();
       const ppFc = new Map((fc.daily?.time || []).map((t, i) => [t, Number(fc.daily.precipitation_sum[i]) || 0]));
       const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-      const dias = []; let qRest = 0;
+      const dias = []; let qRest = 0, mRest = 0;
       for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
         const dow = d.getDay();   // sáb/dom ENTRAN: sábado es el mejor día de venta
         const iso = d.toISOString().slice(0, 10);
@@ -492,17 +492,18 @@ exports.getClimaCorrelacion = async (req, res) => {
         const grupo = fer ? 'feriados' : dow === 6 ? 'sabado' : dow === 0 ? 'domingo'
           : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
         let qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
+        let mEst = (stats[grupo] && stats[grupo].n ? stats[grupo].m_prom : stats.normal.m_prom);
         // HOY cuenta por lo que le QUEDA: fracción del día hábil aún por transcurrir (9-18h)
         if (esHoy) {
           const hCh = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: 'numeric', hour12: false }).format(new Date()));
           const frac = Math.max(0, Math.min(1, (18 - hCh) / 9));
-          qEst = qEst * frac;
+          qEst = qEst * frac; mEst = mEst * frac;
           if (qEst < 0.05) continue;
         }
-        qRest += qEst;
+        qRest += qEst; mRest += mEst;
         dias.push({ f: iso, grupo: (esHoy ? 'hoy_' : '') + grupo, pp, q_est: +qEst.toFixed(2) });
       }
-      proyeccion = { dias, q_restante: Math.round(qRest) };
+      proyeccion = { dias, q_restante: Math.round(qRest), q_restante_exacto: +qRest.toFixed(2), m_restante: Math.round(mRest) };
     } catch (e) { console.error('[clima forecast]', e.message); }
 
     res.json({ success: true, data: {
