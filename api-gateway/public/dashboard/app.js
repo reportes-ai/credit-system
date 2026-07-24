@@ -987,7 +987,7 @@ function buildV1b() {
   });
   const finRows = ['AUTOFIN','UNIDAD'].map(k=>{
     const v=finOt[k]; if(!v) return '';
-    return `<tr><td><strong>${k}</strong></td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td><td>${fM(v.com_seguros)}</td></tr>`;
+    return `<tr><td><a class="ej-link" onclick="abrirDetalleInstitucion('${k}','ot')"><strong>${k}</strong></a></td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td><td>${fM(v.com_seguros)}</td></tr>`;
   }).join('');
   document.getElementById('t-fin1b').innerHTML = `
     <thead><tr><th>Institución</th><th>Ops</th><th>Total Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>
@@ -4230,6 +4230,16 @@ function buildVEvol() {
 let _modalData = { ops: [], titulo: '', totSaldo: 0, totFin: 0, totCD: 0, totIng: 0 };
 
 function abrirDetalleEjecutivo(nombre, tipo) {
+  _abrirDetalleOps(nombre, tipo, r => r.ejecutivo === nombre);
+}
+// Mismo modal de operaciones, filtrado por institución (link en el cuadro Instituciones)
+function abrirDetalleInstitucion(k, tipo) {
+  const pred = k === 'AUTOFIN'
+    ? (r => (r.financiera || 'AUTOFIN') === 'AUTOFIN')
+    : (r => String(r.financiera || '').toUpperCase().startsWith('UNIDAD'));
+  _abrirDetalleOps(k, tipo, pred);
+}
+function _abrirDetalleOps(nombre, tipo, pred) {
   const desde = document.getElementById('sel-desde')?.value || '';
   const hasta  = document.getElementById('sel-hasta')?.value  || '';
 
@@ -4237,7 +4247,7 @@ function abrirDetalleEjecutivo(nombre, tipo) {
   // Usar fecha_otorgado si existe (igual que comisiones), si no usar mes
   let ops = (window.RAW_DATA || []).filter(r => {
     const mesRef = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0,7) : r.mes;
-    return r.ejecutivo === nombre && mesRef >= desde && mesRef <= hasta;
+    return pred(r) && mesRef >= desde && mesRef <= hasta;
   });
   if (tipo === 'ot') {
     ops = ops.filter(r => r.estado_eval === 'OTORGADO');
