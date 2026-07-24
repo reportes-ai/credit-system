@@ -479,17 +479,25 @@ exports.getClimaCorrelacion = async (req, res) => {
       const ppFc = new Map((fc.daily?.time || []).map((t, i) => [t, Number(fc.daily.precipitation_sum[i]) || 0]));
       const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
       const dias = []; let qRest = 0;
-      for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1, 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
         const dow = d.getDay(); if (dow === 0 || dow === 6) continue;
         const iso = d.toISOString().slice(0, 10);
+        const esHoy = d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth();
         const fer = esFeriado(d);
         const visp = !fer && esFeriado(new Date(d.getTime() + 86400000));
         const post = !fer && esFeriado(new Date(d.getTime() - 86400000));
         const pp = ppFc.has(iso) ? ppFc.get(iso) : null;
         const grupo = fer ? 'feriados' : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
-        const qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
+        let qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
+        // HOY cuenta por lo que le QUEDA: fracción del día hábil aún por transcurrir (9-18h)
+        if (esHoy) {
+          const hCh = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour: 'numeric', hour12: false }).format(new Date()));
+          const frac = Math.max(0, Math.min(1, (18 - hCh) / 9));
+          qEst = qEst * frac;
+          if (qEst < 0.05) continue;
+        }
         qRest += qEst;
-        dias.push({ f: iso, grupo, pp, q_est: +qEst.toFixed(2) });
+        dias.push({ f: iso, grupo: (esHoy ? 'hoy_' : '') + grupo, pp, q_est: +qEst.toFixed(2) });
       }
       proyeccion = { dias, q_restante: Math.round(qRest) };
     } catch (e) { console.error('[clima forecast]', e.message); }

@@ -4767,9 +4767,12 @@ async function cargarClimaCorrelacion() {
     if (d.proyeccion && d.proyeccion.dias.length) {
       const GN = { feriados:'FERIADO', vispera:'víspera', post:'post-feriado', lluvia:'lluvia', seco:'seco', normal:'s/pronóstico' };
       const GC = { feriados:'#f59e0b', vispera:'#16a34a', post:'#94a3b8', lluvia:'#38bdf8', seco:'#0141A2', normal:'#64748b' };
-      const chips = d.proyeccion.dias.map(x =>
-        `<span style="display:inline-block;margin:2px;padding:3px 9px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.72rem">
-          ${x.f.slice(8)}-${x.f.slice(5,7)} <b style="color:${GC[x.grupo]}">${GN[x.grupo]}</b>${x.pp!=null&&x.grupo!=='feriados'?` ${x.pp}mm`:''} · ${x.q_est}</span>`).join('');
+      const chips = d.proyeccion.dias.map(x => {
+        const esHoy = String(x.grupo).startsWith('hoy_');
+        const g = esHoy ? x.grupo.slice(4) : x.grupo;
+        return `<span style="display:inline-block;margin:2px;padding:3px 9px;border-radius:9px;background:${esHoy?'#fefce8':'#f8fafc'};border:1px solid ${esHoy?'#fde047':'#e2e8f0'};font-size:.72rem">
+          ${esHoy?'<b>HOY</b> ':''}${x.f.slice(8)}-${x.f.slice(5,7)} <b style="color:${GC[g]}">${GN[g]}</b>${x.pp!=null&&g!=='feriados'?` ${x.pp}mm`:''} · ${x.q_est}${esHoy?' (resto del día)':''}</span>`;
+      }).join('');
       proyHTML = `<div style="margin:8px 0;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px">
         <b style="font-size:.8rem;color:#0141A2">🔭 Proyección resto del mes con pronóstico + feriados:</b>
         <span style="font-size:.85rem;font-weight:800;color:#0f172a"> ≈ ${d.proyeccion.q_restante} ops adicionales</span>
