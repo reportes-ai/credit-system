@@ -450,8 +450,12 @@ exports.getClimaCorrelacion = async (req, res) => {
     const habiles = serie.filter(s => !s.feriado && s.dow >= 1 && s.dow <= 5);   // L-V para clima/feriados
     const media = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
     const grupos = {
+      // Hallazgo del negocio: la lluvia normal NO baja la venta (3,4-4,7 ops/día vs
+      // 2,9 en seco) — lo que la colapsa es el TEMPORAL ≥30mm (0,33 ops/día; el
+      // 16-17 jul 2026 cayeron 31+68mm y hubo 0 ops ambos días).
       seco:     habiles.filter(s => s.pp != null && s.pp < 1),
-      lluvia:   habiles.filter(s => s.pp != null && s.pp >= 1),
+      lluvia:   habiles.filter(s => s.pp != null && s.pp >= 1 && s.pp < 30),
+      temporal: habiles.filter(s => s.pp != null && s.pp >= 30),
       vispera:  habiles.filter(s => s.vispera),
       post:     habiles.filter(s => s.post),
       normal:   habiles.filter(s => !s.vispera && !s.post),
@@ -490,7 +494,7 @@ exports.getClimaCorrelacion = async (req, res) => {
         const post = !fer && esFeriado(new Date(d.getTime() - 86400000));
         const pp = ppFc.has(iso) ? ppFc.get(iso) : null;
         const grupo = fer ? 'feriados' : dow === 6 ? 'sabado' : dow === 0 ? 'domingo'
-          : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
+          : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 30 ? 'temporal' : pp >= 1 ? 'lluvia' : 'seco') : 'normal');
         let qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
         let mEst = (stats[grupo] && stats[grupo].n ? stats[grupo].m_prom : stats.normal.m_prom);
         // HOY cuenta por lo que le QUEDA: fracción del día hábil aún por transcurrir (9-18h)

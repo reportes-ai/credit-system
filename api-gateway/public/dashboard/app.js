@@ -4782,7 +4782,8 @@ async function cargarClimaCorrelacion() {
     const corrTxt = c => c == null ? '—' : (Math.abs(c) < 0.15 ? 'casi nula' : Math.abs(c) < 0.35 ? 'débil' : Math.abs(c) < 0.6 ? 'moderada' : 'fuerte') + ` (${c})`;
     document.getElementById('kpi-clima').innerHTML = `
       <div class="kpi-box"><div class="kpi-label">Día hábil seco</div><div class="kpi-val big">${s.seco.q_prom}</div><div class="kpi-sub">ops/día · ${s.seco.n} días</div></div>
-      <div class="kpi-box"><div class="kpi-label">Día hábil con lluvia (≥1mm)</div><div class="kpi-val big">${s.lluvia.q_prom}</div><div class="kpi-sub">ops/día · ${s.lluvia.n} días · ${fPct(dLluvia)} vs seco</div></div>
+      <div class="kpi-box"><div class="kpi-label">Lluvia normal (1-30mm)</div><div class="kpi-val big">${s.lluvia.q_prom}</div><div class="kpi-sub">ops/día · ${s.lluvia.n} días · ${fPct(dLluvia)} vs seco</div></div>
+      <div class="kpi-box" style="background:#fef2f2;border-color:#fca5a5"><div class="kpi-label">⛈️ Temporal (≥30mm)</div><div class="kpi-val big">${s.temporal ? s.temporal.q_prom : '—'}</div><div class="kpi-sub">ops/día · ${s.temporal ? s.temporal.n : 0} días · colapsa la venta</div></div>
       <div class="kpi-box"><div class="kpi-label">Correlación Q vs lluvia</div><div class="kpi-val big">${d.corr_lluvia ?? '—'}</div><div class="kpi-sub">${corrTxt(d.corr_lluvia)}</div></div>
       <div class="kpi-box"><div class="kpi-label">Correlación Q vs t° máx</div><div class="kpi-val big">${d.corr_temp ?? '—'}</div><div class="kpi-sub">${corrTxt(d.corr_temp)}</div></div>
       <div class="kpi-box"><div class="kpi-label">Víspera de feriado</div><div class="kpi-val big">${s.vispera.q_prom}</div><div class="kpi-sub">ops/día · ${fPct(dVisp)} vs normal</div></div>
@@ -4793,7 +4794,7 @@ async function cargarClimaCorrelacion() {
     // Gráfico: Q diario (últimos ~90 hábiles) coloreado por condición
     const serie = d.serie || [];
     const color = x => x.feriado ? '#f59e0b' : x.dow === 6 ? '#8b5cf6' : x.dow === 0 ? '#c4b5fd'
-      : (x.pp != null && x.pp >= 1) ? '#38bdf8' : '#0141A2';
+      : (x.pp != null && x.pp >= 30) ? '#dc2626' : (x.pp != null && x.pp >= 1) ? '#38bdf8' : '#0141A2';
     if (_chClima) _chClima.destroy();
     _chClima = new Chart(document.getElementById('ch-clima-q'), {
       type: 'bar',
@@ -4807,8 +4808,8 @@ async function cargarClimaCorrelacion() {
     // Proyección resto del mes (pronóstico + feriados)
     let proyHTML = '';
     if (d.proyeccion && d.proyeccion.dias.length) {
-      const GN = { feriados:'FERIADO', vispera:'víspera', post:'post-feriado', lluvia:'lluvia', seco:'seco', normal:'s/pronóstico', sabado:'SÁBADO', domingo:'domingo' };
-      const GC = { feriados:'#f59e0b', vispera:'#16a34a', post:'#94a3b8', lluvia:'#38bdf8', seco:'#0141A2', normal:'#64748b', sabado:'#8b5cf6', domingo:'#c4b5fd' };
+      const GN = { feriados:'FERIADO', vispera:'víspera', post:'post-feriado', lluvia:'lluvia', temporal:'⛈️ TEMPORAL', seco:'seco', normal:'s/pronóstico', sabado:'SÁBADO', domingo:'domingo' };
+      const GC = { feriados:'#f59e0b', vispera:'#16a34a', post:'#94a3b8', lluvia:'#38bdf8', temporal:'#dc2626', seco:'#0141A2', normal:'#64748b', sabado:'#8b5cf6', domingo:'#c4b5fd' };
       const chips = d.proyeccion.dias.map(x => {
         const esHoy = String(x.grupo).startsWith('hoy_');
         const g = esHoy ? x.grupo.slice(4) : x.grupo;
@@ -4822,7 +4823,7 @@ async function cargarClimaCorrelacion() {
         <div style="margin-top:6px">${chips}</div></div>`;
     }
     document.getElementById('clima-nota').innerHTML = proyHTML +
-      `Barras: <b style="color:#0141A2">azul</b> día seco · <b style="color:#38bdf8">celeste</b> con lluvia (≥1mm) · <b style="color:#8b5cf6">violeta</b> sábado · <b style="color:#c4b5fd">lila</b> domingo · <b style="color:#f59e0b">naranjo</b> feriado. ` +
+      `Barras: <b style="color:#0141A2">azul</b> día seco · <b style="color:#38bdf8">celeste</b> lluvia normal (1-30mm) · <b style="color:#dc2626">rojo</b> temporal (≥30mm — colapsa la venta) · <b style="color:#8b5cf6">violeta</b> sábado · <b style="color:#c4b5fd">lila</b> domingo · <b style="color:#f59e0b">naranjo</b> feriado. ` +
       `Período ${d.desde} → ${d.hasta} (${d.dias} días, incluye fines de semana — el sábado es el mejor día de venta). Fuente clima: Open-Meteo (Santiago; pronóstico de los mismos modelos ECMWF/GFS de Windy) · feriados: calendario chileno del sistema. ` +
       `La correlación va de −1 a 1: cerca de 0 el clima no mueve la aguja; negativa = a más lluvia, menos colocación.`;
   } catch (e) { document.getElementById('clima-nota').textContent = 'No se pudo cargar el análisis de clima: ' + e.message; }
