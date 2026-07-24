@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.18 — Vendedores por Dealer: el campo Vendedor pasa a selector desde la base vendedores_dealer; si no está, el ejecutivo lo agrega (nombre+RUT+mail) desde la misma carta; card nueva de mantenedor -->
+  <!-- v4.19 — Revisión de Cartas: columnas Ejecutivo y Financiera en la tabla; el banner de excepciones muestra la tasa pizarra y la comisión pizarra QUE CORRESPONDEN vs lo solicitado (con deltas en $ y pts) para dimensionar la excepción -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2156,10 +2156,13 @@ function renderRevision(){
   const list = pendientesRevision();
   const el = document.getElementById('listaRevision');
   if (!list.length) { el.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-check2-all" style="font-size:2rem"></i><div>No hay cartas pendientes de tu revisión</div></div>'; return; }
-  el.innerHTML = '<table class="tbl"><thead><tr><th>Operación</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Creada por</th><th></th></tr></thead><tbody>' +
+  el.innerHTML = '<table class="tbl"><thead><tr><th>Operación</th><th>Fecha</th><th>Cliente</th><th>Ejecutivo</th><th>Financiera</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Creada por</th><th></th></tr></thead><tbody>' +
     list.map(c=>`<tr>
       <td><b>${escH(c.opCarta||'')}</b></td><td>${fmtFecha(c.fecha)}</td>
-      <td>${escH(toTitle(c.cliente||''))}</td><td style="font-size:.72rem">${escH(c.tipo||'')}</td>
+      <td>${escH(toTitle(c.cliente||''))}</td>
+      <td style="font-size:.74rem">${escH(toTitle(c.ejecutivoNombre||''))}</td>
+      <td><span style="background:${String(c.acreedor||'').toUpperCase().includes('UNIDAD')?'#fef3c7;color:#b45309':'#dbeafe;color:#1d4ed8'};border-radius:6px;padding:1px 8px;font-size:.68rem;font-weight:700">${escH(String(c.acreedor||'').toUpperCase().includes('UNIDAD')?'UNIDAD':(c.acreedor||'—'))}</span></td>
+      <td style="font-size:.72rem">${escH(c.tipo||'')}</td>
       <td style="text-align:right">${fmtCLP(c.saldo)}</td>
       <td style="font-size:.74rem">${escH(c.creadoPorNombre||c.creadoPor||'')}</td>
       <td><button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-search"></i> Revisar</button></td>
@@ -2177,13 +2180,37 @@ function abrirRevision(id){
     const coms = c.excepcionesComentarios || {};
     const tasaInfo = c.tasaCredito ? ` · Tasa solicitada: ${String(c.tasaCredito).replace('.',',')}%` : '';
     const ufInfo = c.montoCreditoUF ? ` · ${parseFloat(c.montoCreditoUF).toLocaleString('es-CL',{maximumFractionDigits:2})} UF (${parseFloat(c.montoCreditoUF)<=200?'≤':'>'}200)` : '';
+    // Dimensión de la excepción: lo que CORRESPONDE por pizarra vs lo solicitado
+    let dimHTML = '';
+    try {
+      const uf = parseFloat(c.montoCreditoUF);
+      const tasaSol = parseFloat(c.tasaCredito);
+      const lineas = [];
+      if (TASAS && !isNaN(uf)) {
+        const piz = tope2(parseFloat(uf <= 200 ? (TASAS.tasa_mensual_menor ?? TASAS.tasa_menor) : (TASAS.tasa_mensual_mayor ?? TASAS.tasa_mayor)));
+        if (!isNaN(piz)) {
+          const d = !isNaN(tasaSol) ? (tasaSol - piz) : null;
+          lineas.push(`<b>Tasa pizarra que corresponde:</b> ${piz.toFixed(2).replace('.',',')}%` +
+            (d != null ? ` — solicitada ${tope2(tasaSol).toFixed(2).replace('.',',')}% (<b style="color:${d < 0 ? '#dc2626' : '#16a34a'}">${d >= 0 ? '+' : ''}${d.toFixed(2).replace('.',',')} pts</b>)` : ''));
+        }
+      }
+      const factor = getFactor(c.plazo, c.tipo);
+      if (factor && c.saldo) {
+        const brutoPiz = Math.round(c.saldo * factor);
+        const dif = (c.partBruto || 0) - brutoPiz;
+        lineas.push(`<b>Comisión pizarra que corresponde:</b> ${(factor*100).toFixed(2).replace('.',',')}% = ${fmtCLP(brutoPiz)}` +
+          (c.partBruto ? ` — solicitada ${fmtCLP(c.partBruto)} (${c.saldo > 0 ? (c.partBruto/c.saldo*100).toFixed(2).replace('.',',') : '—'}%${dif ? `, <b style="color:${dif > 0 ? '#dc2626' : '#16a34a'}">${dif > 0 ? '+' : ''}${fmtCLP(dif)}</b>` : ''})` : ''));
+      }
+      if (lineas.length) dimHTML = `<div style="margin:8px 0 2px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;color:#1e40af;font-size:.8rem">
+        <i class="bi bi-rulers me-1"></i>${lineas.join('<br>')}</div>`;
+    } catch (e) {}
     const items = c.excepciones.map(e=>`
       <div style="margin:6px 0;padding:7px 10px;background:#fff;border-radius:7px;border:1px solid #fed7aa">
         <b>${escH(EXC_LBL[e]||e)}</b>
         <div style="color:#475569;font-size:.8rem;margin-top:2px"><i class="bi bi-chat-left-text me-1"></i>${escH(coms[e]||'(sin justificación)')}</div>
       </div>`).join('');
     excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
-      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${items}</div>`;
+      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${dimHTML}${items}</div>`;
   }
   document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
   udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise
