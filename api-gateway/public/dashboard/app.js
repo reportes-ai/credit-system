@@ -4281,9 +4281,14 @@ function _abrirDetalleOps(nombre, tipo, pred) {
     const ccs = (r.automotora||'—');
     const fin = r.financiera || '—';
     const nc  = r.id_financiera || '—';
+    const fot = (r.fecha_otorgado || r.fecha_ot || '').slice(0,10);
+    const fotCL = fot ? fot.split('-').reverse().join('-') : '—';
+    const ejec = r.ejecutivo || '—';
     return `<tr>
       <td>${r.op||'—'}</td>
       <td>${nc}</td>
+      <td style="white-space:nowrap">${fotCL}</td>
+      <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${ejec}</td>
       <td><span class="${fin==='AUTOFIN'?'tag-men':'tag-may'}">${fin}</span></td>
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${ccs.length>26?ccs.substring(0,26)+'…':ccs}</td>
       <td><span class="${r.estado_eval==='OTORGADO'?'pct-ok':r.estado_eval==='APROBADO'?'pct-hi':'pct-warn'}">${r.estado_eval||'—'}</span></td>
@@ -4294,9 +4299,9 @@ function _abrirDetalleOps(nombre, tipo, pred) {
       <td>${fM(r.rentab_afa)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('t-modal-ops-body').innerHTML = body || '<tr><td colspan="10" style="text-align:center;color:#888;padding:12px">Sin operaciones</td></tr>';
+  document.getElementById('t-modal-ops-body').innerHTML = body || '<tr><td colspan="12" style="text-align:center;color:#888;padding:12px">Sin operaciones</td></tr>';
   document.getElementById('t-modal-ops-foot').innerHTML = `<tr>
-    <td colspan="5">Total (${ops.length} ops)</td>
+    <td colspan="7">Total (${ops.length} ops)</td>
     <td>${fM(totSaldo)}</td><td>${fM(totFin)}</td><td>—</td>
     <td>${fM(totCD)}</td><td>${fM(totIng)}</td>
   </tr>`;
@@ -4318,14 +4323,19 @@ function _buildModalContent(full) {
   // full=true (copiar/Excel): montos COMPLETOS en pesos, como número plano —
   // así Excel/PPT los reciben operables, no "$11.5M".
   const F = full ? (v => Math.round(parseFloat(v) || 0)) : fM;
-  const cols = ['N° Operación','ID Financiera','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
-  const dataRows = ops.map(r => [
-    r.op||'—', r.id_financiera||'—', r.financiera||'—',
-    r.automotora||'—', r.estado_eval||'—',
-    F(r.saldo_precio), F(r.monto_financiado),
-    r.plazo||'—', F(r.com_dealer), F(r.rentab_afa)
-  ]);
-  const footRow = ['Total ('+ops.length+' ops)','','','','',F(totSaldo),F(totFin),'—',F(totCD),F(totIng)];
+  const cols = ['N° Operación','ID Financiera','F. Otorgado','Ejecutivo','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
+  const dataRows = ops.map(r => {
+    const fot = (r.fecha_otorgado || r.fecha_ot || '').slice(0,10);
+    return [
+      r.op||'—', r.id_financiera||'—',
+      fot ? fot.split('-').reverse().join('-') : '—', r.ejecutivo||'—',
+      r.financiera||'—',
+      r.automotora||'—', r.estado_eval||'—',
+      F(r.saldo_precio), F(r.monto_financiado),
+      r.plazo||'—', F(r.com_dealer), F(r.rentab_afa)
+    ];
+  });
+  const footRow = ['Total ('+ops.length+' ops)','','','','','','',F(totSaldo),F(totFin),'—',F(totCD),F(totIng)];
   return { cols, dataRows, footRow, titulo };
 }
 
