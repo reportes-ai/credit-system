@@ -434,20 +434,20 @@ exports.getClimaCorrelacion = async (req, res) => {
     const { esFeriado, cargarFeriados } = require('../../../../shared/feriados');
     await cargarFeriados();   // asegurar el set en frío (carga async al boot)
 
-    // Serie de días HÁBILES (L-V): q, pp, tmax, feriado / víspera / post-feriado
+    // Serie de TODOS los días: en este negocio el SÁBADO es el mejor día de venta
+    // (3,7 ops/día) y el domingo también cursa — no se excluyen fines de semana.
     const serie = [];
     for (let d = new Date(desde + 'T12:00:00'); d <= new Date(hasta + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
       const iso = d.toISOString().slice(0, 10);
       const dow = d.getDay();
-      if (dow === 0 || dow === 6) continue;
       const fer = esFeriado(d);   // esFeriado espera Date (motor único shared/feriados)
       const c = clima.get(iso) || {};
-      serie.push({ f: iso, q: (qPorDia.get(iso) || {}).q || 0, m: (qPorDia.get(iso) || {}).m || 0,
+      serie.push({ f: iso, dow, q: (qPorDia.get(iso) || {}).q || 0, m: (qPorDia.get(iso) || {}).m || 0,
         pp: c.pp ?? null, tmax: c.tmax ?? null, feriado: fer,
         vispera: !fer && esFeriado(new Date(d.getTime() + 86400000)),
         post: !fer && esFeriado(new Date(d.getTime() - 86400000)) });
     }
-    const habiles = serie.filter(s => !s.feriado);
+    const habiles = serie.filter(s => !s.feriado && s.dow >= 1 && s.dow <= 5);   // L-V para clima/feriados
     const media = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
     const grupos = {
       seco:     habiles.filter(s => s.pp != null && s.pp < 1),
@@ -456,6 +456,8 @@ exports.getClimaCorrelacion = async (req, res) => {
       post:     habiles.filter(s => s.post),
       normal:   habiles.filter(s => !s.vispera && !s.post),
       feriados: serie.filter(s => s.feriado),
+      sabado:   serie.filter(s => !s.feriado && s.dow === 6),
+      domingo:  serie.filter(s => !s.feriado && s.dow === 0),
     };
     const stats = {};
     for (const [k, v] of Object.entries(grupos)) stats[k] = { n: v.length, q_prom: +media(v.map(s => s.q)).toFixed(2), m_prom: Math.round(media(v.map(s => s.m))) };
@@ -480,14 +482,15 @@ exports.getClimaCorrelacion = async (req, res) => {
       const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
       const dias = []; let qRest = 0;
       for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
-        const dow = d.getDay(); if (dow === 0 || dow === 6) continue;
+        const dow = d.getDay();   // sáb/dom ENTRAN: sábado es el mejor día de venta
         const iso = d.toISOString().slice(0, 10);
         const esHoy = d.getDate() === hoy.getDate() && d.getMonth() === hoy.getMonth();
         const fer = esFeriado(d);
         const visp = !fer && esFeriado(new Date(d.getTime() + 86400000));
         const post = !fer && esFeriado(new Date(d.getTime() - 86400000));
         const pp = ppFc.has(iso) ? ppFc.get(iso) : null;
-        const grupo = fer ? 'feriados' : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
+        const grupo = fer ? 'feriados' : dow === 6 ? 'sabado' : dow === 0 ? 'domingo'
+          : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
         let qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
         // HOY cuenta por lo que le QUEDA: fracción del día hábil aún por transcurrir (9-18h)
         if (esHoy) {
