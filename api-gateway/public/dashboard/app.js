@@ -4762,9 +4762,23 @@ async function cargarClimaCorrelacion() {
         scales: { x: { ticks: { font: { size: 8 }, maxTicksLimit: 20 } }, y: { beginAtZero: true, ticks: { font: { size: 9 } } } },
         animation: { duration: 400 }, responsive: true, maintainAspectRatio: false }
     });
-    document.getElementById('clima-nota').innerHTML =
+    // Proyección resto del mes (pronóstico + feriados)
+    let proyHTML = '';
+    if (d.proyeccion && d.proyeccion.dias.length) {
+      const GN = { feriados:'FERIADO', vispera:'víspera', post:'post-feriado', lluvia:'lluvia', seco:'seco', normal:'s/pronóstico' };
+      const GC = { feriados:'#f59e0b', vispera:'#16a34a', post:'#94a3b8', lluvia:'#38bdf8', seco:'#0141A2', normal:'#64748b' };
+      const chips = d.proyeccion.dias.map(x =>
+        `<span style="display:inline-block;margin:2px;padding:3px 9px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;font-size:.72rem">
+          ${x.f.slice(8)}-${x.f.slice(5,7)} <b style="color:${GC[x.grupo]}">${GN[x.grupo]}</b>${x.pp!=null&&x.grupo!=='feriados'?` ${x.pp}mm`:''} · ${x.q_est}</span>`).join('');
+      proyHTML = `<div style="margin:8px 0;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px">
+        <b style="font-size:.8rem;color:#0141A2">🔭 Proyección resto del mes con pronóstico + feriados:</b>
+        <span style="font-size:.85rem;font-weight:800;color:#0f172a"> ≈ ${d.proyeccion.q_restante} ops adicionales</span>
+        <span style="font-size:.72rem;color:#64748b">(ops/día esperadas según la condición histórica de cada día)</span>
+        <div style="margin-top:6px">${chips}</div></div>`;
+    }
+    document.getElementById('clima-nota').innerHTML = proyHTML +
       `Barras: <b style="color:#0141A2">azul</b> día seco · <b style="color:#38bdf8">celeste</b> con lluvia (≥1mm) · <b style="color:#f59e0b">naranjo</b> feriado. ` +
-      `Período ${d.desde} → ${d.hasta} (${d.dias} días hábiles). Fuente clima: Open-Meteo (Santiago) · feriados: calendario chileno del sistema. ` +
+      `Período ${d.desde} → ${d.hasta} (${d.dias} días hábiles). Fuente clima: Open-Meteo (Santiago; pronóstico de los mismos modelos ECMWF/GFS de Windy) · feriados: calendario chileno del sistema. ` +
       `La correlación va de −1 a 1: cerca de 0 el clima no mueve la aguja; negativa = a más lluvia, menos colocación.`;
   } catch (e) { document.getElementById('clima-nota').textContent = 'No se pudo cargar el análisis de clima: ' + e.message; }
 }

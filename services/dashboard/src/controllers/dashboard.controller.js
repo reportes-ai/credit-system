@@ -469,7 +469,33 @@ exports.getClimaCorrelacion = async (req, res) => {
     };
     const conClima = habiles.filter(s => s.pp != null);
     const conTemp = habiles.filter(s => s.tmax != null);
+
+    // ── PROYECCIÓN RESTO DEL MES con pronóstico (Open-Meteo forecast, mismos modelos
+    //    ECMWF/GFS de Windy) + feriados: a cada día hábil restante se le asigna el
+    //    rendimiento histórico de su condición (feriado/víspera/post/lluvia/seco).
+    let proyeccion = null;
+    try {
+      const fc = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=-33.45&longitude=-70.66&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago&forecast_days=16')).json();
+      const ppFc = new Map((fc.daily?.time || []).map((t, i) => [t, Number(fc.daily.precipitation_sum[i]) || 0]));
+      const finMesD = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+      const dias = []; let qRest = 0;
+      for (let d = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1, 12); d <= finMesD; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay(); if (dow === 0 || dow === 6) continue;
+        const iso = d.toISOString().slice(0, 10);
+        const fer = esFeriado(d);
+        const visp = !fer && esFeriado(new Date(d.getTime() + 86400000));
+        const post = !fer && esFeriado(new Date(d.getTime() - 86400000));
+        const pp = ppFc.has(iso) ? ppFc.get(iso) : null;
+        const grupo = fer ? 'feriados' : visp ? 'vispera' : post ? 'post' : (pp != null ? (pp >= 1 ? 'lluvia' : 'seco') : 'normal');
+        const qEst = (stats[grupo] && stats[grupo].n ? stats[grupo].q_prom : stats.normal.q_prom);
+        qRest += qEst;
+        dias.push({ f: iso, grupo, pp, q_est: +qEst.toFixed(2) });
+      }
+      proyeccion = { dias, q_restante: Math.round(qRest) };
+    } catch (e) { console.error('[clima forecast]', e.message); }
+
     res.json({ success: true, data: {
+      proyeccion,
       desde, hasta, dias: serie.length, stats,
       corr_lluvia: pearson(conClima.map(s => s.pp), conClima.map(s => s.q)),
       corr_temp: pearson(conTemp.map(s => s.tmax), conTemp.map(s => s.q)),

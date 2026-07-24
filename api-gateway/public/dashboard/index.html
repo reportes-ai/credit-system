@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.0 — card Clima y Feriados vs colocación en Proyección Pro (Open-Meteo + feriados chilenos) -->
+<!-- v2.1 — proyección resto del mes con pronóstico (Open-Meteo forecast) + box explicativo Clima y Feriados -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -924,6 +924,15 @@
           Pondera las dos según cuánto mes ha transcurrido: día 2 = casi pura tendencia; día 20 = casi pura curva. Además usa <b>días hábiles</b> (no calendario) y <b>mediana</b> (un mes raro en el histórico no la distorsiona).
           <br><b>Ventaja:</b> combina lo mejor de ambas — estable al inicio, precisa al final.
           <br><b>Regla práctica:</b> si los 3 métodos convergen, el cierre es confiable; si divergen mucho, el mes viene atípico — mirar la curva del gráfico para saber hacia dónde.
+        </div>
+      </div>
+      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px">
+        <div style="font-weight:800;color:#0141A2;font-size:.85rem;margin-bottom:6px">🌦️ Clima y feriados</div>
+        <div style="font-size:.78rem;color:#374151;line-height:1.5">
+          Cruza los otorgamientos diarios con la lluvia y t° de Santiago (Open-Meteo, mismos modelos que Windy) y el calendario de feriados chileno.
+          <b>Hallazgo:</b> la lluvia NO baja la colocación (correlación casi nula — incluso rinde algo más); los <b>feriados sí</b>: un feriado entre semana rinde menos de la mitad, y la <b>víspera</b> rinde ~20% más (se apura el negocio).
+          <br><b>Proyección:</b> a cada día hábil que queda del mes se le asigna el rendimiento histórico de su condición (pronóstico a 16 días + feriados) → las "ops adicionales" del recuadro celeste.
+          <br><b>Confiar:</b> como referencia del cierre y para planificar meses con muchos feriados (ej. septiembre); no como pronóstico exacto.
         </div>
       </div>
     </div>
