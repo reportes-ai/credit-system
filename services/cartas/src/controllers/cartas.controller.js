@@ -788,6 +788,16 @@ const upsert = async (req, res) => {
       // Sincronizar estado del crédito vinculado
       if (c.idCreditoCreado || c.id_credito_creado) {
         const idCred = c.idCreditoCreado || c.id_credito_creado;
+        // Dealer/parque corregidos en la carta → al crédito NO otorgado (caso 2607043:
+        // guardaron con un dealer, corrigieron la carta y el crédito quedó con el viejo)
+        if (c.concesionario || c.rutConc || c.rut_conc) {
+          pool.query(`UPDATE creditos SET
+              automotora = COALESCE(?, automotora), rut_dealer = COALESCE(?, rut_dealer),
+              parque = COALESCE(?, parque), updated_at = NOW()
+            WHERE id = ? AND estado_credito <> 'OTORGADO'`,
+            [c.concesionario || null, (c.rutConc || c.rut_conc || null), (c.parque || null), idCred]
+          ).catch(e => console.error('[carta→credito dealer]', e.message));
+        }
         // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
         if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined) {
           const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
