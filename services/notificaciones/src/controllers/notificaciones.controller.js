@@ -134,8 +134,11 @@ async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, s
 }
 
 /* ── Endpoints ───────────────────────────────────────────────────── */
-const getVapidKey = (req, res) => {
-  if (!VAPID) return res.status(503).json({ success: false, data: null, error: 'Push no disponible aún' });
+const getVapidKey = async (req, res) => {
+  // Carrera de arranque: si piden la clave antes del init diferido (3s post-boot),
+  // inicializar a demanda en vez de responder 503 (gatillaba la alerta de errores).
+  if (!VAPID) { try { await initVapid(); } catch (_) {} }
+  if (!VAPID) return res.json({ success: false, data: null, error: 'Push no disponible' });
   res.json({ success: true, data: { publicKey: VAPID.publicKey }, error: null });
 };
 
