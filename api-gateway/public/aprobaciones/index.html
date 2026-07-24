@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.15 — selector de dealer: con parque elegido muestra también los demás dealers en "Otros" (el parque lo define la operación) + primas AutoFin escaneadas viajan al crédito -->
+  <!-- v4.16 — campo Dealer: buscador arriba con etiqueta propia y el select DEALER* abajo con el nombre -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -383,8 +383,10 @@
 
       <div class="sec-form">Parque y concesionario</div>
       <div class="ff fg-2" id="wrapParque"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
-      <div class="ff fg-2"><label>Dealer *</label>
-        <input id="cConcFiltro" placeholder="🔍 Escribe cualquier parte del nombre…" oninput="filtrarConcesionarios()" autocomplete="off" style="margin-bottom:4px">
+      <div class="ff fg-2">
+        <label style="color:#94a3b8;font-weight:600">Buscar dealer</label>
+        <input id="cConcFiltro" placeholder="🔍 Escribe cualquier parte del nombre…" oninput="filtrarConcesionarios()" autocomplete="off" style="margin-bottom:8px">
+        <label>Dealer *</label>
         <select id="cConc" onchange="onConcesionario()"><option value="">Cargando…</option></select></div>
       <div class="ff"><label>RUT concesionario</label><input id="cRutConc" readonly></div>
       <div class="ff fg-2"><label>Vendedor</label><input id="cVendedor" placeholder="Nombre vendedor"></div>
