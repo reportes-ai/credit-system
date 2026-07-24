@@ -381,3 +381,102 @@ exports.getSegurosHistorico = async (req, res) => {
     res.status(500).json({ success: false, data: null, error: 'Error al calcular el histórico de seguros' });
   }
 };
+
+/* ═════════ CLIMA Y FERIADOS vs COLOCACIÓN (Proyección Pro) ═════════
+   Correlaciona los otorgamientos diarios (fecha_otorgado) con lluvia y
+   temperatura de Santiago (Open-Meteo, histórico gratuito, cacheado en
+   clima_diario) y con los feriados chilenos (shared/feriados.js).      */
+require('../../../../shared/migrate').enFila('clima-diario', async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS clima_diario (
+      fecha DATE PRIMARY KEY, pp DECIMAL(6,1) NULL, tmax DECIMAL(5,1) NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  } catch (e) { console.error('[clima migration]', e.message); }
+});
+
+async function climaRango(desde, hasta) {
+  const [ya] = await pool.query('SELECT fecha, pp, tmax FROM clima_diario WHERE fecha BETWEEN ? AND ?', [desde, hasta]);
+  const map = new Map(ya.map(r => [String(r.fecha).slice(0, 10) === 'Invalid D' ? r.fecha : new Date(r.fecha).toISOString().slice(0, 10), { pp: Number(r.pp), tmax: Number(r.tmax) }]));
+  // fechas faltantes → Open-Meteo (archive llega hasta ~anteayer)
+  const faltan = [];
+  for (let d = new Date(desde + 'T12:00:00'); d <= new Date(hasta + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
+    const iso = d.toISOString().slice(0, 10);
+    if (!map.has(iso)) faltan.push(iso);
+  }
+  if (faltan.length) {
+    try {
+      const url = `https://archive-api.open-meteo.com/v1/archive?latitude=-33.45&longitude=-70.66&start_date=${faltan[0]}&end_date=${faltan[faltan.length - 1]}&daily=precipitation_sum,temperature_2m_max&timezone=America%2FSantiago`;
+      const j = await (await fetch(url)).json();
+      const t = (j.daily && j.daily.time) || [];
+      for (let i = 0; i < t.length; i++) {
+        const pp = j.daily.precipitation_sum[i], tm = j.daily.temperature_2m_max[i];
+        if (pp == null && tm == null) continue;
+        map.set(t[i], { pp: Number(pp) || 0, tmax: tm == null ? null : Number(tm) });
+        await pool.query('INSERT IGNORE INTO clima_diario (fecha, pp, tmax) VALUES (?,?,?)', [t[i], pp ?? null, tm ?? null]).catch(() => {});
+      }
+    } catch (e) { console.error('[clima open-meteo]', e.message); }
+  }
+  return map;
+}
+
+exports.getClimaCorrelacion = async (req, res) => {
+  try {
+    const meses = Math.min(24, Math.max(3, parseInt(req.query.meses) || 12));
+    const hoy = new Date();
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth() - meses, 1).toISOString().slice(0, 10);
+    const hasta = new Date(hoy.getTime() - 2 * 86400000).toISOString().slice(0, 10);   // archive llega hasta ~anteayer
+    const [ops] = await pool.query(
+      `SELECT DATE(fecha_otorgado) f, COUNT(*) q, SUM(COALESCE(monto_financiado,0)) m
+       FROM creditos WHERE estado_eval='OTORGADO' AND fecha_otorgado BETWEEN ? AND ?
+       GROUP BY 1`, [desde, hasta]);
+    const qPorDia = new Map(ops.map(r => [new Date(r.f).toISOString().slice(0, 10), { q: Number(r.q), m: Number(r.m) }]));
+    const clima = await climaRango(desde, hasta);
+    const { esFeriado, cargarFeriados } = require('../../../../shared/feriados');
+    await cargarFeriados();   // asegurar el set en frío (carga async al boot)
+
+    // Serie de días HÁBILES (L-V): q, pp, tmax, feriado / víspera / post-feriado
+    const serie = [];
+    for (let d = new Date(desde + 'T12:00:00'); d <= new Date(hasta + 'T12:00:00'); d.setDate(d.getDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) continue;
+      const fer = esFeriado(d);   // esFeriado espera Date (motor único shared/feriados)
+      const c = clima.get(iso) || {};
+      serie.push({ f: iso, q: (qPorDia.get(iso) || {}).q || 0, m: (qPorDia.get(iso) || {}).m || 0,
+        pp: c.pp ?? null, tmax: c.tmax ?? null, feriado: fer,
+        vispera: !fer && esFeriado(new Date(d.getTime() + 86400000)),
+        post: !fer && esFeriado(new Date(d.getTime() - 86400000)) });
+    }
+    const habiles = serie.filter(s => !s.feriado);
+    const media = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+    const grupos = {
+      seco:     habiles.filter(s => s.pp != null && s.pp < 1),
+      lluvia:   habiles.filter(s => s.pp != null && s.pp >= 1),
+      vispera:  habiles.filter(s => s.vispera),
+      post:     habiles.filter(s => s.post),
+      normal:   habiles.filter(s => !s.vispera && !s.post),
+      feriados: serie.filter(s => s.feriado),
+    };
+    const stats = {};
+    for (const [k, v] of Object.entries(grupos)) stats[k] = { n: v.length, q_prom: +media(v.map(s => s.q)).toFixed(2), m_prom: Math.round(media(v.map(s => s.m))) };
+    // correlación de Pearson Q vs lluvia y Q vs t° máx (solo hábiles con clima)
+    const pearson = (xs, ys) => {
+      const n = xs.length; if (n < 3) return null;
+      const mx = media(xs), my = media(ys);
+      let num = 0, dx = 0, dy = 0;
+      for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); dx += (xs[i] - mx) ** 2; dy += (ys[i] - my) ** 2; }
+      return (dx && dy) ? +(num / Math.sqrt(dx * dy)).toFixed(3) : null;
+    };
+    const conClima = habiles.filter(s => s.pp != null);
+    const conTemp = habiles.filter(s => s.tmax != null);
+    res.json({ success: true, data: {
+      desde, hasta, dias: serie.length, stats,
+      corr_lluvia: pearson(conClima.map(s => s.pp), conClima.map(s => s.q)),
+      corr_temp: pearson(conTemp.map(s => s.tmax), conTemp.map(s => s.q)),
+      serie: serie.slice(-90),   // últimos ~90 hábiles para el gráfico
+    }, error: null });
+  } catch (e) {
+    console.error('[dashboard clima]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error al calcular la correlación clima/feriados' });
+  }
+};

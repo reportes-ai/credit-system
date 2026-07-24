@@ -12,6 +12,7 @@ router.get('/permisos',     verifyToken, ctrl.getPermisos);
 router.post('/permisos',    verifyToken, configurar, ctrl.savePermisos);
 router.get('/presupuesto',  verifyToken, ctrl.getPresupuesto);
 router.get('/seguros-historico', verifyToken, ctrl.getSegurosHistorico);
+router.get('/clima-correlacion', verifyToken, ctrl.getClimaCorrelacion);
 router.post('/presupuesto', verifyToken, configurar, ctrl.savePresupuesto);
 
 module.exports = router;

@@ -2778,6 +2778,7 @@ function buildVProy2() {
   afChartZoom('ch-proy2-curvaq', 'Avance Q acumulado por día hábil — real vs esperado');
   afChartZoom('ch-proy2-hist', 'Monto colocado mensual — histórico y proyectado');
   afChartZoom('ch-proy2-curva', 'Avance monto acumulado por día hábil — real vs esperado');
+  cargarClimaCorrelacion();
 }
 
 /* ── Popup de gráfico: agranda el canvas y permite copiarlo como imagen (PPT) ──
@@ -4723,4 +4724,47 @@ function exportColocMensual(vista) {
   if (!t || !window.XLSX) return;
   const wb = XLSX.utils.table_to_book(t, { sheet: vista === 'vdealers' ? 'dealers' : 'parques' });
   XLSX.writeFile(wb, `colocaciones_${vista === 'vdealers' ? 'dealers' : 'parques'}.xlsx`);
+}
+
+/* ═════════ CLIMA Y FERIADOS vs COLOCACIÓN (card en Proyección Pro) ═════════ */
+let _climaCargado = false, _chClima = null;
+async function cargarClimaCorrelacion() {
+  if (_climaCargado) return;
+  _climaCargado = true;
+  try {
+    const token = sessionStorage.getItem('token');
+    const r = await fetch('/api/dashboard/clima-correlacion?meses=12', { headers: { Authorization: 'Bearer ' + token } });
+    const j = await r.json();
+    if (!j.success) { document.getElementById('clima-nota').textContent = j.error || 'Sin datos de clima.'; return; }
+    const d = j.data, s = d.stats;
+    const pct = (a, b) => (b && b.q_prom) ? ((a.q_prom - b.q_prom) / b.q_prom * 100) : null;
+    const fPct = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(1) + '%';
+    const dLluvia = pct(s.lluvia, s.seco), dVisp = pct(s.vispera, s.normal), dPost = pct(s.post, s.normal);
+    const corrTxt = c => c == null ? '—' : (Math.abs(c) < 0.15 ? 'casi nula' : Math.abs(c) < 0.35 ? 'débil' : Math.abs(c) < 0.6 ? 'moderada' : 'fuerte') + ` (${c})`;
+    document.getElementById('kpi-clima').innerHTML = `
+      <div class="kpi-box"><div class="kpi-label">Día hábil seco</div><div class="kpi-val big">${s.seco.q_prom}</div><div class="kpi-sub">ops/día · ${s.seco.n} días</div></div>
+      <div class="kpi-box"><div class="kpi-label">Día hábil con lluvia (≥1mm)</div><div class="kpi-val big">${s.lluvia.q_prom}</div><div class="kpi-sub">ops/día · ${s.lluvia.n} días · ${fPct(dLluvia)} vs seco</div></div>
+      <div class="kpi-box"><div class="kpi-label">Correlación Q vs lluvia</div><div class="kpi-val big">${d.corr_lluvia ?? '—'}</div><div class="kpi-sub">${corrTxt(d.corr_lluvia)}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Correlación Q vs t° máx</div><div class="kpi-val big">${d.corr_temp ?? '—'}</div><div class="kpi-sub">${corrTxt(d.corr_temp)}</div></div>
+      <div class="kpi-box"><div class="kpi-label">Víspera de feriado</div><div class="kpi-val big">${s.vispera.q_prom}</div><div class="kpi-sub">ops/día · ${fPct(dVisp)} vs normal</div></div>
+      <div class="kpi-box"><div class="kpi-label">Día post-feriado</div><div class="kpi-val big">${s.post.q_prom}</div><div class="kpi-sub">ops/día · ${fPct(dPost)} vs normal</div></div>
+      <div class="kpi-box"><div class="kpi-label">Feriados hábiles</div><div class="kpi-val big">${s.feriados.q_prom}</div><div class="kpi-sub">ops/día · ${s.feriados.n} feriados</div></div>`;
+    // Gráfico: Q diario (últimos ~90 hábiles) coloreado por condición
+    const serie = d.serie || [];
+    const color = x => x.feriado ? '#f59e0b' : (x.pp != null && x.pp >= 1) ? '#38bdf8' : '#0141A2';
+    if (_chClima) _chClima.destroy();
+    _chClima = new Chart(document.getElementById('ch-clima-q'), {
+      type: 'bar',
+      data: { labels: serie.map(x => x.f.slice(5)), datasets: [{ label: 'Q otorgados', data: serie.map(x => x.q), backgroundColor: serie.map(color) }] },
+      options: { plugins: { legend: { display: false }, tooltip: { callbacks: {
+          label: ctx => { const x = serie[ctx.dataIndex];
+            return ` ${x.q} ops · lluvia ${x.pp != null ? x.pp + 'mm' : 's/d'} · máx ${x.tmax != null ? x.tmax + '°C' : 's/d'}${x.feriado ? ' · FERIADO' : x.vispera ? ' · víspera feriado' : x.post ? ' · post-feriado' : ''}`; } } } },
+        scales: { x: { ticks: { font: { size: 8 }, maxTicksLimit: 20 } }, y: { beginAtZero: true, ticks: { font: { size: 9 } } } },
+        animation: { duration: 400 }, responsive: true, maintainAspectRatio: false }
+    });
+    document.getElementById('clima-nota').innerHTML =
+      `Barras: <b style="color:#0141A2">azul</b> día seco · <b style="color:#38bdf8">celeste</b> con lluvia (≥1mm) · <b style="color:#f59e0b">naranjo</b> feriado. ` +
+      `Período ${d.desde} → ${d.hasta} (${d.dias} días hábiles). Fuente clima: Open-Meteo (Santiago) · feriados: calendario chileno del sistema. ` +
+      `La correlación va de −1 a 1: cerca de 0 el clima no mueve la aguja; negativa = a más lluvia, menos colocación.`;
+  } catch (e) { document.getElementById('clima-nota').textContent = 'No se pudo cargar el análisis de clima: ' + e.message; }
 }
