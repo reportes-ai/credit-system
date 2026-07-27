@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — anexo: fórmula del Factor de Ajuste redactada como los 2 pasos reales (cumplimiento ponderado → × factor máximo) y ejemplo que muestra el ponderado -->
+<!-- v1.6 — anexo: calidad todo o nada (meta como exigencia, no divisor) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -627,7 +627,7 @@ function anexAbrir(cod){
   const c = ANEX_COM;
   $('anexAviso').innerHTML = `<b>Valores vigentes que se imprimirán:</b> mínimo mensual <b>${CLP(c.minimo_monto)}</b> · `
     + `base <b>${anexPct(c.pct_24)}</b> (&lt;24 meses) y <b>${anexPct(c.pct_mas24)}</b> (≥24) · factor máximo <b>${anexPct(c.factor_max,0)}</b> · `
-    + `umbrales cesantía <b>${anexPct(c.umbral_cesantia,0)}</b> / reparación <b>${anexPct(c.umbral_rep,0)}</b> · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
+    + `umbrales cesantía <b>${anexPct(c.umbral_cesantia,0)}</b> / reparación <b>${anexPct(c.umbral_rep,0)}</b> · meta calidad <b>${c.meta_unidad||3} ops</b> (todo o nada) · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
     + `Si algo no corresponde, corrígelo primero en <a href="${ANEX_MODELO.href}">${esc(ANEX_MODELO.fuente)}</a>.`;
   $('anexForm').style.display='block';
   $('anexForm').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -678,7 +678,7 @@ function anexVarEjecutivos(trab, firm){
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px"><tr><td style="${TH}">Indicador</td><td style="${TH};text-align:center">Ponderación</td><td style="${TH};text-align:center">Umbral mínimo</td></tr>
       <tr><td style="${TD}">Cruce de Seguro de Cesantía AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
       <tr><td style="${TD}">Cruce de Seguro de Reparación Menor AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
-      <tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Sin umbral</td></tr></table>
+      <tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Meta de ${c.meta_unidad||3} operaciones (todo o nada)</td></tr></table>
     <p><b>Cómo se calcula el Factor de Ajuste.</b> Se determina en dos pasos:</p>
     <div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;margin:8px 0 12px;font-size:12.5px">
       <b>Paso 1 — Cumplimiento ponderado.</b> Se pondera el cumplimiento de los tres indicadores:<br>
@@ -687,7 +687,7 @@ function anexVarEjecutivos(trab, firm){
       <div style="text-align:center;margin:8px 0"><i>Factor de Ajuste = Cumplimiento ponderado × ${anexPct(c.factor_max)}</i></div>
       De este modo, si los tres indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
     </div>
-    <p><b>Reglas de los indicadores.</b> Los umbrales de los dos cruces de seguros operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. El indicador de <b>Calidad</b> no tiene umbral de activación: aporta de forma proporcional desde la primera operación, y corresponde a las operaciones UNIDAD DE CRÉDITO del mes divididas por la meta vigente${c.meta_unidad?` (actualmente <b>${c.meta_unidad}</b> operaciones)`:''}, con tope de 100% — el sobrecumplimiento no genera aporte adicional.</p>
+    <p><b>Reglas de los indicadores.</b> Los umbrales de los dos cruces de seguros operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. El indicador de <b>Calidad</b> opera de modo <b>todo o nada</b>: se cumple únicamente al alcanzar la meta mensual de operaciones del producto UNIDAD DE CRÉDITO${c.meta_unidad?`, actualmente de <b>${c.meta_unidad}</b> operaciones`:''}. Alcanzada o superada la meta, el indicador entra al cálculo con el 100%; por debajo de ella entra con <b>cero</b>, cualquiera sea el número de operaciones alcanzado. El sobrecumplimiento no genera aporte adicional.</p>
 
     <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
     <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>

@@ -21,7 +21,7 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['peso_cesantia', 0.50,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
       ['peso_rep',      0.30,   'Peso cruce reparaciones',         'Peso del indicador de cruce de seguro reparaciones en el ajuste', 'factor'],
       ['peso_calidad',  0.20,   'Peso calidad',                    'Peso del indicador de calidad en el ajuste',                      'factor'],
-      ['meta_unidad',   3,      'Meta créditos UNIDAD (calidad)',  'Cantidad de créditos UNIDAD DE CRÉDITO en el mes para alcanzar el 100% del indicador de calidad', 'factor'],
+      ['meta_unidad',   3,      'Meta créditos UNIDAD (calidad)',  'TODO O NADA: con esta cantidad de créditos UNIDAD DE CRÉDITO en el mes el indicador de calidad vale 100%; con menos vale 0%', 'factor'],
       ['umbral_cesantia',0.65,  'Umbral mínimo cesantía',          'Si el cruce es ≤ este valor el aporte de cesantía es 0',          'porcentaje'],
       ['umbral_rep',    0.50,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
       ['semana_corrida',1.1667, 'Multiplicador semana corrida',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
@@ -71,6 +71,10 @@ require('../../../../shared/migrate').migrarAuto('comisiones_anexo_2026_08', asy
   );
   await pool.query(
     "UPDATE comisiones_variables SET etiqueta = '% base ≥ 24 cuotas', descripcion = 'Tasa aplicada al monto financiado con plazo IGUAL O MAYOR a 24 meses' WHERE clave = 'pct_mas24'"
+  );
+  // Calidad pasa a TODO O NADA: la meta es exigencia, no divisor (antes 1 de 3 ops pagaba 33%).
+  await pool.query(
+    "UPDATE comisiones_variables SET descripcion = 'TODO O NADA: con esta cantidad de créditos UNIDAD DE CRÉDITO en el mes el indicador de calidad vale 100%; con menos vale 0%' WHERE clave = 'meta_unidad'"
   );
 });
 
@@ -234,7 +238,10 @@ function calcularComision(creditos, vars) {
     (c.financiera || '').toUpperCase().includes('UNIDAD') ||
     (c.producto   || '').toUpperCase().includes('UNIDAD')
   ).length;
-  const calidad        = Math.min(unidad_logrado / META_UNIDAD, 1);
+  // TODO O NADA (anexo de contrato 08-2026): la meta es una EXIGENCIA, no un divisor.
+  // Bajo la meta el indicador aporta 0; alcanzada o superada, aporta el 100%.
+  // (antes era proporcional: 1 de 3 operaciones ya pagaba un tercio del indicador)
+  const calidad        = unidad_logrado >= META_UNIDAD ? 1 : 0;
 
   const cumple_ces = cruce_cesantia    > umbral_cesantia;
   const cumple_rep = cruce_reparaciones > umbral_rep;
