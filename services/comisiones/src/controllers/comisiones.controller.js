@@ -136,7 +136,8 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
   } catch (e) { console.error('[comisiones alertas migration]', e.message); }
 });
 
-const { sumarDiasHabiles, esFeriado, cargarFeriados } = require('../../../../shared/feriados');  // días hábiles = sin fines de semana ni feriados chilenos
+const { sumarDiasHabiles } = require('../../../../shared/feriados');
+const SC = require('../../../../shared/semana-corrida');  // días hábiles = sin fines de semana ni feriados chilenos
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesNombre     = ym => { const [y,m]=String(ym).split('-'); return `${MESES_ES[parseInt(m)-1]} de ${y}`; };
 const mesPagoNombre = ym => { let [y,m]=String(ym).split('-').map(Number); m++; if(m>12){m=1;y++;} return `${MESES_ES[m-1]} de ${y}`; };
@@ -209,27 +210,11 @@ async function getVars() {
   return v;
 }
 
-/* ── Semana corrida (art. 45 CT) ──────────────────────────────────────────────
-   No es una constante: la ley paga los domingos y festivos con el promedio de lo
-   devengado en los días efectivamente trabajados. Llevado al mes:
-       factor = 1 + (domingos + festivos) / días trabajados
-   La jornada pactada de los ejecutivos es LUNES A SÁBADO, así que el divisor son
-   los días lunes-sábado del mes que no sean feriado. Un feriado que cae domingo
-   se cuenta una sola vez. Paramétrico: con semana_corrida_calc = 0 se vuelve al
-   multiplicador fijo de comisiones_variables.semana_corrida.                    */
+/* Semana corrida: motor único en shared/semana-corrida.js (art. 45 CT, jornada L-S).
+   Paramétrico: con semana_corrida_calc = 0 se vuelve al multiplicador fijo. */
 function factorSemanaCorrida(mes, vars) {
   if (!(vars.semana_corrida_calc > 0)) return vars.semana_corrida || 1;
-  const [y, m] = String(mes || '').split('-').map(Number);
-  if (!y || !m) return vars.semana_corrida || 1;
-  const ultimo = new Date(y, m, 0).getDate();
-  let trabajados = 0, domFest = 0;
-  for (let d = 1; d <= ultimo; d++) {
-    const f = new Date(y, m - 1, d), dow = f.getDay();
-    const feriado = esFeriado(f);
-    if (dow === 0 || feriado) domFest++;          // domingos y festivos
-    else if (dow >= 1 && dow <= 6) trabajados++;  // jornada lunes a sábado
-  }
-  return trabajados > 0 ? 1 + domFest / trabajados : (vars.semana_corrida || 1);
+  return SC.factorMes(mes, 6, vars.semana_corrida || 1);
 }
 
 function calcularComision(creditos, vars, mes) {
@@ -363,7 +348,7 @@ async function calcularMes(mes) {
     // La semana corrida legal necesita los feriados del mes. cargarFeriados() es
     // idempotente y barata (una query): así el cálculo nunca depende de que el
     // seed de boot haya alcanzado a correr.
-    await cargarFeriados().catch(() => {});
+    await SC.asegurarFeriados();
 
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(

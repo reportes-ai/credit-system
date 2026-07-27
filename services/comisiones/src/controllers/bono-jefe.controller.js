@@ -12,6 +12,7 @@
    Variables paramétricas en bono_jefe_config (pestaña restringida).
    ════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
+const SC = require('../../../../shared/semana-corrida');
 const { mesChile } = require('../../../../shared/utils/fecha-futura');   // MOTOR ÚNICO fecha/hora Chile
 const { auditar } = require('../../../../shared/audit');
 
@@ -29,7 +30,7 @@ require('../../../../shared/migrate').enFila('bono-jefe', async () => {
       ['monto_por_op', '6800000'], ['pond_montos', '40'],
       ['dealers_min', '1'], ['dealers_esperado', '2'], ['pond_dealers', '15'],
       ['score_min', '80'], ['score_max', '100'], ['pct_variable', '55'], ['k', '0.7'],
-      ['sueldo_fijo', '1500000'], ['factor_semana', '0.1667'],
+      ['sueldo_fijo', '1500000'], ['factor_semana', '0.1667'], ['semana_calc', '1'],
       ['informe_para', ''], ['informe_cc', ''],   // destinatarios del informe mensual por correo
     ];
     for (const [k, v] of defaults)
@@ -58,6 +59,7 @@ async function getCfg() {
     dealers_min: c.dealers_min ?? 1, dealers_esperado: c.dealers_esperado ?? 2, pond_dealers: (c.pond_dealers ?? 15) / 100,
     score_min: c.score_min ?? 80, score_max: c.score_max ?? 100, pct_variable: (c.pct_variable ?? 55) / 100, k: c.k ?? 0.7,
     sueldo_fijo: c.sueldo_fijo ?? 1500000, factor_semana: c.factor_semana ?? 0.1667,
+    semana_calc: c.semana_calc ?? 1,
   };
 }
 
@@ -73,16 +75,27 @@ function curvaPct(score, cfg) {
   const x = (s - cfg.score_min) / (cfg.score_max - cfg.score_min);
   return cfg.pct_variable * ((Math.exp(cfg.k * x) - 1) / (Math.exp(cfg.k) - 1));
 }
-function premioDe(score, cfg) {
+/* Semana corrida: motor único shared/semana-corrida.js (art. 45 CT, jornada L-S).
+   El incremento depende de los domingos y festivos de CADA mes, no es fijo.
+   Con semana_calc = 0 se vuelve al factor_semana configurado. */
+function incSemana(mes, cfg) {
+  if (!(cfg.semana_calc > 0)) return cfg.factor_semana;
+  const inc = SC.incrementoMes(mes, 6);
+  return inc == null ? cfg.factor_semana : inc;
+}
+function premioDe(score, cfg, mes) {
   const pct = curvaPct(score, cfg);
   const variable = Math.round(cfg.sueldo_fijo * pct);
-  const semana = Math.round(variable * cfg.factor_semana);
-  return { score_lookup: Math.floor(Math.max(0, score)), pct_adicional: pct, variable, semana_corrida: semana,
+  const factor = incSemana(mes, cfg);
+  const semana = Math.round(variable * factor);
+  return { score_lookup: Math.floor(Math.max(0, score)), pct_adicional: pct, variable,
+           factor_semana_aplicado: factor, semana_corrida: semana,
            total_variable: variable + semana, renta_total: cfg.sueldo_fijo + variable + semana };
 }
 
 /* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ── */
 async function calcularBSC(mesQ) {
+    await SC.asegurarFeriados();
     const mes = /^\d{4}-\d{2}$/.test(mesQ || '') ? mesQ
       : mesChile();
     const cfg = await getCfg();
@@ -143,7 +156,7 @@ async function calcularBSC(mesQ) {
     avg.ptj_montos = ptjTramo(avg.monto_aprobado, minM, espM, cfg.pond_montos);
     avg.ptj_dealers = ptjDealers(avg.dealers_nuevos, cfg.dealers_min, cfg.dealers_esperado, cfg.pond_dealers);
     avg.score = avg.ptj_creditos + avg.ptj_montos + avg.ptj_dealers;
-    const premio = premioDe(avg.score, cfg);
+    const premio = premioDe(avg.score, cfg, mes);
 
     // Informe paso a paso (mismo espíritu que el informe de comisiones de ejecutivos)
     const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
@@ -157,7 +170,7 @@ async function calcularBSC(mesQ) {
       { titulo: 'Curva del premio', detalle: premio.pct_adicional === 0
           ? `El score (${n2(avg.score)}, se busca el entero ${premio.score_lookup}) no supera el mínimo de ${cfg.score_min} puntos → el premio del mes es $0. La curva parte a pagar sobre ${cfg.score_min} pts.`
           : `Con score entero ${premio.score_lookup} (mínimo ${cfg.score_min}, máximo ${cfg.score_max}): % adicional = ${Math.round(cfg.pct_variable * 100)}% × (e^(${cfg.k}·x)−1)/(e^${cfg.k}−1) con x=(${premio.score_lookup}−${cfg.score_min})/(${cfg.score_max}−${cfg.score_min}) → ${n2(premio.pct_adicional * 100)}% del sueldo fijo.` },
-      { titulo: 'Premio del mes', detalle: `${clp(cfg.sueldo_fijo)} (fijo) × ${n2(premio.pct_adicional * 100)}% = ${clp(premio.variable)} de premio variable. Semana corrida: ${clp(premio.variable)} × ${n2(cfg.factor_semana * 100)}% = ${clp(premio.semana_corrida)}. Total variable: ${clp(premio.total_variable)} → Renta total del mes: ${clp(premio.renta_total)}.` },
+      { titulo: 'Premio del mes', detalle: `${clp(cfg.sueldo_fijo)} (fijo) × ${n2(premio.pct_adicional * 100)}% = ${clp(premio.variable)} de premio variable. Semana corrida: ${clp(premio.variable)} × ${n2(premio.factor_semana_aplicado * 100)}% = ${clp(premio.semana_corrida)} (art. 45 CT, factor del mes). Total variable: ${clp(premio.total_variable)} → Renta total del mes: ${clp(premio.renta_total)}.` },
     ];
 
     return { mes, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos };
@@ -249,7 +262,7 @@ const setVariables = async (req, res) => {
     const vars = req.body && req.body.variables;
     if (!vars || typeof vars !== 'object') return res.status(400).json({ success: false, data: null, error: 'variables requeridas' });
     const PERMITIDAS = new Set(['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos',
-      'dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana']);
+      'dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana','semana_calc']);
     const TEXTO = new Set(['informe_para', 'informe_cc']);   // correos separados por coma
     const cambios = [];
     for (const [k, v] of Object.entries(vars)) {
@@ -273,9 +286,11 @@ const setVariables = async (req, res) => {
 /* ── GET /api/bono-jefe/curva — tabla score→premio para la vista Variables ── */
 const getCurva = async (req, res) => {
   try {
+    await SC.asegurarFeriados();
     const cfg = await getCfg();
     const filas = [];
-    for (let s = cfg.score_min - 5; s <= cfg.score_max + 10; s++) filas.push({ score: s, ...premioDe(s, cfg) });
+    const mesTabla = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    for (let s = cfg.score_min - 5; s <= cfg.score_max + 10; s++) filas.push({ score: s, ...premioDe(s, cfg, mesTabla) });
     res.json({ success: true, data: { cfg, filas }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
