@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — anexo: cláusula sobre la naturaleza del Factor de Ajuste (incentivo adicional por indicadores no monetarios, sin derecho adquirido) -->
+<!-- v2.3 — menos margen superior al imprimir (page 10mm + contenedor sin padding arriba) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,7 +41,7 @@
   .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
   @media print { body * { visibility:hidden; } #docPrint, #docPrint * { visibility:visible; } #docPrint { position:absolute; inset:0; } }
   /* Documentos legales: tamaño CARTA (Letter), el estándar en Chile para contratos y anexos */
-  @page { size: letter; margin: 18mm 16mm; }
+  @page { size: letter; margin: 10mm 16mm 16mm; }
 </style>
 </head>
 <body>
@@ -530,7 +530,7 @@ const HOY = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',ye
    Variable Hans Vargas 08-06-2026") en vez de "Contratos y Cartas Oferta — AutoFácil". */
 function bloqueDoc(inner, nombreArchivo){
   const cont = $('docPrint');
-  cont.innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:50px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
+  cont.innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:0 40px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
   cont.style.display = 'block';
   const imgs = [...cont.querySelectorAll('img')];
   const listas = imgs.map(im => (im.complete && im.naturalWidth)
@@ -552,7 +552,7 @@ const fechaArchivo = v => v ? v.split('-').reverse().join('-') : '';
 /* Encabezado con logo. La fecha es opcional: en los anexos la fecha de firma la fija el
    usuario y va en el cuerpo, así que pasarla vacía evita que el papel muestre dos fechas
    distintas (la de hoy arriba y la firmada abajo). */
-const cabeceraCon = (fecha) => `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:26px">
+const cabeceraCon = (fecha) => `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #012d70;padding-bottom:8px;margin:0 0 18px">
   <img src="/img/logo-autofacil.png" alt="AutoFácil" style="height:44px">
   ${fecha ? `<div style="font-size:12px;color:#555">Santiago, ${fecha}</div>` : ''}</div>`;
 const cabecera = cabeceraCon(HOY);
