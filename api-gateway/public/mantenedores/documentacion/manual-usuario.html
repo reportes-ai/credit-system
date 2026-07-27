@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v7.7 — calidad pasa a todo o nada (meta = exigencia) y se aclara que el Factor de Ajuste es un promedio ponderado -->
+<!-- v7.8 — corrección: el tope es Comisión Base × 1,66 (66% sobre la base), no 1,66% fijo sobre el monto financiado -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -305,8 +305,7 @@
       (el plazo de 24 exactos paga la tasa mayor). Esa base se incrementa por el <b>Factor de Ajuste</b>, que suma tres indicadores:
       cruce de <b>seguro de cesantía</b> AUTOFIN (peso 50%, se activa sobre 65%), cruce de <b>reparación menor</b> AUTOFIN
       (peso 30%, se activa sobre 50%) y <b>calidad</b> = cumplir la meta mensual de operaciones UNIDAD DE CRÉDITO (peso 20%), que es <b>todo o nada</b>: alcanzada la meta el indicador vale 100%, bajo ella vale 0% aunque falte una sola operación.
-      Cada aporte es <i>% de cumplimiento × peso × 66%</i>, y el factor total no supera <b>66%</b> — por eso el techo real es
-      <b>1,66%</b> sobre el monto financiado. Ojo: el Factor de Ajuste es un <b>promedio ponderado</b> — primero se pondera el cumplimiento de los tres indicadores (50/30/20) y ese resultado se multiplica por el 66%, no cada indicador por separado. Y los umbrales de los seguros <b>activan</b> el indicador, no lo topan; superado el umbral el
+      El Factor de Ajuste es un <b>promedio ponderado</b> en dos pasos: primero <i>Cumplimiento ponderado = (Cruce Cesantía × 50%) + (Cruce Rep. Menor × 30%) + (Calidad × 20%)</i>, y luego <i>Factor de Ajuste = Cumplimiento ponderado × 66%</i> — no cada indicador multiplicado por su cuenta. Como el factor tope es 66%, la comisión del mes llega como máximo a <b>Comisión Base × 1,66</b> (ojo: eso NO equivale a un 1,66% fijo sobre el monto financiado — ese número solo se da si todas las operaciones son del tramo de 1%; con operaciones bajo 24 meses el techo es 0,75% × 1,66 = 1,245%). Y los umbrales de los seguros <b>activan</b> el indicador, no lo topan; superado el umbral el
       aporte es proporcional al cruce logrado, y si no se supera ese indicador aporta cero sin afectar a los demás. Al resultado se
       le aplica la <b>semana corrida</b> (×1,1667, art. 45 del Código del Trabajo) y ese es el monto que llega a Remuneraciones.
       Los cruces se miden solo sobre el <b>universo AUTOFIN excluyendo CORFO</b>. Todos los parámetros se editan en

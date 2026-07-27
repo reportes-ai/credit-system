@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.7 — el PDF se guarda con nombre útil (Anexo Variable Hans Vargas 08-06-2026) en vez del título de la página; aplica también a carta, contrato y finiquito -->
+<!-- v1.8 — corrección: el tope se expresa sobre la Comisión Base (×1,66), no como 1,66% del monto financiado -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -663,7 +663,6 @@ function anexVarEjecutivos(trab, firm){
   const c = ANEX_COM;
   const trato = String(trab.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
   const tratoF = String(firm.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
-  const maxPct = anexPct((c.pct_mas24||0)*(1+(c.factor_max||0)));
   const sc = (c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4});
   // Ejemplo numérico calculado con los MISMOS parámetros vigentes
   const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
@@ -704,7 +703,7 @@ function anexVarEjecutivos(trab, firm){
 
     <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
     <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
-    <p>En consecuencia, el porcentaje máximo aplicable sobre el Monto Financiado asciende a <b>${maxPct}</b>: una operación del tramo de ${anexPct(c.pct_mas24)}, con el Factor de Ajuste en su máximo de ${anexPct(c.factor_max)}, paga ${anexPct(c.pct_mas24)} × 1,${String(Math.round((c.factor_max||0)*100)).padStart(2,'0')} = <b>${maxPct}</b> del Monto Financiado.</p>
+    <p>En consecuencia, el incremento máximo aplicable sobre la Comisión Base asciende a <b>${anexPct(c.factor_max)}</b>: con el Factor de Ajuste en su máximo, la comisión del mes equivale a <b>Comisión Base × 1,${String(Math.round((c.factor_max||0)*100)).padStart(2,'0')}</b>.</p>
 
     <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión así determinada se incrementará por concepto de semana corrida, aplicándose el factor <b>${sc}</b> sobre el monto resultante.</p>
 
