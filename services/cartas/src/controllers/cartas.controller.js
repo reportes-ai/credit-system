@@ -142,6 +142,17 @@ async function idsRevisores(excluirEmail) {
 }
 
 // Auto-migración: crea tablas si no existen
+// Fallback IA: cuando el PDF de la financiera viene escaneado (sin capa de texto),
+// Haiku lo lee con visión. Gobernado desde el mantenedor Subsistema IA (nace apagada).
+require('../../../../shared/migrate').enFila('cartas-ia-ocr', async () => {
+  await require('../../../../shared/ia').registrarFuncionalidad({
+    codigo: 'cartas_pdf_ia',
+    nombre: 'Lectura IA de PDFs escaneados (cartas)',
+    descripcion: 'Cuando la Carta Compromiso / Cotización de Unidad o la Carta de Aprobación AutoFin llega escaneada (imagen sin texto), Haiku extrae los campos con visión para el autocompletar del Generador de Cartas. El ejecutivo siempre revisa antes de guardar.',
+    modelo: 'claude-haiku-4-5',
+  });
+});
+
 require('../../../../shared/migrate').enFila('cartas', async () => {
   const sqls = [
     `CREATE TABLE IF NOT EXISTS cartas_ejecutivos (
@@ -1112,6 +1123,38 @@ function parseCartaAutofin(t) {
 const _toBuf = b64 => Buffer.from(String(b64).replace(/^data:[^;]+;base64,/, ''), 'base64');
 
 // POST /api/cartas/parse-unidad → extrae campos sin guardar (autocompletar)
+/* ── Lectura IA de PDFs escaneados (Haiku con visión) ──
+   Devuelve el MISMO shape que los parsers regex, o null si la IA está apagada/falla.
+   Los montos vienen como número entero CLP; la tasa como % mensual (ej 2.87). */
+const _iaNum = v => { const n = parseInt(String(v ?? '').replace(/[^\d-]/g, ''), 10); return isNaN(n) ? null : n; };
+const _iaTasa = v => { const n = parseFloat(String(v ?? '').replace(',', '.').replace(/[^\d.]/g, '')); return isNaN(n) ? null : n; };
+async function ocrCartaIA(tipoDoc, b64) {
+  const ia = require('../../../../shared/ia');
+  if (!(await ia.iaActiva('cartas_pdf_ia'))) return null;
+  const CAMPOS = {
+    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito en pesos (montoCreditoCLP), participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
+    COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), monto del credito en pesos (montoCreditoCLP), plazo en cuotas (plazo), tasa mensual en % (tasaCredito)',
+    CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto credito en pesos (montoCreditoCLP), nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps)',
+  };
+  try {
+    const { datos } = await require('../../../../shared/anthropic').analizar({
+      codigo: 'cartas_pdf_ia', json: true, max_tokens: 1200,
+      documentos: [{ tipo: 'pdf', data: b64 }],
+      system: 'Extraes datos de documentos de crédito automotriz chilenos escaneados. Respondes SOLO JSON con las claves pedidas; usa null cuando el dato no aparece. Montos en pesos como entero sin puntos ni $. La tasa mensual como número (ej: 2.87). No inventes datos.',
+      prompt: `Extrae de este documento (${tipoDoc.replace(/_/g, ' ')}): ${CAMPOS[tipoDoc]}.`,
+    });
+    if (!datos) return null;
+    // coerción de tipos al shape de los parsers
+    for (const k of ['precioVenta', 'pie', 'saldo', 'montoCreditoCLP', 'partBruto', 'segDesgravamen', 'segCesantia', 'segRdh', 'segRep', 'gps']) if (k in datos) datos[k] = _iaNum(datos[k]);
+    if ('plazo' in datos) datos.plazo = _iaNum(datos.plazo);
+    if ('anio' in datos) datos.anio = _iaNum(datos.anio);
+    if ('tasaCredito' in datos) datos.tasaCredito = _iaTasa(datos.tasaCredito);
+    if (datos.rutCliente) datos.rutCliente = RUT.normalizar(datos.rutCliente) || datos.rutCliente;
+    if (datos.rutConc) datos.rutConc = RUT.normalizar(datos.rutConc) || datos.rutConc;
+    return datos;
+  } catch (e) { console.error('[ocrCartaIA]', e.code || e.message); return null; }
+}
+
 const parseUnidad = async (req, res) => {
   try {
     const { compromiso_base64, cotizacion_base64 } = req.body || {};
@@ -1123,7 +1166,12 @@ const parseUnidad = async (req, res) => {
     if (compromiso_base64) {
       try {
         const txt = (await pdf(_toBuf(compromiso_base64))).text;
-        if (esEscaneado(txt)) out.warnings.push('La Carta Compromiso es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde el sistema de Unidad y súbelo de nuevo — igual quedó adjunta para la revisión.');
+        if (esEscaneado(txt)) {
+          out.compromiso = await ocrCartaIA('COMPROMISO_UNIDAD', compromiso_base64);
+          out.warnings.push(out.compromiso
+            ? 'La Carta Compromiso venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.'
+            : 'La Carta Compromiso es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde el sistema de Unidad — igual quedó adjunta para la revisión.');
+        }
         else out.compromiso = parseCartaCompromiso(txt);
       }
       catch (e) { out.warnings.push('No se pudo leer la Carta Compromiso: ' + e.message); }
@@ -1131,7 +1179,12 @@ const parseUnidad = async (req, res) => {
     if (cotizacion_base64) {
       try {
         const txt = (await pdf(_toBuf(cotizacion_base64))).text;
-        if (esEscaneado(txt)) out.warnings.push('La Cotización es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde el sistema de Unidad y súbelo de nuevo — igual quedó adjunta para la revisión.');
+        if (esEscaneado(txt)) {
+          out.cotizacion = await ocrCartaIA('COTIZACION_UNIDAD', cotizacion_base64);
+          out.warnings.push(out.cotizacion
+            ? 'La Cotización venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.'
+            : 'La Cotización es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde el sistema de Unidad — igual quedó adjunta para la revisión.');
+        }
         else out.cotizacion = parseCotizacion(txt);
       }
       catch (e) { out.warnings.push('No se pudo leer la Cotización: ' + e.message); }
@@ -1161,9 +1214,13 @@ const parseAutofin = async (req, res) => {
     const out = { warnings: [] };
     try {
       const txt = (await pdf(_toBuf(b64))).text;
-      if (String(txt || '').replace(/\s/g, '').length < 40)
-        return res.status(422).json({ success: false, data: null, error: 'La carta es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde Trinidad/AutoFin y súbelo de nuevo.' });
-      out.carta = parseCartaAutofin(txt);
+      if (String(txt || '').replace(/\s/g, '').length < 40) {
+        out.carta = await ocrCartaIA('CARTA_AUTOFIN', b64);
+        if (!out.carta)
+          return res.status(422).json({ success: false, data: null, error: 'La carta es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde Trinidad/AutoFin y súbelo de nuevo.' });
+        out.warnings.push('La carta venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.');
+      }
+      else out.carta = parseCartaAutofin(txt);
     }
     catch (e) { return res.status(422).json({ success: false, data: null, error: 'No se pudo leer la carta: ' + e.message }); }
     const c = out.carta || {};
