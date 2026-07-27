@@ -26,7 +26,8 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['umbral_rdh',    0.99,   'Umbral mínimo RDH',               'Si el cruce es ≤ este valor el aporte de RDH es 0',               'porcentaje'],
       ['umbral_cesantia',0.65,  'Umbral mínimo cesantía',          'Si el cruce es ≤ este valor el aporte de cesantía es 0',          'porcentaje'],
       ['umbral_rep',    0.55,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
-      ['semana_corrida',1.1667, 'Multiplicador semana corrida',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
+      ['semana_corrida_calc', 1, 'Semana corrida calculada (1=sí, 0=no)', 'Con 1 se calcula por mes según art. 45 CT: 1 + (domingos+festivos)/(días lunes a sábado hábiles). Con 0 se usa el multiplicador fijo de abajo', 'factor'],
+      ['semana_corrida',1.1667, 'Multiplicador semana corrida (modo fijo)',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
     ];
     for (const [clave, valor, etiqueta, descripcion, tipo] of defaults) {
       await pool.query(
@@ -135,7 +136,7 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
   } catch (e) { console.error('[comisiones alertas migration]', e.message); }
 });
 
-const { sumarDiasHabiles } = require('../../../../shared/feriados');  // días hábiles = sin fines de semana ni feriados chilenos
+const { sumarDiasHabiles, esFeriado, cargarFeriados } = require('../../../../shared/feriados');  // días hábiles = sin fines de semana ni feriados chilenos
 const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesNombre     = ym => { const [y,m]=String(ym).split('-'); return `${MESES_ES[parseInt(m)-1]} de ${y}`; };
 const mesPagoNombre = ym => { let [y,m]=String(ym).split('-').map(Number); m++; if(m>12){m=1;y++;} return `${MESES_ES[m-1]} de ${y}`; };
@@ -208,7 +209,30 @@ async function getVars() {
   return v;
 }
 
-function calcularComision(creditos, vars) {
+/* ── Semana corrida (art. 45 CT) ──────────────────────────────────────────────
+   No es una constante: la ley paga los domingos y festivos con el promedio de lo
+   devengado en los días efectivamente trabajados. Llevado al mes:
+       factor = 1 + (domingos + festivos) / días trabajados
+   La jornada pactada de los ejecutivos es LUNES A SÁBADO, así que el divisor son
+   los días lunes-sábado del mes que no sean feriado. Un feriado que cae domingo
+   se cuenta una sola vez. Paramétrico: con semana_corrida_calc = 0 se vuelve al
+   multiplicador fijo de comisiones_variables.semana_corrida.                    */
+function factorSemanaCorrida(mes, vars) {
+  if (!(vars.semana_corrida_calc > 0)) return vars.semana_corrida || 1;
+  const [y, m] = String(mes || '').split('-').map(Number);
+  if (!y || !m) return vars.semana_corrida || 1;
+  const ultimo = new Date(y, m, 0).getDate();
+  let trabajados = 0, domFest = 0;
+  for (let d = 1; d <= ultimo; d++) {
+    const f = new Date(y, m - 1, d), dow = f.getDay();
+    const feriado = esFeriado(f);
+    if (dow === 0 || feriado) domFest++;          // domingos y festivos
+    else if (dow >= 1 && dow <= 6) trabajados++;  // jornada lunes a sábado
+  }
+  return trabajados > 0 ? 1 + domFest / trabajados : (vars.semana_corrida || 1);
+}
+
+function calcularComision(creditos, vars, mes) {
   const {
     pct_24, pct_mas24, minimo_monto, factor_max,
     peso_rdh, peso_cesantia, peso_rep, peso_calidad,
@@ -281,6 +305,7 @@ function calcularComision(creditos, vars) {
   const bono_calidad = incentivo_base * ajuste_calidad;
 
   const incentivo_final = incentivo_base + bono_rdh + bono_ces + bono_rep + bono_calidad;
+  const factor_sc = factorSemanaCorrida(mes, vars);
 
   return {
     cumple_minimo: true,
@@ -300,7 +325,8 @@ function calcularComision(creditos, vars) {
     ajuste_calidad, factor_ajuste,
     bono_rdh, bono_cesantia: bono_ces, bono_reparaciones: bono_rep, bono_calidad,
     incentivo_final,
-    con_semana_corrida: incentivo_final * semana_corrida,
+    factor_semana_corrida: factor_sc,
+    con_semana_corrida: incentivo_final * factor_sc,
   };
 }
 
@@ -334,6 +360,10 @@ const putVariables = async (req, res) => {
 /* ── Cálculo del mes por ejecutivo (compartido por la vista y el resumen por correo) ── */
 async function calcularMes(mes) {
     const vars = await getVars();
+    // La semana corrida legal necesita los feriados del mes. cargarFeriados() es
+    // idempotente y barata (una query): así el cálculo nunca depende de que el
+    // seed de boot haya alcanzado a correr.
+    await cargarFeriados().catch(() => {});
 
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(
@@ -366,7 +396,7 @@ async function calcularMes(mes) {
     aprobs.forEach(a => { aprobMap[a.ejecutivo] = a; });
 
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
-      const calc = calcularComision(creds, vars);
+      const calc = calcularComision(creds, vars, mes);
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
 
       // Anotar cada crédito con su incentivo individual
