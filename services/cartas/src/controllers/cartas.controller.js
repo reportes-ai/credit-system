@@ -1118,12 +1118,22 @@ const parseUnidad = async (req, res) => {
     if (!compromiso_base64 && !cotizacion_base64)
       return res.status(400).json({ success: false, data: null, error: 'Adjunta al menos un documento' });
     const out = { warnings: [] };
+    // Un PDF escaneado/foto no trae capa de texto → no hay nada que extraer
+    const esEscaneado = (txt) => String(txt || '').replace(/\s/g, '').length < 40;
     if (compromiso_base64) {
-      try { out.compromiso = parseCartaCompromiso((await pdf(_toBuf(compromiso_base64))).text); }
+      try {
+        const txt = (await pdf(_toBuf(compromiso_base64))).text;
+        if (esEscaneado(txt)) out.warnings.push('La Carta Compromiso es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde el sistema de Unidad y súbelo de nuevo — igual quedó adjunta para la revisión.');
+        else out.compromiso = parseCartaCompromiso(txt);
+      }
       catch (e) { out.warnings.push('No se pudo leer la Carta Compromiso: ' + e.message); }
     }
     if (cotizacion_base64) {
-      try { out.cotizacion = parseCotizacion((await pdf(_toBuf(cotizacion_base64))).text); }
+      try {
+        const txt = (await pdf(_toBuf(cotizacion_base64))).text;
+        if (esEscaneado(txt)) out.warnings.push('La Cotización es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde el sistema de Unidad y súbelo de nuevo — igual quedó adjunta para la revisión.');
+        else out.cotizacion = parseCotizacion(txt);
+      }
       catch (e) { out.warnings.push('No se pudo leer la Cotización: ' + e.message); }
     }
     const c = out.compromiso || {}, q = out.cotizacion || {};
@@ -1149,7 +1159,12 @@ const parseAutofin = async (req, res) => {
     const b64 = req.body && (req.body.carta_base64 || req.body.compromiso_base64);
     if (!b64) return res.status(400).json({ success: false, data: null, error: 'Adjunta la Carta de Aprobación (PDF)' });
     const out = { warnings: [] };
-    try { out.carta = parseCartaAutofin((await pdf(_toBuf(b64))).text); }
+    try {
+      const txt = (await pdf(_toBuf(b64))).text;
+      if (String(txt || '').replace(/\s/g, '').length < 40)
+        return res.status(422).json({ success: false, data: null, error: 'La carta es un PDF escaneado (imagen, sin texto): no se pueden extraer los datos. Descarga el PDF original desde Trinidad/AutoFin y súbelo de nuevo.' });
+      out.carta = parseCartaAutofin(txt);
+    }
     catch (e) { return res.status(422).json({ success: false, data: null, error: 'No se pudo leer la carta: ' + e.message }); }
     const c = out.carta || {};
     out.fields = {

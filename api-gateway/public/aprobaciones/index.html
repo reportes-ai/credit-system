@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.19 — Revisión de Cartas: columnas Ejecutivo y Financiera en la tabla; el banner de excepciones muestra la tasa pizarra y la comisión pizarra QUE CORRESPONDEN vs lo solicitado (con deltas en $ y pts) para dimensionar la excepción -->
+  <!-- v4.20 — autocompletar cartas: detección de PDF escaneado (sin capa de texto) con aviso claro en vez de un falso "Datos cargados" -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2031,7 +2031,9 @@ async function onUnidadDoc(input, tipo){
     const f=j.data.fields||{};
     const part = f.partBruto ? ('Participación Unidad: $'+Number(f.partBruto).toLocaleString('es-CL')+' (IVA incl.) — aplícala con "Cambio participación" si corresponde. ') : '';
     const warn = (j.data.warnings||[]).join(' ');
-    udMsg('✓ Datos cargados desde Unidad. '+part+'Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok');
+    const sinDatos = !f.opOrigen && !f.rutCliente && !f.montoCreditoCLP;
+    if (sinDatos) udMsg('⚠ '+(warn||'No se pudieron extraer datos del documento.'), 'warn');
+    else udMsg('✓ Datos cargados desde Unidad. '+part+'Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok');
   } catch(e){ console.error('onUnidadDoc',e); udMsg('Error al procesar el documento.','err'); }
 }
 async function onAutofinDoc(input){
