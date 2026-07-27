@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.7 — Runbook de contingencia BD (docs/RUNBOOK-contingencia-bd.md) enlazado + IP de la instancia nueva -->
+<!-- v3.8 — Runbook de EMERGENCIAS ampliado: TiDB, Render, GitHub, Google Cloud, DNS, error humano, seguridad y servicios externos -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -158,7 +158,7 @@ DEALERNET_USR / DEALERNET_PWD                         → informes comerciales</
       <b>Por qué este setup</b>: el bucket y GitHub guardan <i>archivos</i>, inservibles hasta restaurarlos en un motor real; esta instancia es el motor ya provisionado, así el switch es cambiar 4 env vars en Render (~3 min) en vez de armar un servidor bajo presión. Detenida cuesta lo mismo con máquina chica o grande (no se cobra CPU/RAM apagada), por eso se dejó 2 vCPU/8 GB: la BD entera (54 MB) cabe en RAM, restaura rápido y aguanta holgada a los ~39 usuarios operando en modo contingencia — el cuello de botella sería Render (512 MB), no la BD. Se descartó núcleo compartido (pensado para pruebas, se ahoga con carga real) y Enterprise Plus (extras innecesarios; además fija la serie N2 y bloquea bajar de 2 vCPU).<br>
       <b>Gotcha TiDB→MySQL (obligatorio)</b>: los dumps de TiDB repiten nombres de constraint FK (<code>fk_1</code>, <code>fk_2</code>…) entre tablas; MySQL real exige unicidad por esquema → sin renombrarlos el restore falla a medias y tablas como <code>usuarios</code> quedan <b>vacías sin error visible</b>. Renombrar a <code>fk_auto_N</code> antes de restaurar (los nombres no los usa el sistema). Verificado 2026-07-27: 386 tablas / 39 usuarios / 17.511 créditos, idéntico a producción.<br>
       <b>Switch de emergencia</b>: iniciar instancia → restaurar último dump (con el fix de FK) → en Render cambiar <code>DB_HOST</code>=34.176.225.253, <code>DB_PORT</code>=3306, <code>DB_USER</code>, <code>DB_PASSWORD</code> → redeploy automático. Al recuperar TiDB: revertir las 4 env vars (guardarlas antes) y volver a detener la instancia. No hay sync automático: lo digitado en contingencia se migra a mano.<br>
-      <b>📕 RUNBOOK COMPLETO (autocontenido, para pasárselo a cualquier técnico o a la IA en plena emergencia): <code>docs/RUNBOOK-contingencia-bd.md</code> en el repo</b> — incluye comandos exactos, el script del fix de FK y las cifras de verificación. Guía para no técnicos: <b>Mantenedores → Definiciones → "Respaldo de la Base de Datos"</b>.</td></tr>
+      <b>📕 RUNBOOK DE EMERGENCIAS (autocontenido, para pasárselo a cualquier técnico o a la IA en plena emergencia): <code>docs/RUNBOOK-contingencia-bd.md</code> en el repo</b> — mapa "qué se cayó → qué hacer" que cubre TiDB (probado), Render, GitHub, Google Cloud, DNS/dominio, borrado accidental de datos, filtración de claves y caída de servicios externos; con comandos exactos, el script del fix de FK y las cifras de verificación. Declara explícitamente qué planes están probados y cuáles no. Guía para no técnicos: <b>Mantenedores → Definiciones → "Respaldo de la Base de Datos"</b>.</td></tr>
   </table>
 
   <h2>Convenciones de código</h2>
