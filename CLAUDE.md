@@ -282,6 +282,18 @@ Reglas de diseño que se derivan de este principio:
   - Configurar `connectTimeout` y `queryTimeout` en el pool de BD
   - Evita que una query lenta bloquee el servidor indefinidamente
 
+- [ ] 🔥 **Plan de contingencia si Render cae por horas** (detectado 2026-07-27 al armar el runbook)
+  - **Es el único hueco declarado del `docs/RUNBOOK-contingencia-bd.md`**: hoy NO existe host
+    alternativo configurado ni ensayado. Si Render tiene una caída larga, el sistema queda
+    fuera de servicio y no hay a dónde moverlo.
+  - Contexto: la BD ya tiene contingencia probada (Google Cloud SQL) y los datos nunca están
+    en riesgo (viven en TiDB, no en Render) — lo que falta es **dónde correr la aplicación**.
+  - Qué habría que hacer: elegir un host secundario (Railway / Fly.io / VM), documentar las
+    env vars necesarias, y **ensayar un despliegue real al menos una vez** (un plan no probado
+    no es un plan — lo aprendimos con el gotcha de las FK, que solo apareció al restaurar de verdad).
+  - Decisión alternativa válida: aceptar formalmente el riesgo y definir cuánto tiempo fuera
+    de servicio es tolerable. Lo que no sirve es dejarlo sin decidir.
+
 ### 🟢 Mejora de calidad (profesionalismo)
 
 - [ ] **Documentar reglas de negocio en el código**
