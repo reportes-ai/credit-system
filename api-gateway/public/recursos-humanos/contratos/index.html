@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — cláusula de modificaciones: aviso por escrito (basta correo) con 10 días antes del inicio del mes, solo hacia adelante -->
+<!-- v2.1 — RUT con formato (puntos y guión) en anexos, contratos, cartas y finiquitos, vía motor único rut-core -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -167,6 +167,7 @@
 <div id="docPrint" style="display:none"></div>
 
 <script src="/js/topnav.js"></script>
+<script src="/js/rut-core.js"></script>
 <script>
 const TK = sessionStorage.getItem('token'); if (!TK) location.href='/login.html';
 const H = { Authorization:'Bearer '+TK }, HJ = { ...H, 'Content-Type':'application/json' };
@@ -211,7 +212,7 @@ async function onbCargar(){
     return `<div style="border:1.5px solid ${p.estado==='CERRADO'?'#bbf7d0':'#e2e8f0'};border-radius:12px;padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer" onclick="const b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
         <span class="chip" style="background:${p.tipo==='ONBOARDING'?'#dbeafe':'#fee2e2'};color:${p.tipo==='ONBOARDING'?'#1d4ed8':'#b91c1c'}">${p.tipo}</span>
-        <b>${esc(p.persona)}</b><span style="color:#94a3b8;font-size:.78rem">${esc(p.rut||'')} · base ${fmtD(p.fecha_base)}</span>
+        <b>${esc(p.persona)}</b><span style="color:#94a3b8;font-size:.78rem">${esc(rutFmt(p.rut||''))} · base ${fmtD(p.fecha_base)}</span>
         <div style="flex:1;min-width:120px;background:#f1f5f9;border-radius:99px;height:10px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${pct===100?'#16a34a':'#0141A2'}"></div></div>
         <span style="font-weight:800;font-size:.82rem">${done}/${tot}</span>
         ${p.estado==='CERRADO'?'<span class="chip" style="background:#dcfce7;color:#15803d">CERRADO ✓</span>':''}
@@ -283,7 +284,7 @@ async function fqInit(){
     fetch('/api/rrhh/finiquitos/colaboradores',{headers:H}).then(r=>r.json()),
     fetch('/api/rrhh/finiquitos',{headers:H}).then(r=>r.json()),
   ]);
-  $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(c.rut):''}${c.estado==='inactivo'?' — DADO DE BAJA'+(c.fecha_baja?' el '+c.fecha_baja:''):''}</option>`).join('');
+  $('fqU').innerHTML = (jc?.data?.colaboradores||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)} ${c.rut?'· '+esc(rutFmt(c.rut)):''}${c.estado==='inactivo'?' — DADO DE BAJA'+(c.fecha_baja?' el '+c.fecha_baja:''):''}</option>`).join('');
   $('fqCausal').innerHTML = (jc?.data?.causales||[]).map(c=>`<option value="${esc(c.articulo)}">Art. ${esc(c.articulo)} — ${esc(c.glosa)}</option>`).join('');
   $('fqFecha').value = new Date().toISOString().slice(0,10);
   FINIQ = jf?.data?.finiquitos||[]; fqPintarLista();
@@ -344,7 +345,7 @@ function imprimirFiniquito(id){
   const li = (lbl,m)=> m ? `<tr><td style="padding:4px 0">${lbl}</td><td style="text-align:right">${CLP(m)}</td></tr>` : '';
   bloqueDoc(`${cabecera}
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">FINIQUITO DE CONTRATO DE TRABAJO</div>
-    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(f.trabajador)}</b>${f.rut?`, cédula de identidad N° <b>${esc(f.rut)}</b>`:''}, quien se desempeñó como <b>${esc(f.cargo||'')}</b>${f.fecha_ingreso?` desde el <b>${fmtF(f.fecha_ingreso)}</b>`:''} hasta el <b>${fmtF(f.fecha_termino)}</b>, se deja constancia de lo siguiente:</p>
+    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b> y don/doña <b>${esc(f.trabajador)}</b>${f.rut?`, cédula de identidad N° <b>${esc(rutFmt(f.rut))}</b>`:''}, quien se desempeñó como <b>${esc(f.cargo||'')}</b>${f.fecha_ingreso?` desde el <b>${fmtF(f.fecha_ingreso)}</b>`:''} hasta el <b>${fmtF(f.fecha_termino)}</b>, se deja constancia de lo siguiente:</p>
     <p><b>PRIMERO.</b> El contrato de trabajo terminó por la causal del artículo <b>${esc(f.causal)}</b> del Código del Trabajo: <b>${esc(f.causal_glosa||'')}</b>.</p>
     <p><b>SEGUNDO.</b> El Empleador paga al Trabajador, quien declara recibir a su entera satisfacción, las siguientes sumas:</p>
     <table style="width:100%;max-width:520px;margin:0 auto 14px;font-size:13.5px">
@@ -545,6 +546,8 @@ function bloqueDoc(inner, nombreArchivo){
 }
 /* Nombre corto para archivos: primer nombre + apellido paterno (convención de la suite) */
 const nombreCorto = n => String(n||'').trim().split(/\s+/).slice(0,2).join(' ');
+/* RUT siempre con puntos y guión en los documentos — motor único: /js/rut-core.js */
+const rutFmt = r => (window.AF_RUT && r) ? (AF_RUT.formatear(r) || r) : (r||'');
 const fechaArchivo = v => v ? v.split('-').reverse().join('-') : '';
 /* Encabezado con logo. La fecha es opcional: en los anexos la fecha de firma la fija el
    usuario y va en el cuerpo, así que pasarla vacía evita que el papel muestre dos fechas
@@ -563,7 +566,7 @@ function imprimirCarta(id){
   const bens = listaBeneficios(c);
   bloqueDoc(`${cabecera}
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">CARTA OFERTA LABORAL</div>
-    <p>Estimado/a <b>${esc(c.candidato)}</b>${c.rut?` (RUT ${esc(c.rut)})`:''}:</p>
+    <p>Estimado/a <b>${esc(c.candidato)}</b>${c.rut?` (RUT ${esc(rutFmt(c.rut))})`:''}:</p>
     <p>Tenemos el agrado de extenderle una oferta para incorporarse a <b>AutoFácil SpA</b> en el cargo de <b>${esc(c.cargo)}</b>, bajo contrato <b>${esc(c.tipo_contrato)}</b> con jornada <b>${esc(c.jornada==='COMPLETA'?'completa':'parcial')}</b>${c.fecha_ingreso?`, con fecha de ingreso propuesta el <b>${fmtF(c.fecha_ingreso)}</b>`:''}.</p>
     <p><b>Renta:</b> sueldo base bruto mensual de <b>${CLP(c.sueldo_base)}</b>, más gratificación legal conforme al artículo 50 del Código del Trabajo.</p>
     ${bens.length?`<p><b>Beneficios incluidos:</b></p><ul>${bens.map(b=>`<li>${esc(b)}</li>`).join('')}</ul>`:''}
@@ -579,7 +582,7 @@ function imprimirContrato(id){
   const bens = listaBeneficios(c);
   bloqueDoc(`${cabecera}
     <div style="text-align:center;font-weight:800;font-size:17px;margin-bottom:22px">CONTRATO INDIVIDUAL DE TRABAJO</div>
-    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b>, en adelante "el Empleador", y don/doña <b>${esc(c.trabajador)}</b>${c.rut?`, cédula de identidad N° <b>${esc(c.rut)}</b>`:''}, en adelante "el Trabajador", se ha convenido el siguiente contrato de trabajo:</p>
+    <p>En Santiago de Chile, a ${HOY}, entre <b>AUTOFÁCIL SpA</b>, en adelante "el Empleador", y don/doña <b>${esc(c.trabajador)}</b>${c.rut?`, cédula de identidad N° <b>${esc(rutFmt(c.rut))}</b>`:''}, en adelante "el Trabajador", se ha convenido el siguiente contrato de trabajo:</p>
     <p><b>PRIMERO — Del cargo.</b> El Trabajador se desempeñará como <b>${esc(c.cargo)}</b>, obligándose a ejecutar las labores propias del cargo según la descripción de cargo que declara conocer y que forma parte integrante de este contrato.</p>
     ${String(c.cargo_desc||'').trim()?`<div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;font-size:12.5px;white-space:pre-wrap;margin-bottom:14px">${esc(c.cargo_desc)}</div>`:'<p style="color:#b00"><b>⚠ Falta la descripción de cargo — cargarla en la pestaña Cargos antes de firmar.</b></p>'}
     <p><b>SEGUNDO — De la jornada.</b> Jornada de trabajo <b>${esc(c.jornada==='COMPLETA'?'completa':'parcial')}</b>${bens.some(b=>/40 horas/.test(b))?'':', conforme a la legislación vigente'}.</p>
@@ -630,7 +633,7 @@ function anexAbrir(cod){
   const elegibles = ANEX_PERSONAS.filter(p => ANEX_MODELO.cargos.some(c => String(p.cargo||'').toUpperCase().includes(c)));
   $('anexTitulo').textContent = ANEX_MODELO.titulo;
   $('anexTrab').innerHTML = elegibles.length
-    ? elegibles.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.rut?' · '+esc(p.rut):''}</option>`).join('')
+    ? elegibles.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.rut?' · '+esc(rutFmt(p.rut)):''}</option>`).join('')
     : '<option value="">— sin colaboradores con ese cargo —</option>';
   $('anexFirmante').innerHTML = ANEX_PERSONAS.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.cargo?' — '+esc(p.cargo):''}</option>`).join('');
   const hoy = new Date().toISOString().slice(0,10);
@@ -673,7 +676,7 @@ function anexVarEjecutivos(trab, firm){
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
   bloqueDoc(`${cabeceraCon('')}
     <div style="text-align:center;font-weight:800;font-size:15.5px;line-height:1.4;margin-bottom:20px">ANEXO DE CONTRATO DE TRABAJO<br><span style="font-size:13.5px">REMUNERACIÓN VARIABLE — EJECUTIVO COMERCIAL</span></div>
-    <p>En Santiago de Chile, a <b>${anexFechaLarga($('anexFecha').value)}</b>, entre <b>AUTOFÁCIL SpA</b>, Rol Único Tributario N° 76.545.638-K, representada legalmente por ${tratoF} <b>${esc(firm.nombre)}</b>${firm.rut?`, cédula de identidad N° ${esc(firm.rut)}`:''}, ambos domiciliados para estos efectos en Avenida Presidente Kennedy N° 5757, oficina 1601, comuna de Las Condes, Región Metropolitana, en adelante indistintamente la "Empresa" o el "Empleador"; y ${trato} <b>${esc(trab.nombre)}</b>${trab.rut?`, cédula de identidad N° <b>${esc(trab.rut)}</b>`:''}, en adelante indistintamente el "Trabajador", se conviene el siguiente anexo al contrato de trabajo vigente entre las partes:</p>
+    <p>En Santiago de Chile, a <b>${anexFechaLarga($('anexFecha').value)}</b>, entre <b>AUTOFÁCIL SpA</b>, Rol Único Tributario N° 76.545.638-K, representada legalmente por ${tratoF} <b>${esc(firm.nombre)}</b>${firm.rut?`, cédula de identidad N° ${esc(rutFmt(firm.rut))}`:''}, ambos domiciliados para estos efectos en Avenida Presidente Kennedy N° 5757, oficina 1601, comuna de Las Condes, Región Metropolitana, en adelante indistintamente la "Empresa" o el "Empleador"; y ${trato} <b>${esc(trab.nombre)}</b>${trab.rut?`, cédula de identidad N° <b>${esc(rutFmt(trab.rut))}</b>`:''}, en adelante indistintamente el "Trabajador", se conviene el siguiente anexo al contrato de trabajo vigente entre las partes:</p>
 
     <p><b>PRIMERO — Objeto.</b> El presente Anexo establece la estructura, las variables y la forma de cálculo de la remuneración variable por desempeño comercial a que tendrá derecho el Trabajador, sin perjuicio del sueldo base pactado en su contrato de trabajo, el que se mantiene plenamente vigente e inalterado.</p>
 
@@ -729,7 +732,7 @@ function anexVarEjecutivos(trab, firm){
 
     <div style="display:flex;justify-content:space-between;margin-top:70px;text-align:center;font-size:12.5px">
       <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(firm.nombre)}</b><br>p.p. AUTOFÁCIL SpA<br>RUT N° 76.545.638-K</div>
-      <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(trab.nombre)}</b><br>Trabajador${trab.rut?`<br>RUT N° ${esc(trab.rut)}`:''}</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(trab.nombre)}</b><br>Trabajador${trab.rut?`<br>RUT N° ${esc(rutFmt(trab.rut))}`:''}</div>
     </div>`, `Anexo Variable ${nombreCorto(trab.nombre)} ${fechaArchivo($('anexFecha').value)}`);
 }
 
