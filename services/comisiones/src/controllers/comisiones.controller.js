@@ -14,9 +14,9 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       )
     `);
     const defaults = [
-      ['pct_24',        0.0075, '% base ≤ 24 cuotas',             'Tasa aplicada al monto financiado con plazo hasta 24 meses',       'porcentaje'],
-      ['pct_mas24',     0.0100, '% base > 24 cuotas',             'Tasa aplicada al monto financiado con plazo mayor a 24 meses',     'porcentaje'],
-      ['minimo_monto',  30000000,'Mínimo monto mes (CLP)',          'Si el total financiado del mes es menor a este valor, no hay bono','monto'],
+      ['pct_24',        0.0075, '% base < 24 cuotas',             'Tasa aplicada al monto financiado con plazo MENOR a 24 meses',     'porcentaje'],
+      ['pct_mas24',     0.0100, '% base ≥ 24 cuotas',             'Tasa aplicada al monto financiado con plazo IGUAL O MAYOR a 24 meses', 'porcentaje'],
+      ['minimo_monto',  35000000,'Mínimo monto mes (CLP)',          'Si el total financiado del mes es menor a este valor, no hay bono','monto'],
       ['factor_max',    0.66,   'Factor ajuste máximo',            'Cap máximo del factor de ajuste total (suma de los tres pesos)',   'factor'],
       ['peso_cesantia', 0.50,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
       ['peso_rep',      0.30,   'Peso cruce reparaciones',         'Peso del indicador de cruce de seguro reparaciones en el ajuste', 'factor'],
@@ -54,6 +54,24 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
   } catch (e) {
     console.error('[comisiones migration]', e.message);
   }
+});
+
+/* Anexo de remuneración variable (vigencia 08-2026): el mínimo mensual habilitante sube
+   de $30.000.000 a $35.000.000. El seed de arriba es INSERT IGNORE y no toca la fila ya
+   existente, por eso se actualiza acá una sola vez. Va FUERA del enFila anterior porque
+   migrar() encola en la misma cadena: llamarlo (y esperarlo) dentro sería un deadlock. */
+require('../../../../shared/migrate').migrarAuto('comisiones_anexo_2026_08', async () => {
+  await pool.query(
+    "UPDATE comisiones_variables SET valor = 35000000 WHERE clave = 'minimo_monto' AND valor = 30000000"
+  );
+  // El tramo de 24 meses exactos pasa a pagar la tasa mayor: se corrigen las etiquetas
+  // que decían "≤ 24" / "> 24" (el seed es INSERT IGNORE y no toca filas existentes).
+  await pool.query(
+    "UPDATE comisiones_variables SET etiqueta = '% base < 24 cuotas', descripcion = 'Tasa aplicada al monto financiado con plazo MENOR a 24 meses' WHERE clave = 'pct_24'"
+  );
+  await pool.query(
+    "UPDATE comisiones_variables SET etiqueta = '% base ≥ 24 cuotas', descripcion = 'Tasa aplicada al monto financiado con plazo IGUAL O MAYOR a 24 meses' WHERE clave = 'pct_mas24'"
+  );
 });
 
 /* ═══ Alertas del flujo de aprobación de comisiones (paramétricas) ═══════════
@@ -184,12 +202,13 @@ function calcularComision(creditos, vars) {
   const total_financiado = otorgados.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
 
   if (total_financiado < minimo_monto) {
-    return { cumple_minimo: false, total_creditos: otorgados.length, total_financiado };
+    return { cumple_minimo: false, total_creditos: otorgados.length, total_financiado, minimo_monto };
   }
 
-  // Split por plazo
-  const ot24    = otorgados.filter(c => parseInt(c.plazo) <= 24);
-  const otMas24 = otorgados.filter(c => parseInt(c.plazo) > 24);
+  // Split por plazo — regla del anexo de contrato: MENOR a 24 = pct_24; IGUAL O MAYOR a 24 = pct_mas24.
+  // (el plazo de 24 exactos paga la tasa mayor; antes caía en la menor)
+  const ot24    = otorgados.filter(c => parseInt(c.plazo) <  24);
+  const otMas24 = otorgados.filter(c => parseInt(c.plazo) >= 24);
   const monto24    = ot24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
   const montoMas24 = otMas24.reduce((s, c) => s + (parseFloat(c.monto_financiado) || 0), 0);
 
@@ -236,6 +255,7 @@ function calcularComision(creditos, vars) {
     cumple_minimo: true,
     total_creditos: otorgados.length,
     total_financiado,
+    minimo_monto,
     monto_24: monto24, monto_mas24: montoMas24,
     base_24: base24, base_mas24: baseMas24,
     incentivo_base,
@@ -321,7 +341,7 @@ async function calcularMes(mes) {
       if (calc.cumple_minimo) {
         creds.forEach(c => {
           if ((c.estado_credito || '').toUpperCase() !== 'OTORGADO') return;
-          const pct    = parseInt(c.plazo) <= 24 ? vars.pct_24 : vars.pct_mas24;
+          const pct    = parseInt(c.plazo) < 24 ? vars.pct_24 : vars.pct_mas24;
           const monto  = parseFloat(c.monto_financiado) || 0;
           const base   = monto * pct;
           const isNcnu = (c.financiera || '').toUpperCase() === 'AUTOFIN' &&

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v7.4 — Academia AutoFácil + Atención Remota (pop-up dealer en espera, anti-huérfanas, video al tomar el chat) -->
+<!-- v7.5 — Modelo de comisión del ejecutivo documentado según el anexo de contrato firmado (vigencia 08-2026): mínimo $35M, tramos <24/≥24, factor de ajuste y semana corrida -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -298,6 +298,20 @@
   <h2 id="comercial">14. Gestión comercial</h2>
   <ul>
     <li><b>Comisiones:</b> Comisiones → Revisión — el cálculo mensual por ejecutivo sale solo (piso, incentivo, ajustes). Los supervisores ven a sus asignados.</li>
+    <li><b>Modelo de comisión del ejecutivo (lo que está firmado en el anexo de contrato, vigencia 08-2026):</b>
+      primero un <b>requisito de acceso</b>: si el Monto Financiado del mes es menor a <b>$35.000.000</b> no se paga comisión alguna,
+      cualquiera sea el cumplimiento en las demás variables. Cumplido eso, la <b>Comisión Base</b> es <b>0,75%</b> del monto
+      financiado de las operaciones con plazo <b>menor a 24 meses</b> y <b>1%</b> de las de <b>24 meses o más</b>
+      (el plazo de 24 exactos paga la tasa mayor). Esa base se incrementa por el <b>Factor de Ajuste</b>, que suma tres indicadores:
+      cruce de <b>seguro de cesantía</b> AUTOFIN (peso 50%, se activa sobre 65%), cruce de <b>reparación menor</b> AUTOFIN
+      (peso 30%, se activa sobre 50%) y <b>calidad</b> = operaciones UNIDAD DE CRÉDITO del mes ÷ meta, con tope 100% (peso 20%).
+      Cada aporte es <i>% de cumplimiento × peso × 66%</i>, y el factor total no supera <b>66%</b> — por eso el techo real es
+      <b>1,66%</b> sobre el monto financiado. Ojo con los umbrales: <b>activan</b> el indicador, no lo topan; superado el umbral el
+      aporte es proporcional al cruce logrado, y si no se supera ese indicador aporta cero sin afectar a los demás. Al resultado se
+      le aplica la <b>semana corrida</b> (×1,1667, art. 45 del Código del Trabajo) y ese es el monto que llega a Remuneraciones.
+      Los cruces se miden solo sobre el <b>universo AUTOFIN excluyendo CORFO</b>. Todos los parámetros se editan en
+      <b>Comisiones → Mantenedor Variables</b>, pero están pactados por contrato: cambiarlos exige avisar con 30 días y firmar un
+      nuevo anexo.</li>
     <li><b>Metas y bonos en línea:</b> revisa tu avance de cumplimiento del mes y qué te falta para la meta (colocaciones, mix de financieras, calidad) — así sabes dónde empujar para maximizar tu comisión antes del cierre.</li>
     <li><b>Simulador de Rentabilidad (negociación avanzada):</b> antes de negociar una comisión especial con un dealer, simula ingresos, comisión y cuota por financiera en tiempo real, y consulta el cuadro de <b>Financieras Preferentes</b> para saber con cuál conviene cursar. En Cartas, el botón Rentabilidad (permiso especial) compara AutoFin vs Unidad para esa operación.</li>
     <li><b>Visitas a dealers:</b> agenda tu visita (cupos diarios configurados), registra la gestión Positivo/Negativo y el seguimiento. El mapa de dealers ayuda a planificar la ruta. La <b>asignación masiva ordena cada día por cercanía</b> (ruta óptima, no orden alfabético) y la Ficha diaria se imprime con mapa y ruta numerada.</li>
