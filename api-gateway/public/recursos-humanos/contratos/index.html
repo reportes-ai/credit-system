@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.6 — anexo: calidad todo o nada (meta como exigencia, no divisor) -->
+<!-- v1.7 — el PDF se guarda con nombre útil (Anexo Variable Hans Vargas 08-06-2026) en vez del título de la página; aplica también a carta, contrato y finiquito -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -361,7 +361,8 @@ function imprimirFiniquito(id){
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>AUTOFÁCIL SpA</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(f.trabajador)}</div>
     </div>
-    <p style="font-size:11px;color:#777;margin-top:30px">Generado por el Business Suite — el finiquito debe ratificarse ante notario o inspección del trabajo; revisar con asesoría legal.</p>`);
+    <p style="font-size:11px;color:#777;margin-top:30px">Generado por el Business Suite — el finiquito debe ratificarse ante notario o inspección del trabajo; revisar con asesoría legal.</p>`,
+    `Finiquito ${nombreCorto(f.trabajador)}`);
 }
 function pintar(){
   $('tbCartas').innerHTML = CARTAS.map(c=>{
@@ -523,7 +524,10 @@ const HOY = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',ye
 /* El logo es una imagen: si se llama a print() apenas se inyecta el HTML, el navegador
    imprime antes de que termine de cargar y sale sin logo. Se espera a que las imágenes
    estén listas (con tope de 3s por si alguna falla) y recién ahí se imprime. */
-function bloqueDoc(inner){
+/* nombreArchivo: al guardar como PDF el navegador propone el TÍTULO de la página, así que
+   se cambia momentáneamente para que el archivo salga con un nombre útil (ej: "Anexo
+   Variable Hans Vargas 08-06-2026") en vez de "Contratos y Cartas Oferta — AutoFácil". */
+function bloqueDoc(inner, nombreArchivo){
   const cont = $('docPrint');
   cont.innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:50px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
   cont.style.display = 'block';
@@ -531,9 +535,17 @@ function bloqueDoc(inner){
   const listas = imgs.map(im => (im.complete && im.naturalWidth)
     ? Promise.resolve()
     : new Promise(r => { im.onload = r; im.onerror = r; }));
+  const tituloPrevio = document.title;
   Promise.race([Promise.all(listas), new Promise(r => setTimeout(r, 3000))])
-    .then(() => { window.print(); cont.style.display = 'none'; });
+    .then(() => {
+      if (nombreArchivo) document.title = nombreArchivo;
+      window.print();
+      setTimeout(() => { document.title = tituloPrevio; cont.style.display = 'none'; }, 600);
+    });
 }
+/* Nombre corto para archivos: primer nombre + apellido paterno (convención de la suite) */
+const nombreCorto = n => String(n||'').trim().split(/\s+/).slice(0,2).join(' ');
+const fechaArchivo = v => v ? v.split('-').reverse().join('-') : '';
 /* Encabezado con logo. La fecha es opcional: en los anexos la fecha de firma la fija el
    usuario y va en el cuerpo, así que pasarla vacía evita que el papel muestre dos fechas
    distintas (la de hoy arriba y la firmada abajo). */
@@ -560,7 +572,7 @@ function imprimirCarta(id){
     <div style="display:flex;justify-content:space-between;margin-top:80px;text-align:center;font-size:13px">
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">AUTOFÁCIL SpA<br>Gerencia</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">${esc(c.candidato)}<br>Acepto la oferta — fecha y firma</div>
-    </div>`);
+    </div>`, `Carta Oferta ${nombreCorto(c.candidato)}`);
 }
 function imprimirContrato(id){
   const c = CONTRATOS.find(x=>x.id===id); if(!c) return;
@@ -579,7 +591,8 @@ function imprimirContrato(id){
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">EMPLEADOR<br>AUTOFÁCIL SpA</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(c.trabajador)}</div>
     </div>
-    <p style="font-size:11px;color:#777;margin-top:30px">Documento generado por el Business Suite desde la carta oferta — revisar con asesoría legal antes de firmar.</p>`);
+    <p style="font-size:11px;color:#777;margin-top:30px">Documento generado por el Business Suite desde la carta oferta — revisar con asesoría legal antes de firmar.</p>`,
+    `Contrato de Trabajo ${nombreCorto(c.trabajador)}`);
 }
 
 /* ═══ ANEXOS DE CONTRATO ══════════════════════════════════════════════════
@@ -717,7 +730,7 @@ function anexVarEjecutivos(trab, firm){
     <div style="display:flex;justify-content:space-between;margin-top:70px;text-align:center;font-size:12.5px">
       <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(firm.nombre)}</b><br>p.p. AUTOFÁCIL SpA<br>RUT N° 76.545.638-K</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(trab.nombre)}</b><br>Trabajador${trab.rut?`<br>RUT N° ${esc(trab.rut)}`:''}</div>
-    </div>`);
+    </div>`, `Anexo Variable ${nombreCorto(trab.nombre)} ${fechaArchivo($('anexFecha').value)}`);
 }
 
 cargarTodo();
