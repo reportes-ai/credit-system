@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — RUT con formato (puntos y guión) en anexos, contratos, cartas y finiquitos, vía motor único rut-core -->
+<!-- v2.2 — anexo: cláusula sobre la naturaleza del Factor de Ajuste (incentivo adicional por indicadores no monetarios, sin derecho adquirido) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -704,6 +704,8 @@ function anexVarEjecutivos(trab, firm){
       De este modo, si los indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
     </div>
     <p><b>Reglas de los indicadores.</b> Los umbrales operan como <b>condición de activación</b> de cada indicador, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. En consecuencia, el Cruce de Seguro RDH debe superar el <b>${anexPct(c.umbral_rdh,0)}</b> —esto es, prácticamente la totalidad de las operaciones del Universo de Medición debe incorporar dicho seguro—, el de Cesantía el ${anexPct(c.umbral_cesantia,0)} y el de Reparación Menor el ${anexPct(c.umbral_rep,0)}.${(c.peso_calidad||0)>0?` El indicador de <b>Calidad</b> opera de modo <b>todo o nada</b>: alcanzada la meta de ${c.meta_unidad||3} operaciones UNIDAD DE CRÉDITO entra con el 100%, por debajo con cero.`:''}</p>
+
+    <p><b>Naturaleza del Factor de Ajuste.</b> Se deja expresa constancia de que el Factor de Ajuste <b>no constituye por sí mismo una comisión ni un bono</b>, ni forma parte de la contraprestación por el volumen de ventas —la que se remunera íntegramente mediante la Comisión Base—, sino un <b>incentivo adicional</b> destinado a premiar el sobrecumplimiento de <b>indicadores de gestión de carácter no monetario</b>, referidos a la correcta colocación de los seguros asociados al crédito. En consecuencia, su procedencia y su monto dependen exclusivamente del cumplimiento de dichos indicadores en cada Mes de Cálculo, se determinan mes a mes de forma independiente y <b>no constituyen un derecho adquirido</b>: su devengo en uno o más períodos no supone ni garantiza su devengo en los siguientes.</p>
 
     <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
     <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
