@@ -252,6 +252,18 @@ máquina y luego no deja bajar de tamaño).
 
 **Síntoma**: el sitio no abre, error 502/503, o `/api/health` no responde nada.
 
+**Datos del servicio (verificados 27-07-2026):**
+
+| | |
+|---|---|
+| Nombre del servicio | `credit-system` (workspace *Reportes's*, proyecto *My project* → *Production*) |
+| **🔑 URL DIRECTA (sin dominio)** | **`https://credit-system-45em.onrender.com`** ← por acá entra todo el mundo si el dominio falla |
+| **Link al panel** | `dashboard.render.com/web/srv-d832h7btqb8s73af7lug` ← guárdalo, evita buscar en crisis |
+| Región | Oregon (US West) |
+| Plan | **Starter — 0.5 CPU, 512 MB** (uso normal ~200 MB) |
+| Repo conectado | `reportes-ai/credit-system`, rama `main` (push a main = deploy automático) |
+| Dirección interna | `credit-system-45em:10000` — solo red privada de Render, **no sirve desde el navegador** |
+
 **ACCIÓN INMEDIATA (2 minutos, resuelve la mayoría de los casos):**
 dashboard.render.com → servicio → **Manual Deploy → Deploy latest commit**.
 Reinicia el proceso y levanta el sistema en ~3 minutos. Si vuelve, listo; después
@@ -333,10 +345,13 @@ desde donde recuperar.
 | **Vence** | **17-05-2029** |
 | Subdominios en uso | `afbs.` (suite interna) · `clientes.` (portal cliente) · `dealers.` (portal dealer) |
 
-**Acción inmediata (30 segundos):** avisa al equipo que entren por la **URL directa de
-Render** — está en dashboard.render.com arriba del servicio. El sistema funciona idéntico,
-solo cambia la dirección. Los tres subdominios apuntan al mismo servicio, así que esa URL
-sirve para todos.
+**ACCIÓN INMEDIATA (30 segundos):** manda al equipo esta dirección —
+
+### 👉 `https://credit-system-45em.onrender.com`
+
+El sistema funciona idéntico, solo cambia la dirección. Los tres subdominios apuntan a este
+mismo servicio, así que esa URL sirve para la suite interna, el portal de clientes y el de
+dealers por igual.
 
 **Luego, en orden:**
 1. **Render → Settings → Custom Domains**: que los tres subdominios sigan verificados y con
