@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — pestaña ANEXOS: modelos vigentes (Anexo Variable Ejecutivos) con firmante, fecha de firma y vigencia; imprime en tamaño carta con logo, usando los valores vivos del mantenedor de comisiones -->
+<!-- v1.4 — pestaña ANEXOS + fix: el logo no salía al imprimir (print disparaba antes de cargar la imagen) y el encabezado mostraba una fecha distinta a la de firma -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -520,13 +520,27 @@ async function guardarBenef(){
 
 /* ── documentos imprimibles (carta y contrato) ── */
 const HOY = new Date().toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'});
+/* El logo es una imagen: si se llama a print() apenas se inyecta el HTML, el navegador
+   imprime antes de que termine de cargar y sale sin logo. Se espera a que las imágenes
+   estén listas (con tope de 3s por si alguna falla) y recién ahí se imprime. */
 function bloqueDoc(inner){
-  $('docPrint').innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:50px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
-  $('docPrint').style.display='block'; window.print(); $('docPrint').style.display='none';
+  const cont = $('docPrint');
+  cont.innerHTML = `<div style="font-family:Georgia,serif;max-width:750px;margin:0 auto;padding:50px 40px;color:#111;line-height:1.7;font-size:14px">${inner}</div>`;
+  cont.style.display = 'block';
+  const imgs = [...cont.querySelectorAll('img')];
+  const listas = imgs.map(im => (im.complete && im.naturalWidth)
+    ? Promise.resolve()
+    : new Promise(r => { im.onload = r; im.onerror = r; }));
+  Promise.race([Promise.all(listas), new Promise(r => setTimeout(r, 3000))])
+    .then(() => { window.print(); cont.style.display = 'none'; });
 }
-const cabecera = `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:26px">
+/* Encabezado con logo. La fecha es opcional: en los anexos la fecha de firma la fija el
+   usuario y va en el cuerpo, así que pasarla vacía evita que el papel muestre dos fechas
+   distintas (la de hoy arriba y la firmada abajo). */
+const cabeceraCon = (fecha) => `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #012d70;padding-bottom:10px;margin-bottom:26px">
   <img src="/img/logo-autofacil.png" alt="AutoFácil" style="height:44px">
-  <div style="font-size:12px;color:#555">Santiago, ${HOY}</div></div>`;
+  ${fecha ? `<div style="font-size:12px;color:#555">Santiago, ${fecha}</div>` : ''}</div>`;
+const cabecera = cabeceraCon(HOY);
 function listaBeneficios(c){
   const bens = (typeof c.beneficios==='string'?JSON.parse(c.beneficios||'[]'):c.beneficios)||[];
   const otros = String(c.otros||'').split('\n').map(s=>s.trim()).filter(Boolean);
@@ -644,7 +658,7 @@ function anexVarEjecutivos(trab, firm){
   const fac=aCes+aRep+aCal, com=base*(1+fac), tot=com*c.semana_corrida;
   const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
-  bloqueDoc(`${cabecera}
+  bloqueDoc(`${cabeceraCon('')}
     <div style="text-align:center;font-weight:800;font-size:15.5px;line-height:1.4;margin-bottom:20px">ANEXO DE CONTRATO DE TRABAJO<br><span style="font-size:13.5px">REMUNERACIÓN VARIABLE — EJECUTIVO COMERCIAL</span></div>
     <p>En Santiago de Chile, a <b>${anexFechaLarga($('anexFecha').value)}</b>, entre <b>AUTOFÁCIL SpA</b>, Rol Único Tributario N° 76.545.638-K, representada legalmente por ${tratoF} <b>${esc(firm.nombre)}</b>${firm.rut?`, cédula de identidad N° ${esc(firm.rut)}`:''}, ambos domiciliados para estos efectos en Avenida Presidente Kennedy N° 5757, oficina 1601, comuna de Las Condes, Región Metropolitana, en adelante indistintamente la "Empresa" o el "Empleador"; y ${trato} <b>${esc(trab.nombre)}</b>${trab.rut?`, cédula de identidad N° <b>${esc(trab.rut)}</b>`:''}, en adelante indistintamente el "Trabajador", se conviene el siguiente anexo al contrato de trabajo vigente entre las partes:</p>
 
