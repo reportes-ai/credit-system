@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 — pestaña ANEXOS + fix: el logo no salía al imprimir (print disparaba antes de cargar la imagen) y el encabezado mostraba una fecha distinta a la de firma -->
+<!-- v1.5 — anexo: fórmula del Factor de Ajuste redactada como los 2 pasos reales (cumplimiento ponderado → × factor máximo) y ejemplo que muestra el ponderado -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -654,8 +654,9 @@ function anexVarEjecutivos(trab, firm){
   const sc = (c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4});
   // Ejemplo numérico calculado con los MISMOS parámetros vigentes
   const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
-  const aCes=.80*c.peso_cesantia*c.factor_max, aRep=.60*c.peso_rep*c.factor_max, aCal=1*c.peso_calidad*c.factor_max;
-  const fac=aCes+aRep+aCal, com=base*(1+fac), tot=com*c.semana_corrida;
+  // Mismo orden del motor: primero el cumplimiento ponderado, luego el factor máximo.
+  const pond = .80*c.peso_cesantia + .60*c.peso_rep + 1*c.peso_calidad;
+  const fac = pond*c.factor_max, com = base*(1+fac), tot = com*c.semana_corrida;
   const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
   bloqueDoc(`${cabeceraCon('')}
@@ -678,18 +679,29 @@ function anexVarEjecutivos(trab, firm){
       <tr><td style="${TD}">Cruce de Seguro de Cesantía AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
       <tr><td style="${TD}">Cruce de Seguro de Reparación Menor AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
       <tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Sin umbral</td></tr></table>
-    <p>El aporte de cada indicador se calcula como <i>% de cumplimiento × ponderación × ${anexPct(c.factor_max)}</i>. Los umbrales operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador aporta cero sin afectar a los demás; superado el umbral, el aporte es proporcional al cruce efectivamente alcanzado. El indicador de Calidad corresponde a las operaciones UNIDAD DE CRÉDITO del mes divididas por la meta vigente${c.meta_unidad?` (actualmente <b>${c.meta_unidad}</b> operaciones)`:''}, con tope de 100%. El Factor de Ajuste total no podrá exceder de <b>${anexPct(c.factor_max)}</b>.</p>
+    <p><b>Cómo se calcula el Factor de Ajuste.</b> Se determina en dos pasos:</p>
+    <div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;margin:8px 0 12px;font-size:12.5px">
+      <b>Paso 1 — Cumplimiento ponderado.</b> Se pondera el cumplimiento de los tres indicadores:<br>
+      <div style="text-align:center;margin:8px 0"><i>Cumplimiento ponderado = (Cruce Cesantía × ${anexPct(c.peso_cesantia,0)}) + (Cruce Reparación Menor × ${anexPct(c.peso_rep,0)}) + (Calidad × ${anexPct(c.peso_calidad,0)})</i></div>
+      <b>Paso 2 — Factor de Ajuste.</b> Ese cumplimiento ponderado se aplica sobre el incremento máximo pactado:<br>
+      <div style="text-align:center;margin:8px 0"><i>Factor de Ajuste = Cumplimiento ponderado × ${anexPct(c.factor_max)}</i></div>
+      De este modo, si los tres indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
+    </div>
+    <p><b>Reglas de los indicadores.</b> Los umbrales de los dos cruces de seguros operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. El indicador de <b>Calidad</b> no tiene umbral de activación: aporta de forma proporcional desde la primera operación, y corresponde a las operaciones UNIDAD DE CRÉDITO del mes divididas por la meta vigente${c.meta_unidad?` (actualmente <b>${c.meta_unidad}</b> operaciones)`:''}, con tope de 100% — el sobrecumplimiento no genera aporte adicional.</p>
 
-    <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará como <b>Comisión Base × (1 + Factor de Ajuste)</b>, de modo que el porcentaje máximo aplicable sobre el Monto Financiado asciende a <b>${maxPct}</b>.</p>
+    <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
+    <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
+    <p>En consecuencia, el porcentaje máximo aplicable sobre el Monto Financiado asciende a <b>${maxPct}</b>: una operación del tramo de ${anexPct(c.pct_mas24)}, con el Factor de Ajuste en su máximo de ${anexPct(c.factor_max)}, paga ${anexPct(c.pct_mas24)} × 1,${String(Math.round((c.factor_max||0)*100)).padStart(2,'0')} = <b>${maxPct}</b> del Monto Financiado.</p>
 
     <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión así determinada se incrementará por concepto de semana corrida, aplicándose el factor <b>${sc}</b> sobre el monto resultante.</p>
 
     <p><b>OCTAVO — Ejemplo de cálculo.</b> A modo meramente ilustrativo, sin constituir garantía de resultado:</p>
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px">
       <tr><td style="${TD}">Monto Financiado: ${CLP(m24)} (bajo 24 meses) + ${CLP(mM24)} (24 meses o más)</td><td style="${TD};text-align:right">${CLP(m24+mM24)}</td></tr>
-      <tr><td style="${TD}">Comisión Base</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
-      <tr><td style="${TD}">Cruce cesantía 80% · reparación 60% · calidad 100% → Factor de Ajuste</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
-      <tr><td style="${TD}">Comisión mensual</td><td style="${TD};text-align:right">${CLP(com)}</td></tr>
+      <tr><td style="${TD}">Comisión Base: ${CLP(m24)} × ${anexPct(c.pct_24)} + ${CLP(mM24)} × ${anexPct(c.pct_mas24)}</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
+      <tr><td style="${TD}">Cumplimiento ponderado: (80% × ${anexPct(c.peso_cesantia,0)}) + (60% × ${anexPct(c.peso_rep,0)}) + (100% × ${anexPct(c.peso_calidad,0)})</td><td style="${TD};text-align:right">${anexPct(pond)}</td></tr>
+      <tr><td style="${TD}">Factor de Ajuste: ${anexPct(pond)} × ${anexPct(c.factor_max)}</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
+      <tr><td style="${TD}">Comisión mensual: ${CLP(base)} × (1 + ${anexPct(fac)})</td><td style="${TD};text-align:right">${CLP(com)}</td></tr>
       <tr><td style="${TD}"><b>Total con semana corrida (× ${sc})</b></td><td style="${TD};text-align:right"><b>${CLP(tot)}</b></td></tr></table>
 
     <p><b>NOVENO — Descuentos por prepago y anulación.</b> No se considerarán para el cálculo, o se descontarán de él según corresponda: (i) las operaciones prepagadas íntegramente antes del tercer mes contado desde la fecha de curse, caso en el cual se descontará el 100% de la comisión devengada por dicha operación; y (ii) las operaciones anuladas, descontándose la totalidad de la comisión asociada. El descuento se aplicará en la liquidación del mes en que se verifique el hecho y, de exceder la comisión de ese mes, el saldo se imputará a los meses siguientes, sin afectar en caso alguno el sueldo base.</p>
