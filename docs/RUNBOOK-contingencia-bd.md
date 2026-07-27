@@ -252,15 +252,24 @@ máquina y luego no deja bajar de tamaño).
 
 **Síntoma**: el sitio no abre, error 502/503, o `/api/health` no responde nada.
 
-**Primero, descartar que sea culpa nuestra:**
-1. Revisa **status.render.com** — si es una caída global de Render, no hay nada que arreglar,
-   solo esperar y comunicar.
-2. Entra a **dashboard.render.com** → servicio → pestaña **Logs**. Si el proceso murió por
-   un error de código o por memoria (out of memory), aparece ahí.
-3. Prueba **Manual Deploy → Deploy latest commit**. Reinicia el servicio y suele resolver
-   cuelgues de proceso.
-4. Si fue por memoria (el plan es de 512 MB y el uso normal ronda los 200 MB), revisa
-   **Metrics**; un salto sostenido sobre 70% significa que hay que subir de plan.
+**ACCIÓN INMEDIATA (2 minutos, resuelve la mayoría de los casos):**
+dashboard.render.com → servicio → **Manual Deploy → Deploy latest commit**.
+Reinicia el proceso y levanta el sistema en ~3 minutos. Si vuelve, listo; después
+investigas la causa con calma en los Logs.
+
+**Si el redeploy no lo levanta, en este orden:**
+1. **status.render.com** — si es caída global de Render, no hay nada que hacer más que
+   comunicar y esperar. No sigas tocando.
+2. **Logs** del servicio: busca el motivo real de la muerte del proceso.
+   - `JavaScript heap out of memory` o reinicios repetidos → **memoria** (ver punto 3).
+   - Un error de código en el último despliegue → **Rollback**: en la pestaña Events,
+     buscar el deploy anterior que sí funcionaba y hacer *Redeploy* de ese commit.
+3. **Metrics**: el plan es de **512 MB** y el uso normal ronda los **200 MB (~41%)**. Si está
+   sostenidamente sobre 70%, hay que **subir de plan** — es la señal documentada en el
+   informe semanal de Salud del Sistema.
+
+**Dato clave**: los datos NO viven en Render, viven en TiDB. Una caída de Render es tiempo
+fuera de servicio, **nunca pérdida de información**. Cuando vuelve, vuelve tal cual estaba.
 
 **⚠️ SIN PLAN PROBADO — si Render cae por muchas horas:** hoy **no existe** un host alternativo
 configurado. La aplicación es Node/Express estándar y podría levantarse en otro proveedor
@@ -310,21 +319,32 @@ desde donde recuperar.
 
 ## 14. El dominio no resuelve (DNS)
 
-**Síntoma**: `afbs.autofacilchile.cl` no abre en ningún navegador ni red, pero la URL
-directa de Render (`*.onrender.com`) sí funciona.
+**Síntoma**: `afbs.autofacilchile.cl` no abre en ninguna red, pero la URL directa de Render
+(`*.onrender.com`) sí funciona.
 
-**Qué hacer:**
-1. **Solución inmediata**: avisa al equipo que entren por la **URL directa de Render**
-   (está en dashboard.render.com, arriba del servicio). El sistema funciona igual; solo
-   cambia la dirección.
-2. Revisa en Render → **Settings → Custom Domains** que el dominio siga verificado y el
-   certificado vigente (un certificado vencido produce el mismo síntoma).
-3. Entra al panel del registrador del dominio `autofacilchile.cl` y verifica los registros
-   DNS y que el dominio **no esté vencido** (una renovación impaga es una causa clásica).
+**Datos del dominio (verificados 27-07-2026):**
 
-**⚠️ VERIFICAR Y ANOTAR AQUÍ**: quién es el registrador de `autofacilchile.cl`, con qué
-cuenta se administra y **cuándo vence**. Ese dato no está documentado hoy y es justo el que
-se necesita a las 3 de la mañana. *(Pendiente de completar.)*
+| | |
+|---|---|
+| Dominio | `autofacilchile.cl` |
+| Registrador | **NIC Chile** — administrar en **nic.cl** ("Sistema de Inscripción y Gestión de Dominios" → Mis Dominios) |
+| Titular | **Auto Facil SpA** |
+| Estado | Vigente ✅ |
+| **Vence** | **17-05-2029** |
+| Subdominios en uso | `afbs.` (suite interna) · `clientes.` (portal cliente) · `dealers.` (portal dealer) |
+
+**Acción inmediata (30 segundos):** avisa al equipo que entren por la **URL directa de
+Render** — está en dashboard.render.com arriba del servicio. El sistema funciona idéntico,
+solo cambia la dirección. Los tres subdominios apuntan al mismo servicio, así que esa URL
+sirve para todos.
+
+**Luego, en orden:**
+1. **Render → Settings → Custom Domains**: que los tres subdominios sigan verificados y con
+   certificado vigente. Un certificado vencido da el mismo síntoma que un DNS caído.
+2. **nic.cl → Mis Dominios**: confirma que el dominio siga vigente (no debería vencer antes
+   de mayo 2029) y revisa los registros DNS apuntando a Render.
+3. Si es una caída de NIC Chile (el registro `.cl` completo), no hay nada que arreglar:
+   se opera por la URL de Render hasta que se restablezca.
 
 ---
 
@@ -333,8 +353,12 @@ se necesita a las 3 de la mañana. *(Pendiente de completar.)*
 Este es **más probable que cualquier caída** y no requiere contingencia de servidores: la
 infraestructura está sana, el problema son los datos.
 
-1. **Detén el daño primero**: si fue un proceso o una carga masiva mal hecha, que nadie siga
-   trabajando sobre esos datos hasta entender el alcance.
+**ACCIÓN INMEDIATA: que nadie siga trabajando sobre los datos afectados.** Avisa al equipo
+por el canal más rápido que tengas. Cada minuto de digitación encima complica la
+recuperación. **No intentes "arreglarlo" a mano todavía.**
+
+1. **Determina el alcance antes de tocar nada**: qué tabla, cuántas filas, desde qué hora.
+   Ve a **Auditoría** (`/auditoria/`) — ahí está quién hizo qué y cuándo.
 2. **No restaures encima de producción.** Levanta el respaldo en la instancia de
    contingencia (Parte A, secciones 2 a 5) y **compara** ahí lo que había antes.
 3. Recupera **solo las filas afectadas** desde esa copia, no la base completa: restaurar
@@ -348,11 +372,15 @@ infraestructura está sana, el problema son los datos.
 
 ## 16. Sospecha de acceso indebido o clave filtrada
 
-**⚠️ SIN PLAN PROBADO** — pasos mínimos recomendados, nunca ejecutados en la práctica:
+**ACCIÓN INMEDIATA: cambia `JWT_SECRET` en Render → Environment por cualquier texto largo
+al azar y guarda.** En ~3 minutos **todas las sesiones activas quedan invalidadas** —
+incluida la del intruso. Todo el equipo tendrá que volver a entrar con su clave; avísales
+que es a propósito. Es lo más rápido que puedes hacer para cerrarle la puerta a alguien.
 
-1. **Rota `JWT_SECRET`** en Render. Efecto inmediato: **todas las sesiones se invalidan** y
-   todo el mundo debe volver a entrar. Es molesto y es exactamente lo que quieres si alguien
-   robó un token.
+**⚠️ SIN PLAN PROBADO** — los pasos siguientes son los recomendados, nunca ejecutados en la
+práctica:
+
+1. (Ya hecho arriba: rotar `JWT_SECRET`.)
 2. **Cambia la contraseña de la base** en TiDB Cloud y actualiza `DB_PASSWORD` en Render.
 3. **Rota las claves de terceros** que estén comprometidas: `ANTHROPIC_API_KEY`,
    `WSP_TOKEN`, credenciales de correo, `CMF_API_KEY`, DealerNet.
