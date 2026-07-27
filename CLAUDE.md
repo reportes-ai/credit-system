@@ -282,6 +282,17 @@ Reglas de diseño que se derivan de este principio:
   - Configurar `connectTimeout` y `queryTimeout` en el pool de BD
   - Evita que una query lenta bloquee el servidor indefinidamente
 
+- [ ] **Listado consolidado de servicios pagados y su costo por escenario** (pedido por Pato 2026-07-27)
+  - Hoy los costos están dispersos (cada uno documentado donde salió); falta la vista única.
+  - Por servicio: costo en operación normal · en contingencia (ej. Cloud SQL encendida) ·
+    si crece el volumen · qué pasa si se deja de pagar.
+  - Ya medidos: Cloud SQL (US$2,4/mes detenida, US$4,8/día encendida), bucket GCS (~US$0,05/mes),
+    IA (~US$3,95/mes con 213 análisis — el informe de Salud del Sistema ya lo trackea en vivo).
+  - Por confirmar en cada panel (no inventar): Render Starter, TiDB, Brevo, Meta WhatsApp,
+    DealerNet, SimpleAPI, Workera, renovación del dominio en NIC Chile.
+  - Evaluar que viva en **Contabilidad / Órdenes de Pago** como gasto recurrente real y no
+    solo como documento (Máxima 2: una sola fuente de datos).
+
 - [ ] 🔥 **Plan de contingencia si Render cae por horas** (detectado 2026-07-27 al armar el runbook)
   - **Es el único hueco declarado del `docs/RUNBOOK-contingencia-bd.md`**: hoy NO existe host
     alternativo configurado ni ensayado. Si Render tiene una caída larga, el sistema queda
