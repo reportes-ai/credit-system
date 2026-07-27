@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.3 — menos margen superior al imprimir (page 10mm + contenedor sin padding arriba) -->
+<!-- v2.4 — semana corrida: el anexo ya no fija el factor 1,1667; remite al art. 45 (varía cada mes) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -606,7 +606,7 @@ let ANEX_INIT=false, ANEX_PERSONAS=[], ANEX_COM={}, ANEX_MODELO=null;
 const ANEXOS_MODELOS = [{
   codigo: 'VAR_EJECUTIVOS',
   titulo: 'ANEXO VARIABLE EJECUTIVOS',
-  desc: 'Remuneración variable por desempeño comercial: comisión base por tramo de plazo, factor de ajuste por cruce de seguros y calidad, y semana corrida.',
+  desc: 'Remuneración variable por desempeño comercial: comisión base por tramo de plazo, factor de ajuste por cruce de seguros, y semana corrida legal.',
   cargos: ['EJECUTIVO COMERCIAL'],
   fuente: 'Comisiones → Mantenedor Variables',
   href: '/comisiones/variables/',
@@ -643,7 +643,7 @@ function anexAbrir(cod){
   const c = ANEX_COM;
   $('anexAviso').innerHTML = `<b>Valores vigentes que se imprimirán:</b> mínimo mensual <b>${CLP(c.minimo_monto)}</b> · `
     + `base <b>${anexPct(c.pct_24)}</b> (&lt;24 meses) y <b>${anexPct(c.pct_mas24)}</b> (≥24) · factor máximo <b>${anexPct(c.factor_max,0)}</b> · `
-    + `pesos RDH <b>${anexPct(c.peso_rdh,0)}</b> / cesantía <b>${anexPct(c.peso_cesantia,0)}</b> / reparación <b>${anexPct(c.peso_rep,0)}</b> · umbrales <b>${anexPct(c.umbral_rdh,0)}</b> / <b>${anexPct(c.umbral_cesantia,0)}</b> / <b>${anexPct(c.umbral_rep,0)}</b> · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
+    + `pesos RDH <b>${anexPct(c.peso_rdh,0)}</b> / cesantía <b>${anexPct(c.peso_cesantia,0)}</b> / reparación <b>${anexPct(c.peso_rep,0)}</b> · umbrales <b>${anexPct(c.umbral_rdh,0)}</b> / <b>${anexPct(c.umbral_cesantia,0)}</b> / <b>${anexPct(c.umbral_rep,0)}</b>. `
     + `Si algo no corresponde, corrígelo primero en <a href="${ANEX_MODELO.href}">${esc(ANEX_MODELO.fuente)}</a>.`;
   $('anexForm').style.display='block';
   $('anexForm').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -666,12 +666,11 @@ function anexVarEjecutivos(trab, firm){
   const c = ANEX_COM;
   const trato = String(trab.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
   const tratoF = String(firm.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
-  const sc = (c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4});
   // Ejemplo numérico calculado con los MISMOS parámetros vigentes
   const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
   // Mismo orden del motor: primero el cumplimiento ponderado, luego el factor máximo.
   const pond = 1*c.peso_rdh + .80*c.peso_cesantia + .60*c.peso_rep;
-  const fac = pond*c.factor_max, com = base*(1+fac), tot = com*c.semana_corrida;
+  const fac = pond*c.factor_max, com = base*(1+fac);
   const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
   bloqueDoc(`${cabeceraCon('')}
@@ -711,7 +710,7 @@ function anexVarEjecutivos(trab, firm){
     <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
     <p>En consecuencia, el incremento máximo aplicable sobre la Comisión Base asciende a <b>${anexPct(c.factor_max)}</b>: con el Factor de Ajuste en su máximo, la comisión del mes equivale a <b>Comisión Base × 1,${String(Math.round((c.factor_max||0)*100)).padStart(2,'0')}</b>.</p>
 
-    <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión así determinada se incrementará por concepto de semana corrida, aplicándose el factor <b>${sc}</b> sobre el monto resultante.</p>
+    <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión e incentivo adicional así determinados se incrementarán por concepto de semana corrida.</p>
 
     <p><b>OCTAVO — Ejemplo de cálculo.</b> A modo meramente ilustrativo, sin constituir garantía de resultado:</p>
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px">
@@ -719,8 +718,8 @@ function anexVarEjecutivos(trab, firm){
       <tr><td style="${TD}">Comisión Base: ${CLP(m24)} × ${anexPct(c.pct_24)} + ${CLP(mM24)} × ${anexPct(c.pct_mas24)}</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
       <tr><td style="${TD}">Cumplimiento ponderado: (100% × ${anexPct(c.peso_rdh,0)}) + (80% × ${anexPct(c.peso_cesantia,0)}) + (60% × ${anexPct(c.peso_rep,0)})</td><td style="${TD};text-align:right">${anexPct(pond)}</td></tr>
       <tr><td style="${TD}">Factor de Ajuste: ${anexPct(pond)} × ${anexPct(c.factor_max)}</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
-      <tr><td style="${TD}">Comisión mensual: ${CLP(base)} × (1 + ${anexPct(fac)})</td><td style="${TD};text-align:right">${CLP(com)}</td></tr>
-      <tr><td style="${TD}"><b>Total con semana corrida (× ${sc})</b></td><td style="${TD};text-align:right"><b>${CLP(tot)}</b></td></tr></table>
+      <tr><td style="${TD}"><b>Comisión mensual: ${CLP(base)} × (1 + ${anexPct(fac)})</b></td><td style="${TD};text-align:right"><b>${CLP(com)}</b></td></tr></table>
+    <p style="font-size:11.5px;color:#444">Sobre el monto así obtenido se aplica además el incremento por semana corrida que corresponda al mes, conforme a la cláusula séptima.</p>
 
     <p><b>NOVENO — Descuentos por prepago y anulación.</b> No se considerarán para el cálculo, o se descontarán de él según corresponda: (i) las operaciones prepagadas íntegramente antes del tercer mes contado desde la fecha de curse, caso en el cual se descontará el 100% de la comisión devengada por dicha operación; y (ii) las operaciones anuladas, descontándose la totalidad de la comisión asociada. El descuento se aplicará en la liquidación del mes en que se verifique el hecho y, de exceder la comisión de ese mes, el saldo se imputará a los meses siguientes, sin afectar en caso alguno el sueldo base.</p>
 
