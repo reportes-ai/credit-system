@@ -61,7 +61,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.3</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.4</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -93,8 +93,8 @@
   <div class="formula-box">
     <h6><i class="bi bi-calculator"></i> Lógica del modelo</h6>
     <div class="formula-step"><div class="formula-num">1</div><div class="formula-text"><strong>Incentivo Base</strong> = Monto&lt;24 × <code>% base &lt;24</code> + Monto≥24 × <code>% base ≥24</code> — solo si total mes ≥ <code>Mínimo monto</code>. <em>El plazo de 24 meses exactos paga la tasa mayor (anexo de contrato 08-2026).</em></div></div>
-    <div class="formula-step"><div class="formula-num">2</div><div class="formula-text"><strong>Cruces de seguros</strong>: Cesantía ≥ <code>Umbral cesantía</code> y Reparaciones ≥ <code>Umbral rep.</code> — si no cumple, su aporte es 0</div></div>
-    <div class="formula-step"><div class="formula-num">3</div><div class="formula-text"><strong>Factor ajuste</strong> = (Cruce cesantía × <code>Peso ces.</code> + Cruce rep. × <code>Peso rep.</code> + Calidad × <code>Peso calidad</code>) × <code>Factor máx.</code> — <em>Calidad es <b>todo o nada</b>: 100% si alcanza la <code>Meta créditos UNIDAD</code>, 0% si queda bajo ella.</em></div></div>
+    <div class="formula-step"><div class="formula-num">2</div><div class="formula-text"><strong>Cruces de seguros</strong> (universo AUTOFIN sin CORFO): RDH ≥ <code>Umbral RDH</code>, Cesantía ≥ <code>Umbral cesantía</code> y Reparaciones ≥ <code>Umbral rep.</code> — el que no supera su umbral aporta 0, sin afectar a los demás</div></div>
+    <div class="formula-step"><div class="formula-num">3</div><div class="formula-text"><strong>Factor ajuste</strong> = (Cruce RDH × <code>Peso RDH</code> + Cruce cesantía × <code>Peso ces.</code> + Cruce rep. × <code>Peso rep.</code> + Calidad × <code>Peso calidad</code>) × <code>Factor máx.</code> — <em>Calidad es <b>todo o nada</b>: 100% si alcanza la <code>Meta créditos UNIDAD</code>, 0% si queda bajo ella.</em></div></div>
     <div class="formula-step"><div class="formula-num">4</div><div class="formula-text"><strong>Incentivo Final</strong> = Base + Bono Cesantía + Bono Reparaciones + Bono Calidad — cada bono usa su ajuste individual</div></div>
     <div class="formula-step"><div class="formula-num">5</div><div class="formula-text"><strong>Con Semana Corrida</strong> = Incentivo Final × <code>Multiplicador S.C.</code> (aprox.)</div></div>
   </div>
@@ -167,12 +167,12 @@ const GRUPOS = [
   {
     titulo: 'Factor de ajuste y pesos',
     icon: 'bi-sliders2',
-    claves: ['factor_max','peso_cesantia','peso_rep','peso_calidad'],
+    claves: ['factor_max','peso_rdh','peso_cesantia','peso_rep','peso_calidad'],
   },
   {
     titulo: 'Umbrales mínimos de cruce',
     icon: 'bi-shield-check',
-    claves: ['umbral_cesantia','umbral_rep'],
+    claves: ['umbral_rdh','umbral_cesantia','umbral_rep'],
   },
   {
     titulo: 'Semana corrida',
@@ -184,9 +184,9 @@ const GRUPOS = [
 const UNIDADES = {
   pct_24:'%', pct_mas24:'%', minimo_monto:'$', factor_max:'%',
   peso_cesantia:'%', peso_rep:'%', peso_calidad:'%',
-  umbral_cesantia:'%', umbral_rep:'%', semana_corrida:'×', meta_unidad:'ops',
+  umbral_rdh:'%', umbral_cesantia:'%', umbral_rep:'%', semana_corrida:'×', meta_unidad:'ops', peso_rdh:'%',
 };
-const PORCENTAJES = ['pct_24','pct_mas24','factor_max','peso_cesantia','peso_rep','peso_calidad','umbral_cesantia','umbral_rep'];
+const PORCENTAJES = ['pct_24','pct_mas24','factor_max','peso_rdh','peso_cesantia','peso_rep','peso_calidad','umbral_rdh','umbral_cesantia','umbral_rep'];
 const PASO = { minimo_monto:'100000', semana_corrida:'0.01', meta_unidad:'1' };
 
 let vars = {};

@@ -18,12 +18,14 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['pct_mas24',     0.0100, '% base ≥ 24 cuotas',             'Tasa aplicada al monto financiado con plazo IGUAL O MAYOR a 24 meses', 'porcentaje'],
       ['minimo_monto',  35000000,'Mínimo monto mes (CLP)',          'Si el total financiado del mes es menor a este valor, no hay bono','monto'],
       ['factor_max',    0.66,   'Factor ajuste máximo',            'Cap máximo del factor de ajuste total (suma de los tres pesos)',   'factor'],
-      ['peso_cesantia', 0.50,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
-      ['peso_rep',      0.30,   'Peso cruce reparaciones',         'Peso del indicador de cruce de seguro reparaciones en el ajuste', 'factor'],
-      ['peso_calidad',  0.20,   'Peso calidad',                    'Peso del indicador de calidad en el ajuste',                      'factor'],
+      ['peso_rdh',      0.33,   'Peso cruce RDH',                  'Peso del indicador de cruce de seguro RDH (incluye desgravamen) en el ajuste', 'factor'],
+      ['peso_cesantia', 0.34,   'Peso cruce cesantía',             'Peso del indicador de cruce de seguro cesantía en el ajuste',     'factor'],
+      ['peso_rep',      0.33,   'Peso cruce reparaciones',         'Peso del indicador de cruce de seguro reparaciones en el ajuste', 'factor'],
+      ['peso_calidad',  0.00,   'Peso calidad',                    'Peso del indicador de calidad en el ajuste (0 = fuera del modelo, anexo 08-2026)', 'factor'],
       ['meta_unidad',   3,      'Meta créditos UNIDAD (calidad)',  'TODO O NADA: con esta cantidad de créditos UNIDAD DE CRÉDITO en el mes el indicador de calidad vale 100%; con menos vale 0%', 'factor'],
+      ['umbral_rdh',    0.99,   'Umbral mínimo RDH',               'Si el cruce es ≤ este valor el aporte de RDH es 0',               'porcentaje'],
       ['umbral_cesantia',0.65,  'Umbral mínimo cesantía',          'Si el cruce es ≤ este valor el aporte de cesantía es 0',          'porcentaje'],
-      ['umbral_rep',    0.50,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
+      ['umbral_rep',    0.55,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
       ['semana_corrida',1.1667, 'Multiplicador semana corrida',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
     ];
     for (const [clave, valor, etiqueta, descripcion, tipo] of defaults) {
@@ -76,6 +78,20 @@ require('../../../../shared/migrate').migrarAuto('comisiones_anexo_2026_08', asy
   await pool.query(
     "UPDATE comisiones_variables SET descripcion = 'TODO O NADA: con esta cantidad de créditos UNIDAD DE CRÉDITO en el mes el indicador de calidad vale 100%; con menos vale 0%' WHERE clave = 'meta_unidad'"
   );
+});
+
+/* Modelo de 3 seguros (anexo 08-2026): entra RDH como tercer indicador y sale Calidad.
+   Pesos RDH 33% · Cesantía 34% · Reparaciones 33% (suman 100%), umbrales 99/65/55.
+   Calidad queda con peso 0: sigue calculándose y visible, pero no aporta al factor;
+   para reactivarla basta darle peso en el mantenedor. */
+require('../../../../shared/migrate').migrarAuto('comisiones_3seguros_rdh', async () => {
+  const nuevos = {
+    peso_rdh: 0.33, peso_cesantia: 0.34, peso_rep: 0.33, peso_calidad: 0,
+    umbral_rdh: 0.99, umbral_rep: 0.55,
+  };
+  for (const [clave, valor] of Object.entries(nuevos)) {
+    await pool.query('UPDATE comisiones_variables SET valor = ? WHERE clave = ?', [valor, clave]);
+  }
 });
 
 /* ═══ Alertas del flujo de aprobación de comisiones (paramétricas) ═══════════
@@ -195,8 +211,8 @@ async function getVars() {
 function calcularComision(creditos, vars) {
   const {
     pct_24, pct_mas24, minimo_monto, factor_max,
-    peso_cesantia, peso_rep, peso_calidad,
-    umbral_cesantia, umbral_rep, semana_corrida,
+    peso_rdh, peso_cesantia, peso_rep, peso_calidad,
+    umbral_rdh, umbral_cesantia, umbral_rep, semana_corrida,
     meta_unidad,
   } = vars;
 
@@ -226,9 +242,11 @@ function calcularComision(creditos, vars) {
     !(c.producto || '').toUpperCase().includes('CORFO')
   );
   const ncnu_total    = ncnu.length;
+  const ncnu_rdh      = ncnu.filter(c => (parseFloat(c.seguro_rdh)       || 0) > 0).length;
   const ncnu_cesantia = ncnu.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0).length;
   const ncnu_rep      = ncnu.filter(c => (parseFloat(c.seguro_rep_menor) || 0) > 0).length;
 
+  const cruce_rdh          = ncnu_total > 0 ? ncnu_rdh      / ncnu_total : 0;
   const cruce_cesantia     = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
   const cruce_reparaciones = ncnu_total > 0 ? ncnu_rep      / ncnu_total : 0;
 
@@ -243,20 +261,26 @@ function calcularComision(creditos, vars) {
   // (antes era proporcional: 1 de 3 operaciones ya pagaba un tercio del indicador)
   const calidad        = unidad_logrado >= META_UNIDAD ? 1 : 0;
 
-  const cumple_ces = cruce_cesantia    > umbral_cesantia;
+  const cumple_rdh = cruce_rdh          > umbral_rdh;
+  const cumple_ces = cruce_cesantia     > umbral_cesantia;
   const cumple_rep = cruce_reparaciones > umbral_rep;
 
-  const ajuste_ces     = (cumple_ces ? cruce_cesantia    : 0) * peso_cesantia * factor_max;
+  // Cada indicador entra con su cruce solo si supera su umbral; si no, entra con 0.
+  // El peso de calidad quedó en 0 con el anexo 08-2026 (salió del modelo), pero la
+  // variable sigue existiendo: basta darle peso en el mantenedor para reactivarla.
+  const ajuste_rdh     = (cumple_rdh ? cruce_rdh          : 0) * peso_rdh      * factor_max;
+  const ajuste_ces     = (cumple_ces ? cruce_cesantia     : 0) * peso_cesantia * factor_max;
   const ajuste_rep     = (cumple_rep ? cruce_reparaciones : 0) * peso_rep      * factor_max;
-  const ajuste_calidad = calidad * peso_calidad * factor_max;
-  const factor_ajuste  = ajuste_ces + ajuste_rep + ajuste_calidad;
+  const ajuste_calidad = calidad * (peso_calidad || 0) * factor_max;
+  const factor_ajuste  = ajuste_rdh + ajuste_ces + ajuste_rep + ajuste_calidad;
 
-  // Bonos cesantía, rep y calidad: todos aplican el ajuste sobre incentivo_base total
+  // Cada bono aplica su propio ajuste sobre el incentivo_base total
+  const bono_rdh     = incentivo_base * ajuste_rdh;
   const bono_ces     = incentivo_base * ajuste_ces;
   const bono_rep     = incentivo_base * ajuste_rep;
   const bono_calidad = incentivo_base * ajuste_calidad;
 
-  const incentivo_final = incentivo_base + bono_ces + bono_rep + bono_calidad;
+  const incentivo_final = incentivo_base + bono_rdh + bono_ces + bono_rep + bono_calidad;
 
   return {
     cumple_minimo: true,
@@ -266,14 +290,15 @@ function calcularComision(creditos, vars) {
     monto_24: monto24, monto_mas24: montoMas24,
     base_24: base24, base_mas24: baseMas24,
     incentivo_base,
-    ncnu_total, ncnu_cesantia, ncnu_rep,
-    cruce_cesantia, cruce_reparaciones,
+    ncnu_total, ncnu_rdh, ncnu_cesantia, ncnu_rep,
+    cruce_rdh, cruce_cesantia, cruce_reparaciones,
     calidad, calidad_logrado: unidad_logrado, calidad_meta: META_UNIDAD,
-    umbral_cesantia, umbral_rep,
-    cumple_cesantia: cumple_ces, cumple_reparaciones: cumple_rep,
-    ajuste_cesantia: ajuste_ces, ajuste_reparaciones: ajuste_rep,
+    umbral_rdh, umbral_cesantia, umbral_rep,
+    peso_rdh, peso_cesantia, peso_rep, peso_calidad,
+    cumple_rdh, cumple_cesantia: cumple_ces, cumple_reparaciones: cumple_rep,
+    ajuste_rdh, ajuste_cesantia: ajuste_ces, ajuste_reparaciones: ajuste_rep,
     ajuste_calidad, factor_ajuste,
-    bono_cesantia: bono_ces, bono_reparaciones: bono_rep, bono_calidad,
+    bono_rdh, bono_cesantia: bono_ces, bono_reparaciones: bono_rep, bono_calidad,
     incentivo_final,
     con_semana_corrida: incentivo_final * semana_corrida,
   };

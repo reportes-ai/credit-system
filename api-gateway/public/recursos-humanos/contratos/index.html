@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.8 — corrección: el tope se expresa sobre la Comisión Base (×1,66), no como 1,66% del monto financiado -->
+<!-- v1.9 — anexo con el modelo de 3 seguros (RDH/cesantía/reparaciones), calidad fuera -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -640,7 +640,7 @@ function anexAbrir(cod){
   const c = ANEX_COM;
   $('anexAviso').innerHTML = `<b>Valores vigentes que se imprimirán:</b> mínimo mensual <b>${CLP(c.minimo_monto)}</b> · `
     + `base <b>${anexPct(c.pct_24)}</b> (&lt;24 meses) y <b>${anexPct(c.pct_mas24)}</b> (≥24) · factor máximo <b>${anexPct(c.factor_max,0)}</b> · `
-    + `umbrales cesantía <b>${anexPct(c.umbral_cesantia,0)}</b> / reparación <b>${anexPct(c.umbral_rep,0)}</b> · meta calidad <b>${c.meta_unidad||3} ops</b> (todo o nada) · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
+    + `pesos RDH <b>${anexPct(c.peso_rdh,0)}</b> / cesantía <b>${anexPct(c.peso_cesantia,0)}</b> / reparación <b>${anexPct(c.peso_rep,0)}</b> · umbrales <b>${anexPct(c.umbral_rdh,0)}</b> / <b>${anexPct(c.umbral_cesantia,0)}</b> / <b>${anexPct(c.umbral_rep,0)}</b> · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
     + `Si algo no corresponde, corrígelo primero en <a href="${ANEX_MODELO.href}">${esc(ANEX_MODELO.fuente)}</a>.`;
   $('anexForm').style.display='block';
   $('anexForm').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -667,7 +667,7 @@ function anexVarEjecutivos(trab, firm){
   // Ejemplo numérico calculado con los MISMOS parámetros vigentes
   const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
   // Mismo orden del motor: primero el cumplimiento ponderado, luego el factor máximo.
-  const pond = .80*c.peso_cesantia + .60*c.peso_rep + 1*c.peso_calidad;
+  const pond = 1*c.peso_rdh + .80*c.peso_cesantia + .60*c.peso_rep;
   const fac = pond*c.factor_max, com = base*(1+fac), tot = com*c.semana_corrida;
   const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
   const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
@@ -688,18 +688,19 @@ function anexVarEjecutivos(trab, firm){
 
     <p><b>QUINTO — Factor de Ajuste.</b> La Comisión Base se incrementará por un Factor de Ajuste compuesto por tres indicadores:</p>
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px"><tr><td style="${TH}">Indicador</td><td style="${TH};text-align:center">Ponderación</td><td style="${TH};text-align:center">Umbral mínimo</td></tr>
-      <tr><td style="${TD}">Cruce de Seguro de Cesantía AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
-      <tr><td style="${TD}">Cruce de Seguro de Reparación Menor AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
-      <tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Meta de ${c.meta_unidad||3} operaciones (todo o nada)</td></tr></table>
+      <tr><td style="${TD}">Cruce de Seguro RDH (incluye desgravamen)</td><td style="${TD};text-align:center">${anexPct(c.peso_rdh,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rdh,0)}</td></tr>
+      <tr><td style="${TD}">Cruce de Seguro de Cesantía</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
+      <tr><td style="${TD}">Cruce de Seguro de Reparación Menor</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
+      ${(c.peso_calidad||0)>0?`<tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Meta de ${c.meta_unidad||3} operaciones (todo o nada)</td></tr>`:''}</table>
     <p><b>Cómo se calcula el Factor de Ajuste.</b> Se determina en dos pasos:</p>
     <div style="background:#f6f8fb;border:1px solid #d9e2ef;border-radius:8px;padding:12px 16px;margin:8px 0 12px;font-size:12.5px">
       <b>Paso 1 — Cumplimiento ponderado.</b> Se pondera el cumplimiento de los tres indicadores:<br>
-      <div style="text-align:center;margin:8px 0"><i>Cumplimiento ponderado = (Cruce Cesantía × ${anexPct(c.peso_cesantia,0)}) + (Cruce Reparación Menor × ${anexPct(c.peso_rep,0)}) + (Calidad × ${anexPct(c.peso_calidad,0)})</i></div>
+      <div style="text-align:center;margin:8px 0"><i>Cumplimiento ponderado = (Cruce RDH × ${anexPct(c.peso_rdh,0)}) + (Cruce Cesantía × ${anexPct(c.peso_cesantia,0)}) + (Cruce Reparación Menor × ${anexPct(c.peso_rep,0)})${(c.peso_calidad||0)>0?` + (Calidad × ${anexPct(c.peso_calidad,0)})`:''}</i></div>
       <b>Paso 2 — Factor de Ajuste.</b> Ese cumplimiento ponderado se aplica sobre el incremento máximo pactado:<br>
       <div style="text-align:center;margin:8px 0"><i>Factor de Ajuste = Cumplimiento ponderado × ${anexPct(c.factor_max)}</i></div>
-      De este modo, si los tres indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
+      De este modo, si los indicadores alcanzan el 100%, el cumplimiento ponderado es 100% y el Factor de Ajuste llega a su <b>máximo de ${anexPct(c.factor_max)}</b>. Si los tres quedan en 0%, el Factor es 0% y solo se paga la Comisión Base.
     </div>
-    <p><b>Reglas de los indicadores.</b> Los umbrales de los dos cruces de seguros operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. El indicador de <b>Calidad</b> opera de modo <b>todo o nada</b>: se cumple únicamente al alcanzar la meta mensual de operaciones del producto UNIDAD DE CRÉDITO${c.meta_unidad?`, actualmente de <b>${c.meta_unidad}</b> operaciones`:''}. Alcanzada o superada la meta, el indicador entra al cálculo con el 100%; por debajo de ella entra con <b>cero</b>, cualquiera sea el número de operaciones alcanzado. El sobrecumplimiento no genera aporte adicional.</p>
+    <p><b>Reglas de los indicadores.</b> Los umbrales operan como <b>condición de activación</b> de cada indicador, de forma independiente: si un cruce no supera su umbral, ese indicador entra al cálculo con <b>cero</b>, sin afectar el aporte de los demás; superado el umbral, entra con el porcentaje de cruce efectivamente alcanzado. En consecuencia, el Cruce de Seguro RDH debe superar el <b>${anexPct(c.umbral_rdh,0)}</b> —esto es, prácticamente la totalidad de las operaciones del Universo de Medición debe incorporar dicho seguro—, el de Cesantía el ${anexPct(c.umbral_cesantia,0)} y el de Reparación Menor el ${anexPct(c.umbral_rep,0)}.${(c.peso_calidad||0)>0?` El indicador de <b>Calidad</b> opera de modo <b>todo o nada</b>: alcanzada la meta de ${c.meta_unidad||3} operaciones UNIDAD DE CRÉDITO entra con el 100%, por debajo con cero.`:''}</p>
 
     <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará conforme a la siguiente fórmula:</p>
     <div style="text-align:center;font-weight:700;margin:10px 0 12px;font-size:13.5px">Comisión Mensual = Comisión Base × ( 1 + Factor de Ajuste )</div>
@@ -711,7 +712,7 @@ function anexVarEjecutivos(trab, firm){
     <table style="border-collapse:collapse;width:100%;margin:8px 0 12px">
       <tr><td style="${TD}">Monto Financiado: ${CLP(m24)} (bajo 24 meses) + ${CLP(mM24)} (24 meses o más)</td><td style="${TD};text-align:right">${CLP(m24+mM24)}</td></tr>
       <tr><td style="${TD}">Comisión Base: ${CLP(m24)} × ${anexPct(c.pct_24)} + ${CLP(mM24)} × ${anexPct(c.pct_mas24)}</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
-      <tr><td style="${TD}">Cumplimiento ponderado: (80% × ${anexPct(c.peso_cesantia,0)}) + (60% × ${anexPct(c.peso_rep,0)}) + (100% × ${anexPct(c.peso_calidad,0)})</td><td style="${TD};text-align:right">${anexPct(pond)}</td></tr>
+      <tr><td style="${TD}">Cumplimiento ponderado: (100% × ${anexPct(c.peso_rdh,0)}) + (80% × ${anexPct(c.peso_cesantia,0)}) + (60% × ${anexPct(c.peso_rep,0)})</td><td style="${TD};text-align:right">${anexPct(pond)}</td></tr>
       <tr><td style="${TD}">Factor de Ajuste: ${anexPct(pond)} × ${anexPct(c.factor_max)}</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
       <tr><td style="${TD}">Comisión mensual: ${CLP(base)} × (1 + ${anexPct(fac)})</td><td style="${TD};text-align:right">${CLP(com)}</td></tr>
       <tr><td style="${TD}"><b>Total con semana corrida (× ${sc})</b></td><td style="${TD};text-align:right"><b>${CLP(tot)}</b></td></tr></table>

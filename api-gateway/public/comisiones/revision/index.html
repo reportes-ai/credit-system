@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.16</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.17</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -345,6 +345,8 @@ function renderEjSinComision(d, idx, mes) {
 function renderEjecutivo(d, idx, mes, sinComision = false) {
   const estadoClass = d.estado || 'pendiente';
   const estadoLabel = {pendiente:'Pendiente',aprobado:'Aprobado',rechazado:'Rechazado'}[estadoClass]||'Pendiente';
+  const barRdh = Math.min((d.cruce_rdh||0)*100,100);
+  const colRdh = d.cumple_rdh ? 'ok' : 'bad';
   const barCes = Math.min((d.cruce_cesantia||0)*100,100);
   const barRep = Math.min((d.cruce_reparaciones||0)*100,100);
   const colCes = d.cumple_cesantia    ? 'ok' : 'bad';
@@ -415,7 +417,13 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
       <div class="metrica">
         <div class="m-label">Incentivo Base</div>
         <div class="m-value">${fmt(d.incentivo_base)}</div>
-        <div class="m-sub">0.75%×≤24 + 1.00%×+24</div>
+        <div class="m-sub">0,75%×&lt;24 + 1,00%×≥24</div>
+      </div>
+      <div class="metrica ${colRdh}">
+        <div class="m-label">Cruce RDH</div>
+        <div class="m-value">${pct(d.cruce_rdh)} (${d.ncnu_rdh}/${d.ncnu_total})</div>
+        <div class="prog-bar"><div class="prog-bar-fill" style="width:${barRdh}%;background:${d.cumple_rdh?'#16a34a':'#dc2626'}"></div></div>
+        <div class="m-sub">${d.cumple_rdh?'✓ Cumple':'✗ No cumple'} &nbsp;| mín: ${pct(d.umbral_rdh||0.99)} | ajuste: ${pct(d.ajuste_rdh)}</div>
       </div>
       <div class="metrica ${colCes}">
         <div class="m-label">Cruce Cesantía</div>
@@ -433,7 +441,7 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
         <div class="m-label">Calidad — Créditos UNIDAD</div>
         <div class="m-value">${pct(d.calidad)} <small style="font-size:.72rem;font-weight:400">(${d.calidad_logrado||0}/${d.calidad_meta||3})</small></div>
         <div class="prog-bar"><div class="prog-bar-fill" style="width:${Math.min((d.calidad||0)*100,100)}%;background:${(d.calidad_logrado||0)>=(d.calidad_meta||3)?'#16a34a':(d.calidad_logrado||0)>0?'#d97706':'#dc2626'}"></div></div>
-        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · meta: ${d.calidad_meta||3} (todo o nada) | ajuste: ${pct(d.ajuste_calidad)}</div>
+        <div class="m-sub">${d.calidad_logrado||0} crédito${(d.calidad_logrado||0)!==1?'s':''} UNIDAD · meta: ${d.calidad_meta||3} ${(d.peso_calidad||0)>0?'(todo o nada) | ajuste: '+pct(d.ajuste_calidad):'· <b>fuera del modelo</b> (peso 0, no afecta la comisión)'}</div>
       </div>
     </div>
 
