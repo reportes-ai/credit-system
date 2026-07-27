@@ -705,3 +705,25 @@ async function alegarOnbVencidos() {
 }
 setTimeout(alegarOnbVencidos, 160 * 1000);
 setInterval(alegarOnbVencidos, 24 * 60 * 60 * 1000);
+
+/* ─── ANEXOS DE CONTRATO (modelos vigentes) ─────────────────────────────────
+   Entrega lo necesario para armar un anexo imprimible:
+   · personas  → nombre COMPLETO (con apellido materno, que el contrato exige),
+                 RUT y sexo (para don/doña). Sirve para el firmante y el trabajador.
+   · comision  → los valores VIVOS de comisiones_variables (Máxima 1: un solo
+                 motor). El anexo se redacta con lo que hoy paga el sistema, no
+                 con números copiados que se desactualizan.                        */
+exports.anexosDatos = async (_req, res) => {
+  try {
+    const [personas] = await pool.query(
+      `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido, u.apellido_materno) nombre,
+              u.rut, u.cargo, u.sexo
+         FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario = u.id_usuario
+        WHERE u.estado = 'activo' AND COALESCE(f.no_mostrar,0) = 0
+        ORDER BY u.apellido, u.nombre`);
+    const [vars] = await pool.query('SELECT clave, valor FROM comisiones_variables');
+    const comision = {};
+    vars.forEach(v => { comision[v.clave] = parseFloat(v.valor); });
+    ok(res, { personas, comision });
+  } catch (e) { fail(res, e.message); }
+};

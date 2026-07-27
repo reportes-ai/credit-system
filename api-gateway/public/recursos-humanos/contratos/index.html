@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — selector de finiquitos incluye dados de baja (fecha_baja) y marca DADO DE BAJA -->
+<!-- v1.3 — pestaña ANEXOS: modelos vigentes (Anexo Variable Ejecutivos) con firmante, fecha de firma y vigencia; imprime en tamaño carta con logo, usando los valores vivos del mantenedor de comisiones -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +40,8 @@
   .dlg { padding:20px 24px; }
   .pie { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
   @media print { body * { visibility:hidden; } #docPrint, #docPrint * { visibility:visible; } #docPrint { position:absolute; inset:0; } }
+  /* Documentos legales: tamaño CARTA (Letter), el estándar en Chile para contratos y anexos */
+  @page { size: letter; margin: 18mm 16mm; }
 </style>
 </head>
 <body>
@@ -56,6 +58,7 @@
     <button id="tCargos" onclick="verTab('cargos')"><i class="bi bi-person-badge me-1"></i>Cargos y descripciones</button>
     <button id="tBenef" onclick="verTab('benef')"><i class="bi bi-gift me-1"></i>Catálogo de beneficios</button>
     <button id="tFiniq" onclick="verTab('finiq')"><i class="bi bi-door-open me-1"></i>Finiquitos</button>
+    <button id="tAnexos" onclick="verTab('anexos')"><i class="bi bi-file-earmark-plus me-1"></i>Anexos</button>
     <button id="tOnb" onclick="verTab('onb')"><i class="bi bi-person-check me-1"></i>Onboarding</button>
   </div>
 
@@ -102,6 +105,25 @@
     <table style="margin-top:8px"><thead><tr><th>Trabajador</th><th>Causal</th><th>Término</th><th>Total</th><th></th></tr></thead><tbody id="tbFiniq"></tbody></table>
   </div>
 
+  <div class="panel" id="pAnexos" style="display:none">
+    <b>Modelos de anexo vigentes</b>
+    <p style="font-size:.78rem;color:#64748b;margin:4px 0 12px">Cada modelo se arma con los <b>valores vigentes del sistema</b> — no con números copiados. Elige el modelo, quién firma por la empresa y la fecha, y se genera listo para imprimir o guardar como PDF (tamaño carta, con logo).</p>
+    <div id="anexModelos"></div>
+
+    <div id="anexForm" style="display:none;margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px">
+      <b id="anexTitulo"></b>
+      <div class="grid3" style="margin-top:10px">
+        <div class="fld"><label>Trabajador que firma *</label><select id="anexTrab"></select></div>
+        <div class="fld"><label>Firma por la empresa *</label><select id="anexFirmante"></select></div>
+        <div class="fld"><label>Fecha de firma *</label><input id="anexFecha" type="date"></div>
+      </div>
+      <div class="fld" style="max-width:320px"><label>Vigencia del anexo (rige a contar de) *</label><input id="anexVigencia" type="date"></div>
+      <div id="anexAviso" style="font-size:.79rem;background:#f8fafc;border-left:3px solid var(--navy);border-radius:6px;padding:9px 12px;margin:10px 0;color:#475569"></div>
+      <button class="btn" onclick="anexImprimir()"><i class="bi bi-printer me-1"></i>Imprimir / Guardar PDF</button>
+      <button class="btn-g" onclick="$('anexForm').style.display='none'">Cancelar</button>
+    </div>
+  </div>
+
   <div class="panel" id="pOnb" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <b>Onboarding / Offboarding</b>
@@ -120,6 +142,7 @@
       <li><b>Cargos y descripciones</b> → cartas oferta y contratos de esta página; un cargo sin descripción genera un recordatorio diario (campana) hasta que se cargue.</li>
       <li><b>Catálogo de beneficios</b> → los checkbox disponibles al armar cada <b>carta oferta</b>, y las cláusulas que hereda el <b>contrato</b>.</li>
       <li><b>Carta ACEPTADA → Contratar</b> → crea el contrato con lo ofertado (fuente única) y deja el documento imprimible para firma.</li>
+      <li><b>Anexos</b> → documentos imprimibles en tamaño carta con los <b>valores vigentes del sistema</b>, no copiados. El <b>Anexo Variable Ejecutivos</b> toma sus montos, tramos, pesos y umbrales de <a href="/comisiones/variables/">Comisiones → Mantenedor Variables</a>: si ahí se cambia un valor, el próximo anexo sale con el valor nuevo — y lo que se paga en <a href="/comisiones/revision/">Revisión de Comisiones</a> es exactamente lo que dice el papel firmado.</li>
     </ul>
   </div>
 </div>
@@ -168,11 +191,12 @@ async function cargarTodo(){
   pintar();
 }
 function verTab(t){
-  ['cartas','contratos','cargos','benef','finiq','onb'].forEach(k=>{
+  ['cartas','contratos','cargos','benef','finiq','anexos','onb'].forEach(k=>{
     $('p'+k[0].toUpperCase()+k.slice(1)).style.display = k===t?'block':'none';
     $('t'+k[0].toUpperCase()+k.slice(1)).classList.toggle('on', k===t);
   });
   if (t==='finiq' && !FQ_INIT) fqInit();
+  if (t==='anexos' && !ANEX_INIT) anexInit();
   if (t==='onb') onbCargar();
 }
 
@@ -542,6 +566,132 @@ function imprimirContrato(id){
       <div style="border-top:1px solid #333;padding-top:6px;width:44%">TRABAJADOR<br>${esc(c.trabajador)}</div>
     </div>
     <p style="font-size:11px;color:#777;margin-top:30px">Documento generado por el Business Suite desde la carta oferta — revisar con asesoría legal antes de firmar.</p>`);
+}
+
+/* ═══ ANEXOS DE CONTRATO ══════════════════════════════════════════════════
+   Los modelos se arman con los valores VIVOS del sistema (comisiones_variables),
+   no con números escritos a mano: si el mantenedor cambia, el anexo cambia. */
+let ANEX_INIT=false, ANEX_PERSONAS=[], ANEX_COM={}, ANEX_MODELO=null;
+
+const ANEXOS_MODELOS = [{
+  codigo: 'VAR_EJECUTIVOS',
+  titulo: 'ANEXO VARIABLE EJECUTIVOS',
+  desc: 'Remuneración variable por desempeño comercial: comisión base por tramo de plazo, factor de ajuste por cruce de seguros y calidad, y semana corrida.',
+  cargos: ['EJECUTIVO COMERCIAL'],
+  fuente: 'Comisiones → Mantenedor Variables',
+  href: '/comisiones/variables/',
+}];
+
+async function anexInit(){
+  ANEX_INIT = true;
+  const j = await (await fetch('/api/rrhh/contratos/anexos/datos',{headers:H})).json();
+  if (!j.success) return $('anexModelos').innerHTML = '<p style="color:#b91c1c">'+esc(j.error)+'</p>';
+  ANEX_PERSONAS = j.data.personas||[]; ANEX_COM = j.data.comision||{};
+  $('anexModelos').innerHTML = ANEXOS_MODELOS.map(m=>`
+    <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <div style="font-weight:700;color:#0f172a">${esc(m.titulo)}</div>
+        <div style="font-size:.79rem;color:#64748b;margin-top:3px">${esc(m.desc)}</div>
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:5px"><i class="bi bi-link-45deg"></i> Valores desde <a href="${m.href}">${esc(m.fuente)}</a></div>
+      </div>
+      <button class="btn" onclick="anexAbrir('${m.codigo}')">Generar</button>
+    </div>`).join('');
+}
+
+function anexAbrir(cod){
+  ANEX_MODELO = ANEXOS_MODELOS.find(m=>m.codigo===cod); if(!ANEX_MODELO) return;
+  const elegibles = ANEX_PERSONAS.filter(p => ANEX_MODELO.cargos.some(c => String(p.cargo||'').toUpperCase().includes(c)));
+  $('anexTitulo').textContent = ANEX_MODELO.titulo;
+  $('anexTrab').innerHTML = elegibles.length
+    ? elegibles.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.rut?' · '+esc(p.rut):''}</option>`).join('')
+    : '<option value="">— sin colaboradores con ese cargo —</option>';
+  $('anexFirmante').innerHTML = ANEX_PERSONAS.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.cargo?' — '+esc(p.cargo):''}</option>`).join('');
+  const hoy = new Date().toISOString().slice(0,10);
+  $('anexFecha').value = hoy;
+  const d = new Date(); d.setMonth(d.getMonth()+1, 1);
+  $('anexVigencia').value = d.toISOString().slice(0,10);
+  const c = ANEX_COM;
+  $('anexAviso').innerHTML = `<b>Valores vigentes que se imprimirán:</b> mínimo mensual <b>${CLP(c.minimo_monto)}</b> · `
+    + `base <b>${anexPct(c.pct_24)}</b> (&lt;24 meses) y <b>${anexPct(c.pct_mas24)}</b> (≥24) · factor máximo <b>${anexPct(c.factor_max,0)}</b> · `
+    + `umbrales cesantía <b>${anexPct(c.umbral_cesantia,0)}</b> / reparación <b>${anexPct(c.umbral_rep,0)}</b> · semana corrida <b>×${(c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})}</b>. `
+    + `Si algo no corresponde, corrígelo primero en <a href="${ANEX_MODELO.href}">${esc(ANEX_MODELO.fuente)}</a>.`;
+  $('anexForm').style.display='block';
+  $('anexForm').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+const anexPct = (x,dec=2) => { const s=((x||0)*100).toFixed(dec).replace('.',','); return (s.includes(',')?s.replace(/,?0+$/,''):s)+'%'; };
+const anexFechaLarga = v => v ? new Date(v+'T12:00:00').toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'}) : '';
+
+function anexImprimir(){
+  const trab = ANEX_PERSONAS.find(p=>String(p.id_usuario)===$('anexTrab').value);
+  const firm = ANEX_PERSONAS.find(p=>String(p.id_usuario)===$('anexFirmante').value);
+  if (!trab) return alert('Selecciona el trabajador que firma');
+  if (!firm) return alert('Selecciona quién firma por la empresa');
+  if (!$('anexFecha').value)    return alert('Indica la fecha de firma');
+  if (!$('anexVigencia').value) return alert('Indica desde cuándo rige el anexo');
+  if (ANEX_MODELO.codigo === 'VAR_EJECUTIVOS') anexVarEjecutivos(trab, firm);
+}
+
+function anexVarEjecutivos(trab, firm){
+  const c = ANEX_COM;
+  const trato = String(trab.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
+  const tratoF = String(firm.sexo||'').toUpperCase().startsWith('F') ? 'doña' : 'don';
+  const maxPct = anexPct((c.pct_mas24||0)*(1+(c.factor_max||0)));
+  const sc = (c.semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4});
+  // Ejemplo numérico calculado con los MISMOS parámetros vigentes
+  const m24=40000000, mM24=80000000, base=m24*c.pct_24 + mM24*c.pct_mas24;
+  const aCes=.80*c.peso_cesantia*c.factor_max, aRep=.60*c.peso_rep*c.factor_max, aCal=1*c.peso_calidad*c.factor_max;
+  const fac=aCes+aRep+aCal, com=base*(1+fac), tot=com*c.semana_corrida;
+  const TH='padding:5px 8px;background:#eef4fb;border:1px solid #cbd5e1;font-weight:700;font-size:11.5px';
+  const TD='padding:5px 8px;border:1px solid #cbd5e1;font-size:11.5px';
+  bloqueDoc(`${cabecera}
+    <div style="text-align:center;font-weight:800;font-size:15.5px;line-height:1.4;margin-bottom:20px">ANEXO DE CONTRATO DE TRABAJO<br><span style="font-size:13.5px">REMUNERACIÓN VARIABLE — EJECUTIVO COMERCIAL</span></div>
+    <p>En Santiago de Chile, a <b>${anexFechaLarga($('anexFecha').value)}</b>, entre <b>AUTOFÁCIL SpA</b>, Rol Único Tributario N° 76.545.638-K, representada legalmente por ${tratoF} <b>${esc(firm.nombre)}</b>${firm.rut?`, cédula de identidad N° ${esc(firm.rut)}`:''}, ambos domiciliados para estos efectos en Avenida Presidente Kennedy N° 5757, oficina 1601, comuna de Las Condes, Región Metropolitana, en adelante indistintamente la "Empresa" o el "Empleador"; y ${trato} <b>${esc(trab.nombre)}</b>${trab.rut?`, cédula de identidad N° <b>${esc(trab.rut)}</b>`:''}, en adelante indistintamente el "Trabajador", se conviene el siguiente anexo al contrato de trabajo vigente entre las partes:</p>
+
+    <p><b>PRIMERO — Objeto.</b> El presente Anexo establece la estructura, las variables y la forma de cálculo de la remuneración variable por desempeño comercial a que tendrá derecho el Trabajador, sin perjuicio del sueldo base pactado en su contrato de trabajo, el que se mantiene plenamente vigente e inalterado.</p>
+
+    <p><b>SEGUNDO — Definiciones.</b> Se entenderá por <b>Monto Financiado</b> el monto total del crédito otorgado al cliente, compuesto por el saldo de precio del vehículo más los gastos y seguros incorporados al financiamiento. Se considerarán <b>Operaciones Computables</b> aquellas registradas en los sistemas de la Empresa en estado OTORGADO dentro del mes calendario de cálculo, según su fecha de otorgamiento. El <b>Universo de Medición de Seguros</b> corresponde a las Operaciones Computables cursadas con la financiera AUTOFIN, excluidas las de productos CORFO; sobre ese universo, y solo sobre él, se calculan los porcentajes de cruce.</p>
+
+    <p><b>TERCERO — Requisito de acceso.</b> Para tener derecho a la remuneración variable, el Trabajador deberá alcanzar en el mes un Monto Financiado total igual o superior a <b>${CLP(c.minimo_monto)}</b>. De no alcanzarse dicho monto, no se devengará remuneración variable alguna por ese período, cualquiera sea el cumplimiento obtenido en las demás variables. El incumplimiento de un mes no afecta el derecho respecto de los meses siguientes.</p>
+
+    <p><b>CUARTO — Comisión Base.</b> Cumplido el requisito anterior, la Comisión Base se determinará aplicando sobre el Monto Financiado de las Operaciones Computables los siguientes porcentajes, según el plazo de cada operación:</p>
+    <table style="border-collapse:collapse;width:100%;margin:8px 0 12px"><tr><td style="${TH}">Plazo de la operación</td><td style="${TH};text-align:center">% sobre Monto Financiado</td></tr>
+      <tr><td style="${TD}">Inferior a 24 meses</td><td style="${TD};text-align:center">${anexPct(c.pct_24)}</td></tr>
+      <tr><td style="${TD}">Igual o superior a 24 meses</td><td style="${TD};text-align:center">${anexPct(c.pct_mas24)}</td></tr></table>
+
+    <p><b>QUINTO — Factor de Ajuste.</b> La Comisión Base se incrementará por un Factor de Ajuste compuesto por tres indicadores:</p>
+    <table style="border-collapse:collapse;width:100%;margin:8px 0 12px"><tr><td style="${TH}">Indicador</td><td style="${TH};text-align:center">Ponderación</td><td style="${TH};text-align:center">Umbral mínimo</td></tr>
+      <tr><td style="${TD}">Cruce de Seguro de Cesantía AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_cesantia,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_cesantia,0)}</td></tr>
+      <tr><td style="${TD}">Cruce de Seguro de Reparación Menor AUTOFIN</td><td style="${TD};text-align:center">${anexPct(c.peso_rep,0)}</td><td style="${TD};text-align:center">Superior a ${anexPct(c.umbral_rep,0)}</td></tr>
+      <tr><td style="${TD}">Calidad — colocación UNIDAD DE CRÉDITO</td><td style="${TD};text-align:center">${anexPct(c.peso_calidad,0)}</td><td style="${TD};text-align:center">Sin umbral</td></tr></table>
+    <p>El aporte de cada indicador se calcula como <i>% de cumplimiento × ponderación × ${anexPct(c.factor_max)}</i>. Los umbrales operan como <b>condición de activación</b>, de forma independiente: si un cruce no supera su umbral, ese indicador aporta cero sin afectar a los demás; superado el umbral, el aporte es proporcional al cruce efectivamente alcanzado. El indicador de Calidad corresponde a las operaciones UNIDAD DE CRÉDITO del mes divididas por la meta vigente${c.meta_unidad?` (actualmente <b>${c.meta_unidad}</b> operaciones)`:''}, con tope de 100%. El Factor de Ajuste total no podrá exceder de <b>${anexPct(c.factor_max)}</b>.</p>
+
+    <p><b>SEXTO — Comisión mensual.</b> La comisión se determinará como <b>Comisión Base × (1 + Factor de Ajuste)</b>, de modo que el porcentaje máximo aplicable sobre el Monto Financiado asciende a <b>${maxPct}</b>.</p>
+
+    <p><b>SÉPTIMO — Semana corrida.</b> Conforme al artículo 45 del Código del Trabajo, la comisión así determinada se incrementará por concepto de semana corrida, aplicándose el factor <b>${sc}</b> sobre el monto resultante.</p>
+
+    <p><b>OCTAVO — Ejemplo de cálculo.</b> A modo meramente ilustrativo, sin constituir garantía de resultado:</p>
+    <table style="border-collapse:collapse;width:100%;margin:8px 0 12px">
+      <tr><td style="${TD}">Monto Financiado: ${CLP(m24)} (bajo 24 meses) + ${CLP(mM24)} (24 meses o más)</td><td style="${TD};text-align:right">${CLP(m24+mM24)}</td></tr>
+      <tr><td style="${TD}">Comisión Base</td><td style="${TD};text-align:right">${CLP(base)}</td></tr>
+      <tr><td style="${TD}">Cruce cesantía 80% · reparación 60% · calidad 100% → Factor de Ajuste</td><td style="${TD};text-align:right">${anexPct(fac)}</td></tr>
+      <tr><td style="${TD}">Comisión mensual</td><td style="${TD};text-align:right">${CLP(com)}</td></tr>
+      <tr><td style="${TD}"><b>Total con semana corrida (× ${sc})</b></td><td style="${TD};text-align:right"><b>${CLP(tot)}</b></td></tr></table>
+
+    <p><b>NOVENO — Descuentos por prepago y anulación.</b> No se considerarán para el cálculo, o se descontarán de él según corresponda: (i) las operaciones prepagadas íntegramente antes del tercer mes contado desde la fecha de curse, caso en el cual se descontará el 100% de la comisión devengada por dicha operación; y (ii) las operaciones anuladas, descontándose la totalidad de la comisión asociada. El descuento se aplicará en la liquidación del mes en que se verifique el hecho y, de exceder la comisión de ese mes, el saldo se imputará a los meses siguientes, sin afectar en caso alguno el sueldo base.</p>
+
+    <p><b>DÉCIMO — Devengo, información y pago.</b> La remuneración variable se devenga por mes vencido y se determinará a más tardar dentro de los 20 días siguientes al cierre del mes. Su pago se efectuará junto con la remuneración del mes siguiente. La Empresa pondrá a disposición del Trabajador el detalle del cálculo operación por operación, debiendo este manifestar su conformidad por correo electrónico o formular sus observaciones por la misma vía, a fin de practicar el recálculo antes del pago.</p>
+
+    <p><b>UNDÉCIMO — Descuentos legales.</b> El pago se efectuará previa deducción de los impuestos y cotizaciones previsionales y de salud que legalmente correspondan, y de los demás descuentos autorizados por la ley.</p>
+
+    <p><b>DUODÉCIMO — Modificaciones.</b> Toda modificación a la estructura de cálculo, porcentajes, ponderaciones, umbrales o metas contenidos en este Anexo será comunicada por escrito al Trabajador con a lo menos 30 días de anticipación al inicio del mes en que comenzará a regir, y se formalizará mediante el anexo respectivo suscrito por ambas partes.</p>
+
+    <p><b>DÉCIMO TERCERO — Vigencia.</b> Las estipulaciones de este Anexo regirán a contar del <b>${anexFechaLarga($('anexVigencia').value)}</b> y se aplicarán de manera complementaria al contrato de trabajo vigente, el que subsiste en todo aquello no modificado expresamente. Este Anexo reemplaza y deja sin efecto cualquier acuerdo anterior sobre remuneración variable entre las partes. Se firma en dos ejemplares de igual tenor y fecha, quedando uno en poder de cada parte.</p>
+
+    <div style="display:flex;justify-content:space-between;margin-top:70px;text-align:center;font-size:12.5px">
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(firm.nombre)}</b><br>p.p. AUTOFÁCIL SpA<br>RUT N° 76.545.638-K</div>
+      <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(trab.nombre)}</b><br>Trabajador${trab.rut?`<br>RUT N° ${esc(trab.rut)}`:''}</div>
+    </div>`);
 }
 
 cargarTodo();
