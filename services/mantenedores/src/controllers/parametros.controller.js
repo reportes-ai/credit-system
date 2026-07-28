@@ -136,6 +136,9 @@ const ensureTable = async () => {
     ['umbral_uf_tramo', 200, 'Umbral en UF que separa el tramo MENOR/MAYOR (default 200 UF)'],
     // ── Vigencia de la Carta de Aprobación (días corridos desde la fecha de la carta) ──
     ['vigencia_carta_dias', 5, 'Vigencia de la Carta de Aprobación (días corridos desde la fecha de la carta; al vencer pasa a DESISTIDA)'],
+    // ── ¿Dónde curso? (PWA /donde-curso/ y columna "vs otra" del informe de rentabilidad) ──
+    ['pref_diff_pct',    10,     '¿Dónde curso? — % de diferencia bajo el cual da lo mismo la financiera ("Decides Tú")'],
+    ['pref_rent_minima', 100000, '¿Dónde curso? — rentabilidad mínima por operación ($); bajo esto se avisa que no conviene cursar'],
   ];
   for (const [clave, valor, descripcion] of defaults) {
     await pool.query(

@@ -1,0 +1,17 @@
+{
+  "name": "AutoFácil — ¿Dónde curso?",
+  "short_name": "¿Dónde curso?",
+  "description": "Dice en qué financiera conviene cursar el crédito según la rentabilidad",
+  "start_url": "/donde-curso/",
+  "scope": "/donde-curso/",
+  "display": "standalone",
+  "background_color": "#012d70",
+  "theme_color": "#012d70",
+  "orientation": "portrait",
+  "lang": "es-CL",
+  "icons": [
+    { "src": "/donde-curso/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/donde-curso/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/donde-curso/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

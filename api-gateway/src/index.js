@@ -80,6 +80,14 @@ app.use(express.static(path.join(__dirname, '../public'), {
 app.get('/favicon.ico', (req, res) =>
   res.sendFile(path.join(__dirname, '../public/img/favicon.png')));
 
+/* Motor del tier UAC servido al navegador. Es el MISMO archivo que usan el
+   guardado y el recálculo en el backend (no una copia): la PWA "¿Dónde curso?"
+   necesita el % de la Unidad de Crédito y debe dar exactamente lo mismo. */
+app.get('/js/uac-tier.js', (req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, '../../services/creditos/src/utils/uac-tier.js'));
+});
+
 // Health check (monitoreo + Render): estado del server y ping a la BD
 app.get('/api/health', async (req, res) => {
   let db = false;

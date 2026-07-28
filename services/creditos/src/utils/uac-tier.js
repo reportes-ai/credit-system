@@ -69,4 +69,10 @@ function tierUACInfo(cnt, p) {
   return { n, pct };
 }
 
-module.exports = { modeloActivo, pctUACMes, aplicarCortePlazoUAC, pctUACOperacion, tierUACInfo };
+const _API = { modeloActivo, pctUACMes, aplicarCortePlazoUAC, pctUACOperacion, tierUACInfo };
+if (typeof module !== 'undefined' && module.exports) module.exports = _API;
+
+/* También se sirve al navegador como /js/uac-tier.js (ver api-gateway/src/index.js).
+   Es el MISMO archivo, no una copia: la PWA "¿Dónde curso?" necesita el tier UAC
+   y duplicarlo sería garantizar que algún día digan cosas distintas. */
+if (typeof window !== 'undefined') window.AF_UAC_TIER = _API;

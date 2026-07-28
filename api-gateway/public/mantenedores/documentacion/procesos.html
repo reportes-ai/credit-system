@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.5 — Reversas por prepago y anulacion en comisiones de ejecutivos (clausula novena del anexo) -->
+<!-- v3.6 — Capitulo 26: PWA Donde curso (eleccion de financiera) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,6 +64,7 @@
     <a href="#p23">23. Solicitudes del colaborador (paperless)</a>
     <a href="#p24">24. Asistencia y jornada (Workera)</a>
     <a href="#p25">25. Test de Kuder (intereses vocacionales)</a>
+    <a href="#p26">26. ¿Dónde curso? — elección de financiera</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -456,6 +457,26 @@
   </ol>
   <div class="flujo"><span class="st ini">PERFIL DEL CARGO</span><span class="ar">→</span><span class="st">RINDE (candidato o colaborador)</span><span class="ar">→</span><span class="st">MOTOR ÚNICO (10 áreas 0-100)</span><span class="ar">→</span><span class="st">MATCH vs CARGO</span><span class="ar">→</span><span class="st fin">DECISIÓN RRHH</span></div>
   <div class="afecta"><b>Afecta:</b> Selección de personal y Evaluaciones de Desempeño (§ desempeño). <b>Depende de:</b> Cargos y sus descripciones (RRHH → Contratos), catálogo paramétrico de áreas e ítems.</div>
+
+  <h2 id="p26">26. ¿Dónde curso? — elección de financiera</h2>
+  <div class="paso">
+    <div><b class="lbl">Qué / para qué</b>Que el ejecutivo sepa <b>en el patio, antes de armar la carta</b>, en qué financiera conviene cursar la operación. Antes esto se decidía de memoria o mirando el cuadro impreso, y el informe de rentabilidad recién lo desmentía a fin de mes (el "lucro cesante").</div>
+    <div><b class="lbl">Quién</b>Ejecutivo comercial (consulta, permiso <code>donde_curso_ver</code>) · Gerencia (define los umbrales en Parámetros del Crédito y el cuadro en Preferencia Financiera).</div>
+    <div><b class="lbl">Prerequisitos</b>Tasas vigentes, parámetros del crédito, UF del día y cuadro de Preferencia Financiera configurado. El ejecutivo entra una vez con conexión: la app deja los parámetros guardados en el teléfono.</div>
+  </div>
+  <ol>
+    <li><b>Instalar</b> (PWA <a href="/donde-curso/">/donde-curso/</a>): se abre en el celular y se agrega a la pantalla de inicio. Login con la misma cuenta del sistema.</li>
+    <li><b>Ingresar la operación:</b> valor del vehículo, pie, plazo, tasa (o dejarla en automático), seguros incluidos y si el dealer es de patio o de calle. El saldo precio se calcula solo.</li>
+    <li><b>Leer el veredicto:</b> <b>AUTOFIN</b>, <b>UNIDAD DE CRÉDITO</b> o <b>DECIDES TÚ</b>. Debajo aparece el porqué: monto financiado, cuota, tasa aplicada y la rentabilidad de cada financiera.</li>
+    <li><b>Si sale "Decides Tú"</b> la diferencia es menor al umbral (10% por defecto): para la empresa da lo mismo, así que la decisión es del ejecutivo — sirve para privilegiar la relación con el dealer o la velocidad de curse.</li>
+    <li><b>Si aparece el aviso amarillo</b> la operación deja menos que la rentabilidad mínima ($100.000 por defecto): se puede cursar igual, pero conviene revisarla antes.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">DATOS DEL CRÉDITO</span><span class="ar">→</span><span class="st">AF_RENT (rentabilidad AutoFin y UAC)</span><span class="ar">→</span><span class="st">AF_PREF (elegibilidad + diferencia)</span><span class="ar">→</span><span class="st fin">AUTOFIN / UNIDAD</span><span class="ar">/</span><span class="st">DECIDES TÚ</span></div>
+  <div class="paso">
+    <div><b class="lbl">Cómo decide</b>Primero <b>elegibilidad</b>: el cuadro de Preferencia Financiera dice qué financiera acepta ese plazo con ese saldo — la que no puede tomarla no compite, por muy rentable que se vea. Después <b>rentabilidad</b>: gana la más alta, salvo que la diferencia sea menor al umbral.</div>
+    <div><b class="lbl">Motores únicos</b><code>/js/rentabilidad-calc.js</code> (la misma rentabilidad del Simulador y de la carta) · <code>/js/uac-tier.js</code> (el mismo tier UAC del backend) · <code>/js/preferencia-financiera.js</code> (la decisión, compartida con el informe de rentabilidad).</div>
+  </div>
+  <div class="afecta"><b>Afecta:</b> originación (§1) — la carta se emite en la financiera que indica; e informe de Rentabilidad de Créditos, que audita después con <b>los mismos umbrales</b>. <b>Depende de:</b> mantenedores de Tasas, Parámetros del Crédito (<code>pref_diff_pct</code>, <code>pref_rent_minima</code>), UF y Preferencia Financiera.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<!-- v1.0 — ¿Dónde curso? PWA de decisión de financiera para ejecutivos -->
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#012d70">
+<title>¿Dónde curso? — AutoFácil</title>
+<link rel="manifest" href="/donde-curso/manifest.json">
+<link rel="apple-touch-icon" href="/donde-curso/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --cyan:#009AFE; --bg:#eef2f7; --line:#dbe3ec; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:#1f2937;
+         padding-bottom:env(safe-area-inset-bottom); }
+
+  /* ── Login ── */
+  #loginView { position:fixed; inset:0; background:linear-gradient(160deg,#012d70,#0141A2 55%,#009AFE);
+               display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px; z-index:1000; }
+  #loginView img { height:52px; filter:brightness(0) invert(1); margin-bottom:10px; }
+  #loginView .sub { color:rgba(255,255,255,.85); font-size:.8rem; font-weight:700; letter-spacing:2px;
+                    text-transform:uppercase; margin-bottom:30px; }
+  #loginView input { width:100%; max-width:340px; border:none; border-radius:12px; padding:14px 16px; font-size:1rem; margin-bottom:12px; }
+  #loginView button { width:100%; max-width:340px; border:none; border-radius:12px; padding:14px; font-size:1rem;
+                      font-weight:700; background:#fff; color:var(--navy-dark); cursor:pointer; }
+  #loginErr { color:#fecaca; font-size:.85rem; min-height:22px; margin-top:10px; font-weight:600; text-align:center; }
+
+  /* ── Cabecera ── */
+  header { background:linear-gradient(135deg,var(--navy-dark),var(--navy)); color:#fff; padding:14px 16px;
+           padding-top:calc(14px + env(safe-area-inset-top)); display:flex; align-items:center; gap:10px;
+           position:sticky; top:0; z-index:20; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+  header .t { font-weight:800; font-size:1.05rem; line-height:1.15; }
+  header .u { font-size:.72rem; opacity:.85; }
+  header button { margin-left:auto; background:rgba(255,255,255,.15); border:none; color:#fff;
+                  border-radius:9px; padding:8px 10px; font-size:.9rem; }
+
+  .wrap { max-width:560px; margin:0 auto; padding:14px 14px 40px; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(0,0,0,.07); margin-bottom:14px; overflow:hidden; }
+  .card > h2 { margin:0; background:var(--navy-dark); color:#fff; font-size:.82rem; font-weight:700;
+               letter-spacing:.5px; padding:11px 14px; display:flex; align-items:center; gap:8px; }
+  .card .body { padding:14px; }
+
+  label { display:block; font-size:.68rem; font-weight:700; color:#64748b; letter-spacing:.6px;
+          text-transform:uppercase; margin-bottom:5px; }
+  label .aux { color:var(--cyan); }
+  input[type=text], input[type=number], input[type=email], input[type=password] {
+    width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px 13px; font-size:1.05rem;
+    font-weight:600; color:#0f172a; background:#f8fafc; }
+  input:focus { outline:none; border-color:var(--cyan); background:#fff; }
+  input[readonly] { background:#eef4ff; color:var(--navy); border-style:dashed; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .fld { margin-bottom:13px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { flex:1 1 auto; min-width:calc(50% - 4px); border:1.5px solid var(--line); background:#fff; color:#64748b;
+          border-radius:10px; padding:11px 8px; font-size:.82rem; font-weight:700; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; gap:6px; }
+  .chip.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .seg { display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border:none; background:#fff; color:#64748b; padding:12px 6px; font-size:.85rem;
+                font-weight:700; cursor:pointer; }
+  .seg button.on { background:var(--navy); color:#fff; }
+
+  /* ── Veredicto ── */
+  #veredicto { border-radius:16px; padding:22px 18px; text-align:center; color:#fff; margin-bottom:14px;
+               box-shadow:0 4px 18px rgba(0,0,0,.16); }
+  #veredicto .lbl { font-size:.7rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:.85; }
+  #veredicto .fin { font-size:2.1rem; font-weight:900; line-height:1.1; margin:6px 0 4px; }
+  #veredicto .por { font-size:.88rem; font-weight:600; opacity:.95; }
+  .v-af  { background:linear-gradient(135deg,#065f46,#059669); }
+  .v-un  { background:linear-gradient(135deg,#7c2d12,#ea580c); }
+  .v-tu  { background:linear-gradient(135deg,#1e3a8a,#3b82f6); }
+  .v-no  { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
+  .v-esp { background:linear-gradient(135deg,#475569,#94a3b8); }
+
+  .alerta { background:#fef3c7; border-left:4px solid #d97706; color:#78350f; border-radius:9px;
+            padding:11px 13px; font-size:.83rem; font-weight:600; margin-bottom:14px; display:flex; gap:9px; }
+
+  table.det { width:100%; border-collapse:collapse; font-size:.86rem; }
+  table.det td { padding:9px 4px; border-bottom:1px solid #f1f5f9; }
+  table.det td:last-child { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+  table.det tr.tot td { border-top:2px solid var(--line); border-bottom:none; font-size:.95rem;
+                        padding-top:11px; color:var(--navy-dark); }
+  .win { color:#059669; } .lose { color:#94a3b8; }
+  .mini { font-size:.74rem; color:#64748b; line-height:1.5; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(80px); background:#111827;
+           color:#fff; padding:11px 18px; border-radius:24px; font-size:.85rem; font-weight:600; opacity:0;
+           transition:.25s; z-index:900; max-width:90vw; text-align:center; }
+  #toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="loginView" style="display:none;">
+  <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+  <div class="sub">¿Dónde curso?</div>
+  <input id="liEmail" type="email" placeholder="Correo" autocomplete="username" inputmode="email">
+  <input id="liClave" type="password" placeholder="Contraseña" autocomplete="current-password"
+         onkeydown="if(event.key==='Enter')doLogin()">
+  <button onclick="doLogin()">Entrar</button>
+  <div id="loginErr"></div>
+</div>
+
+<div id="appView" style="display:none;">
+  <header>
+    <div>
+      <div class="t"><i class="bi bi-signpost-split-fill"></i> ¿Dónde curso?</div>
+      <div class="u" id="uNombre">—</div>
+    </div>
+    <button onclick="logout()" title="Salir"><i class="bi bi-box-arrow-right"></i></button>
+  </header>
+
+  <div class="wrap">
+    <div id="veredicto" class="v-esp">
+      <div class="lbl">Cursa en</div>
+      <div class="fin" id="vFin">—</div>
+      <div class="por" id="vPor">Completa el valor del vehículo y el pie.</div>
+    </div>
+
+    <div id="avisoMin" class="alerta" style="display:none">
+      <i class="bi bi-exclamation-triangle-fill"></i><span id="avisoMinTxt"></span>
+    </div>
+
+    <div class="card">
+      <h2><i class="bi bi-sliders"></i> DATOS DEL CRÉDITO</h2>
+      <div class="body">
+        <div class="row2">
+          <div class="fld"><label>Valor vehículo $</label>
+            <input id="iValor" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
+          <div class="fld"><label>Pie $</label>
+            <input id="iPie" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
+        </div>
+        <div class="fld"><label>Saldo precio $ <span class="aux">(calculado)</span></label>
+          <input id="iSaldo" type="text" readonly></div>
+        <div class="row2">
+          <div class="fld"><label>Plazo (cuotas)</label>
+            <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" value="48" oninput="calcular()"></div>
+          <div class="fld"><label>Tasa cliente % <span class="aux" id="tasaAux">(auto)</span></label>
+            <input id="iTasa" type="text" inputmode="decimal" placeholder="auto" oninput="calcular()"></div>
+        </div>
+
+        <div class="fld"><label>Seguros incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cDesg" onclick="tog(this)"><i class="bi bi-shield-check"></i> Desgravamen</div>
+            <div class="chip on" id="cRdh"  onclick="tog(this)"><i class="bi bi-car-front"></i> RDH</div>
+            <div class="chip on" id="cCesa" onclick="tog(this)"><i class="bi bi-briefcase"></i> Cesantía</div>
+            <div class="chip on" id="cRep"  onclick="tog(this)"><i class="bi bi-tools"></i> Rep. menores</div>
+          </div>
+        </div>
+
+        <div class="fld"><label>Tipo dealer</label>
+          <div class="seg">
+            <button id="sPatio" class="on" onclick="setDealer(true)"><i class="bi bi-shop"></i> Patio</button>
+            <button id="sCalle"        onclick="setDealer(false)"><i class="bi bi-car-front-fill"></i> Calle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><i class="bi bi-calculator"></i> POR QUÉ</h2>
+      <div class="body">
+        <table class="det">
+          <tr><td>Monto financiado</td><td id="dMonto">—</td></tr>
+          <tr><td>Cuota mensual</td><td id="dCuota">—</td></tr>
+          <tr><td>Tasa aplicada</td><td id="dTasa">—</td></tr>
+          <tr class="tot"><td>Rentabilidad AutoFin</td><td id="dAF">—</td></tr>
+          <tr class="tot"><td>Rentabilidad Unidad de Crédito</td><td id="dUN">—</td></tr>
+          <tr><td>Diferencia entre las dos</td><td id="dDif">—</td></tr>
+        </table>
+        <p class="mini" id="notaCuadro" style="margin:12px 0 0"></p>
+      </div>
+    </div>
+
+    <p class="mini" id="pie" style="text-align:center"></p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/comision-dealer.js"></script>
+<script src="/js/rentabilidad-core.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
+<script src="/js/preferencia-financiera.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ¿DÓNDE CURSO? — PWA para el ejecutivo en el patio.
+
+   No calcula nada propio: arma los datos, se los pasa a los motores únicos
+   (AF_RENT para la rentabilidad, AF_PREF para la decisión) y muestra el
+   resultado. Si el cálculo cambia en el Simulador, cambia acá solo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const API = '/api';
+const $ = id => document.getElementById(id);
+let TOKEN = localStorage.getItem('token');
+let P = {}, T = {}, UF = null, OPS_UAC = 0, MES_UAC = '', PREF_TABLA = [];
+let ES_PATIO = true;
+
+const H  = () => ({ 'Authorization': 'Bearer ' + TOKEN });
+const fN = n => Math.round(n).toLocaleString('es-CL');
+const fCLP = n => '$' + fN(n);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/donde-curso/sw.js').catch(()=>{});
+
+/* ── Boot ── */
+(async function boot(){
+  if (!TOKEN) return mostrarLogin();
+  try {
+    const r = await fetch(API + '/auth/mis-permisos', { headers: H() });
+    if (r.status === 401 || r.status === 403) return mostrarLogin();
+    const j = await r.json();
+    const u = (j.data && j.data.usuario) || j.usuario || {};
+    $('uNombre').textContent = u.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : 'Ejecutivo';
+  } catch (e) { /* sin señal: seguimos con lo que haya en caché */ }
+  $('appView').style.display = '';
+  await cargarBase();
+  calcular();
+})();
+
+function mostrarLogin(){ $('loginView').style.display=''; $('appView').style.display='none'; }
+async function doLogin(){
+  $('loginErr').textContent = '';
+  try {
+    const r = await fetch(API + '/auth/login', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: $('liEmail').value.trim(), password: $('liClave').value }) });
+    const j = await r.json();
+    if (!j.success) { $('loginErr').textContent = j.error || 'Credenciales inválidas'; return; }
+    TOKEN = j.data.token;
+    localStorage.setItem('token', TOKEN);
+    const u = j.data.usuario || {};
+    $('uNombre').textContent = ((u.nombre||'') + ' ' + (u.apellido||'')).trim() || 'Ejecutivo';
+    $('loginView').style.display = 'none';
+    $('appView').style.display = '';
+    await cargarBase();
+    calcular();
+  } catch (e) { $('loginErr').textContent = 'Sin conexión al servidor'; }
+}
+function logout(){ localStorage.removeItem('token'); location.reload(); }
+
+/* ── Base de cálculo. Se cachea en el teléfono: en el patio la señal falla y la
+      app tiene que seguir respondiendo con los últimos parámetros conocidos. ── */
+async function cargarBase(){
+  const cache = () => { try { return JSON.parse(localStorage.getItem('dc_base')||'null'); } catch(e){ return null; } };
+  try {
+    const [rp, rt, ru, rv, rf] = await Promise.all([
+      fetch(API + '/parametros-credito',                 { headers:H() }),
+      fetch(API + '/tasas/vigente',                      { headers:H() }),
+      fetch(API + '/parametros-credito/uac-ops-vigente', { headers:H() }),
+      fetch(API + '/uf/vigente',                         { headers:H() }),
+      fetch(API + '/cartas-params/financiera_preferencia',{ headers:H() }),
+    ]);
+    const [jp, jt, ju, jv, jf] = await Promise.all([rp.json(), rt.json(), ru.json(), rv.json(), rf.json()]);
+    if (jp.success && jp.data && jp.data.lista) { P = {}; jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); }); }
+    if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
+    if (ju.success && ju.data) { OPS_UAC = ju.data.ops || 0; MES_UAC = ju.data.mes || ''; }
+    const u = jv && jv.data ? (Array.isArray(jv.data) ? jv.data[0] : jv.data) : null;
+    if (u && u.valor) UF = parseFloat(u.valor);
+    try { const t = JSON.parse(jf.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } catch(e){}
+    localStorage.setItem('dc_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, at: Date.now() }));
+    $('pie').textContent = 'UF $' + (UF?fN(UF):'—') + ' · tier UAC con ' + OPS_UAC + ' ops de ' + (MES_UAC||'el mes');
+  } catch (e) {
+    const c = cache();
+    if (c) {
+      P=c.P; T=c.T; UF=c.UF; OPS_UAC=c.OPS_UAC; MES_UAC=c.MES_UAC; PREF_TABLA=c.PREF_TABLA||[];
+      const dias = Math.floor((Date.now()-(c.at||0))/86400000);
+      $('pie').textContent = 'Sin señal — usando datos guardados' + (dias?(' hace '+dias+' día'+(dias===1?'':'s')):' recién');
+      toast('Sin conexión: cálculo con los últimos parámetros');
+    } else {
+      $('pie').textContent = 'Sin conexión y sin datos guardados: conéctate una vez para poder calcular.';
+    }
+  }
+}
+
+/* ── Inputs ── */
+function fmtMiles(inp){
+  let raw = inp.value.replace(/[^0-9]/g,'');
+  inp.value = raw ? '$' + parseInt(raw,10).toLocaleString('es-CL') : '';
+}
+const parseMiles = s => parseInt((s||'').replace(/[^0-9]/g,''),10) || 0;
+function tog(el){ el.classList.toggle('on'); calcular(); }
+function setDealer(patio){
+  ES_PATIO = patio;
+  $('sPatio').classList.toggle('on', patio);
+  $('sCalle').classList.toggle('on', !patio);
+  calcular();
+}
+
+/* ── Cálculo + veredicto ── */
+function calcular(){
+  const valor = parseMiles($('iValor').value);
+  const pie   = parseMiles($('iPie').value);
+  const plazo = Math.min(72, Math.max(1, parseInt($('iPlazo').value) || 0));
+  const saldo = valor - pie;
+  $('iSaldo').value = saldo > 0 ? '$' + fN(saldo) : '';
+
+  if (!valor || !plazo || saldo <= 0 || !window.AF_RENT) return esperando();
+
+  // Tasa: si el ejecutivo no escribe una, manda la TMC automática del motor.
+  const tasaTxt = ($('iTasa').value||'').replace(',','.').replace(/[^0-9.]/g,'');
+  const tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
+  $('tasaAux').textContent = tasaTxt ? '(manual)' : '(auto)';
+
+  // % UAC del tier vigente — motor único uac-tier.js (el mismo del backend).
+  let uacPct = null;
+  if (window.AF_UAC_TIER) uacPct = AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, P);
+
+  const R = AF_RENT.calcular({
+    valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct,
+    gastos:  { prenda:true, gps:true, rep: on('cRep'), lim:true },
+    seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
+  }, P, UF, T);
+  if (!R) return esperando();
+
+  const D = AF_PREF.decidir({
+    rentAF: R.af.rentab, rentUAC: R.uac.rentab, plazo, saldo,
+    tabla: PREF_TABLA, UF,
+    diffPct:    P.pref_diff_pct,
+    rentMinima: P.pref_rent_minima,
+  });
+
+  pintar(R, D, plazo, saldo);
+}
+const on = id => $(id).classList.contains('on');
+
+function esperando(){
+  $('veredicto').className = 'v-esp';
+  $('vFin').textContent = '—';
+  $('vPor').textContent = 'Completa el valor del vehículo, el pie y el plazo.';
+  $('avisoMin').style.display = 'none';
+  ['dMonto','dCuota','dTasa','dAF','dUN','dDif'].forEach(i => $(i).textContent = '—');
+  $('notaCuadro').textContent = '';
+}
+
+function pintar(R, D, plazo, saldo){
+  const MAP = {
+    AUTOFIN:    { cls:'v-af', txt:'AUTOFIN' },
+    UNIDAD:     { cls:'v-un', txt:'UNIDAD DE CRÉDITO' },
+    DECIDES_TU: { cls:'v-tu', txt:'DECIDES TÚ' },
+    NINGUNA:    { cls:'v-no', txt:'NINGUNA' },
+  };
+  const m = MAP[D.veredicto] || MAP.NINGUNA;
+  $('veredicto').className = m.cls;
+  $('vFin').textContent = m.txt;
+  $('vPor').textContent = D.motivo;
+
+  // Aviso de rentabilidad mínima: se cursa igual, pero que nadie diga que no se avisó.
+  const min = (P.pref_rent_minima != null ? P.pref_rent_minima : AF_PREF.RENT_MIN_DEF);
+  if (D.bajoMinimo && D.veredicto !== 'NINGUNA') {
+    $('avisoMin').style.display = '';
+    $('avisoMinTxt').innerHTML = 'Esta operación deja <b>' + fCLP(D.rentGanadora) +
+      '</b>, bajo el mínimo de ' + fCLP(min) + ' por operación. Conviene revisarla antes de cursar.';
+  } else $('avisoMin').style.display = 'none';
+
+  $('dMonto').textContent = fCLP(R.monto_fin);
+  $('dCuota').textContent = fCLP(R.af.cuota);
+  $('dTasa').textContent  = R.tasaCliPct.toFixed(2).replace('.',',') + '% mensual · ' +
+                            (R.esMayor ? 'mayor' : 'menor') + ' 200 UF';
+  const gAF = D.ganadora === 'AF', gUN = D.ganadora === 'UAC';
+  $('dAF').innerHTML = '<span class="' + (gAF?'win':'lose') + '">' + fCLP(R.af.rentab)  + '</span>';
+  $('dUN').innerHTML = '<span class="' + (gUN?'win':'lose') + '">' + fCLP(R.uac.rentab) + '</span>';
+  $('dDif').textContent = isFinite(D.diffPct)
+    ? fCLP(Math.abs(R.af.rentab - R.uac.rentab)) + '  (' + D.diffPct.toFixed(1).replace('.',',') + '%)'
+    : fCLP(Math.abs(R.af.rentab - R.uac.rentab));
+
+  // Qué dijo el cuadro de preferencia (lo que hoy se mira en papel)
+  let nota = '';
+  if (!D.elegible.af || !D.elegible.uac) {
+    const fuera = !D.elegible.af ? 'AutoFin' : 'Unidad de Crédito';
+    nota = 'El cuadro de preferencia no habilita a <b>' + fuera + '</b> para ' + plazo +
+           ' cuotas con saldo ' + fCLP(saldo) + '.';
+  } else if (D.prefCuadro) {
+    const pc = D.prefCuadro === 'AF' ? 'AutoFin' : 'Unidad de Crédito';
+    nota = 'El cuadro de preferencia marca <b>' + pc + '</b> como primera opción para este tramo.';
+  }
+  $('notaCuadro').innerHTML = nota;
+}
+</script>
+</body>
+</html>

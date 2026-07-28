@@ -2424,4 +2424,37 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b47', async () => {
   } catch (e) { console.error('[perfiles migration v47]', e.message); }
 });
 
+/* v48 — PWA "¿Dónde curso?": le dice al ejecutivo en el patio en qué financiera
+   conviene cursar. Nace habilitada para los perfiles que cursan operaciones; el
+   resto se administra desde Perfiles y Permisos como cualquier otra card. */
+require('../../../../shared/migrate').migrarAuto('perfiles_b48', async () => {
+  try {
+    let [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/donde-curso/' LIMIT 1");
+    if (!mod) {
+      const [[o]] = await pool.query('SELECT COALESCE(MAX(orden),0)+1 AS n FROM modulos');
+      const [ins] = await pool.query(
+        `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+         VALUES ('¿Dónde Curso?','Dice en qué financiera conviene cursar el crédito según la rentabilidad',
+                 'bi-signpost-split-fill','/donde-curso/', ?, 'activo')`, [o.n]);
+      mod = { id_modulo: ins.insertId };
+    }
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='donde_curso_ver'");
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [mod.id_modulo, '¿Dónde Curso?', 'donde_curso_ver', '/donde-curso/', 'bi-signpost-split-fill']);
+      idF = ins.insertId;
+    }
+    // Sin fila en permisos_perfil la card no aparece — tampoco al Administrador.
+    const perfiles = ['Administrador', 'Ejecutivo Comercial', 'Ejecutivo Remoto', 'Supervisor Comercial',
+                      'Jefe Comercial', 'Gerente de Operaciones y Crédito', 'Gerente General'];
+    const [ps] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre IN (?)', [perfiles]);
+    for (const p of ps) await pool.query(
+      'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
+      [p.id_perfil, idF]);
+    console.log('✓ Perfiles v48: módulo ¿Dónde Curso? registrado (' + ps.length + ' perfiles)');
+  } catch (e) { console.error('[perfiles migration v48]', e.message); }
+});
+
 module.exports = { getAllPerfiles, getModulosConFuncionalidades, getPermisosPerfil, updatePermisosPerfil, masivoPermisos, reordenarModulos, createPerfil, updatePerfil, deletePerfil, getUsuariosByPerfil };
