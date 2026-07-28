@@ -745,6 +745,17 @@ const upsert = async (req, res) => {
       if (crDup) return res.status(409).json({ success: false, data: null,
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
     }
+    /* El navegador manda las horas con new Date().toISOString() → viene en UTC
+       ("...T18:33:44.000Z"). Como string, MySQL la guardaba TAL CUAL en una columna
+       que se lee en hora de Chile: toda carta quedaba ~4 horas en el futuro (de ahí
+       los "-238 min en el pool"). Convertida a Date, mysql2 la escribe en la zona
+       del pool y la hora queda buena. Las que ya vienen en hora local (sin Z ni
+       offset) se dejan intactas: convertirlas sí las movería. */
+    const dt = v => {
+      if (!v) return null;
+      if (v instanceof Date) return v;
+      return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(String(v).trim()) ? new Date(v) : v;
+    };
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
@@ -754,17 +765,17 @@ const upsert = async (req, res) => {
       c.plazo || null, c.acreedor, c.parque,
       c.concesionario, c.rutConc, c.vendedor,
       c.partNeto || null, c.partIVA || null, c.partBruto || null,
-      c.fecha || null, c.fechaCreacion || new Date(),
+      c.fecha || null, dt(c.fechaCreacion) || new Date(),
       c.creadoPor, c.creadoPorNombre, c.creadoPorInitials,
       c.status || 'PENDIENTE',
       c.aprobadoPor || null, c.aprobadoPorNombre || null, c.aprobadoPorInitials || null,
-      c.fechaAprobacion || null,
+      dt(c.fechaAprobacion),
       c.rechazadoPor || null, c.rechazadoPorNombre || null,
-      c.fechaRechazo || null, c.motivoRechazo || null,
-      c.anuladoPor || null, c.fechaAnulacion || null,
-      c.eliminadoPor || null, c.fechaEliminacion || null,
-      c.fechaCorreccion || null, c.corregidoPor || null,
-      c.otorgado ? 1 : 0, c.fechaOtorgado || null,
+      dt(c.fechaRechazo), c.motivoRechazo || null,
+      c.anuladoPor || null, dt(c.fechaAnulacion),
+      c.eliminadoPor || null, dt(c.fechaEliminacion),
+      dt(c.fechaCorreccion), c.corregidoPor || null,
+      c.otorgado ? 1 : 0, dt(c.fechaOtorgado),
       c.tasaCredito || null,
       c.montoCreditoCLP || null,
       c.montoCreditoUF || null,
