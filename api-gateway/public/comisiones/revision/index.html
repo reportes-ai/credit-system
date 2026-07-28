@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.20</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.21</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -892,7 +892,8 @@ function generarInforme() {
     const desglose = `
       <div style="background:#f0f4f8;border-radius:8px;padding:14px 18px;margin-top:12px">
         <table style="width:100%;font-size:12.5px;border-collapse:collapse">
-          <tr><td style="padding:4px 0;color:#374151">Incentivo Base (0,75% ≤24c / 1,00% &gt;24c)</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtN(d.incentivo_base)}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">Incentivo Base (0,75% &lt;24c / 1,00% ≥24c)</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtN(d.incentivo_base)}</td></tr>
+          <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. RDH ${d.cumple_rdh?'(cruce '+pctN(d.cruce_rdh)+', ajuste '+pctN(d.ajuste_rdh)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600">${d.cumple_rdh?fmtN(d.bono_rdh):'$0'}</td></tr>
           <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Cesantía ${d.cumple_cesantia?'(cruce '+pctN(d.cruce_cesantia)+', ajuste '+pctN(d.ajuste_cesantia)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600">${d.cumple_cesantia?fmtN(d.bono_cesantia):'$0'}</td></tr>
           <tr><td style="padding:4px 0;color:#374151">+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(cruce '+pctN(d.cruce_reparaciones)+', ajuste '+pctN(d.ajuste_reparaciones)+')':'— no cumple'}</td><td style="padding:4px 0;text-align:right;font-weight:600">${d.cumple_reparaciones?fmtN(d.bono_reparaciones):'$0'}</td></tr>
           <tr><td style="padding:4px 0;color:#374151">+ Bono Calidad (ajuste ${pctN(d.ajuste_calidad)})</td><td style="padding:4px 0;text-align:right;font-weight:600">${fmtN(d.bono_calidad)}</td></tr>
@@ -900,6 +901,15 @@ function generarInforme() {
             <td style="padding:8px 0 0;font-weight:700;color:#0141A2;font-size:13px">= INCENTIVO FINAL</td>
             <td style="padding:8px 0 0;text-align:right;font-weight:800;color:#0141A2;font-size:15px">${fmtN(d.incentivo_final)}</td>
           </tr>
+          ${(d.descuentos||[]).length ? `
+          <tr><td colspan="2" style="padding:10px 0 2px;font-weight:700;color:#b91c1c;font-size:11px;text-transform:uppercase;letter-spacing:.8px">Reversas — prepagos y anulaciones del mes anterior</td></tr>
+          ${(d.descuentos||[]).map(r => `<tr><td style="padding:4px 0;color:#374151">${escHtml(r.glosa)}${r.revisar?' <i style="color:#92400e">(pendiente de revisión: '+escHtml(r.revisar)+')</i>':''}</td><td style="padding:4px 0;text-align:right;font-weight:600;color:#b91c1c">${r.revisar?'—':'−'+fmtN(r.descuento)}</td></tr>`).join('')}
+          <tr style="border-top:2px solid #c5cae9">
+            <td style="padding:8px 0 0;font-weight:700;color:#0141A2;font-size:13px">= TOTAL A PAGAR (con semana corrida)</td>
+            <td style="padding:8px 0 0;text-align:right;font-weight:800;color:#0141A2;font-size:15px">${fmtN(d.con_semana_corrida)}</td>
+          </tr>
+          ${(d.saldo_descuento||0) > 0 ? `<tr><td colspan="2" style="padding:6px 0 0;font-size:11.5px;color:#92400e">Queda ${fmtN(d.saldo_descuento)} sin revertir: la reversa supera la comisión del mes y no se deja en negativo.</td></tr>` : ''}
+          ` : ''}
         </table>
       </div>`;
 
