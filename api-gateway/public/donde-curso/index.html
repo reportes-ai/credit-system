@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — Gastos incluidos seleccionables (calzar exacto con el Simulador) -->
+<!-- v1.2 — Sin cifras de rentabilidad: el ejecutivo ve DONDE cursar, no el margen -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -171,16 +171,15 @@
       </div>
     </div>
 
+    <!-- Sin cifras de rentabilidad ni de margen: la app le dice al ejecutivo
+         DÓNDE cursar, no cuánto gana la empresa en cada financiera. -->
     <div class="card">
-      <h2><i class="bi bi-calculator"></i> POR QUÉ</h2>
+      <h2><i class="bi bi-info-circle"></i> DE LA OPERACIÓN</h2>
       <div class="body">
         <table class="det">
           <tr><td>Monto financiado</td><td id="dMonto">—</td></tr>
           <tr><td>Cuota mensual</td><td id="dCuota">—</td></tr>
           <tr><td>Tasa aplicada</td><td id="dTasa">—</td></tr>
-          <tr class="tot"><td>Rentabilidad AutoFin</td><td id="dAF">—</td></tr>
-          <tr class="tot"><td>Rentabilidad Unidad de Crédito</td><td id="dUN">—</td></tr>
-          <tr><td>Diferencia entre las dos</td><td id="dDif">—</td></tr>
         </table>
         <p class="mini" id="notaCuadro" style="margin:12px 0 0"></p>
       </div>
@@ -274,7 +273,7 @@ async function cargarBase(){
     if (u && u.valor) UF = parseFloat(u.valor);
     try { const t = JSON.parse(jf.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } catch(e){}
     localStorage.setItem('dc_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, at: Date.now() }));
-    $('pie').textContent = 'UF $' + (UF?fN(UF):'—') + ' · tier UAC con ' + OPS_UAC + ' ops de ' + (MES_UAC||'el mes');
+    $('pie').textContent = 'UF de hoy $' + (UF?fN(UF):'—');
   } catch (e) {
     const c = cache();
     if (c) {
@@ -344,7 +343,7 @@ function esperando(){
   $('vFin').textContent = '—';
   $('vPor').textContent = 'Completa el valor del vehículo, el pie y el plazo.';
   $('avisoMin').style.display = 'none';
-  ['dMonto','dCuota','dTasa','dAF','dUN','dDif'].forEach(i => $(i).textContent = '—');
+  ['dMonto','dCuota','dTasa'].forEach(i => $(i).textContent = '—');
   $('notaCuadro').textContent = '';
 }
 
@@ -358,26 +357,27 @@ function pintar(R, D, plazo, saldo){
   const m = MAP[D.veredicto] || MAP.NINGUNA;
   $('veredicto').className = m.cls;
   $('vFin').textContent = m.txt;
-  $('vPor').textContent = D.motivo;
+  /* El motivo que devuelve el motor trae el % de diferencia. Acá se traduce a
+     palabras: la app dice DÓNDE cursar, no cuánto gana la empresa en cada una.
+     El detalle numérico vive en el Simulador de Rentabilidad, con su permiso. */
+  let por;
+  if (D.veredicto === 'DECIDES_TU')      por = 'Da lo mismo para la empresa: elige tú según el dealer o la rapidez del curse.';
+  else if (D.veredicto === 'NINGUNA')    por = 'Ninguna financiera toma este plazo con este saldo.';
+  else if (!D.elegible.af || !D.elegible.uac) por = 'Es la única que toma este plazo con este saldo.';
+  else                                   por = 'Es la que más conviene para esta operación.';
+  $('vPor').textContent = por;
 
   // Aviso de rentabilidad mínima: se cursa igual, pero que nadie diga que no se avisó.
-  const min = (P.pref_rent_minima != null ? P.pref_rent_minima : AF_PREF.RENT_MIN_DEF);
   if (D.bajoMinimo && D.veredicto !== 'NINGUNA') {
     $('avisoMin').style.display = '';
-    $('avisoMinTxt').innerHTML = 'Esta operación deja <b>' + fCLP(D.rentGanadora) +
-      '</b>, bajo el mínimo de ' + fCLP(min) + ' por operación. Conviene revisarla antes de cursar.';
+    $('avisoMinTxt').innerHTML = 'Esta operación queda <b>bajo el mínimo</b> que la empresa espera por operación. ' +
+      'Se puede cursar, pero conviene revisarla con tu supervisor antes.';
   } else $('avisoMin').style.display = 'none';
 
   $('dMonto').textContent = fCLP(R.monto_fin);
   $('dCuota').textContent = fCLP(R.af.cuota);
   $('dTasa').textContent  = R.tasaCliPct.toFixed(2).replace('.',',') + '% mensual · ' +
                             (R.esMayor ? 'mayor' : 'menor') + ' 200 UF';
-  const gAF = D.ganadora === 'AF', gUN = D.ganadora === 'UAC';
-  $('dAF').innerHTML = '<span class="' + (gAF?'win':'lose') + '">' + fCLP(R.af.rentab)  + '</span>';
-  $('dUN').innerHTML = '<span class="' + (gUN?'win':'lose') + '">' + fCLP(R.uac.rentab) + '</span>';
-  $('dDif').textContent = isFinite(D.diffPct)
-    ? fCLP(Math.abs(R.af.rentab - R.uac.rentab)) + '  (' + D.diffPct.toFixed(1).replace('.',',') + '%)'
-    : fCLP(Math.abs(R.af.rentab - R.uac.rentab));
 
   // Qué dijo el cuadro de preferencia (lo que hoy se mira en papel)
   let nota = '';
