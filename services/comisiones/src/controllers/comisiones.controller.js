@@ -331,10 +331,15 @@ function calcularComision(creditos, vars, mes) {
      · prepagada hasta el 6º mes                            → se descuenta el 50%
      · anulada, cualquiera sea la fecha                     → se descuenta el 100%
 
-   El descuento se imputa al mes en que OCURRE el hecho (no se reabre el mes ya
-   pagado: los meses cerrados son inmutables). Por eso el cálculo es determinista
-   e idempotente — recalcular cualquier mes da siempre lo mismo, sin tabla de
-   control ni riesgo de descontar dos veces.
+   El descuento se imputa al mes SIGUIENTE al del hecho: cuando la operación se
+   prepaga o anula, la comisión del mes en curso ya está calculada y camino a
+   pago, así que la reversa entra en la liquidación siguiente. No se reabre
+   ningún mes cerrado. Por eso el cálculo es determinista e idempotente —
+   recalcular cualquier mes da siempre lo mismo, sin tabla de control ni riesgo
+   de descontar dos veces.
+
+   Solo se revierten operaciones que efectivamente fueron OTORGADAS: si nunca
+   llegó a otorgarse, nunca hubo comisión que devolver.
 
    Fecha del hecho: anulación → creditos.fecha_estado · prepago → última
    cuotas_credito.fecha_pago (la misma fuente que usa el certificado de prepago).
@@ -346,6 +351,13 @@ function fechaLocal(f) {
   if (f instanceof Date) return new Date(f.getFullYear(), f.getMonth(), f.getDate());
   const [y, m, d] = String(f).slice(0, 10).split('-').map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/* Mes calendario anterior a un 'YYYY-MM'. */
+function mesAnterior(ym) {
+  let [y, m] = String(ym).split('-').map(Number);
+  m--; if (m < 1) { m = 12; y--; }
+  return `${y}-${String(m).padStart(2, '0')}`;
 }
 
 /* Meses COMPLETOS transcurridos entre dos fechas (25-ene → 25-abr = 3). Informativo. */
@@ -399,9 +411,16 @@ async function descuentosDelMes(mes, vars) {
   const porEjecutivo = {};
   if (!(vars.dctos_activo > 0)) return porEjecutivo;
 
-  // Operaciones que murieron en este mes y que YA devengaron comisión en un mes
-  // anterior. Las anuladas dentro de su propio mes de otorgamiento no entran:
-  // nunca se pagaron (dejan de ser OTORGADO y salen del cálculo de ese mes).
+  // El hecho ocurre un mes y se revierte al siguiente: para el mes que se está
+  // calculando, se buscan los prepagos y anulaciones del mes anterior.
+  const mesHecho = mesAnterior(mes);
+
+  // Operaciones OTORGADAS que murieron en el mes del hecho y que ya devengaron
+  // comisión en un mes anterior. Las anuladas dentro de su propio mes de
+  // otorgamiento no entran: salen del cálculo de ese mes, nunca se pagaron.
+  //   · prepagadas → siguen siendo OTORGADO, con la cartera en PREPAGADO
+  //   · anuladas   → el estado pasó a ANULADO y pisó el OTORGADO, así que la
+  //     prueba de que se otorgó (y se comisionó) es tener fecha_otorgado
   const [ops] = await pool.query(
     `SELECT c.num_op, c.ejecutivo, c.monto_financiado, c.plazo,
             c.fecha_otorgado, c.fecha_primera_cuota, c.fecha_estado,
@@ -411,9 +430,10 @@ async function descuentosDelMes(mes, vars) {
      FROM creditos c
      WHERE c.ejecutivo IS NOT NULL AND c.ejecutivo != ''
        AND c.fecha_otorgado IS NOT NULL
-       AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') < ?
+       AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') <= ?
        AND (UPPER(COALESCE(c.estado_credito,'')) = 'ANULADO'
-         OR UPPER(COALESCE(c.estado_cartera,''))  = 'PREPAGADO')`, [mes]);
+         OR (UPPER(COALESCE(c.estado_cartera,'')) = 'PREPAGADO'
+             AND UPPER(COALESCE(c.estado_credito,'')) = 'OTORGADO'))`, [mesHecho]);
 
   const factorOrigen = fabricaFactorOrigen(vars);
   const MES_T1 = vars.dcto_meses_t1 > 0 ? vars.dcto_meses_t1 : 3;
@@ -423,7 +443,10 @@ async function descuentosDelMes(mes, vars) {
   for (const o of ops) {
     const anulada = o.estado_credito === 'ANULADO';
     const fechaHecho = anulada ? o.fecha_estado : (o.fecha_ult_pago || o.fecha_estado);
-    if (!fechaHecho || ymd(fechaHecho).slice(0, 7) !== mes) continue;  // el hecho no ocurrió en este mes
+    if (!fechaHecho || ymd(fechaHecho).slice(0, 7) !== mesHecho) continue;
+    const mesOrigen = ymd(o.fecha_otorgado).slice(0, 7);
+    // Anulada dentro de su propio mes de otorgamiento: nunca se comisionó.
+    if (anulada && mesOrigen >= mesHecho) continue;
 
     let pct = 0, meses = null, revisar = null;
     if (anulada) {
@@ -440,7 +463,6 @@ async function descuentosDelMes(mes, vars) {
       else                                                         pct = 0;   // fuera de plazo: no se descuenta
     }
 
-    const mesOrigen = ymd(o.fecha_otorgado).slice(0, 7);
     const { factor_ajuste, factor_sc } = await factorOrigen(mesOrigen, o.ejecutivo);
     const monto = parseFloat(o.monto_financiado) || 0;
     const base  = monto * (parseInt(o.plazo) < 24 ? vars.pct_24 : vars.pct_mas24);
@@ -451,6 +473,8 @@ async function descuentosDelMes(mes, vars) {
 
     (porEjecutivo[o.ejecutivo] = porEjecutivo[o.ejecutivo] || []).push({
       num_op: o.num_op, tipo: anulada ? 'ANULADA' : 'PREPAGADA',
+      // Glosa con la que la reversa aparece en la liquidación de sueldo
+      glosa: `Reversa comisión pagada OP${o.num_op} ${anulada ? 'Anulación' : 'Prepago'}`,
       fecha_hecho: ymd(fechaHecho), mes_origen: mesOrigen,
       fecha_primera_cuota: ymd(o.fecha_primera_cuota),
       meses_transcurridos: meses, monto_financiado: monto, plazo: parseInt(o.plazo) || null,

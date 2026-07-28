@@ -375,6 +375,14 @@ function calcLiquidacion(inp, ind) {
   const dias = inp.dias == null || inp.dias === '' ? 30 : Math.max(0, Math.min(30, Number(inp.dias)));
   const sueldo = R(R(inp.sueldo_base) * dias / 30), comisiones = R(inp.comisiones), otrosImp = R(inp.otros_imponibles);
   const colacion = R(inp.colacion), movilizacion = R(inp.movilizacion), otrosNoImp = R(inp.otros_no_imponibles);
+  // Reversas de comisión (prepago/anulación, cláusula novena del anexo): vienen
+  // del motor de comisiones con su glosa y se descuentan al líquido, cada una en
+  // su propia línea. NO rebajan el imponible del mes: lo que se revierte ya
+  // cotizó y tributó en el mes en que se pagó.
+  const reversas = (Array.isArray(inp.reversas_comision) ? inp.reversas_comision : [])
+    .map(r => ({ glosa: String(r.glosa || 'Reversa comisión'), monto: R(r.monto) }))
+    .filter(r => r.monto > 0);
+  const totalReversas = reversas.reduce((s, r) => s + r.monto, 0);
   const otrosDesc = R(inp.otros_descuentos);
 
   const baseGrat = sueldo + comisiones + otrosImp;
@@ -408,7 +416,7 @@ function calcLiquidacion(inp, ind) {
   impuesto = Math.max(0, impuesto);
 
   const totalHaberes = imponible + colacion + movilizacion + otrosNoImp;
-  const totalDescuentos = descAfp + descSalud + descSaludAdicional + descAfc + impuesto + otrosDesc;
+  const totalDescuentos = descAfp + descSalud + descSaludAdicional + descAfc + impuesto + otrosDesc + totalReversas;
   // Aportes del EMPLEADOR (no afectan el líquido; alimentan costo empresa/Previred)
   const aporteSis = R(baseCotiz * (ind.rem_sis_pct || 0) / 100);
   const aporteAfcEmp = R(baseAfc * ((esIndef ? ind.rem_afc_emp_pct : ind.rem_afc_emp_pfijo_pct) || 0) / 100);
@@ -423,7 +431,8 @@ function calcLiquidacion(inp, ind) {
     plan_isapre_uf: planUF || null, desc_salud_adicional: descSaludAdicional,
     afc_pct: esIndef ? ind.rem_afc_trabajador_pct : 0, desc_afc: descAfc, base_afc: baseAfc,
     base_tributable: baseTrib, impuesto,
-    otros_descuentos: otrosDesc, total_descuentos: totalDescuentos,
+    otros_descuentos: otrosDesc, reversas_comision: reversas, total_reversas: totalReversas,
+    total_descuentos: totalDescuentos,
     liquido: totalHaberes - totalDescuentos,
     aporte_sis: aporteSis, aporte_afc_emp: aporteAfcEmp, aporte_mutual: aporteMutual,
     costo_empresa: totalHaberes + aporteSis + aporteAfcEmp + aporteMutual,
@@ -484,10 +493,23 @@ async function comisionesDelMes(mes) {
   try {
     const { calcularMes } = require('../../../comisiones/src/controllers/comisiones.controller');
     const filas = await calcularMes(mes);
-    const porNombre = {};
-    for (const f of filas) porNombre[String(f.ejecutivo || '').toUpperCase().trim()] = R(f.con_semana_corrida || f.incentivo_final);
-    return porNombre;
-  } catch (e) { console.error('[remuneraciones comisiones]', e.message); return {}; }
+    const comis = {}, reversas = {};
+    for (const f of filas) {
+      const clave = String(f.ejecutivo || '').toUpperCase().trim();
+      // Comision BRUTA: la reversa NO se netea aca, va como linea de descuento
+      // con su glosa. Hacer las dos cosas descontaria dos veces.
+      comis[clave] = R(f.con_semana_corrida_bruto != null
+        ? f.con_semana_corrida_bruto : (f.con_semana_corrida || f.incentivo_final));
+      const lista = (f.descuentos || []).filter(d => (d.descuento || 0) > 0);
+      if (!lista.length || !(f.descuento_aplicado > 0)) continue;
+      // Si el descuento no cupo entero en la comision del mes, se prorratea lo
+      // aplicado entre las reversas para que las lineas sumen exactamente eso.
+      // El saldo no aplicado queda visible en Revision de Comisiones.
+      const prop = f.descuento_aplicado / f.total_descuentos;
+      reversas[clave] = lista.map(d => ({ glosa: d.glosa, monto: R(d.descuento * prop) }));
+    }
+    return { comis, reversas };
+  } catch (e) { console.error('[remuneraciones comisiones]', e.message); return { comis: {}, reversas: {} }; }
 }
 
 /* ── GET /api/rrhh/remuneraciones?mes=YYYY-MM ───────────────────────────────── */
@@ -505,7 +527,7 @@ const getMes = async (req, res) => {
         ORDER BY nombre`, [mes]);
     const [guardadas] = await pool.query('SELECT * FROM rh_liquidaciones WHERE mes = ?', [mes]);
     const gMap = {}; guardadas.forEach(g => gMap[g.id_usuario] = g);
-    const comis = await comisionesDelMes(mes);
+    const { comis, reversas } = await comisionesDelMes(mes);
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
@@ -526,6 +548,7 @@ const getMes = async (req, res) => {
         dias: diasTrabajadosMes(mes, e.fecha_ingreso, lics[e.id_usuario], e.fecha_baja),
         colacion: e.colacion, movilizacion: e.movilizacion,
         comisiones: comis[String(e.nombre_corto).trim()] || 0,
+        reversas_comision: reversas[String(e.nombre_corto).trim()] || [],
         otros_imponibles: adics[e.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[e.id_usuario]?.noimp || 0,
         otros_descuentos: descs[e.id_usuario] || 0,
@@ -549,7 +572,7 @@ const guardar = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes || '') || !Array.isArray(filas)) return fail(res, 'mes y filas requeridos', 400);
     const ind = await indicadores(mes);
     // Se recalcula SIEMPRE desde las fuentes (nada viene digitado del libro)
-    const comis = await comisionesDelMes(mes);
+    const { comis, reversas } = await comisionesDelMes(mes);
     const adics = await adicionalesDelMes(mes);
     const descs = await descuentosDelMes(mes);
     const lics = await licenciasDelMes(mes);
@@ -570,6 +593,7 @@ const guardar = async (req, res) => {
         dias: diasTrabajadosMes(mes, emp.fecha_ingreso, lics[emp.id_usuario], emp.fecha_baja),
         colacion: emp.colacion, movilizacion: emp.movilizacion,
         comisiones: comis[String(emp.nombre_corto).trim()] || 0,
+        reversas_comision: reversas[String(emp.nombre_corto).trim()] || [],
         otros_imponibles: adics[emp.id_usuario]?.imp || 0,
         otros_no_imponibles: adics[emp.id_usuario]?.noimp || 0,
         otros_descuentos: descs[emp.id_usuario] || 0,
@@ -598,7 +622,7 @@ const emitir = async (req, res) => {
     const [[nb]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='BORRADOR'", [mes]);
     if (!nb.c) return fail(res, 'No hay borradores guardados para emitir en ' + mes, 400);
     // Gate: sin comisiones APROBADAS (Operaciones) no se emiten las liquidaciones
-    const sinAprobar = await comisionesSinAprobar(mes, await comisionesDelMes(mes));
+    const sinAprobar = await comisionesSinAprobar(mes, (await comisionesDelMes(mes)).comis);
     if (sinAprobar.length)
       return fail(res, `No se puede emitir: hay comisiones SIN APROBAR en Revisión de Comisiones para: ${sinAprobar.join(', ')}. Apruébalas primero en /comisiones/revision/.`, 409);
     const u = req.usuario || {};
@@ -641,7 +665,7 @@ async function enviarLiquidacionesCorreo(mes) {
         ${fila('Sueldo base' + (d.dias != null && d.dias !== 30 ? ` (${d.dias}/30 días)` : ''), d.sueldo_base)}${fila('Comisiones', d.comisiones)}${fila('Otros imponibles', d.otros_imponibles)}${fila('Gratificación legal', d.gratificacion)}${fila('Colación', d.colacion)}${fila('Movilización', d.movilizacion)}${fila('Otros no imponibles', d.otros_no_imponibles)}
         <tr><td style="padding:3px 10px;font-weight:700">Total haberes</td><td style="padding:3px 10px;text-align:right;font-weight:700">${co(d.total_haberes)}</td></tr>
         <tr><td colspan="2" style="background:#eff6ff;color:#1e3a8a;font-weight:700;padding:5px 10px">DESCUENTOS</td></tr>
-        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}
+        ${fila('AFP ' + (d.afp || ''), d.desc_afp, 1)}${fila('Salud 7%', d.desc_salud, 1)}${fila('Adicional Isapre', d.desc_salud_adicional, 1)}${fila('Seguro cesantía', d.desc_afc, 1)}${fila('Impuesto único', d.impuesto, 1)}${fila('Otros descuentos', d.otros_descuentos, 1)}${(d.reversas_comision || []).map(r => fila(r.glosa, r.monto, 1)).join('')}
         <tr><td style="padding:3px 10px;font-weight:700">Total descuentos</td><td style="padding:3px 10px;text-align:right;font-weight:700;color:#b91c1c">−${co(d.total_descuentos)}</td></tr>
         <tr><td style="padding:8px 10px;font-weight:800;font-size:14px">LÍQUIDO A PAGAR</td><td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;color:#15803d">${co(d.liquido)}</td></tr>
       </table>

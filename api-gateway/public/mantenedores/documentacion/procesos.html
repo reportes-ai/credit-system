@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.3 — Descuentos por prepago y anulacion en comisiones de ejecutivos (clausula novena del anexo) -->
+<!-- v3.4 — Reversas por prepago y anulacion en comisiones de ejecutivos (clausula novena del anexo) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -231,7 +231,7 @@
   </div>
   <ol>
     <li><b>Cálculo automático</b> (recálculo programado): piso + incentivo + ajustes por cumplimiento/calidad, por ejecutivo.</li>
-    <li><b>Descuentos por prepago y anulación</b> (cláusula novena del anexo, automático): si una operación ya comisionada se <b>prepaga</b> dentro de los 3 meses contados desde el <b>vencimiento de su primera cuota</b>, se devuelve el 100% de la comisión pagada por ella; hasta los 6 meses, el 50%; después, nada. Las <b>anuladas</b> devuelven el 100% siempre. El descuento se imputa al mes en que ocurre el hecho —los meses ya pagados no se reabren— y nunca deja la comisión en negativo: si el descuento la supera, el saldo queda informado en rojo para que Operaciones defina cómo recuperarlo. Tramos y porcentajes son paramétricos (Comisiones → Variables).</li>
+    <li><b>Descuentos por prepago y anulación</b> (cláusula novena del anexo, automático): si una operación ya comisionada se <b>prepaga</b> dentro de los 3 meses contados desde el <b>vencimiento de su primera cuota</b>, se devuelve el 100% de la comisión pagada por ella; hasta los 6 meses, el 50%; después, nada. Las <b>anuladas</b> devuelven el 100% siempre. La reversa se imputa al <b>mes siguiente</b> al del hecho (cuando ocurre, la comisión del mes en curso ya va camino a pago) y aparece en la liquidación como una línea propia con la glosa <i>Reversa comisión pagada OP12345 Prepago/Anulación</i>. Ningún mes ya pagado se reabre y la comisión nunca queda en negativo: si el descuento la supera, el saldo queda informado en rojo para que Operaciones defina cómo recuperarlo. Tramos y porcentajes son paramétricos (Comisiones → Variables).</li>
     <li><b>Revisión y aprobación</b> (Comisiones → Revisión): supervisor revisa a los suyos; la aprobación queda auditada. <b>Sin comisiones APROBADAS no se puede emitir el libro</b> (avisa en rojo).</li>
     <li><b>Libro de liquidaciones</b> (RRHH → Remuneraciones): todo llega solo — comisiones, días trabajados desde ingreso/licencias, adicionales y descuentos; vista previa por persona.</li>
     <li><b>EMITIR</b>: congela, envía cada liquidación por correo y alimenta LRE, F29 (código 048) y la contabilidad.</li>

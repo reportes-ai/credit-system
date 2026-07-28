@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Remuneraciones — AutoFácil</title>
-  <!-- v1.1 — liquidaciones de sueldo: motor único chileno + comisiones automáticas (Fase 3 módulo RRHH) -->
+  <!-- v1.2 — reversas de comision (prepago/anulacion) como linea propia · liquidaciones de sueldo: motor único chileno + comisiones automáticas (Fase 3 módulo RRHH) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -272,6 +272,7 @@ function pintarLiq(l, d){
           ${fila('Seguro cesantía AFC ('+String(d.afc_pct||0).replace('.',',')+'%)', d.desc_afc)}
           ${fila('Impuesto único 2ª categoría', d.impuesto)}
           ${fila('Otros descuentos', d.otros_descuentos)}
+          ${(d.reversas_comision||[]).map(r=>fila(r.glosa, r.monto)).join('')}
           ${sub('TOTAL DESCUENTOS', d.total_descuentos, '#b91c1c')}
         </table>
       </div>

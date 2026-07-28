@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Ficha — AutoFácil</title>
-  <!-- v1.4 — repositorio Mis Documentos Firmados -->
+  <!-- v1.5 — reversas de comision visibles en mi liquidacion · repositorio Mis Documentos Firmados -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -311,7 +311,7 @@ async function verLiq(id){
       ${fila('Sueldo base',d.sueldo_base)}${fila('Comisiones',d.comisiones)}${fila('Otros imponibles',d.otros_imponibles)}${fila('Gratificación legal',d.gratificacion)}${fila('Colación',d.colacion)}${fila('Movilización',d.movilizacion)}${fila('Otros no imponibles',d.otros_no_imponibles)}
       <tr><td style="font-weight:700;padding:3px 8px">Total haberes</td><td style="text-align:right;font-weight:700;padding:3px 8px">${co(d.total_haberes)}</td></tr>
       <tr><td colspan="2" style="background:#eff6ff;font-weight:800;font-size:11px;padding:5px 8px">DESCUENTOS</td></tr>
-      ${fila('AFP '+(d.afp||''),d.desc_afp,1)}${fila('Salud',d.desc_salud,1)}${fila('Seguro cesantía AFC',d.desc_afc,1)}${fila('Impuesto único',d.impuesto,1)}${fila('Otros descuentos',d.otros_descuentos,1)}
+      ${fila('AFP '+(d.afp||''),d.desc_afp,1)}${fila('Salud',d.desc_salud,1)}${fila('Seguro cesantía AFC',d.desc_afc,1)}${fila('Impuesto único',d.impuesto,1)}${fila('Otros descuentos',d.otros_descuentos,1)}${(d.reversas_comision||[]).map(r=>fila(r.glosa,r.monto,1)).join('')}
       <tr><td style="font-weight:700;padding:3px 8px">Total descuentos</td><td style="text-align:right;font-weight:700;color:#b91c1c;padding:3px 8px">−${co(d.total_descuentos)}</td></tr>
       <tr><td style="font-weight:800;font-size:15px;padding:10px 8px 3px">LÍQUIDO A PAGAR</td><td style="text-align:right;font-weight:800;font-size:15px;color:#15803d;padding:10px 8px 3px">${co(d.liquido)}</td></tr>
     </table>

@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.19</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.20</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -358,7 +358,7 @@ function dctosHtml(d) {
   }).join('');
   const saldo = d.saldo_descuento || 0;
   return `<div class="desglose" style="border-left:4px solid #dc2626">
-    <div class="desglose-title" style="color:#dc2626"><i class="bi bi-dash-circle"></i>Descuentos por prepago y anulación (cláusula novena)</div>
+    <div class="desglose-title" style="color:#dc2626"><i class="bi bi-dash-circle"></i>Reversas por prepago y anulación (cláusula novena) — hechos del mes anterior</div>
     <table style="width:100%;border-collapse:collapse;font-size:.84rem">
       <thead><tr style="background:#fef2f2;color:#991b1b">
         <th style="padding:6px 10px;text-align:left">N° Op</th><th style="padding:6px 10px;text-align:left">Motivo</th>
@@ -367,7 +367,7 @@ function dctosHtml(d) {
       </tr></thead>
       <tbody>${filas}</tbody>
     </table>
-    <div class="desglose-row" style="margin-top:6px"><span>Total descontado este mes</span><span style="color:#dc2626;font-weight:700">−${fmt(d.descuento_aplicado)}</span></div>
+    <div class="desglose-row" style="margin-top:6px"><span>Total revertido en esta liquidación</span><span style="color:#dc2626;font-weight:700">−${fmt(d.descuento_aplicado)}</span></div>
     ${saldo > 0 ? `<div style="margin-top:6px;font-size:.78rem;color:#92400e;background:#fffbeb;padding:7px 10px;border-radius:7px">
       <i class="bi bi-exclamation-triangle me-1"></i>Quedan <b>${fmt(saldo)}</b> sin descontar: el descuento supera la comisión del mes. La comisión no se deja en negativo; Operaciones debe definir cómo se recupera el saldo.</div>` : ''}
   </div>`;
