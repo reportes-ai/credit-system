@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — ¿Dónde curso? PWA de decisión de financiera para ejecutivos -->
+<!-- v1.1 — Gastos incluidos seleccionables (calzar exacto con el Simulador) -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -149,6 +149,16 @@
             <div class="chip on" id="cRdh"  onclick="tog(this)"><i class="bi bi-car-front"></i> RDH</div>
             <div class="chip on" id="cCesa" onclick="tog(this)"><i class="bi bi-briefcase"></i> Cesantía</div>
             <div class="chip on" id="cRep"  onclick="tog(this)"><i class="bi bi-tools"></i> Rep. menores</div>
+          </div>
+        </div>
+
+        <!-- Mismos gastos y mismos defaults que el Simulador de Rentabilidad: la
+             limitación de dominio NO viene marcada (no toda operación la lleva). -->
+        <div class="fld"><label>Gastos incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cPrenda" onclick="tog(this)"><i class="bi bi-file-earmark-text"></i> Prenda</div>
+            <div class="chip on" id="cGps"    onclick="tog(this)"><i class="bi bi-geo-alt"></i> GPS</div>
+            <div class="chip"    id="cLim"    onclick="tog(this)"><i class="bi bi-slash-circle"></i> Limitación</div>
           </div>
         </div>
 
@@ -313,7 +323,7 @@ function calcular(){
 
   const R = AF_RENT.calcular({
     valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct,
-    gastos:  { prenda:true, gps:true, rep: on('cRep'), lim:true },
+    gastos:  { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
     seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
   }, P, UF, T);
   if (!R) return esperando();
