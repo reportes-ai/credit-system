@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes DealerNet — AutoFácil</title>
-  <!-- v1.7 — botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
+  <!-- v1.8 — aviso de espera con contador y error util en timeout · botón Reporte IA (bajo demanda, reusa ≤15 días) con formato AF_REP_IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -391,11 +391,32 @@ async function solicitar(){
   } catch(_) {}
 
   // 3) Solicitar a DealerNet (gasta saldo)
+  // DealerNet puede demorar bastante (más aún si se piden varios informes de una
+  // vez). Se avisa y se cuenta el tiempo para que nadie quede mirando un botón.
   btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Consultando DealerNet…';
+  const t0 = Date.now();
+  res.innerHTML = html + '<div class="alertbox" id="espera" style="background:#eff6ff;color:#1e40af">'
+    + '<i class="bi bi-hourglass-split me-1"></i><b>Consultando a DealerNet…</b> '
+    + (aConsultar.length > 1 ? 'Pediste ' + aConsultar.length + ' informes juntos, así que puede tardar. ' : '')
+    + 'No cierres esta ventana. <span id="espera-seg"></span></div>';
+  const tick = setInterval(() => {
+    const e = document.getElementById('espera-seg');
+    if (e) e.textContent = 'Llevamos ' + Math.round((Date.now() - t0) / 1000) + ' s.';
+  }, 1000);
   try {
     const r = await fetch('/api/dealernet/informes/solicitar', { method:'POST', headers:H, body:JSON.stringify({ rut, productos: aConsultar }) });
     const j = await r.json();
-    if (!j.success){ res.innerHTML = html + '<div class="alertbox block">'+esc(j.error||'Error')+'</div>'; resetBtn(); return; }
+    clearInterval(tick);
+    if (!j.success){
+      // El backend ya explica qué pasó (timeout, HTTP o fault). Se agrega la salida.
+      res.innerHTML = html + '<div class="alertbox block"><b>No se pudieron obtener los informes.</b><br>'
+        + esc(j.error||'Error')
+        + (aConsultar.length > 1
+            ? '<br><br>Puedes reintentar, o pedirlos de a uno para que cada consulta sea más corta.'
+            : '<br><br>Puedes reintentar en un momento.')
+        + '</div>';
+      resetBtn(); return;
+    }
     const ok = String(j.data.retcode)==='0';
     html += '<div class="alertbox '+(ok?'ok':'block')+'">'+(ok
       ? '<b>Informes obtenidos.</b> Se agregaron al repositorio: '+aConsultar.map(c=>esc(nombreProd(c))).join(', ')+'.'
@@ -407,7 +428,7 @@ async function solicitar(){
     }
     res.innerHTML = html;
     await cargarHistoricos(j.data.rut);
-  } catch(e){ res.innerHTML = html + '<div class="alertbox block">Error de conexión</div>'; }
+  } catch(e){ clearInterval(tick); res.innerHTML = html + '<div class="alertbox block">Error de conexión</div>'; }
   resetBtn();
 }
 function resetBtn(){ const b=document.getElementById('btnSolicitar'); b.disabled=false; b.innerHTML='<i class="bi bi-send me-1"></i>Solicitar informes'; }

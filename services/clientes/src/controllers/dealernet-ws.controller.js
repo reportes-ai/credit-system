@@ -87,6 +87,10 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
         [cod, nom, ++oExtra]);
     }
 
+    // Tiempo de espera a DealerNet: paramétrico (misma tabla dealernet_config que
+    // ya usan dias_bloqueo/dias_vigencia; esa tabla es solo clave/valor).
+    await pool.query("INSERT IGNORE INTO dealernet_config (clave, valor) VALUES ('timeout_seg','90')");
+
     await pool.query(`CREATE TABLE IF NOT EXISTS dealernet_consultas (
       id         INT AUTO_INCREMENT PRIMARY KEY,
       rut        VARCHAR(12),
@@ -100,6 +104,10 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_rut (rut)
     )`);
+    // Registro de los intentos FALLIDOS (antes solo se guardaban los exitosos:
+    // los timeouts no quedaban en ninguna parte y no se podían medir).
+    for (const col of ['duracion_ms INT NULL', 'exito TINYINT(1) NOT NULL DEFAULT 1'])
+      await pool.query(`ALTER TABLE dealernet_consultas ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
 
     // Mantenedor + permiso de consulta (anti-hardcode: módulo/funcionalidad en BD).
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
@@ -354,24 +362,58 @@ function buildEnvelope({ usr, pwd, ruts, productos, tipocns }) {
 </soapenv:Envelope>`;
 }
 
+/* Cuánto esperamos a DealerNet. NO es un valor de programador: su tiempo de
+   respuesta varía con la carga de ellos y con cuántos informes se piden de una
+   vez, así que vive en el mantenedor (dealernet_config.timeout_seg).
+   Deliberadamente NO reintentamos solo: si el timeout es nuestro pero DealerNet
+   alcanzó a emitir el informe, un reintento automático lo cobraría dos veces. */
+async function timeoutMs() {
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='timeout_seg'");
+    const seg = parseInt(r && r.valor);
+    return (seg > 0 ? Math.min(seg, 300) : 90) * 1000;
+  } catch (e) { return 90000; }
+}
+
+/* Deja registro del intento aunque falle. Antes solo se guardaban las consultas
+   exitosas: los timeouts no quedaban en ninguna parte y no había forma de saber
+   cuántas veces le pasaba a la gente. */
+async function registrarIntento({ num, dv, productos, ok, retcode, detalle, ms, id_usuario }) {
+  try {
+    await pool.query(
+      `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
+       VALUES (?,?,?,?,?,NULL,NULL,?,?,?)`,
+      [num, dv, (productos || []).join(','), retcode || null, String(detalle || '').slice(0, 255),
+       id_usuario || null, ms || null, ok ? 1 : 0]);
+  } catch (e) { console.error('[dealernet registrarIntento]', e.message); }
+}
+
 async function consultarCentral({ ruts, productos, tipocns = TIPOCNS_DEF }) {
   const usr = process.env.DEALERNET_USER, pwd = process.env.DEALERNET_PASS;
   if (!usr || !pwd) { const e = new Error('Credenciales DealerNet no configuradas (env DEALERNET_USER/DEALERNET_PASS)'); e.code = 'NOCREDS'; throw e; }
   const envelope = buildEnvelope({ usr, pwd, ruts, productos, tipocns });
+  const tms = await timeoutMs();
+  const t0 = Date.now();
   let resp;
   try {
     resp = await axios.post(ENDPOINT, envelope, {
       headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': SOAP_ACTION },
-      timeout: 30000, responseType: 'text', transformResponse: x => x,
+      timeout: tms, responseType: 'text', transformResponse: x => x,
     });
   } catch (e) {
     // Error legible para el usuario: timeout, HTTP o SOAP fault (sin filtrar internals)
-    if (e.code === 'ECONNABORTED') throw new Error('DealerNet no respondió dentro de 30 segundos (timeout)');
-    if (e.response) {
+    const seg = Math.round(tms / 1000);
+    let msg;
+    if (e.code === 'ECONNABORTED')
+      msg = `DealerNet no alcanzó a responder en ${seg} segundos. Suele pasar cuando ellos están cargados o cuando se piden varios informes juntos: vuelve a intentar en un momento, o pide menos informes a la vez.`;
+    else if (e.response) {
       const fault = String(e.response.data || '').match(/<faultstring>([\s\S]*?)<\/faultstring>/i);
-      throw new Error(`DealerNet respondió HTTP ${e.response.status}${fault ? ': ' + fault[1].trim().slice(0, 200) : ''}`);
-    }
-    throw new Error('Sin conexión con DealerNet: ' + e.message);
+      msg = `DealerNet respondió HTTP ${e.response.status}${fault ? ': ' + fault[1].trim().slice(0, 200) : ''}`;
+    } else msg = 'Sin conexión con DealerNet: ' + e.message;
+    const err = new Error(msg);
+    err.duracion_ms = Date.now() - t0;
+    err.esTimeout = e.code === 'ECONNABORTED';
+    throw err;
   }
   const raw = String(resp.data || '');
   let retcode = null, retmsg = null, output = null, parsed = null;
@@ -388,7 +430,7 @@ async function consultarCentral({ ruts, productos, tipocns = TIPOCNS_DEF }) {
     const rm = raw.match(/<retmsg>([\s\S]*?)<\/retmsg>/i); if (rm) retmsg = rm[1].trim();
     const op = raw.match(/<output>([\s\S]*?)<\/output>/i); if (op) output = op[1];
   }
-  return { retcode, retmsg, output, parsed, raw };
+  return { retcode, retmsg, output, parsed, raw, duracion_ms: Date.now() - t0 };
 }
 
 /* ── REST: mantenedor de productos ───────────────────────────────────────── */
@@ -471,14 +513,15 @@ const consultar = async (req, res) => {
     } catch (e) {
       if (e.code === 'NOCREDS') return res.status(400).json({ success: false, data: null, error: e.message });
       console.error('[dealernet consultar]', e.message);
-      return res.status(502).json({ success: false, data: null, error: 'No se pudo contactar a DealerNet: ' + e.message });
+      await registrarIntento({ num, dv, productos, ok: 0, detalle: e.message, ms: e.duracion_ms, id_usuario: req.usuario.id_usuario });
+      return res.status(502).json({ success: false, data: null, error: e.message });
     }
 
     const [ins] = await pool.query(
-      `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
+       VALUES (?,?,?,?,?,?,?,?,?,1)`,
       [num, dv, productos.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw,
-       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario]);
+       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms]);
     auditar({ req, accion: 'CONSULTAR', modulo: 'dealernet', entidad: 'consulta', entidad_id: ins.insertId,
       detalle: `Consultó DealerNet RUT ${num}-${dv} (productos ${productos.join(',')}) → retcode ${r.retcode}`, rut: `${num}-${dv}` });
     res.json({ success: true, data: { id: ins.insertId, retcode: r.retcode, retmsg: r.retmsg, output: r.output, productos }, error: null });
@@ -709,14 +752,15 @@ const solicitarInformes = async (req, res) => {
     catch (e) {
       if (e.code === 'NOCREDS') return res.status(400).json({ success: false, data: null, error: e.message });
       console.error('[dealernet solicitar]', e.message);
-      return res.status(502).json({ success: false, data: null, error: 'No se pudo contactar a DealerNet: ' + e.message });
+      await registrarIntento({ num, dv, productos: aPedir, ok: 0, detalle: e.message, ms: e.duracion_ms, id_usuario: req.usuario.id_usuario });
+      return res.status(502).json({ success: false, data: null, error: e.message });
     }
 
     const [ins] = await pool.query(
-      `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario)
-       VALUES (?,?,?,?,?,?,?,?)`,
+      `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
+       VALUES (?,?,?,?,?,?,?,?,?,1)`,
       [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw,
-       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario]);
+       r.parsed ? JSON.stringify(r.parsed) : null, req.usuario.id_usuario, r.duracion_ms]);
     const guardados = String(r.retcode) === '0'
       ? await guardarInformes({ num, dv, productosPedidos: aPedir, r, idConsulta: ins.insertId, usuario: req.usuario })
       : [];
@@ -814,16 +858,17 @@ async function asegurarInformes({ rut, productos, usuario }) {
       const r = await consultarCentral({ ruts: [{ num, dv }], productos: aPedir });
       out.consultado = true;
       const [ins] = await pool.query(
-        `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw, r.parsed ? JSON.stringify(r.parsed) : null, usuario?.id_usuario || null]);
+        `INSERT INTO dealernet_consultas (rut, dv, productos, retcode, retmsg, output_raw, parsed, id_usuario, duracion_ms, exito)
+         VALUES (?,?,?,?,?,?,?,?,?,1)`,
+        [num, dv, aPedir.join(','), r.retcode, (r.retmsg || '').slice(0, 255), r.raw, r.parsed ? JSON.stringify(r.parsed) : null, usuario?.id_usuario || null, r.duracion_ms]);
       if (String(r.retcode) === '0') {
         await guardarInformes({ num, dv, productosPedidos: aPedir, r, idConsulta: ins.insertId, usuario });
         out.pedidos = aPedir;
         for (const cod of aPedir) { const u = await ultimoDe(cod); if (u) vigentes[cod] = u; }
       } else out.error = r.retmsg || ('DealerNet retcode ' + r.retcode);
     } catch (e) {
-      out.error = e.code === 'NOCREDS' ? 'Credenciales DealerNet no configuradas' : ('No se pudo consultar DealerNet: ' + e.message);
+      await registrarIntento({ num, dv, productos: aPedir, ok: 0, detalle: e.message, ms: e.duracion_ms, id_usuario: usuario?.id_usuario });
+      out.error = e.code === 'NOCREDS' ? 'Credenciales DealerNet no configuradas' : e.message;
     }
   }
 
@@ -887,8 +932,22 @@ async function leerRRHHEmail() {
   catch { return ''; }
 }
 const getConfigEndpoint = async (req, res) => {
-  try { res.json({ success: true, data: { ...(await getConfig()), rrhh_email: await leerRRHHEmail() }, error: null }); }
-  catch (e) { errSrv(res, e, 'getConfigEndpoint'); }
+  try {
+    const [[t]] = await pool.query("SELECT valor FROM dealernet_config WHERE clave='timeout_seg'");
+    // Salud real del conector: sirve para saber si vale la pena subir el tiempo
+    // de espera o si el problema es otro. Solo intentos de los últimos 30 días.
+    const [[s]] = await pool.query(
+      `SELECT COUNT(*) total, SUM(exito=1) ok, SUM(exito=0) fallidos,
+              ROUND(AVG(CASE WHEN exito=1 THEN duracion_ms END)) ms_prom,
+              MAX(CASE WHEN exito=1 THEN duracion_ms END) ms_max
+         FROM dealernet_consultas WHERE created_at >= NOW() - INTERVAL 30 DAY`);
+    res.json({ success: true, data: {
+      ...(await getConfig()), rrhh_email: await leerRRHHEmail(),
+      timeout_seg: parseInt(t && t.valor) || 90,
+      salud: { total: s.total || 0, ok: s.ok || 0, fallidos: s.fallidos || 0,
+               ms_prom: s.ms_prom || null, ms_max: s.ms_max || null },
+    }, error: null });
+  } catch (e) { errSrv(res, e, 'getConfigEndpoint'); }
 };
 const updateConfigEndpoint = async (req, res) => {
   try {
@@ -898,6 +957,12 @@ const updateConfigEndpoint = async (req, res) => {
         return res.status(400).json({ success: false, data: null, error: 'Días inválidos (vigencia debe ser mayor que bloqueo, ambos > 0)' });
       await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_bloqueo'", [String(b)]);
       await pool.query("UPDATE dealernet_config SET valor=? WHERE clave='dias_vigencia'", [String(v)]);
+    }
+    if (req.body?.timeout_seg !== undefined) {
+      const t = parseInt(req.body.timeout_seg, 10);
+      if (!(t >= 10 && t <= 300))
+        return res.status(400).json({ success: false, data: null, error: 'El tiempo de espera debe estar entre 10 y 300 segundos' });
+      await pool.query("INSERT INTO dealernet_config (clave, valor) VALUES ('timeout_seg', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)", [String(t)]);
     }
     if (req.body?.rrhh_email !== undefined) {
       await pool.query("INSERT INTO dealernet_config (clave, valor) VALUES ('rrhh_email', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)",

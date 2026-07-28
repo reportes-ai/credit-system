@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Productos DealerNet — AutoFácil</title>
-  <!-- v1.5 -->
+  <!-- v1.6 — espera maxima a DealerNet parametrica + salud del conector -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -117,10 +117,12 @@
     <div class="addgrid" style="grid-template-columns:1fr 1fr auto">
       <div class="fld"><label>Bloqueo (días)</label><input type="number" id="cfgBloqueo" min="1" placeholder="15"></div>
       <div class="fld"><label>Vigencia (días)</label><input type="number" id="cfgVigencia" min="1" placeholder="180"></div>
+      <div class="fld"><label>Espera máx. a DealerNet (seg)</label><input type="number" id="cfgTimeout" min="10" max="300" placeholder="90"></div>
       <button class="btn-primary2" onclick="guardarConfig()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
     </div>
     <div class="fld" style="margin-top:12px"><label>Correo(s) de RRHH para avisos de uso (separar con coma)</label>
       <input type="text" id="cfgRRHH" placeholder="rrhh@autofacilchile.cl"></div>
+    <div id="cfgSalud" style="grid-column:1/-1;font-size:.8rem;color:#475569;background:#f8fafc;border-radius:8px;padding:9px 12px;margin-top:6px"></div>
     <p style="font-size:.78rem;color:#94a3b8;margin:6px 0 0">Cuando alguien consulta su propio RUT o el de otro usuario de la empresa, se avisa automáticamente a su <b>supervisor</b> y a estos correos de <b>RRHH</b>. También se incluyen los usuarios con perfil "Recursos Humanos".</p>
     <p style="font-size:.78rem;color:#94a3b8;margin:8px 0 0">Menos del <b>bloqueo</b>: obliga a usar el histórico (no deja consultar). Entre bloqueo y <b>vigencia</b>: pregunta si reutilizar o pedir nuevo. Más que la vigencia: consulta directa.</p>
   </div>
@@ -142,6 +144,7 @@
       <li><b>Ficha Empresa / Ficha Socio</b> → definen qué informes pide y valida la <a href="/dealers-incorporacion/nuevo.html">Ficha de Dealer</a> (creación/modificación) para la <b>empresa</b> y para cada <b>socio</b>. Al enviar a autorización, Business Suite revisa el repositorio y, si falta o tiene más de 15 días, los solicita a DealerNet. La empresa normalmente NO lleva <code>2101</code> Deudores de Alimentos; los socios sí.</li>
       <li><b>Código / Nombre</b> → identifican cada producto del catálogo DealerNet (rango 3401–3450 y códigos propios como <code>16</code> Comportamiento Vigente o <code>2101</code> Boletín Deudores de Pensión). Agrega aquí los códigos nuevos que te confirme DealerNet.</li>
       <li><b>Vigencia de informes (bloqueo / vigencia)</b> → controlan la reutilización del repositorio en <a href="/dealernet-informes/">Informes DealerNet</a>: bajo el bloqueo no deja consultar (usa histórico), entre bloqueo y vigencia pregunta, sobre la vigencia consulta directo.</li>
+      <li><b>Espera máx. a DealerNet (seg)</b> → cuánto aguantamos su respuesta antes de dar la consulta por fallida, en <a href="/dealernet-informes/">Informes DealerNet</a> y en la <a href="/dealers-incorporacion/nuevo.html">Ficha de Dealer</a>. DealerNet se demora más cuando está cargado o cuando se piden varios informes de una vez; si los usuarios ven timeouts, súbelo mirando la demora máxima real del recuadro de arriba. <b>No hay reintento automático a propósito:</b> si el corte fue nuestro pero DealerNet alcanzó a emitir el informe, reintentar solo lo cobraría dos veces.</li>
       <li><b>Credenciales</b> → en variables de entorno de Render; afectan a toda consulta al Web Service.</li>
       <li>El módulo <a href="/dealernet-informes/">Informes DealerNet</a> (consulta en vivo + repositorio compartido) reemplaza la carga manual de PDF de <a href="/informes-dealernet/">Informes Comerciales Dealernet</a>.</li>
     </ul>
@@ -240,13 +243,31 @@ async function probar(){
 async function cargarConfig(){
   try { const r=await fetch('/api/dealernet/config',{ headers:H }); const j=await r.json();
     if(j.success){ document.getElementById('cfgBloqueo').value=j.data.dias_bloqueo; document.getElementById('cfgVigencia').value=j.data.dias_vigencia;
-      const rr=document.getElementById('cfgRRHH'); if(rr) rr.value=j.data.rrhh_email||''; } } catch(_){}
+      const tt=document.getElementById('cfgTimeout'); if(tt) tt.value=j.data.timeout_seg||90;
+      const rr=document.getElementById('cfgRRHH'); if(rr) rr.value=j.data.rrhh_email||'';
+      pintarSalud(j.data.salud); } } catch(_){}
 }
+/* Salud del conector: cuántos intentos fallaron y cuánto se demora DealerNet
+   de verdad. Sirve para decidir el tiempo de espera con datos, no a ojo. */
+function pintarSalud(sal){
+  const cont = document.getElementById('cfgSalud');
+  if (!cont || !sal) return;
+  const seg = ms => ms ? (ms/1000).toFixed(1).replace('.',',') + ' s' : '—';
+  const falla = sal.total ? Math.round(sal.fallidos*100/sal.total) : 0;
+  cont.innerHTML = !sal.total
+    ? '<span style="color:#94a3b8">Sin consultas en los últimos 30 días.</span>'
+    : `Últimos 30 días: <b>${sal.total}</b> consulta(s) · <b style="color:#166534">${sal.ok} OK</b> ·
+       <b style="color:${sal.fallidos?'#b91c1c':'#94a3b8'}">${sal.fallidos} fallida(s)</b> (${falla}%) ·
+       demora promedio <b>${seg(sal.ms_prom)}</b>, máxima <b>${seg(sal.ms_max)}</b>.
+       ${sal.ms_max && sal.ms_max/1000 > 25 ? '<span style="color:#92400e"> DealerNet ya se ha demorado más de 25 s: conviene una espera holgada.</span>' : ''}`;
+}
+
 async function guardarConfig(){
   const dias_bloqueo=parseInt(document.getElementById('cfgBloqueo').value,10);
   const dias_vigencia=parseInt(document.getElementById('cfgVigencia').value,10);
   const rrhh_email=(document.getElementById('cfgRRHH')?.value||'').trim();
-  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ dias_bloqueo, dias_vigencia, rrhh_email }) });
+  const timeout_seg=parseInt(document.getElementById('cfgTimeout')?.value,10)||90;
+  try { const r=await fetch('/api/dealernet/config',{ method:'PUT', headers:H, body:JSON.stringify({ dias_bloqueo, dias_vigencia, rrhh_email, timeout_seg }) });
     const j=await r.json(); if(j.success) toast('Configuración actualizada'); else toast(j.error||'Error', true); } catch(_){ toast('Error', true); }
 }
 async function copiarDlnt(btn){
