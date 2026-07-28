@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Día — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -89,7 +89,7 @@
 
     if(c.auto){  // CENTRALIZADO: sin botón de conectar
       if(c.error==='sin_email'){ box.innerHTML='<div class="empty">Tu usuario no tiene correo registrado; pídele a RRHH que lo complete para ver tu agenda.</div>'; return; }
-      if(c.error){ box.innerHTML='<div class="empty">No se pudo leer tu calendario. Verifica con el administrador que la delegación de Google esté autorizada.</div>'; return; }
+      if(c.error){ box.innerHTML='<div class="empty">No se pudo leer el calendario de <b>'+esc(c.email||'')+'</b>. Verifica con el administrador que la delegación de Google esté autorizada y que ese correo exista en el Workspace.'+(c.detalle?'<div style="margin-top:6px;font-size:.76rem;color:#94a3b8">Google respondió: '+esc(c.detalle)+'</div>':'')+'</div>'; return; }
       const ev=c.eventos||[];
       const head=`<div style="font-size:.78rem;color:#94a3b8;margin-bottom:6px">${esc(c.email||'')}</div>`;
       box.innerHTML=head+(ev.length?listaEventos(ev):'<div class="empty">No tienes eventos hoy. 🎉</div>');

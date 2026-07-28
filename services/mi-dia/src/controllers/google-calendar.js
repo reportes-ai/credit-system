@@ -131,8 +131,12 @@ async function agendaHoy({ id_usuario, email }) {
       const eventos = await listarEventos(at);
       return { disponible: true, auto: true, conectado: true, email, eventos };
     } catch (e) {
-      console.error('[google SA agenda]', e.response ? JSON.stringify(e.response.data) : e.message);
-      return { disponible: true, auto: true, conectado: false, email, error: 'no_lectura' };
+      const g = (e.response && e.response.data) || {};
+      console.error('[google SA agenda]', e.response ? JSON.stringify(g) : e.message);
+      // El motivo de Google es lo único que permite distinguir "falta la delegación"
+      // de "ese correo no existe en el Workspace". Se muestra en pantalla.
+      const detalle = g.error_description || (g.error && (g.error.message || g.error)) || e.message;
+      return { disponible: true, auto: true, conectado: false, email, error: 'no_lectura', detalle: String(detalle).slice(0, 200) };
     }
   }
   // (B) OAuth por usuario
