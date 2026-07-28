@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.18</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.19</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -338,6 +338,41 @@ function renderizar(data, mes) {
   if (esAdmin) document.getElementById('btnResumenMail').style.display = 'flex';
 }
 
+/* Descuentos por prepago y anulación (cláusula novena del anexo). Se muestran
+   solo si el mes tiene alguno: son la excepción, no la regla. */
+function dctosHtml(d) {
+  const lista = d.descuentos || [];
+  if (!lista.length) return '';
+  const filas = lista.map(x => {
+    const rev = x.revisar;
+    const detalle = x.tipo === 'ANULADA' ? 'Anulada'
+      : (x.fecha_primera_cuota ? `Prepagada · 1ª cuota ${x.fecha_primera_cuota} · ${x.meses_transcurridos} mes${x.meses_transcurridos===1?'':'es'}` : 'Prepagada');
+    return `<tr style="${rev?'background:#fffbeb':''}">
+      <td style="padding:6px 10px">${x.num_op}</td>
+      <td style="padding:6px 10px">${detalle}</td>
+      <td style="padding:6px 10px">${x.mes_origen}</td>
+      <td style="padding:6px 10px;text-align:right">${fmt(x.comision_original)}</td>
+      <td style="padding:6px 10px;text-align:center">${rev?'—':pct(x.pct_descuento)}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:700;color:#dc2626">${rev?'':'−'+fmt(x.descuento)}</td>
+    </tr>${rev?`<tr style="background:#fffbeb"><td colspan="6" style="padding:4px 10px;font-size:.76rem;color:#92400e"><i class="bi bi-exclamation-triangle me-1"></i>${escHtml(rev)}</td></tr>`:''}`;
+  }).join('');
+  const saldo = d.saldo_descuento || 0;
+  return `<div class="desglose" style="border-left:4px solid #dc2626">
+    <div class="desglose-title" style="color:#dc2626"><i class="bi bi-dash-circle"></i>Descuentos por prepago y anulación (cláusula novena)</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.84rem">
+      <thead><tr style="background:#fef2f2;color:#991b1b">
+        <th style="padding:6px 10px;text-align:left">N° Op</th><th style="padding:6px 10px;text-align:left">Motivo</th>
+        <th style="padding:6px 10px;text-align:left">Mes comisionado</th><th style="padding:6px 10px;text-align:right">Comisión pagada</th>
+        <th style="padding:6px 10px;text-align:center">% dcto.</th><th style="padding:6px 10px;text-align:right">Descuento</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="desglose-row" style="margin-top:6px"><span>Total descontado este mes</span><span style="color:#dc2626;font-weight:700">−${fmt(d.descuento_aplicado)}</span></div>
+    ${saldo > 0 ? `<div style="margin-top:6px;font-size:.78rem;color:#92400e;background:#fffbeb;padding:7px 10px;border-radius:7px">
+      <i class="bi bi-exclamation-triangle me-1"></i>Quedan <b>${fmt(saldo)}</b> sin descontar: el descuento supera la comisión del mes. La comisión no se deja en negativo; Operaciones debe definir cómo se recupera el saldo.</div>` : ''}
+  </div>`;
+}
+
 function renderEjSinComision(d, idx, mes) {
   return renderEjecutivo(d, idx, mes, true);
 }
@@ -447,16 +482,19 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
 
     <div class="desglose">
       <div class="desglose-title"><i class="bi bi-calculator"></i>Desglose incentivo final</div>
-      <div class="desglose-row"><span>Incentivo base (≤24 + >24)</span><span>${fmt(d.incentivo_base)}</span></div>
+      <div class="desglose-row"><span>Incentivo base (&lt;24 + ≥24)</span><span>${fmt(d.incentivo_base)}</span></div>
+      <div class="desglose-row"><span>+ Bono Seg. RDH ${d.cumple_rdh?'(ajuste '+pct(d.ajuste_rdh)+')':'— no cumple'}</span><span>${fmt(d.cumple_rdh?d.bono_rdh:0)}</span></div>
       <div class="desglose-row"><span>+ Bono Seg. Cesantía ${d.cumple_cesantia?'(ajuste '+pct(d.ajuste_cesantia)+')':'— no cumple'}</span><span>${fmt(d.cumple_cesantia?d.bono_cesantia:0)}</span></div>
       <div class="desglose-row"><span>+ Bono Seg. Reparaciones ${d.cumple_reparaciones?'(ajuste '+pct(d.ajuste_reparaciones)+')':'— no cumple'}</span><span>${fmt(d.cumple_reparaciones?d.bono_reparaciones:0)}</span></div>
       <div class="desglose-row"><span>+ Bono Calidad (ajuste ${pct(d.ajuste_calidad)})</span><span>${fmt(d.bono_calidad)}</span></div>
       <div class="desglose-row"><span>= Incentivo Final</span><span>${fmt(d.incentivo_final)}</span></div>
     </div>
 
+    ${dctosHtml(d)}
+
     <div class="total-final">
       <div><div class="tf-label">Incentivo Final Bruto</div><div class="tf-value">${fmt(d.incentivo_final)}</div></div>
-      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})})</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
+      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})})${(d.descuento_aplicado||0)>0?' − descuentos':''}</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
     </div>
 
     <button class="toggle-creditos" onclick="toggleCreditos('${idx}')">

@@ -28,6 +28,13 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       ['umbral_rep',    0.55,   'Umbral mínimo reparaciones',      'Si el cruce es ≤ este valor el aporte de reparaciones es 0',      'porcentaje'],
       ['semana_corrida_calc', 1, 'Semana corrida calculada (1=sí, 0=no)', 'Con 1 se calcula por mes según art. 45 CT: 1 + (domingos+festivos)/(días lunes a sábado hábiles). Con 0 se usa el multiplicador fijo de abajo', 'factor'],
       ['semana_corrida',1.1667, 'Multiplicador semana corrida (modo fijo)',    'Incentivo final × 1,1667 = +16,67% por semana corrida (mismo % que el Bono Jefe Comercial)', 'multiplicador'],
+      // Cláusula novena del anexo: descuentos por prepago y anulación
+      ['dctos_activo',   1,     'Descontar prepagos y anulaciones (1=sí, 0=no)', 'Con 1 se descuenta la comisión ya pagada de las operaciones que se prepagan o anulan (cláusula novena del anexo)', 'factor'],
+      ['dcto_meses_t1',  3,     'Prepago — meses tramo 1',         'Prepagos hasta este mes, contado desde el vencimiento de la primera cuota, descuentan el % del tramo 1', 'factor'],
+      ['dcto_pct_t1',    1.00,  'Prepago — % descuento tramo 1',   'Porcentaje de la comisión pagada que se descuenta en el tramo 1 (1,00 = 100%)', 'porcentaje'],
+      ['dcto_meses_t2',  6,     'Prepago — meses tramo 2',         'Prepagos hasta este mes descuentan el % del tramo 2. Después de este mes no hay descuento', 'factor'],
+      ['dcto_pct_t2',    0.50,  'Prepago — % descuento tramo 2',   'Porcentaje de la comisión pagada que se descuenta en el tramo 2 (0,50 = 50%)', 'porcentaje'],
+      ['dcto_pct_anul',  1.00,  'Anulación — % descuento',         'Porcentaje que se descuenta cuando la operación se anula, sin importar cuándo (1,00 = 100%)', 'porcentaje'],
     ];
     for (const [clave, valor, etiqueta, descripcion, tipo] of defaults) {
       await pool.query(
@@ -315,6 +322,144 @@ function calcularComision(creditos, vars, mes) {
   };
 }
 
+/* ═══ DESCUENTOS POR PREPAGO Y ANULACIÓN (cláusula novena del anexo) ═══════════
+   La comisión se paga al otorgar, pero si la operación muere temprano la Empresa
+   nunca alcanza a ganar lo que la originó. El anexo lo devuelve así:
+
+     · prepagada íntegramente hasta el 3er mes contado desde el VENCIMIENTO DE LA
+       PRIMERA CUOTA  → se descuenta el 100% de la comisión pagada por esa operación
+     · prepagada hasta el 6º mes                            → se descuenta el 50%
+     · anulada, cualquiera sea la fecha                     → se descuenta el 100%
+
+   El descuento se imputa al mes en que OCURRE el hecho (no se reabre el mes ya
+   pagado: los meses cerrados son inmutables). Por eso el cálculo es determinista
+   e idempotente — recalcular cualquier mes da siempre lo mismo, sin tabla de
+   control ni riesgo de descontar dos veces.
+
+   Fecha del hecho: anulación → creditos.fecha_estado · prepago → última
+   cuotas_credito.fecha_pago (la misma fuente que usa el certificado de prepago).
+   Todos los tramos y porcentajes son paramétricos (mantenedor de Variables).  */
+
+/* Fecha a medianoche LOCAL. new Date('2026-02-05') se parsea como UTC y en Chile
+   (-04) retrocede al día 4: con eso los cortes de tramo salían un día antes. */
+function fechaLocal(f) {
+  if (f instanceof Date) return new Date(f.getFullYear(), f.getMonth(), f.getDate());
+  const [y, m, d] = String(f).slice(0, 10).split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+/* Meses COMPLETOS transcurridos entre dos fechas (25-ene → 25-abr = 3). Informativo. */
+function mesesEntre(desde, hasta) {
+  const a = fechaLocal(desde), b = fechaLocal(hasta);
+  if (isNaN(a) || isNaN(b)) return null;
+  let m = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  if (b.getDate() < a.getDate()) m--;
+  return m;
+}
+
+/* Suma meses a una fecha. El tramo del contrato es una FECHA de corte, no un
+   conteo redondeado: "hasta el tercer mes contado desde el vencimiento de la
+   primera cuota" con 1ª cuota el 05-02 vence el 05-05, no el 31-05. Si el día
+   no existe en el mes destino (31-ene + 1 mes) se toma el último día del mes. */
+function sumarMeses(fecha, meses) {
+  const d = fechaLocal(fecha), dia = d.getDate();
+  const r = new Date(d.getFullYear(), d.getMonth() + meses, 1);
+  r.setDate(Math.min(dia, new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate()));
+  return r;
+}
+
+/* Factor de ajuste que tenía el ejecutivo en el mes en que se devengó la comisión.
+   Se recalcula con los datos vigentes de ese mes; memo por mes para no repetir la
+   query cuando varias operaciones del mismo origen caen en el mismo descuento. */
+function fabricaFactorOrigen(vars) {
+  const cache = new Map();
+  return async function factorOrigen(mesOrigen, ejecutivo) {
+    if (!cache.has(mesOrigen)) {
+      const [rows] = await pool.query(
+        `SELECT ejecutivo, estado_credito, financiera, producto, monto_financiado, plazo,
+                seguro_cesantia, seguro_rep_menor, seguro_rdh
+         FROM creditos
+         WHERE DATE_FORMAT(COALESCE(fecha_otorgado, mes), '%Y-%m') = ?
+           AND ejecutivo IS NOT NULL AND ejecutivo != ''`, [mesOrigen]);
+      const porEj = {};
+      rows.forEach(r => { (porEj[r.ejecutivo] = porEj[r.ejecutivo] || []).push(r); });
+      const factores = {};
+      for (const [ej, creds] of Object.entries(porEj)) {
+        const c = calcularComision(creds, vars, mesOrigen);
+        factores[ej] = { factor_ajuste: c.factor_ajuste || 0, factor_sc: c.factor_semana_corrida || factorSemanaCorrida(mesOrigen, vars) };
+      }
+      cache.set(mesOrigen, factores);
+    }
+    return cache.get(mesOrigen)[ejecutivo] || { factor_ajuste: 0, factor_sc: factorSemanaCorrida(mesOrigen, vars) };
+  };
+}
+
+/* Descuentos que corresponde imputar al mes `mes`, agrupados por ejecutivo. */
+async function descuentosDelMes(mes, vars) {
+  const porEjecutivo = {};
+  if (!(vars.dctos_activo > 0)) return porEjecutivo;
+
+  // Operaciones que murieron en este mes y que YA devengaron comisión en un mes
+  // anterior. Las anuladas dentro de su propio mes de otorgamiento no entran:
+  // nunca se pagaron (dejan de ser OTORGADO y salen del cálculo de ese mes).
+  const [ops] = await pool.query(
+    `SELECT c.num_op, c.ejecutivo, c.monto_financiado, c.plazo,
+            c.fecha_otorgado, c.fecha_primera_cuota, c.fecha_estado,
+            UPPER(COALESCE(c.estado_credito,'')) AS estado_credito,
+            UPPER(COALESCE(c.estado_cartera,''))  AS estado_cartera,
+            (SELECT MAX(q.fecha_pago) FROM cuotas_credito q WHERE q.id_credito = c.id) AS fecha_ult_pago
+     FROM creditos c
+     WHERE c.ejecutivo IS NOT NULL AND c.ejecutivo != ''
+       AND c.fecha_otorgado IS NOT NULL
+       AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') < ?
+       AND (UPPER(COALESCE(c.estado_credito,'')) = 'ANULADO'
+         OR UPPER(COALESCE(c.estado_cartera,''))  = 'PREPAGADO')`, [mes]);
+
+  const factorOrigen = fabricaFactorOrigen(vars);
+  const MES_T1 = vars.dcto_meses_t1 > 0 ? vars.dcto_meses_t1 : 3;
+  const MES_T2 = vars.dcto_meses_t2 > 0 ? vars.dcto_meses_t2 : 6;
+  const ymd = d => (d ? new Date(d).toISOString().slice(0, 10) : null);
+
+  for (const o of ops) {
+    const anulada = o.estado_credito === 'ANULADO';
+    const fechaHecho = anulada ? o.fecha_estado : (o.fecha_ult_pago || o.fecha_estado);
+    if (!fechaHecho || ymd(fechaHecho).slice(0, 7) !== mes) continue;  // el hecho no ocurrió en este mes
+
+    let pct = 0, meses = null, revisar = null;
+    if (anulada) {
+      pct = vars.dcto_pct_anul != null ? vars.dcto_pct_anul : 1;
+    } else if (!o.fecha_primera_cuota) {
+      // Sin la fecha de referencia que exige el contrato no hay tramo posible.
+      // Se informa para revisión manual en vez de arriesgar un cobro indebido.
+      revisar = 'Sin fecha de vencimiento de la primera cuota: no se puede determinar el tramo';
+    } else {
+      meses = mesesEntre(o.fecha_primera_cuota, fechaHecho);
+      const hecho = fechaLocal(ymd(fechaHecho));
+      if      (hecho <= sumarMeses(o.fecha_primera_cuota, MES_T1)) pct = vars.dcto_pct_t1 != null ? vars.dcto_pct_t1 : 1;
+      else if (hecho <= sumarMeses(o.fecha_primera_cuota, MES_T2)) pct = vars.dcto_pct_t2 != null ? vars.dcto_pct_t2 : 0.5;
+      else                                                         pct = 0;   // fuera de plazo: no se descuenta
+    }
+
+    const mesOrigen = ymd(o.fecha_otorgado).slice(0, 7);
+    const { factor_ajuste, factor_sc } = await factorOrigen(mesOrigen, o.ejecutivo);
+    const monto = parseFloat(o.monto_financiado) || 0;
+    const base  = monto * (parseInt(o.plazo) < 24 ? vars.pct_24 : vars.pct_mas24);
+    // Lo efectivamente pagado por esa operación: base + su ajuste, con la semana
+    // corrida del mes de origen (así se devuelve lo mismo que se pagó, no menos).
+    const comision_original = base * (1 + factor_ajuste) * factor_sc;
+    const descuento = revisar ? 0 : comision_original * pct;
+
+    (porEjecutivo[o.ejecutivo] = porEjecutivo[o.ejecutivo] || []).push({
+      num_op: o.num_op, tipo: anulada ? 'ANULADA' : 'PREPAGADA',
+      fecha_hecho: ymd(fechaHecho), mes_origen: mesOrigen,
+      fecha_primera_cuota: ymd(o.fecha_primera_cuota),
+      meses_transcurridos: meses, monto_financiado: monto, plazo: parseInt(o.plazo) || null,
+      pct_descuento: pct, comision_original, descuento, revisar,
+    });
+  }
+  return porEjecutivo;
+}
+
 /* ── GET /api/comisiones/variables ───────────────────────────────────────── */
 const getVariables = async (_req, res) => {
   try {
@@ -380,6 +525,12 @@ async function calcularMes(mes) {
     const aprobMap = {};
     aprobs.forEach(a => { aprobMap[a.ejecutivo] = a; });
 
+    // Descuentos por prepago/anulación imputables a este mes (cláusula novena).
+    // Un ejecutivo puede tener descuentos aunque no haya colocado nada en el mes,
+    // por eso se agregan al mapa: si no, su descuento se perdería.
+    const dctos = await descuentosDelMes(mes, vars);
+    Object.keys(dctos).forEach(ej => { if (!map[ej]) map[ej] = []; });
+
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars, mes);
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
@@ -402,6 +553,20 @@ async function calcularMes(mes) {
           c.incentivo_adicional_credito = c.bono_cesantia_credito + c.bono_rep_credito + c.bono_calidad_credito;
         });
       }
+
+      // Descuentos: se restan del total con semana corrida, que es lo que se paga.
+      // Si superan la comisión del mes NO se deja en negativo: el saldo queda
+      // informado (saldo_descuento) para que Operaciones decida cómo recuperarlo.
+      const lista_dctos = dctos[ejecutivo] || [];
+      const total_descuentos = lista_dctos.reduce((s, d) => s + (d.descuento || 0), 0);
+      const bruto = calc.con_semana_corrida || 0;
+      const aplicado = Math.min(total_descuentos, bruto);
+      calc.descuentos = lista_dctos;
+      calc.total_descuentos = total_descuentos;
+      calc.descuento_aplicado = aplicado;
+      calc.saldo_descuento = total_descuentos - aplicado;
+      calc.con_semana_corrida_bruto = bruto;
+      calc.con_semana_corrida = bruto - aplicado;
 
       return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at,
         ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, ejec_por: aprob.ejec_por || null, creditos: creds };

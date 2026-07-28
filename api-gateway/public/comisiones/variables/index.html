@@ -61,7 +61,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.6</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.7</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -95,8 +95,9 @@
     <div class="formula-step"><div class="formula-num">1</div><div class="formula-text"><strong>Incentivo Base</strong> = Monto&lt;24 × <code>% base &lt;24</code> + Monto≥24 × <code>% base ≥24</code> — solo si total mes ≥ <code>Mínimo monto</code>. <em>El plazo de 24 meses exactos paga la tasa mayor (anexo de contrato 08-2026).</em></div></div>
     <div class="formula-step"><div class="formula-num">2</div><div class="formula-text"><strong>Cruces de seguros</strong> (universo AUTOFIN sin CORFO): RDH ≥ <code>Umbral RDH</code>, Cesantía ≥ <code>Umbral cesantía</code> y Reparaciones ≥ <code>Umbral rep.</code> — el que no supera su umbral aporta 0, sin afectar a los demás</div></div>
     <div class="formula-step"><div class="formula-num">3</div><div class="formula-text"><strong>Factor ajuste</strong> = (Cruce RDH × <code>Peso RDH</code> + Cruce cesantía × <code>Peso ces.</code> + Cruce rep. × <code>Peso rep.</code> + Calidad × <code>Peso calidad</code>) × <code>Factor máx.</code> — <em>Calidad es <b>todo o nada</b>: 100% si alcanza la <code>Meta créditos UNIDAD</code>, 0% si queda bajo ella.</em></div></div>
-    <div class="formula-step"><div class="formula-num">4</div><div class="formula-text"><strong>Incentivo Final</strong> = Base + Bono Cesantía + Bono Reparaciones + Bono Calidad — cada bono usa su ajuste individual</div></div>
+    <div class="formula-step"><div class="formula-num">4</div><div class="formula-text"><strong>Incentivo Final</strong> = Base + Bono RDH + Bono Cesantía + Bono Reparaciones + Bono Calidad — cada bono usa su ajuste individual</div></div>
     <div class="formula-step"><div class="formula-num">5</div><div class="formula-text"><strong>Con Semana Corrida</strong> = Incentivo Final × factor del mes. Con <code>Semana corrida calculada</code> = 1 se aplica el art. 45 del Código del Trabajo: <code>1 + (domingos+festivos) ÷ días lunes a sábado hábiles</code>, que cambia cada mes (ej. feb-26 1,1667 · may-26 1,2917). Con 0 se usa el multiplicador fijo.</div></div>
+    <div class="formula-step"><div class="formula-num">6</div><div class="formula-text"><strong>− Descuentos por prepago y anulación</strong> (cláusula novena): si una operación ya comisionada se <b>prepaga</b> dentro de los <code>meses tramo 1</code> contados desde el <b>vencimiento de su primera cuota</b> se devuelve el <code>% tramo 1</code> de lo pagado por ella; hasta los <code>meses tramo 2</code>, el <code>% tramo 2</code>; después, nada. Las <b>anuladas</b> devuelven el <code>% anulación</code> siempre. El descuento se imputa al mes en que ocurre el hecho — los meses ya pagados no se reabren — y nunca deja la comisión en negativo.</div></div>
   </div>
 
   <div id="formContainer"><div class="text-center p-4 text-secondary"><i class="bi bi-hourglass-split me-2"></i>Cargando variables...</div></div>
@@ -117,12 +118,17 @@
           <a href="/comisiones/revision/">Revisión de Comisiones</a> y en el informe que se les envía.</li>
       <li><b>Mínimo monto del mes</b> → habilita o bloquea por completo la comisión del mes en
           <a href="/comisiones/revision/">Revisión de Comisiones</a>. Bajo ese monto no se paga nada.</li>
-      <li><b>Meta de calidad (ops UNIDAD)</b> → indicador de calidad del factor de ajuste; el
-          cumplimiento se calcula como operaciones UNIDAD del mes ÷ meta, con tope 100%.</li>
+      <li><b>Meta de calidad (ops UNIDAD)</b> → indicador de calidad del factor de ajuste, <b>todo o nada</b>:
+          alcanzada la meta aporta 100%, bajo la meta aporta 0. Hoy está fuera del modelo (peso 0).</li>
       <li><b>Factor máximo, pesos y umbrales</b> → tamaño del bono por cruce de seguros y calidad.
           Si el cruce no supera su umbral, ese indicador aporta 0.</li>
       <li><b>Multiplicador semana corrida</b> → monto final que pasa a
           <a href="/rrhh/remuneraciones/">Remuneraciones</a> como comisión imponible (art. 45 del Código del Trabajo).</li>
+      <li><b>Descuentos por prepago y anulación</b> (tramos, % y switch) → devolución de la comisión ya
+          pagada cuando una operación se prepaga o anula, imputada al mes en que ocurre el hecho. Se ve
+          en <a href="/comisiones/revision/">Revisión de Comisiones</a> y baja el monto que llega a
+          <a href="/rrhh/remuneraciones/">Remuneraciones</a>. El tramo se cuenta desde el
+          <b>vencimiento de la primera cuota</b>, no desde el curse. Con el switch en 0 no se descuenta nada.</li>
     </ul>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;color:#7c2d12;background:#fff7ed;border-radius:6px;padding:10px 12px">
       <i class="bi bi-exclamation-triangle-fill me-1"></i>
@@ -179,15 +185,23 @@ const GRUPOS = [
     icon: 'bi-calendar-week',
     claves: ['semana_corrida_calc','semana_corrida'],
   },
+  {
+    titulo: 'Descuentos por prepago y anulación',
+    icon: 'bi-dash-circle',
+    claves: ['dctos_activo','dcto_meses_t1','dcto_pct_t1','dcto_meses_t2','dcto_pct_t2','dcto_pct_anul'],
+  },
 ];
 
 const UNIDADES = {
   pct_24:'%', pct_mas24:'%', minimo_monto:'$', factor_max:'%',
   peso_cesantia:'%', peso_rep:'%', peso_calidad:'%',
   umbral_rdh:'%', umbral_cesantia:'%', umbral_rep:'%', semana_corrida:'×', meta_unidad:'ops', peso_rdh:'%', semana_corrida_calc:'0/1',
+  dctos_activo:'0/1', dcto_meses_t1:'meses', dcto_pct_t1:'%', dcto_meses_t2:'meses', dcto_pct_t2:'%', dcto_pct_anul:'%',
 };
-const PORCENTAJES = ['pct_24','pct_mas24','factor_max','peso_rdh','peso_cesantia','peso_rep','peso_calidad','umbral_rdh','umbral_cesantia','umbral_rep'];
-const PASO = { minimo_monto:'100000', semana_corrida:'0.01', meta_unidad:'1', semana_corrida_calc:'1' };
+const PORCENTAJES = ['pct_24','pct_mas24','factor_max','peso_rdh','peso_cesantia','peso_rep','peso_calidad','umbral_rdh','umbral_cesantia','umbral_rep',
+  'dcto_pct_t1','dcto_pct_t2','dcto_pct_anul'];
+const PASO = { minimo_monto:'100000', semana_corrida:'0.01', meta_unidad:'1', semana_corrida_calc:'1',
+  dctos_activo:'1', dcto_meses_t1:'1', dcto_meses_t2:'1' };
 
 let vars = {};
 
