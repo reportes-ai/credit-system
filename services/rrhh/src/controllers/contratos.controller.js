@@ -486,8 +486,12 @@ exports.finiquitoGuardar = async (req, res) => {
     } catch (e) { console.error('[finiquito baja descuentos]', e.message); }
     // Seguridad: si la persona sigue activa en Usuarios, se da de baja con la fecha de término
     try {
-      await pool.query(`UPDATE usuarios SET estado='inactivo', fecha_baja=COALESCE(fecha_baja, ?)
+      const [ru] = await pool.query(`UPDATE usuarios SET estado='inactivo', fecha_baja=COALESCE(fecha_baja, ?)
         WHERE id_usuario=? AND estado='activo' AND COALESCE(protegido,0)=0`, [b.fecha_termino, idU]);
+      // Queda en auditoría: si no, la cuenta aparece suspendida sin que nadie sepa por qué
+      // (se confundió con un bloqueo por intentos fallidos de clave, que NO suspende).
+      if (ru.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(idU),
+        detalle: `Usuario suspendido automáticamente por el finiquito #${r.insertId} (término ${b.fecha_termino})` });
     } catch (e) { console.error('[finiquito baja usuario]', e.message); }
     // Pago: ODP automática del finiquito (correlativo central) + campana a Tesorería
     let odp = null;
