@@ -423,11 +423,15 @@ async function evaluarAlertas() {
         await pool.query(
           'INSERT INTO alertas_emitidas (clave, fired_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE fired_at = NOW()', [clave]);
       }
-      // Resolver: el registro ya no cumple → borrar avisos sin leer y limpiar "emitidas"
-      // (así, si la condición vuelve a darse en el futuro, se puede volver a avisar)
+      // Resolver: el registro ya no cumple → borrar sus avisos y limpiar "emitidas"
+      // (así, si la condición vuelve a darse en el futuro, se puede volver a avisar).
+      // OJO: se borran LEÍDAS Y NO LEÍDAS. Antes solo borraba las no leídas, y como
+      // abrir la campanita marca todo como leído, bastaba con mirar el panel una vez
+      // para que el aviso quedara pegado ahí para siempre aunque la carta ya estuviera
+      // tomada. Una alerta describe un ESTADO: cuando el estado se acaba, se va.
       const inList = clavesActivas.length ? clavesActivas : ['__none__'];
       await pool.query(
-        `DELETE FROM notificaciones WHERE clave LIKE ? AND leida = 0 AND clave NOT IN (?)`,
+        `DELETE FROM notificaciones WHERE clave LIKE ? AND clave NOT IN (?)`,
         [`alerta:${rg.id}:%`, inList]);
       await pool.query(
         `DELETE FROM alertas_emitidas WHERE clave LIKE ? AND clave NOT IN (?)`,
