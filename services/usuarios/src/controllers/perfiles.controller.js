@@ -2447,8 +2447,13 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b48', async () => {
       idF = ins.insertId;
     }
     // Sin fila en permisos_perfil la card no aparece — tampoco al Administrador.
+    // Comercial (decide dónde cursar) + Crédito y Operaciones (revisan la carta y
+    // el veredicto) + Finanzas. Desde acá nace; después se administra en Perfiles
+    // y Permisos como cualquier otra card.
     const perfiles = ['Administrador', 'Ejecutivo Comercial', 'Ejecutivo Remoto', 'Supervisor Comercial',
-                      'Jefe Comercial', 'Gerente de Operaciones y Crédito', 'Gerente General'];
+                      'Jefe Comercial', 'Gerente de Operaciones y Crédito', 'Gerente General',
+                      'Analista de Operaciones', 'Analista de Crédito', 'Supervisor de Crédito',
+                      'Gerente de Finanzas'];
     const [ps] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre IN (?)', [perfiles]);
     for (const p of ps) await pool.query(
       'INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)',
