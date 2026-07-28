@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.6 — Capitulo 26: PWA Donde curso (eleccion de financiera) -->
+<!-- v3.7 — Cap. 26: el veredicto ahora decide la excepcion de financiera en la carta -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -476,7 +476,10 @@
     <div><b class="lbl">Cómo decide</b>Primero <b>elegibilidad</b>: el cuadro de Preferencia Financiera dice qué financiera acepta ese plazo con ese saldo — la que no puede tomarla no compite, por muy rentable que se vea. Después <b>rentabilidad</b>: gana la más alta, salvo que la diferencia sea menor al umbral.</div>
     <div><b class="lbl">Motores únicos</b><code>/js/rentabilidad-calc.js</code> (la misma rentabilidad del Simulador y de la carta) · <code>/js/uac-tier.js</code> (el mismo tier UAC del backend) · <code>/js/preferencia-financiera.js</code> (la decisión, compartida con el informe de rentabilidad).</div>
   </div>
-  <div class="afecta"><b>Afecta:</b> originación (§1) — la carta se emite en la financiera que indica; e informe de Rentabilidad de Créditos, que audita después con <b>los mismos umbrales</b>. <b>Depende de:</b> mantenedores de Tasas, Parámetros del Crédito (<code>pref_diff_pct</code>, <code>pref_rent_minima</code>), UF y Preferencia Financiera.</div>
+  <div class="paso">
+    <div><b class="lbl">En la carta</b>El mismo veredicto vive dentro de <b>Cartas de Aprobación</b>, bajo el selector de financiera. Y define la excepción: cursar en la financiera conveniente <b>no</b> es excepción, y si el veredicto es <b>Decides Tú</b> <b>tampoco</b> lo es cursar en cualquiera de las dos. Solo se registra <code>FINANCIERA_NO_PREFERENTE</code> cuando se elige la <b>menos</b> conveniente. Antes bastaba con apartarse del cuadro, aunque las dos dejaran lo mismo: eso llenaba de excepciones sin sentido a los analistas.</div>
+  </div>
+  <div class="afecta"><b>Afecta:</b> originación (§1) — la carta se emite en la financiera que indica y las excepciones de financiera se calculan con esta regla; e informe de Rentabilidad de Créditos, que audita después con <b>los mismos umbrales</b>. <b>Depende de:</b> mantenedores de Tasas, Parámetros del Crédito (<code>pref_diff_pct</code>, <code>pref_rent_minima</code>), UF y Preferencia Financiera.</div>
 
   <div class="paso" style="margin-top:36px"><b>Máxima 3 en acción:</b> cada proceso nuevo o modificado debe sumar (o actualizar) su capítulo aquí en el mismo trabajo que lo crea. Un proceso sin capítulo está incompleto.</div>
 </div>

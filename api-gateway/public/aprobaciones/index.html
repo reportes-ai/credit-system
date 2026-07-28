@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.20 — autocompletar cartas: detección de PDF escaneado (sin capa de texto) con aviso claro en vez de un falso "Datos cargados" -->
+  <!-- v4.21 — la excepcion de financiera la decide la RENTABILIDAD (motor ¿Donde curso?): misma financiera o "Decides Tu" no son excepcion -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -682,6 +682,8 @@
 <script src="/js/rentabilidad-core.js"></script>
 <script src="/js/comision-dealer.js"></script>
 <script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
+<script src="/js/preferencia-financiera.js"></script>
 <script src="/js/xlsx.full.min.js"></script>
 <script src="/js/carta-doc.js"></script>
 <script src="/js/qrcode-generator.js"></script>
@@ -737,6 +739,7 @@ let CARTA_INTRO = CARTA_INTRO_DEFAULT;
 let CARTA_CONSID = CARTA_CONSID_DEFAULT;
 let editandoId = null;
 let UF_HOY = null, TASAS = null, PARAMS_CRED = null, montoCredManual = false;
+let OPS_UAC = 0, MES_UAC = '';   // ops UAC del mes → tier vigente (rentabilidad de la Unidad)
 let VIGENCIA_DIAS = 5;   // días corridos de vigencia de la carta (parametros_credito.vigencia_carta_dias)
 let FINANCIERAS = [
   { nombre:'AUTOFIN',           estado:'normal' },
@@ -799,17 +802,21 @@ const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) retur
 
 async function cargarUFyTasas(){
   try {
-    const [rUf, rTas, rPar] = await Promise.all([
+    const [rUf, rTas, rPar, rUac] = await Promise.all([
       fetch('/api/uf/vigente', { headers: hdr() }),
       fetch('/api/tasas/vigente', { headers: hdr() }),
       fetch('/api/parametros-credito', { headers: hdr() }),
+      fetch('/api/parametros-credito/uac-ops-vigente', { headers: hdr() }),
     ]);
-    const [jUf, jTas, jPar] = await Promise.all([rUf.json(), rTas.json(), rPar.json()]);
+    const [jUf, jTas, jPar, jUac] = await Promise.all([rUf.json(), rTas.json(), rPar.json(), rUac.json()]);
     const u = Array.isArray(jUf.data) ? jUf.data[0] : jUf.data;
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jTas.data) TASAS = jTas.data;
     if (jPar.success && jPar.data?.obj) { PARAMS_CRED = jPar.data.obj;
       const vd = parseInt(PARAMS_CRED.vigencia_carta_dias, 10); if (vd > 0) VIGENCIA_DIAS = vd; }
+    // Tier UAC vigente: sin esto la rentabilidad de la Unidad de Crédito se
+    // calcularía con el tier 1 y el veredicto saldría sesgado a AutoFin.
+    if (jUac.success && jUac.data) { OPS_UAC = jUac.data.ops || 0; MES_UAC = jUac.data.mes || ''; }
   } catch(e) { console.error('uf/tasas/params', e); }
 }
 
@@ -1523,6 +1530,8 @@ function calcUFyTasa(){
       tasaMsg.innerHTML = '<i class="bi bi-check-circle"></i> Tasa pizarra exacta';
     }
   }
+  // La tasa cambia la rentabilidad → puede cambiar qué financiera conviene.
+  try { avisoFinanciera(); } catch(_) {}
 }
 // Trunca a 2 decimales hacia abajo (décimas y centésimas). Nunca redondea hacia arriba:
 // así la tasa nunca supera la TMC (2,8683% → tope 2,86%). El +1e-6 protege valores exactos.
@@ -1578,6 +1587,8 @@ function partDesdeBruto(){
   const saldo = rawMoney('cSaldo'), bruto = rawMoney('cPartBruto');
   document.getElementById('cPartPct').value = saldo > 0 ? (bruto/saldo*100).toFixed(2).replace('.',',') : '';
   calcNetoIva();
+  // La comisión del dealer es costo de ambas financieras: mueve el veredicto.
+  try { avisoFinanciera(); } catch(_) {}
 }
 function partDesdePct(){
   const saldo = rawMoney('cSaldo');
@@ -1665,6 +1676,49 @@ function explicarTramo(corto, plazo, saldo){
   return txt;
 }
 
+/* ── ¿Dónde curso? dentro de la carta ─────────────────────────────────────────
+   Mismo veredicto que ve el ejecutivo en la PWA /donde-curso/: se calcula la
+   rentabilidad de las dos financieras con AF_RENT y se decide con AF_PREF.
+
+   Para qué: antes, elegir UNIDAD cuando el cuadro marcaba AUTOFIN registraba
+   EXCEPCIÓN aunque las dos dejaran prácticamente lo mismo. Eso llenaba de
+   excepciones sin sentido a los analistas. Ahora:
+     · si la financiera elegida es la que conviene → no es excepción
+     · si el veredicto es "Decides Tú" (diferencia < umbral) → tampoco lo es
+     · solo se registra excepción cuando se cursa en la MENOS conveniente
+   Devuelve null si faltan datos: sin números no se acusa a nadie de excepción. */
+function veredictoFinanciera(){
+  if (!window.AF_RENT || !window.AF_PREF) return null;
+  const plazo = parseInt(document.getElementById('cPlazo').value) || 0;
+  const valor = rawMoney('cPrecio');
+  const pie   = rawMoney('cPie');
+  const saldo = rawMoney('cSaldo');
+  if (!plazo || !valor || saldo <= 0 || !PARAMS_CRED) return null;
+
+  const tasaTxt = String(document.getElementById('cTasa').value || '').replace(',', '.').replace(/[^0-9.]/g, '');
+  const uacPct = window.AF_UAC_TIER
+    ? AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, PARAMS_CRED) : null;
+  const partBruto = rawMoney('cPartBruto');
+
+  const R = AF_RENT.calcular({
+    valor, pie, plazo,
+    tasaCli: tasaTxt ? parseFloat(tasaTxt) / 100 : null,
+    esPatio: String(document.getElementById('cTipo').value || '').toUpperCase().includes('PARQUE'),
+    dealerComCLP: partBruto > 0 ? partBruto : null,   // la carta manda: comisión real negociada
+    uacPct,
+  }, PARAMS_CRED, UF_HOY, TASAS || {});
+  if (!R) return null;
+
+  const D = AF_PREF.decidir({
+    rentAF: R.af.rentab, rentUAC: R.uac.rentab, plazo, saldo,
+    tabla: PREF_TABLA, UF: UF_HOY,
+    diffPct: PARAMS_CRED.pref_diff_pct, rentMinima: PARAMS_CRED.pref_rent_minima,
+  });
+  // 'AUTOFIN' | 'UNIDAD' | null(=da lo mismo), en el vocabulario de esta pantalla
+  const conviene = D.veredicto === 'AUTOFIN' ? 'AUTOFIN' : (D.veredicto === 'UNIDAD' ? 'UNIDAD' : null);
+  return { D, R, conviene, decidesTu: D.veredicto === 'DECIDES_TU' };
+}
+
 function renderFinancierasSelect(){
   const sel = document.getElementById('cAcreedor');
   sel.innerHTML = FINANCIERAS.map(f => {
@@ -1693,8 +1747,30 @@ function avisoFinanciera(){
       <span style="font-weight:600;color:#b45309">${escH(explicarTramo(corto, document.getElementById('cPlazo').value, rawMoney('cSaldo')))}</span>`;
     return;
   }
+  // El veredicto por rentabilidad manda sobre la primera opción del cuadro:
+  // el cuadro dice quién PUEDE, la rentabilidad dice quién CONVIENE.
+  const V = veredictoFinanciera();
+  if (V) {
+    const dif = isFinite(V.D.diffPct) ? V.D.diffPct.toFixed(1).replace('.', ',') + '%' : '—';
+    if (V.decidesTu) {
+      msg.style.color = '#1d4ed8';
+      msg.innerHTML = `<i class="bi bi-check2-circle"></i> <b>Decides tú</b> — entre las dos hay ${dif} de diferencia: no es excepción cursar en cualquiera.`;
+      return;
+    }
+    if (corto && V.conviene && corto === V.conviene) {
+      msg.style.color = '#16a34a';
+      msg.innerHTML = `<i class="bi bi-star-fill"></i> ${V.conviene} es la más conveniente (${dif} sobre la otra) — no es excepción.`;
+      return;
+    }
+    if (corto && V.conviene) {
+      const cf = FINANCIERAS.find(x => nombreCorto(x.nombre) === V.conviene);
+      msg.style.color = '#d97706';
+      msg.innerHTML = `<i class="bi bi-exclamation-triangle"></i> Conviene ${escH(cf?.nombre || V.conviene)} (${dif} más) — grabar con otra registra EXCEPCIÓN.`;
+      return;
+    }
+  }
+  // Sin números suficientes para comparar: se cae al cuadro, como siempre.
   if (pref) {
-    // Preseleccionar la preferente si el usuario aún no eligió manualmente otra
     const prefFin = FINANCIERAS.find(x=>nombreCorto(x.nombre)===pref);
     if (corto === pref) { msg.style.color='#16a34a'; msg.innerHTML=`<i class="bi bi-star-fill"></i> Financiera preferente según tabla (${pref})`; }
     else { msg.style.color='#d97706'; msg.innerHTML=`<i class="bi bi-exclamation-triangle"></i> Preferente según tabla: ${escH(prefFin?.nombre||pref)} — grabar con otra registra EXCEPCIÓN`; }
@@ -1798,8 +1874,19 @@ async function guardarCarta(){
     excList.push({ cod:'PARTICIPACION_SOBRE_PIZARRA',
       detalle:`Participación ${fmtCLP(rawMoney('cPartBruto'))} sobre la pizarra (${fmtCLP(brutoPizarra)})` });
   }
-  // Financiera distinta a la preferente según tabla
-  if (prefInfo.pref && finCorto && finCorto !== prefInfo.pref) {
+  /* Financiera menos conveniente. Manda la RENTABILIDAD, no el cuadro:
+       · misma financiera que la conveniente → no es excepción
+       · "Decides Tú" (diferencia bajo el umbral) → tampoco es excepción
+     El cuadro solo decide cuando no hay números para comparar. */
+  const Vfin = veredictoFinanciera();
+  if (Vfin) {
+    if (!Vfin.decidesTu && Vfin.conviene && finCorto && finCorto !== Vfin.conviene) {
+      const cfNombre = FINANCIERAS.find(x=>nombreCorto(x.nombre)===Vfin.conviene)?.nombre || Vfin.conviene;
+      const dif = isFinite(Vfin.D.diffPct) ? Vfin.D.diffPct.toFixed(1).replace('.',',') + '%' : '';
+      excList.push({ cod:'FINANCIERA_NO_PREFERENTE',
+        detalle:`Conviene ${cfNombre}${dif?' ('+dif+' más rentable)':''} — seleccionada: ${finSel}` });
+    }
+  } else if (prefInfo.pref && finCorto && finCorto !== prefInfo.pref) {
     const prefNombre = FINANCIERAS.find(x=>nombreCorto(x.nombre)===prefInfo.pref)?.nombre || prefInfo.pref;
     excList.push({ cod:'FINANCIERA_NO_PREFERENTE',
       detalle:`Preferente según tabla: ${prefNombre} — seleccionada: ${finSel}` });
