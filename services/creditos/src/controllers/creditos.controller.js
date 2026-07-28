@@ -8,19 +8,15 @@ require('../utils/desistir-aprobados');   // regla: APROBADO > N días sin cursa
 const AF_MORA = require('../../../../api-gateway/public/js/mora-core');   // MOTOR ÚNICO de mora
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 
-/* Pool de quienes analizan/aprueban un crédito: Analistas de Crédito + Supervisor
-   de Crédito (+ Administrador), activos. Excluye al actor para no auto-notificar. */
-async function idsAnalistasCredito(excluirId) {
-  const [rows] = await pool.query(
-    `SELECT u.id_usuario FROM usuarios u
-       JOIN perfiles p ON p.id_perfil = u.id_perfil
-     WHERE u.estado = 'activo'
-       AND p.nombre IN ('Analista de Crédito','Supervisor de Crédito','Administrador')
-       AND u.id_usuario <> ?`,
-    [excluirId || 0]
-  );
-  return rows.map(r => r.id_usuario);
-}
+/* Quién se entera de que hay un crédito para analizar: se define en el mantenedor
+   Avisos (/mantenedores/avisos/). Antes eran tres perfiles fijos en esta query. */
+const AVISOS = require('../../../../shared/avisos');
+AVISOS.registrarAviso({
+  evento: 'credito_analisis', nombre: 'Nuevo crédito para análisis', modulo: 'Créditos',
+  descripcion: 'Un crédito entra al estado EN ANÁLISIS. Avisa al pool que debe analizarlo. Nunca se avisa a quien lo envió.',
+  base_func: null, perfiles: 'Analista de Crédito,Supervisor de Crédito',
+  prioridad: 'alta', sonido_tipo: 'dingdong',
+});
 
 // ── Migración: agregar campos de gestión a creditos ──────────────
 require('../../../../shared/migrate').enFila('creditos', async () => {
@@ -777,14 +773,12 @@ const update = async (req, res) => {
 
         // 1) Entra a Análisis → alerta al POOL de analistas/supervisor de crédito
         if (estado === 'EN_ANALISIS') {
-          const ids = await idsAnalistasCredito(actorId);
-          if (ids.length) await notificar(ids, {
+          await AVISOS.avisar('credito_analisis', {
             tipo: 'CREDITO_ANALISIS',
             titulo: '🛎️ Nuevo crédito para análisis',
             mensaje: `${actor} envió a análisis el crédito N°${nCred}${nCli ? ' — ' + nCli : ''}`,
             href: '/creditos/respaldos?id=' + req.params.id,
-            prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
-          });
+          }, { excluir: [actorId] });
         }
 
         // 2) Resolución del análisis → avisa al que GENERÓ el crédito

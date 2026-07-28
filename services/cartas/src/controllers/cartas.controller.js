@@ -124,21 +124,29 @@ async function crearCreditoDesdeCartas(c) {
   return { id: r.insertId, numero_credito };
 }
 
-/* Usuarios activos con permiso de revisar cartas (incluye Administradores) */
-async function idsRevisores(excluirEmail) {
-  const [rows] = await pool.query(
-    `SELECT u.id_usuario FROM usuarios u
-       JOIN perfiles p ON p.id_perfil = u.id_perfil
-     WHERE p.nombre = 'Administrador' AND u.estado = 'activo' AND u.email <> ?
-     UNION
-     SELECT u.id_usuario FROM usuarios u
-       JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil
-       JOIN funcionalidades f  ON f.id_funcionalidad = pp.id_funcionalidad
-     WHERE f.codigo = 'aprob_revisar' AND pp.habilitado = 1
-       AND u.estado = 'activo' AND u.email <> ?`,
-    [excluirEmail || '', excluirEmail || '']
-  );
-  return rows.map(r => r.id_usuario);
+/* Quién recibe los avisos de cartas: se define en el mantenedor Avisos
+   (/mantenedores/avisos/), no acá. Antes era una query fija "Administrador +
+   permiso aprob_revisar", que metía en el pool a las cuentas de servicio y no
+   se podía ajustar sin tocar código. */
+const AVISOS = require('../../../../shared/avisos');
+AVISOS.registrarAviso({
+  evento: 'carta_nueva', nombre: 'Nueva carta para revisión', modulo: 'Cartas',
+  descripcion: 'Un ejecutivo envía una carta al pool (o reenvía una corregida). Avisa a quien deba revisarla.',
+  base_func: 'aprob_revisar', prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+AVISOS.registrarAviso({
+  evento: 'carta_resuelta', nombre: 'Carta aprobada o rechazada', modulo: 'Cartas',
+  descripcion: 'Avisa al ejecutivo que creó la carta cuando se resuelve. Siempre le llega a él; acá se agregan otros que quieran enterarse.',
+  base_func: null, incluir_admin: 0, prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+
+/* id del usuario dueño de un correo (para excluirlo o avisarle) */
+async function idPorEmail(email) {
+  if (!email) return null;
+  try {
+    const [[u]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [email]);
+    return u ? u.id_usuario : null;
+  } catch (e) { return null; }
 }
 
 // Auto-migración: crea tablas si no existen
@@ -883,30 +891,29 @@ function notificarCambios(c, prevStatus, req) {
       const resuelta           = prevStatus === 'PENDIENTE' && (c.status === 'APROBADA' || c.status === 'RECHAZADA');
 
       if (esNuevaPendiente || vuelveAlPool) {
-        const ids = await idsRevisores(c.creadoPor);
-        // Cliente esperando → alta prioridad y sonido distinto para que no pase desapercibida
-        await notificar(ids, {
+        // Al autor no se le avisa de su propia carta
+        const autorId = await idPorEmail(c.creadoPor);
+        await AVISOS.avisar('carta_nueva', {
           tipo: 'CARTA_NUEVA',
           titulo: vuelveAlPool ? '🔁 Carta corregida para revisión' : '🛎️ Nueva carta para revisión',
           mensaje: `${c.creadoPorNombre || 'Un ejecutivo'} envió la carta ${c.opCarta || ''} — ${c.cliente || ''}`,
           href: '/aprobaciones/?tab=revision',
-          prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
-        });
+        }, { excluir: [autorId] });
       }
       if (resuelta) {
-        const [[u]] = await pool.query('SELECT id_usuario FROM usuarios WHERE email = ? LIMIT 1', [c.creadoPor]);
-        if (u) {
+        const autorId = await idPorEmail(c.creadoPor);
+        if (autorId) {
           const ok = c.status === 'APROBADA';
-          // Resolución → al ejecutivo, alta prioridad (también tiene al cliente esperando)
-          await notificar([u.id_usuario], {
+          // Resolución → al ejecutivo (siempre) + quien el mantenedor agregue
+          await AVISOS.avisar('carta_resuelta', {
             tipo: 'CARTA_' + c.status,
             titulo: ok ? '✅ Carta aprobada' : '❌ Carta rechazada',
             mensaje: ok
               ? `Tu carta ${c.opCarta || ''} (${c.cliente || ''}) fue aprobada — ya puedes imprimirla`
               : `Tu carta ${c.opCarta || ''} fue rechazada${c.motivoRechazo ? ': ' + c.motivoRechazo : ''}. Corrígela y reenvíala.`,
             href: '/aprobaciones/',
-            prioridad: 'alta', sonar: 1, son_tipo: ok ? 'dingdong' : 'alarma',
-          });
+            son_tipo: ok ? 'dingdong' : 'alarma',
+          }, { extra: [autorId] });
         }
         const excs = Array.isArray(c.excepciones) ? c.excepciones.filter(Boolean).length : 0;
         auditar({ req, accion: c.status === 'APROBADA' ? 'APROBAR' : 'RECHAZAR', modulo: 'cartas', entidad: 'carta', entidad_id: c.id,

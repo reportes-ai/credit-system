@@ -170,6 +170,7 @@ app.use('/api/dealernet',              require('../../services/clientes/src/rout
 app.use('/api/impuestos',       require('../../services/mantenedores/src/routes/impuestos.routes'));
 app.use('/api/actividades-economicas', require('../../services/mantenedores/src/routes/actividades-economicas.routes'));
 app.use('/api/estado-creditos', require('../../services/mantenedores/src/routes/estado-creditos.routes'));
+app.use('/api/avisos', require('../../services/mantenedores/src/routes/avisos.routes'));
 app.use('/api/estado-cartera',  require('../../services/mantenedores/src/routes/estado-cartera.routes'));
 app.use('/api/tasas',           require('../../services/mantenedores/src/routes/tasas.routes'));
 app.use('/api/uf',              require('../../services/mantenedores/src/routes/uf.routes'));
@@ -444,6 +445,7 @@ const PAGINAS = [
   ['/mantenedores/dealers-direcciones', 'mantenedores/dealers-direcciones/index.html'],
   ['/juegos', 'juegos/index.html'],
   ['/mantenedores/estado-creditos', 'mantenedores/estado-creditos/index.html'],
+  ['/mantenedores/avisos', 'mantenedores/avisos/index.html'],
   ['/mantenedores/estado-cartera', 'mantenedores/estado-cartera/index.html'],
   ['/mantenedores/broker-validaciones', 'mantenedores/broker-validaciones/index.html'],
   ['/creditos/digitacion-autofin', 'creditos/digitacion-autofin.html'],

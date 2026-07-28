@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mantenedor Avisos — AutoFácil</title>
+  <!-- v1.0 — quién recibe cada aviso de la campanita, por perfil y por usuario -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; } .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.7); font-size:.85rem; } .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main { padding:28px 34px; max-width:1180px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:22px; display:flex; gap:18px; align-items:center; }
+    .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { margin:0; font-size:1.2rem; font-weight:700; } .banner p { margin:3px 0 0; font-size:.85rem; opacity:.85; }
+    .mod-titulo { font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:#0f172a; margin:22px 0 10px; display:flex; align-items:center; gap:8px; }
+    .mod-titulo::after { content:''; flex:1; height:1px; background:#cbd5e1; }
+    .aviso { background:#fff; border-radius:13px; box-shadow:0 1px 5px rgba(0,0,0,.07); margin-bottom:12px; overflow:hidden; }
+    .aviso-head { padding:14px 18px; display:flex; align-items:center; gap:14px; cursor:pointer; }
+    .aviso-head:hover { background:#f8fafc; }
+    .aviso-nom { font-weight:700; font-size:.93rem; color:#0f172a; }
+    .aviso-desc { font-size:.79rem; color:#64748b; margin-top:2px; }
+    .chip { border-radius:20px; padding:3px 11px; font-size:.74rem; font-weight:700; white-space:nowrap; }
+    .chip.on  { background:#d1fae5; color:#065f46; } .chip.off { background:#fee2e2; color:#991b1b; }
+    .chip.n   { background:#e0f2fe; color:#075985; }
+    .cuerpo { display:none; padding:4px 18px 18px; border-top:1px solid #f1f5f9; }
+    .cuerpo.abierto { display:block; }
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    @media(max-width:820px){ .grid2 { grid-template-columns:1fr; } }
+    .campo { margin-bottom:12px; }
+    .campo label { font-size:.78rem; font-weight:700; color:#334155; display:block; margin-bottom:5px; }
+    .campo .ayuda { font-size:.74rem; color:#94a3b8; font-weight:400; }
+    .lista-check { max-height:172px; overflow-y:auto; border:1.5px solid #e2e8f0; border-radius:9px; padding:8px 10px; background:#fcfdff; }
+    .lista-check label { display:flex; align-items:center; gap:7px; font-size:.82rem; font-weight:400; color:#334151; padding:2px 0; cursor:pointer; margin:0; }
+    .dest { background:#f0f9ff; border:1px solid #bae6fd; border-radius:9px; padding:10px 13px; font-size:.82rem; color:#075985; }
+    .dest b { color:#0c4a6e; }
+    .dest ul { margin:6px 0 0; padding-left:18px; } .dest li { margin:1px 0; }
+    .fila-sw { display:flex; align-items:center; gap:9px; font-size:.83rem; color:#334155; margin-bottom:8px; }
+    .btn-guardar { background:var(--navy); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:700; font-size:.85rem; cursor:pointer; }
+    .btn-guardar:disabled { opacity:.55; cursor:not-allowed; }
+    select, input[type=text] { border:1.5px solid #d1d5db; border-radius:8px; padding:6px 10px; font-size:.85rem; outline:none; }
+    #toast { position:fixed; bottom:24px; right:24px; padding:12px 22px; border-radius:10px; color:#fff; font-weight:600; font-size:.88rem; box-shadow:0 4px 20px rgba(0,0,0,.2); transform:translateY(80px); opacity:0; transition:.28s; z-index:9999; }
+    #toast.show { transform:translateY(0); opacity:1; } #toast.ok { background:#166534; } #toast.err { background:#991b1b; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › <span style="color:#fff;font-weight:600">Avisos</span></div>
+  </div>
+  <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+</nav>
+
+<div class="main">
+  <div class="banner">
+    <i class="bi bi-bell"></i>
+    <div>
+      <h2>Mantenedor de Avisos</h2>
+      <p>Define quién recibe cada aviso de la campanita, por perfil y/o por usuario. Debajo de cada aviso se muestra la lista real de personas a las que le llegaría hoy.</p>
+    </div>
+  </div>
+
+  <div id="cont"><div style="color:#94a3b8;padding:20px">Cargando avisos…</div></div>
+
+  <!-- Qué afecta este mantenedor (obligatorio) -->
+  <div style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;padding:16px 20px;margin-top:28px;font-size:.83rem;color:#475569">
+    <div style="font-weight:700;color:#0f172a;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      <i class="bi bi-diagram-3"></i>Qué afecta este mantenedor
+    </div>
+    <ul style="margin:0;padding-left:18px;line-height:1.7">
+      <li><b>Destinatarios de cada aviso</b> → a quién le suena la campanita y le llega el push al celular.
+          No cambia permisos: alguien puede recibir el aviso y no poder resolverlo, o poder resolverlo y no
+          querer el aviso. Los permisos se administran en <a href="/usuarios/">Usuarios y Perfiles</a>.</li>
+      <li><b>Permiso base</b> → cuando está activado, entran automáticamente todos los que tengan esa
+          funcionalidad habilitada en la matriz de <a href="/usuarios/">Perfiles</a>. Es el comportamiento
+          histórico: si lo apagas, mandan solo los perfiles y usuarios que marques acá.</li>
+      <li><b>Incluir Administradores</b> → suma a todos los perfiles Administrador. Útil apagarlo para sacar
+          cuentas de servicio o de prueba del reparto.</li>
+      <li><b>Excluir usuarios</b> → saca a alguien puntual aunque su perfil lo incluya (p. ej. la cuenta
+          break-glass o un usuario de prueba).</li>
+      <li><b>Activo / prioridad / sonido</b> → si el aviso se emite, y cómo se comporta la campana
+          (prioridad alta insiste con sonido hasta que se lee).</li>
+      <li><b>Cartas</b> → <a href="/aprobaciones/">Aprobaciones</a> · <b>Créditos</b> →
+          <a href="/creditos/">Créditos</a> · <b>Fundantes</b> → <a href="/fundantes-operaciones/">Fundantes Operaciones</a>
+          · <b>Plan Liquidez</b> → <a href="/dealers-liquidez/hojas/">Hojas de Liquidación</a>.</li>
+    </ul>
+    <div style="margin-top:12px;padding:10px 12px;border-radius:6px;background:#fff7ed;color:#7c2d12">
+      <i class="bi bi-exclamation-triangle-fill me-1"></i>
+      <b>Todavía fuera de este mantenedor:</b> los avisos de <a href="/comisiones/alertas/">Comisiones</a> y de
+      <a href="/dealers-incorporacion/">Fichas de Dealer</a> tienen su propia configuración, anterior a esta
+      pantalla. Se van a consolidar acá; mientras tanto, se editan en su propio mantenedor.
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="/js/auth-guard.js"></script>
+<script src="/js/app-version.js"></script>
+<script>
+  const token = sessionStorage.getItem('token');
+  if (!token) location.href = '/login.html';
+  const H = { Authorization: 'Bearer ' + token }, HJ = { ...H, 'Content-Type': 'application/json' };
+  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const csv = s => String(s||'').split(',').map(x=>x.trim()).filter(Boolean);
+
+  let DATA = null;
+
+  function toast(msg, ok=true){
+    const t=document.getElementById('toast'); t.textContent=msg; t.className='show '+(ok?'ok':'err');
+    setTimeout(()=>t.className='',2600);
+  }
+
+  async function cargar(){
+    const j = await (await fetch('/api/avisos', { headers:H })).json();
+    if (!j.success) { document.getElementById('cont').innerHTML =
+      '<div style="color:#991b1b;padding:20px">No se pudieron cargar los avisos: '+esc(j.error)+'</div>'; return; }
+    DATA = j.data;
+    render();
+  }
+
+  function render(){
+    const porModulo = {};
+    DATA.eventos.forEach(e => { (porModulo[e.modulo] = porModulo[e.modulo] || []).push(e); });
+    const cont = document.getElementById('cont');
+    if (!DATA.eventos.length) {
+      cont.innerHTML = '<div style="background:#fff;border-radius:13px;padding:22px;color:#64748b">'+
+        'Todavía no hay avisos registrados. Cada módulo se registra solo al iniciar el sistema; '+
+        'si acabas de desplegar, espera al próximo arranque.</div>';
+      return;
+    }
+    cont.innerHTML = Object.keys(porModulo).sort().map(mod => `
+      <div class="mod-titulo"><i class="bi bi-folder2-open"></i>${esc(mod)}</div>
+      ${porModulo[mod].map(e => tarjeta(e)).join('')}
+    `).join('');
+  }
+
+  function tarjeta(e){
+    const id = e.evento.replace(/[^a-z0-9_]/gi,'');
+    const perfilesSel = csv(e.perfiles), usuariosSel = csv(e.usuarios), excluirSel = csv(e.excluir);
+    const chkPerfiles = DATA.perfiles.map(p =>
+      `<label><input type="checkbox" data-p="${id}" value="${esc(p.nombre)}" ${perfilesSel.includes(p.nombre)?'checked':''}>${esc(p.nombre)}</label>`).join('');
+    const chkUsuarios = DATA.usuarios.map(u =>
+      `<label><input type="checkbox" data-u="${id}" value="${u.id_usuario}" ${usuariosSel.includes(String(u.id_usuario))?'checked':''}>${esc(u.nombre)} <span style="color:#94a3b8">· ${esc(u.perfil||'')}</span></label>`).join('');
+    const chkExcluir = DATA.usuarios.map(u =>
+      `<label><input type="checkbox" data-x="${id}" value="${u.id_usuario}" ${excluirSel.includes(String(u.id_usuario))?'checked':''}>${esc(u.nombre)} <span style="color:#94a3b8">· ${esc(u.perfil||'')}</span></label>`).join('');
+    const dest = e.destinatarios || [];
+
+    return `
+    <div class="aviso">
+      <div class="aviso-head" onclick="toggle('${id}')">
+        <i class="bi bi-chevron-right" id="chev-${id}" style="color:#94a3b8"></i>
+        <div style="flex:1">
+          <div class="aviso-nom">${esc(e.nombre)}</div>
+          <div class="aviso-desc">${esc(e.descripcion||'')}</div>
+        </div>
+        <span class="chip n">${dest.length} destinatario${dest.length===1?'':'s'}</span>
+        <span class="chip ${e.activo?'on':'off'}">${e.activo?'Activo':'Apagado'}</span>
+      </div>
+      <div class="cuerpo" id="c-${id}">
+        <div class="grid2">
+          <div>
+            <div class="campo">
+              <label>Perfiles que reciben este aviso</label>
+              <div class="lista-check">${chkPerfiles}</div>
+            </div>
+            <div class="campo">
+              <label>Usuarios adicionales <span class="ayuda">(además de los perfiles de arriba)</span></label>
+              <div class="lista-check">${chkUsuarios}</div>
+            </div>
+          </div>
+          <div>
+            <div class="campo">
+              <label>Excluir a estos usuarios <span class="ayuda">(aunque su perfil los incluya)</span></label>
+              <div class="lista-check">${chkExcluir}</div>
+            </div>
+            <div class="campo">
+              <label>Comportamiento</label>
+              <div class="fila-sw"><input type="checkbox" id="act-${id}" ${e.activo?'checked':''}><span>Aviso activo</span></div>
+              <div class="fila-sw"><input type="checkbox" id="adm-${id}" ${e.incluir_admin?'checked':''}><span>Incluir a los Administradores</span></div>
+              <div class="fila-sw"><input type="checkbox" id="fun-${id}" ${e.usa_func?'checked':''} ${e.base_func?'':'disabled'}>
+                <span>Incluir a quien tenga el permiso base ${e.base_func?`<code>${esc(e.base_func)}</code>`:'<i style="color:#94a3b8">(este aviso no tiene permiso base)</i>'}</span></div>
+              <div class="fila-sw"><span>Prioridad</span>
+                <select id="pri-${id}"><option value="normal" ${e.prioridad!=='alta'?'selected':''}>Normal</option><option value="alta" ${e.prioridad==='alta'?'selected':''}>Alta</option></select>
+              </div>
+              <div class="fila-sw"><input type="checkbox" id="son-${id}" ${e.sonido?'checked':''}><span>Con sonido</span>
+                <select id="sti-${id}">${DATA.sonidos.map(s=>`<option ${e.sonido_tipo===s?'selected':''}>${s}</option>`).join('')}</select>
+              </div>
+            </div>
+            <div class="dest">
+              <b>Hoy le llega a ${dest.length} persona${dest.length===1?'':'s'}:</b>
+              ${dest.length ? `<ul>${dest.map(d=>`<li>${esc(d.nombre)}${d.perfil?` — ${esc(d.perfil)}`:''}</li>`).join('')}</ul>`
+                            : '<div style="margin-top:4px;color:#b91c1c">Nadie. Este aviso no le llegaría a ninguna persona.</div>'}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:12px">
+          <button class="btn-guardar" onclick="guardar('${e.evento}','${id}',this)"><i class="bi bi-check-lg me-1"></i>Guardar este aviso</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function toggle(id){
+    const c = document.getElementById('c-'+id), ch = document.getElementById('chev-'+id);
+    const abierto = c.classList.toggle('abierto');
+    ch.className = 'bi bi-chevron-' + (abierto?'down':'right');
+    ch.style.color = '#94a3b8';
+  }
+
+  async function guardar(evento, id, btn){
+    btn.disabled = true;
+    const marcados = attr => [...document.querySelectorAll(`[data-${attr}="${id}"]:checked`)].map(x=>x.value);
+    const body = {
+      perfiles: marcados('p'), usuarios: marcados('u'), excluir: marcados('x'),
+      activo: document.getElementById('act-'+id).checked ? 1 : 0,
+      incluir_admin: document.getElementById('adm-'+id).checked ? 1 : 0,
+      usa_func: document.getElementById('fun-'+id).checked ? 1 : 0,
+      prioridad: document.getElementById('pri-'+id).value,
+      sonido: document.getElementById('son-'+id).checked ? 1 : 0,
+      sonido_tipo: document.getElementById('sti-'+id).value,
+    };
+    try {
+      const j = await (await fetch('/api/avisos/'+encodeURIComponent(evento), {
+        method:'PUT', headers:HJ, body:JSON.stringify(body) })).json();
+      if (!j.success) throw new Error(j.error||'Error');
+      toast(`Guardado — ahora le llega a ${j.data.destinatarios} persona(s)`);
+      await cargar();
+      const c = document.getElementById('c-'+id); if (c) toggle(id);
+    } catch(e){ toast('No se pudo guardar: '+e.message, false); }
+    btn.disabled = false;
+  }
+
+  cargar();
+</script>
+</body>
+</html>

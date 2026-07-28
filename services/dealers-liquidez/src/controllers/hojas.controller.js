@@ -151,33 +151,32 @@ function motivoDe(C, D, A, desc) {
   if (desc < 0) return `Aumento de adelanto: la comisión subió; se entrega ${f(-desc)} adicional para llevar el adelanto a ${f(A)}.`;
   return `Sin cambio en el adelanto: la comisión (${f(C)}) mantiene la deuda en ${f(A)}.`;
 }
-// Pool de usuarios a avisar para un nivel: Administradores + quien tenga su permiso, activos.
-async function idsPorFunc(func) {
-  const [rows] = await pool.query(
-    `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-       WHERE p.nombre='Administrador' AND u.estado='activo'
-     UNION
-     SELECT u.id_usuario FROM usuarios u
-       JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil
-       JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
-      WHERE f.codigo=? AND pp.habilitado=1 AND u.estado='activo'`, [func]);
-  return rows.map(r => r.id_usuario);
-}
+// Quién recibe el aviso de cada nivel: mantenedor Avisos. El permiso del nivel
+// (liquidez_rev_n1 / liquidez_aprob_n2 / liquidez_info_n3) sigue siendo el default.
+const AVISOS = require('../../../../shared/avisos');
+for (const n of [1, 2, 3]) AVISOS.registrarAviso({
+  evento: 'liquidez_nivel_' + n,
+  nombre: `Plan Liquidez — Hoja en Nivel ${n}`,
+  modulo: 'Plan Liquidez',
+  descripcion: `La Hoja de Liquidación llega al Nivel ${n} de la cadena de aprobación.`,
+  base_func: (NIVELES_SEED.find(x => x.nivel === n) || {}).func || null,
+  prioridad: n === 3 ? 'normal' : 'alta', sonido_tipo: 'dingdong',
+});
 // Alerta (campana) al nivel indicado, respetando su flag `alerta`.
 async function alertarNivel(nivel, hoja) {
   try {
     const niv = await nivelesCfg();
     const cfg = niv[nivel]; if (!cfg || !cfg.alerta) return;
-    const ids = await idsPorFunc(cfg.func); if (!ids.length) return;
+
     const textos = {
       1: { t: '🛎️ Hoja de Liquidación para revisar', m: `La Hoja de Liquidación ${hoja.periodo} está lista para tu revisión (Nivel 1 — Comercial).` },
       2: { t: '🛎️ Hoja de Liquidación — aprobación', m: `La Hoja ${hoja.periodo} fue aprobada en Nivel 1; requiere tu aprobación (Gerencia General). Tienes 48h.` },
       3: { t: 'ℹ️ Hoja de Liquidación aprobada', m: `La Hoja ${hoja.periodo} quedó aprobada; toma conocimiento (Finanzas). Habilitada para Orden de Pago.` },
     }[nivel];
-    await notificar(ids, {
+    await AVISOS.avisar('liquidez_nivel_' + nivel, {
       tipo: 'LIQUIDEZ_HOJA', titulo: textos.t, mensaje: textos.m,
       href: '/dealers-liquidez/hojas/?id=' + hoja.id,
-      prioridad: nivel === 3 ? 'normal' : 'alta', sonar: nivel === 3 ? 0 : 1, son_tipo: 'dingdong',
+      sonar: nivel === 3 ? 0 : 1,
       clave: 'liquidez_hoja_' + hoja.id + '_n' + nivel,
     });
   } catch (e) { console.error('[liquidez alertarNivel]', e.message); }

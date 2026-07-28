@@ -148,21 +148,13 @@ const contratado = v => { const s = String(v == null ? '' : v).trim(); return s 
 // por ámbito del perfil ('todos' | 'asignados'). Soporta varios supervisores.
 async function ejecutivosVisibles(req) { return _visEjec(req.usuario); }
 
-// Pool de Operaciones: usuarios activos cuyo perfil puede validar fundantes (fundantes_validar /
-// fundantes_operaciones) + Administradores. Para avisar cuando llegan fundantes a validación.
-async function idsOperaciones(excluirId) {
-  try {
-    const [rows] = await pool.query(
-      `SELECT DISTINCT u.id_usuario
-         FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
-        WHERE u.estado='activo' AND u.id_usuario <> ?
-          AND (p.nombre='Administrador'
-               OR EXISTS (SELECT 1 FROM permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
-                          WHERE pp.id_perfil=p.id_perfil AND pp.habilitado=1 AND f.codigo IN ('fundantes_validar','fundantes_operaciones')))`,
-      [excluirId || 0]);
-    return rows.map(r => r.id_usuario);
-  } catch (e) { console.error('[fundantes idsOperaciones]', e.message); return []; }
-}
+// Quién se entera de que llegaron fundantes a validar: mantenedor Avisos.
+const AVISOS = require('../../../../shared/avisos');
+AVISOS.registrarAviso({
+  evento: 'fundantes_validar', nombre: 'Fundantes por validar', modulo: 'Fundantes',
+  descripcion: 'Un ejecutivo envía los documentos fundantes de una operación a validación. Avisa al pool de Operaciones.',
+  base_func: 'fundantes_validar,fundantes_operaciones', prioridad: 'normal', sonido_tipo: 'campana',
+});
 
 // Tipos requeridos para una operación según financiera + lo contratado. Devuelve [{codigo,nombre,obligatorio,orden}].
 function tiposDeOperacion(op, tiposPorFin) {
@@ -388,11 +380,11 @@ const enviar = async (req, res) => {
       detalle: `Envió a validación los fundantes de la OP ${op.num_op}` });
     // Alerta al pool de Operaciones: llegaron fundantes para validar.
     try {
-      const pooln = await idsOperaciones(req.usuario.id_usuario);
-      if (pooln.length) await notificar(pooln, {
+      await AVISOS.avisar('fundantes_validar', {
         tipo: 'fundantes', titulo: 'Fundantes por validar',
         mensaje: `${nombreUsuario(req)} envió los fundantes de la OP ${op.num_op} (${op.financiera || ''}).`,
-        href: '/fundantes-operaciones/', prioridad: 'normal', sonar: true, clave: 'fund_env_' + id });
+        href: '/fundantes-operaciones/', clave: 'fund_env_' + id },
+        { excluir: [req.usuario.id_usuario] });
     } catch (_) {}
     res.json({ success: true, data: { id_credito: id, estado: 'ENVIADO' }, error: null });
   } catch (e) {
