@@ -1133,7 +1133,7 @@ function parseCartaCompromiso(t) {
     montoCreditoCLP: _monto,
     concesionario:   g(/Dealers:\s*([^\n]+?)Sucursal/),
     vendedor:        g(/F&I:\s*([^\n]+?)Ejecutivo/),
-    patente:         g(/placa patente\s+([A-Z0-9]+)\s+Marca/),
+    patente:         g(/placa patente\s+([A-Z]{4}\d{2}|[A-Z]{2}\d{4})/i),
     marca:           g(/Marca\s+([A-ZÁÉÍÓÚ]+)\s*,/),
     modelo:          g(/Modelo\s+([A-ZÁÉÍÓÚ0-9 ]+?)\s*,\s*año/),
     anio:            g(/año\s+(\d{4})/),
@@ -1248,9 +1248,9 @@ async function ocrCartaIA(tipoDoc, b64) {
   const ia = require('../../../../shared/ia');
   if (!(await ia.iaActiva('cartas_pdf_ia'))) return null;
   const CAMPOS = {
-    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito = el MONTO BRUTO en pesos (montoCreditoCLP) — nunca el costo total (que incluye intereses) ni la cuota, participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
+    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente/placa COMPLETA de 6 caracteres, formato chileno AAAA00 o AA0000 — suele venir en el parrafo como "placa patente XXXX00"; si no se lee completa usa null (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito = el MONTO BRUTO en pesos (montoCreditoCLP) — nunca el costo total (que incluye intereses) ni la cuota, participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
     COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), MONTO BRUTO del credito en pesos (montoCreditoCLP) — no el liquido ni el costo total, monto liquido del credito (saldo), costo total del credito (costoTotal), plazo en meses (plazo), valor de la cuota (cuota)',
-    CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto del credito = el TOTAL PAGARE en pesos (montoCreditoCLP) — NUNCA el total de recargos ni el valor de una cuota, nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps), gastos = suma de inscripcion + mantenciones prepagadas + garantia mecanica + seguro perdida total (gastos)',
+    CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente/placa COMPLETA de 6 caracteres, formato chileno AAAA00 o AA0000; si no se lee completa usa null (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto del credito = el TOTAL PAGARE en pesos (montoCreditoCLP) — NUNCA el total de recargos ni el valor de una cuota, nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps), gastos = suma de inscripcion + mantenciones prepagadas + garantia mecanica + seguro perdida total (gastos)',
   };
   try {
     const { datos } = await require('../../../../shared/anthropic').analizar({
@@ -1263,6 +1263,12 @@ async function ocrCartaIA(tipoDoc, b64) {
     // coerción de tipos al shape de los parsers
     for (const k of ['precioVenta', 'pie', 'saldo', 'montoCreditoCLP', 'partBruto', 'segDesgravamen', 'segCesantia', 'segRdh', 'segRep', 'gps', 'gastos']) if (k in datos) datos[k] = _iaNum(datos[k]);
     if ('plazo' in datos) datos.plazo = _iaNum(datos.plazo);
+    // Patente: o viene COMPLETA con formato chileno o no viene. Una lectura
+    // truncada ("RRL" de RRLB83) autocompletada es peor que el campo vacío.
+    if ('patente' in datos && datos.patente != null) {
+      const pat = String(datos.patente).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      datos.patente = (/^[A-Z]{4}\d{2}$/.test(pat) || /^[A-Z]{2}\d{4}$/.test(pat)) ? pat : null;
+    }
     if ('anio' in datos) datos.anio = _iaNum(datos.anio);
     if ('tasaCredito' in datos) datos.tasaCredito = _iaTasa(datos.tasaCredito);
     if (datos.rutCliente) datos.rutCliente = RUT.normalizar(datos.rutCliente) || datos.rutCliente;
