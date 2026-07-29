@@ -175,6 +175,26 @@ app.get('/api/health', async (req, res) => {
   } catch (e) { console.error('[apis seed]', e.message); }
 })();
 
+// Presentación Business Suite (para mostrar el sistema al grupo) — gerencias y jefaturas
+(async () => {
+  try {
+    const pool = require('../../shared/config/database');
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' LIMIT 1");
+    if (!mod) return;
+    let [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='presentacion_suite' LIMIT 1`);
+    if (!f) {
+      const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Presentación Business Suite', 'presentacion_suite', '/presentacion-grupo/', 'bi-easel2-fill')`, [mod.id_modulo]);
+      f = { id_funcionalidad: r.insertId };
+    }
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                      SELECT p.id_perfil, ?, 1 FROM perfiles p
+                      WHERE (p.nombre LIKE 'Gerente%' OR p.nombre LIKE 'Director%' OR p.nombre LIKE 'Subgerente%'
+                             OR p.nombre LIKE 'Jefe%' OR p.nombre = 'Administrador')
+                        AND NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                     [f.id_funcionalidad, f.id_funcionalidad]);
+  } catch (e) { console.error('[presentacion seed]', e.message); }
+})();
+
 // Auth (login limitado a 10 intentos/min por IP — QA 15.5)
 const rateLimit = require('../../shared/rate-limit');
 app.use('/api/auth/login', rateLimit({ ventanaMs: 60000, max: 10 }));
