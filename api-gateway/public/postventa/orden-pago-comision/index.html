@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.5 — la comisión es BRUTA (IVA incluido): sin factura se DESAGREGA, no se le suma IVA encima -->
+  <!-- v2.6 — la comisión es BRUTA (IVA incluido): sin desglose capturado se DESAGREGA, nunca se le suma IVA encima -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -215,14 +215,16 @@ function docHTML(ops){
   const pct0 = (f0.impuesto_pct != null) ? Number(f0.impuesto_pct) : (esBoleta ? ret : iva);
   const impLbl = `${esBoleta ? 'Retención' : 'IVA'} ${pct0}%`;
   /* Factura (total de la cartola) — UNA sola vez desde f0.
-     OJO: la comisión del sistema es BRUTA (IVA INCLUIDO). Cuando la factura todavía
-     no se registra, el bruto ES la comisión y el neto se DESAGREGA (bruto ÷ 1,19).
-     Nunca se le suma IVA encima: eso inflaba la orden de pago un 19% y disparaba
-     un descuadre fantasma contra la cartola. Con factura registrada mandan los
-     valores congelados al recibirla (neto, impuesto y líquido). */
-  const sinFactura   = (f0.monto_factura == null);
+     OJO: la comisión del sistema es BRUTA (IVA INCLUIDO).
+     El desglose neto/impuesto SOLO es confiable cuando se capturó al registrar la
+     factura (modal de Seguimiento graba impuesto_monto y monto_liquido). Si ese
+     desglose NO existe —no hay factura aún, o la fila la creó la carga masiva
+     volcando la comisión bruta en monto_bruto— el monto disponible es el BRUTO y
+     el neto se DESAGREGA (bruto ÷ 1,19). Nunca se le suma IVA encima: eso inflaba
+     la orden un 19% y disparaba un descuadre fantasma contra la cartola. */
+  const sinDesglose  = (f0.impuesto_monto == null || f0.monto_liquido == null);
   const facturaBase  = Number(f0.monto_factura ?? f0.comision)||0;   // factura: neto · boleta: bruto
-  const desagregar   = sinFactura && !esBoleta;                      // comisión bruta → neto + IVA
+  const desagregar   = sinDesglose && !esBoleta;                     // comisión bruta → neto + IVA
   const facturaNeto  = desagregar ? Math.round(facturaBase / (1 + pct0/100)) : facturaBase;
   const facturaImp   = (f0.impuesto_monto != null) ? Number(f0.impuesto_monto)
                      : desagregar ? (facturaBase - facturaNeto) : Math.round(facturaNeto*pct0/100);
