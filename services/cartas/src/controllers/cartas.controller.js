@@ -1248,9 +1248,9 @@ async function ocrCartaIA(tipoDoc, b64) {
   const ia = require('../../../../shared/ia');
   if (!(await ia.iaActiva('cartas_pdf_ia'))) return null;
   const CAMPOS = {
-    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito en pesos (montoCreditoCLP), participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
+    COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito = el MONTO BRUTO en pesos (montoCreditoCLP) — nunca el costo total (que incluye intereses) ni la cuota, participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
     COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), MONTO BRUTO del credito en pesos (montoCreditoCLP) — no el liquido ni el costo total, monto liquido del credito (saldo), costo total del credito (costoTotal), plazo en meses (plazo), valor de la cuota (cuota)',
-    CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto credito en pesos (montoCreditoCLP), nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps)',
+    CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto del credito = el TOTAL PAGARE en pesos (montoCreditoCLP) — NUNCA el total de recargos ni el valor de una cuota, nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps), gastos = suma de inscripcion + mantenciones prepagadas + garantia mecanica + seguro perdida total (gastos)',
   };
   try {
     const { datos } = await require('../../../../shared/anthropic').analizar({
@@ -1261,7 +1261,7 @@ async function ocrCartaIA(tipoDoc, b64) {
     });
     if (!datos) return null;
     // coerción de tipos al shape de los parsers
-    for (const k of ['precioVenta', 'pie', 'saldo', 'montoCreditoCLP', 'partBruto', 'segDesgravamen', 'segCesantia', 'segRdh', 'segRep', 'gps']) if (k in datos) datos[k] = _iaNum(datos[k]);
+    for (const k of ['precioVenta', 'pie', 'saldo', 'montoCreditoCLP', 'partBruto', 'segDesgravamen', 'segCesantia', 'segRdh', 'segRep', 'gps', 'gastos']) if (k in datos) datos[k] = _iaNum(datos[k]);
     if ('plazo' in datos) datos.plazo = _iaNum(datos.plazo);
     if ('anio' in datos) datos.anio = _iaNum(datos.anio);
     if ('tasaCredito' in datos) datos.tasaCredito = _iaTasa(datos.tasaCredito);
@@ -1288,7 +1288,7 @@ const parseUnidad = async (req, res) => {
             ? 'La Carta Compromiso venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.'
             : 'La Carta Compromiso es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde el sistema de Unidad — igual quedó adjunta para la revisión.');
         }
-        else out.compromiso = parseCartaCompromiso(txt);
+        else out.compromiso = await completarConIA('COMPROMISO_UNIDAD', compromiso_base64, parseCartaCompromiso(txt), CLAVES_COMPROMISO, out.warnings);
       }
       catch (e) { out.warnings.push('No se pudo leer la Carta Compromiso: ' + e.message); }
     }
@@ -1322,6 +1322,31 @@ const parseUnidad = async (req, res) => {
   } catch (e) { console.error('[parseUnidad]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo procesar el documento' }); }
 };
 
+/* Segunda lectura con IA cuando el parser de texto dejó campos CLAVE vacíos.
+   El PDF sí tiene texto, pero el aplanado de pdf-parse a veces revuelve las
+   columnas y las anclas no calzan (montos pegados, etiquetas separadas de los
+   valores). Regla: lo leído del texto SIEMPRE manda; Haiku solo llena huecos.
+   Definición de Pato: cuando hay problemas para leer, se lee con Haiku. */
+async function completarConIA(tipoDoc, b64, parsed, claves, warnings) {
+  try {
+    const faltan = claves.filter(k => parsed == null || parsed[k] == null || parsed[k] === '');
+    if (!faltan.length) return parsed;
+    const ia = await ocrCartaIA(tipoDoc, b64);
+    if (!ia) return parsed;
+    const out = { ...(parsed || {}) };
+    const llenados = [];
+    for (const [k, v] of Object.entries(ia)) {
+      if (v == null || v === '') continue;
+      if (out[k] == null || out[k] === '') { out[k] = v; llenados.push(k); }
+    }
+    if (llenados.length) warnings.push(
+      `El texto del PDF no dejó leer ${llenados.join(', ')}: se completó con IA (Haiku) — REVISA esos datos antes de guardar.`);
+    return out;
+  } catch (e) { console.error('[completarConIA]', e.message); return parsed; }
+}
+const CLAVES_AUTOFIN = ['precioVenta', 'pie', 'montoCreditoCLP', 'tasaCredito', 'plazo', 'segRdh'];
+const CLAVES_COMPROMISO = ['saldo', 'montoCreditoCLP', 'plazo', 'tasaCredito'];
+
 // POST /api/cartas/parse-autofin → extrae campos de la Carta de Aprobación Autofin
 const parseAutofin = async (req, res) => {
   try {
@@ -1336,7 +1361,7 @@ const parseAutofin = async (req, res) => {
           return res.status(422).json({ success: false, data: null, error: 'La carta es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde Trinidad/AutoFin y súbelo de nuevo.' });
         out.warnings.push('La carta venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.');
       }
-      else out.carta = parseCartaAutofin(txt);
+      else out.carta = await completarConIA('CARTA_AUTOFIN', b64, parseCartaAutofin(txt), CLAVES_AUTOFIN, out.warnings);
     }
     catch (e) { return res.status(422).json({ success: false, data: null, error: 'No se pudo leer la carta: ' + e.message }); }
     const c = out.carta || {};
