@@ -25,25 +25,44 @@ enFila('api_publica', async () => {
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_api_key (api_key)
   )`);
+  // Cada llave pertenece a UNA API del catálogo (una card por API en el mantenedor)
+  await pool.query(`ALTER TABLE api_clientes ADD COLUMN IF NOT EXISTS api VARCHAR(40) NOT NULL DEFAULT 'simulador_rapido'`);
+  // Catálogo paramétrico de APIs publicadas: agregar una API nueva = INSERT aquí
+  // (+ su ruta/handler); la card en /mantenedores/apis/ aparece sola.
+  await pool.query(`CREATE TABLE IF NOT EXISTS apis_catalogo (
+    codigo VARCHAR(40) PRIMARY KEY,
+    nombre VARCHAR(120) NOT NULL,
+    descripcion VARCHAR(300) NULL,
+    icono VARCHAR(50) NOT NULL DEFAULT 'bi-plug',
+    endpoint VARCHAR(200) NOT NULL,
+    activo TINYINT NOT NULL DEFAULT 1,
+    orden INT NOT NULL DEFAULT 100
+  )`);
+  await pool.query(`INSERT IGNORE INTO apis_catalogo (codigo, nombre, descripcion, icono, endpoint, orden) VALUES
+    ('simulador_rapido', 'API Simulador Rápido', 'Un monto → cuotas a 12/24/36/48 meses con CAE, tasa y monto financiado. Motor único del Simulador Rápido.', 'bi-calculator-fill', '/api/publica/v1/simulador-rapido?monto=MONTO', 10)`);
 });
 
 const nuevaLlave = () => 'afk_' + crypto.randomBytes(24).toString('hex');
 
-/* ── Middleware: valida X-API-Key contra el mantenedor ── */
-async function validarApiKey(req, res, next) {
-  try {
-    const key = String(req.headers['x-api-key'] || '').trim();
-    if (!key) return res.status(401).json({ success: false, data: null, error: 'Falta el header X-API-Key' });
-    const [[cli]] = await pool.query('SELECT id, empresa, activo FROM api_clientes WHERE api_key = ? LIMIT 1', [key]);
-    if (!cli) return res.status(401).json({ success: false, data: null, error: 'API Key inválida' });
-    if (!cli.activo) return res.status(403).json({ success: false, data: null, error: 'API Key desactivada — contacte a AutoFácil' });
-    req.apiCliente = cli;
-    pool.query('UPDATE api_clientes SET llamadas = llamadas + 1, ultimo_uso = NOW() WHERE id = ?', [cli.id]).catch(() => {});
-    next();
-  } catch (e) {
-    console.error('[api-publica] validar:', e.message);
-    res.status(500).json({ success: false, data: null, error: 'Error interno' });
-  }
+/* ── Middleware: valida X-API-Key contra el mantenedor, por API ──
+   La llave sirve SOLO para la API a la que fue emitida (una card = una API). */
+function validarApiKey(api) {
+  return async function (req, res, next) {
+    try {
+      const key = String(req.headers['x-api-key'] || '').trim();
+      if (!key) return res.status(401).json({ success: false, data: null, error: 'Falta el header X-API-Key' });
+      const [[cli]] = await pool.query('SELECT id, empresa, api, activo FROM api_clientes WHERE api_key = ? LIMIT 1', [key]);
+      if (!cli) return res.status(401).json({ success: false, data: null, error: 'API Key inválida' });
+      if (!cli.activo) return res.status(403).json({ success: false, data: null, error: 'API Key desactivada — contacte a AutoFácil' });
+      if (cli.api !== api) return res.status(403).json({ success: false, data: null, error: 'Esta API Key no tiene acceso a esta API' });
+      req.apiCliente = cli;
+      pool.query('UPDATE api_clientes SET llamadas = llamadas + 1, ultimo_uso = NOW() WHERE id = ?', [cli.id]).catch(() => {});
+      next();
+    } catch (e) {
+      console.error('[api-publica] validar:', e.message);
+      res.status(500).json({ success: false, data: null, error: 'Error interno' });
+    }
+  };
 }
 
 /* ── GET /api/publica/v1/simulador-rapido?monto=8000000 ── */
@@ -59,20 +78,33 @@ async function simular(req, res) {
 }
 
 /* ── Admin (mantenedor APIs) ── */
+async function adminCatalogo(req, res) {
+  try {
+    const [apis] = await pool.query('SELECT codigo, nombre, descripcion, icono, endpoint, activo, orden FROM apis_catalogo WHERE activo = 1 ORDER BY orden, nombre');
+    const [stats] = await pool.query('SELECT api, COUNT(*) llaves, SUM(activo) activas, SUM(llamadas) llamadas FROM api_clientes GROUP BY api');
+    const m = {}; stats.forEach(s => { m[s.api] = s; });
+    res.json({ success: true, data: apis.map(a => ({ ...a, stats: m[a.codigo] || { llaves: 0, activas: 0, llamadas: 0 } })), error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+}
+
 async function adminListar(req, res) {
   try {
-    const [rows] = await pool.query('SELECT id, empresa, contacto, correo, api_key, activo, llamadas, ultimo_uso, created_at FROM api_clientes ORDER BY created_at DESC');
+    const filtro = req.query.api ? ' WHERE api = ?' : '';
+    const [rows] = await pool.query('SELECT id, empresa, contacto, correo, api, api_key, activo, llamadas, ultimo_uso, created_at FROM api_clientes' + filtro + ' ORDER BY created_at DESC',
+      req.query.api ? [req.query.api] : []);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 }
 
 async function adminCrear(req, res) {
   try {
-    const { empresa, contacto, correo } = req.body || {};
+    const { empresa, contacto, correo, api } = req.body || {};
     if (!empresa || !String(empresa).trim()) return res.status(400).json({ success: false, data: null, error: 'Falta la empresa' });
+    const [[cat]] = await pool.query('SELECT codigo FROM apis_catalogo WHERE codigo = ? AND activo = 1', [api || '']);
+    if (!cat) return res.status(400).json({ success: false, data: null, error: 'API desconocida' });
     const key = nuevaLlave();
-    await pool.query('INSERT INTO api_clientes (empresa, contacto, correo, api_key) VALUES (?,?,?,?)',
-      [String(empresa).trim(), contacto || null, correo || null, key]);
+    await pool.query('INSERT INTO api_clientes (empresa, contacto, correo, api, api_key) VALUES (?,?,?,?,?)',
+      [String(empresa).trim(), contacto || null, correo || null, cat.codigo, key]);
     res.json({ success: true, data: { api_key: key }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 }
@@ -93,4 +125,4 @@ async function adminRegenerar(req, res) {
   } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 }
 
-module.exports = { validarApiKey, simular, adminListar, adminCrear, adminActivo, adminRegenerar };
+module.exports = { validarApiKey, simular, adminCatalogo, adminListar, adminCrear, adminActivo, adminRegenerar };

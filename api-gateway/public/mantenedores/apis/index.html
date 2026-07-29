@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — mantenedor APIs: llaves por empresa + documentación de la API Pública -->
+<!-- v2.0 — una card por API (catálogo paramétrico apis_catalogo); llaves amarradas a su API -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,6 +14,14 @@
   .banner i { font-size:2.3rem; opacity:.88; }
   .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
   .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+  .api-card { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); cursor:pointer; border:1.5px solid transparent; transition:.15s; text-align:left; }
+  .api-card:hover { border-color:var(--blue); transform:translateY(-2px); }
+  .api-card .ic { width:44px; height:44px; border-radius:12px; background:#eff6ff; color:var(--blue); display:flex; align-items:center; justify-content:center; font-size:1.4rem; margin-bottom:10px; }
+  .api-card h4 { margin:0 0 5px; font-size:.98rem; color:var(--navy); }
+  .api-card p { margin:0 0 10px; font-size:.8rem; color:#64748b; line-height:1.5; }
+  .api-card .st { font-size:.72rem; color:#475569; display:flex; gap:14px; }
+  .api-card .st b { color:var(--navy); }
   .panel { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
   .panel h5 { margin:0 0 12px; font-size:.98rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
   table { width:100%; border-collapse:collapse; font-size:.82rem; }
@@ -44,37 +52,73 @@
 
 <div class="main">
   <div class="banner"><i class="bi bi-plug-fill"></i><div>
-    <h2>APIs — Acceso de Empresas Externas</h2>
-    <p>Llaves de acceso a la API Pública (Simulador Rápido) y la documentación para enviar a cada empresa.</p>
+    <h2 id="bTitulo">APIs — Acceso de Empresas Externas</h2>
+    <p id="bSub">Una card por API publicada. Entra a la API para administrar sus llaves y copiar la documentación para enviar.</p>
   </div></div>
 
-  <div class="panel">
-    <h5><i class="bi bi-key-fill"></i> Empresas con acceso</h5>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      <input id="nEmpresa" placeholder="Empresa *" style="flex:1;min-width:180px">
-      <input id="nContacto" placeholder="Contacto" style="min-width:160px">
-      <input id="nCorreo" placeholder="Correo" type="email" style="min-width:200px">
-      <button class="btnx btn-azul" onclick="crear()"><i class="bi bi-plus-lg"></i> Crear llave</button>
-    </div>
-    <div style="overflow-x:auto"><table>
-      <thead><tr><th>Empresa</th><th>Contacto</th><th>API Key (click = copiar)</th><th>Estado</th><th>Llamadas</th><th>Último uso</th><th></th></tr></thead>
-      <tbody id="tbody"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:22px">Cargando…</td></tr></tbody>
-    </table></div>
+  <!-- LANDING: una card por API del catálogo -->
+  <div id="vLanding">
+    <div class="cards" id="cards"><p style="color:#94a3b8">Cargando…</p></div>
   </div>
 
-  <div class="panel doc">
-    <h5><i class="bi bi-file-earmark-text"></i> Documentación de la API — Simulador Rápido
-      <button class="btnx btn-gris btn-mini" style="margin-left:auto" onclick="copiarDoc()"><i class="bi bi-clipboard"></i> Copiar instrucciones para enviar</button>
-    </h5>
-    <div id="docBody">
+  <!-- DETALLE de una API -->
+  <div id="vApi" style="display:none">
+    <button class="btnx btn-gris" style="margin-bottom:14px" onclick="verLanding()"><i class="bi bi-arrow-left"></i> Todas las APIs</button>
+
+    <div class="panel">
+      <h5><i class="bi bi-key-fill"></i> Empresas con acceso a <span id="tNombre"></span></h5>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <input id="nEmpresa" placeholder="Empresa *" style="flex:1;min-width:180px">
+        <input id="nContacto" placeholder="Contacto" style="min-width:160px">
+        <input id="nCorreo" placeholder="Correo" type="email" style="min-width:200px">
+        <button class="btnx btn-azul" onclick="crear()"><i class="bi bi-plus-lg"></i> Crear llave</button>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Empresa</th><th>Contacto</th><th>API Key (click = copiar)</th><th>Estado</th><th>Llamadas</th><th>Último uso</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </div>
+
+    <div class="panel doc">
+      <h5><i class="bi bi-file-earmark-text"></i> Documentación — <span id="tNombre2"></span>
+        <button class="btnx btn-gris btn-mini" style="margin-left:auto" onclick="copiarDoc()"><i class="bi bi-clipboard"></i> Copiar instrucciones para enviar</button>
+      </h5>
+      <div id="docBody"><p style="color:#94a3b8">Documentación pendiente para esta API.</p></div>
+    </div>
+  </div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>API Key por empresa</b> → habilita/corta el acceso externo a la API correspondiente (la llave sirve SOLO para la API donde se creó). Desactivar corta el acceso al instante.</li>
+      <li><b>Regenerar llave</b> → invalida la anterior (reenviar la nueva a la empresa).</li>
+      <li><b>Catálogo de APIs</b> (tabla <code>apis_catalogo</code>) → cada fila es una card aquí. API Simulador Rápido usa el motor único del <a href="/simulador-rapido/">Simulador Rápido</a>: cambios en <a href="/mantenedores/tasas/">Tasas</a>, <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/factores-seguro/">Factores de Seguros</a> se reflejan al instante en la API.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+if (!TOKEN()) location.href = '/login.html';
+const H = { Authorization: 'Bearer ' + TOKEN() };
+const HJ = { ...H, 'Content-Type': 'application/json' };
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtF = d => d ? new Date(d).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' }) : '—';
+let CATALOGO = [], API = null;
+
+/* Documentación por API (texto de presentación — mapa local, no dato de negocio).
+   Al publicar una API nueva: agregar su entrada aquí con html + correo. */
+const DOCS = {
+  simulador_rapido: {
+    html: `
       <h6>Endpoint</h6>
       <pre>GET https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=MONTO</pre>
       <h6>Autenticación</h6>
-      <p>Header <b>X-API-Key</b> con la llave entregada por AutoFácil. Sin llave (o con llave desactivada) la API responde 401/403.</p>
+      <p>Header <b>X-API-Key</b> con la llave entregada por AutoFácil. Sin llave (o desactivada) responde 401/403.</p>
       <h6>Parámetros</h6>
       <ul><li><b>monto</b> — saldo a financiar en pesos chilenos, entero sin puntos. Entre 1.000.000 y 300.000.000.</li></ul>
       <h6>Ejemplo (curl)</h6>
-      <pre>curl -H "X-API-Key: afk_SU_LLAVE" \
+      <pre>curl -H "X-API-Key: afk_SU_LLAVE" \\
   "https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=8000000"</pre>
       <h6>Respuesta</h6>
       <pre>{
@@ -101,68 +145,8 @@
         <li>Máximo <b>60 consultas por minuto</b>; sobre eso responde 429.</li>
         <li>Monto fuera de rango → 400 con el detalle en <code>error</code>.</li>
         <li>Los valores son referenciales y usan las condiciones vigentes del día (UF, tasas, gastos y seguros de AutoFácil).</li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
-    <ul>
-      <li><b>API Key por empresa</b> → habilita/corta el acceso externo a <code>/api/publica/v1/simulador-rapido</code>. Desactivar la llave corta el acceso al instante.</li>
-      <li><b>Regenerar llave</b> → invalida la anterior (hay que reenviar la nueva a la empresa).</li>
-      <li><b>El cálculo</b> sale del motor único del <a href="/simulador-rapido/">Simulador Rápido</a>: cambios en <a href="/mantenedores/tasas/">Tasas</a>, <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/factores-seguro/">Factores de Seguros</a> se reflejan de inmediato en la API.</li>
-    </ul>
-  </div>
-</div>
-
-<script src="/js/auth-guard.js"></script>
-<script>
-const TOKEN = () => sessionStorage.getItem('token');
-if (!TOKEN()) location.href = '/login.html';
-const H = { Authorization: 'Bearer ' + TOKEN() };
-const HJ = { ...H, 'Content-Type': 'application/json' };
-const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const fmtF = d => d ? new Date(d).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' }) : '—';
-
-async function cargar() {
-  const j = await fetch('/api/api-clientes', { headers: H }).then(r => r.json()).catch(() => null);
-  const rows = (j && j.success && j.data) || [];
-  document.getElementById('tbody').innerHTML = rows.length ? rows.map(c => `
-    <tr>
-      <td><b>${esc(c.empresa)}</b></td>
-      <td>${esc(c.contacto || '—')}${c.correo ? '<br><span style="color:#94a3b8;font-size:.72rem">' + esc(c.correo) + '</span>' : ''}</td>
-      <td><span class="key" title="Copiar" onclick="navigator.clipboard.writeText('${esc(c.api_key)}');this.textContent='¡copiada!';setTimeout(()=>this.textContent='${esc(c.api_key)}',1200)">${esc(c.api_key)}</span></td>
-      <td><span class="chip ${c.activo ? 'c-on' : 'c-off'}">${c.activo ? 'ACTIVA' : 'DESACTIVADA'}</span></td>
-      <td>${Number(c.llamadas || 0).toLocaleString('es-CL')}</td>
-      <td style="font-size:.74rem">${fmtF(c.ultimo_uso)}</td>
-      <td style="white-space:nowrap">
-        <button class="btnx btn-gris btn-mini" onclick="toggle(${c.id}, ${c.activo ? 0 : 1})">${c.activo ? 'Desactivar' : 'Activar'}</button>
-        <button class="btnx btn-gris btn-mini" onclick="regenerar(${c.id})" title="Invalida la llave actual"><i class="bi bi-arrow-repeat"></i></button>
-      </td>
-    </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:22px">Sin empresas aún — crea la primera llave arriba.</td></tr>';
-}
-
-async function crear() {
-  const empresa = document.getElementById('nEmpresa').value.trim();
-  if (!empresa) return alert('Falta la empresa');
-  const j = await fetch('/api/api-clientes', { method:'POST', headers: HJ, body: JSON.stringify({
-    empresa, contacto: document.getElementById('nContacto').value.trim() || null,
-    correo: document.getElementById('nCorreo').value.trim() || null }) }).then(r => r.json());
-  if (!j.success) return alert(j.error || 'Error');
-  ['nEmpresa','nContacto','nCorreo'].forEach(id => document.getElementById(id).value = '');
-  cargar();
-}
-async function toggle(id, activo) {
-  await fetch('/api/api-clientes/' + id + '/activo', { method:'PUT', headers: HJ, body: JSON.stringify({ activo }) });
-  cargar();
-}
-async function regenerar(id) {
-  if (!confirm('La llave actual dejará de funcionar y habrá que enviar la nueva a la empresa. ¿Continuar?')) return;
-  await fetch('/api/api-clientes/' + id + '/regenerar', { method:'POST', headers: HJ });
-  cargar();
-}
-
-function copiarDoc() {
-  const txt = `API Pública AutoFácil — Simulador Rápido de Crédito Automotriz
+      </ul>`,
+    correo: `API Pública AutoFácil — Simulador Rápido de Crédito Automotriz
 ================================================================
 
 ENDPOINT
@@ -196,13 +180,95 @@ NOTAS
   - Los valores son referenciales y usan las condiciones comerciales
     vigentes de AutoFácil al momento de la consulta.
   - La llave es personal de su empresa: no la publique en sitios web
-    ni aplicaciones visibles al cliente final (úsela desde su servidor).
+    ni aplicaciones visibles al cliente final (úsela desde su servidor).`
+  }
+};
 
-Contacto técnico: ${JSON.parse(sessionStorage.getItem('usuario')||'{}').correo || 'contacto@autofacilchile.cl'}`;
-  navigator.clipboard.writeText(txt).then(() => alert('Instrucciones copiadas — pégalas en el correo a la empresa.'));
+async function cargarCatalogo() {
+  const j = await fetch('/api/api-clientes/catalogo', { headers: H }).then(r => r.json()).catch(() => null);
+  CATALOGO = (j && j.success && j.data) || [];
+  document.getElementById('cards').innerHTML = CATALOGO.length ? CATALOGO.map(a => `
+    <button class="api-card" onclick="verApi('${esc(a.codigo)}')">
+      <div class="ic"><i class="bi ${esc(a.icono)}"></i></div>
+      <h4>${esc(a.nombre)}</h4>
+      <p>${esc(a.descripcion || '')}</p>
+      <div class="st">
+        <span><b>${a.stats.llaves}</b> llaves (${a.stats.activas || 0} activas)</span>
+        <span><b>${Number(a.stats.llamadas || 0).toLocaleString('es-CL')}</b> llamadas</span>
+      </div>
+    </button>`).join('') : '<p style="color:#94a3b8">Sin APIs en el catálogo.</p>';
 }
 
-cargar();
+function verLanding() {
+  API = null;
+  document.getElementById('vApi').style.display = 'none';
+  document.getElementById('vLanding').style.display = '';
+  document.getElementById('bTitulo').textContent = 'APIs — Acceso de Empresas Externas';
+  document.getElementById('bSub').textContent = 'Una card por API publicada. Entra a la API para administrar sus llaves y copiar la documentación para enviar.';
+  cargarCatalogo();
+}
+
+function verApi(codigo) {
+  API = CATALOGO.find(a => a.codigo === codigo);
+  if (!API) return;
+  document.getElementById('vLanding').style.display = 'none';
+  document.getElementById('vApi').style.display = '';
+  document.getElementById('bTitulo').textContent = API.nombre;
+  document.getElementById('bSub').textContent = API.descripcion || '';
+  document.getElementById('tNombre').textContent = API.nombre;
+  document.getElementById('tNombre2').textContent = API.nombre;
+  const d = DOCS[codigo];
+  document.getElementById('docBody').innerHTML = d ? d.html : '<p style="color:#94a3b8">Documentación pendiente para esta API.</p>';
+  cargarLlaves();
+}
+
+async function cargarLlaves() {
+  const j = await fetch('/api/api-clientes?api=' + encodeURIComponent(API.codigo), { headers: H }).then(r => r.json()).catch(() => null);
+  const rows = (j && j.success && j.data) || [];
+  document.getElementById('tbody').innerHTML = rows.length ? rows.map(c => `
+    <tr>
+      <td><b>${esc(c.empresa)}</b></td>
+      <td>${esc(c.contacto || '—')}${c.correo ? '<br><span style="color:#94a3b8;font-size:.72rem">' + esc(c.correo) + '</span>' : ''}</td>
+      <td><span class="key" title="Copiar" onclick="navigator.clipboard.writeText('${esc(c.api_key)}');this.textContent='¡copiada!';setTimeout(()=>this.textContent='${esc(c.api_key)}',1200)">${esc(c.api_key)}</span></td>
+      <td><span class="chip ${c.activo ? 'c-on' : 'c-off'}">${c.activo ? 'ACTIVA' : 'DESACTIVADA'}</span></td>
+      <td>${Number(c.llamadas || 0).toLocaleString('es-CL')}</td>
+      <td style="font-size:.74rem">${fmtF(c.ultimo_uso)}</td>
+      <td style="white-space:nowrap">
+        <button class="btnx btn-gris btn-mini" onclick="toggle(${c.id}, ${c.activo ? 0 : 1})">${c.activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="btnx btn-gris btn-mini" onclick="regenerar(${c.id})" title="Invalida la llave actual"><i class="bi bi-arrow-repeat"></i></button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:22px">Sin empresas aún — crea la primera llave arriba.</td></tr>';
+}
+
+async function crear() {
+  const empresa = document.getElementById('nEmpresa').value.trim();
+  if (!empresa) return alert('Falta la empresa');
+  const j = await fetch('/api/api-clientes', { method:'POST', headers: HJ, body: JSON.stringify({
+    empresa, api: API.codigo,
+    contacto: document.getElementById('nContacto').value.trim() || null,
+    correo: document.getElementById('nCorreo').value.trim() || null }) }).then(r => r.json());
+  if (!j.success) return alert(j.error || 'Error');
+  ['nEmpresa','nContacto','nCorreo'].forEach(id => document.getElementById(id).value = '');
+  cargarLlaves();
+}
+async function toggle(id, activo) {
+  await fetch('/api/api-clientes/' + id + '/activo', { method:'PUT', headers: HJ, body: JSON.stringify({ activo }) });
+  cargarLlaves();
+}
+async function regenerar(id) {
+  if (!confirm('La llave actual dejará de funcionar y habrá que enviar la nueva a la empresa. ¿Continuar?')) return;
+  await fetch('/api/api-clientes/' + id + '/regenerar', { method:'POST', headers: HJ });
+  cargarLlaves();
+}
+
+function copiarDoc() {
+  const d = DOCS[API && API.codigo];
+  if (!d) return alert('Esta API aún no tiene documentación para enviar.');
+  const firma = '\n\nContacto técnico: ' + (JSON.parse(sessionStorage.getItem('usuario')||'{}').correo || 'contacto@autofacilchile.cl');
+  navigator.clipboard.writeText(d.correo + firma).then(() => alert('Instrucciones copiadas — pégalas en el correo a la empresa.'));
+}
+
+cargarCatalogo();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

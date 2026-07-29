@@ -11,11 +11,12 @@ const c = require('../controllers/api-publica.controller');
 const publica = express.Router();
 publica.get('/v1/simulador-rapido',
   rateLimit({ ventanaMs: 60000, max: 60, mensaje: 'Límite de 60 consultas por minuto excedido' }),
-  c.validarApiKey, c.simular);
+  c.validarApiKey('simulador_rapido'), c.simular);
 
 /* Admin: mantenedor APIs */
 const admin = express.Router();
 admin.use(verifyToken, requireFunc('apis_admin'));
+admin.get('/catalogo', c.adminCatalogo);
 admin.get('/', c.adminListar);
 admin.post('/', c.adminCrear);
 admin.put('/:id/activo', c.adminActivo);
