@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.21 — la excepcion de financiera la decide la RENTABILIDAD (motor ¿Donde curso?): misma financiera o "Decides Tu" no son excepcion -->
+  <!-- v4.22 — bloqueo si el monto del credito viene bajo el saldo precio (el PDF traia la cuota) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -378,7 +378,7 @@
           <option value="">—</option><option>6</option><option>12</option><option>18</option><option>24</option>
           <option>30</option><option>36</option><option>42</option><option>48</option><option>60</option><option>72</option>
         </select></div>
-      <div class="ff"><label>Monto crédito (CLP) *</label><input id="cMontoCred" inputmode="numeric" oninput="fmtMoney(this);montoCredManual=true;calcUFyTasa()"></div>
+      <div class="ff"><label>Monto crédito (CLP) *</label><input id="cMontoCred" inputmode="numeric" oninput="fmtMoney(this);montoCredManual=true;calcUFyTasa()"><div id="montoCredMsg" style="font-size:.72rem;font-weight:600;margin-top:3px"></div></div>
       <div class="ff"><label>Monto crédito (UF) <span id="ufBadge" style="text-transform:none"></span></label><input id="cMontoUF" readonly></div>
       <div class="ff"><label>Tasa crédito (%) *</label><input id="cTasa" inputmode="decimal" placeholder="Ej: 2,7" oninput="calcUFyTasa()"></div>
       <div class="ff"><label>Tasa pizarra (%)</label><input id="cTasaPizarra" readonly>
@@ -1496,6 +1496,27 @@ function calcUFyTasa(){
       ? '<span style="background:#dcfce7;color:#15803d;border-radius:8px;padding:1px 8px;font-size:.66rem;font-weight:700">MENOR 200 UF</span>'
       : '<span style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 8px;font-size:.66rem;font-weight:700">MAYOR 200 UF</span>';
   } else { document.getElementById('cMontoUF').value = ''; ufBadge.innerHTML = ''; }
+  /* El monto del crédito nunca es MENOR al saldo precio: al saldo se le suman los
+     gastos y las primas capitalizadas. Si viene por debajo, el autocompletado del
+     PDF leyó otra cosa — el caso real fue tomar la CUOTA ($148.570) como monto de
+     un crédito de $7.980.000, y pasó la revisión sin que nadie lo notara. */
+  const _saldoCmp = rawMoney('cSaldo');
+  const mcMsg = document.getElementById('montoCredMsg');
+  if (mcMsg) {
+    mcMsg.textContent = '';
+    if (monto > 0 && _saldoCmp > 0) {
+      const r = monto / _saldoCmp;
+      if (r < 0.8) {
+        mcMsg.style.color = '#dc2626';
+        mcMsg.innerHTML = '<i class="bi bi-x-octagon"></i> El monto del crédito (' + fmtCLP(monto) +
+          ') es MENOR al saldo precio (' + fmtCLP(_saldoCmp) + ') — revisa el dato, no se permite grabar.';
+      } else if (r > 1.6) {
+        mcMsg.style.color = '#d97706';
+        mcMsg.innerHTML = '<i class="bi bi-exclamation-triangle"></i> El monto del crédito supera en ' +
+          Math.round((r - 1) * 100) + '% al saldo precio — verifica que sea correcto.';
+      }
+    }
+  }
   // Tasa pizarra según tramo UF
   let pizarra = null;
   if (TASAS && esMenor200 !== null) {
@@ -1831,6 +1852,11 @@ async function guardarCarta(){
   if (!(await resolverVendedorNuevo())) return;   // vendedor nuevo → primero a la base
   if (!editandoId && !document.getElementById('cApPat').value) { setFormAlert('Falta: Apellido paterno del cliente'); return; }
   if (!rawMoney('cMontoCred')) { setFormAlert('Falta: Monto crédito'); return; }
+  // Monto crédito bajo el saldo precio = dato mal leído del PDF. No se graba.
+  if (rawMoney('cSaldo') > 0 && rawMoney('cMontoCred') < rawMoney('cSaldo') * 0.8) {
+    setFormAlert(`⛔ El monto del crédito (${fmtCLP(rawMoney('cMontoCred'))}) es menor al saldo precio (${fmtCLP(rawMoney('cSaldo'))}) — corrígelo antes de grabar`);
+    return;
+  }
   const tasaIngresada = parseFloat(String(document.getElementById('cTasa').value).replace(',','.'));
   if (isNaN(tasaIngresada) || tasaIngresada <= 0) { setFormAlert('Falta: Tasa crédito (%) — obligatoria para comparar contra pizarra'); return; }
   const patenteVal = document.getElementById('cPatente').value.trim();

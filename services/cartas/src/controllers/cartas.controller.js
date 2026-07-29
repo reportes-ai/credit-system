@@ -1102,15 +1102,23 @@ function _splitNombre(full) {
 function parseCartaCompromiso(t) {
   const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
   const nombre = g(/Nombre:\s*([^\n]+)/), sp = _splitNombre(nombre);
+  const _saldo = _numU(g(/Saldo precio:\s*([\d.]+)/));
+  /* "Total a pagar" del compromiso Unidad NO siempre es el capital: en varios PDF
+     es la CUOTA mensual. Caso real: llegó $148.570 como monto de un crédito con
+     $7.980.000 de saldo, y la carta pasó la revisión sin que nadie lo notara.
+     El monto del crédito JAMÁS es menor al saldo precio (a este se le suman los
+     gastos y las primas), así que si viene por debajo se descarta y manda el saldo. */
+  const _totalPagar = _numU(g(/Total a pagar:\s*([\d.]+)/));
+  const _monto = (_saldo && _totalPagar && _totalPagar < _saldo * 0.8) ? _saldo : _totalPagar;
   return {
     opOrigen:        g(/N° Operación\s*\n?\s*(\d{4,})/),
     fecha:           _fechaU(g(/Fecha:\s*(\d{2}-\d{2}-\d{4})/)),
     rutCliente:      g(/Rut:\s*([\d.]+-[\dkK])/),
     nombre, nombres: sp.nombres, apPaterno: sp.apPaterno, apMaterno: sp.apMaterno,
     plazo:           _numU(g(/Número de cuotas:\s*(\d+)/)),
-    saldo:           _numU(g(/Saldo precio:\s*([\d.]+)/)),
+    saldo:           _saldo,
     tasaCredito:     (g(/Tasa de interés Nominal:\s*([\d,]+)/) || '').replace(',', '.') || null,
-    montoCreditoCLP: _numU(g(/Total a pagar:\s*([\d.]+)/)),
+    montoCreditoCLP: _monto,
     concesionario:   g(/Dealers:\s*([^\n]+?)Sucursal/),
     vendedor:        g(/F&I:\s*([^\n]+?)Ejecutivo/),
     patente:         g(/placa patente\s+([A-Z0-9]+)\s+Marca/),
