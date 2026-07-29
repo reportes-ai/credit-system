@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<!-- v1.0 — mantenedor APIs: llaves por empresa + documentación de la API Pública -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APIs — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1150px; margin:0 auto; padding:26px 24px 70px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.88; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .panel { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+  .panel h5 { margin:0 0 12px; font-size:.98rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  table { width:100%; border-collapse:collapse; font-size:.82rem; }
+  th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; border-bottom:2px solid #e2e8f0; padding:7px 10px; }
+  td { padding:7px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  input { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-size:.83rem; }
+  .btnx { border:none; border-radius:9px; padding:8px 15px; font-size:.8rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn-azul { background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  .btn-mini { padding:4px 10px; font-size:.72rem; }
+  .key { font-family:monospace; font-size:.74rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:2px 7px; cursor:pointer; }
+  .chip { border-radius:14px; padding:2px 10px; font-size:.68rem; font-weight:700; }
+  .c-on { background:#dcfce7; color:#166534; } .c-off { background:#fee2e2; color:#b91c1c; }
+  pre { background:#0f172a; color:#a5f3fc; border-radius:10px; padding:14px 16px; font-size:.78rem; overflow-x:auto; line-height:1.6; }
+  .doc h6 { color:var(--navy); font-size:.85rem; margin:16px 0 6px; }
+  .doc p, .doc li { font-size:.84rem; line-height:1.6; }
+  .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:22px; }
+  .afecta ul { margin:8px 0 0; padding-left:18px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Mantenedores', href:'/mantenedores/' },
+  { label:'APIs', icon:'bi-plug-fill', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-plug-fill"></i><div>
+    <h2>APIs — Acceso de Empresas Externas</h2>
+    <p>Llaves de acceso a la API Pública (Simulador Rápido) y la documentación para enviar a cada empresa.</p>
+  </div></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-key-fill"></i> Empresas con acceso</h5>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <input id="nEmpresa" placeholder="Empresa *" style="flex:1;min-width:180px">
+      <input id="nContacto" placeholder="Contacto" style="min-width:160px">
+      <input id="nCorreo" placeholder="Correo" type="email" style="min-width:200px">
+      <button class="btnx btn-azul" onclick="crear()"><i class="bi bi-plus-lg"></i> Crear llave</button>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Empresa</th><th>Contacto</th><th>API Key (click = copiar)</th><th>Estado</th><th>Llamadas</th><th>Último uso</th><th></th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:22px">Cargando…</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="panel doc">
+    <h5><i class="bi bi-file-earmark-text"></i> Documentación de la API — Simulador Rápido
+      <button class="btnx btn-gris btn-mini" style="margin-left:auto" onclick="copiarDoc()"><i class="bi bi-clipboard"></i> Copiar instrucciones para enviar</button>
+    </h5>
+    <div id="docBody">
+      <h6>Endpoint</h6>
+      <pre>GET https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=MONTO</pre>
+      <h6>Autenticación</h6>
+      <p>Header <b>X-API-Key</b> con la llave entregada por AutoFácil. Sin llave (o con llave desactivada) la API responde 401/403.</p>
+      <h6>Parámetros</h6>
+      <ul><li><b>monto</b> — saldo a financiar en pesos chilenos, entero sin puntos. Entre 1.000.000 y 300.000.000.</li></ul>
+      <h6>Ejemplo (curl)</h6>
+      <pre>curl -H "X-API-Key: afk_SU_LLAVE" \
+  "https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=8000000"</pre>
+      <h6>Respuesta</h6>
+      <pre>{
+  "success": true,
+  "data": {
+    "opciones": [
+      { "plazo": 12, "cuota": 786514, "cae": 34.4, "tasa": 2.35, "monto_fin": 9146498 },
+      { "plazo": 24, "cuota": 512340, "cae": 33.1, "tasa": 2.35, "monto_fin": 9310211 },
+      { "plazo": 36, "cuota": 425780, "cae": 32.6, "tasa": 2.35, "monto_fin": 9455904 },
+      { "plazo": 48, "cuota": 380120, "cae": 32.2, "tasa": 2.35, "monto_fin": 9762275 }
+    ],
+    "condiciones": { "uf": 39643.21, "fecha": "2026-07-29", "tasa": 2.35, "mayor200": false }
+  },
+  "error": null
+}</pre>
+      <ul>
+        <li><b>cuota</b> — cuota mensual en CLP, con gastos operacionales y seguros incluidos.</li>
+        <li><b>cae</b> — Carga Anual Equivalente (%), definición oficial CMF.</li>
+        <li><b>tasa</b> — tasa mensual vigente (%) según tramo de 200 UF.</li>
+        <li><b>monto_fin</b> — monto financiado total (saldo + gastos + seguros).</li>
+      </ul>
+      <h6>Límites y errores</h6>
+      <ul>
+        <li>Máximo <b>60 consultas por minuto</b>; sobre eso responde 429.</li>
+        <li>Monto fuera de rango → 400 con el detalle en <code>error</code>.</li>
+        <li>Los valores son referenciales y usan las condiciones vigentes del día (UF, tasas, gastos y seguros de AutoFácil).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>API Key por empresa</b> → habilita/corta el acceso externo a <code>/api/publica/v1/simulador-rapido</code>. Desactivar la llave corta el acceso al instante.</li>
+      <li><b>Regenerar llave</b> → invalida la anterior (hay que reenviar la nueva a la empresa).</li>
+      <li><b>El cálculo</b> sale del motor único del <a href="/simulador-rapido/">Simulador Rápido</a>: cambios en <a href="/mantenedores/tasas/">Tasas</a>, <a href="/mantenedores/parametros/">Parámetros de Crédito</a> y <a href="/mantenedores/factores-seguro/">Factores de Seguros</a> se reflejan de inmediato en la API.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+if (!TOKEN()) location.href = '/login.html';
+const H = { Authorization: 'Bearer ' + TOKEN() };
+const HJ = { ...H, 'Content-Type': 'application/json' };
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtF = d => d ? new Date(d).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' }) : '—';
+
+async function cargar() {
+  const j = await fetch('/api/api-clientes', { headers: H }).then(r => r.json()).catch(() => null);
+  const rows = (j && j.success && j.data) || [];
+  document.getElementById('tbody').innerHTML = rows.length ? rows.map(c => `
+    <tr>
+      <td><b>${esc(c.empresa)}</b></td>
+      <td>${esc(c.contacto || '—')}${c.correo ? '<br><span style="color:#94a3b8;font-size:.72rem">' + esc(c.correo) + '</span>' : ''}</td>
+      <td><span class="key" title="Copiar" onclick="navigator.clipboard.writeText('${esc(c.api_key)}');this.textContent='¡copiada!';setTimeout(()=>this.textContent='${esc(c.api_key)}',1200)">${esc(c.api_key)}</span></td>
+      <td><span class="chip ${c.activo ? 'c-on' : 'c-off'}">${c.activo ? 'ACTIVA' : 'DESACTIVADA'}</span></td>
+      <td>${Number(c.llamadas || 0).toLocaleString('es-CL')}</td>
+      <td style="font-size:.74rem">${fmtF(c.ultimo_uso)}</td>
+      <td style="white-space:nowrap">
+        <button class="btnx btn-gris btn-mini" onclick="toggle(${c.id}, ${c.activo ? 0 : 1})">${c.activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="btnx btn-gris btn-mini" onclick="regenerar(${c.id})" title="Invalida la llave actual"><i class="bi bi-arrow-repeat"></i></button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:22px">Sin empresas aún — crea la primera llave arriba.</td></tr>';
+}
+
+async function crear() {
+  const empresa = document.getElementById('nEmpresa').value.trim();
+  if (!empresa) return alert('Falta la empresa');
+  const j = await fetch('/api/api-clientes', { method:'POST', headers: HJ, body: JSON.stringify({
+    empresa, contacto: document.getElementById('nContacto').value.trim() || null,
+    correo: document.getElementById('nCorreo').value.trim() || null }) }).then(r => r.json());
+  if (!j.success) return alert(j.error || 'Error');
+  ['nEmpresa','nContacto','nCorreo'].forEach(id => document.getElementById(id).value = '');
+  cargar();
+}
+async function toggle(id, activo) {
+  await fetch('/api/api-clientes/' + id + '/activo', { method:'PUT', headers: HJ, body: JSON.stringify({ activo }) });
+  cargar();
+}
+async function regenerar(id) {
+  if (!confirm('La llave actual dejará de funcionar y habrá que enviar la nueva a la empresa. ¿Continuar?')) return;
+  await fetch('/api/api-clientes/' + id + '/regenerar', { method:'POST', headers: HJ });
+  cargar();
+}
+
+function copiarDoc() {
+  const txt = `API Pública AutoFácil — Simulador Rápido de Crédito Automotriz
+================================================================
+
+ENDPOINT
+  GET https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=MONTO
+
+AUTENTICACIÓN
+  Header: X-API-Key: <llave entregada por AutoFácil>
+
+PARÁMETROS
+  monto — saldo a financiar en pesos chilenos, entero sin puntos
+          (mínimo 1.000.000, máximo 300.000.000)
+
+EJEMPLO
+  curl -H "X-API-Key: afk_SU_LLAVE" "https://afbs.autofacilchile.cl/api/publica/v1/simulador-rapido?monto=8000000"
+
+RESPUESTA (JSON)
+  data.opciones[] — una por plazo (12, 24, 36 y 48 meses):
+    plazo      meses
+    cuota      cuota mensual en CLP (incluye gastos operacionales y seguros)
+    cae        Carga Anual Equivalente (%), definición oficial CMF
+    tasa       tasa mensual vigente (%)
+    monto_fin  monto financiado total
+  data.condiciones — UF del día, fecha y tramo de tasa aplicado.
+
+LÍMITES
+  - 60 consultas por minuto (sobre eso responde HTTP 429)
+  - Monto fuera de rango responde HTTP 400 con el detalle
+  - Llave inválida o desactivada responde HTTP 401/403
+
+NOTAS
+  - Los valores son referenciales y usan las condiciones comerciales
+    vigentes de AutoFácil al momento de la consulta.
+  - La llave es personal de su empresa: no la publique en sitios web
+    ni aplicaciones visibles al cliente final (úsela desde su servidor).
+
+Contacto técnico: ${JSON.parse(sessionStorage.getItem('usuario')||'{}').correo || 'contacto@autofacilchile.cl'}`;
+  navigator.clipboard.writeText(txt).then(() => alert('Instrucciones copiadas — pégalas en el correo a la empresa.'));
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

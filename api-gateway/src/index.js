@@ -156,6 +156,25 @@ app.get('/api/health', async (req, res) => {
   } catch (e) { console.error('[simulador-rapido seed]', e.message); }
 })();
 
+// Mantenedor APIs (llaves de la API Pública) — solo perfiles de administración
+(async () => {
+  try {
+    const pool = require('../../shared/config/database');
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' LIMIT 1");
+    if (!mod) return;
+    let [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='apis_admin' LIMIT 1`);
+    if (!f) {
+      const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'APIs', 'apis_admin', '/mantenedores/apis/', 'bi-plug-fill')`, [mod.id_modulo]);
+      f = { id_funcionalidad: r.insertId };
+    }
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                      SELECT p.id_perfil, ?, 1 FROM perfiles p
+                      WHERE p.nombre IN ('Administrador','Gerente General','Gerente de Operaciones y Credito','Gerente de Operaciones y Crédito','Gerente de Finanzas')
+                        AND NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                     [f.id_funcionalidad, f.id_funcionalidad]);
+  } catch (e) { console.error('[apis seed]', e.message); }
+})();
+
 // Auth (login limitado a 10 intentos/min por IP — QA 15.5)
 const rateLimit = require('../../shared/rate-limit');
 app.use('/api/auth/login', rateLimit({ ventanaMs: 60000, max: 10 }));
@@ -239,6 +258,10 @@ app.use('/api/campanas-ventas',           require('../../services/campanas-venta
 
 // Cotizaciones
 app.use('/api/cotizaciones', require('../../services/cotizaciones/src/routes/cotizaciones.routes'));
+// API Pública para empresas externas (X-API-Key) + su mantenedor (JWT)
+const apiPublica = require('../../services/cotizaciones/src/routes/api-publica.routes');
+app.use('/api/publica', apiPublica.publica);
+app.use('/api/api-clientes', apiPublica.admin);
 
 // Evaluación Crediticia (ficha por RUT + módulo Home)
 app.use('/api/evaluacion-crediticia', require('../../services/evaluacion-crediticia/src/routes/evaluacion.routes'));
@@ -380,6 +403,7 @@ const PAGINAS = [
   ['/recursos-humanos/concurso', 'concurso/index.html'],
   ['/recursos-humanos/contratos', 'recursos-humanos/contratos/index.html'],
   ['/simulador-rapido', 'simulador-rapido/index.html'],
+  ['/mantenedores/apis', 'mantenedores/apis/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
