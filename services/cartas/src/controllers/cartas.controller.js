@@ -1103,12 +1103,14 @@ function parseCartaCompromiso(t) {
   const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
   const nombre = g(/Nombre:\s*([^\n]+)/), sp = _splitNombre(nombre);
   const _saldo = _numU(g(/Saldo precio:\s*([\d.]+)/));
-  /* "Total a pagar" del compromiso Unidad NO siempre es el capital: en varios PDF
-     es la CUOTA mensual. Caso real: llegó $148.570 como monto de un crédito con
-     $7.980.000 de saldo, y la carta pasó la revisión sin que nadie lo notara.
-     El monto del crédito JAMÁS es menor al saldo precio (a este se le suman los
-     gastos y las primas), así que si viene por debajo se descarta y manda el saldo. */
-  const _totalPagar = _numU(g(/Total a pagar:\s*([\d.]+)/));
+  /* Monto del crédito en UNIDAD = "Costo Total Crédito" (equivalente al "Total
+     pagaré" de AutoFin). Si el documento no lo trae, se cae a "Total a pagar".
+     Red de seguridad: ese campo NO siempre es el capital — en varios PDF es la
+     CUOTA mensual. Caso real: llegó $148.570 como monto de un crédito con
+     $7.980.000 de saldo y la carta pasó la revisión sin que nadie lo notara.
+     El monto JAMÁS es menor al saldo precio, así que bajo el 80% se descarta. */
+  const _costoTotal = _numU(g(/Costo Total Cr[eé]dito[^\n:]*::?\s*([\d.]+)/i));
+  const _totalPagar = _costoTotal != null ? _costoTotal : _numU(g(/Total a pagar:\s*([\d.]+)/));
   const _monto = (_saldo && _totalPagar && _totalPagar < _saldo * 0.8) ? _saldo : _totalPagar;
   return {
     opOrigen:        g(/N° Operación\s*\n?\s*(\d{4,})/),
@@ -1134,10 +1136,18 @@ function parseCartaCompromiso(t) {
 }
 function parseCotizacion(t) {
   const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
+  /* Regla de negocio (Pato, 29-07-2026): en UNIDAD el monto del crédito de la carta
+     sale del "Costo Total Crédito"; en AutoFin, del "Total pagaré". Son los campos
+     equivalentes de cada financiera, no el líquido ni el bruto. */
   return {
-    opOrigen: g(/N°\s*0*(\d{4,})/),
-    cae:      g(/CAE\s*::\s*([\d,]+)\s*%/),
-    titular:  g(/Titular[\s\S]*?::\s*([A-ZÁÉÍÓÚÑ ]+?)\s*\n/),
+    opOrigen:        g(/N°\s*0*(\d{4,})/),
+    cae:             g(/CAE\s*::\s*([\d,]+)\s*%/),
+    titular:         g(/Titular[\s\S]*?::\s*([A-ZÁÉÍÓÚÑ ]+?)\s*\n/),
+    montoCreditoCLP: _numU(g(/Costo Total Cr[eé]dito[^\n:]*::?\s*([\d.]+)/i)),
+    saldo:           _numU(g(/Monto L[ií]quido del Cr[eé]dito[^\n:]*::?\s*([\d.]+)/i)),
+    montoBruto:      _numU(g(/Monto Bruto del Cr[eé]dito[^\n:]*::?\s*([\d.]+)/i)),
+    plazo:           _numU(g(/Plazo del Cr[eé]dito[^\n:]*::?\s*(\d+)/i)),
+    cuota:           _numU(g(/Valor de Cuota[^\n:]*::?\s*([\d.]+)/i)),
   };
 }
 // Carta de Aprobación Autofin (formato 2 columnas; pdf-parse lo aplana → anclas por contexto).
@@ -1197,7 +1207,7 @@ async function ocrCartaIA(tipoDoc, b64) {
   if (!(await ia.iaActiva('cartas_pdf_ia'))) return null;
   const CAMPOS = {
     COMPROMISO_UNIDAD: 'numero de operacion (opOrigen), fecha del documento (fecha, formato YYYY-MM-DD), rut del cliente (rutCliente, formato 12345678-9), nombres del cliente (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca del vehiculo (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo de precio (saldo), plazo en cuotas (plazo), tasa mensual en % (tasaCredito), monto del credito en pesos (montoCreditoCLP), participacion/comision del dealer en pesos IVA incluido (partBruto), nombre del concesionario/dealer (concesionario), rut del concesionario (rutConc), nombre del vendedor (vendedor)',
-    COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), monto del credito en pesos (montoCreditoCLP), plazo en cuotas (plazo), tasa mensual en % (tasaCredito)',
+    COTIZACION_UNIDAD: 'numero de operacion o cotizacion (opOrigen), COSTO TOTAL DEL CREDITO en pesos (montoCreditoCLP) — no el monto liquido ni el bruto, monto liquido del credito (saldo), monto bruto del credito (montoBruto), plazo en meses (plazo), valor de la cuota (cuota)',
     CARTA_AUTOFIN: 'numero de credito o solicitud (opOrigen), fecha (fecha, YYYY-MM-DD), rut del cliente (rutCliente), nombres (nombres), apellido paterno (apPaterno), apellido materno (apMaterno), marca (marca), modelo (modelo), año (anio), patente (patente), precio de venta (precioVenta), pie (pie), saldo (saldo), plazo en cuotas (plazo), tasa mensual % (tasaCredito), monto credito en pesos (montoCreditoCLP), nombre del ejecutivo (ejecutivo), prima seguro desgravamen (segDesgravamen), prima cesantia (segCesantia), prima RDH/robo-hurto (segRdh), prima reparaciones menores (segRep), gps (gps)',
   };
   try {
