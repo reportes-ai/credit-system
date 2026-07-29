@@ -362,11 +362,14 @@ const sync = async (req, res) => {
         AND c.estado_credito = 'OTORGADO'   -- Post Venta es SOLO post-otorgamiento: un rechazado/digitado/aprobado con fecha_otorgado NO debe generar seguimiento
         AND NOT EXISTS (SELECT 1 FROM postventa_seguimiento s WHERE s.id_credito = c.id)
     `);
-    // Backfill de filas ya creadas sin N° Operación (los créditos de carta nacen sin num_op)
+    // N° Operación: SIEMPRE espejo de creditos (fuente única). No solo backfill de
+    // NULL: si el num_op se corrige en BD Operaciones, acá debe cambiar también —
+    // antes el seguimiento quedaba mostrando el número viejo para siempre.
     await pool.query(`
       UPDATE postventa_seguimiento s JOIN creditos c ON c.id = s.id_credito
       SET s.num_op = COALESCE(c.num_op, CAST(c.numero_credito AS UNSIGNED))
-      WHERE s.num_op IS NULL AND (c.num_op IS NOT NULL OR c.numero_credito REGEXP '^[0-9]+$')
+      WHERE (c.num_op IS NOT NULL OR c.numero_credito REGEXP '^[0-9]+$')
+        AND (s.num_op IS NULL OR s.num_op <> COALESCE(c.num_op, CAST(c.numero_credito AS UNSIGNED)))
     `).catch(e => console.error('[postventa backfill num_op]', e.message));
     // Etapas "Sistema" automáticas para los nuevos
     await pool.query(`
