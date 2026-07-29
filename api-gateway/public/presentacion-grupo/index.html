@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — logo oficial Business Suite (logo-bs.png) en portada, cards, HUD y cierre -->
+<!-- v1.3 — logo BS con colores sobre placa blanca (el PNG no es transparente); tagline "Construido a la medida del negocio" -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -30,7 +30,7 @@
   .cols2 { display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; }
   .tagline { font-size:1.35rem; color:var(--gold); font-weight:700; margin-top:20px; font-style:italic; }
   .brand { position:absolute; top:22px; right:28px; display:flex; align-items:center; gap:9px; opacity:.85; }
-  .brand img { height:40px; filter:brightness(0) invert(1); }
+  .brand img { height:40px; background:#fff; border-radius:8px; padding:4px 10px; }
   .brand span { font-size:.62rem; font-weight:800; letter-spacing:.22em; color:rgba(255,255,255,.7); text-transform:uppercase; border-left:1.5px solid rgba(255,255,255,.3); padding-left:9px; }
   .bigicon { font-size:3.4rem; color:var(--cyan); margin-bottom:12px; display:block; }
 
@@ -40,7 +40,7 @@
   #barra > div { height:100%; background:linear-gradient(90deg,var(--cyan),#7dd3fc); width:0; transition:width .5s; }
   .hbtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:10px; padding:7px 14px; cursor:pointer; font-size:.85rem; font-weight:700; }
   .hbtn:hover { background:rgba(255,255,255,.22); }
-  #logoHud { height:34px; filter:brightness(0) invert(1); opacity:.85; }
+  #logoHud { height:34px; background:#fff; border-radius:7px; padding:3px 8px; opacity:.95; }
   @media print { #hud { display:none; } }
 </style>
 </head>
@@ -50,9 +50,9 @@
   <!-- 0 PORTADA -->
   <section class="step" data-x="0" data-y="0" data-s="1" data-r="0">
     <div style="text-align:center">
-      <img src="/img/logo-bs.png" style="height:150px;filter:brightness(0) invert(1);margin-bottom:30px">
+      <img src="/img/logo-bs.png" style="height:150px;background:#fff;border-radius:20px;padding:14px 34px;margin-bottom:30px;box-shadow:0 18px 50px rgba(0,0,0,.35)">
       <p class="sub" style="font-size:1.5rem;margin-top:14px">El sistema que corre AutoFácil <b>de punta a punta</b>:<br>del primer contacto con el cliente… hasta el balance.</p>
-      <p class="tagline">Construido en casa, a la medida del negocio.</p>
+      <p class="tagline">Construido a la medida del negocio.</p>
       <p style="margin-top:34px;color:rgba(255,255,255,.5);font-size:.95rem"><i class="bi bi-arrow-right-circle"></i> avanza con → o con un click</p>
     </div>
   </section>
@@ -263,7 +263,7 @@
   <!-- 14 CIERRE -->
   <section class="step" data-x="21700" data-y="-460" data-s="1.05" data-r="0">
     <div style="text-align:center">
-      <img src="/img/logo-bs.png" style="height:120px;filter:brightness(0) invert(1);margin-bottom:24px">
+      <img src="/img/logo-bs.png" style="height:120px;background:#fff;border-radius:16px;padding:12px 28px;margin-bottom:24px;box-shadow:0 18px 50px rgba(0,0,0,.35)">
       <h1 style="font-size:3rem">De la prospección al balance.<br>Un solo sistema. Hecho en casa.</h1>
       <p class="sub" style="font-size:1.35rem;margin-top:18px">Core de crédito automotriz + ERP integrado,<br>construido por y para AutoFácil — y listo para crecer con el grupo.</p>
       <p class="tagline" style="font-size:1.5rem;margin-top:26px">Conversemos qué puede hacer por tu empresa.</p>
