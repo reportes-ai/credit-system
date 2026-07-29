@@ -1164,6 +1164,14 @@ function parseCotizacion(t) {
 }
 // Carta de Aprobación Autofin (formato 2 columnas; pdf-parse lo aplana → anclas por contexto).
 function parseCartaAutofin(t) {
+  /* pdf-parse a veces PEGA dos montos en una misma línea ("6.690.0007.413.083" =
+     monto solicitado + total pagaré). Eso corría todo una posición y el total
+     pagaré terminaba siendo el campo siguiente: los recargos ($148.570) llegaron
+     como monto del crédito. Se separan antes de aplicar las anclas. El corte es
+     inequívoco: un monto es \d{1,3}(.\d{3})+ y el pegado parte justo donde
+     termina el patrón. Dos pasadas por si vienen tres montos juntos. */
+  const SEP = /(\d{1,3}(?:\.\d{3})+)(\d{1,3}(?:\.\d{3})+)/g;
+  t = String(t).replace(SEP, '$1\n$2').replace(SEP, '$1\n$2');
   const g = (re, i = 1) => { const m = t.match(re); return m ? String(m[i]).trim() : null; };
   const nameOp = t.match(/\n([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ ]{5,}?)\n(\d{6,8})\n:/);   // nombre cliente + N° crédito
   const nombre = nameOp ? nameOp[1].trim() : null, sp = _splitNombre(nombre);
@@ -1201,7 +1209,9 @@ function parseCartaAutofin(t) {
     // AutoFin trae 4 decimales; se toman solo los 2 primeros TRUNCADOS hacia abajo
     // (2,8683 → 2,86), nunca al más próximo ni al alza, para no quedar sobre la pizarra.
     tasaCredito: tasaRaw ? (Math.floor(Number(tasaRaw.replace(',', '.')) * 100 + 1e-6) / 100).toFixed(2) : null,
-    montoCreditoCLP: totalPagare != null ? totalPagare : saldo,
+    // Red de seguridad: el monto jamás es menor al saldo precio; si el ancla
+    // igual tomó otro campo (recargos, cuota), manda el saldo.
+    montoCreditoCLP: (totalPagare != null && !(saldo && totalPagare < saldo * 0.8)) ? totalPagare : saldo,
     ejecutivo: g(/\n([A-ZÁÉÍÓÚ][A-ZÁÉÍÓÚ ]+?) \(AFA\)\n/),
     acreedor: 'AUTOFIN',
   };
