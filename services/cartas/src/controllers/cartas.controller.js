@@ -747,7 +747,7 @@ const upsert = async (req, res) => {
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
       const MUERTOS = "('DESISTIDO','ANULADO','RECHAZADO')";
       const [[crDup]] = await pool.query(
-        `SELECT id, num_op, numero_credito,
+        `SELECT id, num_op, numero_credito, id_financiera,
                 UPPER(COALESCE(estado,'')) estado_u, UPPER(COALESCE(estado_credito,'')) estado_credito_u
            FROM creditos WHERE id_financiera = ?
             AND id <> COALESCE(?, 0)
@@ -755,8 +755,13 @@ const upsert = async (req, res) => {
             AND UPPER(COALESCE(estado_credito,'')) NOT IN ${MUERTOS}
           LIMIT 1`, [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]);
       if (crDup) {
-        // Ya OTORGADO → duplicado real: la operación ya se cursó.
-        if (crDup.estado_u === 'OTORGADO' || crDup.estado_credito_u === 'OTORGADO')
+        /* Una fila con num_op IGUAL al id_financiera todavía NO tiene numeración
+           nuestra: la creó la carga masiva y está esperando su carta. Su estado
+           OTORGADO es el de la financiera, no el nuestro, así que no es duplicado
+           aunque diga OTORGADO — es la misma operación que se está digitando. */
+        const sinNumeracionPropia = String(crDup.num_op || '') === String(crDup.id_financiera || '');
+        // Ya OTORGADO con numeración nuestra → duplicado real: la operación ya se cursó.
+        if (!sinNumeracionPropia && (crDup.estado_u === 'OTORGADO' || crDup.estado_credito_u === 'OTORGADO'))
           return res.status(409).json({ success: false, data: null,
             error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
         // Crédito vivo NO otorgado (carga masiva de aprobadas, digitación): es la MISMA
