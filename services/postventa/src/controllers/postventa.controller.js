@@ -263,6 +263,24 @@ async function contabilizarComision(idSeguimiento, momento) {
   } catch (e) { console.error('[contabilizarComision]', e.message); }
 }
 
+/* Saldo precio: CUENTA DE PASO (Máxima 4). AutoFácil es intermediario — la
+   financiera transfiere el saldo y se entrega ÍNTEGRO al dealer. No es ingreso ni
+   gasto: entra y sale por un pasivo transitorio, sin tocar el resultado. */
+async function contabilizarSaldoPrecio(idSeguimiento, etapa) {
+  try {
+    const [[s]] = await pool.query('SELECT num_op, saldo_precio, nombre_dealer FROM postventa_seguimiento WHERE id=?', [idSeguimiento]);
+    const monto = Math.round(Number(s && s.saldo_precio) || 0);
+    if (!monto) return;
+    const recibido = etapa === 'FONDOS RECIBIDOS';
+    await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: recibido ? 'SALDO_FONDOS_RECIBIDOS' : 'SALDO_PRECIO_PAGADO',
+      fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
+      glosa: `Saldo precio OP ${s.num_op} — ${recibido ? 'fondos recibidos' : 'pagado a ' + (s.nombre_dealer || 'dealer')}`.slice(0, 300),
+      ref: `SP-${s.num_op}-${recibido ? 'IN' : 'OUT'}`, montos: { monto }, num_op: s.num_op || null,
+    });
+  } catch (e) { console.error('[contabilizarSaldoPrecio]', e.message); }
+}
+
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
    Cada transición del workflow genera una alerta (campana) a destinatarios
    configurables por evento: perfiles + el ejecutivo de la operación + usuarios extra. */
@@ -563,6 +581,9 @@ const setEtapa = async (req, res) => {
       const c = await ctxSeguimiento(req.params.id);
       await notificarEventoSaldo('com_factura_recibida', { op: c.num_op, id_seguimiento: Number(req.params.id) });
     }
+    // Saldo precio = CUENTA DE PASO: entra de la financiera y sale íntegro al dealer
+    if (marcar && track === 'SALDO' && ['FONDOS RECIBIDOS', 'SALDO PRECIO PAGADO'].includes(etapa))
+      await contabilizarSaldoPrecio(Number(req.params.id), etapa);
     res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);

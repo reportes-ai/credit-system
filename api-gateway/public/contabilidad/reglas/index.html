@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reglas de Centralización — AutoFácil</title>
-  <!-- v1.1 — comisión a dealer conectada (devengo/pago, factura/boleta con retención) -->
+  <!-- v1.2 — ingreso por facturación AF, saldo precio como cuenta de paso, comisiones internas y colocación propia -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -48,6 +48,8 @@
       <li><b>Cuentas y lados de cada regla</b> → los comprobantes automáticos que aparecen en <a href="/contabilidad/comprobantes/">Comprobantes</a>, <a href="/contabilidad/libros/">Libros</a> y <a href="/contabilidad/balance/">Balance</a>.</li>
       <li><b>Interruptor Activa</b> → si está apagado, el evento NO se contabiliza (queda registrado en el log como DESACTIVADA); el proceso de negocio sigue funcionando igual.</li>
       <li><b>Eventos conectados hoy</b>: pago de cuotas y prepago en <a href="/tesoreria/">Caja</a> (por transacción), <a href="/ordenes-pago/">Orden de Pago</a> marcada pagada, <a href="/tesoreria/castigar-saldo/">Castigo de saldo</a> aprobado, cierre de mes de Provisiones, emisión del libro de <a href="/recursos-humanos/remuneraciones/">Remuneraciones</a>, y la <b>comisión a dealer</b> de <a href="/postventa/seguimiento/">Post Venta</a> (devengo al registrar la factura/boleta + pago al marcarla pagada).</li>
+      <li><b>Saldo precio = CUENTA DE PASO</b> → AutoFácil es intermediario: la financiera transfiere y se entrega íntegro al dealer. Entra y sale por un pasivo transitorio (2102045) y <b>no toca el resultado</b> — no infla ingresos ni gastos.</li>
+      <li><b>Comisión que cobramos</b> → al solicitar la facturación en <a href="/postventa/facturacion-af/">Facturación AutoFácil</a> se devenga el ingreso: el monto es bruto y se desagrega en ingreso neto + <b>IVA débito fiscal</b> para el F29.</li>
       <li><b>Comisión con BOLETA</b> → la <b>retención de honorarios</b> queda como pasivo con el SII (cuenta 2105070) y la boleta entra al auxiliar de honorarios, por lo que aparece en <a href="/contabilidad/libros-auxiliares/">Libros Auxiliares</a> y en el <a href="/contabilidad/f29/">F29</a>. Con <b>FACTURA</b> el IVA se registra como crédito fiscal (1108010).</li>
     </ul>
   </div>

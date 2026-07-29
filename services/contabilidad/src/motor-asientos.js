@@ -140,6 +140,48 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2102040', 'DEBE',  'liquido', 'Pago comisión dealer (líquido)'],
         ['1101090', 'HABER', 'liquido', 'Salida de banco'],
       ]],
+      /* ── INGRESO: la comisión que AutoFácil COBRA a la financiera ──────────
+         Se devenga al solicitar la facturación del mes (Post Venta → Facturación
+         AutoFácil). El monto calculado es BRUTO (IVA incluido) y se desagrega:
+         el neto es el ingreso y el IVA queda como débito fiscal para el F29. */
+      ['FACTURACION_AF_COLOCACION', 'Comisión por colocación facturada a la financiera', 'Se dispara al solicitar la facturación del concepto COLOCACIÓN (o ANTICIPO) en Post Venta → Facturación AutoFácil. Campos: bruto (total facturado), neto, iva.', 'INGRESO', 1, [
+        ['1106013', 'DEBE',  'bruto', 'Producción comisión por cobrar'],
+        ['3001073', 'HABER', 'neto',  'Comisión de producción'],
+        ['2107010', 'HABER', 'iva',   'IVA débito fiscal'],
+      ]],
+      ['FACTURACION_AF_SEGUROS', 'Comisión por seguros facturada a la financiera', 'Se dispara al solicitar la facturación del concepto SEGUROS en Post Venta → Facturación AutoFácil. Campos: bruto, neto, iva.', 'INGRESO', 1, [
+        ['1106012', 'DEBE',  'bruto', 'Producción seguros por cobrar'],
+        ['3001075', 'HABER', 'neto',  'Comisión seguros'],
+        ['2107010', 'HABER', 'iva',   'IVA débito fiscal'],
+      ]],
+      /* ── SALDO PRECIO: CUENTA DE PASO ──────────────────────────────────────
+         AutoFácil es intermediario: la financiera transfiere el saldo precio y
+         se entrega ÍNTEGRO al dealer. NO es ingreso ni gasto — entra y sale por
+         una cuenta transitoria de pasivo, y el resultado del ejercicio no se toca. */
+      ['SALDO_FONDOS_RECIBIDOS', 'Saldo precio recibido de la financiera (cuenta de paso)', 'Se dispara al marcar FONDOS RECIBIDOS en Post Venta → Seguimiento. NO es ingreso: queda como pasivo hasta pagárselo al dealer. Campos: monto (saldo precio).', 'INGRESO', 1, [
+        ['1101090', 'DEBE',  'monto', 'Ingreso de fondos saldo precio'],
+        ['2102045', 'HABER', 'monto', 'Saldo precio por pagar al dealer'],
+      ]],
+      ['SALDO_PRECIO_PAGADO', 'Saldo precio pagado al dealer (cuenta de paso)', 'Se dispara al marcar SALDO PRECIO PAGADO en Post Venta → Seguimiento. NO es gasto: rebaja el pasivo transitorio contra banco. Campos: monto.', 'EGRESO', 1, [
+        ['2102045', 'DEBE',  'monto', 'Rebaja saldo precio por pagar'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
+      /* ── COMISIONES INTERNAS: ejecutivos y parques (devengo al aprobar el mes) ── */
+      ['COMISION_EJECUTIVOS', 'Comisiones de ejecutivos aprobadas (mes)', 'Se dispara al APROBAR las comisiones del mes en Comisión Ejecutivos → Revisión. Reconoce el gasto y deja el monto por pagar (el pago se registra al emitir/pagar su ODP). Campos: monto (total aprobado del mes).', 'TRASPASO', 1, [
+        ['4001100', 'DEBE',  'monto', 'Gasto comisiones de ejecutivos'],
+        ['2106060', 'HABER', 'monto', 'Comisiones ejecutivos por pagar'],
+      ]],
+      ['COMISION_PARQUES', 'Comisiones/arriendo de parques del mes', 'Se dispara al aprobar las comisiones de parques del mes (Post Venta → Comisiones Parques). Campos: monto.', 'TRASPASO', 1, [
+        ['4002100', 'DEBE',  'monto', 'Gasto arriendo/comisión parque'],
+        ['2106012', 'HABER', 'monto', 'Comisiones parque por pagar'],
+      ]],
+      /* ── CARTERA PROPIA: solo créditos AUTOFÁCIL (recursos propios) ─────────
+         En brokerage (AutoFin/Unidad) el crédito NO es nuestro: no hay colocación
+         que activar. Solo se contabiliza cuando la operación es AUTOFACIL. */
+      ['CREDITO_OTORGADO_AF', 'Crédito AutoFácil otorgado (colocación cartera propia)', 'Se dispara al otorgar un crédito de recursos propios (financiera AUTOFACIL): activa la colocación contra la salida de fondos. NO aplica a operaciones brokerage. Campos: monto (monto financiado).', 'EGRESO', 1, [
+        ['1104010', 'DEBE',  'monto', 'Colocación contratos propios'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
     ];
     for (const [evento, nombre, desc, tipo, activa, lineas] of R) {
       const [r] = await pool.query('INSERT IGNORE INTO ctb_reglas (evento, nombre, descripcion, tipo, activa) VALUES (?,?,?,?,?)',

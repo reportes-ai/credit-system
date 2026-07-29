@@ -227,6 +227,26 @@ exports.solicitar = async (req, res) => {
 
     await pool.query('INSERT INTO facturacion_af_solicitudes (mes, financiera, concepto, monto, ops, usuario) VALUES (?,?,?,?,?,?)',
       [mes, fin, concepto, total, detalle.length, usuario]);
+
+    /* Centralización contable del INGRESO (Máxima 4): la comisión que cobramos se
+       devenga al solicitar la facturación. El monto calculado es BRUTO (IVA
+       incluido) → se desagrega con el motor único: el neto es el ingreso y el IVA
+       queda como débito fiscal para el F29. Nunca bloquea la solicitud. */
+    (async () => {
+      try {
+        const [[iva]] = await pool.query("SELECT porcentaje FROM impuestos WHERE codigo='IVA'");
+        const { desglosar } = require('../../../../api-gateway/public/js/desglose-impuesto');
+        const dg = desglosar(total, iva ? Number(iva.porcentaje) : 19, false);
+        await require('../../../contabilidad/src/motor-asientos').contabilizar({
+          evento: concepto === 'SEGUROS' ? 'FACTURACION_AF_SEGUROS' : 'FACTURACION_AF_COLOCACION',
+          fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
+          glosa: `Facturación ${CONC[concepto]} — ${finTxt} ${mesTxt} (${detalle.length} ops)`.slice(0, 300),
+          ref: `FACTAF-${mes}-${fin}-${concepto}`,
+          montos: { bruto: dg.bruto, neto: dg.neto, iva: dg.impuesto },
+        });
+      } catch (e) { console.error('[factAF contabilizar]', e.message); }
+    })();
+
     res.json({ success: true, data: { total, ops: detalle.length }, error: null });
   } catch (e) { errSrv(res, e, 'factAF solicitar'); }
 };
