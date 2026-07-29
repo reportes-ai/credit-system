@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — presentación estilo Prezi de la Business Suite para las empresas del grupo -->
+<!-- v1.1 — texto ordenado (fix flex), card más grande, sello Business Suite en cada tarjeta -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,8 +16,8 @@
   #canvas { position:absolute; left:50%; top:50%; transform-origin:0 0; transition:transform 1.1s cubic-bezier(.5,.08,.28,1); will-change:transform; }
 
   /* ── pasos ── */
-  .step { position:absolute; width:920px; color:#fff; }
-  .card { background:rgba(255,255,255,.055); border:1.5px solid rgba(255,255,255,.16); border-radius:26px; padding:46px 54px; backdrop-filter:blur(4px); box-shadow:0 30px 90px rgba(0,0,0,.35); }
+  .step { position:absolute; width:1010px; color:#fff; }
+  .card { position:relative; background:rgba(255,255,255,.055); border:1.5px solid rgba(255,255,255,.16); border-radius:26px; padding:50px 60px 44px; backdrop-filter:blur(4px); box-shadow:0 30px 90px rgba(0,0,0,.35); }
   .kicker { display:inline-flex; align-items:center; gap:10px; font-size:.95rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--cyan); margin-bottom:14px; }
   .kicker .num { background:var(--cyan); color:#012d70; border-radius:10px; padding:2px 12px; font-size:1rem; }
   h1 { font-size:3.6rem; line-height:1.08; font-weight:800; }
@@ -29,6 +29,9 @@
   ul.fx li b { color:#fff; }
   .cols2 { display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; }
   .tagline { font-size:1.35rem; color:var(--gold); font-weight:700; margin-top:20px; font-style:italic; }
+  .brand { position:absolute; top:22px; right:28px; display:flex; align-items:center; gap:9px; opacity:.85; }
+  .brand img { height:22px; filter:brightness(0) invert(1); }
+  .brand span { font-size:.62rem; font-weight:800; letter-spacing:.22em; color:rgba(255,255,255,.7); text-transform:uppercase; border-left:1.5px solid rgba(255,255,255,.3); padding-left:9px; }
   .bigicon { font-size:3.4rem; color:var(--cyan); margin-bottom:12px; display:block; }
 
   /* ── HUD ── */
@@ -62,12 +65,12 @@
       <h2>Un solo sistema, todo el ciclo</h2>
       <p class="sub">Cada peso y cada cliente viajan por la suite sin salir de ella:</p>
       <ul class="fx">
-        <li><i class="bi bi-megaphone-fill"></i><b>Prospección</b> → campañas, dealers, terreno</li>
-        <li><i class="bi bi-whatsapp"></i><b>Autoatención</b> → WhatsApp, portal dealer, API pública</li>
-        <li><i class="bi bi-person-check-fill"></i><b>Evaluación y aprobación</b> → scorecard, cartas, analistas</li>
-        <li><i class="bi bi-cash-coin"></i><b>Curse y post venta</b> → saldos precio, comisiones, cartolas</li>
-        <li><i class="bi bi-bank"></i><b>Tesorería, cobranza y contabilidad</b> → hasta el F29</li>
-        <li><i class="bi bi-people-fill"></i><b>Las personas</b> → remuneraciones, bonos, academia</li>
+        <li><i class="bi bi-megaphone-fill"></i><span><b>Prospección</b> → campañas, dealers, terreno</span></li>
+        <li><i class="bi bi-whatsapp"></i><span><b>Autoatención</b> → WhatsApp, portal dealer, API pública</span></li>
+        <li><i class="bi bi-person-check-fill"></i><span><b>Evaluación y aprobación</b> → scorecard, cartas, analistas</span></li>
+        <li><i class="bi bi-cash-coin"></i><span><b>Curse y post venta</b> → saldos precio, comisiones, cartolas</span></li>
+        <li><i class="bi bi-bank"></i><span><b>Tesorería, cobranza y contabilidad</b> → hasta el F29</span></li>
+        <li><i class="bi bi-people-fill"></i><span><b>Las personas</b> → remuneraciones, bonos, academia</span></li>
       </ul>
     </div>
   </section>
@@ -79,10 +82,10 @@
       <i class="bi bi-megaphone-fill bigicon"></i>
       <h2>Salir a buscar la venta</h2>
       <ul class="fx cols2">
-        <li><i class="bi bi-telephone-outbound-fill"></i><b>CRM telefónico</b> con discador, rellamados y estadísticas por campaña</li>
-        <li><i class="bi bi-envelope-paper-fill"></i><b>Campañas masivas</b> por correo y WhatsApp, con grupos de control y conversión medida</li>
-        <li><i class="bi bi-geo-alt-fill"></i><b>Mapa de +880 dealers</b> georreferenciados y categorizados por potencial</li>
-        <li><i class="bi bi-calendar-week-fill"></i><b>Ruta AutoFácil</b>: planificación de visitas a terreno con check-in GPS desde el celular</li>
+        <li><i class="bi bi-telephone-outbound-fill"></i><span><b>CRM telefónico</b> con discador, rellamados y estadísticas por campaña</span></li>
+        <li><i class="bi bi-envelope-paper-fill"></i><span><b>Campañas masivas</b> por correo y WhatsApp, con grupos de control y conversión medida</span></li>
+        <li><i class="bi bi-geo-alt-fill"></i><span><b>Mapa de +880 dealers</b> georreferenciados y categorizados por potencial</span></li>
+        <li><i class="bi bi-calendar-week-fill"></i><span><b>Ruta AutoFácil</b>: planificación de visitas a terreno con check-in GPS desde el celular</span></li>
       </ul>
       <p class="tagline">La fuerza comercial sabe dónde ir, a quién llamar y qué resultó.</p>
     </div>
@@ -95,10 +98,10 @@
       <i class="bi bi-whatsapp bigicon" style="color:#25d366"></i>
       <h2>El cliente parte solo — "Facilito"</h2>
       <ul class="fx">
-        <li><i class="bi bi-robot"></i>Bot de WhatsApp propio: cotiza, <b>pre-aprueba en línea</b> con las políticas del negocio y deriva al ejecutivo con todo el contexto</li>
-        <li><i class="bi bi-shop"></i><b>Portal del Dealer</b>: el concesionario simula, pre-aprueba y hace seguimiento de sus operaciones solo</li>
-        <li><i class="bi bi-plug-fill"></i><b>API Pública</b>: otras empresas conectan nuestro simulador a sus sistemas con una llave</li>
-        <li><i class="bi bi-person-circle"></i><b>Portal del Cliente</b>: cada deudor ve sus créditos y cuotas con clave OTP</li>
+        <li><i class="bi bi-robot"></i><span>Bot de WhatsApp propio: cotiza, <b>pre-aprueba en línea</b> con las políticas del negocio y deriva al ejecutivo con todo el contexto</span></li>
+        <li><i class="bi bi-shop"></i><span><b>Portal del Dealer</b>: el concesionario simula, pre-aprueba y hace seguimiento de sus operaciones solo</span></li>
+        <li><i class="bi bi-plug-fill"></i><span><b>API Pública</b>: otras empresas conectan nuestro simulador a sus sistemas con una llave</span></li>
+        <li><i class="bi bi-person-circle"></i><span><b>Portal del Cliente</b>: cada deudor ve sus créditos y cuotas con clave OTP</span></li>
       </ul>
       <p class="tagline">La venta avanza 24/7; el ejecutivo entra cuando ya hay interés real.</p>
     </div>
@@ -111,10 +114,10 @@
       <i class="bi bi-clipboard2-check-fill bigicon"></i>
       <h2>Decidir con datos, no con olfato</h2>
       <ul class="fx">
-        <li><i class="bi bi-sliders"></i><b>Política de Crédito V3.0 paramétrica</b>: scorecard por quintiles que el negocio ajusta sin programadores</li>
-        <li><i class="bi bi-search"></i>Consulta automática a <b>DealerNet</b> (central de información por RUT)</li>
-        <li><i class="bi bi-stars"></i><b>IA que lee</b> informes crediticios y liquidaciones de sueldo, y resume lo que importa</li>
-        <li><i class="bi bi-signpost-split-fill"></i><b>¿Dónde Curso?</b>: app que le dice al ejecutivo en qué financiera conviene cursar cada crédito</li>
+        <li><i class="bi bi-sliders"></i><span><b>Política de Crédito V3.0 paramétrica</b>: scorecard por quintiles que el negocio ajusta sin programadores</span></li>
+        <li><i class="bi bi-search"></i><span>Consulta automática a <b>DealerNet</b> (central de información por RUT)</span></li>
+        <li><i class="bi bi-stars"></i><span><b>IA que lee</b> informes crediticios y liquidaciones de sueldo, y resume lo que importa</span></li>
+        <li><i class="bi bi-signpost-split-fill"></i><span><b>¿Dónde Curso?</b>: app que le dice al ejecutivo en qué financiera conviene cursar cada crédito</span></li>
       </ul>
     </div>
   </section>
@@ -126,10 +129,10 @@
       <i class="bi bi-patch-check-fill bigicon"></i>
       <h2>Cartas de aprobación sin papeles</h2>
       <ul class="fx">
-        <li><i class="bi bi-file-earmark-arrow-up-fill"></i>El PDF de la financiera <b>se lee solo</b> (parser + IA): la carta se autocompleta</li>
-        <li><i class="bi bi-people-fill"></i><b>Pool de analistas</b> con alertas instantáneas, tiempos medidos y desempeño por analista</li>
-        <li><i class="bi bi-whatsapp"></i>Facilito hace <b>seguimiento automático</b> de cada carta con el dealer antes de que venza</li>
-        <li><i class="bi bi-graph-up-arrow"></i>Cada carta calcula su <b>rentabilidad</b> y avisa si la financiera elegida no es la que más conviene</li>
+        <li><i class="bi bi-file-earmark-arrow-up-fill"></i><span>El PDF de la financiera <b>se lee solo</b> (parser + IA): la carta se autocompleta</span></li>
+        <li><i class="bi bi-people-fill"></i><span><b>Pool de analistas</b> con alertas instantáneas, tiempos medidos y desempeño por analista</span></li>
+        <li><i class="bi bi-whatsapp"></i><span>Facilito hace <b>seguimiento automático</b> de cada carta con el dealer antes de que venza</span></li>
+        <li><i class="bi bi-graph-up-arrow"></i><span>Cada carta calcula su <b>rentabilidad</b> y avisa si la financiera elegida no es la que más conviene</span></li>
       </ul>
     </div>
   </section>
@@ -141,10 +144,10 @@
       <i class="bi bi-pen-fill bigicon"></i>
       <h2>Del OK al crédito otorgado</h2>
       <ul class="fx">
-        <li><i class="bi bi-keyboard-fill"></i>Digitación asistida y <b>carga masiva</b> desde los archivos de las financieras</li>
-        <li><i class="bi bi-folder-check"></i><b>Documentos fundantes</b> con seguimiento y validación por tipo</li>
-        <li><i class="bi bi-shield-lock-fill"></i><b>Firma electrónica simple</b> y certificados verificables con QR</li>
-        <li><i class="bi bi-snow"></i>Al otorgar, la operación queda <b>congelada e inmutable</b>: tabla de desarrollo, tasas y comisiones fijas para siempre</li>
+        <li><i class="bi bi-keyboard-fill"></i><span>Digitación asistida y <b>carga masiva</b> desde los archivos de las financieras</span></li>
+        <li><i class="bi bi-folder-check"></i><span><b>Documentos fundantes</b> con seguimiento y validación por tipo</span></li>
+        <li><i class="bi bi-shield-lock-fill"></i><span><b>Firma electrónica simple</b> y certificados verificables con QR</span></li>
+        <li><i class="bi bi-snow"></i><span>Al otorgar, la operación queda <b>congelada e inmutable</b>: tabla de desarrollo, tasas y comisiones fijas para siempre</span></li>
       </ul>
     </div>
   </section>
@@ -156,10 +159,10 @@
       <i class="bi bi-arrow-repeat bigicon"></i>
       <h2>La trastienda del negocio, ordenada</h2>
       <ul class="fx cols2">
-        <li><i class="bi bi-cash-stack"></i><b>Saldos precio</b>: etapas, alertas y pago al dealer con orden de pago</li>
-        <li><i class="bi bi-percent"></i><b>Comisiones dealer y parques</b> calculadas por motor único — la carta manda</li>
-        <li><i class="bi bi-receipt"></i><b>Cartolas y facturación</b> cuadradas contra la factura del dealer</li>
-        <li><i class="bi bi-truck"></i>Seguimiento de cada operación con su <b>ID de financiera</b> y el nuestro</li>
+        <li><i class="bi bi-cash-stack"></i><span><b>Saldos precio</b>: etapas, alertas y pago al dealer con orden de pago</span></li>
+        <li><i class="bi bi-percent"></i><span><b>Comisiones dealer y parques</b> calculadas por motor único — la carta manda</span></li>
+        <li><i class="bi bi-receipt"></i><span><b>Cartolas y facturación</b> cuadradas contra la factura del dealer</span></li>
+        <li><i class="bi bi-truck"></i><span>Seguimiento de cada operación con su <b>ID de financiera</b> y el nuestro</span></li>
       </ul>
     </div>
   </section>
@@ -171,12 +174,12 @@
       <i class="bi bi-bank2 bigicon"></i>
       <h2>La plata, trazada peso a peso</h2>
       <ul class="fx cols2">
-        <li><i class="bi bi-inboxes-fill"></i><b>Caja</b>: pago de cuotas, prepagos y cierres diarios</li>
-        <li><i class="bi bi-file-earmark-text-fill"></i><b>Órdenes de pago</b> con correlativo único y firmas</li>
-        <li><i class="bi bi-arrow-left-right"></i><b>Conciliación bancaria</b> con matching automático</li>
-        <li><i class="bi bi-droplet-fill"></i><b>Aplicación de fondos</b> con workflow de firmas</li>
-        <li><i class="bi bi-cart-check-fill"></i><b>Venta de cartera</b> y castigos con doble firma gerencial</li>
-        <li><i class="bi bi-shield-fill-check"></i><b>Provisiones automáticas</b> al cierre de cada mes</li>
+        <li><i class="bi bi-inboxes-fill"></i><span><b>Caja</b>: pago de cuotas, prepagos y cierres diarios</span></li>
+        <li><i class="bi bi-file-earmark-text-fill"></i><span><b>Órdenes de pago</b> con correlativo único y firmas</span></li>
+        <li><i class="bi bi-arrow-left-right"></i><span><b>Conciliación bancaria</b> con matching automático</span></li>
+        <li><i class="bi bi-droplet-fill"></i><span><b>Aplicación de fondos</b> con workflow de firmas</span></li>
+        <li><i class="bi bi-cart-check-fill"></i><span><b>Venta de cartera</b> y castigos con doble firma gerencial</span></li>
+        <li><i class="bi bi-shield-fill-check"></i><span><b>Provisiones automáticas</b> al cierre de cada mes</span></li>
       </ul>
     </div>
   </section>
@@ -188,10 +191,10 @@
       <i class="bi bi-telephone-inbound-fill bigicon"></i>
       <h2>Cobrar sin perder al cliente</h2>
       <ul class="fx">
-        <li><i class="bi bi-envelope-exclamation-fill"></i><b>Automatizaciones por tramo de mora</b>: correo y WhatsApp cumpliendo la Ley 21.320</li>
-        <li><i class="bi bi-calculator-fill"></i>Interés por mora y gastos con <b>motor único paramétrico</b> (TMC fija al otorgamiento)</li>
-        <li><i class="bi bi-briefcase-fill"></i><b>Cobranza judicial</b> con expedientes, demandas y estados</li>
-        <li><i class="bi bi-graph-down-arrow"></i><b>Score de mora</b> por segmento que retroalimenta la política de crédito</li>
+        <li><i class="bi bi-envelope-exclamation-fill"></i><span><b>Automatizaciones por tramo de mora</b>: correo y WhatsApp cumpliendo la Ley 21.320</span></li>
+        <li><i class="bi bi-calculator-fill"></i><span>Interés por mora y gastos con <b>motor único paramétrico</b> (TMC fija al otorgamiento)</span></li>
+        <li><i class="bi bi-briefcase-fill"></i><span><b>Cobranza judicial</b> con expedientes, demandas y estados</span></li>
+        <li><i class="bi bi-graph-down-arrow"></i><span><b>Score de mora</b> por segmento que retroalimenta la política de crédito</span></li>
       </ul>
     </div>
   </section>
@@ -203,12 +206,12 @@
       <i class="bi bi-people-fill bigicon"></i>
       <h2>Comisiones, sueldos y cultura</h2>
       <ul class="fx cols2">
-        <li><i class="bi bi-trophy-fill"></i><b>Comisiones de ejecutivos</b>: piso + incentivos + calidad, revisadas y aprobadas en línea</li>
-        <li><i class="bi bi-bullseye"></i><b>Bono del jefe comercial</b> por cuadro de mando con topes</li>
-        <li><i class="bi bi-cash"></i><b>Remuneraciones completas</b>: liquidaciones validadas al peso contra el sistema anterior</li>
-        <li><i class="bi bi-fingerprint"></i><b>Asistencia</b> conectada al reloj control (Workera)</li>
-        <li><i class="bi bi-mortarboard-fill"></i><b>Academia AutoFácil</b> + concurso de capacitación</li>
-        <li><i class="bi bi-chat-heart-fill"></i>Ficha del colaborador, vacaciones, compliance Ley Karin</li>
+        <li><i class="bi bi-trophy-fill"></i><span><b>Comisiones de ejecutivos</b>: piso + incentivos + calidad, revisadas y aprobadas en línea</span></li>
+        <li><i class="bi bi-bullseye"></i><span><b>Bono del jefe comercial</b> por cuadro de mando con topes</span></li>
+        <li><i class="bi bi-cash"></i><span><b>Remuneraciones completas</b>: liquidaciones validadas al peso contra el sistema anterior</span></li>
+        <li><i class="bi bi-fingerprint"></i><span><b>Asistencia</b> conectada al reloj control (Workera)</span></li>
+        <li><i class="bi bi-mortarboard-fill"></i><span><b>Academia AutoFácil</b> + concurso de capacitación</span></li>
+        <li><i class="bi bi-chat-heart-fill"></i><span>Ficha del colaborador, vacaciones, compliance Ley Karin</span></li>
       </ul>
     </div>
   </section>
@@ -220,10 +223,10 @@
       <i class="bi bi-journal-bookmark-fill bigicon"></i>
       <h2>Todo termina en el balance — solo</h2>
       <ul class="fx">
-        <li><i class="bi bi-magic"></i><b>Centralización automática</b>: cada operación del negocio genera su comprobante contable sin digitar</li>
-        <li><i class="bi bi-file-bar-graph-fill"></i><b>Estados financieros</b>, balance, libros y F29 borrador al día</li>
-        <li><i class="bi bi-cloud-arrow-down-fill"></i><b>Libro de compras oficial</b> sincronizado desde el SII</li>
-        <li><i class="bi bi-shield-check"></i><b>Guardián contable</b> + cierre mensual con checklist, candado y acta — reemplazo completo del software anterior</li>
+        <li><i class="bi bi-magic"></i><span><b>Centralización automática</b>: cada operación del negocio genera su comprobante contable sin digitar</span></li>
+        <li><i class="bi bi-file-bar-graph-fill"></i><span><b>Estados financieros</b>, balance, libros y F29 borrador al día</span></li>
+        <li><i class="bi bi-cloud-arrow-down-fill"></i><span><b>Libro de compras oficial</b> sincronizado desde el SII</span></li>
+        <li><i class="bi bi-shield-check"></i><span><b>Guardián contable</b> + cierre mensual con checklist, candado y acta — reemplazo completo del software anterior</span></li>
       </ul>
     </div>
   </section>
@@ -235,10 +238,10 @@
       <i class="bi bi-speedometer2 bigicon"></i>
       <h2>Ver el negocio en vivo</h2>
       <ul class="fx cols2">
-        <li><i class="bi bi-bar-chart-line-fill"></i><b>Dashboard</b> con colocaciones, rentabilidad y P&L por perfil</li>
-        <li><i class="bi bi-tv-fill"></i><b>Cuadro de mando TV</b> estilo NASA para la oficina</li>
-        <li><i class="bi bi-table"></i><b>Reportería a medida</b> + constructor visual de consultas</li>
-        <li><i class="bi bi-chat-dots-fill"></i><b>"Pregúntale a AutoFácil"</b>: preguntas en lenguaje natural respondidas por IA sobre los datos reales</li>
+        <li><i class="bi bi-bar-chart-line-fill"></i><span><b>Dashboard</b> con colocaciones, rentabilidad y P&L por perfil</span></li>
+        <li><i class="bi bi-tv-fill"></i><span><b>Cuadro de mando TV</b> estilo NASA para la oficina</span></li>
+        <li><i class="bi bi-table"></i><span><b>Reportería a medida</b> + constructor visual de consultas</span></li>
+        <li><i class="bi bi-chat-dots-fill"></i><span><b>"Pregúntale a AutoFácil"</b>: preguntas en lenguaje natural respondidas por IA sobre los datos reales</span></li>
       </ul>
       <p class="tagline">La gerencia no pide informes: los mira.</p>
     </div>
@@ -250,10 +253,10 @@
       <span class="kicker"><span class="num">13</span> Cómo está construido</span>
       <h2>Tres principios, cero cajas negras</h2>
       <ul class="fx">
-        <li><i class="bi bi-sliders"></i><b>Paramétrico</b>: tasas, políticas, estados, textos y flujos se cambian desde mantenedores — sin tocar código</li>
-        <li><i class="bi bi-cpu-fill"></i><b>Un solo motor por cálculo</b>: la cuota, la comisión o la mora se calculan en UN lugar y todos lo usan — nunca dos versiones del mismo número</li>
-        <li><i class="bi bi-database-fill-check"></i><b>Una sola fuente de datos</b>: cliente, dealer y operación viven una vez; todo lo demás los referencia</li>
-        <li><i class="bi bi-journal-text"></i>Y todo proceso <b>nace documentado</b>: manual de usuario, procesos y documentación técnica viven dentro del sistema</li>
+        <li><i class="bi bi-sliders"></i><span><b>Paramétrico</b>: tasas, políticas, estados, textos y flujos se cambian desde mantenedores — sin tocar código</span></li>
+        <li><i class="bi bi-cpu-fill"></i><span><b>Un solo motor por cálculo</b>: la cuota, la comisión o la mora se calculan en UN lugar y todos lo usan — nunca dos versiones del mismo número</span></li>
+        <li><i class="bi bi-database-fill-check"></i><span><b>Una sola fuente de datos</b>: cliente, dealer y operación viven una vez; todo lo demás los referencia</span></li>
+        <li><i class="bi bi-journal-text"></i><span>Y todo proceso <b>nace documentado</b>: manual de usuario, procesos y documentación técnica viven dentro del sistema</span></li>
       </ul>
     </div>
   </section>
@@ -299,7 +302,7 @@ function mostrar(i) {
   const p = pasos[idx];
   const x = +p.dataset.x, y = +p.dataset.y, s = +p.dataset.s || 1, r = +p.dataset.r || 0;
   // Ajuste de escala para que el paso quepa en pantalla (base 1000px de ancho útil)
-  const fit = Math.min(innerWidth / 1050, innerHeight / 780);
+  const fit = Math.min(innerWidth / 1150, innerHeight / 800);
   const z = ('overview' in p.dataset) ? Math.min(innerWidth / 24000, innerHeight / 4200) : fit / s;
   canvas.style.transform = `scale(${z}) rotate(${-r}deg) translate(${-x}px,${-y}px)`;
   document.querySelector('#barra > div').style.width = ((idx) / (pasos.length - 1) * 100) + '%';
@@ -316,6 +319,8 @@ addEventListener('keydown', e => {
 });
 addEventListener('click', e => { if (!e.target.closest('#hud')) ir(1); });
 addEventListener('resize', () => mostrar(idx));
+document.querySelectorAll('.card').forEach(c =>
+  c.insertAdjacentHTML('afterbegin', '<div class="brand"><img src="/img/logo.png"><span>Business Suite</span></div>'));
 mostrar(0);
 </script>
 </body>
