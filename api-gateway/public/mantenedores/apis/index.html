@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — una card por API (catálogo paramétrico apis_catalogo); llaves amarradas a su API -->
+<!-- v2.1 — copiar instrucciones en formato HTML (pega con formato en Gmail/Outlook) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -264,8 +264,30 @@ async function regenerar(id) {
 function copiarDoc() {
   const d = DOCS[API && API.codigo];
   if (!d) return alert('Esta API aún no tiene documentación para enviar.');
-  const firma = '\n\nContacto técnico: ' + (JSON.parse(sessionStorage.getItem('usuario')||'{}').correo || 'contacto@autofacilchile.cl');
-  navigator.clipboard.writeText(d.correo + firma).then(() => alert('Instrucciones copiadas — pégalas en el correo a la empresa.'));
+  const correoTecnico = JSON.parse(sessionStorage.getItem('usuario')||'{}').correo || 'contacto@autofacilchile.cl';
+
+  // HTML con estilos INLINE (los <style> de la página no viajan al pegar en Gmail/Outlook)
+  const html = ('<div style="font-family:Segoe UI,Arial,sans-serif;color:#1e293b;font-size:14px;line-height:1.6;max-width:720px">'
+    + '<h2 style="color:#012d70;font-size:18px;margin:0 0 4px">' + esc(API.nombre) + ' — API Pública AutoFácil</h2>'
+    + '<p style="color:#64748b;margin:0 0 14px">' + esc(API.descripcion || '') + '</p>'
+    + d.html
+    + '<p style="margin-top:18px"><b>Importante:</b> la llave es personal de su empresa — no la publique en sitios web ni aplicaciones visibles al cliente final (úsela desde su servidor).</p>'
+    + '<p>Contacto técnico: <a href="mailto:' + esc(correoTecnico) + '">' + esc(correoTecnico) + '</a></p>'
+    + '</div>')
+    // estilos inline para que el correo se vea igual que la página
+    .replace(/<h6>/g, '<h6 style="color:#012d70;font-size:15px;margin:16px 0 6px">')
+    .replace(/<pre>/g, '<pre style="background:#0f172a;color:#a5f3fc;border-radius:10px;padding:14px 16px;font-size:12.5px;font-family:Consolas,monospace;overflow-x:auto;line-height:1.6">')
+    .replace(/<code>/g, '<code style="background:#f1f5f9;border-radius:4px;padding:1px 5px;font-family:Consolas,monospace;font-size:12.5px">')
+    .replace(/<ul>/g, '<ul style="margin:6px 0;padding-left:20px">');
+
+  const texto = d.correo + '\n\nContacto técnico: ' + correoTecnico;
+  const item = new ClipboardItem({
+    'text/html': new Blob([html], { type: 'text/html' }),
+    'text/plain': new Blob([texto], { type: 'text/plain' })
+  });
+  navigator.clipboard.write([item])
+    .then(() => alert('Instrucciones copiadas en formato correo — pégalas directo en Gmail/Outlook (títulos y bloques de código incluidos).'))
+    .catch(() => navigator.clipboard.writeText(texto).then(() => alert('Instrucciones copiadas (texto plano).')));
 }
 
 cargarCatalogo();
