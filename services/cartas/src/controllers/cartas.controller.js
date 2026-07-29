@@ -730,20 +730,35 @@ const upsert = async (req, res) => {
           error: `La carta está vencida (${dias} días corridos desde su fecha) y no puede aprobarse.` });
     }
     // Regla de negocio (2026-07-23): el ID de la financiera es ÚNICO por operación.
-    // Si ya existe en otra carta viva o en un crédito, se detiene la digitación
+    // Si ya existe en otra carta viva o en un crédito VIVO, se detiene la digitación
     // (evita cartas gemelas KT/DI y choques con uq_id_financiera al crear el crédito).
+    // Una carta DESISTIDA/VENCIDA no bloquea: la operación se puede volver a digitar
+    // (caso real: carta desistida por error de concesionario → se re-crea con el mismo ID).
     if (c.opOrigen) {
       const [[caDup]] = await pool.query(
         `SELECT op_carta FROM cartas_aprobacion
-          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA')
+          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA')
             AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.id || null]);
       if (caDup) return res.status(409).json({ success: false, data: null,
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
+      const MUERTOS = "('DESISTIDO','ANULADO','RECHAZADO')";
       const [[crDup]] = await pool.query(
         `SELECT num_op, numero_credito FROM creditos WHERE id_financiera = ?
-            AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]);
+            AND id <> COALESCE(?, 0)
+            AND UPPER(COALESCE(estado,''))         NOT IN ${MUERTOS}
+            AND UPPER(COALESCE(estado_credito,'')) NOT IN ${MUERTOS}
+          LIMIT 1`, [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]);
       if (crDup) return res.status(409).json({ success: false, data: null,
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
+      // uq_id_financiera es UNIQUE: si un crédito MUERTO retiene el ID, hay que
+      // soltárselo ahora o el INSERT del crédito nuevo reventaría igual. El ID
+      // identifica la operación VIVA en la financiera; el muerto conserva su num_op.
+      await pool.query(
+        `UPDATE creditos SET id_financiera = NULL, updated_at = NOW()
+          WHERE id_financiera = ? AND id <> COALESCE(?, 0)
+            AND (UPPER(COALESCE(estado,'')) IN ${MUERTOS} OR UPPER(COALESCE(estado_credito,'')) IN ${MUERTOS})`,
+        [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]
+      ).catch(e => console.error('[carta liberar id_financiera]', e.message));
     }
     /* El navegador manda las horas con new Date().toISOString() → viene en UTC
        ("...T18:33:44.000Z"). Como string, MySQL la guardaba TAL CUAL en una columna
