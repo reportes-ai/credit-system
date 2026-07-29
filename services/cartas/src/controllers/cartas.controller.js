@@ -619,7 +619,11 @@ const otorgar = async (req, res) => {
           `UPDATE creditos SET estado='OTORGADO', estado_credito='OTORGADO', estado_eval='OTORGADO',
                   fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
-            WHERE (${cond.join(' OR ')}) AND estado IN ('CARTA_APROBACION','APROBADO','INGRESO')`,
+            WHERE (${cond.join(' OR ')})
+              AND (estado IN ('CARTA_APROBACION','APROBADO','INGRESO')
+                   /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
+                      Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
+                   OR (estado IS NULL AND COALESCE(estado_credito,'') IN ('APROBADO','DIGITADO','PENDIENTE')))`,
           [partB, partB, ...args]
         ).catch(e => console.error('[carta otorgar→credito]', e.message));
         // El crédito de la carta nace sin num_op → asígnalo (= numero_credito) para que
@@ -743,13 +747,30 @@ const upsert = async (req, res) => {
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
       const MUERTOS = "('DESISTIDO','ANULADO','RECHAZADO')";
       const [[crDup]] = await pool.query(
-        `SELECT num_op, numero_credito FROM creditos WHERE id_financiera = ?
+        `SELECT id, num_op, numero_credito,
+                UPPER(COALESCE(estado,'')) estado_u, UPPER(COALESCE(estado_credito,'')) estado_credito_u
+           FROM creditos WHERE id_financiera = ?
             AND id <> COALESCE(?, 0)
             AND UPPER(COALESCE(estado,''))         NOT IN ${MUERTOS}
             AND UPPER(COALESCE(estado_credito,'')) NOT IN ${MUERTOS}
           LIMIT 1`, [c.opOrigen, c.idCreditoCreado || c.id_credito_creado || null]);
-      if (crDup) return res.status(409).json({ success: false, data: null,
-        error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
+      if (crDup) {
+        // Ya OTORGADO → duplicado real: la operación ya se cursó.
+        if (crDup.estado_u === 'OTORGADO' || crDup.estado_credito_u === 'OTORGADO')
+          return res.status(409).json({ success: false, data: null,
+            error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
+        // Crédito vivo NO otorgado (carga masiva de aprobadas, digitación): es la MISMA
+        // operación esperando su carta → la carta se ENLAZA a ese crédito en vez de
+        // bloquear o crear un gemelo. Al otorgar, ese mismo crédito pasa a OTORGADO.
+        const [[caViva]] = await pool.query(
+          `SELECT op_carta FROM cartas_aprobacion
+            WHERE id_credito_creado = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA')
+              AND id <> COALESCE(?, 0) LIMIT 1`, [crDup.id, c.id || null]);
+        if (caViva) return res.status(409).json({ success: false, data: null,
+          error: `El ID de la financiera ${c.opOrigen} ya tiene una carta viva (${caViva.op_carta}).` });
+        c.idCreditoCreado = crDup.id;
+        c.numeroCreditoCreado = crDup.numero_credito || crDup.num_op || null;
+      }
       // uq_id_financiera es UNIQUE: si un crédito MUERTO retiene el ID, hay que
       // soltárselo ahora o el INSERT del crédito nuevo reventaría igual. El ID
       // identifica la operación VIVA en la financiera; el muerto conserva su num_op.
@@ -864,9 +885,11 @@ const upsert = async (req, res) => {
       }
       notificarCambios(c, prevStatus, req);
     } else {
-      // INSERT nuevo: crear crédito asociado primero
+      // INSERT nuevo: crear crédito asociado primero — salvo que la carta ya venga
+      // ENLAZADA a un crédito existente (operación de carga masiva esperando carta).
       let credCreado = null;
-      try { credCreado = await crearCreditoDesdeCartas(c); } catch(e) { console.error('[carta→credito]', e.message); }
+      if (!c.idCreditoCreado)
+        try { credCreado = await crearCreditoDesdeCartas(c); } catch(e) { console.error('[carta→credito]', e.message); }
       if (credCreado) {
         vals[vals.length - 2] = credCreado.numero_credito; // numero_credito_creado
         vals[vals.length - 1] = credCreado.id;             // id_credito_creado
