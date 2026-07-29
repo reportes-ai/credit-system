@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <!-- v1.1 — pestañas Ordenes de compra y Workflow de aprobacion (niveles parametricos por cargo/persona) -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -33,6 +34,7 @@
     .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
     .toolbar input, .toolbar select { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; font-size:.86rem; }
     .chip-cm { background:#fde68a; color:#92400e; border-radius:10px; padding:1px 8px; font-size:.72rem; font-weight:700; }
+    .chip { display:inline-block; border-radius:10px; padding:1px 9px; font-size:.72rem; font-weight:700; color:#fff; }
     .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:16px 20px; margin-top:28px; }
     .footer-afecta h6 { font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px; }
     .footer-afecta ul { margin:8px 0 0; padding-left:18px; font-size:.85rem; color:#475569; }
@@ -62,6 +64,8 @@
       <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-art">Artículos por perfil</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-dir">Direcciones</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-usr">Usuarios</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ord" onclick="cargarOrd()">Órdenes de compra</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-wf" onclick="cargarWF()">Workflow de aprobación</button></li>
     </ul>
 
     <div class="tab-content">
@@ -131,6 +135,28 @@
           </div>
         </div>
       </div>
+
+      <!-- ── ÓRDENES DE COMPRA (últimas primero; click = detalle) ── -->
+      <div class="tab-pane fade" id="tab-ord">
+        <div class="card-box">
+          <div class="toolbar"><b>Órdenes de compra</b><span class="muted" style="margin-left:8px;font-size:.8rem">Las últimas primero. Pincha el número para ver el detalle por sucursal y sus firmas.</span></div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead><tr><th>#</th><th>Fecha</th><th>Destino</th><th class="text-end">Total</th><th>Estado</th><th>Nivel</th></tr></thead>
+              <tbody id="tbodyOrdM"><tr><td colspan="6" class="text-center py-4 muted">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── WORKFLOW DE APROBACIÓN (paramétrico) ── -->
+      <div class="tab-pane fade" id="tab-wf">
+        <div class="card-box">
+          <div class="toolbar"><b>Workflow de aprobación de órdenes</b></div>
+          <p class="muted" style="font-size:.83rem;margin:0 0 12px">Cada orden consolidada pasa por estos niveles antes de poder comprarse. Marca con casillas el <b>cargo</b> (perfil) y/o la <b>persona</b> que firma cada nivel. Un nivel desactivado se salta; con todos desactivados la orden nace lista para comprar. Las <b>alarmas</b> (campanita) de cada nivel se configuran en el mantenedor <a href="/mantenedores/avisos/">Avisos</a>.</p>
+          <div id="wfNiveles" class="row g-3"></div>
+        </div>
+      </div>
     </div>
 
     <div class="footer-afecta">
@@ -140,9 +166,21 @@
         <li><b>Sincronizar catálogo</b> → recarga precios/stock/artículos desde el proveedor (Dimeiggs). Afecta el catálogo de <a href="/soporte/compras/">Compras</a>.</li>
         <li><b>Direcciones</b> → oficinas de despacho disponibles (parques + Casa Matriz) que el usuario elige en <a href="/soporte/compras/">Compras</a> y a las que se consolidan los envíos.</li>
         <li><b>Usuarios</b> → dirección de despacho por defecto y centro de costo de cada usuario; se usan en sus pedidos y en el reporte mensual por sucursal.</li>
+        <li><b>Workflow de aprobación</b> → niveles de firma (cargo y/o persona) que debe pasar cada orden en <a href="/soporte/compras-admin/">Administrar Compras</a> antes de poder comprarse. Sus alarmas se configuran en <a href="/mantenedores/avisos/">Avisos</a>.</li>
+        <li><b>Órdenes de compra</b> → vista de consulta con el detalle por sucursal, el N° de pedido de origen y las firmas de cada orden.</li>
       </ul>
     </div>
   </div>
+
+  <dialog id="dlgOrdM" style="border:none;border-radius:14px;padding:0;width:640px;max-width:95vw">
+    <div style="padding:16px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h5 style="font-weight:700;margin:0" id="dlgOrdMTit">Orden</h5>
+        <button class="btn btn-sm btn-light" onclick="document.getElementById('dlgOrdM').close()">✕</button>
+      </div>
+      <div id="dlgOrdMBody"></div>
+    </div>
+  </dialog>
 
   <!-- Modal dirección -->
   <dialog id="dlgDir" style="border:none;border-radius:14px;padding:0;width:440px;max-width:94vw">
@@ -348,6 +386,72 @@
       const j = await api('/api/compras/usuarios-config/'+id, { method:'PUT', body:JSON.stringify(body) });
       if (j?.success) { const u = usrAll.find(x=>x.id_usuario===id); if(u){ u.id_direccion=body.id_direccion?+body.id_direccion:null; u.centro_costo=body.centro_costo; } toast('Guardado'); }
       else toast(j?.error||'Error', false);
+    }
+
+    /* ── ÓRDENES DE COMPRA (consulta) ── */
+    const ESTC = { EN_APROBACION:'#d97706', RECHAZADA:'#dc2626', ABIERTA:'#009AFE', COMPRADA:'#2563eb', RECIBIDA:'#16a34a', ANULADA:'#94a3b8' };
+    async function cargarOrd(){
+      const j = await api('/api/compras/admin/ordenes'); if(!j?.success) return;
+      document.getElementById('tbodyOrdM').innerHTML = j.data.length ? j.data.map(o=>`
+        <tr>
+          <td><a href="javascript:void(0)" style="font-weight:700;text-decoration:none" onclick="verOrdM(${o.id})">#${o.id}</a></td>
+          <td>${new Date(o.fecha).toLocaleDateString('es-CL')}</td>
+          <td>${esc(o.destino||'')}</td>
+          <td class="text-end"><b>${fmt(o.total)}</b></td>
+          <td><span class="chip" style="background:${ESTC[o.estado]||'#64748b'}">${esc(o.estado)}</span></td>
+          <td class="muted">${o.nivel_actual?('nivel '+o.nivel_actual):'—'}</td>
+        </tr>`).join('') : '<tr><td colspan="6" class="text-center py-4 muted">Sin órdenes.</td></tr>';
+    }
+    async function verOrdM(id){
+      const j = await api('/api/compras/admin/ordenes/'+id); if(!j?.success) return;
+      const o=j.data.orden, isuc=j.data.items_sucursal||[], firmas=j.data.firmas||[];
+      const grupos={}; isuc.forEach(i=>(grupos[i.sucursal]=grupos[i.sucursal]||[]).push(i));
+      const hojas=Object.entries(grupos).map(([suc,its])=>`
+        <h6 style="font-weight:700;margin:10px 0 4px;color:#0141A2">${esc(suc)} <span class="muted" style="font-weight:400">— ${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</span></h6>
+        <table class="table table-sm"><thead><tr><th style="width:76px">Pedido</th><th>Artículo</th><th class="text-end">Cant.</th><th class="text-end">Subtotal</th></tr></thead>
+        <tbody>${its.map(it=>`<tr><td class="muted">#${it.id_pedido}</td><td>${esc(it.nombre)}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>`).join('');
+      document.getElementById('dlgOrdMTit').innerHTML = `Orden #${o.id} <span class="chip" style="background:${ESTC[o.estado]||'#64748b'};margin-left:6px">${esc(o.estado)}</span>`;
+      document.getElementById('dlgOrdMBody').innerHTML = `
+        <p class="muted" style="font-size:.84rem;margin:0 0 8px">${new Date(o.fecha).toLocaleString('es-CL')} · Destino <b>${esc(o.destino||'')}</b> · Total <b>${fmt(o.total)}</b></p>
+        ${firmas.length?`<ul style="font-size:.82rem;color:#475569;padding-left:18px">${firmas.map(f=>`<li><b>${esc(f.usuario||'')}</b> ${f.accion==='APROBAR'?'✅ aprobó':'⛔ rechazó'} — ${esc(f.nivel_nombre||('nivel '+f.nivel))} · ${new Date(f.fecha).toLocaleString('es-CL')}</li>`).join('')}</ul>`:''}
+        ${hojas||'<p class="muted">Sin ítems.</p>'}`;
+      document.getElementById('dlgOrdM').showModal();
+    }
+
+    /* ── WORKFLOW: casillas por cargo y persona, por nivel ── */
+    let WF=null;
+    async function cargarWF(){
+      const j = await api('/api/compras/admin/aprobacion-niveles'); if(!j?.success) return;
+      WF=j.data;
+      const csv=v=>String(v||'').split(',').map(x=>x.trim()).filter(Boolean);
+      document.getElementById('wfNiveles').innerHTML = WF.niveles.map(n=>{
+        const perf=csv(n.perfiles), usrs=csv(n.usuarios).map(Number);
+        return `<div class="col-lg-4"><div class="card-box" style="margin-top:0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="chip" style="background:#0141A2">Nivel ${n.nivel}</span>
+            <input class="form-control form-control-sm" id="wfNom${n.nivel}" value="${esc(n.nombre)}" style="flex:1">
+            <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="wfAct${n.nivel}" ${n.activo?'checked':''}></div>
+          </div>
+          <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Por cargo (perfil)</div>
+          <div style="max-height:150px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;margin-bottom:8px">
+            ${WF.perfiles.map(pf=>`<label style="display:block;font-size:.82rem"><input type="checkbox" class="form-check-input wfP${n.nivel}" value="${esc(pf.nombre)}" ${perf.includes(pf.nombre)?'checked':''}> ${esc(pf.nombre)}</label>`).join('')}
+          </div>
+          <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Por persona</div>
+          <div style="max-height:150px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;margin-bottom:10px">
+            ${WF.usuarios.map(u=>`<label style="display:block;font-size:.82rem"><input type="checkbox" class="form-check-input wfU${n.nivel}" value="${u.id_usuario}" ${usrs.includes(u.id_usuario)?'checked':''}> ${esc(u.nombre)} <span class="muted">(${esc(u.perfil||'')})</span></label>`).join('')}
+          </div>
+          <button class="btn btn-sm btn-primary w-100" onclick="guardarWF(${n.nivel})"><i class="bi bi-save me-1"></i>Guardar nivel ${n.nivel}</button>
+        </div></div>`;
+      }).join('');
+    }
+    async function guardarWF(nivel){
+      const perfiles=[...document.querySelectorAll('.wfP'+nivel+':checked')].map(c=>c.value);
+      const usuarios=[...document.querySelectorAll('.wfU'+nivel+':checked')].map(c=>c.value);
+      const body={ nombre:document.getElementById('wfNom'+nivel).value.trim(), perfiles, usuarios,
+                   activo:document.getElementById('wfAct'+nivel).checked };
+      if (body.activo && !perfiles.length && !usuarios.length) { toast('Un nivel activo necesita al menos un cargo o una persona', false); return; }
+      const j = await api('/api/compras/admin/aprobacion-niveles/'+nivel, { method:'PUT', body: JSON.stringify(body) });
+      if (j?.success) { toast('Nivel '+nivel+' guardado'); cargarWF(); } else toast(j?.error||'Error', false);
     }
 
     initArt(); cargarDir(); cargarUsr();

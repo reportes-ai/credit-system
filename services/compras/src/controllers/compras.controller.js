@@ -141,6 +141,74 @@ require('../../../../shared/migrate').enFila('compras', async () => {
   } catch (e) { console.error('[compras migration]', e.message); }
 });
 
+/* ── WORKFLOW DE APROBACIÓN DE ÓRDENES (paramétrico) ─────────────────────────
+   La orden consolidada no se compra al tiro: pasa por niveles de firma que el
+   Administrador define con casillas por CARGO (perfil) y/o PERSONA (usuario).
+   Seed del flujo pedido por gerencia: 1) revisión del Asistente Administrativo,
+   2) aprobación del Gerente General, 3) un nivel adicional (nace desactivado).
+   Las alarmas de cada nivel son eventos del mantenedor Avisos (campanita). */
+const AVISOS = require('../../../../shared/avisos');
+require('../../../../shared/migrate').enFila('compras-aprobacion', async () => {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS compras_aprobacion_niveles (
+      nivel INT PRIMARY KEY,
+      nombre VARCHAR(120) NOT NULL,
+      perfiles TEXT,
+      usuarios TEXT,
+      activo TINYINT(1) NOT NULL DEFAULT 1)`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS compras_orden_firmas (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      id_orden INT NOT NULL,
+      nivel INT NOT NULL,
+      nivel_nombre VARCHAR(120) NULL,
+      id_usuario INT NULL,
+      usuario VARCHAR(150) NULL,
+      accion VARCHAR(15) NOT NULL,
+      comentario VARCHAR(400) NULL,
+      fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_orden (id_orden))`);
+    await pool.query(`ALTER TABLE compras_ordenes ADD COLUMN IF NOT EXISTS nivel_actual INT NULL`).catch(() => {});
+    for (const [nivel, nombre, perfiles, activo] of [
+      [1, 'Revisión administrativa', 'Asistente Administrativo', 1],
+      [2, 'Aprobación Gerencia General', 'Gerente General', 1],
+      [3, 'Aprobación adicional', '', 0],
+    ]) await pool.query(
+      'INSERT IGNORE INTO compras_aprobacion_niveles (nivel, nombre, perfiles, usuarios, activo) VALUES (?,?,?,\'\',?)',
+      [nivel, nombre, perfiles, activo]);
+  } catch (e) { console.error('[compras-aprobacion migration]', e.message); }
+});
+for (const n of [1, 2, 3]) AVISOS.registrarAviso({
+  evento: 'compras_aprob_nivel_' + n, modulo: 'Compras',
+  nombre: 'Orden de compra por firmar — nivel ' + n,
+  descripcion: 'Una orden de compra llegó a este nivel del workflow de aprobación y espera firma.',
+  perfiles: n === 1 ? 'Asistente Administrativo' : (n === 2 ? 'Gerente General' : ''),
+  incluir_admin: 0, prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+AVISOS.registrarAviso({ evento: 'compras_orden_aprobada', modulo: 'Compras',
+  nombre: 'Orden de compra aprobada (lista para comprar)',
+  descripcion: 'La orden completó todos los niveles de firma.',
+  perfiles: 'Asistente Administrativo', incluir_admin: 0 });
+AVISOS.registrarAviso({ evento: 'compras_orden_rechazada', modulo: 'Compras',
+  nombre: 'Orden de compra rechazada',
+  descripcion: 'Un firmante rechazó la orden; los pedidos vuelven a pendientes.',
+  perfiles: 'Asistente Administrativo', incluir_admin: 0 });
+
+async function nivelesAprobacion() {
+  const [n] = await pool.query('SELECT * FROM compras_aprobacion_niveles ORDER BY nivel');
+  return n;
+}
+const primerNivelActivo = niveles => { const n = niveles.find(x => x.activo); return n ? n.nivel : null; };
+const siguienteNivelActivo = (niveles, actual) => { const n = niveles.find(x => x.activo && x.nivel > actual); return n ? n.nivel : null; };
+function _csv(s) { return String(s || '').split(',').map(x => x.trim()).filter(Boolean); }
+// ¿Puede este usuario firmar el nivel? Por cargo (perfil), por persona, o Administrador.
+function puedeFirmarNivel(req, nivelCfg) {
+  if (!nivelCfg) return false;
+  const perfil = String(req.usuario.perfil_nombre || '').trim();
+  if (perfil === 'Administrador') return true;
+  if (_csv(nivelCfg.perfiles).some(p => p.toLowerCase() === perfil.toLowerCase())) return true;
+  return _csv(nivelCfg.usuarios).map(Number).includes(Number(req.usuario.id_usuario));
+}
+
 const err = (res, e) => { console.error('[compras]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); };
 const num = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
 
@@ -538,13 +606,18 @@ const consolidar = async (req, res) => {
     if (!peds.length) return res.status(400).json({ success: false, data: null, error: 'No hay pedidos pendientes en la selección' });
     const uid = req.usuario.id_usuario;
     const ordenes = [];
+    // Workflow parametrico: con niveles activos la orden nace EN_APROBACION;
+    // sin niveles (todo desactivado) queda ABIERTA directo, como antes.
+    const NIV = await nivelesAprobacion();
+    const niv0 = primerNivelActivo(NIV);
+    const estadoIni = niv0 ? 'EN_APROBACION' : 'ABIERTA';
 
     if (modo === 'CONSOLIDADO') {
       const [[cm]] = await pool.query('SELECT id, nombre FROM compras_direcciones WHERE es_casa_matriz=1 AND activo=1 ORDER BY id LIMIT 1');
       const total = peds.reduce((s, p) => s + Number(p.total), 0);
       const [r] = await pool.query(
-        `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, total, id_usuario) VALUES ('CONSOLIDADO',?,?, 'ABIERTA', ?, ?)`,
-        [cm?.id ?? null, cm?.nombre || 'Casa Matriz', total, uid]);
+        `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, nivel_actual, total, id_usuario) VALUES ('CONSOLIDADO',?,?,?,?,?,?)`,
+        [cm?.id ?? null, cm?.nombre || 'Casa Matriz', estadoIni, niv0, total, uid]);
       await pool.query('UPDATE compras_pedidos SET estado=\'CONSOLIDADO\', id_orden=? WHERE id IN (?)', [r.insertId, peds.map(p => p.id)]);
       ordenes.push(r.insertId);
     } else {
@@ -556,13 +629,18 @@ const consolidar = async (req, res) => {
         if (dId) { const [[d]] = await pool.query('SELECT nombre FROM compras_direcciones WHERE id=?', [dId]); nombre = d?.nombre || nombre; }
         const total = gr.reduce((s, p) => s + Number(p.total), 0);
         const [r] = await pool.query(
-          `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, total, id_usuario) VALUES ('SEPARADO',?,?, 'ABIERTA', ?, ?)`,
-          [dId || null, nombre, total, uid]);
+          `INSERT INTO compras_ordenes (modo, id_direccion, destino, estado, nivel_actual, total, id_usuario) VALUES ('SEPARADO',?,?,?,?,?,?)`,
+          [dId || null, nombre, estadoIni, niv0, total, uid]);
         await pool.query('UPDATE compras_pedidos SET estado=\'CONSOLIDADO\', id_orden=? WHERE id IN (?)', [r.insertId, gr.map(p => p.id)]);
         ordenes.push(r.insertId);
       }
     }
     auditar({ req, accion: 'CREAR', modulo: 'compras', entidad: 'orden', detalle: `Consolidó ${peds.length} pedido(s) en ${ordenes.length} orden(es) (${modo})`, meta: { modo, ordenes, pedidos: peds.length } });
+    if (niv0) for (const oid of ordenes) AVISOS.avisar('compras_aprob_nivel_' + niv0, {
+      titulo: 'Orden de compra por firmar',
+      mensaje: `La orden de compra #${oid} espera tu firma (${(NIV.find(n=>n.nivel===niv0)||{}).nombre||'nivel '+niv0}).`,
+      href: '/soporte/compras-admin/?orden=' + oid,
+    }, { excluir: [uid] }).catch(()=>{});
     res.json({ success: true, data: { ordenes, modo }, error: null });
   } catch (e) { err(res, e); }
 };
@@ -599,7 +677,101 @@ const adminOrdenDetalle = async (req, res) => {
        LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
        LEFT JOIN usuarios u ON u.id_usuario=p.id_usuario
        WHERE p.id_orden=? ORDER BY p.id`, [id]);
-    res.json({ success: true, data: { orden, items, pedidos }, error: null });
+    // La hoja de la orden va SEPARADA POR SUCURSAL con el N° de pedido de origen
+    const [items_sucursal] = await pool.query(
+      `SELECT COALESCE(d.nombre,'Sin sucursal') AS sucursal, p.id AS id_pedido, p.usuario_nombre,
+              i.sku, i.nombre, i.cantidad, i.precio_unit, i.subtotal
+       FROM compras_pedido_items i
+       JOIN compras_pedidos p ON p.id=i.id_pedido
+       LEFT JOIN compras_direcciones d ON d.id=p.id_direccion
+       WHERE p.id_orden=? ORDER BY sucursal, p.id, i.nombre`, [id]);
+    const [firmas] = await pool.query(
+      'SELECT nivel, nivel_nombre, usuario, accion, comentario, fecha FROM compras_orden_firmas WHERE id_orden=? ORDER BY fecha', [id]);
+    const niveles = await nivelesAprobacion();
+    const nivCfg = orden.nivel_actual ? niveles.find(n => n.nivel === orden.nivel_actual) : null;
+    const puedo_firmar = orden.estado === 'EN_APROBACION' && puedeFirmarNivel(req, nivCfg);
+    res.json({ success: true, data: { orden, items, pedidos, items_sucursal, firmas, niveles, puedo_firmar }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+/* ── POST /api/compras/admin/ordenes/:id/decidir { accion, comentario } ──────
+   Firma del nivel actual. APROBAR pasa al siguiente nivel activo (o deja la
+   orden ABIERTA, lista para comprar). RECHAZAR devuelve los pedidos al pool. */
+const adminOrdenDecidir = async (req, res) => {
+  try {
+    const id = num(req.params.id);
+    const accion = String(req.body.accion || '').toUpperCase();
+    if (!['APROBAR', 'RECHAZAR'].includes(accion))
+      return res.status(400).json({ success: false, data: null, error: 'Acción inválida' });
+    const [[o]] = await pool.query('SELECT * FROM compras_ordenes WHERE id=?', [id]);
+    if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    if (o.estado !== 'EN_APROBACION' || !o.nivel_actual)
+      return res.status(400).json({ success: false, data: null, error: `La orden está ${o.estado}: no espera firma.` });
+    const niveles = await nivelesAprobacion();
+    const nivCfg = niveles.find(n => n.nivel === o.nivel_actual);
+    if (!puedeFirmarNivel(req, nivCfg))
+      return res.status(403).json({ success: false, data: null, error: `Este nivel lo firma: ${nivCfg ? (nivCfg.perfiles || 'personas designadas') : '—'}.` });
+
+    const nom = `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim() || req.usuario.email;
+    await pool.query(
+      'INSERT INTO compras_orden_firmas (id_orden, nivel, nivel_nombre, id_usuario, usuario, accion, comentario) VALUES (?,?,?,?,?,?,?)',
+      [id, o.nivel_actual, nivCfg ? nivCfg.nombre : null, req.usuario.id_usuario, nom, accion,
+       String(req.body.comentario || '').slice(0, 400) || null]);
+
+    if (accion === 'RECHAZAR') {
+      await pool.query("UPDATE compras_ordenes SET estado='RECHAZADA', nivel_actual=NULL WHERE id=?", [id]);
+      await pool.query("UPDATE compras_pedidos SET estado='PENDIENTE', id_orden=NULL WHERE id_orden=?", [id]);
+      auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'orden', entidad_id: String(id),
+        detalle: `RECHAZÓ la orden #${id} en "${nivCfg ? nivCfg.nombre : 'nivel ' + o.nivel_actual}" — los pedidos vuelven a pendientes` });
+      AVISOS.avisar('compras_orden_rechazada', { titulo: 'Orden de compra rechazada',
+        mensaje: `${nom} rechazó la orden #${id}${req.body.comentario ? ': ' + String(req.body.comentario).slice(0, 120) : ''}. Los pedidos volvieron a pendientes.`,
+        href: '/soporte/compras-admin/' }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
+      return res.json({ success: true, data: { estado: 'RECHAZADA' }, error: null });
+    }
+
+    const sig = siguienteNivelActivo(niveles, o.nivel_actual);
+    if (sig) {
+      await pool.query('UPDATE compras_ordenes SET nivel_actual=? WHERE id=?', [sig, id]);
+      const sigCfg = niveles.find(n => n.nivel === sig);
+      AVISOS.avisar('compras_aprob_nivel_' + sig, { titulo: 'Orden de compra por firmar',
+        mensaje: `La orden #${id} pasó a "${sigCfg ? sigCfg.nombre : 'nivel ' + sig}" y espera tu firma.`,
+        href: '/soporte/compras-admin/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
+    } else {
+      await pool.query("UPDATE compras_ordenes SET estado='ABIERTA', nivel_actual=NULL WHERE id=?", [id]);
+      AVISOS.avisar('compras_orden_aprobada', { titulo: 'Orden de compra aprobada',
+        mensaje: `La orden #${id} completó todas las firmas: lista para comprar.`,
+        href: '/soporte/compras-admin/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
+    }
+    auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'orden', entidad_id: String(id),
+      detalle: `APROBÓ la orden #${id} en "${nivCfg ? nivCfg.nombre : 'nivel ' + o.nivel_actual}"${sig ? ' → pasa al nivel ' + sig : ' → orden ABIERTA (lista para comprar)'}` });
+    res.json({ success: true, data: { estado: sig ? 'EN_APROBACION' : 'ABIERTA', nivel_actual: sig }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+/* ── Config del workflow (casillas por cargo y/o persona por nivel) ── */
+const nivelesGet = async (req, res) => {
+  try {
+    const niveles = await nivelesAprobacion();
+    const [perfiles] = await pool.query('SELECT id_perfil, nombre FROM perfiles ORDER BY nombre');
+    const [usuarios] = await pool.query(
+      `SELECT u.id_usuario, TRIM(CONCAT(u.nombre,' ',COALESCE(u.apellido,''))) nombre, p.nombre perfil
+       FROM usuarios u LEFT JOIN perfiles p ON p.id_perfil=u.id_perfil
+       WHERE u.estado='activo' ORDER BY nombre`);
+    res.json({ success: true, data: { niveles, perfiles, usuarios }, error: null });
+  } catch (e) { err(res, e); }
+};
+const nivelesSet = async (req, res) => {
+  try {
+    const nivel = num(req.params.nivel);
+    if (![1, 2, 3].includes(nivel)) return res.status(400).json({ success: false, data: null, error: 'Nivel inválido' });
+    const b = req.body || {};
+    const csv = v => Array.isArray(v) ? v.join(',') : String(v == null ? '' : v);
+    await pool.query(
+      'UPDATE compras_aprobacion_niveles SET nombre=?, perfiles=?, usuarios=?, activo=? WHERE nivel=?',
+      [String(b.nombre || 'Nivel ' + nivel).slice(0, 120), csv(b.perfiles), csv(b.usuarios), b.activo ? 1 : 0, nivel]);
+    auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'aprobacion_nivel', entidad_id: String(nivel),
+      detalle: `Configuró el nivel ${nivel} del workflow de aprobación de compras`, meta: b });
+    res.json({ success: true, data: null, error: null });
   } catch (e) { err(res, e); }
 };
 
@@ -647,5 +819,6 @@ module.exports = {
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
   adminPedidos, adminItemEditar, adminItemEliminar, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
+  adminOrdenDecidir, nivelesGet, nivelesSet,
   reporteMensual,
 };

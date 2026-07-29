@@ -45,6 +45,9 @@ router.post('/admin/consolidar',        verifyToken, admin, c.consolidar);
 router.get('/admin/ordenes',            verifyToken, admin, c.adminOrdenes);
 router.get('/admin/ordenes/:id',        verifyToken, admin, c.adminOrdenDetalle);
 router.put('/admin/ordenes/:id/estado', verifyToken, admin, c.adminOrdenEstado);
+router.post('/admin/ordenes/:id/decidir',      verifyToken, admin, c.adminOrdenDecidir);
+router.get('/admin/aprobacion-niveles',        verifyToken, admin, c.nivelesGet);
+router.put('/admin/aprobacion-niveles/:nivel', verifyToken, requireFunc('compras_mant'), c.nivelesSet);
 router.get('/admin/reporte',            verifyToken, admin, c.reporteMensual);
 
 module.exports = router;

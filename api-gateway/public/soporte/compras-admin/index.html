@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.1 — click en el pedido: detalle con edicion de cantidades y eliminacion de productos -->
+  <!-- v1.2 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -82,7 +82,7 @@
           <div class="toolbar">
             <b>Órdenes de compra</b>
             <select id="fEstadoOrd" onchange="cargarOrdenes()" style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 9px;font-size:.85rem;margin-left:8px">
-              <option value="">Todas</option><option value="ABIERTA">Abiertas</option><option value="COMPRADA">Compradas</option><option value="RECIBIDA">Recibidas</option><option value="ANULADA">Anuladas</option>
+              <option value="">Todas</option><option value="EN_APROBACION">En aprobación</option><option value="ABIERTA">Abiertas (aprobadas)</option><option value="RECHAZADA">Rechazadas</option><option value="COMPRADA">Compradas</option><option value="RECIBIDA">Recibidas</option><option value="ANULADA">Anuladas</option>
             </select>
           </div>
           <div class="table-responsive">
@@ -155,7 +155,7 @@
       return res.json();
     }
     function toast(msg, ok=true){ const d=document.createElement('div'); d.textContent=msg; d.style.cssText=`position:fixed;top:74px;right:20px;z-index:9999;background:${ok?'#16a34a':'#dc2626'};color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:.88rem`; document.body.appendChild(d); setTimeout(()=>d.remove(),3200); }
-    const ESTC = { PENDIENTE:'#f59e0b', CONSOLIDADO:'#009AFE', ABIERTA:'#009AFE', COMPRADO:'#2563eb', COMPRADA:'#2563eb', RECIBIDO:'#16a34a', RECIBIDA:'#16a34a', ANULADA:'#94a3b8', ANULADO:'#94a3b8' };
+    const ESTC = { PENDIENTE:'#f59e0b', EN_APROBACION:'#d97706', RECHAZADA:'#dc2626', CONSOLIDADO:'#009AFE', ABIERTA:'#009AFE', COMPRADO:'#2563eb', COMPRADA:'#2563eb', RECIBIDO:'#16a34a', RECIBIDA:'#16a34a', ANULADA:'#94a3b8', ANULADO:'#94a3b8' };
 
     /* ── PEDIDOS PENDIENTES ── */
     let peds = [];
@@ -301,18 +301,44 @@
     async function verOrden(id) {
       const j = await api('/api/compras/admin/ordenes/'+id); if (!j?.success) return;
       ordenActual = j.data; DIMERC_TXT = buildDimerc(j.data);
-      const o = j.data.orden, items = j.data.items, peds = j.data.pedidos;
-      document.getElementById('dlgOrdTit').innerHTML = `Orden #${o.id} <span class="est" style="background:${ESTC[o.estado]||'#64748b'};margin-left:6px">${esc(o.estado)}</span>`;
+      const o = j.data.orden, peds = j.data.pedidos, isuc = j.data.items_sucursal||[], firmas = j.data.firmas||[], niveles = j.data.niveles||[];
+      document.getElementById('dlgOrdTit').innerHTML = `Orden #${o.id} <span class="est" style="background:${ESTC[o.estado]||'#64748b'};margin-left:6px">${esc(o.estado)}${o.estado==='EN_APROBACION'&&o.nivel_actual?' · nivel '+o.nivel_actual:''}</span>`;
+      // Ítems agrupados por sucursal, con el N° de pedido de origen
+      const grupos = {};
+      isuc.forEach(i => (grupos[i.sucursal] = grupos[i.sucursal] || []).push(i));
+      const hojas = Object.entries(grupos).map(([suc, its]) => `
+        <h6 style="font-weight:700;margin:10px 0 4px;color:#0141A2"><i class="bi bi-geo-alt me-1"></i>${esc(suc)} <span class="muted" style="font-weight:400">— ${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</span></h6>
+        <table class="table table-sm" style="margin-bottom:6px"><thead><tr><th style="width:76px">Pedido</th><th>Artículo</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
+          <tbody>${its.map(it=>`<tr><td class="muted">#${it.id_pedido}</td><td>${esc(it.nombre)}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>`).join('');
+      // Workflow: firmas hechas + nivel pendiente + botones si me toca firmar
+      const firmasHTML = `
+        <h6 style="font-weight:700;margin:12px 0 6px"><i class="bi bi-person-check me-1"></i>Workflow de aprobación</h6>
+        ${firmas.length ? `<ul style="font-size:.82rem;color:#475569;padding-left:18px;margin-bottom:6px">${firmas.map(f=>`<li><b>${esc(f.usuario||'')}</b> ${f.accion==='APROBAR'?'✅ aprobó':'⛔ rechazó'} — ${esc(f.nivel_nombre||('nivel '+f.nivel))} · ${new Date(f.fecha).toLocaleString('es-CL')}${f.comentario?` · <i>${esc(f.comentario)}</i>`:''}</li>`).join('')}</ul>` : '<p class="muted" style="font-size:.82rem;margin:0 0 6px">Sin firmas todavía.</p>'}
+        ${o.estado==='EN_APROBACION' && o.nivel_actual ? `<p style="font-size:.83rem;margin:0 0 8px">Esperando: <b>${esc((niveles.find(n=>n.nivel===o.nivel_actual)||{}).nombre||('nivel '+o.nivel_actual))}</b> (${esc((niveles.find(n=>n.nivel===o.nivel_actual)||{}).perfiles||'personas designadas')})</p>` : ''}
+        ${j.data.puedo_firmar ? `
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input id="firmaCom" class="form-control form-control-sm" placeholder="Comentario (obligatorio si rechazas)" style="max-width:340px">
+            <button class="btn btn-sm btn-success" onclick="decidirOrden(${o.id},'APROBAR')"><i class="bi bi-check-lg me-1"></i>Aprobar</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="decidirOrden(${o.id},'RECHAZAR')"><i class="bi bi-x-lg me-1"></i>Rechazar</button>
+          </div>` : ''}`;
       document.getElementById('dlgOrdBody').innerHTML = `
-        <p class="muted" style="margin:0 0 8px;font-size:.85rem">${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} · Destino: <b>${esc(o.destino||'')}</b> · Total <b>${fmt(o.total)}</b></p>
-        <h6 style="font-weight:700;margin:12px 0 6px">Lista de compra (consolidada)</h6>
-        <table class="table table-sm"><thead><tr><th>Artículo</th><th>SKU</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
-          <tbody>${items.map(it=>`<tr><td>${esc(it.nombre)}</td><td class="muted">${esc(it.sku||'')}</td><td class="text-end">${it.cantidad}</td><td class="text-end">${fmt(it.precio_unit)}</td><td class="text-end">${fmt(it.subtotal)}</td></tr>`).join('')}</tbody></table>
-        <h6 style="font-weight:700;margin:12px 0 6px">Pedidos incluidos (${peds.length})</h6>
-        <ul style="font-size:.82rem;color:#475569;padding-left:18px">${peds.map(p=>`<li>#${p.id} — ${esc(p.usuario_nombre||'')} · ${esc(p.direccion||'')} · ${esc(p.centro_costo||'')} · ${fmt(p.total)}</li>`).join('')}</ul>
+        <p class="muted" style="margin:0 0 8px;font-size:.85rem">${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} · Destino: <b>${esc(o.destino||'')}</b> · Total <b>${fmt(o.total)}</b> · ${peds.length} pedido(s)</p>
+        ${firmasHTML}
+        ${hojas || '<p class="muted">Sin ítems.</p>'}
+        <table class="table table-sm"><tbody><tr><th class="text-end" style="border:none">TOTAL ORDEN</th><th class="text-end" style="border:none;width:130px">${fmt(o.total)}</th></tr></tbody></table>
         <h6 style="font-weight:700;margin:14px 0 6px"><i class="bi bi-clipboard-check me-1"></i>Pedido para Dimerc (copiar y pegar)</h6>
-        <textarea id="dimercTa" readonly style="width:100%;height:170px;font:12px/1.45 ui-monospace,Consolas,monospace;border:1px solid #cbd5e1;border-radius:8px;padding:10px;background:#f8fafc">${esc(DIMERC_TXT)}</textarea>`;
+        <textarea id="dimercTa" readonly style="width:100%;height:150px;font:12px/1.45 ui-monospace,Consolas,monospace;border:1px solid #cbd5e1;border-radius:8px;padding:10px;background:#f8fafc">${esc(DIMERC_TXT)}</textarea>`;
       document.getElementById('dlgOrd').showModal();
+    }
+    async function decidirOrden(id, accion){
+      const com = (document.getElementById('firmaCom')?.value||'').trim();
+      if (accion==='RECHAZAR' && !com) { toast('Para rechazar escribe el motivo', false); return; }
+      if (!confirm(accion==='APROBAR' ? `¿Aprobar la orden #${id}?` : `¿RECHAZAR la orden #${id}? Los pedidos vuelven a pendientes.`)) return;
+      const j = await api(`/api/compras/admin/ordenes/${id}/decidir`, { method:'POST', body: JSON.stringify({ accion, comentario: com }) });
+      if (!j?.success) { toast(j?.error||'Error', false); return; }
+      toast(accion==='APROBAR' ? (j.data.nivel_actual ? `Aprobada — pasa al nivel ${j.data.nivel_actual}` : 'Aprobada — lista para comprar') : 'Rechazada: pedidos vuelven al pool');
+      document.getElementById('dlgOrd').close();
+      cargarOrdenes(); cargarPed();
     }
     async function copiarDimerc() {
       if (!DIMERC_TXT) return;
@@ -321,16 +347,23 @@
     }
     function imprimirOrden() {
       if (!ordenActual) return;
-      const o = ordenActual.orden, items = ordenActual.items;
-      const w = window.open('', '_blank', 'popup=yes,width=760,height=900,scrollbars=yes');
+      const o = ordenActual.orden, isuc = ordenActual.items_sucursal||[], firmas = ordenActual.firmas||[];
+      const w = window.open('', '_blank', 'popup=yes,width=780,height=900,scrollbars=yes');
       if (!w) return;
-      w.document.write(`<html><head><title>Orden #${o.id}</title><style>body{font:13px/1.5 system-ui,Arial;padding:24px;color:#111}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f1f5f9}.r{text-align:right}.tot{font-weight:800}</style></head><body>
-        <h2>Orden de Compra #${o.id}</h2>
-        <div>${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} — Destino: <b>${esc(o.destino||'')}</b></div>
-        <div>Fecha: ${new Date(o.fecha).toLocaleString('es-CL')}</div>
-        <table><thead><tr><th>Artículo</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Subtotal</th></tr></thead>
-        <tbody>${items.map(it=>`<tr><td>${esc(it.nombre)}</td><td>${esc(it.sku||'')}</td><td class="r">${it.cantidad}</td><td class="r">${fmt(it.precio_unit)}</td><td class="r">${fmt(it.subtotal)}</td></tr>`).join('')}
-        <tr><td colspan="4" class="r tot">TOTAL</td><td class="r tot">${fmt(o.total)}</td></tr></tbody></table>
+      const grupos = {};
+      isuc.forEach(i => (grupos[i.sucursal] = grupos[i.sucursal] || []).push(i));
+      const bloques = Object.entries(grupos).map(([suc, its]) => `
+        <h3>${esc(suc)}</h3>
+        <table><thead><tr><th>Pedido</th><th>Artículo</th><th>SKU</th><th class="r">Cant.</th><th class="r">Precio</th><th class="r">Subtotal</th></tr></thead>
+        <tbody>${its.map(it=>`<tr><td>#${it.id_pedido}</td><td>${esc(it.nombre)}</td><td>${esc(it.sku||'')}</td><td class="r">${it.cantidad}</td><td class="r">${fmt(it.precio_unit)}</td><td class="r">${fmt(it.subtotal)}</td></tr>`).join('')}
+        <tr><td colspan="5" class="r st">Subtotal ${esc(suc)}</td><td class="r st">${fmt(its.reduce((a,i)=>a+Number(i.subtotal),0))}</td></tr></tbody></table>`).join('');
+      const firmasTxt = firmas.filter(f=>f.accion==='APROBAR').map(f=>`${esc(f.usuario||'')} — ${esc(f.nivel_nombre||('nivel '+f.nivel))} (${new Date(f.fecha).toLocaleDateString('es-CL')})`).join('  ·  ');
+      w.document.write(`<html><head><title>Orden #${o.id}</title><style>body{font:12.5px/1.45 system-ui,Arial;padding:22px;color:#111}h2{margin:0 0 2px}h3{margin:14px 0 4px;font-size:14px;color:#0141A2}table{width:100%;border-collapse:collapse;margin-top:4px}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}th{background:#f1f5f9}.r{text-align:right}.st{font-weight:700;background:#f8fafc}.tot{font-weight:800;font-size:14px}</style></head><body>
+        <h2>Orden de Compra #${o.id} — AutoFácil</h2>
+        <div>${o.modo==='SEPARADO'?'Por sucursal':'Consolidada a Casa Matriz'} — Destino: <b>${esc(o.destino||'')}</b> · Fecha: ${new Date(o.fecha).toLocaleString('es-CL')} · Estado: <b>${esc(o.estado)}</b></div>
+        ${bloques}
+        <table><tbody><tr><td class="r tot">TOTAL ORDEN</td><td class="r tot" style="width:130px">${fmt(o.total)}</td></tr></tbody></table>
+        ${firmasTxt?`<p style="margin-top:12px;font-size:11.5px;color:#475569"><b>Aprobaciones:</b> ${firmasTxt}</p>`:''}
         </body></html>`);
       w.document.close(); setTimeout(()=>w.print(), 350);
     }
@@ -377,6 +410,9 @@
     }
 
     cargarPed();
+    { const oq = new URLSearchParams(location.search).get('orden');
+      if (oq) { document.querySelector('[data-bs-target="#tab-ord"]').click(); setTimeout(()=>verOrden(+oq), 400); } }
+
   </script>
   <script src="/js/app-version.js"></script>
 </body>
