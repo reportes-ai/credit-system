@@ -396,6 +396,7 @@ const getAll = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
+             c.id_financiera,
              s.fecha_otorgado, s.saldo_precio, s.comision,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer)  AS nombre_dealer,
              COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer,
