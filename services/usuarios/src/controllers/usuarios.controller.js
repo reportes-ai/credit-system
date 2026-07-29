@@ -29,7 +29,7 @@ const correoClave = (nombre, email, clave, esReset = false) => {
     : 'Te damos la bienvenida a AutoFácil Business Suite. Tu cuenta ya está creada; estos son tus datos de acceso:';
   const text = `Hola ${nombre},\n\n${intro}\n\nUsuario (correo): ${email}\nContraseña temporal: ${clave}\n\nPor seguridad, el sistema te pedirá cambiar la contraseña en tu primer ingreso.\nIngresa en ${login}\n\nSi no esperabas este correo, avísale a tu administrador.\n\nSaludos,\nAutoFácil Business Suite`;
   const cuerpo = `
-    <p style="margin:0 0 14px">Hola <b>${nombre}</b>,</p>
+    <p style="margin:0 0 14px">Hola ${nombre},</p>
     <p style="margin:0 0 18px">${intro}</p>
     <table role="presentation" width="100%" style="border-collapse:collapse;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
       <tr><td style="padding:16px 18px 6px">

@@ -549,7 +549,7 @@ async function enviarOportunidad(conv, texto) {
 
   const html = `
     <h2 style="color:#012d70;margin:0 0 6px">🚗 ¡Tienes una nueva oportunidad de negocio!</h2>
-    <p>Hola <b>${nombreEje.split(' ')[0] || 'ejecutivo'}</b>, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
+    <p>Hola ${nombreEje.split(' ')[0] || 'ejecutivo'}, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
     <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}${conv.preaprob_codigo ? ` · <b>N° Preaprobación:</b> ${conv.preaprob_codigo}` : ''}</p>
     ${detalle}
     ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://afbs.autofacilchile.cl/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}

@@ -130,7 +130,7 @@ const enviarMails = async (req, res) => {
     let enviados = 0, fallidos = 0;
     for (const u of rows) {
       const primerNombre = (String(u.nombre || '').trim().split(/\s+/)[0]) || 'usuario';
-      const cuerpo = `<p style="margin:0 0 14px">Hola <b>${esc(primerNombre)}</b>,</p>${cuerpoMsg}`;
+      const cuerpo = `<p style="margin:0 0 14px">Hola ${esc(primerNombre)},</p>${cuerpoMsg}`;
       const r = await enviarCorreo({ to: u.email, subject: String(asunto).trim(), html: envolverHTML(cuerpo), text: `Hola ${primerNombre},\n\n${mensaje}\n\nSaludos,\nAutoFácil Business Suite` });
       if (r.ok) enviados++; else fallidos++;
     }

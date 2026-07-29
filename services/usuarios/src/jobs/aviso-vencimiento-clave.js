@@ -30,7 +30,7 @@ function correoVencimiento(nombre, dias) {
   const subject = `Tu contraseña vence ${cuando} — AutoFácil Business Suite`;
   const text = `Hola ${nombre},\n\nTu contraseña del sistema vence ${cuando}. Por seguridad, te recomendamos cambiarla antes de que expire.\n\nCómo cambiarla: ingresa al sistema, abre el menú de tu usuario (arriba a la derecha) y elige "Cambiar contraseña".\nIngresa en ${login}\n\nSi no la cambias antes del vencimiento, el sistema te pedirá hacerlo en tu próximo ingreso. Seguirás recibiendo este aviso a diario hasta que la cambies.\n\nSaludos,\nAutoFácil Business Suite`;
   const cuerpo = `
-    <p style="margin:0 0 14px">Hola <b>${nombre}</b>,</p>
+    <p style="margin:0 0 14px">Hola ${nombre},</p>
     <p style="margin:0 0 16px">Tu contraseña del sistema <b>vence ${cuando}</b>. Por seguridad, te recomendamos cambiarla antes de que expire.</p>
     <table role="presentation" width="100%" style="border-collapse:collapse;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px">
       <tr><td style="padding:14px 18px;color:#9a3412;font-size:14px;line-height:1.55">
