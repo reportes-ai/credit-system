@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.4 — Depositar en/Titular con banco, tipo cuenta, N° y RUT del dealer -->
+  <!-- v2.5 — la comisión es BRUTA (IVA incluido): sin factura se DESAGREGA, no se le suma IVA encima -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -214,9 +214,18 @@ function docHTML(ops){
   const esBoleta = !!f0.es_boleta;
   const pct0 = (f0.impuesto_pct != null) ? Number(f0.impuesto_pct) : (esBoleta ? ret : iva);
   const impLbl = `${esBoleta ? 'Retención' : 'IVA'} ${pct0}%`;
-  // Factura (total de la cartola) — UNA sola vez desde f0
-  const facturaNeto  = Number(f0.monto_factura ?? f0.comision)||0;
-  const facturaImp   = (f0.impuesto_monto != null) ? Number(f0.impuesto_monto) : Math.round(facturaNeto*pct0/100);
+  /* Factura (total de la cartola) — UNA sola vez desde f0.
+     OJO: la comisión del sistema es BRUTA (IVA INCLUIDO). Cuando la factura todavía
+     no se registra, el bruto ES la comisión y el neto se DESAGREGA (bruto ÷ 1,19).
+     Nunca se le suma IVA encima: eso inflaba la orden de pago un 19% y disparaba
+     un descuadre fantasma contra la cartola. Con factura registrada mandan los
+     valores congelados al recibirla (neto, impuesto y líquido). */
+  const sinFactura   = (f0.monto_factura == null);
+  const facturaBase  = Number(f0.monto_factura ?? f0.comision)||0;   // factura: neto · boleta: bruto
+  const desagregar   = sinFactura && !esBoleta;                      // comisión bruta → neto + IVA
+  const facturaNeto  = desagregar ? Math.round(facturaBase / (1 + pct0/100)) : facturaBase;
+  const facturaImp   = (f0.impuesto_monto != null) ? Number(f0.impuesto_monto)
+                     : desagregar ? (facturaBase - facturaNeto) : Math.round(facturaNeto*pct0/100);
   const facturaPagar = (f0.monto_liquido  != null) ? Number(f0.monto_liquido)  : (esBoleta ? (facturaNeto - facturaImp) : (facturaNeto + facturaImp));
   // Comisiones de las operaciones cargadas (de la carta) → son BRUTAS y deben sumar el bruto de la factura
   const facturaBruto = esBoleta ? facturaNeto : facturaPagar;   // factura: bruto = neto+IVA = líquido; boleta: bruto = base
