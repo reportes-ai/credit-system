@@ -116,11 +116,13 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
          AF_IMPUESTO. El gasto se reconoce al RECIBIR el documento (devengo) y el
          pago solo rebaja el pasivo. Con FACTURA el IVA es crédito fiscal; con
          BOLETA hay retención de honorarios que queda como pasivo con el SII
-         hasta declararla en el F29. */
+         hasta declararla en el F29.
+         Cuenta de pasivo: CONCESIONARIOS POR PAGAR (2102040), SIN año — las cuentas
+         "FACTURAS POR PAGAR ... 20XX" obligan a cambiar la regla cada enero. */
       ['COMISION_DEV_FACTURA', 'Comisión dealer devengada (factura)', 'Se dispara al registrar la FACTURA de comisión del dealer en Post Venta → Seguimiento. Campos: neto, iva, liquido (bruto a pagar).', 'TRASPASO', 1, [
         ['4001127', 'DEBE',  'neto',    'Comisión dealer (neto)'],
         ['1108010', 'DEBE',  'iva',     'IVA crédito fiscal'],
-        ['2102025', 'HABER', 'liquido', 'Facturas por pagar dealer'],
+        ['2102040', 'HABER', 'liquido', 'Concesionarios por pagar'],
       ]],
       ['COMISION_DEV_BOLETA', 'Comisión dealer devengada (boleta de honorarios)', 'Se dispara al registrar la BOLETA de honorarios de comisión en Post Venta → Seguimiento. Campos: honorario (bruto de la boleta), retencion, liquido (a depositar).', 'TRASPASO', 1, [
         ['4002081', 'DEBE',  'honorario', 'Honorarios por comisiones'],
@@ -128,7 +130,7 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['2102040', 'HABER', 'liquido',   'Concesionarios por pagar'],
       ]],
       ['COMISION_PAGADA_FACTURA', 'Comisión dealer pagada (factura)', 'Se dispara al marcar COMISION PAGADA en Post Venta cuando el documento es factura: rebaja el pasivo contra banco. Campos: liquido.', 'EGRESO', 1, [
-        ['2102025', 'DEBE',  'liquido', 'Pago comisión dealer'],
+        ['2102040', 'DEBE',  'liquido', 'Pago comisión dealer'],
         ['1101090', 'HABER', 'liquido', 'Salida de banco'],
       ]],
       ['COMISION_PAGADA_BOLETA', 'Comisión dealer pagada (boleta)', 'Se dispara al marcar COMISION PAGADA en Post Venta cuando el documento es boleta: rebaja el pasivo por el LÍQUIDO (la retención queda pendiente hasta el F29). Campos: liquido.', 'EGRESO', 1, [
