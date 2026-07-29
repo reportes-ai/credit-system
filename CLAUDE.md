@@ -141,6 +141,29 @@ Reglas de diseño que se derivan de este principio:
   cuando sea razonable, o al cierre de la sesión. Nunca dejarlo "para después".
 - El footer "Qué afecta este mantenedor" es la versión in-situ de esta máxima.
 
+### 4. Todo movimiento de dinero se contabiliza
+> **Cada ingreso y cada egreso que el sistema registra DEBE reflejarse en la
+> contabilidad**, automáticamente y por el motor único de centralización
+> (`services/contabilidad/src/motor-asientos.js` → `contabilizar()`), con su regla
+> paramétrica en el mantenedor **Reglas de Centralización**. Sin excepciones.
+
+- **El objetivo es reemplazar AVSOFT**: eso solo es posible si la contabilidad se
+  construye sola desde la operación. Un movimiento que no genera asiento obliga a
+  digitarlo aparte — y ahí volvimos al sistema anterior.
+- **Feature nuevo que mueve plata = regla contable en el MISMO commit.** Antes de
+  cerrar la funcionalidad preguntarse: *¿qué asiento genera esto y con qué cuentas?*
+  Si la respuesta es "ninguno", el feature está incompleto.
+- **Devengo y pago son dos hechos distintos**: el gasto/ingreso se reconoce cuando
+  nace la obligación (documento recibido, liquidación emitida) y el pago solo rebaja
+  el pasivo contra banco. No confundir uno con otro.
+- **Los impuestos son parte del asiento**: IVA crédito/débito fiscal y retenciones
+  van a su cuenta de pasivo o activo, para que el F29 salga del sistema y no a mano.
+- **Las cuentas de las reglas NUNCA llevan año** (`FACTURAS POR PAGAR 2025` ✗): la
+  separación por ejercicio la da el período contable, no cuentas distintas.
+- **La contabilidad nunca bloquea la operación**: el motor no lanza, registra el
+  resultado en `ctb_eventos_log` (CONTABILIZADO / SIN_REGLA / DESCUADRE / ERROR).
+  Ese log es la lista de pendientes: si algo aparece SIN_REGLA, falta cablearlo.
+
 ## Regla de Breadcrumbs (NO negociable — auditado 2026-07-29)
 1. **Toda página visible tiene miga completa**: `Inicio › [Sección] › Título`, con links
    en todos los niveles menos el último. Páginas nuevas usan el componente
