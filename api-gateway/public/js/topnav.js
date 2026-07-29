@@ -197,6 +197,27 @@
     }
   }
 
+  /* ── Miga dinámica para páginas con vistas/pestañas internas (SPA) ──────────
+     REGLA: si la página cambia de vista sin navegar, DEBE llamar esto al cambiar:
+       AF_TOPNAV_HOJA('Nombre de la vista')  → agrega "› Nombre" y deja la sección clickeable
+       AF_TOPNAV_HOJA(null)                  → vuelve a la miga original (vista home)
+     Así ninguna pantalla interna queda con el breadcrumb de la landing. */
+  window.AF_TOPNAV_HOJA = function (label, onVolver) {
+    var bc = document.querySelector('.topnav .breadcrumb-nav');
+    if (!bc) return;
+    if (!bc.dataset.original) bc.dataset.original = bc.innerHTML;   // respaldo de la miga base
+    if (!label) { bc.innerHTML = bc.dataset.original; return; }
+    bc.innerHTML = bc.dataset.original;
+    var cur = bc.querySelector('.cur');
+    if (cur) {                                   // la sección deja de ser "actual" y se vuelve link
+      var a = document.createElement('a');
+      a.href = '#'; a.innerHTML = cur.innerHTML;
+      a.onclick = function (ev) { ev.preventDefault(); if (onVolver) onVolver(); window.AF_TOPNAV_HOJA(null); };
+      cur.replaceWith(a);
+    }
+    bc.insertAdjacentHTML('beforeend', '<span class="sep">›</span><span class="cur">' + esc(label) + '</span>');
+  };
+
   // Logout estándar (si la página no define el suyo).
   window.afLogout = function () {
     try { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); } catch (_) {}

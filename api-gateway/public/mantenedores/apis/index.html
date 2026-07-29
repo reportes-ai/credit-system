@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — copiar instrucciones en formato HTML (pega con formato en Gmail/Outlook) -->
+<!-- v2.2 — miga sigue a la API abierta (AF_TOPNAV_HOJA) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -205,6 +205,7 @@ function verLanding() {
   document.getElementById('vLanding').style.display = '';
   document.getElementById('bTitulo').textContent = 'APIs — Acceso de Empresas Externas';
   document.getElementById('bSub').textContent = 'Una card por API publicada. Entra a la API para administrar sus llaves y copiar la documentación para enviar.';
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(null);
   cargarCatalogo();
 }
 
@@ -217,6 +218,7 @@ function verApi(codigo) {
   document.getElementById('bSub').textContent = API.descripcion || '';
   document.getElementById('tNombre').textContent = API.nombre;
   document.getElementById('tNombre2').textContent = API.nombre;
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(API.nombre, verLanding);
   const d = DOCS[codigo];
   document.getElementById('docBody').innerHTML = d ? d.html : '<p style="color:#94a3b8">Documentación pendiente para esta API.</p>';
   cargarLlaves();

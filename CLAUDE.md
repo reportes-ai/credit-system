@@ -141,6 +141,19 @@ Reglas de diseño que se derivan de este principio:
   cuando sea razonable, o al cierre de la sesión. Nunca dejarlo "para después".
 - El footer "Qué afecta este mantenedor" es la versión in-situ de esta máxima.
 
+## Regla de Breadcrumbs (NO negociable — auditado 2026-07-29)
+1. **Toda página visible tiene miga completa**: `Inicio › [Sección] › Título`, con links
+   en todos los niveles menos el último. Páginas nuevas usan el componente
+   (`window.AF_TOPNAV = { breadcrumb: [...] }` + `/js/topnav.js`), nunca navbar a mano.
+2. **Página con vistas/pestañas internas (SPA)**: al cambiar de vista SIEMPRE actualizar
+   la miga con `AF_TOPNAV_HOJA('Nombre de la vista')` (y `AF_TOPNAV_HOJA(null)` al volver
+   al home interno). Este fue el bug repetido en /aprobaciones y /mantenedores/apis:
+   la miga quedaba clavada en la landing. Páginas con navbar propia (no migradas):
+   replicar el mismo patrón a mano.
+3. **Checklist al crear/modificar una página**: ¿la miga refleja dónde estoy parado en
+   TODAS sus vistas? Si un usuario hace un pantallazo de cualquier vista, la miga debe
+   decir exactamente qué pantalla es.
+
 ## Reglas Anti-Hardcode (NO negociables)
 1. **Módulos y sub-items SIEMPRE desde BD** — nunca listas JS con rutas/íconos fijos
    - Módulos principales → tabla `modulos` (nombre, icono, ruta, orden)
