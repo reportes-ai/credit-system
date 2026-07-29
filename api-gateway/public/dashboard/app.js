@@ -2941,6 +2941,19 @@ function aplicarOrdenNavTabs() {
   });
 }
 
+/* Aviso visible cuando el perfil no tiene NINGUNA pestaña habilitada. */
+function avisarSinPestanas(perfil) {
+  if (document.getElementById('avisoSinTabs')) return;
+  var cont = document.querySelector('.tabs');
+  if (!cont) return;
+  var d = document.createElement('div');
+  d.id = 'avisoSinTabs';
+  d.style.cssText = 'flex:1;color:#fbbf24;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:8px;padding:0 10px';
+  d.innerHTML = '⚠️ El perfil <b>' + (perfil || '—') +
+    '</b> no está configurado en las pestañas del dashboard. Pídele al Administrador que lo agregue en Dashboard → Admin → Permisos de pestañas.';
+  cont.appendChild(d);
+}
+
 function aplicarPermisosNavTabs() {
   if (!sesionActual) return;
   const permisos = JSON.parse(sessionStorage.getItem('af_tab_permisos') || '{}');
@@ -2955,16 +2968,25 @@ function aplicarPermisosNavTabs() {
   }
   // Aplicar visibilidad
   const perfil = (sesionActual.perfil || '').toUpperCase();
+  const sinRestriccion = esAdminDash();   // quien administra las pestañas las ve todas
+  var visibles = 0;
   TABS_NAV.forEach(function(tab) {
     const el = document.querySelector('.tab[data-viewid="' + tab.id + '"]');
     if (!el) return;
     const permitidos = permisos[tab.id];
     // Mostrar si: sin restricción, array vacío, o el perfil está incluido (case-insensitive)
-    const visible = !permitidos || permitidos.length === 0 ||
+    const visible = sinRestriccion || !permitidos || permitidos.length === 0 ||
                     permitidos.some(function(p){ return p.toUpperCase() === perfil; });
     el.dataset.permHidden = visible ? '0' : '1';
     el.style.display = visible ? '' : 'none';
+    if (visible) visibles++;
   });
+  /* Cero pestañas = el perfil no está contemplado en la matriz, no es una decisión
+     de negocio. Pasa cuando se crea un perfil nuevo y nadie lo agrega a la config
+     (la matriz nació con 4 perfiles genéricos y hoy hay 19 reales). NO se abren
+     las pestañas por si acaso —varias muestran márgenes—, pero se avisa en vez de
+     dejar la pantalla muda pareciendo rota. */
+  if (!visibles) avisarSinPestanas(perfil);
   reflowTabs();
 }
 
