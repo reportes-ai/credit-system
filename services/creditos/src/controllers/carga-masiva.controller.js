@@ -7,6 +7,7 @@ const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
+const { desglosar } = require('../../../../api-gateway/public/js/desglose-impuesto'); // motor único: comisión BRUTA → neto + IVA
 const { parseMesTxt, finDeMes } = require('../../../../shared/utils/mes-excel'); // motor único parseo MES
 
 /* ── Lee un Excel acotando el rango real de datos ────────────────────────
@@ -273,6 +274,9 @@ async function marcarPostventaDesdeCarga(objs) {
   }
   const [segs] = await pool.query('SELECT id, num_op, rut_dealer, nombre_dealer FROM postventa_seguimiento WHERE num_op IN (?)', [ops]);
   const porOp = new Map(segs.map(s => [Number(s.num_op), s]));
+  // IVA desde el mantenedor Impuestos (paramétrico, nunca hardcodeado)
+  const [[_iva]] = await pool.query("SELECT porcentaje FROM impuestos WHERE codigo='IVA'").catch(() => [[null]]);
+  const IVA_PCT = _iva ? Number(_iva.porcentaje) : 19;
   let marcados = 0;
   const marcar = (idSeg, track, etapa, fecha) => pool.query(
     `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
@@ -286,12 +290,20 @@ async function marcarPostventaDesdeCarga(objs) {
       await marcar(seg.id, 'SALDO', 'SALDO PRECIO PAGADO', o.fecha_pago_sp || o._fecha_fundante);
     if (o._fecha_factura || o._nro_factura) {
       await marcar(seg.id, 'COMISION', 'FACTURA RECIBIDA', o._fecha_factura);
-      if (o._nro_factura) await pool.query(
-        `INSERT INTO postventa_facturas_comision (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, usuario)
-         SELECT ?,?,?,?,?,?,?, 'Carga Masiva' FROM DUAL
+      if (o._nro_factura) {
+        /* La comisión del dealer es BRUTA (IVA INCLUIDO): se guarda el desglose ya
+           desagregado (motor único) para que la orden de pago no tenga que adivinar
+           ni sume IVA sobre un monto que ya lo trae. base=neto, líquido=bruto. */
+        const dg = desglosar(o.comdea_real || 0, IVA_PCT, false);
+        await pool.query(
+        `INSERT INTO postventa_facturas_comision (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto, impuesto_pct, impuesto_monto, monto_liquido, es_boleta, usuario)
+         SELECT ?,?,?,?,?,?,?,?,?,?,0, 'Carga Masiva' FROM DUAL
          WHERE NOT EXISTS (SELECT 1 FROM postventa_facturas_comision WHERE id_seguimiento=?)`,
         [seg.id, o.num_op, seg.rut_dealer || o.rut_dealer || null, seg.nombre_dealer || o.automotora || null,
-         o._fecha_factura || null, o._nro_factura, o.comdea_real || null, seg.id]).catch(() => {});
+         o._fecha_factura || null, o._nro_factura,
+         o.comdea_real ? dg.base : null, o.comdea_real ? dg.pct : null,
+         o.comdea_real ? dg.impuesto : null, o.comdea_real ? dg.liquido : null, seg.id]).catch(() => {});
+      }
     }
     if (String(o.estado_pago_com || '').toUpperCase() === 'PAGADO' || o._fecha_pago_com)
       await marcar(seg.id, 'COMISION', 'COMISION PAGADA', o._fecha_pago_com || o._fecha_factura);

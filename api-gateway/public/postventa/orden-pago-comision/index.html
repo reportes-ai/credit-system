@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.6 — la comisión es BRUTA (IVA incluido): sin desglose capturado se DESAGREGA, nunca se le suma IVA encima -->
+  <!-- v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -100,6 +100,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="/js/desglose-impuesto.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
@@ -223,12 +224,11 @@ function docHTML(ops){
      el neto se DESAGREGA (bruto ÷ 1,19). Nunca se le suma IVA encima: eso inflaba
      la orden un 19% y disparaba un descuadre fantasma contra la cartola. */
   const sinDesglose  = (f0.impuesto_monto == null || f0.monto_liquido == null);
-  const facturaBase  = Number(f0.monto_factura ?? f0.comision)||0;   // factura: neto · boleta: bruto
-  const desagregar   = sinDesglose && !esBoleta;                     // comisión bruta → neto + IVA
-  const facturaNeto  = desagregar ? Math.round(facturaBase / (1 + pct0/100)) : facturaBase;
-  const facturaImp   = (f0.impuesto_monto != null) ? Number(f0.impuesto_monto)
-                     : desagregar ? (facturaBase - facturaNeto) : Math.round(facturaNeto*pct0/100);
-  const facturaPagar = (f0.monto_liquido  != null) ? Number(f0.monto_liquido)  : (esBoleta ? (facturaNeto - facturaImp) : (facturaNeto + facturaImp));
+  // Sin desglose capturado → se desagrega la comisión BRUTA con el motor único
+  const _dg = sinDesglose ? AF_IMPUESTO.desglosar(Number(f0.monto_factura ?? f0.comision)||0, pct0, esBoleta) : null;
+  const facturaNeto  = _dg ? _dg.base     : (Number(f0.monto_factura ?? f0.comision)||0);
+  const facturaImp   = _dg ? _dg.impuesto : Number(f0.impuesto_monto);
+  const facturaPagar = _dg ? _dg.liquido  : Number(f0.monto_liquido);
   // Comisiones de las operaciones cargadas (de la carta) → son BRUTAS y deben sumar el bruto de la factura
   const facturaBruto = esBoleta ? facturaNeto : facturaPagar;   // factura: bruto = neto+IVA = líquido; boleta: bruto = base
   const sumComision = ops.reduce((s,o)=>s+(Number(o.comision)||0),0);
