@@ -214,7 +214,53 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
      f.fecha_factura || null, f.numero_factura || null, _intOrNull(f.monto_bruto),
      f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0,
      (f.impuesto_pct != null && f.impuesto_pct !== '') ? Number(f.impuesto_pct) : null,
-     _intOrNull(f.impuesto_monto), _intOrNull(f.monto_liquido), usuario]);
+     _intOrNull(f.impuesto_monto), _intOrNull(f.monto_liquido), usuario])
+    .then(() => contabilizarComision(idSeguimiento, 'DEVENGO'));
+}
+
+/* ── Centralización contable de la comisión a dealer ──────────────────────────
+   DEVENGO: al registrar la factura/boleta se reconoce el GASTO y el pasivo
+     (con factura, el IVA como crédito fiscal; con boleta, la retención como
+      pasivo con el SII hasta declararla en el F29).
+   PAGO: solo rebaja el pasivo contra banco por el LÍQUIDO depositado.
+   Nunca bloquea la operación de negocio (el motor jamás lanza).
+   Las boletas además entran al auxiliar de honorarios → libro de honorarios y F29. */
+async function contabilizarComision(idSeguimiento, momento) {
+  try {
+    const [[d]] = await pool.query(
+      `SELECT s.num_op, fc.numero_factura, fc.fecha_factura, fc.es_boleta, fc.rut_dealer, fc.nombre_dealer,
+              fc.monto_bruto, fc.impuesto_pct, fc.impuesto_monto, fc.monto_liquido
+         FROM postventa_seguimiento s
+         JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+        WHERE s.id = ?`, [idSeguimiento]);
+    if (!d || d.monto_liquido == null) return;            // sin documento/desglose → nada que contabilizar
+    const fecha = (d.fecha_factura ? new Date(d.fecha_factura) : new Date()).toISOString().slice(0, 10);
+    const doc = d.es_boleta ? 'BOLETA' : 'FACTURA';
+    const evento = momento === 'DEVENGO' ? `COMISION_DEV_${doc}` : `COMISION_PAGADA_${doc}`;
+    const montos = d.es_boleta
+      ? { honorario: Number(d.monto_bruto) || 0, retencion: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 }
+      : { neto: Number(d.monto_bruto) || 0, iva: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 };
+    await require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento, fecha,
+      glosa: `Comisión OP ${d.num_op} — ${d.nombre_dealer || ''} ${doc.toLowerCase()} ${d.numero_factura || ''}`.slice(0, 300),
+      ref: `COM-${d.num_op}-${momento}`, montos, num_op: d.num_op || null, rut: d.rut_dealer || null,
+    });
+    // Boleta de honorarios → auxiliar (libro de honorarios y F29 de retenciones)
+    if (d.es_boleta && momento === 'DEVENGO' && d.rut_dealer && d.numero_factura) {
+      // La tabla no tiene UNIQUE(rut,num_boleta): se actualiza si ya está (reingreso de la boleta)
+      const [[ya]] = await pool.query(
+        'SELECT id FROM ctb_honorarios_aux WHERE rut=? AND num_boleta=? LIMIT 1', [d.rut_dealer, String(d.numero_factura)]);
+      const datos = [fecha.slice(0, 7), String(d.nombre_dealer || '').slice(0, 200), fecha,
+        `Comisión OP ${d.num_op}`.slice(0, 200), d.monto_bruto, d.impuesto_pct, d.impuesto_monto, d.monto_liquido];
+      if (ya) await pool.query(
+        `UPDATE ctb_honorarios_aux SET mes=?, nombre=?, fecha_emision=?, glosa=?, bruto=?, tasa_retencion=?, retencion=?, liquido=? WHERE id=?`,
+        [...datos, ya.id]).catch(() => {});
+      else await pool.query(
+        `INSERT INTO ctb_honorarios_aux (mes, nombre, fecha_emision, glosa, bruto, tasa_retencion, retencion, liquido, rut, num_boleta, origen)
+         VALUES (?,?,?,?,?,?,?,?,?,?, 'COMISION')`,
+        [...datos, d.rut_dealer, String(d.numero_factura)]).catch(() => {});
+    }
+  } catch (e) { console.error('[contabilizarComision]', e.message); }
 }
 
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
@@ -1230,6 +1276,7 @@ const pagarComisiones = async (req, res) => {
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });
+      await contabilizarComision(id, 'PAGO');   // rebaja el pasivo contra banco (líquido)
     }
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
