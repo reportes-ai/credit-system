@@ -401,7 +401,9 @@ const getAll = async (req, res) => {
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer)  AS nombre_dealer,
              COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer,
              fc.fecha_factura AS fac_fecha, fc.numero_factura AS fac_numero, fc.monto_bruto AS fac_monto,
-             fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta
+             fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta,
+             fc.impuesto_pct AS fac_imp_pct, fc.impuesto_monto AS fac_imp_monto,
+             fc.monto_liquido AS fac_liquido   -- lo que EFECTIVAMENTE se deposita
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
@@ -1108,7 +1110,15 @@ const getOrdenPagoComision = async (req, res) => {
 async function asegurarOrdenComision(id, reqUsuario) {
   const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
   if (ya && ya.num_orden) return ya.num_orden;
-  const [[seg]] = await pool.query('SELECT num_op, comision FROM postventa_seguimiento WHERE id=?', [id]);
+  /* Monto de la ODP = LÍQUIDO A DEPOSITAR del documento recibido, no la comisión bruta.
+     Factura → líquido = bruto (IVA incluido; el IVA es crédito fiscal de AutoFácil).
+     Boleta  → líquido = honorario − retención (el dealer la recupera al año siguiente).
+     Sin documento registrado, el líquido es la comisión (que ya es bruta). */
+  const [[seg]] = await pool.query(
+    `SELECT s.num_op, COALESCE(fc.monto_liquido, s.comision) AS comision
+       FROM postventa_seguimiento s
+       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      WHERE s.id=?`, [id]);
   if (!seg) return null;
   let poId = ya && ya.id;
   if (!poId) {

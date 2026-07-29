@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.5 — boleta: el honorario bruto es el NETO de la factura (IVA = crédito fiscal AF; la retención vuelve al dealer) -->
+  <!-- v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -648,11 +648,25 @@ function abrirEmitirODP(id, track){
   const esAutoFin = track === 'SALDO' && String(r.financiera||'').toUpperCase() === 'AUTOFIN';
   const insc = +FIJOS.autofin_inscripcion || 0, lim = +FIJOS.autofin_limitacion || 0;
   const base = track === 'SALDO' ? (+r.saldo_precio || 0) : (+r.comision || 0);
-  const monto = esAutoFin ? base + insc + lim : base;
-  const desgloseHTML = esAutoFin ? `
+  /* COMISIÓN: se paga el LÍQUIDO A DEPOSITAR del documento recibido, no la comisión bruta.
+     Con factura el líquido es el bruto (IVA incluido, crédito fiscal de AutoFácil);
+     con boleta es el honorario MENOS la retención (que el dealer recupera al año
+     siguiente). Sin documento registrado aún, el líquido es la comisión bruta. */
+  const esComision = track === 'COMISION';
+  const liquido = (esComision && r.fac_liquido != null) ? (+r.fac_liquido || 0) : base;
+  const monto = esAutoFin ? base + insc + lim : liquido;
+  let desgloseHTML = esAutoFin ? `
     <div class="em-row"><span>Saldo Precio</span><b>${fmtCLP(base)}</b></div>
     <div class="em-row"><span>Transferencia</span><b>${fmtCLP(insc)}</b></div>
     <div class="em-row"><span>Limitación de Dominio</span><b>${fmtCLP(lim)}</b></div>` : '';
+  if (esComision && r.fac_liquido != null && r.fac_imp_monto != null) {
+    const pct = Number(r.fac_imp_pct) || 0;
+    desgloseHTML += r.fac_boleta ? `
+      <div class="em-row"><span>Honorario bruto (boleta)</span><b>${fmtCLP(r.fac_monto)}</b></div>
+      <div class="em-row"><span>Retención honorarios (${pct}%)</span><b>− ${fmtCLP(r.fac_imp_monto)}</b></div>` : `
+      <div class="em-row"><span>Neto factura</span><b>${fmtCLP(r.fac_monto)}</b></div>
+      <div class="em-row"><span>IVA (${pct}%)</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
+  }
   document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
   document.getElementById('emBody').innerHTML = `
     <div class="em-row"><span>N° Operación</span><b>${escH(r.num_op||'')}</b></div>
@@ -660,7 +674,7 @@ function abrirEmitirODP(id, track){
     ${r.rut_dealer?`<div class="em-row"><span>RUT</span><b>${escH(r.rut_dealer)}</b></div>`:''}
     <div class="em-row"><span>Concepto</span><b>${tLabel} OP ${escH(r.num_op||'')}</b></div>
     ${desgloseHTML}
-    <div class="em-total"><span>Monto a pagar</span><b>${fmtCLP(monto)}</b></div>
+    <div class="em-total"><span>Monto a pagar${esComision && r.fac_boleta ? ' (líquido a depositar)' : ''}</span><b>${fmtCLP(monto)}</b></div>
     <p style="font-size:.78rem;color:#64748b;margin:12px 0 0">Al confirmar se <b>emite la Orden de Pago</b> (se asigna el N° ODP), queda registrada en <b>Órdenes de Pago</b> y disponible en <b>Saldos Precios a Pagar</b>.</p>`;
   const err = document.getElementById('emErr'); err.style.display = 'none';
   const btn = document.getElementById('emConfirmar'); btn.disabled = false; btn.textContent = '📄 Emitir Orden de Pago';
