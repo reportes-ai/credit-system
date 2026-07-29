@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<!-- v1.0 — presentación estilo Prezi de la Business Suite para las empresas del grupo -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoFácil Business Suite — Presentación</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --cyan:#009AFE; --gold:#f59e0b; --green:#16a34a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; overflow:hidden; background:radial-gradient(1200px 800px at 30% 20%, #0a3d8f 0%, #012d70 45%, #011a45 100%); font-family:'Segoe UI',system-ui,sans-serif; }
+
+  /* ── cámara ── */
+  #viewport { position:absolute; inset:0; perspective:1400px; }
+  #canvas { position:absolute; left:50%; top:50%; transform-origin:0 0; transition:transform 1.1s cubic-bezier(.5,.08,.28,1); will-change:transform; }
+
+  /* ── pasos ── */
+  .step { position:absolute; width:920px; color:#fff; }
+  .card { background:rgba(255,255,255,.055); border:1.5px solid rgba(255,255,255,.16); border-radius:26px; padding:46px 54px; backdrop-filter:blur(4px); box-shadow:0 30px 90px rgba(0,0,0,.35); }
+  .kicker { display:inline-flex; align-items:center; gap:10px; font-size:.95rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--cyan); margin-bottom:14px; }
+  .kicker .num { background:var(--cyan); color:#012d70; border-radius:10px; padding:2px 12px; font-size:1rem; }
+  h1 { font-size:3.6rem; line-height:1.08; font-weight:800; }
+  h2 { font-size:2.5rem; line-height:1.1; font-weight:800; margin-bottom:16px; }
+  .sub { font-size:1.18rem; color:rgba(255,255,255,.82); line-height:1.6; }
+  ul.fx { list-style:none; margin-top:22px; display:grid; gap:12px; }
+  ul.fx li { display:flex; gap:14px; align-items:flex-start; font-size:1.12rem; line-height:1.5; color:rgba(255,255,255,.92); }
+  ul.fx li i { color:var(--cyan); font-size:1.25rem; margin-top:2px; flex:0 0 auto; }
+  ul.fx li b { color:#fff; }
+  .cols2 { display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; }
+  .tagline { font-size:1.35rem; color:var(--gold); font-weight:700; margin-top:20px; font-style:italic; }
+  .bigicon { font-size:3.4rem; color:var(--cyan); margin-bottom:12px; display:block; }
+
+  /* ── HUD ── */
+  #hud { position:fixed; left:0; right:0; bottom:0; display:flex; align-items:center; gap:14px; padding:14px 22px; z-index:50; color:rgba(255,255,255,.65); font-size:.8rem; }
+  #barra { flex:1; height:4px; background:rgba(255,255,255,.15); border-radius:4px; overflow:hidden; }
+  #barra > div { height:100%; background:linear-gradient(90deg,var(--cyan),#7dd3fc); width:0; transition:width .5s; }
+  .hbtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:10px; padding:7px 14px; cursor:pointer; font-size:.85rem; font-weight:700; }
+  .hbtn:hover { background:rgba(255,255,255,.22); }
+  #logoHud { height:26px; filter:brightness(0) invert(1); opacity:.85; }
+  @media print { #hud { display:none; } }
+</style>
+</head>
+<body>
+<div id="viewport"><div id="canvas">
+
+  <!-- 0 PORTADA -->
+  <section class="step" data-x="0" data-y="0" data-s="1" data-r="0">
+    <div style="text-align:center">
+      <img src="/img/logo.png" style="height:74px;filter:brightness(0) invert(1);margin-bottom:26px">
+      <h1>Business Suite</h1>
+      <p class="sub" style="font-size:1.5rem;margin-top:14px">El sistema que corre AutoFácil <b>de punta a punta</b>:<br>del primer contacto con el cliente… hasta el balance.</p>
+      <p class="tagline">Construido en casa, a la medida del negocio.</p>
+      <p style="margin-top:34px;color:rgba(255,255,255,.5);font-size:.95rem"><i class="bi bi-arrow-right-circle"></i> avanza con → o con un click</p>
+    </div>
+  </section>
+
+  <!-- 1 EL VIAJE -->
+  <section class="step" data-x="1500" data-y="-260" data-s="1" data-r="4">
+    <div class="card">
+      <span class="kicker"><span class="num">1</span> El viaje completo</span>
+      <h2>Un solo sistema, todo el ciclo</h2>
+      <p class="sub">Cada peso y cada cliente viajan por la suite sin salir de ella:</p>
+      <ul class="fx">
+        <li><i class="bi bi-megaphone-fill"></i><b>Prospección</b> → campañas, dealers, terreno</li>
+        <li><i class="bi bi-whatsapp"></i><b>Autoatención</b> → WhatsApp, portal dealer, API pública</li>
+        <li><i class="bi bi-person-check-fill"></i><b>Evaluación y aprobación</b> → scorecard, cartas, analistas</li>
+        <li><i class="bi bi-cash-coin"></i><b>Curse y post venta</b> → saldos precio, comisiones, cartolas</li>
+        <li><i class="bi bi-bank"></i><b>Tesorería, cobranza y contabilidad</b> → hasta el F29</li>
+        <li><i class="bi bi-people-fill"></i><b>Las personas</b> → remuneraciones, bonos, academia</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2 PROSPECCION -->
+  <section class="step" data-x="3050" data-y="-700" data-s=".92" data-r="-3">
+    <div class="card">
+      <span class="kicker"><span class="num">2</span> Prospección</span>
+      <i class="bi bi-megaphone-fill bigicon"></i>
+      <h2>Salir a buscar la venta</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-telephone-outbound-fill"></i><b>CRM telefónico</b> con discador, rellamados y estadísticas por campaña</li>
+        <li><i class="bi bi-envelope-paper-fill"></i><b>Campañas masivas</b> por correo y WhatsApp, con grupos de control y conversión medida</li>
+        <li><i class="bi bi-geo-alt-fill"></i><b>Mapa de +880 dealers</b> georreferenciados y categorizados por potencial</li>
+        <li><i class="bi bi-calendar-week-fill"></i><b>Ruta AutoFácil</b>: planificación de visitas a terreno con check-in GPS desde el celular</li>
+      </ul>
+      <p class="tagline">La fuerza comercial sabe dónde ir, a quién llamar y qué resultó.</p>
+    </div>
+  </section>
+
+  <!-- 3 AUTOATENCION -->
+  <section class="step" data-x="4600" data-y="-300" data-s=".92" data-r="3">
+    <div class="card">
+      <span class="kicker"><span class="num">3</span> Autoatención</span>
+      <i class="bi bi-whatsapp bigicon" style="color:#25d366"></i>
+      <h2>El cliente parte solo — "Facilito"</h2>
+      <ul class="fx">
+        <li><i class="bi bi-robot"></i>Bot de WhatsApp propio: cotiza, <b>pre-aprueba en línea</b> con las políticas del negocio y deriva al ejecutivo con todo el contexto</li>
+        <li><i class="bi bi-shop"></i><b>Portal del Dealer</b>: el concesionario simula, pre-aprueba y hace seguimiento de sus operaciones solo</li>
+        <li><i class="bi bi-plug-fill"></i><b>API Pública</b>: otras empresas conectan nuestro simulador a sus sistemas con una llave</li>
+        <li><i class="bi bi-person-circle"></i><b>Portal del Cliente</b>: cada deudor ve sus créditos y cuotas con clave OTP</li>
+      </ul>
+      <p class="tagline">La venta avanza 24/7; el ejecutivo entra cuando ya hay interés real.</p>
+    </div>
+  </section>
+
+  <!-- 4 EVALUACION -->
+  <section class="step" data-x="6150" data-y="-750" data-s=".92" data-r="-2">
+    <div class="card">
+      <span class="kicker"><span class="num">4</span> Evaluación</span>
+      <i class="bi bi-clipboard2-check-fill bigicon"></i>
+      <h2>Decidir con datos, no con olfato</h2>
+      <ul class="fx">
+        <li><i class="bi bi-sliders"></i><b>Política de Crédito V3.0 paramétrica</b>: scorecard por quintiles que el negocio ajusta sin programadores</li>
+        <li><i class="bi bi-search"></i>Consulta automática a <b>DealerNet</b> (central de información por RUT)</li>
+        <li><i class="bi bi-stars"></i><b>IA que lee</b> informes crediticios y liquidaciones de sueldo, y resume lo que importa</li>
+        <li><i class="bi bi-signpost-split-fill"></i><b>¿Dónde Curso?</b>: app que le dice al ejecutivo en qué financiera conviene cursar cada crédito</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 5 CARTAS -->
+  <section class="step" data-x="7700" data-y="-350" data-s=".92" data-r="2">
+    <div class="card">
+      <span class="kicker"><span class="num">5</span> Aprobación</span>
+      <i class="bi bi-patch-check-fill bigicon"></i>
+      <h2>Cartas de aprobación sin papeles</h2>
+      <ul class="fx">
+        <li><i class="bi bi-file-earmark-arrow-up-fill"></i>El PDF de la financiera <b>se lee solo</b> (parser + IA): la carta se autocompleta</li>
+        <li><i class="bi bi-people-fill"></i><b>Pool de analistas</b> con alertas instantáneas, tiempos medidos y desempeño por analista</li>
+        <li><i class="bi bi-whatsapp"></i>Facilito hace <b>seguimiento automático</b> de cada carta con el dealer antes de que venza</li>
+        <li><i class="bi bi-graph-up-arrow"></i>Cada carta calcula su <b>rentabilidad</b> y avisa si la financiera elegida no es la que más conviene</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 6 CURSE -->
+  <section class="step" data-x="9250" data-y="-800" data-s=".92" data-r="-3">
+    <div class="card">
+      <span class="kicker"><span class="num">6</span> Curse</span>
+      <i class="bi bi-pen-fill bigicon"></i>
+      <h2>Del OK al crédito otorgado</h2>
+      <ul class="fx">
+        <li><i class="bi bi-keyboard-fill"></i>Digitación asistida y <b>carga masiva</b> desde los archivos de las financieras</li>
+        <li><i class="bi bi-folder-check"></i><b>Documentos fundantes</b> con seguimiento y validación por tipo</li>
+        <li><i class="bi bi-shield-lock-fill"></i><b>Firma electrónica simple</b> y certificados verificables con QR</li>
+        <li><i class="bi bi-snow"></i>Al otorgar, la operación queda <b>congelada e inmutable</b>: tabla de desarrollo, tasas y comisiones fijas para siempre</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 7 POST VENTA -->
+  <section class="step" data-x="10800" data-y="-380" data-s=".92" data-r="2">
+    <div class="card">
+      <span class="kicker"><span class="num">7</span> Post Venta</span>
+      <i class="bi bi-arrow-repeat bigicon"></i>
+      <h2>La trastienda del negocio, ordenada</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-cash-stack"></i><b>Saldos precio</b>: etapas, alertas y pago al dealer con orden de pago</li>
+        <li><i class="bi bi-percent"></i><b>Comisiones dealer y parques</b> calculadas por motor único — la carta manda</li>
+        <li><i class="bi bi-receipt"></i><b>Cartolas y facturación</b> cuadradas contra la factura del dealer</li>
+        <li><i class="bi bi-truck"></i>Seguimiento de cada operación con su <b>ID de financiera</b> y el nuestro</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 8 TESORERIA -->
+  <section class="step" data-x="12350" data-y="-820" data-s=".92" data-r="-2">
+    <div class="card">
+      <span class="kicker"><span class="num">8</span> Tesorería</span>
+      <i class="bi bi-bank2 bigicon"></i>
+      <h2>La plata, trazada peso a peso</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-inboxes-fill"></i><b>Caja</b>: pago de cuotas, prepagos y cierres diarios</li>
+        <li><i class="bi bi-file-earmark-text-fill"></i><b>Órdenes de pago</b> con correlativo único y firmas</li>
+        <li><i class="bi bi-arrow-left-right"></i><b>Conciliación bancaria</b> con matching automático</li>
+        <li><i class="bi bi-droplet-fill"></i><b>Aplicación de fondos</b> con workflow de firmas</li>
+        <li><i class="bi bi-cart-check-fill"></i><b>Venta de cartera</b> y castigos con doble firma gerencial</li>
+        <li><i class="bi bi-shield-fill-check"></i><b>Provisiones automáticas</b> al cierre de cada mes</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 9 COBRANZA -->
+  <section class="step" data-x="13900" data-y="-400" data-s=".92" data-r="3">
+    <div class="card">
+      <span class="kicker"><span class="num">9</span> Cobranza</span>
+      <i class="bi bi-telephone-inbound-fill bigicon"></i>
+      <h2>Cobrar sin perder al cliente</h2>
+      <ul class="fx">
+        <li><i class="bi bi-envelope-exclamation-fill"></i><b>Automatizaciones por tramo de mora</b>: correo y WhatsApp cumpliendo la Ley 21.320</li>
+        <li><i class="bi bi-calculator-fill"></i>Interés por mora y gastos con <b>motor único paramétrico</b> (TMC fija al otorgamiento)</li>
+        <li><i class="bi bi-briefcase-fill"></i><b>Cobranza judicial</b> con expedientes, demandas y estados</li>
+        <li><i class="bi bi-graph-down-arrow"></i><b>Score de mora</b> por segmento que retroalimenta la política de crédito</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 10 PERSONAS -->
+  <section class="step" data-x="15450" data-y="-850" data-s=".92" data-r="-3">
+    <div class="card">
+      <span class="kicker"><span class="num">10</span> Las personas</span>
+      <i class="bi bi-people-fill bigicon"></i>
+      <h2>Comisiones, sueldos y cultura</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-trophy-fill"></i><b>Comisiones de ejecutivos</b>: piso + incentivos + calidad, revisadas y aprobadas en línea</li>
+        <li><i class="bi bi-bullseye"></i><b>Bono del jefe comercial</b> por cuadro de mando con topes</li>
+        <li><i class="bi bi-cash"></i><b>Remuneraciones completas</b>: liquidaciones validadas al peso contra el sistema anterior</li>
+        <li><i class="bi bi-fingerprint"></i><b>Asistencia</b> conectada al reloj control (Workera)</li>
+        <li><i class="bi bi-mortarboard-fill"></i><b>Academia AutoFácil</b> + concurso de capacitación</li>
+        <li><i class="bi bi-chat-heart-fill"></i>Ficha del colaborador, vacaciones, compliance Ley Karin</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 11 CONTABILIDAD -->
+  <section class="step" data-x="17000" data-y="-430" data-s=".92" data-r="2">
+    <div class="card">
+      <span class="kicker"><span class="num">11</span> Contabilidad</span>
+      <i class="bi bi-journal-bookmark-fill bigicon"></i>
+      <h2>Todo termina en el balance — solo</h2>
+      <ul class="fx">
+        <li><i class="bi bi-magic"></i><b>Centralización automática</b>: cada operación del negocio genera su comprobante contable sin digitar</li>
+        <li><i class="bi bi-file-bar-graph-fill"></i><b>Estados financieros</b>, balance, libros y F29 borrador al día</li>
+        <li><i class="bi bi-cloud-arrow-down-fill"></i><b>Libro de compras oficial</b> sincronizado desde el SII</li>
+        <li><i class="bi bi-shield-check"></i><b>Guardián contable</b> + cierre mensual con checklist, candado y acta — reemplazo completo del software anterior</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 12 DIRECCION -->
+  <section class="step" data-x="18550" data-y="-880" data-s=".92" data-r="-2">
+    <div class="card">
+      <span class="kicker"><span class="num">12</span> Dirección</span>
+      <i class="bi bi-speedometer2 bigicon"></i>
+      <h2>Ver el negocio en vivo</h2>
+      <ul class="fx cols2">
+        <li><i class="bi bi-bar-chart-line-fill"></i><b>Dashboard</b> con colocaciones, rentabilidad y P&L por perfil</li>
+        <li><i class="bi bi-tv-fill"></i><b>Cuadro de mando TV</b> estilo NASA para la oficina</li>
+        <li><i class="bi bi-table"></i><b>Reportería a medida</b> + constructor visual de consultas</li>
+        <li><i class="bi bi-chat-dots-fill"></i><b>"Pregúntale a AutoFácil"</b>: preguntas en lenguaje natural respondidas por IA sobre los datos reales</li>
+      </ul>
+      <p class="tagline">La gerencia no pide informes: los mira.</p>
+    </div>
+  </section>
+
+  <!-- 13 FILOSOFIA -->
+  <section class="step" data-x="20100" data-y="-460" data-s=".95" data-r="0">
+    <div class="card">
+      <span class="kicker"><span class="num">13</span> Cómo está construido</span>
+      <h2>Tres principios, cero cajas negras</h2>
+      <ul class="fx">
+        <li><i class="bi bi-sliders"></i><b>Paramétrico</b>: tasas, políticas, estados, textos y flujos se cambian desde mantenedores — sin tocar código</li>
+        <li><i class="bi bi-cpu-fill"></i><b>Un solo motor por cálculo</b>: la cuota, la comisión o la mora se calculan en UN lugar y todos lo usan — nunca dos versiones del mismo número</li>
+        <li><i class="bi bi-database-fill-check"></i><b>Una sola fuente de datos</b>: cliente, dealer y operación viven una vez; todo lo demás los referencia</li>
+        <li><i class="bi bi-journal-text"></i>Y todo proceso <b>nace documentado</b>: manual de usuario, procesos y documentación técnica viven dentro del sistema</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 14 CIERRE -->
+  <section class="step" data-x="21700" data-y="-460" data-s="1.05" data-r="0">
+    <div style="text-align:center">
+      <img src="/img/logo.png" style="height:60px;filter:brightness(0) invert(1);margin-bottom:22px">
+      <h1 style="font-size:3rem">De la prospección al balance.<br>Un solo sistema. Hecho en casa.</h1>
+      <p class="sub" style="font-size:1.35rem;margin-top:18px">Core de crédito automotriz + ERP integrado,<br>construido por y para AutoFácil — y listo para crecer con el grupo.</p>
+      <p class="tagline" style="font-size:1.5rem;margin-top:26px">Conversemos qué puede hacer por tu empresa.</p>
+    </div>
+  </section>
+
+  <!-- VISTA GENERAL (última: el mapa completo) -->
+  <section class="step" data-x="10850" data-y="-560" data-s="9" data-r="0" data-overview style="width:10px;height:10px"></section>
+
+</div></div>
+
+<div id="hud">
+  <img id="logoHud" src="/img/logo.png">
+  <button class="hbtn" onclick="ir(-1)"><i class="bi bi-chevron-left"></i></button>
+  <button class="hbtn" onclick="ir(1)"><i class="bi bi-chevron-right"></i></button>
+  <div id="barra"><div></div></div>
+  <span id="cont"></span>
+  <button class="hbtn" onclick="fs()" title="Pantalla completa"><i class="bi bi-fullscreen"></i></button>
+</div>
+
+<script>
+/* Motor de zoom/paneo estilo Prezi: la "cámara" es un transform del lienzo que
+   lleva cada paso al centro, invirtiendo su posición, escala y rotación. */
+const pasos = [...document.querySelectorAll('.step')];
+const canvas = document.getElementById('canvas');
+let idx = 0;
+
+pasos.forEach(p => {
+  const x = +p.dataset.x, y = +p.dataset.y, s = +p.dataset.s || 1, r = +p.dataset.r || 0;
+  p.style.transform = `translate(-50%,-50%) translate(${x}px,${y}px) rotate(${r}deg) scale(${s})`;
+});
+
+function mostrar(i) {
+  idx = (i + pasos.length) % pasos.length;
+  const p = pasos[idx];
+  const x = +p.dataset.x, y = +p.dataset.y, s = +p.dataset.s || 1, r = +p.dataset.r || 0;
+  // Ajuste de escala para que el paso quepa en pantalla (base 1000px de ancho útil)
+  const fit = Math.min(innerWidth / 1050, innerHeight / 780);
+  const z = ('overview' in p.dataset) ? Math.min(innerWidth / 24000, innerHeight / 4200) : fit / s;
+  canvas.style.transform = `scale(${z}) rotate(${-r}deg) translate(${-x}px,${-y}px)`;
+  document.querySelector('#barra > div').style.width = ((idx) / (pasos.length - 1) * 100) + '%';
+  document.getElementById('cont').textContent = (idx + 1) + ' / ' + pasos.length;
+}
+function ir(d) { mostrar(idx + d); }
+function fs() { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }
+
+addEventListener('keydown', e => {
+  if (['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)) { e.preventDefault(); ir(1); }
+  if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)) { e.preventDefault(); ir(-1); }
+  if (e.key === 'Home') mostrar(0);
+  if (e.key === 'f' || e.key === 'F') fs();
+});
+addEventListener('click', e => { if (!e.target.closest('#hud')) ir(1); });
+addEventListener('resize', () => mostrar(idx));
+mostrar(0);
+</script>
+</body>
+</html>

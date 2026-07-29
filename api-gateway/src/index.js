@@ -403,6 +403,7 @@ const PAGINAS = [
   ['/recursos-humanos/concurso', 'concurso/index.html'],
   ['/recursos-humanos/contratos', 'recursos-humanos/contratos/index.html'],
   ['/simulador-rapido', 'simulador-rapido/index.html'],
+  ['/presentacion-grupo', 'presentacion-grupo/index.html'],
   ['/mantenedores/apis', 'mantenedores/apis/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
