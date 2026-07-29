@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.4 — fullwidth + ID financiera junto a la OP (visible y buscable) -->
+  <!-- v3.5 — boleta: el honorario bruto es el NETO de la factura (IVA = crédito fiscal AF; la retención vuelve al dealer) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -434,7 +434,22 @@ function fcToggleTerceros(){
   if (FC.terceros){ _fc('fcRut').value=''; _fc('fcNombre').value=''; _fc('fcRut').disabled=true; _fc('fcNombre').disabled=true; }
   else { _fc('fcRut').value=FC.rut; _fc('fcNombre').value=FC.nombre; _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; }
 }
-function fcToggleBoleta(){ FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta); fcBoletaInfo(); }
+function fcToggleBoleta(){
+  const eraBoleta = FC.boleta;
+  FC.boleta = !FC.boleta; _fcSetExc('fcBtnBoleta', FC.boleta);
+  /* Equivalencia de costo al cambiar de documento (regla de negocio):
+     FACTURA → el IVA es CRÉDITO FISCAL de AutoFácil (el dealer solo actúa de agente
+       retenedor), así que el costo real de la comisión es el NETO.
+     BOLETA  → no hay IVA que recuperar, y la retención se la devuelven al dealer
+       reajustada al año siguiente; por eso el HONORARIO BRUTO debe ser ese mismo NETO.
+     Entonces: el neto de la factura viaja al bruto de la boleta (y al revés). */
+  const neto  = parseInt(_fc('fcMonto').dataset.raw||'')||0;
+  const bruto = parseInt(_fc('fcBruto').dataset.raw||'')||0;
+  const set = (id,v) => { _fc(id).dataset.raw = v?String(v):''; _fc(id).value = v?'$'+v.toLocaleString('es-CL'):''; };
+  if (!eraBoleta && FC.boleta && neto)      { set('fcBruto', neto);  set('fcMonto', 0); fcLast = 'BRUTO'; }
+  else if (eraBoleta && !FC.boleta && bruto){ set('fcMonto', bruto); set('fcBruto', 0); fcLast = 'NETO'; }
+  fcBoletaInfo();
+}
 function fcBoletaInfo(){
   // Etiquetas dinámicas según documento (factura/boleta)
   const doc = FC.boleta ? 'Boleta' : 'Factura';
@@ -444,7 +459,8 @@ function fcBoletaInfo(){
   // Advertencia de certificación al cambiar a Boleta
   const warn = _fc('fcBoleta');
   warn.style.display = FC.boleta ? 'block' : 'none';
-  if (FC.boleta) warn.innerHTML = '⚠ Al cambiar a <b>Boleta</b> certificas que se autorizó la emisión de boleta de honorarios en vez de factura. Revisa el desglose y el monto líquido a depositar.';
+  if (FC.boleta) warn.innerHTML = '⚠ Al cambiar a <b>Boleta</b> certificas que se autorizó la emisión de boleta de honorarios en vez de factura. '
+    + 'El <b>honorario bruto es el neto de la factura</b>: con factura el IVA es crédito fiscal de AutoFácil, y con boleta la retención se la devuelven al dealer reajustada al año siguiente. Revisa el monto líquido a depositar.';
   fcCalc();   // recalcula montos + desglose (la relación impuesto cambia según factura/boleta)
 }
 // Calcula el campo no editado + el desglose, a partir de fcLast. bruto = neto + impuesto.

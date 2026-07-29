@@ -6,8 +6,15 @@
 
      Factura afecta (IVA):  neto = bruto / (1 + iva)   · impuesto = bruto − neto
                             a pagar (líquido) = bruto
-     Boleta de honorarios:  base = bruto              · retención = bruto × ret
-                            a pagar (líquido) = bruto − retención
+     Boleta de honorarios:  base = honorario bruto     · retención = base × ret
+                            a pagar (líquido) = base − retención
+
+   EQUIVALENCIA FACTURA ↔ BOLETA (regla de negocio): el costo real de AutoFácil es
+   SIEMPRE el NETO. Con factura el IVA es crédito fiscal (el dealer solo actúa de
+   agente retenedor); con boleta no hay IVA que recuperar y la retención se la
+   devuelven al dealer reajustada al año siguiente. Por eso, al emitir boleta, el
+   HONORARIO BRUTO que se pasa aquí es el NETO de la factura equivalente
+   (comisión ÷ (1 + iva)), nunca la comisión bruta.
 
    Isomorfo: se usa igual en el backend (require) y en el navegador (window).
    Consumidores: carga masiva (guarda el desglose), orden de pago de comisión,
