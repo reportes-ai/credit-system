@@ -464,13 +464,65 @@ const adminPedidos = async (req, res) => {
        WHERE p.estado=? ORDER BY p.fecha DESC LIMIT 500`, [estado]);
     if (peds.length) {
       const [its] = await pool.query(
-        'SELECT id_pedido, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
+        'SELECT id, id_pedido, sku, nombre, precio_unit, cantidad, subtotal FROM compras_pedido_items WHERE id_pedido IN (?)',
         [peds.map(p => p.id)]);
       const by = {};
       for (const it of its) (by[it.id_pedido] = by[it.id_pedido] || []).push(it);
       peds.forEach(p => { p.items = by[p.id] || []; });
     }
     res.json({ success: true, data: peds, error: null });
+  } catch (e) { err(res, e); }
+};
+
+/* Corrección de un pedido ANTES de consolidar: el administrador puede ajustar
+   cantidades o sacar productos (pedidos con ítems de más o equivocados). Solo
+   sobre pedidos PENDIENTES: los ya consolidados viven en su orden de compra. */
+async function _pedidoPendiente(idPedido) {
+  const [[p]] = await pool.query('SELECT id, estado FROM compras_pedidos WHERE id=?', [idPedido]);
+  if (!p) return { error: 'Pedido no existe' };
+  if (p.estado !== 'PENDIENTE') return { error: `El pedido está ${p.estado}: solo se corrigen pedidos pendientes.` };
+  return { p };
+}
+async function _recalcTotal(idPedido) {
+  await pool.query(
+    `UPDATE compras_pedidos p SET p.total =
+       (SELECT COALESCE(SUM(subtotal),0) FROM compras_pedido_items WHERE id_pedido=p.id)
+     WHERE p.id=?`, [idPedido]);
+}
+
+// PUT /api/compras/admin/pedidos/:id/items/:itemId { cantidad }
+const adminItemEditar = async (req, res) => {
+  try {
+    const chk = await _pedidoPendiente(req.params.id);
+    if (chk.error) return res.status(400).json({ success: false, data: null, error: chk.error });
+    const cant = parseInt(req.body.cantidad);
+    if (!(cant > 0)) return res.status(400).json({ success: false, data: null, error: 'Cantidad inválida (para sacar el producto usa eliminar)' });
+    const [r] = await pool.query(
+      'UPDATE compras_pedido_items SET cantidad=?, subtotal=ROUND(precio_unit*?) WHERE id=? AND id_pedido=?',
+      [cant, cant, req.params.itemId, req.params.id]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Ítem no encontrado' });
+    await _recalcTotal(req.params.id);
+    auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'pedido', entidad_id: String(req.params.id),
+      detalle: `Ajustó cantidad del ítem #${req.params.itemId} a ${cant} en el pedido #${req.params.id}` });
+    res.json({ success: true, data: { id: +req.params.itemId, cantidad: cant }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// DELETE /api/compras/admin/pedidos/:id/items/:itemId — si era el último ítem, el pedido se elimina
+const adminItemEliminar = async (req, res) => {
+  try {
+    const chk = await _pedidoPendiente(req.params.id);
+    if (chk.error) return res.status(400).json({ success: false, data: null, error: chk.error });
+    const [r] = await pool.query('DELETE FROM compras_pedido_items WHERE id=? AND id_pedido=?',
+      [req.params.itemId, req.params.id]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Ítem no encontrado' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM compras_pedido_items WHERE id_pedido=?', [req.params.id]);
+    let pedidoEliminado = false;
+    if (n === 0) { await pool.query('DELETE FROM compras_pedidos WHERE id=?', [req.params.id]); pedidoEliminado = true; }
+    else await _recalcTotal(req.params.id);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'compras', entidad: 'pedido', entidad_id: String(req.params.id),
+      detalle: `Eliminó el ítem #${req.params.itemId} del pedido #${req.params.id}${pedidoEliminado ? ' (quedó vacío y se eliminó el pedido)' : ''}` });
+    res.json({ success: true, data: { pedidoEliminado }, error: null });
   } catch (e) { err(res, e); }
 };
 
@@ -594,6 +646,6 @@ module.exports = {
   direccionesList, direccionCrear, direccionEditar, direccionEliminar,
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
-  adminPedidos, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
+  adminPedidos, adminItemEditar, adminItemEliminar, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
   reporteMensual,
 };

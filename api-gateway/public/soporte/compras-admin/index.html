@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <!-- v1.1 — click en el pedido: detalle con edicion de cantidades y eliminacion de productos -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -112,6 +113,18 @@
     </div>
   </div>
 
+  <dialog id="dlgPed" style="border:none;border-radius:14px;padding:0;width:640px;max-width:95vw">
+    <div style="padding:16px 20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h5 style="font-weight:700;margin:0" id="dlgPedTit">Pedido</h5>
+        <button class="btn btn-sm btn-light" onclick="document.getElementById('dlgPed').close()">✕</button>
+      </div>
+      <div id="dlgPedInfo" class="muted" style="font-size:.8rem;margin-bottom:10px"></div>
+      <div id="dlgPedBody"></div>
+      <div class="muted" style="font-size:.74rem;margin-top:8px">Los cambios quedan al tiro (solo pedidos pendientes; al consolidar el pedido se congela en su orden). Si sacas el último producto, el pedido completo se elimina.</div>
+    </div>
+  </dialog>
+
   <dialog id="dlgOrd" style="border:none;border-radius:14px;padding:0;width:680px;max-width:95vw">
     <div style="padding:20px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -155,7 +168,7 @@
       tb.innerHTML = peds.length ? peds.map(p => `
         <tr>
           <td><input type="checkbox" class="chkPed form-check-input" value="${p.id}"></td>
-          <td>#${p.id}</td>
+          <td><a href="javascript:void(0)" style="font-weight:700;text-decoration:none" onclick="verPedido(${p.id})">#${p.id}</a></td>
           <td>${new Date(p.fecha).toLocaleDateString('es-CL')}</td>
           <td>${esc(p.usuario_nombre||'')}</td>
           <td>${esc(p.direccion||'—')}${p.es_casa_matriz?' <span class="muted">(CM)</span>':''}</td>
@@ -164,6 +177,59 @@
           <td><span class="muted" title="${esc((p.items||[]).map(i=>i.cantidad+'× '+i.nombre).join(', '))}">${(p.items||[]).length} ítem(s)</span></td>
         </tr>`).join('') : '<tr><td colspan="8" class="text-center py-4 muted">No hay pedidos pendientes.</td></tr>';
     }
+    /* ── DETALLE DE UN PEDIDO (corregir antes de consolidar) ── */
+    let PED = null;
+    function verPedido(id){
+      PED = peds.find(p=>p.id===id); if(!PED) return;
+      document.getElementById('dlgPedTit').textContent = `Pedido #${PED.id}`;
+      document.getElementById('dlgPedInfo').innerHTML =
+        `${esc(PED.usuario_nombre||'')} · ${esc(PED.direccion||'—')}${PED.es_casa_matriz?' (CM)':''} · ${new Date(PED.fecha).toLocaleDateString('es-CL')}${PED.observacion?` · <i>${esc(PED.observacion)}</i>`:''}`;
+      pintarPed();
+      document.getElementById('dlgPed').showModal();
+    }
+    function pintarPed(){
+      const its = PED.items||[];
+      document.getElementById('dlgPedBody').innerHTML = `
+        <table class="table table-sm align-middle" style="font-size:.84rem">
+          <thead><tr><th>Producto</th><th class="text-end">Precio</th><th style="width:92px">Cant.</th><th class="text-end">Subtotal</th><th></th></tr></thead>
+          <tbody>${its.map(i=>`
+            <tr>
+              <td>${esc(i.nombre||'')}</td>
+              <td class="text-end">${fmt(i.precio_unit)}</td>
+              <td><input type="number" min="1" class="form-control form-control-sm" value="${i.cantidad}" style="width:78px"
+                    onchange="itemCant(${i.id}, this)"></td>
+              <td class="text-end">${fmt(i.subtotal)}</td>
+              <td><button class="btn btn-sm btn-outline-danger" title="Sacar del pedido" onclick="itemQuitar(${i.id})"><i class="bi bi-trash"></i></button></td>
+            </tr>`).join('')}
+          </tbody>
+          <tfoot><tr><th colspan="3" class="text-end">Total</th><th class="text-end">${fmt(PED.total)}</th><th></th></tr></tfoot>
+        </table>`;
+    }
+    async function itemCant(itemId, inp){
+      const cant = parseInt(inp.value);
+      if (!(cant>0)) { toast('Cantidad inválida', false); pintarPed(); return; }
+      const j = await api(`/api/compras/admin/pedidos/${PED.id}/items/${itemId}`, { method:'PUT', body: JSON.stringify({ cantidad: cant }) });
+      if (!j?.success) { toast(j?.error||'Error', false); pintarPed(); return; }
+      await cargarPed();                       // re-lee totales reales del server
+      PED = peds.find(p=>p.id===PED.id);
+      if (PED) pintarPed(); else document.getElementById('dlgPed').close();
+      toast('Cantidad actualizada');
+    }
+    async function itemQuitar(itemId){
+      const it = (PED.items||[]).find(i=>i.id===itemId);
+      const ultimo = (PED.items||[]).length === 1;
+      const aviso = ultimo ? '\n\nEs el último producto: el pedido completo se eliminará.' : '';
+      if (!confirm(`¿Sacar "${it?it.nombre:'este producto'}" del pedido #${PED.id}?${aviso}`)) return;
+      const j = await api(`/api/compras/admin/pedidos/${PED.id}/items/${itemId}`, { method:'DELETE' });
+      if (!j?.success) { toast(j?.error||'Error', false); return; }
+      const eliminado = j.data?.pedidoEliminado, pid = PED.id;
+      await cargarPed();
+      if (eliminado) { document.getElementById('dlgPed').close(); toast(`Pedido #${pid} eliminado (quedó vacío)`); PED=null; return; }
+      PED = peds.find(p=>p.id===pid);
+      if (PED) pintarPed();
+      toast('Producto eliminado');
+    }
+
     function toggleAll(on){ document.querySelectorAll('.chkPed').forEach(c=>c.checked=on); }
     function seleccionados(){ return [...document.querySelectorAll('.chkPed:checked')].map(c=>+c.value); }
     async function consolidar(modo) {
