@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.22 — bloqueo si el monto del credito viene bajo el saldo precio (el PDF traia la cuota) -->
+  <!-- v4.23 — autocompletado trae seguros y gastos aunque el PDF aplane etiquetas separadas de valores -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -392,6 +392,7 @@
       <div class="ff"><label>Prima Cesantía <span id="reqSeg3" style="color:#dc2626">*</span></label><input id="cSegCes" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
       <div class="ff"><label>Prima Rep. Menores <span id="reqSeg4" style="color:#dc2626">*</span></label><input id="cSegRep" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (0 si no aplica)"></div>
       <div class="ff"><label>GPS</label><input id="cGps" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (opcional)"></div>
+      <div class="ff"><label>Gastos <span style="font-weight:400;color:#94a3b8;font-size:.68rem">(inscripción, mantenciones, garantía)</span></label><input id="cGastos" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (opcional)"></div>
 
       <div class="sec-form">Parque y concesionario</div>
       <div class="ff fg-2" id="wrapParque"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
@@ -1817,7 +1818,7 @@ function limpiarForm(){
   montoCredManual = false;
   document.getElementById('tituloForm').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación';
   ['cTipo','cOpOrigen','cOpCarta','cEjecutivo','cEjMail','cEjTel','cRut','cNombres','cApPat','cApMat','cMarca','cModelo','cAnio','cPatente','cPrecio','cPie','cSaldo','cMontoCred','cMontoUF','cTasa','cTasaPizarra','cPlazo','cParque','cConc','cRutConc','cVendedor','cPartBruto','cPartPct','cPartNeto','cPartIVA',
-   'cSegDesg','cSegRdh','cSegCes','cSegRep','cGps']
+   'cSegDesg','cSegRdh','cSegCes','cSegRep','cGps','cGastos']
     .forEach(id => { const el=document.getElementById(id); if(!el) return; el.value=''; if(el.dataset) el.dataset.raw=0; el.style.borderColor=''; });
   document.getElementById('cFecha').value = new Date().toISOString().slice(0,10);
   document.getElementById('cPrenda').value = 'SI';
@@ -1927,6 +1928,7 @@ async function guardarCarta(){
     // primas y GPS desde el formulario (escaneadas o digitadas; null = sin digitar)
     segDesgravamen: moneyZ('cSegDesg'), segRdh: moneyZ('cSegRdh'),
     segCesantia: moneyZ('cSegCes'), segRep: moneyZ('cSegRep'), gps: moneyZ('cGps'),
+    gastos: moneyZ('cGastos'),
     id: editandoId || undefined,
     opCarta:  document.getElementById('cOpCarta').value,
     opOrigen: document.getElementById('cOpOrigen').value.trim(),
@@ -2165,6 +2167,7 @@ async function onAutofinDoc(input){
     // primas reales de la ficha AutoFin → a los campos del formulario (0 explícito válido)
     const f = j.data.fields || {};
     setMoneyZ('cSegDesg', f.segDesgravamen); setMoneyZ('cSegRdh', f.segRdh);
+    setMoneyZ('cGastos', f.gastos);
     setMoneyZ('cSegCes', f.segCesantia);     setMoneyZ('cSegRep', f.segRep);
     setMoneyZ('cGps', f.gps);
     const warn = (j.data.warnings||[]).join(' ');

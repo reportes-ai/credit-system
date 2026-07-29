@@ -67,7 +67,7 @@ async function crearCreditoDesdeCartas(c) {
        id_cliente, rut_dealer, vendedor,
        fecha_otorgado, mes, valor_vehiculo, pie, saldo_precio, pct_financiado,
        monto_financiado, plazo, tascli_real,
-       seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps,
+       seguro_rdh, seguro_cesantia, seguro_rep_menor, seguros, gps, gastos,
        tipo_vehiculo, marca, modelo, anio, patente,
        automotora, ejecutivo, comdea_real,
        created_at, updated_at)
@@ -76,7 +76,7 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             NULL, DATE_FORMAT(NOW(),'%Y-%m-01'), ?,?,?,?,
             ?,?,?,
-            ?,?,?,?,?,
+            ?,?,?,?,?,?,
             ?,?,?,?,?,
             ?,?,?,
             NOW(),NOW())
@@ -92,6 +92,7 @@ async function crearCreditoDesdeCartas(c) {
     (c.plazo || null),
     (c.tasa_credito || c.tasaCredito || null),
     segRdhTot, segCes, segRep, segTotal, (c.gps != null ? Number(c.gps) : null),
+    (c.gastos != null ? Number(c.gastos) : null),
     (c.tipo_vehiculo || c.tipoVehiculo || null),
     (c.marca || null), (c.modelo || null), (c.anio || null), (c.patente || null),
     (c.concesionario || null),
@@ -870,7 +871,7 @@ const upsert = async (req, res) => {
           ).catch(e => console.error('[carta→credito dealer]', e.message));
         }
         // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
-        if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined) {
+        if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined || c.gastos !== undefined) {
           const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
           const ces  = c.segCesantia != null ? Number(c.segCesantia) : null;
           const rep  = c.segRep != null ? Number(c.segRep) : null;
@@ -878,8 +879,9 @@ const upsert = async (req, res) => {
           pool.query(`UPDATE creditos SET
               seguro_rdh = COALESCE(?, seguro_rdh), seguro_cesantia = COALESCE(?, seguro_cesantia),
               seguro_rep_menor = COALESCE(?, seguro_rep_menor), seguros = COALESCE(?, seguros),
-              gps = COALESCE(?, gps), updated_at = NOW() WHERE id = ?`,
-            [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null), idCred]
+              gps = COALESCE(?, gps), gastos = COALESCE(?, gastos), updated_at = NOW() WHERE id = ?`,
+            [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null),
+             (c.gastos != null ? Number(c.gastos) : null), idCred]
           ).catch(e => console.error('[carta→credito primas]', e.message));
         }
         if (c.status === 'APROBADA') {
@@ -1192,11 +1194,29 @@ function parseCartaAutofin(t) {
   const segCesantia    = blk1 ? _numU(blk1[6]) : null;
   // Segundo bloque de valores (antes de "Nº Crédito"): RDH+E / Reparaciones Menores / GPS / …
   const blk2 = t.match(/\n([\d.]*)\n([\d.]*)\n([\d.]*)\n([\d.]*)\n([\d.]*)\nNº Crédito/);
-  const segRdh = blk2 ? _numU(blk2[1]) : null;
-  const segRep = blk2 ? _numU(blk2[2]) : null;
-  const gps    = blk2 ? _numU(blk2[3]) : null;
+  /* Fallback por ETIQUETA: en varios PDF el aplanado deja las etiquetas separadas
+     de los valores ("Seguro RDH+E:\nReparaciones Menores\n515.209\n0") y el
+     bloque posicional no calza. Se busca el primer número tras cada etiqueta,
+     saltando hasta 3 líneas de texto intermedias. */
+  const trasEtiqueta = (label, nth) => {
+    const m = t.match(new RegExp(label + ':?\\s*\\n(?:[^\\n\\d][^\\n]*\\n){0,3}?\\s*([\\d.]+)\\s*\\n\\s*([\\d.]+)?', 'i'));
+    return m ? _numU(m[nth || 1]) : null;
+  };
+  const segRdh = blk2 ? _numU(blk2[1]) : trasEtiqueta('Seguro RDH\\+E');
+  const segRep = blk2 ? _numU(blk2[2]) : trasEtiqueta('Seguro RDH\\+E', 2);
+  const gps    = blk2 ? _numU(blk2[3]) : trasEtiqueta('GPS');
+  /* GASTOS del PDF (fuera de las primas): inscripción + mantenciones prepagadas
+     + garantía mecánica + seguro pérdida total. Van a creditos.gastos. */
+  const _gastosDet = {
+    inscripcion:  trasEtiqueta('Inscripci[oó]n'),
+    mantenciones: trasEtiqueta('Mantenciones Prepagadas'),
+    garantia:     trasEtiqueta('Garant[ií]a Mec[aá]nica'),
+    perdidaTotal: trasEtiqueta('Seguro Perdida Total'),
+  };
+  const _gVals = Object.values(_gastosDet).filter(v => v != null);
+  const gastos = _gVals.length ? _gVals.reduce((a, b) => a + b, 0) : null;
   return {
-    segDesgravamen, segCesantia, segRdh, segRep, gps,
+    segDesgravamen, segCesantia, segRdh, segRep, gps, gastos, gastosDetalle: _gastosDet,
     opOrigen: nameOp ? nameOp[2] : null,
     fecha: fechaRaw ? fechaRaw.split('/').reverse().join('-') : null,
     rutCliente: g(/(\d{7,8}-[\dkK])/),
