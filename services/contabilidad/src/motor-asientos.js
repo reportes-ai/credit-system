@@ -53,6 +53,9 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
 
     // Reglas semilla con el plan REAL de AVSOFT (editable 100% en el mantenedor).
     // Nacen ACTIVAS: los comprobantes generados son visibles y anulables.
+    // Las cuentas de las reglas NUNCA llevan año: la separación por ejercicio la da
+    // el período contable, no cuentas distintas (las 'FACTURAS POR PAGAR 20XX' que
+    // venían de AVSOFT obligaban a reeditar la regla cada enero).
     const R = [
       ['PAGO_CAJA', 'Pago de cuotas en Caja', 'Se dispara al registrar un pago de cuotas en Caja. Campos: total (lo cobrado), cuota (capital+interés de cuotas), mora (interés de mora), gastos (gastos de cobranza).', 'INGRESO', 1, [
         ['1101090', 'DEBE', 'total', 'Recaudación caja'],
@@ -67,7 +70,7 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['3001020', 'HABER', 'gastos', 'Gastos de cobranza'],
       ]],
       ['ODP_PAGADA', 'Orden de Pago pagada', 'Se dispara al marcar PAGADA una Orden de Pago a proveedor. Campos: monto (total de la orden).', 'EGRESO', 1, [
-        ['2102022', 'DEBE', 'monto', 'Pago a proveedor'],
+        ['2102010', 'DEBE', 'monto', 'Pago a proveedor'],   // cuenta SIN año (ver nota abajo)
         ['1101090', 'HABER', 'monto', 'Salida de banco'],
       ]],
       ['ANTICIPO_PERSONAL', 'Anticipo de sueldo depositado', 'Se dispara al marcar PAGADA la ODP de un anticipo de sueldo (Solicitudes RRHH). Es cuenta por cobrar al personal, NO gasto. Campos: monto (anticipo).', 'EGRESO', 1, [
