@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<!-- v1.0 — mantenedor central: todos los workflows de la Suite + escalamiento paramétrico -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workflows y Escalamiento — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1200px; margin:0 auto; padding:26px 24px 70px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.88; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .mod-h { font-size:.78rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:var(--navy); margin:22px 0 10px; display:flex; align-items:center; gap:8px; }
+  .mod-h::after { content:''; flex:1; height:1.5px; background:#dbe3ee; }
+  .wf { background:#fff; border-radius:14px; padding:18px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:12px; }
+  .wf-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .wf-head h5 { margin:0; font-size:.98rem; font-weight:700; color:var(--navy); }
+  .badge-est { border-radius:14px; padding:3px 12px; font-size:.74rem; font-weight:800; }
+  .b-ok { background:#dcfce7; color:#166534; } .b-warn { background:#fee2e2; color:#b91c1c; }
+  .b-off { background:#f1f5f9; color:#94a3b8; } .b-info { background:#e0e7ff; color:#3730a3; }
+  .desc { font-size:.8rem; color:#64748b; margin:6px 0 10px; }
+  .pasos { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .paso { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; border-radius:8px; padding:4px 11px; font-size:.74rem; font-weight:600; }
+  .flecha { color:#94a3b8; font-size:.8rem; }
+  .wf-foot { display:flex; align-items:center; gap:14px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px; font-size:.8rem; }
+  .wf-foot input[type=number] { border:1.5px solid #d1d5db; border-radius:8px; padding:5px 9px; width:76px; font-size:.82rem; }
+  .sw { position:relative; width:40px; height:22px; }
+  .sw input { opacity:0; width:0; height:0; }
+  .sw span { position:absolute; inset:0; background:#cbd5e1; border-radius:22px; transition:.2s; cursor:pointer; }
+  .sw span::before { content:''; position:absolute; left:3px; top:3px; width:16px; height:16px; background:#fff; border-radius:50%; transition:.2s; }
+  .sw input:checked + span { background:var(--blue); }
+  .sw input:checked + span::before { transform:translateX(18px); }
+  .btnx { border:none; border-radius:9px; padding:7px 15px; font-size:.78rem; font-weight:700; cursor:pointer; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .lnk { font-size:.76rem; color:var(--blue); text-decoration:none; font-weight:600; }
+  .lnk:hover { text-decoration:underline; }
+  .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:24px; }
+  .afecta ul { margin:8px 0 0; padding-left:18px; }
+  .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:11px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:2000; display:none; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Mantenedores', href:'/mantenedores/' },
+  { label:'Workflows y Escalamiento', icon:'bi-diagram-3-fill', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-diagram-3-fill"></i><div>
+    <h2>Workflows y Escalamiento</h2>
+    <p>Todos los flujos de la Suite en un solo lugar: sus pasos, dónde se operan, y cuántas horas puede quedarse detenido un ítem antes de <b>re-alarmar con sonido</b>. Los destinatarios de cada alarma se definen en <a href="/mantenedores/avisos/" style="color:#fff;text-decoration:underline">Avisos</a>.</p>
+  </div></div>
+
+  <div id="lista"><p style="color:#94a3b8;text-align:center;padding:30px">Cargando…</p></div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Horas de escalamiento</b> → cuándo suena la campanita <i>"Escalamiento: …"</i> por ítems detenidos, en cada módulo de operación (Cartas, Fundantes, Post Venta, Órdenes de Pago). El motor revisa cada 30 minutos y no repite hasta cumplirse otro ciclo de horas.</li>
+      <li><b>Interruptor Activo</b> → apaga el escalamiento de ese workflow (el flujo sigue funcionando igual; solo deja de alarmar).</li>
+      <li><b>Destinatarios de cada alarma</b> → se configuran por perfil/persona en <a href="/mantenedores/avisos/">Avisos</a> (eventos <code>Escalamiento: …</code> del módulo Workflows).</li>
+      <li><b>La estructura de cada flujo NO se cambia aquí</b> → cada workflow se configura en su propio mantenedor (link "Configurar" de cada card). Compras tiene motor de recordatorios propio por nivel.</li>
+    </ul>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+if (!TOKEN()) location.href = '/login.html';
+const H = { Authorization: 'Bearer ' + TOKEN() };
+const HJ = { ...H, 'Content-Type': 'application/json' };
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtF = d => d ? new Date(d).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' }) : null;
+let WFS = [];
+
+function toast(m, ok = true) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.style.background = ok ? '#16a34a' : '#dc2626'; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2600);
+}
+
+async function cargar() {
+  const j = await fetch('/api/workflows', { headers: H }).then(r => r.json()).catch(() => null);
+  WFS = (j && j.success && j.data) || [];
+  const porMod = {};
+  WFS.forEach(w => (porMod[w.modulo] = porMod[w.modulo] || []).push(w));
+  document.getElementById('lista').innerHTML = Object.entries(porMod).map(([mod, ws]) => `
+    <div class="mod-h"><i class="bi bi-folder2-open"></i> ${esc(mod)}</div>
+    ${ws.map(w => {
+      const badge = !w.medible ? '<span class="badge-est b-info">Informativo</span>'
+        : !w.activo ? '<span class="badge-est b-off">Escalamiento apagado</span>'
+        : (w.estancados > 0 ? `<span class="badge-est b-warn">⏰ ${w.estancados} detenida${w.estancados==1?'':'s'} > ${w.recordatorio_horas} h</span>`
+                            : '<span class="badge-est b-ok">✓ Al día</span>');
+      return `<div class="wf">
+        <div class="wf-head">
+          <h5>${esc(w.nombre)}</h5>
+          ${badge}
+          <span style="margin-left:auto;display:flex;gap:14px">
+            <a class="lnk" href="${esc(w.operar)}"><i class="bi bi-box-arrow-up-right"></i> Operar</a>
+            ${w.configurar ? `<a class="lnk" href="${esc(w.configurar)}"><i class="bi bi-gear"></i> Configurar</a>` : ''}
+          </span>
+        </div>
+        <div class="desc">${esc(w.descripcion)}</div>
+        <div class="pasos">${w.pasos.map(p => `<span class="paso">${esc(p)}</span>`).join('<i class="bi bi-arrow-right flecha"></i>')}</div>
+        ${w.medible ? `<div class="wf-foot">
+          <label class="sw"><input type="checkbox" id="act_${w.codigo}" ${w.activo?'checked':''}><span></span></label>
+          <span><i class="bi bi-alarm" style="color:#b45309"></i> Escalar si un ítem lleva más de</span>
+          <input type="number" min="1" max="720" id="hrs_${w.codigo}" value="${w.recordatorio_horas || 24}">
+          <span>horas detenido</span>
+          <button class="btnx" onclick="guardar('${w.codigo}')"><i class="bi bi-save me-1"></i>Guardar</button>
+          ${w.ultima_alarma ? `<span style="color:#94a3b8;font-size:.72rem;margin-left:auto">última alarma: ${fmtF(w.ultima_alarma)}</span>` : ''}
+        </div>` : `<div class="wf-foot" style="color:#94a3b8">Sin métrica de escalamiento — este flujo se monitorea desde su módulo.</div>`}
+      </div>`;
+    }).join('')}`).join('');
+}
+
+async function guardar(codigo) {
+  const body = {
+    recordatorio_horas: parseInt(document.getElementById('hrs_' + codigo).value) || 0,
+    activo: document.getElementById('act_' + codigo).checked,
+  };
+  const j = await fetch('/api/workflows/' + codigo, { method:'PUT', headers: HJ, body: JSON.stringify(body) })
+    .then(r => r.json()).catch(() => null);
+  if (j && j.success) { toast('Escalamiento guardado'); cargar(); }
+  else toast((j && j.error) || 'Error al guardar', false);
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

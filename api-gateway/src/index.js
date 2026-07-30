@@ -243,6 +243,7 @@ app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/ro
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/terreno',              require('../../services/mantenedores/src/routes/visitas-terreno.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
+app.use('/api/workflows',          require('../../services/mantenedores/src/routes/workflows.routes'));
 app.use('/api/definiciones',       require('../../services/mantenedores/src/routes/definiciones.routes'));
 app.use('/api/feriados',           require('../../services/mantenedores/src/routes/feriados.routes'));
 app.use('/api/politica-aprobacion', require('../../services/mantenedores/src/routes/politica-aprobacion.routes'));
@@ -426,6 +427,7 @@ const PAGINAS = [
   ['/presentacion-grupo', 'presentacion-grupo/index.html'],
   ['/mantenedores/apis', 'mantenedores/apis/index.html'],
   ['/soporte/compras-revision', 'soporte/compras-revision/index.html'],
+  ['/mantenedores/workflows', 'mantenedores/workflows/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
