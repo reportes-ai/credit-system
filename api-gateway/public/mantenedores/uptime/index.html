@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!-- v1.0 — Uptime de Servicios: historia 90 días estilo status-page + latencia (evidencia para casa matriz) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uptime de Servicios — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1100px; margin:0 auto; padding:26px 24px 70px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.88; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .svc { background:#fff; border-radius:14px; padding:18px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+  .svc-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .svc-head h5 { margin:0; font-size:.98rem; font-weight:700; color:var(--navy); }
+  .pcts { margin-left:auto; display:flex; gap:16px; font-size:.78rem; color:#64748b; }
+  .pcts b { font-size:.95rem; display:block; text-align:center; }
+  .ok { color:#166534; } .warn { color:#b45309; } .bad { color:#b91c1c; } .nd { color:#94a3b8; }
+  .barras { display:flex; gap:2px; align-items:flex-end; height:36px; }
+  .barra { flex:1; min-width:3px; border-radius:2px; height:100%; background:#e2e8f0; position:relative; }
+  .barra.g { background:#22c55e; } .barra.a { background:#f59e0b; } .barra.r { background:#ef4444; }
+  .barra:hover::after { content:attr(data-tip); position:absolute; bottom:42px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; font-size:.68rem; padding:4px 8px; border-radius:6px; white-space:nowrap; z-index:10; }
+  .eje { display:flex; justify-content:space-between; font-size:.66rem; color:#94a3b8; margin-top:4px; }
+  .lat { font-size:.72rem; color:#94a3b8; margin-top:8px; }
+  .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:24px; }
+  .afecta ul { margin:8px 0 0; padding-left:18px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Mantenedores', href:'/mantenedores/' },
+  { label:'Uptime de Servicios', icon:'bi-activity', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-activity"></i><div>
+    <h2>Uptime de Servicios</h2>
+    <p>Disponibilidad histórica de cada servicio del que depende la Suite (checks automáticos cada 5 minutos, 90 días de historia). Cada barra es un día: verde ≥ 99,5% · ámbar ≥ 97% · rojo bajo 97% · gris sin datos.</p>
+  </div></div>
+
+  <div id="lista"><p style="color:#94a3b8;text-align:center;padding:30px">Cargando…</p></div>
+
+  <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
+    <ul>
+      <li><b>Solo lectura</b> → los datos los produce el motor <code>shared/uptime.js</code> (checks cada 5 min en <code>uptime_checks</code>); esta página es la evidencia histórica de disponibilidad, exportable con un pantallazo para la casa matriz.</li>
+      <li><b>Agregar/quitar un servicio monitoreado</b> → INSERT en la tabla <code>uptime_servicios</code> (codigo, nombre, tipo BD|HTTP, url) — sin tocar código.</li>
+      <li><b>Resumen semanal</b> → los mismos porcentajes llegan por correo en el <i>Informe de Salud del Sistema</i> (<a href="/mantenedores/correos-programados/">Correos Programados</a>); bajo 97% en 24 h se marca como alerta roja.</li>
+      <li><b>Aplicación (Render)</b> → se mide por omisión: los huecos sin checks son su downtime, por lo que el monitor no puede reportarse arriba estando caído.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+if (!TOKEN()) location.href = '/login.html';
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const nf = v => v == null ? '—' : Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const clase = v => v == null ? 'nd' : v >= 99.5 ? 'ok' : v >= 97 ? 'warn' : 'bad';
+const fD = s => { const [y,m,d] = s.split('-'); return `${d}-${m}-${y}`; };
+
+function barras(serie, dias) {
+  // Rellena los 90 días: los sin datos quedan grises (monitor aún no existía o app caída todo el día)
+  const por = Object.fromEntries(serie.map(x => [x.dia, x]));
+  const hoy = new Date(); const out = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(hoy); d.setDate(d.getDate() - i);
+    const k = d.toISOString().slice(0, 10);
+    const x = por[k];
+    if (!x) { out.push(`<div class="barra" data-tip="${fD(k)}: sin datos"></div>`); continue; }
+    const c = x.pct >= 99.5 ? 'g' : x.pct >= 97 ? 'a' : 'r';
+    out.push(`<div class="barra ${c}" data-tip="${fD(k)}: ${nf(x.pct)}%${x.ms != null ? ' · ' + x.ms + ' ms' : ''}"></div>`);
+  }
+  return out.join('');
+}
+
+function card(nombre, s, dias, extra) {
+  return `<div class="svc">
+    <div class="svc-head">
+      <h5><i class="bi bi-hdd-network" style="color:var(--blue)"></i> ${esc(nombre)}</h5>
+      ${extra || ''}
+      <span class="pcts">
+        <span><b class="${clase(s.p24)}">${nf(s.p24)}%</b>24 h</span>
+        <span><b class="${clase(s.p7)}">${nf(s.p7)}%</b>7 días</span>
+        <span><b class="${clase(s.p30)}">${nf(s.p30)}%</b>30 días</span>
+        <span><b class="${clase(s.p90)}">${nf(s.p90)}%</b>90 días</span>
+      </span>
+    </div>
+    <div class="barras">${barras(s.serie || [], dias)}</div>
+    <div class="eje"><span>hace ${dias} días</span><span>hoy</span></div>
+    ${s.ms24 != null || s.ultima_falla ? `<div class="lat">${s.ms24 != null ? `latencia media 24 h: <b>${s.ms24} ms</b>` : ''}${s.ultima_falla ? ` · última falla: ${new Date(s.ultima_falla).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' })}` : ''}</div>` : ''}
+  </div>`;
+}
+
+async function cargar() {
+  const j = await fetch('/api/uptime/historia', { headers: { Authorization: 'Bearer ' + TOKEN() } }).then(r => r.json()).catch(() => null);
+  if (!j || !j.success) { document.getElementById('lista').innerHTML = '<p style="color:#b91c1c;text-align:center">' + esc((j && j.error) || 'Error al cargar') + '</p>'; return; }
+  const d = j.data;
+  const app = { p24: null, p7: null, p30: d.app.p30, p90: d.app.p30, serie: d.app.serie };
+  document.getElementById('lista').innerHTML =
+    card(d.app.nombre, { ...app, p90: null }, d.dias,
+      '<span style="font-size:.7rem;color:#94a3b8">(medida por omisión de checks: sin registro = caída)</span>')
+    + d.servicios.map(s => card(s.nombre, s, d.dias)).join('');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
