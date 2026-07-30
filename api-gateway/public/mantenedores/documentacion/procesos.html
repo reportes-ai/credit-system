@@ -65,6 +65,9 @@
     <a href="#p24">24. Asistencia y jornada (Workera)</a>
     <a href="#p25">25. Test de Kuder (intereses vocacionales)</a>
     <a href="#p26">26. ¿Dónde curso? — elección de financiera</a>
+    <a href="#p27">27. Compras internas con workflow de aprobación</a>
+    <a href="#p28">28. Workflows y Escalamiento (transversal)</a>
+    <a href="#p29">29. API Pública para empresas externas</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -110,6 +113,8 @@
   <div class="flujo"><span class="st ini">A PAGAR</span><span class="ar">→</span><span class="st">CARTOLA ENVIADA</span><span class="ar">→</span><span class="st">FACTURA CUADRADA</span><span class="ar">→</span><span class="st">ODP</span><span class="ar">→</span><span class="st fin">PAGADA</span></div>
   <div class="afecta"><b>Afecta:</b> Plan Liquidez (§11), Contabilidad (asiento automático al pagar), Cierre de Mes (punto Cartolas). <b>Depende de:</b> originación (§1), motor único de comisión del dealer.</div>
 
+  <div class="afecta" style="border-left-color:#16a34a"><b>Reglas de dinero (v160–v161):</b> la comisión calculada es <b>BRUTA (IVA incluido)</b> y se desagrega con el motor único AF_IMPUESTO — nunca se le suma IVA encima. Con <b>factura</b>, la ODP paga el bruto (el IVA es crédito fiscal de AutoFácil); con <b>boleta de honorarios</b>, el honorario bruto es el NETO de la factura equivalente y la ODP paga el <b>líquido</b> (honorario − retención; la retención queda como pasivo con el SII y se declara en el F29 — la boleta entra sola al auxiliar de honorarios). Todo se <b>contabiliza automático</b>: devengo al registrar el documento y pago al marcar COMISIÓN PAGADA (reglas COMISION_DEV/PAGADA en Reglas de Centralización). El <b>ingreso</b> del negocio también: al solicitar la facturación en Facturación AutoFácil se devenga la comisión por cobrar (neto + IVA débito fiscal).</div>
+
   <h2 id="p4">4. Pago de saldos precio</h2>
   <p><b>Qué y para qué:</b> pagarle al dealer el saldo del precio del vehículo una vez recibidos los fondos de la financiera.</p>
   <div class="meta">
@@ -122,6 +127,8 @@
   </ol>
   <div class="flujo"><span class="st ini">SALDO PENDIENTE</span><span class="ar">→</span><span class="st">EN NÓMINA</span><span class="ar">→</span><span class="st">ORDEN EMITIDA</span><span class="ar">→</span><span class="st fin">PAGADO</span></div>
   <div class="afecta"><b>Afecta:</b> etapas Post Venta, flujo de caja, Contabilidad. <b>Depende de:</b> fundantes (§2).</div>
+
+  <div class="afecta" style="border-left-color:#16a34a"><b>Regla contable (v161):</b> el saldo precio es una <b>CUENTA DE PASO</b> — AutoFácil es intermediario: la financiera transfiere y se entrega íntegro al dealer. Al marcar FONDOS RECIBIDOS entra banco contra el pasivo transitorio (2102045) y al marcar SALDO PRECIO PAGADO se rebaja contra banco. <b>No toca el resultado</b>: no infla ingresos ni gastos, y el saldo de la cuenta muestra cuánta plata de dealers hay en tránsito.</div>
 
   <h2 id="p5">5. Recaudación: pago de cuotas</h2>
   <p><b>Qué y para qué:</b> cobrar la cartera propia — cada peso que entra queda registrado, timbrado y contabilizado una sola vez.</p>
@@ -485,5 +492,52 @@
 </div>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
+
+  <h2 id="p27">27. Compras internas con workflow de aprobación</h2>
+  <p><b>Qué y para qué:</b> pedir artículos de oficina y que la compra consolidada pase por firmas antes de gastarse un peso — control del gasto sin frenar la operación.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Cualquier colaborador pide (catálogo curado por perfil) · el admin de Compras consolida · firman los niveles del workflow (seed: 1 Asistente Administrativo, 2 Gerente General; nivel 3 opcional) · los firmantes operan en <b>Revisión de Órdenes de Compra</b> (Soporte).</div>
+    <div><b class="lbl">Prerequisitos</b>Catálogo sincronizado (Dimeiggs) · niveles del workflow configurados (mantenedor Compras → Workflow) · direcciones de despacho.</div>
+  </div>
+  <ol>
+    <li><b>Pedir</b> (Soporte → Compras): carrito con los artículos del perfil, dirección de despacho y centro de costo → pedido PENDIENTE.</li>
+    <li><b>Consolidar</b> (Administrar Compras): el admin junta pedidos en una orden (a Casa Matriz o por sucursal). La orden entra <b>EN APROBACIÓN</b> al primer nivel activo y suena la campana al firmante.</li>
+    <li><b>Firmar</b> (Revisión de Órdenes de Compra): el firmante ve las órdenes que esperan SU firma con el camino del workflow, el consolidado y el detalle por sucursal con N° de pedido. <b>Aprobar</b> pasa al siguiente nivel; <b>Rechazar exige comentario</b> (validado también en el servidor) y devuelve los pedidos al pool para corregir y reconsolidar.</li>
+    <li><b>Recordatorios</b>: cada nivel tiene sus horas (mantenedor Compras → Workflow, default 24, 0 = sin recordatorio); pasadas, re-suena la campana al firmante cada ciclo hasta que firme.</li>
+    <li><b>Comprar</b>: aprobada por todos los niveles la orden queda ABIERTA (lista para comprar); estados COMPRADA/RECIBIDA se propagan a los pedidos. El reporte mensual muestra el gasto por sucursal.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">PEDIDO</span><span class="ar">→</span><span class="st">CONSOLIDADA</span><span class="ar">→</span><span class="st">EN APROBACIÓN (niveles 1-3)</span><span class="ar">→</span><span class="st fin">ABIERTA → COMPRADA → RECIBIDA</span><span class="ar">/</span><span class="st mal">RECHAZADA (vuelve al pool)</span></div>
+  <div class="afecta"><b>Afecta:</b> gasto por sucursal, alarmas de Avisos (por firmar / aprobada / rechazada / recordatorio). <b>Depende de:</b> catálogo, niveles del workflow, matriz de permisos.</div>
+
+  <h2 id="p28">28. Workflows y Escalamiento (transversal)</h2>
+  <p><b>Qué y para qué:</b> que ningún ítem de ningún flujo se quede dormido en un escritorio. Un mantenedor central muestra todos los workflows de la Suite y define cuánto pueden esperar antes de alarmar — y a quién se sube si nadie resuelve.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Administrador / gerencias configuran (Mantenedores → Workflows y Escalamiento) · las alarmas llegan a los responsables del paso, a los suscritos de Avisos y, escalado, a los jefes directos.</div>
+    <div><b class="lbl">Prerequisitos</b>Jefe directo (supervisor) asignado en Usuarios — la misma fuente que aprueba vacaciones.</div>
+  </div>
+  <ol>
+    <li><b>Quiénes por paso</b>: click en cualquier paso del flujo → casillas por cargo + excepciones por persona (según cargo / SÍ forzar / NO bloquear). Edita la <b>misma matriz</b> de Perfiles y Permisos: define quién digita, quién conforma el pool de analistas, quién valida, quién paga. Aplica en ~1 minuto.</li>
+    <li><b>Escalamiento por horas</b>: cada workflow medible tiene su umbral ("escalar si un ítem lleva más de N horas detenido"). El motor revisa cada 30 minutos y suena la campanita "Escalamiento: …" con link directo a resolver; no repite hasta otro ciclo completo.</li>
+    <li><b>Escalamiento a jefatura</b>: tras N avisos seguidos sin resolverse (paramétrico, 0 = nunca), la alarma sube al <b>jefe directo</b> de quienes pueden destrancar el paso ("🚨 ESCALADO A JEFATURA"), y re-escala cada N ciclos. El contador se reinicia solo al destrancarse.</li>
+    <li><b>Destinatarios</b>: los eventos "Escalamiento: …" y "Escalado a Jefatura" se configuran por perfil/persona en el mantenedor Avisos.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">RESPONSABLE DEL PASO</span><span class="ar">→</span><span class="st">RECORDATORIO cada N horas</span><span class="ar">→</span><span class="st mal">JEFE DIRECTO tras N ciclos</span></div>
+  <div class="afecta"><b>Afecta:</b> Cartas (pool), Fundantes, Post Venta (facturas, ODP y pagos de comisión y saldo precio), Órdenes de Pago, Compras (monitoreo; su recordatorio por nivel es propio). <b>Depende de:</b> matriz de permisos, supervisor en Usuarios, mantenedor Avisos.</div>
+
+  <h2 id="p29">29. API Pública para empresas externas</h2>
+  <p><b>Qué y para qué:</b> que otras empresas conecten sus sistemas a servicios de AutoFácil (hoy: el Simulador Rápido) con una llave propia, sin acceso a nada más.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Administrador / gerencias crean y administran llaves (Mantenedores → APIs) · la empresa externa consume desde su servidor.</div>
+    <div><b class="lbl">Prerequisitos</b>Ninguno; el cálculo usa el motor único del Simulador Rápido (Tasas, Parámetros y Factores de Seguros vigentes).</div>
+  </div>
+  <ol>
+    <li><b>Crear la llave</b> (Mantenedores → APIs → card de la API → Crear llave): empresa, contacto y correo → API Key <code>afk_…</code>. La llave sirve SOLO para esa API.</li>
+    <li><b>Enviar las instrucciones</b>: botón "Copiar instrucciones para enviar" — queda en el portapapeles el correo formateado (endpoint, header X-API-Key, ejemplo, límites).</li>
+    <li><b>Operar</b>: la card muestra llamadas acumuladas y último uso por empresa. <b>Desactivar</b> corta el acceso al instante; <b>Regenerar</b> invalida la llave anterior.</li>
+    <li><b>Límites</b>: 60 consultas/minuto; la respuesta entrega solo información de cotización (cuota, CAE, tasa, monto financiado) — nada interno.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">LLAVE CREADA</span><span class="ar">→</span><span class="st">EMPRESA CONSUME (X-API-Key)</span><span class="ar">→</span><span class="st fin">USO MONITOREADO</span><span class="ar">/</span><span class="st mal">DESACTIVADA</span></div>
+  <div class="afecta"><b>Afecta:</b> nada interno (solo lectura del simulador). <b>Depende de:</b> mantenedores Tasas / Parámetros de Crédito / Factores de Seguros (los cambios se reflejan al instante en la API).</div>
+
 </body>
 </html>
