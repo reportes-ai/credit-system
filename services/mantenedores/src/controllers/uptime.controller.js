@@ -24,16 +24,28 @@ require('../../../../shared/migrate').enFila('uptime-card', async () => {
       f = { id_funcionalidad: r.insertId };
     }
     await pool.query("UPDATE funcionalidades SET nombre='Salud y Uptime' WHERE codigo='uptime_mant' AND nombre<>'Salud y Uptime'");
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                      SELECT p.id_perfil, ?, 1 FROM perfiles p
+                      WHERE (p.nombre = 'Administrador' OR p.nombre LIKE 'Gerente%' OR p.nombre LIKE 'Director%')
+                        AND NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                     [f.id_funcionalidad, f.id_funcionalidad]);
+  } catch (e) { console.error('[uptime card migration]', e.message); }
+});
 
-    // Gastos mensuales por servicio (paramétrico; NO inventar montos: lo no medido nace NULL "por confirmar")
+/* Gastos mensuales por servicio — bloque propio para que un tropiezo en la card
+   no impida crear la tabla (paramétrico; NO inventar montos: lo no medido nace NULL) */
+require('../../../../shared/migrate').enFila('servicios-costos', async () => {
+  try {
     await pool.query(`CREATE TABLE IF NOT EXISTS servicios_costos (
       codigo VARCHAR(30) PRIMARY KEY,
       nombre VARCHAR(120) NOT NULL,
       costo_mensual DECIMAL(12,2) NULL,
       moneda VARCHAR(5) NOT NULL DEFAULT 'USD',
-      variable TINYINT NOT NULL DEFAULT 0,          -- 1 = depende del uso (IA, WhatsApp)
+      es_variable TINYINT NOT NULL DEFAULT 0,       -- 1 = depende del uso (IA, WhatsApp)
       nota VARCHAR(300) NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+    // Si la tabla nació en v163.9 con la columna `variable`, homologar ANTES del seed
+    await pool.query('ALTER TABLE servicios_costos RENAME COLUMN variable TO es_variable').catch(() => {});
     const COSTOS_SEED = [
       // [codigo, nombre, costo, moneda, variable, nota]  — solo montos ya medidos; el resto por confirmar en su panel
       ['render',    'Render (hosting de la app)',            null, 'USD', 0, 'Confirmar plan en dashboard.render.com'],
@@ -49,13 +61,8 @@ require('../../../../shared/migrate').enFila('uptime-card', async () => {
       ['dominio',   'Dominio NIC Chile',                     null, 'CLP', 0, 'Renovación anual; prorratear mensual'],
     ];
     for (const c of COSTOS_SEED)
-      await pool.query('INSERT IGNORE INTO servicios_costos (codigo, nombre, costo_mensual, moneda, variable, nota) VALUES (?,?,?,?,?,?)', c);
-    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
-                      SELECT p.id_perfil, ?, 1 FROM perfiles p
-                      WHERE (p.nombre = 'Administrador' OR p.nombre LIKE 'Gerente%' OR p.nombre LIKE 'Director%')
-                        AND NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
-                     [f.id_funcionalidad, f.id_funcionalidad]);
-  } catch (e) { console.error('[uptime card migration]', e.message); }
+      await pool.query('INSERT IGNORE INTO servicios_costos (codigo, nombre, costo_mensual, moneda, es_variable, nota) VALUES (?,?,?,?,?,?)', c);
+  } catch (e) { console.error('[servicios_costos migration]', e.message); }
 });
 
 /* GET /api/uptime/historia → resumen por servicio + serie diaria (90 días) */
