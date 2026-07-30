@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — tolerante al arranque: si las migraciones aún corren tras un deploy, muestra "preparando" en vez de 500 (evita el correo de alerta) -->
+<!-- v1.6 — cada servicio explicado en lenguaje de negocio: qué hace y qué pasa si se cae (columnas que_hace/si_falla) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,7 +34,9 @@
   .chk b { display:block; color:var(--navy); font-size:.82rem; }
   .chk span { color:#64748b; font-size:.75rem; }
   .costos { width:100%; border-collapse:collapse; font-size:.82rem; }
-  .costos td { padding:8px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .costos td { padding:10px 8px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  .que-hace { color:#475569; font-size:.75rem; line-height:1.45; margin-top:4px; font-weight:400; }
+  .si-falla { color:#92400e; background:#fffbeb; border-radius:6px; padding:4px 8px; font-size:.72rem; line-height:1.4; margin-top:5px; }
   .costos input[type=number] { border:1.5px solid #d1d5db; border-radius:7px; padding:4px 8px; width:110px; font-size:.8rem; text-align:right; }
   .costos input[type=text] { border:1.5px solid #e2e8f0; border-radius:7px; padding:4px 8px; width:100%; font-size:.76rem; color:#64748b; }
   .costos select { border:1.5px solid #d1d5db; border-radius:7px; padding:4px 4px; font-size:.78rem; }
@@ -79,6 +81,7 @@
       <li><b>Resumen semanal</b> → los mismos porcentajes llegan por correo en el <i>Informe de Salud del Sistema</i> (<a href="/mantenedores/correos-programados/">Correos Programados</a>); bajo 97% en 24 h se marca como alerta roja.</li>
       <li><b>Aplicación (Render)</b> → se mide por omisión: los huecos sin checks son su downtime, por lo que el monitor no puede reportarse arriba estando caído.</li>
       <li><b>Gastos mensuales</b> → tabla <code>servicios_costos</code> editable acá (auditado). El gasto de <b>Claude/IA se calcula en vivo</b> desde <code>ia_uso</code>; los demás se digitan tras confirmarlos en el panel de cada proveedor — <b>no se inventan montos</b>. Es la fuente única del pendiente "listado de servicios y costos".</li>
+      <li><b>Qué hace cada servicio y qué pasa si se cae</b> → el texto vive en el código (columnas <code>que_hace</code> / <code>si_falla</code>, refrescadas en cada arranque) para que la explicación no se desactualice. Si contratas un servicio nuevo, agrégalo ahí con su explicación en el mismo commit.</li>
     </ul>
   </div>
 </div>
@@ -158,7 +161,9 @@ async function cargarCostos() {
   if (!j || !j.success) { t.innerHTML = '<tr><td style="color:#b91c1c;padding:14px 0">' + esc((j && j.error) || 'Error al cargar') + '</td></tr>'; return; }
   if (j.data.preparando) { t.innerHTML = '<tr><td style="color:#92400e;padding:14px 0">⏳ ' + esc(j.data.mensaje) + '</td></tr>'; return; }
   t.innerHTML = j.data.items.map(c => `<tr>
-    <td style="width:34%"><b style="color:var(--navy)">${esc(c.nombre)}</b>${c.es_variable ? ' <span style="color:#94a3b8;font-size:.68rem">(variable)</span>' : ''}</td>
+    <td style="width:34%"><b style="color:var(--navy)">${esc(c.nombre)}</b>${c.es_variable ? ' <span style="color:#94a3b8;font-size:.68rem">(variable)</span>' : ''}
+      ${c.que_hace ? `<div class="que-hace">${esc(c.que_hace)}</div>` : ''}
+      ${c.si_falla ? `<div class="si-falla"><b>Si se cae:</b> ${esc(c.si_falla)}</div>` : ''}</td>
     <td style="width:14%;text-align:right">${c.en_vivo
       ? `<b>${nfC(c.costo_mensual, c.moneda)}</b> <span class="pill-vivo">en vivo</span>`
       : `<input type="number" min="0" step="0.01" id="co_${c.codigo}" value="${c.costo_mensual != null ? c.costo_mensual : ''}" placeholder="—">`}</td>

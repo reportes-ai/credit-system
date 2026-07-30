@@ -129,6 +129,16 @@
     <tr><td>academia_progreso + ayuda_paginas</td><td>Academia AutoFácil (autocapacitación): backend dentro del servicio <code>ayuda</code>. Los cursos NO tienen tabla propia — <b>reutilizan</b> <code>ayuda_paginas</code> (una página de ayuda = un curso; cada "paso" = una lección). <code>academia_progreso</code> (PK id_usuario+ruta, slide_idx, completado) guarda el avance por persona. Endpoints solo con verifyToken (capacitación abierta): <code>GET /api/ayuda/academia/cursos</code> (catálogo + mi progreso) y <code>POST /api/ayuda/academia/progreso</code>. Módulo 520001 + funcionalidad <code>academia_ver</code> habilitada para todos los perfiles. Página <code>/academia/</code>: reproductor slide a slide (portada→pasos→submódulos→cierre), teclado ←/→/Esc, retoma donde quedó. Regla aprendida: una card de módulo nuevo necesita fila en <code>permisos_perfil</code> (mis-permisos no tiene bypass de Admin) — el self-ref a permisos_perfil NO lanza 1093 en TiDB.</td></tr>
   </table>
 
+  <h2>Servicios contratados: qué hace cada uno y qué se paga</h2>
+  <p style="font-size:.9rem;color:#475569">La explicación en lenguaje de negocio de <b>cada servicio</b> (qué hace y qué pasa si se cae) y su <b>costo mensual</b> viven en un solo lugar: <b>Mantenedores → Salud y Uptime</b> (tabla <code>servicios_costos</code>, columnas <code>que_hace</code> / <code>si_falla</code> refrescadas desde el código en cada arranque, más el costo editable y auditado). Ahí mismo está el uptime histórico de cada uno, así que la evidencia para la casa matriz sale de una sola pantalla. <b>Servicio nuevo contratado = fila nueva ahí, con su explicación, en el mismo commit.</b></p>
+  <table>
+    <tr><th>Concepto</th><th>Detalle</th></tr>
+    <tr><td>Separación app / datos</td><td><b>Render</b> corre la aplicación (arriendo de una porción de servidor en Oregon); <b>TiDB Cloud</b> guarda los datos. Son proveedores distintos que fallan por separado — por eso la card los mide por separado. Si Render cae, el sistema queda fuera de línea <b>sin perder datos</b>; ese es el pendiente "host alternativo" del runbook.</td></tr>
+    <tr><td>Costo real ≠ precio del plan</td><td>Render se factura con excesos sobre lo incluido (bandwidth y dominios adicionales), así que el gasto efectivo supera el precio de lista de la instancia. El monto que se carga en la card debe ser el de <b>Billing → Unbilled Charges</b>, no el del plan.</td></tr>
+    <tr><td>Costos variables</td><td><b>Claude/IA</b> se calcula EN VIVO desde <code>ia_uso</code> (no se digita). <b>Meta WhatsApp</b> cobra por conversación y <b>DealerNet</b> por consulta: son variables y su nota lo declara.</td></tr>
+    <tr><td>Instancia de Render</td><td>El cuello es la <b>memoria</b>, no la CPU: el check "Memoria del servidor" del informe de Salud alerta al 70%. Ese check es el disparador objetivo para subir de instancia.</td></tr>
+  </table>
+
   <h2>Variables de entorno (Render)</h2>
   <pre>DB_HOST / DB_PORT / DB_USER / DB_PASSWORD / DB_NAME   → TiDB Cloud
 JWT_SECRET                                            → firma de tokens

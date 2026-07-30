@@ -70,6 +70,49 @@ require('../../../../shared/migrate').enFila('servicios-costos', async () => {
     ];
     for (const c of COSTOS_SEED)
       await pool.query('INSERT IGNORE INTO servicios_costos (codigo, nombre, costo_mensual, moneda, es_variable, nota) VALUES (?,?,?,?,?,?)', c);
+
+    /* Qué hace cada servicio y qué pasa si se cae — en lenguaje de negocio.
+       El texto vive acá (código = fuente) y se refresca en cada arranque con UPDATE,
+       para que la explicación nunca quede desactualizada respecto de la realidad. */
+    await pool.query('ALTER TABLE servicios_costos ADD COLUMN IF NOT EXISTS que_hace VARCHAR(600) NULL').catch(() => {});
+    await pool.query('ALTER TABLE servicios_costos ADD COLUMN IF NOT EXISTS si_falla VARCHAR(400) NULL').catch(() => {});
+    const EXPLICA = [
+      ['render',
+       'Es el computador donde vive la aplicación: un servidor físico en un datacenter de Oregon (EE.UU.) del que arrendamos una porción (memoria y CPU). Cada vez que se sube un cambio a GitHub, Render lo compila y lo deja andando; además entrega la dirección pública y el certificado HTTPS. NO guarda los datos — esos viven en TiDB.',
+       'El sistema queda fuera de línea, pero no se pierde ningún dato. Es el único hueco sin plan de contingencia probado.'],
+      ['tidb',
+       'La base de datos en la nube: acá viven de verdad los créditos, clientes, cobranza y la contabilidad. La aplicación solo los lee y escribe; el dato autoritativo está siempre aquí.',
+       'La aplicación responde pero sin información (pantallas vacías o error). Hay contingencia probada en Google Cloud SQL.'],
+      ['cloudsql',
+       'Copia de contingencia de la base de datos en Google. Está APAGADA a propósito: solo se enciende si TiDB falla, y por eso cuesta casi nada estando detenida.',
+       'Se pierde el plan B de la base de datos; la operación normal no se ve afectada.'],
+      ['gcs',
+       'El bucket de Google donde se guardan los respaldos nocturnos de la base de datos.',
+       'Dejan de guardarse respaldos nuevos (los existentes siguen ahí). No afecta la operación diaria.'],
+      ['ia',
+       'Claude (Anthropic) es el motor de inteligencia artificial: analiza informes comerciales de DealerNet, redacta el resumen ejecutivo diario, revisa liquidaciones y responde consultas. Se paga por uso real, no por plan fijo.',
+       'Las pantallas con IA dejan de generar análisis; todo el resto del sistema funciona igual.'],
+      ['meta',
+       'La API de WhatsApp de Meta que mueve a "Facilito": avisos de cobranza, seguimiento de cartas y atención automática a clientes y dealers. Se cobra por conversación.',
+       'No salen ni llegan WhatsApp. La cobranza por correo y el sistema siguen funcionando.'],
+      ['brevo',
+       'El servicio que envía todos los correos del sistema: cartas, certificados, órdenes de pago, informes programados y alertas.',
+       'El sistema funciona pero nadie recibe correos — incluidas las alertas de error.'],
+      ['dealernet',
+       'La central de información comercial: se le consulta por RUT para traer los antecedentes del cliente que alimentan la evaluación crediticia y el scorecard.',
+       'No se pueden pedir informes nuevos; los ya guardados en el repositorio siguen disponibles.'],
+      ['simpleapi',
+       'Trae automáticamente desde el SII el libro de compras (RCV) cada dos días, para que la contabilidad no se digite a mano.',
+       'Hay que cargar el libro de compras manualmente. No detiene la operación.'],
+      ['workera',
+       'El reloj control del personal: entrega las marcas de entrada y salida que usa Recursos Humanos para asistencia y remuneraciones.',
+       'No se actualizan las marcas; las remuneraciones tendrían que revisarse a mano.'],
+      ['dominio',
+       'El nombre autofacilchile.cl inscrito en NIC Chile. Es la dirección por la que todos entran al sistema.',
+       'Si vence, el sistema deja de ser alcanzable por su nombre aunque el servidor esté sano. Renovación anual.'],
+    ];
+    for (const [cod, que, falla] of EXPLICA)
+      await pool.query('UPDATE servicios_costos SET que_hace=?, si_falla=? WHERE codigo=?', [que, falla, cod]);
   } catch (e) { console.error('[servicios_costos migration]', e.message); }
 });
 
