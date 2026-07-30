@@ -130,8 +130,72 @@ const CATALOGO = [
     ],
     operar: '/ordenes-pago/historial/', configurar: '/ordenes-pago/',
     descripcion: 'Órdenes de pago a proveedores EMITIDAS sin marcar pagadas.',
-    stuck: "SELECT COUNT(*) n FROM ordenes_pago WHERE estado='EMITIDA' AND fecha_emision < NOW() - INTERVAL ? HOUR",
+    // COALESCE: fecha_emision es nullable — sin él, ODP sin fecha jamás contarían como estancadas
+    stuck: "SELECT COUNT(*) n FROM ordenes_pago WHERE estado='EMITIDA' AND COALESCE(fecha_emision, created_at) < NOW() - INTERVAL ? HOUR",
     horas: 120,
+  },
+  {
+    codigo: 'aplicacion_fondos', func_responsable: 'aplic_fondos_aprobar', modulo: 'Tesorería', nombre: 'Aplicación de Fondos (firmas)',
+    pasos: [
+      { label: 'Hecho (digitación)', func: 'aplic_fondos' },
+      { label: 'Revisado', func: 'aplic_fondos_aprobar' },
+      { label: 'Aprobado', func: 'aplic_fondos_aprobar' },
+      { label: 'Procesado (aplica al crédito)', func: 'aplic_fondos_aprobar' },
+    ],
+    operar: '/tesoreria/aplicacion-fondos', configurar: '/mantenedores/avisos/',
+    descripcion: 'Aplicaciones de fondos con firmas pendientes (HECHO/REVISADO/APROBADO sin procesar).',
+    stuck: "SELECT COUNT(*) n FROM aplicaciones_fondos WHERE estado IN ('HECHO','REVISADO','APROBADO') AND updated_at < NOW() - INTERVAL ? HOUR",
+    horas: 48,
+  },
+  {
+    codigo: 'castigos', func_responsable: 'castigo_aprobar_finanzas', modulo: 'Tesorería', nombre: 'Castigo de saldo (doble firma)',
+    pasos: [
+      { label: 'Solicitud de castigo', func: 'castigo_solicitar' },
+      { label: 'Firma Finanzas', func: 'castigo_aprobar_finanzas' },
+      { label: 'Firma Operaciones', func: 'castigo_aprobar_operaciones' },
+      { label: 'Aplicado (asiento automático)' },
+    ],
+    operar: '/tesoreria/castigos.html', configurar: '/mantenedores/avisos/',
+    descripcion: 'Solicitudes de castigo PENDIENTES esperando alguna de las dos firmas gerenciales.',
+    stuck: "SELECT COUNT(*) n FROM castigos_contables WHERE estado='PENDIENTE' AND solicitado_at < NOW() - INTERVAL ? HOUR",
+    horas: 72,
+  },
+  {
+    codigo: 'dealers_incorporacion', func_responsable: 'dealer_ficha_revisar', modulo: 'Dealers', nombre: 'Incorporación de dealers (cadena de aprobación)',
+    pasos: [
+      { label: 'Ejecutivo crea la ficha', func: 'dealer_ficha_crear' },
+      { label: 'Revisión', func: 'dealer_ficha_revisar' },
+      { label: 'Niveles de autorización', nota: 'niveles paramétricos en Incorporación → Niveles' },
+      { label: 'Aprobada / Rechazada' },
+    ],
+    operar: '/dealers-incorporacion/', configurar: '/dealers-incorporacion/niveles.html',
+    descripcion: 'Fichas de dealer esperando autorización o cierre — el dealer no puede operar hasta aprobarse.',
+    stuck: "SELECT COUNT(*) n FROM dealer_fichas WHERE estado IN ('PEND_AUTORIZACION','PEND_CIERRE') AND updated_at < NOW() - INTERVAL ? HOUR",
+    horas: 48,
+  },
+  {
+    codigo: 'tickets_ti', func_responsable: 'ti_atender', modulo: 'Soporte', nombre: 'Atención de tickets TI',
+    pasos: [
+      { label: 'Usuario reporta', func: 'tickets_ti' },
+      { label: 'Atención TI', func: 'ti_atender' },
+      { label: 'Cerrado' },
+    ],
+    operar: '/soporte/tickets-ti/', configurar: '/mantenedores/tickets-ti/',
+    descripcion: 'Tiene SLA y escalamiento PROPIOS (mantenedor Tickets TI). Acá solo se monitorea.',
+    stuck: "SELECT COUNT(*) n FROM ti_tickets WHERE cerrado_at IS NULL AND estado <> 'CERRADO' AND created_at < NOW() - INTERVAL ? HOUR",
+    horas: 0,   // nace apagado acá: escala su propio motor (como Compras)
+  },
+  {
+    codigo: 'digitacion_faltantes', modulo: 'Créditos', nombre: 'Digitación de datos faltantes',
+    pasos: [
+      { label: 'Carga masiva deja campos vacíos' },
+      { label: 'Cola de digitación (bloqueo 20 min)', func: 'digitacion_faltantes' },
+      { label: 'Crédito completo' },
+    ],
+    operar: '/carga-masiva/digitacion/', configurar: '/carga-masiva/digitacion/estadisticas.html',
+    descripcion: 'Flujo informativo: el conteo de pendientes vive en la propia cola (motor único del WHERE en su módulo) — acá se documenta quiénes digitan.',
+    stuck: null,   // el motor de pendientes (WHERE por tipo) vive en digitacion-faltantes; no se duplica (Máxima 1)
+    horas: 0,
   },
   {
     codigo: 'compras', func_responsable: 'compras_revision', modulo: 'Compras', nombre: 'Aprobación de órdenes de compra',
