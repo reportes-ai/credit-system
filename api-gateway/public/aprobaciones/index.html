@@ -565,6 +565,7 @@
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn-sec" id="subDetalle" onclick="subTabCartolas('detalle')" style="font-weight:700;border-bottom:3px solid var(--blue)">Detalle Mes</button>
     <button class="btn-sec" id="subRevision" onclick="subTabCartolas('revision')">Revisión Cartolas</button>
+    <button class="btn-sec" id="subIncorp" onclick="subTabCartolas('incorp')">Incorporaciones por aprobar <span id="badgeIncorp" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:0 7px;font-size:.72rem"></span></button>
   </div>
 
   <div id="cartolasDetalle">
@@ -577,6 +578,7 @@
         </select>
         <button class="btn-mini bm-anular" style="padding:8px 16px;font-size:.83rem" onclick="abrirModalPrepago()"><i class="bi bi-arrow-counterclockwise"></i> Ingreso Prepago o Anulación</button>
         <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarMovimientos()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+        <button class="btn-mini" id="btnSinCarta" style="padding:8px 16px;font-size:.83rem;background:#fff7ed;color:#9a3412;border:1px solid #fdba74" onclick="abrirSinCarta()"><i class="bi bi-plus-circle"></i> Otorgadas sin carta <span id="badgeSinCarta" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:0 7px;font-size:.72rem;margin-left:4px"></span></button>
         <span style="font-size:.78rem;color:#64748b" id="ctaCount"></span>
       </div>
       <div style="overflow-x:auto">
@@ -589,12 +591,42 @@
     </div>
   </div>
 
+  <!-- Incorporar otorgadas SIN carta de aprobación (entraron por carga masiva) -->
+  <dialog id="dlgSinCarta" style="border:none;border-radius:16px;padding:0;max-width:1180px;width:96vw;box-shadow:0 24px 64px rgba(0,0,0,.35)">
+    <div style="background:linear-gradient(90deg,#012d70,#0255c5);color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;border-radius:16px 16px 0 0">
+      <div><b style="font-size:1rem">Otorgadas sin carta de aprobación</b>
+        <div style="font-size:.78rem;opacity:.85">Confirma los datos de cada operación. Si la comisión difiere de la que corresponde, la incorporación queda pendiente de un analista de crédito.</div></div>
+      <button class="btn-mini" style="background:rgba(255,255,255,.15);color:#fff" onclick="dlgSinCarta.close()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div style="padding:14px 20px;max-height:64vh;overflow:auto">
+      <div id="scAviso" style="font-size:.82rem;color:#64748b;margin-bottom:10px"></div>
+      <table class="tbl" style="font-size:.8rem"><thead><tr>
+        <th><input type="checkbox" id="scAll" onchange="scToggleAll(this.checked)"></th>
+        <th>N° Op</th><th>Dealer</th><th>Ubicación</th><th style="text-align:right">Saldo precio</th>
+        <th style="text-align:right">Plazo</th><th style="text-align:right">Comisión</th><th style="text-align:right">Corresponde</th><th></th>
+      </tr></thead><tbody id="scBody"></tbody></table>
+    </div>
+    <div style="padding:13px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;align-items:center">
+      <span id="scResumen" style="font-size:.8rem;color:#64748b;margin-right:auto"></span>
+      <button class="btn-mini" style="background:#f1f5f9;color:#475569" onclick="dlgSinCarta.close()">Cancelar</button>
+      <button class="btn-mini bm-ok" style="padding:8px 18px" onclick="scIncorporar()"><i class="bi bi-check2-circle"></i> Incorporar seleccionadas</button>
+    </div>
+  </dialog>
+
   <div id="cartolasRevision" style="display:none">
     <div class="filters-bar" style="margin-bottom:14px">
       <input type="text" id="revCtaBuscar" placeholder="Dealer, RUT, cliente, ID Financiera, N° operación…" oninput="renderRevCartolas()" style="min-width:260px">
       <span style="font-size:.78rem;color:#64748b" id="revCtaCount"></span>
     </div>
     <div id="bloquesCartolas"></div>
+  </div>
+
+  <!-- Incorporaciones con excepción: las aprueba un analista de crédito -->
+  <div id="cartolasIncorp" style="display:none">
+    <div class="card-af">
+      <p style="font-size:.84rem;color:#64748b;margin:0 0 12px">Operaciones otorgadas sin carta cuya <b>comisión confirmada difiere de la que corresponde</b> según el motor. Al aprobar, los valores quedan guardados en la operación y entra a la cartola. El comentario es obligatorio en ambos casos.</p>
+      <div id="incorpBody"></div>
+    </div>
   </div>
 </div>
 
@@ -3046,12 +3078,139 @@ function exportarMovimientos(){
   XLSX.utils.book_append_sheet(wb, ws, 'Cartolas');
   XLSX.writeFile(wb, 'cartolas_' + (document.getElementById('ctaMes').value||mesActual()) + '.xlsx');
 }
+/* ── Otorgadas SIN carta de aprobación → incorporar a la cartola ──────────────
+   Las operaciones que entran por carga masiva no generan carta, y la cartola se
+   construye desde las cartas: sin esto, esa comisión nunca le llega al dealer.
+   La comisión que CORRESPONDE la calcula el motor único en el servidor; si lo
+   confirmado difiere, la fila queda pendiente de un analista de crédito.        */
+let SC = [];
+const scMes = () => document.getElementById('ctaMes').value || mesActual();
+const scNum = v => Number(String(v).replace(/[^\d-]/g,'')) || 0;
+
+async function abrirSinCarta(){
+  const j = await fetch('/api/cartolas/sin-carta?mes=' + encodeURIComponent(scMes()), { headers: hdr() }).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert((j && j.error) || 'No se pudo cargar el listado.');
+  SC = (j.data.items || []).filter(x => !x.ya_solicitada);
+  const yaHechas = (j.data.items || []).length - SC.length;
+  document.getElementById('scAviso').innerHTML = SC.length
+    ? '<b>' + SC.length + '</b> operación(es) otorgada(s) en ' + j.data.mes + ' sin carta de aprobación y sin movimiento en cartola.'
+      + (yaHechas ? ' <span style="color:#92400e">(' + yaHechas + ' ya tienen solicitud en curso)</span>' : '')
+      + '<br><span style="color:#64748b">Los valores que confirmes quedan guardados en la operación.</span>'
+    : '<span style="color:#166534">✓ No hay operaciones pendientes de incorporar en ' + j.data.mes + '.</span>';
+  scRender();
+  document.getElementById('dlgSinCarta').showModal();
+}
+
+function scRender(){
+  document.getElementById('scBody').innerHTML = SC.map((x,i)=>`<tr>
+    <td><input type="checkbox" class="scChk" data-i="${i}" checked onchange="scResumen()"></td>
+    <td><b>${x.num_op||''}</b><div style="font-size:.7rem;color:#94a3b8">${x.financiera||''}</div></td>
+    <td><input type="text" style="width:190px" value="${(x.nombre_dealer||'').replace(/"/g,'&quot;')}" onchange="SC[${i}].nombre_dealer=this.value"></td>
+    <td><select onchange="SC[${i}].es_parque=+this.value;scCalc(${i})">
+          <option value="0" ${!x.es_parque?'selected':''}>Calle</option>
+          <option value="1" ${x.es_parque?'selected':''}>Parque</option></select></td>
+    <td style="text-align:right"><input type="number" style="width:120px;text-align:right" value="${x.saldo_precio||0}" onchange="SC[${i}].saldo_precio=scNum(this.value);scCalc(${i})"></td>
+    <td style="text-align:right"><input type="number" style="width:66px;text-align:right" value="${x.plazo||0}" onchange="SC[${i}].plazo=scNum(this.value);scCalc(${i})"></td>
+    <td style="text-align:right"><input type="number" style="width:120px;text-align:right" id="scCom${i}" value="${x.comision||0}" onchange="SC[${i}].comision=scNum(this.value);scPintar(${i})"></td>
+    <td style="text-align:right" id="scMot${i}">${x.comision_motor!=null?'$'+Number(x.comision_motor).toLocaleString('es-CL'):'—'}</td>
+    <td id="scFlag${i}"></td></tr>`).join('');
+  SC.forEach((_,i)=>scPintar(i));
+  scResumen();
+}
+
+/* Recalcular la comisión que corresponde cuando cambian saldo, plazo o ubicación.
+   El cálculo lo hace SIEMPRE el servidor con el motor único: acá no se replica la fórmula. */
+async function scCalc(i){
+  const x = SC[i];
+  const p = new URLSearchParams({ rut_dealer:x.rut_dealer||'', nombre_dealer:x.nombre_dealer||'',
+    es_parque:x.es_parque?'1':'0', saldo_precio:x.saldo_precio||0, plazo:x.plazo||0 });
+  const j = await fetch('/api/cartolas/comision-motor?' + p, { headers: hdr() }).then(r=>r.json()).catch(()=>null);
+  x.comision_motor = (j && j.success) ? j.data.comision_motor : null;
+  document.getElementById('scMot'+i).textContent = x.comision_motor!=null ? '$'+Number(x.comision_motor).toLocaleString('es-CL') : '—';
+  scPintar(i);
+}
+
+function scPintar(i){
+  const x = SC[i], f = document.getElementById('scFlag'+i), inp = document.getElementById('scCom'+i);
+  if (!f) return;
+  const diff = x.comision_motor!=null && Number(x.comision)!==Number(x.comision_motor);
+  f.innerHTML = diff ? '<span style="background:#fef3c7;color:#92400e;border-radius:10px;padding:2px 9px;font-size:.7rem;font-weight:700">requiere aprobación</span>' : '';
+  if (inp) inp.style.borderColor = diff ? '#f59e0b' : '';
+  scResumen();
+}
+
+function scToggleAll(v){ document.querySelectorAll('.scChk').forEach(c=>c.checked=v); scResumen(); }
+
+function scResumen(){
+  const sel = [...document.querySelectorAll('.scChk:checked')].map(c=>SC[+c.dataset.i]);
+  const conEx = sel.filter(x=>x.comision_motor!=null && Number(x.comision)!==Number(x.comision_motor)).length;
+  const tot = sel.reduce((a,x)=>a+(Number(x.comision)||0),0);
+  document.getElementById('scResumen').innerHTML = sel.length
+    ? sel.length + ' seleccionada(s) · comisión total $' + tot.toLocaleString('es-CL')
+      + (conEx ? ' · <b style="color:#92400e">' + conEx + ' irá(n) a aprobación</b>' : ' · entran directo')
+    : 'Ninguna seleccionada';
+}
+
+async function scIncorporar(){
+  const filas = [...document.querySelectorAll('.scChk:checked')].map(c=>SC[+c.dataset.i]).map(x=>({
+    id_credito:x.id_credito, num_op:x.num_op, mes:scMes(), nombre_dealer:x.nombre_dealer, rut_dealer:x.rut_dealer,
+    es_parque:x.es_parque, saldo_precio:x.saldo_precio, plazo:x.plazo, comision:x.comision }));
+  if (!filas.length) return alert('Selecciona al menos una operación.');
+  const j = await fetch('/api/cartolas/incorporar', { method:'POST', headers: hdr(), body: JSON.stringify({ filas }) }).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert((j && j.error) || 'No se pudo incorporar.');
+  alert('Incorporadas a la cartola: ' + j.data.directas + '\nEnviadas a aprobación del analista: ' + j.data.pendientes);
+  document.getElementById('dlgSinCarta').close();
+  if (typeof cargarMovimientos === 'function') cargarMovimientos();
+}
+
 function subTabCartolas(t){
   document.getElementById('cartolasDetalle').style.display  = t==='detalle' ? '' : 'none';
   document.getElementById('cartolasRevision').style.display = t==='revision' ? '' : 'none';
   document.getElementById('subDetalle').style.cssText  = t==='detalle' ? 'font-weight:700;border-bottom:3px solid var(--blue)' : '';
   document.getElementById('subRevision').style.cssText = t==='revision' ? 'font-weight:700;border-bottom:3px solid var(--blue)' : '';
+  const pi = document.getElementById('cartolasIncorp'), bi = document.getElementById('subIncorp');
+  if (pi) pi.style.display = t==='incorp' ? '' : 'none';
+  if (bi) bi.style.cssText = t==='incorp' ? 'font-weight:700;border-bottom:3px solid var(--blue)' : '';
   if (t==='revision') renderRevCartolas();
+  if (t==='incorp') cargarIncorporaciones();
+}
+
+/* ── Bandeja del analista: incorporaciones con excepción ───────────────────── */
+async function cargarIncorporaciones(){
+  const j = await fetch('/api/cartolas/incorporaciones?estado=PENDIENTE', { headers: hdr() }).then(r=>r.json()).catch(()=>null);
+  const cont = document.getElementById('incorpBody');
+  if (!j || !j.success) { cont.innerHTML = '<p style="color:#b91c1c">No se pudo cargar.</p>'; return; }
+  const b = document.getElementById('badgeIncorp');
+  if (b) { b.textContent = j.data.length; b.style.display = j.data.length ? '' : 'none'; }
+  cont.innerHTML = j.data.length ? j.data.map(i=>`
+    <div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 18px;margin-bottom:10px">
+      <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap">
+        <b style="color:var(--navy)">OP ${i.num_op||'—'}</b>
+        <span>${i.nombre_dealer||''} <span style="color:#94a3b8;font-size:.76rem">(${i.es_parque?'Parque':'Calle'})</span></span>
+        <span style="font-size:.8rem;color:#64748b">saldo $${Number(i.saldo_precio||0).toLocaleString('es-CL')} · ${i.plazo||0} cuotas</span>
+        <span style="margin-left:auto;font-size:.76rem;color:#94a3b8">solicitó ${i.solicitado_nombre||''}</span>
+      </div>
+      <div style="margin:8px 0;font-size:.85rem">
+        Comisión confirmada <b>$${Number(i.comision||0).toLocaleString('es-CL')}</b>
+        · corresponde <b>$${Number(i.comision_motor||0).toLocaleString('es-CL')}</b>
+        <b style="color:#b91c1c"> (${(Number(i.comision||0)-Number(i.comision_motor||0))>0?'+':''}$${(Number(i.comision||0)-Number(i.comision_motor||0)).toLocaleString('es-CL')})</b>
+      </div>
+      ${(i.excepciones||[]).map(e=>`<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:6px;padding:6px 10px;font-size:.78rem;color:#92400e;margin-bottom:5px"><b>${e.tipo}:</b> ${e.mensaje}</div>`).join('')}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input type="text" id="incCom${i.id}" placeholder="Comentario (obligatorio)" style="flex:1">
+        <button class="btn-mini bm-ok" onclick="resolverIncorp(${i.id},'APROBAR')">Aprobar</button>
+        <button class="btn-mini bm-anular" onclick="resolverIncorp(${i.id},'RECHAZAR')">Rechazar</button>
+      </div>
+    </div>`).join('') : '<p style="color:#166534">✓ No hay incorporaciones pendientes de aprobación.</p>';
+}
+
+async function resolverIncorp(id, accion){
+  const comentario = (document.getElementById('incCom'+id).value||'').trim();
+  if (!comentario) return alert('El comentario es obligatorio.');
+  const j = await fetch('/api/cartolas/incorporaciones/'+id, { method:'PUT', headers: hdr(), body: JSON.stringify({ accion, comentario }) }).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert((j && j.error) || 'No se pudo resolver.');
+  cargarIncorporaciones();
+  if (typeof cargarMovimientos === 'function') cargarMovimientos();
 }
 
 /* ═══════════ CARTOLAS: REVISIÓN Y ENVÍO ═══════════

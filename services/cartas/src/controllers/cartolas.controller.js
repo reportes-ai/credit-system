@@ -136,6 +136,7 @@ const getMovimientos = async (req, res) => {
        FROM cartolas_movimientos m
        LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
        LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado
+                             OR (m.id_carta IS NULL AND cr.id_financiera = m.num_op)
        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
        ORDER BY m.mes DESC, m.nombre_dealer, m.id`, vals
     );
