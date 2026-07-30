@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — fix: GROUP BY compatible ONLY_FULL_GROUP_BY (500 en /historia) y error visible también en la sección salud -->
+<!-- v1.3 — gastos mensuales por servicio: tabla servicios_costos editable, IA en vivo desde ia_uso, totales por moneda -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,6 +33,14 @@
   .chk.mal { border-left-color:#ef4444; background:#fff7f7; }
   .chk b { display:block; color:var(--navy); font-size:.82rem; }
   .chk span { color:#64748b; font-size:.75rem; }
+  .costos { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .costos td { padding:8px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .costos input[type=number] { border:1.5px solid #d1d5db; border-radius:7px; padding:4px 8px; width:110px; font-size:.8rem; text-align:right; }
+  .costos input[type=text] { border:1.5px solid #e2e8f0; border-radius:7px; padding:4px 8px; width:100%; font-size:.76rem; color:#64748b; }
+  .costos select { border:1.5px solid #d1d5db; border-radius:7px; padding:4px 4px; font-size:.78rem; }
+  .btnc { border:none; border-radius:8px; padding:5px 12px; font-size:.74rem; font-weight:700; cursor:pointer; background:linear-gradient(135deg,#0141A2,#009AFE); color:#fff; }
+  .pill-conf { background:#fef3c7; color:#92400e; border-radius:10px; padding:1px 9px; font-size:.68rem; font-weight:700; }
+  .pill-vivo { background:#dcfce7; color:#166534; border-radius:10px; padding:1px 9px; font-size:.68rem; font-weight:700; }
   .afecta { background:#f1f5f9; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; font-size:.82rem; color:#334155; margin-top:24px; }
   .afecta ul { margin:8px 0 0; padding-left:18px; }
 </style>
@@ -57,6 +65,12 @@
   <div class="mod-h" style="margin-top:26px"><i class="bi bi-graph-up"></i> Uptime por servicio — 90 días</div>
   <div id="lista"><p style="color:#94a3b8;text-align:center;padding:30px">Cargando…</p></div>
 
+  <div class="mod-h" style="margin-top:26px"><i class="bi bi-cash-coin"></i> Gastos mensuales por servicio</div>
+  <div class="svc" style="padding:8px 22px 14px">
+    <table class="costos" id="tCostos"><tr><td style="color:#94a3b8;padding:14px 0">Cargando…</td></tr></table>
+    <div id="cTotales" style="font-size:.85rem;color:#334155;margin-top:10px"></div>
+  </div>
+
   <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
     <ul>
       <li><b>Solo lectura</b> → los datos los produce el motor <code>shared/uptime.js</code> (checks cada 5 min en <code>uptime_checks</code>); esta página es la evidencia histórica de disponibilidad, exportable con un pantallazo para la casa matriz.</li>
@@ -64,6 +78,7 @@
       <li><b>Agregar/quitar un servicio monitoreado</b> → INSERT en la tabla <code>uptime_servicios</code> (codigo, nombre, tipo BD|HTTP, url) — sin tocar código.</li>
       <li><b>Resumen semanal</b> → los mismos porcentajes llegan por correo en el <i>Informe de Salud del Sistema</i> (<a href="/mantenedores/correos-programados/">Correos Programados</a>); bajo 97% en 24 h se marca como alerta roja.</li>
       <li><b>Aplicación (Render)</b> → se mide por omisión: los huecos sin checks son su downtime, por lo que el monitor no puede reportarse arriba estando caído.</li>
+      <li><b>Gastos mensuales</b> → tabla <code>servicios_costos</code> editable acá (auditado). El gasto de <b>Claude/IA se calcula en vivo</b> desde <code>ia_uso</code>; los demás se digitan tras confirmarlos en el panel de cada proveedor — <b>no se inventan montos</b>. Es la fuente única del pendiente "listado de servicios y costos".</li>
     </ul>
   </div>
 </div>
@@ -128,7 +143,43 @@ async function cargar() {
       '<span style="font-size:.7rem;color:#94a3b8">(medida por omisión de checks: sin registro = caída)</span>')
     + d.servicios.map(s => card(s.nombre, s, d.dias)).join('');
 }
+const nfC = (v, mon) => v == null ? null : (mon === 'CLP'
+  ? '$' + Number(v).toLocaleString('es-CL', { maximumFractionDigits: 0 })
+  : 'US$ ' + Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+async function cargarCostos() {
+  const j = await fetch('/api/uptime/costos', { headers: { Authorization: 'Bearer ' + TOKEN() } }).then(r => r.json()).catch(() => null);
+  const t = document.getElementById('tCostos');
+  if (!j || !j.success) { t.innerHTML = '<tr><td style="color:#b91c1c;padding:14px 0">' + esc((j && j.error) || 'Error al cargar') + '</td></tr>'; return; }
+  t.innerHTML = j.data.items.map(c => `<tr>
+    <td style="width:34%"><b style="color:var(--navy)">${esc(c.nombre)}</b>${c.variable ? ' <span style="color:#94a3b8;font-size:.68rem">(variable)</span>' : ''}</td>
+    <td style="width:14%;text-align:right">${c.en_vivo
+      ? `<b>${nfC(c.costo_mensual, c.moneda)}</b> <span class="pill-vivo">en vivo</span>`
+      : `<input type="number" min="0" step="0.01" id="co_${c.codigo}" value="${c.costo_mensual != null ? c.costo_mensual : ''}" placeholder="—">`}</td>
+    <td style="width:9%">${c.en_vivo ? esc(c.moneda) : `<select id="mo_${c.codigo}"><option ${c.moneda==='USD'?'selected':''}>USD</option><option ${c.moneda==='CLP'?'selected':''}>CLP</option></select>`}</td>
+    <td>${c.en_vivo ? `<span style="color:#64748b;font-size:.76rem">${esc(c.nota || '')}</span>` : `<input type="text" id="no_${c.codigo}" value="${esc(c.nota || '')}">`}</td>
+    <td style="width:10%;text-align:right">${c.en_vivo ? '' : (c.costo_mensual == null ? '<span class="pill-conf">por confirmar</span> ' : '') + `<button class="btnc" onclick="guardarCosto('${c.codigo}')">Guardar</button>`}</td>
+  </tr>`).join('');
+  const tot = Object.entries(j.data.totales).map(([m, v]) => `<b>${nfC(v, m)}</b> ${m === 'CLP' ? 'CLP' : ''}`).join(' + ');
+  document.getElementById('cTotales').innerHTML = `Total mensual registrado: ${tot || '—'}`
+    + (j.data.por_confirmar ? ` · <span style="color:#92400e">${j.data.por_confirmar} servicio(s) por confirmar en su panel (no se inventan montos)</span>` : '');
+}
+
+async function guardarCosto(codigo) {
+  const body = {
+    costo_mensual: document.getElementById('co_' + codigo).value,
+    moneda: document.getElementById('mo_' + codigo).value,
+    nota: document.getElementById('no_' + codigo).value,
+  };
+  const j = await fetch('/api/uptime/costos/' + codigo, { method: 'PUT',
+    headers: { Authorization: 'Bearer ' + TOKEN(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body) }).then(r => r.json()).catch(() => null);
+  if (j && j.success) cargarCostos();
+  else alert((j && j.error) || 'Error al guardar');
+}
+
 cargar();
+cargarCostos();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
