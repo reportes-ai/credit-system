@@ -113,6 +113,9 @@ require('../../../../shared/migrate').enFila('servicios-costos', async () => {
     ];
     for (const [cod, que, falla] of EXPLICA)
       await pool.query('UPDATE servicios_costos SET que_hace=?, si_falla=? WHERE codigo=?', [que, falla, cod]);
+    // TiDB cobra por uso (request units + almacenamiento), no plan fijo → es variable.
+    // es_variable lo manda el código (no se edita en la UI); el monto y la nota son de Pato.
+    await pool.query("UPDATE servicios_costos SET es_variable=1 WHERE codigo='tidb'");
   } catch (e) { console.error('[servicios_costos migration]', e.message); }
 });
 
