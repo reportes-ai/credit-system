@@ -2990,6 +2990,7 @@ function aplicarMes(){
   MOVS = mes ? MOVS_ALL.filter(m => m.mes === mes) : MOVS_ALL.slice();
   renderMovimientos();
   renderRevCartolas();
+  if (typeof scContar === 'function') scContar();
 }
 function fdMov(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); }
 function renderMovimientos(){
@@ -3086,6 +3087,19 @@ function exportarMovimientos(){
 let SC = [];
 const scMes = () => document.getElementById('ctaMes').value || mesActual();
 const scNum = v => Number(String(v).replace(/[^\d-]/g,'')) || 0;
+
+/* Cuántas otorgadas sin carta hay en el mes → badge del botón. Se refresca al
+   entrar al tab y cada vez que cambia el mes, para que el número no engañe. */
+async function scContar(){
+  const b = document.getElementById('badgeSinCarta'); if (!b) return;
+  try {
+    const j = await fetch('/api/cartolas/sin-carta?mes=' + encodeURIComponent(scMes()), { headers: hdr() }).then(r=>r.json());
+    const n = (j && j.success) ? (j.data.items||[]).filter(x=>!x.ya_solicitada).length : 0;
+    b.textContent = n; b.style.display = n ? '' : 'none';
+    const btn = document.getElementById('btnSinCarta');
+    if (btn) btn.title = n ? n + ' operación(es) otorgada(s) sin carta que no están en la cartola' : 'No hay operaciones pendientes de incorporar';
+  } catch (e) { b.style.display = 'none'; }
+}
 
 async function abrirSinCarta(){
   const j = await fetch('/api/cartolas/sin-carta?mes=' + encodeURIComponent(scMes()), { headers: hdr() }).then(r=>r.json()).catch(()=>null);

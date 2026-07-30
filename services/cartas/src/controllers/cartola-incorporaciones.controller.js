@@ -21,9 +21,25 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const AVISOS = require('../../../../shared/avisos');
 const COM = require('../../../../api-gateway/public/js/comision-dealer');
 
 const MOV = 'COMISION';
+
+/* Avisos (campanita). Destinatarios finales configurables en Mantenedores → Avisos;
+   nacen apuntando a quienes tienen la funcionalidad respectiva. */
+AVISOS.registrarAviso({
+  evento: 'cartola_incorp_pendiente', modulo: 'Cartolas',
+  nombre: 'Incorporación a cartola pendiente de aprobación',
+  descripcion: 'Una operación otorgada sin carta se confirmó con una comisión distinta a la que corresponde. Avisa al ANALISTA DE CRÉDITO que debe aprobarla o rechazarla.',
+  base_func: 'cartola_incorp_aprobar', prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+AVISOS.registrarAviso({
+  evento: 'cartola_incorp_resuelta', modulo: 'Cartolas',
+  nombre: 'Incorporación a cartola aprobada o rechazada',
+  descripcion: 'El analista de crédito resolvió una incorporación. Avisa a quien la solicitó (analista de operaciones) y al pool de ambas funcionalidades.',
+  base_func: 'cartola_incorporar', prioridad: 'normal', sonido_tipo: 'campana',
+});
 
 /* ── Migración: tabla de solicitudes + permisos ──────────────────────────── */
 require('../../../../shared/migrate').enFila('cartola-incorporaciones', async () => {
@@ -187,7 +203,16 @@ const incorporar = async (req, res) => {
          Number(f.saldo_precio) || 0, Number(f.plazo) || 0, Number(f.comision) || 0, motor,
          ex.length ? JSON.stringify(ex) : null, estado, req.usuario.id_usuario, quien,
          ex.length ? null : req.usuario.id_usuario, ex.length ? null : quien, ex.length ? null : new Date()]);
-      if (!ex.length) { await aplicar(f, quien); directas++; } else pendientes++;
+      if (!ex.length) { await aplicar(f, quien); directas++; }
+      else {
+        pendientes++;
+        // Campanita al ANALISTA DE CRÉDITO: tiene algo que aprobar
+        AVISOS.avisar('cartola_incorp_pendiente', {
+          titulo: '⏰ Incorporación a cartola por aprobar — OP ' + (f.num_op || ''),
+          mensaje: `${quien} confirmó la OP ${f.num_op} (${f.nombre_dealer || 's/dealer'}) con comisión $${Number(f.comision || 0).toLocaleString('es-CL')}, cuando corresponde $${Number(motor || 0).toLocaleString('es-CL')}. Requiere tu aprobación.`,
+          href: '/aprobaciones/?tab=cartolas',
+        }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
+      }
       auditar({ req, accion: 'CREAR', modulo: 'cartolas', entidad: 'cartola_incorporacion', entidad_id: r.insertId,
         detalle: `OP ${f.num_op}: ${estado === 'APROBADA' ? 'incorporada a cartola' : 'PENDIENTE de analista (' + ex.map(x => x.tipo).join(', ') + ')'}` });
     }
@@ -219,6 +244,14 @@ const resolver = async (req, res) => {
       [aprobar ? 'APROBADA' : 'RECHAZADA', comentario, req.usuario.id_usuario, quien, i.id]);
     auditar({ req, accion: 'EDITAR', modulo: 'cartolas', entidad: 'cartola_incorporacion', entidad_id: i.id,
       detalle: `OP ${i.num_op} ${aprobar ? 'APROBADA' : 'RECHAZADA'} por analista: ${comentario}` });
+    // Campanita: a quien la solicitó (analista de operaciones) + ambos pools.
+    // `extra` asegura al solicitante aunque el mantenedor de Avisos lo excluya.
+    AVISOS.avisar('cartola_incorp_resuelta', {
+      titulo: (aprobar ? '✅ Incorporación APROBADA' : '🔴 Incorporación RECHAZADA') + ' — OP ' + (i.num_op || ''),
+      mensaje: `${quien} ${aprobar ? 'aprobó' : 'rechazó'} la incorporación de la OP ${i.num_op} (${i.nombre_dealer || 's/dealer'}), comisión $${Number(i.comision || 0).toLocaleString('es-CL')}.`
+        + ` Motivo: ${comentario}` + (aprobar ? ' La operación ya está en la cartola.' : ' NO entró a la cartola.'),
+      href: '/aprobaciones/?tab=cartolas',
+    }, { excluir: [req.usuario.id_usuario], extra: i.solicitado_por ? [i.solicitado_por] : [] }).catch(() => {});
     res.json({ success: true, data: { estado: aprobar ? 'APROBADA' : 'RECHAZADA' }, error: null });
   } catch (e) { console.error('[cartolas resolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
