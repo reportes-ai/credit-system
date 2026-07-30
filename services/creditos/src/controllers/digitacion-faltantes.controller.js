@@ -339,7 +339,9 @@ exports.dealerBuscar = async (req, res) => {
     const qd = q.replace(/\D/g, '');                 // dígitos del RUT/número buscado
     // Sin filtro por `activo`: se muestran TODOS los dealers (activo es marcador de operación
     // reciente, no habilitación). RUT se compara por dígitos (ignora puntos y guion).
-    const cond = ['nombre_indexa LIKE ?', 'nombre_razon LIKE ?', 'numero LIKE ?'];
+    // UPPER en ambos lados: la collation de estas columnas distingue mayúsculas
+    // (buscar "valderrama" devolvía 0 y "VALDERRAMA" devolvía 5).
+    const cond = ['UPPER(nombre_indexa) LIKE UPPER(?)', 'UPPER(nombre_razon) LIKE UPPER(?)', 'numero LIKE ?'];
     const params = [like, like, like];
     if (qd.length >= 3) { cond.push("REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','') LIKE ?"); params.push('%' + qd + '%'); }
     else { cond.push('rut LIKE ?'); params.push(like); }

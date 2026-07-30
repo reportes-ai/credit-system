@@ -91,10 +91,21 @@ require('../../../../shared/migrate').enFila('cartola-incorporaciones', async ()
 /* ── Comisión que CORRESPONDE, por el motor único ─────────────────────────── */
 async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombre_dealer }) {
   try {
-    const [[pizarra]] = await pool.query('SELECT * FROM parametros_credito LIMIT 1').catch(() => [[{}]]);
-    const [[dealerTabla]] = await pool.query(
-      'SELECT * FROM dealers WHERE REPLACE(REPLACE(rut,".",""),"-","") = REPLACE(REPLACE(?,".",""),"-","") LIMIT 1',
-      [rut_dealer || '']).catch(() => [[null]]);
+    // parametros_credito es CLAVE/VALOR (no columnas): se arma el mapa igual que
+    // calcular-operacion.js, si no la pizarra llega vacía y el % queda en 0.
+    const [prm] = await pool.query('SELECT clave, valor FROM parametros_credito').catch(() => [[]]);
+    const pizarra = {};
+    (prm || []).forEach(r => { pizarra[r.clave] = parseFloat(r.valor); });
+    // Tabla pactada del dealer: mismas columnas y misma normalización de RUT que el motor
+    const rutNorm = String(rut_dealer || '').replace(/[.\-\s]/g, '').toUpperCase();
+    let dealerTabla = null;
+    if (rutNorm) {
+      const [dr] = await pool.query(
+        `SELECT com_6_12, com_13_24, com_25_36, com_37, com_parque_6_12, com_parque_13_24, com_parque_25_36, com_parque_37
+           FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1`, [rutNorm])
+        .catch(() => [[]]);
+      dealerTabla = (dr && dr[0]) || null;
+    }
     let parqData = null;
     if (es_parque && nombre_dealer) {
       const [pr] = await pool.query(
@@ -104,7 +115,7 @@ async function comisionMotor({ rut_dealer, es_parque, saldo_precio, plazo, nombr
     }
     const cd = COM.comisionDealer(
       { saldo: saldo_precio, plazo, esParque: !!es_parque },
-      { dealerTabla: dealerTabla || null, parqData, pizarra: pizarra || {} });
+      { dealerTabla, parqData, pizarra });
     return cd ? cd.comdea_real : null;
   } catch (e) { console.error('[comisionMotor]', e.message); return null; }
 }
