@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — mantenedor central: todos los workflows de la Suite + escalamiento paramétrico -->
+<!-- v2.0 — quiénes por paso editables (matriz real de Perfiles y Permisos) + escalamiento -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,6 +25,18 @@
   .desc { font-size:.8rem; color:#64748b; margin:6px 0 10px; }
   .pasos { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
   .paso { background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; border-radius:8px; padding:4px 11px; font-size:.74rem; font-weight:600; }
+  .paso.edit { cursor:pointer; }
+  .paso.edit:hover { background:#dbeafe; border-color:var(--blue); }
+  .paso .qn { display:block; font-size:.62rem; font-weight:500; color:#64748b; margin-top:1px; }
+  dialog { border:none; border-radius:16px; padding:0; max-width:640px; width:94vw; box-shadow:0 24px 64px rgba(0,0,0,.35); }
+  dialog::backdrop { background:rgba(2,13,40,.55); }
+  .dlg-head { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; padding:13px 20px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0; }
+  .dlg-body { padding:16px 20px; max-height:62vh; overflow:auto; }
+  .dlg-foot { padding:13px 20px; border-top:1px solid #e5e7eb; display:flex; gap:10px; justify-content:flex-end; align-items:center; }
+  .col-lbl { font-size:.7rem; font-weight:800; text-transform:uppercase; color:#64748b; margin:12px 0 5px; }
+  .lista-chk { border:1px solid #e2e8f0; border-radius:9px; padding:7px 12px; max-height:190px; overflow:auto; }
+  .lista-chk label { display:block; font-size:.82rem; padding:1px 0; }
+  .ov-sel { border:1px solid #d1d5db; border-radius:6px; font-size:.72rem; padding:1px 4px; }
   .flecha { color:#94a3b8; font-size:.8rem; }
   .wf-foot { display:flex; align-items:center; gap:14px; flex-wrap:wrap; border-top:1px solid #f1f5f9; padding-top:10px; font-size:.8rem; }
   .wf-foot input[type=number] { border:1.5px solid #d1d5db; border-radius:8px; padding:5px 9px; width:76px; font-size:.82rem; }
@@ -63,10 +75,26 @@
       <li><b>Horas de escalamiento</b> → cuándo suena la campanita <i>"Escalamiento: …"</i> por ítems detenidos, en cada módulo de operación (Cartas, Fundantes, Post Venta, Órdenes de Pago). El motor revisa cada 30 minutos y no repite hasta cumplirse otro ciclo de horas.</li>
       <li><b>Interruptor Activo</b> → apaga el escalamiento de ese workflow (el flujo sigue funcionando igual; solo deja de alarmar).</li>
       <li><b>Destinatarios de cada alarma</b> → se configuran por perfil/persona en <a href="/mantenedores/avisos/">Avisos</a> (eventos <code>Escalamiento: …</code> del módulo Workflows).</li>
+      <li><b>Quiénes por paso</b> → click en cualquier paso con el ícono de personas: casillas por cargo y excepciones por persona. Edita la <b>misma matriz</b> de <a href="/usuarios/">Perfiles y Permisos</a> (define quién digita, quién conforma el pool, quién aprueba, quién paga…). Aplica en ~1 minuto.</li>
       <li><b>La estructura de cada flujo NO se cambia aquí</b> → cada workflow se configura en su propio mantenedor (link "Configurar" de cada card). Compras tiene motor de recordatorios propio por nivel.</li>
     </ul>
   </div>
 </div>
+<dialog id="dlgPaso">
+  <div class="dlg-head"><h5 style="margin:0;font-weight:700;font-size:.95rem" id="pTitulo">Paso</h5>
+    <button class="btnx" style="background:rgba(255,255,255,.15)" onclick="dlgPaso.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body">
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 4px"><i class="bi bi-info-circle"></i> Esto edita la <b>misma matriz</b> de <a href="/usuarios/">Perfiles y Permisos</a> (una sola fuente). Los cambios aplican en ~1 minuto.</p>
+    <div class="col-lbl">Por cargo (perfil)</div>
+    <div class="lista-chk" id="pPerfiles"></div>
+    <div class="col-lbl">Por persona (excepciones al cargo)</div>
+    <div class="lista-chk" id="pUsuarios"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btnx" style="background:#f1f5f9;color:#475569" onclick="dlgPaso.close()">Cancelar</button>
+    <button class="btnx" onclick="guardarPaso()"><i class="bi bi-save me-1"></i>Guardar quiénes</button>
+  </div>
+</dialog>
 <div class="toast" id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
@@ -107,7 +135,12 @@ async function cargar() {
           </span>
         </div>
         <div class="desc">${esc(w.descripcion)}</div>
-        <div class="pasos">${w.pasos.map(p => `<span class="paso">${esc(p)}</span>`).join('<i class="bi bi-arrow-right flecha"></i>')}</div>
+        <div class="pasos">${w.pasos.map(p => {
+          const quien = p.quienes ? (p.quienes.length ? (p.quienes.length <= 2 ? p.quienes.join(', ') : p.quienes.length + ' cargos') : 'sin cargos !') : (p.nota || null);
+          return p.func
+            ? `<span class="paso edit" onclick="abrirPaso('${esc(p.func)}')" title="Click: definir quiénes pueden este paso">${esc(p.label)} <i class="bi bi-people-fill" style="font-size:.68rem"></i><span class="qn">${esc(quien)}</span></span>`
+            : `<span class="paso">${esc(p.label)}${quien ? `<span class="qn">${esc(quien)}</span>` : ''}</span>`;
+        }).join('<i class="bi bi-arrow-right flecha"></i>')}</div>
         ${w.medible ? `<div class="wf-foot">
           <label class="sw"><input type="checkbox" id="act_${w.codigo}" ${w.activo?'checked':''}><span></span></label>
           <span><i class="bi bi-alarm" style="color:#b45309"></i> Escalar si un ítem lleva más de</span>
@@ -128,6 +161,38 @@ async function guardar(codigo) {
   const j = await fetch('/api/workflows/' + codigo, { method:'PUT', headers: HJ, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => null);
   if (j && j.success) { toast('Escalamiento guardado'); cargar(); }
+  else toast((j && j.error) || 'Error al guardar', false);
+}
+
+let PASO = null;
+async function abrirPaso(func) {
+  const j = await fetch('/api/workflows/paso/' + func, { headers: H }).then(r => r.json()).catch(() => null);
+  if (!j || !j.success) return toast((j && j.error) || 'Error', false);
+  PASO = func;
+  document.getElementById('pTitulo').textContent = 'Quiénes pueden: ' + j.data.nombre;
+  document.getElementById('pPerfiles').innerHTML = j.data.perfiles.map(p => `
+    <label><input type="checkbox" class="pP" value="${p.id_perfil}" ${p.habilitado ? 'checked' : ''}> ${esc(p.nombre)}</label>`).join('');
+  document.getElementById('pUsuarios').innerHTML = j.data.usuarios.map(u => `
+    <label style="display:flex;gap:8px;align-items:center">
+      <select class="pU ov-sel" data-id="${u.id_usuario}">
+        <option value="" ${u.override == null ? 'selected' : ''}>según cargo</option>
+        <option value="1" ${u.override === 1 ? 'selected' : ''}>SÍ (forzar)</option>
+        <option value="0" ${u.override === 0 ? 'selected' : ''}>NO (bloquear)</option>
+      </select>
+      <span>${esc(u.nombre)} <span style="color:#94a3b8;font-size:.72rem">(${esc(u.perfil || '')})</span></span>
+    </label>`).join('');
+  document.getElementById('dlgPaso').showModal();
+}
+async function guardarPaso() {
+  const perfiles = [...document.querySelectorAll('.pP:checked')].map(c => Number(c.value));
+  const usuarios_si = [], usuarios_no = [];
+  document.querySelectorAll('.pU').forEach(sel => {
+    if (sel.value === '1') usuarios_si.push(Number(sel.dataset.id));
+    if (sel.value === '0') usuarios_no.push(Number(sel.dataset.id));
+  });
+  const j = await fetch('/api/workflows/paso/' + PASO, { method: 'PUT', headers: HJ,
+    body: JSON.stringify({ perfiles, usuarios_si, usuarios_no }) }).then(r => r.json()).catch(() => null);
+  if (j && j.success) { document.getElementById('dlgPaso').close(); toast('Quiénes guardados — aplica en ~1 min'); cargar(); }
   else toast((j && j.error) || 'Error al guardar', false);
 }
 
