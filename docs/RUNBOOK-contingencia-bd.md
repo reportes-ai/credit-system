@@ -292,6 +292,19 @@ que una caída larga de Render es tiempo fuera de servicio.
 **Lo que SÍ está a favor**: los datos no corren riesgo — viven en TiDB, no en Render. Cuando
 Render vuelve, el sistema vuelve tal cual estaba.
 
+**🐳 Salvavidas que SÍ existe (nunca ensayado en emergencia, pero está armado): levantar la
+Suite en un computador cualquiera con Docker.** No reemplaza a un host público —solo sirve en
+la red local— pero permite seguir operando internamente mientras Render no vuelve:
+
+```bash
+node scripts/volcar-bd.js       # vuelca la BD (usa el .env actual) → docker/init/dump.sql
+docker-compose up -d --build    # levanta MySQL 8 + la app en http://localhost:3000
+```
+
+Requiere Docker Desktop instalado y el repositorio clonado. El `Dockerfile` y el
+`docker-compose.yml` del repo existen **solo para esto** (producción corre como servicio Node,
+no con Docker). Pendiente: ensayarlo una vez de verdad y cronometrar cuánto toma.
+
 ---
 
 ## 12. Se cayó GitHub
