@@ -89,6 +89,20 @@ require('../../../../shared/migrate').enFila('digitacion-faltantes', async () =>
     `ALTER TABLE digitacion_log ADD COLUMN accion   VARCHAR(12) DEFAULT 'guardar'`,  // guardar | saltar
     `ALTER TABLE digitacion_log ADD COLUMN segundos INT NULL`,                        // desde que cayó hasta grabar
   ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[digitacion_log alter]', e.message); } }
+
+  // Seed de la funcionalidad (en prod ya existe en BD; esto cubre instalación desde cero)
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='digitacion_faltantes' LIMIT 1");
+    if (!ex) {
+      const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Créditos' OR ruta LIKE '/creditos%' LIMIT 1");
+      if (mod) {
+        const [r] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Digitación Datos Faltantes', 'digitacion_faltantes', '/carga-masiva/digitacion/', 'bi-pencil-square')",
+          [mod.id_modulo]);
+        await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [r.insertId]);
+      }
+    }
+  } catch (e) { console.error('[digitacion_faltantes seed]', e.message); }
 });
 
 /* ── Construcción del WHERE de pendientes ───────────────────────────────── */
