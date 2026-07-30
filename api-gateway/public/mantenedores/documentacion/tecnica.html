@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.3 — Mudanza a Virginia (74ms->4ms) + barrido de referencias obsoletas: check de memoria paramétrico (medía sobre 512 MB), Oregon, plan y URL del servicio viejo -->
+<!-- v4.4 — Capitulo "Costo de las consultas: sondeos del navegador (Request Units)": TiDB cobra por consulta, /api/mantenimiento hacia 6 por llamada cada 12s, ahora cacheado y a 30s -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -139,6 +139,18 @@
     <tr><td>Costo real ≠ precio del plan</td><td>Render se factura con excesos sobre lo incluido (bandwidth y dominios adicionales), así que el gasto efectivo supera el precio de lista de la instancia. El monto que se carga en la card debe ser el de <b>Billing → Unbilled Charges</b>, no el del plan.</td></tr>
     <tr><td>Costos variables</td><td><b>Claude/IA</b> se calcula EN VIVO desde <code>ia_uso</code> (no se digita). <b>Meta WhatsApp</b> cobra por conversación y <b>DealerNet</b> por consulta: son variables y su nota lo declara.</td></tr>
     <tr><td>Instancia de Render</td><td>El cuello es la <b>memoria</b>, no la CPU: el check "Memoria del servidor" del informe de Salud alerta al 70%. Ese check es el disparador objetivo para subir de instancia.</td></tr>
+  </table>
+
+  <h2>Costo de las consultas: sondeos del navegador (Request Units)</h2>
+  <p style="font-size:.9rem;color:#475569"><b>TiDB cobra por consulta, no por plan fijo</b> (Request Units; el almacenamiento marca US$0). Eso convierte cada consulta repetitiva en gasto real, y el gasto <b>escala con la cantidad de usuarios conectados</b>. Como el navegador no puede recibir avisos del servidor, varias funciones de tiempo real funcionan con <b>sondeo</b> (poll) — y ahí es donde se acumula el costo.</p>
+  <table>
+    <tr><th>Sondeo</th><th>Detalle</th></tr>
+    <tr><td>/api/mantenimiento<br>(cada 30 s)</td><td>Canal de tiempo real de la Suite: overlay de mantención, cinta de Modo Desarrollo, anuncios globales con sonido, comunicados dirigidos, lanzamiento de juegos y flag break-glass. <b>Corregido 30-07-2026</b>: hacía <b>6 consultas por llamada</b> —4 de ellas a la misma tabla <code>mantenimiento_config</code>, que cambia una vez cada varios meses— cada 12 s por pestaña. Ahora: <b>una sola query con caché en memoria de 5 s</b> (<code>cfgMap()</code>) + caché de 5 min del flag break-glass, y el sondeo a 30 s. Con ~15 usuarios: de ~450 consultas/min a ~70. <b>Las escrituras invalidan el caché</b> (<code>invalidarCfg()</code> en setEstado/setDev/setJuego), así que activar la mantención o lanzar un juego sigue siendo inmediato.</td></tr>
+    <tr><td>/api/notif/aviso-linea<br>(cada 30 s)</td><td>Avisos en Línea (broadcast tipo push a los conectados). Subido de 20 a 30 s para alinearlo con los demás.</td></tr>
+    <tr><td>/api/notif<br>(cada 30 s)</td><td>Campanita. <b>Está bien</b>: 2 consultas por llamada, ambas indexadas por <code>id_usuario</code>. No requiere cambios.</td></tr>
+    <tr><td>/api/desempeno/ping<br>(cada 60 s)</td><td>Heartbeat de sesión (informe de Desempeño Analistas). Es una <b>escritura</b> (<code>UPDATE sesiones_usuario</code>), más cara en RU que una lectura.</td></tr>
+    <tr><td><b>Regla al agregar un sondeo</b></td><td>Antes de crear un poll nuevo preguntarse: <b>¿cuántas consultas cuesta cada llamada, y cuántas pestañas × usuarios lo van a ejecutar?</b> Si el dato es igual para todos, <b>cachearlo en el servidor</b> (una consulta sirve a todos) en vez de bajar la frecuencia — así el usuario no pierde inmediatez. Bajar la frecuencia solo cuando el retardo sea inofensivo.</td></tr>
+    <tr><td>Medición</td><td>TiDB Cloud → clúster → <b>Diagnosis → SQL Statement</b>, rango de un día completo, ordenado por <b>Total RU</b> (no por latencia). El panel <b>Billing → Usage Details</b> separa Request Units de Storage. <b>Pendiente</b>: julio cerró con 155,9 M de RU (US$9,60) y lo identificado hasta ahora explica solo una fracción — falta la medición de un día con gente trabajando.</td></tr>
   </table>
 
   <h2>Variables de entorno (Render)</h2>
