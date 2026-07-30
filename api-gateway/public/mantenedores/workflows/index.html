@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — quiénes por paso editables (matriz real de Perfiles y Permisos) + escalamiento -->
+<!-- v2.1 — escalamiento a JEFATURA: tras N ciclos sin resolver, alarma al jefe directo (id_supervisor) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -73,6 +73,7 @@
   <div class="afecta"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este mantenedor</b>
     <ul>
       <li><b>Horas de escalamiento</b> → cuándo suena la campanita <i>"Escalamiento: …"</i> por ítems detenidos, en cada módulo de operación (Cartas, Fundantes, Post Venta, Órdenes de Pago). El motor revisa cada 30 minutos y no repite hasta cumplirse otro ciclo de horas.</li>
+      <li><b>Escalar al jefe directo</b> → tras N avisos seguidos sin resolverse, la alarma sube al <b>jefe directo</b> (campo supervisor de <a href="/usuarios/">Usuarios</a>, el mismo que aprueba vacaciones) de quienes pueden destrancar el paso, con el evento <i>"ESCALADO A JEFATURA"</i>. El contador se reinicia solo cuando el workflow se destranca.</li>
       <li><b>Interruptor Activo</b> → apaga el escalamiento de ese workflow (el flujo sigue funcionando igual; solo deja de alarmar).</li>
       <li><b>Destinatarios de cada alarma</b> → se configuran por perfil/persona en <a href="/mantenedores/avisos/">Avisos</a> (eventos <code>Escalamiento: …</code> del módulo Workflows).</li>
       <li><b>Quiénes por paso</b> → click en cualquier paso con el ícono de personas: casillas por cargo y excepciones por persona. Edita la <b>misma matriz</b> de <a href="/usuarios/">Perfiles y Permisos</a> (define quién digita, quién conforma el pool, quién aprueba, quién paga…). Aplica en ~1 minuto.</li>
@@ -146,6 +147,9 @@ async function cargar() {
           <span><i class="bi bi-alarm" style="color:#b45309"></i> Escalar si un ítem lleva más de</span>
           <input type="number" min="1" max="720" id="hrs_${w.codigo}" value="${w.recordatorio_horas || 24}">
           <span>horas detenido</span>
+          <span style="border-left:1.5px solid #e2e8f0;padding-left:14px"><i class="bi bi-person-up" style="color:#b91c1c"></i> Escalar al <b>jefe directo</b> tras</span>
+          <input type="number" min="0" max="20" id="cj_${w.codigo}" value="${w.ciclos_jefe}" style="width:56px">
+          <span>avisos sin resolver <span style="color:#94a3b8;font-size:.72rem">(0 = nunca)</span></span>
           <button class="btnx" onclick="guardar('${w.codigo}')"><i class="bi bi-save me-1"></i>Guardar</button>
           ${w.ultima_alarma ? `<span style="color:#94a3b8;font-size:.72rem;margin-left:auto">última alarma: ${fmtF(w.ultima_alarma)}</span>` : ''}
         </div>` : `<div class="wf-foot" style="color:#94a3b8">Sin métrica de escalamiento — este flujo se monitorea desde su módulo.</div>`}
@@ -157,6 +161,7 @@ async function guardar(codigo) {
   const body = {
     recordatorio_horas: parseInt(document.getElementById('hrs_' + codigo).value) || 0,
     activo: document.getElementById('act_' + codigo).checked,
+    ciclos_jefe: parseInt(document.getElementById('cj_' + codigo).value) || 0,
   };
   const j = await fetch('/api/workflows/' + codigo, { method:'PUT', headers: HJ, body: JSON.stringify(body) })
     .then(r => r.json()).catch(() => null);

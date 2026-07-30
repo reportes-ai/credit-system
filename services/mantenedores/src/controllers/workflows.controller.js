@@ -22,7 +22,7 @@ const AVISOS = require('../../../../shared/avisos');
    horas = placeholder `?` (una sola vez). Devuelve { n } = ítems estancados. */
 const CATALOGO = [
   {
-    codigo: 'cartas_revision', modulo: 'Cartas de Aprobación', nombre: 'Revisión de cartas (pool de analistas)',
+    codigo: 'cartas_revision', func_responsable: 'aprob_revisar', modulo: 'Cartas de Aprobación', nombre: 'Revisión de cartas (pool de analistas)',
     pasos: [
       { label: 'Digitación (Generador)', func: 'aprob_crear' },
       { label: 'Pool de revisión (analistas)', func: 'aprob_revisar' },
@@ -35,7 +35,7 @@ const CATALOGO = [
     horas: 4,
   },
   {
-    codigo: 'fundantes', modulo: 'Fundantes', nombre: 'Validación de documentos fundantes',
+    codigo: 'fundantes', func_responsable: 'fundantes_validar', modulo: 'Fundantes', nombre: 'Validación de documentos fundantes',
     pasos: [
       { label: 'Ejecutivo envía docs', func: 'fundantes_seguimiento' },
       { label: 'Validación', func: 'fundantes_validar' },
@@ -48,7 +48,7 @@ const CATALOGO = [
     horas: 24,
   },
   {
-    codigo: 'comision_factura', modulo: 'Post Venta', nombre: 'Factura de comisión del dealer',
+    codigo: 'comision_factura', func_responsable: 'postventa_seguimiento', modulo: 'Post Venta', nombre: 'Factura de comisión del dealer',
     pasos: [
       { label: 'Crédito otorgado' },
       { label: 'Cartola enviada', func: 'aprob_cartolas' },
@@ -65,7 +65,7 @@ const CATALOGO = [
     horas: 120,
   },
   {
-    codigo: 'comision_odp', modulo: 'Post Venta', nombre: 'Emisión ODP de comisión',
+    codigo: 'comision_odp', func_responsable: 'pv_com_orden_emitir', modulo: 'Post Venta', nombre: 'Emisión ODP de comisión',
     pasos: [
       { label: 'Factura recibida', func: 'postventa_seguimiento' },
       { label: 'ODP emitida', func: 'pv_com_orden_emitir' },
@@ -80,7 +80,7 @@ const CATALOGO = [
     horas: 48,
   },
   {
-    codigo: 'comision_pago', modulo: 'Post Venta', nombre: 'Pago de comisión al dealer',
+    codigo: 'comision_pago', func_responsable: 'pv_com_pagar', modulo: 'Post Venta', nombre: 'Pago de comisión al dealer',
     pasos: [
       { label: 'ODP emitida', func: 'pv_com_orden_emitir' },
       { label: 'Enviado a pago', func: 'pv_com_seleccionar' },
@@ -94,7 +94,7 @@ const CATALOGO = [
     horas: 72,
   },
   {
-    codigo: 'saldo_odp', modulo: 'Post Venta', nombre: 'Emisión ODP de saldo precio',
+    codigo: 'saldo_odp', func_responsable: 'pv_orden_emitir', modulo: 'Post Venta', nombre: 'Emisión ODP de saldo precio',
     pasos: [
       { label: 'Fundantes recibidos', func: 'postventa_seguimiento' },
       { label: 'Fondos recibidos (cuenta de paso)', func: 'postventa_seguimiento' },
@@ -109,7 +109,7 @@ const CATALOGO = [
     horas: 24,
   },
   {
-    codigo: 'saldo_pago', modulo: 'Post Venta', nombre: 'Pago de saldo precio al dealer',
+    codigo: 'saldo_pago', func_responsable: 'postventa_saldos_pagar', modulo: 'Post Venta', nombre: 'Pago de saldo precio al dealer',
     pasos: [
       { label: 'ODP emitida', func: 'pv_orden_emitir' },
       { label: 'Enviado a pago', func: 'pv_nomina_generar' },
@@ -123,7 +123,7 @@ const CATALOGO = [
     horas: 48,
   },
   {
-    codigo: 'odp_proveedores', modulo: 'Órdenes de Pago', nombre: 'Pago de órdenes a proveedores',
+    codigo: 'odp_proveedores', func_responsable: 'ordenes_pago_historial', modulo: 'Órdenes de Pago', nombre: 'Pago de órdenes a proveedores',
     pasos: [
       { label: 'ODP emitida', func: 'ordenes_pago_emitir' },
       { label: 'Pagada (asiento automático)', func: 'ordenes_pago_historial' },
@@ -134,7 +134,7 @@ const CATALOGO = [
     horas: 120,
   },
   {
-    codigo: 'compras', modulo: 'Compras', nombre: 'Aprobación de órdenes de compra',
+    codigo: 'compras', func_responsable: 'compras_revision', modulo: 'Compras', nombre: 'Aprobación de órdenes de compra',
     pasos: [
       { label: 'Pedidos', func: 'compras' },
       { label: 'Consolidación', func: 'compras_admin' },
@@ -170,6 +170,9 @@ require('../../../../shared/migrate').enFila('workflows-escalamiento', async () 
       activo TINYINT NOT NULL DEFAULT 1,
       ultima_alarma DATETIME NULL,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`);
+    // Escalamiento a JEFATURA: tras N ciclos de alarma sin resolverse, sube al jefe
+    await pool.query('ALTER TABLE wf_registro ADD COLUMN IF NOT EXISTS ciclos_jefe INT NOT NULL DEFAULT 2').catch(() => {});
+    await pool.query('ALTER TABLE wf_registro ADD COLUMN IF NOT EXISTS ciclos_seguidos INT NOT NULL DEFAULT 0').catch(() => {});
     for (const w of CATALOGO)
       await pool.query('INSERT IGNORE INTO wf_registro (codigo, recordatorio_horas, activo) VALUES (?,?,?)',
         [w.codigo, w.horas, w.horas > 0 ? 1 : 0]);
@@ -201,6 +204,26 @@ for (const w of CATALOGO) if (w.stuck) AVISOS.registrarAviso({
   perfiles: '', incluir_admin: 1, prioridad: 'alta', sonido_tipo: 'dingdong',
 });
 
+AVISOS.registrarAviso({
+  evento: 'wf_esc_jefatura', modulo: 'Workflows',
+  nombre: 'ESCALADO A JEFATURA: workflow sin resolver',
+  descripcion: 'Un workflow acumuló varios ciclos de alarma sin resolverse: se avisa al JEFE DIRECTO (usuarios.id_supervisor) de quienes pueden destrancar el paso. Acá se agregan destinatarios extra.',
+  perfiles: '', incluir_admin: 1, prioridad: 'alta', sonido_tipo: 'alarma',
+});
+
+/* Jefes directos de quienes pueden ejecutar el paso responsable (matriz + id_supervisor) */
+async function jefesDe(func) {
+  try {
+    const responsables = await AVISOS.porFuncionalidad(func);
+    if (!responsables.length) return [];
+    const [rows] = await pool.query(
+      `SELECT DISTINCT s.id_usuario FROM usuarios u
+         JOIN usuarios s ON s.id_usuario = u.id_supervisor AND s.estado = 'activo'
+        WHERE u.id_usuario IN (?)`, [responsables]);
+    return rows.map(r => r.id_usuario);
+  } catch (e) { return []; }
+}
+
 /* ── Motor de escalamiento (cada 30 min) ── */
 async function escalar() {
   try {
@@ -211,13 +234,27 @@ async function escalar() {
       // No repetir la alarma hasta que pase otro ciclo completo de horas
       if (r.ultima_alarma && (Date.now() - new Date(r.ultima_alarma).getTime()) / 36e5 < r.recordatorio_horas) continue;
       const [[{ n }]] = await pool.query(w.stuck, [r.recordatorio_horas]);
-      if (!n) continue;
-      await pool.query('UPDATE wf_registro SET ultima_alarma=NOW() WHERE codigo=?', [r.codigo]);
+      if (!n) {   // se destrancó: el contador de ciclos vuelve a cero
+        if (r.ciclos_seguidos) await pool.query('UPDATE wf_registro SET ciclos_seguidos=0 WHERE codigo=?', [r.codigo]);
+        continue;
+      }
+      const ciclos = (r.ciclos_seguidos || 0) + 1;
+      await pool.query('UPDATE wf_registro SET ultima_alarma=NOW(), ciclos_seguidos=? WHERE codigo=?', [ciclos, r.codigo]);
       await AVISOS.avisar('wf_esc_' + r.codigo, {
         titulo: '⏰ ' + w.nombre + ': ' + n + ' detenida' + (n === 1 ? '' : 's'),
-        mensaje: `${n} ítem${n === 1 ? '' : 's'} lleva${n === 1 ? '' : 'n'} más de ${r.recordatorio_horas} h sin avanzar en "${w.nombre}".`,
+        mensaje: `${n} ítem${n === 1 ? '' : 's'} lleva${n === 1 ? '' : 'n'} más de ${r.recordatorio_horas} h sin avanzar en "${w.nombre}".` + (ciclos > 1 ? ` (${ciclos}° aviso)` : ''),
         href: w.operar,
       }).catch(() => {});
+      // ESCALAMIENTO A JEFATURA: tras N ciclos sin resolverse, al jefe directo
+      // (usuarios.id_supervisor) de quienes pueden destrancar el paso responsable.
+      if (w.func_responsable && r.ciclos_jefe > 0 && ciclos >= r.ciclos_jefe && (ciclos - r.ciclos_jefe) % r.ciclos_jefe === 0) {
+        const jefes = await jefesDe(w.func_responsable);
+        await AVISOS.avisar('wf_esc_jefatura', {
+          titulo: '🚨 ESCALADO A JEFATURA — ' + w.nombre,
+          mensaje: `"${w.nombre}" acumula ${ciclos} avisos sin resolverse (${n} ítem${n === 1 ? '' : 's'} detenido${n === 1 ? '' : 's'} > ${r.recordatorio_horas} h). Tu equipo es responsable de destrancarlo.`,
+          href: w.operar,
+        }, { extra: jefes }).catch(() => {});
+      }
     }
   } catch (e) { console.error('[workflows escalar]', e.message); }
 }
@@ -252,6 +289,7 @@ const getAll = async (req, res) => {
         pasos: w.pasos.map(p => ({ ...p, quienes: p.func ? (quienesPorFunc[p.func] || []) : null })),
         operar: w.operar, configurar: w.configurar, medible: !!w.stuck,
         recordatorio_horas: r.recordatorio_horas, activo: !!r.activo,
+        ciclos_jefe: r.ciclos_jefe != null ? r.ciclos_jefe : 2, ciclos_seguidos: r.ciclos_seguidos || 0,
         ultima_alarma: r.ultima_alarma || null, estancados,
       });
     }
@@ -265,12 +303,13 @@ const setUno = async (req, res) => {
     if (!w) return res.status(404).json({ success: false, data: null, error: 'Workflow desconocido' });
     const horas = Math.max(0, parseInt(req.body.recordatorio_horas, 10) || 0);
     const activo = req.body.activo ? 1 : 0;
+    const ciclosJefe = Math.max(0, parseInt(req.body.ciclos_jefe, 10) || 0);
     await pool.query(
-      `INSERT INTO wf_registro (codigo, recordatorio_horas, activo) VALUES (?,?,?)
-       ON DUPLICATE KEY UPDATE recordatorio_horas=VALUES(recordatorio_horas), activo=VALUES(activo)`,
-      [w.codigo, horas, activo]);
+      `INSERT INTO wf_registro (codigo, recordatorio_horas, activo, ciclos_jefe) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE recordatorio_horas=VALUES(recordatorio_horas), activo=VALUES(activo), ciclos_jefe=VALUES(ciclos_jefe)`,
+      [w.codigo, horas, activo, ciclosJefe]);
     require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'workflow_escalamiento',
-      entidad_id: w.codigo, detalle: `Escalamiento de "${w.nombre}": ${activo ? horas + ' h' : 'desactivado'}` });
+      entidad_id: w.codigo, detalle: `Escalamiento de "${w.nombre}": ${activo ? horas + ' h' + (ciclosJefe ? ', jefatura tras ' + ciclosJefe + ' ciclos' : ', sin jefatura') : 'desactivado'}` });
     res.json({ success: true, data: { codigo: w.codigo, recordatorio_horas: horas, activo: !!activo }, error: null });
   } catch (e) { console.error('[workflows set]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
