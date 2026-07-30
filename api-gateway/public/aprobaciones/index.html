@@ -3119,7 +3119,12 @@ function scRender(){
   document.getElementById('scBody').innerHTML = SC.map((x,i)=>`<tr>
     <td><input type="checkbox" class="scChk" data-i="${i}" checked onchange="scResumen()"></td>
     <td><b>${x.num_op||''}</b><div style="font-size:.7rem;color:#94a3b8">${x.financiera||''}</div></td>
-    <td><input type="text" style="width:190px" value="${(x.nombre_dealer||'').replace(/"/g,'&quot;')}" onchange="SC[${i}].nombre_dealer=this.value"></td>
+    <td style="position:relative">
+      <input type="text" style="width:200px" id="scDl${i}" autocomplete="off" value="${(x.nombre_dealer||'').replace(/"/g,'&quot;')}"
+             oninput="scBuscarDealer(${i},this.value)" onblur="setTimeout(()=>scCerrarLista(${i}),180)">
+      <div id="scLista${i}" style="display:none;position:absolute;z-index:50;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:220px;overflow:auto;min-width:280px"></div>
+      <div id="scRut${i}" style="font-size:.7rem;color:#94a3b8">${x.rut_dealer||'sin RUT'}</div>
+    </td>
     <td><select onchange="SC[${i}].es_parque=+this.value;scCalc(${i})">
           <option value="0" ${!x.es_parque?'selected':''}>Calle</option>
           <option value="1" ${x.es_parque?'selected':''}>Parque</option></select></td>
@@ -3130,6 +3135,43 @@ function scRender(){
     <td id="scFlag${i}"></td></tr>`).join('');
   SC.forEach((_,i)=>scPintar(i));
   scResumen();
+}
+
+/* Autocompletado de dealer contra los creados en el sistema. Al elegir uno se trae
+   también su RUT y si es parque — el RUT es la llave con que el motor encuentra su
+   tabla de comisión, así que escribir solo el nombre dejaría el cálculo mal. */
+let scTimer = null;
+function scCerrarLista(i){ const l = document.getElementById('scLista'+i); if (l) l.style.display='none'; }
+
+function scBuscarDealer(i, q){
+  SC[i].nombre_dealer = q;
+  clearTimeout(scTimer);
+  const lista = document.getElementById('scLista'+i);
+  if (!q || q.trim().length < 2) { lista.style.display='none'; return; }
+  scTimer = setTimeout(async () => {
+    const j = await fetch('/api/cartolas/dealer-buscar?q=' + encodeURIComponent(q.trim()), { headers: hdr() }).then(r=>r.json()).catch(()=>null);
+    const items = (j && j.success) ? j.data : [];
+    if (!items.length) { lista.innerHTML = '<div style="padding:8px 12px;font-size:.78rem;color:#94a3b8">Sin coincidencias — se usará el nombre tal cual</div>'; lista.style.display=''; return; }
+    lista.innerHTML = items.map((d,k)=>`<div onmousedown="scElegirDealer(${i},${k})" style="padding:7px 12px;font-size:.8rem;cursor:pointer;border-bottom:1px solid #f1f5f9"
+        onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background=''">
+        <b>${(d.nombre||'').replace(/</g,'&lt;')}</b>
+        <div style="font-size:.72rem;color:#64748b">${d.rut||'sin RUT'}${d.tipo?' · '+d.tipo:''}${d.activo?'':' · inactivo'}</div></div>`).join('');
+    lista.dataset.items = JSON.stringify(items);
+    lista.style.display = '';
+  }, 250);
+}
+
+function scElegirDealer(i, k){
+  const lista = document.getElementById('scLista'+i);
+  const d = JSON.parse(lista.dataset.items||'[]')[k]; if (!d) return;
+  SC[i].nombre_dealer = d.nombre; SC[i].rut_dealer = d.rut || null;
+  if (d.tipo) SC[i].es_parque = d.tipo === 'PARQUE' ? 1 : 0;
+  document.getElementById('scDl'+i).value = d.nombre;
+  document.getElementById('scRut'+i).textContent = d.rut || 'sin RUT';
+  const sel = document.querySelectorAll('#scBody tr')[i].querySelector('select');
+  if (sel && d.tipo) sel.value = String(SC[i].es_parque);
+  scCerrarLista(i);
+  scCalc(i);   // el RUT y parque/calle cambian la comisión que corresponde
 }
 
 /* Recalcular la comisión que corresponde cuando cambian saldo, plazo o ubicación.

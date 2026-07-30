@@ -235,6 +235,10 @@ const resolver = async (req, res) => {
   try {
     const [[i]] = await pool.query("SELECT * FROM cartola_incorporaciones WHERE id = ? AND estado = 'PENDIENTE'", [req.params.id]);
     if (!i) return res.status(404).json({ success: false, data: null, error: 'Solicitud no encontrada o ya resuelta.' });
+    // Segregación de funciones: quien pidió la excepción NO puede aprobársela.
+    // (Analista de Operaciones tiene ambos permisos por herencia de aprob_revisar).
+    if (Number(i.solicitado_por) === Number(req.usuario.id_usuario))
+      return res.status(403).json({ success: false, data: null, error: 'No puedes aprobar una incorporación que solicitaste tú. Debe resolverla otro analista.' });
     const aprobar = String(req.body.accion || '').toUpperCase() === 'APROBAR';
     const comentario = String(req.body.comentario || '').trim();
     if (!comentario) return res.status(400).json({ success: false, data: null, error: 'El comentario es obligatorio: la comisión difiere de la que corresponde.' });
