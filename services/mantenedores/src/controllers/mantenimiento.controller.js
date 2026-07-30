@@ -31,28 +31,53 @@ require('../../../../shared/migrate').enFila('mantenimiento', async () => {
   } catch (e) { console.error('[mantenimiento migration]', e.message); }
 });
 
+/* ── Caché en memoria de mantenimiento_config (costo de Request Units) ──────────
+   Este endpoint lo consulta CADA pestaña de CADA usuario en bucle, y antes hacía
+   CUATRO lecturas separadas de esta misma tabla —que tiene un puñado de filas y
+   cambia una vez cada varios meses—. Ahora: una sola query con 5 s de caché.
+   Con 15 usuarios conectados pasa de ~450 consultas/min a menos de 15.
+   Las escrituras invalidan el caché (invalidarCfg), así que activar la mantención,
+   el Modo Desarrollo o lanzar un juego sigue surtiendo efecto de inmediato. */
+const CFG_TTL_MS = 5000;
+let _cfgMap = null, _cfgExp = 0;
+async function cfgMap() {
+  if (_cfgMap && Date.now() < _cfgExp) return _cfgMap;
+  const [rows] = await pool.query('SELECT clave, valor FROM mantenimiento_config');
+  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  _cfgMap = m; _cfgExp = Date.now() + CFG_TTL_MS;
+  return m;
+}
+const invalidarCfg = () => { _cfgMap = null; _cfgExp = 0; };
+
 const JUEGOS_OK = ['snake', 'runner', 'breakout', 'topo', 'catapulta', 'comeletras', 'escapistas', 'vidrio', 'terminal', 'clickloco'];
 async function leerJuego() {
-  const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'juego_%'");
-  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  const m = await cfgMap();
   return { activo: m.juego_activo === '1', nombre: m.juego_nombre || '', mensaje: m.juego_mensaje || '', nonce: m.juego_nonce || '' };
 }
 
+/* El flag break-glass de un usuario no cambia nunca en caliente: caché de 5 min
+   por usuario en vez de un SELECT a `usuarios` en cada sondeo. */
+const BG_TTL_MS = 5 * 60 * 1000;
+const _bgCache = new Map();
 async function esBreakGlass(id) {
-  try { const [[u]] = await pool.query('SELECT protegido FROM usuarios WHERE id_usuario = ? LIMIT 1', [id]); return !!(u && u.protegido); }
-  catch { return false; }
+  const hit = _bgCache.get(id);
+  if (hit && Date.now() < hit.exp) return hit.v;
+  try {
+    const [[u]] = await pool.query('SELECT protegido FROM usuarios WHERE id_usuario = ? LIMIT 1', [id]);
+    const v = !!(u && u.protegido);
+    _bgCache.set(id, { v, exp: Date.now() + BG_TTL_MS });
+    return v;
+  } catch { return false; }
 }
 
 async function leerConfig() {
-  const [rows] = await pool.query('SELECT clave, valor FROM mantenimiento_config');
-  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  const m = await cfgMap();
   return { activo: m.activo === '1', mensaje: m.mensaje || MSG_DEFAULT };
 }
 
 // Config del Modo Desarrollo (3 correos con rol to/cc/bcc + whatsapp de prueba).
 async function leerDev() {
-  const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'dev_%'");
-  const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+  const m = await cfgMap();
   const def = { 1: 'to', 2: 'cc', 3: 'bcc' };
   const correos = [1, 2, 3].map(i => ({
     email: m['dev_correo' + i] || '',
@@ -102,6 +127,7 @@ const setDev = async (req, res) => {
     await setKv('dev_activo', activo);
     for (let i = 0; i < 3; i++) { await setKv('dev_correo' + (i + 1), norm[i].email); await setKv('dev_correo' + (i + 1) + '_rol', norm[i].rol); }
     await setKv('dev_whatsapp', String(b.whatsapp || '').trim().slice(0, 30));
+    invalidarCfg();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'modo_desarrollo', entidad_id: 'config',
       detalle: `Modo Desarrollo ${activo === '1' ? 'ACTIVADO' : 'desactivado'}`, meta: { activo, correos: norm.filter(c => c.email).map(c => c.email + '(' + c.rol + ')') } });
     res.json({ success: true, data: await leerDev(), error: null });
@@ -118,6 +144,7 @@ const setEstado = async (req, res) => {
     if (!mensaje.trim()) mensaje = MSG_DEFAULT;
     await pool.query("INSERT INTO mantenimiento_config (clave, valor) VALUES ('activo', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [activo]);
     await pool.query("INSERT INTO mantenimiento_config (clave, valor) VALUES ('mensaje', ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [mensaje]);
+    invalidarCfg();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'mantenimiento_sistema', entidad_id: 'config',
       detalle: `Mantención ${activo === '1' ? 'ACTIVADA' : 'desactivada'}`, meta: { activo, mensaje } });
     res.json({ success: true, data: { activo: activo === '1', mensaje }, error: null });
@@ -139,6 +166,7 @@ const setJuego = async (req, res) => {
     await setKv('juego_nombre', nombre);
     await setKv('juego_mensaje', mensaje);
     if (activo === '1') await setKv('juego_nonce', String(Date.now()));   // instancia nueva → permite relanzar
+    invalidarCfg();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'humorada', entidad_id: 'config',
       detalle: `Humorada ${activo === '1' ? 'LANZADA (' + nombre + ')' : 'apagada'}`, meta: { activo, nombre, mensaje } });
     res.json({ success: true, data: await leerJuego(), error: null });

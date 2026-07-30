@@ -103,5 +103,5 @@
   window.AF_AVISO_PREVIA = av => { cola.push(av); procesarCola(); };
 
   revisar();
-  setInterval(revisar, 20000);
+  setInterval(revisar, 30000);   // antes 20 s — alineado con la campanita y mantención (costo de Request Units en TiDB)
 })();

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v163.16';
+const APP_VERSION = 'v163.17';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -1235,5 +1235,8 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (e) {}
   }
   chk();
-  setInterval(chk, 12000);
+  // 30 s (antes 12): cada pestaña de cada usuario consulta este endpoint en bucle y
+  // cada llamada costaba varias consultas a la BD (Request Units = plata en TiDB).
+  // Anuncios, comunicados y juegos toleran de sobra ese retardo.
+  setInterval(chk, 30000);
 });
