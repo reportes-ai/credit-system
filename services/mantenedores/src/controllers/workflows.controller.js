@@ -32,6 +32,7 @@ const CATALOGO = [
     operar: '/aprobaciones/', configurar: '/mantenedores/estado-creditos/',
     descripcion: 'Cartas digitadas esperando revisión de un analista de crédito.',
     stuck: "SELECT COUNT(*) n FROM cartas_aprobacion WHERE status='PENDIENTE' AND fecha_creacion < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT('Carta #', id, ' — ', COALESCE(cliente,'s/cliente')) ref, fecha_creacion desde FROM cartas_aprobacion WHERE status='PENDIENTE' AND fecha_creacion < NOW() - INTERVAL ? HOUR ORDER BY fecha_creacion LIMIT 30",
     horas: 4,
   },
   {
@@ -45,6 +46,7 @@ const CATALOGO = [
     operar: '/fundantes/', configurar: '/mantenedores/tipos-documento/',
     descripcion: 'Operaciones con fundantes ENVIADOS sin validar, o RECHAZADOS sin reenviar.',
     stuck: "SELECT COUNT(*) n FROM fundantes_seg WHERE estado IN ('ENVIADO','RECHAZADO') AND updated_at < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT('OP ', c.num_op, ' (', fs.estado, ')') ref, fs.updated_at desde FROM fundantes_seg fs JOIN creditos c ON c.id=fs.id_credito WHERE fs.estado IN ('ENVIADO','RECHAZADO') AND fs.updated_at < NOW() - INTERVAL ? HOUR ORDER BY fs.updated_at LIMIT 30",
     horas: 24,
   },
   {
@@ -62,6 +64,10 @@ const CATALOGO = [
             WHERE s.fecha_otorgado < NOW() - INTERVAL ? HOUR
               AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='FACTURA RECIBIDA')
               AND s.fecha_otorgado > NOW() - INTERVAL 90 DAY`,
+    det: `SELECT CONCAT('OP ', s.num_op) ref, s.fecha_otorgado desde FROM postventa_seguimiento s
+          WHERE s.fecha_otorgado < NOW() - INTERVAL ? HOUR
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='FACTURA RECIBIDA')
+            AND s.fecha_otorgado > NOW() - INTERVAL 90 DAY ORDER BY s.fecha_otorgado LIMIT 30`,
     horas: 120,
   },
   {
@@ -77,6 +83,9 @@ const CATALOGO = [
     stuck: `SELECT COUNT(*) n FROM postventa_etapas fr
             WHERE fr.track='COMISION' AND fr.etapa='FACTURA RECIBIDA' AND fr.fecha < NOW() - INTERVAL ? HOUR
               AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=fr.id_seguimiento AND e.track='COMISION' AND e.etapa='ORDEN DE PAGO EMITIDA')`,
+    det: `SELECT CONCAT('OP ', s.num_op) ref, fr.fecha desde FROM postventa_etapas fr JOIN postventa_seguimiento s ON s.id=fr.id_seguimiento
+          WHERE fr.track='COMISION' AND fr.etapa='FACTURA RECIBIDA' AND fr.fecha < NOW() - INTERVAL ? HOUR
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=fr.id_seguimiento AND e.track='COMISION' AND e.etapa='ORDEN DE PAGO EMITIDA') ORDER BY fr.fecha LIMIT 30`,
     horas: 48,
   },
   {
@@ -91,6 +100,9 @@ const CATALOGO = [
     stuck: `SELECT COUNT(*) n FROM postventa_etapas oe
             WHERE oe.track='COMISION' AND oe.etapa='ORDEN DE PAGO EMITIDA' AND oe.fecha < NOW() - INTERVAL ? HOUR
               AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=oe.id_seguimiento AND e.track='COMISION' AND e.etapa='COMISION PAGADA')`,
+    det: `SELECT CONCAT('OP ', s.num_op) ref, oe.fecha desde FROM postventa_etapas oe JOIN postventa_seguimiento s ON s.id=oe.id_seguimiento
+          WHERE oe.track='COMISION' AND oe.etapa='ORDEN DE PAGO EMITIDA' AND oe.fecha < NOW() - INTERVAL ? HOUR
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=oe.id_seguimiento AND e.track='COMISION' AND e.etapa='COMISION PAGADA') ORDER BY oe.fecha LIMIT 30`,
     horas: 72,
   },
   {
@@ -106,6 +118,9 @@ const CATALOGO = [
     stuck: `SELECT COUNT(*) n FROM postventa_etapas fr
             WHERE fr.track='SALDO' AND fr.etapa='FONDOS RECIBIDOS' AND fr.fecha < NOW() - INTERVAL ? HOUR
               AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=fr.id_seguimiento AND e.track='SALDO' AND e.etapa='ORDEN DE PAGO EMITIDA')`,
+    det: `SELECT CONCAT('OP ', s.num_op) ref, fr.fecha desde FROM postventa_etapas fr JOIN postventa_seguimiento s ON s.id=fr.id_seguimiento
+          WHERE fr.track='SALDO' AND fr.etapa='FONDOS RECIBIDOS' AND fr.fecha < NOW() - INTERVAL ? HOUR
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=fr.id_seguimiento AND e.track='SALDO' AND e.etapa='ORDEN DE PAGO EMITIDA') ORDER BY fr.fecha LIMIT 30`,
     horas: 24,
   },
   {
@@ -120,6 +135,9 @@ const CATALOGO = [
     stuck: `SELECT COUNT(*) n FROM postventa_etapas oe
             WHERE oe.track='SALDO' AND oe.etapa='ORDEN DE PAGO EMITIDA' AND oe.fecha < NOW() - INTERVAL ? HOUR
               AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=oe.id_seguimiento AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO')`,
+    det: `SELECT CONCAT('OP ', s.num_op) ref, oe.fecha desde FROM postventa_etapas oe JOIN postventa_seguimiento s ON s.id=oe.id_seguimiento
+          WHERE oe.track='SALDO' AND oe.etapa='ORDEN DE PAGO EMITIDA' AND oe.fecha < NOW() - INTERVAL ? HOUR
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=oe.id_seguimiento AND e.track='SALDO' AND e.etapa='SALDO PRECIO PAGADO') ORDER BY oe.fecha LIMIT 30`,
     horas: 48,
   },
   {
@@ -132,6 +150,7 @@ const CATALOGO = [
     descripcion: 'Órdenes de pago a proveedores EMITIDAS sin marcar pagadas.',
     // COALESCE: fecha_emision es nullable — sin él, ODP sin fecha jamás contarían como estancadas
     stuck: "SELECT COUNT(*) n FROM ordenes_pago WHERE estado='EMITIDA' AND COALESCE(fecha_emision, created_at) < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT(COALESCE(numero, CONCAT('ODP #', id)), ' — ', COALESCE(proveedor_nombre,'s/proveedor')) ref, COALESCE(fecha_emision, created_at) desde FROM ordenes_pago WHERE estado='EMITIDA' AND COALESCE(fecha_emision, created_at) < NOW() - INTERVAL ? HOUR ORDER BY desde LIMIT 30",
     horas: 120,
   },
   {
@@ -145,6 +164,7 @@ const CATALOGO = [
     operar: '/tesoreria/aplicacion-fondos', configurar: '/mantenedores/avisos/',
     descripcion: 'Aplicaciones de fondos con firmas pendientes (HECHO/REVISADO/APROBADO sin procesar).',
     stuck: "SELECT COUNT(*) n FROM aplicaciones_fondos WHERE estado IN ('HECHO','REVISADO','APROBADO') AND updated_at < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT(correlativo, ' — OP ', num_op, ' (', estado, ')') ref, updated_at desde FROM aplicaciones_fondos WHERE estado IN ('HECHO','REVISADO','APROBADO') AND updated_at < NOW() - INTERVAL ? HOUR ORDER BY updated_at LIMIT 30",
     horas: 48,
   },
   {
@@ -158,6 +178,7 @@ const CATALOGO = [
     operar: '/tesoreria/castigos.html', configurar: '/mantenedores/avisos/',
     descripcion: 'Solicitudes de castigo PENDIENTES esperando alguna de las dos firmas gerenciales.',
     stuck: "SELECT COUNT(*) n FROM castigos_contables WHERE estado='PENDIENTE' AND solicitado_at < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT('OP ', num_op, ' — ', motivo) ref, solicitado_at desde FROM castigos_contables WHERE estado='PENDIENTE' AND solicitado_at < NOW() - INTERVAL ? HOUR ORDER BY solicitado_at LIMIT 30",
     horas: 72,
   },
   {
@@ -170,7 +191,9 @@ const CATALOGO = [
     ],
     operar: '/dealers-incorporacion/', configurar: '/dealers-incorporacion/niveles.html',
     descripcion: 'Fichas de dealer esperando autorización o cierre — el dealer no puede operar hasta aprobarse.',
-    stuck: "SELECT COUNT(*) n FROM dealer_fichas WHERE estado IN ('PEND_AUTORIZACION','PEND_CIERRE') AND updated_at < NOW() - INTERVAL ? HOUR",
+    // TOMADA = ficha tomada para cierre y no terminada — también puede quedar botada
+    stuck: "SELECT COUNT(*) n FROM dealer_fichas WHERE estado IN ('PEND_AUTORIZACION','PEND_CIERRE','TOMADA') AND updated_at < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT(COALESCE(ficha_nombre, CONCAT('Ficha #', id)), ' (', estado, ')') ref, updated_at desde FROM dealer_fichas WHERE estado IN ('PEND_AUTORIZACION','PEND_CIERRE','TOMADA') AND updated_at < NOW() - INTERVAL ? HOUR ORDER BY updated_at LIMIT 30",
     horas: 48,
   },
   {
@@ -183,6 +206,7 @@ const CATALOGO = [
     operar: '/soporte/tickets-ti/', configurar: '/mantenedores/tickets-ti/',
     descripcion: 'Tiene SLA y escalamiento PROPIOS (mantenedor Tickets TI). Acá solo se monitorea.',
     stuck: "SELECT COUNT(*) n FROM ti_tickets WHERE cerrado_at IS NULL AND estado <> 'CERRADO' AND created_at < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT(COALESCE(codigo, CONCAT('#', id)), ' — ', asunto) ref, created_at desde FROM ti_tickets WHERE cerrado_at IS NULL AND estado <> 'CERRADO' AND created_at < NOW() - INTERVAL ? HOUR ORDER BY created_at LIMIT 30",
     horas: 0,   // nace apagado acá: escala su propio motor (como Compras)
   },
   {
@@ -208,6 +232,7 @@ const CATALOGO = [
     operar: '/soporte/compras-revision/', configurar: '/mantenedores/compras/',
     descripcion: 'Tiene motor de recordatorios PROPIO por nivel (mantenedor Compras → Workflow). Acá solo se monitorea.',
     stuck: "SELECT COUNT(*) n FROM compras_ordenes WHERE estado='EN_APROBACION' AND fecha < NOW() - INTERVAL ? HOUR",
+    det: "SELECT CONCAT('OC #', id, ' — nivel ', COALESCE(nivel_actual,'-'), ' ($', FORMAT(total,0), ')') ref, fecha desde FROM compras_ordenes WHERE estado='EN_APROBACION' AND fecha < NOW() - INTERVAL ? HOUR ORDER BY fecha LIMIT 30",
     horas: 0,   // nace apagado acá: escala su propio motor
   },
   {
@@ -237,6 +262,15 @@ require('../../../../shared/migrate').enFila('workflows-escalamiento', async () 
     // Escalamiento a JEFATURA: tras N ciclos de alarma sin resolverse, sube al jefe
     await pool.query('ALTER TABLE wf_registro ADD COLUMN IF NOT EXISTS ciclos_jefe INT NOT NULL DEFAULT 2').catch(() => {});
     await pool.query('ALTER TABLE wf_registro ADD COLUMN IF NOT EXISTS ciclos_seguidos INT NOT NULL DEFAULT 0').catch(() => {});
+    // Historial de alarmas: qué flujo se atasca más y cuánto demora en destrancarse (SLA real)
+    await pool.query(`CREATE TABLE IF NOT EXISTS wf_log (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      codigo VARCHAR(40) NOT NULL,
+      tipo VARCHAR(12) NOT NULL DEFAULT 'ALARMA',   -- ALARMA | JEFATURA | RESUELTO
+      n INT NOT NULL DEFAULT 0,                     -- ítems detenidos al alarmar
+      ciclos INT NOT NULL DEFAULT 0,
+      fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_codigo (codigo, fecha))`);
     for (const w of CATALOGO)
       await pool.query('INSERT IGNORE INTO wf_registro (codigo, recordatorio_horas, activo) VALUES (?,?,?)',
         [w.codigo, w.horas, w.horas > 0 ? 1 : 0]);
@@ -288,9 +322,23 @@ async function jefesDe(func) {
   } catch (e) { return []; }
 }
 
+/* Horario hábil Chile: lun–sáb 08–20 h (sábado es día top de venta).
+   Fuera de horario el motor NO alarma (nadie despierta un domingo a las 3 AM);
+   las horas siguen corriendo en las queries y la alarma sale al abrir el día. */
+function enHorarioHabil() {
+  try {
+    const p = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', hour12: false, weekday: 'short', hour: 'numeric' })
+      .formatToParts(new Date());
+    const dia = p.find(x => x.type === 'weekday').value;
+    const hora = Number(p.find(x => x.type === 'hour').value) % 24;
+    return dia !== 'Sun' && hora >= 8 && hora < 20;
+  } catch (e) { return true; }   // si falla el timezone, mejor alarmar que callar
+}
+
 /* ── Motor de escalamiento (cada 30 min) ── */
 async function escalar() {
   try {
+    if (!enHorarioHabil()) return;
     const [regs] = await pool.query('SELECT * FROM wf_registro');
     for (const r of regs) {
       const w = CATALOGO.find(x => x.codigo === r.codigo);
@@ -299,11 +347,15 @@ async function escalar() {
       if (r.ultima_alarma && (Date.now() - new Date(r.ultima_alarma).getTime()) / 36e5 < r.recordatorio_horas) continue;
       const [[{ n }]] = await pool.query(w.stuck, [r.recordatorio_horas]);
       if (!n) {   // se destrancó: el contador de ciclos vuelve a cero
-        if (r.ciclos_seguidos) await pool.query('UPDATE wf_registro SET ciclos_seguidos=0 WHERE codigo=?', [r.codigo]);
+        if (r.ciclos_seguidos) {
+          await pool.query('UPDATE wf_registro SET ciclos_seguidos=0 WHERE codigo=?', [r.codigo]);
+          await pool.query("INSERT INTO wf_log (codigo, tipo, n, ciclos) VALUES (?,'RESUELTO',0,?)", [r.codigo, r.ciclos_seguidos]).catch(() => {});
+        }
         continue;
       }
       const ciclos = (r.ciclos_seguidos || 0) + 1;
       await pool.query('UPDATE wf_registro SET ultima_alarma=NOW(), ciclos_seguidos=? WHERE codigo=?', [ciclos, r.codigo]);
+      await pool.query("INSERT INTO wf_log (codigo, tipo, n, ciclos) VALUES (?,'ALARMA',?,?)", [r.codigo, n, ciclos]).catch(() => {});
       await AVISOS.avisar('wf_esc_' + r.codigo, {
         titulo: '⏰ ' + w.nombre + ': ' + n + ' detenida' + (n === 1 ? '' : 's'),
         mensaje: `${n} ítem${n === 1 ? '' : 's'} lleva${n === 1 ? '' : 'n'} más de ${r.recordatorio_horas} h sin avanzar en "${w.nombre}".` + (ciclos > 1 ? ` (${ciclos}° aviso)` : ''),
@@ -313,6 +365,7 @@ async function escalar() {
       // (usuarios.id_supervisor) de quienes pueden destrancar el paso responsable.
       if (w.func_responsable && r.ciclos_jefe > 0 && ciclos >= r.ciclos_jefe && (ciclos - r.ciclos_jefe) % r.ciclos_jefe === 0) {
         const jefes = await jefesDe(w.func_responsable);
+        await pool.query("INSERT INTO wf_log (codigo, tipo, n, ciclos) VALUES (?,'JEFATURA',?,?)", [r.codigo, n, ciclos]).catch(() => {});
         await AVISOS.avisar('wf_esc_jefatura', {
           titulo: '🚨 ESCALADO A JEFATURA — ' + w.nombre,
           mensaje: `"${w.nombre}" acumula ${ciclos} avisos sin resolverse (${n} ítem${n === 1 ? '' : 's'} detenido${n === 1 ? '' : 's'} > ${r.recordatorio_horas} h). Tu equipo es responsable de destrancarlo.`,
@@ -351,7 +404,7 @@ const getAll = async (req, res) => {
       data.push({
         codigo: w.codigo, modulo: w.modulo, nombre: w.nombre, descripcion: w.descripcion,
         pasos: w.pasos.map(p => ({ ...p, quienes: p.func ? (quienesPorFunc[p.func] || []) : null })),
-        operar: w.operar, configurar: w.configurar, medible: !!w.stuck,
+        operar: w.operar, configurar: w.configurar, medible: !!w.stuck, con_detalle: !!w.det,
         recordatorio_horas: r.recordatorio_horas, activo: !!r.activo,
         ciclos_jefe: r.ciclos_jefe != null ? r.ciclos_jefe : 2, ciclos_seguidos: r.ciclos_seguidos || 0,
         ultima_alarma: r.ultima_alarma || null, estancados,
@@ -376,6 +429,28 @@ const setUno = async (req, res) => {
       entidad_id: w.codigo, detalle: `Escalamiento de "${w.nombre}": ${activo ? horas + ' h' + (ciclosJefe ? ', jefatura tras ' + ciclosJefe + ' ciclos' : ', sin jefatura') : 'desactivado'}` });
     res.json({ success: true, data: { codigo: w.codigo, recordatorio_horas: horas, activo: !!activo }, error: null });
   } catch (e) { console.error('[workflows set]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /api/workflows/:codigo/estancados → los ítems detenidos con su referencia (num_op, correlativo…) */
+const estancadosDetalle = async (req, res) => {
+  try {
+    const w = CATALOGO.find(x => x.codigo === req.params.codigo);
+    if (!w || !w.det) return res.status(404).json({ success: false, data: null, error: 'Workflow sin detalle de estancados' });
+    const [[reg]] = await pool.query('SELECT recordatorio_horas FROM wf_registro WHERE codigo=?', [w.codigo]);
+    const horas = (reg && reg.recordatorio_horas > 0) ? reg.recordatorio_horas : (w.horas || 24);
+    const [rows] = await pool.query(w.det, [horas]);
+    res.json({ success: true, data: { nombre: w.nombre, horas, operar: w.operar, items: rows }, error: null });
+  } catch (e) { console.error('[workflows estancados]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /api/workflows/:codigo/log → últimas 40 alarmas/resoluciones (historial SLA) */
+const logGet = async (req, res) => {
+  try {
+    const w = CATALOGO.find(x => x.codigo === req.params.codigo);
+    if (!w) return res.status(404).json({ success: false, data: null, error: 'Workflow desconocido' });
+    const [rows] = await pool.query('SELECT tipo, n, ciclos, fecha FROM wf_log WHERE codigo=? ORDER BY fecha DESC LIMIT 40', [w.codigo]);
+    res.json({ success: true, data: { nombre: w.nombre, items: rows }, error: null });
+  } catch (e) { console.error('[workflows log]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* ── QUIÉNES de un paso: leer y editar la matriz real ──
@@ -412,6 +487,11 @@ const pasoSet = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Funcionalidad no existe' });
     const idf = f.id_funcionalidad;
     const perfiles = (req.body.perfiles || []).map(Number).filter(Boolean);
+    // Guardia: no dejar el paso SIN NADIE que pueda ejecutarlo (salvo confirmación explícita)
+    const forzados = (req.body.usuarios_si || []).length;
+    if (!perfiles.length && !forzados && !req.body.confirmar)
+      return res.status(409).json({ success: false, data: { requiere_confirmacion: true },
+        error: 'El paso quedaría SIN NADIE que pueda ejecutarlo (0 cargos y 0 personas forzadas). Confirma para guardar igual.' });
     // Perfiles: habilitar los marcados, deshabilitar el resto (misma matriz de Usuarios)
     const [todos] = await pool.query('SELECT id_perfil FROM perfiles');
     for (const { id_perfil } of todos) {
@@ -431,4 +511,4 @@ const pasoSet = async (req, res) => {
   } catch (e) { console.error('[workflows pasoSet]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, setUno, pasoGet, pasoSet };
+module.exports = { getAll, setUno, pasoGet, pasoSet, estancadosDetalle, logGet };
