@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — Salud y Uptime: semáforo en vivo (mismos checks del correo Salud del Sistema) + historia 90 días estilo status-page -->
+<!-- v1.2 — fix: GROUP BY compatible ONLY_FULL_GROUP_BY (500 en /historia) y error visible también en la sección salud -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -112,7 +112,12 @@ function card(nombre, s, dias, extra) {
 
 async function cargar() {
   const j = await fetch('/api/uptime/historia', { headers: { Authorization: 'Bearer ' + TOKEN() } }).then(r => r.json()).catch(() => null);
-  if (!j || !j.success) { document.getElementById('lista').innerHTML = '<p style="color:#b91c1c;text-align:center">' + esc((j && j.error) || 'Error al cargar') + '</p>'; return; }
+  if (!j || !j.success) {
+    const msg = '<p style="color:#b91c1c;text-align:center">' + esc((j && j.error) || 'Error al cargar') + '</p>';
+    document.getElementById('lista').innerHTML = msg;
+    document.getElementById('salud').innerHTML = msg;
+    return;
+  }
   const d = j.data;
   document.getElementById('salud').innerHTML = (d.salud && d.salud.length)
     ? d.salud.map(c => `<div class="chk${c.ok ? '' : ' mal'}">${c.ok ? '✅' : '🔴'}<div><b>${esc(c.nombre)}</b><span>${esc(c.detalle)}</span></div></div>`).join('')

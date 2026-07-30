@@ -48,7 +48,7 @@ const historia = async (req, res) => {
              ROUND(100*AVG(ok), 2) pct, COUNT(*) checks,
              ROUND(AVG(CASE WHEN ok=1 THEN ms END)) ms
       FROM uptime_checks WHERE fecha >= CURDATE() - INTERVAL ? DAY
-      GROUP BY codigo, DATE(fecha) ORDER BY dia`, [DIAS - 1]);
+      GROUP BY codigo, DATE_FORMAT(fecha, '%Y-%m-%d') ORDER BY dia`, [DIAS - 1]);
     const seriePor = {};
     dias.forEach(d => (seriePor[d.codigo] = seriePor[d.codigo] || []).push(d));
 
@@ -64,7 +64,7 @@ const historia = async (req, res) => {
       SELECT DATE_FORMAT(fecha, '%Y-%m-%d') dia,
              COUNT(DISTINCT FLOOR(UNIX_TIMESTAMP(fecha)/300)) hechos
       FROM uptime_checks WHERE fecha >= CURDATE() - INTERVAL ? DAY
-      GROUP BY DATE(fecha) ORDER BY dia`, [DIAS - 1]);
+      GROUP BY DATE_FORMAT(fecha, '%Y-%m-%d') ORDER BY dia`, [DIAS - 1]);
     const hoy = new Date().toISOString().slice(0, 10);
     const buckHoy = Math.max(1, Math.floor((Date.now() - new Date(hoy + 'T00:00:00').getTime()) / 300000));
     const appSerie = appDias.map(d => ({
