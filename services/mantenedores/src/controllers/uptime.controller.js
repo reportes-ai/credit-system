@@ -19,10 +19,11 @@ require('../../../../shared/migrate').enFila('uptime-card', async () => {
     let [[f]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='uptime_mant' LIMIT 1");
     if (!f) {
       const [r] = await pool.query(
-        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Uptime de Servicios', 'uptime_mant', '/mantenedores/uptime/', 'bi-activity')",
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Salud y Uptime', 'uptime_mant', '/mantenedores/uptime/', 'bi-activity')",
         [mod.id_modulo]);
       f = { id_funcionalidad: r.insertId };
     }
+    await pool.query("UPDATE funcionalidades SET nombre='Salud y Uptime' WHERE codigo='uptime_mant' AND nombre<>'Salud y Uptime'");
     await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
                       SELECT p.id_perfil, ?, 1 FROM perfiles p
                       WHERE (p.nombre = 'Administrador' OR p.nombre LIKE 'Gerente%' OR p.nombre LIKE 'Director%')
@@ -35,6 +36,11 @@ require('../../../../shared/migrate').enFila('uptime-card', async () => {
 const historia = async (req, res) => {
   try {
     const resumen = await uptime.resumen();   // motor único: % 24h/7d/30d, latencia, última falla
+
+    // Semáforo de salud EN VIVO — mismo motor que el correo Salud del Sistema (Máxima 1)
+    let salud = [];
+    try { salud = await require('../../../correos-programados/src/controllers/correos.controller')._saludChecks(); }
+    catch (e) { console.error('[uptime saludChecks]', e.message); }
 
     // Serie diaria por servicio
     const [dias] = await pool.query(`
@@ -69,7 +75,7 @@ const historia = async (req, res) => {
     res.json({
       success: true, error: null,
       data: {
-        cada_min: resumen.cada_min, dias: DIAS,
+        cada_min: resumen.cada_min, dias: DIAS, salud,
         app: { ...resumen.app, serie: appSerie },
         servicios: resumen.servicios.map(s => ({ ...s, p90: p90Por[s.codigo] != null ? p90Por[s.codigo] : null, serie: seriePor[s.codigo] || [] })),
       },

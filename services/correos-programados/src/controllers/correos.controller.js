@@ -562,7 +562,10 @@ async function buildAlertaPenetracion(opts = {}) {
 /* ── Informe de Salud del Sistema (semanal) ─────────────────────────────────
    Todo lo que la app puede chequear SOLA. Lo que requiere ojos (Render Metrics,
    TiDB SQL Statements, backups) va como checklist-recordatorio en el mismo correo. */
-async function buildSalud() {
+/* Checks de salud — motor único: los consume el correo semanal Y la card
+   Salud y Uptime de Mantenedores (via _saludChecks). Un check nuevo aparece
+   en ambos automáticamente. */
+async function saludChecks() {
   const checks = [];
   const add = (nombre, ok, detalle) => checks.push({ nombre, ok, detalle });
 
@@ -616,6 +619,12 @@ async function buildSalud() {
   // 6. Memoria del proceso (límite Render Starter: 512 MB)
   const rss = Math.round(process.memoryUsage().rss / 1048576);
   add('Memoria del servidor', rss < 360, `${rss} MB de 512 MB (${Math.round(rss / 5.12)}%)` + (rss >= 360 ? ' — sobre 70%: considerar subir plan Render' : ''));
+
+  return checks;
+}
+
+async function buildSalud() {
+  const checks = await saludChecks();
 
   // 7. Uptime por servicio (monitor shared/uptime.js, checks cada 5 min)
   let uptimeHtml = '';
@@ -760,4 +769,4 @@ const preview = async (req, res) => {
   } catch (e) { console.error('[correos preview]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud };
+module.exports = { listar, actualizar, enviarAhora, preview, _buildSalud: buildSalud, _saludChecks: saludChecks };
