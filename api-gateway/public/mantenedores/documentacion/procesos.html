@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.7 — Cap. 26: el veredicto ahora decide la excepcion de financiera en la carta -->
+<!-- v3.8 — Cap. 30: cuadratura de montos contra el Canal AutoFin (Trinidad); la columna Comision Dealer del export NO es nuestra comision -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -68,6 +68,7 @@
     <a href="#p27">27. Compras internas con workflow de aprobación</a>
     <a href="#p28">28. Workflows y Escalamiento (transversal)</a>
     <a href="#p29">29. API Pública para empresas externas</a>
+    <a href="#p30">30. Cuadratura de montos contra el Canal AutoFin (Trinidad)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -538,6 +539,24 @@
   </ol>
   <div class="flujo"><span class="st ini">LLAVE CREADA</span><span class="ar">→</span><span class="st">EMPRESA CONSUME (X-API-Key)</span><span class="ar">→</span><span class="st fin">USO MONITOREADO</span><span class="ar">/</span><span class="st mal">DESACTIVADA</span></div>
   <div class="afecta"><b>Afecta:</b> nada interno (solo lectura del simulador). <b>Depende de:</b> mantenedores Tasas / Parámetros de Crédito / Factores de Seguros (los cambios se reflejan al instante en la API).</div>
+
+  <h2 id="p30">30. Cuadratura de montos contra el Canal AutoFin (Trinidad)</h2>
+  <p><b>Qué y para qué:</b> AutoFin exporta desde su sistema (Trinidad) el detalle de las operaciones cursadas en un período. Ese archivo es la <b>fuente oficial de los montos de la operación</b> — si una operación se re-evaluó o se digitó mal de nuestro lado, ahí se detecta. Un monto financiado inflado arrastra cuota, comisión del dealer, rentabilidad y cartola, así que la cuadratura evita pagar de más.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Analista de Operaciones detecta la diferencia; la corrección la aplica quien tenga edición de créditos (mes abierto).</div>
+    <div><b class="lbl">Prerequisitos</b>Export de Trinidad (<code>TRISolicitudWWExport-*.xlsx</code>, filtro Fecha Curse + Estado CURSADO). El mes NO debe estar cerrado: si lo está, los montos ya liquidaron comisiones y la corrección va por otra vía.</div>
+  </div>
+  <ol>
+    <li><b>Cruzar por ID</b>: la columna <code>ID</code> del Excel es nuestro <code>id_financiera</code> (NO el num_op). El encabezado real está en la <b>fila 4</b>; las tres primeras son título del reporte.</li>
+    <li><b>Comparar solo los montos</b>: <code>Saldo Precio</code> → <code>saldo_precio</code>, <code>Pie</code> → <code>pie</code>, <b><code>Monto Pagare</code> → <code>monto_financiado</code></b>. Diferencias de <b>±1 peso son redondeo</b>, no errores: filtrar bajo $1.000.</li>
+    <li><b>Corregir</b> los montos y <b>recalcular la cuota</b> con el motor único (cuota francesa), nunca a mano.</li>
+    <li><b>Recalcular el mes</b> (<code>recalcularMeses</code>): la comisión del dealer y la rentabilidad se derivan del saldo precio, así que un monto corregido cambia lo que se le paga al dealer. Sin este paso el arreglo queda a medias.</li>
+  </ol>
+  <div class="max" style="background:#fef2f2;border-left:4px solid #dc2626"><b>⚠️ La columna "Comision Dealer" del Excel NO es nuestra comisión.</b> Es un valor por defecto del sistema de AutoFin y no corresponde a lo que ellos nos pagan (confirmado por Pato, 30-07-2026). En la cuadratura de julio difería en las 57 operaciones, con una mediana de <b>2,65 veces</b> nuestro valor. Copiarla habría triplicado la deuda con los dealers y contaminado cartolas, órdenes de pago y contabilidad. <b>La comisión del dealer la calcula SIEMPRE nuestro motor</b> (tabla del dealer / pizarra), nunca el archivo del canal.</div>
+  <p><b>Ojo con el importador</b>: Carga Trinidad <b>solo rellena campos vacíos</b> (<code>!(Number(r[c]) &gt; 0)</code>) — es una guarda deliberada para que una carga no pise montos ya liquidados. Por eso <b>volver a subir el archivo NO corrige</b> una operación con monto errado: la corrección es deliberada y acotada a las operaciones detectadas.</p>
+  <div class="flujo"><span class="st ini">EXPORT TRINIDAD</span><span class="ar">→</span><span class="st">CRUCE POR id_financiera</span><span class="ar">→</span><span class="st">DIFERENCIAS &gt; $1.000</span><span class="ar">→</span><span class="st">CORRECCIÓN + CUOTA</span><span class="ar">→</span><span class="st fin">RECÁLCULO DEL MES</span></div>
+  <div class="afecta"><b>Afecta:</b> cuota, comisión del dealer, rentabilidad de la operación, cartola del dealer y la orden de pago de su comisión. <b>Depende de:</b> mes abierto (Meses Cerrados) y de los mantenedores de Tasas y comisión por dealer.</div>
+  <p style="font-size:.85rem;color:#64748b"><b>Caso real (30-07-2026):</b> de 57 operaciones cursadas en julio, <b>3</b> tenían diferencias reales de monto. La OP <b>89246</b> estaba inflada en $7,5 millones (financiado 19.939.048 en vez de 12.465.443, con pie y saldo precio igualmente inflados); su comisión de dealer estaba calculada sobre el saldo viejo, o sea medio millón de más. Las otras 54 solo diferían en $1 por redondeo.</p>
 
 </body>
 </html>
