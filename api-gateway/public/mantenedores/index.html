@@ -236,18 +236,24 @@
       'dealernet':'dealers','dealers-mapa':'dealers',
       // Documentos y plantillas
       'tipos-documento':'documentos','pagares':'documentos','broker-validaciones':'documentos',
-      'certificados-textos':'documentos',
+      'certificados-textos':'documentos','documentacion':'documentos',
       // Cobranza y tesorería
       'cobranza-parametros':'cobranza','cobranza-mora':'cobranza','cuentas-bancarias':'cobranza',
+      'cobranza-judicial':'cobranza',
       // Personas y comunicaciones
       'rrhh-saludos':'personas','mi-dia':'personas','ranking-ventas':'personas','carrera':'personas',
-      'correos-programados':'personas','alertas':'personas','alertas-saldos':'personas',
-      'respuestas-rapidas':'personas','backups':'personas','compras':'personas','tickets-ti':'personas',
+      'correos-programados':'personas','alertas':'personas','alertas-saldos':'personas','avisos':'personas',
+      'respuestas-rapidas':'personas','compras':'personas','tickets-ti':'personas',
+      'remuneraciones':'personas',
       // Sistema y datos
       'solo-dios':'sistema','vista-pantallas':'sistema','inteligencia-artificial':'sistema',
       'servidor-hora':'sistema','db-maintenance':'sistema','sql-console':'sistema',
       'mantencion-sistema':'sistema','ayuda':'sistema','definiciones':'sistema','feriados':'sistema',
       'comunas':'sistema','vehiculos':'sistema','actividades-economicas':'sistema',
+      'backups':'sistema','workflows':'sistema','uptime':'sistema','apis':'sistema',
+      'punto-restauracion':'sistema',
+      // Faltaban grupo (caían a "Otros")
+      'preaprobacion':'credito','horarios-analistas':'credito','dealers-direcciones':'dealers',
     };
 
     let sortables = [], modoReordenar = false;
@@ -273,6 +279,9 @@
       const SOLO_DIOS = new Set(['bd-operaciones','bd-clientes','bd-antecedentes','bd-informacion-comercial','meses-cerrados']);
       // DealerNet: las 2 cards van dentro de la card "Mantenedor DealerNet" (/mantenedores/dealernet/)
       const DEALERNET = new Set(['dealernet-productos','dealernet-costos']);
+      // Dealers: categorías y potencial se operan DENTRO de la card Dealers (pestañas
+      // Categoría/Potencial, con link a sus variables) — mismo patrón que DealerNet
+      const DEALERS_HIJAS = new Set(['dealer-categorias','potencial-dealer']);
       // Construir items desde funcionalidades BD (href + icono + nombre desde servidor)
       const nativeHrefs = new Set(funcInfo.map(f => f.href));
       // keys asignadas explícitamente a OTRA sección (formato nuevo {sec:[keys]}) → no van aquí
@@ -282,7 +291,7 @@
       });
       const nativeItems = funcInfo.map(f => {
         const seg = f.href.replace('/mantenedores/', '').replace(/\/$/, '');
-        if (SOLO_DIOS.has(seg) || DEALERNET.has(seg)) return null;
+        if (SOLO_DIOS.has(seg) || DEALERNET.has(seg) || DEALERS_HIJAS.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
         if (asignadasFuera.has(seg)) return null;
         const segBase = seg.replace(/-edicion$/, ''); // desc compartida con la variante -edicion
