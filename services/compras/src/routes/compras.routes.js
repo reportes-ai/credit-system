@@ -50,4 +50,10 @@ router.get('/admin/aprobacion-niveles',        verifyToken, admin, c.nivelesGet)
 router.put('/admin/aprobacion-niveles/:nivel', verifyToken, requireFunc('compras_mant'), c.nivelesSet);
 router.get('/admin/reporte',            verifyToken, admin, c.reporteMensual);
 
+// ── Bandeja de Revisión de Órdenes (el firmante) — la guardia real es ser
+//    firmante del nivel (puedeFirmarNivel), no un permiso de admin ──
+router.get('/revision',              verifyToken, c.revisionBandeja);
+router.get('/revision/:id',          verifyToken, c.revisionDetalle);
+router.post('/revision/:id/decidir', verifyToken, c.adminOrdenDecidir);
+
 module.exports = router;

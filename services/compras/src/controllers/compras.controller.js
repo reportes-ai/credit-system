@@ -168,6 +168,26 @@ require('../../../../shared/migrate').enFila('compras-aprobacion', async () => {
       fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_orden (id_orden))`);
     await pool.query(`ALTER TABLE compras_ordenes ADD COLUMN IF NOT EXISTS nivel_actual INT NULL`).catch(() => {});
+    // Recordatorio paramétrico por nivel (horas sin firma → re-alarma; 0 = sin recordatorio)
+    await pool.query(`ALTER TABLE compras_aprobacion_niveles ADD COLUMN IF NOT EXISTS recordatorio_horas INT NOT NULL DEFAULT 24`).catch(() => {});
+    await pool.query(`ALTER TABLE compras_ordenes ADD COLUMN IF NOT EXISTS ultima_alarma DATETIME NULL`).catch(() => {});
+    // Card "Revisión de Órdenes de Compra" en Soporte — la bandeja del firmante
+    {
+      const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='compras_revision' LIMIT 1");
+      let idf = ex && ex.id_funcionalidad;
+      if (!idf) {
+        const [r] = await pool.query(
+          "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Revisión de Órdenes de Compra', 'compras_revision', '/soporte/compras-revision/', 'bi-clipboard2-check')",
+          [MOD_SOPORTE]);
+        idf = r.insertId;
+      }
+      // Firmantes por defecto del workflow + administración
+      await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+                        SELECT p.id_perfil, ?, 1 FROM perfiles p
+                        WHERE (p.nombre IN ('Administrador','Asistente Administrativo','Gerente General') OR p.nombre LIKE 'Gerente%')
+                          AND NOT EXISTS (SELECT 1 FROM permisos_perfil pp WHERE pp.id_perfil=p.id_perfil AND pp.id_funcionalidad=?)`,
+                       [idf, idf]);
+    }
     for (const [nivel, nombre, perfiles, activo] of [
       [1, 'Revisión administrativa', 'Asistente Administrativo', 1],
       [2, 'Aprobación Gerencia General', 'Gerente General', 1],
@@ -186,12 +206,16 @@ for (const n of [1, 2, 3]) AVISOS.registrarAviso({
 });
 AVISOS.registrarAviso({ evento: 'compras_orden_aprobada', modulo: 'Compras',
   nombre: 'Orden de compra aprobada (lista para comprar)',
-  descripcion: 'La orden completó todos los niveles de firma.',
-  perfiles: 'Asistente Administrativo', incluir_admin: 0 });
+  descripcion: 'La orden completó todos los niveles de firma. A DÓNDE VA: la orden queda ABIERTA (lista para comprar) en Administrar Compras; aquí se define a quién se le avisa.',
+  perfiles: 'Asistente Administrativo', incluir_admin: 0, prioridad: 'alta', sonido_tipo: 'dingdong' });
 AVISOS.registrarAviso({ evento: 'compras_orden_rechazada', modulo: 'Compras',
   nombre: 'Orden de compra rechazada',
-  descripcion: 'Un firmante rechazó la orden; los pedidos vuelven a pendientes.',
-  perfiles: 'Asistente Administrativo', incluir_admin: 0 });
+  descripcion: 'Un firmante rechazó la orden (siempre con comentario); los pedidos vuelven a pendientes en Administrar Compras. Aquí se define a quién se le avisa.',
+  perfiles: 'Asistente Administrativo', incluir_admin: 0, prioridad: 'alta', sonido_tipo: 'dingdong' });
+AVISOS.registrarAviso({ evento: 'compras_aprob_recordatorio', modulo: 'Compras',
+  nombre: 'Recordatorio: orden de compra sin firmar',
+  descripcion: 'Una orden lleva más horas esperando firma que el recordatorio configurado en su nivel (mantenedor Compras → Workflow). Se re-alarma al nivel que debe firmar.',
+  perfiles: '', incluir_admin: 0, prioridad: 'alta', sonido_tipo: 'dingdong' });
 
 async function nivelesAprobacion() {
   const [n] = await pool.query('SELECT * FROM compras_aprobacion_niveles ORDER BY nivel');
@@ -639,7 +663,7 @@ const consolidar = async (req, res) => {
     if (niv0) for (const oid of ordenes) AVISOS.avisar('compras_aprob_nivel_' + niv0, {
       titulo: 'Orden de compra por firmar',
       mensaje: `La orden de compra #${oid} espera tu firma (${(NIV.find(n=>n.nivel===niv0)||{}).nombre||'nivel '+niv0}).`,
-      href: '/soporte/compras-admin/?orden=' + oid,
+      href: '/soporte/compras-revision/?orden=' + oid,
     }, { excluir: [uid] }).catch(()=>{});
     res.json({ success: true, data: { ordenes, modo }, error: null });
   } catch (e) { err(res, e); }
@@ -712,6 +736,9 @@ const adminOrdenDecidir = async (req, res) => {
     if (!puedeFirmarNivel(req, nivCfg))
       return res.status(403).json({ success: false, data: null, error: `Este nivel lo firma: ${nivCfg ? (nivCfg.perfiles || 'personas designadas') : '—'}.` });
 
+    if (accion === 'RECHAZAR' && !String(req.body.comentario || '').trim())
+      return res.status(400).json({ success: false, data: null, error: 'Para rechazar debes indicar el motivo (comentario obligatorio).' });
+
     const nom = `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim() || req.usuario.email;
     await pool.query(
       'INSERT INTO compras_orden_firmas (id_orden, nivel, nivel_nombre, id_usuario, usuario, accion, comentario) VALUES (?,?,?,?,?,?,?)',
@@ -735,7 +762,7 @@ const adminOrdenDecidir = async (req, res) => {
       const sigCfg = niveles.find(n => n.nivel === sig);
       AVISOS.avisar('compras_aprob_nivel_' + sig, { titulo: 'Orden de compra por firmar',
         mensaje: `La orden #${id} pasó a "${sigCfg ? sigCfg.nombre : 'nivel ' + sig}" y espera tu firma.`,
-        href: '/soporte/compras-admin/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
+        href: '/soporte/compras-revision/?orden=' + id }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
     } else {
       await pool.query("UPDATE compras_ordenes SET estado='ABIERTA', nivel_actual=NULL WHERE id=?", [id]);
       AVISOS.avisar('compras_orden_aprobada', { titulo: 'Orden de compra aprobada',
@@ -767,8 +794,9 @@ const nivelesSet = async (req, res) => {
     const b = req.body || {};
     const csv = v => Array.isArray(v) ? v.join(',') : String(v == null ? '' : v);
     await pool.query(
-      'UPDATE compras_aprobacion_niveles SET nombre=?, perfiles=?, usuarios=?, activo=? WHERE nivel=?',
-      [String(b.nombre || 'Nivel ' + nivel).slice(0, 120), csv(b.perfiles), csv(b.usuarios), b.activo ? 1 : 0, nivel]);
+      'UPDATE compras_aprobacion_niveles SET nombre=?, perfiles=?, usuarios=?, activo=?, recordatorio_horas=? WHERE nivel=?',
+      [String(b.nombre || 'Nivel ' + nivel).slice(0, 120), csv(b.perfiles), csv(b.usuarios), b.activo ? 1 : 0,
+       Math.max(0, parseInt(b.recordatorio_horas, 10) || 0), nivel]);
     auditar({ req, accion: 'EDITAR', modulo: 'compras', entidad: 'aprobacion_nivel', entidad_id: String(nivel),
       detalle: `Configuró el nivel ${nivel} del workflow de aprobación de compras`, meta: b });
     res.json({ success: true, data: null, error: null });
@@ -812,6 +840,77 @@ const reporteMensual = async (req, res) => {
   } catch (e) { err(res, e); }
 };
 
+/* ── RECORDATORIOS DEL WORKFLOW ────────────────────────────────────────────────
+   Cada 30 min: órdenes EN_APROBACION cuya última actividad (última firma, última
+   alarma o la creación) superó las `recordatorio_horas` del nivel actual reciben
+   una re-alarma (campanita con sonido) al nivel que debe firmar. 0 = sin recordatorio. */
+async function recordatoriosWorkflow() {
+  try {
+    const niveles = await nivelesAprobacion();
+    const [ords] = await pool.query(`
+      SELECT o.id, o.nivel_actual, o.total,
+             GREATEST(COALESCE(o.ultima_alarma, o.fecha),
+                      COALESCE((SELECT MAX(f.fecha) FROM compras_orden_firmas f WHERE f.id_orden=o.id), o.fecha),
+                      o.fecha) AS ultima_actividad
+      FROM compras_ordenes o WHERE o.estado='EN_APROBACION' AND o.nivel_actual IS NOT NULL`);
+    for (const o of ords) {
+      const cfg = niveles.find(n => n.nivel === o.nivel_actual);
+      const horas = cfg ? Number(cfg.recordatorio_horas) : 0;
+      if (!horas || horas <= 0) continue;
+      const horasSin = (Date.now() - new Date(o.ultima_actividad).getTime()) / 36e5;
+      if (horasSin < horas) continue;
+      await pool.query('UPDATE compras_ordenes SET ultima_alarma=NOW() WHERE id=?', [o.id]);
+      const dest = { titulo: '⏰ Recordatorio: orden de compra sin firmar',
+        mensaje: `La orden #${o.id} ($${Math.round(o.total).toLocaleString('es-CL')}) lleva ${Math.floor(horasSin)} h esperando la firma de "${cfg.nombre}".`,
+        href: '/soporte/compras-revision/?orden=' + o.id };
+      // Al nivel que debe firmar (perfiles/usuarios del nivel) + a los suscritos del evento recordatorio
+      await AVISOS.avisar('compras_aprob_nivel_' + o.nivel_actual, dest).catch(() => {});
+      await AVISOS.avisar('compras_aprob_recordatorio', dest).catch(() => {});
+    }
+  } catch (e) { console.error('[compras recordatorios]', e.message); }
+}
+setInterval(recordatoriosWorkflow, 30 * 60 * 1000);
+setTimeout(recordatoriosWorkflow, 90 * 1000);   // primera pasada al minuto y medio del boot
+
+/* ── BANDEJA DE REVISIÓN (el módulo del firmante) ─────────────────────────────
+   GET /api/compras/revision → órdenes que esperan MI firma + mis decisiones.
+   Sin requireFunc de admin: la validación real es ser firmante del nivel
+   (puedeFirmarNivel) — el detalle y la decisión reusan esa misma guardia. */
+const revisionBandeja = async (req, res) => {
+  try {
+    const niveles = await nivelesAprobacion();
+    const [ords] = await pool.query(`
+      SELECT o.id, o.estado, o.total, o.fecha, o.nivel_actual, o.observacion,
+             (SELECT COUNT(*) FROM compras_pedidos p WHERE p.id_orden=o.id) AS n_pedidos,
+             (SELECT MAX(f.fecha) FROM compras_orden_firmas f WHERE f.id_orden=o.id) AS ultima_firma
+      FROM compras_ordenes o WHERE o.estado='EN_APROBACION' ORDER BY o.fecha`);
+    const pendientes = ords.filter(o => puedeFirmarNivel(req, niveles.find(n => n.nivel === o.nivel_actual)))
+      .map(o => ({ ...o, nivel_nombre: (niveles.find(n => n.nivel === o.nivel_actual) || {}).nombre || ('Nivel ' + o.nivel_actual) }));
+    const [mias] = await pool.query(`
+      SELECT f.id_orden, f.nivel_nombre, f.accion, f.comentario, f.fecha, o.total, o.estado
+      FROM compras_orden_firmas f JOIN compras_ordenes o ON o.id=f.id_orden
+      WHERE f.id_usuario=? ORDER BY f.fecha DESC LIMIT 60`, [req.usuario.id_usuario]);
+    res.json({ success: true, data: { pendientes, mias, niveles }, error: null });
+  } catch (e) { err(res, e); }
+};
+
+// Detalle para el firmante: mismo payload que el admin, pero la guardia es
+// "puedo firmar el nivel actual, ya firmé antes, o soy Administrador".
+const revisionDetalle = async (req, res) => {
+  try {
+    const id = num(req.params.id);
+    const [[o]] = await pool.query('SELECT estado, nivel_actual FROM compras_ordenes WHERE id=?', [id]);
+    if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    const niveles = await nivelesAprobacion();
+    const [[firme]] = await pool.query('SELECT 1 ok FROM compras_orden_firmas WHERE id_orden=? AND id_usuario=? LIMIT 1', [id, req.usuario.id_usuario]);
+    const esAdmin = String(req.usuario.perfil_nombre || '') === 'Administrador';
+    const puedoNivel = niveles.some(n => puedeFirmarNivel(req, n));
+    if (!esAdmin && !firme && !puedoNivel)
+      return res.status(403).json({ success: false, data: null, error: 'No eres firmante de este workflow' });
+    return adminOrdenDetalle(req, res);
+  } catch (e) { err(res, e); }
+};
+
 module.exports = {
   catalogo, categorias, catalogoIds, sincronizar,
   perfiles, articuloPerfilGet, articuloPerfilSet,
@@ -819,6 +918,6 @@ module.exports = {
   usuariosConfig, usuarioConfigSet,
   misArticulos, misCategorias, miConfig, crearPedido, misPedidos,
   adminPedidos, adminItemEditar, adminItemEliminar, consolidar, adminOrdenes, adminOrdenDetalle, adminOrdenEstado,
-  adminOrdenDecidir, nivelesGet, nivelesSet,
+  adminOrdenDecidir, nivelesGet, nivelesSet, revisionBandeja, revisionDetalle,
   reporteMensual,
 };

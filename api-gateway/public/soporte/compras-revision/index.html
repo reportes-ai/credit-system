@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<!-- v1.0 — bandeja del firmante: aprobar/rechazar órdenes de compra (rechazo con comentario obligatorio) -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisión de Órdenes de Compra — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1150px; margin:0 auto; padding:26px 24px 70px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.88; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.85; font-size:.85rem; }
+  .panel { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+  .panel h5 { margin:0 0 12px; font-size:.98rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .ord { border:1.5px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:10px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; cursor:pointer; transition:.12s; }
+  .ord:hover { border-color:var(--blue); background:#f8fafc; }
+  .ord .num { font-size:1.05rem; font-weight:800; color:var(--navy); }
+  .ord .tot { font-size:1.05rem; font-weight:800; margin-left:auto; }
+  .chip { border-radius:14px; padding:2px 10px; font-size:.68rem; font-weight:700; }
+  .c-esp { background:#fef3c7; color:#b45309; }
+  .c-apr { background:#dcfce7; color:#166534; } .c-rej { background:#fee2e2; color:#b91c1c; }
+  .dias { font-weight:800; font-size:.78rem; } .dias.alto { color:#dc2626; }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; border-bottom:2px solid #e2e8f0; padding:6px 8px; }
+  td { padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  .btnx { border:none; border-radius:9px; padding:9px 18px; font-size:.85rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-ok { background:#16a34a; color:#fff; } .btn-no { background:#dc2626; color:#fff; }
+  .btn-gris { background:#f1f5f9; color:#475569; }
+  dialog { border:none; border-radius:16px; padding:0; max-width:980px; width:94vw; box-shadow:0 24px 64px rgba(0,0,0,.35); }
+  dialog::backdrop { background:rgba(2,13,40,.55); }
+  .dlg-head { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; padding:14px 22px; display:flex; justify-content:space-between; align-items:center; border-radius:16px 16px 0 0; }
+  .dlg-body { padding:18px 22px; max-height:64vh; overflow:auto; }
+  .dlg-foot { padding:14px 22px; border-top:1px solid #e5e7eb; display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+  .firma { display:flex; gap:10px; align-items:flex-start; font-size:.8rem; padding:6px 0; border-bottom:1px solid #f8fafc; }
+  .firma i.ok { color:#16a34a; } .firma i.no { color:#dc2626; }
+  textarea { width:100%; border:1.5px solid #d1d5db; border-radius:9px; padding:9px 12px; font-size:.84rem; font-family:inherit; min-height:56px; resize:vertical; }
+  textarea:focus { outline:none; border-color:var(--blue); }
+  .oblig { color:#dc2626; font-size:.72rem; font-weight:700; display:none; }
+  .vacio { color:#94a3b8; text-align:center; padding:26px 0; }
+  .sec-h { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--navy); margin:14px 0 8px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Soporte', href:'/soporte/' },
+  { label:'Revisión de Órdenes de Compra', icon:'bi-clipboard2-check', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-clipboard2-check"></i><div>
+    <h2>Revisión de Órdenes de Compra</h2>
+    <p>Las órdenes que esperan <b>tu firma</b>. Apruébalas para avanzar el workflow, o recházalas indicando el motivo (obligatorio).</p>
+  </div></div>
+
+  <div class="panel">
+    <h5><i class="bi bi-hourglass-split"></i> Esperando tu firma <span id="nPend" class="chip c-esp" style="margin-left:6px">…</span></h5>
+    <div id="pendientes"><p class="vacio">Cargando…</p></div>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-clock-history"></i> Mis decisiones</h5>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Orden</th><th>Nivel</th><th>Decisión</th><th>Comentario</th><th>Fecha</th><th>Estado actual</th></tr></thead>
+      <tbody id="mias"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Detalle + decisión -->
+<dialog id="dlg">
+  <div class="dlg-head"><h5 style="margin:0;font-weight:700" id="dTitulo">Orden</h5>
+    <button class="btnx btn-gris" onclick="dlg.close()"><i class="bi bi-x-lg"></i></button></div>
+  <div class="dlg-body" id="dBody"></div>
+  <div class="dlg-foot" id="dFoot"></div>
+</dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const TOKEN = () => sessionStorage.getItem('token');
+if (!TOKEN()) location.href = '/login.html';
+const H = { Authorization: 'Bearer ' + TOKEN() };
+const HJ = { ...H, 'Content-Type': 'application/json' };
+const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+const fmtF = d => d ? new Date(d).toLocaleString('es-CL', { dateStyle:'short', timeStyle:'short' }) : '—';
+const diasDesde = d => Math.floor((Date.now() - new Date(d).getTime()) / 864e5);
+let ACTUAL = null;
+
+async function cargar() {
+  const j = await fetch('/api/compras/revision', { headers: H }).then(r => r.json()).catch(() => null);
+  const d = (j && j.success && j.data) || { pendientes: [], mias: [] };
+  document.getElementById('nPend').textContent = d.pendientes.length;
+  document.getElementById('pendientes').innerHTML = d.pendientes.length ? d.pendientes.map(o => {
+    const dd = diasDesde(o.ultima_firma || o.fecha);
+    return `<div class="ord" onclick="abrir(${o.id})">
+      <span class="num">Orden #${o.id}</span>
+      <span class="chip c-esp">${esc(o.nivel_nombre)}</span>
+      <span style="font-size:.78rem;color:#64748b">${o.n_pedidos} pedido${o.n_pedidos==1?'':'s'} · creada ${fmtF(o.fecha)}</span>
+      <span class="dias ${dd>=2?'alto':''}">${dd} día${dd==1?'':'s'} esperando</span>
+      <span class="tot">${clp(o.total)}</span>
+      <i class="bi bi-chevron-right" style="color:#94a3b8"></i>
+    </div>`;
+  }).join('') : '<p class="vacio"><i class="bi bi-check2-circle"></i> Nada pendiente de tu firma. ¡Al día!</p>';
+
+  document.getElementById('mias').innerHTML = d.mias.length ? d.mias.map(f => `
+    <tr style="cursor:pointer" onclick="abrir(${f.id_orden})">
+      <td><b>#${f.id_orden}</b> · ${clp(f.total)}</td>
+      <td>${esc(f.nivel_nombre || '')}</td>
+      <td><span class="chip ${f.accion==='APROBAR'?'c-apr':'c-rej'}">${f.accion==='APROBAR'?'APROBÉ':'RECHACÉ'}</span></td>
+      <td style="max-width:280px">${esc(f.comentario || '—')}</td>
+      <td>${fmtF(f.fecha)}</td>
+      <td>${esc(f.estado)}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="vacio">Aún no has firmado órdenes.</td></tr>';
+}
+
+async function abrir(id) {
+  const j = await fetch('/api/compras/revision/' + id, { headers: H }).then(r => r.json()).catch(() => null);
+  if (!j || !j.success) return alert((j && j.error) || 'No se pudo abrir la orden');
+  const { orden, items, items_sucursal, firmas, niveles, puedo_firmar } = j.data;
+  ACTUAL = orden;
+  document.getElementById('dTitulo').innerHTML = `Orden de Compra #${orden.id} — ${clp(orden.total)} <span class="chip c-esp" style="margin-left:8px">${esc(orden.estado)}</span>`;
+
+  // Camino del workflow con lo firmado
+  const camino = niveles.filter(n => n.activo || firmas.some(f => f.nivel === n.nivel)).map(n => {
+    const f = firmas.filter(x => x.nivel === n.nivel).pop();
+    const esActual = orden.nivel_actual === n.nivel;
+    const icon = f ? (f.accion === 'APROBAR' ? '<i class="bi bi-check-circle-fill ok"></i>' : '<i class="bi bi-x-circle-fill no"></i>')
+                   : (esActual ? '<i class="bi bi-hourglass-split" style="color:#b45309"></i>' : '<i class="bi bi-circle" style="color:#cbd5e1"></i>');
+    return `<div class="firma">${icon}<div><b>${esc(n.nombre)}</b>${f ? ` — ${f.accion === 'APROBAR' ? 'aprobó' : 'rechazó'} ${esc(f.usuario)} · ${fmtF(f.fecha)}${f.comentario ? `<br><i style="color:#64748b">"${esc(f.comentario)}"</i>` : ''}` : (esActual ? ' — <b style="color:#b45309">esperando firma</b>' : ' — pendiente')}</div></div>`;
+  }).join('');
+
+  // Items por sucursal (la hoja de la orden)
+  const porSuc = {};
+  (items_sucursal || []).forEach(i => (porSuc[i.sucursal] = porSuc[i.sucursal] || []).push(i));
+  const sucHTML = Object.entries(porSuc).map(([suc, its]) => `
+    <div class="sec-h">${esc(suc)}</div>
+    <table><thead><tr><th>Pedido</th><th>Solicitante</th><th>Artículo</th><th style="text-align:right">Cant.</th><th style="text-align:right">Subtotal</th></tr></thead>
+    <tbody>${its.map(i => `<tr><td>#${i.id_pedido}</td><td>${esc(i.usuario_nombre||'')}</td><td>${esc(i.nombre)}</td><td style="text-align:right">${i.cantidad}</td><td style="text-align:right">${clp(i.subtotal)}</td></tr>`).join('')}</tbody></table>`).join('');
+
+  document.getElementById('dBody').innerHTML = `
+    <div class="sec-h">Workflow de aprobación</div>${camino}
+    <div class="sec-h" style="margin-top:16px">Consolidado (${items.length} artículos)</div>
+    <table><thead><tr><th>Artículo</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio</th><th style="text-align:right">Subtotal</th></tr></thead>
+    <tbody>${items.map(i => `<tr><td>${esc(i.nombre)}</td><td style="text-align:right">${i.cantidad}</td><td style="text-align:right">${clp(i.precio_unit)}</td><td style="text-align:right">${clp(i.subtotal)}</td></tr>`).join('')}
+    <tr><td colspan="3" style="text-align:right;font-weight:800">TOTAL</td><td style="text-align:right;font-weight:800">${clp(orden.total)}</td></tr></tbody></table>
+    ${sucHTML ? `<div class="sec-h" style="margin-top:16px">Detalle por sucursal</div>${sucHTML}` : ''}`;
+
+  document.getElementById('dFoot').innerHTML = puedo_firmar ? `
+    <div style="flex:1;min-width:260px">
+      <label style="font-size:.74rem;font-weight:700;color:#374151">Comentario <span style="font-weight:400;color:#94a3b8">(obligatorio para rechazar)</span></label>
+      <textarea id="dComentario" placeholder="Motivo del rechazo u observación de la aprobación…"></textarea>
+      <span class="oblig" id="dOblig">⚠ Para rechazar debes indicar el motivo.</span>
+    </div>
+    <button class="btnx btn-no" onclick="decidir('RECHAZAR')"><i class="bi bi-x-lg"></i> Rechazar</button>
+    <button class="btnx btn-ok" onclick="decidir('APROBAR')"><i class="bi bi-check-lg"></i> Aprobar</button>`
+    : `<span style="color:#94a3b8;font-size:.82rem"><i class="bi bi-info-circle"></i> ${orden.estado === 'EN_APROBACION' ? 'Este nivel no lo firmas tú.' : 'Esta orden ya no espera firmas.'}</span>
+       <button class="btnx btn-gris" style="margin-left:auto" onclick="dlg.close()">Cerrar</button>`;
+  document.getElementById('dlg').showModal();
+}
+
+async function decidir(accion) {
+  const comentario = (document.getElementById('dComentario') || {}).value || '';
+  if (accion === 'RECHAZAR' && !comentario.trim()) {
+    document.getElementById('dOblig').style.display = 'inline';
+    document.getElementById('dComentario').focus();
+    return;
+  }
+  const txt = accion === 'APROBAR'
+    ? `¿Aprobar la orden #${ACTUAL.id} por ${clp(ACTUAL.total)}? Pasará al siguiente nivel (o quedará lista para comprar).`
+    : `¿Rechazar la orden #${ACTUAL.id}? Los pedidos volverán a pendientes y se avisará con tu comentario.`;
+  if (!confirm(txt)) return;
+  const j = await fetch('/api/compras/revision/' + ACTUAL.id + '/decidir', {
+    method: 'POST', headers: HJ, body: JSON.stringify({ accion, comentario: comentario.trim() || null })
+  }).then(r => r.json()).catch(() => null);
+  if (!j || !j.success) return alert((j && j.error) || 'Error al firmar');
+  document.getElementById('dlg').close();
+  cargar();
+}
+
+cargar().then(() => {
+  const q = new URLSearchParams(location.search).get('orden');
+  if (q) abrir(Number(q));
+});
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

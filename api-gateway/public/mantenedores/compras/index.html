@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.1 — pestañas Ordenes de compra y Workflow de aprobacion (niveles parametricos por cargo/persona) -->
+  <!-- v1.2 — recordatorio por nivel + panel de destinos del workflow  ·  antes: v1.1 — pestañas Ordenes de compra y Workflow de aprobacion (niveles parametricos por cargo/persona) -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -155,6 +155,16 @@
           <div class="toolbar"><b>Workflow de aprobación de órdenes</b></div>
           <p class="muted" style="font-size:.83rem;margin:0 0 12px">Cada orden consolidada pasa por estos niveles antes de poder comprarse. Marca con casillas el <b>cargo</b> (perfil) y/o la <b>persona</b> que firma cada nivel. Un nivel desactivado se salta; con todos desactivados la orden nace lista para comprar. Las <b>alarmas</b> (campanita) de cada nivel se configuran en el mantenedor <a href="/mantenedores/avisos/">Avisos</a>.</p>
           <div id="wfNiveles" class="row g-3"></div>
+
+          <div style="margin-top:16px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px 18px;font-size:.84rem;line-height:1.7">
+            <b style="color:#012d70"><i class="bi bi-signpost-split me-1"></i>¿A dónde va la orden después?</b>
+            <ul style="margin:6px 0 0;padding-left:20px">
+              <li><b style="color:#166534">Aprobada por todos los niveles</b> → queda <b>ABIERTA (lista para comprar)</b> en <a href="/soporte/compras-admin/">Administrar Compras</a>, y suena la alarma <i>"Orden de compra aprobada"</i> a quienes definas en <a href="/mantenedores/avisos/">Avisos</a>.</li>
+              <li><b style="color:#b91c1c">Rechazada en cualquier nivel</b> (siempre con comentario) → los pedidos <b>vuelven a pendientes</b> en <a href="/soporte/compras-admin/">Administrar Compras</a> para corregir y reconsolidar, y suena la alarma <i>"Orden de compra rechazada"</i> con el motivo.</li>
+              <li><b style="color:#b45309">Sin firmar</b> → pasadas las horas del recordatorio del nivel, se <b>re-alarma con sonido</b> al firmante (y a los suscritos al aviso <i>"Recordatorio: orden sin firmar"</i>).</li>
+              <li>Los firmantes aprueban o rechazan en <a href="/soporte/compras-revision/">Revisión de Órdenes de Compra</a>.</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -164,7 +174,8 @@
       <ul>
         <li><b>Artículos por perfil</b> → define qué artículos del catálogo ve cada perfil al comprar en <a href="/soporte/compras/">Soporte › Compras</a>.</li>
         <li><b>Sincronizar catálogo</b> → recarga precios/stock/artículos desde el proveedor (Dimeiggs). Afecta el catálogo de <a href="/soporte/compras/">Compras</a>.</li>
-        <li><b>Direcciones</b> → oficinas de despacho disponibles (parques + Casa Matriz) que el usuario elige en <a href="/soporte/compras/">Compras</a> y a las que se consolidan los envíos.</li>
+        <li><b>Workflow de aprobación</b> → niveles, firmantes y <b>recordatorios (horas)</b> que rigen en <a href="/soporte/compras-revision/">Revisión de Órdenes</a> y las alarmas de <a href="/mantenedores/avisos/">Avisos</a>.</li>
+      <li><b>Direcciones</b> → oficinas de despacho disponibles (parques + Casa Matriz) que el usuario elige en <a href="/soporte/compras/">Compras</a> y a las que se consolidan los envíos.</li>
         <li><b>Usuarios</b> → dirección de despacho por defecto y centro de costo de cada usuario; se usan en sus pedidos y en el reporte mensual por sucursal.</li>
         <li><b>Workflow de aprobación</b> → niveles de firma (cargo y/o persona) que debe pasar cada orden en <a href="/soporte/compras-admin/">Administrar Compras</a> antes de poder comprarse. Sus alarmas se configuran en <a href="/mantenedores/avisos/">Avisos</a>.</li>
         <li><b>Órdenes de compra</b> → vista de consulta con el detalle por sucursal, el N° de pedido de origen y las firmas de cada orden.</li>
@@ -432,6 +443,11 @@
             <input class="form-control form-control-sm" id="wfNom${n.nivel}" value="${esc(n.nombre)}" style="flex:1">
             <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="wfAct${n.nivel}" ${n.activo?'checked':''}></div>
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:.8rem;color:#475569">
+            <i class="bi bi-alarm" style="color:#b45309"></i> Recordatorio si no firma:
+            <input type="number" min="0" max="720" class="form-control form-control-sm" id="wfRec${n.nivel}" value="${n.recordatorio_horas ?? 24}" style="width:76px">
+            horas <span class="muted" style="font-size:.72rem">(0 = sin recordatorio)</span>
+          </div>
           <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Por cargo (perfil)</div>
           <div style="max-height:150px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;margin-bottom:8px">
             ${WF.perfiles.map(pf=>`<label style="display:block;font-size:.82rem"><input type="checkbox" class="form-check-input wfP${n.nivel}" value="${esc(pf.nombre)}" ${perf.includes(pf.nombre)?'checked':''}> ${esc(pf.nombre)}</label>`).join('')}
@@ -448,7 +464,8 @@
       const perfiles=[...document.querySelectorAll('.wfP'+nivel+':checked')].map(c=>c.value);
       const usuarios=[...document.querySelectorAll('.wfU'+nivel+':checked')].map(c=>c.value);
       const body={ nombre:document.getElementById('wfNom'+nivel).value.trim(), perfiles, usuarios,
-                   activo:document.getElementById('wfAct'+nivel).checked };
+                   activo:document.getElementById('wfAct'+nivel).checked,
+                   recordatorio_horas:parseInt(document.getElementById('wfRec'+nivel).value)||0 };
       if (body.activo && !perfiles.length && !usuarios.length) { toast('Un nivel activo necesita al menos un cargo o una persona', false); return; }
       const j = await api('/api/compras/admin/aprobacion-niveles/'+nivel, { method:'PUT', body: JSON.stringify(body) });
       if (j?.success) { toast('Nivel '+nivel+' guardado'); cargarWF(); } else toast(j?.error||'Error', false);

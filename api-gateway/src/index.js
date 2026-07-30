@@ -425,6 +425,7 @@ const PAGINAS = [
   ['/simulador-rapido', 'simulador-rapido/index.html'],
   ['/presentacion-grupo', 'presentacion-grupo/index.html'],
   ['/mantenedores/apis', 'mantenedores/apis/index.html'],
+  ['/soporte/compras-revision', 'soporte/compras-revision/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
   ['/mantenedores/rrhh-saludos', 'mantenedores/rrhh-saludos/index.html'],
   ['/mantenedores/ranking-ventas', 'mantenedores/ranking-ventas/index.html'],
