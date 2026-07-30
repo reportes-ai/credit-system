@@ -11,6 +11,14 @@ const uptime = require('../../../../shared/uptime');
 const DIAS = 90;          // ventana de la serie diaria (calza con la retención del motor)
 const BUCKETS_DIA = 288;  // checks esperados por día (cada 5 min)
 
+/* Recién desplegado: la fila de migraciones (shared/migrate) aún no crea las tablas.
+   Un request que cae en esa ventana NO es un error del sistema — responder "preparando"
+   en vez de 500 evita el correo de alerta en cada deploy. */
+const TABLA_FALTA = (e) => e && (e.errno === 1146 || e.code === 'ER_NO_SUCH_TABLE');
+const preparando = (res, que) => res.status(200).json({
+  success: true, data: { preparando: true, mensaje: `Preparando ${que}: el monitor se está inicializando tras el despliegue. Recarga en un minuto.` }, error: null,
+});
+
 /* ── Card en Mantenedores ── */
 require('../../../../shared/migrate').enFila('uptime-card', async () => {
   try {
@@ -113,7 +121,11 @@ const historia = async (req, res) => {
         servicios: resumen.servicios.map(s => ({ ...s, p90: p90Por[s.codigo] != null ? p90Por[s.codigo] : null, serie: seriePor[s.codigo] || [] })),
       },
     });
-  } catch (e) { console.error('[uptime historia]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+  } catch (e) {
+    if (TABLA_FALTA(e)) return preparando(res, 'el historial de uptime');
+    console.error('[uptime historia]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
 };
 
 /* GET /api/uptime/costos → gastos mensuales por servicio (IA en vivo desde ia_uso) */
@@ -134,7 +146,11 @@ const costosGet = async (req, res) => {
       totales[r.moneda] = Math.round(((totales[r.moneda] || 0) + Number(r.costo_mensual)) * 100) / 100;
     const por_confirmar = data.filter(r => r.costo_mensual == null).length;
     res.json({ success: true, data: { items: data, totales, por_confirmar }, error: null });
-  } catch (e) { console.error('[uptime costos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+  } catch (e) {
+    if (TABLA_FALTA(e)) return preparando(res, 'la tabla de gastos por servicio');
+    console.error('[uptime costos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
 };
 
 /* PUT /api/uptime/costos/:codigo { costo_mensual, moneda, nota } */
