@@ -617,6 +617,31 @@ async function buildSalud() {
   const rss = Math.round(process.memoryUsage().rss / 1048576);
   add('Memoria del servidor', rss < 360, `${rss} MB de 512 MB (${Math.round(rss / 5.12)}%)` + (rss >= 360 ? ' — sobre 70%: considerar subir plan Render' : ''));
 
+  // 7. Uptime por servicio (monitor shared/uptime.js, checks cada 5 min)
+  let uptimeHtml = '';
+  try {
+    const up = await require('../../../../shared/uptime').resumen();
+    const pct = v => v == null ? '<span style="color:#94a3b8">—</span>'
+      : `<span style="color:${v >= 99.5 ? '#166534' : v >= 97 ? '#b45309' : '#b91c1c'};font-weight:700">${Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2 })}%</span>`;
+    const filaU = s => `<tr>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9"><b>${s.nombre}</b></td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center">${pct(s.p24)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center">${pct(s.p7)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:center">${pct(s.p30)}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:11.5px;text-align:right">${
+        s.ms24 != null ? s.ms24 + ' ms' : ''}${s.ultima_falla ? ' · última falla ' + new Date(s.ultima_falla).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : ''}</td></tr>`;
+    uptimeHtml = `
+      <div style="padding:12px 28px 4px;font-size:13px;color:#0f4c81"><b>📡 Uptime por servicio</b> <span style="color:#94a3b8;font-size:11px">(checks cada ${up.cada_min} min, últimos 30 días)</span></div>
+      <table style="border-collapse:collapse;width:100%;font-size:12.5px">
+        <tr style="color:#94a3b8;font-size:11px"><td style="padding:2px 12px"></td><td style="text-align:center">24 h</td><td style="text-align:center">7 d</td><td style="text-align:center">30 d</td><td></td></tr>
+        ${up.app.p30 != null ? `<tr><td style="padding:6px 12px;border-bottom:1px solid #f1f5f9"><b>${up.app.nombre}</b> <span style="color:#94a3b8;font-size:11px">(medida por omisión de checks)</span></td><td></td><td></td><td style="text-align:center">${pct(up.app.p30)}</td><td></td></tr>` : ''}
+        ${up.servicios.map(filaU).join('')}
+      </table>`;
+    // Los servicios con uptime bajo también cuentan como alerta del informe
+    for (const s of up.servicios) if (s.p24 != null && s.p24 < 97)
+      checks.push({ nombre: 'Uptime ' + s.nombre, ok: false, detalle: `${s.p24}% en las últimas 24 h` });
+  } catch (e) { uptimeHtml = `<div style="padding:10px 28px;color:#94a3b8;font-size:12px">Uptime: sin datos aún (${e.message})</div>`; }
+
   const malos = checks.filter(c => !c.ok);
   const fila = c => `<tr><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9">${c.ok ? '✅' : '🔴'} <b>${c.nombre}</b></td><td style="padding:7px 12px;border-bottom:1px solid #f1f5f9;color:#475569">${c.detalle}</td></tr>`;
   const html = `
@@ -624,6 +649,7 @@ async function buildSalud() {
     <div style="max-width:680px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
       <div style="background:${malos.length ? '#b91c1c' : '#0f4c81'};color:#fff;padding:16px 28px"><b style="font-size:16px">${malos.length ? '⚠️' : '💙'} Salud del Sistema — ${malos.length ? malos.length + ' alerta(s)' : 'todo en orden'}</b></div>
       <table style="border-collapse:collapse;width:100%;font-size:13px">${checks.map(fila).join('')}</table>
+      ${uptimeHtml}
       <div style="padding:14px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;font-size:12.5px;color:#475569">
         <b>Rutina manual del mes (10 min)</b> — lo que la app no puede ver sola:<br>
         1. <a href="https://dashboard.render.com">Render → Metrics</a>: memoria base bajo 70%.<br>
