@@ -256,13 +256,13 @@ máquina y luego no deja bajar de tamaño).
 
 | | |
 |---|---|
-| Nombre del servicio | `credit-system` (workspace *Reportes's*, proyecto *My project* → *Production*) |
-| **🔑 URL DIRECTA (sin dominio)** | **`https://credit-system-45em.onrender.com`** ← por acá entra todo el mundo si el dominio falla |
-| **Link al panel** | `dashboard.render.com/web/srv-d832h7btqb8s73af7lug` ← guárdalo, evita buscar en crisis |
-| Región | Oregon (US West) |
-| Plan | **Starter — 0.5 CPU, 512 MB** (uso normal ~200 MB) |
+| Nombre del servicio | `credit-system-1` (workspace *Reportes's*, proyecto *My project* → *Production*) |
+| **🔑 URL DIRECTA (sin dominio)** | **`https://credit-system-1-zydf.onrender.com`** ← por acá entra todo el mundo si el dominio falla |
+| **Link al panel** | `dashboard.render.com/web/srv-d9lovbu417fc73dbaf6g` ← guárdalo, evita buscar en crisis |
+| Región | **Virginia (US East)** — la MISMA que TiDB, a propósito (latencia 4 ms vs 74 ms desde Oregon). Si se recrea el servicio, debe quedar en Virginia. |
+| Plan | **Standard — 1 CPU, 2 GB** (Start Command con `--max-old-space-size=1536`; ese valor va calibrado al tamaño de la instancia) |
 | Repo conectado | `reportes-ai/credit-system`, rama `main` (push a main = deploy automático) |
-| Dirección interna | `credit-system-45em:10000` — solo red privada de Render, **no sirve desde el navegador** |
+| Dirección interna | `credit-system-1:10000` — solo red privada de Render, **no sirve desde el navegador** |
 
 **ACCIÓN INMEDIATA (2 minutos, resuelve la mayoría de los casos):**
 dashboard.render.com → servicio → **Manual Deploy → Deploy latest commit**.
@@ -347,7 +347,7 @@ desde donde recuperar.
 
 **ACCIÓN INMEDIATA (30 segundos):** manda al equipo esta dirección —
 
-### 👉 `https://credit-system-45em.onrender.com`
+### 👉 `https://credit-system-1-zydf.onrender.com`
 
 El sistema funciona idéntico, solo cambia la dirección. Los tres subdominios apuntan a este
 mismo servicio, así que esa URL sirve para la suite interna, el portal de clientes y el de
