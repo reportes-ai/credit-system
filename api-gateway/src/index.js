@@ -11,7 +11,7 @@ const app = express();
 app.set('trust proxy', 1); // Render está detrás de proxy: req.ip = IP real del cliente
 
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'https://credit-system-45em.onrender.com',
+  origin: process.env.CORS_ORIGIN || 'https://afbs.autofacilchile.cl',   // dominio oficial, no la URL del servicio (cambia si se recrea)
   credentials: true
 }));
 app.use((req, res, next) => {

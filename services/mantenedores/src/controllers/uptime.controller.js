@@ -78,7 +78,7 @@ require('../../../../shared/migrate').enFila('servicios-costos', async () => {
     await pool.query('ALTER TABLE servicios_costos ADD COLUMN IF NOT EXISTS si_falla VARCHAR(400) NULL').catch(() => {});
     const EXPLICA = [
       ['render',
-       'Es el computador donde vive la aplicación: un servidor físico en un datacenter de Oregon (EE.UU.) del que arrendamos una porción (memoria y CPU). Cada vez que se sube un cambio a GitHub, Render lo compila y lo deja andando; además entrega la dirección pública y el certificado HTTPS. NO guarda los datos — esos viven en TiDB.',
+       'Es el computador donde vive la aplicación: un servidor físico en un datacenter de Virginia (EE.UU.) del que arrendamos una porción (2 GB de memoria y 1 CPU). Está adrede en la MISMA región que la base de datos, para que las consultas no crucen el país (4 ms en vez de 74). Cada vez que se sube un cambio a GitHub, Render lo compila y lo deja andando; además entrega la dirección pública y el certificado HTTPS. NO guarda los datos — esos viven en TiDB.',
        'El sistema queda fuera de línea, pero no se pierde ningún dato. Es el único hueco sin plan de contingencia probado.'],
       ['tidb',
        'La base de datos en la nube: acá viven de verdad los créditos, clientes, cobranza y la contabilidad. La aplicación solo los lee y escribe; el dato autoritativo está siempre aquí.',

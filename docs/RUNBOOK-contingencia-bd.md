@@ -276,7 +276,7 @@ investigas la causa con calma en los Logs.
    - `JavaScript heap out of memory` o reinicios repetidos → **memoria** (ver punto 3).
    - Un error de código en el último despliegue → **Rollback**: en la pestaña Events,
      buscar el deploy anterior que sí funcionaba y hacer *Redeploy* de ese commit.
-3. **Metrics**: el plan es de **512 MB** y el uso normal ronda los **200 MB (~41%)**. Si está
+3. **Metrics**: el plan es de **2 GB** (Standard, desde el 30-07-2026) y el uso normal ronda los **200 MB (~10%)**. Si está
    sostenidamente sobre 70%, hay que **subir de plan** — es la señal documentada en el
    informe semanal de Salud del Sistema.
 

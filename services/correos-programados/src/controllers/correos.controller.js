@@ -616,9 +616,13 @@ async function saludChecks() {
     add('Gasto IA del mes', Number(ia.usd) < 50, `US$ ${ia.usd} en ${ia.n} análisis` + (Number(ia.usd) >= 50 ? ' — sobre US$50: revisar en Mantenedores → IA' : ''));
   } catch (_) { add('Gasto IA del mes', true, 'sin registro'); }
 
-  // 6. Memoria del proceso (límite Render Starter: 512 MB)
+  // 6. Memoria del proceso. El límite depende de la INSTANCIA de Render, así que es
+  // paramétrico (env RENDER_MEM_MB): Standard = 2048 MB, Starter = 512. Si se cambia de
+  // plan y no se actualiza, este check —el que dispara la decisión de subir— miente.
+  const MEM_MB = Number(process.env.RENDER_MEM_MB) || 2048;
   const rss = Math.round(process.memoryUsage().rss / 1048576);
-  add('Memoria del servidor', rss < 360, `${rss} MB de 512 MB (${Math.round(rss / 5.12)}%)` + (rss >= 360 ? ' — sobre 70%: considerar subir plan Render' : ''));
+  const pctMem = Math.round(rss * 100 / MEM_MB);
+  add('Memoria del servidor', pctMem < 70, `${rss} MB de ${MEM_MB} MB (${pctMem}%)` + (pctMem >= 70 ? ' — sobre 70%: considerar subir plan Render' : ''));
 
   return checks;
 }
