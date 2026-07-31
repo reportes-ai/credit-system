@@ -5,7 +5,7 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cuadro de Mando — AutoFácil Business Suite</title>
-<!-- v1.0 -->
+<!-- v1.1 — reconexion automatica de la cuenta TV (token_tv en localStorage) -->
 <style>
   :root {
     --bg:#020817; --panel:#050e22; --line:#0a2748; --cyan:#00e5ff; --cyan-dim:#0891b2;
@@ -220,8 +220,21 @@
 </div>
 
 <script>
-const token = sessionStorage.getItem('token');
-if (!token) location.href = '/login.html';
+/* Reconexión de la cuenta TV: si el navegador se reinició (corte de luz), el token
+   respaldado en localStorage (solo cuentas TV, lo deja login.html) revive la sesión
+   siempre que no esté vencido. Así la pantalla vuelve sola sin que nadie tipee. */
+let token = sessionStorage.getItem('token');
+if (!token) {
+  try {
+    const tv = localStorage.getItem('token_tv');
+    if (tv) {
+      const p = JSON.parse(atob(tv.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      if (!p.exp || Math.floor(Date.now()/1000) < p.exp) { token = tv; sessionStorage.setItem('token', tv); }
+      else localStorage.removeItem('token_tv');
+    }
+  } catch (_) {}
+}
+if (!token) location.href = '/login.html?next=' + encodeURIComponent('/mando/');
 const H = { Authorization: 'Bearer ' + token };
 const CLP = v => '$' + Math.round(Number(v||0)).toLocaleString('es-CL');
 const MM  = v => '$' + (Number(v||0)/1e6).toLocaleString('es-CL',{maximumFractionDigits:1}) + 'M';

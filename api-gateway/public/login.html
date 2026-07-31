@@ -292,6 +292,10 @@
           // Cuentas con página de inicio propia (ej. TV → Cuadro de Mando) entran directo
           const pi = data.data.usuario && data.data.usuario.pagina_inicio;
           if (_next === '/' && pi && pi.startsWith('/') && !pi.startsWith('//')) _next = pi;
+          // Cuenta TV (sin permisos de módulos): el token se respalda en localStorage para
+          // que la pantalla se reconecte sola tras un corte de luz o reinicio del navegador.
+          // Excepción deliberada a la regla "token solo en sessionStorage" (como la PWA Terreno).
+          if (pi === '/mando/') { try { localStorage.setItem('token_tv', data.data.token); } catch (_) {} }
 
           /* ── Botón de éxito ── */
           document.getElementById('btnSpinner').classList.add('d-none');
