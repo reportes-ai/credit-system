@@ -98,7 +98,10 @@ async function crearCreditoDesdeCartas(c) {
     (c.tipo_vehiculo || c.tipoVehiculo || null),
     (c.marca || null), (c.modelo || null), (c.anio || null), (c.patente || null),
     (c.concesionario || null),
-    (c.ejecutivo_nombre || c.ejecutivoNombre || null),
+    /* Ejecutivo en MAYÚSCULAS: los agrupados (dashboard, comisiones, rankings)
+       agrupan por texto exacto — un "Fernando Contreras" digitado así en la
+       carta partía al ejecutivo en dos y su conteo del mes salía corto. */
+    (c.ejecutivo_nombre || c.ejecutivoNombre ? String(c.ejecutivo_nombre || c.ejecutivoNombre).trim().toUpperCase() : null),
     (c.part_bruto || c.partBruto || null),
   ]);
   // Parque/Calle desde el mantenedor de dealers (por RUT): la carta no lo trae y
@@ -1060,7 +1063,8 @@ const cargaMasivaCartas = async (req, res) => {
     for (const r of rows) {
       try {
         const nId = String(r.nId || '').trim();
-        const ejec = String(r.ejecutivo || '').trim();
+        // MAYÚSCULAS: los agrupados por ejecutivo son por texto exacto (ver INSERT de arriba).
+        const ejec = String(r.ejecutivo || '').trim().toUpperCase() || null;
         const nOp = String(r.nOp || '').trim();
         if (!nId || !ejec) { errores.push({ nOp, error: 'Falta N° ID o ejecutivo' }); continue; }
 
