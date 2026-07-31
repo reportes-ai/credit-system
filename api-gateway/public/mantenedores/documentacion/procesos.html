@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.5 — una sola carta vigente por operacion + una comision por operacion, no por carta. v4.4 — Cap. 33 vendedores del dealer; cap. 2 la cola exige etapa OTORGADO. Cap. 31: regla de oro, etapa distinta de OTORGADO no va a cartolas. Cap. 9: pre-llenado de la digitacion desde la carta de aprobacion + aviso de parque/calle. Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
+<!-- v4.6 — cap. 34: la ETAPA del credito, motor unico shared/etapa-credito.js (las tres columnas se escriben juntas, se leen por ETAPA_SQL), etapa vs estado de cartera y el control desalineados(). v4.5 — una sola carta vigente por operacion + una comision por operacion, no por carta -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -72,6 +72,7 @@
     <a href="#p31">31. Incorporar a la cartola las otorgadas sin carta</a>
     <a href="#p32">32. Anular una operación otorgada</a>
     <a href="#p33">33. Vendedores del dealer: base, ventas y trazabilidad</a>
+    <a href="#p34">34. La ETAPA del crédito: quién la escribe y cómo se lee</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -623,6 +624,23 @@
   <div class="afecta" style="border-left-color:#b45309"><b>Calidad del dato (al 31-07-2026):</b> julio tiene el vendedor identificado en 68 de 85 operaciones; <b>junio solo en 18 de 75</b> — el resto entró por carga masiva con “S/I” y nunca se digitó. Además, de 335 vendedores en la base <b>43 están sin dealer asignado</b>, lo que impide el cruce preferente. Ambas listas se ven en pantalla marcadas en ámbar: el sistema no inventa el dato, lo muestra faltante.</div>
   <div class="flujo"><span class="st ini">CARTA (elige vendedor)</span><span class="ar">→</span><span class="st">OPERACIÓN OTORGADA</span><span class="ar">→</span><span class="st fin">VENDEDOR CON VENTAS</span></div>
   <div class="afecta"><b>Afecta:</b> gestión comercial del dealer, contacto con vendedores, medición de aporte por persona. <b>Depende de:</b> base Vendedores por Dealer, carta de aprobación (§1), etapa del crédito.</div>
+
+  <h2 id="p34">34. La ETAPA del crédito: quién la escribe y cómo se lee</h2>
+  <p><b>Qué y para qué:</b> la <b>etapa</b> dice en qué punto del camino está una operación (DIGITADO → APROBADO → OTORGADO → ANULADO/DESISTIDO…). Es el dato del que cuelga casi todo el sistema: si una operación cuenta como venta, si va a cartolas, si genera comisión, si le exigimos fundantes, si aparece en Post Venta. Que la etapa esté mal no es un error cosmético — descuadra la plata.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Nadie la escribe “a mano” como acto propio: la fija el proceso que corresponde — otorgar una carta (Cartas), anular (Operaciones, doble firma, §32), marcar NO OTORGADO, la carga Trinidad y el desistimiento automático a los N días.</div>
+    <div><b class="lbl">Prerequisitos</b>Que el cambio venga del proceso dueño de ese paso, con su permiso y respetando mes cerrado.</div>
+  </div>
+  <div class="max" style="background:#fef2f2;border-left:4px solid #b91c1c"><b>El gotcha que hay que conocer:</b> por herencia histórica la etapa vive en <b>TRES columnas</b> de <code>creditos</code> — <code>estado</code>, <code>estado_credito</code> y <code>estado_eval</code>. Cuando un proceso escribía solo dos, la operación quedaba con <b>la etapa partida</b> y cada pantalla veía una verdad distinta. Pasó de verdad: la <b>OP 89343</b> se mostraba otorgada en el listado pero quedaba fuera de Vendedores con Ventas, fundantes y cartolas; la <b>OP 88558</b> estaba <b>anulada</b> y se seguía mostrando OTORGADA, porque <code>estado</code> se lee primero.</div>
+  <ol>
+    <li><b>Escribir siempre por el motor único</b> (<code>shared/etapa-credito.js</code>): <code>setEtapa()</code> toca las tres columnas en el mismo UPDATE. Un <code>SET estado_credito=…</code> suelto vuelve a partir la etapa.</li>
+    <li><b>Leer siempre por la expresión canónica</b> (<code>ETAPA_SQL</code>): <code>estado</code> manda cuando está poblada, y si no se cae a las otras dos. Así ninguna pantalla inventa su propio criterio.</li>
+    <li><b>Sincronizaciones desde afuera</b> (carga Trinidad, edición manual): ahí <code>estado_credito</code> y <code>estado_eval</code> pueden diferir <i>legítimamente</i> porque la fuente los mapea distinto; el motor solo acompaña <code>estado</code> para que no quede contradiciendo a las otras dos.</li>
+    <li><b>Control permanente:</b> <code>desalineados()</code> lista las operaciones con la etapa partida. Es la lista de pendientes: <b>si algo aparece ahí, algún proceso escribió la etapa sin pasar por el motor</b> y hay que cablearlo.</li>
+  </ol>
+  <div class="max" style="background:#eff6ff;border-left:4px solid #0141A2"><b>Dos cosas que NO son un error:</b> (1) <b>ETAPA ≠ ESTADO DE CARTERA.</b> En cartera propia <code>estado</code> también guarda VIGENTE / EN MORA / VENCIDO / PREPAGADO / CASTIGADO: eso describe el <i>pago</i>, no la etapa. Un crédito “EN MORA” está, en etapa, OTORGADO — el motor lo respeta y nunca pisa esas palabras. (2) <b>Vacío no es discrepancia:</b> las ~16.000 solicitudes de la carga masiva diaria de AUTOFIN viven con <code>estado</code> vacío a propósito, porque nunca fueron de originación propia.</div>
+  <div class="flujo"><span class="st ini">PROCESO DUEÑO DEL PASO</span><span class="ar">→</span><span class="st">setEtapa() escribe las TRES</span><span class="ar">→</span><span class="st fin">TODOS leen lo mismo</span></div>
+  <div class="afecta"><b>Afecta:</b> listado de Créditos, cartolas y comisiones (§31), Vendedores con Ventas (§33), fundantes (§2), Post Venta, dashboard, cobranza y contabilidad — todo lo que filtra por “otorgado”. <b>Depende de:</b> otorgamiento de la carta (§1), anulación (§32), carga Trinidad (§30) y el desistimiento automático.</div>
 
 </body>
 </html>
