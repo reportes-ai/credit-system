@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.1 — Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
+<!-- v4.2 — Cap. 9: pre-llenado de la digitacion desde la carta de aprobacion + aviso de parque/calle. Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -205,8 +205,10 @@
   <ol>
     <li><b>Cargar</b> (Carga Masiva → Cargar): el validador con IA marca anomalías (RUT, montos, dealers, fechas) ANTES de insertar → confirmar.</li>
     <li><b>Completar</b> (Digitación de Datos Faltantes): los incompletos entran a la cola; se toman de a uno (bloqueo 20 min), campos faltantes en rojo.</li>
+    <li><b>Pre-llenado desde la carta de aprobación</b> (automático): si existe una carta con el mismo <b>ID Financiera</b>, sus datos de vehículo y venta —tipo, marca, modelo, año, patente, vendedor, RUT del dealer y parque/calle— llegan <b>ya cargados</b> y marcados <span style="background:#eff6ff;color:#0141A2;border-radius:5px;padding:0 5px;font-weight:700;font-size:.78em">desde la carta</span>. Son <b>editables</b>: la carta sugiere, no manda, porque entre la carta y el curse el vehículo pudo cambiar. Solo se pre-llena lo que está vacío; nunca pisa un dato ya digitado.</li>
     <li>Cada carga queda en el <b>Historial de Cargas</b> y en Auditoría; el recálculo de comisiones corre solo.</li>
   </ol>
+  <div class="afecta" style="border-left-color:#b45309"><b>Aviso de Parque / Calle:</b> si la carta dice un parque y el crédito quedó como calle (o al revés), la pantalla lo muestra en ámbar y <b>no corrige sola</b>: esa diferencia cambia el tramo de comisión del dealer, así que la decide una persona. Es el mismo criterio del cap. 31.</div>
   <div class="flujo"><span class="st ini">EXCEL</span><span class="ar">→</span><span class="st">VALIDADO</span><span class="ar">→</span><span class="st">INSERTADO</span><span class="ar">→</span><span class="st">COLA FALTANTES</span><span class="ar">→</span><span class="st fin">COMPLETO</span></div>
   <div class="afecta"><b>Afecta:</b> Dashboard, comisiones, todo lo aguas abajo de un crédito. <b>Depende de:</b> equivalencias, mantenedores de dealers/estados.</div>
 
