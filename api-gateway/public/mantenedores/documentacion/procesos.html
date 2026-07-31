@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.3 — Cap. 31: regla de oro, etapa distinta de OTORGADO no va a cartolas. Cap. 9: pre-llenado de la digitacion desde la carta de aprobacion + aviso de parque/calle. Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
+<!-- v4.4 — Cap. 33 vendedores del dealer; cap. 2 la cola exige etapa OTORGADO. Cap. 31: regla de oro, etapa distinta de OTORGADO no va a cartolas. Cap. 9: pre-llenado de la digitacion desde la carta de aprobacion + aviso de parque/calle. Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -71,6 +71,7 @@
     <a href="#p30">30. Cuadratura de montos contra el Canal AutoFin (Trinidad)</a>
     <a href="#p31">31. Incorporar a la cartola las otorgadas sin carta</a>
     <a href="#p32">32. Anular una operación otorgada</a>
+    <a href="#p33">33. Vendedores del dealer: base, ventas y trazabilidad</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -92,7 +93,7 @@
   <p><b>Qué y para qué:</b> respaldar documentalmente la operación otorgada para que la financiera libere los fondos. Sin fundantes cerrados no hay plata.</p>
   <div class="meta">
     <div><b class="lbl">Quién</b>Ejecutivo comercial (sube documentos) · Analista de Operaciones (valida).</div>
-    <div><b class="lbl">Prerequisitos</b>Crédito OTORGADO · matriz de documentos por financiera (mantenedor Tipos de Documento).</div>
+    <div><b class="lbl">Prerequisitos</b>Crédito con <b>etapa OTORGADO</b> · matriz de documentos por financiera (mantenedor Tipos de Documento). <b>La fecha de otorgamiento NO basta</b>: viene poblada también en aprobadas sin cursar, rechazadas y desistidas (3.161 aprobadas la tenían), que se colaban a la cola pidiendo fundantes de un negocio que nunca existió.</div>
   </div>
   <ol>
     <li><b>Subir</b> (Seguimiento Fundantes — Ejecutivo): los documentos que exige la matriz; el sistema los renombra automático (tipo + operación) → Enviar.</li>
@@ -605,6 +606,22 @@
   <div class="flujo"><span class="st ini">OTORGADA</span><span class="ar">→</span><span class="st">ANULACIÓN SOLICITADA</span><span class="ar">→</span><span class="st fin">ANULADA + comisión retirada</span><span class="ar">/</span><span class="st mal">RECHAZADA (sigue vigente)</span></div>
   <div class="afecta"><b>Afecta:</b> el estado de la operación, la cartola del dealer (y aguas abajo su factura y orden de pago), y todo informe que filtre por estado. <b>Depende de:</b> mes contable abierto, matriz de permisos. <b>Avisa:</b> eventos <code>operacion_anulacion_pendiente</code> y <code>operacion_anulacion_resuelta</code>, configurables en Mantenedores → Avisos.</div>
   <p style="font-size:.85rem;color:#64748b"><b>Por qué nació (31-07-2026):</b> hasta entonces anular era cambiar el estado a mano en la pantalla de digitación — sin motivo obligatorio, sin segunda firma y sin tocar la cartola. Una auditoría de los movimientos de cartola contra el estado real del crédito encontró <b>3 operaciones anuladas con $1.901.400 de comisión viva</b> esperando pago, más otras nunca otorgadas. Ninguna alcanzó a enviarse. El estado ANULADO sigue existiendo en la digitación, pero <b>la vía correcta es esta pantalla</b>, que es la única que retira la plata.</p>
+
+  <h2 id="p33">33. Vendedores del dealer: base, ventas y trazabilidad</h2>
+  <p><b>Qué y para qué:</b> saber <b>quién</b> del concesionario nos trae cada negocio, poder contactarlo y medir su aporte. El vendedor no es un dato decorativo: es con quien Comercial trabaja el día a día del dealer.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Quien mantiene dealers carga y corrige la base (<code>aprob_vendedores</code>) · el ejecutivo elige el vendedor al digitar la carta · Comercial y Operaciones consultan.</div>
+    <div><b class="lbl">Prerequisitos</b>Ficha del dealer vigente. El vendedor se elige en la carta de aprobación.</div>
+  </div>
+  <ol>
+    <li><b>Base única</b> (Creación/Mantenedor de Dealer → <b>Vendedores por Dealer</b>, tabla <code>vendedores_dealer</code>): nombre, <b>RUT</b>, <b>correo</b> y a qué dealer pertenece. Es la ÚNICA fuente del RUT y el correo — ni la carta ni el crédito los guardan, solo el nombre. Alimenta el selector de Vendedor del Generador de Cartas.</li>
+    <li><b>Detalle Mensual de Cartas</b> (Cartas de Aprobación): mes a mes, cada carta con su N° de OP, ID financiera, ejecutivo, cliente y el vendedor <b>con RUT y correo</b>. Buscador multi-variable y Excel.</li>
+    <li><b>Vendedores con Ventas</b> (Post Venta): agrupado por vendedor + dealer de las operaciones con <b>etapa OTORGADO</b>, con cantidad y monto; al pinchar la fila se despliega el detalle operación por operación. Abre por defecto en el <b>último mes cerrado</b> (el mes en curso está incompleto y se leería como caída de ventas). Excel con dos hojas: resumen y detalle.</li>
+  </ol>
+  <div class="max" style="background:#eff6ff;border-left:4px solid #0141A2"><b>De dónde sale el nombre del vendedor (importante):</b> de la <b>carta de aprobación</b>, que es donde el ejecutivo lo elige. <b><code>creditos.vendedor</code> NO sirve</b>: la carga masiva escribe ahí a NUESTRO ejecutivo (“VENDEDOR (AFA) …”), no al del dealer; solo se usa como respaldo cuando no hay carta y el valor no es uno de esos placeholders. Y <b>“S/I” es ausencia de dato</b>, no una venta directa: confundirlos hacía aparecer dealers reales como ventas propias. El cruce con la base para traer RUT y correo se hace por <b>nombre + RUT del dealer</b>, con respaldo por nombre solo (un vendedor puede cambiarse de concesionario).</div>
+  <div class="afecta" style="border-left-color:#b45309"><b>Calidad del dato (al 31-07-2026):</b> julio tiene el vendedor identificado en 68 de 85 operaciones; <b>junio solo en 18 de 75</b> — el resto entró por carga masiva con “S/I” y nunca se digitó. Además, de 335 vendedores en la base <b>43 están sin dealer asignado</b>, lo que impide el cruce preferente. Ambas listas se ven en pantalla marcadas en ámbar: el sistema no inventa el dato, lo muestra faltante.</div>
+  <div class="flujo"><span class="st ini">CARTA (elige vendedor)</span><span class="ar">→</span><span class="st">OPERACIÓN OTORGADA</span><span class="ar">→</span><span class="st fin">VENDEDOR CON VENTAS</span></div>
+  <div class="afecta"><b>Afecta:</b> gestión comercial del dealer, contacto con vendedores, medición de aporte por persona. <b>Depende de:</b> base Vendedores por Dealer, carta de aprobación (§1), etapa del crédito.</div>
 
 </body>
 </html>
