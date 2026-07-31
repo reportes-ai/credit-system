@@ -64,6 +64,14 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN debe_cambiar_clave TINYINT(1) NOT NULL DEFAULT 0`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration debe_cambiar_clave]', e.message); }
+  // Cuentas de propósito fijo (ej. pantalla TV): a dónde entra tras el login y cuánto
+  // dura su sesión (horas; NULL = las 8 h estándar). Lo usa auth.controller.
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN pagina_inicio VARCHAR(120) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration pagina_inicio]', e.message); }
+  try {
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN sesion_horas INT NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sesion_horas]', e.message); }
   try {
     // Bloqueo por intentos fallidos de login
     await pool.query(`ALTER TABLE usuarios ADD COLUMN intentos_fallidos INT NOT NULL DEFAULT 0`);

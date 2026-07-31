@@ -92,7 +92,9 @@ const login = async (req, res) => {
       id_supervisor: usuario.id_supervisor
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+    // Cuentas de propósito fijo (ej. TV) pueden tener sesión más larga (usuarios.sesion_horas).
+    const expira = (Number(usuario.sesion_horas) > 0) ? (Number(usuario.sesion_horas) + 'h') : JWT_EXPIRES;
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: expira });
 
     res.json({
       success: true,
@@ -104,7 +106,10 @@ const login = async (req, res) => {
           apellido: usuario.apellido,
           email: usuario.email,
           perfil: usuario.perfil_nombre,
-          protegido: usuario.protegido === 1
+          protegido: usuario.protegido === 1,
+          // Página a la que entra directo tras el login (NULL = home). Ej: la cuenta
+          // de la pantalla TV entra directo al Cuadro de Mando.
+          pagina_inicio: usuario.pagina_inicio || null
         },
         // El frontend del login obliga a cambiar la clave antes de entrar
         // (primer ingreso, reset, o clave vencida según la política)

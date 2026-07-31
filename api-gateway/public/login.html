@@ -225,7 +225,7 @@
 
   <script>
     // Destino post-login: soporta ?next=/ruta (solo rutas locales; lo usa la app dedicada de WhatsApp)
-    const _next = (() => {
+    let _next = (() => {
       const n = new URLSearchParams(location.search).get('next') || '/';
       return (n.startsWith('/') && !n.startsWith('//')) ? n : '/';
     })();
@@ -289,6 +289,9 @@
 
           sessionStorage.setItem('token', data.data.token);
           sessionStorage.setItem('usuario', JSON.stringify(data.data.usuario));
+          // Cuentas con página de inicio propia (ej. TV → Cuadro de Mando) entran directo
+          const pi = data.data.usuario && data.data.usuario.pagina_inicio;
+          if (_next === '/' && pi && pi.startsWith('/') && !pi.startsWith('//')) _next = pi;
 
           /* ── Botón de éxito ── */
           document.getElementById('btnSpinner').classList.add('d-none');
