@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — Fundantes devueltos: full width, colores corporativos y bitácora por OP -->
+<!-- v1.2 — Devueltos: columna Estado (el mismo del flujo de fundantes) y las operaciones NO salen de la lista al corregirse -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -39,6 +39,11 @@
   .num { text-align:right; white-space:nowrap; }
   .motivo { background:#fffbeb; border-left:3px solid #f59e0b; border-radius:6px; padding:5px 9px; font-size:.74rem; color:#92400e; margin-top:4px; }
   .pill { background:#fee2e2; color:#b91c1c; border-radius:10px; padding:1px 8px; font-size:.7rem; font-weight:700; }
+  .est { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 8px; display:inline-block; white-space:nowrap; }
+  .est-PENDIENTE { background:#fee2e2; color:#b91c1c; }
+  .est-ENVIADO   { background:#fef3c7; color:#92400e; }
+  .est-CERRADO   { background:#dcfce7; color:#15803d; }
+  .est-RECHAZADO { background:#fee2e2; color:#991b1b; }
 </style>
 </head>
 <body>
@@ -52,7 +57,7 @@
 <div class="main">
   <div class="banner"><i class="bi bi-arrow-counterclockwise"></i><div>
     <h2>Fundantes Devueltos por la Financiera</h2>
-    <p>Operaciones que la financiera devolvió tras revisarlas. Volvieron a <b>Fundantes Pendientes</b>: el ejecutivo debe corregir los documentos y reenviarlos.</p>
+    <p>Operaciones que la financiera devolvió alguna vez, con su estado actual en el flujo de fundantes. Quedan en la lista aunque se corrijan — la bitácora (pinchando el N° de OP) cuenta por qué se demoró cada una.</p>
   </div></div>
 
   <div class="card-af">
@@ -64,11 +69,11 @@
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Financiera</th><th>Ejecutivo</th><th>N° OP</th><th>ID Fin.</th><th>RUT Cliente</th><th>Cliente</th>
+          <th>Estado</th><th>Financiera</th><th>Ejecutivo</th><th>N° OP</th><th>ID Fin.</th><th>RUT Cliente</th><th>Cliente</th>
           <th>Dealer</th><th>Parque</th><th class="num">Monto Crédito</th><th class="num">Saldo Precio</th>
           <th>Fecha Otorgamiento</th><th>Devolución</th>
         </tr></thead>
-        <tbody id="body"><tr><td colspan="12" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+        <tbody id="body"><tr><td colspan="13" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -113,9 +118,11 @@ function render(){
   const q = (document.getElementById('q').value||'').toLowerCase().trim();
   const f = !q ? DATA : DATA.filter(r => [r.num_op,r.id_financiera,r.rut_cliente,r.cliente,r.ejecutivo,r.dealer,r.parque]
     .some(v => String(v||'').toLowerCase().includes(q)));
-  document.getElementById('cnt').textContent = f.length + ' operación(es)' +
+  const porCorregir = f.filter(r=>r.estado==='PENDIENTE').length;
+  document.getElementById('cnt').textContent = f.length + ' operación(es) · ' + porCorregir + ' por corregir' +
     (f.length ? ' · saldo precio ' + clp(f.reduce((a,r)=>a+Number(r.saldo_precio||0),0)) : '');
   document.getElementById('body').innerHTML = f.length ? f.map(r=>`<tr>
+    <td><span class="est est-${esc(r.estado)}">${r.estado==='PENDIENTE'?'POR CORREGIR':esc(r.estado)}</span></td>
     <td>${esc(r.financiera)}</td><td>${esc(r.ejecutivo)}</td>
     <td><button class="opbtn" title="Ver bitácora de la operación" onclick="abrirBitacora(${r.id_credito},'${esc(r.num_op)}')">${esc(r.num_op)}</button>${Number(r.devoluciones)>1?' <span class="pill">'+r.devoluciones+'ª vez</span>':''}</td>
     <td>${esc(r.id_financiera)}</td><td>${esc(r.rut_cliente)||'—'}</td><td>${esc(r.cliente)||'—'}</td>
@@ -124,7 +131,7 @@ function render(){
     <td>${fd(r.fecha_otorgado)}</td>
     <td style="min-width:240px"><div style="font-size:.72rem;color:#64748b">${fdh(r.devuelto_at)} · ${esc(r.devuelto_por)||''}</div>
         <div class="motivo">${esc(r.devuelto_motivo)}</div></td>
-  </tr>`).join('') : '<tr><td colspan="12" style="color:#166534;padding:20px">✓ No hay operaciones devueltas pendientes de corregir.</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="13" style="color:#166534;padding:20px">✓ Ninguna operación ha sido devuelta por la financiera.</td></tr>';
 }
 
 /* Bitácora de la operación: une lo que el sistema registró solo (auditoría del
@@ -165,7 +172,7 @@ async function guardarComentario(){
 }
 
 function exportar(){
-  const rows = DATA.map(r=>({ Financiera:r.financiera, Ejecutivo:r.ejecutivo, 'N° OP':r.num_op, 'ID Financiera':r.id_financiera,
+  const rows = DATA.map(r=>({ Estado:(r.estado==='PENDIENTE'?'POR CORREGIR':r.estado), Financiera:r.financiera, Ejecutivo:r.ejecutivo, 'N° OP':r.num_op, 'ID Financiera':r.id_financiera,
     'RUT Cliente':r.rut_cliente, Cliente:r.cliente, Dealer:r.dealer, Parque:r.parque,
     'Monto Crédito':Number(r.monto_financiado||0), 'Saldo Precio':Number(r.saldo_precio||0),
     'Fecha Otorgamiento':fd(r.fecha_otorgado), 'Devuelto el':fdh(r.devuelto_at), 'Devuelto por':r.devuelto_por,

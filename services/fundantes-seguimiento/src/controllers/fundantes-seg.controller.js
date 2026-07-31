@@ -467,7 +467,10 @@ const devolver = async (req, res) => {
 };
 
 /* ─── GET /api/fundantes-seguimiento/devueltos ────────────────────────────────
-   Listado de las operaciones devueltas por la financiera que siguen pendientes. */
+   Listado de TODAS las operaciones que la financiera devolvió alguna vez, con su
+   estado ACTUAL en el flujo de fundantes (el mismo de Fundantes Pendientes).
+   No se sacan de la lista al corregirse: la marca queda como historia para saber
+   por qué se demoró cada operación (la bitácora guarda el detalle). */
 const devueltos = async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -479,11 +482,12 @@ const devueltos = async (req, res) => {
                       NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''),' ',COALESCE(cl.apellido_materno,''))),'')) AS cliente,
              COALESCE(c.automotora,'') AS dealer, COALESCE(c.parque,'') AS parque,
              c.monto_financiado, c.saldo_precio, c.fecha_otorgado,
-             fs.devuelto_motivo, fs.devuelto_at, fs.devuelto_por, fs.devoluciones
+             fs.devuelto_motivo, fs.devuelto_at, fs.devuelto_por, fs.devoluciones,
+             COALESCE(fs.estado,'PENDIENTE') AS estado
         FROM fundantes_seg fs
         JOIN creditos c   ON c.id = fs.id_credito
         LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-       WHERE fs.devuelto_fin = 1 AND fs.estado = 'PENDIENTE'
+       WHERE fs.devuelto_fin = 1
        ORDER BY fs.devuelto_at DESC`);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { console.error('[fundantes devueltos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
