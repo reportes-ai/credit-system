@@ -101,7 +101,11 @@ const sync = async (req, res) => {
           ca.id_credito_creado     = cr.id,
           ca.fecha_otorgado        = COALESCE(ca.fecha_otorgado, cr.fecha_otorgado, NOW())
       WHERE ca.otorgado = 0 AND ca.status = 'APROBADA'
-        AND UPPER(cr.estado_credito) = 'OTORGADO' AND cr.fecha_otorgado IS NOT NULL
+        AND cr.fecha_otorgado IS NOT NULL
+        AND 'OTORGADO' IN (UPPER(COALESCE(cr.estado,'')), UPPER(COALESCE(cr.estado_credito,'')), UPPER(COALESCE(cr.estado_eval,'')))
+        AND UPPER(COALESCE(cr.estado,''))         NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
+        AND UPPER(COALESCE(cr.estado_credito,'')) NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
+        AND UPPER(COALESCE(cr.estado_eval,''))    NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
     `);
 
     const [r2] = await pool.query(`
@@ -119,10 +123,16 @@ const sync = async (req, res) => {
       WHERE ca.otorgado = 1 AND ca.status = 'APROBADA'
         -- Segunda barrera: aunque la carta esté marcada otorgada (marcas viejas o
         -- a mano), no se genera comisión si la operación no está OTORGADA.
+        -- La etapa vive en TRES columnas y a veces discrepan: basta que UNA diga
+        -- OTORGADO, pero NINGUNA puede decir anulado/desistido/rechazado.
         AND EXISTS (
           SELECT 1 FROM creditos cv
           WHERE cv.num_op = ca.id_financiera
-            AND UPPER(cv.estado_credito) = 'OTORGADO' AND cv.fecha_otorgado IS NOT NULL
+            AND cv.fecha_otorgado IS NOT NULL
+            AND 'OTORGADO' IN (UPPER(COALESCE(cv.estado,'')), UPPER(COALESCE(cv.estado_credito,'')), UPPER(COALESCE(cv.estado_eval,'')))
+            AND UPPER(COALESCE(cv.estado,''))         NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
+            AND UPPER(COALESCE(cv.estado_credito,'')) NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
+            AND UPPER(COALESCE(cv.estado_eval,''))    NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
         )
         AND NOT EXISTS (
           SELECT 1 FROM cartolas_movimientos m
