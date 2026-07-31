@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<!-- v1.0 — Detalle mensual de cartas con RUT y correo del vendedor + buscador multi-variable -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detalle Mensual de Cartas — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input[type=text],select { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; background:#fff; }
+  input[type=text] { min-width:340px; flex:1; }
+  .btnx { border:none; border-radius:9px; padding:8px 15px; font-size:.8rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
+  .btn-gh { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  table { width:100%; border-collapse:collapse; font-size:.79rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:9px; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; position:sticky; top:0; }
+  td { padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  tbody tr:hover { background:#f8fbff; }
+  .mes-row td { background:linear-gradient(90deg,#eff6ff,#f8fbff); font-weight:800; color:var(--navy); font-size:.82rem; padding:10px 9px; border-top:2px solid var(--accent); }
+  .mes-row .sub { font-weight:600; color:#64748b; font-size:.74rem; }
+  .st { font-size:.68rem; font-weight:700; border-radius:6px; padding:2px 7px; white-space:nowrap; }
+  .st-APROBADA{background:#dcfce7;color:#15803d}.st-PENDIENTE{background:#fef3c7;color:#92400e}
+  .st-RECHAZADA{background:#fee2e2;color:#991b1b}.st-VENCIDA{background:#e2e8f0;color:#475569}
+  .st-DESISTIDA{background:#e2e8f0;color:#475569}.st-ANULADA{background:#fee2e2;color:#b91c1c}
+  .falta { color:#b45309; font-size:.72rem; font-style:italic; }
+  a.mail { color:var(--blue); text-decoration:none; } a.mail:hover { text-decoration:underline; }
+  .chip { background:#f1f5f9; border-radius:9px; padding:5px 11px; font-size:.78rem; color:#334155; }
+  .chip b { color:var(--blue); }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Cartas de Aprobación', href:'/aprobaciones/' },
+  { label:'Detalle Mensual', icon:'bi-calendar3', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-calendar3"></i><div>
+    <h2>Detalle Mensual de Cartas</h2>
+    <p>Mes a mes: operación, ejecutivo, cliente y <b>vendedor con su RUT y correo</b>. Un solo buscador para todos los campos.</p>
+  </div></div>
+
+  <div class="card-af">
+    <div class="bar">
+      <input type="text" id="q" placeholder="Buscar en todo: N° OP, ID financiera, ejecutivo, cliente, RUT, dealer, vendedor o correo…" oninput="deb()">
+      <select id="fMes" onchange="cargar()"><option value="">Todos los meses</option></select>
+      <select id="fStatus" onchange="cargar()">
+        <option value="">Todos los estados</option>
+        <option>APROBADA</option><option>PENDIENTE</option><option>RECHAZADA</option>
+        <option>VENCIDA</option><option>DESISTIDA</option><option>ANULADA</option>
+      </select>
+      <button class="btnx btn-gh" onclick="limpiar()"><i class="bi bi-x-circle"></i> Limpiar</button>
+      <button class="btnx" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+    </div>
+    <div class="bar" style="margin-top:10px"><span class="chip" id="resumen">—</span></div>
+  </div>
+
+  <div class="card-af" style="padding:0;overflow:hidden">
+    <div style="overflow:auto;max-height:70vh">
+      <table>
+        <thead><tr>
+          <th>N° OP</th><th>ID Financiera</th><th>Carta</th><th>Estado</th><th>Fecha</th>
+          <th>Ejecutivo</th><th>Cliente</th><th>RUT Cliente</th>
+          <th>Dealer</th><th>Vendedor</th><th>RUT Vendedor</th><th>Correo Vendedor</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="12" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fd  = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesLbl = m => { const p=String(m||'').split('-'); return p.length===2 ? (MESES[+p[1]-1]+' '+p[0]) : m; };
+let DATA = [], MESLIST = [];
+
+let tq=null; const deb = () => { clearTimeout(tq); tq=setTimeout(cargar, 350); };
+function limpiar(){ document.getElementById('q').value=''; document.getElementById('fMes').value='';
+  document.getElementById('fStatus').value=''; cargar(); }
+
+async function cargar(){
+  const qs = new URLSearchParams();
+  const q = document.getElementById('q').value.trim();
+  if (q) qs.set('q', q);
+  const mes = document.getElementById('fMes').value;      if (mes) qs.set('mes', mes);
+  const st  = document.getElementById('fStatus').value;   if (st)  qs.set('status', st);
+  const j = await fetch('/api/cartas/detalle-mes?'+qs.toString(), { headers:H }).then(r=>r.json()).catch(()=>null);
+  DATA = (j && j.success) ? j.data : [];
+  // El selector de meses se llena una sola vez, con el universo completo
+  if (!MESLIST.length && j && j.meses) {
+    MESLIST = j.meses.map(m=>m.mes).filter(m=>m && m!=='sin fecha').sort().reverse();
+    document.getElementById('fMes').innerHTML = '<option value="">Todos los meses</option>' +
+      MESLIST.map(m=>`<option value="${m}">${mesLbl(m)}</option>`).join('');
+  }
+  render(j && j.meses ? j.meses : []);
+}
+
+function render(meses){
+  const sinDatos = DATA.filter(r => !r.vendedor_rut && !r.vendedor_mail).length;
+  document.getElementById('resumen').innerHTML =
+    `<b>${DATA.length}</b> carta(s) · <b>${meses.length}</b> mes(es)` +
+    (sinDatos ? ` · <span style="color:#b45309"><b>${sinDatos}</b> sin RUT/correo del vendedor</span>` : '');
+
+  // Agrupado por mes, con una fila de encabezado por cada uno
+  const porMes = {};
+  DATA.forEach(r => { const k = r.mes || 'sin fecha'; (porMes[k] = porMes[k] || []).push(r); });
+  const claves = Object.keys(porMes).sort().reverse();
+  const fila = r => `<tr>
+    <td><b>${esc(r.num_op || '—')}</b></td>
+    <td>${esc(r.id_financiera||'—')}</td>
+    <td style="font-size:.72rem;color:#64748b">${esc(r.op_carta||'—')}</td>
+    <td><span class="st st-${esc(r.status||'')}">${esc(r.status||'—')}</span></td>
+    <td>${fd(r.fecha)}</td>
+    <td>${esc(r.ejecutivo||'—')}</td>
+    <td>${esc(r.cliente||'—')}</td>
+    <td>${esc(r.rut_cliente||'—')}</td>
+    <td>${esc(r.nombre_dealer||'—')}</td>
+    <td>${esc(r.vendedor_nombre) || '<span class="falta">sin vendedor en la carta</span>'}</td>
+    <td>${esc(r.vendedor_rut) || '<span class="falta">no está en la base</span>'}</td>
+    <td>${r.vendedor_mail ? `<a class="mail" href="mailto:${esc(r.vendedor_mail)}">${esc(r.vendedor_mail)}</a>` : '<span class="falta">—</span>'}</td>
+  </tr>`;
+  document.getElementById('body').innerHTML = claves.length ? claves.map(k => {
+    const g = porMes[k], sinV = g.filter(r=>!r.vendedor_rut && !r.vendedor_mail).length;
+    return `<tr class="mes-row"><td colspan="12">${mesLbl(k)}
+      <span class="sub">· ${g.length} carta(s)${sinV?` · ${sinV} sin datos del vendedor`:''}</span></td></tr>`
+      + g.map(fila).join('');
+  }).join('') : '<tr><td colspan="12" style="color:#94a3b8;padding:20px">Sin resultados.</td></tr>';
+}
+
+function exportar(){
+  const rows = DATA.map(r=>({ Mes:mesLbl(r.mes), 'N° OP':r.num_op, 'ID Financiera':r.id_financiera,
+    Carta:r.op_carta, Estado:r.status, Fecha:fd(r.fecha), Ejecutivo:r.ejecutivo,
+    Cliente:r.cliente, 'RUT Cliente':r.rut_cliente, Dealer:r.nombre_dealer, 'RUT Dealer':r.rut_dealer,
+    Vendedor:r.vendedor_nombre, 'RUT Vendedor':r.vendedor_rut, 'Correo Vendedor':r.vendedor_mail }));
+  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Detalle Mensual');
+  XLSX.writeFile(wb, 'cartas_detalle_mensual_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

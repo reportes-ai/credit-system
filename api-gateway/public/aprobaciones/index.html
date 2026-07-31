@@ -257,6 +257,11 @@
       <h6>Carga Masiva de Cartas</h6><p>Sube el Excel mensual (hoja DETALLE MES) y carga las cartas en bloque, enlazando a los créditos existentes</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
+    <button class="ap-card" id="cardDetalleMes" onclick="location.href='/aprobaciones/detalle-mes/'" style="display:none">
+      <div class="card-icon"><i class="bi bi-calendar3"></i></div>
+      <h6>Detalle Mensual de Cartas</h6><p>Mes a mes: N° OP, ID financiera, ejecutivo, cliente y el vendedor con su RUT y correo. Buscador multi-variable y exportación a Excel</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
     <button class="ap-card" id="cardVendedores" onclick="location.href='/aprobaciones/vendedores/'" style="display:none">
       <div class="card-icon"><i class="bi bi-person-badge"></i></div>
       <h6>Vendedores por Dealer</h6><p>Base de vendedores de cada concesionario: asigna dealer, corrige datos y agrega nuevos (alimenta el selector de la carta)</p>
@@ -910,6 +915,7 @@ async function cargarPermisos(){
   if (can('aprob_mantenedor')) document.getElementById('cardMantenedor').style.display = '';
   if (can('aprob_carga_masiva')) document.getElementById('cardCargaMasiva').style.display = '';
   if (can('aprob_vendedores')) document.getElementById('cardVendedores').style.display = '';
+  if (can('aprob_detalle_mes') || can('aprob_informes')) document.getElementById('cardDetalleMes').style.display = '';
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 

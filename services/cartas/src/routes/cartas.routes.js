@@ -8,6 +8,10 @@ router.get('/',  verifyToken, ctrl.getAll);
 router.post('/', verifyToken, ctrl.upsert);   // create o update según body.id
 
 // Vigencia configurable de la carta (días corridos). Lectura abierta; edición = mantenedor.
+// Detalle mensual con datos del vendedor (RUT y correo) — controller propio.
+router.get('/detalle-mes', verifyToken, requireFunc('aprob_detalle_mes', 'aprob_informes'),
+  require('../controllers/detalle-mes.controller').detalleMes);
+
 router.get('/vigencia', verifyToken, ctrl.getVigencia);
 router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVigencia);
 
