@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — solo etapa OTORGADO y el vendedor sale de la CARTA (el del credito es nuestro ejecutivo) -->
+<!-- v1.2 — abre por defecto en el ultimo mes cerrado (el anterior al de hoy) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -91,6 +91,17 @@ const fd  = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const mesLbl = m => { const p=String(m||'').split('-'); return p.length===2 ? (MESES[+p[1]-1]+' '+p[0]) : m; };
 let DATA = [], GRUPOS = [], MESLIST = [], ABIERTO = new Set();
+/* Mes por defecto: el ÚLTIMO MES CERRADO, o sea el anterior al de hoy (hora de
+   Chile). El mes en curso todavía se está moviendo, así que abrir en él daría una
+   foto incompleta que se lee como caída de ventas. */
+function mesCerrado(){
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Santiago', year:'numeric', month:'2-digit' })
+    .format(new Date()).split('-');
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, 1);   // 1° del mes en curso
+  d.setMonth(d.getMonth() - 1);                            // → mes anterior
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+let PRIMERA = true;
 
 let tq=null; const deb = () => { clearTimeout(tq); tq=setTimeout(cargar, 350); };
 function limpiar(){ document.getElementById('q').value=''; document.getElementById('fMes').value=''; cargar(); }
@@ -103,9 +114,17 @@ async function cargar(){
   DATA = (j && j.success) ? j.data : [];
   if (!MESLIST.length && j && j.meses) {
     MESLIST = j.meses;
-    document.getElementById('fMes').innerHTML = '<option value="">Últimos 12 meses</option>' +
+    const sel = document.getElementById('fMes');
+    sel.innerHTML = '<option value="">Últimos 12 meses</option>' +
       MESLIST.map(m=>`<option value="${m}">${mesLbl(m)}</option>`).join('');
+    // Primera carga: posicionarse en el último mes cerrado y recargar acotado.
+    if (PRIMERA) {
+      PRIMERA = false;
+      const mc = mesCerrado();
+      if (MESLIST.includes(mc)) { sel.value = mc; return cargar(); }
+    }
   }
+  PRIMERA = false;
   agrupar(); render();
 }
 

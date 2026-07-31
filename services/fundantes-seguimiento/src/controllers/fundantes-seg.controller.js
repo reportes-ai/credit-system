@@ -212,7 +212,12 @@ const listar = async (req, res) => {
     const incluirCerrados = req.query.cerrados === '1' || req.query.cerrados === 'true';
 
     const vis = await ejecutivosVisibles(req);
-    const filt = ['c.fecha_otorgado IS NOT NULL', 'UPPER(c.financiera) IN (?)'];
+    /* Solo operaciones con etapa OTORGADO. `fecha_otorgado` NO alcanza: viene
+       poblada también en aprobadas sin cursar, rechazadas y desistidas (hoy 3.161
+       APROBADAS la tienen), que se colaban a la cola pidiendo fundantes de un
+       negocio que nunca existió. La etapa manda. (31-07-2026) */
+    const filt = ['c.fecha_otorgado IS NOT NULL', "UPPER(COALESCE(c.estado_credito,'')) = 'OTORGADO'",
+                  'UPPER(c.financiera) IN (?)'];
     const fp = [FINANCIERAS];
     if (!vis.all) {
       if (!vis.lista.length)
@@ -307,7 +312,9 @@ const listar = async (req, res) => {
     });
 
     const [ejRows] = await pool.query(
-      `SELECT DISTINCT ejecutivo FROM creditos WHERE fecha_otorgado IS NOT NULL AND UPPER(financiera) IN (?) AND ejecutivo IS NOT NULL AND ejecutivo<>'' ORDER BY ejecutivo`, [FINANCIERAS]);
+      `SELECT DISTINCT ejecutivo FROM creditos WHERE fecha_otorgado IS NOT NULL
+         AND UPPER(COALESCE(estado_credito,'')) = 'OTORGADO'
+         AND UPPER(financiera) IN (?) AND ejecutivo IS NOT NULL AND ejecutivo<>'' ORDER BY ejecutivo`, [FINANCIERAS]);
     const ejecutivos = vis.all ? ejRows.map(r => r.ejecutivo) : (vis.lista || []);
     const puede_validar = await tieneFunc(req.usuario.id_usuario, 'fundantes_validar', 'fundantes_operaciones');
 
@@ -551,7 +558,9 @@ const popup = async (req, res) => {
              DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias_pendiente,
              COALESCE(c.automotora,'') AS dealer, fs.devuelto_motivo
         FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
-       WHERE c.fecha_otorgado IS NOT NULL AND UPPER(c.financiera) IN (?)
+       WHERE c.fecha_otorgado IS NOT NULL
+         AND UPPER(COALESCE(c.estado_credito,'')) = 'OTORGADO'
+         AND UPPER(c.financiera) IN (?)
          AND COALESCE(fs.estado,'PENDIENTE') = 'PENDIENTE'
          AND UPPER(c.ejecutivo) IN (?)
          AND NOT EXISTS (SELECT 1 FROM fundantes_popup_log l
