@@ -26,6 +26,7 @@
     .b { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 7px; display:inline-block; }
     .b-APROBADO { background:#dcfce7; color:#15803d; }
     .b-RECHAZADO { background:#fee2e2; color:#991b1b; }
+    .b-DEVUELTO { background:#fef3c7; color:#92400e; }   /* devuelta por la financiera */
     .b-ENVIADO { background:#fef3c7; color:#92400e; }
     .motivo { color:#b91c1c; font-size:.72rem; }
     .empty { text-align:center; color:#9ca3af; padding:44px 0; }
@@ -35,8 +36,11 @@
 <body>
 <div id="af-topnav"></div>
 <script>
-  window.AF_TOPNAV = { self: { key:'fundantes_historial', title:'Historial de Fundantes', icon:'bi-clock-history', selfHref:'/fundantes-seguimiento/historial', defaultSection:'home',
-    extra:[{ label:'Seguimiento Fundantes', href:'/fundantes/' }, { label:'Historial', icon:'bi-clock-history' }] } };
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Seguimiento Fundantes', href:'/fundantes/' },
+    { label:'Historial de Fundantes', icon:'bi-clock-history', current:true }
+  ] };
 </script>
 
 <div class="main">

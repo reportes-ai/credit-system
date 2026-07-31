@@ -636,7 +636,7 @@ const historial = async (req, res) => {
       `SELECT entidad_id, accion, usuario, fecha, detalle
          FROM auditoria_movimientos
         WHERE modulo='fundantes-seguimiento'
-          AND accion IN ('ENVIAR_FUNDANTES','APROBAR_FUNDANTES','RECHAZAR_FUNDANTES')
+          AND accion IN ('ENVIAR_FUNDANTES','APROBAR_FUNDANTES','RECHAZAR_FUNDANTES','DEVOLVER_FUNDANTES')
         ORDER BY entidad_id, fecha ASC`);
     // Se agrupa por N° OP (extraído del detalle) y no por entidad_id: los créditos pueden
     // recrearse con otro id en re-importaciones, pero el num_op es estable.
@@ -660,12 +660,17 @@ const historial = async (req, res) => {
     for (const [id, evs] of porCred) {
       const c = cmap.get(id); if (!c || !visible(c.ejecutivo)) continue;
       const envios = evs.filter(e => e.accion === 'ENVIAR_FUNDANTES');
-      const valids = evs.filter(e => e.accion !== 'ENVIAR_FUNDANTES');
+      const valids = evs.filter(e => e.accion === 'APROBAR_FUNDANTES' || e.accion === 'RECHAZAR_FUNDANTES');
       const primerRechazo = evs.find(e => e.accion === 'RECHAZAR_FUNDANTES');
       const reenvio = primerRechazo ? envios.find(e => e.fecha > primerRechazo.fecha) : null;
       const primerRes = valids[0] || null;
       const ultimo = evs[evs.length - 1];
-      const estadoDe = e => e.accion === 'APROBAR_FUNDANTES' ? 'APROBADO' : e.accion === 'RECHAZAR_FUNDANTES' ? 'RECHAZADO' : 'ENVIADO';
+      // DEVUELTO = la financiera devolvió los fundantes DESPUÉS de aprobarlos.
+      // El resultado histórico (aprobado/rechazado) se conserva en '1er resultado';
+      // el 'resultado final' pasa a DEVUELTO porque es el estado real de hoy.
+      const estadoDe = e => e.accion === 'APROBAR_FUNDANTES' ? 'APROBADO'
+        : e.accion === 'RECHAZAR_FUNDANTES' ? 'RECHAZADO'
+        : e.accion === 'DEVOLVER_FUNDANTES' ? 'DEVUELTO' : 'ENVIADO';
       rows.push({
         id_credito: c.id_credito,
         num_op: c.num_op, id_financiera: c.id_financiera, rut: c.rut, cliente: c.cliente,
@@ -673,7 +678,7 @@ const historial = async (req, res) => {
         envio1: P(envios[0]),
         resultado1: primerRes ? { estado: estadoDe(primerRes), ...P(primerRes), motivo: primerRes.accion === 'RECHAZAR_FUNDANTES' ? motivoDe(primerRes.detalle) : '' } : null,
         reenvio: P(reenvio), reenvios_n: Math.max(0, envios.length - 1),
-        final: { estado: estadoDe(ultimo), ...P(ultimo), motivo: ultimo.accion === 'RECHAZAR_FUNDANTES' ? motivoDe(ultimo.detalle) : '' },
+        final: { estado: estadoDe(ultimo), ...P(ultimo), motivo: (ultimo.accion === 'RECHAZAR_FUNDANTES' || ultimo.accion === 'DEVOLVER_FUNDANTES') ? motivoDe(ultimo.detalle) : '' },
         _orden: (envios[0] || ultimo).fecha,
       });
     }
