@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Dealer a Pagar — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -35,6 +35,12 @@
     .stat.pag  .sub { font-size:1.5rem; font-weight:800; color:#15803d; }
     .stat.selb { border-left-color:#0d9488; }
     .stat.selb .val { color:#0f766e; }
+    /* La selección no cabe en los fondos disponibles: se pinta en rojo para que
+       nadie mande a pago más plata de la que hay cargada para el día. */
+    .stat.selb.excede { border-left-color:#b91c1c; background:#fef2f2; }
+    .stat.selb.excede .val { color:#b91c1c; }
+    .stat.selb .sub { font-size:.72rem; margin-top:2px; color:#64748b; }
+    .stat.selb.excede .sub { color:#b91c1c; font-weight:700; }
     .stat.fondos { border-left-color:#0ea5e9; }
     .stat.fondos input { width:100%; box-sizing:border-box; margin-top:4px; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:1.15rem; font-weight:800; color:var(--navy); }
     .stat.fondos input:focus { outline:none; border-color:#0ea5e9; }
@@ -135,6 +141,7 @@
     <div class="stat selb">
       <div class="lbl">Seleccionadas</div>
       <div class="val"><span id="selN">0</span> ops X <span id="selM">$0</span></div>
+      <div class="sub" id="selSub"></div>
     </div>
     <div class="stat fondos">
       <div class="lbl">Fondos disponibles</div>
@@ -351,6 +358,16 @@ function recalc(){
   const sel = seleccionadas(), env = enviadas();
   document.getElementById('selN').textContent = sel.length;
   document.getElementById('selM').textContent = fmt(sum(sel));
+  /* Aviso de sobregiro: lo seleccionado no puede pasar el "Disponible para asignar"
+     (fondos del día menos lo ya pagado y lo ya enviado a pago). */
+  const dispAsig = Math.max(0, fondosVal - sum(DATA.filter(r => r.pagado || r.enviado)));
+  const excede = sum(sel) - dispAsig;
+  const boxSel = document.querySelector('.stat.selb');
+  const subSel = document.getElementById('selSub');
+  if (boxSel) boxSel.classList.toggle('excede', excede > 0);
+  if (subSel) subSel.textContent = !sel.length ? ''
+    : excede > 0 ? ('Excede los fondos en ' + fmt(excede) + ' — no alcanza para pagarlas todas hoy')
+    : ('Queda disponible ' + fmt(dispAsig - sum(sel)));
   const be = document.getElementById('btnEnviar');
   be.disabled = sel.length===0 || !CAN.seleccionar;
   be.title = CAN.seleccionar ? '' : quienTxt('seleccionar');
@@ -370,6 +387,7 @@ function onFondos(inp){
   fondosVal = Number(digits||0);
   inp.value = digits ? '$'+fondosVal.toLocaleString('es-CL') : '';
   recalcPropuestas();
+  recalc();          // repinta el aviso rojo de "seleccionadas > disponible"
   clearTimeout(fondosTimer);
   fondosTimer = setTimeout(guardarFondos, 600);
 }
