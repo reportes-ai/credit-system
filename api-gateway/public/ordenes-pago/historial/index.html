@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.15 — bloque Depositar en/Titular (datos bancarios del dealer) en el documento -->
+  <!-- v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -326,8 +326,13 @@ function docHTML(o){
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
       ${o.deposito ? `
-      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}"><b>${escH(o.deposito.banco||'—')}</b>${o.deposito.tipo_cuenta?' · '+escH(o.deposito.tipo_cuenta):''} · Cta. N° <b>${escH(o.deposito.num_cuenta||'')}</b></td></tr>
+      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}"><b>${escH(o.deposito.banco||'—')}</b> · ${
+        o.deposito.tipo_cuenta ? escH(o.deposito.tipo_cuenta)
+        : '<span style="color:#b45309;font-weight:700">⚠ falta el tipo de cuenta</span>'
+      } · Cta. N° <b>${escH(o.deposito.num_cuenta||'')}</b></td></tr>
       <tr><td style="${SresL}">Titular</td><td style="${SresV}">${escH(o.deposito.titular||'—')}${o.deposito.rut?' · RUT '+escH(o.deposito.rut):''}</td></tr>`
+      : o.sin_datos_banco
+      ? `<tr><td style="${SresL}">Depositar en</td><td style="${SresV};color:#b91c1c;font-weight:700">⚠ SIN DATOS BANCARIOS — completar banco, tipo y N° de cuenta en la ficha antes de transferir</td></tr>`
       : `<tr><td style="${SresL}">Destino</td><td style="${SresV}">${escH(o.destino||'—')}</td></tr>`}
       ${montoRows}
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>

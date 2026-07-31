@@ -356,8 +356,9 @@ const getOrden = async (req, res) => {
 
 const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
-// (fechas, desglose IVA, etc.) para forzar el re-congelado idempotente de los snapshots.
-const DOC_VERSION = 5;
+// (fechas, desglose IVA, datos bancarios, etc.) para forzar el re-congelado idempotente.
+// v6 (31-07-2026): datos de transferencia estructurados también en las órdenes generales.
+const DOC_VERSION = 6;
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -375,8 +376,24 @@ async function construirDocumento(oc) {
     const [[op]] = await pool.query('SELECT * FROM ordenes_pago WHERE id = ?', [oc.origen_id]);
     if (!op) return null;
     const estado = oc.anulada ? 'ANULADA' : (oc.pagada ? 'PAGADA' : (op.estado || 'EMITIDA'));
+    /* Datos de transferencia ESTRUCTURADOS (banco, tipo, N° cuenta, titular y RUT).
+       Se leen EN VIVO de la ficha del proveedor —una sola fuente— y no del string
+       `destino`, que es una foto del momento de la emisión: si la orden se emitió
+       antes de cargarle la cuenta al proveedor, ese string quedaba vacío para siempre.
+       `destino` se conserva como respaldo para las órdenes con proveedor de nombre libre. */
+    let deposito = null;
+    if (op.id_proveedor) {
+      const [[p]] = await pool.query(
+        'SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [op.id_proveedor]);
+      if (p && p.numero_cuenta) deposito = {
+        banco: p.banco || null, tipo_cuenta: p.tipo_cuenta || null, num_cuenta: p.numero_cuenta,
+        titular: p.nombre || op.proveedor_nombre || null, rut: p.rut || op.proveedor_rut || null,
+      };
+    }
     return Object.assign({}, op, {
       origen: 'GENERAL', origen_label: ORIGEN_LBL.GENERAL, numero: oc.numero || op.numero, estado,
+      deposito,
+      sin_datos_banco: !deposito && !op.destino,
       fecha_pago: soloFecha(oc.fecha_pagada) || op.fecha_pago, metodo_pago: oc.metodo_pago || op.metodo_pago,
       anulada_nombre: oc.anulada_nombre || op.anulada_nombre, fecha_anulada: oc.fecha_anulada || op.fecha_anulada,
       _v: DOC_VERSION,
@@ -478,7 +495,8 @@ async function construirDocumento(oc) {
     numero_documento: esCom ? (row.numero_factura || null) : null,
     fecha_documento: esCom ? soloFecha(row.fecha_factura) : null,
     tratamiento, monto_bruto: bruto, monto_neto: neto, impuesto_pct: pct, impuesto_monto: imp, monto, desglose,
-    destino, deposito, fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
+    destino, deposito, sin_datos_banco: !deposito && !destino,
+    fecha_emision: soloFecha(oc.created_at), fecha_pago: soloFecha(oc.fecha_pagada),
     metodo_pago: oc.metodo_pago, estado, usuario_nombre: oc.usuario_nombre,
     anulada_nombre: oc.anulada_nombre, fecha_anulada: oc.fecha_anulada, num_op: row.num_op, _v: DOC_VERSION,
   };
