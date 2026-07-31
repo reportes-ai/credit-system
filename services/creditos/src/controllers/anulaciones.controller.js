@@ -111,6 +111,8 @@ const buscar = async (req, res) => {
         FROM creditos c
         LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
        WHERE UPPER(c.estado_credito)='OTORGADO'
+         AND UPPER(COALESCE(c.estado,''))    <> 'ANULADO'
+         AND UPPER(COALESCE(c.estado_eval,'')) <> 'ANULADO'
          AND (REPLACE(c.num_op,'.','') LIKE ? OR c.id_financiera LIKE ? OR cl.rut LIKE ?)
        ORDER BY c.fecha_otorgado DESC LIMIT 25`, ['%' + q + '%', '%' + q + '%', '%' + q + '%']);
     res.json({ success: true, data: rows, error: null });
@@ -125,9 +127,10 @@ const solicitar = async (req, res) => {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
     if (motivo.length < 10) return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio y debe explicar por qué se anula (mínimo 10 caracteres).' });
 
-    const [[op]] = await pool.query('SELECT id, num_op, estado_credito, financiera FROM creditos WHERE id=?', [id]);
+    const [[op]] = await pool.query('SELECT id, num_op, estado, estado_credito, estado_eval, financiera FROM creditos WHERE id=?', [id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    if (String(op.estado_credito || '').toUpperCase() === 'ANULADO')
+    // ANULADO en CUALQUIERA de las tres columnas de etapa ya cuenta como anulada.
+    if ([op.estado, op.estado_credito, op.estado_eval].some(v => String(v || '').toUpperCase() === 'ANULADO'))
       return res.status(409).json({ success: false, data: null, error: 'La operación ya está anulada.' });
     const mes = await getMesDeOp(id);
     if (mes && await isMesCerrado(mes))
@@ -236,7 +239,11 @@ const resolver = async (req, res) => {
 
     // 2) El crédito
     await pool.query(
-      `UPDATE creditos SET estado_credito='ANULADO', estado_eval='ANULADO',
+      /* La ETAPA se escribe en las TRES columnas, igual que al otorgar
+         (cartas.controller: SET estado/estado_credito/estado_eval='OTORGADO').
+         El listado de Créditos resuelve la etapa con `estado` PRIMERO, así que
+         escribir solo las otras dos dejaba la operación mostrándose OTORGADA. */
+      `UPDATE creditos SET estado='ANULADO', estado_credito='ANULADO', estado_eval='ANULADO',
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
         WHERE id=?`, [a.motivo, a.id_credito]);
 
