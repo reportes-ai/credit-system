@@ -305,6 +305,11 @@ function notificarDealerEnEspera(conv) {
         mensaje: `${conv.dealer_nombre || 'Un dealer'} inició un chat${conv.asunto ? ': "' + conv.asunto + '"' : ''}`,
         href: '/atencion-remota/',
         prioridad: 'alta', sonar: 1, son_tipo: 'dingdong',
+        /* Clave del HECHO: este aviso le pide algo a un POOL, así que cuando
+           alguien toma la conversación hay que retirarlo de la campanita de
+           todos. Sin clave era irretirable y quedaba sonando para siempre
+           (había 19 acumulados de chats ya atendidos y cerrados). */
+        clave: 'ar_espera:' + conv.id,
       });
     } catch (e) { console.error('[ar notif espera]', e.message); }
   })();
@@ -313,14 +318,20 @@ async function getConversacion(id) {
   const [[c]] = await pool.query('SELECT * FROM ar_conversaciones WHERE id=?', [id]);
   return c || null;
 }
+// Alguien tomó o cerró el chat: el pool ya no tiene nada que atender ahí.
+const retirarEspera = id =>
+  require('../../../../shared/avisos').retirar('ar_espera:' + id).catch(() => {});
+
 async function asignarConversacion(id, id_ejecutivo, ejecutivo_nombre) {
   await pool.query(
     `UPDATE ar_conversaciones SET id_ejecutivo=?, ejecutivo_nombre=?, estado='ACTIVA', asignada_at=NOW()
      WHERE id=? AND estado='ESPERA'`, [id_ejecutivo, ejecutivo_nombre, id]);
+  retirarEspera(id);
   return getConversacion(id);
 }
 async function cerrarConversacion(id) {
   await pool.query("UPDATE ar_conversaciones SET estado='CERRADA', cerrada_at=NOW() WHERE id=?", [id]);
+  retirarEspera(id);
   return getConversacion(id);
 }
 async function persistMensaje({ id_conversacion, emisor, id_usuario, autor_nombre, cuerpo, tipo, id_adjunto }) {

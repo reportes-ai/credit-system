@@ -174,4 +174,21 @@ async function retirar(clave) {
   } catch (e) { console.error('[avisos retirar]', clave, e.message); return 0; }
 }
 
-module.exports = { registrarAviso, destinatarios, avisar, retirar, configDe, porFuncionalidad, porPerfiles, SONIDOS };
+/* Igual que retirar(), pero por PREFIJO de clave. Sirve para avisos que se
+   emiten uno por período (ej. 'pvalert:fondos_cargados:2026-07-31'): al llegar
+   el del día nuevo, los de los días anteriores ya no piden nada y solo hacen
+   ruido. Requiere un prefijo no vacío para no borrar la campanita entera. */
+async function retirarPrefijo(prefijo, { excepto } = {}) {
+  const p = String(prefijo || '').trim();
+  if (!p) return 0;
+  try {
+    const pool = require('./config/database');
+    const args = [p + '%'];
+    let sql = 'DELETE FROM notificaciones WHERE clave LIKE ?';
+    if (excepto) { sql += ' AND clave <> ?'; args.push(excepto); }
+    const [r] = await pool.query(sql, args);
+    return r.affectedRows || 0;
+  } catch (e) { console.error('[avisos retirarPrefijo]', prefijo, e.message); return 0; }
+}
+
+module.exports = { registrarAviso, destinatarios, avisar, retirar, retirarPrefijo, configDe, porFuncionalidad, porPerfiles, SONIDOS };

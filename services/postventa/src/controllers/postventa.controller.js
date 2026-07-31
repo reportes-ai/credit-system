@@ -284,17 +284,27 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa) {
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
    Cada transición del workflow genera una alerta (campana) a destinatarios
    configurables por evento: perfiles + el ejecutivo de la operación + usuarios extra. */
+/* `sucede`: evento del paso ANTERIOR de la misma operación. Al emitirse este
+   aviso, el del paso previo se retira de la campanita de todos — ya lo atendieron,
+   y su existencia es justamente la prueba de que se atendió. Sin esto, un flujo de
+   5 pasos deja 5 avisos vivos por operación pidiendo cosas ya hechas.
+   `porPeriodo`: el aviso es uno por día (no por operación) y el nuevo reemplaza a
+   los anteriores del mismo evento. */
 const EVENTOS_SALDO = [
   { evento: 'fondos_recibidos', titulo: 'Fondos recibidos — emitir Orden de Pago',
     mensaje: 'La operación {op} tiene FONDOS RECIBIDOS. Emite la Orden de Pago.', href: '/postventa/orden-pago/' },
   { evento: 'orden_emitida', titulo: 'Orden de Pago emitida — cargar montos disponibles',
-    mensaje: 'Se emitió la Orden de Pago de {op}. Carga los montos disponibles para pago.', href: '/postventa/saldos-a-pagar/' },
+    mensaje: 'Se emitió la Orden de Pago de {op}. Carga los montos disponibles para pago.', href: '/postventa/saldos-a-pagar/',
+    sucede: 'fondos_recibidos' },
   { evento: 'fondos_cargados', titulo: 'Montos disponibles cargados',
-    mensaje: 'Tesorería cargó los fondos disponibles para pago de saldos precio. Define qué pagar.', href: '/postventa/saldos-a-pagar/' },
+    mensaje: 'Tesorería cargó los fondos disponibles para pago de saldos precio. Define qué pagar.', href: '/postventa/saldos-a-pagar/',
+    porPeriodo: true },
   { evento: 'enviado_pago', titulo: 'Operaciones enviadas a pago — confirmar pago',
-    mensaje: 'Se enviaron operaciones a pago. Confirma el pago en Saldos Precios a Pagar.', href: '/postventa/saldos-a-pagar/' },
+    mensaje: 'Se enviaron operaciones a pago. Confirma el pago en Saldos Precios a Pagar.', href: '/postventa/saldos-a-pagar/',
+    sucede: 'orden_emitida' },
   { evento: 'pago_realizado', titulo: 'Saldo precio pagado',
-    mensaje: 'Se registró el pago del saldo precio de {op}.', href: '/postventa/seguimiento/' },
+    mensaje: 'Se registró el pago del saldo precio de {op}.', href: '/postventa/seguimiento/',
+    sucede: 'enviado_pago' },
 ];
 /* ── Alertas de proceso Comisión (paramétricas, event-driven) ──────────────
    Espejo del flujo de Saldo Precio: la comisión se alimenta de las cartolas,
@@ -304,13 +314,17 @@ const EVENTOS_COMISION = [
   { evento: 'com_factura_recibida', titulo: 'Factura recibida — emitir Orden de Pago de Comisión',
     mensaje: 'La operación {op} tiene FACTURA RECIBIDA. Emite la Orden de Pago de comisión.', href: '/postventa/orden-pago-comision/' },
   { evento: 'com_orden_emitida', titulo: 'Orden de Pago de Comisión emitida — cargar montos disponibles',
-    mensaje: 'Se emitió la Orden de Pago de comisión de {op}. Carga los montos disponibles para pago.', href: '/postventa/comisiones-a-pagar/' },
+    mensaje: 'Se emitió la Orden de Pago de comisión de {op}. Carga los montos disponibles para pago.', href: '/postventa/comisiones-a-pagar/',
+    sucede: 'com_factura_recibida' },
   { evento: 'com_fondos_cargados', titulo: 'Montos disponibles cargados (Comisión)',
-    mensaje: 'Tesorería cargó los fondos disponibles para pago de comisiones. Define qué pagar.', href: '/postventa/comisiones-a-pagar/' },
+    mensaje: 'Tesorería cargó los fondos disponibles para pago de comisiones. Define qué pagar.', href: '/postventa/comisiones-a-pagar/',
+    porPeriodo: true },
   { evento: 'com_enviado_pago', titulo: 'Comisiones enviadas a pago — confirmar pago',
-    mensaje: 'Se enviaron comisiones a pago. Confirma el pago en Comisiones a Pagar.', href: '/postventa/comisiones-a-pagar/' },
+    mensaje: 'Se enviaron comisiones a pago. Confirma el pago en Comisiones a Pagar.', href: '/postventa/comisiones-a-pagar/',
+    sucede: 'com_orden_emitida' },
   { evento: 'com_pago_realizado', titulo: 'Comisión pagada',
-    mensaje: 'Se registró el pago de la comisión de {op}.', href: '/postventa/seguimiento/' },
+    mensaje: 'Se registró el pago de la comisión de {op}.', href: '/postventa/seguimiento/',
+    sucede: 'com_enviado_pago' },
 ];
 /* ── Alertas de proceso Comisión de PARQUES (paramétricas, event-driven) ────
    Flujo de /postventa/comisiones-parques/: al emitir la Orden de Pago se avisa
@@ -320,7 +334,8 @@ const EVENTOS_PARQUE = [
   { evento: 'parque_orden_emitida', titulo: 'Orden de Pago de Parque emitida — por pagar',
     mensaje: 'Se emitió la Orden de Pago de comisión de parque. Queda por pagar en Órdenes de Pago.', href: '/ordenes-pago/' },
   { evento: 'parque_pago_realizado', titulo: 'Comisión de parque pagada',
-    mensaje: 'Se registró el pago de la comisión de un parque.', href: '/postventa/comisiones-parques/' },
+    mensaje: 'Se registró el pago de la comisión de un parque.', href: '/postventa/comisiones-parques/',
+    sucede: 'parque_orden_emitida' },
 ];
 const SONIDOS_SALDO = ['campana', 'dingdong', 'alarma', 'aplausos'];
 require('../../../../shared/migrate').enFila('postventa', async () => {
@@ -357,8 +372,19 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 // Resuelve destinatarios y crea las notificaciones (campana) de un evento.
 async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, claveExtra } = {}) {
   try {
-    const def = EVENTOS_SALDO.find(e => e.evento === evento) || EVENTOS_COMISION.find(e => e.evento === evento);
+    const def = EVENTOS_SALDO.find(e => e.evento === evento)
+             || EVENTOS_COMISION.find(e => e.evento === evento)
+             || EVENTOS_PARQUE.find(e => e.evento === evento);
     if (!def) return;
+    const sufijo = claveExtra || id_seguimiento;
+
+    /* El paso anterior de ESTA operación ya está atendido: su aviso se retira.
+       Se hace ANTES de resolver destinatarios y fuera del `if (!ids.size)`, para
+       que la limpieza ocurra incluso si este evento no le avisa a nadie. */
+    if (def.sucede && sufijo != null) {
+      require('../../../../shared/avisos').retirar(`pvalert:${def.sucede}:${sufijo}`)
+        .catch(e => console.error('[pvalert retirar]', e.message));
+    }
     const [[cfg]] = await pool.query('SELECT * FROM postventa_alertas_config WHERE evento=?', [evento]);
     if (!cfg || !cfg.activo) return;
 
@@ -385,7 +411,16 @@ async function notificarEventoSaldo(evento, { op, id_seguimiento, ejecutivo, cla
     let dest = [...ids];
     try { dest = await require('../../../../shared/backups').expandirAlerta(dest); } catch (_) {}
     const mensaje = def.mensaje.replace('{op}', op != null ? ('N° ' + op) : 'una operación');
-    const clave = `pvalert:${evento}:${claveExtra || id_seguimiento || Date.now()}`;
+    /* La clave identifica el HECHO, nunca el instante: un `Date.now()` acá hacía
+       que cada disparo naciera con clave nueva, así que el "ya existe" nunca daba
+       y los avisos se apilaban repitiendo lo mismo. */
+    const clave = `pvalert:${evento}:${sufijo != null ? sufijo : 'general'}`;
+    // Aviso por período (uno por día): el nuevo reemplaza a los de días anteriores.
+    if (def.porPeriodo) {
+      await require('../../../../shared/avisos')
+        .retirarPrefijo(`pvalert:${evento}:`, { excepto: clave })
+        .catch(e => console.error('[pvalert periodo]', e.message));
+    }
     const prioridad = cfg.prioridad || 'normal';
     const sonar = cfg.sonido ? 1 : 0;
     const sonTipo = SONIDOS_SALDO.includes(cfg.sonido_tipo) ? cfg.sonido_tipo : 'campana';

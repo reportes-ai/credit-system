@@ -940,7 +940,7 @@ const upsert = async (req, res) => {
       // Snapshot del TIER UAC vigente al generar la carta (para la rentabilidad)
       tierUAC(c.fecha).then(t => pool.query('UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE id=?', [t.n, t.pct, r.insertId])).catch(() => {});
       res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
-      notificarCambios(c, null, req);
+      notificarCambios(c, null, req, r.insertId);
     }
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
@@ -976,9 +976,14 @@ async function anularCartasPrevias(idNueva, idFinanciera, req) {
 }
 
 /* Notificaciones del flujo (no bloquea la respuesta HTTP) */
-function notificarCambios(c, prevStatus, req) {
+/* `idCarta`: al CREAR, `c` es el body y todavía no trae id — el id real es el
+   insertId. Sin este parámetro la clave salía 'carta:undefined' para TODAS las
+   cartas nuevas: compartían una sola clave, así que la segunda ya no avisaba
+   ("ya existe") y retirar una las retiraba todas. */
+function notificarCambios(c, prevStatus, req, idCarta) {
   (async () => {
     try {
+      const idC = idCarta || c.id;
       const esNuevaPendiente   = !prevStatus && c.status === 'PENDIENTE';
       const vuelveAlPool       = prevStatus === 'RECHAZADA' && c.status === 'PENDIENTE';
       const resuelta           = prevStatus === 'PENDIENTE' && (c.status === 'APROBADA' || c.status === 'RECHAZADA');
@@ -992,12 +997,12 @@ function notificarCambios(c, prevStatus, req) {
           mensaje: `${c.creadoPorNombre || 'Un ejecutivo'} envió la carta ${c.opCarta || ''} — ${c.cliente || ''}`,
           href: '/aprobaciones/?tab=revision',
           // clave del hecho: al aprobarse o rechazarse se retira del pool.
-          clave: 'carta:' + c.id,
+          clave: 'carta:' + idC,
         }, { excluir: [autorId] });
       }
       if (resuelta) {
         // El pool ya no tiene nada que revisar en esta carta.
-        AVISOS.retirar('carta:' + c.id).catch(() => {});
+        AVISOS.retirar('carta:' + idC).catch(() => {});
         const autorId = await idPorEmail(c.creadoPor);
         if (autorId) {
           const ok = c.status === 'APROBADA';
