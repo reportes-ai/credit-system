@@ -160,4 +160,18 @@ async function avisar(evento, opciones = {}, { excluir = [], extra = [] } = {}) 
   } catch (e) { console.error('[avisar]', evento, e.message); return 0; }
 }
 
-module.exports = { registrarAviso, destinatarios, avisar, configDe, porFuncionalidad, porPerfiles, SONIDOS };
+/* Retira de la campanita un aviso de "acción pendiente" cuando alguien YA lo atendió.
+   Los avisos que piden una acción a un POOL se emiten con una `clave` única del hecho
+   (ej. 'anulacion:87'); al resolverse, esta función los borra para TODOS — si no, cada
+   miembro del pool sigue viendo (y oyendo) un pendiente que ya no existe.
+   Fire & forget: nunca frena la operación. */
+async function retirar(clave) {
+  if (!clave) return 0;
+  try {
+    const pool = require('./config/database');
+    const [r] = await pool.query('DELETE FROM notificaciones WHERE clave = ?', [clave]);
+    return r.affectedRows || 0;
+  } catch (e) { console.error('[avisos retirar]', clave, e.message); return 0; }
+}
+
+module.exports = { registrarAviso, destinatarios, avisar, retirar, configDe, porFuncionalidad, porPerfiles, SONIDOS };

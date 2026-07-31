@@ -147,6 +147,8 @@ const solicitar = async (req, res) => {
       titulo: '🚫 Anulación por aprobar — OP ' + op.num_op,
       mensaje: `${nombreUsuario(req)} pidió anular la OP ${op.num_op} (${op.financiera || ''}). Motivo: ${motivo}. Debe aprobarla OTRA persona de Operaciones.`,
       href: '/creditos/anulaciones.html',
+      // clave del hecho: al resolverse se retira de la campanita de todo el pool.
+      clave: 'anulacion:' + ins.insertId,
     }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
 
     res.json({ success: true, data: { id: ins.insertId }, error: null });
@@ -199,6 +201,7 @@ const resolver = async (req, res) => {
     if (accion === 'rechazar') {
       await pool.query(`UPDATE anulaciones_operacion SET estado='RECHAZADA', motivo_rechazo=?, resuelto_por=?, resuelto_nombre=?, resuelto_at=NOW() WHERE id=?`,
         [motivoRech, req.usuario.id_usuario || null, nombreUsuario(req), id]);
+      AVISOS.retirar('anulacion:' + id).catch(() => {});   // ya no está pendiente para nadie
       auditar({ req, accion: 'RECHAZAR_ANULACION', modulo: 'creditos', entidad: 'credito', entidad_id: a.id_credito,
         detalle: `Rechazó la anulación de la OP ${op.num_op} — ${motivoRech}`, meta: { motivo_rechazo: motivoRech } });
       AVISOS.avisar('operacion_anulacion_resuelta', {
@@ -242,6 +245,7 @@ const resolver = async (req, res) => {
               resuelto_por=?, resuelto_nombre=?, resuelto_at=NOW() WHERE id=?`,
       [JSON.stringify(retirables), nota.trim(), req.usuario.id_usuario || null, nombreUsuario(req), id]);
 
+    AVISOS.retirar('anulacion:' + id).catch(() => {});     // ya no está pendiente para nadie
     auditar({ req, accion: 'APROBAR_ANULACION', modulo: 'creditos', entidad: 'credito', entidad_id: a.id_credito,
       detalle: `Aprobó la anulación de la OP ${op.num_op} (solicitada por ${a.solicitado_nombre}) — ${a.motivo}. ${nota.trim()}`,
       meta: { motivo: a.motivo, estado_anterior: op.estado_credito, cartola: nota.trim(), movimientos_retirados: retirables.map(m => m.id) } });

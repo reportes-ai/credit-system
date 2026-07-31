@@ -464,6 +464,7 @@ const devolver = async (req, res) => {
          fecha_validacion=NULL, validado_por=NULL, id_validado_por=NULL`,
       [id, motivo, nombreUsuario(req)]);
 
+    AVISOS.retirar('fund_env_' + id).catch(() => {});
     auditar({ req, accion: 'DEVOLVER_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `La financiera devolvió los fundantes de la OP ${op.num_op} (estaba en ${estadoActual}) — ${motivo}`,
       meta: { estado_anterior: estadoActual, motivo } });
@@ -637,6 +638,8 @@ const validar = async (req, res) => {
     await pool.query(
       `UPDATE fundantes_seg SET estado=?, comentario_rechazo=?, fecha_validacion=NOW(), validado_por=?, id_validado_por=? WHERE id_credito=?`,
       [estado, accion === 'rechazar' ? comentario : null, nombreUsuario(req), req.usuario.id_usuario || null, id]);
+    // El pool ya no tiene nada que validar en esta OP: se retira de la campanita.
+    AVISOS.retirar('fund_env_' + id).catch(() => {});
     auditar({ req, accion: accion === 'aprobar' ? 'APROBAR_FUNDANTES' : 'RECHAZAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `${accion === 'aprobar' ? 'Aprobó (CERRADO)' : 'Rechazó'} los fundantes de la OP ${op.num_op}${comentario ? ' — ' + comentario : ''}`, meta: { estado, comentario: comentario || null } });
     // Al APROBAR fundantes: marca automáticamente la etapa "FUNDANTES RECIBIDOS" del Post Venta

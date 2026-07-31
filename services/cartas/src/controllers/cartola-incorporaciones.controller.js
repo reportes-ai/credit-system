@@ -242,6 +242,8 @@ const incorporar = async (req, res) => {
           titulo: '⏰ Incorporación a cartola por aprobar — OP ' + (f.num_op || ''),
           mensaje: `${quien} confirmó la OP ${f.num_op} (${f.nombre_dealer || 's/dealer'}) con comisión $${Number(f.comision || 0).toLocaleString('es-CL')}, cuando corresponde $${Number(motor || 0).toLocaleString('es-CL')}. Requiere tu aprobación.`,
           href: '/aprobaciones/?tab=cartolas',
+          // clave del hecho: al resolverse se retira de la campanita de todo el pool.
+          clave: 'cartola_incorp:' + r.insertId,
         }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
       }
       auditar({ req, accion: 'CREAR', modulo: 'cartolas', entidad: 'cartola_incorporacion', entidad_id: r.insertId,
@@ -277,6 +279,7 @@ const resolver = async (req, res) => {
     if (aprobar) await aplicar(i, quien);
     await pool.query("UPDATE cartola_incorporaciones SET estado = ?, comentario = ?, resuelto_por = ?, resuelto_nombre = ?, resuelto_at = NOW() WHERE id = ?",
       [aprobar ? 'APROBADA' : 'RECHAZADA', comentario, req.usuario.id_usuario, quien, i.id]);
+    AVISOS.retirar('cartola_incorp:' + i.id).catch(() => {});   // ya no está pendiente para nadie
     auditar({ req, accion: 'EDITAR', modulo: 'cartolas', entidad: 'cartola_incorporacion', entidad_id: i.id,
       detalle: `OP ${i.num_op} ${aprobar ? 'APROBADA' : 'RECHAZADA'} por analista: ${comentario}` });
     // Campanita: a quien la solicitó (analista de operaciones) + ambos pools.
