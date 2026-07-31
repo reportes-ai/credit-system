@@ -954,9 +954,13 @@ function notificarCambios(c, prevStatus, req) {
           titulo: vuelveAlPool ? '🔁 Carta corregida para revisión' : '🛎️ Nueva carta para revisión',
           mensaje: `${c.creadoPorNombre || 'Un ejecutivo'} envió la carta ${c.opCarta || ''} — ${c.cliente || ''}`,
           href: '/aprobaciones/?tab=revision',
+          // clave del hecho: al aprobarse o rechazarse se retira del pool.
+          clave: 'carta:' + c.id,
         }, { excluir: [autorId] });
       }
       if (resuelta) {
+        // El pool ya no tiene nada que revisar en esta carta.
+        AVISOS.retirar('carta:' + c.id).catch(() => {});
         const autorId = await idPorEmail(c.creadoPor);
         if (autorId) {
           const ok = c.status === 'APROBADA';

@@ -415,6 +415,8 @@ const enviar = async (req, res) => {
       [id, nombreUsuario(req), req.usuario.id_usuario || null]);
     auditar({ req, accion: 'ENVIAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `Envió a validación los fundantes de la OP ${op.num_op}` });
+    // Si venía DEVUELTA por la financiera, el pendiente de corregir ya se cumplió.
+    AVISOS.retirar('fund_dev_' + id).catch(() => {});
     // Alerta al pool de Operaciones: llegaron fundantes para validar.
     try {
       await AVISOS.avisar('fundantes_validar', {
@@ -473,6 +475,8 @@ const devolver = async (req, res) => {
       titulo: '↩️ Fundantes devueltos por la financiera — OP ' + op.num_op,
       mensaje: `${op.financiera || 'La financiera'} devolvió los fundantes de la OP ${op.num_op}. Motivo: ${motivo}. La operación volvió a Fundantes Pendientes para corregir y reenviar.`,
       href: '/fundantes-seguimiento/',
+      // clave del hecho: se retira cuando el ejecutivo corrige y reenvía.
+      clave: 'fund_dev_' + id,
     }, { excluir: [req.usuario.id_usuario], extra: fs && fs.id_enviado_por ? [fs.id_enviado_por] : [] }).catch(() => {});
 
     res.json({ success: true, data: { estado: 'PENDIENTE', estado_anterior: estadoActual }, error: null });
