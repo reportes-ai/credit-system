@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — abre por defecto en el ultimo mes cerrado (el anterior al de hoy) -->
+<!-- v1.3 — S/I es ausencia de dato, no venta directa: se etiqueta "(sin dato de vendedor)" -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -134,7 +134,7 @@ function agrupar(){
   const map = new Map();
   DATA.forEach(r => {
     const nom = String(r.vendedor_nombre||'').trim()
-      || (r.origen_vendedor === 'venta directa AutoFácil' ? '(venta directa AutoFácil)' : '(sin vendedor en la carta)');
+      || (r.origen_vendedor === 'venta directa AutoFácil' ? '(venta directa AutoFácil)' : '(sin dato de vendedor)');
     const k = nom.toUpperCase() + '|' + String(r.dealer||'').toUpperCase();
     if (!map.has(k)) map.set(k, { key:k, vendedor:nom, dealer:r.dealer||'—',
       rut:r.vendedor_rut, mail:r.vendedor_mail, ops:[] });

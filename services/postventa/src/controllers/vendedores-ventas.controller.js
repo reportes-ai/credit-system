@@ -67,14 +67,20 @@ exports.listar = async (req, res) => {
         [idsFin.slice(i, i + 500)]);
       cs.forEach(c => { if (String(c.vendedor || '').trim()) cartaDe.set(String(c.id_financiera), c.vendedor); });
     }
+    /* "VENDEDOR (AFA) …" / "VENDEDORA PARQUE …" es NUESTRO ejecutivo, no el del dealer.
+       "S/I", "-" o vacío son AUSENCIA de dato: no significan venta directa. Confundir
+       las dos cosas hacía aparecer dealers reales (Verdugo, Fénix) como ventas nuestras. */
     const esPlaceholderAFA = v => /^VENDEDOR(A)?\s*\(?AFA\)?|^VENDEDOR(A)?\s+PARQUE/i.test(String(v || '').trim());
+    const SIN_DATO = new Set(['', 'S/I', 'SI', 'S/D', 'N/A', '-', '--', 'SIN INFORMACION', 'SIN INFORMACIÓN']);
     rows.forEach(r => {
       const deCarta = cartaDe.get(String(r.id_financiera));
       const deCred  = String(r.vendedor_credito || '').trim();
-      if (deCarta)                                    { r.vendedor_nombre = deCarta; r.origen_vendedor = 'carta'; }
-      else if (deCred && deCred.toUpperCase() !== 'S/I' && !esPlaceholderAFA(deCred))
-                                                      { r.vendedor_nombre = deCred; r.origen_vendedor = 'crédito'; }
-      else                                            { r.vendedor_nombre = '';     r.origen_vendedor = deCred ? 'venta directa AutoFácil' : 'sin dato'; }
+      const credVacio = SIN_DATO.has(deCred.toUpperCase());
+      if (deCarta)                          { r.vendedor_nombre = deCarta; r.origen_vendedor = 'carta'; }
+      else if (!credVacio && !esPlaceholderAFA(deCred))
+                                            { r.vendedor_nombre = deCred; r.origen_vendedor = 'crédito'; }
+      else if (!credVacio)                  { r.vendedor_nombre = '';     r.origen_vendedor = 'venta directa AutoFácil'; }
+      else                                  { r.vendedor_nombre = '';     r.origen_vendedor = 'sin dato'; }
     });
 
     // Índice de vendedores: por <nombre|rut_dealer> y por <nombre> como respaldo.
