@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Fundantes devueltos por la financiera: listado para gestionar la corrección -->
+<!-- v1.1 — Fundantes devueltos: full width, colores corporativos y bitácora por OP -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,10 +7,10 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <link href="/css/bootstrap-icons.css" rel="stylesheet">
 <style>
-  :root { --navy:#012d70; --blue:#0141A2; }
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
   * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
-  .main { max-width:1500px; margin:0 auto; padding:26px 24px 70px; }
-  .banner { background:linear-gradient(135deg,#b45309,#d97706 60%,#f59e0b); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .main { max-width:none; width:100%; margin:0; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
   .banner i { font-size:2.3rem; opacity:.9; }
   .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
   .banner p { margin:0; opacity:.9; font-size:.85rem; }
@@ -19,7 +19,22 @@
   input[type=text] { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 12px; font-size:.85rem; min-width:300px; }
   .btnx { border:none; border-radius:9px; padding:7px 15px; font-size:.8rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
   table { width:100%; border-collapse:collapse; font-size:.8rem; }
-  th { background:#f1f5f9; text-align:left; padding:8px 9px; color:#334155; white-space:nowrap; font-size:.75rem; text-transform:uppercase; letter-spacing:.03em; }
+  th { background:var(--navy); text-align:left; padding:9px 9px; color:#fff; white-space:nowrap; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; font-weight:600; }
+  thead tr th:first-child { border-radius:8px 0 0 0; } thead tr th:last-child { border-radius:0 8px 0 0; }
+  tbody tr:hover { background:#f8fbff; }
+  .opbtn { background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--blue); cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+  .opbtn:hover { color:var(--accent); }
+  dialog.bit { border:none; border-radius:16px; padding:0; width:min(680px,94vw); box-shadow:0 20px 60px rgba(0,0,0,.25); }
+  dialog.bit::backdrop { background:rgba(1,45,112,.45); }
+  .bit-h { background:linear-gradient(135deg,var(--navy),var(--blue)); color:#fff; padding:16px 22px; display:flex; align-items:center; gap:10px; }
+  .bit-b { padding:16px 22px; max-height:52vh; overflow:auto; }
+  .ev { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid #f1f5f9; }
+  .ev .dot { width:9px; height:9px; border-radius:50%; margin-top:5px; flex:0 0 9px; background:var(--accent); }
+  .ev.coment .dot { background:#16a34a; }
+  .ev .meta { font-size:.72rem; color:#64748b; }
+  .ev .txt { font-size:.82rem; color:#1e293b; }
+  .bit-f { padding:14px 22px; border-top:1px solid #e5e7eb; background:#f8fafc; border-radius:0 0 16px 16px; }
+  .bit-f textarea { width:100%; border:1.5px solid #d1d5db; border-radius:9px; padding:8px 11px; font:inherit; font-size:.83rem; resize:vertical; }
   td { padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
   .num { text-align:right; white-space:nowrap; }
   .motivo { background:#fffbeb; border-left:3px solid #f59e0b; border-radius:6px; padding:5px 9px; font-size:.74rem; color:#92400e; margin-top:4px; }
@@ -59,6 +74,23 @@
   </div>
 </div>
 
+<dialog class="bit" id="dlgBit">
+  <div class="bit-h">
+    <i class="bi bi-journal-text" style="font-size:1.4rem"></i>
+    <div><div style="font-weight:700;font-size:1rem">Bitácora de la operación</div>
+         <div id="bitOp" style="font-size:.8rem;opacity:.9"></div></div>
+    <button onclick="document.getElementById('dlgBit').close()" style="margin-left:auto;background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div class="bit-b" id="bitBody"></div>
+  <div class="bit-f">
+    <textarea id="bitTxt" rows="2" placeholder="Estado de la operación a la fecha: qué falta, con quién se está viendo, compromisos…"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+      <button class="btnx" style="background:#e2e8f0;color:#334155" onclick="document.getElementById('dlgBit').close()">Cerrar</button>
+      <button class="btnx" style="background:var(--blue)" onclick="guardarComentario()"><i class="bi bi-plus-lg"></i> Agregar comentario</button>
+    </div>
+  </div>
+</dialog>
+
 <script src="/js/auth-guard.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -85,7 +117,7 @@ function render(){
     (f.length ? ' · saldo precio ' + clp(f.reduce((a,r)=>a+Number(r.saldo_precio||0),0)) : '');
   document.getElementById('body').innerHTML = f.length ? f.map(r=>`<tr>
     <td>${esc(r.financiera)}</td><td>${esc(r.ejecutivo)}</td>
-    <td><b>${esc(r.num_op)}</b>${Number(r.devoluciones)>1?' <span class="pill">'+r.devoluciones+'ª vez</span>':''}</td>
+    <td><button class="opbtn" title="Ver bitácora de la operación" onclick="abrirBitacora(${r.id_credito},'${esc(r.num_op)}')">${esc(r.num_op)}</button>${Number(r.devoluciones)>1?' <span class="pill">'+r.devoluciones+'ª vez</span>':''}</td>
     <td>${esc(r.id_financiera)}</td><td>${esc(r.rut_cliente)||'—'}</td><td>${esc(r.cliente)||'—'}</td>
     <td>${esc(r.dealer)||'—'}</td><td>${esc(r.parque)||'—'}</td>
     <td class="num">${clp(r.monto_financiado)}</td><td class="num">${clp(r.saldo_precio)}</td>
@@ -93,6 +125,43 @@ function render(){
     <td style="min-width:240px"><div style="font-size:.72rem;color:#64748b">${fdh(r.devuelto_at)} · ${esc(r.devuelto_por)||''}</div>
         <div class="motivo">${esc(r.devuelto_motivo)}</div></td>
   </tr>`).join('') : '<tr><td colspan="12" style="color:#166534;padding:20px">✓ No hay operaciones devueltas pendientes de corregir.</td></tr>';
+}
+
+/* Bitácora de la operación: une lo que el sistema registró solo (auditoría del
+   módulo) con los comentarios de gestión que escribe el usuario. */
+let BIT_ID = null;
+function abrirBitacora(id, numop){
+  BIT_ID = id;
+  document.getElementById('bitOp').textContent = 'OP ' + numop;
+  document.getElementById('bitTxt').value = '';
+  document.getElementById('bitBody').innerHTML = '<div style="color:#94a3b8;font-size:.82rem">Cargando…</div>';
+  document.getElementById('dlgBit').showModal();
+  cargarBitacora();
+}
+async function cargarBitacora(){
+  const j = await fetch('/api/fundantes-seguimiento/'+BIT_ID+'/bitacora', { headers:{ Authorization:'Bearer '+token } })
+    .then(r=>r.json()).catch(()=>null);
+  const ev = (j && j.success) ? j.data.eventos : [];
+  document.getElementById('bitBody').innerHTML = ev.length ? ev.map(e=>`
+    <div class="ev ${e.tipo==='comentario'?'coment':''}">
+      <div class="dot"></div>
+      <div style="flex:1">
+        <div class="txt">${esc(e.texto)}</div>
+        <div class="meta">${fdh(e.fecha)} · ${esc(e.usuario)||'Sistema'}${e.tipo==='comentario'?' · comentario':''}</div>
+      </div>
+    </div>`).join('') : '<div style="color:#94a3b8;font-size:.82rem">Sin movimientos registrados todavía.</div>';
+}
+async function guardarComentario(){
+  const t = document.getElementById('bitTxt');
+  const c = (t.value||'').trim();
+  if (!c) { t.focus(); return; }
+  const r = await fetch('/api/fundantes-seguimiento/'+BIT_ID+'/bitacora', {
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+    body: JSON.stringify({ comentario: c }) });
+  const j = await r.json().catch(()=>null);
+  if (!j || !j.success) { alert((j && j.error) || 'No se pudo guardar el comentario.'); return; }
+  t.value = '';
+  cargarBitacora();
 }
 
 function exportar(){

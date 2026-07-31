@@ -55,6 +55,19 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       "ALTER TABLE fundantes_seg ADD COLUMN devuelto_por VARCHAR(150) NULL",
       "ALTER TABLE fundantes_seg ADD COLUMN devoluciones INT NOT NULL DEFAULT 0",
     ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes devolucion]', e.message); } }
+    /* Bitácora de gestión: comentarios manuales sobre el estado de la operación
+       (qué se conversó con la financiera, qué falta, con quién se está viendo).
+       La traza automática de qué pasó ya vive en auditoria_movimientos — esta
+       tabla guarda SOLO lo que la persona aporta, y la vista une ambas. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fundantes_bitacora (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        id_credito INT NOT NULL,
+        comentario TEXT NOT NULL,
+        autor      VARCHAR(150), id_autor INT,
+        created_at DATETIME DEFAULT NOW(),
+        INDEX idx_cred (id_credito)
+      )`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_seg_docs (
         id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -458,7 +471,7 @@ const devolver = async (req, res) => {
 const devueltos = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT c.num_op, c.id_financiera, c.financiera, c.ejecutivo,
+      SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.financiera, c.ejecutivo,
              cl.rut AS rut_cliente,
              -- nombre_completo es la columna poblada (18.604 de 18.619); los campos
              -- separados solo existen en 13.139. Se concatena únicamente si falta.
@@ -474,6 +487,45 @@ const devueltos = async (req, res) => {
        ORDER BY fs.devuelto_at DESC`);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { console.error('[fundantes devueltos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ─── Bitácora de la operación ────────────────────────────────────────────────
+   GET  /:id/bitacora  → línea de tiempo: lo que el sistema registró solo
+        (auditoría del módulo, una sola fuente) + los comentarios de gestión.
+   POST /:id/bitacora  → agrega un comentario con el estado a la fecha.        */
+const bitacora = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
+    const [[op]] = await pool.query('SELECT num_op, id_financiera FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const [aud] = await pool.query(
+      `SELECT fecha, usuario, accion, detalle FROM auditoria_movimientos
+        WHERE modulo='fundantes-seguimiento' AND entidad='credito' AND entidad_id=?
+        ORDER BY fecha DESC LIMIT 200`, [String(id)]);
+    const [com] = await pool.query(
+      'SELECT created_at AS fecha, autor AS usuario, comentario FROM fundantes_bitacora WHERE id_credito=? ORDER BY created_at DESC', [id]);
+    const eventos = [
+      ...aud.map(a => ({ tipo: 'evento', fecha: a.fecha, usuario: a.usuario, accion: a.accion, texto: a.detalle })),
+      ...com.map(c => ({ tipo: 'comentario', fecha: c.fecha, usuario: c.usuario, accion: 'COMENTARIO', texto: c.comentario })),
+    ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    res.json({ success: true, data: { num_op: op.num_op, id_financiera: op.id_financiera, eventos }, error: null });
+  } catch (e) { console.error('[fundantes bitacora]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const comentar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const comentario = String((req.body || {}).comentario || '').trim();
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
+    if (!comentario) return res.status(400).json({ success: false, data: null, error: 'El comentario no puede ir vacío.' });
+    if (comentario.length > 2000) return res.status(400).json({ success: false, data: null, error: 'El comentario no puede superar los 2.000 caracteres.' });
+    const [[op]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    await pool.query('INSERT INTO fundantes_bitacora (id_credito, comentario, autor, id_autor) VALUES (?,?,?,?)',
+      [id, comentario, nombreUsuario(req), req.usuario.id_usuario || null]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[fundantes comentar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 const validar = async (req, res) => {
@@ -690,4 +742,4 @@ const historial = async (req, res) => {
   } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos };
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar };
