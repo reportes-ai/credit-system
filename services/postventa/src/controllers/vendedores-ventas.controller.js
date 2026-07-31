@@ -7,7 +7,13 @@
    operación por operación sin salir a cruzar planillas.
 
    De dónde sale cada dato (una sola fuente, Máxima 2):
-     · Operaciones otorgadas, monto, dealer y nombre del vendedor → `creditos`.
+     · Operaciones otorgadas, monto y dealer → `creditos`, con etapa OTORGADO.
+       OJO: `fecha_otorgado` viene poblada también en rechazadas, desistidas y
+       aprobadas sin cursar, así que filtrar solo por esa fecha inflaba el conteo
+       (julio 2026: 949 filas vs. 85 otorgadas de verdad). La etapa manda.
+     · Nombre del VENDEDOR → `cartas_aprobacion` (es el vendedor DEL DEALER).
+       `creditos.vendedor` NO sirve: la carga masiva escribe ahí nuestro propio
+       ejecutivo ("VENDEDOR (AFA) …"). Solo se usa como respaldo si no hay carta.
      · RUT y correo del vendedor → `vendedores_dealer` (el crédito solo guarda el
        NOMBRE). El cruce se resuelve en código —~335 filas— porque TiDB no admite
        subconsultas en el ON y un JOIN doble multiplicaría operaciones.
@@ -29,7 +35,8 @@ exports.listar = async (req, res) => {
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : null;
     const q   = String(req.query.q || '').trim();
 
-    const where = ['c.fecha_otorgado IS NOT NULL'], params = [];
+    // Etapa OTORGADO: la fecha por sí sola no basta (ver cabecera del archivo).
+    const where = ['c.fecha_otorgado IS NOT NULL', "UPPER(COALESCE(c.estado_credito,'')) = 'OTORGADO'"], params = [];
     if (mes) { where.push("DATE_FORMAT(c.fecha_otorgado,'%Y-%m') = ?"); params.push(mes); }
     else       where.push('c.fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)');
 
@@ -37,7 +44,7 @@ exports.listar = async (req, res) => {
       SELECT DATE_FORMAT(c.fecha_otorgado,'%Y-%m') AS mes,
              c.id, c.num_op, c.id_financiera, c.financiera, c.fecha_otorgado,
              c.ejecutivo, c.monto_financiado, c.saldo_precio,
-             COALESCE(NULLIF(c.vendedor,''), '') AS vendedor_nombre,
+             COALESCE(NULLIF(c.vendedor,''), '') AS vendedor_credito,
              COALESCE(c.automotora,'') AS dealer, c.rut_dealer,
              COALESCE(NULLIF(cl.nombre_completo,''),
                       NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''))),'')) AS cliente,
@@ -47,6 +54,28 @@ exports.listar = async (req, res) => {
        WHERE ${where.join(' AND ')}
        ORDER BY c.fecha_otorgado DESC, c.id DESC
        LIMIT 20000`, params);
+
+    /* Vendedor del DEALER: sale de la carta. Se resuelve en código y no con un
+       JOIN porque una misma operación puede tener varias cartas (correcciones), y
+       el JOIN duplicaba la operación tantas veces como cartas tuviera. Se toma la
+       más reciente (id mayor). */
+    const idsFin = [...new Set(rows.map(r => r.id_financiera).filter(Boolean))];
+    const cartaDe = new Map();
+    for (let i = 0; i < idsFin.length; i += 500) {
+      const [cs] = await pool.query(
+        'SELECT id, id_financiera, vendedor FROM cartas_aprobacion WHERE id_financiera IN (?) ORDER BY id ASC',
+        [idsFin.slice(i, i + 500)]);
+      cs.forEach(c => { if (String(c.vendedor || '').trim()) cartaDe.set(String(c.id_financiera), c.vendedor); });
+    }
+    const esPlaceholderAFA = v => /^VENDEDOR(A)?\s*\(?AFA\)?|^VENDEDOR(A)?\s+PARQUE/i.test(String(v || '').trim());
+    rows.forEach(r => {
+      const deCarta = cartaDe.get(String(r.id_financiera));
+      const deCred  = String(r.vendedor_credito || '').trim();
+      if (deCarta)                                    { r.vendedor_nombre = deCarta; r.origen_vendedor = 'carta'; }
+      else if (deCred && deCred.toUpperCase() !== 'S/I' && !esPlaceholderAFA(deCred))
+                                                      { r.vendedor_nombre = deCred; r.origen_vendedor = 'crédito'; }
+      else                                            { r.vendedor_nombre = '';     r.origen_vendedor = deCred ? 'venta directa AutoFácil' : 'sin dato'; }
+    });
 
     // Índice de vendedores: por <nombre|rut_dealer> y por <nombre> como respaldo.
     const [vend] = await pool.query('SELECT rut_dealer, nombre, rut, mail FROM vendedores_dealer');

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Vendedores con Ventas: agrupado por vendedor, detalle al pinchar, filtros y Excel -->
+<!-- v1.1 — solo etapa OTORGADO y el vendedor sale de la CARTA (el del credito es nuestro ejecutivo) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,7 +52,7 @@
 <div class="main">
   <div class="banner"><i class="bi bi-person-badge"></i><div>
     <h2>Vendedores con Ventas</h2>
-    <p>Quién vendió cada mes: operaciones otorgadas y monto por vendedor. <b>Pincha una fila</b> para ver el detalle de sus operaciones.</p>
+    <p>Quién vendió cada mes: operaciones con etapa <b>OTORGADO</b> y monto por vendedor <b>del dealer</b> (sale de la carta de aprobación). <b>Pincha una fila</b> para ver el detalle de sus operaciones.</p>
   </div></div>
 
   <div class="card-af">
@@ -114,7 +114,8 @@ async function cargar(){
 function agrupar(){
   const map = new Map();
   DATA.forEach(r => {
-    const nom = String(r.vendedor_nombre||'').trim() || '(sin vendedor)';
+    const nom = String(r.vendedor_nombre||'').trim()
+      || (r.origen_vendedor === 'venta directa AutoFácil' ? '(venta directa AutoFácil)' : '(sin vendedor en la carta)');
     const k = nom.toUpperCase() + '|' + String(r.dealer||'').toUpperCase();
     if (!map.has(k)) map.set(k, { key:k, vendedor:nom, dealer:r.dealer||'—',
       rut:r.vendedor_rut, mail:r.vendedor_mail, ops:[] });
@@ -127,7 +128,7 @@ function agrupar(){
 
 function render(){
   const totOps = DATA.length, totMonto = DATA.reduce((a,r)=>a+Number(r.monto_financiado||0),0);
-  const sinId  = GRUPOS.filter(g=>!g.rut && g.vendedor!=='(sin vendedor)').length;
+  const sinId  = GRUPOS.filter(g=>!g.rut && !g.vendedor.startsWith('(')).length;
   document.getElementById('resumen').innerHTML =
     `<b>${GRUPOS.length}</b> vendedor(es) · <b>${totOps}</b> operación(es) otorgadas · <b>${clp(totMonto)}</b>` +
     (sinId ? ` · <span style="color:#b45309"><b>${sinId}</b> sin RUT en la base de vendedores</span>` : '');
