@@ -87,6 +87,12 @@ const nombreUsuario = u => (u?.nombre ? (u.nombre + ' ' + (u.apellido || '')).tr
       aprobada que aún no lo tenga.                                    */
 const sync = async (req, res) => {
   try {
+    /* Que EXISTA el crédito no significa que se haya otorgado: un crédito puede
+       estar APROBADO, DIGITADO o incluso ANULADO. Sin exigir OTORGADO, el sync
+       marcaba la carta como otorgada y le generaba comisión en la cartola a
+       operaciones que nunca se cursaron (8 casos por $3,8 MM detectados el
+       31-07-2026, ninguno alcanzó a facturarse). La fecha de otorgamiento del
+       CRÉDITO manda: si no la tiene, no está otorgado. */
     const [r1] = await pool.query(`
       UPDATE cartas_aprobacion ca
       JOIN creditos cr ON cr.num_op = ca.id_financiera
@@ -95,6 +101,7 @@ const sync = async (req, res) => {
           ca.id_credito_creado     = cr.id,
           ca.fecha_otorgado        = COALESCE(ca.fecha_otorgado, cr.fecha_otorgado, NOW())
       WHERE ca.otorgado = 0 AND ca.status = 'APROBADA'
+        AND UPPER(cr.estado_credito) = 'OTORGADO' AND cr.fecha_otorgado IS NOT NULL
     `);
 
     const [r2] = await pool.query(`
@@ -110,6 +117,13 @@ const sync = async (req, res) => {
       FROM cartas_aprobacion ca
       LEFT JOIN creditos crx ON crx.id = ca.id_credito_creado
       WHERE ca.otorgado = 1 AND ca.status = 'APROBADA'
+        -- Segunda barrera: aunque la carta esté marcada otorgada (marcas viejas o
+        -- a mano), no se genera comisión si la operación no está OTORGADA.
+        AND EXISTS (
+          SELECT 1 FROM creditos cv
+          WHERE cv.num_op = ca.id_financiera
+            AND UPPER(cv.estado_credito) = 'OTORGADO' AND cv.fecha_otorgado IS NOT NULL
+        )
         AND NOT EXISTS (
           SELECT 1 FROM cartolas_movimientos m
           WHERE m.id_carta = ca.id AND m.movimiento = 'COMISION'
