@@ -83,6 +83,12 @@
       <p>Revisa, autoriza y cierra las fichas pendientes (cadena de niveles), haz seguimiento del estado de tus solicitudes y edita los datos de los dealers vigentes.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/aprobaciones/vendedores/" class="module-card" id="cardVendedores" style="display:none">
+      <div class="card-icon"><i class="bi bi-person-badge"></i></div>
+      <h5>Vendedores por Dealer</h5>
+      <p>Base única de vendedores de cada concesionario: asigna dealer, corrige RUT y correo, y agrega nuevos. Alimenta el selector de Vendedor del Generador de Cartas.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/dealers-incorporacion/niveles.html" class="module-card" id="cardNiveles" style="display:none">
       <div class="card-icon"><i class="bi bi-diagram-3"></i></div>
       <h5>Niveles de Aprobación</h5>
@@ -124,6 +130,7 @@
     let alguna = false;
     if (tiene('dealer_ficha_crear'))                      { document.getElementById('cardNuevo').style.display = '';      alguna = true; }
     if (tiene('dealer_ficha_revisar','dealer_mantener','dealer_part_especial'))  { document.getElementById('cardMantencion').style.display = ''; alguna = true; }
+    if (tiene('aprob_vendedores'))                        { document.getElementById('cardVendedores').style.display = ''; alguna = true; }
     if (tiene('dealer_aprob_config'))                     { document.getElementById('cardNiveles').style.display = '';    alguna = true; }
     if (tiene('dealer_plan_liquidez'))                    { document.getElementById('cardLiquidez').style.display = '';   alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
