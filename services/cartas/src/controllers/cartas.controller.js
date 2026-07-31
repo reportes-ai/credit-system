@@ -5,6 +5,8 @@ const { notificar } = require('../../../notificaciones/src/controllers/notificac
 const { auditar } = require('../../../../shared/audit');
 const { publicarAnuncio } = require('../../../../shared/anuncios');
 const { marcarForzadosCalculo } = require('../../../creditos/src/utils/recalcular-mes');
+// Motor único de etapa: otorgar escribe las TRES columnas de una sola vez.
+const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 const pdf = require('pdf-parse');
 
 /* Genera numero_credito igual que creditos.controller (YYMMXXX) */
@@ -617,7 +619,7 @@ const otorgar = async (req, res) => {
       const partB = Number(ca.part_bruto) || 0;
       if (cond.length) {
         await pool.query(
-          `UPDATE creditos SET estado='OTORGADO', estado_credito='OTORGADO', estado_eval='OTORGADO',
+          `UPDATE creditos SET ${SET_ETAPA_SQL},
                   fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
@@ -625,7 +627,7 @@ const otorgar = async (req, res) => {
                    /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
                    OR (estado IS NULL AND COALESCE(estado_credito,'') IN ('APROBADO','DIGITADO','PENDIENTE')))`,
-          [partB, partB, ...args]
+          [...valoresEtapa('OTORGADO'), partB, partB, ...args]
         ).catch(e => console.error('[carta otorgar→credito]', e.message));
         // El crédito de la carta nace sin num_op → asígnalo (= numero_credito) para que
         // aparezca y sea buscable en Post Venta.

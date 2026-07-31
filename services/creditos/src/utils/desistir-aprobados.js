@@ -8,6 +8,8 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+// La etapa se escribe por el motor único: las TRES columnas o ninguna.
+const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 
 async function getDias() {
   try {
@@ -21,13 +23,13 @@ async function desistirAprobadosVencidos() {
   const dias = await getDias();
   const [r] = await pool.query(
     `UPDATE creditos
-        SET estado_credito='DESISTIDO', estado_eval='DESISTIDO',
+        SET ${SET_ETAPA_SQL},
             fecha_estado = DATE_ADD(fecha_estado, INTERVAL ? DAY)
       WHERE estado_credito='APROBADO'
         AND COALESCE(estado,'') NOT IN ('OTORGADO','VIGENTE','EN MORA','VENCIDO','PREPAGADO','CASTIGADO')
         AND fecha_estado IS NOT NULL
         AND fecha_estado <= DATE_SUB(CURDATE(), INTERVAL ? DAY)`,
-    [dias, dias]);
+    [...valoresEtapa('DESISTIDO'), dias, dias]);
   if (r.affectedRows > 0) {
     console.log(`[desistir-aprobados] ${r.affectedRows} aprobados > ${dias} días → DESISTIDO`);
     try { auditar({ accion: 'EDITAR', modulo: 'creditos', entidad: 'desistimiento_auto', entidad_id: new Date().toISOString().slice(0, 10),

@@ -1,0 +1,1778 @@
+[
+  {
+    "id": 1200001,
+    "num_op": 55,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200002,
+    "num_op": 91,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200003,
+    "num_op": 152,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200004,
+    "num_op": 216,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200005,
+    "num_op": 344,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200006,
+    "num_op": 473,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200007,
+    "num_op": 487,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200008,
+    "num_op": 528,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200009,
+    "num_op": 631,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200010,
+    "num_op": 645,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200011,
+    "num_op": 675,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200012,
+    "num_op": 691,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200013,
+    "num_op": 750,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200014,
+    "num_op": 972,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200015,
+    "num_op": 1049,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200016,
+    "num_op": 1182,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200017,
+    "num_op": 1262,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200018,
+    "num_op": 1278,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200019,
+    "num_op": 1392,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200020,
+    "num_op": 1418,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200021,
+    "num_op": 1423,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200022,
+    "num_op": 1481,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200023,
+    "num_op": 1492,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200024,
+    "num_op": 1595,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200025,
+    "num_op": 1685,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200026,
+    "num_op": 1687,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200027,
+    "num_op": 1722,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200028,
+    "num_op": 1726,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200029,
+    "num_op": 1796,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200030,
+    "num_op": 1885,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200031,
+    "num_op": 1903,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200032,
+    "num_op": 1918,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200033,
+    "num_op": 1940,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200034,
+    "num_op": 1966,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200035,
+    "num_op": 2022,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200036,
+    "num_op": 2023,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200037,
+    "num_op": 2073,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200038,
+    "num_op": 2107,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200039,
+    "num_op": 2126,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200040,
+    "num_op": 2129,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200041,
+    "num_op": 2296,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200042,
+    "num_op": 2352,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200043,
+    "num_op": 2408,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200044,
+    "num_op": 2594,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200045,
+    "num_op": 2682,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200046,
+    "num_op": 2801,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200047,
+    "num_op": 2949,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200048,
+    "num_op": 2993,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200049,
+    "num_op": 3074,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200050,
+    "num_op": 3209,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200051,
+    "num_op": 3314,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200052,
+    "num_op": 3757,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200053,
+    "num_op": 3868,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200054,
+    "num_op": 4143,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200055,
+    "num_op": 4180,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200056,
+    "num_op": 4471,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200057,
+    "num_op": 4503,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200058,
+    "num_op": 4715,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200059,
+    "num_op": 4780,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200060,
+    "num_op": 4827,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200061,
+    "num_op": 4987,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200062,
+    "num_op": 5083,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200063,
+    "num_op": 5244,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200064,
+    "num_op": 5247,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200065,
+    "num_op": 5386,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200066,
+    "num_op": 5641,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200067,
+    "num_op": 5645,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200068,
+    "num_op": 5736,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200069,
+    "num_op": 6127,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200070,
+    "num_op": 6459,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200071,
+    "num_op": 6938,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200072,
+    "num_op": 7018,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200073,
+    "num_op": 7127,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200074,
+    "num_op": 7133,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200075,
+    "num_op": 7182,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200076,
+    "num_op": 7425,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200077,
+    "num_op": 7704,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200078,
+    "num_op": 7810,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200079,
+    "num_op": 7894,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200080,
+    "num_op": 8008,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200081,
+    "num_op": 8154,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200082,
+    "num_op": 8256,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200083,
+    "num_op": 8308,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200084,
+    "num_op": 8405,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200085,
+    "num_op": 8423,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200086,
+    "num_op": 8586,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200087,
+    "num_op": 9001,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200088,
+    "num_op": 9039,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200089,
+    "num_op": 9325,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200090,
+    "num_op": 9465,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200091,
+    "num_op": 9497,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200092,
+    "num_op": 9745,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200093,
+    "num_op": 9799,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200094,
+    "num_op": 10079,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200095,
+    "num_op": 10085,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200096,
+    "num_op": 10746,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200097,
+    "num_op": 10810,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200098,
+    "num_op": 10908,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200099,
+    "num_op": 10950,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200100,
+    "num_op": 11009,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200101,
+    "num_op": 11074,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200102,
+    "num_op": 11089,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200103,
+    "num_op": 11144,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200104,
+    "num_op": 11229,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200105,
+    "num_op": 11447,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200106,
+    "num_op": 11709,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200107,
+    "num_op": 11760,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200108,
+    "num_op": 11842,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200109,
+    "num_op": 12037,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200110,
+    "num_op": 12147,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200111,
+    "num_op": 12458,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200112,
+    "num_op": 12880,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200113,
+    "num_op": 13728,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200114,
+    "num_op": 13766,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200115,
+    "num_op": 13932,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200116,
+    "num_op": 14032,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200117,
+    "num_op": 14081,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200118,
+    "num_op": 14398,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200119,
+    "num_op": 14449,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200120,
+    "num_op": 14777,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200121,
+    "num_op": 15007,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200122,
+    "num_op": 15144,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200123,
+    "num_op": 15261,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200124,
+    "num_op": 15345,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200125,
+    "num_op": 15457,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200126,
+    "num_op": 15560,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200127,
+    "num_op": 15861,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200128,
+    "num_op": 15893,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200129,
+    "num_op": 16727,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200130,
+    "num_op": 17060,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200131,
+    "num_op": 17545,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200132,
+    "num_op": 17745,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200133,
+    "num_op": 17884,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200134,
+    "num_op": 17911,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200135,
+    "num_op": 17920,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200136,
+    "num_op": 17955,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200137,
+    "num_op": 18124,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200138,
+    "num_op": 18151,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200139,
+    "num_op": 18165,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200140,
+    "num_op": 18168,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200141,
+    "num_op": 18458,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200142,
+    "num_op": 18490,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200143,
+    "num_op": 18508,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200144,
+    "num_op": 18611,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200145,
+    "num_op": 18616,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200146,
+    "num_op": 18886,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200147,
+    "num_op": 18921,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200148,
+    "num_op": 18977,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200149,
+    "num_op": 19219,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200150,
+    "num_op": 19239,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200151,
+    "num_op": 19246,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200152,
+    "num_op": 19259,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200153,
+    "num_op": 19579,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200154,
+    "num_op": 19636,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200155,
+    "num_op": 19860,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200156,
+    "num_op": 19900,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200157,
+    "num_op": 20212,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200158,
+    "num_op": 20780,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200159,
+    "num_op": 20788,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200160,
+    "num_op": 22086,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200161,
+    "num_op": 22130,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200162,
+    "num_op": 24958,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200163,
+    "num_op": 25473,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200164,
+    "num_op": 27970,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200165,
+    "num_op": 28598,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200166,
+    "num_op": 31691,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200167,
+    "num_op": 33643,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200168,
+    "num_op": 33876,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200169,
+    "num_op": 34232,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200170,
+    "num_op": 34397,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200171,
+    "num_op": 34580,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200172,
+    "num_op": 35038,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200173,
+    "num_op": 36668,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200174,
+    "num_op": 37088,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200175,
+    "num_op": 37990,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200176,
+    "num_op": 38263,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200177,
+    "num_op": 38678,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200178,
+    "num_op": 38679,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200179,
+    "num_op": 38913,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200180,
+    "num_op": 39214,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200181,
+    "num_op": 39337,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200182,
+    "num_op": 39659,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200183,
+    "num_op": 40963,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200184,
+    "num_op": 40983,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200185,
+    "num_op": 41234,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200186,
+    "num_op": 42261,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200187,
+    "num_op": 43099,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200188,
+    "num_op": 43293,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200189,
+    "num_op": 44063,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200190,
+    "num_op": 45759,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200191,
+    "num_op": 47422,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200192,
+    "num_op": 47488,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200193,
+    "num_op": 47503,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200194,
+    "num_op": 47790,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200195,
+    "num_op": 47792,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200196,
+    "num_op": 48019,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200197,
+    "num_op": 48886,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200198,
+    "num_op": 49338,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200199,
+    "num_op": 50696,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200200,
+    "num_op": 50861,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200201,
+    "num_op": 51033,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200202,
+    "num_op": 51177,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200203,
+    "num_op": 51608,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200204,
+    "num_op": 51794,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200205,
+    "num_op": 52438,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200206,
+    "num_op": 52577,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200207,
+    "num_op": 54665,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200208,
+    "num_op": 55575,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200209,
+    "num_op": 55627,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200210,
+    "num_op": 55653,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200211,
+    "num_op": 56681,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200212,
+    "num_op": 57673,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200213,
+    "num_op": 57702,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200214,
+    "num_op": 59678,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200215,
+    "num_op": 60993,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1200216,
+    "num_op": 62286,
+    "financiera": "AFA",
+    "estado": "OTORGADO",
+    "estado_credito": "OTORGADO",
+    "estado_eval": "PENDIENTE"
+  },
+  {
+    "id": 1350707,
+    "num_op": 88449,
+    "financiera": "AUTOFIN",
+    "estado": "DESISTIDO",
+    "estado_credito": "APROBADO",
+    "estado_eval": "APROBADO"
+  },
+  {
+    "id": 1380049,
+    "num_op": 6123661,
+    "financiera": "AUTOFIN",
+    "estado": "CARTA_APROBACION",
+    "estado_credito": "RECHAZADO",
+    "estado_eval": "RECHAZADO"
+  },
+  {
+    "id": 1380052,
+    "num_op": 6123607,
+    "financiera": "AUTOFIN",
+    "estado": "CARTA_APROBACION",
+    "estado_credito": "RECHAZADO",
+    "estado_eval": "RECHAZADO"
+  },
+  {
+    "id": 2010004,
+    "num_op": 2607001,
+    "financiera": "AUTOFIN",
+    "estado": "DESISTIDO",
+    "estado_credito": "DIGITADO",
+    "estado_eval": "DIGITADO"
+  },
+  {
+    "id": 2130009,
+    "num_op": 2607016,
+    "financiera": "AUTOFIN",
+    "estado": "DESISTIDO",
+    "estado_credito": "PENDIENTE",
+    "estado_eval": "APROBADO"
+  },
+  {
+    "id": 2490002,
+    "num_op": 2607052,
+    "financiera": "AUTOFIN",
+    "estado": "DESISTIDO",
+    "estado_credito": "PENDIENTE",
+    "estado_eval": "APROBADO"
+  }
+]

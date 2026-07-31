@@ -4,6 +4,8 @@ const { calcularOperacion } = require('../utils/calcular-operacion');
 const { recalcularMeses } = require('../utils/recalcular-mes');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
+// Motor único de etapa: escribir la etapa toca SIEMPRE las tres columnas.
+const { SET_ETAPA_SQL, SET_ESTADO_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 
 // Migración: tabla creditos
 require('../../../../shared/migrate').enFila('operaciones', async () => {
@@ -366,6 +368,9 @@ const update = async (req, res) => {
     const sets = [
       'num_op=?','mes=?','financiera=?','comentarios=?',
       'ejecutivo=?','automotora=?','nombre_local=?','estado_eval=?','estado_credito=?',
+      // La etapa también en `estado`, para que las tres columnas no se partan
+      // (motor único: shared/etapa-credito.js).
+      SET_ESTADO_SQL,
       'fecha_otorgado=?','producto=?',
       'marca=?','modelo=?','anio=?','tasacion=?','permiso_circulacion=?',
       'valor_vehiculo=?','pie=?',
@@ -382,6 +387,7 @@ const update = async (req, res) => {
     const vals = [
       b.num_op||null, b.mes||null, b.financiera, b.comentarios||null,
       b.ejecutivo||null, b.automotora||null, b.nombre_local||null, b.estado_eval||null, b.estado_credito||null,
+      (b.estado_credito || b.estado_eval || null),
       b.fecha_otorgado||null, b.producto||null,
       b.marca||null, b.modelo||null, b.anio||null, b.tasacion||null, b.permiso_circulacion||null,
       b.valor_vehiculo||null, b.pie||null,
@@ -500,9 +506,11 @@ const marcarNoOtorgado = async (req, res) => {
     if (_mesNoOt && await isMesCerrado(_mesNoOt))
       return res.status(403).json({ success: false, data: null, error: `🔒 Mes ${_mesNoOt} cerrado — no se permiten modificaciones` });
     await pool.query(
-      `UPDATE creditos SET estado_credito='NO OTORGADO',
+      // La etapa por el motor único: si se escribiera solo `estado_credito`, un
+      // crédito con `estado` poblado seguiría mostrándose OTORGADO (caso 88558).
+      `UPDATE creditos SET ${SET_ETAPA_SQL},
        comentarios=CONCAT(COALESCE(comentarios,''),' | NO OTORGADO: ', COALESCE(?,'')) WHERE id=?`,
-      [comentario || '', id]
+      [...valoresEtapa('NO OTORGADO'), comentario || '', id]
     );
     const [[row]] = await pool.query('SELECT * FROM creditos WHERE id = ?', [id]);
     auditar({ req, accion: 'EDITAR', modulo: 'creditos', entidad: 'credito', entidad_id: id,

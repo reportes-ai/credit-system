@@ -27,6 +27,8 @@ const { auditar } = require('../../../../shared/audit');
 const AVISOS = require('../../../../shared/avisos');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
+// Motor único de etapa: anular escribe las TRES columnas de una sola vez.
+const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 
 const nombreUsuario = req => {
   const u = req.usuario || {};
@@ -239,13 +241,12 @@ const resolver = async (req, res) => {
 
     // 2) El crédito
     await pool.query(
-      /* La ETAPA se escribe en las TRES columnas, igual que al otorgar
-         (cartas.controller: SET estado/estado_credito/estado_eval='OTORGADO').
-         El listado de Créditos resuelve la etapa con `estado` PRIMERO, así que
-         escribir solo las otras dos dejaba la operación mostrándose OTORGADA. */
-      `UPDATE creditos SET estado='ANULADO', estado_credito='ANULADO', estado_eval='ANULADO',
+      /* La ETAPA por el motor único (shared/etapa-credito.js): las TRES columnas
+         en el mismo UPDATE. El listado resuelve la etapa con `estado` PRIMERO, así
+         que escribir solo las otras dos dejaba la operación mostrándose OTORGADA. */
+      `UPDATE creditos SET ${SET_ETAPA_SQL},
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
-        WHERE id=?`, [a.motivo, a.id_credito]);
+        WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
     await pool.query(
       `UPDATE anulaciones_operacion SET estado='APROBADA', cartola_retirada=?, cartola_nota=?,

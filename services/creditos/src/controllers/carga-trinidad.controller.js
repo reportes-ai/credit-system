@@ -6,6 +6,8 @@ const historial = require('./carga-historial.controller');
 const { recalcularMeses } = require('../utils/recalcular-mes');
 const { isMesCerrado, getMesDeNumOp } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura, hoyChile } = require('../../../../shared/utils/fecha-futura');
+// Motor único de etapa: al sincronizar desde Trinidad, `estado` acompaña a las otras dos.
+const { SET_ESTADO_SQL } = require('../../../../shared/etapa-credito');
 
 /* ── Migraciones ────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
@@ -507,11 +509,12 @@ exports.importar = async (req, res) => {
           const fechaEq = esCursadoEq ? (f.fecha_otorgado || hoyChile()) : null;
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
-               estado_credito = ?, estado_eval = ?, id_cliente = COALESCE(id_cliente, ?),
+               estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL},
+               id_cliente = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(fecha_otorgado, ?),
                mes            = COALESCE(mes, ?), updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, idCliente,
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.estado_credito || null, idCliente,
              fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
@@ -537,6 +540,7 @@ exports.importar = async (req, res) => {
                estado_autofin = ?, ejecutivo_tri = ?,
                estado_credito = ?,
                estado_eval    = ?,
+               ${SET_ESTADO_SQL},
                id_financiera  = COALESCE(NULLIF(id_financiera,''), ?),
                id_cliente     = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(?, fecha_otorgado),
@@ -544,7 +548,7 @@ exports.importar = async (req, res) => {
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, String(f.num_op), idCliente,
+            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.estado_credito || null, String(f.num_op), idCliente,
              esCursado ? f.fecha_otorgado : null, esCursado ? f.mes : null,
              f.marca, f.modelo, f.vendedor, f.num_op]
           );
@@ -674,8 +678,8 @@ exports.reprocesarEstados = async (req, res) => {
       const estadoCredito = mapEstado(c.estado_autofin, mapaEstados);
       const estadoEval    = EVAL_MAP[estadoCredito] || estadoCredito?.toUpperCase() || null;
       await pool.query(
-        `UPDATE creditos SET estado_credito = ?, estado_eval = ?, updated_at = NOW() WHERE id = ?`,
-        [estadoCredito, estadoEval, c.id]
+        `UPDATE creditos SET estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL}, updated_at = NOW() WHERE id = ?`,
+        [estadoCredito, estadoEval, estadoCredito || null, c.id]
       );
       actualizados++;
     }
