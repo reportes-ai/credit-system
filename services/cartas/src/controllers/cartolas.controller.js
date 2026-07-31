@@ -134,9 +134,17 @@ const sync = async (req, res) => {
             AND UPPER(COALESCE(cv.estado_credito,'')) NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
             AND UPPER(COALESCE(cv.estado_eval,''))    NOT IN ('ANULADO','DESISTIDO','RECHAZADO','NO OTORGADO')
         )
+        -- Tercera barrera: UNA COMISION POR OPERACION, no por carta. Deduplicar
+        -- por id_carta dejaba que una operacion con varias cartas aprobadas
+        -- generara una comision por cada una (9 operaciones duplicadas). Se
+        -- compara contra AMBAS llaves porque el historico de num_op guarda a
+        -- veces el ID Financiera y a veces el N de operacion.
         AND NOT EXISTS (
           SELECT 1 FROM cartolas_movimientos m
-          WHERE m.id_carta = ca.id AND m.movimiento = 'COMISION'
+          WHERE m.movimiento = 'COMISION'
+            AND (m.id_carta = ca.id
+              OR m.num_op = ca.id_financiera
+              OR m.num_op IN (SELECT cx.num_op FROM creditos cx WHERE cx.id_financiera = ca.id_financiera))
         )
     `);
 

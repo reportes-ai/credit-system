@@ -928,6 +928,13 @@ const upsert = async (req, res) => {
         ) VALUES (${vals.map(() => '?').join(',')})`,
         vals
       );
+      /* UNA SOLA CARTA VIGENTE POR OPERACIÓN (regla de Pato, 31-07-2026).
+         Al nacer una carta nueva para el mismo ID Financiera, las anteriores que
+         sigan vivas (PENDIENTE o APROBADA) se ANULAN. Antes convivían varias
+         aprobadas a la vez: además de prestarse a confusión, el motor de cartolas
+         generaba UNA COMISIÓN POR CARTA — 9 operaciones quedaron con comisión
+         duplicada por $4.499.700. La carta vigente es siempre la última. */
+      anularCartasPrevias(r.insertId, c.id_financiera, req).catch(() => {});
       // Snapshot del TIER UAC vigente al generar la carta (para la rentabilidad)
       tierUAC(c.fecha).then(t => pool.query('UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE id=?', [t.n, t.pct, r.insertId])).catch(() => {});
       res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
@@ -937,6 +944,34 @@ const upsert = async (req, res) => {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
+
+/* Una sola carta vigente por operación: anula las anteriores del mismo ID Financiera.
+   Fire & forget — no frena la creación de la carta nueva. */
+async function anularCartasPrevias(idNueva, idFinanciera, req) {
+  const idFin = String(idFinanciera || '').trim();
+  if (!idFin || !idNueva) return;
+  const quien = req && req.usuario ? ([req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email) : 'Sistema';
+  const [prev] = await pool.query(
+    "SELECT id, op_carta, status FROM cartas_aprobacion WHERE id_financiera = ? AND id <> ? AND status IN ('PENDIENTE','APROBADA')",
+    [idFin, idNueva]);
+  if (!prev.length) return;
+  await pool.query(
+    `UPDATE cartas_aprobacion SET status='ANULADA', anulado_por=?, fecha_anulacion=NOW(),
+            motivo_rechazo=CONCAT('Anulada automáticamente: se generó una carta nueva para la operación ', ?)
+      WHERE id IN (?)`,
+    [quien, idFin, prev.map(p => p.id)]);
+  /* La comisión que esa carta haya dejado en la cartola se retira, salvo que ya
+     se haya enviado al dealer (ahí el movimiento se respeta y se regulariza aparte). */
+  await pool.query(
+    "DELETE FROM cartolas_movimientos WHERE id_carta IN (?) AND mes_cartola IS NULL",
+    [prev.map(p => p.id)]).catch(() => {});
+  try {
+    const { auditar } = require('../../../../shared/audit');
+    auditar({ req, accion: 'ANULAR_CARTA_PREVIA', modulo: 'cartas', entidad: 'carta', entidad_id: idNueva,
+      detalle: `Se anularon ${prev.length} carta(s) previas de la operación ${idFin} al generar una nueva: ${prev.map(p => p.op_carta + ' (' + p.status + ')').join(', ')}`,
+      meta: { anuladas: prev.map(p => p.id), id_financiera: idFin } });
+  } catch (_) {}
+}
 
 /* Notificaciones del flujo (no bloquea la respuesta HTTP) */
 function notificarCambios(c, prevStatus, req) {
