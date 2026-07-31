@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.6 — cap. 34: la ETAPA del credito, motor unico shared/etapa-credito.js (las tres columnas se escriben juntas, se leen por ETAPA_SQL), etapa vs estado de cartera y el control desalineados(). v4.5 — una sola carta vigente por operacion + una comision por operacion, no por carta -->
+<!-- v4.8 — cap. 4: card Saldo Precio en Proceso de Pago (Tesoreria) — la planilla manual reconstruida en vivo, SLA 24/48/72h habiles parametrico, montos desde la ODP, export con nombre exigido. v4.6 — cap. 34 motor unico de ETAPA -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -139,6 +139,8 @@
   <div class="afecta"><b>Afecta:</b> etapas Post Venta, flujo de caja, Contabilidad. <b>Depende de:</b> fundantes (§2).</div>
 
   <div class="afecta" style="border-left-color:#16a34a"><b>Regla contable (v161):</b> el saldo precio es una <b>CUENTA DE PASO</b> — AutoFácil es intermediario: la financiera transfiere y se entrega íntegro al dealer. Al marcar FONDOS RECIBIDOS entra banco contra el pasivo transitorio (2102045) y al marcar SALDO PRECIO PAGADO se rebaja contra banco. <b>No toca el resultado</b>: no infla ingresos ni gastos, y el saldo de la cuenta muestra cuánta plata de dealers hay en tránsito.</div>
+
+  <div class="max" style="background:#eff6ff;border-left:4px solid #0141A2"><b>Card "Saldo Precio en Proceso de Pago" (Tesorería, v168):</b> la planilla que Tesorería llevaba a mano ("SALDOS PRECIOS.xlsx") ahora se <b>reconstruye en vivo</b> desde las etapas de Post Venta: recepción de fundantes (con AM/PM), <b>vencimiento por SLA</b> — 24/48/72 horas hábiles según la clasificación del dealer (SUPERPARTNER/PARTNER/SOCIO; recepción PM cuenta desde el día hábil siguiente; paramétrico en <code>postventa_config</code>, claves <code>sla_saldo_*_horas</code>) —, N° de ODP, carga al banco y pago. El <b>monto a pagar sale de la ODP</b> (saldo + gastos: por eso la planilla mostraba $45.380 sobre el saldo puro); sin ODP aún se muestra el saldo marcado como preliminar. Las operaciones <b>anuladas/desistidas se excluyen</b> (motor de etapa). Botón <b>Exportar Excel</b> genera el archivo con el nombre que la otra aplicación exige: <code>Saldo Precio en Proceso de Pago AAAAMMDD.xlsx</code>. Los estados usan NUESTROS nombres de etapa: el "CARGADO" de la planilla es ENVIADO A PAGO y su "CARGAR" es ORDEN DE PAGO EMITIDA.</div>
 
   <h2 id="p5">5. Recaudación: pago de cuotas</h2>
   <p><b>Qué y para qué:</b> cobrar la cartera propia — cada peso que entra queda registrado, timbrado y contabilizado una sola vez.</p>

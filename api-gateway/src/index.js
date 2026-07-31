@@ -315,6 +315,7 @@ app.use('/api/aplicacion-fondos',    require('../../services/tesoreria/src/route
 app.use('/api/cierre-contable',      require('../../services/tesoreria/src/routes/cierre-contable.routes'));
 app.use('/api/venta-cartera',        require('../../services/tesoreria/src/routes/venta-cartera.routes'));
 app.use('/api/banco',                require('../../services/tesoreria/src/routes/banco-conexiones.routes'));
+app.use('/api/saldo-proceso-pago',   require('../../services/tesoreria/src/routes/saldo-proceso-pago.routes'));
 app.use('/api/conciliacion',         require('../../services/tesoreria/src/routes/conciliacion.routes'));
 app.use('/api/cierre-mes',           require('../../services/tesoreria/src/routes/cierre-mes.routes'));
 app.use('/api/facilbook',            require('../../services/facilbook/src/routes/facilbook.routes'));
@@ -529,6 +530,7 @@ const PAGINAS = [
   ['/tesoreria/cierre-mes', 'tesoreria/cierre-mes.html'],
   ['/tesoreria/castigos', 'tesoreria/castigos.html'],
   ['/tesoreria/bitacora', 'tesoreria/bitacora.html'],
+  ['/tesoreria/saldo-proceso-pago', 'tesoreria/saldo-proceso-pago.html'],
   ['/crm', 'crm/index.html'],
   ['/crm/gestiones', 'crm/gestiones.html'],
   ['/crm/estadisticas', 'crm/estadisticas.html'],

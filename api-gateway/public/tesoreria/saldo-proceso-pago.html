@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<!-- v1.0 — Saldo Precio en Proceso de Pago: la planilla de Tesorería reconstruida en vivo desde Post Venta + export para la otra app -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Saldo Precio en Proceso de Pago — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input[type=text],input[type=date],select { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; background:#fff; }
+  input[type=text] { min-width:300px; flex:1; }
+  label.chk { display:flex; gap:6px; align-items:center; font-size:.82rem; font-weight:600; color:#334155; cursor:pointer; }
+  .btnx { border:none; border-radius:9px; padding:8px 15px; font-size:.8rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
+  .btn-gh { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  .chip { background:#f1f5f9; border-radius:9px; padding:5px 11px; font-size:.78rem; color:#334155; }
+  .chip b { color:var(--blue); }
+  .chip.rojo b { color:#b91c1c; }
+  table { width:100%; border-collapse:collapse; font-size:.78rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:8px 8px; font-size:.68rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; position:sticky; top:0; }
+  td { padding:7px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+  tbody tr:hover { background:#f8fbff; }
+  td.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .st { font-size:.66rem; font-weight:700; border-radius:6px; padding:2px 7px; }
+  .st-PAG{background:#dcfce7;color:#15803d}.st-BAN{background:#dbeafe;color:#1d4ed8}
+  .st-ODP{background:#e0e7ff;color:#4338ca}.st-LIB{background:#fef9c3;color:#a16207}
+  .st-FUN{background:#fef3c7;color:#92400e}.st-PEN{background:#fee2e2;color:#991b1b}
+  .atraso { color:#b91c1c; font-weight:800; }
+  .okdia { color:#15803d; font-weight:700; }
+  .prelim { color:#b45309; font-size:.68rem; }
+  .tag { font-size:.64rem; font-weight:700; border-radius:5px; padding:1px 5px; background:#f1f5f9; color:#475569; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Tesorería', href:'/tesoreria' },
+  { label:'Saldo Precio en Proceso de Pago', icon:'bi-hourglass-split', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-hourglass-split"></i><div>
+    <h2>Saldo Precio en Proceso de Pago</h2>
+    <p>La planilla de Tesorería, en vivo desde el seguimiento de Post Venta: recepción de fundantes, vencimiento por SLA (24/48/72 h hábiles según clasificación), ODP, carga al banco y pago. Sin digitar nada.</p>
+  </div></div>
+
+  <div class="card-af">
+    <div class="bar">
+      <input type="text" id="q" placeholder="Buscar: N° OP, dealer, RUT, ejecutivo, financiera, N° ODP…" oninput="deb()">
+      <select id="fEstado" onchange="cargar()"><option value="">Todas las etapas</option></select>
+      <input type="date" id="fDesde" onchange="cargar()" title="Recepción de fundantes desde">
+      <input type="date" id="fHasta" onchange="cargar()" title="Recepción de fundantes hasta">
+      <label class="chk"><input type="checkbox" id="fTodo" onchange="cargar()"> Incluir pagadas (histórico)</label>
+      <button class="btnx btn-gh" onclick="limpiar()"><i class="bi bi-x-circle"></i> Limpiar</button>
+      <button class="btnx" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+    </div>
+    <div class="bar" style="margin-top:10px" id="chips"></div>
+  </div>
+
+  <div class="card-af" style="padding:0;overflow:hidden">
+    <div style="overflow:auto;max-height:70vh">
+      <table>
+        <thead><tr>
+          <th>N° OP</th><th>Dealer</th><th>RUT Dealer</th><th>Ejecutivo</th>
+          <th>Monto a Pagar</th><th>Recepción Fundantes</th><th>AM/PM</th>
+          <th>Vence (SLA)</th><th>Días p/ Pago</th><th>Etapa</th>
+          <th>Fund. Enviados</th><th>Liberado</th><th>N° ODP</th><th>Ingreso Banco</th><th>Pagado</th>
+          <th>Tipo</th><th>Clasif.</th><th>Financiera</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="18" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+const fd  = s => { if (!s) return '—'; const p = s.split('-'); return p[2]+'-'+p[1]+'-'+p[0]; };
+const stCls = e => e==='SALDO PRECIO PAGADO'?'st-PAG':e==='ENVIADO A PAGO'?'st-BAN'
+  :(e==='ORDEN DE PAGO EMITIDA'||e==='FONDOS RECIBIDOS')?'st-ODP':e==='LIBERADO A PAGO'?'st-LIB'
+  :e==='FUNDANTES PENDIENTES'?'st-PEN':'st-FUN';
+let DATA = [], FLUJO = [];
+
+let tq=null; const deb = () => { clearTimeout(tq); tq=setTimeout(cargar, 350); };
+function limpiar(){ ['q','fDesde','fHasta'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('fEstado').value=''; document.getElementById('fTodo').checked=false; cargar(); }
+
+async function cargar(){
+  const qs = new URLSearchParams();
+  const v = id => document.getElementById(id).value.trim();
+  if (v('q')) qs.set('q', v('q'));
+  if (v('fEstado')) qs.set('estado', v('fEstado'));
+  if (v('fDesde')) qs.set('desde', v('fDesde'));
+  if (v('fHasta')) qs.set('hasta', v('fHasta'));
+  if (document.getElementById('fTodo').checked) qs.set('todo','1');
+  const j = await fetch('/api/saldo-proceso-pago?'+qs.toString(), { headers:H }).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) { document.getElementById('body').innerHTML =
+    '<tr><td colspan="18" style="color:#b91c1c;padding:20px">'+esc(j&&j.error||'Error al cargar')+'</td></tr>'; return; }
+  DATA = j.data;
+  if (!FLUJO.length) { FLUJO = j.flujo || [];
+    document.getElementById('fEstado').innerHTML = '<option value="">Todas las etapas</option>' +
+      FLUJO.map(e=>`<option>${e}</option>`).join(''); }
+  render(j.resumen);
+}
+
+function render(r){
+  document.getElementById('chips').innerHTML =
+    `<span class="chip"><b>${r.n}</b> operación(es)</span>` +
+    `<span class="chip">Total <b>${clp(r.monto)}</b></span>` +
+    (r.atrasados ? `<span class="chip rojo"><b>${r.atrasados}</b> con SLA vencido</span>` : '') +
+    Object.entries(r.por_estado).map(([e,n])=>`<span class="chip">${e}: <b>${n}</b></span>`).join('');
+  document.getElementById('body').innerHTML = DATA.length ? DATA.map(x => `<tr>
+    <td><b>${esc(x.num_op)}</b></td>
+    <td>${esc(x.dealer||'—')}</td>
+    <td>${esc(x.rut_dealer||'—')}</td>
+    <td>${esc(x.ejecutivo||'—')}</td>
+    <td class="num"><b>${clp(x.monto)}</b>${x.monto_preliminar?'<br><span class="prelim">saldo puro, sin ODP aún</span>':''}</td>
+    <td>${fd(x.f_recepcion)}</td>
+    <td>${esc(x.ampm||'—')}</td>
+    <td>${fd(x.f_venc_sla)}${x.sla_horas?` <span class="tag">${x.sla_horas}h</span>`:''}</td>
+    <td class="num">${x.dias_para_pago==null?'—':(x.dias_para_pago<0
+      ?`<span class="atraso">${x.dias_para_pago} (atrasado)</span>`
+      :`<span class="okdia">+${x.dias_para_pago}</span>`)}</td>
+    <td><span class="st ${stCls(x.estado)}">${esc(x.estado)}</span></td>
+    <td>${fd(x.f_fund_enviados)}</td>
+    <td>${fd(x.f_liberado)}</td>
+    <td>${esc(x.odp||'—')}</td>
+    <td>${fd(x.f_banco)}</td>
+    <td>${fd(x.f_pagado)}</td>
+    <td><span class="tag">${esc(x.tipo_dealer)}</span></td>
+    <td>${esc(x.clasificacion||'—')}</td>
+    <td>${esc(x.financiera||'—')}</td>
+  </tr>`).join('') : '<tr><td colspan="18" style="color:#94a3b8;padding:20px">Sin operaciones en proceso. 🎉</td></tr>';
+}
+
+/* Export para cargar en la otra aplicación. Nombre exigido:
+   "Saldo Precio en Proceso de Pago AAAAMMDD.xlsx" con la fecha de HOY (Chile). */
+function exportar(){
+  const rows = DATA.map(x => ({
+    'OP': x.num_op, 'DEALER': x.dealer, 'RUT DEALER': x.rut_dealer, 'EJECUTIVO/A': x.ejecutivo,
+    'MONTO': x.monto, 'FECHA RECEPCION FUNDANTES': fd(x.f_recepcion), 'AM-PM': x.ampm,
+    'FECHA VENCIMIENTO SLA': fd(x.f_venc_sla), 'DIAS PARA PAGO': x.dias_para_pago,
+    'ETAPA': x.estado, 'FECHA FUNDANTES ENVIADOS': fd(x.f_fund_enviados),
+    'FECHA LIBERADO': fd(x.f_liberado), 'N°ODP': x.odp,
+    'FECHA INGRESO AL BANCO': fd(x.f_banco), 'FECHA PAGO': fd(x.f_pagado),
+    'TIPO DEALER': x.tipo_dealer, 'CLASIFICACION DEALER': x.clasificacion,
+    'FINANCIERA': x.financiera,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Saldo Precio');
+  const hoy = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Santiago',
+    year:'numeric', month:'2-digit', day:'2-digit' }).format(new Date()).replace(/-/g,'');
+  XLSX.writeFile(wb, `Saldo Precio en Proceso de Pago ${hoy}.xlsx`);
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
