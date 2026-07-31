@@ -150,8 +150,23 @@ const sinCarta = async (req, res) => {
          AND NOT EXISTS (SELECT 1 FROM cartas_aprobacion ca WHERE ca.id_financiera = c.num_op)
          AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.num_op = c.id_financiera)
        ORDER BY c.num_op`, [mes]);
+    /* Parque o calle: la carga masiva NO trae ese dato confiable, así que el default
+       sale de la FICHA DEL DEALER (dealers.ccs_parque), que es un registro mantenido.
+       El crédito solo sirve de respaldo. Si ambos discrepan se marca para que el
+       operador lo confirme a ojo — igual siempre es editable en pantalla. */
     for (const r of rows) {
-      r.es_parque = /parque/i.test(String(r.tipo_ubicacion || '')) ? 1 : 0;
+      const credParque = /parque/i.test(String(r.tipo_ubicacion || '')) ? 1 : 0;
+      let fichaParque = null;
+      const rn = String(r.rut_dealer || '').replace(/[.\-\s]/g, '').toUpperCase();
+      if (rn) {
+        const [d] = await pool.query(
+          "SELECT ccs_parque FROM dealers WHERE UPPER(REPLACE(REPLACE(REPLACE(rut,'.',''),'-',''),' ','')) = ? LIMIT 1", [rn]).catch(() => [[]]);
+        if (d && d[0] && String(d[0].ccs_parque || '').trim())
+          fichaParque = /parque/i.test(String(d[0].ccs_parque)) ? 1 : 0;
+      }
+      r.es_parque   = fichaParque != null ? fichaParque : credParque;
+      r.origen_ubic = fichaParque != null ? 'ficha del dealer' : (r.tipo_ubicacion ? 'carga masiva' : 'sin dato');
+      r.ubic_discrepa = (fichaParque != null && fichaParque !== credParque) ? 1 : 0;
       r.comision_motor = await comisionMotor(r);
     }
     res.json({ success: true, data: { mes, items: rows }, error: null });

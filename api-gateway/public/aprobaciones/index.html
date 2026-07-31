@@ -3129,9 +3129,10 @@ function scRender(){
       <div id="scLista${i}" style="display:none;position:absolute;z-index:50;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:220px;overflow:auto;min-width:280px"></div>
       <div id="scRut${i}" style="font-size:.7rem;color:#94a3b8">${x.rut_dealer||'sin RUT'}</div>
     </td>
-    <td><select onchange="SC[${i}].es_parque=+this.value;scCalc(${i})">
+    <td><select onchange="SC[${i}].es_parque=+this.value;scCalc(${i})" style="${x.ubic_discrepa?'border:2px solid #f59e0b':''}">
           <option value="0" ${!x.es_parque?'selected':''}>Calle</option>
-          <option value="1" ${x.es_parque?'selected':''}>Parque</option></select></td>
+          <option value="1" ${x.es_parque?'selected':''}>Parque</option></select>
+        <div style="font-size:.66rem;color:${x.ubic_discrepa?'#92400e':'#94a3b8'}">${x.ubic_discrepa ? '⚠ la carga decía otra cosa' : (x.origen_ubic||'')}</div></td>
     <td style="text-align:right"><input type="text" inputmode="numeric" style="width:130px;text-align:right" value="${scFmt(x.saldo_precio)}"
         oninput="scMoneda(this)" onchange="SC[${i}].saldo_precio=scNum(this.value);this.value=scFmt(SC[${i}].saldo_precio);scCalc(${i})"></td>
     <td style="text-align:right"><input type="number" style="width:66px;text-align:right" value="${x.plazo||0}" onchange="SC[${i}].plazo=scNum(this.value);scCalc(${i})"></td>
