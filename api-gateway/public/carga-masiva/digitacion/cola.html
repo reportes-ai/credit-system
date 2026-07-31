@@ -28,6 +28,8 @@
     .fld.falta label { color:#b91c1c; }
     .fld.falta input, .fld.falta select { border-color:#ef4444; background:#fff5f5; }
     .fld .tag-falta { color:#b91c1c; font-size:.66rem; font-weight:800; margin-left:6px; }
+    .fld .tag-carta { color:#0141A2; background:#eff6ff; border-radius:6px; padding:1px 6px; font-size:.62rem; font-weight:800; margin-left:6px; white-space:nowrap; }
+    .fld.desde-carta input, .fld.desde-carta select { border-color:#93c5fd; background:#f8fbff; }
     .foot { position:sticky; bottom:0; background:#fff; border-top:1px solid #e2e8f0; padding:14px 22px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; box-shadow:0 -4px 14px rgba(0,0,0,.06); border-radius:0 0 14px 14px; }
     .btn { border:none; border-radius:9px; padding:10px 20px; font-weight:700; font-size:.88rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
     .btn-save { background:#16a34a; color:#fff; } .btn-save:hover { background:#15803d; }
@@ -116,10 +118,15 @@ function render(d){
   const campos = d.campos;
   const falt = campos.filter(c => faltSet.has(c.col));
   const resto = campos.filter(c => !faltSet.has(c.col));
+  // Campos pre-llenados desde la carta de aprobación: se marcan para que el digitador
+  // sepa que ese valor NO lo escribió él y pueda corregirlo si el vehículo cambió.
+  const sug = d.sugerencias || null;
+  const sugSet = new Set(sug ? Object.keys(sug.campos || {}) : []);
   const fldHTML = (c) => {
     const isF = faltSet.has(c.col);
-    return `<div class="fld ${isF?'falta':''}">
-      <label>${esc(c.label)}${isF?'<span class="tag-falta">FALTA</span>':''}</label>
+    const isS = sugSet.has(c.col);
+    return `<div class="fld ${isF?'falta':''} ${isS?'desde-carta':''}">
+      <label>${esc(c.label)}${isF?'<span class="tag-falta">FALTA</span>':''}${isS?`<span class="tag-carta" title="Pre-llenado desde la carta ${esc(sug.carta||'')}"><i class="bi bi-envelope-paper"></i> desde la carta</span>`:''}</label>
       ${inputHTML(c, cr[c.col], isF)}
     </div>`;
   };
@@ -132,6 +139,14 @@ function render(d){
       </div>
       <span class="pend"><i class="bi bi-stack me-1"></i>${d.pendientes} por digitar</span>
     </div>
+    ${sug ? `<div class="card" style="border-left:4px solid #0141A2">
+      <div style="font-size:.85rem;color:#1e293b"><i class="bi bi-envelope-paper" style="color:#0141A2"></i>
+        <b>${Object.keys(sug.campos||{}).length} dato(s) pre-llenados desde la carta ${esc(sug.carta||'')}</b>
+        <span style="color:#64748b">(${esc(sug.status||'')})</span> — revísalos: si el vehículo cambió entre la carta y el curse, corrígelos antes de guardar.</div>
+    </div>` : ''}
+    ${d.aviso_parque ? `<div class="card" style="border-left:4px solid #b45309;background:#fffbeb">
+      <div style="font-size:.85rem;color:#92400e"><i class="bi bi-exclamation-triangle-fill"></i> <b>Parque / Calle no calza:</b> ${esc(d.aviso_parque)}</div>
+    </div>` : ''}
     ${falt.length ? `<div class="card">
       <div class="sec-title falt"><i class="bi bi-exclamation-triangle-fill"></i> Datos faltantes (${falt.length})</div>
       <div class="grid">${falt.map(fldHTML).join('')}</div>

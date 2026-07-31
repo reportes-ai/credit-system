@@ -230,8 +230,49 @@ exports.siguiente = async (req, res) => {
       }
     }
     const reqs = REQUERIDOS[tipo];
-    const faltantes = reqs.filter(c => esVacio(c, cr[c], cr));
-    res.json({ success:true, data:{ credito:cr, campos:CAMPOS, requeridos:reqs, faltantes, pendientes, tipo }, error:null });
+    let faltantes = reqs.filter(c => esVacio(c, cr[c], cr));
+
+    /* Sugerencias desde la CARTA DE APROBACIÓN del mismo ID Financiera.
+       El dato ya existe en el sistema: pedirle a una persona que lo teclee de nuevo
+       es trabajo duplicado y una fuente de errores. Se PRE-LLENA solo lo que falta,
+       marcando el origen, y queda editable: entre la carta y el curse el vehículo
+       pudo cambiar, así que la carta sugiere, no manda. */
+    let sugerencias = null, avisoParque = null;
+    try {
+      if (cr.id_financiera) {
+        const [[ca]] = await pool.query(
+          `SELECT op_carta, status, tipo_vehiculo, marca, modelo, anio, patente, vendedor,
+                  parque, rut_dealer, nombre_dealer, plazo
+             FROM cartas_aprobacion
+            WHERE id_financiera = ? ORDER BY id DESC LIMIT 1`, [cr.id_financiera]);
+        if (ca) {
+          const MAPA = { tipo_vehiculo:'tipo_vehiculo', marca:'marca', modelo:'modelo',
+                         anio:'anio', patente:'patente', vendedor:'vendedor', rut_dealer:'rut_dealer' };
+          const s = {};
+          for (const [colCred, colCarta] of Object.entries(MAPA)) {
+            const val = ca[colCarta];
+            if (val === null || val === undefined || String(val).trim() === '') continue;
+            if (esVacio(colCred, cr[colCred], cr)) { cr[colCred] = val; s[colCred] = val; }
+          }
+          // Parque/Calle: la carta dice el parque por nombre; si el crédito no lo tiene,
+          // se deduce PARQUE / CALLE. Es plata (cambia el tramo de comisión del dealer).
+          const parqCarta = String(ca.parque || '').trim().toUpperCase();
+          if (parqCarta) {
+            const esParque = parqCarta !== 'NO APLICA' && parqCarta !== 'CALLE' && parqCarta !== 'S/I';
+            const sugerido = esParque ? 'PARQUE' : 'CALLE';
+            if (esVacio('tipo_ubicacion', cr.tipo_ubicacion, cr)) { cr.tipo_ubicacion = sugerido; s.tipo_ubicacion = sugerido; }
+            else if (String(cr.tipo_ubicacion || '').toUpperCase() !== sugerido)
+              avisoParque = `La carta ${ca.op_carta} dice "${ca.parque}" (${sugerido}) y el crédito quedó como ${cr.tipo_ubicacion}. Afecta la comisión del dealer — verificar.`;
+          }
+          if (Object.keys(s).length || avisoParque)
+            sugerencias = { carta: ca.op_carta, status: ca.status, campos: s };
+        }
+      }
+    } catch (e) { console.error('[digit sugerencias carta]', e.message); }
+
+    // Lo pre-llenado ya no cuenta como faltante (sigue siendo editable y obligatorio al guardar).
+    faltantes = reqs.filter(c => esVacio(c, cr[c], cr));
+    res.json({ success:true, data:{ credito:cr, campos:CAMPOS, requeridos:reqs, faltantes, pendientes, tipo, sugerencias, aviso_parque: avisoParque }, error:null });
   } catch (e) { errSrv(res, e, 'digit siguiente'); }
 };
 
