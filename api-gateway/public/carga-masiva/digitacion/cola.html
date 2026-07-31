@@ -27,6 +27,7 @@
     .fld input:focus, .fld select:focus { outline:none; border-color:var(--navy); }
     .fld.falta label { color:#b91c1c; }
     .fld.falta input, .fld.falta select { border-color:#ef4444; background:#fff5f5; }
+    .fld .hint { font-size:.68rem; color:#64748b; margin-top:3px; line-height:1.35; }
     .fld .tag-falta { color:#b91c1c; font-size:.66rem; font-weight:800; margin-left:6px; }
     .fld .tag-carta { color:#0141A2; background:#eff6ff; border-radius:6px; padding:1px 6px; font-size:.62rem; font-weight:800; margin-left:6px; white-space:nowrap; }
     .fld.desde-carta input, .fld.desde-carta select { border-color:#93c5fd; background:#f8fbff; }
@@ -66,6 +67,22 @@ let ACTUAL = null;   // { id, campos, faltantes }
 function fmtPesoStr(v){ const s=String(v??''); const d=s.replace(/[^\d]/g,''); return (s.trim()===''||d==='') ? '' : '$'+parseInt(d,10).toLocaleString('es-CL'); }
 function fmtPeso(el){ const d=el.value.replace(/[^\d]/g,''); el.value = d ? '$'+parseInt(d,10).toLocaleString('es-CL') : ''; }
 
+// Campos que alimentan un total (se declaran con `suma` en el controller).
+let SUMANDOS = new Set();
+function recalcSumas(){
+  document.querySelectorAll('input[data-suma]').forEach(tot => {
+    const cols = tot.dataset.suma.split(',');
+    let hay = false, acc = 0;
+    cols.forEach(col => {
+      const el = document.getElementById('f_'+col);
+      if (!el) return;
+      const raw = String(el.value||'').replace(/[^0-9-]/g,'');
+      if (raw !== '') { hay = true; acc += Number(raw); }
+    });
+    tot.value = hay ? fmtPesoStr(acc) : '';
+  });
+}
+
 function inputHTML(c, val){
   const v = (val === null || val === undefined) ? '' : val;
   const id = 'f_' + c.col;
@@ -78,7 +95,10 @@ function inputHTML(c, val){
     return `<div style="position:relative"><input id="${id}" type="number" step="0.001" inputmode="decimal" data-pct="1" value="${esc(pv)}" placeholder="0,000" style="padding-right:26px"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.85rem">%</span></div>`;
   }
   if (c.money) {
-    return `<input id="${id}" type="text" inputmode="numeric" data-money="1" value="${esc(fmtPesoStr(v))}" oninput="fmtPeso(this)">`;
+    // Campo total (suma de otros): no se digita, se calcula — un solo motor para el dato.
+    if (c.suma) return `<input id="${id}" type="text" inputmode="numeric" data-money="1" data-suma="${esc(c.suma.join(','))}" value="${esc(fmtPesoStr(v))}" readonly style="background:#f1f5f9;font-weight:700">`;
+    const esSumando = SUMANDOS.has(c.col);
+    return `<input id="${id}" type="text" inputmode="numeric" data-money="1" value="${esc(fmtPesoStr(v))}" oninput="fmtPeso(this)${esSumando?';recalcSumas()':''}">`;
   }
   if (c.col === 'rut_dealer') {
     return `<div style="display:flex;gap:6px">
@@ -120,6 +140,7 @@ function render(d){
   const resto = campos.filter(c => !faltSet.has(c.col));
   // Campos pre-llenados desde la carta de aprobación: se marcan para que el digitador
   // sepa que ese valor NO lo escribió él y pueda corregirlo si el vehículo cambió.
+  SUMANDOS = new Set(d.campos.flatMap(c => c.suma || []));
   const sug = d.sugerencias || null;
   const sugSet = new Set(sug ? Object.keys(sug.campos || {}) : []);
   const fldHTML = (c) => {
@@ -128,6 +149,7 @@ function render(d){
     return `<div class="fld ${isF?'falta':''} ${isS?'desde-carta':''}">
       <label>${esc(c.label)}${isF?'<span class="tag-falta">FALTA</span>':''}${isS?`<span class="tag-carta" title="Pre-llenado desde la carta ${esc(sug.carta||'')}"><i class="bi bi-envelope-paper"></i> desde la carta</span>`:''}</label>
       ${inputHTML(c, cr[c.col], isF)}
+      ${c.hint?`<div class="hint">${esc(c.hint)}</div>`:''}
     </div>`;
   };
   document.getElementById('main').innerHTML = `

@@ -36,7 +36,15 @@ const CAMPOS = [
   { col:'tascli_real',        label:'Tasa Mensual (%)',     tipo:'decimal', pct:true },
   { col:'cuota',              label:'Cuota',               tipo:'number', money:true },
   { col:'fecha_primera_cuota',label:'Fecha 1ª Cuota',      tipo:'date'   },
-  { col:'seguros',            label:'Primas de Seguro',    tipo:'number', money:true },
+  /* Seguros: el crédito guarda el TOTAL (`seguros`) y su desglose en tres primas.
+     Se muestran las tres para que el digitador sepa exactamente qué buscar en el
+     contrato; el total se calcula solo sumándolas (motor único: seguros = RDH +
+     cesantía + rep. menor, como lo arma la carga masiva). */
+  { col:'seguro_rdh',         label:'Prima RDH + Escudo',  tipo:'number', money:true, hint:'Desgravamen y escudo. Si no se contrató, escribe 0.' },
+  { col:'seguro_cesantia',    label:'Prima Cesantía',      tipo:'number', money:true, hint:'Si no se contrató, escribe 0.' },
+  { col:'seguro_rep_menor',   label:'Prima Rep. Menor',    tipo:'number', money:true, hint:'Reparación menor. Si no se contrató, escribe 0.' },
+  { col:'seguros',            label:'Primas de Seguro (total)', tipo:'number', money:true, suma:['seguro_rdh','seguro_cesantia','seguro_rep_menor'],
+    hint:'Se calcula solo: RDH+Escudo + Cesantía + Rep. Menor. Si la operación no llevó seguros, deja los tres en 0.' },
   { col:'comdea_real',        label:'Comisión Dealer',     tipo:'number', money:true },
   { col:'com_parque',         label:'Comisión Parque',     tipo:'number', money:true },
   { col:'monto_comision_fin', label:'Comisión Financiera', tipo:'number', money:true },
