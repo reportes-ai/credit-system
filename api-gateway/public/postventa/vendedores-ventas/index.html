@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!-- v1.0 — Vendedores con Ventas: agrupado por vendedor, detalle al pinchar, filtros y Excel -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vendedores con Ventas — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  input[type=text],select { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; background:#fff; }
+  input[type=text] { min-width:340px; flex:1; }
+  .btnx { border:none; border-radius:9px; padding:8px 15px; font-size:.8rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
+  .btn-gh { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  .chip { background:#f1f5f9; border-radius:9px; padding:5px 11px; font-size:.78rem; color:#334155; }
+  .chip b { color:var(--blue); }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:9px; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; position:sticky; top:0; z-index:2; }
+  td { padding:9px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .num { text-align:right; white-space:nowrap; }
+  tr.grp { cursor:pointer; }
+  tr.grp:hover { background:#f8fbff; }
+  tr.grp.open { background:#eff6ff; }
+  tr.grp td { border-bottom:1px solid #e2e8f0; }
+  .caret { color:var(--blue); transition:transform .15s; display:inline-block; }
+  tr.grp.open .caret { transform:rotate(90deg); }
+  .vend { font-weight:700; color:var(--navy); }
+  .falta { color:#b45309; font-size:.72rem; font-style:italic; }
+  .det td { background:#f8fafc; font-size:.76rem; color:#475569; }
+  .det table { font-size:.76rem; }
+  .det th { background:#e2e8f0; color:#334155; position:static; font-size:.66rem; }
+  a.mail { color:var(--blue); text-decoration:none; } a.mail:hover { text-decoration:underline; }
+  .tot td { background:#f1f5f9; font-weight:800; color:var(--navy); }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Post Venta', href:'/postventa/' },
+  { label:'Vendedores con Ventas', icon:'bi-person-badge', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-person-badge"></i><div>
+    <h2>Vendedores con Ventas</h2>
+    <p>Quién vendió cada mes: operaciones otorgadas y monto por vendedor. <b>Pincha una fila</b> para ver el detalle de sus operaciones.</p>
+  </div></div>
+
+  <div class="card-af">
+    <div class="bar">
+      <select id="fMes" onchange="cargar()"><option value="">Últimos 12 meses</option></select>
+      <input type="text" id="q" placeholder="Buscar en todo: vendedor, RUT, correo, dealer, cliente, N° OP, ejecutivo…" oninput="deb()">
+      <button class="btnx btn-gh" onclick="limpiar()"><i class="bi bi-x-circle"></i> Limpiar</button>
+      <button class="btnx" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+    </div>
+    <div class="bar" style="margin-top:10px"><span class="chip" id="resumen">—</span></div>
+  </div>
+
+  <div class="card-af" style="padding:0;overflow:hidden">
+    <div style="overflow:auto;max-height:70vh">
+      <table>
+        <thead><tr>
+          <th style="width:26px"></th>
+          <th>RUT Vendedor</th><th>Vendedor</th><th>Correo</th><th>Dealer</th>
+          <th class="num">Créditos otorgados</th><th class="num">Monto</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="7" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = v => '$' + Math.round(Number(v||0)).toLocaleString('es-CL');
+const fd  = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesLbl = m => { const p=String(m||'').split('-'); return p.length===2 ? (MESES[+p[1]-1]+' '+p[0]) : m; };
+let DATA = [], GRUPOS = [], MESLIST = [], ABIERTO = new Set();
+
+let tq=null; const deb = () => { clearTimeout(tq); tq=setTimeout(cargar, 350); };
+function limpiar(){ document.getElementById('q').value=''; document.getElementById('fMes').value=''; cargar(); }
+
+async function cargar(){
+  const qs = new URLSearchParams();
+  const q = document.getElementById('q').value.trim();  if (q) qs.set('q', q);
+  const mes = document.getElementById('fMes').value;    if (mes) qs.set('mes', mes);
+  const j = await fetch('/api/postventa/vendedores-ventas?'+qs.toString(), { headers:H }).then(r=>r.json()).catch(()=>null);
+  DATA = (j && j.success) ? j.data : [];
+  if (!MESLIST.length && j && j.meses) {
+    MESLIST = j.meses;
+    document.getElementById('fMes').innerHTML = '<option value="">Últimos 12 meses</option>' +
+      MESLIST.map(m=>`<option value="${m}">${mesLbl(m)}</option>`).join('');
+  }
+  agrupar(); render();
+}
+
+/* El agrupado se arma con las MISMAS filas del detalle: la suma de la cabecera y
+   lo que se ve al abrir no pueden discrepar porque son la misma lista. */
+function agrupar(){
+  const map = new Map();
+  DATA.forEach(r => {
+    const nom = String(r.vendedor_nombre||'').trim() || '(sin vendedor)';
+    const k = nom.toUpperCase() + '|' + String(r.dealer||'').toUpperCase();
+    if (!map.has(k)) map.set(k, { key:k, vendedor:nom, dealer:r.dealer||'—',
+      rut:r.vendedor_rut, mail:r.vendedor_mail, ops:[] });
+    map.get(k).ops.push(r);
+  });
+  GRUPOS = [...map.values()].map(g => ({ ...g, n:g.ops.length,
+    monto: g.ops.reduce((a,x)=>a+Number(x.monto_financiado||0),0) }))
+    .sort((a,b)=> b.n - a.n || b.monto - a.monto);
+}
+
+function render(){
+  const totOps = DATA.length, totMonto = DATA.reduce((a,r)=>a+Number(r.monto_financiado||0),0);
+  const sinId  = GRUPOS.filter(g=>!g.rut && g.vendedor!=='(sin vendedor)').length;
+  document.getElementById('resumen').innerHTML =
+    `<b>${GRUPOS.length}</b> vendedor(es) · <b>${totOps}</b> operación(es) otorgadas · <b>${clp(totMonto)}</b>` +
+    (sinId ? ` · <span style="color:#b45309"><b>${sinId}</b> sin RUT en la base de vendedores</span>` : '');
+
+  document.getElementById('body').innerHTML = GRUPOS.length ? GRUPOS.map(g => {
+    const abierto = ABIERTO.has(g.key);
+    const det = !abierto ? '' : `<tr class="det"><td colspan="7" style="padding:0 9px 12px">
+      <table><thead><tr><th>N° OP</th><th>ID Fin.</th><th>Financiera</th><th>Fecha otorgado</th>
+        <th>Cliente</th><th>RUT Cliente</th><th>Ejecutivo</th><th class="num">Monto</th></tr></thead>
+      <tbody>${g.ops.slice().sort((a,b)=> new Date(b.fecha_otorgado)-new Date(a.fecha_otorgado)).map(o=>`
+        <tr><td><b>${esc(o.num_op)}</b></td><td>${esc(o.id_financiera||'—')}</td>
+          <td>${esc(o.financiera||'—')}</td><td>${fd(o.fecha_otorgado)}</td>
+          <td>${esc(o.cliente||'—')}</td><td>${esc(o.rut_cliente||'—')}</td>
+          <td>${esc(o.ejecutivo||'—')}</td><td class="num">${clp(o.monto_financiado)}</td></tr>`).join('')}
+      </tbody></table></td></tr>`;
+    return `<tr class="grp ${abierto?'open':''}" onclick="toggle('${esc(g.key).replace(/'/g,"\\'")}')">
+      <td><i class="bi bi-caret-right-fill caret"></i></td>
+      <td>${esc(g.rut) || '<span class="falta">no está en la base</span>'}</td>
+      <td class="vend">${esc(g.vendedor)}</td>
+      <td>${g.mail ? `<a class="mail" href="mailto:${esc(g.mail)}" onclick="event.stopPropagation()">${esc(g.mail)}</a>` : '<span class="falta">—</span>'}</td>
+      <td>${esc(g.dealer)}</td>
+      <td class="num"><b>${g.n}</b></td>
+      <td class="num"><b>${clp(g.monto)}</b></td>
+    </tr>` + det;
+  }).join('') + `<tr class="tot"><td colspan="5">TOTAL</td><td class="num">${totOps}</td><td class="num">${clp(totMonto)}</td></tr>`
+   : '<tr><td colspan="7" style="color:#94a3b8;padding:20px">Sin operaciones otorgadas para el filtro.</td></tr>';
+}
+function toggle(k){ ABIERTO.has(k) ? ABIERTO.delete(k) : ABIERTO.add(k); render(); }
+
+function exportar(){
+  const mes = document.getElementById('fMes').value;
+  const wb = XLSX.utils.book_new();
+  // Hoja 1: resumen por vendedor (lo que se ve). Hoja 2: el detalle operación por operación.
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(GRUPOS.map(g=>({
+    'RUT Vendedor':g.rut||'', Vendedor:g.vendedor, Correo:g.mail||'', Dealer:g.dealer,
+    'Créditos otorgados':g.n, Monto:g.monto }))), 'Vendedores');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(DATA.map(r=>({
+    Mes:mesLbl(r.mes), 'RUT Vendedor':r.vendedor_rut||'', Vendedor:r.vendedor_nombre||'',
+    'Correo Vendedor':r.vendedor_mail||'', Dealer:r.dealer, 'RUT Dealer':r.rut_dealer||'',
+    'N° OP':r.num_op, 'ID Financiera':r.id_financiera, Financiera:r.financiera,
+    'Fecha Otorgado':fd(r.fecha_otorgado), Cliente:r.cliente, 'RUT Cliente':r.rut_cliente,
+    Ejecutivo:r.ejecutivo, Monto:Number(r.monto_financiado||0) }))), 'Detalle');
+  XLSX.writeFile(wb, 'vendedores_con_ventas_' + (mes || 'ultimos12m') + '.xlsx');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

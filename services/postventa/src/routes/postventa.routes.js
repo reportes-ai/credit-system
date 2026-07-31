@@ -6,6 +6,10 @@ const c = require('../controllers/postventa.controller');
 
 router.post('/sync',             verifyToken, c.sync);
 router.post('/marcar-historico', verifyToken, c.marcarHistorico);
+// Vendedores con Ventas (controller propio) — quién vendió, cuánto y qué operaciones.
+router.get('/vendedores-ventas', verifyToken, requireFunc('postventa_vendedores_ventas'),
+  require('../controllers/vendedores-ventas.controller').listar);
+
 router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
 router.get('/perfiles-lista', verifyToken, c.getPerfiles);
