@@ -588,7 +588,7 @@
   <h2 id="p32">32. Anular una operación otorgada</h2>
   <p><b>Qué y para qué:</b> dejar sin efecto una operación que ya se cursó (el cliente desistió, la financiera reversó el curse, apareció un problema legal o un fraude). Anular no es solo cambiar un estado: la operación arrastra <b>comisión del dealer comprometida en la cartola</b>, y si esa plata no se retira queda esperando pago sobre un negocio que no existe.</p>
   <div class="meta">
-    <div><b class="lbl">Quién</b><b>Operaciones</b> solicita (<code>operacion_anular_solicitar</code>) · <b>otra persona de Operaciones</b> aprueba o rechaza (<code>operacion_anular_aprobar</code>).</div>
+    <div><b class="lbl">Quién</b><b>Analista de Operaciones</b> solicita (<code>operacion_anular_solicitar</code>) · aprueba o rechaza <b>otro Analista de Operaciones</b> o el <b>Gerente de Operaciones y Crédito</b> (<code>operacion_anular_aprobar</code>).</div>
     <div><b class="lbl">Prerequisitos</b>Operación en estado OTORGADO · el mes de la operación NO puede estar cerrado.</div>
   </div>
   <ol>

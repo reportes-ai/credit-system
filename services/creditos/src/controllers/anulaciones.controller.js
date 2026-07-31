@@ -78,14 +78,20 @@ require('../../../../shared/migrate').enFila('anulaciones-operacion', async () =
       if (!ex && idMod) await pool.query(
         'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)', [idMod, nombre, codigo, href, icono]);
     }
-    // Los tres nacen en los perfiles que hoy operan fundantes/operaciones.
-    // Que una misma persona tenga solicitar y aprobar NO rompe nada: el control es
-    // por USUARIO (quien solicita no puede aprobar), no por perfil.
-    for (const codigo of ['creditos_anulaciones', 'operacion_anular_solicitar', 'operacion_anular_aprobar']) {
+    /* Quién puede qué (definido con Pato, 31-07-2026):
+         solicitar → Analista de Operaciones
+         aprobar   → OTRO Analista de Operaciones, o el Gerente de Operaciones y Crédito
+       Que el analista tenga los dos permisos NO rompe la segregación: el control es
+       por USUARIO (quien solicita no puede aprobar), no por perfil. */
+    const PERM = {
+      creditos_anulaciones:       ['Analista de Operaciones', 'Gerente de Operaciones y Crédito'],
+      operacion_anular_solicitar: ['Analista de Operaciones'],
+      operacion_anular_aprobar:   ['Analista de Operaciones', 'Gerente de Operaciones y Crédito'],
+    };
+    for (const [codigo, perfiles] of Object.entries(PERM)) {
       await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
-        SELECT pp.id_perfil, (SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?), 1
-          FROM permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
-         WHERE f.codigo='fundantes_operaciones' AND pp.habilitado=1`, [codigo]);
+        SELECT p.id_perfil, (SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?), 1
+          FROM perfiles p WHERE p.nombre IN (?)`, [codigo, perfiles]);
     }
   } catch (e) { console.error('[anulaciones migration]', e.message); }
 });
