@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.9 — Cap. 31: incorporar a la cartola las otorgadas sin carta (carga masiva) — quien confirma no aprueba, parque/calle sale de la ficha del dealer -->
+<!-- v4.0 — Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -97,9 +97,14 @@
     <li><b>Subir</b> (Seguimiento Fundantes — Ejecutivo): los documentos que exige la matriz; el sistema los renombra automático (tipo + operación) → Enviar.</li>
     <li><b>Validar</b> (Seguimiento Fundantes — Operaciones): CERRADO aprueba; RECHAZADO con comentario avisa al ejecutivo para corregir y reenviar.</li>
     <li><b>Seguir los fondos:</b> cada etapa queda con fecha — alimenta el flujo de caja y marca sola la etapa FUNDANTES RECIBIDOS del Post Venta.</li>
+    <li><b>Devolución de la FINANCIERA</b> (Historial de Fundantes → botón Devolver, con motivo obligatorio): distinta del rechazo interno — la operación ya estaba cerrada y enviada, pero la financiera la devuelve (ej. un dato mal escrito en el contrato). Vuelve a <b>Fundantes Pendientes</b> para que el mismo ejecutivo corrija y reenvíe por el flujo normal, con campanita a él y a Operaciones.</li>
+    <li><b>Card Fundantes Devueltos</b> (Seguimiento Fundantes): TODAS las operaciones devueltas alguna vez, con su estado ACTUAL (POR CORREGIR / ENVIADO / CERRADO). No salen de la lista al corregirse — la marca queda como historia. Filtro "Solo POR CORREGIR" marcado por defecto + desplegable de ejecutivos.</li>
+    <li><b>Bitácora por operación</b> (pinchar el N° de OP en Devueltos): línea de tiempo con lo que el sistema registró solo (envío, aprobación, rechazo, devolución — sale de la auditoría del módulo, una sola fuente) + comentarios de gestión que cualquiera puede agregar. Ahí se lee por qué se demoró cada operación.</li>
+    <li><b>Pop-up de rendición semanal</b> (automático, en pantalla): al ejecutivo con fundantes PENDIENTES se le abre un pop-up bloqueante — sin comentario de mínimo 3 palabras no se cierra — con su operación pendiente más antigua; el comentario va a la bitácora de la OP. Una vez a la semana por operación; si tiene más casos, el siguiente espera 2 horas. Solo lo ven usuarios con visibilidad acotada (ejecutivos), nunca Admin/Gerencia. Paramétrico en <b>Mantenedores → Correos Programados</b> (fila "Pop-up Fundantes Pendientes"): on/off, días, frecuencia, espera y mínimo de palabras.</li>
   </ol>
   <div class="flujo"><span class="st ini">RECIBIDOS</span><span class="ar">→</span><span class="st">ENVIADOS</span><span class="ar">→</span><span class="st">FONDOS LIBERADOS</span><span class="ar">→</span><span class="st fin">FONDOS RECIBIDOS</span></div>
-  <div class="afecta"><b>Afecta:</b> Post Venta (etapas), flujo de caja. <b>Depende de:</b> originación (§1), matriz de tipos de documento.</div>
+  <div class="flujo"><span class="st fin">CERRADO</span><span class="ar">→ financiera devuelve →</span><span class="st ini">PENDIENTE (POR CORREGIR)</span><span class="ar">→ corrige y reenvía →</span><span class="st">ENVIADO</span><span class="ar">→</span><span class="st fin">CERRADO</span></div>
+  <div class="afecta"><b>Afecta:</b> Post Venta (etapas), flujo de caja. <b>Depende de:</b> originación (§1), matriz de tipos de documento, mantenedor Avisos (campanitas) y Correos Programados (pop-up de rendición).</div>
 
   <h2 id="p3">3. Post Venta: cartola → factura → pago de comisión</h2>
   <p><b>Qué y para qué:</b> pagarle al dealer su comisión, con respaldo tributario y cuadratura exacta.</p>
