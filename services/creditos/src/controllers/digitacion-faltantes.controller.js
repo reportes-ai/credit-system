@@ -59,7 +59,10 @@ const REQUERIDOS = {
               'tipo_vehiculo','marca','modelo','anio','patente'],
   // 'otros' (no otorgados): tasa y plazo NO son requeridos — un rechazado/desistido sin
   // tasa no participa en ningún cálculo de ingresos (decisión 2026-07-11, equivale a "S/I").
-  otros:     ['automotora','rut_dealer'],
+  // El RUT del dealer TAMPOCO se pide (decisión de Pato, 31-07-2026): en las operaciones
+  // que no se cursaron simplemente no lo tenemos, y exigirlo mandaba a digitar un dato
+  // que nadie puede completar. Sin curse no hay comisión, así que no afecta ingresos.
+  otros:     ['automotora'],
 };
 const CAMPO = Object.fromEntries(CAMPOS.map(c => [c.col, c]));
 
