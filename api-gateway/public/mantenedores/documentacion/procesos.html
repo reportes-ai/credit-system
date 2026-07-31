@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.0 — Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
+<!-- v4.1 — Cap. 32: anular operacion otorgada con doble firma de Operaciones y retiro automatico de la comision. Cap. 2: devolucion de fundantes por la financiera (card Devueltos con estado actual), bitacora por OP y pop-up semanal de rendicion al ejecutivo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -70,6 +70,7 @@
     <a href="#p29">29. API Pública para empresas externas</a>
     <a href="#p30">30. Cuadratura de montos contra el Canal AutoFin (Trinidad)</a>
     <a href="#p31">31. Incorporar a la cartola las otorgadas sin carta</a>
+    <a href="#p32">32. Anular una operación otorgada</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -583,6 +584,23 @@
   <div class="afecta"><b>Afecta:</b> la operación (dealer, ubicación, saldo precio, plazo y comisión quedan guardados en <code>creditos</code>), la cartola del dealer y, aguas abajo, su factura y la orden de pago de comisión. <b>Depende de:</b> mantenedor de Dealers (tabla pactada y ccs_parque), Parques y Parámetros de Crédito. <b>Avisa:</b> eventos <code>cartola_incorp_pendiente</code> y <code>cartola_incorp_resuelta</code>, con destinatarios configurables en Mantenedores → Avisos.</div>
   <p style="font-size:.85rem;color:#64748b"><b>Caso real (30-07-2026):</b> julio tenía <b>29</b> operaciones otorgadas fuera de la cartola por <b>$13,5 MM</b> de comisión, y junio arrastraba <b>58</b> por $25,1 MM — el quiebre empieza en junio, cuando la carga masiva pasó a ser la vía principal de ingreso. Con el motor calculando bien, 18 de las 29 calzaban y solo 11 requerían aprobación.<br>
   <b>Pendiente conocido:</b> varios de esos dealers tienen la <b>tabla de comisión vacía</b> en su ficha, así que el motor les aplica la pizarra. Si con alguno hay un <b>porcentaje pactado distinto</b>, cargarlo en el mantenedor de Dealers evita que sus operaciones caigan en excepción todos los meses. Es independiente de este proceso.</p>
+
+  <h2 id="p32">32. Anular una operación otorgada</h2>
+  <p><b>Qué y para qué:</b> dejar sin efecto una operación que ya se cursó (el cliente desistió, la financiera reversó el curse, apareció un problema legal o un fraude). Anular no es solo cambiar un estado: la operación arrastra <b>comisión del dealer comprometida en la cartola</b>, y si esa plata no se retira queda esperando pago sobre un negocio que no existe.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b><b>Operaciones</b> solicita (<code>operacion_anular_solicitar</code>) · <b>otra persona de Operaciones</b> aprueba o rechaza (<code>operacion_anular_aprobar</code>).</div>
+    <div><b class="lbl">Prerequisitos</b>Operación en estado OTORGADO · el mes de la operación NO puede estar cerrado.</div>
+  </div>
+  <ol>
+    <li><b>Solicitar</b> (Créditos → <b>Anular Operación</b>): se busca por N° de operación, ID financiera o RUT del cliente, y se escribe el <b>motivo obligatorio</b>. La solicitud queda PENDIENTE y dispara campanita al pool de Operaciones.</li>
+    <li><b>Aprobar o rechazar</b> (misma pantalla, bandeja inferior): otra persona revisa. Al <b>rechazar</b> se exige motivo y la operación sigue vigente.</li>
+    <li><b>Al aprobar</b>, en un solo acto: el crédito pasa a <b>ANULADO</b> (con el motivo y la fecha agregados a sus comentarios) y se <b>retira su comisión de la cartola</b>, guardando una foto del movimiento retirado para que sea reversible y auditable.</li>
+    <li><b>Si esa cartola ya se envió al dealer</b>, el movimiento <b>NO se toca</b>: el sistema lo informa en pantalla y en la campanita, porque el dealer ya la vio y corresponde regularizarla como <b>descuento</b>, no borrarla a espaldas suyas.</li>
+  </ol>
+  <p><b>Segregación de funciones:</b> quien solicita <b>no puede aprobar</b>, aunque tenga los dos permisos. El bloqueo es por usuario y está en el servidor, así que no depende de cómo queden configurados los perfiles.</p>
+  <div class="flujo"><span class="st ini">OTORGADA</span><span class="ar">→</span><span class="st">ANULACIÓN SOLICITADA</span><span class="ar">→</span><span class="st fin">ANULADA + comisión retirada</span><span class="ar">/</span><span class="st mal">RECHAZADA (sigue vigente)</span></div>
+  <div class="afecta"><b>Afecta:</b> el estado de la operación, la cartola del dealer (y aguas abajo su factura y orden de pago), y todo informe que filtre por estado. <b>Depende de:</b> mes contable abierto, matriz de permisos. <b>Avisa:</b> eventos <code>operacion_anulacion_pendiente</code> y <code>operacion_anulacion_resuelta</code>, configurables en Mantenedores → Avisos.</div>
+  <p style="font-size:.85rem;color:#64748b"><b>Por qué nació (31-07-2026):</b> hasta entonces anular era cambiar el estado a mano en la pantalla de digitación — sin motivo obligatorio, sin segunda firma y sin tocar la cartola. Una auditoría de los movimientos de cartola contra el estado real del crédito encontró <b>3 operaciones anuladas con $1.901.400 de comisión viva</b> esperando pago, más otras nunca otorgadas. Ninguna alcanzó a enviarse. El estado ANULADO sigue existiendo en la digitación, pero <b>la vía correcta es esta pantalla</b>, que es la única que retira la plata.</p>
 
 </body>
 </html>

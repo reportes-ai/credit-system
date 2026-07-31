@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<!-- v1.0 — Anulación de operaciones con aprobación de un segundo par de Operaciones -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anular Operación — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:18px; }
+  .card-af h3 { margin:0 0 12px; font-size:.95rem; color:var(--navy); font-weight:700; }
+  input[type=text],textarea { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; width:100%; }
+  .btnx { border:none; border-radius:9px; padding:8px 16px; font-size:.82rem; font-weight:700; cursor:pointer; background:var(--blue); color:#fff; }
+  .btnx:disabled { background:#cbd5e1; cursor:not-allowed; }
+  .btn-ok { background:#16a34a; } .btn-no { background:#b91c1c; }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:9px; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  td { padding:9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  tbody tr:hover { background:#f8fbff; }
+  .num { text-align:right; white-space:nowrap; }
+  .est { font-size:.7rem; font-weight:700; border-radius:6px; padding:2px 8px; display:inline-block; white-space:nowrap; }
+  .est-PENDIENTE { background:#fef3c7; color:#92400e; }
+  .est-APROBADA  { background:#fee2e2; color:#991b1b; }
+  .est-RECHAZADA { background:#e2e8f0; color:#475569; }
+  .motivo { background:#fffbeb; border-left:3px solid #f59e0b; border-radius:6px; padding:5px 9px; font-size:.74rem; color:#92400e; margin-top:4px; }
+  .nota { background:#eff6ff; border-left:3px solid var(--accent); border-radius:6px; padding:5px 9px; font-size:.73rem; color:#1e40af; margin-top:4px; }
+  .res { border:1.5px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-top:8px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .res.sel { border-color:var(--blue); background:#f0f7ff; }
+  .aviso { background:#fef2f2; border-left:4px solid #b91c1c; border-radius:8px; padding:10px 14px; font-size:.8rem; color:#7f1d1d; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Créditos', href:'/creditos/' },
+  { label:'Anular Operación', icon:'bi-x-octagon', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-x-octagon"></i><div>
+    <h2>Anular Operación</h2>
+    <p>Anular una operación otorgada requiere motivo y la aprobación de <b>otra persona de Operaciones</b>. Al aprobarse, la comisión del dealer se retira automáticamente de la cartola.</p>
+  </div></div>
+
+  <div class="aviso"><b>Por qué existe este flujo:</b> antes se anulaba cambiando el estado a mano en la digitación, sin motivo ni segunda firma, y la comisión quedaba viva en la cartola esperando pago. Aquí queda todo registrado y la plata se retira sola.</div>
+
+  <div class="card-af" id="cardSolicitar" style="display:none">
+    <h3><i class="bi bi-search"></i> 1. Buscar la operación a anular</h3>
+    <input type="text" id="q" placeholder="N° de operación, ID financiera o RUT del cliente…" oninput="buscar()">
+    <div id="resultados"></div>
+    <div id="formSol" style="display:none;margin-top:14px">
+      <label style="font-size:.82rem;font-weight:700;color:var(--navy)">Motivo de la anulación (obligatorio)</label>
+      <textarea id="motivo" rows="2" placeholder="Ej: el cliente desistió y la financiera reversó el curse; vehículo con problema legal…" style="margin-top:5px"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px">
+        <button class="btnx" onclick="solicitar()"><i class="bi bi-send"></i> Enviar a aprobación</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-af">
+    <h3><i class="bi bi-inbox"></i> Solicitudes de anulación</h3>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Estado</th><th>N° OP</th><th>ID Fin.</th><th>Cliente</th><th>Dealer</th><th>Ejecutivo</th>
+          <th class="num">Monto</th><th>Solicitó</th><th>Resolvió</th><th>Acción</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="10" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = v => v==null||v==='' ? '—' : '$'+Number(v).toLocaleString('es-CL');
+const fdh = d => d ? new Date(d).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}) : '—';
+let SEL = null, YO = null, PUEDE = false;
+
+/* ── Solicitar ───────────────────────────────────────────────────────────── */
+let tBusca = null;
+function buscar(){
+  clearTimeout(tBusca);
+  tBusca = setTimeout(async () => {
+    const q = document.getElementById('q').value.trim();
+    const cont = document.getElementById('resultados');
+    if (q.length < 3) { cont.innerHTML=''; return; }
+    const j = await fetch('/api/anulaciones/buscar?q='+encodeURIComponent(q), { headers:H }).then(r=>r.json()).catch(()=>null);
+    const rows = (j && j.success) ? j.data : [];
+    cont.innerHTML = rows.length ? rows.map(r=>`
+      <div class="res" id="res_${r.id}" onclick="elegir(${r.id})" style="cursor:pointer">
+        <b>OP ${esc(r.num_op)}</b>
+        <span style="color:#64748b">ID ${esc(r.id_financiera)||'—'}</span>
+        <span>${esc(r.cliente)||'—'}</span>
+        <span style="color:#64748b">${esc(r.dealer)||'—'}</span>
+        <span class="num" style="margin-left:auto"><b>${clp(r.monto_financiado)}</b></span>
+        ${Number(r.ya_solicitada)?'<span class="est est-PENDIENTE">ya solicitada</span>':''}
+      </div>`).join('') : '<div style="color:#94a3b8;font-size:.82rem;margin-top:8px">Sin operaciones OTORGADAS que coincidan.</div>';
+  }, 300);
+}
+function elegir(id){
+  SEL = id;
+  document.querySelectorAll('.res').forEach(e=>e.classList.remove('sel'));
+  const el = document.getElementById('res_'+id); if (el) el.classList.add('sel');
+  document.getElementById('formSol').style.display = '';
+  document.getElementById('motivo').focus();
+}
+async function solicitar(){
+  const motivo = document.getElementById('motivo').value.trim();
+  if (!SEL) { alert('Elige la operación.'); return; }
+  if (motivo.length < 10) { alert('El motivo es obligatorio y debe explicar por qué se anula.'); return; }
+  const j = await fetch('/api/anulaciones', { method:'POST', headers:H, body:JSON.stringify({ id_credito:SEL, motivo }) })
+    .then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) { alert((j&&j.error)||'No se pudo enviar la solicitud.'); return; }
+  alert('Solicitud enviada. La debe aprobar otra persona de Operaciones.');
+  SEL = null; document.getElementById('q').value=''; document.getElementById('resultados').innerHTML='';
+  document.getElementById('motivo').value=''; document.getElementById('formSol').style.display='none';
+  cargar();
+}
+
+/* ── Bandeja ─────────────────────────────────────────────────────────────── */
+async function cargar(){
+  const j = await fetch('/api/anulaciones', { headers:H }).then(r=>r.json()).catch(()=>null);
+  const rows = (j && j.success) ? j.data : [];
+  YO = j && j.yo; PUEDE = !!(j && j.puede_aprobar);
+  document.getElementById('cardSolicitar').style.display = '';
+  document.getElementById('body').innerHTML = rows.length ? rows.map(r=>{
+    // Segregación de funciones: quien pidió la anulación no puede resolverla.
+    const propia = Number(r.solicitado_por) === Number(YO);
+    const acc = r.estado !== 'PENDIENTE' ? '—'
+      : !PUEDE ? '<span style="color:#94a3b8;font-size:.74rem">sin permiso</span>'
+      : propia ? '<span style="color:#b45309;font-size:.74rem">la pediste tú</span>'
+      : `<button class="btnx btn-ok" style="padding:4px 10px;font-size:.74rem" onclick="resolver(${r.id},'aprobar','${esc(r.num_op)}')">Aprobar</button>
+         <button class="btnx btn-no" style="padding:4px 10px;font-size:.74rem;margin-left:4px" onclick="resolver(${r.id},'rechazar','${esc(r.num_op)}')">Rechazar</button>`;
+    return `<tr>
+      <td><span class="est est-${esc(r.estado)}">${esc(r.estado)}</span></td>
+      <td><b>${esc(r.num_op)}</b></td><td>${esc(r.id_financiera)||'—'}</td>
+      <td>${esc(r.cliente)||'—'}<div style="color:#94a3b8;font-size:.72rem">${esc(r.rut_cliente)||''}</div></td>
+      <td>${esc(r.dealer)||'—'}</td><td>${esc(r.ejecutivo)||'—'}</td>
+      <td class="num">${clp(r.monto_financiado)}</td>
+      <td style="min-width:200px"><div style="font-size:.74rem">${esc(r.solicitado_nombre)||'—'}</div>
+        <div style="color:#94a3b8;font-size:.71rem">${fdh(r.solicitado_at)}</div>
+        <div class="motivo">${esc(r.motivo)}</div></td>
+      <td style="min-width:200px">${r.resuelto_at?`<div style="font-size:.74rem">${esc(r.resuelto_nombre)}</div>
+        <div style="color:#94a3b8;font-size:.71rem">${fdh(r.resuelto_at)}</div>`:'<span style="color:#94a3b8;font-size:.74rem">—</span>'}
+        ${r.motivo_rechazo?`<div class="motivo">${esc(r.motivo_rechazo)}</div>`:''}
+        ${r.cartola_nota?`<div class="nota">${esc(r.cartola_nota)}</div>`:''}</td>
+      <td style="white-space:nowrap">${acc}</td>
+    </tr>`;}).join('') : '<tr><td colspan="10" style="color:#166534;padding:20px">✓ No hay solicitudes de anulación.</td></tr>';
+}
+async function resolver(id, accion, numop){
+  let body = { accion };
+  if (accion === 'rechazar') {
+    const m = prompt('¿Por qué se rechaza la anulación de la OP '+numop+'?');
+    if (m === null) return;
+    if (!m.trim()) { alert('El motivo es obligatorio.'); return; }
+    body.motivo_rechazo = m.trim();
+  } else if (!confirm('¿Anular definitivamente la OP '+numop+'?\n\nEl crédito pasa a ANULADO y su comisión se retira de la cartola.')) return;
+  const j = await fetch('/api/anulaciones/'+id+'/resolver', { method:'POST', headers:H, body:JSON.stringify(body) })
+    .then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) { alert((j&&j.error)||'No se pudo resolver.'); return; }
+  alert(accion==='aprobar' ? ('OP '+numop+' anulada.\n\n'+(j.data.cartola||'')) : ('Anulación de la OP '+numop+' rechazada.'));
+  cargar();
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
