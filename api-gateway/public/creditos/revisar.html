@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.5 — header muestra num_op (las ops del sync no tienen numero_credito) -->
+<!-- v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -473,6 +473,7 @@ async function cargarPagina() {
     renderPagina(_credito, ant, com);
     poblarEstadosParametricos(_credito);
     renderCastigo(_credito);
+    renderAnular(_credito);
   } catch(e) {
     document.getElementById('pageWrap').innerHTML = `<div class="no-data"><i class="bi bi-exclamation-triangle"></i>${e.message}</div>`;
   }
@@ -897,8 +898,52 @@ function renderPagina(c, ant, com) {
       <button id="btnGuardarEstado" class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
       </button>`}
+      <!-- Anular: fuera de los dos brazos del ternario, porque aplica a cualquier
+           operación OTORGADA (brokerage o propia). Lo dibuja renderAnular(). -->
+      <span id="anularSlot"></span>
     </div>
   </div>`;
+}
+
+/* ── Anular Operación ────────────────────────────────────────────────────────
+   La ETAPA pasa a ANULADO, pero no aquí: se SOLICITA y la aprueba otra persona
+   de Operaciones (o el Gerente), y recién ahí se retira la comisión de la cartola.
+   El botón solo aparece en operaciones cuya etapa es OTORGADO.               */
+async function renderAnular(c) {
+  const slot = document.getElementById('anularSlot');
+  if (!slot) return;
+  const etapa = String(c.estado_etapa || c.estado || '').toUpperCase();
+  if (etapa === 'ANULADO') {
+    slot.innerHTML = '<span style="font-size:.8rem;color:#b91c1c;align-self:center;padding:0 6px"><i class="bi bi-x-octagon me-1"></i>Operación anulada</span>';
+    return;
+  }
+  if (etapa !== 'OTORGADO') return;
+  const fs = await misFuncs();
+  if (!_puede('operacion_anular_solicitar', fs)) return;
+  // ¿Ya hay una solicitud pendiente para esta operación?
+  let pend = null;
+  try {
+    const j = await fetch('/api/anulaciones?estado=PENDIENTE', { headers: apiHdr() }).then(r => r.json());
+    pend = (j.data || []).find(x => Number(x.id_credito) === Number(c.id_credito)) || null;
+  } catch (_) {}
+  if (pend) {
+    slot.innerHTML = `<a href="/creditos/anulaciones.html" class="btn-accion" style="background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;text-decoration:none"><i class="bi bi-hourglass-split"></i>Anulación por aprobar</a>`;
+    return;
+  }
+  slot.innerHTML = `<button class="btn-accion" style="background:linear-gradient(135deg,#7f1d1d,#b91c1c);color:#fff" onclick="solicitarAnulacion(${c.id_credito})"><i class="bi bi-x-octagon"></i>Anular Operación</button>`;
+}
+async function solicitarAnulacion(idCredito) {
+  const motivo = prompt('Anular esta operación (la etapa pasará a ANULADO y se retirará la comisión de la cartola).\n\nMotivo (obligatorio):');
+  if (motivo === null) return;
+  if (motivo.trim().length < 10) { alert('El motivo es obligatorio y debe explicar por qué se anula.'); return; }
+  try {
+    const r = await fetch('/api/anulaciones', { method:'POST', headers: apiHdr(),
+      body: JSON.stringify({ id_credito: idCredito, motivo: motivo.trim() }) });
+    const j = await r.json();
+    if (!j.success) { alert(j.error || 'No se pudo enviar la solicitud.'); return; }
+    alert('Solicitud enviada. La debe aprobar otra persona de Operaciones (o el Gerente de Operaciones y Crédito).');
+    location.reload();
+  } catch (_) { alert('No se pudo enviar la solicitud.'); }
 }
 
 /* ── Mora calculation (TMC) ── */
