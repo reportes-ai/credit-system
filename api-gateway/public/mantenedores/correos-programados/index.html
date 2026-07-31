@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Correos Programados — Mantenedor — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 — parámetros propios por mensaje (params JSON) + fila Pop-up Fundantes Pendientes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -136,6 +136,12 @@ function render(){
         <div><label>Hora (Chile)</label><input type="time" id="hora_${i}" value="${esc(String(r.hora||'08:30').slice(0,5))}" ${esAdmin?'':'disabled'}></div>
         <div><label>Días</label><div class="dias" id="dias_${i}">${DIAS.map(([v,l])=>`<span class="dchip ${sel.includes(v)?'on':''}" data-v="${v}" onclick="${esAdmin?`togDia(${i},'${v}',this)`:''}">${l}</span>`).join('')}</div></div>
       </div>
+      ${(function(){ // Parámetros propios del mensaje (JSON {clave:{label,valor}}) — solo si los tiene
+        let p = r.params; try { if (typeof p==='string') p = JSON.parse(p); } catch(_) { p = null; }
+        if (!p || !Object.keys(p).length) return '';
+        return '<div class="grid" style="margin-bottom:12px">' + Object.keys(p).map(k =>
+          `<div><label>${esc(p[k].label||k)}</label><input type="number" min="1" id="prm_${i}_${esc(k)}" value="${esc(p[k].valor)}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem"></div>`).join('') + '</div>';
+      })()}
       <div class="grid" style="margin-bottom:12px">
         <div><label>Destinatarios (separar con comas)</label><textarea id="dest_${i}" ${esAdmin?'':'disabled'}>${esc(r.destinatarios||'')}</textarea></div>
         <div><label>Desde (cuenta remitente)</label><select id="rem_${i}" ${esAdmin?'':'disabled'} style="width:100%;padding:8px 10px;border:1.5px solid #d1d5db;border-radius:8px;font-size:.9rem">${CUENTAS.map(c=>`<option value="${esc(c.clave)}" ${String(r.remitente||'sistema')===c.clave?'selected':''}>${esc(c.label)}</option>`).join('')}</select></div>
@@ -160,8 +166,11 @@ async function guardar(i){
   const destinatarios = document.getElementById('dest_'+i).value.trim();
   const remitente = document.getElementById('rem_'+i).value;
   if (!dias){ toast('Selecciona al menos un día'); return; }
+  let params;   // parámetros propios (si el mensaje los tiene)
+  let pd = r.params; try { if (typeof pd==='string') pd = JSON.parse(pd); } catch(_) { pd = null; }
+  if (pd) { params = {}; for (const k of Object.keys(pd)) { const el = document.getElementById('prm_'+i+'_'+k); if (el) params[k] = Number(el.value); } }
   try {
-    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente }) })).json();
+    const j = await (await fetch('/api/correos-programados/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify({ activo, hora, dias, destinatarios, remitente, params }) })).json();
     if (!j.success) throw new Error(j.error||'Error');
     toast('✓ Guardado');
     cargar();

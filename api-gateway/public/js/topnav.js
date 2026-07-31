@@ -224,6 +224,52 @@
     location.href = '/login.html';
   };
 
+  /* ── Pop-up de rendición de Fundantes Pendientes ────────────────────────────
+     Paramétrico en Mantenedores → Correos Programados ("Pop-up Fundantes
+     Pendientes"). El backend decide si a ESTE usuario le toca rendir una
+     operación (solo ejecutivos, frecuencia semanal por OP, espera entre casos).
+     Es bloqueante: sin comentario de N palabras mínimo no se puede cerrar. */
+  function popupFundantes() {
+    var tk = null; try { tk = sessionStorage.getItem('token'); } catch (_) {}
+    if (!tk) return;
+    fetch('/api/fundantes-seguimiento/popup', { headers: { Authorization: 'Bearer ' + tk } })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        var op = j && j.success && j.data;
+        if (!op) return;
+        var dlg = document.createElement('dialog');
+        dlg.style.cssText = 'border:none;border-radius:16px;padding:0;width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.35)';
+        dlg.innerHTML =
+          '<div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:16px 22px">' +
+            '<div style="font-weight:700;font-size:1rem"><i class="bi bi-exclamation-triangle-fill" style="color:#fbbf24"></i> Fundantes pendientes — OP ' + esc(op.num_op) + '</div>' +
+            '<div style="font-size:.8rem;opacity:.9;margin-top:2px">' + esc(op.financiera || '') + ' · dealer ' + esc(op.dealer || '—') + ' · otorgada hace <b>' + esc(op.dias_pendiente) + ' días</b> sin fundantes cerrados</div></div>' +
+          '<div style="padding:16px 22px;font-family:Segoe UI,system-ui,sans-serif">' +
+            (op.devuelto_motivo ? '<div style="background:#fffbeb;border-left:3px solid #f59e0b;border-radius:6px;padding:6px 10px;font-size:.78rem;color:#92400e;margin-bottom:10px">Devuelta por la financiera: ' + esc(op.devuelto_motivo) + '</div>' : '') +
+            '<div style="font-size:.85rem;color:#334155;margin-bottom:8px">Escribe el estado de esta operación a la fecha (mínimo <b>' + esc(op.min_palabras) + ' palabras</b>). Queda en la bitácora de la OP.</div>' +
+            '<textarea id="afPopFundTxt" rows="3" style="width:100%;box-sizing:border-box;border:1.5px solid #d1d5db;border-radius:9px;padding:8px 11px;font:inherit;font-size:.85rem" placeholder="Qué falta, con quién se está viendo, compromisos…"></textarea>' +
+            '<div id="afPopFundErr" style="color:#b91c1c;font-size:.76rem;min-height:16px;margin-top:4px"></div>' +
+            '<div style="display:flex;justify-content:flex-end;margin-top:6px">' +
+              '<button id="afPopFundBtn" style="border:none;border-radius:9px;padding:8px 18px;font-weight:700;font-size:.85rem;cursor:pointer;background:#0141A2;color:#fff">Grabar en la bitácora</button></div></div>';
+        document.body.appendChild(dlg);
+        dlg.addEventListener('cancel', function (ev) { ev.preventDefault(); });   // ESC no lo cierra
+        dlg.showModal();
+        document.getElementById('afPopFundBtn').onclick = function () {
+          var txt = (document.getElementById('afPopFundTxt').value || '').trim();
+          var err = document.getElementById('afPopFundErr');
+          if (txt.split(/\s+/).filter(Boolean).length < Number(op.min_palabras)) {
+            err.textContent = 'El comentario debe tener al menos ' + op.min_palabras + ' palabras.'; return;
+          }
+          fetch('/api/fundantes-seguimiento/popup/' + op.id + '/comentar', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tk },
+            body: JSON.stringify({ comentario: txt })
+          }).then(function (r) { return r.json(); }).then(function (j2) {
+            if (j2 && j2.success) { dlg.close(); dlg.remove(); }
+            else err.textContent = (j2 && j2.error) || 'No se pudo grabar. Intenta de nuevo.';
+          }).catch(function () { err.textContent = 'No se pudo grabar. Intenta de nuevo.'; });
+        };
+      }).catch(function () {});
+  }
+  setTimeout(popupFundantes, 2500);
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
 })();

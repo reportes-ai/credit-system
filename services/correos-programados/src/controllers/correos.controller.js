@@ -30,6 +30,24 @@ require('../../../../shared/migrate').enFila('correos', async () => {
     )`);
     // Cuenta remitente ("Desde") por correo — evita enviar desde la cuenta equivocada.
     try { await pool.query("ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS remitente VARCHAR(20) NOT NULL DEFAULT 'sistema'"); } catch (_) {}
+    // Parámetros propios de cada mensaje (JSON {clave:{label,valor}}) — el mantenedor
+    // los dibuja como campos numéricos editables. Hoy los usa el pop-up de fundantes.
+    try { await pool.query('ALTER TABLE correos_programados ADD COLUMN IF NOT EXISTS params JSON NULL'); } catch (_) {}
+    // Pop-up Fundantes Pendientes (v163.32): NO es un correo — es un pop-up bloqueante
+    // en pantalla al EJECUTIVO con fundantes pendientes, que lo obliga a comentar el
+    // estado de la operación (va a la bitácora). Vive aquí porque este es el mantenedor
+    // de los mensajes automatizados: activar/suspender, días y parámetros.
+    await pool.query(
+      `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo, params)
+       VALUES (?,?,?,?,?,?,1,?)`,
+      ['popup_fundantes_pendientes', 'Pop-up Fundantes Pendientes (en pantalla)',
+        'No es un correo: es un pop-up bloqueante que se muestra al Ejecutivo Comercial con fundantes pendientes, una vez a la semana por operación, y lo obliga a escribir un comentario con el estado del caso (va a la bitácora de la OP). Si tiene más casos, el siguiente pop-up espera las horas configuradas. La hora no aplica (aparece al usar el sistema); los días marcan cuándo puede aparecer.',
+        '08:30', '1,2,3,4,5', '',
+        JSON.stringify({
+          frecuencia_dias: { label: 'Frecuencia por operación (días)', valor: 7 },
+          espera_horas: { label: 'Espera entre pop-ups (horas)', valor: 2 },
+          min_palabras: { label: 'Mínimo de palabras del comentario', valor: 3 },
+        })]);
     await pool.query(
       `INSERT IGNORE INTO correos_programados (codigo, nombre, descripcion, hora, dias, destinatarios, activo)
        VALUES (?,?,?,?,?,?,0)`,
@@ -677,7 +695,10 @@ async function buildSalud() {
   return { asunto: malos.length ? `⚠️ Salud del Sistema: ${malos.length} alerta(s)` : '💙 Salud del Sistema: todo en orden', html };
 }
 
-const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion, informe_salud_sistema: buildSalud };
+const BUILDERS = { informe_ventas_diario: buildInformeVentas, resumen_ejecutivo_ia: buildResumenEjecutivo, alerta_penetracion_seguros: buildAlertaPenetracion, informe_salud_sistema: buildSalud,
+  // El pop-up de fundantes NO envía correo: se muestra en pantalla (fundantes-seguimiento
+  // lee esta fila). El builder existe solo para que el cron no lo acuse como error.
+  popup_fundantes_pendientes: async () => ({ skip: true, estado: 'es un pop-up en pantalla, no un correo' }) };
 
 /* ── Ejecuta y envía un reporte. auto=true marca el dedup diario. ── */
 async function ejecutarReporte(r, { auto = false } = {}) {
@@ -745,6 +766,17 @@ const actualizar = async (req, res) => {
     if (dias !== undefined) { sets.push('dias=?'); vals.push(String(dias).split(',').map(s => s.trim()).filter(d => /^[1-7]$/.test(d)).join(',')); }
     if (destinatarios !== undefined) { sets.push('destinatarios=?'); vals.push(String(destinatarios || '').trim()); }
     if (remitente !== undefined && cuentasRemitente().some(c => c.clave === remitente)) { sets.push('remitente=?'); vals.push(remitente); }
+    // Parámetros propios ({clave: valor numérico}): se actualiza SOLO el valor,
+    // las claves y labels los define el seed (no se pueden inventar desde la UI).
+    const params = (req.body || {}).params;
+    if (params && typeof params === 'object') {
+      const [[cur]] = await pool.query('SELECT params FROM correos_programados WHERE codigo=?', [req.params.codigo]);
+      const p = cur && cur.params ? (typeof cur.params === 'string' ? JSON.parse(cur.params) : cur.params) : null;
+      if (p) {
+        for (const k of Object.keys(p)) if (params[k] !== undefined && isFinite(Number(params[k])) && Number(params[k]) > 0) p[k].valor = Number(params[k]);
+        sets.push('params=?'); vals.push(JSON.stringify(p));
+      }
+    }
     if (!sets.length) return res.status(400).json({ success: false, data: null, error: 'Nada que actualizar' });
     vals.push(req.params.codigo);
     await pool.query(`UPDATE correos_programados SET ${sets.join(', ')} WHERE codigo=?`, vals);

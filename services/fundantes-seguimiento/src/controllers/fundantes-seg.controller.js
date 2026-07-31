@@ -68,6 +68,18 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
         created_at DATETIME DEFAULT NOW(),
         INDEX idx_cred (id_credito)
       )`);
+    /* Log del pop-up semanal al ejecutivo: una fila por comentario grabado desde
+       el pop-up (usuario × operación). Con esto se sabe qué operación ya rindió
+       cuentas esta semana y cuándo fue el último pop-up (espera entre casos). */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fundantes_popup_log (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario INT NOT NULL,
+        id_credito INT NOT NULL,
+        created_at DATETIME DEFAULT NOW(),
+        INDEX idx_usr (id_usuario, created_at),
+        INDEX idx_cred (id_credito, created_at)
+      )`);
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_seg_docs (
         id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -493,6 +505,80 @@ const devueltos = async (req, res) => {
   } catch (e) { console.error('[fundantes devueltos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ─── Pop-up semanal de rendición al ejecutivo ────────────────────────────────
+   Una vez a la semana (paramétrico en Mantenedores → Correos Programados, fila
+   "Pop-up Fundantes Pendientes") a cada EJECUTIVO con fundantes pendientes se le
+   muestra un pop-up bloqueante que lo obliga a comentar el estado de UNA de sus
+   operaciones (mínimo N palabras). El comentario va a la bitácora de la OP.
+   Si tiene más casos, el siguiente pop-up espera X horas. Solo aplica a usuarios
+   con visibilidad acotada (ejecutivos); Admin/Gerencia nunca lo ven.            */
+async function popupConfig() {
+  try {
+    const [[r]] = await pool.query(
+      "SELECT activo, dias, params FROM correos_programados WHERE codigo='popup_fundantes_pendientes'");
+    if (!r || !r.activo) return null;
+    const p = typeof r.params === 'string' ? JSON.parse(r.params || '{}') : (r.params || {});
+    const v = (k, d) => Number((p[k] && p[k].valor) != null ? p[k].valor : d) || d;
+    return { dias: String(r.dias || '1,2,3,4,5').split(',').map(s => s.trim()),
+             frecuencia_dias: v('frecuencia_dias', 7), espera_horas: v('espera_horas', 2), min_palabras: v('min_palabras', 3) };
+  } catch (_) { return null; }
+}
+const dowChile = () => {
+  const d = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Santiago', weekday: 'short' }).format(new Date());
+  return String({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[d] || 0);
+};
+
+/* GET /popup → el caso que el ejecutivo debe comentar ahora, o null. */
+const popup = async (req, res) => {
+  const nada = () => res.json({ success: true, data: null, error: null });
+  try {
+    const cfg = await popupConfig();
+    if (!cfg || !cfg.dias.includes(dowChile())) return nada();
+    const vis = await ejecutivosVisibles(req);
+    if (vis.all || !vis.lista || !vis.lista.length) return nada();      // solo ejecutivos acotados
+    // Espera entre casos: desde el último comentario grabado vía pop-up.
+    const [[ult]] = await pool.query(
+      'SELECT MAX(created_at) t FROM fundantes_popup_log WHERE id_usuario=?', [req.usuario.id_usuario]);
+    if (ult && ult.t && (Date.now() - new Date(ult.t).getTime()) < cfg.espera_horas * 3600e3) return nada();
+    // La operación pendiente más antigua que no ha rendido cuentas esta semana.
+    const [[op]] = await pool.query(`
+      SELECT c.id, c.num_op, c.id_financiera, c.financiera, c.fecha_otorgado,
+             DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias_pendiente,
+             COALESCE(c.automotora,'') AS dealer, fs.devuelto_motivo
+        FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
+       WHERE c.fecha_otorgado IS NOT NULL AND UPPER(c.financiera) IN (?)
+         AND COALESCE(fs.estado,'PENDIENTE') = 'PENDIENTE'
+         AND UPPER(c.ejecutivo) IN (?)
+         AND NOT EXISTS (SELECT 1 FROM fundantes_popup_log l
+                          WHERE l.id_credito = c.id AND l.id_usuario = ?
+                            AND l.created_at > DATE_SUB(NOW(), INTERVAL ? DAY))
+       ORDER BY c.fecha_otorgado ASC LIMIT 1`,
+      [FINANCIERAS, vis.lista.map(x => String(x).toUpperCase()), req.usuario.id_usuario, cfg.frecuencia_dias]);
+    if (!op) return nada();
+    res.json({ success: true, data: { ...op, min_palabras: cfg.min_palabras }, error: null });
+  } catch (e) { console.error('[fundantes popup]', e.message); nada(); }
+};
+
+/* POST /popup/:id/comentar → graba el comentario obligatorio en la bitácora. */
+const popupComentar = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const comentario = String((req.body || {}).comentario || '').trim();
+    const cfg = await popupConfig();
+    const min = (cfg && cfg.min_palabras) || 3;
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
+    if (comentario.split(/\s+/).filter(Boolean).length < min)
+      return res.status(400).json({ success: false, data: null, error: `El comentario debe tener al menos ${min} palabras.` });
+    const [[op]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    await pool.query('INSERT INTO fundantes_bitacora (id_credito, comentario, autor, id_autor) VALUES (?,?,?,?)',
+      [id, comentario, nombreUsuario(req), req.usuario.id_usuario || null]);
+    await pool.query('INSERT INTO fundantes_popup_log (id_usuario, id_credito) VALUES (?,?)',
+      [req.usuario.id_usuario, id]);
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[fundantes popupComentar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ─── Bitácora de la operación ────────────────────────────────────────────────
    GET  /:id/bitacora  → línea de tiempo: lo que el sistema registró solo
         (auditoría del módulo, una sola fuente) + los comentarios de gestión.
@@ -746,4 +832,4 @@ const historial = async (req, res) => {
   } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar };
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar };

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — Devueltos: columna Estado (el mismo del flujo de fundantes) y las operaciones NO salen de la lista al corregirse -->
+<!-- v1.3 — filtro "Solo POR CORREGIR" (marcado por defecto) + desplegable de ejecutivos -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -63,6 +63,11 @@
   <div class="card-af">
     <div class="bar">
       <input type="text" id="q" placeholder="Buscar por OP, ID, RUT, cliente, ejecutivo o dealer…" oninput="render()">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:#b91c1c;cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="soloCorr" checked onchange="render()" style="accent-color:#b91c1c;width:15px;height:15px"> Solo POR CORREGIR</label>
+      <select id="fEjec" onchange="render()" style="border:1.5px solid #d1d5db;border-radius:9px;padding:7px 10px;font-size:.82rem;background:#fff">
+        <option value="">Todos los ejecutivos</option>
+      </select>
       <span id="cnt" style="font-size:.8rem;color:#64748b"></span>
       <button class="btnx" style="margin-left:auto" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
     </div>
@@ -111,13 +116,23 @@ async function cargar(){
   const j = await fetch('/api/fundantes-seguimiento/devueltos', { headers:{ Authorization:'Bearer '+token } })
     .then(r=>r.json()).catch(()=>null);
   DATA = (j && j.success) ? j.data : [];
+  // Lista desplegable de ejecutivos presentes en el listado
+  const sel = document.getElementById('fEjec'), prev = sel.value;
+  const ejs = [...new Set(DATA.map(r=>r.ejecutivo).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los ejecutivos</option>' + ejs.map(e=>`<option value="${esc(e)}">${esc(e)}</option>`).join('');
+  sel.value = ejs.includes(prev) ? prev : '';
   render();
 }
 
 function render(){
   const q = (document.getElementById('q').value||'').toLowerCase().trim();
-  const f = !q ? DATA : DATA.filter(r => [r.num_op,r.id_financiera,r.rut_cliente,r.cliente,r.ejecutivo,r.dealer,r.parque]
-    .some(v => String(v||'').toLowerCase().includes(q)));
+  const soloCorr = document.getElementById('soloCorr').checked;
+  const ej = document.getElementById('fEjec').value;
+  const f = DATA.filter(r =>
+    (!soloCorr || r.estado==='PENDIENTE') &&
+    (!ej || r.ejecutivo===ej) &&
+    (!q || [r.num_op,r.id_financiera,r.rut_cliente,r.cliente,r.ejecutivo,r.dealer,r.parque]
+      .some(v => String(v||'').toLowerCase().includes(q))));
   const porCorregir = f.filter(r=>r.estado==='PENDIENTE').length;
   document.getElementById('cnt').textContent = f.length + ' operación(es) · ' + porCorregir + ' por corregir' +
     (f.length ? ' · saldo precio ' + clp(f.reduce((a,r)=>a+Number(r.saldo_precio||0),0)) : '');
