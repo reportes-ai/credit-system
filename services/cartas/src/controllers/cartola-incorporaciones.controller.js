@@ -197,7 +197,12 @@ async function aplicar(f, usuario) {
     [f.nombre_dealer || null, f.rut_dealer || null, f.es_parque ? 'PARQUE' : 'CALLE',
      Number(f.saldo_precio) || 0, Number(f.plazo) || 0, Number(f.comision) || 0, c.id]);
   // 2) Movimiento de cartola (id_carta NULL = incorporada sin carta)
-  const [[cli]] = await pool.query('SELECT rut, TRIM(CONCAT(COALESCE(nombres,"")," ",COALESCE(apellido_paterno,""))) nom FROM clientes WHERE id_cliente = ?', [c.id_cliente]).catch(() => [[{}]]);
+  // nombre_completo es la columna poblada en `clientes`; los campos separados
+  // (nombres/apellido_paterno) están vacíos en buena parte de la base.
+  const [[cli]] = await pool.query(
+    `SELECT rut, COALESCE(NULLIF(nombre_completo,''),
+              NULLIF(TRIM(CONCAT(COALESCE(nombres,''),' ',COALESCE(apellido_paterno,''))),'')) AS nom
+       FROM clientes WHERE id_cliente = ?`, [c.id_cliente]).catch(() => [[{}]]);
   await pool.query(
     `INSERT INTO cartolas_movimientos (mes, id_carta, num_op, movimiento, rut_dealer, nombre_dealer,
        ejecutivo, nombre_cliente, rut_cliente, saldo, comision, estado_comision, observaciones)

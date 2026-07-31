@@ -460,7 +460,10 @@ const devueltos = async (req, res) => {
     const [rows] = await pool.query(`
       SELECT c.num_op, c.id_financiera, c.financiera, c.ejecutivo,
              cl.rut AS rut_cliente,
-             TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''),' ',COALESCE(cl.apellido_materno,''))) AS cliente,
+             -- nombre_completo es la columna poblada (18.604 de 18.619); los campos
+             -- separados solo existen en 13.139. Se concatena únicamente si falta.
+             COALESCE(NULLIF(cl.nombre_completo,''),
+                      NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''),' ',COALESCE(cl.apellido_materno,''))),'')) AS cliente,
              COALESCE(c.automotora,'') AS dealer, COALESCE(c.parque,'') AS parque,
              c.monto_financiado, c.saldo_precio, c.fecha_otorgado,
              fs.devuelto_motivo, fs.devuelto_at, fs.devuelto_por, fs.devoluciones
