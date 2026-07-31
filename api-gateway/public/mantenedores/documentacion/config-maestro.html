@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 -->
+<!-- v2.2 — Dealers: la tabla de comision pactada manda sobre la pizarra; ficha vacia = excepcion todos los meses en la cartola -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -95,6 +95,7 @@
     <tr><td>Comisiones Variables</td><td>Parámetros del cálculo mensual de ejecutivos: piso, incentivos, metas (meta Unidad incluida) y ajustes por calidad.</td></tr>
     <tr><td>Backups / Suplencias</td><td>Quién hereda funciones, alertas y correos de un titular ausente.</td></tr>
     <tr><td>Bono Jefe Comercial</td><td>Variables del BSC y curva del premio (restringido).</td></tr>
+    <tr><td>Dealers → tabla de comisión</td><td>El <b>porcentaje pactado</b> de cada dealer por tramo de plazo, separado en parque y calle (<code>com_*</code> / <code>com_parque_*</code>). <b>Manda sobre la pizarra</b> de Parámetros de Crédito: si la ficha está vacía, el motor aplica la pizarra. Un dealer con pactado distinto y ficha vacía hace que <b>sus operaciones caigan en excepción todos los meses</b> al incorporarlas a la cartola (ver Manual de Procesos, cap. 31). También aquí se define si es <b>parque o calle</b> (<code>ccs_parque</code>), que es el dato que manda sobre lo que traiga la carga masiva.</td></tr>
   </table>
 
   <h2>Inteligencia Artificial</h2>

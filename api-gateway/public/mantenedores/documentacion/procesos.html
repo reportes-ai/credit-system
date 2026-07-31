@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.8 — Cap. 30: cuadratura de montos contra el Canal AutoFin (Trinidad); la columna Comision Dealer del export NO es nuestra comision -->
+<!-- v3.9 — Cap. 31: incorporar a la cartola las otorgadas sin carta (carga masiva) — quien confirma no aprueba, parque/calle sale de la ficha del dealer -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -69,6 +69,7 @@
     <a href="#p28">28. Workflows y Escalamiento (transversal)</a>
     <a href="#p29">29. API Pública para empresas externas</a>
     <a href="#p30">30. Cuadratura de montos contra el Canal AutoFin (Trinidad)</a>
+    <a href="#p31">31. Incorporar a la cartola las otorgadas sin carta</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -556,7 +557,27 @@
   <p><b>Ojo con el importador</b>: Carga Trinidad <b>solo rellena campos vacíos</b> (<code>!(Number(r[c]) &gt; 0)</code>) — es una guarda deliberada para que una carga no pise montos ya liquidados. Por eso <b>volver a subir el archivo NO corrige</b> una operación con monto errado: la corrección es deliberada y acotada a las operaciones detectadas.</p>
   <div class="flujo"><span class="st ini">EXPORT TRINIDAD</span><span class="ar">→</span><span class="st">CRUCE POR id_financiera</span><span class="ar">→</span><span class="st">DIFERENCIAS &gt; $1.000</span><span class="ar">→</span><span class="st">CORRECCIÓN + CUOTA</span><span class="ar">→</span><span class="st fin">RECÁLCULO DEL MES</span></div>
   <div class="afecta"><b>Afecta:</b> cuota, comisión del dealer, rentabilidad de la operación, cartola del dealer y la orden de pago de su comisión. <b>Depende de:</b> mes abierto (Meses Cerrados) y de los mantenedores de Tasas y comisión por dealer.</div>
-  <p style="font-size:.85rem;color:#64748b"><b>Caso real (30-07-2026):</b> de 57 operaciones cursadas en julio, <b>3</b> tenían diferencias reales de monto. La OP <b>89246</b> estaba inflada en $7,5 millones (financiado 19.939.048 en vez de 12.465.443, con pie y saldo precio igualmente inflados); su comisión de dealer estaba calculada sobre el saldo viejo, o sea medio millón de más. Las otras 54 solo diferían en $1 por redondeo.</p>
+  <p style="font-size:.85rem;color:#64748b" id="p30caso"><b>Caso real (30-07-2026):</b> de 57 operaciones cursadas en julio, <b>3</b> tenían diferencias reales de monto. La OP <b>89246</b> estaba inflada en $7,5 millones (financiado 19.939.048 en vez de 12.465.443, con pie y saldo precio igualmente inflados); su comisión de dealer estaba calculada sobre el saldo viejo, o sea medio millón de más. Las otras 54 solo diferían en $1 por redondeo.</p>
+
+  <h2 id="p31">31. Incorporar a la cartola las otorgadas sin carta</h2>
+  <p><b>Qué y para qué:</b> la cartola del dealer se construye desde las <b>cartas de aprobación</b>. Una operación que entró por <b>carga masiva</b> no genera carta, así que su comisión nunca aparecía en la cartola: el dealer no la veía ni la facturaba. Este proceso las incorpora, confirmando a mano los datos que la carga masiva no trae confiables.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b><b>Analista de Operaciones</b> confirma e incorpora (<code>cartola_incorporar</code>) · <b>Analista de Crédito</b> aprueba las que quedan con excepción (<code>cartola_incorp_aprobar</code>).</div>
+    <div><b class="lbl">Prerequisitos</b>Operación OTORGADA del mes, sin carta y sin movimiento en cartola. Mantenedores de Dealers, Parques y Parámetros de Crédito al día: de ahí sale la comisión que corresponde.</div>
+  </div>
+  <ol>
+    <li><b>Abrir</b> Post Venta → Cartolas → botón <b>"Otorgadas sin carta"</b>, que trae un <b>contador</b> de cuántas hay en el mes seleccionado.</li>
+    <li><b>Confirmar cada fila</b> (todo editable): <b>dealer</b> —con autocompletado contra los dealers del sistema; al elegir uno se traen su <b>RUT</b> y si es parque—, <b>ubicación</b>, <b>saldo precio</b>, <b>plazo</b> y <b>comisión</b>.</li>
+    <li><b>Mirar la columna "Corresponde"</b>: la comisión según el <b>motor único</b> (tabla pactada del dealer si la tiene, si no la pizarra) para ese saldo, plazo y parque/calle. Se recalcula al vuelo al editar cualquier campo.</li>
+    <li><b>Incorporar</b>: las filas cuya comisión <b>calza</b> entran directo a la cartola; las que <b>difieren</b> quedan <b>PENDIENTE</b> y disparan campanita al analista de crédito.</li>
+    <li><b>Aprobar o rechazar</b> (sub-tab <b>"Incorporaciones por aprobar"</b>): el analista ve la diferencia en pesos y la excepción redactada, y resuelve con <b>comentario obligatorio</b>. Al aprobar, los valores quedan guardados en la operación y recién ahí se crea el movimiento de cartola.</li>
+  </ol>
+  <div class="max" style="background:#eff6ff;border-left:4px solid #0141A2"><b>De dónde sale cada dato (importante):</b> la carga masiva <b>no trae confiable si el dealer es parque o calle</b>, así que ese valor se toma de la <b>ficha del dealer</b> (<code>dealers.ccs_parque</code>), que es un registro mantenido; el crédito queda solo de respaldo. Si ambos discrepan, la fila se marca en ámbar y bajo el selector se indica de dónde salió el valor. <b>El RUT del dealer es la llave</b> con que el motor encuentra su tabla pactada: por eso el autocompletado lo trae junto con el nombre — escribir el nombre a mano dejaría el cálculo cayendo a la pizarra equivocada.</div>
+  <p><b>Segregación de funciones:</b> quien solicita una incorporación <b>no puede aprobársela</b>, aunque tenga ambos permisos (el perfil Analista de Operaciones hereda el de aprobar desde <code>aprob_revisar</code>). El bloqueo está en el servidor y no depende de cómo estén configurados los permisos.</p>
+  <div class="flujo"><span class="st ini">OTORGADA SIN CARTA</span><span class="ar">→</span><span class="st">CONFIRMACIÓN DE DATOS</span><span class="ar">→</span><span class="st fin">CALZA: A CARTOLA</span><span class="ar">/</span><span class="st">DIFIERE: PENDIENTE</span><span class="ar">→</span><span class="st fin">APROBADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span></div>
+  <div class="afecta"><b>Afecta:</b> la operación (dealer, ubicación, saldo precio, plazo y comisión quedan guardados en <code>creditos</code>), la cartola del dealer y, aguas abajo, su factura y la orden de pago de comisión. <b>Depende de:</b> mantenedor de Dealers (tabla pactada y ccs_parque), Parques y Parámetros de Crédito. <b>Avisa:</b> eventos <code>cartola_incorp_pendiente</code> y <code>cartola_incorp_resuelta</code>, con destinatarios configurables en Mantenedores → Avisos.</div>
+  <p style="font-size:.85rem;color:#64748b"><b>Caso real (30-07-2026):</b> julio tenía <b>29</b> operaciones otorgadas fuera de la cartola por <b>$13,5 MM</b> de comisión, y junio arrastraba <b>58</b> por $25,1 MM — el quiebre empieza en junio, cuando la carga masiva pasó a ser la vía principal de ingreso. Con el motor calculando bien, 18 de las 29 calzaban y solo 11 requerían aprobación.<br>
+  <b>Pendiente conocido:</b> varios de esos dealers tienen la <b>tabla de comisión vacía</b> en su ficha, así que el motor les aplica la pizarra. Si con alguno hay un <b>porcentaje pactado distinto</b>, cargarlo en el mantenedor de Dealers evita que sus operaciones caigan en excepción todos los meses. Es independiente de este proceso.</p>
 
 </body>
 </html>
