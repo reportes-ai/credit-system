@@ -579,6 +579,7 @@ const PAGINAS = [
   ['/postventa/orden-pago', 'postventa/orden-pago/index.html'],
   ['/postventa/fundantes-pendientes', 'postventa/fundantes-pendientes/index.html'],
   ['/fundantes-seguimiento/historial', 'fundantes-seguimiento/historial.html'],
+  ['/fundantes-seguimiento/devueltos', 'fundantes-seguimiento/devueltos.html'],
   ['/postventa/consulta-saldos', 'postventa/consulta-saldos/index.html'],
   ['/postventa/consulta-factura', 'postventa/consulta-factura/index.html'],
   ['/ordenes-pago', 'ordenes-pago/index.html'],

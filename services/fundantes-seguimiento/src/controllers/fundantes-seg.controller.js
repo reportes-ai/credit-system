@@ -43,6 +43,18 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
         updated_at         DATETIME DEFAULT NOW() ON UPDATE NOW(),
         INDEX idx_estado (estado)
       )`);
+    /* Devolución de la FINANCIERA: distinta del rechazo interno de Operaciones.
+       La operación ya estaba cerrada y enviada, pero la financiera la devuelve →
+       vuelve a PENDIENTE para que el ejecutivo corrija, y queda marcada para la
+       card "Fundantes Devueltos". El estado NO alcanza: al volver a PENDIENTE se
+       confundiría con una operación que nunca se envió. */
+    for (const ddl of [
+      "ALTER TABLE fundantes_seg ADD COLUMN devuelto_fin TINYINT NOT NULL DEFAULT 0",
+      "ALTER TABLE fundantes_seg ADD COLUMN devuelto_motivo VARCHAR(600) NULL",
+      "ALTER TABLE fundantes_seg ADD COLUMN devuelto_at DATETIME NULL",
+      "ALTER TABLE fundantes_seg ADD COLUMN devuelto_por VARCHAR(150) NULL",
+      "ALTER TABLE fundantes_seg ADD COLUMN devoluciones INT NOT NULL DEFAULT 0",
+    ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes devolucion]', e.message); } }
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_seg_docs (
         id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -395,6 +407,72 @@ const enviar = async (req, res) => {
 
 /* ─── POST /api/fundantes-seguimiento/:id/validar — Operaciones aprueba/rechaza ──
    { accion:'aprobar'|'rechazar', comentario }. Rechazo exige comentario. (route: requireFunc fundantes_validar) */
+AVISOS.registrarAviso({
+  evento: 'fundantes_devuelto', nombre: 'Fundantes DEVUELTOS por la financiera', modulo: 'Fundantes',
+  descripcion: 'La financiera devolvió los fundantes de una operación ya enviada. Vuelve a PENDIENTE y el ejecutivo debe corregir y reenviar. Avisa al ejecutivo y al pool de Operaciones.',
+  base_func: 'fundantes_seguimiento,fundantes_validar,fundantes_operaciones', prioridad: 'alta', sonido_tipo: 'dingdong',
+});
+
+/* ─── POST /api/fundantes-seguimiento/:id/devolver ────────────────────────────
+   La FINANCIERA devuelve los fundantes de una operación que ya habíamos cerrado
+   y enviado. Distinto del rechazo interno de Operaciones (que ocurre ANTES de
+   salir). Vuelve a PENDIENTE —para que el ejecutivo corrija y reenvíe— y queda
+   marcada como devuelta, que es lo que alimenta la card "Fundantes Devueltos".  */
+const devolver = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const motivo = String((req.body || {}).motivo || '').trim();
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
+    if (!motivo) return res.status(400).json({ success: false, data: null, error: 'Indica el motivo por el que la financiera devolvió los fundantes.' });
+    const [[op]] = await pool.query('SELECT id, num_op, financiera, ejecutivo FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    const [[fs]] = await pool.query('SELECT estado, id_enviado_por FROM fundantes_seg WHERE id_credito=?', [id]);
+    const estadoActual = (fs && fs.estado) || 'PENDIENTE';
+    if (estadoActual === 'PENDIENTE')
+      return res.status(409).json({ success: false, data: null, error: 'La operación ya está en Fundantes Pendientes.' });
+
+    await pool.query(
+      `INSERT INTO fundantes_seg (id_credito, estado, devuelto_fin, devuelto_motivo, devuelto_at, devuelto_por, devoluciones)
+       VALUES (?, 'PENDIENTE', 1, ?, NOW(), ?, 1)
+       ON DUPLICATE KEY UPDATE estado='PENDIENTE', devuelto_fin=1, devuelto_motivo=VALUES(devuelto_motivo),
+         devuelto_at=NOW(), devuelto_por=VALUES(devuelto_por), devoluciones=devoluciones+1,
+         fecha_validacion=NULL, validado_por=NULL, id_validado_por=NULL`,
+      [id, motivo, nombreUsuario(req)]);
+
+    auditar({ req, accion: 'DEVOLVER_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
+      detalle: `La financiera devolvió los fundantes de la OP ${op.num_op} (estaba en ${estadoActual}) — ${motivo}`,
+      meta: { estado_anterior: estadoActual, motivo } });
+
+    AVISOS.avisar('fundantes_devuelto', {
+      titulo: '↩️ Fundantes devueltos por la financiera — OP ' + op.num_op,
+      mensaje: `${op.financiera || 'La financiera'} devolvió los fundantes de la OP ${op.num_op}. Motivo: ${motivo}. La operación volvió a Fundantes Pendientes para corregir y reenviar.`,
+      href: '/fundantes-seguimiento/',
+    }, { excluir: [req.usuario.id_usuario], extra: fs && fs.id_enviado_por ? [fs.id_enviado_por] : [] }).catch(() => {});
+
+    res.json({ success: true, data: { estado: 'PENDIENTE', estado_anterior: estadoActual }, error: null });
+  } catch (e) { console.error('[fundantes devolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ─── GET /api/fundantes-seguimiento/devueltos ────────────────────────────────
+   Listado de las operaciones devueltas por la financiera que siguen pendientes. */
+const devueltos = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT c.num_op, c.id_financiera, c.financiera, c.ejecutivo,
+             cl.rut AS rut_cliente,
+             TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''),' ',COALESCE(cl.apellido_materno,''))) AS cliente,
+             COALESCE(c.automotora,'') AS dealer, COALESCE(c.parque,'') AS parque,
+             c.monto_financiado, c.saldo_precio, c.fecha_otorgado,
+             fs.devuelto_motivo, fs.devuelto_at, fs.devuelto_por, fs.devoluciones
+        FROM fundantes_seg fs
+        JOIN creditos c   ON c.id = fs.id_credito
+        LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+       WHERE fs.devuelto_fin = 1 AND fs.estado = 'PENDIENTE'
+       ORDER BY fs.devuelto_at DESC`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[fundantes devueltos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 const validar = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -604,4 +682,4 @@ const historial = async (req, res) => {
   } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs };
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos };

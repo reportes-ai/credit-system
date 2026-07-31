@@ -7,6 +7,8 @@ const c = require('../controllers/fundantes-seg.controller');
 
 router.get('/',                         verifyToken, c.listar);
 router.get('/resumen',                  verifyToken, c.resumen);
+router.get('/devueltos',                verifyToken, c.devueltos);
+router.post('/:id/devolver',            verifyToken, requireFunc('fundantes_validar', 'fundantes_operaciones'), c.devolver);
 router.get('/historial',                verifyToken, requireFunc('fundantes_historial', 'fundantes_operaciones', 'fundantes_validar'), c.historial);
 router.get('/doc/:docId/download',      verifyToken, c.descargar);
 router.get('/:id/docs',                 verifyToken, c.listarDocs);

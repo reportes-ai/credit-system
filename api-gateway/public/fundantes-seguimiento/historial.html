@@ -84,6 +84,22 @@ async function cargar(){
   DATA = (j && j.success) ? j.data : [];
   render();
 }
+/* La FINANCIERA devuelve los fundantes de una operación ya cerrada: vuelve a
+   PENDIENTE para que el ejecutivo corrija y reenvíe, y entra al listado de
+   Fundantes Devueltos. El motivo es obligatorio y queda en la auditoría. */
+async function devolver(id, numop){
+  const motivo = prompt('Devolver a Fundantes Pendientes la OP ' + numop + '. Motivo por el que la financiera los devolvió (obligatorio):');
+  if (motivo === null) return;
+  if (!motivo.trim()) { alert('El motivo es obligatorio.'); return; }
+  const r = await fetch('/api/fundantes-seguimiento/' + id + '/devolver', {
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+    body: JSON.stringify({ motivo: motivo.trim() }) });
+  const j = await r.json().catch(()=>null);
+  if (!j || !j.success) { alert((j && j.error) || 'No se pudo devolver la operación.'); return; }
+  alert('OP ' + numop + ' devuelta a Fundantes Pendientes. El ejecutivo fue notificado.');
+  cargar();
+}
+
 function render(){
   const q = document.getElementById('q').value.toLowerCase().trim();
   const list = !q ? DATA : DATA.filter(r =>
@@ -105,6 +121,7 @@ function render(){
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:3px 8px" onclick="verDocs(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-eye"></i> Ver</button>
         <a class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:3px 8px" href="/api/fundantes-seguimiento/${r.id_credito}/zip?token=${encodeURIComponent(token)}"><i class="bi bi-download"></i> ZIP</a>
+        <button class="btn btn-sm btn-outline-warning" style="font-size:.72rem;padding:3px 8px" title="La financiera devolvió los fundantes: vuelve a Pendientes" onclick="devolver(${r.id_credito}, '${esc(r.num_op)}')"><i class="bi bi-arrow-counterclockwise"></i> Devolver</button>
       </td>
     </tr>`).join('');
 }

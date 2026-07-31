@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!-- v1.0 — Fundantes devueltos por la financiera: listado para gestionar la corrección -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fundantes Devueltos — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1500px; margin:0 auto; padding:26px 24px 70px; }
+  .banner { background:linear-gradient(135deg,#b45309,#d97706 60%,#f59e0b); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+  .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  input[type=text] { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 12px; font-size:.85rem; min-width:300px; }
+  .btnx { border:none; border-radius:9px; padding:7px 15px; font-size:.8rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:#f1f5f9; text-align:left; padding:8px 9px; color:#334155; white-space:nowrap; font-size:.75rem; text-transform:uppercase; letter-spacing:.03em; }
+  td { padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  .num { text-align:right; white-space:nowrap; }
+  .motivo { background:#fffbeb; border-left:3px solid #f59e0b; border-radius:6px; padding:5px 9px; font-size:.74rem; color:#92400e; margin-top:4px; }
+  .pill { background:#fee2e2; color:#b91c1c; border-radius:10px; padding:1px 8px; font-size:.7rem; font-weight:700; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Seguimiento Fundantes', href:'/fundantes/' },
+  { label:'Fundantes Devueltos', icon:'bi-arrow-counterclockwise', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-arrow-counterclockwise"></i><div>
+    <h2>Fundantes Devueltos por la Financiera</h2>
+    <p>Operaciones que la financiera devolvió tras revisarlas. Volvieron a <b>Fundantes Pendientes</b>: el ejecutivo debe corregir los documentos y reenviarlos.</p>
+  </div></div>
+
+  <div class="card-af">
+    <div class="bar">
+      <input type="text" id="q" placeholder="Buscar por OP, ID, RUT, cliente, ejecutivo o dealer…" oninput="render()">
+      <span id="cnt" style="font-size:.8rem;color:#64748b"></span>
+      <button class="btnx" style="margin-left:auto" onclick="exportar()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Financiera</th><th>Ejecutivo</th><th>N° OP</th><th>ID Fin.</th><th>RUT Cliente</th><th>Cliente</th>
+          <th>Dealer</th><th>Parque</th><th class="num">Monto Crédito</th><th class="num">Saldo Precio</th>
+          <th>Fecha Otorgamiento</th><th>Devolución</th>
+        </tr></thead>
+        <tbody id="body"><tr><td colspan="12" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+let DATA = [];
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const clp = v => v==null||v==='' ? '—' : '$' + Number(v).toLocaleString('es-CL');
+const fd  = d => d ? new Date(d).toLocaleDateString('es-CL') : '—';
+const fdh = d => d ? new Date(d).toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}) : '—';
+
+async function cargar(){
+  const j = await fetch('/api/fundantes-seguimiento/devueltos', { headers:{ Authorization:'Bearer '+token } })
+    .then(r=>r.json()).catch(()=>null);
+  DATA = (j && j.success) ? j.data : [];
+  render();
+}
+
+function render(){
+  const q = (document.getElementById('q').value||'').toLowerCase().trim();
+  const f = !q ? DATA : DATA.filter(r => [r.num_op,r.id_financiera,r.rut_cliente,r.cliente,r.ejecutivo,r.dealer,r.parque]
+    .some(v => String(v||'').toLowerCase().includes(q)));
+  document.getElementById('cnt').textContent = f.length + ' operación(es)' +
+    (f.length ? ' · saldo precio ' + clp(f.reduce((a,r)=>a+Number(r.saldo_precio||0),0)) : '');
+  document.getElementById('body').innerHTML = f.length ? f.map(r=>`<tr>
+    <td>${esc(r.financiera)}</td><td>${esc(r.ejecutivo)}</td>
+    <td><b>${esc(r.num_op)}</b>${Number(r.devoluciones)>1?' <span class="pill">'+r.devoluciones+'ª vez</span>':''}</td>
+    <td>${esc(r.id_financiera)}</td><td>${esc(r.rut_cliente)||'—'}</td><td>${esc(r.cliente)||'—'}</td>
+    <td>${esc(r.dealer)||'—'}</td><td>${esc(r.parque)||'—'}</td>
+    <td class="num">${clp(r.monto_financiado)}</td><td class="num">${clp(r.saldo_precio)}</td>
+    <td>${fd(r.fecha_otorgado)}</td>
+    <td style="min-width:240px"><div style="font-size:.72rem;color:#64748b">${fdh(r.devuelto_at)} · ${esc(r.devuelto_por)||''}</div>
+        <div class="motivo">${esc(r.devuelto_motivo)}</div></td>
+  </tr>`).join('') : '<tr><td colspan="12" style="color:#166534;padding:20px">✓ No hay operaciones devueltas pendientes de corregir.</td></tr>';
+}
+
+function exportar(){
+  const rows = DATA.map(r=>({ Financiera:r.financiera, Ejecutivo:r.ejecutivo, 'N° OP':r.num_op, 'ID Financiera':r.id_financiera,
+    'RUT Cliente':r.rut_cliente, Cliente:r.cliente, Dealer:r.dealer, Parque:r.parque,
+    'Monto Crédito':Number(r.monto_financiado||0), 'Saldo Precio':Number(r.saldo_precio||0),
+    'Fecha Otorgamiento':fd(r.fecha_otorgado), 'Devuelto el':fdh(r.devuelto_at), 'Devuelto por':r.devuelto_por,
+    Motivo:r.devuelto_motivo, 'N° devoluciones':r.devoluciones }));
+  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Devueltos');
+  XLSX.writeFile(wb, 'fundantes_devueltos_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
