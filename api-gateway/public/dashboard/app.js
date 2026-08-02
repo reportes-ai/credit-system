@@ -2840,14 +2840,18 @@ function buildVProy2() {
     for (let d = 1; d <= Dm; d++) arr[d] += arr[d - 1];
     return arr;
   };
-  const mesPrev = mesesHist[mesesHist.length - 1] || null;
-  let prevQ = null, prevM = null, prevLbl = '';
-  if (mesPrev) {
-    const [py, pm] = mesPrev.split('-').map(Number);
+  /* Los DOS meses previos como referencia (pedido Pato 02-08): el mes pasado
+     en verde y el antepasado en naranjo, cada uno con su curva acumulada real. */
+  const refMeses = mesesHist.slice(-2).reverse();   // [mes pasado, mes antepasado]
+  const refs = refMeses.map((mk, i) => {
+    const [py, pm] = mk.split('-').map(Number);
     const Dp = habilesDelMes(py, pm - 1);
-    prevQ = acum(mesPrev, 'q', Dp); prevM = acum(mesPrev, 'm', Dp);
-    prevLbl = MES_NOM[pm - 1].charAt(0) + MES_NOM[pm - 1].slice(1).toLowerCase();
-  }
+    return {
+      q: acum(mk, 'q', Dp), m: acum(mk, 'm', Dp),
+      lbl: MES_NOM[pm - 1].charAt(0) + MES_NOM[pm - 1].slice(1).toLowerCase() + ' ' + String(py).slice(2),
+      color: i === 0 ? '#16a34a' : '#f59e0b', dash: i === 0 ? [8, 4] : [3, 3],
+    };
+  });
   const curvaChart = (canvasId, curvas, actArr, proyTot, prevArr, fmt) => {
     const base = proyTot || actArr[dHoy];
     const med = dias.map(d => en(curvas, d / D * 100, .5) * base);
@@ -2860,7 +2864,7 @@ function buildVProy2() {
         { label: 'p25–p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
         { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
         { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
-        ...(prevArr ? [{ label: prevLbl + ' (mes pasado)', data: dias.map(d => prevArr[Math.min(d, prevArr.length - 1)]), borderColor: '#16a34a', borderWidth: 2, borderDash: [8, 4], pointRadius: 0, tension: .2 }] : []),
+        ...(prevArr || []).map(rf => ({ label: rf.lbl, data: dias.map(d => rf.arr[Math.min(d, rf.arr.length - 1)]), borderColor: rf.color, borderWidth: 2, borderDash: rf.dash, pointRadius: 0, tension: .2 })),
         { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? actArr[d] : null), borderColor: '#0141A2', fill: false, tension: .2, pointRadius: 0, borderWidth: 2.5 },
       ]},
       options: { responsive: true, maintainAspectRatio: false,
@@ -2868,8 +2872,8 @@ function buildVProy2() {
         scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fmt(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
     });
   };
-  curvaChart('ch-proy2-curvaq', curvasQ, acum(mesAct, 'q', D), mzQ, prevQ, v => Math.round(v));
-  curvaChart('ch-proy2-curva', curvasM, acum(mesAct, 'm', D), mzM, prevM, fM);
+  curvaChart('ch-proy2-curvaq', curvasQ, acum(mesAct, 'q', D), mzQ, refs.map(r => ({ lbl: r.lbl, arr: r.q, color: r.color, dash: r.dash })), v => Math.round(v));
+  curvaChart('ch-proy2-curva', curvasM, acum(mesAct, 'm', D), mzM, refs.map(r => ({ lbl: r.lbl, arr: r.m, color: r.color, dash: r.dash })), fM);
 
   // Click en cualquiera de los gráficos → popup grande con copiar/descargar
   afChartZoom('ch-proy2-histq', 'Q operaciones mensual — histórico y proyectado');
