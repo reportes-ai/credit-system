@@ -182,6 +182,10 @@ function render(d){
       <button class="btn btn-skip" onclick="saltar()"><i class="bi bi-skip-forward"></i> Saltar este</button>
       <button class="btn btn-save" onclick="guardar()"><i class="bi bi-check-lg"></i> Guardar y siguiente</button>
     </div>`;
+  /* El total de primas también con los valores PRE-LLENADOS: recalcSumas solo
+     corría al tipear, así que si RDH venía de la BD/carta el total quedaba vacío
+     aunque las tres primas estuvieran a la vista. */
+  recalcSumas();
 }
 
 function renderVacio(pendientes){
