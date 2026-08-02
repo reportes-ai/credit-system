@@ -4330,12 +4330,14 @@ function _abrirDetalleOps(nombre, tipo, pred) {
   const totSaldo= ops.reduce((a,r) => a + (parseFloat(r.saldo_precio)||0), 0);
   const totCD   = ops.reduce((a,r) => a + (parseFloat(r.com_dealer)||0), 0);
   const totIng  = ops.reduce((a,r) => a + (parseFloat(r.rentab_afa)||0), 0);
+  const totSeg  = ops.reduce((a,r) => a + (parseFloat(r.com_seguros)||0), 0);
   document.getElementById('modal-ejec-kpis').innerHTML = `
     <div class="mekpi"><div class="mekpi-lbl">Operaciones</div><div class="mekpi-val">${ops.length}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Total Financiado</div><div class="mekpi-val">${fM(totFin)}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Saldo Precio</div><div class="mekpi-val">${fM(totSaldo)}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Com. Dealer</div><div class="mekpi-val">${fM(totCD)}</div></div>
-    <div class="mekpi"><div class="mekpi-lbl">Ing. x Colocaciones</div><div class="mekpi-val">${fM(totIng)}</div></div>`;
+    <div class="mekpi"><div class="mekpi-lbl">Ing. x Colocaciones</div><div class="mekpi-val">${fM(totIng)}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Ing. x Seguros</div><div class="mekpi-val">${fM(totSeg)}</div></div>`;
 
   // Filas de operaciones — ordenar por saldo desc
   ops.sort((a,b) => (parseFloat(b.saldo_precio)||0) - (parseFloat(a.saldo_precio)||0));
@@ -4359,19 +4361,20 @@ function _abrirDetalleOps(nombre, tipo, pred) {
       <td>${r.plazo||'—'}</td>
       <td>${fM(r.com_dealer)}</td>
       <td>${fM(r.rentab_afa)}</td>
+      <td>${fM(r.com_seguros)}</td>
     </tr>`;
   }).join('');
-  document.getElementById('t-modal-ops-body').innerHTML = body || '<tr><td colspan="12" style="text-align:center;color:#888;padding:12px">Sin operaciones</td></tr>';
+  document.getElementById('t-modal-ops-body').innerHTML = body || '<tr><td colspan="13" style="text-align:center;color:#888;padding:12px">Sin operaciones</td></tr>';
   document.getElementById('t-modal-ops-foot').innerHTML = `<tr>
     <td colspan="7">Total (${ops.length} ops)</td>
     <td>${fM(totSaldo)}</td><td>${fM(totFin)}</td><td>—</td>
-    <td>${fM(totCD)}</td><td>${fM(totIng)}</td>
+    <td>${fM(totCD)}</td><td>${fM(totIng)}</td><td>${fM(totSeg)}</td>
   </tr>`;
 
   const tipoLabel = tipo === 'ot' ? 'OTORGADOS' : 'APROBADOS';
   const titulo = nombre + ' — ' + tipoLabel + ' (' + desde + (desde !== hasta ? ' → ' + hasta : '') + ')';
   document.getElementById('modal-ejec-title').textContent = titulo;
-  _modalData = { ops, titulo, totSaldo, totFin, totCD, totIng, fM };
+  _modalData = { ops, titulo, totSaldo, totFin, totCD, totIng, totSeg, fM };
   document.getElementById('modal-ejec-overlay').classList.add('open');
 }
 
@@ -4381,11 +4384,11 @@ function cerrarModalEjec() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModalEjec(); });
 
 function _buildModalContent(full) {
-  const { ops, titulo, totSaldo, totFin, totCD, totIng, fM } = _modalData;
+  const { ops, titulo, totSaldo, totFin, totCD, totIng, totSeg, fM } = _modalData;
   // full=true (copiar/Excel): montos COMPLETOS en pesos, como número plano —
   // así Excel/PPT los reciben operables, no "$11.5M".
   const F = full ? (v => Math.round(parseFloat(v) || 0)) : fM;
-  const cols = ['N° Operación','ID Financiera','F. Otorgado','Ejecutivo','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.'];
+  const cols = ['N° Operación','ID Financiera','F. Otorgado','Ejecutivo','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.','Ing. x Seguros'];
   const dataRows = ops.map(r => {
     const fot = (r.fecha_otorgado || r.fecha_ot || '').slice(0,10);
     return [
@@ -4394,17 +4397,17 @@ function _buildModalContent(full) {
       r.financiera||'—',
       r.automotora||'—', r.estado_eval||'—',
       F(r.saldo_precio), F(r.monto_financiado),
-      r.plazo||'—', F(r.com_dealer), F(r.rentab_afa)
+      r.plazo||'—', F(r.com_dealer), F(r.rentab_afa), F(r.com_seguros)
     ];
   });
-  const footRow = ['Total ('+ops.length+' ops)','','','','','','',F(totSaldo),F(totFin),'—',F(totCD),F(totIng)];
+  const footRow = ['Total ('+ops.length+' ops)','','','','','','',F(totSaldo),F(totFin),'—',F(totCD),F(totIng),F(totSeg)];
   return { cols, dataRows, footRow, titulo };
 }
 
 function _tablaHtml() {
   const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
-  const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
-  const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Total Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)}`;
+  const { ops, totSaldo, totFin, totCD, totIng, totSeg, fM } = _modalData;
+  const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Total Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)} &nbsp;|&nbsp; <b>Ing. x Seguros:</b> ${fM(totSeg)}`;
   const thStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#1a3a6a;color:#fff;font-weight:bold';
   const tdStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap';
   const tfStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#eef2fa;color:#1a3a6a;font-weight:bold';
@@ -4461,8 +4464,8 @@ async function copiarImagenModal() {
 
 function exportarExcelModal() {
   const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
-  const { ops, totSaldo, totFin, totCD, totIng, fM } = _modalData;
-  const kpis = `Operaciones: ${ops.length}; Total Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}`;
+  const { ops, totSaldo, totFin, totCD, totIng, totSeg, fM } = _modalData;
+  const kpis = `Operaciones: ${ops.length}; Total Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}; Ing. x Seguros: ${fM(totSeg)}`;
   const esc = v => '"' + String(v).replace(/"/g,'""') + '"';
   const csv = esc(titulo) + '\r\n' + esc(kpis) + '\r\n\r\n'
     + [cols, ...dataRows, footRow].map(r => r.map(esc).join(';')).join('\r\n');
