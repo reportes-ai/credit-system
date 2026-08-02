@@ -2865,7 +2865,9 @@ function buildVProy2() {
         { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
         { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
         ...(prevArr || []).map(rf => ({ label: rf.lbl, data: dias.map(d => rf.arr[Math.min(d, rf.arr.length - 1)]), borderColor: rf.color, borderWidth: 2, borderDash: rf.dash, pointRadius: 0, tension: .2 })),
-        { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? actArr[d] : null), borderColor: '#0141A2', fill: false, tension: .2, pointRadius: 0, borderWidth: 2.5 },
+        /* pointRadius > 0: en el día hábil 1 del mes la serie tiene UN solo punto
+           y sin radio la línea no dibuja nada — parecía que faltaba el Real. */
+        { label: 'Real acumulado', data: dias.map(d => d <= dHoy ? actArr[d] : null), borderColor: '#0141A2', backgroundColor: '#0141A2', fill: false, tension: .2, pointRadius: 2.5, pointHoverRadius: 5, borderWidth: 2.5 },
       ]},
       options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { position: 'top', labels: { font: { size: 10 }, filter: i => i.text !== 'p25' } }, tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } } },
