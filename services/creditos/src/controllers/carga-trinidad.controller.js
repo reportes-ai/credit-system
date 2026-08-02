@@ -562,6 +562,11 @@ exports.importar = async (req, res) => {
             log.push(`⏭ Omitido ${f.num_op}: fecha futura (${f.fecha_otorgado || f.mes})`);
             continue;
           }
+          /* NUM_OP NUESTRO desde que nace (regla de Pato, agosto 2026): toda
+             operación entra con el correlativo AutoFácil; el ID de Trinidad
+             queda en id_financiera. Las cargas siguientes la encuentran por
+             id_financiera (afEquivSet → rama "Sincronizado en AF"). */
+          const numOpAF = await require('../../../../shared/num-op').siguienteNumOpAF();
           await pool.query(
             `INSERT INTO creditos
                (num_op, id_financiera, estado_autofin, estado_credito, estado_eval,
@@ -571,7 +576,7 @@ exports.importar = async (req, res) => {
                 financiera, created_at, updated_at)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'AUTOFIN', NOW(), NOW())`,
             [
-              f.num_op, String(f.num_op),
+              numOpAF, String(f.num_op),
               f.estado_autofin, f.estado_credito, f.estado_eval,
               f.producto, f.ejecutivo, f.ejecutivo_tri, f.automotora,
               f.valor_vehiculo, f.pie, f.saldo_precio,
@@ -580,9 +585,10 @@ exports.importar = async (req, res) => {
             ]
           );
           insertados++;
-          detallesIns.push({ num_op: f.num_op, datos: f });
-          log.push(`➕ Insertado  ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
-          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
+          detallesIns.push({ num_op: numOpAF, id_financiera: f.num_op, datos: f });
+          log.push(`➕ Insertado  OP ${numOpAF} (ID fin. ${f.num_op}) → ${f.estado_autofin} / ${f.estado_credito}`);
+          // La recalculación posterior la ubica por id_financiera (num_op ya es el nuestro)
+          if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
         }
       } catch (rowErr) {
         errores++;

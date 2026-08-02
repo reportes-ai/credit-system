@@ -147,7 +147,10 @@ async function crearCreditoDesdeCartas(c) {
             ?,?,?,
             NOW(),NOW())
   `, [
-    numero_credito, (/^\d+$/.test(String(numero_credito)) ? parseInt(numero_credito, 10) : null), financiera,
+    /* num_op = correlativo AutoFácil desde que nace (motor único shared/num-op.js,
+       regla ago-2026). numero_credito (YYMM###) sigue siendo el N° interno del
+       crédito de carta; la OP es la serie única del negocio. */
+    numero_credito, await require('../../../../shared/num-op').siguienteNumOpAF(), financiera,
     // ID de la operación en la financiera: el frontend lo manda como opOrigen
     (c.id_financiera ?? c.idFinanciera ?? c.opOrigen ?? c.op_origen ?? null),
     cliRow?.id_cliente || null,
@@ -705,26 +708,24 @@ const otorgar = async (req, res) => {
                    OR (estado IS NULL AND COALESCE(estado_credito,'') IN ('APROBADO','DIGITADO','PENDIENTE')))`,
           [...valoresEtapa('OTORGADO'), partB, partB, ...args]
         ).catch(e => console.error('[carta otorgar→credito]', e.message));
-        // El crédito de la carta nace sin num_op → asígnalo (= numero_credito) para que
-        // aparezca y sea buscable en Post Venta.
-        await pool.query(
-          `UPDATE creditos SET num_op = CAST(numero_credito AS UNSIGNED)
-            WHERE (${cond.join(' OR ')}) AND num_op IS NULL AND numero_credito REGEXP '^[0-9]+$'`, args
-        ).catch(() => {});
-        /* NÚMERO DE OPERACIÓN NUESTRO al otorgar (regla de Pato, desde agosto 2026):
-           los créditos de la carga masiva nacen con num_op = ID de la financiera
-           (7 dígitos, ej. 6189286). Hasta julio se dejó ese número; desde agosto,
-           al OTORGAR se les asigna el siguiente correlativo AutoFácil (serie
-           80000-99999, hoy en 89xxx). Se hace AL OTORGAR y no antes para no gastar
-           correlativos en solicitudes que no se cursan. Solo si num_op ≥ 1.000.000
-           (o sea, aún trae el ID de la financiera) — nunca pisa un correlativo ya puesto. */
+        // El crédito de la carta nace sin num_op → correlativo AutoFácil (motor único).
         try {
+          const [[sinOp]] = await pool.query(
+            `SELECT id FROM creditos WHERE (${cond.join(' OR ')}) AND num_op IS NULL LIMIT 1`, args);
+          if (sinOp) await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op IS NULL',
+            [await require('../../../../shared/num-op').siguienteNumOpAF(), sinOp.id]);
+        } catch (e) { console.error('[carta otorgar→num_op nuevo]', e.message); }
+        /* RESPALDO de numeración (motor único shared/num-op.js): desde agosto 2026
+           toda operación nace ya con correlativo AutoFácil (lo asigna la carga
+           Trinidad al insertar). Este bloque cubre solo las filas ANTERIORES a la
+           regla que aún traen el ID de la financiera como num_op: al otorgarse,
+           reciben el suyo. Nunca pisa un correlativo ya puesto. */
+        try {
+          const { siguienteNumOpAF, esIdFinanciera } = require('../../../../shared/num-op');
           const [[cr]] = await pool.query(
             `SELECT id, num_op FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args);
-          if (cr && Number(cr.num_op) >= 1000000) {
-            const [[mx]] = await pool.query(
-              'SELECT COALESCE(MAX(num_op),80000) mx FROM creditos WHERE num_op BETWEEN 80000 AND 99999');
-            const nuevo = Number(mx.mx) + 1;
+          if (cr && esIdFinanciera(cr.num_op)) {
+            const nuevo = await siguienteNumOpAF();
             await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op>=1000000', [nuevo, cr.id]);
             console.log(`[carta otorgar] num_op AutoFácil ${nuevo} asignado (antes ${cr.num_op}, id ${cr.id})`);
           }
