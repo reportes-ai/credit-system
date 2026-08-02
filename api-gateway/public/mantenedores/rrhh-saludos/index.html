@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saludos y Certificados RRHH — Mantenedores</title>
-  <!-- v1.1 aviso por banner, no campana -->
+  <!-- v1.2 ventana de próximos cumpleaños para Mi Día -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -70,6 +70,15 @@
   </div>
 
   <div class="card-box">
+    <h5><i class="bi bi-sunrise"></i> Cumpleaños en el panel Mi Día</h5>
+    <div class="row"><div class="col-md-5"><div class="fld">
+      <label>Ventana de próximos cumpleaños (días)</label>
+      <input type="number" id="cumple_midia_dias" min="0" max="60">
+      <div class="hint">Cuántos días hacia adelante lista <a href="/mi-dia/">Mi Día</a>. 0 = solo los de hoy.</div>
+    </div></div></div>
+  </div>
+
+  <div class="card-box">
     <h5><i class="bi bi-award"></i> Certificado de Antigüedad Laboral</h5>
     <div class="row">
       <div class="col-md-6"><div class="fld"><label>Antigüedad mínima para auto-emitir (meses)</label><input type="number" id="cert_min_meses" min="0"><div class="hint">Bajo este mínimo (contrato fijo) el certificado se solicita a RRHH.</div></div></div>
@@ -86,6 +95,7 @@
     <ul>
       <li><b>Popup de cumpleaños</b> → aparece al conectarse el cumpleañero en <b>todas las páginas</b> de la app (según <code>usuarios.fecha_nacimiento</code>, se edita en <a href="/usuarios/">Usuarios</a>).</li>
       <li><b>Aviso a compañeros</b> → <b>banner superior</b> (mismo formato del anuncio de créditos nuevos) al conectarse cada usuario, 1 vez al día por cumpleañero.</li>
+      <li><b>Ventana de próximos cumpleaños</b> → sección <b>Cumpleaños</b> del panel <a href="/mi-dia/">Mi Día</a> (mismos datos del popup: <code>usuarios.fecha_nacimiento</code>, sin los ocultos en la ficha).</li>
       <li><b>Mínimo de meses y cooldown</b> → regulan el botón "Emitir mi certificado ahora" en <a href="/recursos-humanos/antiguedad/">Certificado de Antigüedad</a>.</li>
       <li><b>Cuerpo/cierre del certificado</b> → texto del PDF con QR verificable en <a href="/verificar/">/verificar</a> (fecha de ingreso y cargo se editan en <a href="/usuarios/">Usuarios</a>).</li>
     </ul>
@@ -100,7 +110,7 @@
   function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const CAMPOS=['cumple_popup_activo','cumple_musica','cumple_campana_activo'];
-  const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cumple_aviso_tarde','cumple_dias_tope','cumple_banner_dur','cumple_banner_sonido','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre'];
+  const TEXTOS=['cumple_titulo','cumple_linea1','cumple_linea2','cumple_aviso_titulo','cumple_aviso_msg','cumple_aviso_tarde','cumple_dias_tope','cumple_midia_dias','cumple_banner_dur','cumple_banner_sonido','cert_min_meses','cert_cooldown_dias','cert_cuerpo','cert_cierre'];
   async function cargar(){
     const j=await(await fetch('/api/rrhh/config',{headers:H})).json(); const c=j.data||{};
     CAMPOS.forEach(k=>{ const el=document.getElementById(k); if(el) el.checked=c[k]==='1'; });

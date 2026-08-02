@@ -101,6 +101,7 @@ require('../../../../shared/migrate').enFila('rrhh', async () => {
       ['cumple_aviso_msg', 'No olvides saludar{lo} y desearle un gran día.'],
       ['cumple_aviso_tarde', '🎂 Recuerda que {nombre} estuvo de cumpleaños el {dia}. ¡No olvides saludar{lo}!'],
       ['cumple_dias_tope', '3'],
+      ['cumple_midia_dias', '15'],   // ventana de "próximos cumpleaños" del panel Mi Día
       ['cumple_banner_dur', '9'],
       ['cumple_banner_sonido', 'none'],
     ];
@@ -334,7 +335,7 @@ const getConfigApi = async (req, res) => {
 const setConfigApi = async (req, res) => {
   try {
     const b = req.body || {};
-    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_banner_dur', 'cumple_banner_sonido'];
+    const PERMITIDAS = ['cert_min_meses', 'cert_cooldown_dias', 'cert_cuerpo', 'cert_cierre', 'cumple_popup_activo', 'cumple_campana_activo', 'cumple_musica', 'cumple_titulo', 'cumple_linea1', 'cumple_linea2', 'cumple_aviso_titulo', 'cumple_aviso_msg', 'cumple_aviso_tarde', 'cumple_dias_tope', 'cumple_midia_dias', 'cumple_banner_dur', 'cumple_banner_sonido'];
     for (const [k, v] of Object.entries(b)) {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO rh_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);
@@ -460,6 +461,33 @@ async function cumplesEnVentana(tope, soloId) {
 }
 const diaSemanaCL = iso => new Date(iso + 'T12:00:00').toLocaleDateString('es-CL', { weekday: 'long' });
 
+/* Cumpleaños de HOY hacia adelante, dentro de los próximos N días.
+   MOTOR ÚNICO de cumpleaños: misma fuente (usuarios.fecha_nacimiento) y mismo
+   filtro (activo + rh_fichas.no_mostrar) que el popup y el banner. Lo consume
+   el panel Mi Día; la ventana la define el mantenedor (cumple_midia_dias). */
+async function cumplesProximos(dias) {
+  const hoy = hoyChile();
+  const fechas = [];
+  for (let d = 0; d <= Math.max(0, dias); d++) {
+    const f = new Date(hoy + 'T12:00:00'); f.setDate(f.getDate() + d);
+    fechas.push({ iso: isoFecha(f), dias: d });
+  }
+  const [rows] = await pool.query(
+    `SELECT u.id_usuario, CONCAT_WS(' ', u.nombre, u.apellido) nombre, u.nombre nombre_pila, u.sexo, u.cargo, u.fecha_nacimiento
+       FROM usuarios u LEFT JOIN rh_fichas unm ON unm.id_usuario=u.id_usuario
+      WHERE u.fecha_nacimiento IS NOT NULL AND u.estado='activo' AND COALESCE(unm.no_mostrar,0)=0 LIMIT 600`);
+  const out = [];
+  for (const r of rows) {
+    const fn = isoFecha(r.fecha_nacimiento);
+    const hit = fechas.find(f => f.iso.slice(5) === fn.slice(5));   // match mes-día
+    if (hit) out.push({
+      id_usuario: r.id_usuario, nombre: r.nombre, nombre_pila: r.nombre_pila, sexo: r.sexo,
+      cargo: r.cargo || '', fecha: hit.iso, dias: hit.dias, dia_semana: diaSemanaCL(hit.iso),
+    });
+  }
+  return out.sort((a, b) => a.dias - b.dias || a.nombre.localeCompare(b.nombre));
+}
+
 // ¿Estuvo/está de cumpleaños el usuario logueado? (para el popup global)
 const cumpleEstado = async (req, res) => {
   try {
@@ -525,4 +553,5 @@ const pendientes = async (req, res) => {
 };
 
 module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
-  certEstado, certEmitir, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi };
+  certEstado, certEmitir, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi,
+  cumplesProximos, getConfig };

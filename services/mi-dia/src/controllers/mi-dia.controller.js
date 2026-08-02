@@ -175,8 +175,20 @@ const panel = async (req, res) => {
       calendario = await G.agendaHoy({ id_usuario: u.id_usuario, email });
     }
 
+    // Cumpleaños próximos — motor único de RRHH (misma fuente que el popup y el banner)
+    let cumples = [];
+    try {
+      const R = require('../../../rrhh/src/controllers/rrhh.controller');
+      const cfg = await R.getConfig();
+      const dias = Math.max(0, Math.min(60, parseInt(cfg.cumple_midia_dias || '15', 10)));
+      cumples = (await R.cumplesProximos(dias)).map(c => ({
+        id: c.id_usuario, nombre: c.nombre, cargo: c.cargo, dias: c.dias,
+        fecha: c.fecha, dia_semana: c.dia_semana, yo: c.id_usuario === u.id_usuario,
+      }));
+    } catch (e) { cumples = []; }
+
     res.json({ success: true, data: {
-      saludo: saludo(), nombre: (u.nombre || '').trim(),
+      saludo: saludo(), nombre: (u.nombre || '').trim(), cumples,
       fecha: new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()),
       widgets, calendario,
     }, error: null });

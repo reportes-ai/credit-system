@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mi Día — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 sección Cumpleaños (próximos N días, ventana paramétrica en Saludos RRHH) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -53,6 +53,11 @@
 
   <div class="sec-title"><i class="bi bi-list-check"></i> Tus pendientes</div>
   <div class="grid" id="grid"><div class="empty">Cargando…</div></div>
+
+  <div id="cumpWrap" style="display:none">
+    <div class="sec-title"><i class="bi bi-balloon-heart"></i> Cumpleaños</div>
+    <div class="cal" id="cump"></div>
+  </div>
 </div>
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -78,6 +83,22 @@
       </a>`).join('');
     // Calendario
     renderCal(d.calendario||{});
+    renderCumples(d.cumples||[]);
+  }
+
+  /* Cumpleaños próximos (ventana paramétrica en el mantenedor Saludos RRHH) */
+  function renderCumples(list){
+    const wrap=document.getElementById('cumpWrap'), box=document.getElementById('cump');
+    if(!list.length){ wrap.style.display='none'; return; }
+    wrap.style.display='';
+    const cuando=c=> c.dias===0?'Hoy':(c.dias===1?'Mañana':`${c.dia_semana} ${new Date(c.fecha+'T12:00:00').getDate()}`);
+    box.innerHTML=list.map(c=>`
+      <div class="cal-ev">
+        <div class="hora" style="min-width:76px;text-transform:capitalize;${c.dias===0?'color:#c2410c':''}">${esc(cuando(c))}</div>
+        <div class="tit">${c.dias===0?'🎂 ':''}${esc(c.nombre)}${c.yo?' <span style="color:#94a3b8;font-weight:400">(tú)</span>':''}
+          ${c.cargo?`<div class="loc">${esc(c.cargo)}</div>`:''}</div>
+        ${c.dias===0&&!c.yo?'<span style="font-size:.76rem;color:#c2410c;font-weight:700">¡No olvides saludar!</span>':''}
+      </div>`).join('');
   }
 
   function renderCal(c){
