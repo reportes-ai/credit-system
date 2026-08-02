@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.9 — sin snapshot embebido de ejecutivos (EJ_PERF vacio hasta la API), pill Solo año actual dinamico, aviso visible cuando el presupuesto es de respaldo, Restaurar orden conoce TODAS las pestañas -->
+<!-- v3.0 — Desempeño por Ejecutivo: default Ultimos 6, solo ejecutivos con actividad en el rango visible, orden por operaciones del mes actual y cascada hacia atras -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -652,9 +652,9 @@
     </div>
     <span style="font-size:11px;color:#777;margin-left:8px">Columnas:</span>
     <div class="pills" id="pills-cols">
-      <div class="pill active" onclick="setCols('all',this)">Todos los meses</div>
+      <div class="pill" onclick="setCols('all',this)">Todos los meses</div>
       <div class="pill" id="pill-anio-actual" onclick="setCols('2026',this)">Solo año actual</div>
-      <div class="pill" onclick="setCols('last6',this)">Últimos 6</div>
+      <div class="pill active" onclick="setCols('last6',this)">Últimos 6</div>
     </div>
   </div>
 

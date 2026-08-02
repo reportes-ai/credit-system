@@ -1770,7 +1770,7 @@ function buildV4() {
    de hoy. Vacío es honesto; con datos, se reemplaza completo. */
 const EJ_PERF = { meses: [], meses_labels: {}, ejecutivos: [] };
 let currentMetric = 'ot';
-let currentCols = 'all';
+let currentCols = 'last6';   // default: últimos 6 meses (pedido Pato 02-08)
 
 function setMetric(m, el) {
   currentMetric = m;
@@ -1804,9 +1804,24 @@ function buildV5() {
   else if (currentCols === 'last6') meses = meses_all.slice(-6).reverse();
   else meses = [...meses_all].reverse();
 
+  /* Ejecutivos VISIBLES (pedido Pato 02-08): solo los que tengan alguna
+     operación en los meses que se están mostrando — con "Últimos 6" desaparecen
+     los que llevan 6 meses en cero, con "Todos" vuelven. Orden: más operaciones
+     ingresadas ESTE mes primero; a igualdad, el mes anterior, y así en cascada. */
+  const opsDe = (ej, m) => { const d = ej.meses[m] || {}; return (d.ing || 0) + (d.apro || 0) + (d.ot || 0); };
+  const ejsVisibles = EJ_PERF.ejecutivos
+    .filter(ej => meses.some(m => opsDe(ej, m) > 0))
+    .sort((a, b) => {
+      for (const m of meses) {                          // meses ya viene del más reciente al más viejo
+        const d = ((b.meses[m] || {}).ing || 0) - ((a.meses[m] || {}).ing || 0);
+        if (d) return d;
+      }
+      return String(a.nombre).localeCompare(String(b.nombre));
+    });
+
   // Calcular valores para heatmap y percentiles de TC/TA
   const vals = [];
-  EJ_PERF.ejecutivos.forEach(ej => {
+  ejsVisibles.forEach(ej => {
     meses.forEach(m => {
       const d = ej.meses[m];
       if (d) vals.push(d[currentMetric]||0);
@@ -1822,7 +1837,7 @@ function buildV5() {
     return sorted[Math.max(0,idx)];
   };
   const tcVals=[], taVals=[];
-  EJ_PERF.ejecutivos.forEach(ej => {
+  ejsVisibles.forEach(ej => {
     [...meses, 'p12','p6','p3'].forEach(k => {
       const d = ej.meses?.[k] || ej[k] || {};
       if (d.tc > 0) tcVals.push(d.tc);
@@ -1902,7 +1917,7 @@ function buildV5() {
     <tr>${subHeaders}</tr>`;
 
   // TBODY
-  const rows = EJ_PERF.ejecutivos.map(ej => {
+  const rows = ejsVisibles.map(ej => {
     ej.nombre_completo = fmtNombreCompleto(ej.nombre);
     const nameCell = `<td style="background:#f8faff;font-size:10px;font-weight:600;padding:4px 8px;white-space:nowrap;position:sticky;left:0;z-index:1;border-right:1px solid #dce3ed">${ej.nombre_completo}</td>`;
 
