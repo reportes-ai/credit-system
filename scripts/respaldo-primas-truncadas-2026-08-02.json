@@ -1,0 +1,200 @@
+[
+  {
+    "id": 1145233,
+    "num_op": 77277,
+    "mes": "2025-01-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "314480",
+    "seguro_rep_menor": "425221",
+    "seguros": null
+  },
+  {
+    "id": 1145857,
+    "num_op": 77706,
+    "mes": "2025-02-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "344650",
+    "seguros": null
+  },
+  {
+    "id": 1145863,
+    "num_op": 77750,
+    "mes": "2025-02-01T04:00:00.000Z",
+    "seguro_rdh": "222254",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1145886,
+    "num_op": 77757,
+    "mes": "2025-02-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "1",
+    "seguros": null
+  },
+  {
+    "id": 1146632,
+    "num_op": 78389,
+    "mes": "2025-03-01T04:00:00.000Z",
+    "seguro_rdh": "262289",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1147555,
+    "num_op": 79145,
+    "mes": "2025-04-01T04:00:00.000Z",
+    "seguro_rdh": "234297",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "1",
+    "seguros": null
+  },
+  {
+    "id": 1148912,
+    "num_op": 80285,
+    "mes": "2025-06-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "348791",
+    "seguros": null
+  },
+  {
+    "id": 1149525,
+    "num_op": 80922,
+    "mes": "2025-07-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "1",
+    "seguros": null
+  },
+  {
+    "id": 1153680,
+    "num_op": 84520,
+    "mes": "2025-12-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "323921",
+    "seguro_rep_menor": "437986",
+    "seguros": null
+  },
+  {
+    "id": 1154572,
+    "num_op": 85320,
+    "mes": "2026-01-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "173455",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1155164,
+    "num_op": 85842,
+    "mes": "2026-02-01T04:00:00.000Z",
+    "seguro_rdh": "252",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1155984,
+    "num_op": 86671,
+    "mes": "2026-04-01T04:00:00.000Z",
+    "seguro_rdh": "474",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1156318,
+    "num_op": 87014,
+    "mes": "2026-04-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "1028266",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 1156926,
+    "num_op": 87634,
+    "mes": "2026-05-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "347214",
+    "seguro_rep_menor": "126679",
+    "seguros": null
+  },
+  {
+    "id": 1950001,
+    "num_op": 89216,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "320",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 2130029,
+    "num_op": 89198,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "359",
+    "seguro_cesantia": "0",
+    "seguro_rep_menor": "0",
+    "seguros": null
+  },
+  {
+    "id": 2130032,
+    "num_op": 89191,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "307",
+    "seguro_cesantia": "266",
+    "seguro_rep_menor": "363",
+    "seguros": null
+  },
+  {
+    "id": 2280816,
+    "num_op": 89283,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": null,
+    "seguro_rep_menor": null,
+    "seguros": null
+  },
+  {
+    "id": 2430064,
+    "num_op": 89212,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "368",
+    "seguro_cesantia": "272",
+    "seguro_rep_menor": "480",
+    "seguros": null
+  },
+  {
+    "id": 2430233,
+    "num_op": 89246,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": null,
+    "seguro_rep_menor": null,
+    "seguros": null
+  },
+  {
+    "id": 2520001,
+    "num_op": 89285,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "1",
+    "seguros": 0
+  },
+  {
+    "id": 2550001,
+    "num_op": 89286,
+    "mes": "2026-07-01T04:00:00.000Z",
+    "seguro_rdh": "1",
+    "seguro_cesantia": "1",
+    "seguro_rep_menor": "1",
+    "seguros": 0
+  }
+]

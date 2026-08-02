@@ -103,7 +103,15 @@ const { parseMesTxt, finDeMes } = require('../../../../shared/utils/mes-excel');
 
 function normInt(v) {
   if (v === null || v === undefined) return null;
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ''));
+  // Si Excel ya entrega número, respetarlo tal cual.
+  if (typeof v === 'number') return isNaN(v) ? null : Math.round(v);
+  /* Texto: formato CHILENO — el punto es separador de MILES y la coma el decimal.
+     El parseFloat directo convertía "307.000" en 307 y "1.109.286" en 1: las
+     primas de seguros entraban divididas por mil (o peor) cuando la celda venía
+     como texto. 22 operaciones quedaron con primas de $1 a $500. */
+  let t = String(v).trim().replace(/[^0-9.,\-]/g, '');
+  t = t.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(t);
   return isNaN(n) ? null : Math.round(n);
 }
 
