@@ -726,7 +726,7 @@ const otorgar = async (req, res) => {
             `SELECT id, num_op FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args);
           if (cr && esIdFinanciera(cr.num_op)) {
             const nuevo = await siguienteNumOpAF();
-            await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op>=1000000', [nuevo, cr.id]);
+            await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op BETWEEN 1000000 AND 19999999', [nuevo, cr.id]);
             console.log(`[carta otorgar] num_op AutoFácil ${nuevo} asignado (antes ${cr.num_op}, id ${cr.id})`);
           }
         } catch (e) { console.error('[carta otorgar→num_op AF]', e.message); }

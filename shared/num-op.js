@@ -6,32 +6,44 @@
    desde que nace — no solo las otorgadas. El ID que le puso la financiera vive
    en `id_financiera`; `num_op` es la llave de negocio de AutoFácil.
 
-   La serie: correlativo único que hoy va en ~89.36x. Se deja crecer más allá
-   de 99.999 hacia el rango 100.000–518.999, que está COMPLETAMENTE libre
-   (~430.000 números ≈ décadas al ritmo actual). El techo 518.999 existe porque
-   en 519.xxx vive la serie migrada de INDEXA y sobre 1.000.000 los IDs de
-   Trinidad — jamás deben chocar.
+   FORMATO (definido por Pato): AAMM#### — año+mes + secuencia de CUATRO
+   dígitos, reiniciada cada mes. Agosto 2026 parte en 26080001. Cuatro dígitos
+   porque tres (999/mes) quedaban cortos: entran hasta ~350 solicitudes por día.
 
-   Julio 2026 y hacia atrás quedó con los números con que cerró (Trinidad/INDEXA
-   en las filas históricas): esta regla rige para lo que nace desde agosto.
+   Por qué no choca con nada:
+     · Serie nueva ≥ 20.000.000 siempre (26.08xxxx, 27.01xxxx, …).
+     · IDs de Trinidad: ~6.2 millones (crecen lento; techo 20M les da años).
+     · Serie histórica AutoFácil 80000–99999 e INDEXA 519xxx: muy por debajo.
+     · numero_credito de cartas (YYMM###, 7 dígitos) queda como N° INTERNO del
+       crédito de carta; la OP es esta serie.
+
+   Julio 2026 y hacia atrás quedó con los números con que cerró: esta regla
+   rige para lo que nace desde agosto.
    ───────────────────────────────────────────────────────────────────────────── */
-const PISO  = 80000;
-const TECHO = 518999;   // exclusivo de la serie INDEXA (519xxx) hacia arriba
+
+/** Prefijo AAMM del mes actual en hora de Chile (ej. '2608'). */
+function prefijoMes() {
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Santiago', year: '2-digit', month: '2-digit' })
+    .format(new Date()).split('-');
+  return p[0] + p[1];
+}
 
 /**
- * Siguiente correlativo AutoFácil. Se apoya en MAX() dentro de la serie, así
- * que debe llamarse en flujos secuenciales (cargas fila a fila, otorgar).
+ * Siguiente correlativo AutoFácil (AAMM####). Se apoya en MAX() dentro del mes,
+ * así que debe llamarse en flujos secuenciales (cargas fila a fila, otorgar).
  * @param {object} [conn] conexión/transacción; por defecto el pool compartido
  */
 async function siguienteNumOpAF(conn) {
   const db = conn || require('./config/database');
+  const base = Number(prefijoMes()) * 10000;          // 26080000
   const [[r]] = await db.query(
     'SELECT COALESCE(MAX(num_op), ?) mx FROM creditos WHERE num_op BETWEEN ? AND ?',
-    [PISO, PISO, TECHO]);
-  return Number(r.mx) + 1;
+    [base, base + 1, base + 9999]);
+  return Number(r.mx) + 1;                            // primer número del mes: AAMM0001
 }
 
-/** ¿Este num_op es un ID de financiera (Trinidad) y no un correlativo nuestro? */
-const esIdFinanciera = n => Number(n) >= 1000000;
+/** ¿Este num_op es un ID de financiera (Trinidad) y no un correlativo nuestro?
+    Trinidad va en ~6,2 millones; nuestra serie AAMM#### parte en 20+ millones. */
+const esIdFinanciera = n => Number(n) >= 1000000 && Number(n) < 20000000;
 
-module.exports = { siguienteNumOpAF, esIdFinanciera, PISO, TECHO };
+module.exports = { siguienteNumOpAF, esIdFinanciera, prefijoMes };
