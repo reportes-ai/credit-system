@@ -514,7 +514,7 @@ function buildRentabTable() {
   if(fil.ccs) rows = rows.filter(r=>r.ccs===fil.ccs);
   if(fil.fin) rows = rows.filter(r=>r.financiera===fil.fin);
 
-  const pClass = p => p>=25?'pct-ok':p>=15?'pct-hi':p>=8?'pct-warn':'pct-bad';
+  const pClass = _pClassParam;   // semáforo paramétrico (mantenedor Parámetros del Dashboard)
   const trs = rows.map((r,i)=>`<tr>
     <td>${r.op||'—'}</td>
     <td><span class="${r.mm==='>'?'tag-may':'tag-men'}">${r.mm==='>'?'MAYOR':'MENOR'}</span></td>
@@ -528,7 +528,7 @@ function buildRentabTable() {
     <td>${fN(r.com_dealer)}</td>
     <td><span class="${pClass(r.pct_d)}">${r.pct_d}%</span></td>
     <td>${fN(r.com_par)}</td>
-    <td>0,0%</td>
+    <td><span class="${pClass(r.pct_p)}">${r.pct_p}%</span></td>
     <td>${fN(r.total_com_broke)}</td>
     <td><span class="${pClass(r.pct_t)}">${r.pct_t}%</span></td>
     <td>${fN(r.com_seguros)}</td>
@@ -565,7 +565,7 @@ function buildRentabTable() {
       <td>${totOpsR ? Math.round(rows.reduce((a,r)=>a+r.plazo,0)/totOpsR) : '—'}m</td>
       <td>${fN(tot.afa)}</td><td><span class="${pClass(parseFloat(tAfaPct))}">${tAfaPct}%</span></td>
       <td>${fN(tot.cd)}</td><td><span class="${pClass(parseFloat(tCdPct))}">${tCdPct}%</span></td>
-      <td>${fN(tot.par)}</td><td>0%</td>
+      <td>${fN(tot.par)}</td><td>${tot.fin?+(tot.par/tot.fin*100).toFixed(1):0}%</td>
       <td>${fN(tot.tcb)}</td><td><span class="${pClass(parseFloat(tTcbPct))}">${tTcbPct}%</span></td>
       <td>${fN(tot.seg)}</td>
       <td>${fN(tot.ig)}</td><td><span class="${pClass(parseFloat(tIgPct))}">${tIgPct}%</span></td>
@@ -801,7 +801,7 @@ function buildRentabTablePL() {
   if(fil_pl.ccs) rows = rows.filter(r=>r.ccs===fil_pl.ccs);
   if(fil_pl.fin) rows = rows.filter(r=>r.financiera===fil_pl.fin);
 
-  const pClass = p => p>=25?'pct-ok':p>=15?'pct-hi':p>=8?'pct-warn':'pct-bad';
+  const pClass = _pClassParam;   // semáforo paramétrico (mantenedor Parámetros del Dashboard)
   const trs = rows.map(r=>`<tr>
     <td>${r.op||'—'}</td>
     <td><span class="${r.mm==='>'?'tag-may':'tag-men'}">${r.mm==='>'?'MAYOR':'MENOR'}</span></td>
@@ -815,7 +815,7 @@ function buildRentabTablePL() {
     <td>${fN(r.com_dealer)}</td>
     <td><span class="${pClass(r.pct_d)}">${r.pct_d}%</span></td>
     <td>${fN(r.com_par)}</td>
-    <td>0,0%</td>
+    <td><span class="${pClass(r.pct_p)}">${r.pct_p}%</span></td>
     <td>${fN(r.total_com_broke)}</td>
     <td><span class="${pClass(r.pct_t)}">${r.pct_t}%</span></td>
     <td>${fN(r.com_seguros)}</td>
@@ -852,7 +852,7 @@ function buildRentabTablePL() {
       <td>${totOpsR?Math.round(rows.reduce((a,r)=>a+r.plazo,0)/totOpsR):'—'}m</td>
       <td>${fN(tot.afa)}</td><td><span class="${pClass(parseFloat(tAfaPct))}">${tAfaPct}%</span></td>
       <td>${fN(tot.cd)}</td><td><span class="${pClass(parseFloat(tCdPct))}">${tCdPct}%</span></td>
-      <td>${fN(tot.par)}</td><td>0%</td>
+      <td>${fN(tot.par)}</td><td>${tot.fin?+(tot.par/tot.fin*100).toFixed(1):0}%</td>
       <td>${fN(tot.tcb)}</td><td><span class="${pClass(parseFloat(tTcbPct))}">${tTcbPct}%</span></td>
       <td>${fN(tot.seg)}</td>
       <td>${fN(tot.ig)}</td><td><span class="${pClass(parseFloat(tIgPct))}">${tIgPct}%</span></td>
@@ -890,17 +890,20 @@ function buildRentabTablePL() {
 // ======== VISTA 3 ========
 function buildV3() {
   const T = window.DASH.tendencia || [];
-  const s25 = T.filter(t=>t.mes_key.startsWith('2025'));
+  // Año VIGENTE derivado de los datos (antes estaba clavado en 2025: los KPIs
+  // mostraban el año pasado mientras los gráficos mostraban todo el histórico).
+  const anioT = (T.length ? T[T.length-1].mes_key : String(new Date().getFullYear())).slice(0,4);
+  const s25 = T.filter(t=>t.mes_key.startsWith(anioT));
   const totOps25 = s25.reduce((a,t)=>a+t.total_ops,0);
   const totOt25  = s25.reduce((a,t)=>a+t.otorgados,0);
   const totSal25 = s25.reduce((a,t)=>a+t.saldo_ot,0);
-  const tcProm   = (totOt25/totOps25*100).toFixed(1);
-  const best     = s25.reduce((a,b)=>b.otorgados>a.otorgados?b:a,s25[0]);
+  const tcProm   = totOps25 ? (totOt25/totOps25*100).toFixed(1) : '0.0';
+  const best     = s25.reduce((a,b)=>b.otorgados>a.otorgados?b:a,s25[0]||{mes:'—',otorgados:0});
 
   document.getElementById('kpi3').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total Ingresados 2025</div><div class="kpi-val">${fN(totOps25)}</div></div>
-    <div class="kpi-box"><div class="kpi-label">Otorgados 2025</div><div class="kpi-val">${fN(totOt25)}</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Saldo Total 2025</div><div class="kpi-val">${fM(totSal25)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Total Ingresados ${anioT}</div><div class="kpi-val">${fN(totOps25)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Otorgados ${anioT}</div><div class="kpi-val">${fN(totOt25)}</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Saldo Total ${anioT}</div><div class="kpi-val">${fM(totSal25)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Tasa Conv. Prom.</div><div class="kpi-val">${tcProm}%</div></div>
     <div class="kpi-box"><div class="kpi-label">Mejor Mes</div><div class="kpi-val">${best.mes}</div><div class="kpi-sub">${best.otorgados} otorgados</div></div>`;
 
@@ -1097,7 +1100,7 @@ function buildV1b() {
   const jTotPar = jDet.reduce((a,r)=>a+(r.com_par||0),0);
   const jTotArr = jDet.reduce((a,r)=>a+(r.arriendo_parque||0),0);
   const jTotNeto = jDet.reduce((a,r)=>a+(r.ing_neto||0),0);
-  const jFinStyle = jTotFin < 30000000 ? 'color:#e53935;font-weight:700' : '';
+  const jFinStyle = jTotFin < window.DASH_PARAMS.alerta_fin_mes ? 'color:#e53935;font-weight:700' : '';
   // Nombre del mes anterior en el título — mismo criterio de mes que la comisión ejecutivos
   const _refJ = document.getElementById('sel-hasta')?.value || document.getElementById('sel-desde')?.value || '';
   const [_jy, _jm] = _refJ ? _refJ.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
@@ -1255,7 +1258,7 @@ function buildV1b() {
   // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio)
   const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin);
   const ejRows2 = topEj.map(([nombre,v],i)=>{
-    const finStyle = v.fin < 40000000 ? 'color:#e53935;font-weight:700' : '';
+    const finStyle = v.fin < window.DASH_PARAMS.alerta_fin_ejecutivo ? 'color:#e53935;font-weight:700' : '';
     return `<tr>
     <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
@@ -1348,8 +1351,29 @@ window.DASH = window.DASH || { feb: {}, jan: {} };
     }
   });
 })();
+/* ── Parámetros del negocio (mantenedor Parámetros del Dashboard) ──
+   Umbrales que antes vivían hardcodeados acá. Defaults = los valores históricos,
+   así el dashboard pinta igual aunque la API tarde; al llegar la respuesta se
+   re-renderiza con lo configurado. Editar en /mantenedores/dashboard-parametros/. */
+window.DASH_PARAMS = {
+  meta_ing_dia: 2, alerta_fin_ejecutivo: 40000000, alerta_fin_mes: 30000000,
+  rentab_verde: 25, rentab_amarillo: 15, rentab_naranjo: 8,
+};
+async function cargarParametros() {
+  try {
+    const r = await fetch('/api/dashboard/parametros', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+    const j = await r.json();
+    if (j && j.success && j.data)
+      Object.entries(j.data).forEach(([k, v]) => { if (Number.isFinite(Number(v.valor))) window.DASH_PARAMS[k] = Number(v.valor); });
+  } catch (e) { console.warn('[dash params]', e.message); }
+}
+const _pClassParam = p => p >= window.DASH_PARAMS.rentab_verde ? 'pct-ok'
+  : p >= window.DASH_PARAMS.rentab_amarillo ? 'pct-hi'
+  : p >= window.DASH_PARAMS.rentab_naranjo ? 'pct-warn' : 'pct-bad';
+
 // ── Cargar datos frescos desde el JSON generado automáticamente ──
 async function cargarDatos() {
+  await cargarParametros();
   const loadingEl = document.getElementById('loading-overlay');
   try {
     const r = await fetch('/api/dashboard/datos', {
@@ -1580,7 +1604,7 @@ window.RAW_DATA = [];
         })(),
         saldo_precio: r.saldo_precio, total_a_financiar: r.monto_financiado,
         plazo: r.plazo, tasa_cli: r.tasa_cli||0, ing_autofacil: r.rentab_afa, pct_a,
-        com_dealer: r.com_dealer, pct_d, com_par: r.com_parque, pct_p: 0,
+        com_dealer: r.com_dealer, pct_d, com_par: r.com_parque, pct_p: +((r.com_parque||0)/fin2*100).toFixed(1),
         total_com_broke: tcb, pct_t, com_seguros: r.com_seguros,
         ingreso_bruto: ib, pct_b,
         ing_neto: r.ingreso_neto_total || 0, arriendo_parque: r.arriendo_parque || 0
@@ -2391,9 +2415,10 @@ function buildV7() {
 }
 
 // ======== PROSPECCIÓN (funnel + meta ingresos diarios) ========
-// Regla negocio: cada ejecutivo debe digitar al menos META_ING_DIA ingresos por
+// Regla negocio: cada ejecutivo debe digitar al menos META_ING_DIA() ingresos por
 // día hábil (lunes a sábado). Bajo eso, el problema clave es PROSPECCIÓN.
-const META_ING_DIA = 2;
+// Paramétrico: mantenedor Parámetros del Dashboard (default 2)
+const META_ING_DIA = () => window.DASH_PARAMS.meta_ing_dia;
 
 // Días hábiles L-S entre dos meses 'YYYY-MM' inclusive; el mes en curso se
 // cuenta solo hasta hoy (hora Chile).
@@ -2418,7 +2443,7 @@ function buildV7p() {
   document.getElementById('titulo-v7p').textContent = 'Embudo por Ejecutivo — ' + lbl;
 
   const diasHab = diasHabilesLS(desde, hasta);
-  const metaIng = META_ING_DIA * diasHab;
+  const metaIng = META_ING_DIA() * diasHab;
 
   const rows = window.RAW_DATA.filter(r => r.mes >= desde && r.mes <= hasta && r.ejecutivo);
   const ejMap = {};
@@ -2438,10 +2463,10 @@ function buildV7p() {
   const totIng  = ejs.reduce((a,[,v])=>a+v.ing,0);
   const totApro = ejs.reduce((a,[,v])=>a+v.apro,0);
   const totOt   = ejs.reduce((a,[,v])=>a+v.ot,0);
-  const bajoMeta = ejs.filter(([,v]) => v.ing/diasHab < META_ING_DIA).length;
+  const bajoMeta = ejs.filter(([,v]) => v.ing/diasHab < META_ING_DIA()).length;
   document.getElementById('kpi7p').innerHTML = `
     <div class="kpi-box"><div class="kpi-label">Días Hábiles (L–S)</div><div class="kpi-val big">${diasHab}</div><div class="kpi-sub">del período</div></div>
-    <div class="kpi-box highlight"><div class="kpi-label">Meta Ing. / Ejecutivo</div><div class="kpi-val big">${metaIng}</div><div class="kpi-sub">${META_ING_DIA} × ${diasHab} días</div></div>
+    <div class="kpi-box highlight"><div class="kpi-label">Meta Ing. / Ejecutivo</div><div class="kpi-val big">${metaIng}</div><div class="kpi-sub">${META_ING_DIA()} × ${diasHab} días</div></div>
     <div class="kpi-box"><div class="kpi-label">Ingresados</div><div class="kpi-val big">${totIng}</div><div class="kpi-sub">${(totIng/Math.max(ejs.length,1)/diasHab).toFixed(2)} ing/día prom.</div></div>
     <div class="kpi-box"><div class="kpi-label">Aprobados</div><div class="kpi-val big">${totApro}</div><div class="kpi-sub">${fPct(totApro,totIng)} TA</div></div>
     <div class="kpi-box"><div class="kpi-label">Otorgados</div><div class="kpi-val big">${totOt}</div><div class="kpi-sub">${fPct(totOt,totApro)} TC</div></div>
@@ -2454,7 +2479,7 @@ function buildV7p() {
     <th style="padding:6px 8px;text-align:left;position:sticky;left:0;background:#1a3a6a;min-width:160px">Ejecutivo</th>
     <th style="padding:6px;text-align:center;min-width:50px">Ing.</th>
     <th style="padding:6px;text-align:center;min-width:55px" title="Ingresados / días hábiles L-S">Ing./día</th>
-    <th style="padding:6px;text-align:center;min-width:50px" title="Meta = ${META_ING_DIA} × días hábiles">Meta</th>
+    <th style="padding:6px;text-align:center;min-width:50px" title="Meta = ${META_ING_DIA()} × días hábiles">Meta</th>
     <th style="padding:6px;text-align:center;min-width:50px">Apro.</th>
     <th style="padding:6px;text-align:center;min-width:55px" title="Tasa Aprobación">TA%</th>
     <th style="padding:6px;text-align:center;min-width:45px">Ot.</th>
@@ -2470,14 +2495,14 @@ function buildV7p() {
     const ingDia = v.ing / diasHab;
     const taC = ta >= taTeam*0.9 ? '#43a047' : ta >= taTeam*0.7 ? '#fb8c00' : '#e53935';
     const tcC = tc >= tcTeam*0.9 ? '#43a047' : tc >= tcTeam*0.7 ? '#fb8c00' : '#e53935';
-    const idC = ingDia >= META_ING_DIA ? '#43a047' : ingDia >= META_ING_DIA*0.75 ? '#fb8c00' : '#e53935';
+    const idC = ingDia >= META_ING_DIA() ? '#43a047' : ingDia >= META_ING_DIA()*0.75 ? '#fb8c00' : '#e53935';
 
     const pApro = v.ing ? v.apro/v.ing*100 : 0;
     const pOt   = v.ing ? v.ot/v.ing*100 : 0;
 
     // Diagnóstico: prospección primero (tope del embudo), luego el resto
     let diag = '', diagC = '#666';
-    if (ingDia < META_ING_DIA)      { diag = '⚠ Prospección'; diagC = '#e53935'; }
+    if (ingDia < META_ING_DIA())      { diag = '⚠ Prospección'; diagC = '#e53935'; }
     else if (ta < taTeam*0.7)       { diag = '⚠ Aprobación';  diagC = '#e53935'; }
     else if (tc < tcTeam*0.7)       { diag = '⚠ Conversión';  diagC = '#fb8c00'; }
     else                            { diag = '✓ OK';          diagC = '#43a047'; }
@@ -2532,7 +2557,7 @@ function buildV7p() {
       labels: lblIng,
       datasets: [{
         label: 'Ing./día', data: valIng,
-        backgroundColor: valIng.map(v => v >= META_ING_DIA ? '#43a047cc' : v >= META_ING_DIA*0.75 ? '#fb8c00cc' : '#e53935cc'),
+        backgroundColor: valIng.map(v => v >= META_ING_DIA() ? '#43a047cc' : v >= META_ING_DIA()*0.75 ? '#fb8c00cc' : '#e53935cc'),
         borderRadius: 3
       }]
     },
@@ -2541,7 +2566,7 @@ function buildV7p() {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.raw} ing/día (meta: ${META_ING_DIA})` } }
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw} ing/día (meta: ${META_ING_DIA()})` } }
       },
       scales: {
         x: { min: 0, ticks: { font: { size: 9 } }, grid: { color: '#f0f2f5' } },

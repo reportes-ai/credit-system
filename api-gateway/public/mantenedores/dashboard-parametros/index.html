@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- v1.0 — Mantenedor Parámetros del Dashboard: meta de prospección, alertas rojas y semáforo de rentabilidad, sin tocar código -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parámetros del Dashboard — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:860px; margin:0 auto; padding:22px 20px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:20px 22px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .grupo h3 { margin:0 0 4px; font-size:.95rem; color:var(--navy); }
+  .grupo p.desc { margin:0 0 12px; font-size:.8rem; color:#64748b; }
+  .fila { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid #f1f5f9; }
+  .fila label { flex:1; font-size:.85rem; }
+  .fila input { width:150px; border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.9rem; text-align:right; }
+  .fila input:focus { outline:none; border-color:var(--accent); }
+  .btnx { border:none; border-radius:10px; padding:10px 22px; font-size:.88rem; font-weight:700; cursor:pointer; background:#16a34a; color:#fff; }
+  .btnx[disabled] { opacity:.6; cursor:default; }
+  .msg { font-size:.82rem; margin-left:12px; font-weight:600; }
+  .sem { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  .afecta { background:#f8fafc; border-left:4px solid var(--blue); border-radius:10px; padding:16px 18px; font-size:.82rem; }
+  .afecta h4 { margin:0 0 8px; font-size:.88rem; color:var(--navy); }
+  .afecta ul { margin:0; padding-left:18px; } .afecta li { margin-bottom:5px; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Mantenedores', href:'/mantenedores/' },
+  { label:'Parámetros del Dashboard', icon:'bi-sliders', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-sliders"></i><div>
+    <h2>Parámetros del Dashboard</h2>
+    <p>Metas y umbrales que antes vivían en el código: acá los cambia el Administrador sin programador. El dashboard los aplica en la próxima carga.</p>
+  </div></div>
+
+  <div class="card-af grupo">
+    <h3><i class="bi bi-bullseye"></i> Meta de prospección</h3>
+    <p class="desc">Regla comercial: cuántos ingresos debe digitar cada ejecutivo por día hábil (lunes a sábado). Bajo la meta, el diagnóstico del funnel marca "⚠ Prospección".</p>
+    <div class="fila"><label>Ingresos por ejecutivo por día hábil</label><input type="number" step="0.5" min="0" id="meta_ing_dia"></div>
+  </div>
+
+  <div class="card-af grupo">
+    <h3><i class="bi bi-exclamation-triangle"></i> Alertas rojas de colocación</h3>
+    <p class="desc">Bajo estos montos, el Total Financiado se pinta rojo en las tablas del dashboard.</p>
+    <div class="fila"><label>Por <b>ejecutivo</b> en el período (tabla Ejecutivos — Otorgados)</label><input type="number" step="1000000" min="0" id="alerta_fin_ejecutivo"></div>
+    <div class="fila"><label>Del <b>mes anterior completo</b> (cuadro Resumen Mes Anterior)</label><input type="number" step="1000000" min="0" id="alerta_fin_mes"></div>
+  </div>
+
+  <div class="card-af grupo">
+    <h3><i class="bi bi-palette"></i> Semáforo de rentabilidad (%)</h3>
+    <p class="desc">Colorea los porcentajes de margen (%_A, %_D, %_t, %_B) en Rentabilidades y P&L Operativo. Debe cumplirse verde ≥ amarillo ≥ naranjo; bajo el naranjo, rojo.</p>
+    <div class="fila"><label><span class="sem" style="background:#43a047"></span>Verde desde</label><input type="number" step="1" min="0" id="rentab_verde"></div>
+    <div class="fila"><label><span class="sem" style="background:#fbc02d"></span>Amarillo desde</label><input type="number" step="1" min="0" id="rentab_amarillo"></div>
+    <div class="fila"><label><span class="sem" style="background:#fb8c00"></span>Naranjo desde</label><input type="number" step="1" min="0" id="rentab_naranjo"></div>
+  </div>
+
+  <div style="margin:18px 0 26px">
+    <button class="btnx" id="btnGuardar" onclick="guardar()"><i class="bi bi-save"></i> Guardar</button>
+    <span class="msg" id="msg"></span>
+  </div>
+
+  <div class="afecta">
+    <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
+    <ul>
+      <li><b>Meta de prospección</b> → KPI "Meta Ing./Ejecutivo", columna Meta, semáforo Ing./día, diagnóstico "⚠ Prospección" y gráfico de barras del <a href="/dashboard/">Dashboard → Funnel/Prospección</a>.</li>
+      <li><b>Alerta roja por ejecutivo</b> → color del Total Fin. en <a href="/dashboard/">Dashboard → Otorgados → Ejecutivos</a>.</li>
+      <li><b>Alerta roja del mes anterior</b> → color del Total Financiado en <a href="/dashboard/">Dashboard → Resumen Mes Anterior</a>.</li>
+      <li><b>Semáforo de rentabilidad</b> → colores de los % de margen en <a href="/dashboard/">Dashboard → Rentabilidades y P&L Operativo</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+const CAMPOS = ['meta_ing_dia','alerta_fin_ejecutivo','alerta_fin_mes','rentab_verde','rentab_amarillo','rentab_naranjo'];
+
+async function cargar() {
+  const j = await fetch('/api/dashboard/parametros', { headers: H }).then(r => r.json()).catch(() => null);
+  if (!j || !j.success) { document.getElementById('msg').textContent = 'Error al cargar'; return; }
+  CAMPOS.forEach(k => { if (j.data[k]) document.getElementById(k).value = j.data[k].valor; });
+}
+async function guardar() {
+  const btn = document.getElementById('btnGuardar'), msg = document.getElementById('msg');
+  btn.disabled = true; msg.textContent = ''; msg.style.color = '#16a34a';
+  const body = {};
+  CAMPOS.forEach(k => body[k] = parseFloat(document.getElementById(k).value));
+  const j = await fetch('/api/dashboard/parametros', { method: 'POST', headers: H, body: JSON.stringify(body) })
+    .then(r => r.json()).catch(() => null);
+  btn.disabled = false;
+  if (j && j.success) { msg.textContent = '✓ Guardado — el dashboard lo aplica en la próxima carga'; }
+  else { msg.style.color = '#b91c1c'; msg.textContent = (j && j.error) || 'Error al guardar'; }
+}
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

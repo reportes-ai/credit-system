@@ -522,3 +522,80 @@ exports.getClimaCorrelacion = async (req, res) => {
     res.status(500).json({ success: false, data: null, error: 'Error al calcular la correlación clima/feriados' });
   }
 };
+
+/* ─── Parámetros del Dashboard (mantenedor, v170) ──────────────────────────────
+   Umbrales de negocio que vivían HARDCODEADOS en el JS del dashboard (meta de
+   prospección, rojos de alerta, semáforo de rentabilidad): el Administrador no
+   podía verlos ni cambiarlos. Ahora viven en dashboard_config (clave 'parametros')
+   y se editan en /mantenedores/dashboard-parametros/. Filosofía paramétrica. */
+const PARAMS_KEY = 'parametros';
+const PARAMS_DEFAULT = {
+  meta_ing_dia:        { valor: 2,        label: 'Meta de prospección: ingresos por ejecutivo por día hábil' },
+  alerta_fin_ejecutivo:{ valor: 40000000, label: 'Rojo en Total Financiado del ejecutivo si queda bajo este monto ($/mes)' },
+  alerta_fin_mes:      { valor: 30000000, label: 'Rojo en Total Financiado del mes anterior si queda bajo este monto ($)' },
+  rentab_verde:        { valor: 25,       label: 'Semáforo de rentabilidad: verde desde este % de margen' },
+  rentab_amarillo:     { valor: 15,       label: 'Semáforo de rentabilidad: amarillo desde este %' },
+  rentab_naranjo:      { valor: 8,        label: 'Semáforo de rentabilidad: naranjo desde este % (bajo eso, rojo)' },
+};
+
+exports.getParametros = async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT config_value FROM dashboard_config WHERE config_key = ?', [PARAMS_KEY]);
+    let data = PARAMS_DEFAULT;
+    if (rows.length) {
+      try {
+        const saved = JSON.parse(rows[0].config_value);
+        // merge: claves nuevas del código aparecen solas; valores guardados mandan
+        data = Object.fromEntries(Object.entries(PARAMS_DEFAULT).map(([k, d]) =>
+          [k, { ...d, valor: (saved[k] && Number.isFinite(Number(saved[k].valor ?? saved[k]))) ? Number(saved[k].valor ?? saved[k]) : d.valor }]));
+      } catch { /* JSON corrupto: defaults */ }
+    }
+    res.json({ success: true, data, error: null });
+  } catch (err) {
+    console.error('[dashboard] getParametros:', err);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+exports.saveParametros = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const out = {};
+    for (const [k, d] of Object.entries(PARAMS_DEFAULT)) {
+      const n = Number(b[k]);
+      if (!Number.isFinite(n) || n < 0)
+        return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${d.label}` });
+      out[k] = { valor: n };
+    }
+    if (!(out.rentab_verde.valor >= out.rentab_amarillo.valor && out.rentab_amarillo.valor >= out.rentab_naranjo.valor))
+      return res.status(400).json({ success: false, data: null, error: 'El semáforo debe cumplir verde ≥ amarillo ≥ naranjo' });
+    await pool.query(`INSERT INTO dashboard_config (config_key, config_value) VALUES (?, ?)
+      ON DUPLICATE KEY UPDATE config_value = VALUES(config_value), updated_at = NOW()`,
+      [PARAMS_KEY, JSON.stringify(out)]);
+    try { require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'dashboard', entidad: 'parametros', entidad_id: PARAMS_KEY,
+      detalle: 'Actualizó los Parámetros del Dashboard: ' + Object.entries(out).map(([k, v]) => `${k}=${v.valor}`).join(', ') }); } catch (_) {}
+    res.json({ success: true, data: out, error: null });
+  } catch (err) {
+    console.error('[dashboard] saveParametros:', err);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* Card en Mantenedores + permiso (anti-hardcode) */
+require('../../../../shared/migrate').enFila('dashboard-parametros', async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' AND estado='activo' LIMIT 1");
+    if (!mod) return;
+    const f = { codigo: 'mant_dashboard_param', nombre: 'Parámetros del Dashboard',
+                href: '/mantenedores/dashboard-parametros/', icono: 'bi-sliders' };
+    const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [f.codigo]);
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [r] = await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+        [mod.id_modulo, f.nombre, f.codigo, f.href, f.icono]);
+      idF = r.insertId;
+    }
+    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
+    console.log('[dashboard-parametros] mantenedor listo');
+  } catch (e) { console.error('[dashboard-parametros migration]', e.message); }
+});

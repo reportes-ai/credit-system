@@ -14,5 +14,7 @@ router.get('/presupuesto',  verifyToken, ctrl.getPresupuesto);
 router.get('/seguros-historico', verifyToken, ctrl.getSegurosHistorico);
 router.get('/clima-correlacion', verifyToken, ctrl.getClimaCorrelacion);
 router.post('/presupuesto', verifyToken, configurar, ctrl.savePresupuesto);
+router.get('/parametros',   verifyToken, ctrl.getParametros);                  // los lee todo usuario del dashboard
+router.post('/parametros',  verifyToken, requireFunc('mant_dashboard_param'), ctrl.saveParametros);
 
 module.exports = router;
