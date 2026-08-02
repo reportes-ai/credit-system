@@ -4,7 +4,7 @@ const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforceme
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { auditar } = require('../../../../shared/audit');
 const { publicarAnuncio } = require('../../../../shared/anuncios');
-const { marcarForzadosCalculo } = require('../../../creditos/src/utils/recalcular-mes');
+const { marcarForzadosCalculo, recalcularPorOps } = require('../../../creditos/src/utils/recalcular-mes');
 // Motor único de etapa: otorgar escribe las TRES columnas de una sola vez.
 const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 const pdf = require('pdf-parse');
@@ -729,6 +729,14 @@ const otorgar = async (req, res) => {
             console.log(`[carta otorgar] num_op AutoFácil ${nuevo} asignado (antes ${cr.num_op}, id ${cr.id})`);
           }
         } catch (e) { console.error('[carta otorgar→num_op AF]', e.message); }
+        /* MOTOR DE CÁLCULO tras otorgar (Máxima 1 + recálculo automático en toda
+           vía): sin esto el crédito quedaba con plazo/tasa/primas completos pero
+           monto_comision_fin, com_* e ingreso_neto_total en NULL — "sin ingreso
+           por colocación ni por seguros" en el dashboard (2608001-2608004).
+           Fire-and-forget: respeta forzados y meses cerrados. */
+        pool.query(`SELECT id FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args)
+          .then(([[cr2]]) => cr2 && recalcularPorOps([cr2.id]))
+          .catch(e => console.error('[carta otorgar→recalculo]', e.message));
         // comdea_real pactado: márcalo forzado para que el recálculo mensual lo respete
         // (marcarForzadosCalculo re-compara contra el motor: solo queda forzado si difiere).
         if (partB > 0) {
