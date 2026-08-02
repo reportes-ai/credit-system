@@ -31,6 +31,70 @@ async function generarNumeroCreditoDesdeCartas() {
   return prefix + String(seq).padStart(3, '0');
 }
 
+/* Persiste en la CARTA las primas/gastos del documento de la financiera (los
+   trae el autofill del PDF). Antes solo viajaban en el request y se perdían si
+   el crédito ya existía. Fire & forget: no frena el guardado de la carta. */
+function persistirPrimasCarta(idCarta, c) {
+  if (!idCarta) return;
+  if (c.segRdh === undefined && c.segDesgravamen === undefined && c.segCesantia === undefined
+      && c.segRep === undefined && c.gps === undefined && c.gastos === undefined) return;
+  const rdhT = (c.segRdh != null || c.segDesgravamen != null)
+    ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
+  pool.query(`UPDATE cartas_aprobacion SET
+      seg_rdh = COALESCE(?, seg_rdh), seg_cesantia = COALESCE(?, seg_cesantia),
+      seg_rep = COALESCE(?, seg_rep), gps_monto = COALESCE(?, gps_monto),
+      gastos_monto = COALESCE(?, gastos_monto) WHERE id = ?`,
+    [rdhT, c.segCesantia != null ? Number(c.segCesantia) : null,
+     c.segRep != null ? Number(c.segRep) : null,
+     c.gps != null ? Number(c.gps) : null,
+     c.gastos != null ? Number(c.gastos) : null, idCarta]
+  ).catch(e => console.error('[carta primas persist]', e.message));
+}
+
+/* Sincroniza hacia el CRÉDITO enlazado lo que la carta sabe y el crédito no:
+   dealer/parque, primas/GPS/gastos, plazo/tasa/vendedor. Solo RELLENA (COALESCE
+   sobre NULL) — jamás pisa un dato ya digitado. Corre tanto al EDITAR la carta
+   como al CREARLA ya enlazada a un crédito de carga masiva: ese segundo camino
+   no sincronizaba NADA y las operaciones caían a "datos faltantes" (6189618,
+   6189286) aunque la carta traía todo. */
+function sincronizarCreditoDesdeCarta(c, idCred) {
+  if (!idCred) return;
+  // Dealer/parque corregidos en la carta → al crédito NO otorgado (caso 2607043:
+  // guardaron con un dealer, corrigieron la carta y el crédito quedó con el viejo)
+  if (c.concesionario || c.rutConc || c.rut_conc) {
+    pool.query(`UPDATE creditos SET
+        automotora = COALESCE(?, automotora), rut_dealer = COALESCE(?, rut_dealer),
+        parque = COALESCE(?, parque), updated_at = NOW()
+      WHERE id = ? AND estado_credito <> 'OTORGADO'`,
+      [c.concesionario || null, (c.rutConc || c.rut_conc || null), (c.parque || null), idCred]
+    ).catch(e => console.error('[carta→credito dealer]', e.message));
+  }
+  // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
+  if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined || c.gastos !== undefined) {
+    const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
+    const ces  = c.segCesantia != null ? Number(c.segCesantia) : null;
+    const rep  = c.segRep != null ? Number(c.segRep) : null;
+    const tot  = (rdhT != null || ces != null || rep != null) ? (Number(rdhT || 0) + Number(ces || 0) + Number(rep || 0)) : null;
+    pool.query(`UPDATE creditos SET
+        seguro_rdh = COALESCE(?, seguro_rdh), seguro_cesantia = COALESCE(?, seguro_cesantia),
+        seguro_rep_menor = COALESCE(?, seguro_rep_menor), seguros = COALESCE(?, seguros),
+        gps = COALESCE(?, gps), gastos = COALESCE(?, gastos), updated_at = NOW() WHERE id = ?`,
+      [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null),
+       (c.gastos != null ? Number(c.gastos) : null), idCred]
+    ).catch(e => console.error('[carta→credito primas]', e.message));
+  }
+  // Plazo/tasa/vendedor: la carta los trae; el crédito de carga masiva a veces no.
+  // El vendedor del crédito solo se rellena si está vacío o es el placeholder
+  // "VENDEDOR (AFA) …" (que es nuestro ejecutivo, no el vendedor del dealer).
+  pool.query(`UPDATE creditos SET
+      plazo = COALESCE(plazo, ?), tascli_real = COALESCE(tascli_real, ?),
+      vendedor = CASE WHEN COALESCE(vendedor,'')='' OR UPPER(vendedor) LIKE 'VENDEDOR (AFA)%' OR UPPER(vendedor) LIKE 'VENDEDOR%PARQUE%'
+                      THEN COALESCE(?, vendedor) ELSE vendedor END,
+      updated_at = NOW() WHERE id = ?`,
+    [c.plazo || null, (c.tasa_credito || c.tasaCredito || null), (c.vendedor || null), idCred]
+  ).catch(e => console.error('[carta→credito datos]', e.message));
+}
+
 /* Crea registro en creditos a partir de una carta y devuelve { id, numero_credito } */
 async function crearCreditoDesdeCartas(c) {
   const rutNorm = RUT.normalizar(c.rut_cliente || c.rutCliente) || (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
@@ -280,6 +344,15 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     // Snapshot del TIER UAC vigente al emitir la carta (para la rentabilidad). Se puede recalcular por mes.
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS tier_uac_n INT DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS tier_uac_pct DECIMAL(6,3) DEFAULT NULL`);
+    /* Primas y gastos de la carta de la financiera (v168.2): el autofill del PDF
+       los extraía pero la carta NO los guardaba — si el crédito ya existía (carga
+       masiva), las primas se PERDÍAN y la operación caía a "datos faltantes".
+       La carta es el documento que las trae: ahora las persiste y las sincroniza. */
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rdh DECIMAL(12,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_cesantia DECIMAL(12,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rep DECIMAL(12,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gps_monto DECIMAL(12,2) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gastos_monto DECIMAL(12,2) DEFAULT NULL`);
   } catch(e) { /* columna ya existe */ }
   // Barrer vencidas al arrancar (por si el servicio estuvo caído al cumplirse el plazo).
   barrerVencidas().catch(e => console.error('[cartas barrerVencidas boot]', e.message));
@@ -638,6 +711,24 @@ const otorgar = async (req, res) => {
           `UPDATE creditos SET num_op = CAST(numero_credito AS UNSIGNED)
             WHERE (${cond.join(' OR ')}) AND num_op IS NULL AND numero_credito REGEXP '^[0-9]+$'`, args
         ).catch(() => {});
+        /* NÚMERO DE OPERACIÓN NUESTRO al otorgar (regla de Pato, desde agosto 2026):
+           los créditos de la carga masiva nacen con num_op = ID de la financiera
+           (7 dígitos, ej. 6189286). Hasta julio se dejó ese número; desde agosto,
+           al OTORGAR se les asigna el siguiente correlativo AutoFácil (serie
+           80000-99999, hoy en 89xxx). Se hace AL OTORGAR y no antes para no gastar
+           correlativos en solicitudes que no se cursan. Solo si num_op ≥ 1.000.000
+           (o sea, aún trae el ID de la financiera) — nunca pisa un correlativo ya puesto. */
+        try {
+          const [[cr]] = await pool.query(
+            `SELECT id, num_op FROM creditos WHERE (${cond.join(' OR ')}) LIMIT 1`, args);
+          if (cr && Number(cr.num_op) >= 1000000) {
+            const [[mx]] = await pool.query(
+              'SELECT COALESCE(MAX(num_op),80000) mx FROM creditos WHERE num_op BETWEEN 80000 AND 99999');
+            const nuevo = Number(mx.mx) + 1;
+            await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op>=1000000', [nuevo, cr.id]);
+            console.log(`[carta otorgar] num_op AutoFácil ${nuevo} asignado (antes ${cr.num_op}, id ${cr.id})`);
+          }
+        } catch (e) { console.error('[carta otorgar→num_op AF]', e.message); }
         // comdea_real pactado: márcalo forzado para que el recálculo mensual lo respete
         // (marcarForzadosCalculo re-compara contra el motor: solo queda forzado si difiere).
         if (partB > 0) {
@@ -862,33 +953,11 @@ const upsert = async (req, res) => {
         [...vals, c.id]
       );
       res.json({ success: true, data: { id: c.id }, error: null });
+      persistirPrimasCarta(c.id, c);
       // Sincronizar estado del crédito vinculado
       if (c.idCreditoCreado || c.id_credito_creado) {
         const idCred = c.idCreditoCreado || c.id_credito_creado;
-        // Dealer/parque corregidos en la carta → al crédito NO otorgado (caso 2607043:
-        // guardaron con un dealer, corrigieron la carta y el crédito quedó con el viejo)
-        if (c.concesionario || c.rutConc || c.rut_conc) {
-          pool.query(`UPDATE creditos SET
-              automotora = COALESCE(?, automotora), rut_dealer = COALESCE(?, rut_dealer),
-              parque = COALESCE(?, parque), updated_at = NOW()
-            WHERE id = ? AND estado_credito <> 'OTORGADO'`,
-            [c.concesionario || null, (c.rutConc || c.rut_conc || null), (c.parque || null), idCred]
-          ).catch(e => console.error('[carta→credito dealer]', e.message));
-        }
-        // Primas/GPS digitadas o corregidas en la carta → al crédito (0 explícito válido)
-        if (c.segRdh !== undefined || c.segDesgravamen !== undefined || c.segCesantia !== undefined || c.segRep !== undefined || c.gps !== undefined || c.gastos !== undefined) {
-          const rdhT = (c.segRdh != null || c.segDesgravamen != null) ? (Number(c.segRdh || 0) + Number(c.segDesgravamen || 0)) : null;
-          const ces  = c.segCesantia != null ? Number(c.segCesantia) : null;
-          const rep  = c.segRep != null ? Number(c.segRep) : null;
-          const tot  = (rdhT != null || ces != null || rep != null) ? (Number(rdhT || 0) + Number(ces || 0) + Number(rep || 0)) : null;
-          pool.query(`UPDATE creditos SET
-              seguro_rdh = COALESCE(?, seguro_rdh), seguro_cesantia = COALESCE(?, seguro_cesantia),
-              seguro_rep_menor = COALESCE(?, seguro_rep_menor), seguros = COALESCE(?, seguros),
-              gps = COALESCE(?, gps), gastos = COALESCE(?, gastos), updated_at = NOW() WHERE id = ?`,
-            [rdhT, ces, rep, tot, (c.gps != null ? Number(c.gps) : null),
-             (c.gastos != null ? Number(c.gastos) : null), idCred]
-          ).catch(e => console.error('[carta→credito primas]', e.message));
-        }
+        sincronizarCreditoDesdeCarta(c, idCred);
         if (c.status === 'APROBADA') {
           pool.query(`UPDATE creditos SET estado='CARTA_APROBACION', updated_at=NOW() WHERE id=? AND estado='INGRESO'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
         } else if (c.status === 'RECHAZADA') {
@@ -940,6 +1009,11 @@ const upsert = async (req, res) => {
          generaba UNA COMISIÓN POR CARTA — 9 operaciones quedaron con comisión
          duplicada por $4.499.700. La carta vigente es siempre la última. */
       anularCartasPrevias(r.insertId, c.id_financiera, req).catch(() => {});
+      persistirPrimasCarta(r.insertId, c);
+      /* Carta nueva ya ENLAZADA a un crédito de carga masiva: sincronizar igual
+         que en la edición — este camino no sincronizaba nada y las primas del
+         PDF de la financiera se perdían (operación a "datos faltantes"). */
+      if (c.idCreditoCreado) sincronizarCreditoDesdeCarta(c, c.idCreditoCreado);
       // Snapshot del TIER UAC vigente al generar la carta (para la rentabilidad)
       tierUAC(c.fecha).then(t => pool.query('UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE id=?', [t.n, t.pct, r.insertId])).catch(() => {});
       res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });

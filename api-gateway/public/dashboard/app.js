@@ -4513,6 +4513,7 @@ window.abrirModalIncompletos = function abrirModalIncompletos() {
     return `
     <tr data-id="${c.id}" style="border-bottom:1px solid #e5e7eb;font-size:.78rem">
       <td style="padding:7px 8px;font-weight:700;white-space:nowrap">${c.num_op}</td>
+      <td style="padding:7px 6px;color:#374151;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.cliente||''}">${c.cliente||'—'}</td>
       <td style="padding:7px 6px;color:#374151;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ejecutivo||'—'}</td>
       <td style="padding:7px 6px;white-space:nowrap">${(c.mes||'').slice(0,7)}</td>
       <td style="padding:7px 6px;font-weight:600;white-space:nowrap">${$m(c.monto_financiado)}</td>
@@ -4551,6 +4552,7 @@ window.abrirModalIncompletos = function abrirModalIncompletos() {
         <thead>
           <tr style="background:#fef3c7;font-size:.7rem;text-transform:uppercase;color:#78350f;letter-spacing:.4px;white-space:nowrap">
             <th style="padding:8px 8px;text-align:left">N° Operación</th>
+            <th style="padding:8px 6px;text-align:left">Cliente</th>
             <th style="padding:8px 6px;text-align:left">Ejecutivo</th>
             <th style="padding:8px 6px">Mes</th>
             <th style="padding:8px 6px">Monto</th>

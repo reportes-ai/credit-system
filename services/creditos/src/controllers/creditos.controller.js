@@ -933,21 +933,25 @@ const getReporteria = async (req, res) => {
 const getOtorgadosIncompletos = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT id, num_op, ejecutivo, automotora, monto_financiado, mes,
-             financiera, id_financiera, parque,
-             plazo, tascli_real,
-             seguro_rdh, seguro_cesantia, seguro_rep_menor,
-             monto_comision_fin, comdea_real, com_parque
-      FROM creditos
-      WHERE estado_eval = 'OTORGADO'
-        AND estado_credito NOT IN ('RECHAZADO','ANULADO')
-        AND (plazo IS NULL OR plazo = 0 OR tascli_real IS NULL OR tascli_real = 0
+      SELECT c.id, c.num_op, c.ejecutivo, c.automotora, c.monto_financiado, c.mes,
+             c.financiera, c.id_financiera, c.parque,
+             c.plazo, c.tascli_real,
+             c.seguro_rdh, c.seguro_cesantia, c.seguro_rep_menor,
+             c.monto_comision_fin, c.comdea_real, c.com_parque,
+             COALESCE(NULLIF(cl.nombre_completo,''),
+                      NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''))),''),
+                      c.nombre_cliente) AS cliente
+      FROM creditos c
+      LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+      WHERE c.estado_eval = 'OTORGADO'
+        AND c.estado_credito NOT IN ('RECHAZADO','ANULADO')
+        AND (c.plazo IS NULL OR c.plazo = 0 OR c.tascli_real IS NULL OR c.tascli_real = 0
              -- primas nunca digitadas (misma regla que la cola de digitación): afectan el
              -- ingreso por seguros SALVO en UNIDAD DE CREDITO (UAC no paga comisión de
              -- seguros — rentabilidad-calc.js). 0 explícito = válido.
-             OR (UPPER(COALESCE(financiera,'')) <> 'UNIDAD DE CREDITO'
-                 AND seguros IS NULL AND seguro_rdh IS NULL AND seguro_cesantia IS NULL AND seguro_rep_menor IS NULL))
-      ORDER BY mes DESC, num_op DESC
+             OR (UPPER(COALESCE(c.financiera,'')) <> 'UNIDAD DE CREDITO'
+                 AND c.seguros IS NULL AND c.seguro_rdh IS NULL AND c.seguro_cesantia IS NULL AND c.seguro_rep_menor IS NULL))
+      ORDER BY c.mes DESC, c.num_op DESC
       LIMIT 2000 -- LIMIT defensivo (cola de digitacion faltantes)
     `);
     res.json({ success: true, data: rows, error: null });
