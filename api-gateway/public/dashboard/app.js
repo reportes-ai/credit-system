@@ -449,12 +449,23 @@ function buildV2() {
     <span class="dleg-pct"> ${dt3?(dv3ops[i]/dt3*100).toFixed(1):0}%</span>
     <div style="font-size:10px;color:#888">${fM(dv3sal[i])}</div></div></div>`).join('');
 
-  // Estado eval riesgo
+  
+/* Anuladas REALES del período (antes había un "1" escrito a mano en las tablas
+   Estado Eval. Riesgo — mostraba una anulada fantasma en todos los períodos). */
+function _anuladasPeriodo() {
+  const d = document.getElementById('sel-desde')?.value || '';
+  const h = document.getElementById('sel-hasta')?.value || '';
+  return (window.RAW_DATA || []).filter(r => {
+    const m = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0, 7) : r.mes;
+    return r.estado_eval === 'ANULADO' && m >= d && m <= h;
+  }).length;
+}
+// Estado eval riesgo
   document.getElementById('t-estado2').innerHTML = `
     <thead><tr><th>Estado Eval. Riesgo</th><th>OP</th></tr></thead>
     <tbody>
       <tr><td>✓ OTORGADO</td><td>${det.length}</td></tr>
-      <tr><td>✓ ANULADO</td><td>1</td></tr>
+      <tr><td>✓ ANULADO</td><td>${_anuladasPeriodo()}</td></tr>
     </tbody>`;
 
   // Chart mayor/menor AFA vs total
@@ -740,7 +751,7 @@ function buildV2pl() {
     <thead><tr><th>Estado Eval. Riesgo</th><th>OP</th></tr></thead>
     <tbody>
       <tr><td>✓ OTORGADO</td><td>${det.length}</td></tr>
-      <tr><td>✓ ANULADO</td><td>1</td></tr>
+      <tr><td>✓ ANULADO</td><td>${_anuladasPeriodo()}</td></tr>
     </tbody>`;
 
   const ecMM = Chart.getChart(document.getElementById('ch-mm-pl')); if(ecMM) ecMM.destroy();
