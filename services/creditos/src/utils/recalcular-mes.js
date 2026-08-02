@@ -225,7 +225,7 @@ async function recalcularMeses(meses, opciones = {}) {
 
     // ── Traer todas las ops del mes (estados activos) ────────────────
     const [ops] = await pool.query(`
-      SELECT id, num_op, financiera, parque, rut_dealer, estado, estado_credito,
+      SELECT id, num_op, id_financiera, financiera, parque, rut_dealer, estado, estado_credito,
              saldo_precio, monto_financiado, monto_capitalizado,
              plazo, fecha_otorgado, mes,
              seguro_rdh, seguro_cesantia, seguro_rep_menor,
@@ -240,6 +240,23 @@ async function recalcularMeses(meses, opciones = {}) {
     `, soloFin ? [mesStr, soloFin] : [mesStr]);
 
     if (!ops.length) continue;
+
+    /* ── LA CARTA MANDA (regla de negocio): la participación dealer PACTADA en
+       la carta de aprobación vigente rige sobre el cálculo del motor. Antes esto
+       solo se conciliaba en el botón "otorgar" de la carta; las operaciones que
+       AutoFin cursaba vía sync de Trinidad quedaban con el comdea del motor y la
+       cartola pagaba OTRO monto (el de la carta, vía COALESCE) — 13 descuadres
+       reales entre junio y julio 2026. Ahora la precedencia es una sola en el
+       motor: forzado a mano > carta vigente > cálculo. ── */
+    const idsFin = [...new Set(ops.map(o => String(o.id_financiera || '')).filter(Boolean))];
+    const partCartaDe = new Map();
+    for (let i = 0; i < idsFin.length; i += 500) {
+      const [cs] = await pool.query(
+        `SELECT id_financiera, part_bruto FROM cartas_aprobacion
+          WHERE status='APROBADA' AND COALESCE(part_bruto,0) > 0 AND id_financiera IN (?)
+          ORDER BY id ASC`, [idsFin.slice(i, i + 500)]);
+      cs.forEach(c => partCartaDe.set(String(c.id_financiera), Number(c.part_bruto)));  // id mayor gana (vigente)
+    }
 
     // ── Conteo UAC (penetración de seguros no se recalcula aquí) ────
     // Las comisiones de seguros (com_rdh/cesantia/rep) vienen del Excel
@@ -303,7 +320,10 @@ async function recalcularMeses(meses, opciones = {}) {
       // se recalcula siempre con los valores EFECTIVOS (forzado o calculado).
       const forz   = forzadosSet(op.campos_forzados);
       const eff_mcf = forz.has('monto_comision_fin') ? (parseFloat(op.monto_comision_fin) || 0) : monto_comision_fin;
-      const eff_cdr = forz.has('comdea_real')        ? (parseFloat(op.comdea_real)        || 0) : comdea_real;
+      // Precedencia comisión dealer: forzado a mano > carta vigente > cálculo.
+      const partCarta = partCartaDe.get(String(op.id_financiera || ''));
+      const eff_cdr = forz.has('comdea_real') ? (parseFloat(op.comdea_real) || 0)
+                    : (partCarta != null ? partCarta : comdea_real);
       const eff_cpq = forz.has('com_parque')         ? (parseFloat(op.com_parque)         || 0) : com_parque_val;
 
       // 5. Ingreso neto total ─────────────────────────────────────────

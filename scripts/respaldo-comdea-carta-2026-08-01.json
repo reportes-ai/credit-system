@@ -1,0 +1,121 @@
+[
+  {
+    "id": 1157436,
+    "num_op": 88150,
+    "comdea_real": "292500",
+    "ingreso_neto_total": "364250.00",
+    "campos_forzados": null,
+    "part_bruto": 500000,
+    "op_carta": "26572576PE"
+  },
+  {
+    "id": 1157988,
+    "num_op": 88712,
+    "comdea_real": "259000",
+    "ingreso_neto_total": "744769.00",
+    "campos_forzados": null,
+    "part_bruto": 388500,
+    "op_carta": "266060979AS"
+  },
+  {
+    "id": 1260612,
+    "num_op": 88786,
+    "comdea_real": "411750",
+    "ingreso_neto_total": "1005524.00",
+    "campos_forzados": null,
+    "part_bruto": 274500,
+    "op_carta": "266068811DI"
+  },
+  {
+    "id": 1260703,
+    "num_op": 88882,
+    "comdea_real": "999000",
+    "ingreso_neto_total": "1149631.00",
+    "campos_forzados": null,
+    "part_bruto": 749250,
+    "op_carta": "266083313DI"
+  },
+  {
+    "id": 2130008,
+    "num_op": 88967,
+    "comdea_real": "199000",
+    "ingreso_neto_total": "517400.00",
+    "campos_forzados": null,
+    "part_bruto": 238800,
+    "op_carta": "26609777KT"
+  },
+  {
+    "id": 2130010,
+    "num_op": 88975,
+    "comdea_real": "100000",
+    "ingreso_neto_total": "359790.00",
+    "campos_forzados": null,
+    "part_bruto": 50000,
+    "op_carta": "266122729DI"
+  },
+  {
+    "id": 2130013,
+    "num_op": 88976,
+    "comdea_real": "274000",
+    "ingreso_neto_total": "620737.00",
+    "campos_forzados": null,
+    "part_bruto": 137000,
+    "op_carta": "266122452DI"
+  },
+  {
+    "id": 2130019,
+    "num_op": 88986,
+    "comdea_real": "454500",
+    "ingreso_neto_total": "636300.00",
+    "campos_forzados": null,
+    "part_bruto": 303000,
+    "op_carta": "26611541DI"
+  },
+  {
+    "id": 2130020,
+    "num_op": 89037,
+    "comdea_real": "279000",
+    "ingreso_neto_total": "631985.00",
+    "campos_forzados": null,
+    "part_bruto": 139500,
+    "op_carta": "266136213KT"
+  },
+  {
+    "id": 2130022,
+    "num_op": 88788,
+    "comdea_real": "474000",
+    "ingreso_neto_total": "793897.00",
+    "campos_forzados": null,
+    "part_bruto": 355500,
+    "op_carta": "266078208DI"
+  },
+  {
+    "id": 2130024,
+    "num_op": 88833,
+    "comdea_real": "373500",
+    "ingreso_neto_total": "757014.00",
+    "campos_forzados": null,
+    "part_bruto": 249000,
+    "op_carta": "266088831DI"
+  },
+  {
+    "id": 2130025,
+    "num_op": 88885,
+    "comdea_real": "449250",
+    "ingreso_neto_total": "957432.00",
+    "campos_forzados": null,
+    "part_bruto": 299500,
+    "op_carta": "266090351DI"
+  },
+  {
+    "id": 2130030,
+    "num_op": 89199,
+    "comdea_real": "150000",
+    "ingreso_neto_total": "534000.00",
+    "campos_forzados": [
+      "comdea_real"
+    ],
+    "part_bruto": 190000,
+    "op_carta": "26620688DI"
+  }
+]
