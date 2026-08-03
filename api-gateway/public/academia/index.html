@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Academia AutoFácil — Autocapacitación</title>
-  <!-- v1.0 — MVP navegable: cursos por módulo (sembrados desde la ayuda), reproductor slide a slide con progreso por persona -->
+  <!-- v1.1 — card Libro: Creación de Dealers (flipbook). v1.0 — MVP navegable: cursos por módulo (sembrados desde la ayuda), reproductor slide a slide con progreso por persona -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -174,10 +174,29 @@ function pintarResumen(){
     <div class="stat"><div class="n" style="color:#16a34a">${done}</div><div class="l">Completados</div></div>`;
 }
 
+/* Libros interactivos (flipbook) — material de estudio aparte de los cursos */
+const LIBROS = [
+  { titulo:'Creación de Dealers', icono:'bi-book-half', href:'/academia/libro-dealers/',
+    resumen:'El manual de creación de concesionarios como libro interactivo: 12 páginas que se dan vuelta, desde la ficha hasta el cierre.' }
+];
+
 function pintarGrid(){
   const g = document.getElementById('grid');
-  if (!CURSOS.length){ g.innerHTML=''; document.getElementById('vacio').style.display='block'; return; }
-  g.innerHTML = CURSOS.map((c,i)=>`
+  if (!CURSOS.length && !LIBROS.length){ g.innerHTML=''; document.getElementById('vacio').style.display='block'; return; }
+  const librosHtml = LIBROS.map(l=>`
+    <div class="curso" onclick="location.href='${esc(l.href)}'">
+      <span class="badge-cont" style="background:#f3e8ff;color:#7c3aed">Libro</span>
+      <div class="top">
+        <div class="cico" style="background:linear-gradient(135deg,#f3e8ff,#e4d3ff);color:#7c3aed"><i class="bi ${esc(l.icono)}"></i></div>
+        <h3>${esc(l.titulo)}</h3>
+      </div>
+      <div class="res">${esc(l.resumen)}</div>
+      <div class="meta">
+        <span class="lecc"><i class="bi bi-book"></i> Libro interactivo</span>
+        <span><i class="bi bi-box-arrow-up-right"></i></span>
+      </div>
+    </div>`).join('');
+  g.innerHTML = librosHtml + CURSOS.map((c,i)=>`
     <div class="curso" onclick="abrir(${i})">
       ${c.completado ? '<span class="badge-done"><i class="bi bi-check-circle-fill"></i> Completado</span>'
         : (c.vistos>0 ? '<span class="badge-cont">Continuar</span>' : '')}

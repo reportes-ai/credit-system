@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Libro: Creación de Dealers — Academia AutoFácil</title>
+  <!-- v1.0 — Libro interactivo (flipbook 2 páginas) del Manual de Creación de Concesionarios v1.1 -->
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0b2447; --blue:#0141A2; --blue2:#0d6efd; --papel:#fdfcf8; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:linear-gradient(160deg,#0b2447 0%,#123a75 60%,#0b2447 100%); min-height:100vh; }
+
+    .escena { display:flex; flex-direction:column; align-items:center; padding:26px 12px 40px; }
+    .escena h1 { color:#fff; font-size:1.15rem; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:9px; }
+    .escena .sub { color:rgba(255,255,255,.55); font-size:.82rem; margin-bottom:20px; }
+
+    /* ── Libro ── */
+    .libro-wrap { perspective:2600px; width:min(96vw, 980px); }
+    .libro { position:relative; width:100%; aspect-ratio:980/640; transform-style:preserve-3d; }
+    /* base: página izquierda y derecha fijas (lo que queda debajo de las hojas) */
+    .cara-fija { position:absolute; top:0; width:50%; height:100%; background:var(--papel); overflow:hidden; }
+    .cara-fija.izq { left:0; border-radius:10px 2px 2px 10px; box-shadow:-6px 8px 26px rgba(0,0,0,.45); }
+    .cara-fija.der { right:0; border-radius:2px 10px 10px 2px; box-shadow:6px 8px 26px rgba(0,0,0,.45); }
+    /* hojas que giran */
+    .hoja { position:absolute; top:0; right:0; width:50%; height:100%; transform-style:preserve-3d; transform-origin:left center; transition:transform .9s cubic-bezier(.35,.1,.25,1); cursor:pointer; }
+    .hoja.girada { transform:rotateY(-180deg); }
+    .cara { position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; background:var(--papel); overflow:hidden; }
+    .cara.frente { border-radius:2px 10px 10px 2px; }
+    .cara.dorso { transform:rotateY(180deg); border-radius:10px 2px 2px 10px; }
+    /* sombra del lomo */
+    .cara.frente::before { content:''; position:absolute; left:0; top:0; bottom:0; width:34px; background:linear-gradient(90deg,rgba(0,0,0,.14),transparent); pointer-events:none; }
+    .cara.dorso::before  { content:''; position:absolute; right:0; top:0; bottom:0; width:34px; background:linear-gradient(-90deg,rgba(0,0,0,.14),transparent); pointer-events:none; }
+
+    /* ── Contenido de página ── */
+    .pg { padding:5.2% 6.5% 4.2%; height:100%; display:flex; flex-direction:column; font-size:clamp(9px, 1.35vw, 14.5px); line-height:1.5; color:#2b3a52; }
+    .pg .kick { color:var(--blue2); font-weight:800; font-size:.72em; letter-spacing:.14em; text-transform:uppercase; display:flex; align-items:center; gap:6px; margin-bottom:.45em; }
+    .pg h2 { margin:0 0 .5em; color:var(--navy); font-size:1.32em; font-weight:800; line-height:1.2; }
+    .pg h3 { margin:.7em 0 .25em; color:var(--blue); font-size:1em; font-weight:800; }
+    .pg p { margin:0 0 .55em; }
+    .pg ul { margin:.15em 0 .6em; padding-left:1.25em; }
+    .pg li { margin-bottom:.28em; }
+    .pg b { color:var(--navy); }
+    .pg .caja { background:#eef4fe; border-left:3px solid var(--blue2); border-radius:0 8px 8px 0; padding:.55em .8em; margin:.4em 0 .6em; font-size:.93em; }
+    .pg .ojo { background:#fef7e8; border-left:3px solid #f59e0b; border-radius:0 8px 8px 0; padding:.55em .8em; margin:.4em 0 .6em; font-size:.93em; }
+    .pg .num { display:inline-flex; align-items:center; justify-content:center; width:1.55em; height:1.55em; border-radius:50%; background:var(--blue); color:#fff; font-weight:800; font-size:.85em; margin-right:.45em; flex:0 0 auto; }
+    .pg .folio { margin-top:auto; padding-top:.6em; font-size:.72em; color:#9aa7bb; display:flex; justify-content:space-between; border-top:1px solid #edf0f5; }
+    .pg .flujo { display:flex; flex-wrap:wrap; gap:.3em; align-items:center; font-size:.82em; font-weight:700; }
+    .pg .flujo span { background:#e8f0fe; color:var(--blue); border-radius:20px; padding:.2em .7em; }
+    .pg .flujo i { color:#94a3b8; }
+
+    /* portada / contraportada */
+    .portada { background:linear-gradient(150deg,#0141A2,#0b2447); color:#fff; align-items:center; justify-content:center; text-align:center; }
+    .portada .logo { font-size:2.2em; font-weight:800; letter-spacing:-.02em; }
+    .portada .logo .f { color:#61a8ff; font-style:italic; }
+    .portada h2 { color:#fff; font-size:1.7em; margin:.6em 0 .3em; }
+    .portada .marco { border:2px solid rgba(255,255,255,.28); border-radius:14px; padding:2em 1.6em; }
+    .portada .v { font-size:.78em; opacity:.65; margin-top:1.4em; }
+
+    /* ── Controles ── */
+    .controles { display:flex; align-items:center; gap:16px; margin-top:22px; }
+    .cbtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff; border-radius:10px; padding:9px 20px; font-weight:700; font-size:.9rem; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:background .15s; }
+    .cbtn:hover:not(:disabled) { background:rgba(255,255,255,.22); }
+    .cbtn:disabled { opacity:.35; cursor:default; }
+    .indicador { color:rgba(255,255,255,.65); font-size:.83rem; min-width:110px; text-align:center; }
+    .tip-flip { color:rgba(255,255,255,.4); font-size:.75rem; margin-top:10px; }
+  </style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Academia', href:'/academia/' },
+  { label:'Libro: Creación de Dealers', icon:'bi-book-half', current:true }
+] };</script>
+<script src="/js/topnav.js"></script>
+
+<div class="escena">
+  <h1><i class="bi bi-book-half"></i> Creación de Dealers</h1>
+  <div class="sub">Manual interactivo · haz clic en las páginas para dar vuelta la hoja</div>
+
+  <div class="libro-wrap">
+    <div class="libro" id="libro">
+      <div class="cara-fija izq" id="baseIzq"></div>
+      <div class="cara-fija der" id="baseDer"></div>
+      <!-- las hojas se generan por JS -->
+    </div>
+  </div>
+
+  <div class="controles">
+    <button class="cbtn" id="bAtras" onclick="voltear(-1)"><i class="bi bi-chevron-left"></i> Anterior</button>
+    <div class="indicador" id="indicador">—</div>
+    <button class="cbtn" id="bSig" onclick="voltear(1)">Siguiente <i class="bi bi-chevron-right"></i></button>
+  </div>
+  <div class="tip-flip">También puedes usar las flechas ← → del teclado</div>
+</div>
+
+<script src="/js/app-version.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+
+/* ── Las 12 páginas del libro (6 hojas) — contenido del Manual v1.1 ── */
+const PAGINAS = [
+`<div class="pg portada">
+  <div class="marco">
+    <div class="logo">Auto<span class="f">Fácil</span></div>
+    <div style="font-size:.72em;letter-spacing:.3em;opacity:.7">CRÉDITO AUTOMOTRIZ</div>
+    <h2>Creación de<br>Nuevo Concesionario</h2>
+    <div style="font-size:.85em;opacity:.8">Manual del proceso en Business Suite</div>
+    <div class="v">Versión 1.1 · Agosto 2026<br>Área Comercial / Área de Riesgo</div>
+  </div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-bullseye"></i> Objetivo y alcance</div>
+  <h2>¿De qué se trata este proceso?</h2>
+  <p>Solicitar, revisar, autorizar y completar la creación de un nuevo concesionario en Business Suite, asegurando el registro correcto de la información societaria, comercial, tributaria y bancaria.</p>
+  <h3>Tipos de ficha</h3>
+  <ul>
+    <li><b>General (Calle):</b> opera fuera de un parque automotriz.</li>
+    <li><b>Parque Automotriz:</b> opera dentro de un parque.</li>
+    <li><b>Ambos (Calle + Parque):</b> opera en las dos modalidades — pacta dos tablas de comisión.</li>
+  </ul>
+  <div class="caja"><b>Ningún dealer opera sin ficha aprobada.</b> El proceso parte con la solicitud del Ejecutivo Comercial y termina cuando el concesionario aparece activo en Dealers vigentes.</div>
+  <div class="folio"><span>Creación de Dealers</span><span>2</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-people-fill"></i> Participantes</div>
+  <h2>Quién hace qué</h2>
+  <ul>
+    <li><b>Ejecutivo Comercial:</b> recopila antecedentes, verifica que no exista, completa la ficha, adjunta documentos, gestiona excepciones, envía, obtiene la firma y carga la ficha firmada.</li>
+    <li><b>Área de Riesgo:</b> revisa antecedentes e informes, autoriza o rechaza, documenta motivos y hace la revisión final de la ficha firmada.</li>
+    <li><b>Concesionario:</b> entrega información y documentos, y firma la ficha aceptando comisiones, condiciones y datos bancarios.</li>
+    <li><b>Área de Operaciones:</b> incorpora un parque automotriz cuando no aparece en la lista (correo operaciones@autofacilchile.cl).</li>
+  </ul>
+  <div class="caja">La autorización recorre una <b>cadena de niveles configurable</b>: el N°1 (Análisis de Operaciones y Crédito) revisa <b>siempre</b>; el N°2 (Visto de Gerencia) se activa solo con comisión sobre la pizarra o depósito modificado.</div>
+  <div class="folio"><span>Creación de Dealers</span><span>3</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-list-check"></i> Requisitos previos</div>
+  <h2>Antes de crear la solicitud</h2>
+  <p>El Ejecutivo recopila los antecedentes en una ficha física. Los mínimos:</p>
+  <ul>
+    <li>RUT, razón social, nombre de fantasía, dirección, comuna, ciudad y región.</li>
+    <li>Tipo de ficha y, si corresponde, parque automotriz y dirección de calle por separado.</li>
+    <li><b>Todos los socios</b> de la sociedad.</li>
+    <li>Contacto comercial, contacto financiero y representante legal (si ninguno cumple esa función).</li>
+    <li>Porcentajes de comisión, documento tributario y cuenta para pago.</li>
+    <li>Respaldo formal de cualquier comisión excepcional.</li>
+    <li>Poder simple y estatutos/poderes cuando la cuenta de pago tiene un RUT diferente.</li>
+  </ul>
+  <div class="folio"><span>Creación de Dealers</span><span>4</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-1-circle-fill"></i> Paso 1 · La ficha</div>
+  <h2>Iniciar la solicitud</h2>
+  <p>Entra a <b>Creación/Mantenedor de Dealer → Creación Nuevo Dealer</b>. En todas las pantallas tienes el botón de ayuda <b>«?»</b>.</p>
+  <h3>Busca primero el RUT</h3>
+  <p>Si el concesionario <b>ya existe</b>, la solicitud cambia a <b>Modificación de Dealer</b>: actualizas lo que corresponda y evitas duplicados. Las diferencias con los datos vigentes se muestran <b style="color:#b91c1c">en rojo</b> al revisor.</p>
+  <div class="ojo">Si cambias banco o cuenta de pago en una modificación, el sistema exige la misma documentación que un pago a RUT diferente: <b>poder simple + poderes o estatutos</b>.</div>
+  <h3>Completa los datos</h3>
+  <p>Tipo de ficha, ejecutivo responsable, datos del concesionario, parque (si aplica) y <b>todos los socios</b> (el formulario agrega espacios automáticamente).</p>
+  <div class="folio"><span>Creación de Dealers</span><span>5</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-2-circle-fill"></i> Paso 2 · Contactos</div>
+  <h2>Contactos y representante legal</h2>
+  <ul>
+    <li><b>Contacto Comercial:</b> responsable de la relación comercial con AutoFácil (nombre, teléfono, correo). Indica si es el representante legal.</li>
+    <li><b>Contacto Financiero:</b> quien recibe información de pagos y materias financieras. Indica si es el representante legal.</li>
+    <li><b>Representante Legal:</b> si ninguno de los dos anteriores lo es, regístralo aparte con los mismos datos.</li>
+  </ul>
+  <h3>Comisión pactada</h3>
+  <p>El sistema precarga los porcentajes según el tipo de ficha (la <b>pizarra</b>). En una ficha <b>Ambos</b> revisas dos tablas: calle y parque.</p>
+  <div class="ojo"><b>Comisión excepcional:</b> si modificas por sobre la pizarra, la solicitud requiere además el <b>Visto de Gerencia</b> y, al aprobarse, queda sellada como «Participación especial aprobada por» quien la autorizó. Debes adjuntar el respaldo formal.</div>
+  <div class="folio"><span>Creación de Dealers</span><span>6</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-3-circle-fill"></i> Paso 3 · Pago</div>
+  <h2>Documento tributario y datos de pago</h2>
+  <p><b>Boleta o factura</b> (una sola modalidad). Si puede emitir factura, prioriza factura.</p>
+  <h3>Datos para el pago</h3>
+  <p>RUT de la cuenta, número, tipo, titular, banco y <b>correo de confirmación</b> (quien recibe los comprobantes de pago).</p>
+  <div class="caja"><b>Regla general:</b> el RUT de la cuenta debe ser el del concesionario y el titular, su razón social.</div>
+  <h3>¿Pago a un RUT diferente?</h3>
+  <p>El sistema exige: <b>poder simple</b> firmado por todos los socios o quienes tengan facultades (descarga el formato desde el sistema) + <b>poderes del representante legal o estatutos completos</b>.</p>
+  <p>Deja en <b>Observaciones</b> todo acuerdo especial con su respaldo. Puedes <b>Guardar borrador</b> y seguir después.</p>
+  <div class="folio"><span>Creación de Dealers</span><span>7</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-4-circle-fill"></i> Paso 4 · Enviar</div>
+  <h2>Enviar a autorización</h2>
+  <p>Al enviar, el sistema consulta automáticamente los <b>informes comerciales</b> del concesionario y de <b>hasta 3 socios</b> (qué informes se piden es configurable por el Administrador).</p>
+  <ul>
+    <li>Los informes tienen <b>vigencia de 15 días</b>: dentro del plazo se reutilizan sin costo.</li>
+    <li>El <b>primer envío puede tardar unos minutos</b>; los reenvíos son rápidos.</li>
+    <li>Se genera un <b>Reporte IA</b> por cada entidad (empresa y socios) con clasificación de riesgo.</li>
+    <li>Si hay <b>registros graves</b> (productos penales) se genera una alerta automática que acompaña la solicitud hasta el revisor.</li>
+  </ul>
+  <p>Terminada la preevaluación, la solicitud pasa al Área de Riesgo con notificación automática.</p>
+  <div class="folio"><span>Creación de Dealers</span><span>8</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-5-circle-fill"></i> Paso 5 · Revisión</div>
+  <h2>Validar la solicitud (Riesgo)</h2>
+  <p>En <b>Mantención Dealers → pestaña Revisión (pool)</b>, ubica la solicitud y selecciona <b>Revisar</b>: verás la barra con el <b>Informe DealerNet</b> y el <b>Reporte IA</b> de la empresa y de cada socio.</p>
+  <div class="ojo">Si autorizas sin abrir la revisión, queda marcado <b>«⚠ Aprobado sin revisión de ficha»</b> ante el siguiente evaluador y en la auditoría.</div>
+  <ul>
+    <li><b>Autorizar:</b> vuelve al Ejecutivo para imprimir y firmar.</li>
+    <li><b>Rechazar:</b> explica claramente el motivo.</li>
+  </ul>
+  <p><b>Apelación:</b> no es un trámite aparte — al corregir y reenviar la ficha rechazada puedes escribir una nota de apelación que aparece destacada en el pool.</p>
+  <div class="folio"><span>Creación de Dealers</span><span>9</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-6-circle-fill"></i> Paso 6 · Firma</div>
+  <h2>Imprimir, firmar y cerrar</h2>
+  <p>Autorizada la solicitud, en <b>Mis fichas → Imprimir/Firmar</b> descargas la ficha definitiva con todos los datos, comisiones y condiciones.</p>
+  <div class="caja">La ficha impresa incluye <b>en letra chica las autorizaciones otorgadas</b> (quién y cuándo). Por eso los términos se autorizan siempre <b>ANTES</b> de la firma.</div>
+  <ul>
+    <li>La firma puede ser <b>electrónica o física</b> (escaneada o fotografiada, legible; sin timbre).</li>
+    <li>Carga el archivo (PDF, JPG o PNG) en <b>Ficha firmada por el cliente</b> y selecciona <b>Enviar firmada</b>.</li>
+    <li>Riesgo verifica que coincida con lo autorizado y selecciona <b>Cerrar</b> → el dealer queda creado o actualizado.</li>
+  </ul>
+  <div class="folio"><span>Creación de Dealers</span><span>10</span></div>
+</div>`,
+
+`<div class="pg">
+  <div class="kick"><i class="bi bi-flag-fill"></i> Cierre</div>
+  <h2>Después del cierre</h2>
+  <p>Recibirás la notificación con el <b>número asignado al dealer</b>. Valida en <b>Dealers vigentes</b> (busca por RUT, razón social o fantasía) que todo esté correcto: número, categoría, comisiones, documento tributario y estado activo.</p>
+  <div class="caja">La <b>tabla de comisiones del dealer es inmutable</b>: solo se cambia con una nueva ficha de Modificación aprobada por la cadena.</div>
+  <p>En <b>Aprobaciones Históricas</b> quedan todas las fichas aprobadas y rechazadas, con su timbre de resolución e informes.</p>
+  <h3>Estados de la ficha (pestaña Mis fichas)</h3>
+  <div class="flujo"><span>Borrador</span><i class="bi bi-arrow-right"></i><span>En autorización</span><i class="bi bi-arrow-right"></i><span>Autorizada</span><i class="bi bi-arrow-right"></i><span>Pend. cierre</span><i class="bi bi-arrow-right"></i><span>Aprobada</span></div>
+  <div class="folio"><span>Creación de Dealers</span><span>11</span></div>
+</div>`,
+
+`<div class="pg portada">
+  <div class="marco">
+    <i class="bi bi-patch-check-fill" style="font-size:2.6em;color:#61a8ff"></i>
+    <h2>¡Eso es todo!</h2>
+    <div style="font-size:.9em;opacity:.85;line-height:1.6">Ya conoces el proceso completo de<br>creación de concesionarios.<br><br>Ante cualquier duda, usa el botón <b>«?»</b><br>del módulo o consulta el manual completo<br>en Documentación.</div>
+    <div class="v">Academia AutoFácil · Manual v1.1</div>
+  </div>
+</div>`
+];
+
+/* ── Armar el libro: 6 hojas (frente = pág par, dorso = pág impar) ── */
+const libro = document.getElementById('libro');
+const N_HOJAS = PAGINAS.length / 2;
+let VOLTEADAS = 0;
+
+for (let i = 0; i < N_HOJAS; i++) {
+  const h = document.createElement('div');
+  h.className = 'hoja';
+  h.dataset.i = i;
+  h.innerHTML = `<div class="cara frente">${PAGINAS[2*i]}</div><div class="cara dorso">${PAGINAS[2*i+1]}</div>`;
+  h.addEventListener('click', () => { (Number(h.dataset.i) < VOLTEADAS) ? voltear(-1) : voltear(1); });
+  libro.appendChild(h);
+}
+const HOJAS = [...libro.querySelectorAll('.hoja')];
+
+function pintar() {
+  HOJAS.forEach((h, i) => {
+    h.classList.toggle('girada', i < VOLTEADAS);
+    // apilamiento: la hoja activa siempre arriba de su lado
+    h.style.zIndex = (i < VOLTEADAS) ? (i + 1) : (N_HOJAS - i);
+  });
+  // libro cerrado: sin base a la izquierda; libro terminado: sin base a la derecha
+  document.getElementById('baseIzq').style.display = VOLTEADAS > 0 ? 'block' : 'none';
+  document.getElementById('baseDer').style.display = VOLTEADAS < N_HOJAS ? 'block' : 'none';
+  document.getElementById('bAtras').disabled = VOLTEADAS === 0;
+  document.getElementById('bSig').disabled = VOLTEADAS === N_HOJAS;
+  const ind = document.getElementById('indicador');
+  if (VOLTEADAS === 0) ind.textContent = 'Portada';
+  else if (VOLTEADAS === N_HOJAS) ind.textContent = 'Fin del libro';
+  else ind.textContent = `Páginas ${2*VOLTEADAS}–${2*VOLTEADAS+1} de ${PAGINAS.length-2}`;
+}
+
+function voltear(dir) {
+  const n = VOLTEADAS + dir;
+  if (n < 0 || n > N_HOJAS) return;
+  VOLTEADAS = n;
+  pintar();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') voltear(1);
+  else if (e.key === 'ArrowLeft') voltear(-1);
+});
+
+pintar();
+</script>
+</body>
+</html>
