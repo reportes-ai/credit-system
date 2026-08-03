@@ -222,7 +222,7 @@ async function correr({ real = false } = {}) {
   const lista = await candidatos();
   if (!real) return { simulado: true, candidatos: lista };
 
-  let devMode = false;
+  let devMode = true;   // FAIL-SAFE (auditoria B-1): ante la duda, NO se envia a clientes reales
   try { devMode = !!(await require('../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
   // Ley 21.320: gestiones de cobranza solo L-S hábiles 8:00-20:00 (en Modo Desarrollo
   // se permite porque nada sale a clientes — queda SIMULADO)

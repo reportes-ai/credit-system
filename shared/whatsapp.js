@@ -44,7 +44,11 @@ async function enviarWhatsApp({ telefono, texto, plantilla, variables = [] } = {
       if (devFono) fono = devFono;
       else return { ok: true, simulado: true, telefono: fono };
     }
-  } catch (_) {}
+  } catch (e) {
+    // FAIL-SAFE (auditoria B-1): sin confirmacion del estado NO se envia a un numero real
+    console.error('[whatsapp] no se pudo confirmar Modo Desarrollo — envio simulado:', e.message);
+    return { ok: true, simulado: true, telefono: fono };
+  }
 
   const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
   if (!token || !phoneId) return { ok: true, simulado: true, telefono: fono };

@@ -127,7 +127,12 @@ async function crearCreditoDesdeCartas(c) {
   const segRep = c.segRep != null ? Number(c.segRep) : null;
   const segTotal = (segRdhTot != null || segCes != null || segRep != null)
     ? (Number(segRdhTot || 0) + Number(segCes || 0) + Number(segRep || 0)) : null;
-  const [r] = await pool.query(`
+  /* El correlativo se pide DENTRO de conNumOpAF: si otro otorgamiento gana la
+     carrera y choca contra uq_num_op, reintenta con el siguiente número en vez
+     de devolverle un 500 al usuario (auditoría 03-08-2026, A-8). */
+  const { conNumOpAF } = require('../../../../shared/num-op');
+  const r = await conNumOpAF(null, async (numOpAF) => {
+  const [rIns] = await pool.query(`
     INSERT INTO creditos
       (numero_credito, num_op, financiera, id_financiera, estado_eval, estado,
        id_cliente, rut_dealer, vendedor,
@@ -150,7 +155,7 @@ async function crearCreditoDesdeCartas(c) {
     /* num_op = correlativo AutoFácil desde que nace (motor único shared/num-op.js,
        regla ago-2026). numero_credito (YYMM###) sigue siendo el N° interno del
        crédito de carta; la OP es la serie única del negocio. */
-    numero_credito, await require('../../../../shared/num-op').siguienteNumOpAF(), financiera,
+    numero_credito, numOpAF, financiera,
     // ID de la operación en la financiera: el frontend lo manda como opOrigen
     (c.id_financiera ?? c.idFinanciera ?? c.opOrigen ?? c.op_origen ?? null),
     cliRow?.id_cliente || null,
@@ -171,6 +176,8 @@ async function crearCreditoDesdeCartas(c) {
     (c.ejecutivo_nombre || c.ejecutivoNombre ? String(c.ejecutivo_nombre || c.ejecutivoNombre).trim().toUpperCase() : null),
     (c.part_bruto || c.partBruto || null),
   ]);
+    return rIns;
+  });
   // Parque/Calle desde el mantenedor de dealers (por RUT): la carta no lo trae y
   // dejaba el campo vacío en la cola de digitación (mismo criterio de dealerBuscar).
   try {
@@ -713,7 +720,7 @@ const otorgar = async (req, res) => {
           const [[sinOp]] = await pool.query(
             `SELECT id FROM creditos WHERE (${cond.join(' OR ')}) AND num_op IS NULL LIMIT 1`, args);
           if (sinOp) await pool.query('UPDATE creditos SET num_op=? WHERE id=? AND num_op IS NULL',
-            [await require('../../../../shared/num-op').siguienteNumOpAF(), sinOp.id]);
+            [await require('../../../../shared/num-op').siguienteNumOpAF(), sinOp.id]);   // secuencial: sin carrera
         } catch (e) { console.error('[carta otorgar→num_op nuevo]', e.message); }
         /* RESPALDO de numeración (motor único shared/num-op.js): desde agosto 2026
            toda operación nace ya con correlativo AutoFácil (lo asigna la carga

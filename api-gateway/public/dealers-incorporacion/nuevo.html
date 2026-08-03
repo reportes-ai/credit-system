@@ -996,7 +996,9 @@ async function cargar(){
     if (f.tiene_ficha) { $('fileInfo').textContent = '✓ Ficha firmada ya cargada (puedes reemplazarla)'; $('fileInfo').style.display='block'; }
     if (f.estado === 'RECHAZADA' && f.motivo_rechazo) {
       const b=$('boxRechazo'); b.style.display='block';
-      b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Ficha rechazada por ${f.revisor_nombre||'Operaciones'}:</b> ${f.motivo_rechazo}`;
+      // XSS almacenado (auditoría 03-08-2026, A-2): el motivo lo escribe un revisor
+      // y se inyectaba crudo en el DOM de quien abre la ficha. escH ya existía acá.
+      b.innerHTML = `<b><i class="bi bi-x-octagon me-1"></i>Ficha rechazada por ${escH(f.revisor_nombre||'Operaciones')}:</b> ${escH(f.motivo_rechazo)}`;
     }
     await cargarInformes();
     actualizarTercero();

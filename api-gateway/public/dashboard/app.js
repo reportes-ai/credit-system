@@ -80,6 +80,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 const RAW = null; // reemplazado abajo
 
 // Formato
+/* Escape HTML — auditoría 03-08-2026 (A-3): los nombres de dealer y ejecutivo
+   vienen de los Excel de carga masiva (archivos de TERCEROS) y se interpolaban
+   crudos en innerHTML: una celda con <img src=x onerror=…> ejecutaba script en
+   el navegador de la gerencia. Todo texto de origen externo pasa por acá. */
+const escH = s => String(s == null ? '' : s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 const fM = v => {
   const a = Math.abs(v);
   if(a>=1e6) return (v/1e6).toFixed(1)+'M';
@@ -1744,7 +1752,7 @@ function buildV4() {
   det.forEach(r=>{if(!ccs4[r.ccs])ccs4[r.ccs]={ops:0,saldo:0,com_dealer:0,rentab_afa:0};ccs4[r.ccs].ops++;ccs4[r.ccs].saldo+=r.saldo_precio;ccs4[r.ccs].com_dealer+=r.com_dealer;ccs4[r.ccs].rentab_afa+=r.ing_autofacil;});
   const topCcs4=Object.entries(ccs4).sort((a,b)=>b[1].saldo-a[1].saldo);
   const totCcs4=topCcs4.reduce((a,[,v])=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa}),{ops:0,saldo:0,cd:0,afa:0});
-  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${nombre.length>28?nombre.substring(0,28)+'…':nombre}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.saldo)}</td><td>${fM(totCcs4.ops?totCcs4.saldo/totCcs4.ops:0)}</td><td>${fM(totCcs4.cd)}</td><td>${fM(totCcs4.afa)}</td></tr></tfoot>`;
+  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>28?nombre.substring(0,28)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.saldo)}</td><td>${fM(totCcs4.ops?totCcs4.saldo/totCcs4.ops:0)}</td><td>${fM(totCcs4.cd)}</td><td>${fM(totCcs4.afa)}</td></tr></tfoot>`;
 
   const desde=document.getElementById('sel-desde').value, hasta=document.getElementById('sel-hasta').value;
   const rawOt=window.RAW_DATA?window.RAW_DATA.filter(r=>r.mes>=desde&&r.mes<=hasta&&r.estado_eval==='OTORGADO'&&(r.financiera==='AUTOFIN'||r.financiera==='UNIDAD DE CREDITO')):[];
@@ -1752,7 +1760,7 @@ function buildV4() {
   rawOt.forEach(r=>{const k=r.ejecutivo||'S/E';if(!ej4[k])ej4[k]={ops:0,saldo:0,com_dealer:0,rentab_afa:0,plazo_sum:0,cnt:0};ej4[k].ops++;ej4[k].saldo+=r.saldo_precio;ej4[k].com_dealer+=r.com_dealer;ej4[k].rentab_afa+=r.rentab_afa;if(r.plazo>0){ej4[k].plazo_sum+=r.plazo;ej4[k].cnt++;}});
   const topEj4=Object.entries(ej4).sort((a,b)=>b[1].ops-a[1].ops||b[1].saldo-a[1].saldo);   // Q otorgados y, a igual Q, Total Financiado
   const totEj4=topEj4.reduce((a,[,v])=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa,plazo:a.plazo+v.plazo_sum,cnt:a.cnt+v.cnt}),{ops:0,saldo:0,cd:0,afa:0,plazo:0,cnt:0});
-  document.getElementById('t-ej4').innerHTML=`<thead><tr><th>Ejecutivo</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Plazo</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topEj4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${nombre.length>22?nombre.substring(0,22)+'…':nombre}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${v.cnt?Math.round(v.plazo_sum/v.cnt)+'m':'—'}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totEj4.ops}</td><td>${fM(totEj4.saldo)}</td><td>${fM(totEj4.ops?totEj4.saldo/totEj4.ops:0)}</td><td>${totEj4.cnt?Math.round(totEj4.plazo/totEj4.cnt)+'m':'—'}</td><td>${fM(totEj4.cd)}</td><td>${fM(totEj4.afa)}</td></tr></tfoot>`;
+  document.getElementById('t-ej4').innerHTML=`<thead><tr><th>Ejecutivo</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Plazo</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topEj4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>22?nombre.substring(0,22)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${v.cnt?Math.round(v.plazo_sum/v.cnt)+'m':'—'}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totEj4.ops}</td><td>${fM(totEj4.saldo)}</td><td>${fM(totEj4.ops?totEj4.saldo/totEj4.ops:0)}</td><td>${totEj4.cnt?Math.round(totEj4.plazo/totEj4.cnt)+'m':'—'}</td><td>${fM(totEj4.cd)}</td><td>${fM(totEj4.afa)}</td></tr></tfoot>`;
 
   document.getElementById('t-estado4').innerHTML=`<thead><tr><th>Estado</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${af.ops||0}</td><td>${totOps?((af.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(af.saldo||0)}</td></tr><tr><td>UNIDAD</td><td>${un.ops||0}</td><td>${totOps?((un.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(un.saldo||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${totOps}</td><td>100%</td><td>${fM(totSaldo)}</td></tr></tfoot>`;
 

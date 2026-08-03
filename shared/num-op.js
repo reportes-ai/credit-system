@@ -29,21 +29,56 @@ function prefijoMes() {
 }
 
 /**
- * Siguiente correlativo AutoFácil (AAMM####). Se apoya en MAX() dentro del mes,
- * así que debe llamarse en flujos secuenciales (cargas fila a fila, otorgar).
+ * Siguiente correlativo AutoFácil (AAMM####).
+ *
+ * MAX()+1 no es atómico (auditoría 03-08-2026, A-8): dos otorgamientos
+ * simultáneos leían el mismo máximo y el segundo chocaba contra `uq_num_op`,
+ * devolviéndole un error 500 al usuario en mitad de otorgar un crédito. Ahora
+ * la función solo PROPONE el número; quien inserta debe usar `conNumOpAF()`,
+ * que reintenta ante el duplicado hasta encontrar el hueco.
+ *
  * @param {object} [conn] conexión/transacción; por defecto el pool compartido
+ * @param {number} [saltar=0] cuántos números avanzar sobre el máximo (reintentos)
  */
-async function siguienteNumOpAF(conn) {
+async function siguienteNumOpAF(conn, saltar = 0) {
   const db = conn || require('./config/database');
   const base = Number(prefijoMes()) * 10000;          // 26080000
   const [[r]] = await db.query(
     'SELECT COALESCE(MAX(num_op), ?) mx FROM creditos WHERE num_op BETWEEN ? AND ?',
     [base, base + 1, base + 9999]);
-  return Number(r.mx) + 1;                            // primer número del mes: AAMM0001
+  return Number(r.mx) + 1 + Number(saltar || 0);      // primer número del mes: AAMM0001
+}
+
+/**
+ * Ejecuta `fn(num_op)` con un correlativo libre, reintentando si otro proceso
+ * ganó la carrera. `fn` debe hacer el INSERT que consume el número: si choca
+ * contra el índice único, se pide el siguiente y se vuelve a intentar.
+ *
+ *   const id = await conNumOpAF(conn, async (num) => insertarCredito(num));
+ *
+ * @param {object} conn conexión/transacción (o null para el pool)
+ * @param {(num:number)=>Promise<any>} fn operación que consume el número
+ * @param {number} [intentos=8]
+ */
+async function conNumOpAF(conn, fn, intentos = 8) {
+  let ultimoError = null;
+  for (let i = 0; i < intentos; i++) {
+    const num = await siguienteNumOpAF(conn, i);
+    try {
+      return await fn(num);
+    } catch (e) {
+      const dup = e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062 ||
+                        /duplicate entry/i.test(e.message || ''));
+      if (!dup) throw e;                              // otro error: no es carrera
+      ultimoError = e;
+      await new Promise(r => setTimeout(r, 40 * (i + 1)));   // backoff corto
+    }
+  }
+  throw ultimoError || new Error('No se pudo obtener un número de operación libre');
 }
 
 /** ¿Este num_op es un ID de financiera (Trinidad) y no un correlativo nuestro?
     Trinidad va en ~6,2 millones; nuestra serie AAMM#### parte en 20+ millones. */
 const esIdFinanciera = n => Number(n) >= 1000000 && Number(n) < 20000000;
 
-module.exports = { siguienteNumOpAF, esIdFinanciera, prefijoMes };
+module.exports = { siguienteNumOpAF, conNumOpAF, esIdFinanciera, prefijoMes };

@@ -21,7 +21,9 @@ const DESTINO = process.argv[2] || 'C:\\Users\\patri\\Documents\\respaldos-bd\\b
   const [tablas] = await pool.query(`
     SELECT table_name n FROM information_schema.tables
      WHERE table_schema = DATABASE()
-       AND (table_name LIKE 'bkp%' OR table_name LIKE 'tmp%' OR table_name LIKE '%_old')
+       AND (table_name LIKE 'bkp%' OR table_name LIKE 'tmp%' OR table_name LIKE '%_old'
+            OR table_name LIKE '%_backup%' OR table_name LIKE '%_bak'
+            OR table_name = 'ia_liquidaciones')   -- auditoria A-9: respaldos con otra convencion
      ORDER BY table_name`);
 
   const inv = [];

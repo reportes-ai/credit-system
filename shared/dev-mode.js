@@ -10,10 +10,19 @@
 const pool = require('./config/database');
 
 let _cache = null, _ts = 0;
-const TTL = 30000; // 30s
+const TTL = 30000;        // 30s con el estado confirmado
+const TTL_FALLO = 5000;   // 5s cuando no se pudo confirmar: reintentar pronto
+
+/* FAIL-SAFE (auditoría 03-08-2026, hallazgo B-1): si NO se puede leer el estado,
+   se asume el modo ACTIVO. Antes se asumía inactivo, así que un hipo de la BD
+   apagaba solo la protección y el sistema pasaba a escribirle a clientes reales.
+   Ante la duda, el daño de no enviar un correo es reversible; el de enviarlo no.
+   Los destinos de respaldo salen de env (DEV_CORREOS_FALLBACK) o del admin. */
+const CORREOS_FALLBACK = String(process.env.DEV_CORREOS_FALLBACK || process.env.ALERTA_ERRORES_MAIL || '')
+  .split(',').map(s => s.trim()).filter(Boolean).map(email => ({ email, rol: 'to' }));
 
 async function getDevMode() {
-  if (_cache && (Date.now() - _ts) < TTL) return _cache;
+  if (_cache && (Date.now() - _ts) < (_cache._confirmado ? TTL : TTL_FALLO)) return _cache;
   try {
     const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'dev_%'");
     const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
@@ -22,9 +31,10 @@ async function getDevMode() {
       const e = String(m['dev_correo' + i] || '').trim();
       if (e) correos.push({ email: e, rol: String(m['dev_correo' + i + '_rol'] || 'to').toLowerCase() });
     }
-    _cache = { activo: m.dev_activo === '1', correos, whatsapp: String(m.dev_whatsapp || '').trim() };
-  } catch (_) {
-    _cache = { activo: false, correos: [], whatsapp: '' };
+    _cache = { activo: m.dev_activo === '1', correos, whatsapp: String(m.dev_whatsapp || '').trim(), _confirmado: true };
+  } catch (e) {
+    console.error('[dev-mode] NO se pudo leer el estado — se asume ACTIVO por seguridad:', e.message);
+    _cache = { activo: true, correos: CORREOS_FALLBACK, whatsapp: '', _confirmado: false };
   }
   _ts = Date.now();
   return _cache;

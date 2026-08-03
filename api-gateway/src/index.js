@@ -7,6 +7,10 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Chequeo de variables de entorno ANTES de levantar nada (auditoría A-4):
+// las críticas cortan el arranque, el resto se informa en el log.
+require('../../shared/env-check').verificarEntorno();
+
 const app = express();
 app.set('trust proxy', 1); // Render está detrás de proxy: req.ip = IP real del cliente
 
@@ -199,6 +203,27 @@ app.get('/api/health', async (req, res) => {
 // Auth (login limitado a 10 intentos/min por IP — QA 15.5)
 const rateLimit = require('../../shared/rate-limit');
 app.use('/api/auth/login', rateLimit({ ventanaMs: 60000, max: 10 }));
+
+/* Límite general de la API (auditoría 03-08-2026, A-5). Antes solo el login tenía
+   techo: los otros ~1.270 endpoints quedaban abiertos a un bucle, y en TiDB cada
+   consulta se factura — el abuso no es molestia, es cuenta.
+   Se limita por USUARIO cuando hay token (la oficina comparte IP pública) y las
+   rutas caras llevan techo aparte. Los valores son holgados: un humano usando el
+   sistema a dos manos no los roza. */
+const claveUsuario = (req) => {
+  const h = req.headers.authorization || '';
+  const raw = h.startsWith('Bearer ') ? h.slice(7) : req.query.token;
+  if (!raw) return null;                       // sin token → cae a la IP
+  try {
+    const p = JSON.parse(Buffer.from(String(raw).split('.')[1] || '', 'base64').toString('utf8'));
+    return p.id_usuario ? 'u' + p.id_usuario : null;   // solo para agrupar, NO es autenticación
+  } catch (_) { return null; }
+};
+const msjTecho = 'Demasiadas peticiones seguidas. Espera unos segundos y vuelve a intentar.';
+// Rutas caras primero (reportería y contabilidad arrastran consultas grandes)
+for (const ruta of ['/api/reporteria', '/api/tablas-dinamicas', '/api/diseno-consulta', '/api/contabilidad'])
+  app.use(ruta, rateLimit({ ventanaMs: 60000, max: 120, clave: claveUsuario, mensaje: msjTecho }));
+app.use('/api', rateLimit({ ventanaMs: 60000, max: 600, clave: claveUsuario, mensaje: msjTecho }));
 app.use('/api/auth', require('../../services/usuarios/src/routes/auth.routes'));
 
 // Usuarios y perfiles
@@ -682,8 +707,15 @@ app.use((err, req, res, next) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason instanceof Error ? reason.stack : reason);
 });
+/* uncaughtException NO se puede tragar (auditoría 03-08-2026, A-1): tras una
+   excepción no capturada el proceso queda en estado indefinido —pool de conexiones
+   dudoso, transacciones a medio camino— y seguir atendiendo peticiones de dinero
+   así es peor que reiniciar. Se registra, se avisa y se sale: Render levanta el
+   proceso en segundos y la caída queda visible en vez de enmascarada. */
 process.on('uncaughtException', (err) => {
-  console.error('[uncaughtException]', err.stack || err.message);
+  console.error('[uncaughtException] FATAL — el proceso terminará:', err.stack || err.message);
+  try { require('../../shared/alerta-errores')({ method: 'PROCESO', originalUrl: 'uncaughtException' }, err.message); } catch (_) {}
+  setTimeout(() => process.exit(1), 1500);   // margen para que salga el log/correo
 });
 
 const PORT = process.env.PORT || 3000;

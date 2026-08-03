@@ -96,7 +96,9 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
     let subjectFinal = subject || '(sin asunto)', htmlFinal = html, textFinal = text;
 
     // ── Modo DESARROLLO: redirige TODO a los correos de prueba (no sale a clientes) ──
-    let dev = { activo: false };
+    // FAIL-SAFE (auditoria B-1): si no se puede confirmar el estado se asume ACTIVO;
+    // el mailer no enviara sin correos de prueba, que es el resultado seguro.
+    let dev = { activo: true, correos: [], whatsapp: '' };
     try { dev = await require('./dev-mode').getDevMode(); } catch (_) {}
     if (dev.activo) {
       const { destinosDev } = require('./dev-mode');

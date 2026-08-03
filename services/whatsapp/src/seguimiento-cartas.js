@@ -122,7 +122,7 @@ async function correr({ real = false } = {}) {
   const lista = await candidatos();
   if (!real) return { simulado: true, candidatos: lista };
 
-  let devMode = false;
+  let devMode = true;   // FAIL-SAFE (auditoria B-1): ante la duda, NO se envia a clientes reales
   try { devMode = !!(await require('../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
   const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
   const tplEstado = await estadoPlantilla().catch(() => null);

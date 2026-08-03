@@ -622,7 +622,7 @@ exports.enviarMensaje = async (req, res) => {
     let mensajeTxt = '', tipo = '', wamid = null, telNorm = null;
 
     if (canal === 'WHATSAPP') {
-      let devMode = false;
+      let devMode = true;   // FAIL-SAFE (auditoria B-1): ante la duda, NO se envia a clientes reales
       try { devMode = !!(await require('../../../../shared/dev-mode').getDevMode()).activo; } catch (e) {}
       if (devMode) return fail(res, 'Modo Desarrollo activo: este WhatsApp saldría al cliente REAL. Para probar usa "Enviar prueba" en el mantenedor.', 400);
       const auto = require('../../../whatsapp/src/automatizacion-cobranza');
