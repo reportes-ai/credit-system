@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Diario y Mayor — AutoFácil</title>
-  <!-- v1.0 — libro diario por rango + libro mayor por cuenta con saldo acumulado -->
+  <!-- v1.1 — pestana Mayor Completo: TODAS las cuentas con saldo inicial, movimientos y saldo final, exportable -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -22,6 +22,9 @@
     .tot td { font-weight:700; background:#f8fafc; }
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--navy); }
     .fila-click { cursor:pointer; } .fila-click:hover td { background:#f0f9ff; }
+    .cta-head td { background:#eef4ff; border-top:2px solid #c7dbff; font-weight:800; color:var(--navy-dark); cursor:pointer; }
+    .cta-head:hover td { background:#e2ecff; }
+    .cta-fin td { background:#f8fafc; font-weight:700; }
   </style>
 </head>
 <body>
@@ -34,6 +37,7 @@
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item"><a class="nav-link active" href="#" id="tabD" onclick="tab('D');return false">Libro Diario</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabM" onclick="tab('M');return false">Libro Mayor</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tabT" onclick="tab('T');return false">Mayor Completo</a></li>
     <li class="nav-item"><a class="nav-link" href="#" id="tabB" onclick="tab('B');return false"><i class="bi bi-search me-1"></i>Buscar</a></li>
   </ul>
 
@@ -45,6 +49,11 @@
     <div><label class="form-label small fw-semibold mb-1">Desde</label><input type="date" id="fDesde" class="form-control form-control-sm"></div>
     <div><label class="form-label small fw-semibold mb-1">Hasta</label><input type="date" id="fHasta" class="form-control form-control-sm"></div>
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
+    <div id="wTodas" style="display:none" class="d-flex gap-2 align-items-center">
+      <div class="form-check mb-0 ms-1"><input class="form-check-input" type="checkbox" id="fSinMov">
+        <label class="form-check-label small" for="fSinMov">Incluir cuentas sin movimiento (solo saldo)</label></div>
+      <button class="btn btn-sm btn-success" onclick="exportarMayor()"><i class="bi bi-file-earmark-excel me-1"></i>Excel</button>
+    </div>
   </div>
   <div class="small text-muted mb-2"><i class="bi bi-hand-index me-1"></i>Haz clic en cualquier fila para ver el comprobante completo (con sus respaldos adjuntos).</div>
 
@@ -69,7 +78,9 @@ fHasta.value = `${hoy.getFullYear()}-${pad(hoy.getMonth()+1)}-${pad(hoy.getDate(
 function tab(m){ MODO=m;
   document.getElementById('tabD').classList.toggle('active',m==='D');
   document.getElementById('tabM').classList.toggle('active',m==='M');
+  document.getElementById('tabT').classList.toggle('active',m==='T');
   document.getElementById('tabB').classList.toggle('active',m==='B');
+  document.getElementById('wTodas').style.display = m==='T'?'':'none';
   document.getElementById('wCuenta').style.display = m==='M'||m==='B'?'':'none';
   document.getElementById('wQ').style.display = m==='B'?'':'none';
   if (m==='B' && ![...fCuenta.options].some(o=>o.value==='')) fCuenta.insertAdjacentHTML('afterbegin','<option value="">— todas las cuentas —</option>');
@@ -84,6 +95,7 @@ async function cargarCuentas(){
 async function consultar(){
   if (MODO==='D') return diario();
   if (MODO==='B') return buscar();
+  if (MODO==='T') return mayorCompleto();
   return mayor();
 }
 async function buscar(){
@@ -162,6 +174,74 @@ async function mayor(){
   html += `<tr class="tot"><td colspan="6">SALDO FINAL al ${fHasta.value}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
   document.getElementById('tbody').innerHTML = html;
 }
+/* MAYOR COMPLETO: todas las cuentas, una tras otra. Cada cuenta parte con su
+   saldo inicial, encadena el saldo movimiento a movimiento y cierra con el saldo
+   final -- el mismo calculo del mayor de una cuenta, repetido para todas. Las
+   cuentas arrancan PLEGADAS: un periodo puede traer miles de lineas y lo que se
+   mira primero es el saldo por cuenta. */
+let MAYOR_TODO = null;
+async function mayorCompleto(){
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '<tr><td class="text-center text-muted py-4"><i class="bi bi-hourglass-split"></i> Armando el mayor de todas las cuentas...</td></tr>';
+  const p = new URLSearchParams({ desde:fDesde.value, hasta:fHasta.value, solo_con_movimiento: fSinMov.checked?'0':'1' });
+  const r = await fetch('/api/contabilidad/libro-mayor-completo?'+p,{headers:H});
+  const j = await r.json(); if (!j.success) { tb.innerHTML=''; return alert(j.error); }
+  MAYOR_TODO = j.data;
+  document.getElementById('thead').innerHTML = '<tr><th>N&deg;</th><th>Fecha</th><th>Detalle</th><th>N&deg; OP</th><th class="text-right">Debe</th><th class="text-right">Haber</th><th class="text-right">Saldo</th></tr>';
+  const t = j.data.totales;
+  let html = `<tr class="tot"><td colspan="4">${t.cuentas} cuenta(s) &middot; ${t.movimientos} movimiento(s) &mdash; ${esc(j.data.desde)} al ${esc(j.data.hasta)}</td>
+    <td class="text-right">$${fmt(t.debe)}</td><td class="text-right">$${fmt(t.haber)}</td><td></td></tr>`;
+  if (j.data.truncado) html += '<tr><td colspan="7" class="text-center text-danger small">Se alcanzo el limite de lineas: acota el periodo, faltan movimientos por mostrar.</td></tr>';
+  if (!j.data.cuentas.length) html += '<tr><td colspan="7" class="text-center text-muted py-4">Sin movimientos en el periodo</td></tr>';
+
+  j.data.cuentas.forEach((c,i)=>{
+    html += `<tr class="cta-head" onclick="plegar(${i})"><td colspan="4"><i class="bi bi-caret-right-fill" id="cx${i}"></i>
+        ${esc(c.cuenta)} &middot; ${esc(c.nombre||'')} <span class="fw-normal text-muted">(${c.movimientos.length} mov.)</span></td>
+      <td class="text-right">$${fmt(c.debe)}</td><td class="text-right">$${fmt(c.haber)}</td>
+      <td class="text-right">$${fmt(c.saldo_final)}</td></tr>`;
+    let saldo = Number(c.saldo_inicial);
+    html += `<tr class="det d${i}" style="display:none"><td colspan="6" class="text-muted">Saldo inicial al ${esc(j.data.desde)}</td><td class="text-right">$${fmt(saldo)}</td></tr>`;
+    html += c.movimientos.map(x=>{ saldo += Number(x.debe)-Number(x.haber); return `
+      <tr class="det d${i} fila-click" style="display:none" onclick="ver(${x.id})">
+        <td class="num">${esc(x.num)}</td><td>${String(x.fecha).slice(0,10)}</td>
+        <td>${esc(x.glosa||x.comp_glosa)}</td><td>${esc(x.num_op||'')}</td>
+        <td class="text-right">${x.debe>0?'$'+fmt(x.debe):''}</td><td class="text-right">${x.haber>0?'$'+fmt(x.haber):''}</td>
+        <td class="text-right">$${fmt(saldo)}</td></tr>`; }).join('');
+    html += `<tr class="det d${i} cta-fin" style="display:none"><td colspan="6">Saldo final al ${esc(j.data.hasta)}</td><td class="text-right">$${fmt(c.saldo_final)}</td></tr>`;
+  });
+  tb.innerHTML = html;
+}
+function plegar(i){
+  const filas = document.querySelectorAll('.d'+i);
+  const abierto = filas.length && filas[0].style.display !== 'none';
+  filas.forEach(f => f.style.display = abierto ? 'none' : '');
+  const ic = document.getElementById('cx'+i);
+  if (ic) ic.className = 'bi bi-caret-' + (abierto ? 'right' : 'down') + '-fill';
+}
+/* Exportacion: una fila por movimiento con la cuenta repetida y el saldo
+   encadenado (formato plano, el que abre el contador y el que pide auditoria). */
+function exportarMayor(){
+  if (!MAYOR_TODO) return alert('Primero consulta el periodo.');
+  const sep = ';';
+  const t = x => '"' + String(x==null?'':x).replace(/"/g,'""') + '"';
+  const filas = [['Cuenta','Nombre cuenta','Tipo','N comprobante','Fecha','Detalle','N OP','RUT','Debe','Haber','Saldo'].map(t).join(sep)];
+  for (const c of MAYOR_TODO.cuentas) {
+    let saldo = Number(c.saldo_inicial);
+    filas.push([t(c.cuenta),t(c.nombre),t(c.tipo),'',t(MAYOR_TODO.desde),t('SALDO INICIAL'),'','','','',saldo].join(sep));
+    for (const x of c.movimientos) {
+      saldo += Number(x.debe)-Number(x.haber);
+      filas.push([t(c.cuenta),t(c.nombre),t(c.tipo),t(x.num),t(String(x.fecha).slice(0,10)),
+        t(x.glosa||x.comp_glosa),t(x.num_op||''),t(x.rut||''),Number(x.debe),Number(x.haber),saldo].join(sep));
+    }
+    filas.push([t(c.cuenta),t(c.nombre),t(c.tipo),'',t(MAYOR_TODO.hasta),t('SALDO FINAL'),'','',c.debe,c.haber,c.saldo_final].join(sep));
+  }
+  const blob = new Blob(['\ufeff'+filas.join('\r\n')], { type:'text/csv;charset=utf-8;' });
+  const u = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = u; a.download = 'Libro Mayor Completo ' + MAYOR_TODO.desde + ' a ' + MAYOR_TODO.hasta + '.csv'; a.click();
+  URL.revokeObjectURL(u);
+}
+
 (async()=>{
   await cargarCuentas();
   // Drill-down desde balance/estados: /contabilidad/libros/?cuenta=X&desde=&hasta=

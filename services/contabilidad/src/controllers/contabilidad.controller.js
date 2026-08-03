@@ -339,6 +339,72 @@ exports.libroMayor = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* MAYOR COMPLETO — todas las cuentas del período, cada una con su saldo inicial,
+   sus movimientos y su saldo final. Es el mayor analítico que pide auditoría para
+   respaldar el balance; el mayor de una cuenta (arriba) es el mismo cálculo con
+   filtro. Se arma en DOS queries (saldos iniciales y movimientos, ambos agrupados
+   por cuenta) para no disparar una consulta por cuenta.
+   `solo_con_movimiento=0` incluye también las cuentas que solo arrastran saldo. */
+exports.libroMayorCompleto = async (req, res) => {
+  try {
+    const r = rangoFechas(req);
+    if (!r) return fail(res, 'desde y hasta obligatorios', 400);
+    const soloConMov = String(req.query.solo_con_movimiento || '1') === '1';
+    const LIMITE = Math.min(50000, Math.max(1000, parseInt(req.query.limite || '20000', 10)));
+
+    const [iniRows] = await pool.query(
+      `SELECT m.cuenta, COALESCE(SUM(m.debe),0) d, COALESCE(SUM(m.haber),0) h
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+        WHERE c.estado='CONTABILIZADO' AND c.fecha < ?
+        GROUP BY m.cuenta`, [r.desde]);
+    const inicial = new Map(iniRows.map(x => [x.cuenta, Number(x.d) - Number(x.h)]));
+
+    const [movs] = await pool.query(
+      `SELECT m.cuenta, c.id, c.tipo, c.anio, c.numero, c.fecha, c.glosa comp_glosa,
+              m.glosa, m.debe, m.haber, m.num_op, m.rut
+         FROM ctb_movimientos m JOIN ctb_comprobantes c ON c.id=m.id_comprobante
+        WHERE c.estado='CONTABILIZADO' AND c.fecha BETWEEN ? AND ?
+        ORDER BY m.cuenta, c.fecha, c.id LIMIT ?`, [r.desde, r.hasta, LIMITE]);
+
+    const [nombres] = await pool.query('SELECT codigo, nombre, tipo FROM ctb_cuentas');
+    const nomDe = new Map(nombres.map(x => [x.codigo, x]));
+
+    const porCuenta = new Map();
+    const dame = (cta) => {
+      if (!porCuenta.has(cta)) {
+        const k = nomDe.get(cta) || {};
+        porCuenta.set(cta, {
+          cuenta: cta, nombre: k.nombre || '', tipo: k.tipo || '',
+          saldo_inicial: inicial.get(cta) || 0, movimientos: [], debe: 0, haber: 0,
+        });
+      }
+      return porCuenta.get(cta);
+    };
+    for (const m of movs) {
+      const g = dame(m.cuenta);
+      g.debe += Number(m.debe); g.haber += Number(m.haber);
+      g.movimientos.push({ ...m, num: fmtNum(m), cuenta: undefined });
+    }
+    // Cuentas sin movimiento en el rango pero con saldo arrastrado
+    if (!soloConMov) for (const [cta, saldo] of inicial) if (saldo && !porCuenta.has(cta)) dame(cta);
+
+    const cuentas = [...porCuenta.values()]
+      .map(g => ({ ...g, saldo_final: g.saldo_inicial + g.debe - g.haber }))
+      .sort((a, b) => String(a.cuenta).localeCompare(String(b.cuenta)));
+
+    ok(res, {
+      desde: r.desde, hasta: r.hasta, cuentas,
+      totales: {
+        cuentas: cuentas.length,
+        movimientos: movs.length,
+        debe: cuentas.reduce((a, c) => a + c.debe, 0),
+        haber: cuentas.reduce((a, c) => a + c.haber, 0),
+      },
+      truncado: movs.length >= LIMITE,   // el front avisa que faltan líneas
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Punto de Restauración (Contabilidad) ──────────────────────────────────────
    Marca de agua antes de algo arriesgado (importar un libro, digitación masiva,
    probar reglas): guarda el MAX(id) de comprobantes y del log del motor.
