@@ -938,9 +938,11 @@ const getOtorgadosIncompletos = async (req, res) => {
              c.plazo, c.tascli_real,
              c.seguro_rdh, c.seguro_cesantia, c.seguro_rep_menor,
              c.monto_comision_fin, c.comdea_real, c.com_parque,
+             -- El nombre vive SOLO en clientes (creditos no lo guarda): misma fuente
+             -- que la cola de digitación, con respaldo si nombre_completo está vacío.
              COALESCE(NULLIF(cl.nombre_completo,''),
-                      NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''))),''),
-                      c.nombre_cliente) AS cliente
+                      NULLIF(TRIM(CONCAT(COALESCE(cl.nombres, cl.nombre, ''),' ',COALESCE(cl.apellido_paterno,''))),''),
+                      '') AS cliente
       FROM creditos c
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE c.estado_eval = 'OTORGADO'
