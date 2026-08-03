@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores — AutoFácil</title>
+  <!-- v1.1 las cards también salen por MÓDULO (funcionalidad de Mantenedores con página fuera de /mantenedores/) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/Sortable.min.js"></script>
@@ -270,8 +271,13 @@
         const jOrden = await rOrden.json(); const jP = await rPlacement.json(); const jM = await rMods.json();
         if (jOrden.success && Array.isArray(jOrden.data)) orden = jOrden.data;
         if (jP.success && jP.data) placement = jP.data;
-        funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/mantenedores/'));
         if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
+        // Cards de esta sección: por RUTA (/mantenedores/…) o por MÓDULO — una
+        // funcionalidad del módulo Mantenedores cuya página vive en otra ruta
+        // (ej. /presentacion-grupo/) también es una card de acá.
+        const idMant = (modsBD.find(m => (m.ruta || '') === '/mantenedores/') || {}).id_modulo;
+        funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href &&
+          (f.href.startsWith('/mantenedores/') || (idMant && f.id_modulo === idMant)));
         esProt = !!jM.protegido;   // BG-ADMIN (servidor), no de la sesión
       } catch {}
 
@@ -290,7 +296,7 @@
         if (sec !== 'mantenedores' && Array.isArray(arr)) arr.forEach(k => asignadasFuera.add(k));
       });
       const nativeItems = funcInfo.map(f => {
-        const seg = f.href.replace('/mantenedores/', '').replace(/\/$/, '');
+        const seg = f.href.replace('/mantenedores/', '').replace(/^\//, '').replace(/\/$/, '');
         if (SOLO_DIOS.has(seg) || DEALERNET.has(seg) || DEALERS_HIJAS.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
         if (asignadasFuera.has(seg)) return null;

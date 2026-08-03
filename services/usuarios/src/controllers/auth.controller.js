@@ -181,7 +181,7 @@ const misPermisos = async (req, res) => {
 
     // Funcionalidades habilitadas con detalle (perfil base)
     const [perfilFuncs] = await pool.query(
-      `SELECT f.codigo, f.nombre, f.href, f.icono, pp.habilitado
+      `SELECT f.codigo, f.nombre, f.href, f.icono, f.id_modulo, pp.habilitado
        FROM permisos_perfil pp
        JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
        WHERE pp.id_perfil = ?`,
@@ -189,20 +189,20 @@ const misPermisos = async (req, res) => {
     );
     const permisosMapa = {};
     perfilFuncs.forEach(p => {
-      permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono };
+      permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono, id_modulo: p.id_modulo };
     });
 
     // Aplicar overrides individuales del usuario (permisos_usuario)
     try {
       const [userFuncs] = await pool.query(
-        `SELECT f.codigo, f.nombre, f.href, f.icono, pu.habilitado
+        `SELECT f.codigo, f.nombre, f.href, f.icono, f.id_modulo, pu.habilitado
          FROM permisos_usuario pu
          JOIN funcionalidades f ON f.id_funcionalidad = pu.id_funcionalidad
          WHERE pu.id_usuario = ?`,
         [id_usuario]
       );
       userFuncs.forEach(p => {
-        permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono };
+        permisosMapa[p.codigo] = { habilitado: p.habilitado === 1, nombre: p.nombre, href: p.href, icono: p.icono, id_modulo: p.id_modulo };
       });
     } catch (e) { /* tabla puede no existir aún */ }
 
@@ -214,7 +214,7 @@ const misPermisos = async (req, res) => {
 
     const funcionalidadesInfo = Object.entries(permisosMapa)
       .filter(([, v]) => v.habilitado)
-      .map(([codigo, v]) => ({ codigo, nombre: v.nombre, href: v.href, icono: v.icono }));
+      .map(([codigo, v]) => ({ codigo, nombre: v.nombre, href: v.href, icono: v.icono, id_modulo: v.id_modulo }));
 
     res.json({ success: true, data: modulos, funcionalidades, funcionalidadesInfo, protegido: _protegido, error: null });
   } catch (error) {
