@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Parámetros de Crédito — AutoFácil</title>
+  <!-- v1.1 piso de validez de las primas de seguro + footer 'Qué afecta' -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -142,6 +143,35 @@
         <span id="metaFecha">—</span>
       </div>
     </div>
+
+    <!-- Validación de datos ------------------------------------------------ -->
+    <div class="card" style="margin-top:18px">
+      <div class="card-head">
+        <div class="card-head-left"><i class="bi bi-shield-check"></i> Validación de datos</div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:6px 0">
+          <div style="flex:1;min-width:280px">
+            <div style="font-weight:600;font-size:.92rem">Prima de seguro mínima válida</div>
+            <div style="font-size:.8rem;color:#64748b;margin-top:3px">
+              Sobre $0 pero bajo este monto, la prima se considera un dato corrupto y el crédito
+              vuelve a la cola de Digitación. El $0 explícito sigue siendo válido ("no se contrató").
+            </div>
+          </div>
+          <input id="inp_prima_minima_valida" style="width:150px;text-align:right;border:1.5px solid #cbd5e1;border-radius:8px;padding:8px 11px;font:inherit">
+          <button class="btn-save" onclick="guardarPrima()"><i class="bi bi-floppy"></i> Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Qué afecta este mantenedor ----------------------------------------- -->
+    <div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:10px;padding:16px 20px;font-size:.83rem;color:#475569;margin-top:18px">
+      <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
+      <ul style="margin:8px 0 0;padding-left:18px">
+        <li><b>Gastos operacionales</b> → se capitalizan en el monto financiado y entran al costo de cada operación en <a href="/dashboard/">Dashboard → Rentabilidades</a> y en las <a href="/cotizaciones/">Cotizaciones</a>.</li>
+        <li><b>Prima de seguro mínima válida</b> → qué créditos entran a la cola de <a href="/carga-masiva/digitacion/">Digitación de Datos Faltantes</a> y al cuadro de otorgados incompletos (mismo motor para los dos).</li>
+      </ul>
+    </div>
   </div>
 </div>
 
@@ -260,6 +290,8 @@ async function cargar() {
     }
 
     renderRows();
+    const ip = document.getElementById('inp_prima_minima_valida');
+    if (ip) ip.value = fmtPeso(valores.prima_minima_valida || 10000);
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('mainCard').style.display = '';
   } catch (err) {
@@ -267,6 +299,24 @@ async function cargar() {
       `<i class="bi bi-exclamation-triangle text-danger me-2"></i> Error al cargar. <a href="javascript:cargar()">Reintentar</a>`;
     console.error(err);
   }
+}
+
+/* Piso de validez de las primas: se guarda solo (no toca los gastos ni dispara
+   recálculo — no cambia ningún monto, solo qué se considera dato faltante). */
+async function guardarPrima() {
+  const v = parsePeso(document.getElementById('inp_prima_minima_valida').value);
+  if (isNaN(v) || v < 0) { showToast('Valor inválido', 'error'); return; }
+  try {
+    const res = await fetch('/api/parametros-credito', {
+      method: 'PUT', headers: authHdr(),
+      body: JSON.stringify({ prima_minima_valida: v, _recalc: false })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    valores.prima_minima_valida = v;
+    document.getElementById('inp_prima_minima_valida').value = fmtPeso(v);
+    showToast('Piso de primas guardado: ' + fmtPeso(v));
+  } catch (e) { showToast('Error al guardar: ' + e.message, 'error'); }
 }
 
 /* ─── GUARDAR ───────────────────────────────────────────────────────────── */

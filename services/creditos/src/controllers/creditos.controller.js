@@ -932,6 +932,10 @@ const getReporteria = async (req, res) => {
    Actualiza solo los campos de ingresos/comisiones que vienen del body */
 const getOtorgadosIncompletos = async (req, res) => {
   try {
+    // Misma regla que la cola de digitación (motor único): primas en blanco o bajo
+    // el piso de validez cuentan como faltantes.
+    const DF = require('./digitacion-faltantes.controller');
+    await DF.refrescarPrimaMin();
     const [rows] = await pool.query(`
       SELECT c.id, c.num_op, c.ejecutivo, c.automotora, c.monto_financiado, c.mes,
              c.financiera, c.id_financiera, c.parque,
@@ -948,11 +952,9 @@ const getOtorgadosIncompletos = async (req, res) => {
       WHERE c.estado_eval = 'OTORGADO'
         AND c.estado_credito NOT IN ('RECHAZADO','ANULADO')
         AND (c.plazo IS NULL OR c.plazo = 0 OR c.tascli_real IS NULL OR c.tascli_real = 0
-             -- primas nunca digitadas (misma regla que la cola de digitación): afectan el
-             -- ingreso por seguros SALVO en UNIDAD DE CREDITO (UAC no paga comisión de
-             -- seguros — rentabilidad-calc.js). 0 explícito = válido.
-             OR (UPPER(COALESCE(c.financiera,'')) <> 'UNIDAD DE CREDITO'
-                 AND c.seguros IS NULL AND c.seguro_rdh IS NULL AND c.seguro_cesantia IS NULL AND c.seguro_rep_menor IS NULL))
+             -- primas faltantes: motor único de la cola de digitación (blanco o bajo
+             -- el piso). UNIDAD DE CREDITO no paga comisión de seguros (rentabilidad-calc.js).
+             OR ${DF.primasFaltanSQL('c')})
       ORDER BY c.mes DESC, c.num_op DESC
       LIMIT 2000 -- LIMIT defensivo (cola de digitacion faltantes)
     `);

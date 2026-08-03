@@ -117,6 +117,31 @@ require('../../../../shared/migrate').enFila('digitacion-faltantes', async () =>
 });
 
 /* ── Construcción del WHERE de pendientes ───────────────────────────────── */
+/* Piso de validez de una prima — PARAMÉTRICO (mantenedor Parámetros de Crédito,
+   clave `prima_minima_valida`). Bajo este monto la prima se considera un dato
+   corrupto y vuelve a la cola de digitación. Se cachea 60s: el WHERE se arma
+   sincrónico en varios puntos y no puede esperar a la BD. */
+let PRIMA_MIN = 10000, _primaMinAt = 0;
+async function refrescarPrimaMin() {
+  if (Date.now() - _primaMinAt < 60000) return PRIMA_MIN;
+  try {
+    const [[r]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='prima_minima_valida' LIMIT 1");
+    if (r && Number(r.valor) >= 0) PRIMA_MIN = Number(r.valor);
+  } catch (_) { /* sin parámetro: queda el default */ }
+  _primaMinAt = Date.now();
+  return PRIMA_MIN;
+}
+const primaSospechosaSQL = (col) => `(${col} > 0 AND ${col} < ${Number(PRIMA_MIN) || 0})`;
+exports._primaMinima = () => PRIMA_MIN;
+exports.refrescarPrimaMin = refrescarPrimaMin;
+/* MOTOR ÚNICO de "a esta operación le faltan primas": lo usa la cola y también el
+   cuadro de otorgados incompletos, para que ambos digan exactamente lo mismo. */
+exports.primasFaltanSQL = (a = 'c') =>
+  `(UPPER(COALESCE(${a}.financiera,'')) <> 'UNIDAD DE CREDITO'
+     AND (${a}.seguro_rdh IS NULL OR ${a}.seguro_cesantia IS NULL OR ${a}.seguro_rep_menor IS NULL
+       OR ${primaSospechosaSQL(a + '.seguro_rdh')} OR ${primaSospechosaSQL(a + '.seguro_cesantia')}
+       OR ${primaSospechosaSQL(a + '.seguro_rep_menor')}))`;
+
 function estadoCond(tipo) {
   return tipo === 'otorgados'
     ? `ob.estado_eval = 'OTORGADO'`
@@ -124,11 +149,18 @@ function estadoCond(tipo) {
 }
 function colVacioSQL(col) {
   const c = CAMPO[col] || {};
-  // primas: falta solo si NI el agregado NI los seguros individuales están digitados (0 = válido).
+  // Primas (regla de negocio, Pato 03-08-2026): cada una de las tres se exige digitada.
+  //   · en blanco (NULL)        → falta, hay que ir a buscarla al contrato
+  //   · $0 explícito            → válido, significa "no se contrató"
+  //   · 0 < prima < piso mínimo → falta: no existe una prima de $300; es un dato
+  //     mutilado en la carga (el punto de miles leído como decimal) y hasta ahora
+  //     se blindaba solo, porque al ser > 0 el sistema la daba por completa.
   // Regla negocio (rentabilidad-calc.js): UNIDAD DE CREDITO no paga comisión de seguros →
   // las primas NO son ingreso ahí y no se exigen.
   if (col === 'seguros') return `(UPPER(COALESCE(ob.financiera,'')) <> 'UNIDAD DE CREDITO'
-    AND ob.seguros IS NULL AND ob.seguro_rdh IS NULL AND ob.seguro_cesantia IS NULL AND ob.seguro_rep_menor IS NULL)`;
+    AND (ob.seguro_rdh IS NULL OR ob.seguro_cesantia IS NULL OR ob.seguro_rep_menor IS NULL
+      OR ${primaSospechosaSQL('ob.seguro_rdh')} OR ${primaSospechosaSQL('ob.seguro_cesantia')}
+      OR ${primaSospechosaSQL('ob.seguro_rep_menor')}))`;
   if (col === 'comdea_real') return `(ob.${col} IS NULL)`;                   // 0 = sin comisión, válido si se digitó
   if (col === 'anio')    return `(ob.${col} IS NULL)`;                       // 0 = "S/I", válido
   if (c.tipo === 'text' || c.tipo === 'select') return `(ob.${col} IS NULL OR ob.${col} = '')`;
@@ -154,8 +186,11 @@ function esVacio(col, v, row) {
   // individuales digitados también cuentan como completado
   if (col === 'seguros') {
     if (String((row || {}).financiera || '').toUpperCase() === 'UNIDAD DE CREDITO') return false;
-    if (row && (row.seguro_rdh != null || row.seguro_cesantia != null || row.seguro_rep_menor != null)) return false;
-    return v === null || v === undefined;   // 0 explícito = válido
+    // Mismo criterio que colVacioSQL: las tres digitadas y ninguna bajo el piso.
+    const primas = ['seguro_rdh', 'seguro_cesantia', 'seguro_rep_menor'].map(k => (row || {})[k]);
+    if (primas.some(p => p === null || p === undefined)) return true;
+    if (primas.some(p => Number(p) > 0 && Number(p) < PRIMA_MIN)) return true;
+    return false;                            // 0 explícito = válido ("no se contrató")
   }
   if (v === null || v === undefined) return true;
   const c = CAMPO[col] || {};
@@ -169,6 +204,7 @@ const errSrv = (res, e, tag) => { console.error(`[${tag}]`, e.message); res.stat
 
 /* Conteo reutilizable (motor único de la cola) — lo consume Mi Día */
 exports.contarPendientes = async () => {
+  await refrescarPrimaMin();
   const out = {};
   for (const tipo of ['otorgados', 'otros']) {
     const [[{ n }]] = await pool.query(`SELECT COUNT(*) n FROM creditos ob WHERE ${pendingWhere(tipo)}`);
@@ -180,6 +216,7 @@ exports.contarPendientes = async () => {
 /* ── GET /conteo → { otorgados, otros } ─────────────────────────────────── */
 exports.conteo = async (req, res) => {
   try {
+    await refrescarPrimaMin();
     const out = {};
     for (const tipo of ['otorgados','otros']) {
       const [[{ n }]] = await pool.query(`SELECT COUNT(*) n FROM creditos ob WHERE ${pendingWhere(tipo)}`);
@@ -193,6 +230,7 @@ exports.conteo = async (req, res) => {
 exports.siguiente = async (req, res) => {
   try {
     const tipo = req.query.tipo === 'otros' ? 'otros' : 'otorgados';
+    await refrescarPrimaMin();
     const uid = req.usuario.id_usuario;
     const nombre = ((req.usuario.nombre||'') + ' ' + (req.usuario.apellido||'')).trim() || req.usuario.email || ('U' + uid);
 
