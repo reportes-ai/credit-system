@@ -101,19 +101,10 @@ function normDate(v) {
 // Parseo de columna MES ("may-26"→YYYY-MM-01) y fin de mes: motor único en shared/utils/mes-excel.js
 const { parseMesTxt, finDeMes } = require('../../../../shared/utils/mes-excel');
 
-function normInt(v) {
-  if (v === null || v === undefined) return null;
-  // Si Excel ya entrega número, respetarlo tal cual.
-  if (typeof v === 'number') return isNaN(v) ? null : Math.round(v);
-  /* Texto: formato CHILENO — el punto es separador de MILES y la coma el decimal.
-     El parseFloat directo convertía "307.000" en 307 y "1.109.286" en 1: las
-     primas de seguros entraban divididas por mil (o peor) cuando la celda venía
-     como texto. 22 operaciones quedaron con primas de $1 a $500. */
-  let t = String(v).trim().replace(/[^0-9.,\-]/g, '');
-  t = t.replace(/\./g, '').replace(',', '.');
-  const n = parseFloat(t);
-  return isNaN(n) ? null : Math.round(n);
-}
+/* Lectura de montos en formato chileno: MOTOR ÚNICO en shared/num-chile.js.
+   Estaba escrito acá y también, en otra variante, en `numCL` del parser de PDF
+   (misma regla, dos implementaciones). Ahora ambas apuntan al mismo lugar. */
+const { enteroCL: normInt, numeroCL } = require('../../../../shared/num-chile');
 
 function normStr(v) {
   if (v === null || v === undefined) return null;
@@ -740,7 +731,7 @@ exports.parseCarta = async (req, res) => {
     };
 
     const firstNum = s => { const m = String(s || '').match(/\d[\d.]*(?:,\d+)?/); return m ? m[0] : null; };
-    const numCL = s => { const f = firstNum(s); if (f == null) return null; const n = parseFloat(f.replace(/\./g, '').replace(',', '.')); return isNaN(n) ? null : n; };
+    const numCL = s => { const f = firstNum(s); return f == null ? null : numeroCL(f); };   // motor único: shared/num-chile
     const dateCL = s => { const m = String(s || '').match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
     const allText = items.map(i => i.s).join(' ');
     const rut = (allText.match(/\b\d{7,8}-[\dkK]\b/) || [])[0] || null;
@@ -820,4 +811,4 @@ exports.parseCarta = async (req, res) => {
 };
 
 // Internos expuestos para scripts de operación y pruebas (mismo motor, cero duplicación)
-exports._interno = { parseCanal, aplicarCanal, esArchivoCanal };
+exports._interno = { parseCanal, aplicarCanal, esArchivoCanal, normInt };

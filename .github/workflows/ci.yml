@@ -1,0 +1,41 @@
+name: CI — sintaxis y pruebas
+
+# Auditoría 03-08-2026 (B-2): antes de esto el único workflow era el respaldo
+# nocturno. Nada verificaba el código antes de que Render lo desplegara a
+# producción — y push a main es despliegue inmediato a los usuarios.
+#
+# No necesita secretos ni base de datos: las pruebas son de motores PUROS.
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm ci --omit=dev
+
+      - name: Sintaxis de todos los archivos JS
+        run: |
+          errores=0
+          while IFS= read -r f; do
+            node --check "$f" || { echo "✗ Error de sintaxis: $f"; errores=$((errores+1)); }
+          done < <(find services shared api-gateway/src scripts -name '*.js' -not -path '*/node_modules/*')
+          echo "Archivos con error de sintaxis: $errores"
+          [ "$errores" -eq 0 ]
+
+      - name: Pruebas de los motores de cálculo
+        run: npm test
+
+      - name: Vulnerabilidades de dependencias (informativo)
+        run: npm audit --production || true
