@@ -81,6 +81,10 @@ body{font-family:'Roboto',sans-serif;background:#f0f2f5;font-size:12px;color:#33
 .sumtbl th:not(:first-child){text-align:right}
 .sumtbl td{padding:4px 8px;border-bottom:1px solid #f0f2f5;text-align:right}
 .sumtbl td:first-child{text-align:left;color:#444}
+/* Ritmo requerido: valores CENTRADOS bajo su encabezado (pedido de Pato 03-08).
+   Va con clase propia para no cambiar la alineación del resto de los cuadros. */
+.sumtbl.tbl-centrada th:not(:first-child),
+.sumtbl.tbl-centrada td:not(:first-child){text-align:center}
 .sumtbl tfoot td{font-weight:700;color:#1a3a6a;border-top:2px solid #dce3ed;background:#f8faff;padding:5px 8px}
 
 /* ---- HIGHLIGHTED NUMBERS ---- */

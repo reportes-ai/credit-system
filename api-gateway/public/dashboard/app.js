@@ -2947,7 +2947,7 @@ function renderRitmoRequerido({ pptoQ, pptoM, actQ, actM, D, dHoy, proyQ, proyM,
   const fQ = v => Math.round(v).toLocaleString('es-CL');
 
   cont.innerHTML = `
-    <table class="sumtbl">
+    <table class="sumtbl tbl-centrada">
       <thead><tr><th></th><th>Presupuesto</th><th>Real a hoy</th><th>Falta</th>
         <th>Por día (parejo)</th><th>Por día (con curva)</th><th>Proyección</th><th>Cumplimiento</th></tr></thead>
       <tbody>
