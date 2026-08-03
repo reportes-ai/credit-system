@@ -21,7 +21,33 @@ const TTL_FALLO = 5000;   // 5s cuando no se pudo confirmar: reintentar pronto
 const CORREOS_FALLBACK = String(process.env.DEV_CORREOS_FALLBACK || process.env.ALERTA_ERRORES_MAIL || '')
   .split(',').map(s => s.trim()).filter(Boolean).map(email => ({ email, rol: 'to' }));
 
+/* STAGING fuerza el Modo Desarrollo sin preguntarle a nadie (Fase 4 del plan
+   staging): en el ambiente de pruebas es IMPOSIBLE contactar a un cliente real,
+   aunque la BD diga otra cosa o alguien lo apague por error desde el mantenedor. */
+const { esStaging } = require('./entorno');
+
 async function getDevMode() {
+  if (esStaging()) {
+    if (!_cache || !_cache._staging) {
+      _cache = { activo: true, correos: CORREOS_FALLBACK, whatsapp: '', _confirmado: true, _staging: true };
+      _ts = Date.now();
+    }
+    // Se intenta enriquecer con los correos de prueba configurados, pero el
+    // "activo: true" no depende de que la consulta funcione.
+    try {
+      const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'dev_%'");
+      const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
+      const correos = [];
+      for (const i of [1, 2, 3]) {
+        const e = String(m['dev_correo' + i] || '').trim();
+        if (e) correos.push({ email: e, rol: String(m['dev_correo' + i + '_rol'] || 'to').toLowerCase() });
+      }
+      if (correos.length) _cache.correos = correos;
+      if (m.dev_whatsapp) _cache.whatsapp = String(m.dev_whatsapp).trim();
+    } catch (_) { /* da igual: el modo ya está activo */ }
+    return _cache;
+  }
+
   if (_cache && (Date.now() - _ts) < (_cache._confirmado ? TTL : TTL_FALLO)) return _cache;
   try {
     const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave LIKE 'dev_%'");

@@ -741,8 +741,8 @@ async function tick() {
   } catch (e) { console.error('[correos tick]', e.message); }
   finally { _busy = false; }
 }
-setTimeout(tick, 15000);
-setInterval(tick, 60000);
+// Motor de correos programados: se apaga en staging (Fase 4 plan staging)
+require('../../../../shared/scheduler').programar('correos-programados', tick, 60000, { arranqueMs: 15000 });
 
 /* ── Endpoints ── */
 const esAdmin = req => req.usuario && req.usuario.perfil_nombre === 'Administrador';

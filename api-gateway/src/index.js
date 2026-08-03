@@ -9,6 +9,7 @@ require('dotenv').config();
 
 // Chequeo de variables de entorno ANTES de levantar nada (auditoría A-4):
 // las críticas cortan el arranque, el resto se informa en el log.
+require('../../shared/entorno').anunciar();
 require('../../shared/env-check').verificarEntorno();
 
 const app = express();
@@ -104,7 +105,12 @@ app.get('/api/health', async (req, res) => {
     ]);
     db = true;
   } catch (e) { /* db queda false */ }
-  res.status(db ? 200 : 503).json({ status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()) });
+  const ent = require('../../shared/entorno');
+  res.status(db ? 200 : 503).json({
+    status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()),
+    entorno: ent.NOMBRE,                                   // producción o staging, de un vistazo
+    motores: require('../../shared/scheduler').listar().filter(m => !m.activo).map(m => m.nombre),
+  });
 });
 
 // Easter egg: módulo Café ("la app hace de todo... hasta café") — card para todos los perfiles

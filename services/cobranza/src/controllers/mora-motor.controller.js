@@ -210,8 +210,8 @@ async function tick() {
   } catch (e) { console.error('[cobranza mora-motor tick]', e.message); }
   finally { _busy = false; }
 }
-setTimeout(tick, 20000);
-setInterval(tick, 60000);
+// Motor de mora (envía correos de cobranza): se apaga en staging
+require('../../../../shared/scheduler').programar('mora-motor', tick, 60000, { arranqueMs: 20000 });
 
 /* ── Endpoints (mantenedor) ── */
 exports.getTodo = async (req, res) => {

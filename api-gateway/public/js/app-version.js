@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v172.1';
+const APP_VERSION = 'v172.2';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -1060,6 +1060,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const d = document.createElement('div'); d.id = 'afDevRibbon'; d.textContent = 'DESARROLLO';
     document.body.appendChild(d);
   }
+
+  /* Cinta STAGING (Fase 4 del plan staging): banda superior imposible de ignorar,
+     para que nadie confunda el ambiente de pruebas con el real. Se pinta desde
+     /api/health, que informa el entorno sin necesidad de sesión. */
+  function afMostrarCintaStaging() {
+    if (document.getElementById('afStgRibbon')) return;
+    const st = document.createElement('style');
+    st.textContent = '#afStgRibbon{position:fixed;top:0;left:0;right:0;z-index:100001;background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);' +
+      "color:#fff;font-weight:800;font-size:11px;letter-spacing:3px;text-align:center;padding:3px 0;pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}" +
+      'body{border-top:0}';
+    document.head.appendChild(st);
+    const d = document.createElement('div'); d.id = 'afStgRibbon';
+    d.textContent = 'STAGING — AMBIENTE DE PRUEBAS · NADA DE LO QUE HAGAS ACÁ LLEGA A UN CLIENTE';
+    document.body.appendChild(d);
+  }
+  try {
+    const h = await fetch('/api/health').then(r => r.json());
+    if (h && h.entorno === 'staging') afMostrarCintaStaging();
+  } catch (_) { /* si falla, no bloquea nada */ }
 
   let data;
   try {

@@ -313,6 +313,7 @@ async function tick() {
     console.log(`[automatizacion-cobranza] corrida ${hoy}: ${r.resultados.length} envíos`, r.resultados.map(x => x.estado).join(','));
   } catch (e) { console.error('[automatizacion-cobranza tick]', e.message); }
 }
-setInterval(tick, 10 * 60 * 1000);
+// Cobranza automática por WhatsApp: se apaga en staging
+require('../../../shared/scheduler').programar('wsp-cobranza', tick, 10 * 60 * 1000);
 
 module.exports = { correr, candidatos, secuencia, marcarEstado, CAMPOS, CAMPOS_LABEL, normTel };

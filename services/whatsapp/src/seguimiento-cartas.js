@@ -221,7 +221,8 @@ async function tick() {
     console.log(`[seguimiento-cartas] corrida ${hoy}: ${r.resultados.length} envíos`, r.resultados.map(x => x.estado).join(','));
   } catch (e) { console.error('[seguimiento-cartas tick]', e.message); }
 }
-setInterval(tick, 10 * 60 * 1000);
+// Seguimiento de cartas por WhatsApp: se apaga en staging
+require('../../../shared/scheduler').programar('wsp-seguimiento-cartas', tick, 10 * 60 * 1000);
 
 module.exports.correr = correr;
 module.exports.candidatos = candidatos;

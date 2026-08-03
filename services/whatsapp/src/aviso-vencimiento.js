@@ -266,6 +266,7 @@ async function tick() {
     console.log(`[aviso-vencimiento] corrida ${hoy}: ${r.resultados.length} avisos`, r.resultados.map(x => x.estado).join(','));
   } catch (e) { console.error('[aviso-vencimiento tick]', e.message); }
 }
-setInterval(tick, 10 * 60 * 1000);   // revisa cada 10 min; corre 1 vez al día a las 10:00 Chile
+// Aviso de vencimiento por WhatsApp: se apaga en staging
+require('../../../shared/scheduler').programar('wsp-aviso-vencimiento', tick, 10 * 60 * 1000);   // revisa cada 10 min; corre 1 vez al día a las 10:00 Chile
 
 module.exports = { correr, candidatos, estadoPlantillas, crearPlantillas, cuerposPlantillas };
