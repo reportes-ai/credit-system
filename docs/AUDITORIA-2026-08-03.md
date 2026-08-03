@@ -510,7 +510,7 @@ de test sobre los motores puros cambian esa ecuación más que cualquier refacto
 | # | Estado | Qué se hizo | Archivo |
 |---|---|---|---|
 | **C-1** | ✅ Cerrado | `aliasSeguro()` sanea `alias` y `orden_campo` antes de entrar al identificador. Verificado: el payload de la PoC queda convertido en un identificador inocuo y los alias legítimos ("Monto financiado 2026") se conservan intactos | `tablas-dinamicas.controller.js` |
-| **C-2** | 🟡 Primera pasada | `bkp_rutmig_usuarios` exportada a respaldo frío local y **eliminada** de producción, junto a las 2 tablas realmente vacías. **Quedan 32 tablas** con datos personales, listadas en el script para decidirlas una a una | `scripts/limpieza-tablas-bkp-2026-08-03.js` |
+| **C-2** | 🟢 Casi cerrado | **De 35 tablas a 8.** Primera pasada: `bkp_rutmig_usuarios` (hashes) + 2 vacías. Segunda pasada: las 32 restantes exportadas a ZIP en disco del usuario (99.316 filas) y **24 eliminadas** (53.311 filas) tras verificar una por una que estuvieran respaldadas. Producción verificada intacta y arranque OK | `scripts/exportar-tablas-bkp-2026-08-03.js`, `scripts/borrar-tablas-bkp-2026-08-03.js` |
 | **A-1** | ✅ Cerrado | `requireFunc('mant_servidor_hora','mantenedores_solo_dios')` en GET y POST del override de timezone | `servidor-hora.routes.js` |
 | **A-2** | ✅ Cerrado | `requireFunc` en antecedentes laborales e información comercial: lectura con permiso de ver, escritura con permiso de editar | `antecedentes.routes.js`, `informacion-comercial.routes.js` |
 | **A-3** | 🟡 Parcial | `npm audit fix`: **de 7 vulnerabilidades a 3**. Cerradas axios (10 CVE), body-parser y form-data, sin cambios de ruptura. Arranque del gateway verificado tras la actualización | `package-lock.json` |
@@ -519,6 +519,30 @@ de test sobre los motores puros cambian esa ecuación más que cualquier refacto
 `exceljs` o aislar el parseo con timeout) y `fast-xml-parser` + `nodemailer`, que solo se
 arreglan con cambios de versión mayor y necesitan prueba.
 
-**El respaldo frío** (`scripts/respaldo-bkp-2026-08-03/`) contiene hashes de contraseña y está
-excluido del repositorio por `.gitignore`. Guárdalo fuera del equipo o destrúyelo cuando ya no
-lo necesites.
+**Los respaldos fríos** — `scripts/respaldo-bkp-2026-08-03/` y el ZIP en
+`Documents\respaldos-bd\bkp-tablas-2026-08-03.zip` — contienen hashes de contraseña y datos
+personales, y están fuera del repositorio. Guardarlos en lugar seguro.
+
+### Las 8 tablas que siguen en producción (decisión de negocio pendiente)
+
+**Única copia — sus filas ya NO existen en producción (verificado con JOIN):**
+
+| Tabla | Filas | Qué es |
+|---|---|---|
+| `bkp_del_20260501_creditos` | 1.168 | Créditos borrados el 01-05 |
+| `bkp_del_20260501_cuotas` | 3.019 | Sus cuotas |
+| `bkp_del_20260501_pagos` | 31 | Sus pagos |
+| `bkp_del_20260701_prueba_creditos` | 562 | Créditos borrados el 01-07 (el nombre sugiere datos de prueba) |
+
+**Respaldos de reversa de scripts de operación** (además, esos scripts abortan si la tabla
+existe: borrarlas habilita re-ejecutarlos por accidente):
+
+| Tabla | Filas | Script |
+|---|---|---|
+| `bkp_dealnom_creditos` | 11.098 | `limpiar-nombre-dealer.js` |
+| `bkp_dealnom_dealers` | 889 | `limpiar-nombre-dealer.js` |
+| `bkp_iddealer_creditos` | 15.486 | `backfill-iddealer-creditos.js` |
+| `bkp_nombres_clientes` | 13.752 | `separar-nombres-clientes.js` |
+
+Todas están en el ZIP. Para cerrar C-2 falta confirmar que los créditos borrados eran
+efectivamente de prueba.
