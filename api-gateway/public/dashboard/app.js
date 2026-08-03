@@ -2860,11 +2860,16 @@ function buildVProy2() {
       color: i === 0 ? '#16a34a' : '#f59e0b', dash: i === 0 ? [8, 4] : [3, 3],
     };
   });
-  const curvaChart = (canvasId, curvas, actArr, proyTot, prevArr, fmt) => {
+  const curvaChart = (canvasId, curvas, actArr, proyTot, prevArr, fmt, ppto) => {
     const base = proyTot || actArr[dHoy];
     const med = dias.map(d => en(curvas, d / D * 100, .5) * base);
     const p25 = dias.map(d => en(curvas, d / D * 100, .25) * base);
     const p75 = dias.map(d => en(curvas, d / D * 100, .75) * base);
+    /* PRESUPUESTO repartido por día hábil con la MISMA forma de curva que la
+       proyección (no en línea recta): si históricamente el mes arranca lento y
+       cierra fuerte, la meta diaria acompaña esa realidad en vez de exigir el
+       mismo ritmo el día 2 que el día 20. */
+    const pptoCurva = ppto > 0 ? dias.map(d => en(curvas, d / D * 100, .5) * ppto) : null;
     const c = Chart.getChart(document.getElementById(canvasId)); if (c) c.destroy();
     new Chart(document.getElementById(canvasId), {
       type: 'line',
@@ -2872,6 +2877,7 @@ function buildVProy2() {
         { label: 'p25–p75', data: p75, borderColor: 'transparent', backgroundColor: '#90caf933', fill: '+1', pointRadius: 0 },
         { label: 'p25', data: p25, borderColor: 'transparent', pointRadius: 0, fill: false },
         { label: 'Esperado (mediana)', data: med, borderColor: '#94a3b8', borderDash: [3, 3], pointRadius: 0, borderWidth: 1.5 },
+        ...(pptoCurva ? [{ label: 'Presupuesto', data: pptoCurva, borderColor: '#dc2626', borderWidth: 2.5, borderDash: [10, 4], pointRadius: 0, tension: .2 }] : []),
         ...(prevArr || []).map(rf => ({ label: rf.lbl, data: dias.map(d => rf.arr[Math.min(d, rf.arr.length - 1)]), borderColor: rf.color, borderWidth: 2, borderDash: rf.dash, pointRadius: 0, tension: .2 })),
         /* pointRadius > 0: en el día hábil 1 del mes la serie tiene UN solo punto
            y sin radio la línea no dibuja nada — parecía que faltaba el Real. */
@@ -2882,8 +2888,16 @@ function buildVProy2() {
         scales: { x: { title: { display: true, text: 'Día hábil del mes', font: { size: 10 } }, ticks: { font: { size: 9 } } }, y: { ticks: { callback: v => fmt(v), font: { size: 9 } }, grid: { color: '#f0f2f5' } } } }
     });
   };
-  curvaChart('ch-proy2-curvaq', curvasQ, acum(mesAct, 'q', D), mzQ, refs.map(r => ({ lbl: r.lbl, arr: r.q, color: r.color, dash: r.dash })), v => Math.round(v));
-  curvaChart('ch-proy2-curva', curvasM, acum(mesAct, 'm', D), mzM, refs.map(r => ({ lbl: r.lbl, arr: r.m, color: r.color, dash: r.dash })), fM);
+  /* Presupuesto del mes en curso (mantenedor Presupuesto; el respaldo local solo
+     si la BD aún no respondió). `monto` viene en MILLONES. */
+  let pptoMes = null;
+  try { pptoMes = (PPTO_DATA || []).find(x => String(x.mes) === mesAct) || null; } catch (_) { /* aún no cargado */ }
+  const pptoQ = pptoMes ? Number(pptoMes.ops) || 0 : 0;
+  const pptoM = pptoMes ? (Number(pptoMes.monto) || 0) * 1e6 : 0;
+
+  curvaChart('ch-proy2-curvaq', curvasQ, acum(mesAct, 'q', D), mzQ, refs.map(r => ({ lbl: r.lbl, arr: r.q, color: r.color, dash: r.dash })), v => Math.round(v), pptoQ);
+  curvaChart('ch-proy2-curva', curvasM, acum(mesAct, 'm', D), mzM, refs.map(r => ({ lbl: r.lbl, arr: r.m, color: r.color, dash: r.dash })), fM, pptoM);
+  renderRitmoRequerido({ pptoQ, pptoM, actQ: tot.q, actM: tot.m, D, dHoy, proyQ: mzQ, proyM: mzM, curvas: curvasQ, en });
 
   // Click en cualquiera de los gráficos → popup grande con copiar/descargar
   afChartZoom('ch-proy2-histq', 'Q operaciones mensual — histórico y proyectado');
@@ -2891,6 +2905,79 @@ function buildVProy2() {
   afChartZoom('ch-proy2-hist', 'Monto colocado mensual — histórico y proyectado');
   afChartZoom('ch-proy2-curva', 'Avance monto acumulado por día hábil — real vs esperado');
   cargarClimaCorrelacion();
+}
+
+/* ── RITMO REQUERIDO PARA EL PRESUPUESTO ──────────────────────────────────────
+   Responde la pregunta operativa: "¿cuánto tengo que colocar por día para llegar
+   al presupuesto?". Dos lecturas, porque no son lo mismo:
+
+     · PAREJO      — lo que falta ÷ días hábiles que quedan. Simple y accionable.
+     · CON CURVA   — el mismo remanente repartido con la forma histórica del mes
+                     (arranque lento, cierre fuerte). Es la meta realista de HOY.
+
+   Y el veredicto: la proyección de cierre contra el presupuesto, que es lo que
+   dice si el mes alcanza o no. */
+function renderRitmoRequerido({ pptoQ, pptoM, actQ, actM, D, dHoy, proyQ, proyM, curvas, en }) {
+  const cont = document.getElementById('proy2-ritmo');
+  if (!cont) return;
+  if (!pptoQ && !pptoM) { cont.innerHTML = '<div style="padding:10px 14px;font-size:.78rem;color:#94a3b8">Sin presupuesto cargado para este mes.</div>'; return; }
+
+  const diasRest = Math.max(D - dHoy, 0);
+  const faltaQ = Math.max(pptoQ - actQ, 0), faltaM = Math.max(pptoM - actM, 0);
+
+  /* Fracción de la curva que queda por delante: lo que aún debería ocurrir del
+     día de hoy al cierre. Si ya pasó el 40% del mes, el 60% restante de la curva
+     concentra el remanente — no se reparte parejo. */
+  const fracHoy = en(curvas, dHoy / D * 100, .5);
+  const fracRest = Math.max(1 - fracHoy, 0.0001);
+
+  // Meta de HOY según la curva: cuánto debería sumar el día hábil siguiente.
+  const fracManana = en(curvas, Math.min(dHoy + 1, D) / D * 100, .5);
+  const pesoDia = Math.max(fracManana - fracHoy, 0) / fracRest;      // qué parte del remanente toca mañana
+  const metaDiaQ = diasRest ? faltaQ * (pesoDia || (1 / diasRest)) : 0;
+  const metaDiaM = diasRest ? faltaM * (pesoDia || (1 / diasRest)) : 0;
+
+  const parejoQ = diasRest ? faltaQ / diasRest : 0;
+  const parejoM = diasRest ? faltaM / diasRest : 0;
+
+  const cumpleQ = pptoQ ? (proyQ / pptoQ) : null;
+  const cumpleM = pptoM ? (proyM / pptoM) : null;
+  const color = p => p == null ? '#64748b' : (p >= 1 ? '#16a34a' : p >= 0.9 ? '#f59e0b' : '#dc2626');
+  const pct = p => p == null ? '—' : (p * 100).toFixed(0) + '%';
+  const fQ = v => Math.round(v).toLocaleString('es-CL');
+
+  cont.innerHTML = `
+    <table class="sumtbl">
+      <thead><tr><th></th><th>Presupuesto</th><th>Real a hoy</th><th>Falta</th>
+        <th>Por día (parejo)</th><th>Por día (con curva)</th><th>Proyección</th><th>Cumplimiento</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Operaciones</b></td>
+          <td>${fQ(pptoQ)}</td><td>${fQ(actQ)}</td><td>${fQ(faltaQ)}</td>
+          <td><b>${(parejoQ).toFixed(1)}</b> /día</td>
+          <td><b>${(metaDiaQ).toFixed(1)}</b> mañana</td>
+          <td>${fQ(proyQ || 0)}</td>
+          <td style="color:${color(cumpleQ)};font-weight:800">${pct(cumpleQ)}</td>
+        </tr>
+        <tr>
+          <td><b>Monto financiado</b></td>
+          <td>${fM(pptoM)}</td><td>${fM(actM)}</td><td>${fM(faltaM)}</td>
+          <td><b>${fM(parejoM)}</b> /día</td>
+          <td><b>${fM(metaDiaM)}</b> mañana</td>
+          <td>${fM(proyM || 0)}</td>
+          <td style="color:${color(cumpleM)};font-weight:800">${pct(cumpleM)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:8px 14px;font-size:.74rem;color:#64748b">
+      Quedan <b>${diasRest}</b> de ${D} días hábiles.
+      <b>Por día (parejo)</b> = lo que falta ÷ días restantes.
+      <b>Por día (con curva)</b> = el mismo remanente repartido con la forma histórica del mes
+      (arranque lento, cierre fuerte), así que es la meta realista para el próximo día hábil.
+      El <b>cumplimiento</b> compara la proyección de cierre contra el presupuesto.
+      ${(() => { try { return PPTO_ES_RESPALDO; } catch (_) { return false; } })()
+        ? '<br><span style="color:#b45309"><b>⚠ Presupuesto de respaldo</b> — la BD no respondió; cárgalo en el mantenedor Presupuesto.</span>' : ''}
+    </div>`;
 }
 
 /* ── Popup de gráfico: agranda el canvas y permite copiarlo como imagen (PPT) ──
