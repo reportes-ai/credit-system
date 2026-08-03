@@ -97,7 +97,17 @@ async function configDe(evento) {
 
 /* Resuelve los id_usuario que deben recibir el aviso.
    opciones: { excluir:[ids], extra:[ids] } */
-async function destinatarios(evento, { excluir = [], extra = [] } = {}) {
+async function destinatarios(evento, { excluir = [], extra = [], soloA = null } = {}) {
+  /* `soloA` — aviso DIRIGIDO: cuando el hecho tiene un dueño identificable (el
+     ejecutivo de la operación), va solo a él y NO al pool de la funcionalidad.
+     Los suplentes se agregan igual después, en notificar(). Si viene vacío se
+     ignora y manda la configuración normal, para que un aviso nunca se pierda. */
+  if (Array.isArray(soloA) && soloA.filter(Boolean).length) {
+    const set = new Set(soloA.filter(Boolean).map(Number));
+    (extra || []).filter(Boolean).forEach(i => set.add(Number(i)));
+    (excluir || []).filter(Boolean).forEach(i => set.delete(parseInt(i)));
+    return [...set];
+  }
   const cfg = await configDe(evento);
   // Sin config (evento aún no registrado): no se pierde el aviso, van los
   // Administradores activos. Es el mismo criterio que tenía el código antes.
@@ -144,9 +154,9 @@ async function porPerfiles(nombres) {
 
 /* Emite el aviso: resuelve destinatarios y delega en el núcleo de notificaciones.
    La prioridad y el sonido salen de la config, salvo que el emisor los fuerce. */
-async function avisar(evento, opciones = {}, { excluir = [], extra = [] } = {}) {
+async function avisar(evento, opciones = {}, { excluir = [], extra = [], soloA = null } = {}) {
   try {
-    const dest = await destinatarios(evento, { excluir, extra });
+    const dest = await destinatarios(evento, { excluir, extra, soloA });
     if (!dest.length) return 0;
     const cfg = await configDe(evento);
     const { notificar } = require('../services/notificaciones/src/controllers/notificaciones.controller');

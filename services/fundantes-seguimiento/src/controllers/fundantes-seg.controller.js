@@ -478,13 +478,35 @@ const devolver = async (req, res) => {
       detalle: `La financiera devolvió los fundantes de la OP ${op.num_op} (estaba en ${estadoActual}) — ${motivo}`,
       meta: { estado_anterior: estadoActual, motivo } });
 
-    AVISOS.avisar('fundantes_devuelto', {
-      titulo: '↩️ Fundantes devueltos por la financiera — OP ' + op.num_op,
-      mensaje: `${op.financiera || 'La financiera'} devolvió los fundantes de la OP ${op.num_op}. Motivo: ${motivo}. La operación volvió a Fundantes Pendientes para corregir y reenviar.`,
-      href: '/fundantes-seguimiento/',
-      // clave del hecho: se retira cuando el ejecutivo corrige y reenvía.
-      clave: 'fund_dev_' + id,
-    }, { excluir: [req.usuario.id_usuario], extra: fs && fs.id_enviado_por ? [fs.id_enviado_por] : [] }).catch(() => {});
+    /* AVISO DIRIGIDO al ejecutivo DUEÑO de la operación (decisión de Pato,
+       03-08-2026). Antes iba a todo el que tuviera la funcionalidad: 17 personas
+       por una operación de una sola — 12 ejecutivos que no tenían nada que ver.
+       Si el ejecutivo está ausente, lo cubre su suplente: notificar() expande por
+       `usuario_backups` cuando la categoría Alertas está activa.
+       Si el nombre NO resuelve a un usuario (placeholder tipo "AUTOFACIL DIRECTO",
+       ex-empleado, u homónimos), NO se pierde el aviso: cae al pool de siempre. */
+    (async () => {
+      let soloA = null;
+      try {
+        const uid = await require('../../../../shared/ejecutivo-usuario').idUsuarioDeEjecutivo(op.ejecutivo);
+        if (uid) soloA = [uid];
+        else console.warn(`[fundantes devolver] OP ${op.num_op}: no se pudo identificar al ejecutivo "${op.ejecutivo || ''}" — el aviso va al pool`);
+      } catch (e) { console.error('[fundantes devolver ejecutivo]', e.message); }
+
+      await AVISOS.avisar('fundantes_devuelto', {
+        titulo: '↩️ Fundantes devueltos por la financiera — OP ' + op.num_op,
+        mensaje: `${op.financiera || 'La financiera'} devolvió los fundantes de la OP ${op.num_op}`
+          + (op.ejecutivo ? ` (ejecutivo: ${op.ejecutivo})` : '')
+          + `. Motivo: ${motivo}. La operación volvió a Fundantes Pendientes para corregir y reenviar.`,
+        href: '/fundantes-seguimiento/',
+        // clave del hecho: se retira cuando el ejecutivo corrige y reenvía.
+        clave: 'fund_dev_' + id,
+      }, {
+        excluir: [req.usuario.id_usuario],
+        extra: fs && fs.id_enviado_por ? [fs.id_enviado_por] : [],
+        soloA,
+      });
+    })().catch(() => {});
 
     res.json({ success: true, data: { estado: 'PENDIENTE', estado_anterior: estadoActual }, error: null });
   } catch (e) { console.error('[fundantes devolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
