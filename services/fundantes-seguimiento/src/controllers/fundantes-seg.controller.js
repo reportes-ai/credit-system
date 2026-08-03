@@ -443,7 +443,8 @@ const enviar = async (req, res) => {
    { accion:'aprobar'|'rechazar', comentario }. Rechazo exige comentario. (route: requireFunc fundantes_validar) */
 AVISOS.registrarAviso({
   evento: 'fundantes_devuelto', nombre: 'Fundantes DEVUELTOS por la financiera', modulo: 'Fundantes',
-  descripcion: 'La financiera devolvió los fundantes de una operación ya enviada. Vuelve a PENDIENTE y el ejecutivo debe corregir y reenviar. Avisa al ejecutivo y al pool de Operaciones.',
+  descripcion: 'La financiera devolvió los fundantes de una operación ya enviada. Vuelve a PENDIENTE y el ejecutivo debe corregir y reenviar.',
+  dirigido_a: 'el ejecutivo dueño de la operación (más su suplente, si tiene Alertas activas)',
   base_func: 'fundantes_seguimiento,fundantes_validar,fundantes_operaciones', prioridad: 'alta', sonido_tipo: 'dingdong',
 });
 

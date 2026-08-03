@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor Avisos — AutoFácil</title>
-  <!-- v1.0 — quién recibe cada aviso de la campanita, por perfil y por usuario -->
+  <!-- v1.1 — marca los avisos DIRIGIDOS (van al dueño del hecho; la config queda de respaldo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -159,10 +159,18 @@
           <div class="aviso-nom">${esc(e.nombre)}</div>
           <div class="aviso-desc">${esc(e.descripcion||'')}</div>
         </div>
+        ${e.dirigido_a ? '<span class="chip" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd">🎯 Dirigido</span>' : ''}
         <span class="chip n">${dest.length} destinatario${dest.length===1?'':'s'}</span>
         <span class="chip ${e.activo?'on':'off'}">${e.activo?'Activo':'Apagado'}</span>
       </div>
       <div class="cuerpo" id="c-${id}">
+        ${e.dirigido_a ? `<div style="background:#f5f3ff;border-left:4px solid #7c3aed;border-radius:8px;padding:11px 14px;margin-bottom:12px;font-size:.82rem;color:#4c1d95">
+          <b>🎯 Este aviso es DIRIGIDO.</b> No usa la configuración de abajo en el caso normal:
+          va a <b>${esc(e.dirigido_a)}</b>.<br>
+          <span style="color:#6d28d9">Lo de abajo queda como <b>respaldo</b>: se usa solo cuando el sistema no logra
+          identificar al destinatario (por ejemplo un ejecutivo dado de baja o un nombre genérico como
+          &laquo;AUTOFACIL DIRECTO&raquo;). Así el aviso nunca se pierde.</span>
+        </div>` : ''}
         <div class="grid2">
           <div>
             <div class="campo">

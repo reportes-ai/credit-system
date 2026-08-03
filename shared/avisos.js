@@ -41,18 +41,28 @@ require('./migrate').enFila('avisos', async () => {
         nombre        VARCHAR(160) NOT NULL,
         modulo        VARCHAR(60)  NOT NULL DEFAULT 'General',
         descripcion   VARCHAR(400),
-        base_func     VARCHAR(60)  NULL,
+        base_func     VARCHAR(200) NULL,
         usa_func      TINYINT(1) NOT NULL DEFAULT 1,
         incluir_admin TINYINT(1) NOT NULL DEFAULT 1,
         perfiles      TEXT,
         usuarios      TEXT,
         excluir       TEXT,
         activo        TINYINT(1) NOT NULL DEFAULT 1,
+        dirigido_a    VARCHAR(160) NULL,   -- si el aviso tiene DUEÑO, a quién va (texto para el mantenedor)
         prioridad     VARCHAR(10) NOT NULL DEFAULT 'normal',
         sonido        TINYINT(1) NOT NULL DEFAULT 1,
         sonido_tipo   VARCHAR(20) NOT NULL DEFAULT 'campana',
         updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
+    // Avisos DIRIGIDOS (03-08-2026): los que van al dueño del hecho y no al pool.
+    await pool.query('ALTER TABLE avisos_config ADD COLUMN dirigido_a VARCHAR(160) NULL')
+      .catch(e => { if (e.errno !== 1060) console.error('[avisos dirigido_a]', e.message); });
+    /* base_func admite VARIOS permisos separados por coma y VARCHAR(60) quedaba
+       corto: 'fundantes_seguimiento,fundantes_validar,fundantes_operaciones' son
+       61 caracteres, así que el registro de ese evento fallaba en SILENCIO y su
+       descripción en el mantenedor quedó congelada (detectado 03-08-2026). */
+    await pool.query('ALTER TABLE avisos_config MODIFY COLUMN base_func VARCHAR(200) NULL')
+      .catch(e => console.error('[avisos base_func]', e.message));
   } catch (e) { console.error('[avisos migration]', e.message); }
 });
 
@@ -67,7 +77,7 @@ function registrarAviso(def) {
 async function _registrar(def) {
   const { evento, nombre, modulo = 'General', descripcion = null, base_func = null,
           prioridad = 'normal', sonido_tipo = 'campana', incluir_admin = 1,
-          perfiles = '' } = def || {};
+          perfiles = '', dirigido_a = null } = def || {};
   if (!evento || !nombre) return;
   try {
     // perfiles: SOLO se siembra la primera vez (INSERT IGNORE). Sirve para que el
@@ -82,8 +92,8 @@ async function _registrar(def) {
        prioridad === 'alta' ? 'alta' : 'normal', SONIDOS.includes(sonido_tipo) ? sonido_tipo : 'campana']);
     // Los textos y el permiso base son del código, no del Administrador: se refrescan.
     await pool.query(
-      'UPDATE avisos_config SET nombre=?, modulo=?, descripcion=?, base_func=? WHERE evento=?',
-      [nombre, modulo, descripcion, base_func, evento]);
+      'UPDATE avisos_config SET nombre=?, modulo=?, descripcion=?, base_func=?, dirigido_a=? WHERE evento=?',
+      [nombre, modulo, descripcion, base_func, dirigido_a, evento]);
   } catch (e) { console.error('[registrarAviso]', evento, e.message); }
 }
 
