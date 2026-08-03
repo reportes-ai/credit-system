@@ -951,6 +951,14 @@ const getOtorgadosIncompletos = async (req, res) => {
       LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       WHERE c.estado_eval = 'OTORGADO'
         AND c.estado_credito NOT IN ('RECHAZADO','ANULADO')
+        -- MISMO UNIVERSO que la cola de digitación (motor único): solo brokerage y
+        -- meses abiertos. Los créditos AFA/AUTOFACIL vienen de la migración de
+        -- cartera propia y no se digitan por esta vía (ahí un plazo 80 con tasa 0
+        -- es un dato real, no un faltante), y un mes cerrado no admite el
+        -- "Guardar y recalcular" que ofrece este cuadro.
+        AND c.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
+        AND NOT EXISTS (SELECT 1 FROM meses_cerrados mc
+                         WHERE mc.mes = DATE_FORMAT(c.mes,'%Y-%m') AND mc.cerrado = 1)
         AND (c.plazo IS NULL OR c.plazo = 0 OR c.tascli_real IS NULL OR c.tascli_real = 0
              -- primas faltantes: motor único de la cola de digitación (blanco o bajo
              -- el piso). UNIDAD DE CREDITO no paga comisión de seguros (rentabilidad-calc.js).
