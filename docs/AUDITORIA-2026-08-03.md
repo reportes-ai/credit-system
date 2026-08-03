@@ -1,6 +1,9 @@
 # Auditoría de Software — AutoFácil Business Suite
 **Fecha:** 03-08-2026 · **Versión auditada:** v171.3 · **Commit:** rama `main`
 
+> **ESTADO 03-08-2026 (misma jornada):** aplicados C-1, A-1, A-2, A-3 (parcial) y la primera
+> pasada de C-2. Ver **Anexo — Correcciones aplicadas** al final.
+
 ---
 
 ## Alcance real de esta auditoría (léelo primero)
@@ -124,6 +127,13 @@ el costo de almacenamiento.
 
 Bajo la Ley 19.628 y el estándar de minimización de datos, una copia de trabajo de hace
 meses no debería seguir viva en producción.
+
+> **CORRECCIÓN a este hallazgo (verificada con `COUNT(*)` real):** los conteos citados arriba
+> venían de `information_schema.table_rows`, que en TiDB es una **estimación**. Al contarlas de
+> verdad, solo **2 tablas estaban vacías**, no 8. Varias que figuraban en cero tienen miles de
+> filas: `bkp_iddealer_creditos` (15.486), `bkp_recalc_20260629` (15.486), `bkp_nombres_clientes`
+> (13.752), `bkp_dealnom_creditos` (11.098), `bkp_tascli_real_20260629` (5.845). El resto del
+> hallazgo se mantiene y, de hecho, es peor de lo estimado: hay más datos personales vivos.
 
 **Cómo se corrige.** Exportar las que tengan valor histórico a un respaldo frío y eliminarlas
 del esquema. Las que están en 0 filas (`bkp_tascli_real_20260629`, `bkp_recalc_20260629`,
@@ -492,3 +502,23 @@ Lo que no se arregla en media jornada es **C-3**. Un sistema que liquida comisio
 mora y arma la contabilidad sin una sola prueba automatizada depende de que la persona que
 programa no se equivoque nunca — y esta misma sesión mostró que eso no ocurre. Cinco archivos
 de test sobre los motores puros cambian esa ecuación más que cualquier refactor.
+
+---
+
+## Anexo — Correcciones aplicadas (03-08-2026, misma jornada)
+
+| # | Estado | Qué se hizo | Archivo |
+|---|---|---|---|
+| **C-1** | ✅ Cerrado | `aliasSeguro()` sanea `alias` y `orden_campo` antes de entrar al identificador. Verificado: el payload de la PoC queda convertido en un identificador inocuo y los alias legítimos ("Monto financiado 2026") se conservan intactos | `tablas-dinamicas.controller.js` |
+| **C-2** | 🟡 Primera pasada | `bkp_rutmig_usuarios` exportada a respaldo frío local y **eliminada** de producción, junto a las 2 tablas realmente vacías. **Quedan 32 tablas** con datos personales, listadas en el script para decidirlas una a una | `scripts/limpieza-tablas-bkp-2026-08-03.js` |
+| **A-1** | ✅ Cerrado | `requireFunc('mant_servidor_hora','mantenedores_solo_dios')` en GET y POST del override de timezone | `servidor-hora.routes.js` |
+| **A-2** | ✅ Cerrado | `requireFunc` en antecedentes laborales e información comercial: lectura con permiso de ver, escritura con permiso de editar | `antecedentes.routes.js`, `informacion-comercial.routes.js` |
+| **A-3** | 🟡 Parcial | `npm audit fix`: **de 7 vulnerabilidades a 3**. Cerradas axios (10 CVE), body-parser y form-data, sin cambios de ruptura. Arranque del gateway verificado tras la actualización | `package-lock.json` |
+
+**Sigue abierto de A-3:** `xlsx` (ReDoS, **sin parche disponible** — decidir entre migrar a
+`exceljs` o aislar el parseo con timeout) y `fast-xml-parser` + `nodemailer`, que solo se
+arreglan con cambios de versión mayor y necesitan prueba.
+
+**El respaldo frío** (`scripts/respaldo-bkp-2026-08-03/`) contiene hashes de contraseña y está
+excluido del repositorio por `.gitignore`. Guárdalo fuera del equipo o destrúyelo cuando ya no
+lo necesites.

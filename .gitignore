@@ -150,3 +150,6 @@ docker/init/dump.sql
 uploads/
 _*.js
 _fund_run.js
+
+# Respaldos frios de tablas bkp_ (contienen datos personales) — NUNCA al repo
+scripts/respaldo-bkp-*/

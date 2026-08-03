@@ -96,6 +96,12 @@ const getFuentes = (req, res) => {
   res.json({ success: true, data: lista, error: null });
 };
 
+/* Alias de columna seguro: deja letras, números, espacios, punto y guion —
+   fuera comillas invertidas, comillas y paréntesis, que son lo único que puede
+   romper un identificador `así`. Nunca devuelve vacío. */
+const aliasSeguro = (s) =>
+  String(s == null ? '' : s).replace(/[^\w áéíóúñÁÉÍÓÚÑ.\-]/g, '').slice(0, 60) || 'valor';
+
 /* ── POST /api/tablas-dinamicas/ejecutar ─────────────────────────── */
 const ejecutar = async (req, res) => {
   try {
@@ -136,7 +142,10 @@ const ejecutar = async (req, res) => {
       }
     });
     valoresValidos.forEach(v => {
-      const alias = v.alias || `${v.funcion}(${v.campo})`;
+      // El alias viaja en el cuerpo de la petición y termina DENTRO de comillas
+      // invertidas: una comilla invertida cerraba el identificador y abría SQL
+      // arbitrario (auditoría 03-08-2026, C-1). Mismo saneo que Diseño de Consulta.
+      const alias = aliasSeguro(v.alias || `${v.funcion}(${v.campo})`);
       if (v.funcion === 'COUNT_DISTINCT') {
         selectParts.push(`COUNT(DISTINCT \`${v.campo}\`) AS \`${alias}\``);
       } else {
@@ -172,10 +181,12 @@ const ejecutar = async (req, res) => {
     let orderBy = '';
     if (orden_campo) {
       const dirSafe = orden_dir === 'ASC' ? 'ASC' : 'DESC';
-      const campoOrdenOK = filasValidas.includes(orden_campo) ||
-        valoresValidos.some(v => (v.alias || `${v.funcion}(${v.campo})`) === orden_campo);
+      // Se compara y se emite ya saneado: el alias contra el que calza también lo está.
+      const ordenSafe = aliasSeguro(orden_campo);
+      const campoOrdenOK = filasValidas.includes(ordenSafe) ||
+        valoresValidos.some(v => aliasSeguro(v.alias || `${v.funcion}(${v.campo})`) === ordenSafe);
       if (campoOrdenOK) {
-        orderBy = `ORDER BY \`${orden_campo}\` ${dirSafe}`;
+        orderBy = `ORDER BY \`${ordenSafe}\` ${dirSafe}`;
       }
     }
 
