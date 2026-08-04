@@ -1,0 +1,41 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Qué NO entra a la imagen del contenedor.
+#
+#  El `Dockerfile` instala dependencias y DESPUÉS hace `COPY . .`. Sin este
+#  archivo, esa copia pisaría los `node_modules` recién instalados en Alpine con
+#  los del computador de desarrollo —compilados para Windows— y la imagen
+#  arrancaría rota o no arrancaría. Es exactamente el tipo de falla que aparece
+#  recién en el despliegue.
+#
+#  De paso evita subir 113 MB inútiles a Cloud Build en cada construcción.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Dependencias: las instala el propio Dockerfile, para el sistema operativo que corresponde
+node_modules
+npm-debug.log*
+
+# Historia de git: la imagen no la necesita (41 MB)
+.git
+.gitignore
+.github
+
+# SECRETOS: jamás dentro de una imagen
+.env
+.env.*
+!.env.example
+
+# Archivos subidos por usuarios en desarrollo local
+api-gateway/uploads
+
+# Herramientas de desarrollo y documentación
+.claude
+docs
+tests
+docker-compose.yml
+Dockerfile
+*.md
+!README.md
+
+# Respaldos y volcados de base
+docker/init/*.sql
+*.sql.gz

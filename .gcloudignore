@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Qué NO se sube a Cloud Build.
+#
+#  OJO — NO es lo mismo que `.dockerignore`, y confundirlos cuesta un build:
+#    · `.dockerignore` dice qué NO entra a la IMAGEN → ahí sí se excluye el
+#      propio `Dockerfile`, porque dentro del contenedor no sirve de nada.
+#    · `.gcloudignore` (este) dice qué NO se SUBE al servidor de construcción →
+#      acá el `Dockerfile` es IMPRESCINDIBLE: es la receta. Excluirlo hace que
+#      Cloud Build falle con "lstat /workspace/Dockerfile: no such file".
+#      (Pasó el 04-08-2026, por copiar un archivo sobre el otro.)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Dependencias: las instala el Dockerfile dentro del contenedor
+node_modules
+
+# Historia de git (41 MB que el build no necesita)
+.git
+.github
+
+# SECRETOS: nunca salen del computador
+.env
+.env.*
+!.env.example
+
+# Archivos locales de desarrollo
+api-gateway/uploads
+.claude
+docker/init/*.sql
+*.sql.gz
+*.log
