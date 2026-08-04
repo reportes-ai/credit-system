@@ -331,6 +331,11 @@ no con Docker). Pendiente: ensayarlo una vez de verdad y cronometrar cuánto tom
 los motores automáticos apagados. Comparte el `JWT_SECRET` con producción, así que **las
 sesiones abiertas siguen valiendo**: nadie tiene que volver a entrar.
 
+> **Si no puedes entrar a la consola de Google**: la cuenta tiene verificación en dos pasos
+> desde el 04-08-2026. Además de la app del teléfono existen **códigos de respaldo en papel**,
+> en dos lugares físicos que Pato conoce (uno lo lleva encima). Sin acceso a la consola **no se
+> puede promover el respaldo**, así que esto es parte del plan, no un trámite aparte.
+
 ### Paso 1 — Comprobar que responde (10 segundos)
 
 ```bash

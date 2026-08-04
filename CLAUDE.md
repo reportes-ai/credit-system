@@ -368,9 +368,13 @@ correos programados y cobranza.
     Promovido funciona toda la operación del negocio; no funcionan indicadores, IA, WhatsApp,
     DealerNet ni SII. Degradación deliberada — cerrarla es cargar esos secretos (§6 del manual).
 
-- [ ] 🔴 **Activar la verificación en dos pasos de Google antes del 20-10-2026**
-  - Google bloqueará el acceso a la consola sin MFA. **Sin consola no se puede promover la
-    contingencia**, así que esto protege todo lo anterior.
+- [x] ✅ **Verificación en dos pasos de Google** (2026-08-04, antes del plazo del 20-10-2026)
+  - Activada en la cuenta que administra la infraestructura, con app de autenticación, mensaje
+    de Google, teléfono y **códigos de respaldo en papel** guardados en dos lugares físicos.
+  - **El acceso a la consola es parte de la contingencia**: sin él no se puede promover el host
+    de respaldo. Ver §11 de `docs/CONTINGENCIA-cloud-run.md`.
+  - Pendiente aparte: **exigir MFA a todo el equipo** desde la consola de Workspace (~40
+    personas — necesita aviso, plazo y acompañamiento; no se hace de un día para otro).
 
 ### 🟢 Mejora de calidad (profesionalismo)
 

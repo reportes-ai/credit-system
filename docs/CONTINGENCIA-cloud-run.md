@@ -337,8 +337,45 @@ TiDB. Irrelevante para un respaldo que despierta de vez en cuando.
 ## 10. Pendientes conocidos
 
 - [ ] **Cargar las claves de integración** como secretos, si se quiere cobertura total (§6).
-- [ ] **Activar la verificación en dos pasos de Google** antes del **20 de octubre de 2026**.
-      Google va a bloquear el acceso a la consola sin MFA — y sin consola no se puede promover
-      esta contingencia. Es el requisito más urgente de esta lista.
+- [x] ✅ **Verificación en dos pasos de Google** — activada el 04-08-2026, antes del plazo del
+      20 de octubre. Ver §11 abajo: **sin acceso a la consola no se puede promover nada de
+      esto**, así que el acceso de Pato es parte de la contingencia, no un trámite aparte.
 - [ ] **Ensayar la promoción completa una vez al año**, idealmente contra la base de staging
       para no duplicar motores. El ensayo del 04-08-2026 se hizo así y funcionó.
+
+---
+
+## 11. El acceso a la consola ES parte de la contingencia
+
+De nada sirve un host de respaldo si el día de la emergencia nadie puede entrar a Google Cloud
+a promoverlo. Por eso el acceso de la cuenta se trata como una pieza más del plan.
+
+**Estado (04-08-2026):** verificación en dos pasos **activada** en
+`patricio.escobar@autofacilchile.cl`, con cuatro segundos factores:
+
+| Factor | Estado |
+|---|---|
+| App de autenticación (TOTP) | ✅ configurada |
+| Mensaje de Google | ✅ 2 dispositivos |
+| Número de teléfono | ✅ |
+| **Códigos de respaldo (papel)** | ✅ generados y guardados **en dos lugares físicos distintos** |
+
+**Dónde están los códigos de respaldo:** deliberadamente **NO se escribe acá**. Este documento
+vive en GitHub, y anotar el lugar exacto le daría a cualquiera con acceso al repositorio el
+mapa para saltarse el segundo factor. **Pato sabe dónde están** — uno de los dos lugares lo
+lleva encima; el otro está en la oficina.
+
+**Por qué el papel importa más de lo que parece.** El escenario a cubrir no es "olvidé la
+contraseña": es **Render caído, Pato fuera de la oficina, y el teléfono sin batería o
+extraviado**. Si los tres factores viven en el mismo teléfono, ese día no hay acceso a la
+consola y la contingencia queda inservible justo cuando se necesita. Los códigos en papel son
+el único factor que no depende de ese aparato.
+
+**Al usar un código de respaldo, se quema.** Son de un solo uso: hay que regenerar el juego
+completo después de una emergencia.
+
+### Pendiente relacionado
+
+- [ ] **Exigir MFA a todo el equipo** (Workspace lo permite desde la consola de administración).
+      Afecta a las ~40 personas, así que merece su propio plan: avisar, dar plazo y acompañar a
+      quien se complique. Lo urgente —la cuenta que administra la infraestructura— ya está cubierto.
