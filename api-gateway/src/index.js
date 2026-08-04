@@ -109,6 +109,12 @@ app.get('/api/health', async (req, res) => {
   res.status(db ? 200 : 503).json({
     status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()),
     entorno: ent.NOMBRE,                                   // producción o staging, de un vistazo
+    /* ¿Este proceso es el HOST EN ESPERA? (arrancado con MOTORES=off). Lo usa la
+       cinta de CONTINGENCIA del frontend: mientras sea true, quien entre por
+       `afbs2` ve una banda que le avisa que ese NO es el sistema en uso. Al
+       promoverlo se quita `MOTORES` y la cinta desaparece sola, porque en ese
+       momento sí pasa a ser el sistema real. */
+    standby: !require('../../shared/scheduler').motoresActivos(),
     // Los motores que NO quedaron programados. En producción es []; en staging
     // salen los que contactan clientes. El nombre dice "apagados" porque leer
     // `motores: [...]` invitaba a entenderlo justo al revés.

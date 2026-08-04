@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v172.8';
+const APP_VERSION = 'v172.9';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -1075,9 +1075,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     d.textContent = 'STAGING — AMBIENTE DE PRUEBAS · NADA DE LO QUE HAGAS ACÁ LLEGA A UN CLIENTE';
     document.body.appendChild(d);
   }
+  /* Cinta CONTINGENCIA: el host de respaldo (Cloud Run, afbs2.autofacilchile.cl)
+     es IDÉNTICO a producción y usa los mismos datos, así que sin un aviso nadie
+     notaría en cuál de los dos está parado. Un nombre fácil de recordar se
+     comparte fácil por error, y ese es justo el riesgo.
+     Aparece solo mientras el proceso corre con MOTORES=off; al promoverlo la
+     cinta desaparece sola, porque ahí sí pasa a ser el sistema en uso. */
+  function afMostrarCintaContingencia() {
+    if (document.getElementById('afStbyRibbon')) return;
+    const st = document.createElement('style');
+    st.textContent = '#afStbyRibbon{position:fixed;top:0;left:0;right:0;z-index:100001;background:repeating-linear-gradient(45deg,#b45309,#b45309 14px,#92400e 14px,#92400e 28px);' +
+      "color:#fff;font-weight:800;font-size:11px;letter-spacing:2px;text-align:center;padding:3px 0;pointer-events:none;font-family:'Segoe UI',system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)}";
+    document.head.appendChild(st);
+    const d = document.createElement('div'); d.id = 'afStbyRibbon';
+    d.textContent = 'SISTEMA DE CONTINGENCIA — NO ES EL SISTEMA EN USO · ENTRA POR afbs.autofacilchile.cl';
+    document.body.appendChild(d);
+  }
   try {
     const h = await fetch('/api/health').then(r => r.json());
     if (h && h.entorno === 'staging') afMostrarCintaStaging();
+    else if (h && h.standby) afMostrarCintaContingencia();
   } catch (_) { /* si falla, no bloquea nada */ }
 
   let data;
