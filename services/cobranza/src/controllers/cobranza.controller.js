@@ -3,6 +3,9 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { getUF } = require('../../../../shared/uf');
+/* Dinero de la mora (interés + gasto de cobranza): motor único en shared/mora-calc.js.
+   Vivía acá; se movió para poder probarlo sin levantar la BD (auditoría B-3). */
+const { calcularGastoCobranza, calcularInteresMora, moraFechaFija, addDias } = require('../../../../shared/mora-calc');
 
 // ─── Migración automática ─────────────────────────────────────────────────────
 require('../../../../shared/migrate').enFila('cobranza', async () => {
@@ -69,9 +72,6 @@ const COB_DEFAULTS = {
   // o 'variable' (TMC vigente de cada día de mora — Ley 18.010 art. 16 sin pacto).
   mora_tasa_modo: 'fija_otorgamiento',
 };
-// Fecha de tasa fija para el motor de mora según el modo configurado (null = variable).
-const moraFechaFija = (cfg, fechaOtorgado) =>
-  String((cfg && cfg.mora_tasa_modo) || 'fija_otorgamiento') === 'variable' ? null : (fechaOtorgado || null);
 require('../../../../shared/migrate').enFila('cobranza', async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS cobranza_config (
@@ -100,60 +100,6 @@ async function getCobranzaConfig() {
   return obj;
 }
 const rellenar = (tpl, vars) => String(tpl || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : '{' + k + '}'));
-
-// Gasto de cobranza: tramos MARGINALES sobre la deuda en UF (como tabla de tramos de impuesto).
-// tramos = [{hasta_uf, pct}, ...]; el último con hasta_uf null/∞ es el resto de la deuda.
-function calcularGastoCobranza(deudaPesos, ufValor, tramos) {
-  const uf = Number(ufValor) || 0;
-  const deudaUF = uf > 0 ? (Number(deudaPesos) || 0) / uf : 0;
-  let prev = 0, gastoUF = 0;
-  const detalle = [];
-  for (const t of (tramos || [])) {
-    const tope = (t.hasta_uf == null || t.hasta_uf === '') ? Infinity : Number(t.hasta_uf);
-    const porcion = Math.max(0, Math.min(deudaUF, tope) - prev);
-    const aporte = porcion * (Number(t.pct) || 0) / 100;
-    if (porcion > 0) detalle.push({ desde_uf: prev, hasta_uf: tope === Infinity ? null : tope, porcion_uf: porcion, pct: Number(t.pct) || 0, gasto_uf: aporte });
-    gastoUF += aporte;
-    prev = tope;
-    if (deudaUF <= tope) break;
-  }
-  return { deuda_uf: deudaUF, gasto_uf: gastoUF, gasto_pesos: Math.round(gastoUF * uf), detalle };
-}
-
-// Interés por mora: diario simple sobre la cuota original. Tasa diaria = TMC mensual / 30.
-// Modo de tasa (cobranza_config.mora_tasa_modo, mantenedor Parámetros de Cobranza):
-//   'fija_otorgamiento' (default) → TMC vigente a la FECHA DE OTORGAMIENTO del crédito,
-//     fija para toda la mora (Contrato cláusula 6.1: interés máximo convencional según
-//     monto y plazo, pactado al originar — Ley 18.010 art. 16 permite pacto en contrario).
-//     Requiere pasar fechaTasaFija (fecha_otorgado); sin ella cae a variable.
-//   'variable' → cada día usa la TMC vigente de SU mes (tabla tasas por rango de fechas).
-// Tramo del crédito (menor/mayor 200 UF) elige la columna.
-//   tasas = filas {fecha_desde, fecha_hasta, tasa_mensual_menor, tasa_mensual_mayor}
-function calcularInteresMora(cuota, fechaVenc, fechaCalc, tramo, tasas, fechaTasaFija) {
-  const c = Number(cuota) || 0;
-  if (!c || !fechaVenc) return { dias: 0, interes: 0, detalle: [] };
-  const ini = new Date(fechaVenc + 'T00:00:00Z'); ini.setUTCDate(ini.getUTCDate() + 1); // día 1 de mora
-  const fin = new Date((fechaCalc || new Date().toISOString().slice(0, 10)) + 'T00:00:00Z');
-  const campo = tramo === 'mayor' ? 'tasa_mensual_mayor' : 'tasa_mensual_menor';
-  const tmcDe = (fechaStr) => {
-    const row = (tasas || []).find(t => String(t.fecha_desde) <= fechaStr && fechaStr <= String(t.fecha_hasta));
-    return row ? (parseFloat(row[campo]) || 0) : 0; // % mensual
-  };
-  // Tasa fija al otorgamiento: se resuelve UNA vez y aplica a todos los días de mora.
-  // Fallback: si a la fecha de otorgamiento no hay TMC cargada (historia incompleta), variable.
-  const tmcFija = fechaTasaFija ? tmcDe(String(fechaTasaFija).slice(0, 10)) : 0;
-  let dias = 0, interes = 0; const porPeriodo = {};
-  for (let d = new Date(ini); d <= fin; d.setUTCDate(d.getUTCDate() + 1)) {
-    const fs = d.toISOString().slice(0, 10);
-    const tmcMes = tmcFija > 0 ? tmcFija : tmcDe(fs);
-    const interesDia = c * (tmcMes / 100) / 30;
-    interes += interesDia; dias++;
-    const k = tmcMes.toFixed(4);
-    porPeriodo[k] = porPeriodo[k] || { tmc_mensual: tmcMes, dias: 0, interes: 0 };
-    porPeriodo[k].dias++; porPeriodo[k].interes += interesDia;
-  }
-  return { dias, interes: Math.round(interes), detalle: Object.values(porPeriodo).map(p => ({ ...p, interes: Math.round(p.interes) })) };
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function ok(res, data, status = 200) {
@@ -1033,12 +979,6 @@ async function getUFporFecha(fecha) {
   const [[u2]] = await pool.query('SELECT valor FROM uf ORDER BY fecha DESC LIMIT 1');
   return u2 ? parseFloat(u2.valor) : 0;
 }
-// Suma N días a una fecha YYYY-MM-DD
-function addDias(fechaStr, n) {
-  const d = new Date(fechaStr + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-
 // Reutilizable por otros módulos (ej. certificados: liquidación de prepago).
 exports._calc = { calcularGastoCobranza, calcularInteresMora, moraFechaFija, getCobranzaConfig, getUFporFecha, addDias };
 // Dependencias para el motor de automatización de mora (mora-motor.controller).

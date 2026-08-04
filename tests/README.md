@@ -28,6 +28,8 @@ llegaron a producción en una sola semana y que estas pruebas habrían detenido:
 | `rut-core.test.js` | `public/js/rut-core.js` | DV módulo 11, forma canónica, casos `K` y `0` |
 | `etapa-credito.test.js` | `shared/etapa-credito.js` | Las tres columnas se escriben juntas; cartera ≠ etapa |
 | `num-op.test.js` | `shared/num-op.js` | Correlativo AAMM####, reintento ante carrera |
+| `mora-calc.test.js` | `shared/mora-calc.js` | Interés por mora a TMC fija al otorgar; gastos por tramos marginales |
+| `comision-ejecutivo.test.js` | `shared/comision-ejecutivo.js` | Piso del mes, tramo de 24 cuotas exactas, umbrales de cruce, calidad todo o nada |
 
 ## Reglas para agregar pruebas
 
@@ -42,9 +44,27 @@ llegaron a producción en una sola semana y que estas pruebas habrían detenido:
    (el campo era `valor_cuota` y no `monto`; todo pagado da `TERMINADO`/`PREPAGADO`
    y no `VIGENTE`). Verificar contra el código antes de "corregir" el motor.
 
+## Motores que hubo que liberar para poder probarlos
+
+Dos cálculos vivían dentro de controllers que **corren migraciones al importarse**:
+probarlos habría significado levantar la base de producción. Se movieron a `shared/`
+tal cual, sin cambiar una línea de lógica, y el controller los sigue consumiendo desde
+ahí — no hay una segunda copia (Máxima 1).
+
+| Se movió | De | A |
+|---|---|---|
+| Interés por mora + gasto de cobranza | `cobranza.controller.js` | `shared/mora-calc.js` |
+| Comisión del ejecutivo | `comisiones.controller.js` | `shared/comision-ejecutivo.js` |
+
+`comision-ejecutivo.js` además carga `semana-corrida` de forma **perezosa**: ese módulo
+arrastra la tabla de feriados, que se siembra contra la BD al importarse.
+
+**Si un motor no se puede probar sin la base, ese es el hallazgo** — no una excusa para
+no probarlo.
+
 ## Lo que todavía NO se cubre
 
-- Comisión de ejecutivo y de dealer (dependen de parámetros en BD).
+- Comisión de **dealer** (tabla individual del dealer, depende de BD).
 - Motor de asientos contables.
 - Penetración de seguros y rentabilidad por carta.
 - Todo lo que toque base de datos, HTTP o el DOM.

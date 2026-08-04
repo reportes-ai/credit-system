@@ -730,11 +730,33 @@ abiertos de la lista de altos: **A-6** (sesiones no revocables, `token_version`)
 **Se adopta la regla que faltaba:** toda tabla de respaldo nace con prefijo `bkp_` y fecha en
 el nombre. Las dos pasadas de limpieza dejaron tablas afuera justamente por no seguirla.
 
-## Semana 2 — Pruebas automatizadas (B-3)
+## Semana 2 — Pruebas automatizadas (B-3) ✅ CERRADA (04-08-2026)
 
-Los 7 motores de la tabla de B-3, con `node --test`. Sin framework, sin dependencias.
-Criterio de término: las tres regresiones de esta semana quedan cubiertas por una prueba que
-las habría detectado.
+**95 pruebas, 9 archivos, 0,7 segundos, sin una sola dependencia** (`npm test` → `node --test`).
+Ninguna toca la base de datos.
+
+| Motor de la tabla B-3 | Archivo | Pruebas |
+|---|---|---:|
+| Números chilenos | `tests/num-chile.test.js` | 7 |
+| Cuota francesa y tabla de desarrollo | `tests/rentabilidad-core.test.js` | 11 |
+| Días de mora y estado de cartera | `tests/mora-core.test.js` | 11 |
+| **Dinero de la mora** (interés a TMC fija + gastos) | `tests/mora-calc.test.js` | 17 |
+| Etapa del crédito | `tests/etapa-credito.test.js` | 8 |
+| **Comisión del ejecutivo** | `tests/comision-ejecutivo.test.js` | 15 |
+| Correlativo `num_op` | `tests/num-op.test.js` | 9 |
+| RUT | `tests/rut-core.test.js` | 8 |
+| Detección de ambiente | `tests/entorno.test.js` | 9 |
+
+**Hallazgo de la semana:** dos motores de dinero —el interés por mora y la comisión del
+ejecutivo— **no se podían probar**, porque vivían dentro de controllers que corren
+migraciones al importarse. Se movieron tal cual a `shared/mora-calc.js` y
+`shared/comision-ejecutivo.js`, sin tocar la lógica y sin dejar una segunda copia. Que un
+cálculo de plata solo exista dentro de un controller es, por sí mismo, un defecto de diseño.
+
+**Criterio de término, cumplido:** de las tres regresiones de esa semana, las dos de cálculo
+quedan cubiertas (`"320.118"` → 320.118 en `num-chile.test.js`; el ingreso por seguros era su
+consecuencia directa). La tercera —columna inexistente en un `SELECT`— no es un motor puro:
+la cubre el `node --check` del CI de la semana 3, no una prueba unitaria.
 
 ## Semana 3 — Ambiente de staging (B-2)
 
