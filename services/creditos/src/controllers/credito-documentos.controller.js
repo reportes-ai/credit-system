@@ -159,6 +159,19 @@ const download = async (req, res) => {
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
+/* Una operación cerrada no se toca. Se bloquea SOLO lo irreversible —borrar—,
+   no la subida: los 6 respaldos vivos del sistema pertenecen a créditos ya
+   OTORGADOS, así que no se puede descartar que agregar un documento después del
+   cierre sea un uso legítimo. Borrar, en cambio, no tiene vuelta.
+   Esta guardia importa porque la pantalla de respaldos ahora se puede abrir en
+   operaciones cerradas (en modo lectura): la puerta nueva necesita cerradura de
+   verdad, no solo botones escondidos. */
+const ESTADOS_CERRADOS = ['OTORGADO', 'CURSADO', 'DESISTIDO', 'ANULADO', 'CANCELADO', 'PREPAGADO'];
+async function operacionCerrada(idCredito) {
+  const [[c]] = await pool.query('SELECT estado FROM creditos WHERE id=?', [idCredito]);
+  return c && ESTADOS_CERRADOS.includes(String(c.estado || '').toUpperCase()) ? c.estado : null;
+}
+
 /* ─── DELETE ────────────────────────────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
@@ -171,6 +184,11 @@ const remove = async (req, res) => {
        WHERE cd.id_doc=?`,
       [req.params.id_doc]
     );
+    if (prev.length) {
+      const cerrada = await operacionCerrada(prev[0].id_credito);
+      if (cerrada) return res.status(409).json({ success: false, data: null,
+        error: `La operación está ${cerrada}: sus respaldos ya no se pueden eliminar.` });
+    }
     await pool.query('DELETE FROM credito_documentos WHERE id_doc=?', [req.params.id_doc]);
     if (prev.length && prev[0].doc_ruta) await almacen.borrar(prev[0].doc_ruta);
     if (prev.length) {
@@ -190,6 +208,9 @@ const remove = async (req, res) => {
 const removeAll = async (req, res) => {
   try {
     const { id_credito } = req.params;
+    const cerrada = await operacionCerrada(id_credito);
+    if (cerrada) return res.status(409).json({ success: false, data: null,
+      error: `La operación está ${cerrada}: sus respaldos ya no se pueden eliminar.` });
     const [prev] = await pool.query(
       'SELECT COUNT(*) AS cnt FROM credito_documentos WHERE id_credito=?', [id_credito]
     );

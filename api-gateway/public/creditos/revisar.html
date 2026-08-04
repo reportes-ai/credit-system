@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -898,6 +898,27 @@ function renderPagina(c, ant, com) {
       <button id="btnGuardarEstado" class="btn-accion btn-guardar" onclick="guardarCambios()">
         <i class="bi bi-floppy"></i>Guardar cambios
       </button>`}
+      ${(() => {
+        /* VER RESPALDOS — fuera de los dos brazos del ternario, igual que Anular.
+           Cada brazo ofrece su propio botón hacia esta pantalla mientras la
+           operación está en curso ("Cargar Respaldos", "Analizar y Aprobar",
+           "Ir a Validación"...), pero en los estados donde no ofrece ninguno los
+           respaldos quedaban SIN puerta de entrada: una operación cerrada no
+           tenía cómo mostrar sus documentos, que es justo cuando se piden para
+           una auditoría o un reclamo. Este botón cubre solo esos casos —la
+           pantalla se abre en modo lectura y no deja modificar nada. */
+        const CON_RESPALDOS_PROPIAS = new Set(['INGRESO','REVISION','CARGA_RESPALDOS','EN_ANALISIS']);
+        const esBrokerBtn = ['AUTOFIN','UNIDAD DE CREDITO'].includes(c.financiera);
+        const yaHayBoton = esBrokerBtn
+          ? !ESTADOS_BROKER_FINALES.has(c.estado)
+          : CON_RESPALDOS_PROPIAS.has(c.estado);
+        return yaHayBoton ? '' : `
+      <button class="btn-accion" style="background:#fff;color:#334155;border:1.5px solid #cbd5e1"
+        title="Ver los documentos de respaldo (solo lectura)"
+        onclick="location.href='/creditos/respaldos?id=${c.id_credito}'">
+        <i class="bi bi-folder2-open"></i>Ver Respaldos
+      </button>`;
+      })()}
       <!-- Anular: fuera de los dos brazos del ternario, porque aplica a cualquier
            operación OTORGADA (brokerage o propia). Lo dibuja renderAnular(). -->
       <span id="anularSlot"></span>

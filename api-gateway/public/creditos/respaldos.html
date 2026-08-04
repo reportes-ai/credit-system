@@ -329,6 +329,13 @@ let _credito     = null;
 let _tipos       = [];
 let _docs        = {};       // { id_tipo: doc_row }
 let _esAnalista  = false;
+/* SOLO LECTURA: la operación ya está cerrada. Antes esta pantalla simplemente no
+   tenía puerta de entrada en esos estados, así que los respaldos de una
+   operación terminada no se podían mirar desde ninguna parte — justo cuando más
+   se necesitan (una auditoría, un reclamo). Ahora se entra, pero sin poder
+   tocar nada: lo otorgado es inmutable. */
+let _soloLectura = false;
+const ESTADOS_CERRADOS = new Set(['OTORGADO','CURSADO','DESISTIDO','ANULADO','CANCELADO','PREPAGADO']);
 let _pendingTipo = null;
 let _viewerDoc   = null;     // { idDoc, nombre, mime }
 let _vistos      = new Set(); // id_doc de documentos ya abiertos con "Ver"
@@ -390,10 +397,28 @@ async function cargarPagina() {
 function renderPagina() {
   const c = _credito;
   _esAnalista = c.estado === 'EN_ANALISIS';
+  _soloLectura = ESTADOS_CERRADOS.has(c.estado);
+  if (_soloLectura) _esAnalista = false;   // sin barra de aprobar/rechazar
 
   // Broker: AUTOFIN y UNIDAD → flujo propio, ocultar Enviar a Análisis
   const esBroker = ['AUTOFIN','UNIDAD DE CREDITO'].includes((c.financiera||'').toUpperCase());
   const ESTADOS_BROKER_FINALES_R = new Set(['OTORGADO','DESISTIDO','CURSADO']);
+
+  /* Aviso permanente: quien entra tiene que saber por qué no puede subir nada,
+     o va a creer que le faltan permisos. */
+  if (_soloLectura) {
+    const barra = document.getElementById('actionBar');
+    barra.querySelectorAll('button').forEach(b => { if (b.id !== 'btnDocBar') b.style.display = 'none'; });
+    const wrap = document.getElementById('pageWrap');
+    if (wrap && !document.getElementById('avisoSoloLectura')) {
+      const av = document.createElement('div');
+      av.id = 'avisoSoloLectura';
+      av.style.cssText = 'background:#fef9c3;border:1px solid #fde047;border-left:5px solid #ca8a04;color:#713f12;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:.86rem';
+      av.innerHTML = `<b><i class="bi bi-lock-fill me-1"></i>Solo lectura</b> — la operación está ${c.estado}. `
+        + `Los respaldos se pueden ver y descargar, pero no modificar: una operación cerrada no se toca.`;
+      wrap.prepend(av);
+    }
+  }
 
   // Botón "Volver a Ingresado": broker + NO estado final
   const btnVolverIngresado = document.getElementById('btnVolverIngresado');
@@ -542,11 +567,12 @@ function renderDocVacio(tipo) {
     <i class="bi bi-cloud-upload"></i>
     <span>Sin documento cargado</span>
   </div>
+  ${_soloLectura ? '' : `
   <div class="doc-actions">
     <button class="btn-upload" onclick="seleccionarArchivo(${tipo.id_tipo})">
       <i class="bi bi-upload"></i>Subir documento
     </button>
-  </div>`;
+  </div>`}`;
 }
 
 function renderDocSubido(tipo, doc) {
@@ -578,13 +604,15 @@ function renderDocSubido(tipo, doc) {
       <button class="btn-dl"  onclick="descargarDoc(${doc.id_doc},'${escQ(doc.archivo_nombre)}')" title="Descargar">
         <i class="bi bi-download"></i>
       </button>
+      ${_soloLectura ? '' : `
       <button class="btn-del" onclick="eliminarDoc(${idTipo},${doc.id_doc})" title="Eliminar">
         <i class="bi bi-trash"></i>
-      </button>
+      </button>`}
     </div>
+    ${_soloLectura ? '' : `
     <button class="btn-upload reupload" onclick="seleccionarArchivo(${idTipo})" style="flex:none">
       <i class="bi bi-arrow-repeat"></i>
-    </button>
+    </button>`}
   </div>
   ${aprBar}`;
 }
