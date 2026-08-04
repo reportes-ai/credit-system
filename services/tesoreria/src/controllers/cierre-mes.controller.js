@@ -16,6 +16,7 @@
      TRANSITORIAS  → cuentas transitorias ACTIVAS con saldo sin aplicar
      ODP_PENDIENTES→ órdenes de pago EMITIDAS (sin pagar) emitidas en el mes
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { sumarDiasHabiles } = require('../../../../shared/feriados');
@@ -387,6 +388,6 @@ async function tickRecordatorios() {
   } catch (e) { console.error('[cierre-mes tick]', e.message); }
 }
 setTimeout(tickRecordatorios, 2 * 60 * 1000);
-setInterval(tickRecordatorios, 30 * 60 * 1000);   // revisa cada 30 min; envía 1 vez al día pasada la hora
+programar('cierre-mes-recordatorios', tickRecordatorios, 30 * 60 * 1000);   // revisa cada 30 min; envía 1 vez al día pasada la hora
 
 module.exports = { getEstado, marcarOk, cerrarMes, getConfig, guardarItem, guardarConfig };

@@ -6,6 +6,7 @@
    plazo (fecha_estado + N), no en el día que corrió el motor.
    Corre al arrancar y luego cada 12 h. Paramétrico vía Parámetros Crédito.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 // La etapa se escribe por el motor único: las TRES columnas o ninguna.
@@ -42,8 +43,7 @@ require('../../../../shared/migrate').enFila('desistir-aprobados', async () => {
   try {
     await pool.query(`INSERT IGNORE INTO parametros_credito (clave, valor, descripcion)
       VALUES ('aprobado_desiste_dias', '6', 'Días corridos para que un crédito APROBADO sin cursar pase a DESISTIDO automáticamente')`);
-    setTimeout(() => desistirAprobadosVencidos().catch(e => console.error('[desistir-aprobados]', e.message)), 20000);
-    setInterval(() => desistirAprobadosVencidos().catch(e => console.error('[desistir-aprobados]', e.message)), 12 * 60 * 60 * 1000);
+    programar('desistir-aprobados', desistirAprobadosVencidos, 12 * 60 * 60 * 1000, { arranqueMs: 20000 });
   } catch (e) { console.error('[desistir-aprobados init]', e.message); }
 });
 

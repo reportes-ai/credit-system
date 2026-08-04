@@ -8,6 +8,7 @@
    salen de la ventana). Si la clave ya venció, el login los obliga a
    cambiarla (ver auth.controller.js); aquí solo se avisa antes.
    ════════════════════════════════════════════════════════════════ */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
 
@@ -90,6 +91,6 @@ async function revisar() {
 }
 
 setTimeout(revisar, 15000);            // primera corrida al arrancar
-setInterval(revisar, 60 * 60 * 1000); // cada hora (a lo sumo 1 correo/día por usuario)
+programar('aviso-vencimiento-clave', revisar, 60 * 60 * 1000); // cada hora (a lo sumo 1 correo/día por usuario)
 
 module.exports = { revisar };

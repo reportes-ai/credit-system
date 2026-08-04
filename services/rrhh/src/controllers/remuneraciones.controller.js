@@ -791,7 +791,7 @@ async function revisarIndicadores(usuario) {
 }
 
 // Cron liviano: cada hora; corre los días 1-3 (09-18h Chile) si el mes no tiene revisión aún.
-setInterval(async () => {
+require('../../../../shared/scheduler').programar('rrhh-indicadores-previred', async () => {
   try {
     const ahora = new Date().toLocaleString('en-CA', { timeZone: 'America/Santiago', hour12: false });
     const dia = parseInt(ahora.slice(8, 10), 10), hora = parseInt(ahora.slice(11, 13), 10);

@@ -4,6 +4,7 @@
    Paramétrico: motivos, SLA de primera respuesta, escalamiento y correos
    automáticos se configuran en el Mantenedor (no hardcode de negocio).
    ──────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
@@ -290,7 +291,7 @@ async function tickEscalar() {
   } catch (e) { console.error('[tickets tickEscalar]', e.message); }
   finally { _esc = false; }
 }
-setInterval(tickEscalar, 30 * 60 * 1000);
+programar('tickets-escalar', tickEscalar, 30 * 60 * 1000);
 setTimeout(tickEscalar, 25 * 1000);
 
 module.exports = { motivos, crear, listar, obtener, comentar, cambiarEstado, pendientes, motivosAdmin, guardarMotivo, eliminarMotivo, getConfig: getConfigEp, setConfig, tickEscalar };

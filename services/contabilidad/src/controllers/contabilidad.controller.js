@@ -10,6 +10,7 @@
    Fase 2 (futura): centralización automática — reglas evento→asiento desde
    cajas, ODP, castigos, provisiones, comisiones y remuneraciones.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 require('../motor-asientos'); // Fase 2: carga el motor (migra reglas + log al boot)
@@ -2246,8 +2247,7 @@ async function tickCavem() {
         status: () => ({ json: j => console.log('[cavem auto]', mes, '—', (j && j.error) || 'sin datos aún') }) });
   } catch (e) { console.error('[cavem auto]', e.message); }
 }
-setTimeout(tickCavem, 90 * 1000);                        // al arrancar (tras el boot)
-{ const _t = setInterval(tickCavem, 24 * 60 * 60 * 1000); if (_t.unref) _t.unref(); }  // y cada 24 h
+programar('cavem', tickCavem, 24 * 60 * 60 * 1000, { arranqueMs: 90 * 1000 });
 
 exports.hechosDirectorioIA = async (req, res) => {
   try {

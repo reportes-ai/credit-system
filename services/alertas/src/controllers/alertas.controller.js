@@ -1,4 +1,5 @@
 'use strict';
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const ANUN = require('../../../../shared/anuncios');
 const COM  = require('../../../../shared/comunicados');
@@ -441,7 +442,7 @@ async function evaluarAlertas() {
   finally { evaluando = false; }
 }
 setTimeout(evaluarAlertas, 8000);          // primera corrida al arrancar
-setInterval(evaluarAlertas, 60000);        // cada 60s
+programar('alertas', evaluarAlertas, 60000);        // cada 60s
 
 /* ── Endpoints CRUD + metadatos ─────────────────────────────────── */
 const getMeta = async (req, res) => {

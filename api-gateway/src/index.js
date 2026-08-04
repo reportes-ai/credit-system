@@ -733,4 +733,6 @@ require('../../services/atencion-remota/src/ws').initAtencionWS(server);
 server.listen(PORT, () => {
   console.log(`✓ API Gateway en http://localhost:${PORT}`);
   console.log(`✓ Login: http://localhost:${PORT}/login.html`);
+  // Al final: para acá ya se registraron todos los motores de todos los módulos.
+  require('../../shared/scheduler').anunciar();
 });

@@ -4,6 +4,7 @@
  * curado por perfil; el usuario pide cantidad + dirección de despacho; el admin consolida.
  * Fase 1: catálogo + curaduría por perfil + direcciones + config por usuario (mantenedor).
  */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { sincronizarCatalogo } = require('../compras-sync');
@@ -869,7 +870,7 @@ async function recordatoriosWorkflow() {
     }
   } catch (e) { console.error('[compras recordatorios]', e.message); }
 }
-setInterval(recordatoriosWorkflow, 30 * 60 * 1000);
+programar('compras-recordatorios', recordatoriosWorkflow, 30 * 60 * 1000);
 setTimeout(recordatoriosWorkflow, 90 * 1000);   // primera pasada al minuto y medio del boot
 
 /* ── BANDEJA DE REVISIÓN (el módulo del firmante) ─────────────────────────────

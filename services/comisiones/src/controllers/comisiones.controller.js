@@ -1,3 +1,4 @@
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
@@ -209,8 +210,7 @@ async function autoAprobarComisiones() {
     }
   } catch (e) { console.error('[autoAprobarComisiones]', e.message); }
 }
-setTimeout(autoAprobarComisiones, 20000);
-setInterval(autoAprobarComisiones, 30 * 60 * 1000);
+programar('comisiones-auto-aprobar', autoAprobarComisiones, 30 * 60 * 1000, { arranqueMs: 20000 });
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 async function getVars() {

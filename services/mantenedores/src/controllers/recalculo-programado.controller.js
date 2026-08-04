@@ -5,6 +5,7 @@
  * de forma automática según tramos por día de semana + horario, con su intervalo.
  * On/off global. Red de seguridad para que los cálculos nunca queden viejos.
  */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { recalcularMesesAbiertos } = require('../../../creditos/src/utils/recalcular-mes');
 const { auditar } = require('../../../../shared/audit');
@@ -117,8 +118,7 @@ async function tick() {
   } catch (e) { console.error('[recalc-programado tick]', e.message); }
   finally { _busy = false; }
 }
-setTimeout(tick, 20000);
-setInterval(tick, 60000);
+programar('recalculo-programado', tick, 60000, { arranqueMs: 20000 });
 
 /* ── Endpoints ── */
 exports.get = async (req, res) => {

@@ -15,6 +15,7 @@
    Historial completo (fecha/hora, motivo, comentario, aprobadores) en Tesorería.
    Autorización paramétrica (funcionalidades + matriz de Perfiles), nada hardcodeado.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
@@ -482,8 +483,7 @@ async function tickCierreAutomatico() {
     console.log(`[provisiones] cierre automático ${mesAnt}: prov ${r.provisiones.saldo_final}`);
   } catch (e) { console.error('[provisiones tick]', e.message); }
 }
-setTimeout(tickCierreAutomatico, 90 * 1000);                       // al boot (tras las migraciones)
-setInterval(tickCierreAutomatico, 6 * 60 * 60 * 1000);             // y cada 6 horas
+programar('provisiones-cierre', tickCierreAutomatico, 6 * 60 * 60 * 1000, { arranqueMs: 90 * 1000 });
 
 // Resuelve num_op → id de crédito (para el atajo "CASTIGAR SALDO" en Tesorería).
 const resolver = async (req, res) => {

@@ -8,6 +8,7 @@
      Nivel 3  Gerente de Finanzas        (toma conocimiento, no bloquea)
    Vencido el SLA → se da por aprobada y avanza. Aprobada → habilita la ODP (paso 3).
    ──────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
@@ -348,7 +349,7 @@ async function tickSLA() {
   } catch (e) { console.error('[liquidez tickSLA]', e.message); }
   finally { _slaCorriendo = false; }
 }
-setInterval(tickSLA, 30 * 60 * 1000);
+programar('liquidez-sla', tickSLA, 30 * 60 * 1000);
 setTimeout(tickSLA, 20 * 1000); // un primer chequeo al arrancar
 
 /* ── Paso 3: emisión de Órdenes de Pago y abono al pagarse ─────────────────── */

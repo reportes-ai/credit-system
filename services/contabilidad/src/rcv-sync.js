@@ -19,6 +19,7 @@
    read-only del SII (se reemplaza el mes completo en cada sync); el auxiliar
    ctb_compras_aux sigue siendo el libro operativo — el panel compara ambos.
    ─────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../shared/scheduler.js');
 const pool = require('../../../shared/config/database');
 
 const BASE = 'https://servicios.simpleapi.cl/api/';
@@ -151,6 +152,6 @@ async function tick() {
   } catch (e) { console.error('[rcv tick]', e.message); }
 }
 setTimeout(tick, 45000);                       // al arrancar (tras migraciones)
-setInterval(tick, 12 * 60 * 60 * 1000);        // cada 12h, corre solo si tocan los 2 días
+programar('rcv-sii', tick, 12 * 60 * 60 * 1000);        // cada 12h, corre solo si tocan los 2 días
 
 module.exports = { sincronizar, sincronizarMes, configurado };

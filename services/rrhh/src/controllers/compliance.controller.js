@@ -10,6 +10,7 @@
    · Solo los gestores (permiso compliance_gestionar) ven y tramitan; correo
      inmediato al recibirse una y alegato semanal por las vencidas.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const crypto = require('crypto');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
@@ -189,4 +190,4 @@ async function alegarVencidas() {
   } catch (e) { console.error('[alegato compliance]', e.message); }
 }
 setTimeout(alegarVencidas, 200 * 1000);
-setInterval(alegarVencidas, 24 * 60 * 60 * 1000);
+programar('compliance-vencidas', alegarVencidas, 24 * 60 * 60 * 1000);

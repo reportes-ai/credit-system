@@ -14,6 +14,7 @@
    Paramétrico (tabla `uptime_servicios`): agregar un servicio nuevo = un
    INSERT (codigo, nombre, tipo BD|HTTP, url). Sin tocar código.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('./scheduler.js');
 const pool = require('./config/database');
 
 const CADA_MIN = 5;                 // frecuencia de chequeo
@@ -120,7 +121,6 @@ async function resumen() {
   };
 }
 
-setInterval(() => chequear().catch(() => {}), CADA_MIN * 60 * 1000);
-setTimeout(() => chequear().catch(() => {}), 90 * 1000);   // primer check al arrancar
+programar('uptime', () => chequear().catch(() => {}), CADA_MIN * 60 * 1000, { infra: true, enStaging: true, arranqueMs: 90 * 1000 });
 
 module.exports = { resumen };

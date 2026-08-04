@@ -9,6 +9,7 @@
  * usa el servidor WebSocket (ws.js). El transporte en tiempo real vive en ws.js;
  * acá vive la persistencia y la autenticación.
  */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool   = require('../../../../shared/config/database');
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
@@ -868,8 +869,7 @@ async function desactivarInactivos() {
   } catch (e) { console.error('[dealer inactividad]', e.message); }
   finally { _inactJobRunning = false; }
 }
-setTimeout(desactivarInactivos, 25000);
-{ const _t = setInterval(desactivarInactivos, 12 * 3600 * 1000); if (_t.unref) _t.unref(); }
+programar('atencion-inactivos', desactivarInactivos, 12 * 3600 * 1000, { arranqueMs: 25000 });
 
 module.exports = {
   // middlewares

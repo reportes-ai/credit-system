@@ -9,6 +9,7 @@
    · Contrato: nace DESDE la carta aceptada — los beneficios ofertados entran
      como cláusulas automáticamente (una sola fuente: lo ofertado = lo contratado).
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
@@ -149,7 +150,7 @@ async function alegarCargosSinDescripcion() {
   } catch (e) { console.error('[alegato cargos]', e.message); }
 }
 setTimeout(alegarCargosSinDescripcion, 120 * 1000);
-setInterval(alegarCargosSinDescripcion, 24 * 60 * 60 * 1000);
+programar('rrhh-cargos-sin-descripcion', alegarCargosSinDescripcion, 24 * 60 * 60 * 1000);
 
 /* ── Cargos ─────────────────────────────────────────────────────────────────── */
 exports.getCargos = async (req, res) => {
@@ -708,7 +709,7 @@ async function alegarOnbVencidos() {
   } catch (e) { console.error('[alegato onb]', e.message); }
 }
 setTimeout(alegarOnbVencidos, 160 * 1000);
-setInterval(alegarOnbVencidos, 24 * 60 * 60 * 1000);
+programar('rrhh-onboarding-vencidos', alegarOnbVencidos, 24 * 60 * 60 * 1000);
 
 /* ─── ANEXOS DE CONTRATO (modelos vigentes) ─────────────────────────────────
    Entrega lo necesario para armar un anexo imprimible:

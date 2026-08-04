@@ -11,6 +11,7 @@
    (1,25/mes). ESTE es el motor único: lo usan el formulario de vacaciones,
    el módulo Ausencias y el finiquito.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 
@@ -75,7 +76,7 @@ async function alegarSinCertificadoAFP() {
   } catch (e) { console.error('[alegato cert AFP]', e.message); }
 }
 setTimeout(alegarSinCertificadoAFP, 140 * 1000);
-setInterval(alegarSinCertificadoAFP, 24 * 60 * 60 * 1000);
+programar('rrhh-certificado-afp', alegarSinCertificadoAFP, 24 * 60 * 60 * 1000);
 
 /* ── Generación de devengos: cada aniversario cumplido deposita su período ──── */
 function progresivoDelPeriodo(previos, periodoN) {
@@ -119,7 +120,7 @@ async function generarDevengos() {
   } catch (e) { console.error('[vac devengos]', e.message); }
 }
 setTimeout(generarDevengos, 100 * 1000);
-setInterval(generarDevengos, 24 * 60 * 60 * 1000);
+programar('rrhh-devengo-vacaciones', generarDevengos, 24 * 60 * 60 * 1000);
 exports.generarDevengos = generarDevengos;
 
 /* ── MOTOR ÚNICO de saldo: movimientos + proporcional del período en curso ──── */

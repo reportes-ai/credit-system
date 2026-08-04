@@ -9,6 +9,7 @@
    · Resultados solo para RRHH (rh_colaboradores) y solo agregados; los
      resultados no se muestran si respondieron menos de 3 personas.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
@@ -325,4 +326,4 @@ async function recordarPendientes() {
   } catch (e) { console.error('[recordatorio encuestas]', e.message); }
 }
 setTimeout(recordarPendientes, 240 * 1000);
-setInterval(recordarPendientes, 24 * 60 * 60 * 1000);
+programar('rrhh-encuestas-recordar', recordarPendientes, 24 * 60 * 60 * 1000);

@@ -6,6 +6,7 @@
  *  - TMC: desde el DÍA 13 y hasta encontrar el período nuevo del mes (tmc-sync.js).
  * Corre al arrancar (force) y cada 24h. Requiere CMF_API_KEY (sin ella, falla suave y avisa).
  */
+const { programar } = require('../../../shared/scheduler.js');
 const pool = require('../../../shared/config/database');
 const { cmfGet } = require('./cmf-api');
 const { sincronizarTMC, backfillTMC } = require('./tmc-sync');
@@ -110,7 +111,7 @@ async function sincronizar(opts = {}) {
 }
 
 // Al arrancar: puesta al día (force). Luego cada 24h.
-setTimeout(() => { sincronizar({ force: true }); }, 15000);
-setInterval(() => { sincronizar(); }, 24 * 60 * 60 * 1000);
+programar('indicadores-sync', () => sincronizar(), 24 * 60 * 60 * 1000,
+  { arranqueMs: 15000, arranqueFn: () => sincronizar({ force: true }) });
 
 module.exports = { sincronizar };

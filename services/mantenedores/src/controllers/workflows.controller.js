@@ -15,6 +15,7 @@
    configurables en Avisos) y anota ultima_alarma para no repetir hasta que
    pase otro ciclo completo de horas.
    ───────────────────────────────────────────────────────────────────────────── */
+const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const AVISOS = require('../../../../shared/avisos');
 
@@ -375,7 +376,7 @@ async function escalar() {
     }
   } catch (e) { console.error('[workflows escalar]', e.message); }
 }
-setInterval(escalar, 30 * 60 * 1000);
+programar('workflows-escalar', escalar, 30 * 60 * 1000);
 setTimeout(escalar, 2 * 60 * 1000);
 
 /* ── API del mantenedor ── */
