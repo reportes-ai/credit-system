@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v47.0 -->
+<!-- v47.1 — la ocupacion del cliente se recupera sola: ya estaba guardada en cada documento -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -247,6 +247,11 @@
 
   let FICHA = null;     // { cliente, antecedentes, cotizaciones }
   let OCUPACIONES = {};  // { ocupacion: [{documento,...}] }
+  /* Ocupación con la que ya se cargaron documentos de este cliente. Cada
+     documento guarda la suya en la base, así que no hay nada que preguntar de
+     nuevo: al volver a un cliente la pantalla la recupera sola. Antes se perdía
+     y había que acertarle otra vez para ver los archivos ya subidos. */
+  let OCUP_GUARDADA = null;
   let cotSel = null;     // id cotización seleccionada
   let lastRut = '';
 
@@ -555,6 +560,11 @@
     document.getElementById('docsDetalle').innerHTML = '';
     document.getElementById('secOcupacion').style.display = '';
     ocultarDesde('secEvaluar');
+    /* Si este cliente ya tiene documentos cargados, se recupera su ocupación y
+       se muestran de inmediato. Volver a elegirla a mano era pura fricción: el
+       dato ya estaba en la base y, si se erraba, los archivos subidos parecían
+       no existir. */
+    if (OCUP_GUARDADA && ocs.includes(OCUP_GUARDADA)) { sel.value = OCUP_GUARDADA; renderDocs(); }
     document.getElementById('secOcupacion').scrollIntoView({ behavior:'smooth', block:'center' });
   }
 
@@ -656,11 +666,15 @@
   }
 
   async function cargarDocsCargados(rut){
-    DOCS_CARGADOS = {};
+    DOCS_CARGADOS = {}; OCUP_GUARDADA = null;
     try {
       const r = await fetch('/api/evaluacion-crediticia/documentos/' + encodeURIComponent(rut), { headers: H });
       const j = await r.json();
-      (j.data || []).forEach(d => { DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre, validado: d.validado, vtexto: d.validacion_texto, url: d.validacion_url || null }; });
+      (j.data || []).forEach(d => {
+        DOCS_CARGADOS[d.documento] = { id: d.id, nombre: d.archivo_nombre, validado: d.validado, vtexto: d.validacion_texto, url: d.validacion_url || null };
+        // La del último documento cargado: si alguien corrigió la ocupación, esa manda.
+        if (d.ocupacion) OCUP_GUARDADA = d.ocupacion;
+      });
     } catch (_) {}
   }
 
