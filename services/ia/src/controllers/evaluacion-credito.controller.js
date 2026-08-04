@@ -12,6 +12,7 @@ const pool = require('../../../../shared/config/database');
 const ia = require('../../../../shared/ia');
 const { analizar } = require('../../../../shared/anthropic');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 
 const CODIGO = 'evaluacion_consistencia';
 
@@ -140,17 +141,22 @@ exports.evaluar = async (req, res) => {
 
     // 4) Documentos cargados → adjuntos para visión (pdf/imagen)
     const [docsRows] = await pool.query(
-      'SELECT documento, archivo_nombre, mime_type, archivo_data, archivo_size FROM evaluacion_documentos WHERE rut_cliente=? ORDER BY id', [rutDash]).catch(() => [[]]);
+      'SELECT documento, archivo_nombre, mime_type, archivo_data, archivo_size, doc_ruta FROM evaluacion_documentos WHERE rut_cliente=? ORDER BY id', [rutDash]).catch(() => [[]]);
     const documentos = []; const docsLista = []; let totalBytes = 0;
     const MAX_TOTAL = 18 * 1024 * 1024;   // presupuesto total (la API limita ~32MB/100 págs por request)
     for (const d of (docsRows || [])) {
       docsLista.push(`- ${d.documento} (${d.archivo_nombre || 's/n'})`);
       const mt = (d.mime_type || '').toLowerCase();
       const size = d.archivo_size || (d.archivo_data ? d.archivo_data.length : 0);
-      if (!d.archivo_data || size > 5 * 1024 * 1024 || documentos.length >= 6 || totalBytes + size > MAX_TOTAL) continue;
+      /* Los filtros de tamaño se aplican ANTES de traer el archivo: si el
+         documento vive en el bucket, descargar uno que igual se iba a descartar
+         sería una vuelta de red pagada al pedo. */
+      if ((!d.archivo_data && !d.doc_ruta) || size > 5 * 1024 * 1024 || documentos.length >= 6 || totalBytes + size > MAX_TOTAL) continue;
+      const contenido = await almacen.obtener({ ruta: d.doc_ruta, blob: d.archivo_data }).catch(() => null);
+      if (!contenido) continue;
       totalBytes += size;
-      if (mt.includes('pdf')) documentos.push({ tipo: 'pdf', data: Buffer.from(d.archivo_data).toString('base64') });
-      else if (mt.startsWith('image/')) documentos.push({ tipo: 'image', media_type: mt, data: Buffer.from(d.archivo_data).toString('base64') });
+      if (mt.includes('pdf')) documentos.push({ tipo: 'pdf', data: contenido.toString('base64') });
+      else if (mt.startsWith('image/')) documentos.push({ tipo: 'image', media_type: mt, data: contenido.toString('base64') });
     }
 
     // 5) Tablas Política V3.0

@@ -3,6 +3,7 @@ const pool = require('../../../../shared/config/database');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 const { publicarAnuncio } = require('../../../../shared/anuncios');
 const { marcarForzadosCalculo, recalcularPorOps } = require('../../../creditos/src/utils/recalcular-mes');
 // Motor único de etapa: otorgar escribe las TRES columnas de una sola vez.
@@ -363,6 +364,10 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rep DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gps_monto DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gastos_monto DECIMAL(12,2) DEFAULT NULL`);
+    // Dónde vive el PDF adjunto (shared/almacen-docs.js): 161 documentos = 10,5 MB.
+    for (const ddl of almacen.sqlColumnas('cartas_documentos')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[cartas docs almacen]', e.message); }
+    }
   } catch(e) { /* columna ya existe */ }
   // Barrer vencidas al arrancar (por si el servicio estuvo caído al cumplirse el plazo).
   barrerVencidas().catch(e => console.error('[cartas barrerVencidas boot]', e.message));
@@ -1602,12 +1607,20 @@ const subirDocumento = async (req, res) => {
     const buf = _toBuf(data_base64);
     if (!buf.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
     if (buf.length > 12 * 1024 * 1024) return res.status(413).json({ success: false, data: null, error: 'Máximo 12 MB por archivo' });
-    if (idCarta) await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [idCarta, tipo]); // re-subida: reemplaza
+    /* Re-subida: la fila anterior se borra, así que hay que quedarse con su ruta
+       antes o el objeto queda huérfano en el bucket para siempre. */
+    let rutasViejas = [];
+    if (idCarta) {
+      [rutasViejas] = await pool.query('SELECT doc_ruta FROM cartas_documentos WHERE id_carta=? AND tipo=? AND doc_ruta IS NOT NULL', [idCarta, tipo]);
+      await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [idCarta, tipo]); // re-subida: reemplaza
+    }
+    const d = await almacen.colocar({ ambito: 'cartas', clave: idCarta || 'sin-carta', buffer: buf, mime, nombre: nombre || 'documento.pdf' });
     const [r] = await pool.query(
-      `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, extracted, subido_por, id_subido_por)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [idCarta, tipo, nombre || 'documento.pdf', mime || 'application/pdf', buf.length, buf,
+      `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, doc_storage, doc_ruta, doc_bytes, extracted, subido_por, id_subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [idCarta, tipo, nombre || 'documento.pdf', mime || 'application/pdf', buf.length, d.blob, d.storage, d.ruta, d.bytes,
        extracted ? JSON.stringify(extracted) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
+    for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) { console.error('[subirDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
@@ -1624,13 +1637,17 @@ const listarDocumentos = async (req, res) => {
 // GET /api/cartas/documentos/:docId → stream inline del PDF
 const verDocumento = async (req, res) => {
   try {
-    const [[d]] = await pool.query('SELECT nombre, mime, data FROM cartas_documentos WHERE id=?', [req.params.docId]);
-    if (!d || !d.data) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    const [[d]] = await pool.query('SELECT nombre, mime, data, doc_ruta FROM cartas_documentos WHERE id=?', [req.params.docId]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    const contenido = await almacen.obtener({ ruta: d.doc_ruta, blob: d.data });
+    if (!contenido) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
+    /* Cabecera propia y no almacen.servir(): esta manda además `filename*` para
+       que los nombres con acentos lleguen bien al navegador. */
     const fname = String(d.nombre || 'documento.pdf');
     const safe = fname.replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
     res.setHeader('Content-Type', d.mime || 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(fname)}`);
-    res.send(d.data);
+    res.send(contenido);
   } catch (e) { console.error('[verDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

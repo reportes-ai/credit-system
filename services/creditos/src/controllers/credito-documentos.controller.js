@@ -1,6 +1,7 @@
 const pool  = require('../../../../shared/config/database');
 const audit = require('../../../../shared/auditoria');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 
 require('../../../../shared/migrate').enFila('credito-documentos', async () => {
   try {
@@ -44,6 +45,10 @@ require('../../../../shared/migrate').enFila('credito-documentos', async () => {
       )
     `);
   } catch(e) { if (e.errno !== 1050) console.error('[credito_documentos migration]', e.message); }
+  // Dónde vive el archivo (shared/almacen-docs.js): 12 documentos = 4,6 MB.
+  for (const ddl of almacen.sqlColumnas('credito_documentos')) {
+    try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[credito-docs almacen]', e.message); }
+  }
 });
 
 /* ─── GET por crédito (sin datos binarios) ──────────────────────────────── */
@@ -80,16 +85,20 @@ const upload = async (req, res) => {
       if (tn.length) tipoNombre = tn[0].nombre;
     } catch(e) {}
 
-    // Reemplaza el doc anterior del mismo tipo para este crédito
+    // Reemplaza el doc anterior del mismo tipo para este crédito. Sus rutas se
+    // guardan antes del DELETE: después de borrar la fila ya no hay cómo saberlas.
+    const [viejos] = await pool.query('SELECT doc_ruta FROM credito_documentos WHERE id_credito=? AND id_tipo=? AND doc_ruta IS NOT NULL', [id_credito, id_tipo]);
     await pool.query('DELETE FROM credito_documentos WHERE id_credito=? AND id_tipo=?', [id_credito, id_tipo]);
 
+    const d = await almacen.colocar({ ambito: 'creditos', clave: id_credito, buffer, mime: mime_type, nombre: archivo_nombre || 'documento' });
     const [r] = await pool.query(
       `INSERT INTO credito_documentos
-         (id_credito, id_tipo, archivo_nombre, archivo_size, mime_type, archivo_data, comentario, subido_por)
-       VALUES (?,?,?,?,?,?,?,?)`,
+         (id_credito, id_tipo, archivo_nombre, archivo_size, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, comentario, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [id_credito, id_tipo, archivo_nombre || 'documento', archivo_size || buffer.length,
-       mime_type || 'application/octet-stream', buffer, comentario || null, id_usuario]
+       mime_type || 'application/octet-stream', d.blob, d.storage, d.ruta, d.bytes, comentario || null, id_usuario]
     );
+    for (const v of viejos) await almacen.borrar(v.doc_ruta);
     audit.registrar({
       id_credito, req,
       accion: 'DOCUMENTO_CARGADO',
@@ -114,7 +123,7 @@ const updateComentario = async (req, res) => {
 const view = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT archivo_nombre, mime_type, archivo_data FROM credito_documentos WHERE id_doc=?',
+      'SELECT archivo_nombre, mime_type, archivo_data, doc_ruta FROM credito_documentos WHERE id_doc=?',
       [req.params.id_doc]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Documento no encontrado' });
@@ -130,7 +139,7 @@ const view = async (req, res) => {
     auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_respaldo', entidad_id: req.params.id_doc, detalle: `Visualizó documento de respaldo: ${doc.archivo_nombre || ''}` });
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
-    res.send(doc.archivo_data);
+    res.send(await almacen.obtener({ ruta: doc.doc_ruta, blob: doc.archivo_data }));
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
@@ -138,7 +147,7 @@ const view = async (req, res) => {
 const download = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT archivo_nombre, mime_type, archivo_data FROM credito_documentos WHERE id_doc=?',
+      'SELECT archivo_nombre, mime_type, archivo_data, doc_ruta FROM credito_documentos WHERE id_doc=?',
       [req.params.id_doc]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'Documento no encontrado' });
@@ -146,7 +155,7 @@ const download = async (req, res) => {
     auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'documentos', entidad: 'documento_respaldo', entidad_id: req.params.id_doc, detalle: `Descargó documento de respaldo: ${doc.archivo_nombre || ''}` });
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre)}`);
-    res.send(doc.archivo_data);
+    res.send(await almacen.obtener({ ruta: doc.doc_ruta, blob: doc.archivo_data }));
   } catch(e) { (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'})); }
 };
 
@@ -155,7 +164,7 @@ const remove = async (req, res) => {
   try {
     // Obtener datos antes de borrar para la auditoría
     const [prev] = await pool.query(
-      `SELECT cd.id_credito, cd.archivo_nombre, cd.id_tipo,
+      `SELECT cd.id_credito, cd.archivo_nombre, cd.id_tipo, cd.doc_ruta,
               t.nombre AS tipo_nombre
        FROM credito_documentos cd
        LEFT JOIN tipos_documento t ON t.id_tipo = cd.id_tipo
@@ -163,6 +172,7 @@ const remove = async (req, res) => {
       [req.params.id_doc]
     );
     await pool.query('DELETE FROM credito_documentos WHERE id_doc=?', [req.params.id_doc]);
+    if (prev.length && prev[0].doc_ruta) await almacen.borrar(prev[0].doc_ruta);
     if (prev.length) {
       const tipoNombre = prev[0].tipo_nombre || `tipo ID ${prev[0].id_tipo}`;
       audit.registrar({
@@ -183,7 +193,10 @@ const removeAll = async (req, res) => {
     const [prev] = await pool.query(
       'SELECT COUNT(*) AS cnt FROM credito_documentos WHERE id_credito=?', [id_credito]
     );
+    // Rutas antes del borrado masivo, o los objetos quedan huérfanos en el bucket.
+    const [rutas] = await pool.query('SELECT doc_ruta FROM credito_documentos WHERE id_credito=? AND doc_ruta IS NOT NULL', [id_credito]);
     await pool.query('DELETE FROM credito_documentos WHERE id_credito=?', [id_credito]);
+    for (const r of rutas) await almacen.borrar(r.doc_ruta);
     audit.registrar({
       id_credito, req,
       accion: 'DOCUMENTOS_LIMPIADOS',

@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { analizar } = require('../../../../shared/anthropic');
+const almacen = require('../../../../shared/almacen-docs');
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Evaluación Crediticia
@@ -78,6 +79,8 @@ require('../../../../shared/migrate').enFila('evaluacion', async () => {
       'ALTER TABLE evaluacion_documentos ADD COLUMN validado TINYINT NULL',          // 1 ok · 0 observado · null sin validar
       'ALTER TABLE evaluacion_documentos ADD COLUMN validacion_texto VARCHAR(255) NULL',
       'ALTER TABLE evaluacion_documentos ADD COLUMN validacion_url VARCHAR(300) NULL', // validador de la AFP detectada
+      // Dónde vive el archivo (shared/almacen-docs.js): 6 documentos = 2,3 MB.
+      ...almacen.sqlColumnas('evaluacion_documentos'),
     ]) { try { await pool.query(sql); } catch (e) { if (e.errno !== 1060) console.error('[evdoc alter]', e.message); } }
 
     // Módulo/card propio "Evaluación Crediticia" en el Home.
@@ -225,16 +228,22 @@ const subirDocumento = async (req, res) => {
     if (buffer.length > 15 * 1024 * 1024)
       return res.status(413).json({ success: false, data: null, error: 'El archivo supera 15 MB' });
     const id_usuario = req.usuario?.id_usuario || null;
+    const doc255 = String(documento).slice(0, 255);
+    // Reemplazo (ON DUPLICATE KEY): la ruta anterior antes de pisarla.
+    const [[prev]] = await pool.query('SELECT doc_ruta FROM evaluacion_documentos WHERE rut_cliente=? AND documento=? LIMIT 1', [r, doc255]);
+    const d = await almacen.colocar({ ambito: 'evaluacion', clave: r, buffer, mime: mime_type, nombre: archivo_nombre || 'documento' });
     await pool.query(
       `INSERT INTO evaluacion_documentos
-         (rut_cliente, ocupacion, documento, archivo_nombre, archivo_size, mime_type, archivo_data, subido_por)
-       VALUES (?,?,?,?,?,?,?,?)
+         (rut_cliente, ocupacion, documento, archivo_nombre, archivo_size, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE ocupacion=VALUES(ocupacion), archivo_nombre=VALUES(archivo_nombre),
          archivo_size=VALUES(archivo_size), mime_type=VALUES(mime_type), archivo_data=VALUES(archivo_data),
+         doc_storage=VALUES(doc_storage), doc_ruta=VALUES(doc_ruta), doc_bytes=VALUES(doc_bytes),
          subido_por=VALUES(subido_por), created_at=CURRENT_TIMESTAMP`,
-      [r, ocupacion || null, String(documento).slice(0, 255), archivo_nombre || 'documento',
-       archivo_size || buffer.length, mime_type || 'application/octet-stream', buffer, id_usuario]);
-    const [[row]] = await pool.query('SELECT id FROM evaluacion_documentos WHERE rut_cliente=? AND documento=? LIMIT 1', [r, String(documento).slice(0, 255)]);
+      [r, ocupacion || null, doc255, archivo_nombre || 'documento',
+       archivo_size || buffer.length, mime_type || 'application/octet-stream', d.blob, d.storage, d.ruta, d.bytes, id_usuario]);
+    if (prev && prev.doc_ruta && prev.doc_ruta !== d.ruta) await almacen.borrar(prev.doc_ruta);
+    const [[row]] = await pool.query('SELECT id FROM evaluacion_documentos WHERE rut_cliente=? AND documento=? LIMIT 1', [r, doc255]);
     res.json({ success: true, data: { id: row ? row.id : null }, error: null });
   } catch (e) {
     console.error('[evaluacion subirDocumento]', e);
@@ -246,11 +255,11 @@ const subirDocumento = async (req, res) => {
 const verDocumento = async (req, res) => {
   try {
     const [[doc]] = await pool.query(
-      'SELECT archivo_nombre, mime_type, archivo_data FROM evaluacion_documentos WHERE id=?', [req.params.id]);
+      'SELECT archivo_nombre, mime_type, archivo_data, doc_ruta FROM evaluacion_documentos WHERE id=?', [req.params.id]);
     if (!doc) return res.status(404).json({ success: false, data: null, error: 'No encontrado' });
     res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(doc.archivo_nombre || 'documento')}`);
-    res.send(doc.archivo_data);
+    res.send(await almacen.obtener({ ruta: doc.doc_ruta, blob: doc.archivo_data }));
   } catch (e) {
     console.error('[evaluacion verDocumento]', e);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -260,7 +269,9 @@ const verDocumento = async (req, res) => {
 /* DELETE /api/evaluacion-crediticia/documento/:id — elimina archivo cargado */
 const removeDocumento = async (req, res) => {
   try {
+    const [[doc]] = await pool.query('SELECT doc_ruta FROM evaluacion_documentos WHERE id=?', [req.params.id]);
     await pool.query('DELETE FROM evaluacion_documentos WHERE id=?', [req.params.id]);
+    if (doc && doc.doc_ruta) await almacen.borrar(doc.doc_ruta);
     res.json({ success: true, data: { id: req.params.id }, error: null });
   } catch (e) {
     console.error('[evaluacion removeDocumento]', e);
@@ -286,15 +297,17 @@ const promptAFP = (rutCliente) => `Valida el documento adjunto como Certificado 
 
 const validarAfp = async (req, res) => {
   try {
-    const [[doc]] = await pool.query('SELECT id, rut_cliente, documento, mime_type, archivo_data FROM evaluacion_documentos WHERE id=?', [req.params.id]);
+    const [[doc]] = await pool.query('SELECT id, rut_cliente, documento, mime_type, archivo_data, doc_ruta FROM evaluacion_documentos WHERE id=?', [req.params.id]);
     if (!doc) return res.status(404).json({ success: false, data: null, error: 'Documento no encontrado' });
     const mt = (doc.mime_type || '').toLowerCase();
-    if (!doc.archivo_data || !(mt.includes('pdf') || mt.startsWith('image/')))
+    // La IA necesita el contenido real: se trae del bucket o de la base, según viva.
+    const contenido = await almacen.obtener({ ruta: doc.doc_ruta, blob: doc.archivo_data });
+    if (!contenido || !(mt.includes('pdf') || mt.startsWith('image/')))
       return res.json({ success: true, data: { validado: null, texto: 'Solo se valida PDF o imagen' }, error: null });
 
     const documentos = mt.includes('pdf')
-      ? [{ tipo: 'pdf', data: Buffer.from(doc.archivo_data).toString('base64') }]
-      : [{ tipo: 'image', media_type: mt, data: Buffer.from(doc.archivo_data).toString('base64') }];
+      ? [{ tipo: 'pdf', data: contenido.toString('base64') }]
+      : [{ tipo: 'image', media_type: mt, data: contenido.toString('base64') }];
 
     let x = null, texto = null, validado = null;
     try {
