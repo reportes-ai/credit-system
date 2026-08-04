@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -45,6 +45,11 @@
     .et .tit { font-weight:800; color:#012d70; text-transform:uppercase; font-size:.57rem; min-height:18px; line-height:1.15; }
     .et .usr { color:#64748b; min-height:12px; }
     .et input[type=checkbox] { width:14px; height:14px; cursor:pointer; accent-color:#0141A2; }
+    /* Un casillero deshabilitado no emite eventos de clic: se le quitan los
+       punteros para que el clic llegue al envoltorio, que sí explica por qué
+       está bloqueado y dónde se hace el cambio. */
+    .et input[type=checkbox]:disabled { pointer-events:none; }
+    .chkw { display:inline-block; cursor:help; }
     .et .pend { color:#b45309; font-weight:700; }
     .et .fecha { color:#475569; }
     .et .dias { color:#0e7490; font-weight:700; }
@@ -100,6 +105,9 @@ const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 
 const fmtCLP = v => '$'+(parseInt(v)||0).toLocaleString('es-CL');
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/* Para atributos: escH NO escapa comillas, y un texto con comillas dentro de
+   un title="..." o data-msg="..." rompe el HTML sin dar error visible. */
+const escA = s => escH(s).replace(/"/g,'&quot;');
 const fmtF = f => { if(!f) return ''; const d=new Date(f); return isNaN(d)?'':d.toLocaleDateString('es-CL'); };
 
 let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
@@ -318,16 +326,35 @@ function trackHTML(r, track, lista){
     const canUnmark = !esAuto && m && !esSistema && i === lastIdx && (esAdmin || esHoy);
 
     const disabled = esAuto || esSistema || (!m && !canMark) || (m && !canUnmark) ? 'disabled' : '';
-    let title = '';
-    if (esAuto) title = x.etapa==='FUNDANTES RECIBIDOS'
-      ? 'Se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)'
-      : x.etapa==='ORDEN DE PAGO EMITIDA'
-      ? 'Se marca automáticamente al emitir la orden en "Emisión Orden de Pago"'
-      : x.etapa==='ENVIADO A PAGO'
-      ? 'Se marca al presionar "Enviar a Pago" en "Saldos Precios a Pagar"'
-      : 'Se marca automáticamente al registrar el pago en "Saldos Precios a Pagar"';
-    else if (!esSistema && !m && !canMark)   title = `Debes marcar primero "${lista[i-1]?.etapa}"`;
-    else if (!esSistema && m && !canUnmark) title = esAdmin ? '' : (esHoy ? 'Solo puedes desmarcar la última etapa' : 'Solo puedes desmarcar etapas marcadas hoy');
+
+    /* Por qué está bloqueado y —sobre todo— DÓNDE se hace. Un casillero
+       deshabilitado no responde al clic, así que el globo de ayuda pasaba
+       desapercibido: el mensaje se muestra ahora al intentar tocarlo (ver
+       porQueBloqueado más abajo). `donde` agrega el enlace al módulo que manda
+       sobre esa etapa, para no dejar a nadie buscando. */
+    let title = '', donde = '', dondeTxt = '';
+    if (esAuto) {
+      if (x.etapa==='FUNDANTES RECIBIDOS') {
+        title = 'Esta etapa la controla Seguimiento de Fundantes: se marca sola al aprobar los fundantes de la operación.';
+        donde = '/fundantes-seguimiento/'; dondeTxt = 'Ir a Seguimiento de Fundantes';
+      } else if (x.etapa==='ORDEN DE PAGO EMITIDA') {
+        title = 'Esta etapa la controla Emisión Orden de Pago: se marca sola al emitir la orden.';
+        donde = '/postventa/orden-pago/'; dondeTxt = 'Ir a Emisión Orden de Pago';
+      } else if (x.etapa==='ENVIADO A PAGO') {
+        title = 'Esta etapa la controla Saldos Precios a Pagar: se marca al presionar «Enviar a Pago».';
+        donde = '/postventa/saldos-a-pagar/'; dondeTxt = 'Ir a Saldos Precios a Pagar';
+      } else {
+        title = 'Esta etapa la controla Saldos Precios a Pagar: se marca sola al registrar el pago.'
+              + (m && esAdmin ? ' Como Administrador puedes revertirla con el botón «↶ Revertir» de esta misma tarjeta.' : '');
+        donde = '/postventa/saldos-a-pagar/'; dondeTxt = 'Ir a Saldos Precios a Pagar';
+      }
+      title += ' Acá solo se refleja lo que pasó allá.';
+    }
+    else if (esSistema) title = 'La primera etapa la marca el sistema al otorgarse la operación. No se marca ni se desmarca a mano.';
+    else if (!m && !canMark)  title = `Las etapas se marcan en orden: primero hay que marcar «${lista[i-1]?.etapa}».`;
+    else if (m && !canUnmark) title = (i !== lastIdx)
+      ? `Las etapas se deshacen en orden inverso: primero hay que desmarcar «${lista[lastIdx]?.etapa}», que es la última marcada.`
+      : `Esta etapa se marcó el ${fmtF(m.fecha)} y solo puede desmarcarse el mismo día. Para revertirla ahora necesitas a un Administrador.`;
 
     let dias = '';
     if (m && fechaPrev) {
@@ -341,9 +368,11 @@ function trackHTML(r, track, lista){
       <div>
         ${(x.etapa==='ORDEN DE PAGO EMITIDA' && !m && prevMarcado)
           ? `<button onclick="abrirEmitirODP(${r.id},'${track}')" title="Emitir la Orden de Pago" style="background:#0141A2;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:.66rem;font-weight:700;cursor:pointer;white-space:nowrap">📄 Emitir</button>`
-          : `<input type="checkbox" ${m?'checked':''} ${disabled} title="${escH(title)}"
+          : `${disabled && title ? `<span class="chkw" data-msg="${escA(title)}" data-href="${escA(donde)}" data-dtxt="${escA(dondeTxt)}" data-et="${escA(x.etapa)}" onclick="porQueBloqueado(this)">` : ''}
+            <input type="checkbox" ${m?'checked':''} ${disabled} title="${escA(title)}"
               onchange="toggleEtapa(${r.id},'${track}','${escH(x.etapa)}',this)">
-            ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}`}
+            ${!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:''}
+            ${disabled && title ? '</span>' : ''}`}
         ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
         ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
       </div>
@@ -583,6 +612,46 @@ async function fcGuardar(){
     }
     document.getElementById('modalFactura').close(); FC = {id:null,chk:null}; render();
   } catch(e){ al.textContent='Error de conexión'; al.style.display='block'; }
+}
+
+/* ── Aviso al tocar un casillero bloqueado ─────────────────────────────────
+   Antes esto solo vivía en el `title`: el globo del navegador tarda en salir,
+   se pierde al mover el mouse y en un táctil no aparece nunca. La gente
+   terminaba clickeando un casillero que no reaccionaba, sin saber si estaba
+   bloqueado, roto, o si le faltaba permiso.
+   El mensaje dice DOS cosas: por qué no se puede acá, y dónde sí se puede. */
+let _avisoT = null;
+function porQueBloqueado(w){
+  const msg = w.dataset.msg || '';
+  if (!msg) return;
+  const prev = document.getElementById('avisoEtapa');
+  if (prev) prev.remove();
+  clearTimeout(_avisoT);
+
+  const href = w.dataset.href, dtxt = w.dataset.dtxt;
+  const caja = document.createElement('div');
+  caja.id = 'avisoEtapa';
+  caja.innerHTML = `<div style="font-weight:800;font-size:.78rem;margin-bottom:3px">🔒 ${escH(w.dataset.et||'Etapa bloqueada')}</div>
+    <div style="font-size:.74rem;line-height:1.35">${escH(msg)}</div>
+    ${href ? `<a href="${escH(href)}" style="display:inline-block;margin-top:7px;background:#fff;color:#0141A2;border-radius:6px;padding:3px 9px;font-size:.72rem;font-weight:700;text-decoration:none">${escH(dtxt||'Ir al módulo')} →</a>` : ''}`;
+  caja.style.cssText = 'position:fixed;z-index:9999;max-width:320px;background:#0f172a;color:#fff;border-radius:10px;padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.28)';
+  document.body.appendChild(caja);
+
+  /* Junto al casillero, pero sin salirse de la pantalla: estas tarjetas están
+     pegadas al borde derecho y un aviso anclado a secas quedaría cortado. */
+  const r = w.getBoundingClientRect(), c = caja.getBoundingClientRect();
+  let x = r.left + r.width/2 - c.width/2;
+  x = Math.max(8, Math.min(x, window.innerWidth - c.width - 8));
+  let y = r.bottom + 8;
+  if (y + c.height > window.innerHeight - 8) y = Math.max(8, r.top - c.height - 8);
+  caja.style.left = x + 'px'; caja.style.top = y + 'px';
+
+  /* Se va sola, o al primer clic en cualquier otra parte — si tiene enlace se
+     queda más rato, porque hay algo que leer y hacia dónde ir. */
+  _avisoT = setTimeout(() => caja.remove(), href ? 9000 : 6000);
+  setTimeout(() => document.addEventListener('click', function fuera(ev){
+    if (!caja.contains(ev.target)) { caja.remove(); document.removeEventListener('click', fuera); }
+  }), 0);
 }
 
 async function toggleEtapa(id, track, etapa, chk){
