@@ -36,6 +36,14 @@ test('un documento sin ruta ni blob devuelve null, no revienta', async () => {
   assert.strictEqual(await almacen.obtener({ ruta: null, blob: null }), null);
 });
 
+/* Durante la migración el documento existe en los dos lados. Que gane el blob
+   es lo que hace que el orden de los pasos no importe: se pueden marcar filas
+   como migradas aunque el servidor todavía no tenga credenciales del bucket. */
+test('mientras el blob siga en la fila, se lee de la base aunque haya ruta', async () => {
+  const buf = await almacen.obtener({ ruta: 'fundantes/42/x.pdf', blob: Buffer.from('el de la base') });
+  assert.strictEqual(buf.toString(), 'el de la base');
+});
+
 /* Este es el caso que importa en contingencia: la fila dice que el archivo está
    en el bucket, pero este servidor no lo alcanza. Tiene que decirlo con todas
    sus letras, no devolver un archivo vacío que el usuario creerá corrupto. */

@@ -18,6 +18,7 @@ const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
+const almacen = require('../../../../shared/almacen-docs');
 
 const MODULO_ID = 420001;    // card "Seguimiento Fundantes" (ejecutivo) — 410001 era Certificados
 const MODULO_OPS = 420002;   // card "Seguimiento Fundantes - Operaciones" (módulo propio → card en Home)
@@ -91,6 +92,15 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
         UNIQUE KEY uk_doc (id_credito, codigo),
         INDEX idx_cred (id_credito)
       )`);
+    /* Dónde vive el archivo (shared/almacen-docs.js). Esta es la tabla más pesada
+       del sistema: 62 archivos ocupaban 63,9 MB, más que TODA la operación del
+       negocio junta. Con `doc_ruta` el PDF se va al bucket y la fila queda de
+       unos pocos bytes. `archivo_data` se conserva porque las filas viejas siguen
+       ahí hasta que el barrido las mueve, y porque sin bucket configurado (local,
+       staging, contingencia sin credenciales) se sigue guardando en la base. */
+    for (const ddl of almacen.sqlColumnas('fundantes_seg_docs')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes docs almacen]', e.message); }
+    }
     await pool.query(`
       CREATE TABLE IF NOT EXISTS fundantes_seg_tipos (
         id                INT AUTO_INCREMENT PRIMARY KEY,
@@ -353,12 +363,20 @@ const subirDoc = async (req, res) => {
     if (!tipo) return res.status(400).json({ success: false, data: null, error: 'Tipo de documento no válido para esta financiera' });
 
     const buffer = Buffer.from(archivo_data, 'base64');
+    /* Reemplazo: hay que quedarse con la ruta ANTERIOR antes de pisarla, o el
+       objeto viejo queda huérfano en el bucket para siempre. */
+    const [[previo]] = await pool.query('SELECT doc_ruta FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
+    const d = await almacen.colocar({ ambito: 'fundantes', clave: id, buffer, mime: mime_type, nombre: archivo_nombre || codigo });
     await pool.query(
-      `INSERT INTO fundantes_seg_docs (id_credito, codigo, archivo_nombre, mime_type, archivo_data, subido_por, id_subido_por)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO fundantes_seg_docs (id_credito, codigo, archivo_nombre, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por, id_subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE archivo_nombre=VALUES(archivo_nombre), mime_type=VALUES(mime_type),
-         archivo_data=VALUES(archivo_data), subido_por=VALUES(subido_por), id_subido_por=VALUES(id_subido_por), created_at=NOW()`,
-      [id, codigo, archivo_nombre || null, mime_type || null, buffer, nombreUsuario(req), req.usuario.id_usuario || null]);
+         archivo_data=VALUES(archivo_data), doc_storage=VALUES(doc_storage), doc_ruta=VALUES(doc_ruta), doc_bytes=VALUES(doc_bytes),
+         subido_por=VALUES(subido_por), id_subido_por=VALUES(id_subido_por), created_at=NOW()`,
+      [id, codigo, archivo_nombre || null, mime_type || null, d.blob, d.storage, d.ruta, d.bytes, nombreUsuario(req), req.usuario.id_usuario || null]);
+    /* Recién ahora, con la fila ya apuntando al archivo nuevo: si esto falla lo
+       peor que queda es un objeto de más, nunca un documento inaccesible. */
+    if (previo && previo.doc_ruta && previo.doc_ruta !== d.ruta) await almacen.borrar(previo.doc_ruta);
     res.json({ success: true, data: { id_credito: id, codigo }, error: null });
   } catch (e) {
     console.error('[fundantes-seguimiento subirDoc]', e.message);
@@ -372,7 +390,12 @@ const eliminarDoc = async (req, res) => {
     const id = Number(req.params.id), codigo = String(req.params.codigo || '');
     if (!id || !codigo) return res.status(400).json({ success: false, data: null, error: 'id y codigo requeridos' });
     if (!(await puedeOperar(req, id))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso sobre esta operación' });
+    const [[doc]] = await pool.query('SELECT doc_ruta FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
     await pool.query('DELETE FROM fundantes_seg_docs WHERE id_credito=? AND codigo=?', [id, codigo]);
+    /* La fila manda: borrada la fila el documento ya no existe para el sistema.
+       El objeto se limpia después y sin bloquear —y el bucket tiene versionado,
+       así que un borrado por error todavía se puede revertir. */
+    if (doc && doc.doc_ruta) await almacen.borrar(doc.doc_ruta);
     res.json({ success: true, data: { id_credito: id, codigo }, error: null });
   } catch (e) {
     console.error('[fundantes-seguimiento eliminarDoc]', e.message);
@@ -383,11 +406,9 @@ const eliminarDoc = async (req, res) => {
 /* ─── GET /api/fundantes-seguimiento/doc/:docId/download ──────────────────── */
 const descargar = async (req, res) => {
   try {
-    const [[row]] = await pool.query('SELECT archivo_nombre, mime_type, archivo_data FROM fundantes_seg_docs WHERE id=?', [req.params.docId]);
-    if (!row || !row.archivo_data) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
-    res.set('Content-Type', row.mime_type || 'application/octet-stream');
-    res.set('Content-Disposition', `inline; filename="${String(row.archivo_nombre || 'fundante').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_')}"`);
-    res.send(row.archivo_data);
+    const [[row]] = await pool.query('SELECT archivo_nombre, mime_type, archivo_data, doc_ruta FROM fundantes_seg_docs WHERE id=?', [req.params.docId]);
+    if (!row) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    await almacen.servir(res, { ruta: row.doc_ruta, blob: row.archivo_data, nombre: row.archivo_nombre || 'fundante', mime: row.mime_type });
   } catch (e) {
     console.error('[fundantes-seguimiento descargar]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -746,14 +767,16 @@ const descargarZip = async (req, res) => {
     const id = Number(req.params.id);
     const [[op]] = await pool.query('SELECT num_op, financiera, id_financiera FROM creditos WHERE id=?', [id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
-    const [docs] = await pool.query('SELECT codigo, archivo_nombre, mime_type, archivo_data FROM fundantes_seg_docs WHERE id_credito=? AND archivo_data IS NOT NULL', [id]);
+    const [docs] = await pool.query('SELECT codigo, archivo_nombre, mime_type, archivo_data, doc_ruta FROM fundantes_seg_docs WHERE id_credito=? AND (archivo_data IS NOT NULL OR doc_ruta IS NOT NULL)', [id]);
     if (!docs.length) return res.status(404).json({ success: false, data: null, error: 'No hay documentos para descargar' });
     const idf = op.id_financiera || op.num_op || id;
     const carpeta = sanitizeFn(`Fundantes ${op.financiera || ''} ID${idf}`);
-    const files = docs.map(d => ({
+    /* En paralelo: una carpeta típica trae media docena de archivos y traerlos
+       del bucket de a uno sumaría una vuelta de red por documento. */
+    const files = await Promise.all(docs.map(async d => ({
       name: `${carpeta}/${sanitizeFn((DOC_LABEL[d.codigo] || d.codigo) + ' ID' + idf)}${extDe(d.archivo_nombre, d.mime_type)}`,
-      buf: d.archivo_data,
-    }));
+      buf: await almacen.obtener({ ruta: d.doc_ruta, blob: d.archivo_data }),
+    })));
     const zip = zipStore(files);
     res.set('Content-Type', 'application/zip');
     res.set('Content-Disposition', `attachment; filename="${carpeta}.zip"`);
@@ -805,7 +828,7 @@ const resumen = async (req, res) => {
 const listarDocs = async (req, res) => {
   try {
     const [docs] = await pool.query(
-      'SELECT id, codigo, archivo_nombre, mime_type, DATE_FORMAT(created_at,"%Y-%m-%d %H:%i") subido, subido_por FROM fundantes_seg_docs WHERE id_credito=? AND archivo_data IS NOT NULL ORDER BY codigo',
+      'SELECT id, codigo, archivo_nombre, mime_type, DATE_FORMAT(created_at,"%Y-%m-%d %H:%i") subido, subido_por FROM fundantes_seg_docs WHERE id_credito=? AND (archivo_data IS NOT NULL OR doc_ruta IS NOT NULL) ORDER BY codigo',
       [Number(req.params.id)]);
     res.json({ success: true, data: docs, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno' }); }

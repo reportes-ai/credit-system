@@ -140,14 +140,20 @@ async function colocar({ ambito, clave, buffer, mime, nombre }) {
  * Devuelve el contenido de un documento, esté donde esté.
  * `fila` es la fila tal como salió del SELECT: se le pasa la ruta y el blob.
  */
+/* EL BLOB MANDA CUANDO ESTÁ. Durante la migración un documento existe en los dos
+   lados: mientras el blob siga ahí se lee de la base, sin red y sin credenciales.
+   Eso elimina una trampa de orden que si no sería fácil de pisar — marcar filas
+   como migradas en un servidor que todavía no alcanza el bucket dejaría esos
+   documentos inaccesibles. Recién cuando el blob se suelta (paso deliberado y
+   aparte) el bucket pasa a ser la única fuente. */
 async function obtener({ ruta, blob }) {
+  if (blob) return Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
   if (ruta) {
     const b = bucket();
     if (!b) throw new Error(`El documento vive en el bucket "${BUCKET || '(sin definir)'}" y este servidor no tiene acceso (${_motivo}).`);
     const [buf] = await b.file(ruta).download();
     return buf;
   }
-  if (blob) return Buffer.isBuffer(blob) ? blob : Buffer.from(blob);
   return null;
 }
 
