@@ -52,13 +52,15 @@ steps:
     entrypoint: bash
     args:
       - -c
+      # OJO con los `$$`: Cloud Build se come los `$` simples creyendo que son
+      # sustituciones suyas. Las variables de bash van SIEMPRE con doble signo.
       - |
-        URL=$(gcloud run services describe afbs-standby --region=us-east4 --format='value(status.url)')
-        echo "Verificando $URL/api/health"
-        R=$(curl -s --max-time 120 "$URL/api/health")
-        echo "$R"
-        echo "$R" | grep -q '"db":true'   || { echo "✗ el standby no llega a la base"; exit 1; }
-        echo "$R" | grep -q '"standby":true' || { echo "✗ el standby quedó con los motores ENCENDIDOS"; exit 1; }
+        URL=$$(gcloud run services describe afbs-standby --region=us-east4 --format='value(status.url)')
+        echo "Verificando $${URL}/api/health"
+        R=$$(curl -s --max-time 120 "$${URL}/api/health")
+        echo "$${R}"
+        echo "$${R}" | grep -q '"db":true'      || { echo "✗ el standby no llega a la base"; exit 1; }
+        echo "$${R}" | grep -q '"standby":true' || { echo "✗ el standby quedó con los motores ENCENDIDOS"; exit 1; }
         echo "✓ standby sano y con los motores apagados"
 
 images:
