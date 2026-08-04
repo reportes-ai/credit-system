@@ -308,6 +308,9 @@ no con Docker). Pendiente: ensayarlo una vez de verdad y cronometrar cuánto tom
 
 ## 11-bis. Promover el host alternativo (Google Cloud Run)
 
+> **Manual completo: `docs/CONTINGENCIA-cloud-run.md`** — cómo funciona, qué NO cubre,
+> cómo se reconstruye solo, y las mediciones reales. Acá va solo lo que se hace en la emergencia.
+
 > **Cuándo usar esto**: Render lleva horas caído y el punto 11 no lo levantó. Si la caída es
 > de minutos, espera — promover y volver atrás cuesta más que esperar.
 
@@ -316,9 +319,11 @@ no con Docker). Pendiente: ensayarlo una vez de verdad y cronometrar cuánto tom
 | | |
 |---|---|
 | Servicio | `afbs-standby` · proyecto `autofacil-bs` · región `us-east4` (Virginia, al lado de TiDB) |
-| **🔑 URL** | **`https://afbs-standby-821999538473.us-east4.run.app`** |
+| **🔑 URL** | **`https://afbs2.autofacilchile.cl`** · directa: `afbs-standby-821999538473.us-east4.run.app` |
 | Panel | `console.cloud.google.com/run/detail/us-east4/afbs-standby` |
 | Estado normal | **dormido**: escala a cero, `MOTORES=off`, apunta a la base de PRODUCCIÓN |
+| Se actualiza | **solo, todos los días a las 05:00** (Cloud Scheduler → Cloud Build) |
+| Aviso visual | mientras duerme muestra una **cinta naranja** de CONTINGENCIA; al promoverlo desaparece sola |
 | Costo dormido | ~US$1/mes · promovido ~US$27/mes, prorrateado por hora |
 | Credenciales | Secret Manager: `afbs-db-user`, `afbs-db-password`, `afbs-jwt-secret`, `afbs-mail-user`, `afbs-mail-pass` |
 
@@ -329,7 +334,7 @@ sesiones abiertas siguen valiendo**: nadie tiene que volver a entrar.
 ### Paso 1 — Comprobar que responde (10 segundos)
 
 ```bash
-curl https://afbs-standby-821999538473.us-east4.run.app/api/health
+curl https://afbs2.autofacilchile.cl/api/health
 ```
 
 Debe decir `"db":true` y `"entorno":"produccion"`. Si estaba dormido, la primera petición
@@ -346,7 +351,7 @@ gcloud run services update afbs-standby --region us-east4 \
 Eso enciende los 27 motores automáticos y lo deja permanentemente despierto. Verifica:
 
 ```bash
-curl https://afbs-standby-821999538473.us-east4.run.app/api/health
+curl https://afbs2.autofacilchile.cl/api/health
 ```
 
 `"motores_apagados"` debe venir **vacío**: `[]`.

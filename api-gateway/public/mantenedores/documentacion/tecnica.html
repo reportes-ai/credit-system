@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
+<!-- v4.8 — host de contingencia en Cloud Run (afbs2), interruptor MOTORES=off y reconstruccion diaria. v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -144,9 +144,31 @@
   <p style="font-size:.9rem;color:#475569">La explicación en lenguaje de negocio de <b>cada servicio</b> (qué hace y qué pasa si se cae) y su <b>costo mensual</b> viven en un solo lugar: <b>Mantenedores → Salud y Uptime</b> (tabla <code>servicios_costos</code>, columnas <code>que_hace</code> / <code>si_falla</code> refrescadas desde el código en cada arranque, más el costo editable y auditado). Ahí mismo está el uptime histórico de cada uno, así que la evidencia para la casa matriz sale de una sola pantalla. <b>Servicio nuevo contratado = fila nueva ahí, con su explicación, en el mismo commit.</b></p>
   <table>
     <tr><th>Concepto</th><th>Detalle</th></tr>
-    <tr><td>Separación app / datos</td><td><b>Render</b> corre la aplicación (arriendo de una porción de servidor); <b>TiDB Cloud</b> guarda los datos. Son proveedores distintos que fallan por separado — por eso la card los mide por separado. Si Render cae, el sistema queda fuera de línea <b>sin perder datos</b>; ese es el pendiente "host alternativo" del runbook.</td></tr>
+    <tr><td>Separación app / datos</td><td><b>Render</b> corre la aplicación (arriendo de una porción de servidor); <b>TiDB Cloud</b> guarda los datos. Son proveedores distintos que fallan por separado — por eso la card los mide por separado. Si Render cae, el sistema queda fuera de línea <b>sin perder datos</b>. Desde el <b>04-08-2026 ese hueco está cerrado</b>: existe un <b>host de contingencia en Google Cloud Run</b> (<code>afbs2.autofacilchile.cl</code>) que toma el control con un comando — ver la fila de abajo.</td></tr>
     <tr><td><b>Región: app y BD juntas (2026-07-30)</b></td><td>Render y TiDB están ambos en <b>Virginia (us-east-1)</b>, <b>a propósito</b>. Antes Render estaba en Oregon (us-west) y cada consulta cruzaba EE.UU.: el monitor de uptime medía <b>74 ms</b> de ida y vuelta a la BD contra <b>3,9 ms</b> que TiDB declaraba de ejecución — el 95% era red. Tras mover la app a Virginia bajó a <b>4 ms</b> (medición del mismo monitor, columna <code>ms</code> de <code>uptime_checks</code> con <code>codigo='bd'</code>). Impacto: una pantalla que encadena 15 consultas pasó de ~1,1 s de espera de red a ~60 ms. <b>Si algún día se recrea el servicio, debe quedar en la misma región que TiDB.</b> Render no permite cambiar la región de un servicio existente: hay que crear uno nuevo y mover los dominios.</td></tr>
     <tr><td>Cómo se movió (receta probada)</td><td>Sin caída ni pérdida de datos, porque <b>Render no guarda estado</b>: (1) servicio nuevo desde el mismo repo/rama, con Start Command propio <code>node --max-old-space-size=1536 …</code> (el valor va calibrado al tamaño de la instancia: 400 era para los 512 MB del Starter y anulaba el beneficio de subir a 2 GB); (2) copiar las env vars; (3) cambiar los CNAME en Wix <b>antes</b> del corte — no interrumpe, porque Render enruta por el <i>Host</i> del dominio y no por el CNAME; (4) quitar cada dominio del servicio viejo y agregarlo al nuevo (Render bloquea el mismo dominio en dos servicios), de a uno y empezando por el menos crítico; (5) suspender el viejo. <b>Ojo</b>: los subdominios eran <b>tres</b> — <code>afbs</code>, <code>dealers</code> y <code>clientes</code> (este último aparece en los WhatsApp de cobranza). Revisar SIEMPRE la lista completa de registros DNS, no la de memoria. El DNS lo administra <b>Wix</b> (NIC Chile solo delega a ns4/ns5.wixdns.net).</td></tr>
+    <tr><td><b>🛟 Host de contingencia (Cloud Run) — 04-08-2026</b></td><td>
+      Segundo servidor listo para tomar el control si Render cae por horas. <b>Servicio <code>afbs-standby</code></b>
+      (proyecto <code>autofacil-bs</code>, región <b>us-east4</b>, la misma zona que TiDB), accesible en
+      <b><code>https://afbs2.autofacilchile.cl</code></b>. Usa la <b>MISMA base de producción</b>: no tiene datos propios,
+      así que reemplazar a Render no exige migrar ni sincronizar nada.<br>
+      <b>Duerme con <code>MOTORES=off</code></b>: atiende peticiones pero <b>no ejecuta ninguno de los 27 motores
+      automáticos</b>. Esa es la pieza que hace posible tenerlo desplegado y probado — si los dos hosts corrieran los
+      motores contra la misma base, cada reloj dispararía dos veces y el daño sería silencioso (una comisión aprobada
+      dos veces no se queja). Mientras duerme muestra una <b>cinta naranja de CONTINGENCIA</b> que desaparece sola al
+      promoverlo, porque se engancha al mismo interruptor.<br>
+      <b>Promoción</b>: <code>gcloud run services update afbs-standby --region us-east4 --remove-env-vars MOTORES
+      --min-instances 1 --no-cpu-throttling --memory 2Gi</code>. <b>Al volver, PRIMERO se apagan los motores del
+      standby y recién después se levanta Render</b> — el orden no es negociable.<br>
+      <b>Medido</b>: arranque en frío <b>5 s</b>, respuesta caliente 0,2 s. <b>Costo</b>: US$1/mes dormido,
+      US$27/mes prorrateado solo mientras esté promovido (2 días de caída ≈ US$2).<br>
+      <b>Se reconstruye solo todos los días a las 05:00</b> (Cloud Scheduler → Cloud Build → construye, despliega y
+      <b>verifica</b> que siga siendo standby; si quedara con motores encendidos, la compilación falla). Sin eso la
+      imagen envejecería y el día de la emergencia levantaría una versión vieja contra una base que ya avanzó.<br>
+      <b>Lo que NO cubre</b>: tiene las 16 variables del núcleo pero no las de integraciones — funcionan créditos,
+      clientes, cartas, cobranza, contabilidad, comisiones, post venta, portales y el correo saliente; <b>no</b>
+      funcionan indicadores CMF, IA, WhatsApp, DealerNet ni SII. Degradación deliberada y aceptable para horas.<br>
+      <b>📘 Manual completo: <code>docs/CONTINGENCIA-cloud-run.md</code></b> · emergencia: <code>docs/RUNBOOK-contingencia-bd.md</code> §11-bis.</td></tr>
     <tr><td>Costo real ≠ precio del plan</td><td>Render se factura con excesos sobre lo incluido (bandwidth y dominios adicionales), así que el gasto efectivo supera el precio de lista de la instancia. El monto que se carga en la card debe ser el de <b>Billing → Unbilled Charges</b>, no el del plan.</td></tr>
     <tr><td>Costos variables</td><td><b>Claude/IA</b> se calcula EN VIVO desde <code>ia_uso</code> (no se digita). <b>Meta WhatsApp</b> cobra por conversación y <b>DealerNet</b> por consulta: son variables y su nota lo declara.</td></tr>
     <tr><td>Instancia de Render</td><td>El cuello es la <b>memoria</b>, no la CPU: el check "Memoria del servidor" del informe de Salud alerta al 70%. Ese check es el disparador objetivo para subir de instancia.</td></tr>

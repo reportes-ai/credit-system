@@ -164,6 +164,26 @@ Reglas de diseño que se derivan de este principio:
   resultado en `ctb_eventos_log` (CONTABILIZADO / SIN_REGLA / DESCUADRE / ERROR).
   Ese log es la lista de pendientes: si algo aparece SIN_REGLA, falta cablearlo.
 
+## Motores automáticos: un solo interruptor (`shared/scheduler.js`)
+> **Toda tarea de fondo se registra con `programar()`, nunca con un `setInterval` suelto.**
+
+Hay **27 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
+vencidos, cierran castigos, generan devengos de vacaciones, escalan tickets y workflows, mandan
+correos programados y cobranza.
+
+- **`programar(nombre, fn, ms, opts)`** decide en UN solo lugar si corre o no, y lo deja en el
+  log y en `/api/health` (`motores_apagados`). Un `setInterval` suelto es invisible y no se
+  puede apagar.
+- **`ENTORNO=staging`** apaga los que salen al mundo. **`MOTORES=off`** apaga TODOS los de
+  negocio — es lo que permite tener un host de contingencia desplegado sin que duplique el
+  trabajo del principal. `opts.infra: true` marca lo que no toca datos y corre siempre.
+- **Por qué importa tanto**: dos procesos ejecutando los mismos relojes contra la misma base
+  disparan cada tarea dos veces, y **el daño es silencioso** — una comisión aprobada dos veces
+  no se queja, un devengo duplicado tampoco.
+- `opts.arranqueFn` existe porque varias tareas hacen algo distinto al arrancar que en cada
+  vuelta (`indicadores-sync` se pone al día con `force`). Migrar una sin eso le cambia la
+  conducta en silencio.
+
 ## Regla de Breadcrumbs (NO negociable — auditado 2026-07-29)
 1. **Toda página visible tiene miga completa**: `Inicio › [Sección] › Título`, con links
    en todos los niveles menos el último. Páginas nuevas usan el componente
@@ -329,17 +349,28 @@ Reglas de diseño que se derivan de este principio:
   - Evaluar que viva en **Contabilidad / Órdenes de Pago** como gasto recurrente real y no
     solo como documento (Máxima 2: una sola fuente de datos).
 
-- [ ] 🔥 **Plan de contingencia si Render cae por horas** (detectado 2026-07-27 al armar el runbook)
-  - **Es el único hueco declarado del `docs/RUNBOOK-contingencia-bd.md`**: hoy NO existe host
-    alternativo configurado ni ensayado. Si Render tiene una caída larga, el sistema queda
-    fuera de servicio y no hay a dónde moverlo.
-  - Contexto: la BD ya tiene contingencia probada (Google Cloud SQL) y los datos nunca están
-    en riesgo (viven en TiDB, no en Render) — lo que falta es **dónde correr la aplicación**.
-  - Qué habría que hacer: elegir un host secundario (Railway / Fly.io / VM), documentar las
-    env vars necesarias, y **ensayar un despliegue real al menos una vez** (un plan no probado
-    no es un plan — lo aprendimos con el gotcha de las FK, que solo apareció al restaurar de verdad).
-  - Decisión alternativa válida: aceptar formalmente el riesgo y definir cuánto tiempo fuera
-    de servicio es tolerable. Lo que no sirve es dejarlo sin decidir.
+- [x] ✅ **Plan de contingencia si Render cae por horas** (2026-08-04: **CERRADO Y ENSAYADO**)
+  - Host alternativo en **Google Cloud Run**: servicio `afbs-standby`, región `us-east4`,
+    accesible en **`afbs2.autofacilchile.cl`**. Usa la MISMA base de producción, así que
+    reemplazar a Render no exige migrar nada.
+  - Duerme con **`MOTORES=off`**: atiende peticiones pero no ejecuta ninguno de los 27 motores
+    automáticos. Sin ese interruptor no se podía tener un standby desplegado — dos procesos
+    contra la misma base disparan cada reloj dos veces, en silencio.
+  - **Arranque en frío 5 s** (medido). **US$1/mes** dormido, US$27 prorrateado solo mientras
+    esté promovido. Se **reconstruye solo todos los días a las 05:00**.
+  - Promoción con un comando; el orden de vuelta (primero apagar los motores del standby) está
+    en el runbook. **Ensayado el 04-08-2026** contra la base de staging.
+  - 📘 `docs/CONTINGENCIA-cloud-run.md` · emergencia: `docs/RUNBOOK-contingencia-bd.md` §11-bis.
+
+- [ ] **Cargar las claves de integración en el host de contingencia** (queda del punto anterior)
+  - Hoy el standby tiene las 16 variables del núcleo pero no `CMF_API_KEY`, `ANTHROPIC_API_KEY`,
+    `WSP_*`, `DEALERNET_*`, `GOOGLE_*`, `FINTOC_*`, `SII_*`, `SIMPLEAPI_KEY` ni `WORKERA_*`.
+    Promovido funciona toda la operación del negocio; no funcionan indicadores, IA, WhatsApp,
+    DealerNet ni SII. Degradación deliberada — cerrarla es cargar esos secretos (§6 del manual).
+
+- [ ] 🔴 **Activar la verificación en dos pasos de Google antes del 20-10-2026**
+  - Google bloqueará el acceso a la consola sin MFA. **Sin consola no se puede promover la
+    contingencia**, así que esto protege todo lo anterior.
 
 ### 🟢 Mejora de calidad (profesionalismo)
 
