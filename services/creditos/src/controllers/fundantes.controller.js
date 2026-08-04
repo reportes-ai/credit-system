@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 
 /* ─── Migración ─────────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('fundantes', async () => {
@@ -30,6 +31,10 @@ require('../../../../shared/migrate').enFila('fundantes', async () => {
     // Homologación: operacion_id → id_credito
     const [[fc]] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='fundantes_brokerage' AND column_name='operacion_id'`);
     if (fc.c > 0) await pool.query(`ALTER TABLE fundantes_brokerage CHANGE COLUMN operacion_id id_credito INT NOT NULL`);
+    // Los archivos van al bucket, no a la base (shared/almacen-docs.js).
+    for (const ddl of almacen.sqlColumnas('fundantes_brokerage')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes-brokerage almacen]', e.message); }
+    }
     console.log('✓ fundantes_brokerage: tabla lista');
   } catch (e) {
     console.error('[fundantes migration]', e.message);
@@ -84,14 +89,19 @@ const upload = async (req, res) => {
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     const buffer = archivo_data ? Buffer.from(archivo_data, 'base64') : null;
+    // Sin archivo la fila igual se crea (el documento puede subirse después),
+    // por eso el almacén solo entra en juego cuando hay bytes.
+    const d = buffer
+      ? await almacen.colocar({ ambito: 'fundantes-brokerage', clave: operacion_id, buffer, mime: mime_type, nombre: archivo_nombre || nombre_documento })
+      : { storage: 'db', ruta: null, blob: null, bytes: null };
     const [r] = await pool.query(
       `INSERT INTO fundantes_brokerage
-        (id_credito, nombre_documento, tipo, archivo_nombre, mime_type, archivo_data,
+        (id_credito, nombre_documento, tipo, archivo_nombre, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes,
          subido_por, id_subido_por, estado)
-       VALUES (?,?,?,?,?,?,?,?,'PENDIENTE')`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,'PENDIENTE')`,
       [
         operacion_id, nombre_documento, tipo || 'DOCUMENTO',
-        archivo_nombre || null, mime_type || null, buffer || null,
+        archivo_nombre || null, mime_type || null, d.blob, d.storage, d.ruta, d.bytes,
         req.usuario?.nombre ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null,
         req.usuario?.id_usuario || null
       ]
@@ -171,9 +181,10 @@ async function _recalcEstadoFundantes(operacion_id) {
 /* ─── DELETE /api/fundantes/:id ─────────────────────────────────────── */
 const remove = async (req, res) => {
   try {
-    const [[exists]] = await pool.query('SELECT id_credito AS operacion_id FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
+    const [[exists]] = await pool.query('SELECT id_credito AS operacion_id, doc_ruta FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
     if (!exists) return res.status(404).json({ success: false, data: null, error: 'No encontrado' });
     await pool.query('DELETE FROM fundantes_brokerage WHERE id = ?', [req.params.id]);
+    if (exists.doc_ruta) await almacen.borrar(exists.doc_ruta);
     await _recalcEstadoFundantes(exists.operacion_id);
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {

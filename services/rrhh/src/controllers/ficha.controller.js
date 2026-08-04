@@ -11,6 +11,7 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
@@ -61,6 +62,13 @@ require('../../../../shared/migrate').enFila('rrhh-ficha', async () => {
       )`);
     // Tipos de documento paramétricos (mantenedor rh_config)
     await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES ('doc_tipos', 'CONTRATO,ANEXO,CERTIFICADO,AMONESTACION,TITULO,OTRO')`);
+    /* Los documentos del colaborador van al bucket (shared/almacen-docs.js). El
+       blob nació NOT NULL, así que hay que dejarlo vaciarse: si no, una fila
+       cuyo archivo vive en el bucket no podría soltar sus bytes. */
+    for (const ddl of [
+      ...almacen.sqlColumnas('rh_documentos'),
+      'ALTER TABLE rh_documentos MODIFY COLUMN archivo_data LONGBLOB NULL',
+    ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[rrhh docs almacen]', e.message); } }
 
     // ── Promover Recursos Humanos a MÓDULO propio del Home (antes vivía en Soporte) ──
     const [[mod]] = await pool.query('SELECT id_modulo, estado FROM modulos WHERE id_modulo=500002');
@@ -350,9 +358,10 @@ const subirDoc = async (req, res) => {
     if (!tipos.includes(String(tipo).toUpperCase())) return fail(res, 'Tipo de documento no válido', 400);
     const buffer = Buffer.from(archivo_data, 'base64');
     if (buffer.length > 15 * 1024 * 1024) return fail(res, 'Archivo supera 15 MB', 400);
+    const d = await almacen.colocar({ ambito: 'rrhh-documentos', clave: objetivo, buffer, mime: mime_type, nombre: archivo_nombre || 'documento' });
     const [r] = await pool.query(
-      'INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, subido_por) VALUES (?,?,?,?,?,?)',
-      [objetivo, String(tipo).toUpperCase(), String(archivo_nombre || 'documento').slice(0, 255), mime_type || null, buffer, nombreDe(u)]);
+      'INSERT INTO rh_documentos (id_usuario, tipo, nombre_archivo, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, subido_por) VALUES (?,?,?,?,?,?,?,?,?)',
+      [objetivo, String(tipo).toUpperCase(), String(archivo_nombre || 'documento').slice(0, 255), mime_type || null, d.blob, d.storage, d.ruta, d.bytes, nombreDe(u)]);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'documento', entidad_id: r.insertId,
       detalle: `Subió ${tipo} "${archivo_nombre}" a la carpeta del colaborador #${objetivo}` });
     ok(res, { id: r.insertId });
@@ -369,7 +378,7 @@ const descargarDoc = async (req, res) => {
       return fail(res, 'Sin permiso sobre este documento', 403);
     res.setHeader('Content-Type', d.mime_type || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(d.nombre_archivo)}"`);
-    res.send(d.archivo_data);
+    res.send(await almacen.obtener({ ruta: d.doc_ruta, blob: d.archivo_data }));
   } catch (e) { console.error('[rrhh descargarDoc]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -378,9 +387,10 @@ const eliminarDoc = async (req, res) => {
   try {
     const u = req.usuario || {};
     if (!(await esRRHH(u.id_usuario))) return fail(res, 'Solo RRHH elimina documentos', 403);
-    const [[d]] = await pool.query('SELECT id, id_usuario, tipo, nombre_archivo FROM rh_documentos WHERE id=?', [req.params.docId]);
+    const [[d]] = await pool.query('SELECT id, id_usuario, tipo, nombre_archivo, doc_ruta FROM rh_documentos WHERE id=?', [req.params.docId]);
     if (!d) return fail(res, 'Documento no encontrado', 404);
     await pool.query('DELETE FROM rh_documentos WHERE id=?', [d.id]);
+    if (d.doc_ruta) await almacen.borrar(d.doc_ruta);
     auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'documento', entidad_id: d.id,
       detalle: `Eliminó ${d.tipo} "${d.nombre_archivo}" del colaborador #${d.id_usuario}` });
     ok(res, { ok: true });

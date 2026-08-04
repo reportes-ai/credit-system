@@ -1,5 +1,6 @@
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 
 /* ─── Migraciones ────────────────────────────────────────────────────── */
 require('../../../../shared/migrate').enFila('brokerage', async () => {
@@ -56,6 +57,10 @@ require('../../../../shared/migrate').enFila('brokerage', async () => {
     `);
     const [[pa]] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='pagos_brokerage' AND column_name='operacion_id'`);
     if (pa.c > 0) await pool.query(`ALTER TABLE pagos_brokerage CHANGE COLUMN operacion_id id_credito INT NOT NULL`);
+    // El PDF de la factura va al bucket, no a la base (shared/almacen-docs.js).
+    for (const ddl of almacen.sqlColumnas('facturas_brokerage')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[facturas-brokerage almacen]', e.message); }
+    }
     console.log('✓ pagos_brokerage: tabla lista');
   } catch (e) {
     console.error('[pagos_brokerage migration]', e.message);
@@ -150,15 +155,19 @@ const createFactura = async (req, res) => {
 
     const buffer = archivo_data ? Buffer.from(archivo_data, 'base64') : null;
     const regPor = req.usuario ? `${req.usuario.nombre} ${req.usuario.apellido || ''}`.trim() : null;
+    // La factura puede registrarse sin PDF adjunto: el almacén solo entra si hay bytes.
+    const d = buffer
+      ? await almacen.colocar({ ambito: 'brokerage-facturas', clave: operacion_id, buffer, mime: mime_type, nombre: archivo_nombre || `factura-${numero_factura || ''}` })
+      : { storage: 'db', ruta: null, blob: null, bytes: null };
 
     const [r] = await pool.query(
       `INSERT INTO facturas_brokerage
         (id_credito, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura,
-         archivo_nombre, mime_type, archivo_data, observaciones, estado, registrado_por, id_registrado_por)
-       VALUES (?,?,?,?,?,?,?,?,?,'RECIBIDA',?,?,?)`,
+         archivo_nombre, mime_type, archivo_data, doc_storage, doc_ruta, doc_bytes, observaciones, estado, registrado_por, id_registrado_por)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'RECIBIDA',?,?)`,
       [operacion_id, numero_factura || null, rut_emisor || null, nombre_emisor || null,
        monto || null, fecha_factura || null, archivo_nombre || null, mime_type || null,
-       buffer, observaciones || null, regPor, req.usuario?.id_usuario || null]
+       d.blob, d.storage, d.ruta, d.bytes, observaciones || null, regPor, req.usuario?.id_usuario || null]
     );
     const [[row]] = await pool.query(
       'SELECT id, id_credito AS operacion_id, numero_factura, rut_emisor, nombre_emisor, monto, fecha_factura, estado, registrado_por, created_at FROM facturas_brokerage WHERE id = ?',
@@ -191,7 +200,9 @@ const downloadFactura = async (req, res) => {
 /* ─── DELETE /api/brokerage/facturas/:id ─────────────────────────── */
 const deleteFactura = async (req, res) => {
   try {
+    const [[fac]] = await pool.query('SELECT doc_ruta FROM facturas_brokerage WHERE id = ?', [req.params.id]);
     await pool.query('DELETE FROM facturas_brokerage WHERE id = ?', [req.params.id]);
+    if (fac && fac.doc_ruta) await almacen.borrar(fac.doc_ruta);
     auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'factura_brokerage', entidad_id: req.params.id, detalle: `Eliminó factura brokerage #${req.params.id}` });
     res.json({ success: true, data: { eliminado: req.params.id }, error: null });
   } catch (e) {

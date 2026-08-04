@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const almacen = require('../../../../shared/almacen-docs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -48,6 +49,12 @@ require('../../../../shared/migrate').enFila('informes-dealernet', async () => {
        `pdf_path` se conserva para no perder la referencia histórica. */
     await pool.query(`ALTER TABLE informes_dealernet ADD COLUMN pdf_data LONGBLOB NULL`)
       .catch(() => {});   // ya existe
+    /* Segundo paso del mismo razonamiento: si el disco no sirve porque es del
+       servidor, la base tampoco es el lugar de un PDF. Los informes nuevos van
+       al bucket (shared/almacen-docs.js), que sí alcanzan los dos hosts. */
+    for (const ddl of almacen.sqlColumnas('informes_dealernet')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[dealernet almacen]', e.message); }
+    }
 
     /* Traslado de los informes que ya existían: se leen del disco y se suben a la
        base. Tiene que correr DENTRO de Render, que es donde vive ese disco — por
@@ -337,14 +344,23 @@ const uploadInforme = [
       const normalizeRut = r => (r || '').replace(/\./g, '').trim().toUpperCase();
       const rut = normalizeRut(req.body.rut || parsed.rut) || 'SIN_RUT';
 
+      /* El PDF va al bucket (shared/almacen-docs.js). Si la lectura del archivo
+         fallara se guarda igual la ficha con el resto de los datos: perder el
+         adjunto es malo, perder el informe entero es peor. */
+      let bufPdf = null;
+      try { bufPdf = fs.readFileSync(req.file.path); } catch (_) {}
+      const doc = bufPdf
+        ? await almacen.colocar({ ambito: 'dealernet', clave: rut, buffer: bufPdf, mime: 'application/pdf', nombre: req.file.filename })
+        : { storage: 'db', ruta: null, blob: null, bytes: null };
+
       const [result] = await pool.query(`
         INSERT INTO informes_dealernet
           (rut, nombre_completo, apellido_paterno, apellido_materno, nombres,
            fecha_nacimiento, edad, ocupacion, estado_civil, perfil_socioeconomico,
            hijos, deuda_total_mk, impagos_vigentes, direccion_principal,
            telefonos, emails, fecha_informe, pdf_filename, pdf_path, pdf_data,
-           datos_extraidos, usuario_carga)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+           doc_storage, doc_ruta, doc_bytes, datos_extraidos, usuario_carga)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `, [
         rut,
         parsed.nombre_completo  || req.body.nombre || null,
@@ -365,10 +381,7 @@ const uploadInforme = [
         parsed.fecha_informe    || null,
         req.file.filename,
         req.file.path,
-        // El archivo entra a la base. Si la lectura fallara, se guarda igual la
-        // ficha con el resto de los datos: perder el adjunto es malo, perder el
-        // informe entero es peor.
-        (() => { try { return fs.readFileSync(req.file.path); } catch (_) { return null; } })(),
+        doc.blob, doc.storage, doc.ruta, doc.bytes,
         JSON.stringify(parsed),
         req.user?.nombre || 'sistema'
       ]);
@@ -417,11 +430,12 @@ const getPDF = async (req, res) => {
 
 const deleteInforme = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT pdf_path FROM informes_dealernet WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.query('SELECT pdf_path, doc_ruta FROM informes_dealernet WHERE id = ?', [req.params.id]);
     if (rows.length && rows[0].pdf_path && fs.existsSync(rows[0].pdf_path)) {
       try { fs.unlinkSync(rows[0].pdf_path); } catch(_) {}
     }
     await pool.query('DELETE FROM informes_dealernet WHERE id = ?', [req.params.id]);
+    if (rows.length && rows[0].doc_ruta) await almacen.borrar(rows[0].doc_ruta);
     res.json({ success: true, data: null, error: null });
   } catch(e) {
     res.status(500).json({ success: false, data: null, error: e.message });

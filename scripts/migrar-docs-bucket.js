@@ -41,6 +41,13 @@ const TABLAS = {
   credito:     { tabla: 'credito_documentos',    blob: 'archivo_data', nombre: 'archivo_nombre', mime: 'mime_type',  clave: 'id_credito',  ambito: 'creditos', pk: 'id_doc' },
   evaluacion:  { tabla: 'evaluacion_documentos', blob: 'archivo_data', nombre: 'archivo_nombre', mime: 'mime_type',  clave: 'rut_cliente', ambito: 'evaluacion' },
   dealernet:   { tabla: 'informes_dealernet',    blob: 'pdf_data',     nombre: 'pdf_filename',   mime: null,         clave: 'rut',         ambito: 'dealernet' },
+  /* Estas todavía no tenían ni un archivo cuando se hizo la migración, pero
+     están cableadas para que el primero que suban ya vaya al bucket. */
+  fundbrok:    { tabla: 'fundantes_brokerage',        blob: 'archivo_data', nombre: 'archivo_nombre', mime: 'mime_type', clave: 'id_credito', ambito: 'fundantes-brokerage' },
+  facbrok:     { tabla: 'facturas_brokerage',         blob: 'archivo_data', nombre: 'archivo_nombre', mime: 'mime_type', clave: 'id_credito', ambito: 'brokerage-facturas' },
+  rrhh:        { tabla: 'rh_documentos',              blob: 'archivo_data', nombre: 'nombre_archivo', mime: 'mime_type', clave: 'id_usuario', ambito: 'rrhh-documentos' },
+  liquidez:    { tabla: 'dealer_liquidez_documentos', blob: 'data',         nombre: 'nombre',         mime: 'mime',      clave: 'id_plan',    ambito: 'liquidez' },
+  atencion:    { tabla: 'ar_adjuntos',                blob: 'data',         nombre: 'nombre',         mime: 'mime',      clave: 'id_conversacion', ambito: 'atencion-remota' },
 };
 
 const MB = n => (Number(n || 0) / 1048576).toFixed(1) + ' MB';

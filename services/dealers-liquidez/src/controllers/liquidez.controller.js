@@ -6,6 +6,7 @@
    ──────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 const { liquidar } = require('../../../../shared/liquidez-core');
 
 /* ── Migración (idempotente, en fila) ──────────────────────────────────────── */
@@ -46,6 +47,10 @@ require('../../../../shared/migrate').enFila('liquidez', async () => {
         created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_plan (id_plan)
       )`);
+    // Contratos y pagarés van al bucket, no a la base (shared/almacen-docs.js).
+    for (const ddl of almacen.sqlColumnas('dealer_liquidez_documentos')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[liquidez docs almacen]', e.message); }
+    }
   } catch (e) { if (e.errno !== 1050) console.error('[dealer_liquidez_documentos migration]', e.message); }
 
   try {
@@ -213,9 +218,10 @@ const subirDocumento = async (req, res) => {
     const [[p]] = await pool.query('SELECT id FROM dealer_liquidez_planes WHERE id=?', [req.params.id]);
     if (!p) return res.status(404).json({ success: false, data: null, error: 'Plan no encontrado' });
     const buffer = Buffer.from(archivo_data, 'base64');
+    const d = await almacen.colocar({ ambito: 'liquidez', clave: req.params.id, buffer, mime: mime_type, nombre: archivo_nombre || (cat.toLowerCase() + '.pdf') });
     const [r] = await pool.query(
-      'INSERT INTO dealer_liquidez_documentos (id_plan, categoria, nombre, mime, data) VALUES (?,?,?,?,?)',
-      [req.params.id, cat, archivo_nombre || (cat.toLowerCase() + '.pdf'), mime_type || 'application/octet-stream', buffer]);
+      'INSERT INTO dealer_liquidez_documentos (id_plan, categoria, nombre, mime, data, doc_storage, doc_ruta, doc_bytes) VALUES (?,?,?,?,?,?,?,?)',
+      [req.params.id, cat, archivo_nombre || (cat.toLowerCase() + '.pdf'), mime_type || 'application/octet-stream', d.blob, d.storage, d.ruta, d.bytes]);
     auditar({ req, accion: 'EDITAR', modulo: 'dealers', entidad: 'dealer_liquidez_plan', entidad_id: req.params.id,
       detalle: `Subió documento ${cat} al Plan Liquidez #${req.params.id}` });
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
@@ -223,16 +229,18 @@ const subirDocumento = async (req, res) => {
 };
 const verDocumento = async (req, res) => {
   try {
-    const [[doc]] = await pool.query('SELECT nombre, mime, data FROM dealer_liquidez_documentos WHERE id=? AND id_plan=?', [req.params.docId, req.params.id]);
-    if (!doc || !doc.data) return res.status(404).send('No encontrado');
+    const [[doc]] = await pool.query('SELECT nombre, mime, data, doc_ruta FROM dealer_liquidez_documentos WHERE id=? AND id_plan=?', [req.params.docId, req.params.id]);
+    if (!doc || (!doc.data && !doc.doc_ruta)) return res.status(404).send('No encontrado');
     res.setHeader('Content-Type', doc.mime || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${doc.nombre || 'documento'}"`);
-    res.send(doc.data);
+    res.send(await almacen.obtener({ ruta: doc.doc_ruta, blob: doc.data }));
   } catch (e) { console.error('[liquidez verDocumento]', e.message); res.status(500).send('Error'); }
 };
 const eliminarDocumento = async (req, res) => {
   try {
+    const [[dv]] = await pool.query('SELECT doc_ruta FROM dealer_liquidez_documentos WHERE id=? AND id_plan=?', [req.params.docId, req.params.id]);
     await pool.query('DELETE FROM dealer_liquidez_documentos WHERE id=? AND id_plan=?', [req.params.docId, req.params.id]);
+    if (dv && dv.doc_ruta) await almacen.borrar(dv.doc_ruta);
     auditar({ req, accion: 'ELIMINAR', modulo: 'dealers', entidad: 'dealer_liquidez_plan', entidad_id: req.params.id,
       detalle: `Eliminó documento #${req.params.docId} del Plan Liquidez #${req.params.id}` });
     res.json({ success: true, data: { ok: true }, error: null });

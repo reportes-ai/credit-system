@@ -15,6 +15,7 @@ const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('../../../../shared/middleware/auth');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 const { notificar } = require('../../../notificaciones/src/controllers/notificaciones.controller');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
 const { clientIp } = require('../../../../shared/middleware/rate-limit');
@@ -102,6 +103,10 @@ require('../../../../shared/migrate').enFila('atencion', async () => {
       created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_conv (id_conversacion)
     )`);
+    // Los adjuntos del chat van al bucket, no a la base (shared/almacen-docs.js).
+    for (const ddl of almacen.sqlColumnas('ar_adjuntos')) {
+      try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[ar_adjuntos almacen]', e.message); }
+    }
 
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_adjuntos (
       id              INT AUTO_INCREMENT PRIMARY KEY,
@@ -684,10 +689,11 @@ const subirAdjunto = async (req, res) => {
     if (buf.length > 8 * 1024 * 1024) return res.status(413).json({ success: false, data: null, error: 'Máximo 8 MB por archivo' });
     const quien = req.esDealer ? 'DEALER' : 'EJECUTIVO';
     const quienId = req.esDealer ? req.auth.id_cuenta : req.auth.id_usuario;
+    const d = await almacen.colocar({ ambito: 'atencion-remota', clave: conv.id, buffer: buf, mime, nombre: nombre || 'documento' });
     const [r] = await pool.query(
-      `INSERT INTO ar_adjuntos (id_conversacion, nombre, mime, tamano, data, subido_por, subido_id)
-       VALUES (?,?,?,?,?,?,?)`,
-      [conv.id, nombre || 'documento', mime || 'application/octet-stream', buf.length, buf, quien, quienId]);
+      `INSERT INTO ar_adjuntos (id_conversacion, nombre, mime, tamano, data, doc_storage, doc_ruta, doc_bytes, subido_por, subido_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [conv.id, nombre || 'documento', mime || 'application/octet-stream', buf.length, d.blob, d.storage, d.ruta, d.bytes, quien, quienId]);
     const m = await persistMensaje({
       id_conversacion: conv.id, emisor: quien,
       id_usuario: req.esDealer ? null : req.auth.id_usuario,
@@ -709,7 +715,7 @@ const descargarAdjunto = async (req, res) => {
     }
     res.setHeader('Content-Type', a.mime || 'application/octet-stream');
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(a.nombre || 'documento')}"`);
-    res.send(a.data);
+    res.send(await almacen.obtener({ ruta: a.doc_ruta, blob: a.data }));
   } catch (e) { errSrv(res, e, 'descargarAdjunto'); }
 };
 

@@ -180,10 +180,13 @@ los documentos migrados dejan de existir.
 
 - **Soltar los blobs** — hasta que se corra `--soltar-blob` la base no baja de tamaño.
   Se hace cuando Render lleve días leyendo del bucket sin incidentes.
-- **Tablas chicas todavía no cableadas** (hoy bajo 1 MB cada una, pero crecen):
-  `fundantes_brokerage`, `facturas_brokerage`, documentos de RRHH (`ficha`, `firmas`),
-  Atención Remota, Liquidez de dealers e `informes_dealernet`. El script ya las
-  contempla; falta cablear sus controladores.
+- ~~Tablas chicas todavía no cableadas~~ ✅ **cerrado el 04-08-2026.** Al revisarlas una a
+  una resultó que **estaban todas vacías**: existían pero no tenían ni un archivo. Así que
+  no había nada que migrar, solo que cablear para que el primero que suban ya vaya al
+  bucket. Quedaron listas `fundantes_brokerage`, `facturas_brokerage`, `rh_documentos`,
+  `dealer_liquidez_documentos`, `ar_adjuntos` (Atención Remota) e `informes_dealernet`.
+  `rh_documentos` necesitó además un `MODIFY` porque su blob nació `NOT NULL` y una fila
+  cuyo archivo vive en el bucket tiene que poder soltar sus bytes.
 - **Lo que NO es documento y también pesa**: `dealernet_consultas.output_raw` (3,3 MB de
   respuestas crudas) y `op_correlativos.snapshot_json` (1,3 MB en 10.709 filas). Eso no
   va al bucket — se purga o se acota, que es otra decisión.
