@@ -260,6 +260,18 @@ probado**: qué hacer si Render cae por horas. La base ya tenía contingencia en
 | **Promovido** (durante la caída) | CPU siempre asignada, `min-instances=1`, sin `MOTORES` | **US$26,96/mes** |
 
 Tener la contingencia lista cuesta **US$12 al año**. Dos días de caída suman **menos de US$2**.
+
+Presupuesto del standby guardado (Google Pricing Calculator, precios al 04-08-2026):
+<https://cloud.google.com/calculator?dl=CjhDaVJsWldGbE9EZzNaaTA1TnpRd0xUUm1Nell0WWpRek1TMWpPVFU1WVRKak5XVTRNRE1RQVE9PRokNzhBQzIyRjgtMDYzMC00NzU0LUI4QTEtOTlBMEFCNEEzQzQz>
+
+Desglose: 40.000 vCPU·s = US$0,96 · 20.000 GiB·s = US$0,05 · 100.000 peticiones = US$0
+(gratis hasta 2 millones). **Es conservador**: un standby real atiende una fracción de esas
+peticiones, y el tier gratuito cubre 180.000 vCPU·s mensuales contra los 40.000 de acá — en la
+práctica puede salir US$0.
+
+Las dos tarifas explican por qué los escenarios difieren tanto: *request-based* cobra
+US$0,000024 por vCPU·segundo, mientras que *CPU siempre asignada* cuesta cerca de la mitad
+(~US$0,00001) pero se paga las 24 horas. Barato por segundo, caro por mes.
 La región no altera el precio (Bélgica y Virginia son ambas Tier 1): se elige `us-east4`
 solo por latencia a TiDB. **No activar el Committed Use Discount** — es un compromiso de
 3 años sobre una caja de emergencia que ojalá nunca se use.
