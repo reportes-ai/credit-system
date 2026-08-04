@@ -247,3 +247,47 @@ Modo Desarrollo y apaga los motores que envían. Son dos candados independientes
 
 **Si difiere un número que nadie tocó, sospecha primero de la carga, no del sistema** — vuelve
 a cargar los meses y compara de nuevo antes de salir a buscar un bug que puede no existir.
+
+---
+
+# Host alternativo: Google Cloud Run (decidido 04-08-2026)
+
+Cierra el único escenario que el `docs/RUNBOOK-contingencia-bd.md` declaraba **sin plan
+probado**: qué hacer si Render cae por horas. La base ya tenía contingencia ensayada
+(Google Cloud SQL); lo que faltaba era **dónde correr la aplicación**.
+
+**Precios verificados en la calculadora de Google** (región `us-east4`, 1 vCPU, 512 MiB):
+
+| Escenario | Configuración | Costo |
+|---|---|---:|
+| **Standby dormido** (permanente) | request-based, escala a cero, `MOTORES=off` | **US$1,01/mes** |
+| **Promovido** (durante la caída) | CPU siempre asignada, `min-instances=1`, sin `MOTORES` | **US$26,96/mes** |
+
+Tener la contingencia lista cuesta **US$12 al año**. Dos días de caída suman **menos de US$2**.
+La región no altera el precio (Bélgica y Virginia son ambas Tier 1): se elige `us-east4`
+solo por latencia a TiDB. **No activar el Committed Use Discount** — es un compromiso de
+3 años sobre una caja de emergencia que ojalá nunca se use.
+
+## Por qué el standby puede estar dormido
+
+Porque lleva `MOTORES=off` y entonces **no tiene nada que hacer** hasta que alguien lo llame.
+Sin esa variable habría dos opciones, ambas malas: dejarlo encendido pagando US$27 al mes por
+un proceso que duplica cada reloj del principal, o no desplegarlo nunca y descubrir en plena
+emergencia que no arranca.
+
+Nombres de Google, que confunden porque describen *cómo se cobra* y no *para qué sirve*:
+- *"Charged only when processing"* → el contenedor **se apaga** cuando nadie lo llama → **standby**.
+- *"Charged for the entire lifecycle"* → el contenedor **queda encendido** con CPU completa → **promovido**.
+
+En una línea: **el que duerme paga por rato, el que trabaja paga por mes.** El promovido
+necesita CPU siempre asignada porque con facturación por petición Google le corta la CPU
+entre llamadas, y los `setInterval` de los motores no dispararían.
+
+**Costo del diseño:** arranque en frío de 30-60 s en la primera petición tras la promoción
+(el sistema corre migraciones al arrancar). Aceptable para una emergencia.
+
+## Pendiente
+
+Desplegar y **ensayar la promoción de verdad al menos una vez**. Un plan no probado no es un
+plan: el gotcha de las claves foráneas TiDB→MySQL solo apareció al restaurar en serio, y
+habría sido fatal descubrirlo en medio de la emergencia.
