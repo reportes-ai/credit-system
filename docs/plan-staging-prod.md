@@ -337,3 +337,64 @@ curl https://credit-system-staging.onrender.com/api/health   # staging  → los 
 En producción la lista viene **vacía** porque todos corren; en staging vienen **los 27**
 porque todos se apagan. Si producción alguna vez muestra motores apagados sin que nadie haya
 tocado `MOTORES`, algo está mal.
+
+---
+
+# El standby se reconstruye solo, todos los días
+
+**El problema que resuelve:** Render se actualiza en cada push, pero la imagen de Cloud Run
+queda **congelada** en el momento en que se construyó. Sin automatización, el respaldo
+envejece en silencio y el día de la emergencia levantaría una versión vieja del sistema
+contra una base que ya avanzó — pantallas esperando columnas que cambiaron, endpoints que ya
+no existen. Es una avería que solo se descubre cuando ya no puedes permitírtela.
+
+**Cómo quedó** (04-08-2026, todo verificado ejecutándolo de verdad):
+
+```
+Cloud Scheduler  ──►  activador de Cloud Build  ──►  construye · despliega · VERIFICA
+ "standby-diario"      "standby-reconstruir"          (cloudbuild.yaml)
+ 05:00 Chile, diario   invocación manual
+```
+
+| Pieza | Detalle |
+|---|---|
+| Trabajo programado | `standby-diario`, región `us-east4`, `0 5 * * *`, huso `America/Santiago` |
+| Activador | `standby-reconstruir`, región `global`, invocación manual (no dispara en cada push) |
+| Receta | `cloudbuild.yaml` en la raíz del repositorio |
+| Cuenta de servicio | `cloudbuild-standby@autofacil-bs.iam.gserviceaccount.com` |
+| Costo | US$0 — Cloud Build regala 120 min/día y el build dura 33 s; Cloud Scheduler regala 3 trabajos |
+
+**La cuenta de servicio es dedicada y mínima a propósito.** Solo puede publicar la imagen,
+actualizar el servicio `afbs-standby` y escribir sus registros: **no lee secretos, no toca la
+base, no puede modificar nada más del proyecto**. La opción por defecto que ofrece la consola
+es la cuenta de Compute, que tiene rol *Editor* — y como el `cloudbuild.yaml` vive en el
+repositorio, cualquiera que pudiera escribir en `main` heredaría esos permisos.
+
+**El último paso del build es una comprobación, no un adorno:** consulta `/api/health` del
+standby y **falla la compilación** si `db` no es `true` o si `standby` no es `true`. Un
+respaldo que quedara ejecutando motores en paralelo con producción duplicaría cada reloj
+contra la misma base, y eso no avisa solo — una comisión aprobada dos veces no se queja.
+
+## Dos gotchas que costaron intentos
+
+1. **`gcloud` no puede crear el activador.** Con la conexión clásica de GitHub, tanto el CLI
+   como la API REST responden `INVALID_ARGUMENT`: falta un identificador de instalación que
+   solo la consola conoce. Hay que crearlo por interfaz. Después sí se puede modificar por
+   API (así se le cambió la cuenta de servicio sin rehacer el formulario).
+2. **Las variables de bash dentro de `cloudbuild.yaml` van con `$$`.** Con un solo signo,
+   Cloud Build cree que es una sustitución suya y rechaza el archivo entero con
+   *"key in the template URL is not a valid built-in substitution"*.
+
+Y uno de permisos: una cuenta de servicio **no** puede actuar como sí misma por defecto. Como
+el trabajo programado corre con la misma cuenta que usa el activador, hubo que darle
+`iam.serviceAccountUser` **sobre sí misma** o Cloud Scheduler respondía código 7.
+
+## Cómo comprobar que sigue vivo
+
+```bash
+gcloud scheduler jobs describe standby-diario --location=us-east4   # última ejecución y estado
+gcloud builds list --region=global --limit=5                        # las compilaciones diarias
+```
+
+Si `status.code` del trabajo viene vacío, la última ejecución salió bien. Cualquier otro
+número es un fallo.
