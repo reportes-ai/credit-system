@@ -406,6 +406,29 @@ gcloud run services update afbs-standby --region us-east4 \
 se construyó. Antes de una promoción larga, conviene reconstruirla para llevar los últimos
 cambios.
 
+## 11-ter. ⚠️ Nada se guarda en el disco del servidor
+
+**Lección aprendida el 04-08-2026, a costa de 8 archivos.**
+
+El módulo de informes DealerNet guardaba los PDF subidos en el disco de Render
+(`/opt/render/project/src/api-gateway/uploads/`) en vez de en la base. **Los 8 archivos se
+perdieron el 30-07-2026**, cuando el servicio se movió de Oregon a Virginia: mover el servicio
+significa crear uno nuevo, y el disco no viaja. La frase *"Render no guarda estado"* de la
+receta del traslado era cierta — se escribió como una ventaja, sin notar que había archivos ahí.
+
+*(Lo que sí se conservó: todos los datos que la IA había extraído de esos PDF viven en la base.
+Se perdió el documento original, no la información.)*
+
+**La regla, sin excepciones: los archivos van a la BASE, nunca al disco del servidor.** Así lo
+hacen fundantes, cartas y certificados. Ahora también los informes DealerNet.
+
+**Y desde que existe el host de contingencia, esto pesa el doble: Cloud Run NO TIENE disco.**
+Cualquier archivo guardado en disco sería invisible al promover el respaldo — el sistema
+andando y los adjuntos rotos, justo en la emergencia.
+
+**Al revisar código nuevo, buscar esto:** `multer.diskStorage`, `fs.writeFileSync` sobre una
+carpeta del proyecto, o cualquier columna que guarde una *ruta* en vez del *contenido*.
+
 ## 12. Se cayó GitHub
 
 **Qué se rompe**: (a) no se puede desplegar código nuevo, y (b) **no corre el respaldo
