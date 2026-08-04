@@ -342,7 +342,7 @@ gcloud run services update afbs-standby --region us-east4 \
   --remove-env-vars MOTORES --min-instances 1 --no-cpu-throttling --memory 2Gi
 ```
 
-Eso enciende los 26 motores automáticos y lo deja permanentemente despierto. Verifica:
+Eso enciende los 27 motores automáticos y lo deja permanentemente despierto. Verifica:
 
 ```bash
 curl https://afbs-standby-821999538473.us-east4.run.app/api/health

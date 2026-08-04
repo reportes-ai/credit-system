@@ -28,7 +28,7 @@
 > dentro de los controllers y corrían en staging igual que en producción — aprobación
 > automática de comisiones, desistimiento de aprobados vencidos, cierre de castigos, devengos
 > de vacaciones, escalamiento de tickets. No alcanzaban a un cliente, pero mutaban datos.
-> Hoy los **26 motores** pasan por el scheduler y obedecen a `ENTORNO` y a `MOTORES=off`.
+> Hoy los **27 motores** pasan por el scheduler y obedecen a `ENTORNO` y a `MOTORES=off`.
 
 > Objetivo: que `main` deje de ser "producción en vivo" y todo cambio pase por un ambiente
 > de prueba idéntico antes de llegar a los usuarios. Ejecutar en el orden indicado;
@@ -299,3 +299,24 @@ entre llamadas, y los `setInterval` de los motores no dispararían.
 Desplegar y **ensayar la promoción de verdad al menos una vez**. Un plan no probado no es un
 plan: el gotcha de las claves foráneas TiDB→MySQL solo apareció al restaurar en serio, y
 habría sido fatal descubrirlo en medio de la emergencia.
+
+---
+
+# Cuántos motores automáticos hay: **27**
+
+Verificado el 04-08-2026 contra el `/api/health` de staging, que lista los apagados.
+
+Ojo con contarlos en el arranque local: **`desistir-aprobados` se registra dentro de la cola
+de migraciones**, así que aparece decenas de segundos después que los otros 26. Una prueba
+corta lo deja fuera y da 26 — pasó al migrarlos.
+
+Cómo verificar en cualquier momento, sin adivinar:
+
+```bash
+curl https://afbs.autofacilchile.cl/api/health          # producción → motores_apagados: []
+curl https://credit-system-staging.onrender.com/api/health   # staging  → los 27
+```
+
+En producción la lista viene **vacía** porque todos corren; en staging vienen **los 27**
+porque todos se apagan. Si producción alguna vez muestra motores apagados sin que nadie haya
+tocado `MOTORES`, algo está mal.
