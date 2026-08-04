@@ -874,9 +874,19 @@ const upsert = async (req, res) => {
            aunque diga OTORGADO — es la misma operación que se está digitando. */
         const sinNumeracionPropia = String(crDup.num_op || '') === String(crDup.id_financiera || '');
         // Ya OTORGADO con numeración nuestra → duplicado real: la operación ya se cursó.
-        if (!sinNumeracionPropia && (crDup.estado_u === 'OTORGADO' || crDup.estado_credito_u === 'OTORGADO'))
+        if (!sinNumeracionPropia && (crDup.estado_u === 'OTORGADO' || crDup.estado_credito_u === 'OTORGADO')) {
+          const opDup = crDup.num_op || crDup.numero_credito;
+          /* Si la carta que otorgó ese crédito está ANULADA, el bloqueo tiene una
+             causa concreta y una salida concreta — decirla acá ahorra el rato de
+             no entender por qué el sistema se niega (pasó el 04-08-2026). */
+          const [[cartaMuerta]] = await pool.query(
+            `SELECT op_carta FROM cartas_aprobacion
+              WHERE id_credito_creado = ? AND status IN ('ANULADA','ELIMINADA') LIMIT 1`, [crDup.id]);
           return res.status(409).json({ success: false, data: null,
-            error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${crDup.num_op || crDup.numero_credito}).` });
+            error: cartaMuerta
+              ? `La operación ${opDup} sigue OTORGADA y mantiene tomado el ID ${c.opOrigen}. Su carta (${cartaMuerta.op_carta}) se anuló, pero anular la carta NO anula la operación: hay que anularla en Créditos → Anular Operación (requiere una segunda firma). Recién entonces se puede generar la carta nueva.`
+              : `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (crédito ${opDup}).` });
+        }
         // Crédito vivo NO otorgado (carga masiva de aprobadas, digitación): es la MISMA
         // operación esperando su carta → la carta se ENLAZA a ese crédito en vez de
         // bloquear o crear un gemelo. Al otorgar, ese mismo crédito pasa a OTORGADO.
@@ -978,6 +988,8 @@ const upsert = async (req, res) => {
           pool.query(`UPDATE creditos SET estado='CARTA_APROBACION', updated_at=NOW() WHERE id=? AND estado='INGRESO'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
         } else if (c.status === 'RECHAZADA') {
           pool.query(`UPDATE creditos SET estado='INGRESO', updated_at=NOW() WHERE id=? AND estado='CARTA_APROBACION'`, [idCred]).catch(e => console.error('[carta→credito estado]', e.message));
+        } else if (c.status === 'ANULADA' && prevStatus !== 'ANULADA') {
+          avisarOperacionViva(c, idCred, req);
         }
       }
       notificarCambios(c, prevStatus, req);
@@ -1039,6 +1051,58 @@ const upsert = async (req, res) => {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }
 };
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Anular una carta que YA OTORGÓ no deshace la operación.
+
+   Caso real del 04-08-2026: se anuló la carta 266230115FM porque iba con un
+   error, pero el crédito 26080005 que esa carta había otorgado quedó VIVO y
+   OTORGADO. Consecuencia: el ID de la financiera seguía tomado y el sistema no
+   dejaba generar la carta corregida — con un mensaje que no explicaba por qué.
+
+   Anularla automáticamente NO corresponde: anular una operación otorgada retira
+   comisión de la cartola y por eso exige DOBLE FIRMA de Operaciones
+   (`/creditos/anulaciones.html`). Saltarse ese control desde el módulo de cartas
+   sería peor que el problema.
+
+   Entonces: se AVISA, con el número de operación y el enlace directo. El aviso
+   va por campanita y no por un mensaje pasajero a propósito — queda pendiente
+   hasta que alguien lo atienda, que es justo lo que faltó acá.
+   Fire & forget: no frena el guardado de la carta.
+   ───────────────────────────────────────────────────────────────────────────── */
+async function avisarOperacionViva(c, idCredito, req) {
+  try {
+    const MUERTOS = ['DESISTIDO', 'ANULADO', 'RECHAZADO'];
+    const [[cr]] = await pool.query(
+      `SELECT id, num_op, id_financiera, UPPER(COALESCE(estado,'')) e1,
+              UPPER(COALESCE(estado_credito,'')) e2
+         FROM creditos WHERE id = ? LIMIT 1`, [idCredito]);
+    if (!cr) return;
+    // Si el crédito ya está muerto, no hay nada que avisar.
+    if (MUERTOS.includes(cr.e1) || MUERTOS.includes(cr.e2)) return;
+
+    const op = cr.num_op || cr.id_financiera || idCredito;
+    const quien = req && req.usuario ? req.usuario.id_usuario : null;
+    let destinatarios = quien ? [quien] : [];
+    try {   // más el pool de Operaciones, que es quien puede aprobar la anulación
+      const [ops] = await pool.query(
+        `SELECT DISTINCT u.id_usuario FROM usuarios u
+           JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil AND pp.habilitado = 1
+           JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+          WHERE f.codigo = 'operacion_anular_aprobar' AND u.estado = 'activo'`);
+      destinatarios = destinatarios.concat(ops.map(o => o.id_usuario));
+    } catch (_) {}
+
+    await notificar(destinatarios, {
+      tipo: 'carta_anulada_operacion_viva',
+      titulo: `La operación ${op} sigue vigente`,
+      mensaje: `Se anuló la carta ${c.opCarta || c.op_carta || ''} pero el crédito ${op} que había otorgado NO se anuló: sigue OTORGADO y mantiene tomado el ID de la financiera ${cr.id_financiera || ''}. Mientras siga así no se puede generar una carta nueva para esa operación. Anúlala en Créditos → Anular Operación (requiere una segunda firma).`,
+      href: '/creditos/anulaciones.html',
+      prioridad: 'alta',
+      clave: `carta_anulada_op_viva:${idCredito}`,
+    });
+  } catch (e) { console.error('[carta anulada → operación viva]', e.message); }
+}
 
 /* Una sola carta vigente por operación: anula las anteriores del mismo ID Financiera.
    Fire & forget — no frena la creación de la carta nueva. */
