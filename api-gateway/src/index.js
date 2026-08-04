@@ -119,6 +119,10 @@ app.get('/api/health', async (req, res) => {
     // salen los que contactan clientes. El nombre dice "apagados" porque leer
     // `motores: [...]` invitaba a entenderlo justo al revés.
     motores_apagados: require('../../shared/scheduler').listar().filter(m => !m.activo).map(m => m.nombre),
+    /* ¿Este host alcanza el bucket de documentos? Importa sobre todo en
+       contingencia: si `activo` es false, los documentos que ya se movieron al
+       bucket no se pueden abrir desde acá (los que siguen en la base, sí). */
+    documentos: require('../../shared/almacen-docs').estado(),
   });
 });
 
