@@ -18,6 +18,10 @@ router.post('/ordenes',           verifyToken, requireFunc('ordenes_pago_emitir'
 router.put('/ordenes/:id/estado', verifyToken, requireFunc('ordenes_pago_emitir'), c.cambiarEstadoOrden);
 router.post('/ordenes/:id/enviar-correo', verifyToken, requireFunc('ordenes_pago_emitir'), c.enviarCorreoOrden);
 router.post('/ordenes/:id/pagar',         verifyToken, c.pagarOrden);   // gate real = Caja Activa (en el controller)
+// Anular una orden de POST VENTA (Saldo Precio / Comisión). El gate real es
+// Administrador + motivo, validado en el controller; `requireFunc` deja fuera
+// a quien ni siquiera puede emitir.
+router.put('/ordenes/:id/anular-postventa', verifyToken, requireFunc('ordenes_pago_emitir'), c.anularOrdenPostventa);
 router.get('/mi-caja',                    verifyToken, c.miCajaOP);
 
 // Estadísticas

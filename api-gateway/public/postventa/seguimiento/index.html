@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -342,8 +342,8 @@ function trackHTML(r, track, lista){
            Pago" solo lista las PENDIENTES, así que mandar ahí a alguien que ya
            emitió es mandarlo a una pantalla donde su operación no aparece. */
         if (m) {
-          title = 'La orden ya se emitió. Anular una orden de Post Venta ya emitida todavía no está resuelto en el sistema: no se puede desde acá, ni desde Emisión Orden de Pago (que solo muestra las pendientes), ni desde el Historial (su botón Anular aplica solo a órdenes de proveedores). Avisa a Administración.';
-          donde = '/ordenes-pago/historial/?origen=SALDO'; dondeTxt = 'Ver la orden en el Historial';
+          title = 'La orden ya se emitió, por eso esta operación ya no aparece en Emisión Orden de Pago. Para deshacerla hay que ANULAR la orden desde el Historial de Órdenes de Pago (solo Administrador, con motivo): el número queda anulado y la operación vuelve acá para emitirla de nuevo.';
+          donde = '/ordenes-pago/historial/?origen=' + track; dondeTxt = 'Ir al Historial a anular la orden';
         } else {
           title = 'Esta etapa la controla Emisión Orden de Pago: se marca sola al emitir la orden.';
           donde = '/postventa/orden-pago/'; dondeTxt = 'Ir a Emisión Orden de Pago';

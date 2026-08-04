@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -156,6 +156,16 @@ function chk401(r){ if(r && r.status===401){ sessionStorage.clear(); location.hr
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('/') : '—';
 const fdatetime = d => { if(!d) return '—'; const s=String(d); const f=fdate(s); const hm=(s.slice(11,16)||''); return hm? f+' '+hm : f; };
 let DATA = [], PUEDE = (yo.perfil==='Administrador'), ORIGEN='', MICAJA=null, PAGO_ID=null;
+/* ?origen=SALDO|COMISION|GENERAL — para que quien llegue desde otro módulo
+   (ej. el aviso de Seguimiento que manda a anular una orden) caiga ya filtrado
+   y no tenga que buscar su orden entre todas. */
+(function(){
+  const o = (new URLSearchParams(location.search).get('origen')||'').toUpperCase();
+  if (!['SALDO','COMISION','GENERAL'].includes(o)) return;
+  ORIGEN = o;
+  addEventListener('DOMContentLoaded', () => document.querySelectorAll('.ofilt')
+    .forEach(b => b.classList.toggle('on', (b.dataset.o||'') === o)));
+})();
 const isAdmin = (yo.perfil==='Administrador');   // solo Admin puede anular
 let HORARIO=null, cajaTimer=null, cajaDeadline=0, cajaModo='';
 async function cargarCaja(){
@@ -219,6 +229,9 @@ async function cargar(){
       let acc = '';
       if (o.pagable && MICAJA) acc += `<button class="icon-btn" title="Pagar" onclick="pagar(${o.id})"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
       if (o.editable && o.estado==='EMITIDA' && isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
+      // Post Venta: mismo ícono, vía propia — además de anular el número hay que
+      // deshacer las etapas del seguimiento para que pueda volver a emitirse.
+      if (o.anulable_pv && isAdmin) acc += `<button class="icon-btn" title="Anular orden de Post Venta (solo Admin)" onclick="anularPV(${o.id})"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
       return `<tr>
         <td><b>${escH(o.numero||'—')}</b></td>
         <td><span class="tipo-badge tipo-${o.origen}">${escH(o.origen_label)}</span></td>
@@ -366,7 +379,8 @@ async function ver(id){
   document.getElementById('dBody').innerHTML = extra + docHTML(full);
   const foot = document.getElementById('dFoot');
   // Anular y Enviar a Contabilidad solo aplican a órdenes generales (las de Post Venta se gestionan allí).
-  const anularBtn = (row.editable && full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>` : '';
+  const anularBtn = (row.editable && full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>`
+    : (row.anulable_pv && isAdmin) ? `<button class="btn-ghost" onclick="anularPV(${row.id})">Anular</button>` : '';
   const enviar    = (row.editable && PUEDE) ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   const pagarBtn  = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
@@ -434,6 +448,37 @@ async function doMarcar(opId, numero, estado){
     const j = await r.json();
     if (j.success) { try{document.getElementById('dlg').close();}catch(e){} cargar(); }
     else alert(j.error||'Error');
+  } catch(e) { alert('Error de red'); }
+}
+
+/* ── Anular una orden de POST VENTA (Saldo Precio / Comisión) ──────────────
+   Vía propia porque, además de anular el número, hay que devolver la operación
+   a su etapa anterior para que pueda volver a emitirse. El motivo es
+   obligatorio: una orden anulada sin explicación es un número perdido que nadie
+   sabe justificar meses después. */
+async function anularPV(ocId){
+  const o = DATA.find(x=>x.id===ocId); if(!o) return;
+  const motivo = prompt(
+    `ANULAR la orden ${o.numero||''} — ${o.proveedor_nombre||''}\n`
+  + `Monto: ${fmtMon(o.monto)}\n\n`
+  + `El número queda reservado y marcado como anulado (no se reutiliza), y la\n`
+  + `operación vuelve a "Emisión Orden de Pago" para emitirla de nuevo.\n\n`
+  + `Escribe el motivo (mínimo 10 caracteres):`, '');
+  if (motivo === null) return;
+  if (motivo.trim().length < 10) { alert('El motivo es obligatorio y debe explicar por qué se anula.'); return; }
+  try {
+    const r = await fetch(`/api/ordenes-pago/ordenes/${ocId}/anular-postventa`, {
+      method:'PUT', headers:H, body: JSON.stringify({ motivo: motivo.trim() }) });
+    if (chk401(r)) return;
+    const j = await r.json();
+    if (!j.success) { alert(j.error||'Error'); return; }
+    const d = j.data || {};
+    alert(`Orden ${d.numero||''} anulada.`
+      + (d.etapas_deshechas && d.etapas_deshechas.length
+          ? `\n\nSe deshicieron estas etapas de la OP ${d.num_op||''}:\n· ${d.etapas_deshechas.join('\n· ')}\n\nYa puede emitirse de nuevo.`
+          : ''));
+    try{ document.getElementById('dlg').close(); }catch(e){}
+    cargar();
   } catch(e) { alert('Error de red'); }
 }
 

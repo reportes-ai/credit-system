@@ -326,7 +326,12 @@ const listarOrdenes = async (req, res) => {
         usuario_nombre: r.usuario_nombre, proveedor_nombre: proveedor || '—', documento: documento || '—',
         estado, fecha_pago: r.fecha_pagada || (esGen ? r.g_fechapago : null),
         anulada_nombre: r.anulada_nombre, fecha_anulada: r.fecha_anulada,
-        editable: esGen,   // solo las generales se gestionan (editar/anular) en este módulo
+        editable: esGen,   // editar (y anular por la vía general): solo las de proveedores
+        /* Las de Post Venta SÍ se anulan acá, pero por su propia vía: hay que
+           deshacer las etapas del seguimiento, cosa que las generales no tienen.
+           Antes esto no existía en ninguna parte y una orden emitida por error
+           quedaba viva para siempre, bloqueando la reemisión. */
+        anulable_pv: (!esGen && estado === 'EMITIDA' && !r.anulada),
         pagable: (estado === 'EMITIDA' && !r.anulada),   // se puede pagar desde el historial
       };
     });
@@ -825,6 +830,103 @@ const pagarOrden = async (req, res) => {
   }
 };
 
+/* ── PUT /api/ordenes-pago/ordenes/:id/anular-postventa ───────────────────────
+   Anula una Orden de Pago de POST VENTA (Saldo Precio o Comisión). `:id` es el
+   id del correlativo (op_correlativos).
+
+   POR QUÉ EXISTE
+   Hasta hoy no había forma de anular una de estas órdenes en ninguna parte:
+   "Emisión Orden de Pago" solo lista las PENDIENTES de emitir, el botón Anular
+   del Historial aplicaba solo a las de proveedores, y el casillero de la etapa
+   lo rechaza el servidor. Una orden emitida por error quedaba viva para siempre
+   y bloqueaba la reemisión.
+
+   POR QUÉ NO SE FUSIONA CON cambiarEstadoOrden
+   Esa anula órdenes de PROVEEDORES: cambia el estado en `ordenes_pago` y no
+   tiene etapas que deshacer. Esta tiene que devolver la operación a su etapa
+   anterior para que pueda volver a emitirse. Son dos cosas que se parecen pero
+   no son la misma (Máxima 1). Lo que SÍ comparten —anular el correlativo— es el
+   mismo motor: `anularCorrelativo()`.
+
+   QUÉ HACE, EN ORDEN
+     1. El número NO se libera: queda reservado y marcado como anulado, con
+        quién y cuándo. Un correlativo que se reutiliza es un número de orden
+        que aparece dos veces en la contabilidad.
+     2. Suelta `num_orden` de la orden de Post Venta, para que la próxima
+        emisión saque un número NUEVO en vez de devolver el anulado.
+     3. Borra las etapas que la orden había marcado, así la operación vuelve a
+        aparecer en "Emisión Orden de Pago".
+
+   NO reversa contabilidad porque emitir no genera asiento: el saldo precio se
+   contabiliza en FONDOS RECIBIDOS y en SALDO PRECIO PAGADO, no al emitir.
+   Por eso mismo una orden YA PAGADA no se puede anular — ahí sí hay plata que
+   salió y un asiento que existe. */
+const anularOrdenPostventa = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const motivo = norm((req.body || {}).motivo);
+    if ((req.usuario || {}).perfil_nombre !== 'Administrador')
+      return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
+    if (motivo.length < 10)
+      return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio y debe explicar por qué se anula (mínimo 10 caracteres)' });
+
+    const [[oc]] = await pool.query('SELECT id, numero, origen, origen_id, monto, anulada, pagada FROM op_correlativos WHERE id=?', [id]);
+    if (!oc) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
+    if (oc.origen === 'GENERAL')
+      return res.status(400).json({ success: false, data: null, error: 'Esta es una orden de proveedores: se anula con el botón Anular del Historial' });
+    if (!['SALDO', 'COMISION'].includes(oc.origen))
+      return res.status(400).json({ success: false, data: null, error: 'Origen de orden no reconocido' });
+    if (oc.anulada) return res.status(409).json({ success: false, data: null, error: `La orden ${oc.numero} ya está anulada` });
+    if (oc.pagada)  return res.status(409).json({ success: false, data: null, error: `La orden ${oc.numero} ya está pagada y queda en duro: no puede anularse` });
+
+    const esSaldo = oc.origen === 'SALDO';
+    const tabla = esSaldo ? 'postventa_ordenes' : 'postventa_ordenes_comision';
+    const track = esSaldo ? 'SALDO' : 'COMISION';
+    const etapaPagada = esSaldo ? 'SALDO PRECIO PAGADO' : 'COMISION PAGADA';
+
+    const [[po]] = await pool.query(`SELECT id, id_seguimiento, num_op FROM \`${tabla}\` WHERE id=?`, [oc.origen_id]);
+    if (!po) return res.status(404).json({ success: false, data: null, error: 'No se encontró la orden de Post Venta asociada' });
+
+    /* El correlativo puede estar sin pagar y la etapa marcada igual (el pago se
+       registra por las dos vías). Se revisa la etapa además del correlativo. */
+    const [[yaPagada]] = await pool.query(
+      'SELECT 1 x FROM postventa_etapas WHERE id_seguimiento=? AND track=? AND etapa=? LIMIT 1',
+      [po.id_seguimiento, track, etapaPagada]);
+    if (yaPagada) return res.status(409).json({ success: false, data: null, error: `La operación ya está marcada como "${etapaPagada}": la orden no puede anularse` });
+
+    const quien = nombreUsuario(req), idU = (req.usuario || {}).id_usuario || null;
+
+    // 1. El número queda reservado y marcado anulado — nunca se reutiliza.
+    await anularCorrelativo({ numero: oc.numero, origen: oc.origen, origen_id: oc.origen_id, id_usuario: idU, usuario_nombre: quien });
+
+    // 2. Sin num_orden, la próxima emisión saca un número nuevo en vez de devolver este.
+    await pool.query(`UPDATE \`${tabla}\` SET num_orden=NULL WHERE id=?`, [po.id]);
+
+    // 3. Deshacer las etapas que la orden había marcado, para que vuelva a
+    //    aparecer en "Emisión Orden de Pago". Se informa CUÁLES se deshicieron:
+    //    "ENVIADO A PAGO" significa que ya se había instruido el pago, y quien
+    //    anula tiene que saber que eso también se está revirtiendo.
+    const [etapasVivas] = await pool.query(
+      `SELECT etapa FROM postventa_etapas WHERE id_seguimiento=? AND track=? AND etapa IN ('ORDEN DE PAGO EMITIDA','ENVIADO A PAGO')`,
+      [po.id_seguimiento, track]);
+    const deshechas = etapasVivas.map(e => e.etapa);
+    if (deshechas.length) {
+      await pool.query(
+        `DELETE FROM postventa_etapas WHERE id_seguimiento=? AND track=? AND etapa IN ('ORDEN DE PAGO EMITIDA','ENVIADO A PAGO')`,
+        [po.id_seguimiento, track]);
+    }
+
+    auditar({ req, accion: 'ANULAR', modulo: 'ordenes-pago', entidad: 'orden_pago_postventa', entidad_id: id,
+      detalle: `Anuló ${oc.numero} (OP ${po.num_op}, $${Number(oc.monto || 0).toLocaleString('es-CL')})`
+             + `${deshechas.length ? ' — se deshicieron las etapas: ' + deshechas.join(', ') : ''}. Motivo: ${motivo}` });
+
+    res.json({ success: true, data: { id, numero: oc.numero, num_op: po.num_op, etapas_deshechas: deshechas }, error: null });
+  } catch (e) {
+    console.error('[ordenes-pago anularOrdenPostventa]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 // GET /api/ordenes-pago/mi-caja — caja activa del usuario + estado del horario (abierta/cerrada + countdown).
 const miCajaOP = async (req, res) => {
   const caja = await cajaActiva((req.usuario || {}).id_usuario);
@@ -835,5 +937,5 @@ const miCajaOP = async (req, res) => {
 module.exports = {
   listarProveedores, crearProveedor, actualizarProveedor, eliminarProveedor,
   listarOrdenes, getOrden, getDocumento, crearOrden, cambiarEstadoOrden, estadisticas, enviarCorreoOrden,
-  pagarOrden, miCajaOP,
+  pagarOrden, miCajaOP, anularOrdenPostventa,
 };
