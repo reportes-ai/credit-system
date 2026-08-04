@@ -13,7 +13,7 @@
 | Síntoma | Qué falló | Ir a | Estado del plan |
 |---|---|---|---|
 | El sistema abre pero da errores de datos / no carga nada | **TiDB (base de datos)** | Secciones 0 a 8 | ✅ **Probado 27-07-2026** |
-| El sitio no abre / error 502 / "service unavailable" | **Render (servidor)** | Sección 11 | ⚠️ Sin plan probado |
+| El sitio no abre / error 502 / "service unavailable" | **Render (servidor)** | Sección 11 · si no vuelve → **11-bis** | ✅ Probado (Cloud Run, 04-08-2026) |
 | No se puede desplegar; no llegó el respaldo de anoche | **GitHub** | Sección 12 | ✅ Mitigado |
 | No se puede bajar el respaldo del bucket | **Google Cloud Storage** | Sección 13 | ✅ Mitigado |
 | El dominio no resuelve (el sitio "no existe") | **DNS / dominio** | Sección 14 | ⚠️ Verificar registrador |
@@ -243,8 +243,9 @@ máquina y luego no deja bajar de tamaño).
 
 # PARTE B — Otras emergencias
 
-> Honestidad sobre el estado de estos planes: **solo la caída de la base (Parte A) está
-> probada de punta a punta**. Lo de abajo es el análisis de qué hacer en cada caso, con las
+> Honestidad sobre el estado de estos planes: están probados de punta a punta **la caída de
+> la base (Parte A)** y **la caída de Render (punto 11-bis, host alternativo en Cloud Run,
+> ensayado el 04-08-2026)**. El resto es el análisis de qué hacer en cada caso, con las
 > mitigaciones que sí existen hoy y los huecos declarados como tales. Donde dice
 > "SIN PLAN PROBADO", es literal: hay que decidirlo y ensayarlo antes de necesitarlo.
 
@@ -283,11 +284,9 @@ investigas la causa con calma en los Logs.
 **Dato clave**: los datos NO viven en Render, viven en TiDB. Una caída de Render es tiempo
 fuera de servicio, **nunca pérdida de información**. Cuando vuelve, vuelve tal cual estaba.
 
-**⚠️ SIN PLAN PROBADO — si Render cae por muchas horas:** hoy **no existe** un host alternativo
-configurado. La aplicación es Node/Express estándar y podría levantarse en otro proveedor
-(Railway, Fly.io, una VM), pero eso **nunca se ha ensayado** y requiere recrear todas las
-variables de entorno. Decisión pendiente: definir y probar un host secundario, o aceptar
-que una caída larga de Render es tiempo fuera de servicio.
+**✅ HOST ALTERNATIVO LISTO Y ENSAYADO (04-08-2026) — Google Cloud Run.**
+Ver el procedimiento completo en la sección 11-bis, más abajo. En una línea: existe un
+servicio dormido en Cloud Run que se promueve con UN comando y toma el control.
 
 **Lo que SÍ está a favor**: los datos no corren riesgo — viven en TiDB, no en Render. Cuando
 Render vuelve, el sistema vuelve tal cual estaba.
@@ -306,6 +305,95 @@ Requiere Docker Desktop instalado y el repositorio clonado. El `Dockerfile` y el
 no con Docker). Pendiente: ensayarlo una vez de verdad y cronometrar cuánto toma.
 
 ---
+
+## 11-bis. Promover el host alternativo (Google Cloud Run)
+
+> **Cuándo usar esto**: Render lleva horas caído y el punto 11 no lo levantó. Si la caída es
+> de minutos, espera — promover y volver atrás cuesta más que esperar.
+
+**Qué existe hoy** (creado y verificado el 04-08-2026):
+
+| | |
+|---|---|
+| Servicio | `afbs-standby` · proyecto `autofacil-bs` · región `us-east4` (Virginia, al lado de TiDB) |
+| **🔑 URL** | **`https://afbs-standby-821999538473.us-east4.run.app`** |
+| Panel | `console.cloud.google.com/run/detail/us-east4/afbs-standby` |
+| Estado normal | **dormido**: escala a cero, `MOTORES=off`, apunta a la base de PRODUCCIÓN |
+| Costo dormido | ~US$1/mes · promovido ~US$27/mes, prorrateado por hora |
+| Credenciales | Secret Manager: `afbs-db-user`, `afbs-db-password`, `afbs-jwt-secret`, `afbs-mail-user`, `afbs-mail-pass` |
+
+**El standby ya está sirviendo la aplicación completa contra los datos reales** — solo tiene
+los motores automáticos apagados. Comparte el `JWT_SECRET` con producción, así que **las
+sesiones abiertas siguen valiendo**: nadie tiene que volver a entrar.
+
+### Paso 1 — Comprobar que responde (10 segundos)
+
+```bash
+curl https://afbs-standby-821999538473.us-east4.run.app/api/health
+```
+
+Debe decir `"db":true` y `"entorno":"produccion"`. La primera petición puede demorar
+**hasta un minuto** porque despierta de cero: es normal, no insistas.
+
+### Paso 2 — Promoverlo (un comando)
+
+```bash
+gcloud run services update afbs-standby --region us-east4 \
+  --remove-env-vars MOTORES --min-instances 1 --no-cpu-throttling --memory 2Gi
+```
+
+Eso enciende los 26 motores automáticos y lo deja permanentemente despierto. Verifica:
+
+```bash
+curl https://afbs-standby-821999538473.us-east4.run.app/api/health
+```
+
+`"motores_apagados"` debe venir **vacío**: `[]`.
+
+### Paso 3 — Mandar a la gente ahí
+
+Reparte la URL del standby. Si la caída va para largo, apunta el dominio: en el panel DNS
+de **Wix** (no NIC, no Google — ver punto 14), cambia el CNAME de `afbs` al dominio que
+entrega Cloud Run.
+
+### Paso 4 — Cuando Render vuelva
+
+**En este orden, y no al revés:**
+
+1. **Primero apaga los motores del standby** — si los dos quedan encendidos contra la misma
+   base, cada reloj dispara dos veces y el daño es silencioso (una comisión aprobada dos
+   veces no avisa):
+   ```bash
+   gcloud run services update afbs-standby --region us-east4 \
+     --update-env-vars MOTORES=off --min-instances 0
+   ```
+2. Recién entonces levanta Render y devuelve el tráfico.
+3. Confirma que Render diga `"motores_apagados":[]` y el standby los tenga todos apagados.
+
+### ⚠️ Lo que el standby NO puede hacer
+
+Tiene las **16 variables del núcleo** (base de datos, sesiones, correo), pero **no** las de
+las integraciones. Promovido hoy:
+
+- ✅ **Funciona**: créditos, clientes, cartas, cobranza, contabilidad, tesorería, comisiones,
+  post venta, portales, y el correo saliente.
+- ❌ **No funciona**: sincronización de indicadores (falta `CMF_API_KEY`), IA
+  (`ANTHROPIC_API_KEY`), WhatsApp (`WSP_*`), DealerNet, SII y Workera.
+
+Para una caída de horas es una degradación aceptable y **deliberada**. Si quieres cobertura
+total, hay que cargar esas claves como secretos — está pendiente.
+
+### Cómo se reconstruye la imagen (si hiciera falta)
+
+```bash
+gcloud builds submit --tag us-east4-docker.pkg.dev/autofacil-bs/autofacil/suite:v1
+gcloud run services update afbs-standby --region us-east4 \
+  --image us-east4-docker.pkg.dev/autofacil-bs/autofacil/suite:v1
+```
+
+**El standby NO se actualiza solo.** Su imagen quedó congelada en la versión del día en que
+se construyó. Antes de una promoción larga, conviene reconstruirla para llevar los últimos
+cambios.
 
 ## 12. Se cayó GitHub
 
