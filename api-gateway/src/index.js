@@ -109,7 +109,10 @@ app.get('/api/health', async (req, res) => {
   res.status(db ? 200 : 503).json({
     status: db ? 'ok' : 'degraded', db, uptime: Math.round(process.uptime()),
     entorno: ent.NOMBRE,                                   // producción o staging, de un vistazo
-    motores: require('../../shared/scheduler').listar().filter(m => !m.activo).map(m => m.nombre),
+    // Los motores que NO quedaron programados. En producción es []; en staging
+    // salen los que contactan clientes. El nombre dice "apagados" porque leer
+    // `motores: [...]` invitaba a entenderlo justo al revés.
+    motores_apagados: require('../../shared/scheduler').listar().filter(m => !m.activo).map(m => m.nombre),
   });
 });
 
