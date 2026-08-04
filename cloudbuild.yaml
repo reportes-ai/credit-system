@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  Reconstrucción diaria del HOST DE CONTINGENCIA (Google Cloud Run).
+#
+#  Por qué existe: Render se actualiza solo en cada push, pero la imagen de
+#  Cloud Run queda CONGELADA en el momento en que se construyó. Sin esto, el
+#  standby envejece en silencio y el día de la emergencia levantaría una versión
+#  vieja del sistema contra una base que ya avanzó — pantallas esperando
+#  columnas que cambiaron, endpoints que ya no existen.
+#
+#  Lo dispara Cloud Scheduler todos los días a las 05:00 de Chile
+#  (trabajo `standby-diario`). Un desfase de hasta 24 h es irrelevante para una
+#  contingencia: la base es compartida y los cambios de esquema son aditivos.
+#
+#  OJO — `run services update --image` actualiza SOLO la imagen y conserva todo
+#  lo demás: las variables, los secretos y `MOTORES=off`. Nunca cambiar esto por
+#  `run deploy` con la lista de variables, o una reconstrucción podría encender
+#  los motores del standby sin que nadie se entere y duplicar el trabajo de
+#  producción contra la misma base.
+# ─────────────────────────────────────────────────────────────────────────────
+steps:
+  - id: construir
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite:v1
+      - -t
+      - us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite:$BUILD_ID
+      - .
+
+  - id: publicar
+    name: gcr.io/cloud-builders/docker
+    args: [push, --all-tags, us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite]
+
+  - id: desplegar-standby
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - afbs-standby
+      - --region=us-east4
+      - --image=us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite:$BUILD_ID
+
+  # Comprobación: el standby tiene que seguir siendo un STANDBY después del
+  # despliegue. Si `motores_apagados` viniera vacío, significa que quedó
+  # ejecutando motores en paralelo con producción — la compilación falla para
+  # que se note de inmediato y no dentro de un mes.
+  - id: verificar
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        URL=$(gcloud run services describe afbs-standby --region=us-east4 --format='value(status.url)')
+        echo "Verificando $URL/api/health"
+        R=$(curl -s --max-time 120 "$URL/api/health")
+        echo "$R"
+        echo "$R" | grep -q '"db":true'   || { echo "✗ el standby no llega a la base"; exit 1; }
+        echo "$R" | grep -q '"standby":true' || { echo "✗ el standby quedó con los motores ENCENDIDOS"; exit 1; }
+        echo "✓ standby sano y con los motores apagados"
+
+images:
+  - us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite:v1
+  - us-east4-docker.pkg.dev/$PROJECT_ID/autofacil/suite:$BUILD_ID
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
