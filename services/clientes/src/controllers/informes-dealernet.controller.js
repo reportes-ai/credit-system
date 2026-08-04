@@ -38,6 +38,41 @@ require('../../../../shared/migrate').enFila('informes-dealernet', async () => {
         INDEX idx_carga (fecha_carga)
       )
     `);
+
+    /* El PDF pasa a vivir EN LA BASE (04-08-2026), como ya lo hacen fundantes,
+       cartas y certificados. Antes se guardaba solo en el disco de Render, y eso
+       tenía dos problemas: el disco es del servidor, no del sistema (si se
+       recrea el servicio los archivos no viajan), y sobre todo **el host de
+       contingencia de Cloud Run NO TIENE disco** — al promoverlo, estos informes
+       se habrían visto rotos justo en la emergencia.
+       `pdf_path` se conserva para no perder la referencia histórica. */
+    await pool.query(`ALTER TABLE informes_dealernet ADD COLUMN pdf_data LONGBLOB NULL`)
+      .catch(() => {});   // ya existe
+
+    /* Traslado de los informes que ya existían: se leen del disco y se suben a la
+       base. Tiene que correr DENTRO de Render, que es donde vive ese disco — por
+       eso va acá y no en un script suelto de este computador.
+       Es idempotente: solo toca las filas sin `pdf_data`, y si el archivo ya no
+       está en disco lo informa y sigue (esa fila queda sin adjunto, pero con
+       todos sus datos extraídos intactos). */
+    try {
+      const [pend] = await pool.query(
+        `SELECT id, pdf_path, pdf_filename FROM informes_dealernet
+          WHERE pdf_data IS NULL AND pdf_path IS NOT NULL AND pdf_path <> ''`);
+      if (pend.length) {
+        let ok = 0; const perdidos = [];
+        for (const r of pend) {
+          try {
+            if (!fs.existsSync(r.pdf_path)) { perdidos.push(r.pdf_filename || r.id); continue; }
+            await pool.query('UPDATE informes_dealernet SET pdf_data = ? WHERE id = ?',
+                             [fs.readFileSync(r.pdf_path), r.id]);
+            ok++;
+          } catch (e) { perdidos.push(`${r.pdf_filename || r.id} (${e.message})`); }
+        }
+        console.log(`[informes-dealernet] PDFs trasladados a la base: ${ok}/${pend.length}` +
+                    (perdidos.length ? ` — sin archivo en disco: ${perdidos.join(', ')}` : ''));
+      }
+    } catch (e) { console.error('[informes-dealernet] traslado de PDFs:', e.message); }
     console.log('[informes_dealernet] tabla lista');
   } catch(e) {
     console.error('[informes_dealernet] migration error:', e.message);
@@ -307,9 +342,9 @@ const uploadInforme = [
           (rut, nombre_completo, apellido_paterno, apellido_materno, nombres,
            fecha_nacimiento, edad, ocupacion, estado_civil, perfil_socioeconomico,
            hijos, deuda_total_mk, impagos_vigentes, direccion_principal,
-           telefonos, emails, fecha_informe, pdf_filename, pdf_path,
+           telefonos, emails, fecha_informe, pdf_filename, pdf_path, pdf_data,
            datos_extraidos, usuario_carga)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `, [
         rut,
         parsed.nombre_completo  || req.body.nombre || null,
@@ -330,6 +365,10 @@ const uploadInforme = [
         parsed.fecha_informe    || null,
         req.file.filename,
         req.file.path,
+        // El archivo entra a la base. Si la lectura fallara, se guarda igual la
+        // ficha con el resto de los datos: perder el adjunto es malo, perder el
+        // informe entero es peor.
+        (() => { try { return fs.readFileSync(req.file.path); } catch (_) { return null; } })(),
         JSON.stringify(parsed),
         req.user?.nombre || 'sistema'
       ]);
@@ -354,12 +393,21 @@ const getById = async (req, res) => {
 
 const getPDF = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT pdf_path, pdf_filename FROM informes_dealernet WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.query('SELECT pdf_path, pdf_filename, pdf_data FROM informes_dealernet WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
-    const { pdf_path, pdf_filename } = rows[0];
+    const { pdf_path, pdf_filename, pdf_data } = rows[0];
+    const nombre = String(pdf_filename || 'informe').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
+
+    // La BASE manda; el disco queda solo como recurso de los informes viejos que
+    // todavía no se hayan trasladado (ver la migración de arriba).
+    if (pdf_data && pdf_data.length) {
+      res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
+      res.setHeader('Content-Type', 'application/pdf');
+      return res.end(pdf_data);
+    }
     if (!pdf_path || !fs.existsSync(pdf_path))
       return res.status(404).json({ success: false, error: 'Archivo PDF no disponible en servidor' });
-    res.setHeader('Content-Disposition', `inline; filename="${String(pdf_filename || 'informe').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_')}"`);
+    res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
     res.setHeader('Content-Type', 'application/pdf');
     fs.createReadStream(pdf_path).pipe(res);
   } catch(e) {
