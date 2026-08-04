@@ -338,8 +338,16 @@ function trackHTML(r, track, lista){
         title = 'Esta etapa la controla Seguimiento de Fundantes: se marca sola al aprobar los fundantes de la operación.';
         donde = '/fundantes-seguimiento/'; dondeTxt = 'Ir a Seguimiento de Fundantes';
       } else if (x.etapa==='ORDEN DE PAGO EMITIDA') {
-        title = 'Esta etapa la controla Emisión Orden de Pago: se marca sola al emitir la orden.';
-        donde = '/postventa/orden-pago/'; dondeTxt = 'Ir a Emisión Orden de Pago';
+        /* Emitida y sin emitir necesitan mensajes DISTINTOS: "Emisión Orden de
+           Pago" solo lista las PENDIENTES, así que mandar ahí a alguien que ya
+           emitió es mandarlo a una pantalla donde su operación no aparece. */
+        if (m) {
+          title = 'La orden ya se emitió. Anular una orden de Post Venta ya emitida todavía no está resuelto en el sistema: no se puede desde acá, ni desde Emisión Orden de Pago (que solo muestra las pendientes), ni desde el Historial (su botón Anular aplica solo a órdenes de proveedores). Avisa a Administración.';
+          donde = '/ordenes-pago/historial/?origen=SALDO'; dondeTxt = 'Ver la orden en el Historial';
+        } else {
+          title = 'Esta etapa la controla Emisión Orden de Pago: se marca sola al emitir la orden.';
+          donde = '/postventa/orden-pago/'; dondeTxt = 'Ir a Emisión Orden de Pago';
+        }
       } else if (x.etapa==='ENVIADO A PAGO') {
         title = 'Esta etapa la controla Saldos Precios a Pagar: se marca al presionar «Enviar a Pago».';
         donde = '/postventa/saldos-a-pagar/'; dondeTxt = 'Ir a Saldos Precios a Pagar';
@@ -348,7 +356,8 @@ function trackHTML(r, track, lista){
               + (m && esAdmin ? ' Como Administrador puedes revertirla con el botón «↶ Revertir» de esta misma tarjeta.' : '');
         donde = '/postventa/saldos-a-pagar/'; dondeTxt = 'Ir a Saldos Precios a Pagar';
       }
-      title += ' Acá solo se refleja lo que pasó allá.';
+      // El caso "orden ya emitida" trae su propio cierre; no le calza este.
+      if (!(x.etapa==='ORDEN DE PAGO EMITIDA' && m)) title += ' Acá solo se refleja lo que pasó allá.';
     }
     else if (esSistema) title = 'La primera etapa la marca el sistema al otorgarse la operación. No se marca ni se desmarca a mano.';
     else if (!m && !canMark)  title = `Las etapas se marcan en orden: primero hay que marcar «${lista[i-1]?.etapa}».`;
