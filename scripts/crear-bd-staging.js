@@ -105,37 +105,9 @@ const CON_DATOS = {
 };
 const LISTA = Object.values(CON_DATOS).flat();
 
-/* Columnas de contacto que se enmascaran en TODO lo que se copia. */
-const esCorreo   = c => /(mail|correo)/i.test(c);
-const esTelefono = c => /(telefono|fono|celular|movil|whatsapp|wsp)/i.test(c);
-
-/* Un correo enmascarado tiene que ser INALCANZABLE, no IRRECONOCIBLE.
-   La primera versión reemplazaba todo por `staging+N@autofacilchile.cl` y así
-   nadie podía entrar: el login del sistema es POR CORREO, de modo que borrar la
-   dirección borraba también la identidad. Ahora se conserva la parte local y se
-   cambia el dominio a `.invalid`, un TLD reservado por la RFC 2606 que ningún
-   DNS resuelve jamás: `patricio.escobar@staging.invalid` sirve para entrar y no
-   puede recibir un correo ni por accidente. Además preserva la unicidad, que
-   `usuarios.email` exige por índice.
-
-   Dos partes locales iguales con dominio distinto (admin@admin.cl y
-   admin@sistema.cl) chocarían contra ese índice, así que la SEGUNDA en aparecer
-   lleva sufijo. Solo las que chocan: el resto queda con su nombre limpio. */
-const correoStaging = (v, vistos) => {
-  const local = String(v).split('@')[0].trim().toLowerCase() || 'usuario';
-  let cand = local, n = 1;
-  while (vistos.has(cand)) cand = `${local}-${++n}`;
-  vistos.add(cand);
-  return cand + '@staging.invalid';
-};
-
-const esc = v => {
-  if (v === null || v === undefined) return 'NULL';
-  if (v instanceof Date) return `'${v.toISOString().slice(0, 19).replace('T', ' ')}'`;
-  if (Buffer.isBuffer(v)) return `X'${v.toString('hex')}'`;
-  if (typeof v === 'number') return String(v);
-  return `'${String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
-};
+/* Motor único de copia y enmascarado (Máxima 1): lo comparte con
+   cargar-meses-staging.js. Los cuatro gotchas están documentados ahí. */
+const { copiarTabla } = require('./lib/copiar-filas');
 
 (async () => {
   const [[{ d: ORIGEN }]] = await pool.query('SELECT DATABASE() d');
@@ -205,64 +177,18 @@ const esc = v => {
   await cx.query('SET FOREIGN_KEY_CHECKS = 0');
 
   for (const n of conDatos) {
-    /* La metadata manda sobre el nombre de la columna, por dos motivos:
-       · las columnas GENERADAS (rut_cuerpo, rut_dv) las calcula la base y no
-         admiten un valor en el INSERT;
-       · `password_updated_at` es una FECHA, no una clave: enmascararla por su
-         nombre metía un hash de bcrypt en una columna DATETIME. */
-    const [meta] = await pool.query(
-      `SELECT column_name c, data_type t, extra e FROM information_schema.columns
-        WHERE table_schema = ? AND table_name = ?`, [ORIGEN, n]);
-    const generadas = new Set(meta.filter(m => /GENERATED/i.test(m.e || '')).map(m => m.c));
-    const texto = new Set(meta.filter(m => /char|text/i.test(m.t)).map(m => m.c));
-    // mysql2 entrega las columnas JSON ya parseadas como objeto: hay que volver a
-    // serializarlas o el INSERT recibe "[object Object]" y la base lo rechaza.
-    const json = new Set(meta.filter(m => /json/i.test(m.t)).map(m => m.c));
-
-    const [filas] = await pool.query(`SELECT * FROM \`${ORIGEN}\`.\`${n}\``);
-    if (!filas.length) { vacias.push(n); continue; }
-    const cols = Object.keys(filas[0]).filter(c => !generadas.has(c));
-    const mask = {};
-    cols.forEach(c => {
-      if (!texto.has(c)) return;                       // solo se enmascara texto
-      /* OJO: en este código `clave` casi siempre significa LLAVE, no contraseña
-         — las tablas de configuración son (clave, valor). Enmascarar por el
-         nombre `clave` reemplazaba la LLAVE de cada parámetro por un hash y
-         dejaba inservibles config_sistema, cobranza_config y compañía. Solo se
-         enmascara lo que de verdad guarda una contraseña. */
-      if (/password/i.test(c) || /(^|_)hash$/i.test(c)) mask[c] = 'clave';
-      else if (esCorreo(c))   mask[c] = 'correo';
-      else if (esTelefono(c)) mask[c] = 'fono';
-    });
-    const vistosCorreo = new Set();   // unicidad del correo enmascarado, por tabla
-
     try {
-      for (let i = 0; i < filas.length; i += 200) {
-        const lote = filas.slice(i, i + 200).map(r => {
-          return '(' + cols.map(c => {
-            const v = r[c];
-            if (mask[c] === 'clave')  return esc(hashStaging);      // nunca un hash de producción
-            if (v == null || v === '') return esc(v);
-            if (mask[c] === 'correo') return esc(correoStaging(v, vistosCorreo));
-            if (mask[c] === 'fono')   return `'+56900000000'`;
-            if (json.has(c))          return esc(typeof v === 'string' ? v : JSON.stringify(v));
-            return esc(v);
-          }).join(',') + ')';
-        }).join(',');
-        await cx.query(
-          `INSERT INTO \`${DESTINO}\`.\`${n}\` (${cols.map(c => '`' + c + '`').join(',')}) VALUES ${lote}`);
-      }
+      const r = await copiarTabla(cx, { origen: ORIGEN, destino: DESTINO, tabla: n, hashStaging });
+      if (!r.filas) { vacias.push(n); continue; }
+      // Verificación: lo que quedó en destino debe ser lo que se leyó del origen.
+      const [[chk]] = await cx.query(`SELECT COUNT(*) n FROM \`${DESTINO}\`.\`${n}\``);
+      if (Number(chk.n) !== r.filas) errores.push(`${n}: se leyeron ${r.filas} filas pero quedaron ${chk.n}`);
+      totalFilas += r.filas;
+      copiadas.push({ n, filas: r.filas, mask: r.mascaras });
     } catch (e) {
       // Una tabla que falla no puede tumbar el resto: se anota y se sigue.
       errores.push(`${n}: ${e.message}`);
-      continue;
     }
-    // Verificación: lo que quedó en destino debe ser lo que se leyó del origen.
-    const [[chk]] = await cx.query(`SELECT COUNT(*) n FROM \`${DESTINO}\`.\`${n}\``);
-    if (Number(chk.n) !== filas.length)
-      errores.push(`${n}: se leyeron ${filas.length} filas pero quedaron ${chk.n}`);
-    totalFilas += filas.length;
-    copiadas.push({ n, filas: filas.length, mask: Object.keys(mask) });
   }
   await cx.query('SET FOREIGN_KEY_CHECKS = 1');
   cx.release();

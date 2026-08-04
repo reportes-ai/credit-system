@@ -177,3 +177,62 @@ Si el punto 1 dice `produccion`, **no lo uses**: falta la variable `ENTORNO` y e
 puede escribirle a clientes reales.
 
 Entra con cualquier usuario y la clave `Staging2026!`.
+
+---
+
+# Línea base de regresión — meses completos de cartera en staging
+
+`node scripts/cargar-meses-staging.js --ejecutar` carga en staging **meses completos de
+cartera real** (por defecto los dos últimos meses cerrados) para poder responder, antes de
+soltar un cambio, la única pregunta que importa: **¿siguen cuadrando los números?**
+
+Sin esto, staging sirve para ver que una pantalla no reviente. Con esto, corres el mismo
+informe en los dos ambientes y exiges que las cifras den idénticas.
+
+**Cómo se elige qué traer.** El ancla son los `creditos` cuyo `mes` cae en los meses pedidos;
+de ahí cuelga todo lo demás — clientes, cuotas, pagos, cartas, cartolas, post venta,
+fundantes y contabilidad. **Traer media operación sería peor que no traerla**: cuadraría mal y
+nadie sabría si es el cambio o la carga. La contabilidad se trae por **comprobante completo**
+(no por movimiento suelto), o el asiento no cuadraría.
+
+```bash
+node scripts/cargar-meses-staging.js                       # simulación: dice qué traería
+node scripts/cargar-meses-staging.js --ejecutar            # los 2 últimos meses cerrados
+node scripts/cargar-meses-staging.js --ejecutar --meses=2026-05,2026-06
+node scripts/cargar-meses-staging.js --ejecutar --limpiar  # vacía antes de cargar
+```
+
+**OJO con el orden**: `crear-bd-staging.js --recrear` borra la base entera, así que después de
+recrear hay que **volver a cargar los meses**.
+
+## Carga del 04-08-2026 (junio y julio) — verificada al peso
+
+2.145 operaciones · 1.543 clientes · 19 tablas · 8.104 filas.
+
+| Indicador | Producción | Staging |
+|---|---:|---:|
+| Operaciones | 2.145 | 2.145 |
+| Monto financiado | 18.338.919.731 | 18.338.919.731 |
+| Saldo precio | 15.733.323.239 | 15.733.323.239 |
+| Comisión dealer | 938.639.703 | 938.639.703 |
+| Comisión ejecutivo | 14.938.129 | 14.938.129 |
+| Ingreso neto total | −7.776.767 | −7.776.767 |
+| Otorgadas | 162 | 162 |
+| Contabilidad debe | 6.319.469.367 | 6.319.469.367 |
+| Contabilidad haber | 6.319.469.367 | 6.319.469.367 |
+
+Integridad comprobada: **0** operaciones sin su cliente y **0** clientes con correo real.
+
+**Los datos son reales** (nombres y RUT); lo que no viaja es la posibilidad de contactar a
+alguien. Los correos y teléfonos se enmascaran en la copia, y `ENTORNO=staging` ya fuerza el
+Modo Desarrollo y apaga los motores que envían. Son dos candados independientes.
+
+## Cómo se usa antes de un cambio
+
+1. Anota las cifras de producción del informe que vas a tocar (o usa la tabla de arriba).
+2. Aplica el cambio en la rama `staging` y espera el deploy.
+3. Corre el MISMO informe en staging y compara.
+4. Si un número se movió y no debía moverse, el cambio tiene un efecto que no viste venir.
+
+**Si difiere un número que nadie tocó, sospecha primero de la carga, no del sistema** — vuelve
+a cargar los meses y compara de nuevo antes de salir a buscar un bug que puede no existir.
