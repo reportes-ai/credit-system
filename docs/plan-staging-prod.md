@@ -6,13 +6,22 @@
 > |---|---|---|
 > | **Fase 4** — blindajes en código | ✅ Hecha | — |
 > | **Fase 1** — rama `staging` | ✅ Creada y al día con `main` | — |
-> | Fase 1.2 — proteger `main` en GitHub | ⏳ **Pendiente: Pato** | panel GitHub |
 > | **Fase 2** — BD espejo en TiDB | ✅ `credit_system_staging` creada y verificada | — |
-> | **Fase 3** — servicio en Render | ⏳ **Pendiente: Pato** | panel Render |
-> | **Fase 5** — disciplina de deploy | ⏳ Arranca cuando exista el servicio | todos |
+> | **Fase 3** — servicio en Render | ✅ **En vivo**: `credit-system-staging.onrender.com` | — |
 > | CI (`node --check` + 95 pruebas) | ✅ `.github/workflows/ci.yml` | — |
+> | Fase 1.2 — proteger `main` en GitHub | 🅿️ **Postergada por decisión de Pato** | día del corte |
+> | **Fase 5** — disciplina de deploy | 🅿️ **Postergada por decisión de Pato** | día del corte |
 >
-> Lo que falta son los **dos paneles** (GitHub y Render): ver "Lo que queda por hacer" al final.
+> **Decisión de Pato (04-08-2026):** mientras corre la UAT con usuarios, él sigue trabajando
+> **directo contra producción** como hasta hoy. Proteger `main` le cambiaría el flujo diario
+> justo en medio de las pruebas. El ambiente queda **configurado y andando**; el interruptor
+> —protección de rama + disciplina de merge— se activa el día del corte a producción final.
+>
+> **Cómo entrar a staging:** tu correo de siempre pero con dominio `@staging.invalid`
+> (ej. `patricio.escobar@staging.invalid`), clave `Staging2026!`.
+>
+> **Verificación de un vistazo:** `/api/health` informa `entorno` (`staging` vs `produccion`) y
+> `motores_apagados` (en staging, los 5 que contactan clientes; en producción, `[]`).
 
 > Objetivo: que `main` deje de ser "producción en vivo" y todo cambio pase por un ambiente
 > de prueba idéntico antes de llegar a los usuarios. Ejecutar en el orden indicado;
@@ -125,9 +134,9 @@ advertencia para cualquier copia futura de esquema):
 
 ---
 
-# Lo que queda por hacer (dos paneles, Pato)
+# Los dos paneles (referencia)
 
-## A. Proteger `main` en GitHub — 5 minutos
+## A. Proteger `main` en GitHub — 5 minutos  🅿️ POSTERGADA hasta el corte final
 `github.com/reportes-ai/credit-system` → **Settings → Branches → Add branch protection rule**
 - Branch name pattern: `main`
 - ✅ Require a pull request before merging
@@ -136,7 +145,7 @@ advertencia para cualquier copia futura de esquema):
 
 Sin esto, `git push origin main` sigue siendo despliegue inmediato a los usuarios.
 
-## B. Crear el servicio de staging en Render — 20 minutos
+## B. Crear el servicio de staging en Render — ✅ HECHA el 04-08-2026
 **New → Web Service** → mismo repositorio → **rama `staging`** → plan **Free** → nombre
 `credit-system-staging` → Health Check Path: `/api/health`.
 

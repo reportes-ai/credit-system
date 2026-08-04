@@ -109,6 +109,26 @@ const LISTA = Object.values(CON_DATOS).flat();
 const esCorreo   = c => /(mail|correo)/i.test(c);
 const esTelefono = c => /(telefono|fono|celular|movil|whatsapp|wsp)/i.test(c);
 
+/* Un correo enmascarado tiene que ser INALCANZABLE, no IRRECONOCIBLE.
+   La primera versión reemplazaba todo por `staging+N@autofacilchile.cl` y así
+   nadie podía entrar: el login del sistema es POR CORREO, de modo que borrar la
+   dirección borraba también la identidad. Ahora se conserva la parte local y se
+   cambia el dominio a `.invalid`, un TLD reservado por la RFC 2606 que ningún
+   DNS resuelve jamás: `patricio.escobar@staging.invalid` sirve para entrar y no
+   puede recibir un correo ni por accidente. Además preserva la unicidad, que
+   `usuarios.email` exige por índice.
+
+   Dos partes locales iguales con dominio distinto (admin@admin.cl y
+   admin@sistema.cl) chocarían contra ese índice, así que la SEGUNDA en aparecer
+   lleva sufijo. Solo las que chocan: el resto queda con su nombre limpio. */
+const correoStaging = (v, vistos) => {
+  const local = String(v).split('@')[0].trim().toLowerCase() || 'usuario';
+  let cand = local, n = 1;
+  while (vistos.has(cand)) cand = `${local}-${++n}`;
+  vistos.add(cand);
+  return cand + '@staging.invalid';
+};
+
 const esc = v => {
   if (v === null || v === undefined) return 'NULL';
   if (v instanceof Date) return `'${v.toISOString().slice(0, 19).replace('T', ' ')}'`;
@@ -214,19 +234,16 @@ const esc = v => {
       else if (esCorreo(c))   mask[c] = 'correo';
       else if (esTelefono(c)) mask[c] = 'fono';
     });
+    const vistosCorreo = new Set();   // unicidad del correo enmascarado, por tabla
 
     try {
       for (let i = 0; i < filas.length; i += 200) {
-        const lote = filas.slice(i, i + 200).map((r, k) => {
-          /* El correo enmascarado lleva número de fila porque `usuarios.email`
-             es UNIQUE: una sola dirección para todos rompía el INSERT. Todos
-             llegan igual a la casilla de staging (subdirección con +). */
-          const nro = i + k;
+        const lote = filas.slice(i, i + 200).map(r => {
           return '(' + cols.map(c => {
             const v = r[c];
             if (mask[c] === 'clave')  return esc(hashStaging);      // nunca un hash de producción
             if (v == null || v === '') return esc(v);
-            if (mask[c] === 'correo') return `'staging+${nro}@autofacilchile.cl'`;
+            if (mask[c] === 'correo') return esc(correoStaging(v, vistosCorreo));
             if (mask[c] === 'fono')   return `'+56900000000'`;
             if (json.has(c))          return esc(typeof v === 'string' ? v : JSON.stringify(v));
             return esc(v);
