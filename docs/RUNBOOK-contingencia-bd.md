@@ -332,8 +332,9 @@ sesiones abiertas siguen valiendo**: nadie tiene que volver a entrar.
 curl https://afbs-standby-821999538473.us-east4.run.app/api/health
 ```
 
-Debe decir `"db":true` y `"entorno":"produccion"`. La primera petición puede demorar
-**hasta un minuto** porque despierta de cero: es normal, no insistas.
+Debe decir `"db":true` y `"entorno":"produccion"`. Si estaba dormido, la primera petición
+demora **unos 5 segundos** (medido 04-08-2026). Si a los 30 segundos no responde, no es que
+esté despertando: algo está mal.
 
 ### Paso 2 — Promoverlo (un comando)
 

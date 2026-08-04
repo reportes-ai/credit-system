@@ -291,8 +291,25 @@ En una línea: **el que duerme paga por rato, el que trabaja paga por mes.** El 
 necesita CPU siempre asignada porque con facturación por petición Google le corta la CPU
 entre llamadas, y los `setInterval` de los motores no dispararían.
 
-**Costo del diseño:** arranque en frío de 30-60 s en la primera petición tras la promoción
-(el sistema corre migraciones al arrancar). Aceptable para una emergencia.
+**Costo del diseño: 5 segundos de arranque en frío**, medido el 04-08-2026 en los registros
+de Cloud Run:
+
+```
+18:22:00.553  Starting new instance
+18:22:05.558  ✓ API Gateway escuchando
+18:22:05.561  Sonda de arranque TCP: OK al primer intento
+```
+
+Antes había estimado 30-60 s, suponiendo que las migraciones bloqueaban el arranque. **No lo
+hacen**: el gateway empieza a atender de inmediato y la cola del capataz (`shared/migrate.js`)
+corre detrás unos 5 minutos sin frenar el servicio. Ese diseño, que existía por otro motivo,
+es lo que hace que el standby despierte casi instantáneo.
+
+**Efecto secundario que conviene saber:** cada arranque en frío ejecuta toda la tanda de
+migraciones contra la base de PRODUCCIÓN. Son idempotentes (`CREATE TABLE IF NOT EXISTS`,
+`INSERT IGNORE`), así que no cambian nada, pero consumen ~5 minutos de consultas en TiDB.
+Con un standby que despierta de vez en cuando es irrelevante; si algún día se le pusiera
+tráfico real y escalara a muchas instancias, habría que revisarlo.
 
 ## Pendiente
 
