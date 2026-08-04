@@ -758,10 +758,31 @@ quedan cubiertas (`"320.118"` → 320.118 en `num-chile.test.js`; el ingreso por
 consecuencia directa). La tercera —columna inexistente en un `SELECT`— no es un motor puro:
 la cubre el `node --check` del CI de la semana 3, no una prueba unitaria.
 
-## Semana 3 — Ambiente de staging (B-2)
+## Semana 3 — Ambiente de staging (B-2) 🟡 HECHA EN CÓDIGO Y DATOS (04-08-2026)
 
-Ejecutar `docs/plan-staging-prod.md` en su orden: Fase 4 → Fase 1 → Fases 2 y 3 → Fase 5.
-Añadir el workflow de CI (`node --check` + pruebas de la semana 2).
+| Pieza | Estado |
+|---|---|
+| **Fase 4** — blindajes por `ENTORNO=staging` (`shared/entorno.js`) | ✅ Modo Desarrollo forzado, motores apagados, cinta STAGING, `/api/health` informa el entorno |
+| **CI** — `.github/workflows/ci.yml` | ✅ `node --check` de todo el JS + las 95 pruebas, en cada push y PR a `main`/`staging` |
+| **Fase 1** — rama `staging` | ✅ Creada y al día con `main` |
+| **Fase 2** — BD espejo `credit_system_staging` | ✅ 368 tablas, 118.106 filas, verificada |
+| Fase 1.2 — proteger `main` en GitHub | ⏳ Panel de GitHub — **Pato** |
+| **Fase 3** — servicio en Render | ⏳ Panel de Render — **Pato** |
+
+La base de staging se construye con `scripts/crear-bd-staging.js`: estructura completa, datos
+solo de una **lista explícita** de 136 tablas de configuración, la cartera vacía, contactos
+enmascarados y **ningún hash de contraseña de producción**.
+
+**Tres defectos aparecieron al construirla**, y los tres valen para cualquier copia de esquema
+futura: el orden de las claves foráneas; un `INSERT IGNORE` que descartaba filas **en
+silencio** (el log decía "40 filas" y la tabla quedaba vacía — de ahí la verificación de
+conteos que ahora hace el script); y que en este código `clave` significa *llave*, no
+*contraseña*, así que enmascarar por ese nombre destruía las tablas `(clave, valor)`.
+
+**Lo que falta es de panel, no de código** — está paso a paso en `docs/plan-staging-prod.md`:
+proteger `main` en GitHub (5 min) y crear el servicio `credit-system-staging` en Render con
+`ENTORNO=staging` y `DB_NAME=credit_system_staging` (20 min). Hasta que eso exista, `main`
+sigue siendo producción en vivo y **B-2 no se puede dar por cerrado**.
 
 ## Semana 4 — Continuidad y certificación (B-4)
 
