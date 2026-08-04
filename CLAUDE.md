@@ -289,7 +289,7 @@ Reglas de diseño que se derivan de este principio:
   - Revisar `.gitignore` para asegurar que ningún `.env` esté en el repositorio
   - Rotar el `JWT_SECRET` si alguna vez estuvo expuesto en GitHub
 
-- [x] ✅ **Rate limiting en el API Gateway** (v89.2: shared/rate-limit.js — login 10/min por IP + portal cliente)
+- [x] ✅ **Rate limiting en el API Gateway** (v89.2: login 10/min por IP + portal cliente. Ampliado 04-08-2026 tras el hallazgo A-5, que descubrió que los ~1.270 endpoints restantes seguían sin techo: ahora `shared/rate-limit.js` cubre TODO `/api` — 600/min por usuario, 120/min en reportería, tablas dinámicas, diseño de consulta y contabilidad. Se limita por usuario y no por IP porque la oficina sale por una sola IP pública)
   - Agregar `express-rate-limit` en `api-gateway/src/index.js` para evitar abuso
   - Límite sugerido: 200 req/min por IP en rutas públicas, 500 req/min en rutas autenticadas
   - Proteger especialmente `/api/auth/login` (máx 10 intentos/min por IP)

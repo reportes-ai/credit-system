@@ -710,20 +710,25 @@ sumó los ejes de proceso: ambiente, continuidad y variables de entorno.)*
 
 # 8. Roadmap a la certificación
 
-## Semana 1 — Bloqueantes de seguridad y correcciones rápidas
+## Semana 1 — Bloqueantes de seguridad y correcciones rápidas ✅ CERRADA (04-08-2026)
 
-| # | Acción | Esfuerzo |
-|---|---|---|
-| 1 | **B-1**: Modo Desarrollo a prueba de fallos (fail-safe) | 15 min |
-| 2 | **A-2**: escapar `motivo_rechazo` y `revisor_nombre` | 5 min |
-| 3 | **A-3**: escapar nombres en los rankings del dashboard | 10 min |
-| 4 | **A-1**: `process.exit(1)` tras `uncaughtException` | 15 min |
-| 5 | **A-5**: rate limiting global en `/api` | 2 h |
-| 6 | **A-9**: exportar y eliminar las 4 tablas de respaldo restantes | 30 min |
-| 7 | **A-4**: completar `.env.example` (44 variables) + verificación al arranque | 2 h |
-| 8 | **A-8**: reintento ante duplicado en `num_op` | 1 h |
+| # | Acción | Estado | Dónde quedó |
+|---|---|---|---|
+| 1 | **B-1**: Modo Desarrollo a prueba de fallos (fail-safe) | ✅ | `shared/dev-mode.js` — el `catch` asume ACTIVO y reintenta a los 5 s; `shared/entorno.js` fuerza el modo en staging sin preguntarle a la BD |
+| 2 | **A-2**: escapar `motivo_rechazo` y `revisor_nombre` | ✅ | `dealers-incorporacion/nuevo.html` — ambos con `escH()` |
+| 3 | **A-3**: escapar nombres en los rankings del dashboard | ✅ | `dashboard/app.js` — Top Dealers y Top Ejecutivos con `escH()` |
+| 4 | **A-1**: `process.exit(1)` tras `uncaughtException` | ✅ | `api-gateway/src/index.js` — registra, alerta por correo y sale con 1,5 s de margen |
+| 5 | **A-5**: rate limiting global en `/api` | ✅ | 600/min por usuario en toda la API; 120/min en reportería, tablas dinámicas, diseño de consulta y contabilidad. Se agrupa por usuario, no por IP (la oficina comparte IP pública). Corregido además el estado que `CLAUDE.md` daba por cerrado |
+| 6 | **A-9**: exportar y eliminar las tablas de respaldo restantes | ✅ | Las 4 nombradas en el hallazgo ya no existen. En esta pasada apareció una quinta que el patrón `bkp_` tampoco cazaba: **`fin_fix_backup_2026_06`** (9.680 filas, respaldo de reversa de la migración `fix-financieras` de jun-2026, aplicada y validada hace dos meses). Exportada a JSON+SQL y eliminada con `scripts/borrar-fin-fix-backup-2026-08-04.js` |
+| 7 | **A-4**: completar `.env.example` + verificación al arranque | ✅ | 43 variables documentadas y agrupadas; `shared/env-check.js` se ejecuta al arrancar el gateway |
+| 8 | **A-8**: reintento ante duplicado en `num_op` | ✅ | `shared/num-op.js` — `conNumOpAF()` reintenta con backoff ante `ER_DUP_ENTRY`; `siguienteNumOpAF()` solo propone el número |
 
-**Total: menos de un día de trabajo.** Cierra 6 de 9 hallazgos altos y 1 bloqueante.
+**Resultado:** cerrados el bloqueante **B-1** y los altos **A-1 a A-5, A-8 y A-9**. Quedan
+abiertos de la lista de altos: **A-6** (sesiones no revocables, `token_version`) y **A-7**
+(`xlsx` sin parche) — ambos de esfuerzo Medio, no de semana 1.
+
+**Se adopta la regla que faltaba:** toda tabla de respaldo nace con prefijo `bkp_` y fecha en
+el nombre. Las dos pasadas de limpieza dejaron tablas afuera justamente por no seguirla.
 
 ## Semana 2 — Pruebas automatizadas (B-3)
 
