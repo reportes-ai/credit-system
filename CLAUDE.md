@@ -164,6 +164,28 @@ Reglas de diseño que se derivan de este principio:
   resultado en `ctb_eventos_log` (CONTABILIZADO / SIN_REGLA / DESCUADRE / ERROR).
   Ese log es la lista de pendientes: si algo aparece SIN_REGLA, falta cablearlo.
 
+## Los documentos NO van en la base (`shared/almacen-docs.js`)
+> **Todo archivo que sube un usuario va al bucket `gs://autofacil-docs`; la fila guarda
+> solo `doc_storage` + `doc_ruta` + `doc_bytes`.** Nunca un `LONGBLOB` nuevo.
+
+- **Por qué**: medido el 04-08-2026, los documentos eran el **95% de la base** — 112,9 MB
+  en 293 archivos, contra ~6 MB de TODA la operación (17.932 créditos, 18.634 clientes,
+  contabilidad completa). TiDB cobra por almacenamiento **y por consulta**, y el respaldo
+  nocturno arrastraba todo: de 38 MB a 118 MB en quince días, por 30 copias.
+- **Un solo motor**: `colocar()` / `obtener()` / `servir()` / `borrar()`. Un controlador
+  nunca decide dónde va un archivo ni arma una ruta a mano.
+- **El blob manda mientras exista**: `obtener()` mira primero el blob y solo va al bucket
+  si la fila ya no lo tiene. Por eso el orden de la migración no importa y nunca queda un
+  documento inaccesible en un host sin credenciales.
+- **Sin `GCS_BUCKET` todo sigue funcionando** guardando en la base — local, staging y el
+  standby quedan enteros aunque no se les carguen credenciales.
+- **Al reemplazar o borrar**: capturar `doc_ruta` **antes** del DELETE (después ya no hay
+  cómo saber qué objeto quedó huérfano) y borrar el objeto **después** de que la fila
+  apunte al archivo nuevo.
+- **El bucket NO es disco de servidor** — esa es la lección de los informes DealerNet.
+- 📘 `docs/ALMACEN-documentos.md` · barrido: `scripts/migrar-docs-bucket.js` ·
+  verificación: `/api/health → documentos`.
+
 ## Motores automáticos: un solo interruptor (`shared/scheduler.js`)
 > **Toda tarea de fondo se registra con `programar()`, nunca con un `setInterval` suelto.**
 

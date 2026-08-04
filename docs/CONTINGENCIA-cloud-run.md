@@ -196,6 +196,20 @@ las integraciones externas. Promovido hoy:
 | Portales de cliente y dealer | DealerNet — informes comerciales |
 | **Correo saliente** (cartolas, alertas) | SII / RCV (`SIMPLEAPI_KEY`), Workera, Fintoc |
 
+### Los documentos SÍ los alcanza (y hay que verificarlo)
+
+Los archivos que suben los usuarios ya no viven en la base sino en el bucket
+`gs://autofacil-docs` (📘 `docs/ALMACEN-documentos.md`). El standby **sí** llega a ellos,
+usando su propia identidad de Cloud Run — sin llave que cargar. Se comprueba de un vistazo:
+
+```bash
+curl -s https://afbs2.autofacilchile.cl/api/health | grep -o '"documentos":{[^}]*}'
+```
+
+Debe decir `"activo":true`. **Si dijera `false`, todo documento ya migrado sería
+inaccesible desde el standby** — no se perdería nada, pero no se podría abrir hasta
+restablecer el acceso al bucket.
+
 **Es una degradación deliberada, no un descuido.** Para una caída de horas es aceptable: la
 operación del negocio sigue. El sistema lo informa solo en el log de arranque, listando cada
 variable ausente y qué módulo deja fuera de servicio.
