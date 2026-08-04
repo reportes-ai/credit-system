@@ -22,6 +22,17 @@
 >
 > **Verificación de un vistazo:** `/api/health` informa `entorno` (`staging` vs `produccion`) y
 > `motores_apagados` (en staging, los 5 que contactan clientes; en producción, `[]`).
+>
+> ⚠️ **OJO — el apagado de motores es PARCIAL (detectado 04-08-2026).** Solo **8** temporizadores
+> pasan por `shared/scheduler.js` y obedecen a `ENTORNO`. Los otros **~24 son `setInterval`
+> crudos** dentro de los controllers y **siguen corriendo en staging**: aprobación automática
+> de comisiones, desistimiento de aprobados vencidos, cierre de castigos, devengos de
+> vacaciones, escalamiento de tickets y workflows, recordatorios de cierre de mes.
+> No pueden contactar a un cliente (Modo Desarrollo forzado + sin credenciales de WhatsApp),
+> pero **sí mutan datos de la base de staging**. Para el ambiente de pruebas es tolerable; para
+> un **segundo host de contingencia es inaceptable**: dos procesos contra la misma base
+> disparan cada reloj dos veces. Migrarlos al scheduler es requisito previo a cualquier
+> host alternativo.
 
 > Objetivo: que `main` deje de ser "producción en vivo" y todo cambio pase por un ambiente
 > de prueba idéntico antes de llegar a los usuarios. Ejecutar en el orden indicado;
