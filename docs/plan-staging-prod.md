@@ -105,8 +105,9 @@ cluster de TiDB. Resultado verificado: **368 tablas, 118.106 filas**.
   mantenedores, indicadores (UF, tasas, feriados), máquinas de estados y maestros de negocio.
 - **La cartera nace vacía**: créditos, clientes, cuotas, pagos, cartas, cobranza, RRHH y
   contabilidad tienen 0 filas. La QA crea sus propios casos.
-- **Enmascarado**: correos y teléfonos de las 4 tablas que los tienen (`dealers`, `usuarios`,
-  `vendedores_dealer`, `proveedores`) quedan en `staging+N@autofacilchile.cl` y `+56900000000`.
+- **Enmascarado**: los correos y teléfonos de las 4 tablas que los tienen (`dealers`,
+  `usuarios`, `vendedores_dealer`, `proveedores`) conservan su parte local y cambian de
+  dominio a **`@staging.invalid`**; los teléfonos quedan en `+56900000000`.
 - **Ningún hash de producción**: los 40 usuarios comparten una clave de staging conocida
   (`--clave`, por defecto `Staging2026!`). Sirve para entrar con cualquier perfil sin
   arrastrar credenciales reales.
@@ -119,8 +120,15 @@ dealers. Con lista de inclusión, una tabla nueva con datos de personas no se co
 falta algo en staging, se agrega a mano — ese costo es mucho más barato que filtrar datos de
 clientes al ambiente de pruebas.
 
-**Tres defectos que aparecieron al construirla** (quedan resueltos en el script, y valen como
+**Cuatro defectos que aparecieron al construirla** (quedan resueltos en el script, y valen como
 advertencia para cualquier copia futura de esquema):
+0. **Enmascarar el correo dejó a todos afuera.** La primera versión reemplazaba cada dirección
+   por `staging+N@autofacilchile.cl`, y **el login del sistema es POR CORREO**: al borrar la
+   dirección se borró la identidad de acceso. Un correo enmascarado tiene que ser
+   **inalcanzable**, no **irreconocible**. `.invalid` es un TLD reservado por la RFC 2606 que
+   ningún DNS resuelve, así que `patricio.escobar@staging.invalid` sirve para entrar y no puede
+   recibir correo ni por accidente. (Colisión real: `admin@admin.cl` y `admin@sistema.cl`
+   comparten parte local — la segunda en aparecer lleva sufijo.)
 1. **Claves foráneas**: no se puede crear `comunas` antes que `provincias`. El script crea en
    pasadas hasta que una pasada completa no agrega nada. Es el mismo gotcha del respaldo de
    Google Cloud SQL.
