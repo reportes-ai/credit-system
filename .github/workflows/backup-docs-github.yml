@@ -50,13 +50,17 @@ jobs:
           gsutil -m cp -r "gs://${GCS_DOCS}/*" documentos/
           rm -f /tmp/gcp-sa.json
 
-          # Conteo de control ANTES de empaquetar: un tar de un directorio vacío
-          # pesa poco y se sube feliz. Sin esta comparación, un fallo de la copia
-          # produce un "respaldo" verde y hueco, que es el peor resultado posible.
+          # Control ANTES de empaquetar, contra el ORIGEN y no contra un mínimo
+          # inventado: un tar de un directorio vacío —o a medias— pesa poco y se
+          # sube feliz. Sin comparar contra el bucket, un fallo de la copia
+          # produce un "respaldo" verde y hueco, que es el peor resultado
+          # posible: parece que estás cubierto justo cuando no lo estás.
+          ENBUCKET=$(gsutil ls -r "gs://${GCS_DOCS}/**" 2>/dev/null | grep -v '/$' | wc -l)
           BAJADOS=$(find documentos -type f | wc -l)
-          echo "archivos bajados: $BAJADOS"
-          if [ "$BAJADOS" -lt 1 ]; then
-            echo "✗ no se bajó ni un archivo — se aborta antes de generar un respaldo vacío"; exit 1
+          BYTES=$(du -sm documentos | cut -f1)
+          echo "en el bucket: $ENBUCKET · bajados: $BAJADOS · ${BYTES} MB"
+          if [ "$BAJADOS" -lt "$ENBUCKET" ]; then
+            echo "✗ faltan archivos ($BAJADOS de $ENBUCKET) — se aborta antes de generar un respaldo incompleto"; exit 1
           fi
 
           tar -czf documentos-$(date +%Y%m%d).tar.gz documentos
