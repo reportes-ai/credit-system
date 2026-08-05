@@ -390,11 +390,17 @@ const createBatch = async (req, res) => {
     // Calendario congelado (cuotas_credito): marcar las cuotas pagadas también ahí,
     // para que la tabla de desarrollo real y los pagos en app siempre conversen.
     if (pagos.length) {
+      /* SIN `.catch(() => {})`: esto está DENTRO de la transacción y antes del
+         commit. Al tragarse el error, el flujo seguía y se commiteaba igual:
+         quedaban filas en `pagos_credito` diciendo que la cuota se pagó y
+         `cuotas_credito` diciendo que sigue impaga — el cliente pagó, salió su
+         comprobante, y la cuota seguía devengando mora y entrando a cobranza.
+         Si falla, que reviente y haga rollback (auditoría 05-08-2026, C-6). */
       await conn.query(
         `UPDATE cuotas_credito SET estado_cuota='PAGADA', fecha_pago=?
           WHERE id_credito=? AND numero_cuota IN (?) AND estado_cuota<>'PAGADA'`,
         [fecha_pago || new Date(), id_credito, pagos.map(p => p.numero_cuota)]
-      ).catch(() => {});
+      );
     }
 
     // ── 5. Consumir saldo a favor si se necesitó ───────────────────────────
@@ -611,9 +617,15 @@ const prepagar = async (req, res) => {
       'Comisión de prepago + interés corriente', reg, u.id_usuario || null, idCajaInt, b.origen_fondos || null, idCtaInt, trx, corrComTot, 0]);
 
     // Calendario real → marcar cuotas PAGADA; y estado terminal PREPAGADO (creditos + brokerage)
-    await conn.query("UPDATE cuotas_credito SET estado_cuota='PAGADA', fecha_pago=? WHERE id_credito=? AND estado_cuota<>'PAGADA'", [fp, id_credito]).catch(() => {});
+    // Mismo caso que arriba (C-6): iban con `.catch(() => {})` dentro de la
+    // transacción, así que un prepago podía quedar cobrado sin marcar el
+    // calendario ni la cartera, y commiteaba igual.
+    await conn.query("UPDATE cuotas_credito SET estado_cuota='PAGADA', fecha_pago=? WHERE id_credito=? AND estado_cuota<>'PAGADA'", [fp, id_credito]);
     await conn.query("UPDATE creditos SET estado_cartera='PREPAGADO' WHERE id=?", [id_credito]);
-    await conn.query("UPDATE operaciones_brokerage SET estado_cartera='PREPAGADO' WHERE num_op=?", [num_op]).catch(() => {});
+    // `operaciones_brokerage` es tabla espejo y puede no existir en todos los
+    // entornos: ese sí se tolera, pero dejando rastro en el log.
+    await conn.query("UPDATE operaciones_brokerage SET estado_cartera='PREPAGADO' WHERE num_op=?", [num_op])
+      .catch(e => console.error('[prepago] operaciones_brokerage:', e.message));
 
     await conn.commit();
 

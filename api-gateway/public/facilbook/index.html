@@ -219,7 +219,9 @@ let FOTOS_PERFIL = {}, YO = null, FOTOS_TMP = { post: [], item: [] }, PICK = 'po
 
 function avatarHTML(nombre, idU, cls) {
   const src = idU && FOTOS_PERFIL[idU];
-  return `<div class="avatar ${cls||''}">${src ? `<img src="${src}" alt="">` : esc((nombre||'?')[0].toUpperCase())}</div>`;
+  // El nombre se escapaba y el src NO: defensa en profundidad junto con la
+  // validación del servidor, porque estas fotos las ve toda la empresa.
+  return `<div class="avatar ${cls||''}">${src ? `<img src="${esc(src)}" alt="">` : esc((nombre||'?')[0].toUpperCase())}</div>`;
 }
 
 /* ── init ── */

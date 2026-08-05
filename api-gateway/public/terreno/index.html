@@ -367,8 +367,8 @@ function renderLista(){
         ${v.telefono || v.cf_telefono ? `<div class="row"><i>📞</i>${v.telefono || v.cf_telefono}</div>` : ''}
         <div class="row"><i>🕓</i>Última venta: ${fFecha(v.ultima_venta)} · ${v.creditos_total} créditos hist.</div>
         ${v.com_6_12 != null ? `<div class="row"><i>%</i>Comisión 6-12: ${v.com_6_12} · 13-24: ${v.com_13_24 ?? '—'} · 25-36: ${v.com_25_36 ?? '—'} · 37+: ${v.com_37 ?? '—'}</div>` : ''}
-        ${v.comentarios ? `<div class="row"><i>💬</i>${v.comentarios}</div>` : ''}
-        ${v.seguimiento_fecha ? `<div class="row"><i>🔔</i>Seguimiento ${fFecha(v.seguimiento_fecha)}: ${v.seguimiento_nota || ''}</div>` : ''}
+        ${v.comentarios ? `<div class="row"><i>💬</i>${esc(v.comentarios)}</div>` : ''}
+        ${v.seguimiento_fecha ? `<div class="row"><i>🔔</i>Seguimiento ${fFecha(v.seguimiento_fecha)}: ${esc(v.seguimiento_nota || "")}</div>` : ''}
       </div>
       <div class="vc-btns">
         <button onclick="navegar(${v.id})"><span class="ic">🧭</span>Ir</button>

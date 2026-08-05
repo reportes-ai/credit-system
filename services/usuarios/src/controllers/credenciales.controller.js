@@ -109,7 +109,13 @@ exports.guardar = async (req, res) => {
   try {
     const id = parseInt(req.params.id) || 0;
     const b = req.body || {};
-    if (b.foto !== undefined && b.foto && !/^data:image\/(png|jpe?g|webp);base64,/.test(String(b.foto)))
+    /* La expresión validaba SOLO el prefijo (sin `$`), así que cualquier texto
+       podía viajar después de `base64,` — incluido `" onerror="…`, que rompe el
+       atributo src donde se pinta y ejecuta en el muro de Facilbook de toda la
+       empresa. Ahora se exige que el resto sea base64 legítimo de punta a punta
+       (auditoría 05-08-2026, M-1). */
+    if (b.foto !== undefined && b.foto &&
+        !/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/\r\n]+={0,2}$/.test(String(b.foto)))
       return res.status(400).json({ success: false, data: null, error: 'Foto inválida (debe ser imagen)' });
     if (String(b.foto || '').length > 2_000_000)
       return res.status(400).json({ success: false, data: null, error: 'Foto muy pesada (máx ~1,5 MB)' });

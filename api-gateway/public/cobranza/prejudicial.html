@@ -321,6 +321,10 @@
 
 <script src="/js/auth-guard.js"></script>
 <script>
+/* Escapa texto libre antes de meterlo en innerHTML. Sin esto, un mensaje de
+   gestión con <img src=x onerror=...> roba el JWT desde sessionStorage de quien
+   abra la bitácora — supervisor, jefatura, gerencia (auditoría 05-08-2026). */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
@@ -816,11 +820,11 @@ async function cargarBitacora(id_credito) {
     document.getElementById('bitacoraContent').innerHTML = data.map(g => `
       <div class="bitacora-item" style="border-color:${g.confirmado ? '#10b981' : '#94a3b8'}">
         <div style="display:flex;justify-content:space-between">
-          <div class="bitacora-tipo">${g.tipo_gestion} · ${g.canal} ${g.confirmado ? '<span style="color:#10b981">✓ confirmado</span>' : ''}</div>
+          <div class="bitacora-tipo">${esc(g.tipo_gestion)} · ${esc(g.canal)} ${g.confirmado ? '<span style="color:#10b981">✓ confirmado</span>' : ''}</div>
           <div class="bitacora-fecha">${fmtFechaHora(g.created_at)}</div>
         </div>
-        <div style="font-size:0.78rem;color:#64748b">${g.nombre_usuario || '—'} · ${g.resultado}</div>
-        ${g.mensaje ? `<div class="bitacora-msg">${g.mensaje}</div>` : ''}
+        <div style="font-size:0.78rem;color:#64748b">${esc(g.nombre_usuario || "—")} · ${esc(g.resultado)}</div>
+        ${g.mensaje ? `<div class="bitacora-msg">${esc(g.mensaje)}</div>` : ''}
         ${g.resultado === 'PROMESA_PAGO' ? `<div style="font-size:0.8rem;margin-top:4px;color:#d97706"><i class="bi bi-calendar-check me-1"></i>Promesa: ${fmtFecha(g.fecha_promesa)} — ${fmt(g.monto_promesa)}</div>` : ''}
       </div>`).join('');
   } catch(e) {

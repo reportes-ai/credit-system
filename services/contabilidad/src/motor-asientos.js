@@ -236,12 +236,33 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
-      const [[{ sig }]] = await conn.query(
-        'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', [regla.tipo, anio]);
-      const [r] = await conn.query(
-        `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, origen, origen_ref, total, creado_por)
-         VALUES (?,?,?,?,?,?,?,?,'Motor de asientos')`,
-        [regla.tipo, anio, sig, f, (glosa || regla.nombre).slice(0, 300), evento, ref || null, debe]);
+      /* `SELECT MAX(...) FOR UPDATE` NO reserva el hueco: es un agregado, y
+         cuando el año/tipo aún no tiene filas no hay nada que bloquear. Dos
+         eventos simultáneos del mismo tipo leían el mismo número y el segundo
+         chocaba contra `uq_tipo_anio_num`; ese error subía al catch de abajo,
+         que registra y devuelve null SIN reintentar. Resultado: la operación de
+         negocio se completaba y el asiento sencillamente no existía — la
+         contabilidad quedaba descuadrada sin que nadie se enterara hasta el
+         cierre de mes (auditoría 05-08-2026, C-5).
+         Mismo remedio que `shared/num-op.js` para el correlativo de operación:
+         insistir con el siguiente número hasta encontrar el libre. */
+      let sig = null, r = null, ultimo = null;
+      for (let intento = 0; intento < 8 && !r; intento++) {
+        const [[mx]] = await conn.query(
+          'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', [regla.tipo, anio]);
+        sig = Number(mx.sig) + intento;
+        try {
+          [r] = await conn.query(
+            `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, origen, origen_ref, total, creado_por)
+             VALUES (?,?,?,?,?,?,?,?,'Motor de asientos')`,
+            [regla.tipo, anio, sig, f, (glosa || regla.nombre).slice(0, 300), evento, ref || null, debe]);
+        } catch (e) {
+          const dup = e && (e.code === 'ER_DUP_ENTRY' || e.errno === 1062);
+          if (!dup) throw e;                       // otro error: no es carrera
+          ultimo = e;
+        }
+      }
+      if (!r) throw ultimo || new Error('No se pudo obtener un número de comprobante libre');
       for (const m of movs)
         await conn.query('INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber, num_op, rut) VALUES (?,?,?,?,?,?,?)',
           [r.insertId, m.cuenta, m.glosa, m.debe, m.haber, num_op, rut]);

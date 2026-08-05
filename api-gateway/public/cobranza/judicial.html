@@ -274,6 +274,10 @@
 
 <script src="/js/auth-guard.js"></script>
 <script>
+/* Escapa texto libre antes de meterlo en innerHTML. Sin esto, un mensaje de
+   gestión con <img src=x onerror=...> roba el JWT desde sessionStorage de quien
+   abra la bitácora — supervisor, jefatura, gerencia (auditoría 05-08-2026). */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) window.location.href = '/login.html';
@@ -691,8 +695,8 @@ async function cargarBitacora(id_credito) {
           <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:#64748b">${g.tipo_gestion} · ${g.canal} ${g.confirmado ? '<span style="color:#10b981">✓</span>' : ''}</div>
           <div style="font-size:0.75rem;color:#94a3b8">${fmtFechaHora(g.created_at)}</div>
         </div>
-        <div style="font-size:0.78rem;color:#64748b">${g.nombre_usuario || '—'} · ${g.resultado}</div>
-        ${g.mensaje ? `<div style="font-size:0.83rem;color:#334155;margin-top:4px">${g.mensaje}</div>` : ''}
+        <div style="font-size:0.78rem;color:#64748b">${esc(g.nombre_usuario || "—")} · ${esc(g.resultado)}</div>
+        ${g.mensaje ? `<div style="font-size:0.83rem;color:#334155;margin-top:4px">${esc(g.mensaje)}</div>` : ''}
       </div>`).join('');
   } catch(e) {}
 }
