@@ -89,20 +89,22 @@ jobs:
       - name: Respaldar los documentos (bucket → bucket)
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-          GCS_DOCS: ${{ secrets.GCS_DOCS }}
-          GCS_DOCS_RESPALDO: ${{ secrets.GCS_DOCS_RESPALDO }}
+          # Nombres de bucket, no secretos: van acá a la vista. El único secreto
+          # real es la llave de la cuenta de servicio.
+          GCS_DOCS: autofacil-docs
+          GCS_DOCS_RESPALDO: autofacil-docs-respaldo
         run: |
-          if [ -z "$GCP_SA_KEY" ] || [ -z "$GCS_DOCS_RESPALDO" ]; then
-            echo "Sin GCP_SA_KEY o GCS_DOCS_RESPALDO — se omite el respaldo de documentos"; exit 0
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Sin GCP_SA_KEY — se omite el respaldo de documentos"; exit 0
           fi
           printf '%s' "$GCP_SA_KEY" > /tmp/gcp-sa.json
           gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json --quiet
-          gsutil -m rsync -r "gs://${GCS_DOCS:-autofacil-docs}" "gs://${GCS_DOCS_RESPALDO}/"
+          gsutil -m rsync -r "gs://${GCS_DOCS}" "gs://${GCS_DOCS_RESPALDO}/"
           rm -f /tmp/gcp-sa.json
           # Conteo de control: si el respaldo tiene MENOS archivos que el origen,
           # algo se perdió en el camino y hay que mirarlo — no se falla el job,
           # pero queda gritado en el log.
-          ORIG=$(gsutil ls -r "gs://${GCS_DOCS:-autofacil-docs}/**" 2>/dev/null | wc -l)
+          ORIG=$(gsutil ls -r "gs://${GCS_DOCS}/**" 2>/dev/null | wc -l)
           COPIA=$(gsutil ls -r "gs://${GCS_DOCS_RESPALDO}/**" 2>/dev/null | wc -l)
           echo "documentos: origen=$ORIG respaldo=$COPIA"
           [ "$COPIA" -ge "$ORIG" ] && echo "✓ respaldo completo" || echo "⚠ el respaldo tiene MENOS archivos que el origen — revisar"

@@ -121,9 +121,35 @@ Si el paso 3 falla, lo peor que queda es un objeto de más. Nunca un documento s
 |---|---|
 | Bucket | `gs://autofacil-docs` · **us-east4** (junto a la app y a TiDB, como Render en Virginia) |
 | Clase | Standard · acceso público **bloqueado** · acceso uniforme |
-| Versionado | **activado** — un borrado por error se puede revertir |
+| Versionado | **activado el 05-08-2026** — un borrado por error se puede revertir. Antes de esa fecha NO lo estaba, aunque este mismo documento decía que sí: lo único que había era el *soft delete* de 7 días que Google pone por defecto |
 | Costo | ~US$0,026/GB/mes → **centavos** al volumen actual |
 | Cuenta de servicio | `afbs-docs@autofacil-bs.iam.gserviceaccount.com` — `objectAdmin` **solo sobre este bucket** |
+
+### El respaldo de los documentos es un paso aparte
+
+**El `mysqldump` nocturno ya no los contiene.** Es la consecuencia menos obvia de sacar los
+archivos de la base: el respaldo siguió corriendo igual, verde, y dejó de cubrir el 95% de
+lo que cubría — sin avisar. Un respaldo que se achica solo es peor que no tenerlo, porque
+nadie lo mira.
+
+| | |
+|---|---|
+| Destino | `gs://autofacil-docs-respaldo` · **southamerica-west1** (otra región que el origen) |
+| Clase | Nearline · versionado activo · **sin regla de borrado** |
+| Cuándo | en el mismo workflow nocturno, después del dump (`.github/workflows/backup-bd.yml`) |
+| Cuenta | `github-backup-uploader@` — `objectViewer` en el origen, `objectAdmin` en el destino |
+
+**Por qué `objectViewer` y no `objectAdmin` en el origen:** el proceso de respaldo no tiene
+ninguna razón para poder modificar los documentos vivos. Si algo sale mal ahí, que salga
+mal en dirección inofensiva.
+
+**Y por qué un bucket propio y no el de los dumps:** `autofacil-respaldos-bd` borra a los 90
+días por regla de ciclo de vida. Un documento que lleve tres meses sin cambiar sería
+borrado por esa regla, y `rsync` **no lo repondría** —en el origen no cambió nada—, así que
+desaparecería del respaldo en silencio.
+
+El paso imprime `documentos: origen=N respaldo=N` al terminar. Si el respaldo tiene menos
+archivos que el origen, avisa en el log.
 
 **Autenticación, en este orden:**
 
