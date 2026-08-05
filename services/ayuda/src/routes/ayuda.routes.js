@@ -7,6 +7,7 @@ const c = require('../controllers/ayuda.controller');
 // Academia (autocapacitación) — solo requiere sesión: es para todos.
 router.get('/academia/cursos', verifyToken, c.academiaCursos);
 router.post('/academia/progreso', verifyToken, c.academiaProgreso);
+router.get('/dcq', verifyToken, c.dcqListar);   // Dónde·Cómo·Quién: banco completo
 
 router.get('/todas', verifyToken, requireFunc('mantenedores_ayuda'), c.listAyuda);
 router.get('/', verifyToken, c.getAyuda);

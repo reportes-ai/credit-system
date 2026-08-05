@@ -419,4 +419,50 @@ const upsertAyuda = async (req, res) => {
   }
 };
 
-module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso };
+/* ── DÓNDE · CÓMO · QUIÉN (Academia) ──────────────────────────────────────────
+   Banco precargado de preguntas operativas: dónde se hace, cómo y quién puede.
+   El conocimiento vive en dcq-banco.js (escrito desde el código real, no
+   generado por IA en runtime) y se CONVERGE a la BD en cada arranque: el slug
+   es la llave, así que corregir una entrada en el archivo corrige la fila.
+   La búsqueda es 100% en el navegador: el banco entero pesa poco y así no se
+   paga una consulta TiDB por cada tecla. */
+require('../../../../shared/migrate').enFila('ayuda-dcq', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dcq_preguntas (
+        slug       VARCHAR(60) PRIMARY KEY,
+        cat        VARCHAR(40) NOT NULL,
+        pregunta   VARCHAR(200) NOT NULL,
+        donde      TEXT,
+        como       TEXT,
+        quien      TEXT,
+        href       VARCHAR(200) NULL,
+        kw         VARCHAR(300) NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`);
+    const BANCO = require('../dcq-banco');
+    for (const q of BANCO) {
+      await pool.query(
+        `INSERT INTO dcq_preguntas (slug, cat, pregunta, donde, como, quien, href, kw)
+         VALUES (?,?,?,?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE cat=VALUES(cat), pregunta=VALUES(pregunta), donde=VALUES(donde),
+           como=VALUES(como), quien=VALUES(quien), href=VALUES(href), kw=VALUES(kw)`,
+        [q.slug, q.cat, q.p, q.donde, q.como, q.quien, q.href || null, q.kw || null]);
+    }
+    console.log(`[dcq] banco Dónde·Cómo·Quién convergido: ${BANCO.length} preguntas`);
+  } catch (e) { console.error('[dcq migration]', e.message); }
+});
+
+/* GET /api/ayuda/dcq — el banco completo, para búsqueda client-side */
+const dcqListar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT slug, cat, pregunta, donde, como, quien, href, kw FROM dcq_preguntas ORDER BY cat, pregunta');
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[dcq listar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso, dcqListar };

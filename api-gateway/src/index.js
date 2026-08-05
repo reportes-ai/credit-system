@@ -685,6 +685,7 @@ const PAGINAS = [
   ['/informes-dealernet', 'informes-dealernet/index.html'],
   ['/dealernet-informes', 'dealernet-informes/index.html'],
   ['/academia', 'academia/index.html'],
+  ['/academia/donde-como-quien', 'academia/donde-como-quien/index.html'],
 ];
 for (const [ruta, archivo] of PAGINAS) {
   const urls = Array.isArray(ruta) ? ruta : [ruta, ruta + '/'];

@@ -176,6 +176,8 @@ function pintarResumen(){
 
 /* Libros interactivos (flipbook) — material de estudio aparte de los cursos */
 const LIBROS = [
+  { titulo:'Dónde · Cómo · Quién', icono:'bi-signpost-split', href:'/academia/donde-como-quien/', badge:'Buscador',
+    resumen:'Pregunta con tus palabras cómo opera la plataforma: dónde se hace cada cosa, cómo se hace y quién puede hacerla. Respuestas precargadas desde las reglas reales del sistema.' },
   { titulo:'Creación de Dealers', icono:'bi-book-half', href:'/academia/libro-dealers/',
     resumen:'El manual de creación de concesionarios como libro interactivo: las 21 hojas reales del manual, con sus pantallas, que se dan vuelta como libro.' }
 ];
@@ -185,14 +187,14 @@ function pintarGrid(){
   if (!CURSOS.length && !LIBROS.length){ g.innerHTML=''; document.getElementById('vacio').style.display='block'; return; }
   const librosHtml = LIBROS.map(l=>`
     <div class="curso" onclick="location.href='${esc(l.href)}'">
-      <span class="badge-cont" style="background:#f3e8ff;color:#7c3aed">Libro</span>
+      <span class="badge-cont" style="background:#f3e8ff;color:#7c3aed">${esc(l.badge||'Libro')}</span>
       <div class="top">
         <div class="cico" style="background:linear-gradient(135deg,#f3e8ff,#e4d3ff);color:#7c3aed"><i class="bi ${esc(l.icono)}"></i></div>
         <h3>${esc(l.titulo)}</h3>
       </div>
       <div class="res">${esc(l.resumen)}</div>
       <div class="meta">
-        <span class="lecc"><i class="bi bi-book"></i> Libro interactivo</span>
+        <span class="lecc"><i class="bi bi-book"></i> ${esc(l.badge==='Buscador'?'Buscador de respuestas':'Libro interactivo')}</span>
         <span><i class="bi bi-box-arrow-up-right"></i></span>
       </div>
     </div>`).join('');
