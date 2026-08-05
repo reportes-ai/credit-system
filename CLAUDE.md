@@ -183,7 +183,10 @@ Reglas de diseño que se derivan de este principio:
   cómo saber qué objeto quedó huérfano) y borrar el objeto **después** de que la fila
   apunte al archivo nuevo.
 - **El bucket NO es disco de servidor** — esa es la lección de los informes DealerNet.
+- **Cerrado el 05-08-2026**: 293 archivos migrados y los 287 blobs restantes liberados
+  (tamaño + SHA-256 verificados uno a uno). **La base pasó de 118 MB a 44,4 MB.**
 - 📘 `docs/ALMACEN-documentos.md` · barrido: `scripts/migrar-docs-bucket.js` ·
+  liberar espacio: `scripts/soltar-blobs-migrados.js` (paso aparte, sin retorno) ·
   verificación: `/api/health → documentos`.
 
 ## Motores automáticos: un solo interruptor (`shared/scheduler.js`)

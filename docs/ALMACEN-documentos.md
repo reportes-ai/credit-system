@@ -152,7 +152,7 @@ carguen credenciales.
 node scripts/migrar-docs-bucket.js                    # informe, no mueve nada
 node scripts/migrar-docs-bucket.js fundantes          # copia una tabla
 node scripts/migrar-docs-bucket.js todo               # copia todas
-node scripts/migrar-docs-bucket.js todo --soltar-blob # copia Y libera el espacio
+node scripts/migrar-docs-bucket.js todo --soltar-blob # copia Y libera, en un solo paso
 ```
 
 Para cada archivo: **1)** se sube, **2)** se verifica que arriba pese lo mismo, **3)**
@@ -160,10 +160,27 @@ recién entonces la fila apunta al bucket. Si el proceso se corta en cualquier p
 documento sigue siendo legible. Es **re-ejecutable**: solo toma filas con blob y sin
 `doc_ruta`.
 
-### El paso `--soltar-blob` es el punto de no retorno
+Copiar **no** libera espacio: el archivo queda en los dos lados y basta borrar `doc_ruta`
+para volver atrás. Soltar los blobs es un paso aparte y sin retorno.
 
-Mientras no se corra, el archivo está en **los dos lados** y basta borrar `doc_ruta` para
-volver atrás. El espacio en la base recién se libera al soltar los blobs.
+### Soltar los blobs: `scripts/soltar-blobs-migrados.js`
+
+```bash
+node scripts/soltar-blobs-migrados.js              # informe, no borra nada
+node scripts/soltar-blobs-migrados.js todo --si    # libera (el --si es a propósito)
+```
+
+**Por qué un script propio y no `--soltar-blob`.** Esa bandera suelta el blob *en el mismo
+momento de subirlo*, y su SELECT solo alcanza filas con `doc_ruta IS NULL`. Las filas ya
+migradas quedan fuera de ese filtro para siempre: correrla después no libera un solo byte.
+El caso normal —migrar primero, verificar durante días, soltar después— necesita este
+barrido distinto.
+
+Fila por fila, antes de borrar: baja el objeto del bucket, compara el **tamaño** y compara
+el **SHA-256**. Los tres tienen que coincidir. Que `doc_ruta` esté escrito no prueba nada
+—prueba que alguien dijo que subió, no que el archivo esté arriba y entero—. Lo que no
+coincide conserva su blob y queda marcado `!revisar:` en `doc_ruta` para que salte a la
+vista y no se relea en un ciclo infinito.
 
 **Antes de soltar, verificar que TODOS los hosts alcanzan el bucket:**
 
@@ -174,12 +191,22 @@ volver atrás. El espacio en la base recién se libera al soltar los blobs.
 en producción **y** en `afbs2.autofacilchile.cl`. Si un host no lo alcanza, para ese host
 los documentos migrados dejan de existir.
 
+**Y verificar leyendo de verdad, no por checksum.** El checksum prueba que los bytes están
+arriba; no prueba que la aplicación sepa ir a buscarlos, porque mientras el blob exista
+todo lo lee del blob. Hay que abrir un documento de cada pantalla —con el blob ya en NULL—
+antes de soltar el resto.
+
 ---
 
 ## 7. Qué falta
 
-- **Soltar los blobs** — hasta que se corra `--soltar-blob` la base no baja de tamaño.
-  Se hace cuando Render lleve días leyendo del bucket sin incidentes.
+- ~~Soltar los blobs~~ ✅ **cerrado el 05-08-2026.** Antes se probó **abriendo un documento
+  real de cada pantalla** con su blob ya en NULL —fundantes, cartas, ficha de dealer,
+  informe comercial, respaldo de crédito y evaluación—, que es la única prueba de que la
+  aplicación sabe leer del bucket. Recién ahí se soltaron los **287** restantes: los 287
+  coincidieron en tamaño y SHA-256, cero conservados. **La base pasó de 118 MB a 44,4 MB**
+  y ninguna tabla de documentos aparece ya entre las más grandes; el respaldo nocturno
+  pesa menos de la mitad.
 - ~~Tablas chicas todavía no cableadas~~ ✅ **cerrado el 04-08-2026.** Al revisarlas una a
   una resultó que **estaban todas vacías**: existían pero no tenían ni un archivo. Así que
   no había nada que migrar, solo que cablear para que el primero que suban ya vaya al
