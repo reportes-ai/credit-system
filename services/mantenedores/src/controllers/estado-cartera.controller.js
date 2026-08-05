@@ -57,22 +57,22 @@ require('../../../../shared/migrate').enFila('estado-cartera', async () => {
       await pool.query(
         `INSERT IGNORE INTO estados_cartera (codigo, nombre, color, orden, es_inicial, es_final, automatico) VALUES
           ('VIGENTE','Vigente','#16a34a',10,1,0,1),
-          ('MORA','En Mora','#d97706',20,0,0,1),
+          ('EN MORA','En Mora','#d97706',20,0,0,1),
           ('VENCIDO','Vencido','#dc2626',30,0,0,1),
           ('PREPAGADO','Prepagado','#7c3aed',40,0,1,0),
           ('TERMINADO','Terminado','#0f766e',50,0,1,0),
           ('CASTIGADO','Castigado','#111827',60,0,1,0)`);
       await pool.query(
         `INSERT IGNORE INTO estados_cartera_transicion (origen, destino) VALUES
-          ('VIGENTE','MORA'),
+          ('VIGENTE','EN MORA'),
           ('VIGENTE','PREPAGADO'),
           ('VIGENTE','TERMINADO'),
-          ('MORA','VIGENTE'),
-          ('MORA','VENCIDO'),
-          ('MORA','PREPAGADO'),
-          ('MORA','TERMINADO'),
-          ('MORA','CASTIGADO'),
-          ('VENCIDO','MORA'),
+          ('EN MORA','VIGENTE'),
+          ('EN MORA','VENCIDO'),
+          ('EN MORA','PREPAGADO'),
+          ('EN MORA','TERMINADO'),
+          ('EN MORA','CASTIGADO'),
+          ('VENCIDO','EN MORA'),
           ('VENCIDO','VIGENTE'),
           ('VENCIDO','PREPAGADO'),
           ('VENCIDO','TERMINADO'),
@@ -81,6 +81,18 @@ require('../../../../shared/migrate').enFila('estado-cartera', async () => {
 
     // Campo en creditos: el Estado de cartera vive en la operación (solo propios).
     await pool.query(`ALTER TABLE creditos ADD COLUMN IF NOT EXISTS estado_cartera VARCHAR(40) NULL`).catch(() => {});
+
+    /* Homologación 'MORA' → 'EN MORA' (05-08-2026). El mantenedor sembró el
+       código 'MORA' mientras el motor de etapa (PALABRAS_CARTERA) y 24 usos más
+       esperaban 'EN MORA'; convivían los dos literales y había parches
+       traduciendo uno al otro. Una magnitud, un nombre. Corre una sola vez. */
+    require('../../../../shared/migrate').migrar('cartera-mora-homologar', async () => {
+      await pool.query("UPDATE estados_cartera SET codigo='EN MORA' WHERE codigo='MORA'");
+      await pool.query("UPDATE estados_cartera_transicion SET origen='EN MORA'  WHERE origen='MORA'");
+      await pool.query("UPDATE estados_cartera_transicion SET destino='EN MORA' WHERE destino='MORA'");
+      const [r] = await pool.query("UPDATE creditos SET estado_cartera='EN MORA' WHERE estado_cartera='MORA'");
+      console.log(`[cartera] 'MORA' → 'EN MORA': ${r.affectedRows} crédito(s) homologado(s)`);
+    });
 
     // El Estado de Cartera ahora vive DENTRO del mantenedor unificado "Etapas y
     // Estados" (/mantenedores/estado-creditos/, pestaña AutoFácil). Mantenemos la

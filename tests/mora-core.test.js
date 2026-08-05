@@ -14,15 +14,15 @@ test('clasificación por días: los umbrales por defecto', () => {
   assert.equal(M.UMBRALES_DEFAULT.mora, 1);
   assert.equal(M.UMBRALES_DEFAULT.vencido, 91);
   assert.equal(M.clasificarPorDias(0), 'VIGENTE');
-  assert.equal(M.clasificarPorDias(1), 'MORA');       // el día 1 ya es mora
-  assert.equal(M.clasificarPorDias(90), 'MORA');
+  assert.equal(M.clasificarPorDias(1), 'EN MORA');  // el día 1 ya es mora
+  assert.equal(M.clasificarPorDias(90), 'EN MORA');
   assert.equal(M.clasificarPorDias(91), 'VENCIDO');   // el 91 cruza a vencido
 });
 
 test('los umbrales son parametrizables (mantenedor), no fijos', () => {
   const u = { mora: 5, vencido: 60 };
   assert.equal(M.clasificarPorDias(3, u), 'VIGENTE');
-  assert.equal(M.clasificarPorDias(5, u), 'MORA');
+  assert.equal(M.clasificarPorDias(5, u), 'EN MORA');
   assert.equal(M.clasificarPorDias(60, u), 'VENCIDO');
 });
 

@@ -68,10 +68,14 @@
   }
 
   // Días de atraso → estado (la ÚNICA definición de los umbrales).
+  // El literal es 'EN MORA', igual que en PALABRAS_CARTERA y en el mantenedor:
+  // este motor devolvía 'MORA' y el resto del sistema esperaba 'EN MORA', así
+  // que había dos parches traduciendo uno al otro (creditos.controller y
+  // app.js). Una magnitud, un nombre (05-08-2026).
   function clasificarPorDias(dias, umbrales) {
     const um = umbrales || UMBRALES_DEFAULT;
     if (dias >= (um.vencido ?? 91)) return 'VENCIDO';
-    if (dias >= (um.mora ?? 1)) return 'MORA';
+    if (dias >= (um.mora ?? 1)) return 'EN MORA';
     return 'VIGENTE';
   }
 
