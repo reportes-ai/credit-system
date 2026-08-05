@@ -5,6 +5,13 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/fundantes-seg.controller');
 
+// Mantenedor de tipos de documento. Va ANTES de las rutas con :id para que
+// "/tipos" no lo capture ningún patrón parametrizado.
+router.get('/tipos',                    verifyToken, c.tiposListar);
+router.post('/tipos',                   verifyToken, requireFunc('fundantes_tipos'), c.tiposCrear);
+router.put('/tipos/:id',                verifyToken, requireFunc('fundantes_tipos'), c.tiposActualizar);
+router.delete('/tipos/:id',             verifyToken, requireFunc('fundantes_tipos'), c.tiposEliminar);
+
 router.get('/',                         verifyToken, c.listar);
 router.get('/resumen',                  verifyToken, c.resumen);
 router.get('/devueltos',                verifyToken, c.devueltos);

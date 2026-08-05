@@ -146,6 +146,7 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       ['Seguimiento Fundantes - Operaciones', 'fundantes_operaciones', '/fundantes-operaciones/', 'bi-inboxes'],
       ['Validar Fundantes', 'fundantes_validar', null, 'bi-check2-circle'],
       ['Historial de Fundantes', 'fundantes_historial', '/fundantes-seguimiento/historial', 'bi-clock-history'],
+      ['Documentos Fundantes (mantenedor)', 'fundantes_tipos', '/mantenedores/fundantes-tipos/', 'bi-sliders'],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono] of funcs) {
@@ -899,4 +900,103 @@ const historial = async (req, res) => {
   } catch (e) { console.error('[fundantes historial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar };
+/* ─── MANTENEDOR DE TIPOS DE DOCUMENTO ────────────────────────────────────────
+   Qué documentos pide cada financiera, y cuáles son obligatorios, es un dato de
+   negocio: cambia cuando la financiera cambia de exigencia, no cuando cambia el
+   código. Antes vivía solo en el seed de este archivo y hacía falta un
+   programador para volver opcional un documento (fue el caso del Informe GPS el
+   05-08-2026). Ahora lo administra el Administrador.
+
+   `requiere_contrato` es el tercer estado, y por eso no es un simple sí/no:
+   'gps' o 'limitacion' significan "obligatorio SOLO si la operación lo lleva
+   contratado". Se conserva porque hay documentos que dependen de lo vendido. */
+const TIPOS_CONTRATO = ['gps', 'limitacion'];
+
+const tiposListar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, financiera, codigo, nombre, obligatorio, requiere_contrato, orden
+         FROM fundantes_seg_tipos ORDER BY financiera, orden, id`);
+    const [[{ fin } = {}]] = await pool.query(
+      `SELECT GROUP_CONCAT(DISTINCT UPPER(financiera) ORDER BY financiera) fin FROM fundantes_seg_tipos`);
+    res.json({ success: true, data: { tipos: rows, financieras: String(fin || '').split(',').filter(Boolean) }, error: null });
+  } catch (e) { console.error('[fundantes tipos listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
+};
+
+function validarTipo(b) {
+  const financiera = String(b.financiera || '').trim().toUpperCase();
+  const codigo = String(b.codigo || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  const nombre = String(b.nombre || '').trim();
+  if (!financiera) return { error: 'La financiera es obligatoria' };
+  if (!codigo) return { error: 'El código es obligatorio' };
+  if (!nombre) return { error: 'El nombre es obligatorio' };
+  const rc = String(b.requiere_contrato || '').trim().toLowerCase();
+  if (rc && !TIPOS_CONTRATO.includes(rc)) return { error: `"Solo si viene contratado" admite: ${TIPOS_CONTRATO.join(', ')}` };
+  return {
+    financiera, codigo, nombre,
+    // Si es condicional, el sí/no no manda: el campo que decide es requiere_contrato.
+    obligatorio: rc ? 1 : (b.obligatorio ? 1 : 0),
+    requiere_contrato: rc || null,
+    orden: Number(b.orden) || 0,
+  };
+}
+
+const tiposCrear = async (req, res) => {
+  try {
+    const t = validarTipo(req.body || {});
+    if (t.error) return res.status(400).json({ success: false, data: null, error: t.error });
+    const [r] = await pool.query(
+      `INSERT INTO fundantes_seg_tipos (financiera, codigo, nombre, obligatorio, requiere_contrato, orden)
+       VALUES (?,?,?,?,?,?)`,
+      [t.financiera, t.codigo, t.nombre, t.obligatorio, t.requiere_contrato, t.orden]);
+    auditar({ req, accion: 'CREAR', modulo: 'fundantes-seguimiento', entidad: 'tipo_documento', entidad_id: String(r.insertId),
+      detalle: `Agregó el documento "${t.nombre}" (${t.codigo}) a ${t.financiera}${t.obligatorio ? ' como obligatorio' : ' como opcional'}` });
+    res.json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) {
+    if (e.errno === 1062) return res.status(409).json({ success: false, data: null, error: 'Esa financiera ya tiene un documento con ese código' });
+    console.error('[fundantes tipos crear]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' });
+  }
+};
+
+const tiposActualizar = async (req, res) => {
+  try {
+    const t = validarTipo(req.body || {});
+    if (t.error) return res.status(400).json({ success: false, data: null, error: t.error });
+    const [[prev]] = await pool.query('SELECT nombre, obligatorio, requiere_contrato FROM fundantes_seg_tipos WHERE id=?', [req.params.id]);
+    if (!prev) return res.status(404).json({ success: false, data: null, error: 'No existe ese documento' });
+    await pool.query(
+      `UPDATE fundantes_seg_tipos SET financiera=?, codigo=?, nombre=?, obligatorio=?, requiere_contrato=?, orden=? WHERE id=?`,
+      [t.financiera, t.codigo, t.nombre, t.obligatorio, t.requiere_contrato, t.orden, req.params.id]);
+    const antes = prev.requiere_contrato ? `solo si trae ${prev.requiere_contrato}` : (prev.obligatorio ? 'obligatorio' : 'opcional');
+    const ahora = t.requiere_contrato ? `solo si trae ${t.requiere_contrato}` : (t.obligatorio ? 'obligatorio' : 'opcional');
+    auditar({ req, accion: 'EDITAR', modulo: 'fundantes-seguimiento', entidad: 'tipo_documento', entidad_id: String(req.params.id),
+      detalle: `Editó "${t.nombre}" (${t.financiera}): ${antes} → ${ahora}` });
+    res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
+  } catch (e) {
+    if (e.errno === 1062) return res.status(409).json({ success: false, data: null, error: 'Esa financiera ya tiene un documento con ese código' });
+    console.error('[fundantes tipos actualizar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' });
+  }
+};
+
+/* No se borra un tipo que ya tiene documentos cargados: dejaría archivos
+   colgando de un código que ya no existe, invisibles en la pantalla y sin
+   forma de llegar a ellos. Se vuelve opcional, que es lo que se quiere el 99%
+   de las veces. */
+const tiposEliminar = async (req, res) => {
+  try {
+    const [[t]] = await pool.query('SELECT id, financiera, codigo, nombre FROM fundantes_seg_tipos WHERE id=?', [req.params.id]);
+    if (!t) return res.status(404).json({ success: false, data: null, error: 'No existe ese documento' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM fundantes_seg_docs WHERE codigo=?', [t.codigo]);
+    if (n) return res.status(409).json({
+      success: false, data: null,
+      error: `No se puede eliminar: ya hay ${n} archivo(s) cargado(s) con este documento. Si dejó de pedirse, márcalo como opcional.`
+    });
+    await pool.query('DELETE FROM fundantes_seg_tipos WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'fundantes-seguimiento', entidad: 'tipo_documento', entidad_id: String(req.params.id),
+      detalle: `Eliminó el documento "${t.nombre}" (${t.codigo}) de ${t.financiera}` });
+    res.json({ success: true, data: { eliminado: true }, error: null });
+  } catch (e) { console.error('[fundantes tipos eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
+};
+
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar,
+  tiposListar, tiposCrear, tiposActualizar, tiposEliminar };

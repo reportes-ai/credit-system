@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentos Fundantes — AutoFácil</title>
+  <!-- v1.0 — qué documentos pide cada financiera, administrable -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { max-width:1040px; margin:0 auto; padding:22px 24px 60px; }
+    .page-banner { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; border-radius:14px; padding:18px 24px; display:flex; align-items:center; gap:18px; margin-bottom:20px; }
+    .page-banner .big { font-size:2.1rem; opacity:.9; }
+    .page-banner h2 { margin:0; font-weight:800; font-size:1.35rem; }
+    .page-banner p { margin:4px 0 0; font-size:.86rem; opacity:.85; max-width:760px; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:0; margin-bottom:18px; overflow:hidden; }
+    .card-af h5 { font-weight:800; color:var(--navy); font-size:.95rem; margin:0; padding:14px 20px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; text-align:left; padding:9px 14px; border-bottom:1px solid #e2e8f0; }
+    td { padding:9px 14px; border-bottom:1px solid #f1f5f9; font-size:.87rem; color:#1f2937; vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    .fin { font-weight:700; color:var(--navy); }
+    .cod { font-family:ui-monospace,Consolas,monospace; font-size:.78rem; color:#64748b; }
+    .pill { border-radius:20px; padding:3px 11px; font-size:.74rem; font-weight:700; display:inline-block; }
+    .p-ob { background:#fee2e2; color:#b91c1c; }
+    .p-op { background:#dcfce7; color:#15803d; }
+    .p-co { background:#fef3c7; color:#92400e; }
+    .btn-ic { background:none; border:none; color:#64748b; cursor:pointer; font-size:1rem; padding:2px 6px; border-radius:6px; }
+    .btn-ic:hover { background:#f1f5f9; color:var(--blue); }
+    .btn-ic.del:hover { color:#dc2626; }
+    .btn-add { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:7px 16px; font-weight:700; font-size:.83rem; cursor:pointer; }
+    .btn-guardar { background:#16a34a; color:#fff; border:none; border-radius:9px; padding:9px 22px; font-weight:800; cursor:pointer; }
+    label.fl { font-weight:600; font-size:.82rem; color:#374151; margin-bottom:3px; }
+    .form-control, .form-select { border:1.5px solid #d1d5db; border-radius:8px; font-size:.88rem; }
+    .hint { font-size:.76rem; color:#64748b; margin-top:3px; }
+    dialog { border:none; border-radius:14px; padding:0; width:min(560px,94vw); box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(15,23,42,.5); }
+    dialog .dlg-h { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; padding:14px 20px; font-weight:700; }
+    dialog .dlg-b { padding:18px 20px; }
+    dialog .dlg-f { padding:12px 20px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:10px; }
+    .afecta { background:#f8fafc; border:1px solid #e2e8f0; border-left:4px solid var(--blue); border-radius:10px; padding:14px 18px; }
+    .afecta .tit { font-weight:700; color:#0f2a52; margin-bottom:8px; font-size:.9rem; }
+    .afecta ul { margin:0; padding-left:20px; }
+    .afecta li { font-size:.82rem; color:#475569; margin-bottom:6px; line-height:1.45; }
+    .afecta a { color:var(--navy); font-weight:600; text-decoration:none; }
+    .afecta a:hover { text-decoration:underline; }
+    .toast { position:fixed; top:70px; right:22px; z-index:9999; border-radius:10px; padding:12px 18px; font-weight:600; font-size:.88rem; color:#fff; box-shadow:0 8px 24px rgba(0,0,0,.2); display:none; }
+    .toast.ok { background:#059669; } .toast.err { background:#dc2626; }
+    .muted { color:#94a3b8; }
+  </style>
+</head>
+<body>
+  <div id="af-topnav"></div>
+  <script>
+    window.AF_TOPNAV = {
+      breadcrumb: [
+        { label:'Inicio', href:'/' },
+        { label:'Mantenedores', href:'/mantenedores' },
+        { label:'Documentos Fundantes', icon:'bi-sliders', current:true }
+      ],
+      actions: [ { label:'Mantenedores', icon:'bi-arrow-left', href:'/mantenedores' } ]
+    };
+  </script>
+
+  <div class="main">
+    <div class="page-banner">
+      <i class="bi bi-sliders big"></i>
+      <div>
+        <h2>Documentos Fundantes</h2>
+        <p>Qué documentos exige cada financiera para cerrar una operación otorgada, y cuáles son obligatorios. Cambiarlo acá cambia lo que pide la pantalla del Ejecutivo Comercial — sin tocar código.</p>
+      </div>
+    </div>
+
+    <div class="card-af">
+      <h5>
+        <span><i class="bi bi-folder-check"></i> Documentos por financiera</span>
+        <button class="btn-add" onclick="abrir()"><i class="bi bi-plus-lg"></i> Agregar documento</button>
+      </h5>
+      <table>
+        <thead>
+          <tr>
+            <th>Financiera</th><th>Documento</th><th>Código</th>
+            <th>Exigencia</th><th style="width:70px">Orden</th><th style="width:90px"></th>
+          </tr>
+        </thead>
+        <tbody id="tb"><tr><td colspan="6" class="muted" style="padding:24px;text-align:center">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="afecta">
+      <div class="tit"><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</div>
+      <ul>
+        <li><b>Documento obligatorio</b> → traba el botón <b>Enviar</b> del ejecutivo hasta que esté subido, y cuenta en el "Faltan N" de <a href="/fundantes-seguimiento/">Seguimiento Fundantes — Ejecutivo Comercial</a>.</li>
+        <li><b>Documento opcional</b> → se puede subir igual y queda a la vista, pero no impide enviar a validación. Aparece como <i>"Subir (opc.)"</i>.</li>
+        <li><b>Solo si viene contratado</b> → se exige únicamente cuando la operación trae ese producto vendido (GPS o limitación). Es el estado intermedio: ni siempre ni nunca.</li>
+        <li><b>Financiera</b> → determina en qué operaciones aparece la columna. Una operación de otra financiera muestra "—" y no lo pide nunca.</li>
+        <li><b>Orden</b> → el orden de las columnas en la grilla del ejecutivo y en <a href="/fundantes-operaciones/">Validación por Operaciones</a>.</li>
+        <li><b>Agregar o quitar un documento</b> → cambia también el ZIP que descarga Operaciones y el detalle del <a href="/fundantes-seguimiento/historial">Historial de Fundantes</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+  <dialog id="dlg">
+    <form method="dialog" onsubmit="return false">
+      <div class="dlg-h" id="dlgTit">Nuevo documento</div>
+      <div class="dlg-b">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="fl">Financiera</label>
+            <input class="form-control" id="fFin" list="finList" placeholder="AUTOFIN">
+            <datalist id="finList"></datalist>
+          </div>
+          <div class="col-6">
+            <label class="fl">Orden</label>
+            <input class="form-control" id="fOrden" type="number" min="0" value="0">
+          </div>
+          <div class="col-12">
+            <label class="fl">Nombre del documento</label>
+            <input class="form-control" id="fNombre" placeholder="Informe GPS" maxlength="120">
+            <div class="hint">Es el título que ve el ejecutivo en la columna.</div>
+          </div>
+          <div class="col-12">
+            <label class="fl">Código</label>
+            <input class="form-control cod" id="fCodigo" placeholder="INFORME_GPS" maxlength="40">
+            <div class="hint">Identificador interno. <b>No se cambia una vez que hay archivos cargados</b>: los archivos existentes quedarían colgando de un código que ya no existe.</div>
+          </div>
+          <div class="col-12">
+            <label class="fl">Exigencia</label>
+            <select class="form-select" id="fExig">
+              <option value="1">Obligatorio — sin él no se puede enviar</option>
+              <option value="0">Opcional — se puede subir, pero no traba</option>
+              <option value="gps">Solo si la operación trae GPS contratado</option>
+              <option value="limitacion">Solo si la operación trae limitación contratada</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="dlg-f">
+        <button class="btn-ic" style="font-size:.88rem;padding:8px 14px" onclick="document.getElementById('dlg').close()">Cancelar</button>
+        <button class="btn-guardar" onclick="guardar()">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/js/topnav.js"></script>
+  <script>
+const API = '/api/fundantes-seguimiento/tipos';
+const T = () => sessionStorage.getItem('token');
+let TIPOS = [], EDIT = null;
+
+function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast '+(err?'err':'ok'); t.style.display='block'; setTimeout(()=>t.style.display='none', 3200); }
+const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+
+/* Las tres exigencias que entiende el motor. `requiere_contrato` gana sobre el
+   sí/no, igual que en el servidor. */
+function etiqueta(t){
+  if (t.requiere_contrato) return `<span class="pill p-co">Solo si trae ${E(t.requiere_contrato)}</span>`;
+  return t.obligatorio ? '<span class="pill p-ob">Obligatorio</span>' : '<span class="pill p-op">Opcional</span>';
+}
+
+async function cargar(){
+  try {
+    const r = await fetch(API, { headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    TIPOS = j.data.tipos || [];
+    document.getElementById('finList').innerHTML = (j.data.financieras||[]).map(f=>`<option value="${E(f)}">`).join('');
+    pintar();
+  } catch(e){ toast(e.message||'Error al cargar', true); }
+}
+
+function pintar(){
+  const tb = document.getElementById('tb');
+  if (!TIPOS.length){ tb.innerHTML = '<tr><td colspan="6" class="muted" style="padding:24px;text-align:center">No hay documentos configurados</td></tr>'; return; }
+  let finPrev = null;
+  tb.innerHTML = TIPOS.map(t => {
+    const primera = t.financiera !== finPrev; finPrev = t.financiera;
+    return `<tr>
+      <td class="fin">${primera ? E(t.financiera) : ''}</td>
+      <td>${E(t.nombre)}</td>
+      <td class="cod">${E(t.codigo)}</td>
+      <td>${etiqueta(t)}</td>
+      <td>${t.orden}</td>
+      <td style="text-align:right">
+        <button class="btn-ic" title="Editar" onclick="abrir(${t.id})"><i class="bi bi-pencil"></i></button>
+        <button class="btn-ic del" title="Eliminar" onclick="eliminar(${t.id})"><i class="bi bi-trash"></i></button>
+      </td></tr>`;
+  }).join('');
+}
+
+function abrir(id){
+  EDIT = id ? TIPOS.find(x=>x.id===id) : null;
+  document.getElementById('dlgTit').textContent = EDIT ? 'Editar documento' : 'Nuevo documento';
+  document.getElementById('fFin').value    = EDIT ? EDIT.financiera : '';
+  document.getElementById('fNombre').value = EDIT ? EDIT.nombre : '';
+  document.getElementById('fCodigo').value = EDIT ? EDIT.codigo : '';
+  document.getElementById('fOrden').value  = EDIT ? EDIT.orden : 0;
+  document.getElementById('fExig').value   = EDIT ? (EDIT.requiere_contrato || String(EDIT.obligatorio ? 1 : 0)) : '1';
+  document.getElementById('dlg').showModal();
+}
+
+async function guardar(){
+  const exig = document.getElementById('fExig').value;
+  const body = {
+    financiera: document.getElementById('fFin').value,
+    nombre:     document.getElementById('fNombre').value,
+    codigo:     document.getElementById('fCodigo').value,
+    orden:      document.getElementById('fOrden').value,
+    obligatorio: exig === '1' ? 1 : 0,
+    requiere_contrato: (exig === '1' || exig === '0') ? '' : exig,
+  };
+  try {
+    const r = await fetch(EDIT ? `${API}/${EDIT.id}` : API, {
+      method: EDIT ? 'PUT' : 'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+T() },
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    document.getElementById('dlg').close();
+    toast(EDIT ? 'Documento actualizado' : 'Documento agregado');
+    cargar();
+  } catch(e){ toast(e.message||'Error al guardar', true); }
+}
+
+async function eliminar(id){
+  const t = TIPOS.find(x=>x.id===id);
+  if (!confirm(`¿Eliminar "${t.nombre}" de ${t.financiera}?\n\nSi el documento dejó de pedirse pero ya hay archivos cargados, márcalo como Opcional en vez de eliminarlo.`)) return;
+  try {
+    const r = await fetch(`${API}/${id}`, { method:'DELETE', headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'Error');
+    toast('Documento eliminado');
+    cargar();
+  } catch(e){ toast(e.message||'Error al eliminar', true); }
+}
+
+cargar();
+  </script>
+  <script src="/js/app-version.js"></script>
+</body>
+</html>
