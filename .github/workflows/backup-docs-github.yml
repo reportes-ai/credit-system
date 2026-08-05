@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────
+# TERCERA PATA DE LOS DOCUMENTOS: una copia FUERA de Google
+#
+# Los documentos ya tienen dos copias (gs://autofacil-docs y
+# gs://autofacil-docs-respaldo, en regiones distintas), pero LAS DOS VIVEN EN
+# LA MISMA CUENTA DE GOOGLE. Eso protege de un borrado por error, de un archivo
+# corrupto y de que se caiga una región; NO protege de perder la cuenta — una
+# suspensión, una factura impaga, un acceso comprometido, y se van las dos
+# juntas.
+#
+# Este workflow las saca de Google: empaqueta el bucket y lo deja como artefacto
+# privado del repositorio. Junto con el dump nocturno, los documentos quedan con
+# las mismas tres patas que la base de datos.
+#
+# POR QUÉ SEMANAL Y NO DIARIO
+# Son ~110 MB casi todo PDF, así que no comprimen. Diario con 30 días de
+# retención serían ~3,3 GB en GitHub, muy por encima del medio giga gratis de un
+# repositorio privado. Semanal con 7 días deja ~110-220 MB vivos. Para lo que
+# esta copia cubre —perder la cuenta de Google entera— una semana de atraso es
+# aceptable; las otras dos copias siguen siendo las del día.
+#
+# RESTAURACIÓN: descargar el artefacto → descomprimir → subir de vuelta con
+#   gsutil -m rsync -r ./documentos gs://autofacil-docs
+# La estructura de carpetas del tar ES la del bucket, así que las rutas que
+# tiene guardadas la base (`doc_ruta`) siguen calzando. Ver docs/ALMACEN-documentos.md.
+# ─────────────────────────────────────────────────────────────────
+name: Backup documentos a GitHub (semanal)
+
+on:
+  schedule:
+    - cron: '30 7 * * 0'   # 07:30 UTC domingo = 03:30 Chile — después del dump nocturno
+  workflow_dispatch: {}
+
+jobs:
+  backup-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Bajar el bucket y empaquetar
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCS_DOCS: autofacil-docs
+        run: |
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "Sin GCP_SA_KEY — no se puede leer el bucket"; exit 1
+          fi
+          printf '%s' "$GCP_SA_KEY" > /tmp/gcp-sa.json
+          gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json --quiet
+          mkdir -p documentos
+          gsutil -m cp -r "gs://${GCS_DOCS}/*" documentos/
+          rm -f /tmp/gcp-sa.json
+
+          # Conteo de control ANTES de empaquetar: un tar de un directorio vacío
+          # pesa poco y se sube feliz. Sin esta comparación, un fallo de la copia
+          # produce un "respaldo" verde y hueco, que es el peor resultado posible.
+          BAJADOS=$(find documentos -type f | wc -l)
+          echo "archivos bajados: $BAJADOS"
+          if [ "$BAJADOS" -lt 1 ]; then
+            echo "✗ no se bajó ni un archivo — se aborta antes de generar un respaldo vacío"; exit 1
+          fi
+
+          tar -czf documentos-$(date +%Y%m%d).tar.gz documentos
+          ls -lh documentos-*.tar.gz
+          tar -tzf documentos-*.tar.gz > /dev/null && echo "✓ el paquete se abre correctamente"
+
+      - name: Guardar artefacto (7 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-documentos-${{ github.run_id }}
+          path: documentos-*.tar.gz
+          retention-days: 7
+          compression-level: 0   # ya viene comprimido

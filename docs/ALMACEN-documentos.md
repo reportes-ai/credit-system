@@ -151,6 +151,31 @@ desaparecería del respaldo en silencio.
 El paso imprime `documentos: origen=N respaldo=N` al terminar. Si el respaldo tiene menos
 archivos que el origen, avisa en el log.
 
+#### Y una tercera copia FUERA de Google
+
+Las dos de arriba **viven en la misma cuenta de Google**. Eso cubre un borrado por error,
+un archivo corrupto o la caída de una región; **no cubre perder la cuenta** —suspensión,
+factura impaga, acceso comprometido— y ahí se irían las dos juntas.
+
+`.github/workflows/backup-docs-github.yml` empaqueta el bucket y lo deja como artefacto
+privado del repositorio: **domingos 03:30, retención 7 días**. Es semanal y no diario
+porque son ~110 MB casi todo PDF (no comprimen): diario con 30 días serían ~3,3 GB, muy por
+encima del medio giga gratis de un repositorio privado. Para lo único que esta copia cubre
+—perder Google entero— una semana de atraso es aceptable, y las otras dos siguen siendo del
+día.
+
+**Aborta si no bajó ni un archivo.** Un `tar` de un directorio vacío pesa poco y se sube
+feliz: sin esa comparación, una falla de la copia produciría un respaldo verde y hueco, que
+es peor que no tenerlo.
+
+**Restaurar**: descargar el artefacto, descomprimir y
+`gsutil -m rsync -r ./documentos gs://autofacil-docs`. La estructura de carpetas del
+paquete **es** la del bucket, así que las rutas guardadas en `doc_ruta` siguen calzando sin
+tocar la base.
+
+Con esto los documentos tienen las mismas tres patas que la base de datos: el original, una
+copia en otra región y una copia en otro proveedor.
+
 **Autenticación, en este orden:**
 
 1. `GCS_CREDENCIALES` — el JSON de la cuenta de servicio en una variable de entorno.
