@@ -81,4 +81,52 @@ async function conNumOpAF(conn, fn, intentos = 8) {
     Trinidad va en ~6,2 millones; nuestra serie AAMM#### parte en 20+ millones. */
 const esIdFinanciera = n => Number(n) >= 1000000 && Number(n) < 20000000;
 
-module.exports = { siguienteNumOpAF, conNumOpAF, esIdFinanciera, prefijoMes };
+/**
+ * NÚMERO DE CRÉDITO DE LA CARTA (YYMM### — tres dígitos).
+ *
+ * Motor único (Máxima 1). Vivía copiado en CUATRO lugares —cartas, créditos,
+ * operaciones y `next-op`— y las copias no eran equivalentes:
+ *
+ *   · Tres resolvían la secuencia con `ORDER BY id DESC LIMIT 1`, o sea el
+ *     ÚLTIMO INSERTADO y no el número MAYOR. Tras una restauración el último
+ *     id no es el número más alto, y se generaban números repetidos que hacían
+ *     fallar el INSERT. Cartas ya lo había corregido a MAX() numérico; las
+ *     otras tres seguían con el bug. Acá manda la versión corregida.
+ *   · Ninguna usaba la hora de Chile: en el servidor (UTC) desde las 20:00 del
+ *     último día del mes el prefijo saltaba al mes siguiente.
+ *
+ * Ojo con lo que este número NO es: la llave de negocio es `num_op`
+ * (`siguienteNumOpAF`). Este nace en la carta y sobrevive como dato de los
+ * documentos ya emitidos.
+ *
+ * @param {string|Date} [mesISO] mes de la operación ('YYYY-MM' o fecha); por
+ *                               defecto el mes en curso en hora de Chile
+ * @param {object} [conn] conexión/transacción; por defecto el pool compartido
+ */
+async function numeroCreditoCarta(mesISO, conn) {
+  const db = conn || require('./config/database');
+  let prefix;
+  if (mesISO) {
+    const m = String(mesISO).match(/^(\d{4})-(\d{2})/);
+    if (m) prefix = m[1].slice(-2) + m[2];
+    else {
+      const d = new Date(mesISO);
+      prefix = String(d.getFullYear()).slice(-2) + String(d.getMonth() + 1).padStart(2, '0');
+    }
+  } else prefix = prefijoMes();
+
+  // El mayor del mes mirando numero_credito Y num_op: los dos consumen la serie.
+  const [[row]] = await db.query(
+    `SELECT GREATEST(
+        COALESCE((SELECT MAX(CAST(numero_credito AS UNSIGNED)) FROM creditos
+                   WHERE numero_credito REGEXP '^[0-9]+$' AND numero_credito LIKE ?), 0),
+        COALESCE((SELECT MAX(num_op) FROM creditos WHERE num_op BETWEEN ? AND ?), 0)
+      ) mx`,
+    [prefix + '%', Number(prefix) * 1000, Number(prefix) * 1000 + 999]);
+
+  const mx = Number(row.mx) || 0;
+  const seq = mx > 0 ? (mx % 1000) + 1 : 1;
+  return prefix + String(seq).padStart(3, '0');
+}
+
+module.exports = { siguienteNumOpAF, conNumOpAF, esIdFinanciera, prefijoMes, numeroCreditoCarta };

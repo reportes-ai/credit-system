@@ -6,6 +6,8 @@ const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { isMesCerrado, getMesDeOp } = require('../../../../shared/utils/mes-cerrado');
 // Motor único de etapa: escribir la etapa toca SIEMPRE las tres columnas.
 const { SET_ETAPA_SQL, SET_ESTADO_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
+// Motor único de numeración (num_op y numero_credito).
+const { numeroCreditoCarta } = require('../../../../shared/num-op');
 
 // Migración: tabla creditos
 require('../../../../shared/migrate').enFila('operaciones', async () => {
@@ -134,31 +136,17 @@ function calcular(body) {
 }
 
 /* ─── GET /api/operaciones/next-op?mes=YYYY-MM ───────────────────────── */
-// Misma fórmula que generarNumero() en creditos.controller: YYMM + seq 3 dígitos
-// ej: mes=2026-05 → prefix="2605", resultado "2605006"
+// Lo que este endpoint PROPONE en pantalla tiene que ser el mismo número que
+// después asigna el INSERT: por eso ambos salen del mismo motor. Cuando eran
+// dos copias, la de aquí podía mostrar uno y guardarse otro.
+// ej: mes=2026-05 → "2605006"
 const nextOp = async (req, res) => {
   try {
     const { mes } = req.query; // ej: "2026-05"
     if (!mes || !/^\d{4}-\d{2}$/.test(mes))
       return res.status(400).json({ success: false, data: null, error: 'Parámetro mes requerido (YYYY-MM)' });
 
-    // Replicar la lógica de generarNumero(): YYMM (2 dígitos de año)
-    const [anio, mStr] = mes.split('-');
-    const yy     = String(anio).slice(-2);          // "26"
-    const mm     = String(mStr).padStart(2, '0');   // "05"
-    const prefix = yy + mm;                          // "2605"
-
-    const [rows] = await pool.query(
-      `SELECT numero_credito FROM creditos
-       WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
-      [prefix + '%']
-    );
-
-    const seq = rows.length
-      ? parseInt(rows[0].numero_credito.slice(4), 10) + 1
-      : 1;
-
-    const nextNum = prefix + String(seq).padStart(3, '0'); // "2605006"
+    const nextNum = await numeroCreditoCarta(mes);
 
     res.json({ success: true, data: { nextOp: nextNum }, error: null });
   } catch (e) {
@@ -208,20 +196,10 @@ const getOne = async (req, res) => {
 };
 
 /* ─── POST /api/operaciones ───────────────────────────────────────────── */
-// Genera numero_credito (YYMMXXX) — misma lógica que creditos.controller
-async function generarNumeroCred(mesISO) {
-  const base = mesISO ? new Date(mesISO) : new Date();
-  const yy     = String(base.getFullYear()).slice(-2);
-  const mm     = String(base.getMonth() + 1).padStart(2, '0');
-  const prefix = `${yy}${mm}`;
-  const [rows] = await pool.query(
-    `SELECT numero_credito FROM creditos
-     WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
-    [prefix + '%']
-  );
-  const seq = rows.length ? parseInt(rows[0].numero_credito.slice(4), 10) + 1 : 1;
-  return prefix + String(seq).padStart(3, '0');
-}
+// numero_credito (YYMM###) — motor único en shared/num-op.js. Respeta el mes de
+// la operación, que es lo propio de esta vía (una op de mayo digitada en junio
+// lleva número de mayo).
+const generarNumeroCred = mesISO => numeroCreditoCarta(mesISO || null);
 
 const create = async (req, res) => {
   try {

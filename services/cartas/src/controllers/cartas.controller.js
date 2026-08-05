@@ -10,27 +10,11 @@ const { marcarForzadosCalculo, recalcularPorOps } = require('../../../creditos/s
 const { SET_ETAPA_SQL, valoresEtapa } = require('../../../../shared/etapa-credito');
 const pdf = require('pdf-parse');
 
-/* Genera numero_credito igual que creditos.controller (YYMMXXX) */
-async function generarNumeroCreditoDesdeCartas() {
-  const hoy = new Date();
-  const yy = String(hoy.getFullYear()).slice(-2);
-  const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-  const prefix = `${yy}${mm}`;
-  // Máximo NUMÉRICO del mes mirando numero_credito Y num_op (no "el último por id":
-  // tras una restauración el último id puede no ser el número mayor y se generaban
-  // duplicados / choques de num_op que hacían fallar el INSERT en silencio).
-  const [[row]] = await pool.query(
-    `SELECT GREATEST(
-        COALESCE((SELECT MAX(CAST(numero_credito AS UNSIGNED)) FROM creditos
-                   WHERE numero_credito REGEXP '^[0-9]+$' AND numero_credito LIKE ?), 0),
-        COALESCE((SELECT MAX(num_op) FROM creditos WHERE num_op BETWEEN ? AND ?), 0)
-      ) mx`,
-    [prefix + '%', Number(prefix) * 1000, Number(prefix) * 1000 + 999]
-  );
-  const mx = Number(row.mx) || 0;
-  const seq = mx > 0 ? (mx % 1000) + 1 : 1;
-  return prefix + String(seq).padStart(3, '0');
-}
+/* numero_credito (YYMM###) — motor único en shared/num-op.js. La versión
+   robusta de esta función fue la que se llevó allá: era la única de las cuatro
+   copias que resolvía la secuencia por MAX() y no por "el último por id". */
+const { numeroCreditoCarta } = require('../../../../shared/num-op');
+const generarNumeroCreditoDesdeCartas = () => numeroCreditoCarta();
 
 /* Persiste en la CARTA las primas/gastos del documento de la financiera (los
    trae el autofill del PDF). Antes solo viajaban en el request y se perdían si

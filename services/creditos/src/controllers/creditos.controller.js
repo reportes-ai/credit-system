@@ -98,20 +98,11 @@ require('../../../../shared/migrate').enFila('creditos', async () => {
   }
 });
 
-// ── Generar número de crédito (YYMMXXX) ──────────────────────────────────────
-async function generarNumero() {
-  const hoy = new Date();
-  const yy   = String(hoy.getFullYear()).slice(-2);
-  const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
-  const prefix = `${yy}${mm}`;
-  const [rows] = await pool.query(
-    `SELECT numero_credito FROM creditos
-     WHERE numero_credito LIKE ? ORDER BY id DESC LIMIT 1`,
-    [prefix + '%']
-  );
-  const seq = rows.length ? parseInt(rows[0].numero_credito.slice(4)) + 1 : 1;
-  return prefix + String(seq).padStart(3, '0');
-}
+// ── Número de crédito (YYMM###) — motor único en shared/num-op.js ────────────
+// Esta copia resolvía la secuencia con ORDER BY id DESC (el último insertado,
+// no el mayor): tras una restauración devolvía un número ya usado.
+const { numeroCreditoCarta } = require('../../../../shared/num-op');
+const generarNumero = () => numeroCreditoCarta();
 
 // ── SELECT base para gestión ──────────────────────────────────────────────────
 // Muestra OTORGADOS de AUTOFIN y UNIDAD + cualquier crédito digitado manualmente
