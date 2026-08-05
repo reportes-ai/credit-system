@@ -185,13 +185,13 @@ const createFactura = async (req, res) => {
 const downloadFactura = async (req, res) => {
   try {
     const [[row]] = await pool.query(
-      'SELECT archivo_nombre, mime_type, archivo_data FROM facturas_brokerage WHERE id = ?',
+      'SELECT archivo_nombre, mime_type, archivo_data, doc_ruta FROM facturas_brokerage WHERE id = ?',
       [req.params.id]
     );
-    if (!row || !row.archivo_data) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
-    res.set('Content-Type', row.mime_type || 'application/octet-stream');
-    res.set('Content-Disposition', `attachment; filename="${String(row.archivo_nombre || 'factura').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_')}"`);
-    res.send(row.archivo_data);
+    /* El archivo puede vivir en el bucket (doc_ruta) con el blob en NULL:
+       preguntar solo por archivo_data hacía invisible todo archivo nuevo. */
+    if (!row || (!row.archivo_data && !row.doc_ruta)) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    await almacen.servir(res, { ruta: row.doc_ruta, blob: row.archivo_data, nombre: row.archivo_nombre || 'factura', mime: row.mime_type, adjunto: true });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
   }

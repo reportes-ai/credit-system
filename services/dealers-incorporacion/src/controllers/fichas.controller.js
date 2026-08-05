@@ -1039,10 +1039,15 @@ const enviarFirmada = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede enviarla' });
     if (f.estado !== 'AUTORIZADA')
       return res.status(400).json({ success: false, data: null, error: 'La ficha debe estar AUTORIZADA para subir la firmada' });
-    if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
+    /* Desde la migración al bucket, el archivo puede vivir en `doc_ruta` con el
+       blob en NULL: preguntar solo por `ficha_data` rechazaba fichas RECIÉN
+       subidas — el bug que frenó a una ejecutiva el 05-08-2026. El almacén
+       resuelve de dónde leer (blob primero, bucket si no hay). */
+    if (!f.ficha_data && !f.doc_ruta) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
+    const fichaBuf = await almacen.obtener({ ruta: f.doc_ruta, blob: f.ficha_data });
     // Verifica la firma + compara el documento con los datos ingresados (para el analista).
-    const firma = await verificarFirma(f.ficha_data, f.ficha_mime);
-    const cmpTexto = await compararFichaTexto(f.ficha_data, f.ficha_mime, f);
+    const firma = await verificarFirma(fichaBuf, f.ficha_mime);
+    const cmpTexto = await compararFichaTexto(fichaBuf, f.ficha_mime, f);
     await pool.query(
       `UPDATE dealer_fichas SET estado='PEND_CIERRE', firma_sospecha=?, firma_detalle=?, ficha_faltantes=? WHERE id=?`,
       [firma.sospecha, firma.detalle, JSON.stringify(cmpTexto.faltantes), f.id]);
@@ -1178,7 +1183,7 @@ const cerrar = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (!['PEND_CIERRE', 'TOMADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión de cierre' });
-    if (!f.ficha_data) return res.status(400).json({ success: false, data: null, error: 'No hay ficha firmada para cerrar' });
+    if (!f.ficha_data && !f.doc_ruta) return res.status(400).json({ success: false, data: null, error: 'No hay ficha firmada para cerrar' });
     const { idDealer, numero, esMod } = await finalizarDealer(f);
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(
