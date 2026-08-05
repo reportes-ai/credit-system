@@ -116,7 +116,7 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       ['AUTOFIN', 'CONTRATO_CV', 'Contrato Compraventa', 1, null, 1],
       ['AUTOFIN', 'SOL_TRANSFERENCIA', 'Solicitud Transferencia', 1, null, 2],
       ['AUTOFIN', 'SOL_LIMITACION', 'Solicitud Limitación', 1, null, 3],
-      ['AUTOFIN', 'INFORME_GPS', 'Informe GPS', 1, 'gps', 4],
+      ['AUTOFIN', 'INFORME_GPS', 'Informe GPS', 0, null, 4],   // opcional desde 05-08-2026
       ['UNIDAD DE CREDITO', 'CONTRATO_CV', 'Contrato Compraventa', 1, null, 1],
       ['UNIDAD DE CREDITO', 'SOL_TRANSFERENCIA', 'Solicitud Transferencia', 1, null, 2],
     ];
@@ -125,6 +125,11 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
         `INSERT IGNORE INTO fundantes_seg_tipos (financiera, codigo, nombre, obligatorio, requiere_contrato, orden) VALUES (?,?,?,?,?,?)`, s);
     // Corrección: en AUTOFIN la Solicitud de Limitación es SIEMPRE obligatoria (no condicional). Idempotente.
     await pool.query("UPDATE fundantes_seg_tipos SET obligatorio=1, requiere_contrato=NULL WHERE financiera='AUTOFIN' AND codigo='SOL_LIMITACION'");
+    // El Informe GPS pasa a ser OPCIONAL (Pato, 05-08-2026): se sigue pudiendo
+    // subir y queda a la vista, pero ya no traba el envío a validación. Antes
+    // era obligatorio-si-contratado y dejaba operaciones frenadas por un
+    // documento que no siempre llega a tiempo. Idempotente.
+    await pool.query("UPDATE fundantes_seg_tipos SET obligatorio=0, requiere_contrato=NULL WHERE codigo='INFORME_GPS'");
 
     // Card PADRE única en Home → landing /fundantes/ con 2 sub-cards (Ejecutivo Comercial / Operaciones).
     await pool.query(
