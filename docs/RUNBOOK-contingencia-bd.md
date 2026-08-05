@@ -536,7 +536,7 @@ práctica:
    `WSP_TOKEN`, credenciales de correo, `CMF_API_KEY`, DealerNet.
 4. Revisa **Auditoría** y los usuarios activos; desactiva las cuentas sospechosas desde
    Usuarios (hay bloqueo por intentos fallidos configurable).
-5. Recuerda que `admin@admin.cl` es una **cuenta break-glass intencional**, no un intruso.
+5. Recuerda que existe una **cuenta de emergencia intencional** del sistema (el Administrador sabe cuál): no la trates como intruso ni la desactives.
 
 ---
 

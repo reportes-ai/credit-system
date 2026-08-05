@@ -11,7 +11,7 @@
 
 | # | Prueba | Esperado | Prio |
 |---|--------|----------|------|
-| 0.1 | Activar Modo Desarrollo (BG-ADMIN) | Cinta "DESARROLLO" visible en todas las páginas; todo correo sale solo a los 3 correos de prueba | P0 |
+| 0.1 | Activar Modo Desarrollo (cuenta protegida) | Cinta "DESARROLLO" visible en todas las páginas; todo correo sale solo a los 3 correos de prueba | P0 |
 | 0.2 | Verificar versión desplegada | Badge de `app-version.js` coincide con el último commit en Render | P0 |
 | 0.3 | `GET /api/health` o equivalente / logs Render sin errores al boot | Servicio arriba, migraciones IIFE sin error en logs | P0 |
 | 0.4 | Backup TiDB verificado | Backup diario activo + una restauración de prueba documentada | P0 |
@@ -27,7 +27,7 @@
 | 1.4 | Crear usuario nuevo + asignar perfil | Ve SOLO las cards/funciones de su perfil (probar con perfil Ejecutivo y Analista) | P0 |
 | 1.5 | Matriz de permisos: quitar una funcionalidad a un perfil | La card desaparece y la API responde 403 (probar 2-3 códigos: cartas, comisiones, mantenedores) | P0 |
 | 1.6 | `node scripts/audit-permisos.js` | Sin duplicados ni huérfanos | P1 |
-| 1.7 | Cuenta break-glass admin@admin.cl | Funciona (protegida, no tocar) | P0 |
+| 1.7 | Cuenta protegida de emergencia (el Administrador sabe cuál) | Funciona (no tocar) | P0 |
 | 1.8 | Visibilidad de ejecutivos (`ambito_ejecutivos` asignados) | Supervisor con asignados ve solo los suyos en Comisiones/Fundantes/Post Venta | P1 |
 | 1.9 | Módulo Auditoría | Login y 2-3 acciones críticas del día quedan registradas | P1 |
 

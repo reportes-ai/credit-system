@@ -134,7 +134,7 @@ advertencia para cualquier copia futura de esquema):
    dirección se borró la identidad de acceso. Un correo enmascarado tiene que ser
    **inalcanzable**, no **irreconocible**. `.invalid` es un TLD reservado por la RFC 2606 que
    ningún DNS resuelve, así que `patricio.escobar@staging.invalid` sirve para entrar y no puede
-   recibir correo ni por accidente. (Colisión real: `admin@admin.cl` y `admin@sistema.cl`
+   recibir correo ni por accidente. (Colisión real: dos cuentas internas del sistema
    comparten parte local — la segunda en aparecer lleva sufijo.)
 1. **Claves foráneas**: no se puede crear `comunas` antes que `provincias`. El script crea en
    pasadas hasta que una pasada completa no agrega nada. Es el mismo gotcha del respaldo de

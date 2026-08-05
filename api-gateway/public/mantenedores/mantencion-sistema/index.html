@@ -71,7 +71,7 @@
   <div class="wrap">
     <div class="intro">
       <h2><i class="bi bi-cone-striped me-1"></i>Mantención de Sistema</h2>
-      <p>Activa un aviso de mantención que verán todos los usuarios al ingresar o cambiar de pantalla. Control exclusivo de <b>BG-ADMIN</b>.</p>
+      <p>Activa un aviso de mantención que verán todos los usuarios al ingresar o cambiar de pantalla. Control exclusivo de una <b>cuenta protegida</b> del sistema.</p>
     </div>
 
     <div id="contenido"></div>
@@ -92,15 +92,15 @@
       try { const r = await fetch('/api/mantenimiento', { headers:H }); j = await r.json(); }
       catch(_){ return; }
       const cont = document.getElementById('contenido');
-      // Gate server-authoritative: solo BG-ADMIN ve y edita.
+      // Gate server-authoritative: solo la cuenta protegida ve y edita.
       if (!j.success || !j.data.es_bg) {
-        cont.innerHTML = `<div class="restringido"><i class="bi bi-shield-lock"></i><b>Acceso restringido.</b><br>Esta sección es exclusiva de <b>BG-ADMIN</b>.</div>`;
+        cont.innerHTML = `<div class="restringido"><i class="bi bi-shield-lock"></i><b>Acceso restringido.</b><br>Esta sección es exclusiva de una <b>cuenta protegida</b> del sistema.</div>`;
         return;
       }
       cont.innerHTML = `
         <div class="card-af">
           <h3><i class="bi bi-toggle-on"></i>Estado de la mantención</h3>
-          <div class="sub">Al activar, todos los usuarios (menos BG-ADMIN) verán el aviso en cada pantalla.</div>
+          <div class="sub">Al activar, todos los usuarios (menos esta cuenta) verán el aviso en cada pantalla.</div>
           <div class="sw-row">
             <label class="switch"><input type="checkbox" id="swActivo" onchange="onSwitch()"><span class="slider"></span></label>
             <span class="sw-estado off" id="swTxt">Desactivada</span>
@@ -144,10 +144,10 @@
         <div class="afecta">
           <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
           <ul>
-            <li><b>Switch de mantención</b> → cuando está activo, <b>todos los usuarios</b> (excepto BG-ADMIN) ven un aviso centrado al ingresar o cambiar de pantalla, en cualquier página del sistema.</li>
+            <li><b>Switch de mantención</b> → cuando está activo, <b>todos los usuarios</b> (excepto esta cuenta) ven un aviso centrado al ingresar o cambiar de pantalla, en cualquier página del sistema.</li>
             <li><b>Mensaje</b> → el texto que aparece en ese aviso.</li>
             <li><b>Modo Desarrollo</b> → cuando está activo, <b>todo correo del sistema</b> (cartas, comprobantes, alertas, claves, ODP, etc.) se <b>redirige a los correos de prueba</b> con un aviso del destinatario original; y se muestra la cinta <b>DESARROLLO</b> sobre el logo en todas las páginas. <a href="/usuarios">Prueba de correo</a> también se redirige.</li>
-            <li><b>Acceso</b> → este mantenedor y ambas activaciones son <b>exclusivos de BG-ADMIN</b>; ningún otro usuario (ni Administrador) puede verlo ni activarlo.</li>
+            <li><b>Acceso</b> → este mantenedor y ambas activaciones son <b>exclusivos de la cuenta protegida</b>; ningún otro usuario (ni Administrador) puede verlo ni activarlo.</li>
           </ul>
         </div>`;
       document.getElementById('swActivo').checked = !!j.data.activo;
