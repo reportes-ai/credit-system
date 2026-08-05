@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.24 — breadcrumb homologado -->
+  <!-- v1.25 — la ficha entra siempre en una sola hoja carta -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1108,7 +1108,53 @@ function autorizacionesPrintHTML(E){
 }
 /* Imprime cualquier HTML reutilizando el área de impresión */
 const LOGO_PRINT = '<div class="plogo"><img src="/img/logo.png" alt="AutoFácil"></div>';
-function printHTML(html, cls){ const pa=$('printArea'); pa.className=cls||''; pa.innerHTML=html; window.print(); }
+
+/* ── LA FICHA SIEMPRE EN UNA SOLA HOJA CARTA ──────────────────────────
+   El `zoom:0.95` fijo alcanzaba mientras la ficha fuera corta, pero una con
+   varios socios, dirección de parque y la cadena de autorizaciones se pasa a
+   una segunda hoja — y el bloque de firma queda solo en la página 2. Por eso se
+   rechazó una ficha el 05-08-2026: "debe venir firmada en 1 sola página, no
+   cortada en 2". El contenido estaba bien; el corte la invalidó.
+
+   En vez de confiar en un factor fijo, se MIDE el alto real y se calcula el
+   zoom que hace falta. Así la garantía no depende de cuántos socios tenga el
+   dealer ni de cuántas firmas lleve la cadena.
+
+   Hoja carta 279,4 × 215,9 mm menos 9 mm de margen por lado, a 96 dpi. */
+const HOJA_ALTO_PX  = Math.round((279.4 - 18) / 25.4 * 96);   // ≈ 988
+const HOJA_ANCHO_PX = Math.round((215.9 - 18) / 25.4 * 96);   // ≈ 748
+const ZOOM_BASE = 0.95;   // el de siempre: si ya entra, nada cambia
+const ZOOM_MIN  = 0.55;   // bajo esto el papel se vuelve ilegible
+
+function ajustarAUnaHoja(pa){
+  // Se mide con el ancho REAL de la hoja y sin zoom; fuera de pantalla para que
+  // el usuario no vea el parpadeo.
+  const antes = pa.getAttribute('style') || '';
+  pa.style.zoom = '1';
+  pa.style.display = 'block';
+  pa.style.position = 'absolute';
+  pa.style.left = '-10000px';
+  pa.style.top = '0';
+  pa.style.width = HOJA_ANCHO_PX + 'px';
+  const alto = pa.scrollHeight;
+  pa.setAttribute('style', antes);   // vuelve exactamente como estaba
+
+  // 0,99 de holgura: el navegador redondea y un pelo de más abre una hoja entera.
+  let z = alto > 0 ? Math.min(ZOOM_BASE, (HOJA_ALTO_PX / alto) * 0.99) : ZOOM_BASE;
+  if (z < ZOOM_MIN) {
+    z = ZOOM_MIN;
+    console.warn('[ficha] el contenido no entra ni al ' + ZOOM_MIN + ' — revisar el documento');
+  }
+  pa.style.zoom = z;
+}
+
+function printHTML(html, cls){
+  const pa=$('printArea');
+  pa.className=cls||'';
+  pa.innerHTML=html;
+  ajustarAUnaHoja(pa);
+  window.print();
+}
 
 cargar();
 </script>
