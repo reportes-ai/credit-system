@@ -119,6 +119,10 @@ const SELECT_GESTION = `
   SELECT
     ob.id                                                      AS id_credito,
     COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR))       AS numero_credito,
+    -- N° OP AutoFácil: es EL número de la operación de cara al usuario. El
+    -- numero_credito nace en la carta y viaja aparte solo como dato histórico
+    -- de los documentos ya emitidos (ver shared/num-op.js).
+    ob.num_op                                                  AS num_op,
     COALESCE(cl.rut,             '')    AS rut_cliente,
     COALESCE(cl.nombre_completo, '')   AS nombre_cliente,
     COALESCE(ob.financiera, 'AUTOFACIL')                       AS financiera,
@@ -509,6 +513,7 @@ const getAll = async (req, res) => {
 
     // Orden por columna (whitelist) — default: mes/id desc
     const SORT_MAP = {
+      num_op:             'CAST(COALESCE(ob.num_op, CAST(ob.numero_credito AS UNSIGNED)) AS UNSIGNED)',
       numero_credito:     'CAST(COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS UNSIGNED)',
       rut_cliente:        'cl.rut',
       nombre_cliente:     'cl.nombre_completo',

@@ -454,7 +454,7 @@ async function exportarCreditosExcel() {
 
     const fmtF = s => s ? String(s).slice(0, 10) : '';
     const out = rows.map(c => ({
-      'N° OP': c.numero_credito || '', 'RUT': c.rut_cliente || '', 'Cliente': c.nombre_cliente || '',
+      'N° OP': c.num_op || c.numero_credito || '', 'RUT': c.rut_cliente || '', 'Cliente': c.nombre_cliente || '',
       'Financiera': c.financiera || '', 'ID Financiera': c.id_financiera || '',
       'Fecha': fmtF(c.fecha_otorgamiento || c.created_at), 'Monto Financiado': +c.monto_financiado || 0,
       'Marca': c.marca || '', 'Modelo': c.modelo || '', 'Año': c.anio || '', 'Patente': c.patente || '',
@@ -605,7 +605,7 @@ function renderConsulta(list) {
     <table class="cred-table" style="min-width:0;width:100%;table-layout:auto">
       <thead>
         <tr>
-          ${sTh('N° OP','numero_credito')}
+          ${sTh('N° OP','num_op')}
           ${sTh('RUT','rut_cliente')}
           ${sTh('Cliente','nombre_cliente')}
           ${sTh('Financiera','financiera')}
@@ -623,7 +623,7 @@ function renderConsulta(list) {
       <tbody>
         ${list.map(c => `
         <tr>
-          <td class="num-cred">${c.numero_credito||'—'}</td>
+          <td class="num-cred">${c.num_op||c.numero_credito||'—'}</td>
           <td class="mono" style="white-space:nowrap">${c.rut_cliente||'—'}</td>
           <td>${c.nombre_cliente||'—'}</td>
           <td>${finTag(c.financiera)}</td>
@@ -662,7 +662,7 @@ async function abrirDetalle(id) {
     const c = j.data;
     _creditoEditId  = c.id_credito;
     _detalleData    = c;
-    document.getElementById('dNumCred').textContent  = c.numero_credito || '—';
+    document.getElementById('dNumCred').textContent  = c.num_op || c.numero_credito || '—';
     document.getElementById('dNombre').textContent   = c.nombre_cliente || '—';
     document.getElementById('dRut').textContent      = c.rut_cliente    || '—';
     const fmtD = s => s ? new Date(s).toLocaleDateString('es-CL') : '—';
