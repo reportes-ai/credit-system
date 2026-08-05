@@ -3,6 +3,7 @@ const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforceme
 const bcrypt = require('bcryptjs');
 const { auditar } = require('../../../../shared/audit');
 const { tieneFunc } = require('../../../../shared/middleware/permisos');
+const { cerrarSesiones } = require('../../../../shared/middleware/auth');
 const { enviarCorreo, envolverHTML } = require('../../../../shared/mailer');
 // Job en segundo plano: avisa por correo el vencimiento de clave (carga al boot)
 require('../jobs/aviso-vencimiento-clave');
@@ -79,6 +80,13 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
     await pool.query(`ALTER TABLE usuarios ADD COLUMN bloqueado TINYINT(1) NOT NULL DEFAULT 0`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration bloqueado]', e.message); }
+  try {
+    // Revocación de sesiones (hallazgo A-7): el token lleva esta versión y
+    // subirla mata todas las sesiones abiertas del usuario en el acto.
+    // Arranca en 0 a propósito: los tokens ya emitidos no traen `tv` y valen 0,
+    // así que instalar esto no desloguea a nadie.
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN token_version INT NOT NULL DEFAULT 0`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration token_version]', e.message); }
   try {
     // Fecha del último cambio de clave (para calcular el vencimiento). Backfill a la creación.
     await pool.query(`ALTER TABLE usuarios ADD COLUMN password_updated_at DATETIME NULL DEFAULT NULL`);
@@ -357,6 +365,13 @@ const updateUsuario = async (req, res) => {
       [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, id]
     );
 
+    // A-7: al suspender, sus sesiones abiertas mueren ya — no al vencer el token.
+    // También al cambiarle el perfil: el token viejo lleva el perfil anterior y
+    // varias pantallas se dibujan con ese dato.
+    if (estadoFinal !== 'activo' || (act && Number(act.id_perfil) !== Number(perfilFinal))) {
+      try { await cerrarSesiones(id); } catch (e) { console.error('[usuarios] cerrarSesiones:', e.message); }
+    }
+
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
       detalle: `Editó el usuario ${nombre} ${apellido} (${email}) — perfil #${perfilFinal}, estado ${estadoFinal}`, meta: { email, id_perfil: perfilFinal, estado: estadoFinal } });
     res.json({ success: true, data: { id_usuario: id, nombre, apellido, email, id_perfil: perfilFinal, estado: estadoFinal }, error: null });
@@ -438,6 +453,9 @@ const resetClave = async (req, res) => {
     const hash = await bcrypt.hash(nuevaClave, 10);
     // Forzar cambio en el próximo ingreso (igual que en el alta) y desbloquear la cuenta.
     await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 1, password_updated_at = NOW(), intentos_fallidos = 0, bloqueado = 0 WHERE id_usuario = ?', [hash, id]);
+    // A-7: si la clave se resetea es porque se sospecha del acceso o se perdió.
+    // Dejar viva la sesión anterior haría inútil el reseteo.
+    try { await cerrarSesiones(id); } catch (e) { console.error('[usuarios] cerrarSesiones:', e.message); }
 
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: `Reseteó la contraseña del usuario #${id}` });
 

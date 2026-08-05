@@ -293,6 +293,21 @@ worker threads, y ejecutar las migraciones de datos fuera del arranque.
 ---
 
 ### A-7 · Sesión no revocable: hasta 8 horas de acceso tras desactivar un usuario
+✅ **CORREGIDO el 05-08-2026.** `usuarios.token_version` viaja en el token y `verifyToken`
+la compara contra la base (caché 60s, igual que `requireFunc`), más el estado del usuario.
+Subir ese número mata todas sus sesiones en el acto, sin guardar tokens en ninguna parte.
+
+Se sube solo en los cuatro momentos en que corresponde: **suspensión**, **cambio de
+perfil** (el token viejo lleva el perfil anterior y varias pantallas se dibujan con ese
+dato), **reseteo de clave** (si se resetea es porque se sospecha del acceso — dejar viva la
+sesión anterior haría inútil el reseteo) y **finiquito en RRHH**, que es el caso real de la
+desvinculación.
+
+Dos decisiones a propósito: los tokens ya emitidos **no traen `tv`, valen 0** —igual que el
+valor por omisión en la base—, así que instalarlo no deslogueó a nadie; y **si la base
+falla se deja pasar**, porque sin base no funciona ninguna pantalla y cerrar la sesión
+encima obligaría a todos a reingresar justo cuando el sistema vuelve.
+
 **Ubicación:** `shared/middleware/auth.js:5` (`JWT_EXPIRES = '8h'`)
 
 `requireFunc` consulta `u.estado = 'activo'` (`permisos.js:29`), así que las rutas con
@@ -486,7 +501,7 @@ del colapso; tiene tres cosas que arreglar rápido y una disciplina que adoptar 
 | A-4 | Sin rate limiting general | 🟠 Alto | `index.js:200` | Costo TiDB y degradación | Límite global tras auth | Bajo |
 | A-5 | Carrera en `num_op` | 🟠 Alto | `shared/num-op.js:38` | Error 500 al otorgar en paralelo | Reintento o tabla atómica | Bajo |
 | A-6 | Proceso único | 🟠 Alto | Arquitectura | Una excepción tumba todo | Guardas + workers | Medio |
-| A-7 | Sesión no revocable | 🟠 Alto | `auth.js:5` | 8h de acceso tras desvinculación | `token_version` | Medio |
+| A-7 | Sesión no revocable | ✅ Corregido 05-08 | `auth.js` | 8h de acceso tras desvinculación | `token_version` | Hecho |
 | M-1..M-11 | Ver sección Medios | 🟡 Medio | Varios | Fricción, costo, riesgo acotado | Ver detalle | Bajo/Medio |
 | B-1..B-8 | Ver sección Bajos | 🔵 Bajo | Varios | Calidad y mantenibilidad | Ver detalle | Bajo |
 

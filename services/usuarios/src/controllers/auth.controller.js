@@ -89,7 +89,9 @@ const login = async (req, res) => {
       email: usuario.email,
       id_perfil: usuario.id_perfil,
       perfil_nombre: usuario.perfil_nombre,
-      id_supervisor: usuario.id_supervisor
+      id_supervisor: usuario.id_supervisor,
+      // Versión de sesión (A-7): si en la base sube, este token deja de valer.
+      tv: Number(usuario.token_version || 0)
     };
 
     // Cuentas de propósito fijo (ej. TV) pueden tener sesión más larga (usuarios.sesion_horas).

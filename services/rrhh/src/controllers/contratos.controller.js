@@ -491,8 +491,14 @@ exports.finiquitoGuardar = async (req, res) => {
         WHERE id_usuario=? AND estado='activo' AND COALESCE(protegido,0)=0`, [b.fecha_termino, idU]);
       // Queda en auditoría: si no, la cuenta aparece suspendida sin que nadie sepa por qué
       // (se confundió con un bloqueo por intentos fallidos de clave, que NO suspende).
-      if (ru.affectedRows) auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(idU),
-        detalle: `Usuario suspendido automáticamente por el finiquito #${r.insertId} (término ${b.fecha_termino})` });
+      if (ru.affectedRows) {
+        // A-7: el finiquito es EL caso de la desvinculación. Sin esto, la persona
+        // conservaba acceso hasta que su token venciera solo — el resto de la jornada.
+        try { await require('../../../../shared/middleware/auth').cerrarSesiones(idU); }
+        catch (e) { console.error('[finiquito cerrarSesiones]', e.message); }
+        auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: String(idU),
+          detalle: `Usuario suspendido automáticamente por el finiquito #${r.insertId} (término ${b.fecha_termino})` });
+      }
     } catch (e) { console.error('[finiquito baja usuario]', e.message); }
     // Pago: ODP automática del finiquito (correlativo central) + campana a Tesorería
     let odp = null;
