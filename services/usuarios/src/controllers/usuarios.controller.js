@@ -12,11 +12,27 @@ require('../jobs/aviso-vencimiento-clave');
 const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replace(/\/+$/, '');
 
 // Clave temporal aleatoria (alta entropía, sin caracteres ambiguos)
+/* Clave temporal para altas y reseteos. Dos cosas que antes no se cumplían:
+   · `crypto.randomInt` en vez de `Math.random()`, que no es criptográfico — es
+     una clave que da acceso al sistema, aunque sea de un solo uso.
+   · Se garantiza una mayúscula, una minúscula, un dígito y un símbolo, para que
+     la temporal cumpla la política del mantenedor Seguridad de Usuarios sea
+     cual sea su configuración (antes salía al azar y podía no traer ninguno).
+   Sin caracteres ambiguos (I, l, 1, O, 0): se dicta por teléfono. */
 const generarClaveTemporal = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
-  let c = '';
-  for (let i = 0; i < 10; i++) c += chars[Math.floor(Math.random() * chars.length)];
-  return c;
+  const { randomInt } = require('crypto');
+  const MAY = 'ABCDEFGHJKLMNPQRSTUVWXYZ', MIN = 'abcdefghjkmnpqrstuvwxyz';
+  const NUM = '23456789', ESP = '!@#$%*-_';
+  const todo = MAY + MIN + NUM + ESP;
+  const pick = s => s[randomInt(s.length)];
+  const chars = [pick(MAY), pick(MIN), pick(NUM), pick(ESP)];
+  while (chars.length < 12) chars.push(pick(todo));
+  // Barajado Fisher-Yates: sin esto los cuatro obligatorios quedan siempre al inicio.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 };
 
 // Correo con la clave (alta de usuario o reset). El usuario la cambia en su primer ingreso.

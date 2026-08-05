@@ -140,16 +140,26 @@ const cambiarClave = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Contraseña actual y nueva son requeridas' });
     }
     const [rows] = await pool.query('SELECT password_hash, protegido FROM usuarios WHERE id_usuario = ?', [id_usuario]);
-    // Complejidad de clave: las cuentas protegidas (break-glass) quedan fuera de esta política.
-    if (!(rows[0] && rows[0].protegido) && password_nuevo.length < 6) {
-      return res.status(400).json({ success: false, data: null, error: 'La nueva contraseña debe tener al menos 6 caracteres' });
-    }
+
     const valid = await bcrypt.compare(password_actual, rows[0].password_hash);
     if (!valid) {
       return res.status(401).json({ success: false, data: null, error: 'Contraseña actual incorrecta' });
     }
 
+    /* Política del mantenedor Seguridad de Usuarios (motor único). Acá había un
+       `length < 6` escrito a mano que ignoraba las ocho reglas configuradas: el
+       Administrador exigía 8 caracteres con mayúscula, número y símbolo, y el
+       sistema aceptaba `123456`. Las cuentas protegidas siguen exentas. */
+    const politica = require('../../../../shared/politica-clave');
+    const v = await politica.validarClave(password_nuevo, {
+      id_usuario, protegido: !!(rows[0] && rows[0].protegido),
+    });
+    if (!v.ok) return res.status(400).json({ success: false, data: null, error: v.error });
+
     const hash = await bcrypt.hash(password_nuevo, 10);
+    // La clave saliente entra al historial ANTES de reemplazarla (regla "no
+    // repetir las últimas N" del mantenedor).
+    await politica.registrarEnHistorial(id_usuario, rows[0].password_hash);
     // Al cambiar la clave se limpia la marca de "primer ingreso" y se reinicia el reloj de vencimiento
     await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 0, password_updated_at = NOW() WHERE id_usuario = ?', [hash, id_usuario]);
 

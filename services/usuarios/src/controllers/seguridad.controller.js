@@ -33,6 +33,19 @@ require('../../../../shared/migrate').enFila('seguridad', async () => {
         [clave, valor]
       );
     }
+
+    /* Historial de claves: sostiene la regla "no repetir las últimas N" del
+       mantenedor, que hasta ahora se configuraba y no se aplicaba (no existía
+       dónde guardar las anteriores). Solo el hash, nunca la clave. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuarios_claves_hist (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        id_usuario    INT      NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_usuario (id_usuario, id)
+      )
+    `);
   } catch (e) {
     console.error('[config_seguridad migration]', e.message);
   }
@@ -68,6 +81,9 @@ const putConfig = async (req, res) => {
         [clave, String(valor)]
       );
     }
+    // El motor de política cachea 60 s: sin esto, guardar la regla y probarla
+    // enseguida daba el resultado viejo y parecía que no se había aplicado.
+    require('../../../../shared/politica-clave').olvidarConfig();
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     (console.error('[error]', e), res.status(500).json({success:false,data:null,error:'Error interno del servidor'}));
