@@ -171,7 +171,7 @@ function comprobanteEmailHTML({ credito, cuotas, trxNum, fechaPago, total, orige
 /* ─── Carga datos de cabecera del crédito (cliente, número, email) ──────────── */
 async function ctxCredito(idCredito) {
   const [[row]] = await pool.query(
-    `SELECT c.id AS id_credito, c.numero_credito,
+    `SELECT c.id AS id_credito, COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
             cl.rut             AS rut_cliente,
             cl.nombre_completo AS nombre_cliente,
             cl.email           AS email_cliente

@@ -45,8 +45,8 @@ const list = async (req, res) => {
 
     if (q) {
       const like = `%${q.trim().toUpperCase()}%`;
-      where += ` AND (UPPER(ct.rut_cliente) LIKE ? OR UPPER(ct.nombre_cliente) LIKE ? OR UPPER(c.numero_credito) LIKE ?)`;
-      params.push(like, like, like);
+      where += ` AND (UPPER(ct.rut_cliente) LIKE ? OR UPPER(ct.nombre_cliente) LIKE ? OR UPPER(c.numero_credito) LIKE ? OR CAST(c.num_op AS CHAR) LIKE ?)`;
+      params.push(like, like, like, like);
     }
 
     const [rows] = await pool.query(`
@@ -54,7 +54,7 @@ const list = async (req, res) => {
         ct.id_credito,
         ct.rut_cliente,
         ct.nombre_cliente,
-        c.numero_credito,
+        COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
         ROUND(SUM(ct.monto_original), 2)                        AS monto_original,
         ROUND(SUM(ct.monto_utilizado), 2)                       AS monto_utilizado,
         ROUND(SUM(ct.monto_original - ct.monto_utilizado), 2)   AS saldo,
@@ -64,7 +64,7 @@ const list = async (req, res) => {
       FROM cuentas_transitorias ct
       LEFT JOIN creditos c ON ct.id_credito = c.id
       WHERE ${where}
-      GROUP BY ct.id_credito, ct.rut_cliente, ct.nombre_cliente, c.numero_credito
+      GROUP BY ct.id_credito, ct.rut_cliente, ct.nombre_cliente, c.num_op, c.numero_credito
       ORDER BY ultima_actualizacion DESC
     `, params);
 
@@ -106,7 +106,7 @@ const cartola = async (req, res) => {
 
     // Info del crédito y cliente
     const [[cred]] = await pool.query(
-      `SELECT c.numero_credito,
+      `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
               COALESCE(cl.nombre_completo, '') AS nombre_cliente,
               COALESCE(cl.rut,             '') AS rut_cliente
        FROM creditos c

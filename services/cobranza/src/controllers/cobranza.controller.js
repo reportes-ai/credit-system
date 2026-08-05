@@ -347,8 +347,10 @@ exports.cartera = async (req, res) => {
     const qParams = [];
     let whereQ = '';
     if (q) {
-      whereQ = 'AND (COALESCE(cl_m.nombre_completo, \'\') LIKE ? OR COALESCE(cl_m.rut, \'\') LIKE ? OR c.numero_credito LIKE ?)';
-      qParams.push(`%${q}%`, `%${q}%`, `%${q}%`);
+      // Se busca por AMBOS números: en pantalla se muestra el N° OP, pero el
+      // número viejo de la carta sigue siendo válido para lo ya emitido.
+      whereQ = 'AND (COALESCE(cl_m.nombre_completo, \'\') LIKE ? OR COALESCE(cl_m.rut, \'\') LIKE ? OR c.numero_credito LIKE ? OR CAST(c.num_op AS CHAR) LIKE ?)';
+      qParams.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
 
     const havingExtra = havingFilters.length
@@ -777,7 +779,7 @@ exports.misGestiones = async (req, res) => {
 
     // Promesas pendientes y vencidas
     const [promesas] = await pool.query(`
-      SELECT g.*, c.numero_credito,
+      SELECT g.*, COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
              COALESCE(cl.nombre_completo,'') AS nombre_cliente,
              COALESCE(cl.rut,'') AS rut_cliente
       FROM cobranza_gestiones g
@@ -789,7 +791,7 @@ exports.misGestiones = async (req, res) => {
     `, [idUsuario]);
 
     const [promesasVencidas] = await pool.query(`
-      SELECT g.*, c.numero_credito,
+      SELECT g.*, COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
              COALESCE(cl.nombre_completo,'') AS nombre_cliente
       FROM cobranza_gestiones g
       LEFT JOIN creditos c ON c.id = g.id_credito

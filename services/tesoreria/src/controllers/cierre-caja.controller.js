@@ -54,7 +54,7 @@ const getCierre = async (req, res) => {
       pc.fecha_pago, pc.created_at, pc.numero_transaccion, pc.origen_fondos,
       pc.id_cuenta_bancaria, pc.comentario_reverso,
       pc.registrado_por, pc.id_registrado_por,
-      c.numero_credito,
+      COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
       COALESCE(cl.nombre_completo, '') AS nombre_cliente,
       COALESCE(cl.rut,             '') AS rut_cliente,
       TRIM(CONCAT(COALESCE(u.nombre,''),' ',COALESCE(u.apellido,''))) AS nombre_cajero,
@@ -114,7 +114,7 @@ const getCierre = async (req, res) => {
           NULL AS origen_fondos, pc.id_cuenta_bancaria, pc.comentario_reverso,
           pc.reversado_por    AS registrado_por,
           pc.id_reversado_por AS id_registrado_por,
-          c.numero_credito,
+          COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
           COALESCE(cl2.nombre_completo, '') AS nombre_cliente,
           COALESCE(cl2.rut,             '') AS rut_cliente,
           TRIM(CONCAT(COALESCE(ur.nombre,''),' ',COALESCE(ur.apellido,''))) AS nombre_cajero,
@@ -148,7 +148,7 @@ const getCierre = async (req, res) => {
           ct.fecha, ct.monto_original, ct.monto_utilizado,
           ROUND(ct.monto_original - ct.monto_utilizado, 2) AS saldo,
           ct.glosa, ct.estado, ct.created_at,
-          c.numero_credito,
+          COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
           COALESCE(cl3.nombre_completo, '') AS nombre_cliente,
           COALESCE(cl3.rut,             '') AS rut_cliente
        FROM cuentas_transitorias ct
@@ -165,7 +165,8 @@ const getCierre = async (req, res) => {
     if (idsTransitorias.length) {
       const [cart] = await pool.query(
         `SELECT tc.*, ct.glosa AS glosa_transitoria,
-                c.numero_credito, COALESCE(cl_tc.nombre_completo,'') AS nombre_cliente
+                COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito,
+                COALESCE(cl_tc.nombre_completo,'') AS nombre_cliente
          FROM transitorias_cartola tc
          LEFT JOIN cuentas_transitorias ct ON tc.id_transitoria = ct.id_transitoria
          LEFT JOIN creditos c ON tc.id_credito = c.id_credito

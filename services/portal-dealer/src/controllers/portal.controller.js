@@ -235,7 +235,7 @@ exports.operaciones = async (req, res) => {
       `SELECT * FROM (
         SELECT
           ob.id                                                AS id,
-          COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS num_op,
+          COALESCE(CAST(ob.num_op AS CHAR), ob.numero_credito) AS num_op,
           ob.id_financiera,
           COALESCE(cl.nombre_completo, '')                     AS cliente_nombre,
           COALESCE(cl.rut, '')                                 AS cliente_rut,
@@ -426,7 +426,7 @@ async function datosDelDealer(req) {
   const sc = dealerScope(req);
   if (!sc.hasScope) return null;
   const [ops] = await pool.query(
-    `SELECT COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)) AS num_op,
+    `SELECT COALESCE(CAST(ob.num_op AS CHAR), ob.numero_credito) AS num_op,
             COALESCE(cl.nombre_completo,'') AS cliente,   -- solo como etiqueta para identificar la operación; el RUT NO se expone
             ob.financiera, ob.marca, ob.modelo, ob.anio, ob.patente,
             DATE(ob.fecha_otorgado) AS fecha_otorgado, ob.monto_financiado, ob.plazo,

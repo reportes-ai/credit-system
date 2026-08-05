@@ -434,7 +434,7 @@ const createBatch = async (req, res) => {
     let transitoria = null;
     if (exceso > 0) {
       const [[cred]] = await conn.query(
-        `SELECT c.numero_credito, COALESCE(cl.rut,'') AS rut_cliente,
+        `SELECT COALESCE(CAST(c.num_op AS CHAR), c.numero_credito) AS numero_credito, COALESCE(cl.rut,'') AS rut_cliente,
                 COALESCE(cl.nombre_completo,'') AS nombre_cliente
          FROM creditos c LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
          WHERE c.id_credito = ?`,
