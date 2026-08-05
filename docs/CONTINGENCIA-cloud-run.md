@@ -185,16 +185,51 @@ corresponde.
 
 ## 6. Lo que el standby NO puede hacer
 
-Tiene las **16 variables del núcleo** (base de datos, sesiones, correo), pero **no** las de
-las integraciones externas. Promovido hoy:
+**Desde el 05-08-2026 hace prácticamente todo**: tiene **33 variables**, con las
+integraciones cargadas (indicadores, IA, WhatsApp, DealerNet, Workera, Google, SimpleAPI).
+Antes tenía solo las 16 del núcleo.
 
-| Funciona | No funciona |
+Lo único que sigue sin funcionar promovido:
+
+| Falta | Por qué |
 |---|---|
-| Créditos, clientes, cartas de aprobación | Sincronización de indicadores (`CMF_API_KEY`) |
-| Cobranza, tesorería, contabilidad | IA — lectura de PDFs, informes (`ANTHROPIC_API_KEY`) |
-| Comisiones, post venta, fundantes | WhatsApp — bot y campañas (`WSP_*`) |
-| Portales de cliente y dealer | DealerNet — informes comerciales |
-| **Correo saliente** (cartolas, alertas) | SII / RCV (`SIMPLEAPI_KEY`), Workera, Fintoc |
+| **SII / RCV** (`SII_CLAVE`, `SII_RUT_USUARIO`) | Las de Render **están malas** y no sirve copiar un valor equivocado: disimularía el pendiente. Tampoco funciona hoy en producción |
+| **Fintoc** (`FINTOC_SECRET_KEY`) | No está cargada en Render tampoco — la integración bancaria sigue en sandbox |
+| Certificado digital SII (`SII_CERT_*`) | Igual que arriba |
+
+### Las llaves van a Secret Manager, no como variable plana
+
+Las 14 sensibles se guardan como secretos (`afbs-<nombre-en-minúscula>`) y el servicio las
+referencia; solo la configuración inocua —URLs, puertos, RUT de la empresa, IDs públicos—
+va como variable normal. Se respetó la convención que ya existía para `DB_PASSWORD` y
+`JWT_SECRET`: media configuración en un lugar y media en otro es cómo se pierde el rastro
+de dónde vive cada llave.
+
+**Cómo se cargan** (no a mano — veinte copy-paste es donde uno se pega mal, y ese error
+solo aparece el día que se promueve el host):
+
+```bash
+node scripts/sincronizar-env-standby.js            # compara y muestra, sin tocar nada
+node scripts/sincronizar-env-standby.js --aplicar
+```
+
+Lee las variables de Render por su API y carga en Cloud Run las que faltan, **sin imprimir
+ni un valor** y sin pasarlos por la línea de comandos. Necesita una API key de Render, que
+se revoca apenas termina.
+
+**Tres cosas que el script se niega a copiar, y conviene entender por qué:**
+
+- **`MOTORES`** — el standby debe seguir apagado. Aborta si el resultado no es `off`.
+- **`GCS_CREDENCIALES`** — en Cloud Run sobra: el servicio usa su propia identidad, sin
+  llave que rotar ni que se pueda filtrar. Copiarla sería un retroceso.
+- **`APP_URL`** — se fuerza a la del standby. Copiar la de producción haría que los correos
+  del host de respaldo enlacen al servidor caído: el error más fácil de cometer y el más
+  difícil de notar.
+
+> **Trampa que costó encontrar:** `gcloud run services update --env-vars-file` **reemplaza
+> todo el conjunto** y, como las referencias a Secret Manager no traen valor legible, un
+> volcado ingenuo las borra — el standby se queda sin base de datos. Hay que usar
+> `--update-env-vars` / `--update-secrets`, que son aditivos.
 
 ### Los documentos SÍ los alcanza (y hay que verificarlo)
 
