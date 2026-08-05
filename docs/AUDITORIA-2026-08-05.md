@@ -88,7 +88,7 @@ las transacciones de pago.
 
 ## Hallazgos críticos
 
-### C-1 · El webhook de WhatsApp acepta mensajes de cualquiera en internet
+### ✅ C-1 · El webhook de WhatsApp acepta mensajes de cualquiera en internet
 `services/whatsapp/src/routes/whatsapp.routes.js:10` · CWE-345
 
 El endpoint es público por necesidad (Meta debe poder llamarlo), pero **no verifica la
@@ -109,7 +109,7 @@ después sirve de respaldo de gestión.
 bytes originales con `express.json({ verify })`. Es el único hallazgo explotable desde
 internet sin ninguna credencial. **Esfuerzo: bajo (30 min).**
 
-### C-2 · CRUD completo de créditos sin ninguna autorización
+### ✅ C-2 · CRUD completo de créditos sin ninguna autorización
 `services/creditos/src/routes/operaciones.routes.js:10,11,15`
 
 ```js
@@ -128,7 +128,7 @@ y nombre del cliente iterando ids.
 **Impacto:** `creditos` es la fuente de verdad de la que cuelgan comisiones, cartolas,
 contabilidad y cobranza. **Esfuerzo: bajo (3 líneas).**
 
-### C-3 · Escalada a Administrador vía `resetClave`
+### ✅ C-3 · Escalada a Administrador vía `resetClave`
 `services/usuarios/src/controllers/usuarios.controller.js:448` · CWE-269
 
 El controlador **no valida nada sobre el objetivo**: ni el flag `protegido`, ni
@@ -143,7 +143,7 @@ exactamente el control pensado para esto — pero esa bandera solo la respeta el
 (ver C-4). Por API el token entregado es plenamente válido. `desbloquearUsuario`
 (`:485`) tiene el mismo defecto. **Esfuerzo: bajo (~10 líneas).**
 
-### C-4 · El cambio de clave obligatorio es solo del frontend
+### ✅ C-4 · El cambio de clave obligatorio es solo del frontend
 `services/usuarios/src/controllers/auth.controller.js:96-118` · CWE-602
 
 `debe_cambiar_clave` no aparece ni una vez en `shared/middleware/auth.js`. El login entrega
@@ -158,7 +158,7 @@ cerrado la puerta y no la cerró. Se agrava con C-3 y con M-1.
 **Corrección:** que el token nazca marcado (`cc: 1`) y `verifyToken` lo haga valer, con
 excepción para la propia ruta de cambio de clave. **Esfuerzo: bajo.**
 
-### C-5 · El asiento contable se pierde en silencio ante carrera del correlativo
+### ✅ C-5 · El asiento contable se pierde en silencio ante carrera del correlativo
 `services/contabilidad/src/motor-asientos.js:238`
 
 ```js
@@ -179,7 +179,7 @@ condición para reemplazar AVSOFT.
 secuencia con `FOR UPDATE` sobre fila real, como ya hace `shared/ordenes-pago.js`.
 **Esfuerzo: bajo.**
 
-### C-6 · Transacciones de pago que hacen commit tras tragarse un error
+### ✅ C-6 · Transacciones de pago que hacen commit tras tragarse un error
 `services/creditos/src/controllers/pagos-credito.controller.js:396`, `:614`, `:616`
 
 ```js
@@ -259,13 +259,40 @@ contingencia de Cloud SQL), definers de vistas y triggers, y el charset de los a
 
 ---
 
+## Estado de las correcciones (05-08-2026, mismo día)
+
+Los **8 críticos del roadmap quedaron cerrados** en las versiones v182.0 y v182.1, marcados
+con ✅ en sus secciones. Lo que cambió respecto de lo planificado:
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| 1 | C-1 firma del webhook de WhatsApp | ✅ **Falta cargar `WSP_APP_SECRET` en Render** — sin esa variable el endpoint sigue aceptando sin verificar; el estado se ve en `/api/health → whatsapp_webhook_firmado` |
+| 2 | C-2 `requireFunc` en el CRUD de créditos | ✅ Permisos nuevos `creditos_crear/editar/eliminar` — **hay que habilitarlos en la matriz** a los perfiles que digitan |
+| 3 | C-3 validación del objetivo en `resetClave` | ✅ |
+| 4 | C-4 forzado real del cambio de clave | ✅ El token nace marcado (`cc`) y `verifyToken` lo hace valer |
+| 5 | C-6 `.catch(() => {})` en transacciones de pago | ✅ |
+| 6 | C-5 reintento del correlativo contable | ✅ |
+| 7 | A-1/A-2/M-1 XSS almacenado | ✅ 5 pantallas + la foto de credencial |
+| 8 | A-3 `requireFunc` en Órdenes de Pago | ✅ Permiso nuevo `ordenes_pago_ver` |
+
+**Dos acciones pendientes de configuración, no de código:** cargar `WSP_APP_SECRET` y
+asignar los cuatro permisos nuevos en la matriz de Perfiles. Hasta que se asignen, solo el
+Administrador puede crear, editar o borrar operaciones y ver Órdenes de Pago (pasa por su
+bypass).
+
+**Efecto en las notas:** Seguridad sube de 5,0 a ~7,0. El resto queda igual: los 54 endpoints
+sin autorización, el bypass por nombre de perfil, los índices y la persistencia de logs
+siguen abiertos.
+
+---
+
 ## Hallazgos altos
 
 | # | Hallazgo | Ubicación | Impacto |
 |---|---|---|---|
-| A-1 | **XSS almacenado en la bitácora de Cobranza** — `innerHTML` con `g.mensaje` y el archivo no define `esc` | `public/cobranza/prejudicial.html:823`, `judicial.html:695` | Un cobrador roba el JWT desde `sessionStorage` de supervisor y gerencia |
-| A-2 | **Mismo XSS en Terreno, Cierre de Mes y Orden de Pago** | `terreno/index.html:370`, `tesoreria/cierre-mes.html:247`, `postventa/orden-pago/index.html:227` | Cierre de Mes es el peor: lo escribe un analista, lo lee toda la gerencia |
-| A-3 | **Órdenes de Pago: los 4 GET sin `requireFunc`** mientras las escrituras sí lo exigen | `ordenes-pago.routes.js:8,14,15,16` | Cualquier autenticado lista banco y cuenta de todos los proveedores — insumo exacto del fraude BEC |
+| ✅ A-1 | **XSS almacenado en la bitácora de Cobranza** — `innerHTML` con `g.mensaje` y el archivo no define `esc` | `public/cobranza/prejudicial.html:823`, `judicial.html:695` | Un cobrador roba el JWT desde `sessionStorage` de supervisor y gerencia |
+| ✅ A-2 | **Mismo XSS en Terreno, Cierre de Mes y Orden de Pago** | `terreno/index.html:370`, `tesoreria/cierre-mes.html:247`, `postventa/orden-pago/index.html:227` | Cierre de Mes es el peor: lo escribe un analista, lo lee toda la gerencia |
+| ✅ A-3 | **Órdenes de Pago: los 4 GET sin `requireFunc`** mientras las escrituras sí lo exigen | `ordenes-pago.routes.js:8,14,15,16` | Cualquier autenticado lista banco y cuenta de todos los proveedores — insumo exacto del fraude BEC |
 | A-4 | **El bypass de Administrador cuelga de un string** — `u.perfil === 'Administrador'`, sin columna `es_admin`. 174 literales en el backend | `shared/middleware/permisos.js:33` | Renombrar el perfil lo desactiva en silencio; crear uno con ese nombre lo otorga |
 | A-5 | **Comisiones de todos los ejecutivos para cualquier autenticado** | `comisiones.routes.js:9,10` | La planilla de remuneración variable de toda la fuerza de venta |
 | A-6 | **`visibilidad-ejecutivos.js` aplicado en 2 de ~8 módulos**, y falla abierto (`{all:true}`) ante error | créditos, comisiones, dashboard, mando, reportería, cartolas | Cada ejecutivo ve la cartera completa |
@@ -285,7 +312,7 @@ contingencia de Cloud SQL), definers de vistas y triggers, y el charset de los a
 
 ## Hallazgos medios
 
-- **M-1 · XSS por ruptura de atributo en la foto de credencial** — el regex valida solo el
+- **✅ M-1 · XSS por ruptura de atributo en la foto de credencial** — el regex valida solo el
   prefijo `data:image/…;base64,` sin `$`, y `facilbook/index.html:222` no escapa el `src`.
   Se distribuye a toda la empresa (`credenciales.controller.js:112`).
 - **M-2 · 54 rutas de escritura sin autorización de negocio** (11,7% de 462). El bloque de
