@@ -94,6 +94,20 @@ const verifyToken = async (req, res, next) => {
     } catch (e) {
       console.error('[auth] no se pudo verificar la sesión (se deja pasar):', e.message);
     }
+
+    /* Clave por cambiar (C-4): el token nace marcado y acá se hace valer. Se
+       deja pasar SOLO el cambio de clave y la lectura de permisos (que la
+       pantalla necesita para dibujarse); todo lo demás espera. Sin esto, la
+       obligación de cambiar la clave vivía únicamente en el navegador. */
+    if (Number(payload.cc || 0) === 1) {
+      const rutaCruda = req.originalUrl || req.url || '';
+      const ruta = rutaCruda.split('?')[0];
+      const PERMITIDAS = ['/api/auth/cambiar-clave', '/api/auth/mis-permisos', '/api/health'];
+      if (!PERMITIDAS.some(p => ruta === p || ruta.endsWith(p))) {
+        return res.status(403).json({ success: false, data: null,
+          error: 'Debes cambiar tu contraseña antes de usar el sistema.' });
+      }
+    }
   }
 
   req.usuario = payload;

@@ -87,6 +87,16 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b02', async () => {
       ['Créditos',     'Condonar Intereses',               'creditos_condonar_intereses', 0],
       ['Créditos',     'Condonar Gastos de Cobranza',      'creditos_condonar_gastos',    0],
       ['Créditos',     'Ver Auditoría de Crédito',         'creditos_auditoria',          0],
+      /* Auditoría 05-08-2026 (C-2): POST/PUT/DELETE de operaciones estaban solo
+         con verifyToken, así que cualquier usuario activo podía crear, editar o
+         BORRAR una operación de crédito — la tabla de la que cuelgan comisiones,
+         cartolas, contabilidad y cobranza. Nacen en 0: se otorgan desde la matriz
+         a quien corresponda (el Administrador pasa igual por su bypass). */
+      ['Créditos',     'Crear Operación',                  'creditos_crear',              0],
+      ['Créditos',     'Editar Operación',                 'creditos_editar',             0],
+      ['Créditos',     'Eliminar Operación',               'creditos_eliminar',           0],
+      // Órdenes de Pago — leer también expone datos: banco y cuenta de proveedores (A-3)
+      ['Órdenes de Pago', 'Ver Órdenes y Proveedores',     'ordenes_pago_ver',            0],
       // Tesorería
       ['Tesorería',    'Gestionar Cajas',                  'tesoreria_cajas',             0],
       ['Tesorería',    'Cierre de Caja',                   'tesoreria_cierre_caja',       0],

@@ -448,6 +448,23 @@ const reactivarUsuario = async (req, res) => {
 const resetClave = async (req, res) => {
   try {
     const { id } = req.params;
+
+    /* Auditoría 05-08-2026 (C-3): no se validaba NADA sobre el objetivo. Quien
+       tuviera el permiso de resetear —típicamente RRHH o soporte— podía
+       resetear la clave de un Administrador, leerla en la respuesta y entrar
+       con su perfil. `createUsuario` y `updateUsuario` ya aplicaban la regla
+       "solo otorgas lo que tienes"; acá faltaba. */
+    if (await esProtegido(id)) {
+      return res.status(403).json({ success: false, data: null,
+        error: 'Cuenta protegida: su clave no se resetea desde acá.' });
+    }
+    const [[objetivo]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario = ?', [id]);
+    if (!objetivo) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    if (!(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, objetivo.id_perfil))) {
+      return res.status(403).json({ success: false, data: null,
+        error: 'No puedes resetear la clave de un usuario con más permisos que los tuyos.' });
+    }
+
     const nuevaClave = generarClaveTemporal();
 
     const hash = await bcrypt.hash(nuevaClave, 10);

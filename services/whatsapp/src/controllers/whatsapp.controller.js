@@ -6,6 +6,7 @@
    Transporte: shared/whatsapp.js (Meta Cloud API directa). Sin credenciales el
    envío queda SIMULADO y el módulo funciona completo con el Simulador del panel.
    ───────────────────────────────────────────────────────────────────────────── */
+const crypto = require('crypto');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { enviarWhatsApp, normalizarFono } = require('../../../../shared/whatsapp');
@@ -905,7 +906,33 @@ exports.webhookVerify = (req, res) => {
   res.sendStatus(403);
 };
 
+/* ¿Viene de verdad de Meta? (auditoría 05-08-2026, C-1)
+   El endpoint es público por necesidad — Meta lo llama sin nuestro JWT — y no
+   validaba NADA: cualquiera en internet podía mandar un mensaje forjado y el
+   bot respondía por el número comercial de la empresa, gastando saldo de Meta y
+   de la IA, y dejando conversaciones falsas atribuidas al RUT de un cliente real.
+   Meta firma cada envío con HMAC-SHA256 sobre el cuerpo crudo. */
+function firmaMetaValida(req) {
+  const secreto = process.env.WSP_APP_SECRET;
+  if (!secreto) {
+    // Sin el secreto configurado no se puede verificar. Se deja pasar para no
+    // cortar la recepción, pero queda ruidoso en el log y visible en /api/health.
+    console.warn('⚠ [whatsapp] WSP_APP_SECRET no configurado: el webhook acepta sin verificar firma.');
+    return true;
+  }
+  const firma = String(req.headers['x-hub-signature-256'] || '');
+  if (!firma.startsWith('sha256=') || !req.rawBody) return false;
+  const esperado = 'sha256=' + crypto.createHmac('sha256', secreto).update(req.rawBody).digest('hex');
+  // Comparación en tiempo constante: comparar con === filtra el secreto por tiempo.
+  const a = Buffer.from(firma), b = Buffer.from(esperado);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 exports.webhookReceive = async (req, res) => {
+  if (!firmaMetaValida(req)) {
+    console.error('[whatsapp] webhook con firma inválida — descartado');
+    return res.sendStatus(403);
+  }
   res.sendStatus(200); // responder al tiro: Meta reintenta si demora
   try {
     for (const entry of req.body?.entry || []) {

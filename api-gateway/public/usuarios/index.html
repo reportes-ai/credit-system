@@ -1726,6 +1726,8 @@
 
       const data = await api('POST', '/api/auth/cambiar-clave', { password_actual: actual, password_nuevo: nueva });
       if (data?.success) {
+        // Token reemitido sin la marca "clave por cambiar" (C-4)
+        if (data.data?.token) sessionStorage.setItem('token', data.data.token);
         al.className = 'alert alert-success'; al.textContent = 'Contraseña actualizada correctamente.';
         document.getElementById('claveActual').value = '';
         document.getElementById('claveNueva').value = '';

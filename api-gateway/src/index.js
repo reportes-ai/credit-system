@@ -27,7 +27,16 @@ app.use((req, res, next) => {
   res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); // HTTPS forzado 1 año
   next();
 });
-app.use(express.json({ limit: '10mb' }));
+/* `verify` guarda el cuerpo CRUDO. La firma de Meta (X-Hub-Signature-256) se
+   calcula sobre los bytes exactos que enviaron: si se firma el JSON reserializado,
+   cualquier diferencia de orden o espaciado la invalida. Solo se retiene para el
+   webhook, no para las ~1.270 rutas restantes. */
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => {
+    if (req.originalUrl && req.originalUrl.startsWith('/api/whatsapp/webhook')) req.rawBody = buf;
+  },
+}));
 app.use(require('../../shared/presencia').middleware); // telemetría "conectados" (Cuadro de Mando)
 require('../../shared/uptime');                         // monitor de uptime por servicio (cada 5 min → uptime_checks)
 
@@ -123,6 +132,11 @@ app.get('/api/health', async (req, res) => {
        contingencia: si `activo` es false, los documentos que ya se movieron al
        bucket no se pueden abrir desde acá (los que siguen en la base, sí). */
     documentos: require('../../shared/almacen-docs').estado(),
+    /* El webhook de WhatsApp es público (Meta lo llama sin nuestro JWT). Con el
+       App Secret cargado se verifica la firma de cada envío; sin él, el endpoint
+       acepta lo que le manden desde internet. Se expone acá para que la falta se
+       vea y no quede solo en una advertencia del log. */
+    whatsapp_webhook_firmado: !!process.env.WSP_APP_SECRET,
   });
 });
 

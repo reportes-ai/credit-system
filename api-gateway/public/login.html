@@ -346,8 +346,11 @@
         });
         const data = await r.json();
         if (data.success) {
-          // Recién ahora se persiste la sesión
-          sessionStorage.setItem('token', _pendingToken);
+          // Recién ahora se persiste la sesión. Se guarda el token que DEVUELVE
+          // el cambio de clave: el de la mano está marcado "clave por cambiar" y
+          // solo sirve para esta llamada (C-4). Si el servidor no lo mandara
+          // (versión anterior), se cae al que ya se tenía.
+          sessionStorage.setItem('token', (data.data && data.data.token) || _pendingToken);
           sessionStorage.setItem('usuario', JSON.stringify(_pendingUsuario));
           document.getElementById('btnSpinnerNC').classList.add('d-none');
           document.getElementById('btnTextNC').classList.remove('d-none');

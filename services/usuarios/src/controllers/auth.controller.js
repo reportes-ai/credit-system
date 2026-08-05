@@ -91,7 +91,14 @@ const login = async (req, res) => {
       perfil_nombre: usuario.perfil_nombre,
       id_supervisor: usuario.id_supervisor,
       // Versión de sesión (A-7): si en la base sube, este token deja de valer.
-      tv: Number(usuario.token_version || 0)
+      tv: Number(usuario.token_version || 0),
+      /* Clave por cambiar (auditoría 05-08-2026, C-4). El forzado era SOLO del
+         frontend: el login entregaba un token plenamente válido junto con la
+         bandera, así que con curl se operaba el sistema entero sin cambiar
+         nunca la clave — y eso dejaba sin efecto el primer ingreso, el reseteo
+         por sospecha y el vencimiento por política. Ahora viaja en el token y
+         `verifyToken` solo deja pasar el cambio de clave. */
+      cc: debeForzar ? 1 : 0
     };
 
     // Cuentas de propósito fijo (ej. TV) pueden tener sesión más larga (usuarios.sesion_horas).
@@ -146,7 +153,14 @@ const cambiarClave = async (req, res) => {
     // Al cambiar la clave se limpia la marca de "primer ingreso" y se reinicia el reloj de vencimiento
     await pool.query('UPDATE usuarios SET password_hash = ?, debe_cambiar_clave = 0, password_updated_at = NOW() WHERE id_usuario = ?', [hash, id_usuario]);
 
-    res.json({ success: true, data: { mensaje: 'Contraseña actualizada correctamente' }, error: null });
+    /* Token nuevo sin la marca `cc` (C-4): el que trae en la mano quedó
+       restringido al propio cambio de clave, así que sin reemitirlo el usuario
+       terminaría de cambiarla y no podría entrar a nada. El frontend lo guarda
+       si viene; si no lo usa, basta con volver a entrar. */
+    const { cc, iat, exp, ...resto } = req.usuario || {};
+    const token = jwt.sign(resto, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+
+    res.json({ success: true, data: { mensaje: 'Contraseña actualizada correctamente', token }, error: null });
   } catch (error) {
     res.status(500).json({ success: false, data: null, error: errMsg(error) });
   }

@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v181.1';
+const APP_VERSION = 'v182.0';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -443,6 +443,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await r.json();
       if (data.success) {
+        // El servidor reemite el token al cambiar la clave (C-4): guardarlo evita
+        // seguir con uno marcado "clave por cambiar".
+        if (data.data && data.data.token) sessionStorage.setItem('token', data.data.token);
         alert.textContent = '✓ Contraseña actualizada correctamente.';
         alert.className = 'af-alert ok';
         alert.style.display = 'block';
