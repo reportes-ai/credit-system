@@ -406,18 +406,18 @@ const getById = async (req, res) => {
 
 const getPDF = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT pdf_path, pdf_filename, pdf_data FROM informes_dealernet WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.query('SELECT pdf_path, pdf_filename, pdf_data, doc_ruta FROM informes_dealernet WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
-    const { pdf_path, pdf_filename, pdf_data } = rows[0];
+    const { pdf_path, pdf_filename, pdf_data, doc_ruta } = rows[0];
     const nombre = String(pdf_filename || 'informe').replace(/"/g, '').replace(/[^\x20-\x7E]/g, '_');
 
-    // La BASE manda; el disco queda solo como recurso de los informes viejos que
-    // todavía no se hayan trasladado (ver la migración de arriba).
-    if (pdf_data && pdf_data.length) {
-      res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
-      res.setHeader('Content-Type', 'application/pdf');
-      return res.end(pdf_data);
-    }
+    // El ALMACÉN manda: el blob mientras exista, el bucket cuando ya se liberó.
+    // Esta ruta leía solo `pdf_data`, así que al soltar los blobs (05-08-2026) los
+    // informes caían al disco de Render, que se borra en cada deploy. El disco
+    // queda solo para los informes viejos que nunca llegaron al bucket.
+    if (doc_ruta || (pdf_data && pdf_data.length))
+      return almacen.servir(res, { ruta: doc_ruta, blob: pdf_data, nombre, mime: 'application/pdf' });
+
     if (!pdf_path || !fs.existsSync(pdf_path))
       return res.status(404).json({ success: false, error: 'Archivo PDF no disponible en servidor' });
     res.setHeader('Content-Disposition', `inline; filename="${nombre}"`);
