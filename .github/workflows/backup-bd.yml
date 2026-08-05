@@ -42,7 +42,7 @@ jobs:
           mysqldump -h "$DB_HOST" -P "${DB_PORT:-4000}" -u "$DB_USER" -p"$DB_PASSWORD" \
             --ssl-mode=REQUIRED --skip-lock-tables --quick --no-tablespaces \
             --set-gtid-purged=OFF --column-statistics=0 \
-            "$DB_NAME" | gzip -9 > backup-$(date +%Y%m%d).sql.gz
+            "$DB_NAME" | gzip -9 > backup-$(date +%Y%m%d-%H%M).sql.gz
           ls -lh backup-*.sql.gz
           # Sanidad: el dump debe terminar completo
           gunzip -t backup-*.sql.gz
@@ -57,7 +57,13 @@ jobs:
           compression-level: 0
 
       # ── Tercera copia: Google Cloud Storage (bucket privado, 90 días de retención
-      #    por regla de ciclo de vida del bucket). Si el secret no está, se omite. ──
+      #    por regla de ciclo de vida del bucket). Si el secret no está, se omite.
+      #
+      #    LA CUENTA NO PUEDE BORRAR NI SOBREESCRIBIR, Y ASÍ DEBE QUEDAR: tiene
+      #    `objectCreator`, o sea que estos respaldos son de solo-escritura y ni
+      #    con la llave en la mano se pueden destruir. Por eso el nombre del dump
+      #    lleva HHMM además de la fecha: dos corridas el mismo día son dos
+      #    archivos distintos, no una sobreescritura que rebota con un 403. ──
       - name: Subir a Google Cloud Storage
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
@@ -87,6 +93,9 @@ jobs:
       #  2. rsync SIN `-d`: con esa bandera el destino imita al origen, borrados
       #     incluidos. Un respaldo que replica borrados no es un respaldo.
       - name: Respaldar los documentos (bucket → bucket)
+        # Corre aunque haya fallado la subida del dump: son dos respaldos
+        # independientes y que uno falle no es razón para quedarse sin el otro.
+        if: always()
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
           # Nombres de bucket, no secretos: van acá a la vista. El único secreto
