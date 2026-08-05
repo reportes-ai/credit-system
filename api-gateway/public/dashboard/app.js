@@ -1299,7 +1299,14 @@ function buildV1b() {
   document.getElementById('t-estado1b').innerHTML =
     '<thead><tr><th>Estado</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead>' +
     '<tbody>'+estRowsOt+'</tbody>' +
-    '<tfoot><tr><td>INGRESADAS</td><td>'+grpEst1b.INGRESADAS+'</td><td>100%</td><td>'+fM(salEst1b.INGRESADAS)+'</td></tr></tfoot>';
+    // El pie decía "INGRESADAS" y repetía la primera fila: se leía como si fuera
+    // un total sumable. Los estados son un EMBUDO (otorgadas ⊂ aprobadas ⊂
+    // ingresadas), así que la columna no suma y la nota lo advierte.
+    '<tfoot><tr><td>TOTAL INGRESADAS</td><td>'+grpEst1b.INGRESADAS+'</td><td>100%</td><td>'+fM(salEst1b.INGRESADAS)+'</td></tr>' +
+    '<tr><td colspan="4" style="font-size:.62rem;color:#94a3b8;font-weight:400;padding-top:4px;line-height:1.35">' +
+    'Cifras acumulativas: cada estado incluye a los siguientes del embudo (las otorgadas ya están contadas en las aprobadas). ' +
+    'Los porcentajes son conversión sobre el total ingresado — la columna N° op no suma.' +
+    '</td></tr></tfoot>';
 
   // Chart evolución otorgados
   const last6 = (window.DASH.tendencia||[]).slice(-6);
