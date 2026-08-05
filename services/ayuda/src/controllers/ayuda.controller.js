@@ -450,6 +450,15 @@ require('../../../../shared/migrate').enFila('ayuda-dcq', async () => {
       "ALTER TABLE dcq_preguntas ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'SISTEMA'");
     } catch (e) { if (e.errno !== 1060) throw e; }
 
+    // Cola de lo que se buscó y no estaba: de acá salen las respuestas por escribir.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dcq_sin_respuesta (
+        texto      VARCHAR(200) PRIMARY KEY,
+        veces      INT NOT NULL DEFAULT 1,
+        resuelta   TINYINT NOT NULL DEFAULT 0,
+        ultima_vez DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+
     const BANCO = require('../dcq-banco');
     for (const q of BANCO) {
       await pool.query(
@@ -477,6 +486,51 @@ const dcqListar = async (req, res) => {
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     console.error('[dcq listar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── Lo que la gente buscó y NO encontró ─────────────────────────────────────
+   El banco solo sirve si cubre lo que la gente realmente pregunta. Sin esto,
+   las preguntas que faltan no dejan rastro: el usuario no encuentra, se va, y
+   nadie se entera nunca. Cada búsqueda sin resultado se acumula acá (una fila
+   por texto, con el contador), y esa lista es la cola de trabajo para escribir
+   las respuestas que faltan en dcq-banco.js. */
+const dcqSinRespuesta = async (req, res) => {
+  try {
+    const texto = String((req.body || {}).texto || '').trim().slice(0, 200).toLowerCase();
+    if (texto.length < 4) return res.json({ success: true, data: null, error: null });
+    await pool.query(
+      `INSERT INTO dcq_sin_respuesta (texto, veces) VALUES (?, 1)
+       ON DUPLICATE KEY UPDATE veces = veces + 1, ultima_vez = NOW()`, [texto]);
+    res.json({ success: true, data: null, error: null });
+  } catch (e) {
+    // Nunca molestar al usuario por esto: es telemetría, no su tarea.
+    console.error('[dcq sin-respuesta]', e.message);
+    res.json({ success: true, data: null, error: null });
+  }
+};
+
+const dcqPendientes = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT texto, veces, DATE_FORMAT(ultima_vez,'%Y-%m-%d %H:%i') ultima_vez
+         FROM dcq_sin_respuesta WHERE resuelta = 0
+        ORDER BY veces DESC, ultima_vez DESC LIMIT 200`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) {
+    console.error('[dcq pendientes]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+const dcqResolverPendiente = async (req, res) => {
+  try {
+    await pool.query('UPDATE dcq_sin_respuesta SET resuelta = 1 WHERE texto = ?',
+      [String(req.params.texto || '').toLowerCase()]);
+    res.json({ success: true, data: null, error: null });
+  } catch (e) {
+    console.error('[dcq resolver]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
@@ -567,4 +621,5 @@ const dcqEliminar = async (req, res) => {
 };
 
 module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso,
-                    dcqListar, dcqCrear, dcqActualizar, dcqEliminar };
+                    dcqListar, dcqCrear, dcqActualizar, dcqEliminar,
+                    dcqSinRespuesta, dcqPendientes, dcqResolverPendiente };

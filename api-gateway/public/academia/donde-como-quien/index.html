@@ -76,6 +76,9 @@
     <button id="btnNueva" onclick="abrirEditor(null)" style="display:none;float:right;background:var(--navy);color:#fff;border:0;border-radius:7px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer">
       <i class="bi bi-plus-lg me-1"></i>Agregar respuesta
     </button>
+    <button id="btnPend" onclick="verPendientes()" style="display:none;float:right;margin-right:8px;background:#fff;color:var(--navy);border:1.5px solid var(--navy);border-radius:7px;padding:4px 11px;font-size:.76rem;font-weight:700;cursor:pointer" title="Lo que la gente buscó y no encontró">
+      <i class="bi bi-inbox me-1"></i>Sin respuesta
+    </button>
     <span id="nresTxt"></span>
   </div>
   <div id="lista"></div>
@@ -155,6 +158,7 @@ async function cargarPermiso(){
   } catch(e){ PUEDE_EDITAR = false; }
   document.getElementById('btnNueva').style.display     = PUEDE_EDITAR ? '' : 'none';
   document.getElementById('btnVacioNueva').style.display = PUEDE_EDITAR ? '' : 'none';
+  document.getElementById('btnPend').style.display       = PUEDE_EDITAR ? '' : 'none';
   if (PUEDE_EDITAR) document.getElementById('hintVacio').innerHTML =
     'Prueba con otras palabras (ej: "comisión", "clave", "anular") o quita el filtro de categoría.<br>Si la respuesta falta, agrégala tú y queda para todos.';
 }
@@ -274,6 +278,8 @@ function pintar(){
   }
   document.getElementById('nresTxt').textContent = rows.length ? `${rows.length} respuesta(s)` : '';
   document.getElementById('vacio').style.display = rows.length ? 'none' : 'block';
+  // Búsqueda con palabras reales y cero resultados → queda en la cola por responder
+  if (!rows.length && tokens.length) anotarSinRespuesta(texto.trim());
   const abierta = tokens.length && rows.length <= 3;   // pocas → mostrarlas abiertas
   document.getElementById('lista').innerHTML = rows.map((q,i)=>`
     <div class="qa ${abierta?'open':''}" id="qa${i}">
@@ -314,6 +320,49 @@ function resaltar(texto, tokens){
     pos = b;
   }
   return out + t.slice(pos);
+}
+
+/* Si alguien buscó y no encontró nada, queda anotado. Con espera de 1,5 s para
+   no registrar cada tecla del camino (y no pagarle a TiDB una consulta por
+   pulsación). Es telemetría: si falla, al usuario no le importa ni se entera. */
+let _tmrSin = null;
+function anotarSinRespuesta(texto){
+  clearTimeout(_tmrSin);
+  _tmrSin = setTimeout(() => {
+    fetch('/api/ayuda/dcq/sin-respuesta', { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+T() },
+      body: JSON.stringify({ texto }) }).catch(()=>{});
+  }, 1500);
+}
+
+/* Cola de preguntas por responder — el mantenedor la revisa y escribe lo que falta */
+async function verPendientes(){
+  try {
+    const r = await fetch('/api/ayuda/dcq/pendientes', { headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    if (!j.success) return alert(j.error || 'No se pudo cargar');
+    const filas = j.data || [];
+    if (!filas.length) return alert('No hay búsquedas sin respuesta. El banco está cubriendo lo que la gente pregunta.');
+    const cont = document.getElementById('lista');
+    document.getElementById('nresTxt').textContent = filas.length + ' búsqueda(s) sin respuesta';
+    document.getElementById('vacio').style.display = 'none';
+    cont.innerHTML = '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px">' +
+      '<div style="font-size:.78rem;color:#64748b;margin-bottom:10px">Esto buscó la gente y no encontró respuesta. Al agregar una, se marca resuelta.</div>' +
+      filas.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
+        <b style="min-width:34px;color:var(--navy);font-size:.8rem">${f.veces}×</b>
+        <span style="flex:1;font-size:.86rem">${esc(f.texto)}</span>
+        <span style="font-size:.7rem;color:#94a3b8">${esc(f.ultima_vez)}</span>
+        <button onclick="abrirEditor(null, '${esc(f.texto).replace(/'/g,'&#39;')}')" style="background:var(--navy);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:600;cursor:pointer">Responder</button>
+        <button onclick="marcarResuelta('${encodeURIComponent(f.texto)}')" title="No amerita respuesta" style="background:#f1f5f9;color:#64748b;border:0;border-radius:6px;padding:4px 8px;font-size:.72rem;cursor:pointer">Descartar</button>
+      </div>`).join('') + '</div>';
+  } catch(e){ alert('No se pudo cargar: ' + e.message); }
+}
+
+async function marcarResuelta(textoEnc){
+  try {
+    await fetch('/api/ayuda/dcq/pendientes/' + textoEnc, { method:'PUT', headers:{ Authorization:'Bearer '+T() } });
+    verPendientes();
+  } catch(e){}
 }
 
 document.getElementById('q').addEventListener('input', pintar);

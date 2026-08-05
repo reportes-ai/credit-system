@@ -8,6 +8,11 @@ const c = require('../controllers/ayuda.controller');
 router.get('/academia/cursos', verifyToken, c.academiaCursos);
 router.post('/academia/progreso', verifyToken, c.academiaProgreso);
 router.get('/dcq', verifyToken, c.dcqListar);   // Dónde·Cómo·Quién: banco completo
+// Lo que se buscó y no estaba: cualquiera lo alimenta (es su propia búsqueda),
+// solo el mantenedor ve la cola y la marca resuelta.
+router.post('/dcq/sin-respuesta', verifyToken, c.dcqSinRespuesta);
+router.get('/dcq/pendientes', verifyToken, requireFunc('mantenedores_ayuda'), c.dcqPendientes);
+router.put('/dcq/pendientes/:texto', verifyToken, requireFunc('mantenedores_ayuda'), c.dcqResolverPendiente);
 // Mantención del banco: cuando falta una respuesta se agrega en el momento.
 router.post('/dcq',         verifyToken, requireFunc('mantenedores_ayuda'), c.dcqCrear);
 router.put('/dcq/:slug',    verifyToken, requireFunc('mantenedores_ayuda'), c.dcqActualizar);
