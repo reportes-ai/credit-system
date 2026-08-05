@@ -647,7 +647,7 @@ async function autoCompletarCliente(rutFormateado) {
 
       // 3. Auto-detectar tipo_cliente
       const creditosActivos    = creditos.filter(c => c.estado === 'VIGENTE' || c.estado === 'EN MORA');
-      const creditosTerminados = creditos.filter(c => ['CANCELADO','PREPAGADO','CASTIGADO'].includes(c.estado));
+      const creditosTerminados = creditos.filter(c => ['RECHAZADO','PREPAGADO','CASTIGADO'].includes(c.estado));
 
       let tipoAuto = 'PROSPECTO';
       if (creditosActivos.length)    { tipoAuto = 'ACTIVO';     idCredito = creditosActivos[0].id_credito; }

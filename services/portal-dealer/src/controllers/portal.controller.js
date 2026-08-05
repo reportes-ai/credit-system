@@ -83,7 +83,6 @@ const ESTADO_SQL = `
     WHEN ob.estado IS NOT NULL AND ob.estado <> '' THEN ob.estado
     WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
     WHEN ob.estado_credito = 'OTORGADO' OR ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
-    WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
     ELSE COALESCE(ob.estado_credito, ob.estado_eval)
   END`;
 
@@ -194,7 +193,7 @@ exports.resumen = async (req, res) => {
       por_estado[e] = Number(r.cnt);
       total += Number(r.cnt);
       if (e === 'OTORGADO') otorgadas += Number(r.cnt);
-      else if (['RECHAZADO', 'CANCELADO', 'DESISTIDO', 'ANULADO'].includes(e)) canceladas += Number(r.cnt);
+      else if (['RECHAZADO', 'DESISTIDO', 'ANULADO'].includes(e)) canceladas += Number(r.cnt);
       else en_proceso += Number(r.cnt);
     }
     return res.json({

@@ -335,7 +335,7 @@ let _esAnalista  = false;
    se necesitan (una auditoría, un reclamo). Ahora se entra, pero sin poder
    tocar nada: lo otorgado es inmutable. */
 let _soloLectura = false;
-const ESTADOS_CERRADOS = new Set(['OTORGADO','CURSADO','DESISTIDO','ANULADO','CANCELADO','PREPAGADO']);
+const ESTADOS_CERRADOS = new Set(['OTORGADO','CURSADO','DESISTIDO','ANULADO','RECHAZADO','PREPAGADO']);
 let _pendingTipo = null;
 let _viewerDoc   = null;     // { idDoc, nombre, mime }
 let _vistos      = new Set(); // id_doc de documentos ya abiertos con "Ver"

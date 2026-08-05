@@ -597,7 +597,7 @@ const fmtMonto = n => (n==null||n==='')?'—':'$ '+Number(n).toLocaleString('es-
 const fmtFecha = f => { if(!f) return '—'; const d=new Date(f); if(isNaN(d)) return '—'; return d.toLocaleDateString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric'}); };
 const prettyCod = c => String(c||'').replace(/_/g,' ').replace(/\b\w/g, m=>m.toUpperCase());
 let CAT = { etapa:{}, cartera:{} };
-function colorEtapa(cod){ const c=CAT.etapa[cod]&&CAT.etapa[cod].color; if(c) return c; if(cod==='OTORGADO') return '#16a34a'; if(['RECHAZADO','CANCELADO','DESISTIDO','ANULADO'].includes(cod)) return '#dc2626'; return '#0141A2'; }
+function colorEtapa(cod){ const c=CAT.etapa[cod]&&CAT.etapa[cod].color; if(c) return c; if(cod==='OTORGADO') return '#16a34a'; if(['RECHAZADO','DESISTIDO','ANULADO'].includes(cod)) return '#dc2626'; return '#0141A2'; }
 function nombreEtapa(cod){ return (CAT.etapa[cod]&&CAT.etapa[cod].nombre) || prettyCod(cod); }
 function colorCartera(cod){ const c=CAT.cartera[cod]&&CAT.cartera[cod].color; if(c) return c; if(cod==='MORA'||cod==='EN MORA') return '#f59e0b'; if(cod==='VENCIDO') return '#dc2626'; if(cod==='VIGENTE') return '#0891b2'; return '#64748b'; }
 function nombreCartera(cod){ return (CAT.cartera[cod]&&CAT.cartera[cod].nombre) || prettyCod(cod); }

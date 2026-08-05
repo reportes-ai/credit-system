@@ -58,3 +58,19 @@ test('SET_ESTADO_SQL no pisa una palabra de cartera ya guardada', () => {
   assert.ok(E.SET_ESTADO_SQL.includes('COALESCE(?, estado)'),
     'un valor NULL entrante no debe borrar el estado existente');
 });
+
+/* CANCELADO no existe como etapa (decisión de Pato, 05-08-2026). Era una
+   traducción de presentación: `estado_eval='RECHAZADO'` se mostraba como
+   "CANCELADO" y confundía, porque no es un estado de AutoFin ni figura en el
+   mantenedor de equivalencias — la gente lo buscaba y no lo encontraba.
+   Un rechazado se llama RECHAZADO en toda la plataforma. */
+test('la etapa NO traduce RECHAZADO a CANCELADO', () => {
+  const sql = E.ETAPA_SQL('c');
+  assert.ok(!/CANCELADO/.test(sql),
+    'ETAPA_SQL volvió a inventar la etapa CANCELADO: un rechazado se llama RECHAZADO');
+});
+
+test('ANULADO sigue siendo su propia etapa, distinta de RECHAZADO', () => {
+  const sql = E.ETAPA_SQL('c');
+  assert.match(sql, /THEN 'ANULADO'/, 'los anulados deben conservar su etapa propia');
+});

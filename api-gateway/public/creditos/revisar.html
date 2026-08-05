@@ -44,7 +44,7 @@
   .eb-VALIDACION_FIRMA    { background:#fff7ed; color:#b45309; border:1.5px solid #fcd34d; }
   .eb-VIGENTE              { background:#f0fdf4; color:#16a34a; border:1.5px solid #86efac; }
   .eb-EN-MORA              { background:#fffbeb; color:#d97706; border:1.5px solid #fcd34d; }
-  .eb-CANCELADO            { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
+  .eb-RECHAZADO            { background:#eff6ff; color:#2563eb; border:1.5px solid #93c5fd; }
   .eb-PREPAGADO            { background:#f5f3ff; color:#7c3aed; border:1.5px solid #c4b5fd; }
   .eb-CASTIGADO            { background:#fff1f2; color:#be123c; border:1.5px solid #fda4af; }
   .eb-OTORGADO             { background:#fef9c3; color:#854d0e; border:1.5px solid #fde68a; }
@@ -326,7 +326,7 @@
             <option value="OTORGADO">Otorgado (Cursado)</option>
             <option value="CURSADO">Cursado</option>
             <option value="DESISTIDO">Desistido</option>
-            <option value="CANCELADO">Cancelado</option>
+            <option value="RECHAZADO">Rechazado</option>
           </select>
         </label>
         <label class="eb-field"><span>Observaciones</span><textarea id="eb_observaciones" rows="2"></textarea></label>
@@ -392,7 +392,7 @@ let _tmc         = null;      // tasa máxima convencional vigente
 let _uf          = null;      // valor UF hoy (fallback)
 let _ufPorFecha  = new Map(); // UF del día-21 de mora por cuota: 'YYYY-MM-DD' → valor
 
-const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO']);
+const ESTADOS_CURSADOS  = new Set(['VIGENTE','EN MORA','RECHAZADO','PREPAGADO','CASTIGADO']);
 // ¿Es cartera propia (tiene Estado de cartera)? Sirve para gatear pago/historial sin
 // depender de que la ETAPA sea VIGENTE (ahora los propios cursados son OTORGADO).
 const _ec = c => String(c.estado_cartera_disp || c.estado_cartera || '').toUpperCase();
@@ -892,7 +892,7 @@ function renderPagina(c, ant, com) {
         onclick="location.href='/creditos/validacion-firma?id=${c.id_credito}'">
         <i class="bi bi-pen-fill"></i>Validar Firmas
       </button>` : `
-      <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('CANCELADO')">
+      <button class="btn-accion btn-rechazar" onclick="cambiarEstadoRapido('RECHAZADO')">
         <i class="bi bi-x-circle"></i>Rechazar
       </button>`}
       <button id="btnGuardarEstado" class="btn-accion btn-guardar" onclick="guardarCambios()">
@@ -1260,7 +1260,7 @@ function estadoEstado(e) {
     CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
     VALIDACION_FIRMA:'Validación Firma',
     VIGENTE:'Vigente', 'EN MORA':'En Mora',
-    CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
+    RECHAZADO:'Rechazado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
     OTORGADO:'Otorgado', CARTA_APROBACION:'Carta Aprobación',
     CURSADO:'Cursado', DESISTIDO:'Desistido',
   };

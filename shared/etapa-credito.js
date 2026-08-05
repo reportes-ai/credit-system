@@ -71,7 +71,6 @@ function ETAPA_SQL(alias = 'c') {
       WHEN ${a}financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ${a}estado_eval = 'OTORGADO' THEN 'OTORGADO'
       WHEN ${a}estado_credito = 'OTORGADO' OR ${a}estado_eval = 'OTORGADO' THEN 'OTORGADO'
       WHEN ${a}estado_eval = 'ANULADO' OR ${a}estado_credito = 'ANULADO' THEN 'ANULADO'
-      WHEN ${a}estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
       ELSE COALESCE(${a}estado_credito, ${a}estado_eval)
     END`;
 }

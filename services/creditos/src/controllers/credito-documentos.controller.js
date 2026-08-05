@@ -166,7 +166,7 @@ const download = async (req, res) => {
    Esta guardia importa porque la pantalla de respaldos ahora se puede abrir en
    operaciones cerradas (en modo lectura): la puerta nueva necesita cerradura de
    verdad, no solo botones escondidos. */
-const ESTADOS_CERRADOS = ['OTORGADO', 'CURSADO', 'DESISTIDO', 'ANULADO', 'CANCELADO', 'PREPAGADO'];
+const ESTADOS_CERRADOS = ['OTORGADO', 'CURSADO', 'DESISTIDO', 'ANULADO', 'RECHAZADO', 'PREPAGADO'];
 async function operacionCerrada(idCredito) {
   const [[c]] = await pool.query('SELECT estado FROM creditos WHERE id=?', [idCredito]);
   return c && ESTADOS_CERRADOS.includes(String(c.estado || '').toUpperCase()) ? c.estado : null;

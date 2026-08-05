@@ -39,7 +39,7 @@ const CAMPOS_CALCULADOS = ['monto_comision_fin', 'comdea_real', 'com_parque'];
 // Campos editables y sus etiquetas
 const CAMPOS_EDIT = [
   { col:'financiera',         label:'Financiera',          tipo:'select', ops:['AUTOFACIL','AUTOFIN','UNIDAD DE CREDITO'] },
-  { col:'estado',             label:'Estado',              tipo:'select', ops:['INGRESO','CARTA_APROBACION','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','EN MORA','CANCELADO','PREPAGADO','CASTIGADO','OTORGADO','CURSADO','DESISTIDO'] },
+  { col:'estado',             label:'Estado',              tipo:'select', ops:['INGRESO','CARTA_APROBACION','EMISION_DOCUMENTOS','CARGA_DOCUMENTOS_AF','VALIDACION_FIRMA','VIGENTE','EN MORA','RECHAZADO','PREPAGADO','CASTIGADO','OTORGADO','CURSADO','DESISTIDO'] },
   { col:'fecha_otorgado',     label:'Fecha Otorgado',      tipo:'date'   },
   { col:'mes',                label:'Mes',                 tipo:'month'  },
   { col:'ejecutivo',          label:'Ejecutivo',           tipo:'text'   },
@@ -81,7 +81,6 @@ const estadoExpr = `COALESCE(ob.estado,
     WHEN ob.financiera IN ('AUTOFIN','UNIDAD DE CREDITO') AND ob.estado_eval = 'OTORGADO' THEN 'OTORGADO'
     WHEN ob.estado_credito = 'OTORGADO' THEN 'VIGENTE'
     WHEN ob.estado_eval    = 'OTORGADO' THEN 'VIGENTE'
-    WHEN ob.estado_eval IN ('RECHAZADO','ANULADO') THEN 'CANCELADO'
     ELSE COALESCE(ob.estado_credito, ob.estado_eval)
   END)`;
 

@@ -325,7 +325,7 @@ let _filtroProceso = false;
 let _filtroSinEstado = false;   // Estados → "Sin Estado" (créditos sin estado de cartera = Brokerage)
 
 // Estados que se consideran "terminales" o activos (NO son "en proceso")
-const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','CANCELADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO']);
+const ESTADOS_FUERA_PROCESO = new Set(['VIGENTE','RECHAZADO','PREPAGADO','CASTIGADO','EN MORA','OTORGADO','CURSADO','DESISTIDO']);
 // Estados del nuevo flujo AutoFácil
 const LABEL_ESTADO = {
   INGRESO:'Ingresado', REVISION:'Ingresado',
@@ -336,7 +336,7 @@ const LABEL_ESTADO = {
   CARGA_DOCUMENTOS_AF:'Carga Docs. AF',
   VALIDACION_FIRMA:'Validación Firma',
   VIGENTE:'Vigente', 'EN MORA':'En Mora',
-  CANCELADO:'Cancelado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
+  RECHAZADO:'Rechazado', PREPAGADO:'Prepagado', CASTIGADO:'Castigado',
   OTORGADO:'Otorgado', CURSADO:'Cursado', DESISTIDO:'Desistido',
 };
 
@@ -541,7 +541,7 @@ function actualizarStats(stats, totalServidor) {
   set('statAprobado', g('APROBADO'));
   set('statCartaAprobacion', g('CARTA_APROBACION'));
   set('statOtorgados', g('OTORGADO'));   // "Cursado" de AutoFin = nuestro Otorgado
-  set('statRechazados', g('CANCELADO'));   // CANCELADO = rechazados + anulados
+  set('statRechazados', g('RECHAZADO'));   // los anulados tienen su propia etapa
   set('statDesistidos', g('DESISTIDO'));
   set('statPrepagadoEt', g('PREPAGADO'));
   set('statAnulado', g('ANULADO'));
@@ -733,7 +733,7 @@ async function abrirDetalle(id) {
               <option value="VALIDACION_FIRMA"   ${c.estado==='VALIDACION_FIRMA'   ?'selected':''}>Validación Firma</option>
               <option value="VIGENTE"            ${c.estado==='VIGENTE'            ?'selected':''}>Vigente</option>
               <option value="EN MORA"            ${c.estado==='EN MORA'            ?'selected':''}>En Mora</option>
-              <option value="CANCELADO"          ${c.estado==='CANCELADO'          ?'selected':''}>Cancelado</option>
+              <option value="RECHAZADO"          ${c.estado==='RECHAZADO'          ?'selected':''}>Rechazado</option>
               <option value="PREPAGADO"          ${c.estado==='PREPAGADO'          ?'selected':''}>Prepagado</option>
               <option value="CASTIGADO"          ${c.estado==='CASTIGADO'          ?'selected':''}>Castigado</option>
               <optgroup label="── Broker (AUTOFIN / UNIDAD) ──">
