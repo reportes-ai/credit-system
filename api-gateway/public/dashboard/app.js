@@ -386,6 +386,23 @@ function buildV1() {
     <tfoot><tr><td>Total</td><td>${totEst.ops}</td><td>100%</td><td>${fM(totEst.saldo)}</td></tr></tfoot>`;
 }
 
+/* Anuladas REALES del período (antes había un "1" escrito a mano en las tablas
+   Estado Eval. Riesgo — mostraba una anulada fantasma en todos los períodos).
+
+   Vive ACÁ, en el nivel superior, y no dentro de buildV2: escrita pegada al
+   margen parecía global, pero quedaba anidada porque buildV2 todavía no cerraba.
+   Así funcionaba desde la propia buildV2 y reventaba con "is not defined" al
+   llamarla desde buildV2pl — que es lo que dejaba el P&L Operativo a medio
+   dibujar, sin el detalle ni los cuadros de abajo. */
+function _anuladasPeriodo() {
+  const d = document.getElementById('sel-desde')?.value || '';
+  const h = document.getElementById('sel-hasta')?.value || '';
+  return (window.RAW_DATA || []).filter(r => {
+    const m = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0, 7) : r.mes;
+    return r.estado_eval === 'ANULADO' && m >= d && m <= h;
+  }).length;
+}
+
 // ======== VISTA 2 ========
 function buildV2() {
   const D = window.DASH;
@@ -458,16 +475,7 @@ function buildV2() {
     <div style="font-size:10px;color:#888">${fM(dv3sal[i])}</div></div></div>`).join('');
 
   
-/* Anuladas REALES del período (antes había un "1" escrito a mano en las tablas
-   Estado Eval. Riesgo — mostraba una anulada fantasma en todos los períodos). */
-function _anuladasPeriodo() {
-  const d = document.getElementById('sel-desde')?.value || '';
-  const h = document.getElementById('sel-hasta')?.value || '';
-  return (window.RAW_DATA || []).filter(r => {
-    const m = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0, 7) : r.mes;
-    return r.estado_eval === 'ANULADO' && m >= d && m <= h;
-  }).length;
-}
+/* (definición movida al nivel superior, antes de buildV2 — ver _anuladasPeriodo) */
 // Estado eval riesgo
   document.getElementById('t-estado2').innerHTML = `
     <thead><tr><th>Estado Eval. Riesgo</th><th>OP</th></tr></thead>
@@ -3135,7 +3143,7 @@ function aplicarPermisosNavTabs() {
   }
   // Aplicar visibilidad
   const perfil = (sesionActual.perfil || '').toUpperCase();
-  const sinRestriccion = esAdminDash();   // quien administra las pestañas las ve todas
+  const sinRestriccion = esAdmin();   // quien administra las pestañas las ve todas
   var visibles = 0;
   TABS_NAV.forEach(function(tab) {
     const el = document.querySelector('.tab[data-viewid="' + tab.id + '"]');
