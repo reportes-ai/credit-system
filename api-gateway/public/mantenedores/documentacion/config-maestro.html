@@ -51,11 +51,38 @@
     <tr><td>Feriados</td><td>Calendario de feriados que usan los plazos y vencimientos.</td></tr>
   </table>
 
+  <h2>Seguridad de las claves</h2>
+  <p style="font-size:.92rem;color:#475569;margin:-4px 0 10px">
+    <b>Usuarios → Seguridad</b>. Estas reglas <b>se aplican en el servidor</b> cada vez que
+    alguien fija una contraseña: no son una sugerencia de la pantalla. Cambiar cualquiera de
+    ellas rige de inmediato para el próximo cambio de clave.
+  </p>
+  <table>
+    <tr><th>Parámetro</th><th>Qué hace</th></tr>
+    <tr><td>Longitud mínima</td><td>Caracteres mínimos de la contraseña. Se valida en el servidor; el usuario ve el motivo exacto del rechazo.</td></tr>
+    <tr><td>Exigir mayúscula / número / carácter especial</td><td>Cada casilla que enciendas se vuelve obligatoria. Lo que dejes apagado no se exige.</td></tr>
+    <tr><td>No permitir la misma clave</td><td>Impide volver a poner la contraseña actual.</td></tr>
+    <tr><td>Historial de claves (N)</td><td>Impide repetir las últimas N contraseñas. Se guarda solo el <i>hash</i>, nunca la clave.</td></tr>
+    <tr><td>Vencimiento de clave (días)</td><td>Pasados N días desde el último cambio, el sistema <b>obliga</b> a cambiarla antes de dejar operar. En 0 = nunca vence.</td></tr>
+    <tr><td>Aviso de vencimiento (correo + días)</td><td>Avisa por correo N días antes de que la clave venza.</td></tr>
+    <tr><td>Máximo de intentos de login</td><td>Intentos fallidos seguidos antes de bloquear la cuenta. El Administrador la desbloquea desde Usuarios.</td></tr>
+    <tr><td>Tiempo de inactividad</td><td>Minutos sin actividad antes de cerrar la sesión.</td></tr>
+  </table>
+  <div class="max" style="background:#fff7ed;border-left:4px solid #d97706;padding:10px 14px;margin:10px 0;font-size:.9rem">
+    <b>Dos cosas que conviene saber.</b> (1) Quien hoy tenga una clave que no cumple las reglas
+    <b>puede seguir entrando</b> — la política se aplica al <i>cambiarla</i>, no al ingresar. Para
+    forzar la renovación de todos, usa <b>Vencimiento de clave</b>. (2) La <b>cuenta protegida de
+    emergencia</b> queda exenta de estas reglas a propósito: es la última vía de entrada si algo se
+    rompe, y una política nueva no puede dejar al dueño afuera.
+  </div>
+
   <h2>Estados y flujos</h2>
   <table>
     <tr><th>Mantenedor</th><th>Qué configura</th></tr>
     <tr><td>Estado Créditos</td><td>Máquina de estados por ámbito (brokerage / AutoFácil): estados, colores, orden, iniciales/finales y transiciones permitidas. Aquí se dibuja el Flujo Brokerage.</td></tr>
-    <tr><td>Estado Cartera</td><td>Estados de pago de la cartera propia (vigente, mora, vencido, terminado…), la segunda dimensión del crédito.</td></tr>
+    <tr><td>Estado Cartera</td><td>Estados de pago de la cartera propia, la segunda dimensión del crédito: <b>VIGENTE · EN MORA · VENCIDO · PREPAGADO · TERMINADO · CASTIGADO</b>. El de mora se llama <b>EN MORA</b> en todo el sistema (antes convivía escrito de dos formas).</td></tr>
+    <tr><td>Equivalencias Trinidad<br><span style="font-size:.85em;color:#64748b">(Carga Masiva)</span></td><td>Traduce el estado que trae el archivo de AutoFin al estado nuestro (ej. <i>Cursado</i> → OTORGADO). <b>Lo que no esté en la tabla entra como DIGITADO</b>: si tras una carga aparecen muchas digitadas, revisa aquí primero.</td></tr>
+    <tr><td>Equivalencia Ejecutivos<br><span style="font-size:.85em;color:#64748b">(Carga Masiva)</span></td><td>Enlaza el nombre del ejecutivo como lo escribe AutoFin con el nuestro. <b>Lo que no calce se guarda tal cual viene</b>, y por eso el mismo ejecutivo puede aparecer escrito de dos formas en los informes.</td></tr>
     <tr><td>Etapas Post Venta</td><td>Etapas de Saldo Precio y Comisión, y sus alertas.</td></tr>
     <tr><td>Workflows y Escalamiento</td><td>Todos los flujos de la Suite: quiénes hacen cada paso (cargos + excepciones por persona, sobre la matriz real de permisos), horas máximas detenido antes de re-alarmar, y escalamiento al jefe directo tras N avisos sin resolver. Los destinatarios de cada alarma van en Avisos.</td></tr>
     <tr><td>Compras → Workflow de aprobación</td><td>Niveles de firma de las órdenes de compra (1-3, casillas por cargo/persona), recordatorio en horas por nivel, y el destino post-decisión (aprobada = lista para comprar; rechazada = pedidos vuelven al pool, siempre con comentario).</td></tr>

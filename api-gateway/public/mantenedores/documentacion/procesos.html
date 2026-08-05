@@ -204,8 +204,12 @@
   <p><b>Qué y para qué:</b> ingresar la producción del brokerage por Excel sin errores y completar lo que venga incompleto.</p>
   <div class="meta">
     <div><b class="lbl">Quién</b>Operaciones (carga) · digitadores (cola de faltantes).</div>
-    <div><b class="lbl">Prerequisitos</b>Equivalencia de Ejecutivos al día (si el archivo trae uno nuevo, agregarlo primero).</div>
+    <div><b class="lbl">Prerequisitos</b>Equivalencia de Ejecutivos al día (si el archivo trae uno nuevo, agregarlo primero) y <b>Equivalencias Trinidad</b> con los estados del archivo.</div>
   </div>
+  <div class="afecta" style="border-left-color:#0141A2"><b>Las dos equivalencias explican casi todas las sorpresas de una carga.</b>
+    Un <b>estado</b> que no esté en Equivalencias Trinidad entra como <b>DIGITADO</b> — si tras cargar aparecen muchas digitadas de golpe, ese es el motivo, no un problema del archivo.
+    Un <b>ejecutivo</b> que no esté en la equivalencia <b>se guarda tal cual viene</b>, y por eso el mismo vendedor puede figurar escrito de dos formas en los informes. Ambas se corrigen en Carga Masiva y la siguiente carga ya entra bien.</div>
+  <div class="afecta" style="border-left-color:#059669"><b>N° OP nuestro desde que nace:</b> a cada ID de financiera nuevo se le asigna el correlativo AutoFácil (<code>AAMM####</code>) en el momento de insertarlo; el número de la institución queda en <b>ID Financiera</b>. Las cargas siguientes reconocen la operación por ese ID, así que recargar el mismo archivo <b>no duplica ni renumera</b>. <b>Se cargan todas las filas, no solo las otorgadas</b> — rechazadas y desistidas entran igual, porque sirven para la estadística de conversión. Única excepción: las filas con fecha de otorgamiento o mes <b>futuro</b> se omiten y quedan listadas en el log como "⏭ Omitido".</div>
   <ol>
     <li><b>Cargar</b> (Carga Masiva → Cargar): el validador con IA marca anomalías (RUT, montos, dealers, fechas) ANTES de insertar → confirmar.</li>
     <li><b>Completar</b> (Digitación de Datos Faltantes): los incompletos entran a la cola; se toman de a uno (bloqueo 20 min), campos faltantes en rojo.</li>
