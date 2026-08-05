@@ -1,5 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
+const { auditar } = require('../../../../shared/audit');
 
 /* ── Migración + seed piloto (Post Venta) ─────────────────────────── */
 require('../../../../shared/migrate').enFila('ayuda', async () => {
@@ -440,13 +441,28 @@ require('../../../../shared/migrate').enFila('ayuda-dcq', async () => {
         kw         VARCHAR(300) NULL,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
+    /* `origen` decide quién manda sobre cada fila. El banco se converge en CADA
+       arranque, así que sin esta marca una respuesta escrita o corregida por el
+       Administrador se perdía en el siguiente deploy — silenciosamente, que es
+       la peor forma de perder trabajo. Cuando el Administrador toca una fila
+       pasa a USUARIO y el seed deja de pisarla. */
+    try { await pool.query(
+      "ALTER TABLE dcq_preguntas ADD COLUMN origen VARCHAR(10) NOT NULL DEFAULT 'SISTEMA'");
+    } catch (e) { if (e.errno !== 1060) throw e; }
+
     const BANCO = require('../dcq-banco');
     for (const q of BANCO) {
       await pool.query(
-        `INSERT INTO dcq_preguntas (slug, cat, pregunta, donde, como, quien, href, kw)
-         VALUES (?,?,?,?,?,?,?,?)
-         ON DUPLICATE KEY UPDATE cat=VALUES(cat), pregunta=VALUES(pregunta), donde=VALUES(donde),
-           como=VALUES(como), quien=VALUES(quien), href=VALUES(href), kw=VALUES(kw)`,
+        `INSERT INTO dcq_preguntas (slug, cat, pregunta, donde, como, quien, href, kw, origen)
+         VALUES (?,?,?,?,?,?,?,?,'SISTEMA')
+         ON DUPLICATE KEY UPDATE
+           cat      = IF(origen='USUARIO', cat,      VALUES(cat)),
+           pregunta = IF(origen='USUARIO', pregunta, VALUES(pregunta)),
+           donde    = IF(origen='USUARIO', donde,    VALUES(donde)),
+           como     = IF(origen='USUARIO', como,     VALUES(como)),
+           quien    = IF(origen='USUARIO', quien,    VALUES(quien)),
+           href     = IF(origen='USUARIO', href,     VALUES(href)),
+           kw       = IF(origen='USUARIO', kw,       VALUES(kw))`,
         [q.slug, q.cat, q.p, q.donde, q.como, q.quien, q.href || null, q.kw || null]);
     }
     console.log(`[dcq] banco Dónde·Cómo·Quién convergido: ${BANCO.length} preguntas`);
@@ -457,7 +473,7 @@ require('../../../../shared/migrate').enFila('ayuda-dcq', async () => {
 const dcqListar = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT slug, cat, pregunta, donde, como, quien, href, kw FROM dcq_preguntas ORDER BY cat, pregunta');
+      'SELECT slug, cat, pregunta, donde, como, quien, href, kw, origen FROM dcq_preguntas ORDER BY cat, pregunta');
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
     console.error('[dcq listar]', e.message);
@@ -465,4 +481,90 @@ const dcqListar = async (req, res) => {
   }
 };
 
-module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso, dcqListar };
+/* ── Mantención del banco (Administrador) ────────────────────────────────────
+   Cuando alguien busca algo que no está, el Administrador lo agrega en el
+   momento y queda para todos. Lo que se escribe acá manda sobre el banco del
+   código: la fila pasa a origen='USUARIO' y el seed ya no la toca. */
+const slugify = s => String(s || '')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+
+function validarDcq(b) {
+  const pregunta = String(b.pregunta || '').trim();
+  const cat      = String(b.cat || '').trim();
+  if (pregunta.length < 5)  return { error: 'La pregunta es muy corta' };
+  if (pregunta.length > 200) return { error: 'La pregunta no puede pasar de 200 caracteres' };
+  if (!cat)                 return { error: 'Elige una categoría' };
+  if (cat.length > 40)      return { error: 'La categoría no puede pasar de 40 caracteres' };
+  const campo = (v, max) => { const s = String(v ?? '').trim(); return s ? s.slice(0, max) : null; };
+  return {
+    cat, pregunta,
+    donde: campo(b.donde, 2000), como: campo(b.como, 2000), quien: campo(b.quien, 2000),
+    href:  campo(b.href, 200),   kw:   campo(b.kw, 300),
+  };
+}
+
+const dcqCrear = async (req, res) => {
+  try {
+    const v = validarDcq(req.body || {});
+    if (v.error) return res.status(400).json({ success: false, data: null, error: v.error });
+    // El slug se deriva de la pregunta; si choca, se numera (no se pisa una existente).
+    let slug = slugify(v.pregunta) || 'pregunta';
+    const [[ya]] = await pool.query('SELECT slug FROM dcq_preguntas WHERE slug = ?', [slug]);
+    if (ya) { for (let i = 2; i < 100; i++) {
+      const s = (slug + '-' + i).slice(0, 60);
+      const [[c]] = await pool.query('SELECT slug FROM dcq_preguntas WHERE slug = ?', [s]);
+      if (!c) { slug = s; break; }
+    } }
+    await pool.query(
+      `INSERT INTO dcq_preguntas (slug, cat, pregunta, donde, como, quien, href, kw, origen)
+       VALUES (?,?,?,?,?,?,?,?,'USUARIO')`,
+      [slug, v.cat, v.pregunta, v.donde, v.como, v.quien, v.href, v.kw]);
+    auditar({ req, accion: 'CREAR', modulo: 'ayuda', entidad: 'dcq_pregunta', entidad_id: slug,
+      detalle: `Agregó al banco Dónde·Cómo·Quién: "${v.pregunta}"` });
+    res.json({ success: true, data: { slug }, error: null });
+  } catch (e) {
+    console.error('[dcq crear]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+const dcqActualizar = async (req, res) => {
+  try {
+    const v = validarDcq(req.body || {});
+    if (v.error) return res.status(400).json({ success: false, data: null, error: v.error });
+    const [r] = await pool.query(
+      `UPDATE dcq_preguntas SET cat=?, pregunta=?, donde=?, como=?, quien=?, href=?, kw=?,
+              origen='USUARIO'
+        WHERE slug = ?`,
+      [v.cat, v.pregunta, v.donde, v.como, v.quien, v.href, v.kw, req.params.slug]);
+    if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Esa respuesta ya no existe' });
+    auditar({ req, accion: 'EDITAR', modulo: 'ayuda', entidad: 'dcq_pregunta', entidad_id: req.params.slug,
+      detalle: `Editó en el banco Dónde·Cómo·Quién: "${v.pregunta}"` });
+    res.json({ success: true, data: { slug: req.params.slug }, error: null });
+  } catch (e) {
+    console.error('[dcq actualizar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+const dcqEliminar = async (req, res) => {
+  try {
+    const [[q]] = await pool.query('SELECT origen, pregunta FROM dcq_preguntas WHERE slug = ?', [req.params.slug]);
+    if (!q) return res.status(404).json({ success: false, data: null, error: 'Esa respuesta ya no existe' });
+    // Las del banco base vuelven solas en el próximo arranque: borrarlas daría
+    // la falsa impresión de haberlas quitado. Se editan, no se eliminan.
+    if (q.origen !== 'USUARIO') return res.status(409).json({ success: false, data: null,
+      error: 'Esta respuesta viene del banco base del sistema: puedes editarla, pero no eliminarla (volvería a aparecer en el próximo arranque).' });
+    await pool.query('DELETE FROM dcq_preguntas WHERE slug = ?', [req.params.slug]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'ayuda', entidad: 'dcq_pregunta', entidad_id: req.params.slug,
+      detalle: `Eliminó del banco Dónde·Cómo·Quién: "${q.pregunta}"` });
+    res.json({ success: true, data: null, error: null });
+  } catch (e) {
+    console.error('[dcq eliminar]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAyuda, listAyuda, upsertAyuda, academiaCursos, academiaProgreso,
+                    dcqListar, dcqCrear, dcqActualizar, dcqEliminar };

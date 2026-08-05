@@ -72,14 +72,64 @@
     <button class="clr" id="clr" onclick="limpiar()"><i class="bi bi-x-circle-fill"></i></button>
   </div>
   <div class="cats" id="cats"></div>
-  <div class="nres" id="nres"></div>
+  <div class="nres" id="nres">
+    <button id="btnNueva" onclick="abrirEditor(null)" style="display:none;float:right;background:var(--navy);color:#fff;border:0;border-radius:7px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer">
+      <i class="bi bi-plus-lg me-1"></i>Agregar respuesta
+    </button>
+    <span id="nresTxt"></span>
+  </div>
   <div id="lista"></div>
   <div class="empty" id="vacio" style="display:none">
     <i class="bi bi-signpost-2" style="font-size:2.6rem;opacity:.4"></i>
     <p style="margin-top:10px">Nada calza con esa búsqueda.</p>
-    <div class="hint">Prueba con otras palabras (ej: "comisión", "clave", "anular") o quita el filtro de categoría.<br>Si la pregunta falta, pídela por Tickets TI y se agrega al banco.</div>
+    <div class="hint" id="hintVacio">Prueba con otras palabras (ej: "comisión", "clave", "anular") o quita el filtro de categoría.<br>Si la pregunta falta, pídela por Tickets TI y se agrega al banco.</div>
+    <!-- Al Administrador se le ofrece agregarla en el momento, con lo que buscó ya escrito -->
+    <button id="btnVacioNueva" onclick="abrirEditor(null, document.getElementById('q').value)" style="display:none;margin-top:14px;background:var(--navy);color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:.85rem;font-weight:700;cursor:pointer">
+      <i class="bi bi-plus-lg me-1"></i>Agregar esta pregunta al banco
+    </button>
   </div>
 </div>
+
+<!-- Editor del banco (solo con permiso de mantenedor de Ayuda) -->
+<dialog id="dlg" style="border:0;border-radius:14px;padding:0;width:min(720px,94vw);box-shadow:0 18px 50px rgba(0,0,0,.28)">
+  <form method="dialog" style="margin:0">
+    <div style="background:var(--navy);color:#fff;padding:14px 20px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:center">
+      <b id="dlgTit" style="font-size:1rem"><i class="bi bi-signpost-split me-2"></i>Nueva respuesta</b>
+      <button value="cancel" style="background:transparent;border:0;color:#fff;font-size:1.2rem;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="padding:18px 20px;max-height:70vh;overflow:auto">
+      <div id="dlgErr" style="display:none;background:#fee2e2;color:#991b1b;border-radius:7px;padding:8px 12px;font-size:.8rem;margin-bottom:12px"></div>
+      <label for="fPregunta" style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:3px">PREGUNTA *</label>
+      <input id="fPregunta" maxlength="200" placeholder="¿Dónde veo las equivalencias de AutoFin?" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px">
+
+      <label for="fCat" style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:3px">CATEGORÍA *</label>
+      <input id="fCat" list="catsExist" maxlength="40" placeholder="Créditos" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px">
+      <datalist id="catsExist"></datalist>
+
+      <label for="fDonde" style="display:block;font-size:.72rem;font-weight:700;color:#2563eb;margin-bottom:3px">DÓNDE</label>
+      <textarea id="fDonde" rows="2" placeholder="En qué pantalla o menú se hace" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px;resize:vertical"></textarea>
+
+      <label for="fComo" style="display:block;font-size:.72rem;font-weight:700;color:#059669;margin-bottom:3px">CÓMO</label>
+      <textarea id="fComo" rows="3" placeholder="Los pasos, en orden" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px;resize:vertical"></textarea>
+
+      <label for="fQuien" style="display:block;font-size:.72rem;font-weight:700;color:#b45309;margin-bottom:3px">QUIÉN</label>
+      <textarea id="fQuien" rows="2" placeholder="Qué perfil o permiso puede hacerlo" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px;resize:vertical"></textarea>
+
+      <label for="fHref" style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:3px">ENLACE A LA PANTALLA (opcional)</label>
+      <input id="fHref" maxlength="200" placeholder="/mantenedores/fundantes-tipos/" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem;margin-bottom:12px">
+
+      <label for="fKw" style="display:block;font-size:.72rem;font-weight:700;color:#475569;margin-bottom:3px">PALABRAS CLAVE (opcional)</label>
+      <input id="fKw" maxlength="300" placeholder="equivalencias autofin trinidad estados" style="width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem">
+      <div style="font-size:.7rem;color:#94a3b8;margin-top:4px">Sinónimos con los que alguien podría buscarla. Ayudan a que la encuentre quien no usa las mismas palabras.</div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;gap:8px">
+      <button type="button" id="btnBorrar" onclick="borrarActual()" style="display:none;background:#fee2e2;color:#991b1b;border:0;border-radius:8px;padding:8px 14px;font-size:.82rem;font-weight:600;cursor:pointer">Eliminar</button>
+      <span style="flex:1"></span>
+      <button value="cancel" style="background:#f1f5f9;color:#475569;border:0;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:600;cursor:pointer">Cancelar</button>
+      <button type="button" id="btnGuardar" onclick="guardarEditor()" style="background:var(--navy);color:#fff;border:0;border-radius:8px;padding:8px 18px;font-size:.82rem;font-weight:700;cursor:pointer">Guardar</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
 const T = () => sessionStorage.getItem('token');
@@ -91,6 +141,24 @@ const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/
 const STOP = new Set(['como','donde','quien','que','cual','cuales','se','el','la','los','las','un','una','de','del','en','y','o','a','al','para','por','con','puedo','puede','pueden','hacer','hace','hago','es','esta','estan','mi','su','me','le','si','no','ver','tengo','hay']);
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
 
+/* ¿Puede mantener el banco? Mismo permiso que el mantenedor de Ayuda. */
+let PUEDE_EDITAR = false;
+async function cargarPermiso(){
+  try {
+    // El perfil viene de la sesión (mis-permisos no lo devuelve); las
+    // funcionalidades, de la matriz. Admin manda igual que en el backend.
+    const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
+    const esAdmin = (yo?.perfil || '') === 'Administrador';
+    const r = await fetch('/api/auth/mis-permisos?_=' + Date.now(), { cache:'no-store', headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    PUEDE_EDITAR = esAdmin || (j.funcionalidades || []).includes('mantenedores_ayuda');
+  } catch(e){ PUEDE_EDITAR = false; }
+  document.getElementById('btnNueva').style.display     = PUEDE_EDITAR ? '' : 'none';
+  document.getElementById('btnVacioNueva').style.display = PUEDE_EDITAR ? '' : 'none';
+  if (PUEDE_EDITAR) document.getElementById('hintVacio').innerHTML =
+    'Prueba con otras palabras (ej: "comisión", "clave", "anular") o quita el filtro de categoría.<br>Si la respuesta falta, agrégala tú y queda para todos.';
+}
+
 async function cargar(){
   try {
     const r = await fetch('/api/ayuda/dcq', { headers:{ Authorization:'Bearer '+T() } });
@@ -98,8 +166,80 @@ async function cargar(){
     if (!j.success) throw new Error(j.error||'Error');
     BANCO = (j.data||[]).map(q => ({ ...q, _idx: norm(q.pregunta+' '+(q.kw||'')+' '+q.cat+' '+q.donde+' '+q.como+' '+q.quien) }));
     pintarCats();
+    document.getElementById('catsExist').innerHTML =
+      [...new Set(BANCO.map(q=>q.cat))].map(c=>`<option value="${esc(c)}">`).join('');
     pintar();
   } catch(e){ document.getElementById('lista').innerHTML = '<div class="empty">No se pudo cargar el banco ('+esc(e.message)+')</div>'; }
+}
+
+/* ── Editor del banco ───────────────────────────────────────────────────── */
+let EDIT_SLUG = null;
+function abrirEditor(slug, preguntaSugerida){
+  if (!PUEDE_EDITAR) return;
+  EDIT_SLUG = slug;
+  const q = slug ? BANCO.find(x => x.slug === slug) : null;
+  document.getElementById('dlgTit').innerHTML = '<i class="bi bi-signpost-split me-2"></i>' +
+    (q ? 'Editar respuesta' : 'Nueva respuesta');
+  document.getElementById('fPregunta').value = q ? q.pregunta : (preguntaSugerida || '');
+  document.getElementById('fCat').value      = q ? q.cat   : (CAT || '');
+  document.getElementById('fDonde').value    = q ? (q.donde||'') : '';
+  document.getElementById('fComo').value     = q ? (q.como ||'') : '';
+  document.getElementById('fQuien').value    = q ? (q.quien||'') : '';
+  document.getElementById('fHref').value     = q ? (q.href ||'') : '';
+  document.getElementById('fKw').value       = q ? (q.kw   ||'') : '';
+  document.getElementById('dlgErr').style.display = 'none';
+  // Las del banco base se editan pero no se eliminan: volverían en el próximo arranque.
+  document.getElementById('btnBorrar').style.display = (q && q.origen === 'USUARIO') ? '' : 'none';
+  document.getElementById('dlg').showModal();
+  document.getElementById('fPregunta').focus();
+}
+
+function errEditor(msg){
+  const e = document.getElementById('dlgErr');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+async function guardarEditor(){
+  const body = {
+    pregunta: document.getElementById('fPregunta').value.trim(),
+    cat:      document.getElementById('fCat').value.trim(),
+    donde:    document.getElementById('fDonde').value.trim(),
+    como:     document.getElementById('fComo').value.trim(),
+    quien:    document.getElementById('fQuien').value.trim(),
+    href:     document.getElementById('fHref').value.trim(),
+    kw:       document.getElementById('fKw').value.trim(),
+  };
+  if (body.pregunta.length < 5) return errEditor('Escribe la pregunta completa.');
+  if (!body.cat)                return errEditor('Indica una categoría.');
+  if (!body.donde && !body.como && !body.quien)
+    return errEditor('Completa al menos uno de los tres: dónde, cómo o quién.');
+
+  const btn = document.getElementById('btnGuardar');
+  const txt = btn.textContent; btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const url = EDIT_SLUG ? '/api/ayuda/dcq/' + encodeURIComponent(EDIT_SLUG) : '/api/ayuda/dcq';
+    const r = await fetch(url, { method: EDIT_SLUG ? 'PUT' : 'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+T() },
+      body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!j.success) return errEditor(j.error || 'No se pudo guardar.');
+    document.getElementById('dlg').close();
+    await cargar();
+  } catch(e){ errEditor('No se pudo guardar: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = txt; }
+}
+
+async function borrarActual(){
+  if (!EDIT_SLUG) return;
+  if (!confirm('¿Eliminar esta respuesta del banco?')) return;
+  try {
+    const r = await fetch('/api/ayuda/dcq/' + encodeURIComponent(EDIT_SLUG), {
+      method:'DELETE', headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    if (!j.success) return errEditor(j.error || 'No se pudo eliminar.');
+    document.getElementById('dlg').close();
+    await cargar();
+  } catch(e){ errEditor('No se pudo eliminar: ' + e.message); }
 }
 
 function pintarCats(){
@@ -132,7 +272,7 @@ function pintar(){
     rows = rows.map(q => ({ q, s: puntaje(q, tokens) })).filter(x => x.s>0)
                .sort((a,b) => b.s-a.s).map(x => x.q);
   }
-  document.getElementById('nres').textContent = rows.length ? `${rows.length} respuesta(s)` : '';
+  document.getElementById('nresTxt').textContent = rows.length ? `${rows.length} respuesta(s)` : '';
   document.getElementById('vacio').style.display = rows.length ? 'none' : 'block';
   const abierta = tokens.length && rows.length <= 3;   // pocas → mostrarlas abiertas
   document.getElementById('lista').innerHTML = rows.map((q,i)=>`
@@ -147,6 +287,9 @@ function pintar(){
         <div class="fila f-como"><span class="tag">Cómo</span><span class="txt">${resaltar(q.como, tokens)}</span></div>
         <div class="fila f-quien"><span class="tag">Quién</span><span class="txt">${resaltar(q.quien, tokens)}</span></div>
         ${q.href ? `<div class="ir"><a href="${esc(q.href)}"><i class="bi bi-box-arrow-up-right"></i> Ir a la pantalla</a></div>` : ''}
+        ${PUEDE_EDITAR ? `<div style="margin-top:10px;text-align:right">
+          <button onclick="event.stopPropagation();abrirEditor('${esc(q.slug)}')" style="background:#f1f5f9;color:#475569;border:0;border-radius:6px;padding:4px 11px;font-size:.72rem;font-weight:600;cursor:pointer">
+            <i class="bi bi-pencil me-1"></i>Editar</button></div>` : ''}
       </div>
     </div>`).join('');
 }
@@ -174,7 +317,7 @@ function resaltar(texto, tokens){
 }
 
 document.getElementById('q').addEventListener('input', pintar);
-cargar();
+cargarPermiso().then(cargar);
 </script>
 <script src="/js/app-version.js"></script>
 </body>
