@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.26 — entidad PARQUE: mismo circuito, el cierre crea el parque -->
+  <!-- v1.27 — modo PARQUE: textos correctos (Datos del Parque, Pago de Comisiones) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -562,6 +562,17 @@ function aplicarEntidadUI(){
   const tipoCard = document.querySelector('input[name=tipo]')?.closest('.card-sec'); if (tipoCard) tipoCard.style.display = 'none';
   const comCard = $('com_6_12')?.closest('.card-sec'); if (comCard) comCard.style.display = 'none';
   const nf = $('nombre_fantasia')?.closest('.fld')?.querySelector('label'); if (nf) nf.textContent = 'Nombre del Parque (fantasía)';
+  // Textos: acá no hay concesionario ni saldo precio — es el PARQUE y sus COMISIONES.
+  const datosCard = $('dealerBuscar')?.closest('.card-sec');
+  if (datosCard) {
+    const h3 = datosCard.querySelector('h3'); if (h3) h3.innerHTML = '<i class="bi bi-p-square me-1"></i> Datos del Parque';
+    $('dealerBuscar').closest('.fld').style.display = 'none';   // buscador de dealers: no aplica a parques
+  }
+  const rutLbl = $('rut')?.closest('.fld')?.querySelector('label'); if (rutLbl) rutLbl.textContent = 'RUT del Parque *';
+  if ($('lblDir')) $('lblDir').textContent = 'Dirección del Parque';
+  if ($('lblCom')) $('lblCom').textContent = 'Comuna del Parque';
+  const pagoH3 = $('rut_cuenta')?.closest('.card-sec')?.querySelector('h3');
+  if (pagoH3) pagoH3.innerHTML = '<i class="bi bi-bank me-1"></i> Datos para Pago de Comisiones';
 }
 let ESTADO = 'BORRADOR';
 let fileB64 = null, fileName = null, fileMime = null;
@@ -1107,7 +1118,7 @@ function imprimir(){
     ${comTable}
     <table class="p"><tr><th colspan="4">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${celdaX(o.tipo_documento,'BOLETA')}</td><td>FACTURA: ${celdaX(o.tipo_documento,'FACTURA')}</td><td></td></tr></table>
-    <table class="p"><tr><th colspan="4">FORMA DE PAGO SALDO PRECIO</th></tr>
+    <table class="p"><tr><th colspan="4">${esParque?'FORMA DE PAGO DE COMISIONES':'FORMA DE PAGO SALDO PRECIO'}</th></tr>
       <tr><td class="lbl">Cuenta</td><td>EMPRESA: ${celdaX(o.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${celdaX(o.cuenta_tipo,'PERSONA')}</td><td></td></tr>
       <tr><td class="lbl">Tipo de Cuenta</td><td colspan="3">${E(o.tipo_cuenta)}</td></tr>
       <tr><td class="lbl">Nombre de la cuenta</td><td colspan="3">${E(o.nombre_cuenta)}</td></tr>

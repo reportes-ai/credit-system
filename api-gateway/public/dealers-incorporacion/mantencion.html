@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.14 — fichas de entidad PARQUE marcadas en las listas -->
+  <!-- v1.15 — vista de ficha PARQUE: titulos propios, sin tabla de comision -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -426,10 +426,11 @@ function abrirArchivo(id){ window.open('/api/dealer-incorporacion/fichas/'+id+'/
 function fichaDocHTML(f){
   const E = escH;
   const X = (v,t)=> (String(v||'').toUpperCase()===String(t).toUpperCase()) ? '✕' : '';
+  const esParqueEnt = f.entidad==='PARQUE';
   const esP = f.tipo==='PARQUE', esA = f.tipo==='AMBOS';
-  const dirLbl = esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
-  const comLbl = esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
-  const subt = esP?' · Parque Automotriz':(esA?' · Calle + Parque Automotriz':'');
+  const dirLbl = esParqueEnt?'Dirección del Parque':esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
+  const comLbl = esParqueEnt?'Comuna del Parque':esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
+  const subt = esParqueEnt?' · Parque como contraparte comercial':esP?' · Parque Automotriz':(esA?' · Calle + Parque Automotriz':'');
   const parqueNombreRow = (esP||esA) ? `<tr><td class="lbl">Nombre del Parque</td><td>${E(f.nombre_parque)}</td></tr>` : '';
   const parqueDirRows = esA ? `<tr><td class="lbl">Dirección de Parque</td><td>${E(f.direccion_parque)}</td></tr><tr><td class="lbl">Comuna de Parque</td><td>${E(f.comuna_parque)}</td></tr>` : '';
   const comRows = esA
@@ -441,12 +442,12 @@ function fichaDocHTML(f){
     ? _socs.slice(0,3).map((s,i)=>`<tr><td class="lbl">Socio ${i+1}</td><td>${E(s.rut)}</td><td>${E([s.nombre,s.apellido_paterno,s.apellido_materno].filter(Boolean).join(' '))}</td></tr>`).join('')
     : `<tr><td class="lbl">Socio 1</td><td></td><td></td></tr>`;
   return `<div class="fdoc">
-    <h2 class="fdoc-t">FICHA DE INCORPORACIÓN DE CONCESIONARIO${subt}</h2>
+    <h2 class="fdoc-t">FICHA DE INCORPORACIÓN DE ${esParqueEnt?'PARQUE AUTOMOTRIZ':'CONCESIONARIO'}${subt}</h2>
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E(f.ejecutivo_nombre)}</td></tr>
       <tr><td class="lbl">Fecha de solicitud</td><td>${E(f.fecha_solicitud?String(f.fecha_solicitud).slice(0,10):'')}</td></tr></table>
-    <table class="p"><tr><th colspan="2">DATOS DE CONCESIONARIO</th></tr>
-      <tr><td class="lbl">Rut de Concesionario</td><td>${E(f.rut)}</td></tr>
+    <table class="p"><tr><th colspan="2">DATOS DE${esParqueEnt?'L PARQUE':' CONCESIONARIO'}</th></tr>
+      <tr><td class="lbl">Rut ${esParqueEnt?'del Parque':'de Concesionario'}</td><td>${E(f.rut)}</td></tr>
       <tr><td class="lbl">Nombre Razón Social</td><td>${E(f.nombre_razon)}</td></tr>
       <tr><td class="lbl">Nombre de Fantasía</td><td>${E(f.nombre_fantasia)}</td></tr>
       ${parqueNombreRow}
@@ -469,12 +470,12 @@ function fichaDocHTML(f){
       ${sociosRows}</table>
     <table class="p"><tr><th colspan="2">REPRESENTANTE LEGAL</th></tr>
       <tr><td class="lbl">Nombre</td><td>${E(f.rl_nombre)}</td></tr><tr><td class="lbl">Teléfono</td><td>${E(f.rl_telefono)}</td></tr><tr><td class="lbl">Email</td><td>${E(f.rl_email)}</td></tr></table>
-    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
+    ${esParqueEnt?'':`<table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
       <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
-      ${comRows}</table>
+      ${comRows}</table>`}
     <table class="p"><tr><th colspan="3">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${X(f.tipo_documento,'BOLETA')}</td><td>FACTURA: ${X(f.tipo_documento,'FACTURA')}</td></tr></table>
-    <table class="p"><tr><th colspan="3">FORMA DE PAGO SALDO PRECIO</th></tr>
+    <table class="p"><tr><th colspan="3">${esParqueEnt?'FORMA DE PAGO DE COMISIONES':'FORMA DE PAGO SALDO PRECIO'}</th></tr>
       <tr><td class="lbl">Cuenta</td><td>EMPRESA: ${X(f.cuenta_tipo,'EMPRESA')}</td><td>PERSONA: ${X(f.cuenta_tipo,'PERSONA')}</td></tr>
       <tr><td class="lbl">Tipo de Cuenta</td><td colspan="2">${E(f.tipo_cuenta)}</td></tr>
       <tr><td class="lbl">Nombre de la cuenta</td><td colspan="2">${E(f.nombre_cuenta)}</td></tr>
