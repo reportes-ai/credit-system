@@ -17,7 +17,7 @@
    - Pagar: marca el correlativo pagado y alerta a los ejecutivos del parque.
    ═══════════════════════════════════════════════════════════════════════════ */
 const pool = require('../../../../shared/config/database');
-const { emitirCorrelativo, pagarCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
+const { emitirCorrelativo, pagarCorrelativo, anularCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { auditar } = require('../../../../shared/audit');
 
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
@@ -53,6 +53,7 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
       const funcs = [
         ['Comisiones Parques a Pagar',            'postventa_comisiones_parques', '/postventa/comisiones-parques/', 'bi-signpost-2'],
         ['Seguimiento Comisión Parques',          'postventa_seg_parques',        '/postventa/seguimiento-parques/', 'bi-p-square'],
+        ['Emisión de Cartolas Parque',            'postventa_cartolas_parque',    '/postventa/cartolas-parque/',    'bi-envelope-paper'],
         ['Aprobar Comisión de Parque',            'pv_parques_aprobar',           null, null],
         ['Emitir Orden de Pago de Parque',        'pv_parques_emitir',            null, null],
         ['Confirmar Pago de Parque',              'pv_parques_pagar',             null, null],
@@ -70,6 +71,19 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
         if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)', [idf]);
       }
     }
+    // Registro de cartolas de parque enviadas (reverso preciso por envío).
+    await pool.query(`CREATE TABLE IF NOT EXISTS parques_cartolas_enviadas (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      mes         VARCHAR(7)   NOT NULL,
+      parque      VARCHAR(120) NOT NULL,
+      mail        VARCHAR(200) NULL,
+      arriendo    BIGINT NULL,
+      comision    BIGINT NULL,
+      total       BIGINT NULL,
+      enviado_por VARCHAR(150) NULL,
+      fecha_envio DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_mes (mes)
+    )`);
     console.log('[comisiones-parques] módulo registrado');
   } catch (e) { console.error('[comisiones-parques migration]', e.message); }
 });
@@ -133,6 +147,19 @@ async function marcarEtapaParqueOps(parque, mes, etapas, usuario) {
       JOIN creditos c ON c.id = s.id_credito
       WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?`,
       [etapa, usuario, parque, mes]).catch(e => console.error('[parques marcar etapa]', e.message));
+  }
+}
+
+/* Reversa exacta de marcarEtapaParqueOps: quita etapa(s) del track PARQUE. */
+async function desmarcarEtapaParqueOps(parque, mes, etapas) {
+  for (const etapa of etapas) {
+    await pool.query(`
+      DELETE pe FROM postventa_etapas pe
+      JOIN postventa_seguimiento s ON s.id = pe.id_seguimiento
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE pe.track='PARQUE' AND pe.etapa=?
+        AND UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?`,
+      [etapa, parque, mes]).catch(e => console.error('[parques desmarcar etapa]', e.message));
   }
 }
 
@@ -360,4 +387,158 @@ const pagar = async (req, res) => {
   } catch (e) { console.error('[comisiones-parques pagar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, detalle, aprobar, emitir, pagar };
+/* ═══ CARTOLAS PARQUE ═══════════════════════════════════════════════════════
+   La cartola del parque del mes: sus operaciones (com_parque) + la línea de
+   arriendo. Cada acción marca la etapa en el track PARQUE de TODAS las ops del
+   parque/mes (y las previas de cartola, patrón del envío de cartolas dealer). */
+
+/* GET /cartola-estado?mes — por parque: etapas de cartola + datos de la ficha. */
+const cartolaEstado = async (req, res) => {
+  try {
+    const mes = mesParam(req);
+    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes (YYYY-MM) requerido' });
+    // Una etapa está "hecha" cuando TODAS las ops del parque/mes la tienen.
+    const [rows] = await pool.query(`
+      SELECT s.parque,
+             COUNT(*) ops,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA EMITIDA'))  em,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA APROBADA')) ap,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA ENVIADA'))  en,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='FACTURA RECIBIDA')) fa
+      FROM postventa_seguimiento s
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE s.parque IS NOT NULL AND DATE_FORMAT(c.mes,'%Y-%m') = ?
+      GROUP BY s.parque`, [mes]);
+    const [fichas] = await pool.query(`
+      SELECT p.nombre, f.rut, f.razon_social, f.cf_email, f.cf_nombre, f.tipo_documento
+      FROM parques_comisiones p LEFT JOIN parques_ficha f ON f.id_parque = p.id`);
+    const fMap = new Map(fichas.map(f => [f.nombre, f]));
+    const data = rows.map(r => ({
+      parque: r.parque, ops: r.ops,
+      emitida: Number(r.em) >= r.ops, aprobada: Number(r.ap) >= r.ops,
+      enviada: Number(r.en) >= r.ops, factura: Number(r.fa) >= r.ops,
+      ficha: fMap.get(r.parque) || null,
+    }));
+    // También los parques solo-arriendo (sin ops en el mes) con su ficha
+    for (const [nombre, f] of fMap) {
+      if (!data.some(d => d.parque === nombre))
+        data.push({ parque: nombre, ops: 0, emitida: false, aprobada: false, enviada: false, factura: false, ficha: f });
+    }
+    res.json({ success: true, data: { mes, rows: data }, error: null });
+  } catch (e) { console.error('[cartola-estado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const quienDe = req => `${req.user?.nombre || req.usuario?.nombre || ''} ${req.user?.apellido || req.usuario?.apellido || ''}`.trim() || 'sistema';
+
+/* POST /cartola/emitir {mes,parque} */
+const cartolaEmitir = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    await marcarEtapaParqueOps(parque, mes, ['CARTOLA EMITIDA'], quienDe(req));
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'cartola_parque', detalle: `Emitió cartola parque ${parque} (${mes})` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[cartola emitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /cartola/aprobar {mes,parque} — revisión conforme (marca también EMITIDA si faltara) */
+const cartolaAprobar = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    await marcarEtapaParqueOps(parque, mes, ['CARTOLA EMITIDA', 'CARTOLA APROBADA'], quienDe(req));
+    auditar({ req, accion: 'APROBAR', modulo: 'postventa', entidad: 'cartola_parque', detalle: `Aprobó cartola parque ${parque} (${mes})` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[cartola aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /cartola/enviar {mes,parque,mail,arriendo,comision,total} — registra el
+   envío y marca las 4 etapas de cartola en cada operación (patrón dealer). */
+const cartolaEnviar = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    const quien = quienDe(req);
+    const [r] = await pool.query(
+      `INSERT INTO parques_cartolas_enviadas (mes, parque, mail, arriendo, comision, total, enviado_por)
+       VALUES (?,?,?,?,?,?,?)`,
+      [mes, parque, String(req.body.mail || '') || null,
+       Math.round(Number(req.body.arriendo) || 0), Math.round(Number(req.body.comision) || 0),
+       Math.round(Number(req.body.total) || 0), quien]);
+    await marcarEtapaParqueOps(parque, mes, ['COMISION A PAGAR', 'CARTOLA EMITIDA', 'CARTOLA APROBADA', 'CARTOLA ENVIADA'], quien);
+    auditar({ req, accion: 'ENVIAR_CARTOLA', modulo: 'postventa', entidad: 'cartola_parque', entidad_id: r.insertId,
+      detalle: `Envió cartola parque ${parque} (${mes}) por ${CLP(Number(req.body.total) || 0)}` });
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { console.error('[cartola enviar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /cartolas-enviadas?mes */
+const cartolasEnviadas = async (req, res) => {
+  try {
+    const mes = mesParam(req);
+    const [rows] = await pool.query(
+      `SELECT * FROM parques_cartolas_enviadas ${mes ? 'WHERE mes=?' : ''} ORDER BY fecha_envio DESC LIMIT 300`, mes ? [mes] : []);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[cartolas enviadas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* DELETE /cartolas-enviadas/:id — reversa el envío: quita CARTOLA ENVIADA (las previas quedan). */
+const cartolaReversarEnvio = async (req, res) => {
+  try {
+    const [[env]] = await pool.query('SELECT * FROM parques_cartolas_enviadas WHERE id=?', [req.params.id]);
+    if (!env) return res.status(404).json({ success: false, data: null, error: 'Envío no encontrado' });
+    await desmarcarEtapaParqueOps(env.parque, env.mes, ['CARTOLA ENVIADA']);
+    await pool.query('DELETE FROM parques_cartolas_enviadas WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'REVERSAR', modulo: 'postventa', entidad: 'cartola_parque', entidad_id: req.params.id,
+      detalle: `Reversó envío de cartola parque ${env.parque} (${env.mes})` });
+    res.json({ success: true, data: { reversado: Number(req.params.id) }, error: null });
+  } catch (e) { console.error('[cartola reversar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ═══ REVERSAS DE ODP Y PAGO (con motivo, auditadas) ═══════════════════════ */
+
+/* POST /anular-odp {mes,parque,motivo} — solo con la ODP emitida y NO pagada.
+   Anula el correlativo (el número no se libera), vuelve el mes a APROBADA y
+   desmarca ORDEN DE PAGO EMITIDA en las operaciones. */
+const anularODP = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    const motivo = String(req.body.motivo || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    if (motivo.length < 5) return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo válido' });
+    const [[e]] = await pool.query("SELECT * FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+    if (!e || e.etapa !== 'OP_EMITIDA')
+      return res.status(400).json({ success: false, data: null, error: 'Solo se puede anular una ODP emitida y aún no pagada' });
+    const quien = quienDe(req);
+    await anularCorrelativo({ numero: e.odp_numero, id_usuario: req.user?.id_usuario, usuario_nombre: quien });
+    await pool.query("UPDATE parques_pagos_mes SET etapa='APROBADA', odp_id=NULL, odp_numero=NULL, emitida_por=NULL, fecha_emitida=NULL WHERE id=?", [e.id]);
+    await desmarcarEtapaParqueOps(parque, mes, ['ORDEN DE PAGO EMITIDA']);
+    auditar({ req, accion: 'REVERSAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: e.id,
+      detalle: `Anuló ODP ${e.odp_numero} — parque ${parque} ${mes}: "${motivo}"` });
+    res.json({ success: true, data: { etapa: 'APROBADA', odp_anulada: e.odp_numero }, error: null });
+  } catch (e) { console.error('[parques anular-odp]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /revertir-pago {mes,parque,motivo} — deshace el pago: la ODP vuelve a
+   "por pagar" y se desmarcan ENVIADO A PAGO + COMISION PAGADA. */
+const revertirPago = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    const motivo = String(req.body.motivo || '').trim();
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    if (motivo.length < 5) return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo válido' });
+    const [[e]] = await pool.query("SELECT * FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+    if (!e || e.etapa !== 'PAGO_REALIZADO')
+      return res.status(400).json({ success: false, data: null, error: 'Solo se puede revertir un pago realizado' });
+    await despagarCorrelativo({ numero: e.odp_numero });
+    await pool.query("UPDATE parques_pagos_mes SET etapa='OP_EMITIDA', pagada_por=NULL, fecha_pagada=NULL WHERE id=?", [e.id]);
+    await desmarcarEtapaParqueOps(parque, mes, ['ENVIADO A PAGO', 'COMISION PAGADA']);
+    auditar({ req, accion: 'REVERSAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: e.id,
+      detalle: `Revirtió el pago de ${e.odp_numero} — parque ${parque} ${mes}: "${motivo}"` });
+    res.json({ success: true, data: { etapa: 'OP_EMITIDA' }, error: null });
+  } catch (e) { console.error('[parques revertir-pago]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { listar, detalle, aprobar, emitir, pagar,
+  cartolaEstado, cartolaEmitir, cartolaAprobar, cartolaEnviar, cartolasEnviadas, cartolaReversarEnvio,
+  anularODP, revertirPago };

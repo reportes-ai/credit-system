@@ -140,4 +140,22 @@ async function pagarCorrelativo({ numero = null, origen = null, origen_id = null
   } catch (e) { console.error('[pagarCorrelativo]', e.message); return false; }
 }
 
-module.exports = { emitirCorrelativo, anularCorrelativo, pagarCorrelativo };
+/**
+ * Reversa el PAGO de un correlativo (deja la orden nuevamente "por pagar").
+ * Solo si estaba pagada y no anulada. El motivo queda en el log del módulo que
+ * reversa (auditoría); acá solo se limpia el estado del timbre.
+ * @returns {boolean} true si reversó.
+ */
+async function despagarCorrelativo({ numero = null, origen = null, origen_id = null }) {
+  try {
+    let where, args;
+    if (numero) { where = 'numero=? AND anulada=0 AND pagada=1'; args = [numero]; }
+    else if (origen && origen_id) { where = 'origen=? AND origen_id=? AND anulada=0 AND pagada=1'; args = [origen, origen_id]; }
+    else return false;
+    const [r] = await pool.query(
+      `UPDATE op_correlativos SET pagada=0, fecha_pagada=NULL, pagada_por=NULL, pagada_nombre=NULL, id_caja=NULL, metodo_pago=NULL WHERE ${where}`, args);
+    return r.affectedRows > 0;
+  } catch (e) { console.error('[despagarCorrelativo]', e.message); return false; }
+}
+
+module.exports = { emitirCorrelativo, anularCorrelativo, pagarCorrelativo, despagarCorrelativo };

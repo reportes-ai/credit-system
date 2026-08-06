@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Post Venta — AutoFácil</title>
-  <!-- v1.7 -->
+  <!-- v1.8 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,6 +88,12 @@
     <p>Track por operación de la comisión del parque — mismas etapas que la comisión dealer: cartola, factura, orden de pago y pago.</p>
     <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
   </a>
+  <a href="/postventa/cartolas-parque/" class="module-card" id="cardCartParques" style="display:none">
+    <div class="card-icon"><i class="bi bi-envelope-paper"></i></div>
+    <h5>Emisión de Cartolas Parque</h5>
+    <p>Cartola mensual de cada parque (comisiones + arriendo): emitir, aprobar, enviar por correo con el detalle y reversar si hace falta.</p>
+    <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+  </a>
   <a href="/postventa/orden-pago-comision/" class="module-card" id="cardOrdenCom" style="display:none">
     <div class="card-icon"><i class="bi bi-receipt-cutoff"></i></div>
     <h5>Emisión Orden de Pago Comisión</h5>
@@ -165,6 +171,7 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
   if (tiene('postventa_comisiones_pagar'))  { document.getElementById('cardComPagar').style.display='';  document.getElementById('cardOrdenCom').style.display=''; alguna=true; }
   if (tiene('postventa_comisiones_parques')){ document.getElementById('cardComParques').style.display=''; alguna=true; }
   if (tiene('postventa_seg_parques'))       { document.getElementById('cardSegParques').style.display=''; alguna=true; }
+  if (tiene('postventa_cartolas_parque'))   { document.getElementById('cardCartParques').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_saldos'))   { document.getElementById('cardConsSaldo').style.display=''; alguna=true; }
   if (tiene('postventa_vendedores_ventas')) { document.getElementById('cardVendVentas').style.display=''; alguna=true; }
   if (tiene('postventa_consulta_factura'))  { document.getElementById('cardConsFact').style.display='';  alguna=true; }
