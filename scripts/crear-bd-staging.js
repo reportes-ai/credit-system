@@ -193,20 +193,31 @@ const { copiarTabla } = require('./lib/copiar-filas');
   await cx.query('SET FOREIGN_KEY_CHECKS = 1');
   cx.release();
 
-  /* ── Usuario DEMO para capacitaciones (pedido Pato 05-08-2026) ────────────
-     demo.ejecutivo@autofacilchile.cl · perfil Ejecutivo Comercial · clave la
-     de staging. Existe SOLO en staging (no viene de producción, por eso se
-     siembra acá: sin este bloque, un --recrear lo haría desaparecer). El RUT
-     77777777-7 es ficticio; los 9999… y 1111… ya están tomados por tv y admin. */
-  try {
-    await cx.query(`INSERT INTO \`${DESTINO}\`.usuarios
-      (rut, nombre, apellido, email, password_hash, id_perfil, estado, debe_cambiar_clave, protegido, cargo)
-      SELECT '77777777-7','Demo','Ejecutivo','demo.ejecutivo@autofacilchile.cl',?, p.id_perfil,'activo',0,0,'Ejecutivo Comercial (DEMO)'
-      FROM \`${DESTINO}\`.perfiles p WHERE p.nombre='Ejecutivo Comercial'
-        AND NOT EXISTS (SELECT 1 FROM \`${DESTINO}\`.usuarios u WHERE u.email='demo.ejecutivo@autofacilchile.cl')`,
-      [hashStaging]);
-    console.log('\n✓ Usuario demo de capacitación: demo.ejecutivo@autofacilchile.cl (Ejecutivo Comercial)');
-  } catch (e) { console.error('⚠ usuario demo:', e.message); }
+  /* ── Usuarios DEMO para capacitaciones (pedido Pato 05-08-2026) ───────────
+     Cuatro cuentas para enseñar el circuito completo — ejecutivo digita,
+     operaciones revisa, crédito evalúa, tesorería paga. Clave la de staging,
+     entran directo a Mi Día. Existen SOLO en staging (no vienen de producción,
+     por eso se siembran acá: sin este bloque, un --recrear las borraría).
+     RUTs ficticios; 9999… y 1111… ya están tomados por tv y admin — y OJO:
+     usuarios tiene UNIQUE por rut Y por email, un ON DUPLICATE por rut ajeno
+     pisa la fila de otro usuario (pasó con el admin el 05-08-2026). */
+  const DEMOS = [
+    ['77777777-7', 'Ejecutivo',   'demo.ejecutivo@autofacilchile.cl',   'Ejecutivo Comercial'],
+    ['66666666-6', 'Operaciones', 'demo.operaciones@autofacilchile.cl', 'Analista de Operaciones'],
+    ['55555555-5', 'Crédito',     'demo.credito@autofacilchile.cl',     'Analista de Crédito'],
+    ['44444444-4', 'Tesorero',    'demo.tesorero@autofacilchile.cl',    'Tesorero'],
+  ];
+  for (const [rut, apellido, email, perfil] of DEMOS) {
+    try {
+      await cx.query(`INSERT INTO \`${DESTINO}\`.usuarios
+        (rut, nombre, apellido, email, password_hash, id_perfil, estado, debe_cambiar_clave, protegido, cargo, pagina_inicio)
+        SELECT ?,'Demo',?,?,?, p.id_perfil,'activo',0,0,CONCAT(p.nombre,' (DEMO)'),'/mi-dia/'
+        FROM \`${DESTINO}\`.perfiles p WHERE p.nombre=?
+          AND NOT EXISTS (SELECT 1 FROM \`${DESTINO}\`.usuarios u WHERE u.email=? OR u.rut=?)`,
+        [rut, apellido, email, hashStaging, perfil, email, rut]);
+    } catch (e) { console.error('⚠ usuario demo ' + email + ':', e.message); }
+  }
+  console.log('\n✓ Usuarios demo de capacitación: ejecutivo, operaciones, crédito y tesorero (→ Mi Día)');
 
   console.log('\nDatos copiados:');
   copiadas.sort((a, b) => b.filas - a.filas).forEach(c =>
