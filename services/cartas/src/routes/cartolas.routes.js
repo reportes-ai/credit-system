@@ -16,9 +16,9 @@ router.post('/incorporar',        verifyToken, requireFunc('cartola_incorporar')
 router.get('/incorporaciones',    verifyToken, requireFunc('cartola_incorporar', 'cartola_incorp_aprobar'), inc.listarIncorporaciones);
 router.put('/incorporaciones/:id', verifyToken, requireFunc('cartola_incorp_aprobar'), inc.resolver);
 
-router.post('/sync',        verifyToken, c.sync);
+router.post('/sync',        verifyToken, requireFunc('aprob_cartolas'), c.sync);
 router.get('/enviadas',     verifyToken, c.getEnviadas);
-router.post('/enviadas',    verifyToken, c.registrarEnvio);
+router.post('/enviadas',    verifyToken, requireFunc('aprob_cartolas'), c.registrarEnvio);
 router.delete('/enviadas/:id', verifyToken, requireFunc('aprob_cartola_reversar'), c.reversarEnvio);
 router.get('/',             verifyToken, c.getMovimientos);
 router.post('/',            verifyToken, requireFunc('aprob_cartolas'), c.crearMovimiento);

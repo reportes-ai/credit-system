@@ -4,8 +4,8 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/postventa.controller');
 
-router.post('/sync',             verifyToken, c.sync);
-router.post('/marcar-historico', verifyToken, c.marcarHistorico);
+router.post('/sync',             verifyToken, requireFunc('postventa_seguimiento', 'postventa_ver'), c.sync);
+router.post('/marcar-historico', verifyToken, requireFunc('postventa_mantenedores'), c.marcarHistorico);
 // Vendedores con Ventas (controller propio) — quién vendió, cuánto y qué operaciones.
 router.get('/vendedores-ventas', verifyToken, requireFunc('postventa_vendedores_ventas'),
   require('../controllers/vendedores-ventas.controller').listar);
@@ -40,7 +40,7 @@ router.post('/comisiones-a-pagar/desmarcar', verifyToken, requireFunc('pv_com_re
 router.get('/consulta-saldos',    verifyToken, c.consultaSaldos);
 router.get('/consulta-facturas',  verifyToken, c.consultaFacturas);
 router.get('/consulta-fundantes', verifyToken, c.consultaFundantes);
-router.post('/enviar-correo-orden', verifyToken, c.enviarCorreoOrden);
+router.post('/enviar-correo-orden', verifyToken, requireFunc('pv_orden_emitir', 'pv_com_orden_emitir'), c.enviarCorreoOrden);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 router.get('/:id/factura-comision', verifyToken, c.getFacturaComision);

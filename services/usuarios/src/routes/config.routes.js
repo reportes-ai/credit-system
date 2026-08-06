@@ -19,6 +19,7 @@ router.post('/mail/enviar',   verifyToken, requireFunc('usuarios_mails', 'usuari
 
 router.get('/ui/ping',        verifyToken,            uiCtrl.ping);
 router.get('/ui/:clave',      verifyToken,            uiCtrl.getUiConfig);
-router.put('/ui/:clave',      verifyToken,            uiCtrl.putUiConfig);
+// Escritura de config GLOBAL de UI (placement, orden de cards): solo Vista Pantallas
+router.put('/ui/:clave',      verifyToken, requireFunc('mant_vista_pantallas'), uiCtrl.putUiConfig);
 
 module.exports = router;

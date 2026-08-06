@@ -10,12 +10,12 @@ const consulta = require('../controllers/consulta.controller');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024, files: 6 } });
 
-router.post('/liquidaciones/evaluar', verifyToken, upload.array('archivos', 6), liquidaciones.evaluar);
-router.post('/evaluacion/:id/recalcular', verifyToken, liquidaciones.recalcular);
-router.post('/evaluacion/:id/guardar-cliente', verifyToken, liquidaciones.guardarCliente);
+router.post('/liquidaciones/evaluar', verifyToken, requireFunc('evaluacion_crediticia', 'ia_consulta'), upload.array('archivos', 6), liquidaciones.evaluar);
+router.post('/evaluacion/:id/recalcular', verifyToken, requireFunc('evaluacion_crediticia', 'ia_consulta'), liquidaciones.recalcular);
+router.post('/evaluacion/:id/guardar-cliente', verifyToken, requireFunc('evaluacion_crediticia', 'ia_consulta'), liquidaciones.guardarCliente);
 router.get('/evaluaciones', verifyToken, liquidaciones.historial);
 
-router.post('/informe-dealernet', verifyToken, informeDn.analizar);
+router.post('/informe-dealernet', verifyToken, requireFunc('dealernet_reporte_ia', 'dealernet_informes_ver', 'dealernet_consultar'), informeDn.analizar);
 router.get('/informe-dealernet/historial', verifyToken, informeDn.historial);
 router.get('/informe-dealernet/ruts', verifyToken, informeDn.rutsConReporte);
 router.get('/informe-dealernet/por-rut/:rut', verifyToken, informeDn.porRut);
@@ -28,7 +28,7 @@ router.get('/consulta/lecciones',     verifyToken, requireFunc('ia_consulta'), c
 router.post('/consulta/lecciones',    verifyToken, requireFunc('ia_consulta'), consulta.crearLeccion);
 router.put('/consulta/lecciones/:id', verifyToken, requireFunc('ia_consulta'), consulta.toggleLeccion);
 
-router.post('/evaluacion-credito', verifyToken, evalCredito.evaluar);
+router.post('/evaluacion-credito', verifyToken, requireFunc('evaluacion_crediticia', 'ia_consulta'), evalCredito.evaluar);
 router.get('/evaluacion-credito', verifyToken, evalCredito.listado);
 router.get('/evaluacion-credito/detalle/:id', verifyToken, evalCredito.detalle);
 router.get('/evaluacion-credito/:rut/historial', verifyToken, evalCredito.historial);

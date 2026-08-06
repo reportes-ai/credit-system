@@ -18,14 +18,14 @@ router.get('/dashboard',              verifyToken, ctrl.dashboard);
 router.get('/cartera',                verifyToken, ctrl.cartera);
 router.get('/provisiones',            verifyToken, ctrl.provisiones);
 router.get('/mis-gestiones',          verifyToken, ctrl.misGestiones);
-router.post('/gestiones',             verifyToken, ctrl.crearGestion);
-router.put('/gestiones/:id/confirmar',verifyToken, ctrl.confirmarGestion);
+router.post('/gestiones',             verifyToken, requireFunc('cobranza_gestionar', 'cobranza_prejudicial', 'cobranza_judicial', 'cobranza_mis'), ctrl.crearGestion);
+router.put('/gestiones/:id/confirmar',verifyToken, requireFunc('cobranza_gestionar'), ctrl.confirmarGestion);
 
 // Rutas con parámetro al final
 router.get('/disponibilidad/:id_credito', verifyToken, ctrl.disponibilidad);
 router.get('/mensajes/:id_credito',       verifyToken, ctrl.mensajes);
-router.post('/enviar/:id_credito',        verifyToken, ctrl.enviarMensaje);
-router.put('/contacto/:id_credito',       verifyToken, ctrl.guardarContacto);
+router.post('/enviar/:id_credito',        verifyToken, requireFunc('cobranza_gestionar', 'cobranza_prejudicial', 'cobranza_judicial', 'cobranza_mis'), ctrl.enviarMensaje);
+router.put('/contacto/:id_credito',       verifyToken, requireFunc('cobranza_gestionar', 'cobranza_prejudicial', 'cobranza_judicial', 'cobranza_mis'), ctrl.guardarContacto);
 router.get('/bitacora/:id_credito',       verifyToken, ctrl.bitacora);
 
 // Reportería Cobranzas (informes agregados, read-only)

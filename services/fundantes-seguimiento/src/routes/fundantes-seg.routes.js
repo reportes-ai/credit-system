@@ -20,7 +20,7 @@ router.get('/historial',                verifyToken, requireFunc('fundantes_hist
 router.get('/popup',                    verifyToken, c.popup);
 router.post('/popup/:id/comentar',      verifyToken, c.popupComentar);
 router.get('/:id/bitacora',             verifyToken, c.bitacora);
-router.post('/:id/bitacora',            verifyToken, c.comentar);
+router.post('/:id/bitacora',            verifyToken, requireFunc('fundantes_seguimiento', 'fundantes_validar', 'fundantes_operaciones'), c.comentar);
 router.get('/doc/:docId/download',      verifyToken, c.descargar);
 router.get('/:id/docs',                 verifyToken, c.listarDocs);
 router.get('/:id/zip',                  verifyToken, c.descargarZip);

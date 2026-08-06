@@ -5,7 +5,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 router.get('/',  verifyToken, ctrl.getAll);
-router.post('/', verifyToken, ctrl.upsert);   // create o update según body.id
+router.post('/', verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.upsert);   // create o update según body.id
 
 // Vigencia configurable de la carta (días corridos). Lectura abierta; edición = mantenedor.
 // Detalle mensual con datos del vendedor (RUT y correo) — controller propio.
@@ -19,16 +19,16 @@ router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVi
 router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), ctrl.rentabilidadTier);
 
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
-router.post('/:id/verificable', verifyToken, ctrl.verificable);
+router.post('/:id/verificable', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.verificable);
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
 router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
 router.post('/carga-masiva', verifyToken, requireFunc('aprob_carga_masiva'), ctrl.cargaMasivaCartas);
 
 // Documentos Unidad: parseo para autocompletar + almacenamiento para revisión
-router.post('/parse-unidad',     verifyToken, ctrl.parseUnidad);
-router.post('/parse-autofin',    verifyToken, ctrl.parseAutofin);
+router.post('/parse-unidad',     verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.parseUnidad);
+router.post('/parse-autofin',    verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.parseAutofin);
 router.get('/documentos/:docId', verifyToken, ctrl.verDocumento);
-router.post('/:id/documentos',   verifyToken, ctrl.subirDocumento);
+router.post('/:id/documentos',   verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.subirDocumento);
 router.get('/:id/documentos',    verifyToken, ctrl.listarDocumentos);
 
 module.exports = router;

@@ -11,7 +11,7 @@ const crearCampana    = requireFunc('crm_campanas_crear');
 const gestionarCampana = requireFunc('crm_campanas_gestionar');
 
 router.get('/',                   verifyToken, ctrl.list);
-router.post('/',                  verifyToken, ctrl.create);
+router.post('/',                  verifyToken, requireFunc('crm_crear', 'crm_gestiones', 'crm_ver'), ctrl.create);
 router.get('/estadisticas',       verifyToken, ctrl.stats);
 router.get('/campanas',               verifyToken,                  ctrl.listCampanas);
 router.post('/campanas',              verifyToken, crearCampana,    ctrl.createCampana);
@@ -20,6 +20,6 @@ router.put('/campanas/:id',            verifyToken, gestionarCampana, ctrl.updat
 router.get('/campanas/:id/resultados', verifyToken,                  ctrl.resultadosCampana);
 router.get('/historial/:rut',     verifyToken, ctrl.historialCliente);
 router.get('/:id',                verifyToken, ctrl.getOne);
-router.put('/:id',                verifyToken, ctrl.update);
+router.put('/:id',                verifyToken, requireFunc('crm_crear', 'crm_editar', 'crm_gestiones', 'crm_ver'), ctrl.update);
 
 module.exports = router;
