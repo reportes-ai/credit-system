@@ -483,7 +483,13 @@ const CAMPOS = ['entidad','tipo','ejecutivo_nombre','fecha_solicitud','rut','nom
   'tipo_documento','cuenta_tipo','tipo_cuenta','nombre_cuenta','banco',
   'rut_cuenta','num_cuenta','correo_confirmacion','observaciones'];
 
-const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'SOCIO1', 'SOCIO2', 'SOCIO3', 'PODER_SIMPLE', 'PODER_REP_LEGAL'];   // adjuntos
+const CATEGORIAS = ['EMPRESA', 'SOCIOS', 'SOCIO1', 'SOCIO2', 'SOCIO3', 'PODER_SIMPLE', 'PODER_REP_LEGAL', 'CEDULA'];   // adjuntos
+// CEDULA = cédulas de identidad de los firmantes: se suben JUNTO con la ficha
+// firmada (estado AUTORIZADA), por eso tiene reglas de estado propias y admite
+// hasta 6 archivos (rep. legal + socios, anverso/reverso).
+const MAX_POR_CATEGORIA = cat => (cat === 'CEDULA' ? 6 : 3);
+const puedeTocarArchivos = (estado, cat) =>
+  ['BORRADOR', 'RECHAZADA'].includes(estado) || (cat === 'CEDULA' && ['AUTORIZADA', 'PEND_CIERRE'].includes(estado));
 const normRut = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 
 // Comentario de excepción válido: ≥10 caracteres y al menos un espacio (no se avisan las reglas al usuario).
@@ -1054,6 +1060,9 @@ const enviarFirmada = async (req, res) => {
        subidas — el bug que frenó a una ejecutiva el 05-08-2026. El almacén
        resuelve de dónde leer (blob primero, bucket si no hay). */
     if (!f.ficha_data && !f.doc_ruta) return res.status(400).json({ success: false, data: null, error: 'Debes subir la ficha firmada (PDF o foto) antes de enviar' });
+    // Las cédulas de identidad de los firmantes van JUNTO con la ficha firmada (obligatorio).
+    const [[{ nCed }]] = await pool.query("SELECT COUNT(*) nCed FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria='CEDULA'", [f.id]);
+    if (!nCed) return res.status(400).json({ success: false, data: null, error: 'Debes adjuntar la(s) cédula(s) de identidad de los firmantes junto con la ficha firmada' });
     const fichaBuf = await almacen.obtener({ ruta: f.doc_ruta, blob: f.ficha_data });
     // Verifica la firma + compara el documento con los datos ingresados (para el analista).
     const firma = await verificarFirma(fichaBuf, f.ficha_mime);
@@ -1318,10 +1327,10 @@ const subirArchivo = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
-    if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
+    if (!puedeTocarArchivos(f.estado, cat))
       return res.status(400).json({ success: false, data: null, error: 'No se pueden cambiar archivos en este estado' });
     const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM dealer_ficha_archivos WHERE id_ficha=? AND categoria=?', [req.params.id, cat]);
-    if (n >= 3) return res.status(400).json({ success: false, data: null, error: 'Máximo 3 archivos por categoría' });
+    if (n >= MAX_POR_CATEGORIA(cat)) return res.status(400).json({ success: false, data: null, error: `Máximo ${MAX_POR_CATEGORIA(cat)} archivos por categoría` });
     const buffer = Buffer.from(archivo_data, 'base64');
     const d = await almacen.colocar({ ambito: 'dealers-archivos', clave: req.params.id, buffer, mime: mime_type, nombre: archivo_nombre || 'archivo' });
     const [r] = await pool.query('INSERT INTO dealer_ficha_archivos (id_ficha, categoria, nombre, mime, data, doc_storage, doc_ruta, doc_bytes) VALUES (?,?,?,?,?,?,?,?)',
@@ -1354,9 +1363,10 @@ const eliminarArchivo = async (req, res) => {
     if (!f) return res.status(404).json({ success: false, data: null, error: 'Ficha no encontrada' });
     if (f.id_ejecutivo !== req.usuario.id_usuario && req.usuario.perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Sin permiso' });
-    if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
+    const [[arch]] = await pool.query('SELECT doc_ruta, categoria FROM dealer_ficha_archivos WHERE id=? AND id_ficha=?', [req.params.archivoId, req.params.id]);
+    if (!arch) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    if (!puedeTocarArchivos(f.estado, arch.categoria))
       return res.status(400).json({ success: false, data: null, error: 'No se pueden cambiar archivos en este estado' });
-    const [[arch]] = await pool.query('SELECT doc_ruta FROM dealer_ficha_archivos WHERE id=? AND id_ficha=?', [req.params.archivoId, req.params.id]);
     await pool.query('DELETE FROM dealer_ficha_archivos WHERE id=? AND id_ficha=?', [req.params.archivoId, req.params.id]);
     if (arch && arch.doc_ruta) await almacen.borrar(arch.doc_ruta);
     res.json({ success: true, data: { ok: true }, error: null });

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.27 — modo PARQUE: textos correctos (Datos del Parque, Pago de Comisiones) -->
+  <!-- v1.28 — cedulas de identidad de los firmantes obligatorias junto con la ficha firmada -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -324,9 +324,15 @@
   <div class="card-sec" id="cardFirma" style="display:none">
     <h3><i class="bi bi-cloud-upload me-1"></i> Ficha firmada por el cliente</h3>
     <div class="card-body">
-      <p class="hint" style="margin-top:0">Ya autorizada: 1) <b>Imprime</b> la ficha (incluye las autorizaciones) · 2) hazla <b>firmar</b> por el cliente · 3) sube el <b>PDF o foto</b> · 4) pulsa <b>Enviar firmada</b>.</p>
+      <p class="hint" style="margin-top:0">Ya autorizada: 1) <b>Imprime</b> la ficha (incluye las autorizaciones) · 2) hazla <b>firmar</b> por el cliente · 3) sube el <b>PDF o foto</b> junto con las <b>cédulas de los firmantes</b> · 4) pulsa <b>Enviar firmada</b>.</p>
       <input type="file" id="fileFicha" accept="application/pdf,image/*" onchange="onFile()">
       <div class="fileinfo" id="fileInfo"></div>
+      <div class="fld full" style="margin-top:14px">
+        <label><i class="bi bi-person-vcard me-1"></i> Cédulas de identidad de los firmantes <b style="color:#991b1b">(obligatorio)</b></label>
+        <input type="file" id="fileCedulas" accept="application/pdf,image/*" multiple onchange="onInformes('CEDULA')">
+        <div id="listCedulas" class="filelist"></div>
+        <small class="hint">La cédula de quien firma la ficha (representante legal) y de los socios si también firman — hasta 6 archivos (sirve anverso y reverso por separado).</small>
+      </div>
     </div>
   </div>
 
@@ -441,6 +447,7 @@ function aplicarEstadoUI(estado, f){
 }
 async function onEnviarFirmada(){
   if(!fileB64 && !TIENE_FICHA){ toast('Sube la ficha firmada (PDF o foto) primero.', true); return; }
+  if(nArch('CEDULA')<1){ toast('Adjunta la(s) cédula(s) de identidad de los firmantes junto con la ficha firmada.', true); return; }
   if(fileB64){
     try{ const ru=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivo',{method:'POST',headers:H,body:JSON.stringify({archivo_nombre:nombreFichaArchivo(),mime_type:fileMime,archivo_data:fileB64})});
       const ju=await ru.json(); if(!ju.success) throw new Error(ju.error||'Error al subir'); fileB64=null; TIENE_FICHA=true;
@@ -668,7 +675,7 @@ function repLegalData(){
 }
 
 /* ── Adjuntos (poderes a tercero; los informes ya NO se suben: van por DealerNet) ── */
-const CAT_UI = { PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'} };
+const CAT_UI = { PODER_SIMPLE:{input:'filePoderSimple',list:'listPoderSimple'}, PODER_REP_LEGAL:{input:'filePoderRepLegal',list:'listPoderRepLegal'}, CEDULA:{input:'fileCedulas',list:'listCedulas',max:6} };
 
 // 3 filas de Socios: RUT (autoformato) + Nombre (autocompleta desde base de clientes).
 function renderSocios(){
@@ -703,8 +710,9 @@ async function onInformes(cat){
   const ui=CAT_UI[cat]; const inp=$(ui.input); const files=[...inp.files]; inp.value='';
   if(!files.length) return;
   if(!(await ensureId())) return;
+  const maxCat = ui.max || 3;
   const yaN = document.querySelectorAll('#'+ui.list+' .filerow').length;
-  if(yaN+files.length>3){ toast('Máximo 3 archivos en esta sección', true); return; }
+  if(yaN+files.length>maxCat){ toast('Máximo '+maxCat+' archivos en esta sección', true); return; }
   for(const f of files){
     if(f.size>7*1024*1024){ toast(f.name+' supera 7 MB',true); continue; }
     const b64=await new Promise(rs=>{ const rd=new FileReader(); rd.onload=()=>rs(rd.result.split(',')[1]); rd.readAsDataURL(f); });
@@ -719,8 +727,9 @@ function nArch(cat){ return document.querySelectorAll('#'+CAT_UI[cat].list+' .fi
 async function cargarInformes(){
   if(!FICHA_ID) return;
   try{ const r=await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID+'/archivos',{headers:H}); const j=await r.json(); if(!j.success)return;
-    const bloqueado = !['BORRADOR','RECHAZADA'].includes(ESTADO);
     for(const cat of Object.keys(CAT_UI)){
+      // CEDULA se sube junto con la firmada: editable también en AUTORIZADA/PEND_CIERRE
+      const bloqueado = !['BORRADOR','RECHAZADA'].includes(ESTADO) && !(cat==='CEDULA' && ['AUTORIZADA','PEND_CIERRE'].includes(ESTADO));
       const cont=$(CAT_UI[cat].list); if(!cont) continue;
       const rows=(j.data||[]).filter(a=>a.categoria===cat);
       cont.innerHTML = rows.map(a=>`<div class="filerow"><i class="bi bi-file-earmark-text fi"></i>

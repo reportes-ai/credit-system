@@ -349,7 +349,7 @@
     <li><b>Ficha</b> (Incorporación de Dealers → Nueva): datos, banco, tabla de comisiones (default pizarra), socios. Si el RUT existe → modo Modificación con diferencias en rojo.</li>
     <li><b>Enviar a autorización</b>: el sistema pide solo los informes DealerNet (empresa + socios) + análisis IA; alerta grave si hay antecedentes penales.</li>
     <li><b>Cadena de niveles</b> (paramétrica): autorizar ANTES de firmar. Aprobar sin abrir la revisión queda marcado.</li>
-    <li><b>Imprimir → firma del cliente → subir firmada → Cerrar</b>: el dealer queda creado/actualizado; su tabla de comisiones rige sus operaciones desde ese momento.</li>
+    <li><b>Imprimir → firma del cliente → subir firmada + cédulas → Cerrar</b>: junto con la ficha firmada es <b>obligatorio adjuntar la(s) cédula(s) de identidad de los firmantes</b> (rep. legal y socios que firmen; hasta 6 archivos) — sin cédulas el sistema no acepta el envío. Al cerrar, el dealer queda creado/actualizado; su tabla de comisiones rige sus operaciones desde ese momento.</li>
   </ol>
   <div class="flujo"><span class="st ini">BORRADOR</span><span class="ar">→</span><span class="st">PEND. AUTORIZACIÓN</span><span class="ar">→</span><span class="st">AUTORIZADA</span><span class="ar">→</span><span class="st">FIRMADA</span><span class="ar">→</span><span class="st fin">APROBADA</span><span class="ar">/</span><span class="st mal">RECHAZADA</span></div>
   <div class="afecta"><b>Afecta:</b> comisión de cada operación del dealer, originación (§1), Plan Liquidez. <b>Depende de:</b> pizarra, DealerNet, categorías.</div>
