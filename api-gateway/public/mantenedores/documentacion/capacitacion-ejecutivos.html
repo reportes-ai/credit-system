@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<!-- v1.0 — manual del profesor: capacitación de Ejecutivos Comerciales en staging con los usuarios demo -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capacitación Ejecutivos Comerciales — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --sky:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .doc { max-width:900px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; }
+  .portada { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:18px; color:#fff; padding:38px 40px; margin-bottom:30px; }
+  .portada img { height:44px; filter:brightness(0) invert(1); margin-bottom:18px; }
+  .portada h1 { margin:0 0 6px; font-size:1.6rem; }
+  .portada p { margin:0; opacity:.85; font-size:.95rem; }
+  h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  h3 { color:#0f172a; margin-top:26px; font-size:1.02rem; }
+  table { border-collapse:collapse; width:100%; font-size:.87rem; margin:12px 0; }
+  th { background:#f1f5f9; text-align:left; padding:8px 10px; color:#334155; }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  td:first-child { font-weight:700; color:#0f172a; white-space:nowrap; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-size:.85em; }
+  .nota { background:#fffbeb; border-left:4px solid #d97706; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  .ok { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  .paso { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:10px 0; font-size:.92rem; }
+  .leccion { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px; margin:12px 0; }
+  .leccion h4 { margin:0 0 6px; color:var(--accent); font-size:.98rem; }
+  .leccion .dur { float:right; background:#eff6ff; color:var(--accent); border-radius:12px; padding:2px 12px; font-size:.75rem; font-weight:700; }
+  ul { padding-left:20px; } li { margin-bottom:5px; }
+  .chk li { list-style:none; } .chk li::before { content:'☐ '; color:var(--accent); font-weight:700; }
+  @media print { #af-topnav { display:none; } .portada { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Capacitación Ejecutivos",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
+<div class="doc">
+
+  <div class="portada">
+    <img src="/img/logo.png" alt="AutoFácil Business Suite">
+    <h1>Manual de Capacitación — Ejecutivos Comerciales</h1>
+    <p>Guía del profesor · ambiente de práctica (staging) · usuarios demo · Punto de Restauración</p>
+  </div>
+
+  <h2><i class="bi bi-mortarboard me-1"></i>1. Para el profesor: qué es esto</h2>
+  <p>Esta capacitación enseña a los Ejecutivos Comerciales a trabajar en el <b>Business Suite</b> haciendo, no mirando: cada alumno entra con una cuenta demo a un <b>ambiente de práctica idéntico a producción</b> y ejecuta los procesos reales — cotizar, evaluar, emitir cartas, otorgar, seguir sus operaciones. Nada de lo que hagan toca datos reales, y al final de la clase el ambiente <b>se restaura al estado inicial</b> con un botón.</p>
+  <ul>
+    <li><b>El ambiente</b> es una copia del sistema con la configuración real (tasas, parámetros, dealers, permisos) y algunos meses de cartera de ejemplo. Los correos de clientes están enmascarados y los motores que "salen al mundo" están apagados: <b>no se le escribe a ningún cliente real</b>.</li>
+    <li><b>Los alumnos ven exactamente lo que verán en su trabajo</b>: la cuenta demo tiene el perfil Ejecutivo Comercial real, con sus mismos permisos. Si algo no les aparece en producción, tampoco aparece acá — y viceversa.</li>
+    <li>El botón <b>? (Dónde·Cómo·Quién)</b> abajo a la derecha de cada pantalla responde "dónde se hace, cómo y quién puede" — enséñales a usarlo: es su ayuda de cabecera cuando el profesor no esté.</li>
+  </ul>
+
+  <h2><i class="bi bi-key me-1"></i>2. Accesos</h2>
+  <table>
+    <tr><th>Qué</th><th>Dato</th></tr>
+    <tr><td>URL del ambiente</td><td><code>https://credit-system-staging.onrender.com</code> — cinta <b>morada STAGING</b> en todas las páginas (si no está la cinta, ¡estás en producción!)</td></tr>
+    <tr><td>Cuenta del alumno</td><td><code>demo.ejecutivo@autofacilchile.cl</code> — perfil <b>Ejecutivo Comercial</b>, entra directo a Mi Día</td></tr>
+    <tr><td>Cuentas de apoyo<br>(para demostrar el circuito completo)</td><td><code>demo.operaciones@autofacilchile.cl</code> (Analista de Operaciones)<br><code>demo.credito@autofacilchile.cl</code> (Analista de Crédito)<br><code>demo.tesorero@autofacilchile.cl</code> (Tesorero)</td></tr>
+    <tr><td>Cuenta del profesor</td><td>Tu correo de siempre con dominio <code>@staging.invalid</code> (ej. <code>nombre.apellido@staging.invalid</code>)</td></tr>
+    <tr><td>Clave (todas)</td><td>La clave común de staging (la conoce el Administrador; no se imprime en este manual)</td></tr>
+  </table>
+  <div class="nota"><b>⏰ El ambiente duerme.</b> Tras 15 minutos sin uso se apaga y la primera carga demora ~50 segundos. <b>Ábrelo 5 minutos antes de la clase</b> para que despierte, y pide a los alumnos entrar todos al inicio.</div>
+  <div class="nota"><b>👥 Varias personas, una cuenta.</b> Todos los alumnos pueden entrar con <code>demo.ejecutivo</code> a la vez desde computadores distintos. Verán las operaciones de los demás — úsalo a favor: "miren lo que digitó su compañero".</div>
+
+  <h2><i class="bi bi-arrow-counterclockwise me-1"></i>3. El Punto de Restauración: dejar todo como estaba</h2>
+  <p>Es la máquina del tiempo de la clase. Lo maneja <b>el profesor con su cuenta</b> (necesita permiso de Administrador en staging); los alumnos no lo ven.</p>
+  <div class="paso"><b>ANTES de la clase</b> — Mantenedores → <b>Punto de Restauración</b> → <b>Crear punto</b>. Eso marca "hasta aquí es lo real". Hazlo SIEMPRE, aunque creas que la clase será corta.</div>
+  <div class="paso"><b>DESPUÉS de la clase</b> — misma pantalla → <b>Restaurar</b> (pide escribir <code>RESTAURAR</code>). Borra todo lo creado después de la marca: créditos con todas sus tablas hijas, cartas de aprobación, cotizaciones y preaprobaciones. El ambiente queda listo para la próxima clase.</div>
+  <ul>
+    <li>La restauración queda <b>auditada</b> (quién y cuándo), como todo en el sistema.</li>
+    <li><b>Qué NO borra</b>: clientes e informes creados en la demo (decisión de diseño: no molestan) y los movimientos de cartola. Para clases de Ejecutivos —originación, cartas, cotizador— eso no se toca; evita hacer demos de envío de cartolas en la misma sesión.</li>
+    <li>Si una clase quedó a medias y la siguiente es del mismo grupo, puedes <b>no restaurar</b> y retomar donde quedaron.</li>
+  </ul>
+
+  <h2><i class="bi bi-map me-1"></i>4. Qué verá el alumno al entrar</h2>
+  <p>La cuenta entra directo a <b>Mi Día</b> (su página de inicio real). En el menú verá solo los módulos de su perfil:</p>
+  <table>
+    <tr><th>Módulo</th><th>Para qué lo usa un ejecutivo</th></tr>
+    <tr><td>Mi Día</td><td>Su panel diario: pendientes, avisos, accesos rápidos.</td></tr>
+    <tr><td>Simulador Rápido / ¿Dónde Curso?</td><td>Cotizar en segundos y comparar en qué financiera conviene cursar.</td></tr>
+    <tr><td>Evaluación Crediticia</td><td>RUT → ficha del cliente, informes y preaprobación.</td></tr>
+    <tr><td>Cartas de Aprobación</td><td>El corazón del trabajo: digitar la carta, imprimirla, otorgar o desistir.</td></tr>
+    <tr><td>Clientes (Antecedentes / Info Comercial)</td><td>Completar la situación laboral y comercial del cliente.</td></tr>
+    <tr><td>Creación/Mantenedor de Dealer</td><td>Ficha de incorporación de un dealer o parque nuevo (con su cadena de aprobación).</td></tr>
+    <tr><td>Seguimiento Fundantes</td><td>Subir y corregir los documentos fundantes de sus operaciones.</td></tr>
+    <tr><td>Post Venta</td><td>Ver el estado de pago de saldos y comisiones de SUS operaciones.</td></tr>
+    <tr><td>WhatsApp</td><td>Atender conversaciones derivadas por el bot Facilito.</td></tr>
+    <tr><td>RRHH / Soporte / Facilbook / Café</td><td>Lo transversal: su ficha, vacaciones, tickets TI, la vida interna.</td></tr>
+  </table>
+
+  <h2><i class="bi bi-easel me-1"></i>5. Guion de clase sugerido (~2 horas)</h2>
+
+  <div class="leccion"><span class="dur">10 min</span><h4>Lección 0 — Entrar y orientarse</h4>
+  Login, la cinta morada ("esto es práctica"), Mi Día, el menú, la campanita de avisos y el botón <b>?</b> de ayuda. Regla de oro: la miga de pan arriba siempre dice dónde estás parado.</div>
+
+  <div class="leccion"><span class="dur">15 min</span><h4>Lección 1 — Cotizar</h4>
+  Simulador Rápido: auto de $12M, pie $3M, 36 cuotas → leer cuota, CAE y gastos. Luego <b>¿Dónde Curso?</b> con el mismo caso: entender la grilla y el "Decides Tú". Ejercicio: cada alumno cotiza un caso propio.</div>
+
+  <div class="leccion"><span class="dur">20 min</span><h4>Lección 2 — Evaluar al cliente</h4>
+  Evaluación Crediticia con un RUT de prueba: ficha, antecedentes laborales e información comercial (dónde se completan y por qué importan). <b>Ojo profesor:</b> en el ambiente de práctica los informes DealerNet pueden no estar conectados — si no cargan, muéstralos con pantallazos de producción y sigue.</div>
+
+  <div class="leccion"><span class="dur">30 min</span><h4>Lección 3 — La Carta de Aprobación (el proceso estrella)</h4>
+  Digitar una carta completa: cliente, vehículo, dealer, vendedor, condiciones. Enviarla, imprimirla, y el ciclo de vida: vive 5 días → <b>Otorgar</b> (nace el crédito y todo queda congelado) o <b>Desistir</b>. Ejercicio: cada alumno digita y otorga una carta. Si tienes ayudante, que apruebe con <code>demo.operaciones</code> para mostrar el circuito de verdad.</div>
+
+  <div class="leccion"><span class="dur">15 min</span><h4>Lección 4 — Después del otorgamiento</h4>
+  Seguimiento Fundantes (subir los documentos de la operación recién otorgada) y Post Venta (dónde mira el ejecutivo si ya pagaron el saldo precio y su comisión — enseña a leer las etapas, no a marcarlas: eso es de Operaciones).</div>
+
+  <div class="leccion"><span class="dur">15 min</span><h4>Lección 5 — Incorporar un dealer o parque</h4>
+  La ficha de incorporación: llenarla, enviarla a autorización y entender que <b>no se imprime hasta que los niveles aprueben</b>. Mostrar el flujo con <code>demo.operaciones</code> autorizando.</div>
+
+  <div class="leccion"><span class="dur">15 min</span><h4>Cierre — Se ayudan solos</h4>
+  El botón <b>?</b>: que cada alumno busque una pregunta y la responda al grupo. Recordarles: en producción entran con SU cuenta, y todo queda auditado con su nombre.</div>
+
+  <h2><i class="bi bi-check2-square me-1"></i>6. Checklist del profesor</h2>
+  <h3>Antes de la clase</h3>
+  <ul class="chk">
+    <li>Abrir el ambiente 5 minutos antes (despertarlo).</li>
+    <li>Entrar con tu cuenta y <b>crear el Punto de Restauración</b>.</li>
+    <li>Probar el login de <code>demo.ejecutivo</code> en un computador de alumno.</li>
+    <li>Tener 2-3 RUTs y casos de ejemplo preparados.</li>
+  </ul>
+  <h3>Después de la clase</h3>
+  <ul class="chk">
+    <li><b>Restaurar</b> el punto (escribir RESTAURAR).</li>
+    <li>Verificar que la lista de créditos volvió al estado inicial.</li>
+    <li>Anotar los hallazgos: pasos donde los alumnos se trabaron = candidatos a mejorar la pantalla o el banco de ayuda.</li>
+    <li>Si un perfil no pudo hacer un paso que debería → avisar al Administrador (es un hallazgo real de la matriz de permisos).</li>
+  </ul>
+
+  <div class="ok"><b><i class="bi bi-lightbulb me-1"></i>La regla del ambiente de práctica:</b> acá está PERMITIDO equivocarse — para eso existe. Lo único prohibido es hacer la clase en producción: si no ves la cinta morada, detente.</div>
+
+</div>
+<script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
