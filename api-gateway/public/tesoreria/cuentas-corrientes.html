@@ -7,7 +7,7 @@
   <title>Cuentas Corrientes — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.2 — pestañas Resumen Gastos / Resumen Ingresos -->
+  <!-- v1.3 — fix: nombre y perfil del usuario en el topnav -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -75,7 +75,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.2</span>
+      <span class="version-badge">v1.3</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -198,9 +198,8 @@ function setTab(t){
 
 (async function init(){
   try {
-    const me = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
-    const u = me.data && me.data.usuario || me.usuario || {};
-    $('navNombre').textContent = u.nombre || '—';
+    const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
+    $('navNombre').textContent = (u.nombre||'—') + ' ' + (u.apellido||'');
     $('navPerfil').textContent = u.perfil || '—';
     $('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
   } catch {}

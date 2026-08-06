@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.4 — reglas por descripción: recurrentes se concilian solos -->
+  <!-- v1.5 — fix: nombre y perfil del usuario en el topnav -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -242,9 +242,8 @@ let CUENTAS = [], TAB = 'pend', archivoSel = null, movManual = null;
 
 (async function init(){
   try {
-    const me = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
-    const u = me.data && me.data.usuario || me.usuario || {};
-    $('navNombre').textContent = u.nombre || '—';
+    const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
+    $('navNombre').textContent = (u.nombre||'—') + ' ' + (u.apellido||'');
     $('navPerfil').textContent = u.perfil || '—';
     $('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
   } catch {}
