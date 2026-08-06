@@ -110,11 +110,21 @@ const getAll = async (req, res) => {
                FROM cotizaciones c
                LEFT JOIN clientes cl ON cl.rut = c.rut_cliente`;
     const params = [];
+    const cond = [];
+    /* Cada uno ve las SUYAS: perfiles con ámbito 'asignados' (Ejecutivo Comercial)
+       solo ven sus propias cotizaciones; perfiles con ámbito 'todos' ven todas.
+       Mismo interruptor paramétrico que el resto (perfiles.ambito_ejecutivos). */
+    try {
+      const { ejecutivosVisibles } = require('../../../../shared/visibilidad-ejecutivos');
+      const vis = await ejecutivosVisibles(req.usuario);
+      if (!vis.all) { cond.push('c.id_usuario = ?'); params.push(req.usuario.id_usuario); }
+    } catch (_) { /* si el motor falla, no bloquea (comportamiento previo) */ }
     if (q && q.trim()) {
       const like = `%${q.trim().toUpperCase()}%`;
-      sql += ` WHERE UPPER(c.rut_cliente) LIKE ? OR UPPER(COALESCE(cl.nombre_completo, c.nombre_cliente)) LIKE ?`;
+      cond.push('(UPPER(c.rut_cliente) LIKE ? OR UPPER(COALESCE(cl.nombre_completo, c.nombre_cliente)) LIKE ?)');
       params.push(like, like);
     }
+    if (cond.length) sql += ' WHERE ' + cond.join(' AND ');
     sql += ` ORDER BY c.created_at DESC LIMIT 500`;
     const [rows] = await pool.query(sql, params);
     res.json({ success: true, data: rows, error: null });
