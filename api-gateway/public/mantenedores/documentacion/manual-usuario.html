@@ -120,6 +120,14 @@
     <li><b>Facturas de dealers:</b> cada factura queda <b>registrada</b> en el sistema y se cuadra contra el total de la cartola (mismo monto bruto en cada operación); si no cuadra, se marca en rojo.</li>
     <li><b>Pago de saldos:</b> definir fondos → seleccionar saldos → generar nómina → emitir orden de pago. Al pagarse, el <b>informe de saldos precio pagados</b> se envía a Operaciones y al ejecutivo comercial de cada operación.</li>
   </ul>
+  <h3>Comisiones de PARQUES — mismo circuito que el dealer</h3>
+  <ul>
+    <li><b>Seguimiento Comisión Parques:</b> cada operación otorgada en un parque tiene su propio track con las <b>mismas 8 etapas</b> de la comisión dealer (comisión a pagar → cartola emitida/aprobada/enviada → factura recibida → ODP → enviado a pago → pagada). Mismo buscador, mismos filtros por mes/parque/etapa y el botón «≠ Pagado». La primera etapa la marca el sistema al otorgar; las tres últimas las marca solo el módulo Comisiones Parques a Pagar.</li>
+    <li><b>Emisión de Cartolas Parque:</b> la cartola mensual de cada parque lista sus operaciones con la comisión de cada una más la línea de <b>arriendo mensual</b> (el arriendo es del parque, no de un crédito). Flujo: <b>Emitir → Aprobar → Enviar</b> — el envío genera el PDF y abre el correo al contacto de finanzas de la <b>ficha del parque</b> con el total a facturar. Un parque solo-arriendo envía su cartola directo.</li>
+    <li><b>La ODP nace de la factura, igual que en dealers:</b> Comisiones Parques a Pagar NO deja emitir la Orden de Pago mensual mientras alguna operación del parque no tenga FACTURA RECIBIDA marcada.</li>
+    <li><b>Todo es reversable con motivo auditado:</b> el envío de la cartola (pestaña Enviadas → Reversar; quita solo CARTOLA ENVIADA), la ODP emitida no pagada (Anular ODP — el número queda anulado, nunca se reutiliza) y el pago realizado (Revertir pago — la ODP vuelve a «por pagar»).</li>
+    <li><b>Dónde se configura el parque:</b> su ficha comercial (RUT, contactos, cuenta, correo de finanzas) en <b>Creación de Parque</b>; su arriendo y % de comisión en el mantenedor <b>Arriendos y Comisiones Parque y Calle</b>.</li>
+  </ul>
   <figure class="shot"><img src="img/postventa.png" alt="Módulo Post Venta" loading="lazy"><figcaption>Post Venta: seguimiento, consultas de estado, emisión de órdenes de pago y cartolas.</figcaption></figure>
 
   <h2 id="fundantes">6. Seguimiento Fundantes</h2>
@@ -407,6 +415,7 @@
     <li><b>Tipos:</b> GENERAL (calle), PARQUE o AMBOS (dos tablas de comisión; el cálculo elige por operación según dónde se cursó). Modificar un dealer existente usa la misma ficha: las diferencias salen en rojo para el aprobador.</li>
     <li><b>Plan Liquidez (Super Partner):</b> anticipo de comisiones con tope (default $5M), respaldado por contrato + pagaré. Cada mes se genera la <b>Hoja de Liquidación</b> (comisión, deuda, descuento, pago neto) que recorre su cadena: Jefe/Gerente Comercial → Gerente General → Finanzas toma conocimiento (48h por nivel, auto-avanza). Aprobada la hoja se emiten las ODP con el descuento; al pagarse, el abono queda en la cuenta corriente del dealer. La cartola siempre va por el 100% — el descuento vive solo en la ODP.</li>
     <li><b>Categorías (Socio/Partner/Super Partner):</b> segmento por ventas, propuesto automáticamente cada mes y asignable a mano en su mantenedor. Es un eje distinto a Parque/Calle.</li>
+    <li><b>Creación de PARQUES — misma máquina:</b> incorporar un parque como contraparte comercial (card <b>Creación de Parque</b>) usa <b>el mismo circuito de la ficha de dealer</b>: informes DealerNet + IA de la empresa y sus socios, cadena de niveles, imprimir solo autorizada, firma del representante legal y cierre del analista. Diferencias: la ficha de parque no lleva tabla de comisión por tramos (su arriendo y % viven en el mantenedor Arriendos y Comisiones) ni participación especial, y al <b>cerrar el caso se crea el parque</b>, no un dealer. En Mantención esas fichas aparecen marcadas <b>PARQUE</b>. La base muestra cada parque con su ficha (Completa/Incompleta) y sus documentos de respaldo: ficha firmada, poderes/escritura y cédulas de los firmantes.</li>
   </ul>
 
   <h2 id="admin">20. Administración y control del sistema</h2>
