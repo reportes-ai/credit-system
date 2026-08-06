@@ -513,7 +513,7 @@ module.exports = [
   quien:'Ejecutivo crea la ficha; Análisis y Gerencia autorizan; el analista cierra.', kw:'parque crear ficha incorporacion nuevo automotriz' },
 { slug:'parque-cartola', cat:'Post Venta', p:'¿Cómo se le paga la comisión a un parque?',
   donde:'Post Venta → Emisión de Cartolas Parque; el pago en Comisiones Parques a Pagar.',
-  como:'Las condiciones son las mismas que para el dealer. La cartola mensual del parque (comisión por cada crédito + arriendo) se Emite, se Aprueba y se Envía por correo al contacto de finanzas de su ficha con el total a facturar. El parque factura; con FACTURA RECIBIDA marcada en todas sus operaciones se emite la ODP mensual y se paga. Cada operación se sigue en Seguimiento Comisión Parques con las mismas 8 etapas de la comisión dealer.',
+  como:'Las condiciones son las mismas que para el dealer. La cartola mensual del parque (comisión por cada crédito + arriendo) se Emite, se Aprueba y se Envía por correo al contacto de finanzas de su ficha con el total a facturar. El parque factura y la factura se registra en Cartolas Parque con cuadratura estricta: el monto debe ser exactamente el total de la cartola. Recién con eso se emite la ODP mensual y se paga. La contabilidad es automática: arriendo y comisión van a cuentas separadas al aprobar, y el pago rebaja el pasivo contra banco.',
   quien:'Post Venta emite y envía; quien tiene el permiso aprueba; Tesorería paga.', kw:'parque comision pagar cartola arriendo factura odp' },
 { slug:'parque-reversa', cat:'Post Venta', p:'Me equivoqué con la cartola o la ODP de un parque, ¿puedo deshacerlo?',
   donde:'Emisión de Cartolas Parque (pestaña Enviadas) y la misma pantalla del parque.',
