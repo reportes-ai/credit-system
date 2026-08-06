@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cuentas Corrientes — AutoFácil</title>
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <!-- v1.0 -->
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
+    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-left { display:flex; align-items:center; gap:16px; }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
+    .topnav-right { display:flex; align-items:center; gap:10px; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .main-content { padding:32px 40px; max-width:1500px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:24px; display:flex; align-items:center; gap:18px; }
+    .page-banner i { font-size:2.4rem; opacity:.8; }
+    .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.3rem; }
+    .page-banner p { opacity:.8; margin:0; font-size:.88rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); margin-bottom:22px; }
+    .panel-header { padding:16px 22px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .panel-header h5 { margin:0; font-weight:700; font-size:.97rem; color:#111827; display:flex; align-items:center; gap:8px; }
+    .panel-body { padding:20px 22px; }
+    .btn-primary2 { background:var(--navy); color:#fff; border:none; border-radius:8px; padding:8px 18px; font-size:.85rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-primary2:hover { background:var(--navy-light); }
+    .btn-primary2:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-ghost { background:#fff; border:1.5px solid #d1d5db; color:#374151; border-radius:8px; padding:7px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .btn-ghost:hover { background:#f9fafb; }
+    label.f { font-size:.82rem; font-weight:600; color:#374151; display:block; margin-bottom:4px; }
+    .form-control, .form-select { font-size:.88rem; }
+    .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:22px; }
+    .stat { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .stat .v { font-size:1.35rem; font-weight:800; color:#111827; }
+    .stat .l { font-size:.72rem; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; }
+    .stat.abo .v { color:#15803d; } .stat.car .v { color:#dc2626; } .stat.sal .v { color:var(--navy); }
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:10px 14px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:9px 14px; border-bottom:1px solid #f1f5f9; color:#1f2937; vertical-align:top; }
+    .text-right { text-align:right; }
+    .amt-neg { color:#dc2626; font-weight:700; white-space:nowrap; }
+    .amt-pos { color:#15803d; font-weight:700; white-space:nowrap; }
+    .empty-state { text-align:center; color:#9ca3af; padding:40px 0; }
+    .tag { border-radius:5px; padding:1px 8px; font-size:.7rem; font-weight:700; }
+    .tag-conc { background:#dcfce7; color:#15803d; }
+    .info-box { background:#eff6ff; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; font-size:.83rem; color:#1e3a5f; margin-bottom:18px; }
+    .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
+    .footer-afecta h6 { font-weight:700; color:#111827; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .pager { display:flex; align-items:center; gap:10px; justify-content:flex-end; padding:12px 0 0; font-size:.83rem; color:#374151; }
+    dialog { border:none; border-radius:14px; padding:0; max-width:560px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    dialog .dlg-head { padding:16px 22px; border-bottom:1px solid #e5e7eb; font-weight:700; }
+    dialog .dlg-body { padding:20px 22px; max-height:60vh; overflow:auto; }
+    dialog .dlg-foot { padding:14px 22px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+    @media(max-width:640px){ .main-content{padding:16px;} }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-left">
+    <a href="/" class="topnav-brand">
+      <img src="/img/logo.png" alt="AutoFácil">
+      <span class="version-badge">v1.0</span>
+    </a>
+    <div class="breadcrumb-nav">
+      <a href="/">Inicio</a><span class="sep">›</span>
+      <a href="/tesoreria/">Tesorería</a><span class="sep">›</span>
+      <span style="color:#fff;font-weight:600"><i class="bi bi-bank me-1"></i>Cuentas Corrientes</span>
+    </div>
+  </div>
+  <div class="topnav-right">
+    <div class="user-chip">
+      <div class="avatar" id="avatarInicial">?</div>
+      <div>
+        <div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
+        <div class="perfil-badge" id="navPerfil">—</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="main-content">
+  <div class="page-banner">
+    <i class="bi bi-bank"></i>
+    <div>
+      <h2>Cuentas Corrientes</h2>
+      <p>Movimientos de las cuentas corrientes de la empresa — cargados desde las cartolas del banco</p>
+    </div>
+  </div>
+
+  <div class="info-box"><i class="bi bi-lightbulb me-1"></i>
+    Carga la cartola Excel del banco y el sistema <b>anexa solo los movimientos que no estén</b>:
+    re-cargar el mismo archivo o períodos que se traslapan no duplica nada.
+    Los movimientos son los mismos que ve <a href="/tesoreria/conciliacion-bancaria">Conciliación Bancaria</a> (una sola fuente).
+  </div>
+
+  <!-- Cuenta + carga -->
+  <div class="panel">
+    <div class="panel-header">
+      <h5><i class="bi bi-wallet2"></i> Cuenta corriente</h5>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn-primary2" onclick="document.getElementById('fileCartola').click()" id="btnCargar" disabled>
+          <i class="bi bi-upload"></i> Cargar cartola</button>
+        <input type="file" id="fileCartola" accept=".xlsx,.xls,.csv" style="display:none" onchange="cargarCartola(this)">
+      </div>
+    </div>
+    <div class="panel-body" style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="min-width:300px;"><label class="f">Cuenta</label>
+        <select id="selCuenta" class="form-select" onchange="cambiarCuenta()"></select></div>
+      <div><label class="f">Desde</label><input type="date" id="fDesde" class="form-control" onchange="resetYcargar()"></div>
+      <div><label class="f">Hasta</label><input type="date" id="fHasta" class="form-control" onchange="resetYcargar()"></div>
+      <div style="min-width:220px;"><label class="f">Buscar</label>
+        <input id="fTexto" class="form-control" placeholder="Descripción, N° doc, N° mov…" onkeydown="if(event.key==='Enter')resetYcargar()"></div>
+      <div><label class="f">Tipo</label>
+        <select id="fTipo" class="form-select" onchange="resetYcargar()">
+          <option value="">Todos</option><option value="ABONO">Abonos</option><option value="CARGO">Cargos</option>
+        </select></div>
+    </div>
+  </div>
+
+  <div class="stats" id="statsWrap" style="display:none;">
+    <div class="stat sal"><div class="v" id="stSaldo">—</div><div class="l">Saldo última cartola</div></div>
+    <div class="stat"><div class="v" id="stTotal">—</div><div class="l">Movimientos (filtro)</div></div>
+    <div class="stat abo"><div class="v" id="stAbonos">—</div><div class="l">Total abonos</div></div>
+    <div class="stat car"><div class="v" id="stCargos">—</div><div class="l">Total cargos</div></div>
+    <div class="stat"><div class="v" id="stRango">—</div><div class="l">Cartola cubre</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto;">
+      <div id="tablaWrap"><div class="empty-state">Selecciona una cuenta</div></div>
+      <div class="pager" id="pagerWrap" style="display:none;">
+        <button class="btn-ghost" id="pgPrev" onclick="pagina(-1)"><i class="bi bi-chevron-left"></i></button>
+        <span id="pgInfo">—</span>
+        <button class="btn-ghost" id="pgNext" onclick="pagina(1)"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-afecta">
+    <h6><i class="bi bi-diagram-3"></i> Qué afecta este módulo</h6>
+    <ul style="margin:0;">
+      <li><b>Cargar cartola</b> → anexa movimientos a la misma fuente que usa la <a href="/tesoreria/conciliacion-bancaria">Conciliación Bancaria</a>: lo cargado aquí queda disponible allá para conciliar (y viceversa).</li>
+      <li><b>Cuentas</b> → son las de <a href="/tesoreria/banco-conexiones">Conexiones Bancarias</a>; las cuentas nuevas se crean allá o en Conciliación (cuenta manual).</li>
+      <li><b>Cargas</b> → quedan registradas en <a href="/auditoria/">Auditoría</a> (acción IMPORTAR).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Dialog: resultado carga -->
+<dialog id="dlgRes">
+  <div class="dlg-head"><i class="bi bi-file-earmark-excel me-1"></i> Resultado de la carga</div>
+  <div class="dlg-body" id="resBody"></div>
+  <div class="dlg-foot"><button class="btn-primary2" onclick="dlgRes.close()">Entendido</button></div>
+</dialog>
+
+<script src="/js/app-version.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login';
+const H = { 'Authorization': 'Bearer ' + token };
+function logout(){ sessionStorage.clear(); location.href='/login'; }
+const $ = id => document.getElementById(id);
+const fmt = n => '$' + Math.round(Number(n||0)).toLocaleString('es-CL');
+const fFecha = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let CUENTAS = [], PAG = 1, TOTAL = 0, POR = 100;
+
+(async function init(){
+  try {
+    const me = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
+    const u = me.data && me.data.usuario || me.usuario || {};
+    $('navNombre').textContent = u.nombre || '—';
+    $('navPerfil').textContent = u.perfil || '—';
+    $('avatarInicial').textContent = (u.nombre||'?').charAt(0).toUpperCase();
+  } catch {}
+  await cargarCuentas();
+})();
+
+async function cargarCuentas(){
+  const j = await (await fetch('/api/cuentas-corrientes/cuentas', { headers: H })).json();
+  CUENTAS = j.data || [];
+  const sel = $('selCuenta');
+  sel.innerHTML = CUENTAS.length
+    ? CUENTAS.map(c => `<option value="${c.id}">${esc(c.banco)} ${esc(c.numero||'')} ${c.alias?('— '+esc(c.alias)):''} · ${Number(c.movimientos||0).toLocaleString('es-CL')} movs.</option>`).join('')
+    : '<option value="">— sin cuentas: créala en Conciliación Bancaria —</option>';
+  $('btnCargar').disabled = !CUENTAS.length;
+  if (CUENTAS.length) cambiarCuenta();
+}
+function cta(){ return CUENTAS.find(c => String(c.id) === $('selCuenta').value); }
+function cambiarCuenta(){
+  const c = cta(); if (!c) return;
+  // rango por defecto: todo lo que la cartola cubre
+  $('fDesde').value = c.primera_fecha ? String(c.primera_fecha).slice(0,10) : '';
+  $('fHasta').value = c.ultima_fecha  ? String(c.ultima_fecha).slice(0,10)  : '';
+  resetYcargar();
+}
+function resetYcargar(){ PAG = 1; cargarMovs(); }
+function pagina(d){ PAG = Math.max(1, PAG + d); cargarMovs(); }
+
+async function cargarMovs(){
+  const c = cta(); if (!c) return;
+  const q = new URLSearchParams({ pagina: PAG, por_pagina: POR });
+  if ($('fDesde').value) q.set('desde', $('fDesde').value);
+  if ($('fHasta').value) q.set('hasta', $('fHasta').value);
+  if ($('fTexto').value.trim()) q.set('texto', $('fTexto').value.trim());
+  if ($('fTipo').value) q.set('tipo', $('fTipo').value);
+  const j = await (await fetch(`/api/cuentas-corrientes/cuentas/${c.id}/movimientos?` + q, { headers: H })).json();
+  if (!j.success) { $('tablaWrap').innerHTML = `<div class="empty-state">${esc(j.error)}</div>`; return; }
+  const { movimientos: movs, stats } = j.data;
+  TOTAL = Number(stats.total||0);
+
+  $('statsWrap').style.display = '';
+  $('stSaldo').textContent  = c.saldo_cartola != null ? fmt(c.saldo_cartola) : '—';
+  $('stTotal').textContent  = TOTAL.toLocaleString('es-CL');
+  $('stAbonos').textContent = fmt(stats.abonos);
+  $('stCargos').textContent = fmt(stats.cargos);
+  $('stRango').textContent  = c.primera_fecha ? `${fFecha(c.primera_fecha)} → ${fFecha(c.ultima_fecha)}` : '—';
+
+  if (!movs.length) { $('tablaWrap').innerHTML = '<div class="empty-state">Sin movimientos con este filtro. Carga la cartola del banco.</div>'; $('pagerWrap').style.display='none'; return; }
+  $('tablaWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Fecha</th><th>Descripción</th><th class="text-right">Monto</th><th class="text-right">Saldo</th>
+        <th>N° Doc</th><th>Sucursal</th><th>N° Mov</th><th>Conciliado</th></tr></thead>
+      <tbody>${movs.map(m => `
+        <tr>
+          <td style="white-space:nowrap">${fFecha(m.fecha)}</td>
+          <td>${esc(m.descripcion||'')}</td>
+          <td class="text-right ${m.monto<0?'amt-neg':'amt-pos'}">${fmt(m.monto)}</td>
+          <td class="text-right" style="white-space:nowrap">${m.saldo!=null?fmt(m.saldo):'—'}</td>
+          <td>${esc((m.n_documento||'').replace(/^0+$/,'') || '—')}</td>
+          <td style="font-size:.76rem">${esc(m.sucursal||'—')}</td>
+          <td style="font-size:.76rem">${esc((m.n_movimiento||'').replace(/^0+/,'') || '—')}</td>
+          <td>${m.conciliado ? `<span class="tag tag-conc">✓ ${esc(m.match_tipo||'')}</span>` : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  const pags = Math.max(1, Math.ceil(TOTAL / POR));
+  $('pagerWrap').style.display = pags > 1 ? '' : 'none';
+  $('pgInfo').textContent = `Página ${PAG} de ${pags} · ${TOTAL.toLocaleString('es-CL')} movimientos`;
+  $('pgPrev').disabled = PAG <= 1;
+  $('pgNext').disabled = PAG >= pags;
+}
+
+async function cargarCartola(inp){
+  const file = inp.files[0]; inp.value = '';
+  const c = cta(); if (!file || !c) return;
+  $('btnCargar').disabled = true;
+  try {
+    const fd = new FormData(); fd.append('archivo', file);
+    const j = await (await fetch(`/api/cuentas-corrientes/cuentas/${c.id}/cartola`, { method:'POST', headers: H, body: fd })).json();
+    if (!j.success) throw new Error(j.error);
+    const r = j.data;
+    $('resBody').innerHTML = `
+      <div style="font-size:.9rem">
+        <p style="margin:0 0 10px"><b>${esc(file.name)}</b></p>
+        <ul style="margin:0;padding-left:18px;line-height:1.9">
+          <li>Movimientos en el archivo: <b>${r.filas.toLocaleString('es-CL')}</b></li>
+          <li>Anexados (no estaban): <b style="color:#15803d">${r.nuevas.toLocaleString('es-CL')}</b></li>
+          <li>Ya existían (omitidos): <b style="color:#6b7280">${r.duplicadas.toLocaleString('es-CL')}</b></li>
+        </ul>
+      </div>`;
+    dlgRes.showModal();
+    await cargarCuentas();
+  } catch (e) {
+    $('resBody').innerHTML = `<div style="color:#b91c1c;font-size:.9rem"><i class="bi bi-x-circle me-1"></i>${esc(e.message)}</div>`;
+    dlgRes.showModal();
+  } finally { $('btnCargar').disabled = false; }
+}
+</script>
+</body>
+</html>

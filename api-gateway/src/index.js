@@ -376,6 +376,7 @@ app.use('/api/venta-cartera',        require('../../services/tesoreria/src/route
 app.use('/api/banco',                require('../../services/tesoreria/src/routes/banco-conexiones.routes'));
 app.use('/api/saldo-proceso-pago',   require('../../services/tesoreria/src/routes/saldo-proceso-pago.routes'));
 app.use('/api/conciliacion',         require('../../services/tesoreria/src/routes/conciliacion.routes'));
+app.use('/api/cuentas-corrientes',   require('../../services/tesoreria/src/routes/cuentas-corrientes.routes'));
 app.use('/api/cierre-mes',           require('../../services/tesoreria/src/routes/cierre-mes.routes'));
 app.use('/api/facilbook',            require('../../services/facilbook/src/routes/facilbook.routes'));
 app.use('/api/concurso',             require('../../services/rrhh/src/routes/concurso.routes'));

@@ -34,6 +34,11 @@ require('../../../../shared/migrate').enFila('conciliacion-bancaria', async () =
     if (!has('conciliado_por'))     alters.push("ADD COLUMN conciliado_por VARCHAR(120) NULL");
     if (!has('fecha_conciliacion')) alters.push("ADD COLUMN fecha_conciliacion DATETIME NULL");
     if (!has('origen'))             alters.push("ADD COLUMN origen VARCHAR(10) DEFAULT 'FINTOC'"); // FINTOC | MANUAL
+    // Campos extra de la cartola del banco (módulo Cuentas Corrientes)
+    if (!has('saldo'))              alters.push("ADD COLUMN saldo BIGINT NULL");
+    if (!has('sucursal'))           alters.push("ADD COLUMN sucursal VARCHAR(80) NULL");
+    if (!has('n_movimiento'))       alters.push("ADD COLUMN n_movimiento VARCHAR(30) NULL");
+    if (!has('n_documento'))        alters.push("ADD COLUMN n_documento VARCHAR(60) NULL");
     if (alters.length) await pool.query('ALTER TABLE banco_movimientos ' + alters.join(', '));
 
     await pool.query(`
@@ -142,13 +147,19 @@ function parsearCartola(buffer) {
     const cells = rows[i].map(low);
     const iF = cells.findIndex(c => /fecha/.test(c));
     if (iF < 0) continue;
-    const iCargo = cells.findIndex(c => /(cargo|debito|giro)/.test(c) && !/fecha/.test(c));
-    const iAbono = cells.findIndex(c => /(abono|credito|deposito)/.test(c) && !/fecha/.test(c));
+    // "CARGO/ABONO" (Banco de Chile) es una columna INDICADORA (letra C/A), no de montos:
+    // se excluye de ambas para que el monto salga de la columna MONTO (ya firmada).
+    const iCargo = cells.findIndex(c => /(cargo|debito|giro)/.test(c) && !/fecha/.test(c) && !/abono/.test(c));
+    const iAbono = cells.findIndex(c => /(abono|credito|deposito)/.test(c) && !/fecha/.test(c) && !/cargo/.test(c));
     const iMonto = cells.findIndex(c => /^monto|importe/.test(c));
     if (iCargo < 0 && iAbono < 0 && iMonto < 0) continue;
     const iDesc = cells.findIndex(c => /(descripc|detalle|glosa|movimiento|concepto|transacc)/.test(c));
     const iDoc  = cells.findIndex(c => /(n.*doc|documento|nro|serial)/.test(c) && !/fecha/.test(c));
-    hIdx = i; map = { iF, iCargo, iAbono, iMonto, iDesc, iDoc };
+    // Columnas extra de la cartola Banco de Chile (Cuentas Corrientes)
+    const iSaldo = cells.findIndex(c => /^saldo/.test(c));
+    const iSuc   = cells.findIndex(c => /sucursal/.test(c));
+    const iNMov  = cells.findIndex(c => /^n/.test(c) && /mov/.test(c));   // "N° MOVIMIENTO" (descripción parte con "d")
+    hIdx = i; map = { iF, iCargo, iAbono, iMonto, iDesc, iDoc, iSaldo, iSuc, iNMov };
     break;
   }
   if (hIdx < 0) throw new Error('No se encontró la fila de encabezados (se busca una columna "Fecha" y columnas de Cargo/Abono o Monto).');
@@ -169,6 +180,9 @@ function parsearCartola(buffer) {
       fecha, monto,
       descripcion: map.iDesc >= 0 ? String(r[map.iDesc] || '').trim().slice(0, 400) : '',
       documento:   map.iDoc  >= 0 ? String(r[map.iDoc]  || '').trim().slice(0, 60)  : '',
+      saldo:        map.iSaldo >= 0 && r[map.iSaldo] !== '' ? parseMonto(r[map.iSaldo]) : null,
+      sucursal:     map.iSuc   >= 0 ? String(r[map.iSuc]  || '').trim().slice(0, 80) : '',
+      n_movimiento: map.iNMov  >= 0 ? String(r[map.iNMov] || '').trim().slice(0, 30) : '',
     });
   }
   return movs;
@@ -221,9 +235,10 @@ const importarCartola = async (req, res) => {
     let nuevas = 0;
     for (const m of movs) {
       const [r] = await pool.query(
-        `INSERT IGNORE INTO banco_movimientos (id_conexion, fintoc_id, fecha, monto, moneda, descripcion, tipo, origen)
-         VALUES (?,?,?,?,'CLP',?,?, 'MANUAL')`,
-        [idConexion, m.fintoc_id, m.fecha, m.monto, m.descripcion || null, m.documento ? ('DOC ' + m.documento) : null]);
+        `INSERT IGNORE INTO banco_movimientos (id_conexion, fintoc_id, fecha, monto, moneda, descripcion, tipo, origen, saldo, sucursal, n_movimiento, n_documento)
+         VALUES (?,?,?,?,'CLP',?,?, 'MANUAL',?,?,?,?)`,
+        [idConexion, m.fintoc_id, m.fecha, m.monto, m.descripcion || null, m.documento ? ('DOC ' + m.documento) : null,
+         m.saldo ?? null, m.sucursal || null, m.n_movimiento || null, m.documento || null]);
       if (r.affectedRows === 1) nuevas++;
     }
     await pool.query(
@@ -401,4 +416,6 @@ const resumen = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, desconciliar, resumen };
+module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, desconciliar, resumen,
+  // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
+  parsearCartola, hashMovs };
