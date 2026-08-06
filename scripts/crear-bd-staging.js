@@ -193,6 +193,21 @@ const { copiarTabla } = require('./lib/copiar-filas');
   await cx.query('SET FOREIGN_KEY_CHECKS = 1');
   cx.release();
 
+  /* ── Usuario DEMO para capacitaciones (pedido Pato 05-08-2026) ────────────
+     demo.ejecutivo@autofacilchile.cl · perfil Ejecutivo Comercial · clave la
+     de staging. Existe SOLO en staging (no viene de producción, por eso se
+     siembra acá: sin este bloque, un --recrear lo haría desaparecer). El RUT
+     77777777-7 es ficticio; los 9999… y 1111… ya están tomados por tv y admin. */
+  try {
+    await cx.query(`INSERT INTO \`${DESTINO}\`.usuarios
+      (rut, nombre, apellido, email, password_hash, id_perfil, estado, debe_cambiar_clave, protegido, cargo)
+      SELECT '77777777-7','Demo','Ejecutivo','demo.ejecutivo@autofacilchile.cl',?, p.id_perfil,'activo',0,0,'Ejecutivo Comercial (DEMO)'
+      FROM \`${DESTINO}\`.perfiles p WHERE p.nombre='Ejecutivo Comercial'
+        AND NOT EXISTS (SELECT 1 FROM \`${DESTINO}\`.usuarios u WHERE u.email='demo.ejecutivo@autofacilchile.cl')`,
+      [hashStaging]);
+    console.log('\n✓ Usuario demo de capacitación: demo.ejecutivo@autofacilchile.cl (Ejecutivo Comercial)');
+  } catch (e) { console.error('⚠ usuario demo:', e.message); }
+
   console.log('\nDatos copiados:');
   copiadas.sort((a, b) => b.filas - a.filas).forEach(c =>
     console.log(`   ${c.n.padEnd(34)} ${String(c.filas).padStart(6)} filas` +
