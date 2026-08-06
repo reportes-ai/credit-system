@@ -52,6 +52,7 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
     if (fRef) {
       const funcs = [
         ['Comisiones Parques a Pagar',            'postventa_comisiones_parques', '/postventa/comisiones-parques/', 'bi-signpost-2'],
+        ['Seguimiento Comisión Parques',          'postventa_seg_parques',        '/postventa/seguimiento-parques/', 'bi-p-square'],
         ['Aprobar Comisión de Parque',            'pv_parques_aprobar',           null, null],
         ['Emitir Orden de Pago de Parque',        'pv_parques_emitir',            null, null],
         ['Confirmar Pago de Parque',              'pv_parques_pagar',             null, null],
@@ -118,6 +119,21 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
       detalle: g.ops.sort((a, b) => b.com_parque - a.com_parque),
     };
   });
+}
+
+/* Refleja el hito en el track PARQUE del Seguimiento por operación: marca la(s)
+   etapa(s) en todos los créditos del parque cuyo mes de cierre es `mes`.
+   Espejo del patrón COMISION: las etapas de ODP/pago se marcan desde su módulo. */
+async function marcarEtapaParqueOps(parque, mes, etapas, usuario) {
+  for (const etapa of etapas) {
+    await pool.query(`
+      INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+      SELECT s.id, 'PARQUE', ?, ?, NOW()
+      FROM postventa_seguimiento s
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?`,
+      [etapa, usuario, parque, mes]).catch(e => console.error('[parques marcar etapa]', e.message));
+  }
 }
 
 const mesParam = req => {
@@ -283,6 +299,7 @@ const emitir = async (req, res) => {
       }
     } catch (me) { console.error('[comisiones-parques mail]', me.message); }
 
+    await marcarEtapaParqueOps(parque, mes, ['ORDEN DE PAGO EMITIDA'], quien);
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: odp.id, detalle: `Emitió ${odp.numero}: ${concepto}` });
     res.json({ success: true, data: { etapa: 'OP_EMITIDA', odp_numero: odp.numero }, error: null });
   } catch (e) { console.error('[comisiones-parques emitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -321,6 +338,7 @@ const pagar = async (req, res) => {
       href: '/postventa/comisiones-parques/', clave: `parquepago:${e.odp_numero}`,
     });
 
+    await marcarEtapaParqueOps(parque, mes, ['ENVIADO A PAGO', 'COMISION PAGADA'], quien);
     auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: e.id, detalle: `Confirmó pago ${e.odp_numero} — parque ${parque} ${mes}` });
     res.json({ success: true, data: { etapa: 'PAGO_REALIZADO' }, error: null });
   } catch (e) { console.error('[comisiones-parques pagar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }

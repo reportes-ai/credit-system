@@ -60,6 +60,17 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     ];
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?)',
       ['etapas_saldo', JSON.stringify(DEF_SALDO), 'etapas_comision', JSON.stringify(DEF_COM)]);
+
+    /* ── Track PARQUE: comisión del PARQUE por operación — mismas etapas y mismas
+       condiciones que la comisión del dealer. La ODP y el pago son por parque+mes
+       (módulo Comisiones Parques a Pagar), que marca esas etapas en cada operación
+       del parque. Las etapas de cartola las marcará el módulo Emisión de Cartolas
+       Parque. */
+    try { await pool.query("ALTER TABLE postventa_etapas MODIFY track ENUM('SALDO','COMISION','PARQUE') NOT NULL"); } catch (e) { console.error('[postventa track parque]', e.message); }
+    try { await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS parque VARCHAR(120) NULL'); } catch (_) {}
+    try { await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS com_parque BIGINT NULL'); } catch (_) {}
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
+      ['etapas_parque', JSON.stringify(DEF_COM)]);   // mismas 8 etapas de comisión
     // Plantillas editables del correo a Contabilidad al emitir la Orden de Pago (saldo y comisión).
     const CORREO_SALDO = {
       asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
@@ -483,6 +494,23 @@ const sync = async (req, res) => {
       FROM postventa_seguimiento s
       WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
         WHERE e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR')`);
+    /* Track PARQUE: atribución igual que Comisiones Parques a Pagar (dealers.ccs_parque
+       vía el dealer del crédito; fallback texto creditos.parque; CALLE no es parque) y
+       monto = creditos.com_parque, ya persistido por el motor único comision-dealer. */
+    await pool.query(`
+      UPDATE postventa_seguimiento s
+        JOIN creditos c ON c.id = s.id_credito
+        LEFT JOIN dealers d ON d.id_dealer = c.id_dealer
+      SET s.parque = (SELECT p.nombre FROM parques_comisiones p
+                       WHERE UPPER(p.nombre) = UPPER(TRIM(COALESCE(NULLIF(d.ccs_parque,''), c.parque, ''))) LIMIT 1),
+          s.com_parque = c.com_parque`).catch(e => console.error('[postventa sync parque]', e.message));
+    await pool.query(`
+      INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+      SELECT s.id, 'PARQUE', 'COMISION A PAGAR', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
+      FROM postventa_seguimiento s
+      WHERE s.parque IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas e
+          WHERE e.id_seguimiento = s.id AND e.track='PARQUE' AND e.etapa='COMISION A PAGAR')`);
     res.json({ success: true, data: { nuevos: r1.affectedRows }, error: null });
   } catch (e) {
     console.error('[postventa sync]', e.message);
@@ -495,7 +523,7 @@ const getAll = async (req, res) => {
   try {
     const [rows] = await pool.query(`
       SELECT s.id, s.id_credito, s.num_op, s.financiera, s.ejecutivo,
-             c.id_financiera,
+             c.id_financiera, s.parque, s.com_parque,
              s.fecha_otorgado, s.saldo_precio, s.comision,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer)  AS nombre_dealer,
              COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer,
@@ -526,7 +554,7 @@ const ETAPAS_SISTEMA = ['FUNDANTES PENDIENTES', 'COMISION A PAGAR'];
 const setEtapa = async (req, res) => {
   try {
     const { track, etapa, marcar } = req.body;
-    if (!['SALDO','COMISION'].includes(track) || !etapa)
+    if (!['SALDO','COMISION','PARQUE'].includes(track) || !etapa)
       return res.status(400).json({ success: false, data: null, error: 'track y etapa requeridos' });
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
@@ -537,20 +565,22 @@ const setEtapa = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago / Saldos Precios a Pagar)` });
     if (track === 'COMISION' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(etapa))
       return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde su módulo (Emisión Orden de Pago Comisión / Comisiones a Pagar)` });
+    if (track === 'PARQUE' && ['ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(etapa))
+      return res.status(400).json({ success: false, data: null, error: `"${etapa}" se marca automáticamente desde Comisiones Parques a Pagar (al emitir la ODP del parque y al pagarla)` });
 
     const esAdmin = req.usuario?.perfil_nombre === 'Administrador';
     const usuario = loginDe(req.usuario);
 
     // Cargar config para orden y permisos
     const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave = ?`,
-      [track === 'SALDO' ? 'etapas_saldo' : 'etapas_comision']);
+      [track === 'SALDO' ? 'etapas_saldo' : track === 'PARQUE' ? 'etapas_parque' : 'etapas_comision']);
     const listaEtapas = cfgRow ? JSON.parse(cfgRow.valor) : [];
     const idxEtapa = listaEtapas.findIndex(x => x.etapa === etapa);
     if (idxEtapa < 0) return res.status(400).json({ success: false, data: null, error: 'Etapa no reconocida' });
 
     // Validar permisos de perfil para esta etapa
     if (!esAdmin) {
-      const cfgKey = track === 'SALDO' ? 'etapa_perfiles_saldo' : 'etapa_perfiles_comision';
+      const cfgKey = track === 'SALDO' ? 'etapa_perfiles_saldo' : track === 'PARQUE' ? 'etapa_perfiles_parque' : 'etapa_perfiles_comision';
       const [[permRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave = ?`, [cfgKey]);
       if (permRow) {
         const permisos = JSON.parse(permRow.valor); // array de arrays, índice = posición etapa
