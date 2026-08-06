@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores — AutoFácil</title>
-  <!-- v1.1 las cards también salen por MÓDULO (funcionalidad de Mantenedores con página fuera de /mantenedores/) -->
+  <!-- v1.2 los extras del placement se filtran por permisos (fuga a perfiles sin acceso) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/Sortable.min.js"></script>
@@ -279,7 +279,15 @@
         funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href &&
           (f.href.startsWith('/mantenedores/') || (idMant && f.id_modulo === idMant)));
         esProt = !!jM.protegido;   // cuenta protegida (lo dice el servidor, no la sesión)
+        // TODOS los hrefs a los que el usuario tiene permiso (funcs de cualquier módulo
+        // + módulos completos): los extras del placement se filtran contra esto — sin
+        // este cedazo, una card movida acá se le mostraba a perfiles sin permiso.
+        window.__permHrefs = new Set([
+          ...(jM.funcionalidadesInfo || []).filter(f => f.href).map(f => f.href.replace(/\/$/, '')),
+          ...modsBD.map(m => (m.ruta || '').replace(/\/$/, '')),
+        ]);
       } catch {}
+      const permitido = h => !!h && (window.__permHrefs || new Set()).has(String(h).replace(/\/$/, ''));
 
       // BD Nivel Dios: solo accesibles dentro de la card SOLO DIOS, no como cards sueltas
       const SOLO_DIOS = new Set(['bd-operaciones','bd-clientes','bd-antecedentes','bd-informacion-comercial','meses-cerrados']);
@@ -310,7 +318,7 @@
       const extrasSubitem = Object.entries(PLACEMENT_ITEMS || {})
         // dedup TAMBIÉN por href: la misma página puede venir de funcionalidades BD
         // con otra clave (ej. bd-operaciones-edicion vs bd-operaciones del manifiesto)
-        .filter(([k, v]) => !nativeIds.has(k) && !nativeHrefs.has(v.href) && (placement[k] === 'mantenedores' || _mantArrKeys.includes(k)))
+        .filter(([k, v]) => !nativeIds.has(k) && !nativeHrefs.has(v.href) && permitido(v.href) && (placement[k] === 'mantenedores' || _mantArrKeys.includes(k)))
         .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: DESCS[k] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || v.desc || '' }));
 
       // Extras: módulos BD movidos aquí (formato viejo: placement[ruta] === 'mantenedores')

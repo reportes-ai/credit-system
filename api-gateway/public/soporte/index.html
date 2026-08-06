@@ -106,7 +106,12 @@
         funcInfo = (j.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/soporte/') && f.href !== '/soporte/');
         if (j.success && Array.isArray(j.data)) modsBD = j.data;
         if (jp.success && jp.data) placement = jp.data;
+        window.__permHrefsSop = new Set([
+          ...(j.funcionalidadesInfo || []).filter(f => f.href).map(f => f.href.replace(/\/$/, '')),
+          ...(Array.isArray(j.data) ? j.data : []).map(m => (m.ruta || '').replace(/\/$/, '')),
+        ]);
       } catch {}
+      const permitido = h => !!h && (window.__permHrefsSop || new Set()).has(String(h).replace(/\/$/, ''));
       const items = funcInfo.map(f => {
         const seg = f.href.replace('/soporte/', '').replace(/\/$/, '');
         return { seg, href: f.href, icon: f.icono || 'bi-grid', titulo: f.nombre, desc: DESCS[seg] || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[seg]) || '' };
@@ -120,7 +125,7 @@
         if (typeof k === 'string' && k.startsWith('/') && modsByRuta.has(normR(k)) && !yaHref.has(normR(k))) {
           const m = modsByRuta.get(normR(k));
           items.push({ seg: m.ruta.replace(/\//g, ''), href: m.ruta, icon: m.icono || 'bi-grid', titulo: m.nombre, desc: m.descripcion || (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || '' });
-        } else if (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[k] && !yaHref.has(PLACEMENT_ITEMS[k].href)) {
+        } else if (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[k] && !yaHref.has(PLACEMENT_ITEMS[k].href) && permitido(PLACEMENT_ITEMS[k].href)) {
           const v = PLACEMENT_ITEMS[k];
           items.push({ seg: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: (typeof PLACEMENT_DESCS !== 'undefined' && PLACEMENT_DESCS[k]) || v.desc || '' });
         }

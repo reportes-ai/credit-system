@@ -127,7 +127,7 @@
     let sortable = null, modoReordenar = false;
 
     async function cargar() {
-      let orden = null, placement = {}, funcInfo = [], modsBD = [];
+      let orden = null, placement = {}, funcInfo = [], modsBD = [], allFuncs = [];
       try {
         const [rO, rP, rM] = await Promise.all([
           fetch(`/api/config/ui/${CONFIG_KEY}`, { headers: H }),
@@ -138,7 +138,8 @@
         if (jO.success && Array.isArray(jO.data)) orden = jO.data;
         if (jP.success && jP.data) placement = jP.data;
         // funcionalidadesInfo: array {codigo, nombre, href, icono} desde BD
-        funcInfo = (jM.funcionalidadesInfo || []).filter(f => f.href && f.href.startsWith('/tesoreria/'));
+        allFuncs = jM.funcionalidadesInfo || [];
+        funcInfo = allFuncs.filter(f => f.href && f.href.startsWith('/tesoreria/'));
         if (jM.success && Array.isArray(jM.data)) modsBD = jM.data;
       } catch {}
 
@@ -169,8 +170,14 @@
       const nativeManifestKeys = new Set(Object.values(KEY));
       const nuevoIncoming = isNew ? (Array.isArray(placement['tesoreria']) ? placement['tesoreria'] : []) : null;
       const enTeso = k => isNew ? nuevoIncoming.includes(k) : placement[k] === 'tesoreria';
+      // Solo extras a los que el usuario tiene permiso (func de cualquier módulo o módulo completo)
+      const permHrefs = new Set([
+        ...allFuncs.filter(f => f.href).map(f => f.href.replace(/\/$/, '')),
+        ...modsBD.map(m => (m.ruta || '').replace(/\/$/, '')),
+      ]);
+      const permitido = h => !!h && permHrefs.has(String(h).replace(/\/$/, ''));
       const extrasSubitem = Object.entries(typeof PLACEMENT_ITEMS !== 'undefined' ? PLACEMENT_ITEMS : {})
-        .filter(([k]) => !nativeManifestKeys.has(k) && enTeso(k))
+        .filter(([k, v]) => !nativeManifestKeys.has(k) && enTeso(k) && permitido(v.href))
         .map(([k, v]) => ({ id: k, href: v.href, icon: v.icon, titulo: v.titulo, desc: v.desc || '' }));
 
       // Extras: módulos BD completos movidos aquí
