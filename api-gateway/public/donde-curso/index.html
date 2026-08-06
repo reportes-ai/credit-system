@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — Icono propio: letrero caminero de dos brazos -->
+<!-- v1.4 — leyenda del cuadro explica la discrepancia con la rentabilidad real -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -387,7 +387,17 @@ function pintar(R, D, plazo, saldo){
            ' cuotas con saldo ' + fCLP(saldo) + '.';
   } else if (D.prefCuadro) {
     const pc = D.prefCuadro === 'AF' ? 'AutoFin' : 'Unidad de Crédito';
-    nota = 'El cuadro de preferencia marca <b>' + pc + '</b> como primera opción para este tramo.';
+    const coincide = (D.veredicto === 'AUTOFIN' && D.prefCuadro === 'AF') ||
+                     (D.veredicto === 'UNIDAD'  && D.prefCuadro === 'UAC');
+    if (coincide) {
+      nota = 'Coincide con el cuadro de preferencia: <b>' + pc + '</b> es la primera opción para este tramo.';
+    } else if (D.veredicto === 'DECIDES_TU') {
+      nota = 'El cuadro de preferencia sugiere <b>' + pc + '</b> para este tramo; puedes usarlo para desempatar.';
+    } else {
+      // El cuadro en papel dice una cosa, la rentabilidad REAL de esta operación otra: manda la rentabilidad.
+      nota = 'El cuadro de preferencia general sugiere <b>' + pc + '</b> para este tramo, pero con los números ' +
+             'de <b>esta</b> operación (tasa, seguros y gastos) la rentabilidad favorece a la financiera indicada arriba — manda el cálculo real.';
+    }
   }
   $('notaCuadro').innerHTML = nota;
 }
