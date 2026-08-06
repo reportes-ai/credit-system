@@ -7,7 +7,7 @@
   <title>Cuentas Corrientes — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.1 — buscador filtra al escribir (debounce) -->
+  <!-- v1.2 — pestañas Resumen Gastos / Resumen Ingresos -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -58,6 +58,11 @@
     .footer-afecta { background:#f8fafc; border-left:4px solid var(--navy); border-radius:8px; padding:16px 20px; margin-top:26px; font-size:.83rem; color:#374151; }
     .footer-afecta h6 { font-weight:700; color:#111827; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
     .pager { display:flex; align-items:center; gap:10px; justify-content:flex-end; padding:12px 0 0; font-size:.83rem; color:#374151; }
+    .tabs { display:flex; gap:6px; }
+    .tab-btn { border:none; background:#e5e7eb; color:#374151; border-radius:8px 8px 0 0; padding:8px 18px; font-size:.83rem; font-weight:700; cursor:pointer; }
+    .tab-btn.act { background:#fff; color:var(--navy); }
+    .pct-bar { background:#e5e7eb; border-radius:4px; height:8px; min-width:90px; overflow:hidden; }
+    .pct-bar>div { height:100%; border-radius:4px; }
     dialog { border:none; border-radius:14px; padding:0; max-width:560px; width:94%; box-shadow:0 20px 60px rgba(0,0,0,.3); }
     dialog .dlg-head { padding:16px 22px; border-bottom:1px solid #e5e7eb; font-weight:700; }
     dialog .dlg-body { padding:20px 22px; max-height:60vh; overflow:auto; }
@@ -70,7 +75,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.1</span>
+      <span class="version-badge">v1.2</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -137,7 +142,12 @@
     <div class="stat"><div class="v" id="stRango">—</div><div class="l">Cartola cubre</div></div>
   </div>
 
-  <div class="panel">
+  <div class="tabs">
+    <button class="tab-btn act" id="tbMovs" onclick="setTab('movs')">Movimientos</button>
+    <button class="tab-btn" id="tbGastos" onclick="setTab('gastos')">Resumen Gastos</button>
+    <button class="tab-btn" id="tbIngresos" onclick="setTab('ingresos')">Resumen Ingresos</button>
+  </div>
+  <div class="panel" style="border-top-left-radius:0;">
     <div class="panel-body" style="overflow-x:auto;">
       <div id="tablaWrap"><div class="empty-state">Selecciona una cuenta</div></div>
       <div class="pager" id="pagerWrap" style="display:none;">
@@ -176,7 +186,15 @@ const fmt = n => '$' + Math.round(Number(n||0)).toLocaleString('es-CL');
 const fFecha = f => f ? String(f).slice(0,10).split('-').reverse().join('-') : '—';
 const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-let CUENTAS = [], PAG = 1, TOTAL = 0, POR = 100;
+let CUENTAS = [], PAG = 1, TOTAL = 0, POR = 100, TAB = 'movs';
+
+function setTab(t){
+  TAB = t;
+  $('tbMovs').classList.toggle('act', t==='movs');
+  $('tbGastos').classList.toggle('act', t==='gastos');
+  $('tbIngresos').classList.toggle('act', t==='ingresos');
+  resetYcargar();
+}
 
 (async function init(){
   try {
@@ -207,7 +225,45 @@ function cambiarCuenta(){
   $('fHasta').value = c.ultima_fecha  ? String(c.ultima_fecha).slice(0,10)  : '';
   resetYcargar();
 }
-function resetYcargar(){ PAG = 1; cargarMovs(); }
+function resetYcargar(){ PAG = 1; TAB === 'movs' ? cargarMovs() : cargarResumen(); }
+
+async function cargarResumen(){
+  const c = cta(); if (!c) return;
+  const tipo = TAB === 'gastos' ? 'CARGO' : 'ABONO';
+  const q = new URLSearchParams({ tipo });
+  if ($('fDesde').value) q.set('desde', $('fDesde').value);
+  if ($('fHasta').value) q.set('hasta', $('fHasta').value);
+  const j = await (await fetch(`/api/cuentas-corrientes/cuentas/${c.id}/resumen-tipos?` + q, { headers: H })).json();
+  if (!j.success) { $('tablaWrap').innerHTML = `<div class="empty-state">${esc(j.error)}</div>`; return; }
+  const { filas, gran_total } = j.data;
+  $('pagerWrap').style.display = 'none';
+  const et = TAB === 'gastos' ? 'Gastos' : 'Ingresos';
+  const color = TAB === 'gastos' ? '#dc2626' : '#15803d';
+  if (!filas.length) { $('tablaWrap').innerHTML = `<div class="empty-state">Sin ${et.toLowerCase()} en el período.</div>`; return; }
+  const nTrans = filas.reduce((s,f)=>s+Number(f.transacciones||0),0);
+  const fPct = p => (Math.round(p*10)/10).toLocaleString('es-CL') + '%';
+  $('tablaWrap').innerHTML = `
+    <table>
+      <thead><tr><th>Cuenta / tipo de transacción</th><th class="text-right">Transacciones</th>
+        <th class="text-right">Suma</th><th class="text-right">% del total</th><th style="width:120px"></th></tr></thead>
+      <tbody>${filas.map(f => `
+        <tr>
+          <td>${esc(f.cuenta)}</td>
+          <td class="text-right">${Number(f.transacciones).toLocaleString('es-CL')}</td>
+          <td class="text-right" style="color:${color};font-weight:700;white-space:nowrap">${fmt(f.total)}</td>
+          <td class="text-right" style="white-space:nowrap">${fPct(f.pct)}</td>
+          <td><div class="pct-bar"><div style="width:${Math.max(2,Math.min(100,f.pct))}%;background:${color}"></div></div></td>
+        </tr>`).join('')}
+        <tr>
+          <td style="font-weight:800;background:#f8fafc">TOTAL ${et.toUpperCase()}</td>
+          <td class="text-right" style="font-weight:800;background:#f8fafc">${nTrans.toLocaleString('es-CL')}</td>
+          <td class="text-right" style="font-weight:800;background:#f8fafc;color:${color}">${fmt(gran_total)}</td>
+          <td class="text-right" style="font-weight:800;background:#f8fafc">100%</td>
+          <td style="background:#f8fafc"></td>
+        </tr>
+      </tbody>
+    </table>`;
+}
 let _tBuscar = null;
 function buscarDebounce(){ clearTimeout(_tBuscar); _tBuscar = setTimeout(resetYcargar, 350); }
 function pagina(d){ PAG = Math.max(1, PAG + d); cargarMovs(); }

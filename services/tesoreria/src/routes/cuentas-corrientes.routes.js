@@ -9,6 +9,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 router.get('/cuentas',                verifyToken, puede, ctrl.cuentas);
 router.get('/cuentas/:id/movimientos', verifyToken, puede, ctrl.movimientos);
+router.get('/cuentas/:id/resumen-tipos', verifyToken, puede, ctrl.resumenTipos);
 router.post('/cuentas/:id/cartola',    verifyToken, puede, upload.single('archivo'), ctrl.cargarCartola);
 
 module.exports = router;

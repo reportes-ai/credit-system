@@ -96,6 +96,33 @@ const movimientos = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Resumen por tipo de transacción (Gastos / Ingresos) ────────────────────
+   Agrupa por descripción del movimiento: N° de transacciones, suma y % del
+   total del período. El signo lo decide el parámetro tipo (CARGO|ABONO). */
+const resumenTipos = async (req, res) => {
+  try {
+    const idConexion = parseInt(req.params.id, 10);
+    if (!idConexion) return fail(res, 'Cuenta inválida', 400);
+    const tipo = req.query.tipo === 'ABONO' ? 'ABONO' : 'CARGO';
+    const { desde, hasta } = req.query;
+    const cond = ['id_conexion=?', tipo === 'ABONO' ? 'monto>0' : 'monto<0'];
+    const args = [idConexion];
+    if (desde) { cond.push('fecha>=?'); args.push(desde); }
+    if (hasta) { cond.push('fecha<=?'); args.push(hasta); }
+    const [rows] = await pool.query(`
+      SELECT COALESCE(NULLIF(TRIM(descripcion),''),'(sin descripción)') AS cuenta,
+             COUNT(*) AS transacciones,
+             SUM(ABS(monto)) AS total
+      FROM banco_movimientos WHERE ${cond.join(' AND ')}
+      GROUP BY cuenta ORDER BY total DESC LIMIT 500`, args);
+    const granTotal = rows.reduce((s, r) => s + Number(r.total || 0), 0);
+    ok(res, {
+      tipo, gran_total: granTotal,
+      filas: rows.map(r => ({ ...r, pct: granTotal ? Number(r.total) / granTotal * 100 : 0 })),
+    });
+  } catch (e) { fail(res, e.message); }
+};
+
 /* ── Carga de cartola: anexa SOLO lo que no está (motor único) ──────────────── */
 const cargarCartola = async (req, res) => {
   try {
@@ -133,4 +160,4 @@ const cargarCartola = async (req, res) => {
   } catch (e) { fail(res, e.message, 400); }
 };
 
-module.exports = { cuentas, movimientos, cargarCartola };
+module.exports = { cuentas, movimientos, cargarCartola, resumenTipos };
