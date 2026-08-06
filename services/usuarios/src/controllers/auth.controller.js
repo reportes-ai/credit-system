@@ -248,4 +248,63 @@ const misPermisos = async (req, res) => {
   }
 };
 
-module.exports = { login, cambiarClave, misPermisos };
+/* ── VER COMO (impersonación de solo lectura) ────────────────────────────────
+   El Administrador obtiene un token de 30 minutos con la identidad y permisos
+   del usuario elegido, marcado `vc` (ver-como). verifyToken bloquea TODA
+   escritura de esos tokens: sirve para validar qué VE cada perfil, no para
+   operar a nombre de otro. Auditado siempre. */
+const verCome_migracion = require('../../../../shared/migrate').enFila('ver-como-func', async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '/usuarios%' LIMIT 1");
+    if (!mod) return;
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='usuarios_ver_como' LIMIT 1");
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [r] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?, 'Ver como (impersonación lectura)', 'usuarios_ver_como', NULL, 'bi-eye')", [mod.id_modulo]);
+      idF = r.insertId;
+    }
+    await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
+  } catch (e) { console.error('[ver-como migración]', e.message); }
+});
+
+const verComo = async (req, res) => {
+  try {
+    const idObjetivo = parseInt(req.body && req.body.id_usuario, 10);
+    if (!idObjetivo) return res.status(400).json({ success: false, data: null, error: 'id_usuario es obligatorio' });
+    if (idObjetivo === req.usuario.id_usuario) return res.status(400).json({ success: false, data: null, error: 'Ya estás viendo como tú mismo' });
+
+    const [[u]] = await pool.query(
+      `SELECT u.*, p.nombre AS perfil_nombre FROM usuarios u
+       JOIN perfiles p ON p.id_perfil = u.id_perfil
+       WHERE u.id_usuario = ? LIMIT 1`, [idObjetivo]);
+    if (!u) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
+    if (u.protegido === 1) return res.status(403).json({ success: false, data: null, error: 'Esa cuenta no admite Ver como' });
+
+    const payload = {
+      id_usuario: u.id_usuario, nombre: u.nombre, apellido: u.apellido, email: u.email,
+      id_perfil: u.id_perfil, perfil_nombre: u.perfil_nombre, id_supervisor: u.id_supervisor,
+      tv: Number(u.token_version || 0),
+      vc: req.usuario.id_usuario,                       // quién impersona (marca de solo lectura)
+      vc_nombre: `${req.usuario.nombre || ''} ${req.usuario.apellido || ''}`.trim(),
+    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30m' });
+    auditar({ req, accion: 'VER', modulo: 'usuarios', entidad: 'usuario', entidad_id: u.id_usuario,
+      detalle: `VER COMO: sesión de solo lectura como ${u.nombre} ${u.apellido || ''} (${u.perfil_nombre}), 30 min` });
+    res.json({
+      success: true, error: null,
+      data: {
+        token,
+        usuario: {
+          id_usuario: u.id_usuario, nombre: u.nombre, apellido: u.apellido, email: u.email,
+          perfil: u.perfil_nombre, pagina_inicio: u.pagina_inicio || null,
+          ver_como: true, ver_como_por: payload.vc_nombre,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, data: null, error: errMsg(error) });
+  }
+};
+
+module.exports = { login, cambiarClave, misPermisos, verComo };

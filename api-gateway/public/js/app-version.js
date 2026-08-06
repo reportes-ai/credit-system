@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v189.8';
+const APP_VERSION = 'v190.0';
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
@@ -34,6 +34,30 @@ const APP_VERSION = 'v189.8';
     return res;
   };
 })();
+
+/* ── 👁 MODO "VER COMO" — banner global de impersonación de solo lectura ──
+   El Administrador abre una pestaña como otro usuario (pestaña Ver como en
+   Usuarios). El token está marcado y el backend bloquea toda escritura; este
+   banner deja el modo siempre visible para que nunca se confunda la sesión. */
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    if (sessionStorage.getItem('ver_como') !== '1') return;
+    const u = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+    const b = document.createElement('div');
+    b.id = 'afVerComo';
+    b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(90deg,#6d28d9,#8b5cf6);color:#fff;padding:9px 18px;display:flex;align-items:center;gap:12px;font-family:system-ui;font-size:.86rem;box-shadow:0 -3px 14px rgba(0,0,0,.3)';
+    b.innerHTML = '<span style="font-size:1.05rem">👁</span>' +
+      '<span><b>Viendo como ' + (u.nombre || '') + ' ' + (u.apellido || '') + '</b> (' + (u.perfil || '') + ') — modo de solo lectura: puedes navegar, no operar.</span>' +
+      '<button id="afVerComoSalir" style="margin-left:auto;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 14px;font-weight:700;cursor:pointer">Salir del modo</button>';
+    document.body.appendChild(b);
+    document.body.style.paddingBottom = '46px';
+    document.getElementById('afVerComoSalir').onclick = () => {
+      sessionStorage.clear();
+      window.close();
+      setTimeout(() => location.href = '/login.html', 200); // si el navegador no deja cerrar la pestaña
+    };
+  } catch (e) {}
+});
 
 /* ── PWA: instalable como app de escritorio (ventana propia, sin barras) ──
    Inyecta el manifest y registra el service worker en TODAS las páginas.

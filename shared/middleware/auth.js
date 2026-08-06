@@ -110,6 +110,14 @@ const verifyToken = async (req, res, next) => {
     }
   }
 
+  /* VER COMO (impersonación del Administrador): token marcado `vc`. Sirve para
+     validar qué VE cada perfil — NUNCA para operar a su nombre. Se bloquea toda
+     escritura a nivel de middleware, así ninguna ruta depende de acordarse. */
+  if (payload && payload.vc && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return res.status(403).json({ success: false, data: null,
+      error: 'Modo "Ver como": solo lectura. Para operar, ingresa con tu propia cuenta.' });
+  }
+
   req.usuario = payload;
   req.user    = req.usuario;   // alias para controllers que usan req.user
   next();

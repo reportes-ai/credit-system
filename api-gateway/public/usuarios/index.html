@@ -229,6 +229,11 @@
           <i class="bi bi-person-badge me-1"></i>Credenciales
         </button>
       </li>
+      <li class="nav-item" id="tabVerComoNav" style="display:none">
+        <button class="nav-link" data-tab="vercomo" onclick="switchTab('vercomo')">
+          <i class="bi bi-eye me-1"></i>Ver como
+        </button>
+      </li>
     </ul>
 
     <!-- TAB: USUARIOS -->
@@ -658,6 +663,32 @@
       </div>
     </div>
 
+    <!-- TAB: VER COMO -->
+    <div id="tab-vercomo" style="display:none">
+      <div class="card"><div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="bi bi-eye me-2 text-primary"></i>Ver el sistema como otro usuario</h6>
+        <p class="text-muted" style="font-size:.85rem">
+          Abre una pestaña nueva donde ves y navegas <b>exactamente como ese usuario</b> (sus módulos, cards y permisos),
+          en <b>modo solo lectura</b>: el sistema bloquea cualquier acción de escritura. Sirve para validar que a cada
+          perfil no se le filtre nada que no deba ver. La sesión dura 30 minutos y queda registrada en Auditoría.
+        </p>
+        <div class="row g-3" style="max-width:760px">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Perfil</label>
+            <select id="vcPerfil" class="form-select" onchange="vcFiltrarUsuarios()"><option value="">Todos los perfiles</option></select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label fw-semibold">Usuario</label>
+            <select id="vcUsuario" class="form-select"></select>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary w-100" onclick="vcAbrir()"><i class="bi bi-box-arrow-up-right me-1"></i>Ver como</button>
+          </div>
+        </div>
+        <div id="vcAlert" class="alert alert-danger d-none mt-3" style="max-width:760px"></div>
+      </div></div>
+    </div>
+
     <!-- TAB: MAILS -->
     <div id="tab-mails" style="display:none">
       <div class="card"><div class="card-body">
@@ -978,12 +1009,13 @@
 
     // ── TABS ──────────────────────────────────────────────────
     function switchTab(tab) {
-      ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad', 'mails'].forEach(t => {
+      ['usuarios', 'suspendidos', 'permisos', 'miclave', 'seguridad', 'mails', 'vercomo'].forEach(t => {
         const el = document.getElementById(`tab-${t}`); if (el) el.style.display = t === tab ? '' : 'none';
       });
       document.querySelectorAll('.nav-tabs .nav-link').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === tab);
       });
+      if (tab === 'vercomo') vcPoblar();
       if (tab === 'permisos' && !perfilesData.length) cargarPerfiles();
       if (tab === 'seguridad') cargarSeguridad();
       if (tab === 'mails') cargarMails();
@@ -995,6 +1027,40 @@
         document.getElementById('buscadorSusp').value = '';
         renderSuspendidos(suspendidos());
       }
+    }
+
+    // ── VER COMO ──────────────────────────────────────────────
+    function vcPoblar() {
+      const act = activos().filter(u => !u.protegido);
+      const perfiles = [...new Set(act.map(u => u.perfil).filter(Boolean))].sort();
+      const sp = document.getElementById('vcPerfil');
+      if (sp.options.length <= 1)
+        sp.innerHTML = '<option value="">Todos los perfiles</option>' + perfiles.map(p => `<option>${p}</option>`).join('');
+      vcFiltrarUsuarios();
+    }
+    function vcFiltrarUsuarios() {
+      const perfil = document.getElementById('vcPerfil').value;
+      const act = activos().filter(u => !u.protegido && (!perfil || u.perfil === perfil));
+      document.getElementById('vcUsuario').innerHTML = act
+        .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''))
+        .map(u => `<option value="${u.id_usuario}">${u.nombre} ${u.apellido || ''} — ${u.perfil || ''}</option>`).join('')
+        || '<option value="">— sin usuarios —</option>';
+    }
+    async function vcAbrir() {
+      const id = parseInt(document.getElementById('vcUsuario').value, 10);
+      const al = document.getElementById('vcAlert');
+      al.classList.add('d-none');
+      if (!id) return;
+      try {
+        const r = await fetch('/api/auth/ver-como', { method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ id_usuario: id }) });
+        const j = await r.json();
+        if (!j.success) throw new Error(j.error);
+        // token + usuario viajan en el HASH (no llega al servidor ni queda en logs)
+        const u = btoa(unescape(encodeURIComponent(JSON.stringify(j.data.usuario))));
+        window.open('/ver-como.html#t=' + encodeURIComponent(j.data.token) + '&u=' + encodeURIComponent(u), '_blank');
+      } catch (e) { al.textContent = e.message; al.classList.remove('d-none'); }
     }
 
     // ── USUARIOS ──────────────────────────────────────────────
@@ -2094,6 +2160,9 @@
       // Tab Mails por permiso usuarios_mails o gestionar usuarios
       const _tabMails = document.getElementById('tabMailsNav');
       if (_tabMails) _tabMails.style.display = (tiene('usuarios_mails') || tiene('usuarios_gestionar')) ? '' : 'none';
+      // Tab Ver como por permiso usuarios_ver_como (Admin incluido vía tiene())
+      const _tabVC = document.getElementById('tabVerComoNav');
+      if (_tabVC) _tabVC.style.display = tiene('usuarios_ver_como') ? '' : 'none';
       const _tabSusp = document.getElementById('tabSuspNav');
       if (_tabSusp) _tabSusp.style.display = puedeUsuarios ? '' : 'none';
       if (!puedeUsuarios) document.querySelector('[data-tab="usuarios"]').closest('li').style.display = 'none';

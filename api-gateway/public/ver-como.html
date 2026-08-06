@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Ver como… — AutoFácil</title>
+  <!-- v1.0 — puente: instala la sesión de solo lectura y entra al sistema -->
+</head>
+<body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#374151">
+<div>Entrando en modo <b>Ver como</b>…</div>
+<script>
+// Recibe token+usuario en el hash (nunca en query: los hash no viajan al servidor ni quedan en logs)
+try {
+  const p = new URLSearchParams(location.hash.slice(1));
+  const token = p.get('t');
+  const usuario = JSON.parse(decodeURIComponent(escape(atob(p.get('u') || ''))) || '{}');
+  if (token && usuario && usuario.id_usuario) {
+    sessionStorage.clear();                       // esta pestaña queda 100% como el usuario objetivo
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('usuario', JSON.stringify(usuario));
+    sessionStorage.setItem('ver_como', '1');
+    history.replaceState(null, '', '/ver-como.html'); // borrar el token de la barra/historial
+    location.replace(usuario.pagina_inicio || '/');
+  } else {
+    document.body.innerHTML = '<div>Enlace inválido. Vuelve a <a href="/usuarios/">Usuarios</a> y usa la pestaña Ver como.</div>';
+  }
+} catch (e) {
+  document.body.innerHTML = '<div>Enlace inválido: ' + e.message + '</div>';
+}
+</script>
+</body>
+</html>
