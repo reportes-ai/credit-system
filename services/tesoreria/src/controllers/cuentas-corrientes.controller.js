@@ -74,7 +74,8 @@ const movimientos = async (req, res) => {
     const cond = ['id_conexion=?']; const args = [idConexion];
     if (desde) { cond.push('fecha>=?'); args.push(desde); }
     if (hasta) { cond.push('fecha<=?'); args.push(hasta); }
-    if (texto) { cond.push('(descripcion LIKE ? OR n_documento LIKE ? OR n_movimiento LIKE ?)'); const t = `%${texto}%`; args.push(t, t, t); }
+    // UPPER en ambos lados: la tabla usa collation binaria (case-sensitive) y "zor" no encontraba "ZORZETTO"
+    if (texto) { cond.push('(UPPER(descripcion) LIKE ? OR n_documento LIKE ? OR n_movimiento LIKE ?)'); const t = `%${texto}%`; args.push(t.toUpperCase(), t, t); }
     if (tipo === 'ABONO') cond.push('monto>0');
     if (tipo === 'CARGO') cond.push('monto<0');
     const where = cond.join(' AND ');
