@@ -51,8 +51,9 @@ router.delete('/niveles/:id',   verifyToken, requireFunc('dealer_aprob_config'),
 
 // Base de Parques — la ficha del parque como contraparte comercial (parques-base.controller.js).
 const parques = require('../controllers/parques-base.controller');
+// La CREACIÓN de un parque no tiene POST directo: pasa por el circuito de fichas
+// (nuevo.html?entidad=PARQUE → informes+IA → niveles → firma → cerrar crea el parque).
 router.get('/parques-base',           verifyToken, requireFunc('parque_ficha'), parques.listar);
-router.post('/parques-base',          verifyToken, requireFunc('parque_ficha'), parques.crear);
 router.put('/parques-base/:idParque', verifyToken, requireFunc('parque_ficha'), parques.guardar);
 router.get('/parques-base/:idParque/archivos',                verifyToken, requireFunc('parque_ficha'), parques.archivosListar);
 router.post('/parques-base/:idParque/archivos',               verifyToken, requireFunc('parque_ficha'), parques.archivoSubir);

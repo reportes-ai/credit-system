@@ -133,29 +133,6 @@ exports.listar = async (_req, res) => {
   } catch (e) { console.error('[parques-base listar]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-/* POST /parques-base — crea el PARQUE (fila en parques_comisiones) + su ficha.
-   El arriendo y la comisión nacen en 0: se fijan en su mantenedor, no aquí. */
-exports.crear = async (req, res) => {
-  try {
-    const nombre = norm(req.body?.nombre)?.toUpperCase();
-    if (!nombre) return res.status(400).json({ success: false, data: null, error: 'Nombre del parque requerido' });
-    const { f, error } = limpiarFicha(req.body || {});
-    if (error) return res.status(400).json({ success: false, data: null, error });
-
-    const [[dup]] = await pool.query('SELECT id FROM parques_comisiones WHERE nombre=?', [nombre]);
-    if (dup) return res.status(400).json({ success: false, data: null, error: 'Ya existe un parque con ese nombre' });
-
-    const [r] = await pool.query(
-      'INSERT INTO parques_comisiones (nombre, arriendo, comision_pct, activo, orden) VALUES (?,0,0,1,99)', [nombre]);
-    await pool.query(
-      `INSERT INTO parques_ficha (id_parque, ${CAMPOS.join(',')}) VALUES (?${',?'.repeat(CAMPOS.length)})`,
-      [r.insertId, ...CAMPOS.map(c => f[c])]);
-
-    auditar({ req, accion: 'CREAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: r.insertId, detalle: `Creó el parque "${nombre}" con su ficha`, meta: req.body });
-    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
-  } catch (e) { console.error('[parques-base crear]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
-};
-
 /* PUT /parques-base/:idParque — guarda/actualiza la ficha de un parque existente. */
 exports.guardar = async (req, res) => {
   try {

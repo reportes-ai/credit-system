@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.25 — la ficha entra siempre en una sola hoja carta -->
+  <!-- v1.26 — entidad PARQUE: mismo circuito, el cierre crea el parque -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -546,6 +546,23 @@ document.addEventListener('click', e=>{ const b=$('dealerResults'), i=$('dealerB
   if(b && i && !b.contains(e.target) && e.target!==i) b.style.display='none'; });
 
 let FICHA_ID = new URLSearchParams(location.search).get('id') || null;
+
+/* ── ENTIDAD: DEALER (default) o PARQUE — mismo circuito, distinto cierre ──
+   Con ?entidad=PARQUE la ficha incorpora un PARQUE como contraparte comercial:
+   se ocultan el tipo de ficha y la comisión pactada (los tramos son de dealers;
+   la comisión/arriendo del parque viven en su mantenedor) y al cerrar el caso
+   se crea el parque, no un dealer. */
+let ENTIDAD = (new URLSearchParams(location.search).get('entidad') || 'DEALER').toUpperCase() === 'PARQUE' ? 'PARQUE' : 'DEALER';
+function aplicarEntidadUI(){
+  if (ENTIDAD !== 'PARQUE') return;
+  document.title = 'Nueva Ficha de Parque — AutoFácil';
+  const mig = document.querySelector('.breadcrumb-nav span:last-child'); if (mig) mig.textContent = 'Nueva Ficha de Parque';
+  const h = document.querySelector('.main h2, .page-title'); if (h) h.innerHTML = '<i class="bi bi-p-square me-1"></i> Ficha de Incorporación de Parque';
+  // Fuera: selector de tipo (concepto de dealer; se fuerza GENERAL) y comisión pactada.
+  const tipoCard = document.querySelector('input[name=tipo]')?.closest('.card-sec'); if (tipoCard) tipoCard.style.display = 'none';
+  const comCard = $('com_6_12')?.closest('.card-sec'); if (comCard) comCard.style.display = 'none';
+  const nf = $('nombre_fantasia')?.closest('.fld')?.querySelector('label'); if (nf) nf.textContent = 'Nombre del Parque (fantasía)';
+}
 let ESTADO = 'BORRADOR';
 let fileB64 = null, fileName = null, fileMime = null;
 let EXC_COM = {}, EXC_LIST = [], _excResolve = null;   // excepciones + comentarios
@@ -560,7 +577,7 @@ function nombreFichaBase(){
   const rut = val('rut');
   const d = new Date();
   const my = String(d.getMonth()+1).padStart(2,'0') + d.getFullYear();
-  return 'Ficha Concesionario ' + nombre + (rut ? (' - ' + rut) : '') + ' - ' + my;
+  return (ENTIDAD==='PARQUE'?'Ficha Parque ':'Ficha Concesionario ') + nombre + (rut ? (' - ' + rut) : '') + ' - ' + my;
 }
 function nombreFichaArchivo(){
   const ext = (typeof fileName === 'string' && fileName.includes('.')) ? fileName.slice(fileName.lastIndexOf('.')) : '.pdf';
@@ -845,7 +862,7 @@ function onFile(){
 }
 
 function recolectar(){
-  const o = { tipo:getTipo(), fecha_solicitud:val('fecha_solicitud'), rut:val('rut'),
+  const o = { entidad:ENTIDAD, tipo:getTipo(), fecha_solicitud:val('fecha_solicitud'), rut:val('rut'),
     nombre_razon:val('nombre_razon'), nombre_fantasia:val('nombre_fantasia'),
     direccion:val('direccion'), comuna:val('comuna'), provincia:val('provincia'), region:val('region'),
     cc_nombre:val('cc_nombre'), cc_telefono:val('cc_telefono'), cc_email:val('cc_email'),
@@ -967,12 +984,13 @@ async function cargar(){
   await cargarGeo();
   await cargarComDefault();
   await cargarParques();
-  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); return; }
+  if (!FICHA_ID) { await cargarEjecutivos(); $('fecha_solicitud').value = new Date().toLocaleDateString('sv-SE',{timeZone:'America/Santiago'}); onTipo(); actualizarTercero(); onRepToggle(); onTipoCuenta(); aplicarEstadoUI('BORRADOR'); aplicarEntidadUI(); return; }
   try {
     const r = await fetch('/api/dealer-incorporacion/fichas/'+FICHA_ID, { headers:H });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     const f = j.data; ESTADO = f.estado; FICHA = f; TIENE_FICHA = !!f.tiene_ficha;
+    if (f.entidad === 'PARQUE') ENTIDAD = 'PARQUE';   // al reabrir, el modo lo manda la ficha
     setRadio('tipo', f.tipo); onTipo();
     await cargarEjecutivos(f.ejecutivo_nombre);
     ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','tipo_cuenta','nombre_cuenta','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
@@ -1020,6 +1038,7 @@ async function cargar(){
       if (f.estado==='AUTORIZADA' && $('fileFicha')) $('fileFicha').disabled=false;
     }
     aplicarEstadoUI(f.estado, f);
+    aplicarEntidadUI();
   } catch(e){ toast(e.message||'Error al cargar', true); }
 }
 
@@ -1031,10 +1050,11 @@ function imprimir(){
   const _prevTitle = document.title;
   document.title = nombreFichaBase();   // nombre sugerido al "Guardar como PDF"
   window.addEventListener('afterprint', function _r(){ document.title = _prevTitle; window.removeEventListener('afterprint', _r); });
+  const esParque = ENTIDAD==='PARQUE';   // ficha de PARQUE (entidad): sin tabla de comisión, títulos propios
   const esP = o.tipo==='PARQUE', esA = o.tipo==='AMBOS';
-  const dirLbl = esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
-  const comLbl = esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
-  const subt = esP?'Parque Automotriz':(esA?'Calle + Parque Automotriz':'');
+  const dirLbl = esParque?'Dirección del Parque':esP?'Dirección de Parque Automotriz':(esA?'Dirección de Sucursal (Calle)':'Dirección de Sucursal');
+  const comLbl = esParque?'Comuna del Parque':esP?'Comuna de Parque Automotriz':(esA?'Comuna de Sucursal (Calle)':'Comuna de Sucursal');
+  const subt = esParque?'Parque como contraparte comercial':esP?'Parque Automotriz':(esA?'Calle + Parque Automotriz':'');
   const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   const parqueNombreRow = (esP||esA) ? `<tr><td class="lbl">Nombre del Parque</td><td>${E(o.nombre_parque)}</td></tr>` : '';
   const parqueDirRows = esA ? `<tr><td class="lbl">Dirección de Parque</td><td>${E(o.direccion_parque)}</td></tr><tr><td class="lbl">Comuna de Parque</td><td>${E(o.comuna_parque)}</td></tr>` : '';
@@ -1045,12 +1065,16 @@ function imprimir(){
   const sociosRows = (o.socios && o.socios.length)
     ? o.socios.slice(0,3).map((s,i)=>`<tr><td class="lbl">Socio ${i+1}</td><td>${E(s.rut)}</td><td>${E(s.nombre)}</td></tr>`).join('')
     : `<tr><td class="lbl">Socio 1</td><td></td><td></td></tr>`;
+  const comTable = esParque ? '' : `
+    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
+      <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
+      ${comRows}</table>`;
   printHTML(`${LOGO_PRINT}
-    <h1${subt?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE CONCESIONARIO</h1>${subt?`<div class="subt">${subt}</div>`:''}
+    <h1${subt?'':' class="solo"'}>FICHA DE INCORPORACIÓN DE ${esParque?'PARQUE AUTOMOTRIZ':'CONCESIONARIO'}</h1>${subt?`<div class="subt">${subt}</div>`:''}
     <table class="p"><tr><th colspan="2">EJECUTIVO COMERCIAL</th></tr>
       <tr><td class="lbl">Nombre Ejecutivo</td><td>${E($('ejecutivo_nombre').value)}</td></tr>
       <tr><td class="lbl">Fecha de solicitud</td><td>${E(o.fecha_solicitud)}</td></tr></table>
-    <table class="p"><tr><th colspan="2">DATOS DE CONCESIONARIO</th></tr>
+    <table class="p"><tr><th colspan="2">DATOS DE${esParque?'L PARQUE':' CONCESIONARIO'}</th></tr>
       <tr><td class="lbl">Rut de Concesionario</td><td>${E(o.rut)}</td></tr>
       <tr><td class="lbl">Nombre Razón Social</td><td>${E(o.nombre_razon)}</td></tr>
       <tr><td class="lbl">Nombre de Fantasía</td><td>${E(o.nombre_fantasia)}</td></tr>
@@ -1080,9 +1104,7 @@ function imprimir(){
       <tr><td class="lbl">Nombre</td><td>${E(o.rl_nombre)}</td></tr>
       <tr><td class="lbl">Teléfono</td><td>${E(o.rl_telefono)}</td></tr>
       <tr><td class="lbl">Email</td><td>${E(o.rl_email)}</td></tr></table>
-    <table class="p"><tr><th colspan="5">COMISIÓN PACTADA${esA?' (Calle / Parque)':''}</th></tr>
-      <tr><td class="lbl">Cantidad de Cuotas</td><td>6 a 12</td><td>13 a 24</td><td>25 a 36</td><td>37 y Más</td></tr>
-      ${comRows}</table>
+    ${comTable}
     <table class="p"><tr><th colspan="4">TIPO DE DOCUMENTO TRIBUTARIO</th></tr>
       <tr><td class="lbl">Tipo de documento</td><td>BOLETA: ${celdaX(o.tipo_documento,'BOLETA')}</td><td>FACTURA: ${celdaX(o.tipo_documento,'FACTURA')}</td><td></td></tr></table>
     <table class="p"><tr><th colspan="4">FORMA DE PAGO SALDO PRECIO</th></tr>
@@ -1095,7 +1117,7 @@ function imprimir(){
       <tr><td class="lbl">Email Confirmación</td><td colspan="3">${E(o.correo_confirmacion)}</td></tr></table>
     <table class="p"><tr><th>OBSERVACIONES</th></tr><tr><td style="height:30px;vertical-align:top">${E(o.observaciones)}</td></tr></table>
     ${autorizacionesPrintHTML(E)}
-    <div class="firma"><div class="sign-space"></div><div class="line">Firma Representante Legal del Concesionario${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
+    <div class="firma"><div class="sign-space"></div><div class="line">Firma Representante Legal del ${esParque?"Parque":"Concesionario"}${o.rl_nombre?' · '+E(o.rl_nombre):''}</div></div>`);
 }
 // Autorizaciones internas (letra chica) que se imprimen en la ficha autorizada.
 function autorizacionesPrintHTML(E){

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creación de Parque — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -93,7 +93,7 @@
   <div class="card-box">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-weight:700;color:#111827"><i class="bi bi-list-ul me-1"></i>Base de parques</div>
-      <button class="btn-primary-af" onclick="abrirNuevo()"><i class="bi bi-plus-lg me-1"></i>Nuevo parque</button>
+      <a class="btn-primary-af" style="text-decoration:none" href="/dealers-incorporacion/nuevo.html?entidad=PARQUE"><i class="bi bi-plus-lg me-1"></i>Nuevo parque (ficha de incorporación)</a>
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
@@ -108,7 +108,8 @@
   <div class="footer-afecta">
     <h6><i class="bi bi-diagram-3"></i>Qué afecta este módulo</h6>
     <ul>
-      <li><b>Crear un parque</b> → lo agrega a la base y al mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>, donde se fijan su arriendo y comisión (aquí nacen en 0).</li>
+      <li><b>Crear un parque</b> → pasa por el <b>mismo circuito de la ficha de dealer</b> (informes comerciales + análisis IA → niveles de aprobación → imprimir y firmar → cierre del analista). Al cerrar el caso, el parque queda en esta base y en el mantenedor <a href="/mantenedores/parques/">Arriendos y Comisiones Parque y Calle</a>, donde se fijan su arriendo y comisión (nacen en 0).</li>
+      <li><b>Seguimiento de la ficha en trámite</b> → <a href="/dealers-incorporacion/mantencion.html">Mantención Dealers</a> (aparece marcada como <b>PARQUE</b>).</li>
       <li><b>Ficha del parque</b> (RUT, representantes, contactos, cuenta) → será la fuente de las <b>cartolas de parque</b> y su facturación (próxima etapa, flujo espejo de las <a href="/aprobaciones/?tab=cartolas">cartolas de dealers</a>).</li>
       <li><b>Arriendo y comisión</b> NO se editan aquí: viven en su <a href="/mantenedores/parques/">mantenedor</a> y alimentan el cálculo de comisiones y el P&amp;L.</li>
     </ul>
@@ -121,7 +122,7 @@
     <button onclick="document.getElementById('dlg').close()" style="background:none;border:none;color:#fff;font-size:1.2rem;cursor:pointer"><i class="bi bi-x-lg"></i></button>
   </div>
   <div class="dlg-body">
-    <div class="aviso" id="avisoNuevo" style="display:none"><i class="bi bi-info-circle me-1"></i>El parque se creará también en el mantenedor <b>Arriendos y Comisiones Parque y Calle</b> con arriendo y comisión en 0 — se fijan allá, no aquí.</div>
+    
     <div class="sec-title">Identificación</div>
     <div class="grid3">
       <div class="fld"><label>Nombre del parque *</label><input id="fNombre" placeholder="PARQUE …"></div>
@@ -233,24 +234,10 @@
     fCorreoConf:'correo_confirmacion', fObs:'observaciones',
   };
 
-  function abrirNuevo() {
-    EDIT = null;
-    document.getElementById('dlgTitulo').textContent = 'Nuevo parque';
-    document.getElementById('avisoNuevo').style.display = '';
-    document.getElementById('secDocs').style.display = 'none';
-    document.getElementById('avisoDocsNuevo').style.display = '';
-    document.getElementById('fNombre').disabled = false;
-    document.getElementById('fNombre').value = '';
-    for (const id of Object.keys(CAMPOS_UI)) document.getElementById(id).value = '';
-    document.getElementById('dlgError').textContent = '';
-    document.getElementById('dlg').showModal();
-  }
-
   function abrirEditar(idParque) {
     const p = PARQUES.find(x => x.id === idParque); if (!p) return;
     EDIT = idParque;
     document.getElementById('dlgTitulo').textContent = 'Ficha — ' + p.nombre;
-    document.getElementById('avisoNuevo').style.display = 'none';
     document.getElementById('fNombre').value = p.nombre;
     document.getElementById('fNombre').disabled = true;   // el nombre vive en su mantenedor
     for (const [id, campo] of Object.entries(CAMPOS_UI)) document.getElementById(id).value = p[campo] || '';
@@ -389,14 +376,7 @@
     for (const [campo, rotulo] of [['rut','RUT del parque'], ['rut_cuenta','RUT de la cuenta']]) {
       if (body[campo] && window.AF_RUT && !AF_RUT.normalizar(body[campo])) { err.textContent = `El ${rotulo} no es válido`; return; }
     }
-    let r;
-    if (EDIT == null) {
-      body.nombre = document.getElementById('fNombre').value.trim();
-      if (!body.nombre) { err.textContent = 'El nombre del parque es obligatorio'; return; }
-      r = await fetch('/api/dealer-incorporacion/parques-base', { method: 'POST', headers: HJ, body: JSON.stringify(body) });
-    } else {
-      r = await fetch('/api/dealer-incorporacion/parques-base/' + EDIT, { method: 'PUT', headers: HJ, body: JSON.stringify(body) });
-    }
+    const r = await fetch('/api/dealer-incorporacion/parques-base/' + EDIT, { method: 'PUT', headers: HJ, body: JSON.stringify(body) });
     const j = await r.json();
     if (!j.success) { err.textContent = j.error || 'Error al guardar'; return; }
     document.getElementById('dlg').close();

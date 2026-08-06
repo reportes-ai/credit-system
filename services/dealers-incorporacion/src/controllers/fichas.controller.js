@@ -136,6 +136,11 @@ require('../../../../shared/migrate').enFila('fichas', async () => {
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS comuna_parque    VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS provincia_parque VARCHAR(120) NULL`);
     await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS region_parque    VARCHAR(120) NULL`);
+    // ENTIDAD de la ficha: DEALER (concesionario) o PARQUE (el parque como contraparte
+    // comercial). El circuito es EL MISMO — informes, IA, niveles, firma —; solo el
+    // cierre bifurca: PARQUE crea el parque (parques_comisiones + parques_ficha).
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS entidad VARCHAR(10) NOT NULL DEFAULT 'DEALER'`);
+    await pool.query(`ALTER TABLE dealer_fichas ADD COLUMN IF NOT EXISTS id_parque_creado INT NULL`);
   } catch (e) { console.error('[dealer_fichas alter cols]', e.message); }
 
   // Archivos adjuntos múltiples (informes comerciales empresa/socios, hasta 3 c/u).
@@ -300,6 +305,7 @@ async function idsGerencia() {
 // ¿La comisión pactada de la ficha supera la PIZARRA de su tipo? → participación especial.
 async function esEspecial(f) {
   try {
+    if (f.entidad === 'PARQUE') return false;   // el parque no lleva tramos: no hay pizarra que superar
     const defs = await comDefaults();
     const gt = (v, base) => v != null && v !== '' && Number(v) > Number(base) + 1e-9;
     if (f.tipo === 'AMBOS') {
@@ -468,7 +474,7 @@ const setAlertasConfig = async (req, res) => {
 };
 
 // Campos editables de la ficha (todo menos workflow/archivo).
-const CAMPOS = ['tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
+const CAMPOS = ['entidad','tipo','ejecutivo_nombre','fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region',
   'nombre_parque','direccion_parque','comuna_parque','provincia_parque','region_parque',
   'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
   'rep_legal_origen','rl_nombre','rl_telefono','rl_email',
@@ -507,6 +513,7 @@ function armarValores(body) {
     if (!(k in body)) continue;
     if (k.startsWith('com_')) v[k] = num(body[k]);
     else if (k === 'tipo') { const t = norm(body[k]).toUpperCase(); v[k] = (t === 'PARQUE' || t === 'AMBOS') ? t : 'GENERAL'; }
+    else if (k === 'entidad') v[k] = norm(body[k]).toUpperCase() === 'PARQUE' ? 'PARQUE' : 'DEALER';
     else if (k === 'fecha_solicitud') v[k] = body[k] || null;
     else v[k] = norm(body[k]) || null;
   }
@@ -537,7 +544,7 @@ const listar = async (req, res) => {
       const like = '%' + q + '%'; vals.push(like, like, like, like); }
     const whereStr = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const [rows] = await pool.query(
-      `SELECT df.id, df.tipo, df.estado, df.id_ejecutivo, df.ejecutivo_nombre, df.fecha_solicitud, df.rut, df.nombre_razon, df.nombre_fantasia,
+      `SELECT df.id, df.entidad, df.tipo, df.estado, df.id_ejecutivo, df.ejecutivo_nombre, df.fecha_solicitud, df.rut, df.nombre_razon, df.nombre_fantasia,
               df.comuna, df.direccion, df.apelacion, df.tomada_por, df.tomada_por_nombre, df.revisor_nombre, df.fecha_revision, df.motivo_rechazo,
               df.com_6_12, df.com_13_24, df.com_25_36, df.com_37, df.tipo_documento, df.cuenta_tipo, df.banco, df.num_cuenta, df.rut_cuenta,
               df.cc_nombre, df.cc_telefono, df.cc_email, df.id_dealer, df.id_dealer_origen, df.part_especial, df.part_especial_por, df.nivel_actual,
@@ -557,7 +564,7 @@ const listar = async (req, res) => {
 const obtener = async (req, res) => {
   try {
     const [[f]] = await pool.query(
-      `SELECT id, tipo, estado, id_ejecutivo, ejecutivo_email, ejecutivo_nombre, fecha_solicitud,
+      `SELECT id, entidad, tipo, estado, id_ejecutivo, ejecutivo_email, ejecutivo_nombre, fecha_solicitud,
               rut, nombre_razon, nombre_fantasia, direccion, comuna, provincia, region,
               nombre_parque, direccion_parque, comuna_parque, provincia_parque, region_parque,
               cc_nombre, cc_telefono, cc_email, cf_nombre, cf_telefono, cf_email,
@@ -569,7 +576,7 @@ const obtener = async (req, res) => {
               excepciones, excepciones_comentarios, diferencias, firma_sospecha, firma_detalle, ficha_faltantes,
               ficha_nombre, ficha_mime, (ficha_data IS NOT NULL OR doc_ruta IS NOT NULL) AS tiene_ficha,
               tomada_por, tomada_por_nombre, fecha_tomada, revisor_id, revisor_nombre, fecha_revision,
-              motivo_rechazo, apelacion, id_dealer, id_dealer_origen, nivel_actual,
+              motivo_rechazo, apelacion, id_dealer, id_dealer_origen, id_parque_creado, nivel_actual,
               socios, informes_resumen, informes_alerta_grave,
               part_especial, part_especial_por, part_especial_fecha, created_at, updated_at
        FROM dealer_fichas WHERE id = ?`, [req.params.id]);
@@ -613,13 +620,15 @@ const crear = async (req, res) => {
     if (!v.tipo) v.tipo = 'GENERAL';
     // Comisiones por defecto (derivadas de la pizarra Parque/Calle) si no vienen.
     // AMBOS: tabla CALLE (com_*) ← pizarra calle (GENERAL); tabla PARQUE (com_parque_*) ← pizarra parque.
-    const defs = await comDefaults();
-    const def = v.tipo === 'AMBOS' ? defs.GENERAL : (defs[v.tipo] || defs.GENERAL);
-    for (const k of ['com_6_12','com_13_24','com_25_36','com_37'])
-      if (v[k] == null) v[k] = def[k];
-    if (v.tipo === 'AMBOS')
-      for (const k of ['6_12','13_24','25_36','37'])
-        if (v['com_parque_' + k] == null) v['com_parque_' + k] = defs.PARQUE['com_' + k];
+    if (v.entidad !== 'PARQUE') {   // un PARQUE no lleva tramos de comisión (esa vive en su mantenedor)
+      const defs = await comDefaults();
+      const def = v.tipo === 'AMBOS' ? defs.GENERAL : (defs[v.tipo] || defs.GENERAL);
+      for (const k of ['com_6_12','com_13_24','com_25_36','com_37'])
+        if (v[k] == null) v[k] = def[k];
+      if (v.tipo === 'AMBOS')
+        for (const k of ['6_12','13_24','25_36','37'])
+          if (v['com_parque_' + k] == null) v['com_parque_' + k] = defs.PARQUE['com_' + k];
+    }
     const u = req.usuario;
     // ejecutivo_nombre es editable (otro Ejecutivo/Jefe Comercial/Analista); default = creador.
     if (!v.ejecutivo_nombre) v.ejecutivo_nombre = [u.nombre, u.apellido].filter(Boolean).join(' ') || null;
@@ -735,6 +744,7 @@ const verFicha = async (req, res) => {
 async function calcularDiferencias(f) {
   const dif = [];
   try {
+    if (f.entidad === 'PARQUE') return dif;   // el parque no se compara contra la base de dealers
     const [rows] = await pool.query('SELECT * FROM dealers WHERE rut IS NOT NULL', []);
     // Compara contra el dealer que la ficha declara modificar (id_dealer_origen);
     // si no, cae al match por RUT (RUT es UNIQUE en dealers).
@@ -1163,6 +1173,39 @@ async function finalizarDealer(f) {
   return { idDealer: d.insertId, numero: maxN, esMod: false };
 }
 
+/* Crea (o actualiza si ya existe uno con el mismo nombre) el PARQUE a partir de la
+   ficha aprobada: fila en parques_comisiones (arriendo/comisión nacen en 0 — se
+   fijan en su mantenedor) + ficha comercial en parques_ficha. */
+async function finalizarParque(f) {
+  const nombre = String(f.nombre_fantasia || f.nombre_razon || '').trim().toUpperCase();
+  if (!nombre) throw new Error('La ficha no tiene nombre de parque');
+  const [[ex]] = await pool.query('SELECT id FROM parques_comisiones WHERE nombre=?', [nombre]);
+  let idParque = ex?.id, esMod = !!ex;
+  if (!idParque) {
+    const [r] = await pool.query('INSERT INTO parques_comisiones (nombre, arriendo, comision_pct, activo, orden) VALUES (?,0,0,1,99)', [nombre]);
+    idParque = r.insertId;
+  }
+  const campos = ['rut','razon_social','direccion','comuna','rl_nombre','rl_telefono','rl_email',
+    'cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email',
+    'tipo_documento','banco','cuenta_tipo','rut_cuenta','nombre_cuenta','num_cuenta',
+    'correo_confirmacion','observaciones'];
+  const vals = {
+    rut: RUT.normalizar(f.rut) || f.rut, razon_social: f.nombre_razon,
+    direccion: f.direccion, comuna: f.comuna,
+    rl_nombre: f.rl_nombre, rl_telefono: f.rl_telefono, rl_email: f.rl_email,
+    cc_nombre: f.cc_nombre, cc_telefono: f.cc_telefono, cc_email: f.cc_email,
+    cf_nombre: f.cf_nombre, cf_telefono: f.cf_telefono, cf_email: f.cf_email,
+    tipo_documento: f.tipo_documento, banco: f.banco, cuenta_tipo: f.tipo_cuenta,
+    rut_cuenta: RUT.normalizar(f.rut_cuenta) || f.rut_cuenta, nombre_cuenta: f.nombre_cuenta,
+    num_cuenta: f.num_cuenta, correo_confirmacion: f.correo_confirmacion, observaciones: f.observaciones,
+  };
+  await pool.query(
+    `INSERT INTO parques_ficha (id_parque, ${campos.join(',')}) VALUES (?${',?'.repeat(campos.length)})
+     ON DUPLICATE KEY UPDATE ${campos.map(c => `${c}=VALUES(${c})`).join(',')}`,
+    [idParque, ...campos.map(c => vals[c] ?? null)]);
+  return { idParque, nombre, esMod };
+}
+
 // Aviso al ejecutivo (+ analista si lo cerró Gerencia) cuando el dealer queda creado/actualizado.
 async function avisarFinalizado(f, numero, esMod, sello) {
   const avisar = new Set();
@@ -1184,6 +1227,24 @@ const cerrar = async (req, res) => {
     if (!['PEND_CIERRE', 'TOMADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha no está en revisión de cierre' });
     if (!f.ficha_data && !f.doc_ruta) return res.status(400).json({ success: false, data: null, error: 'No hay ficha firmada para cerrar' });
+
+    // ENTIDAD PARQUE: mismo circuito, distinto final — se crea el parque, no un dealer.
+    if (f.entidad === 'PARQUE') {
+      const { idParque, nombre: nomParque, esMod: parqueMod } = await finalizarParque(f);
+      const quien = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+      await pool.query(
+        `UPDATE dealer_fichas SET estado='APROBADA', revisor_id=?, revisor_nombre=?, fecha_revision=NOW(), motivo_rechazo=NULL, id_parque_creado=? WHERE id=?`,
+        [req.usuario.id_usuario, quien, idParque, req.params.id]);
+      await pool.query('DELETE FROM notificaciones WHERE clave=? AND leida=0', [`dealerficha:${f.id}:rev`]).catch(() => {});
+      await notificarEventoDealer('dealer_cerrada', { idsBase: [f.id_ejecutivo].filter(Boolean),
+        titulo: parqueMod ? '✅ Parque actualizado' : '✅ Parque creado',
+        mensaje: `Tu ficha de ${nomParque} fue aprobada — el parque ${parqueMod ? 'fue actualizado' : 'ya está'} en el sistema. Su arriendo y comisión se fijan en Arriendos y Comisiones Parque y Calle.`,
+        href: '/dealers-incorporacion/parques.html' });
+      auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
+        detalle: `Cerró la ficha de PARQUE ${nomParque} → parque #${idParque}${parqueMod ? ' (actualización)' : ''}`, rut: f.rut, meta: { id_parque: idParque, modificacion: parqueMod } });
+      return res.json({ success: true, data: { estado: 'APROBADA', id_parque: idParque, modificacion: parqueMod, entidad: 'PARQUE' }, error: null });
+    }
+
     const { idDealer, numero, esMod } = await finalizarDealer(f);
     const nombre = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     await pool.query(

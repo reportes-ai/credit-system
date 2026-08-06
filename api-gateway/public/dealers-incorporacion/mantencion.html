@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.13 — breadcrumb homologado -->
+  <!-- v1.14 — fichas de entidad PARQUE marcadas en las listas -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -251,7 +251,7 @@ function renderHistoricas(){
         ? `<span class="estado-pill" style="background:#dcfce7;color:#166534"><i class="bi bi-patch-check-fill"></i> APROBADO</span>`
         : `<span class="estado-pill" style="background:#fee2e2;color:#991b1b"><i class="bi bi-x-octagon-fill"></i> RECHAZADO</span>`;
       return `<tr>
-        <td>${f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
+        <td>${f.entidad==='PARQUE'?'<i class="bi bi-p-square"></i> <b>PARQUE</b>':f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
         <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.id_dealer_origen?'<div class="alert-row"><span class="alert-chip" style="background:#ffedd5;color:#9a3412"><i class="bi bi-pencil-square"></i> modificación</span></div>':''}</td>
         <td>${escH(f.rut||'—')}</td>
         <td>${escH(f.ejecutivo_nombre||'—')}</td>
@@ -282,7 +282,7 @@ function renderRevision(){
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
     <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Ejecutivo</th><th>Comisión</th><th>Estado</th><th>Enviada</th><th></th></tr></thead><tbody>${
     rows.map(f=>`<tr>
-      <td>${f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
+      <td>${f.entidad==='PARQUE'?'<i class="bi bi-p-square"></i> <b>PARQUE</b>':f.tipo==='AMBOS'?'<i class="bi bi-signpost-split"></i> Ambos':(f.tipo==='PARQUE'?'<i class="bi bi-car-front"></i> Parque':'<i class="bi bi-shop"></i> General')}</td>
       <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.apelacion?`<div class="apel-line"><i class="bi bi-megaphone"></i> Apelación: ${escH(f.apelacion)}</div>`:''}${alertasFila(f)}</td>
       <td>${escH(f.rut||'—')}</td>
       <td>${escH(f.ejecutivo_nombre||'—')}</td>
@@ -321,7 +321,7 @@ function renderMias(){
   $('contenido').innerHTML = `<table class="tb"><thead><tr>
     <th>Tipo</th><th>Concesionario</th><th>RUT</th><th>Estado</th><th>Actualizada</th><th>N° Dealer</th><th></th></tr></thead><tbody>${
     rows.map(f=>`<tr>
-      <td>${f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General')}</td>
+      <td>${f.entidad==='PARQUE'?'PARQUE (entidad)':f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General')}</td>
       <td><b>${escH(f.nombre_razon||f.nombre_fantasia||'—')}</b>${f.estado==='RECHAZADA'&&f.motivo_rechazo?`<div class="motivo-line"><i class="bi bi-x-octagon"></i> ${escH(f.motivo_rechazo)}</div>`:''}</td>
       <td>${escH(f.rut||'—')}</td>
       <td><span class="estado-pill e-${f.estado}">${f.estado.replace('_',' ')}</span></td>
@@ -356,7 +356,7 @@ async function verFicha(id, revisar, historico){
   try {
     const r=await fetch('/api/dealer-incorporacion/fichas/'+id,{headers:H}); const j=await r.json();
     if(!j.success) throw new Error(j.error); const f=j.data;
-    $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General'));
+    $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.entidad==='PARQUE'?'Ficha de PARQUE':f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General'));
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
     // Adjuntos (ficha firmada + informes comerciales)
     let adjHtml = '';
