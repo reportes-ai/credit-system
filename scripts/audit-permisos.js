@@ -104,6 +104,25 @@ const pool = require('../shared/config/database');
     sinCablear.forEach(x => console.log('    ', x));
   }
 
+  titulo('9. LA MATRIZ MANDA: toda card del manifiesto debe existir en la matriz');
+  // Regla de oro: una card que no está en funcionalidades/modulos no se puede
+  // gobernar desde Perfiles y Permisos → es una fuga en potencia. Detectarla acá.
+  try {
+    const vm = require('vm');
+    const src = require('fs').readFileSync(__dirname + '/../api-gateway/public/js/placement-manifest.js', 'utf8');
+    const ctx = {}; vm.createContext(ctx);
+    vm.runInContext(src.replace(/\bconst\b/g, 'var'), ctx);
+    const items = ctx.PLACEMENT_ITEMS || {};
+    const [fh] = await pool.query('SELECT href FROM funcionalidades WHERE href IS NOT NULL');
+    const [mr] = await pool.query("SELECT ruta FROM modulos WHERE estado='activo'");
+    const norm = h => String(h || '').replace(/\/$/, '');
+    const enMatriz = new Set([...fh.map(x => norm(x.href)), ...mr.map(x => norm(x.ruta))]);
+    const huerfanas = Object.entries(items).filter(([, v]) => v.href && !enMatriz.has(norm(v.href)));
+    huerfanas.length
+      ? huerfanas.forEach(([k, v]) => mal(`Card "${v.titulo}" (${v.href}) NO existe en la matriz — nadie puede controlarla desde Perfiles y Permisos`))
+      : ok('Las ' + Object.keys(items).length + ' cards del manifiesto están todas representadas en la matriz');
+  } catch (e) { console.log('  (no se pudo evaluar el manifiesto: ' + e.message + ')'); }
+
   console.log('\n' + '─'.repeat(50));
   console.log(problemas ? `✗ ${problemas} problema(s) crítico(s) encontrados` : '✓ Integridad OK — sin problemas críticos');
   process.exit(problemas ? 1 : 0);
