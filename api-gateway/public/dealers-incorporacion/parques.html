@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creación de Parque — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -167,6 +167,14 @@
       <div class="fld"><label>Correo confirmación de depósitos</label><input id="fCorreoConf" type="email"></div>
       <div class="fld"><label>Observaciones</label><input id="fObs"></div>
     </div>
+    <div id="secDocs" style="display:none">
+      <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Documentos de respaldo</span>
+        <button class="btn-mini" onclick="imprimirFicha()"><i class="bi bi-printer me-1"></i>Imprimir ficha</button>
+      </div>
+      <div id="docsGrupos"></div>
+    </div>
+    <div id="avisoDocsNuevo" class="aviso" style="display:none"><i class="bi bi-paperclip me-1"></i>Guarda el parque primero: después podrás imprimir la ficha y subir la firmada, los poderes/escritura y las cédulas de los firmantes.</div>
     <div id="dlgError" style="color:#b91c1c;font-size:.8rem;font-weight:600;margin-top:12px"></div>
   </div>
   <div class="dlg-foot">
@@ -229,6 +237,8 @@
     EDIT = null;
     document.getElementById('dlgTitulo').textContent = 'Nuevo parque';
     document.getElementById('avisoNuevo').style.display = '';
+    document.getElementById('secDocs').style.display = 'none';
+    document.getElementById('avisoDocsNuevo').style.display = '';
     document.getElementById('fNombre').disabled = false;
     document.getElementById('fNombre').value = '';
     for (const id of Object.keys(CAMPOS_UI)) document.getElementById(id).value = '';
@@ -245,7 +255,130 @@
     document.getElementById('fNombre').disabled = true;   // el nombre vive en su mantenedor
     for (const [id, campo] of Object.entries(CAMPOS_UI)) document.getElementById(id).value = p[campo] || '';
     document.getElementById('dlgError').textContent = '';
+    document.getElementById('secDocs').style.display = '';
+    document.getElementById('avisoDocsNuevo').style.display = 'none';
+    cargarDocs();
     document.getElementById('dlg').showModal();
+  }
+
+  /* ═══ Documentos de respaldo ═══ */
+  const CATS = [
+    { cod: 'FIRMADA', rotulo: 'Ficha firmada',              icono: 'bi-file-earmark-check' },
+    { cod: 'PODERES', rotulo: 'Poderes y escritura',        icono: 'bi-file-earmark-ruled' },
+    { cod: 'CEDULA',  rotulo: 'Cédulas de los firmantes',   icono: 'bi-person-vcard' },
+  ];
+  const fmtKB = b => b ? (b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.round(b/1024)+' KB') : '';
+
+  async function cargarDocs() {
+    if (EDIT == null) return;
+    const j = await (await fetch(`/api/dealer-incorporacion/parques-base/${EDIT}/archivos`, { headers: H })).json();
+    const docs = j.data || [];
+    document.getElementById('docsGrupos').innerHTML = CATS.map(c => {
+      const de = docs.filter(d => d.categoria === c.cod);
+      const filas = de.map(d => `
+        <div style="display:flex;align-items:center;gap:8px;font-size:.8rem;padding:3px 0">
+          <a href="#" onclick="verDoc(${d.id});return false" style="color:var(--navy);text-decoration:none"><i class="bi bi-file-earmark me-1"></i>${esc(d.nombre)}</a>
+          <span style="color:#94a3b8;font-size:.72rem">${fmtKB(d.doc_bytes)}${d.subido_por ? ' · ' + esc(d.subido_por) : ''}</span>
+          <button onclick="borrarDoc(${d.id})" style="background:none;border:none;color:#dc2626;cursor:pointer;padding:0 4px" title="Eliminar"><i class="bi bi-trash"></i></button>
+        </div>`).join('') || '<div style="font-size:.75rem;color:#94a3b8;padding:3px 0">Sin archivos</div>';
+      return `
+        <div style="border:1px solid #eef1f5;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:.78rem;font-weight:700;color:#334155"><i class="bi ${c.icono} me-1"></i>${c.rotulo}</div>
+            <label class="btn-mini" style="margin:0;cursor:pointer"><i class="bi bi-upload me-1"></i>Subir
+              <input type="file" hidden accept=".pdf,.jpg,.jpeg,.png" onchange="subirDoc('${c.cod}', this)">
+            </label>
+          </div>
+          ${filas}
+        </div>`;
+    }).join('');
+  }
+
+  async function subirDoc(cat, input) {
+    const file = input.files[0]; if (!file) return;
+    input.value = '';
+    if (file.size > 15 * 1024 * 1024) { alert('El archivo supera los 15 MB'); return; }
+    const b64 = await new Promise((ok, ko) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result).split(',')[1]);
+      r.onerror = ko; r.readAsDataURL(file);
+    });
+    const j = await (await fetch(`/api/dealer-incorporacion/parques-base/${EDIT}/archivos`, {
+      method: 'POST', headers: HJ,
+      body: JSON.stringify({ categoria: cat, archivo_nombre: file.name, mime_type: file.type, archivo_data: b64 }),
+    })).json();
+    if (!j.success) { alert(j.error || 'Error al subir'); return; }
+    cargarDocs();
+  }
+
+  async function verDoc(id) {
+    const r = await fetch(`/api/dealer-incorporacion/parques-base/${EDIT}/archivos/${id}`, { headers: H });
+    if (!r.ok) { alert('No se pudo abrir el archivo'); return; }
+    const url = URL.createObjectURL(await r.blob());
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  async function borrarDoc(id) {
+    if (!confirm('¿Eliminar este documento?')) return;
+    const j = await (await fetch(`/api/dealer-incorporacion/parques-base/${EDIT}/archivos/${id}`, { method: 'DELETE', headers: H })).json();
+    if (!j.success) { alert(j.error || 'Error al eliminar'); return; }
+    cargarDocs();
+  }
+
+  /* ═══ Imprimir ficha ═══ */
+  function imprimirFicha() {
+    const p = PARQUES.find(x => x.id === EDIT) || {};
+    const v = id => esc(document.getElementById(id).value || '—');
+    const fila = (rot, val) => `<tr><td class="r">${rot}</td><td>${val}</td></tr>`;
+    const sec = t => `<tr><th colspan="2">${t}</th></tr>`;
+    const hoy = new Date().toLocaleDateString('es-CL');
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Ficha de Parque — ${esc(p.nombre || '')}</title>
+      <style>
+        body { font-family:'Segoe UI',Arial,sans-serif; margin:36px; color:#111; font-size:13px; }
+        h2 { margin:0; font-size:18px; } .sub { color:#555; font-size:11px; margin-bottom:18px; }
+        table { width:100%; border-collapse:collapse; margin-bottom:6px; }
+        th { background:#eef2ff; color:#0141A2; text-align:left; padding:6px 10px; font-size:11px; text-transform:uppercase; letter-spacing:.5px; border:1px solid #cbd5e1; }
+        td { border:1px solid #cbd5e1; padding:6px 10px; }
+        td.r { width:220px; color:#475569; font-weight:600; background:#f8fafc; }
+        .firmas { display:flex; gap:40px; margin-top:70px; }
+        .firma { flex:1; border-top:1px solid #111; text-align:center; padding-top:6px; font-size:12px; }
+        @media print { body { margin:14mm; } }
+      </style></head><body>
+      <h2>Ficha de Incorporación de Parque Automotriz</h2>
+      <div class="sub">AutoFácil Crédito Automotriz · emitida el ${hoy}</div>
+      <table>
+        ${sec('Identificación')}
+        ${fila('Nombre del parque', esc(p.nombre || ''))}
+        ${fila('RUT', v('fRut'))}
+        ${fila('Razón social', v('fRazon'))}
+        ${fila('Dirección', v('fDireccion') + ' — ' + v('fComuna'))}
+        ${sec('Representante legal')}
+        ${fila('Nombre', v('fRlNombre'))}
+        ${fila('Teléfono / Email', v('fRlTelefono') + ' · ' + v('fRlEmail'))}
+        ${sec('Contacto comercial')}
+        ${fila('Nombre', v('fCcNombre'))}
+        ${fila('Teléfono / Email', v('fCcTelefono') + ' · ' + v('fCcEmail'))}
+        ${sec('Contacto finanzas / facturación')}
+        ${fila('Nombre', v('fCfNombre'))}
+        ${fila('Teléfono / Email', v('fCfTelefono') + ' · ' + v('fCfEmail'))}
+        ${sec('Facturación y cuenta de depósito')}
+        ${fila('Documento que emite', v('fTipoDoc'))}
+        ${fila('Banco / Tipo de cuenta', v('fBanco') + ' · ' + v('fCuentaTipo'))}
+        ${fila('RUT de la cuenta', v('fRutCuenta'))}
+        ${fila('Nombre de la cuenta', v('fNombreCuenta'))}
+        ${fila('N° de cuenta', v('fNumCuenta'))}
+        ${fila('Correo confirmación de depósitos', v('fCorreoConf'))}
+        ${fila('Observaciones', v('fObs'))}
+      </table>
+      <div class="firmas">
+        <div class="firma">Representante legal del parque<br>Nombre, RUT y firma</div>
+        <div class="firma">AutoFácil Crédito Automotriz<br>Nombre, RUT y firma</div>
+      </div>
+      <script>window.onload = () => window.print();<\/script>
+      </body></html>`);
+    w.document.close();
   }
 
   async function guardar() {

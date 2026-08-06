@@ -17,6 +17,7 @@
 const pool = require('../../../../shared/config/database');
 const RUT = require('../../../../api-gateway/public/js/rut-core');
 const { auditar } = require('../../../../shared/audit');
+const almacen = require('../../../../shared/almacen-docs');
 
 /* ── Migración: tabla + card en el módulo Creación/Mantenedor de Dealer ───── */
 require('../../../../shared/migrate').enFila('parques-base', async () => {
@@ -51,6 +52,28 @@ require('../../../../shared/migrate').enFila('parques-base', async () => {
         UNIQUE KEY uq_parque (id_parque)
       )`);
   } catch (e) { if (e.errno !== 1050) console.error('[parques_ficha migration]', e.message); }
+
+  // Documentos de respaldo del parque: ficha firmada, poderes/escritura y cédulas
+  // de los firmantes. Los archivos van al bucket vía shared/almacen-docs (la
+  // columna `data` existe SOLO como fallback cuando no hay GCS_BUCKET — local y
+  // staging; en producción queda NULL y el contenido vive en gs://autofacil-docs).
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS parques_ficha_archivos (
+        id          INT AUTO_INCREMENT PRIMARY KEY,
+        id_parque   INT          NOT NULL,
+        categoria   VARCHAR(20)  NOT NULL,
+        nombre      VARCHAR(200) NULL,
+        mime        VARCHAR(100) NULL,
+        data        LONGBLOB     NULL,
+        doc_storage VARCHAR(10)  NOT NULL DEFAULT 'db',
+        doc_ruta    VARCHAR(500) NULL,
+        doc_bytes   BIGINT       NULL,
+        subido_por  VARCHAR(200) NULL,
+        created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_parque (id_parque)
+      )`);
+  } catch (e) { if (e.errno !== 1050) console.error('[parques_ficha_archivos migration]', e.message); }
 
   // Card en el landing del módulo 370001 + permiso (Admin y quienes mantienen dealers).
   try {
@@ -150,4 +173,75 @@ exports.guardar = async (req, res) => {
     auditar({ req, accion: 'EDITAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: idParque, detalle: `Editó la ficha del parque "${p.nombre}"`, meta: req.body });
     res.json({ success: true, data: null, error: null });
   } catch (e) { console.error('[parques-base guardar]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── Documentos de respaldo ───────────────────────────────────────────────── */
+const CATEGORIAS = ['FIRMADA', 'PODERES', 'CEDULA'];   // ficha firmada · poderes y escritura · cédulas de los firmantes
+const MAX_POR_CAT = 5;
+const MAX_MB = 15;
+
+/* GET /parques-base/:idParque/archivos — lista (sin el contenido). */
+exports.archivosListar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, categoria, nombre, mime, doc_bytes, subido_por, created_at
+         FROM parques_ficha_archivos WHERE id_parque=? ORDER BY categoria, id`, [Number(req.params.idParque)]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[parques-base archivos]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* POST /parques-base/:idParque/archivos — sube un documento (base64). */
+exports.archivoSubir = async (req, res) => {
+  try {
+    const idParque = Number(req.params.idParque);
+    const { categoria, archivo_nombre, mime_type, archivo_data } = req.body || {};
+    const cat = String(categoria || '').toUpperCase();
+    if (!CATEGORIAS.includes(cat)) return res.status(400).json({ success: false, data: null, error: 'Categoría inválida' });
+    if (!archivo_data) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
+    const [[p]] = await pool.query('SELECT id, nombre FROM parques_comisiones WHERE id=?', [idParque]);
+    if (!p) return res.status(404).json({ success: false, data: null, error: 'Parque no encontrado' });
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) n FROM parques_ficha_archivos WHERE id_parque=? AND categoria=?', [idParque, cat]);
+    if (n >= MAX_POR_CAT) return res.status(400).json({ success: false, data: null, error: `Máximo ${MAX_POR_CAT} archivos por categoría` });
+    const buffer = Buffer.from(String(archivo_data), 'base64');
+    if (!buffer.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
+    if (buffer.length > MAX_MB * 1024 * 1024) return res.status(400).json({ success: false, data: null, error: `El archivo supera los ${MAX_MB} MB` });
+
+    const d = await almacen.colocar({ ambito: 'parques-archivos', clave: idParque, buffer, mime: mime_type, nombre: archivo_nombre || 'archivo' });
+    const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || null;
+    const [r] = await pool.query(
+      `INSERT INTO parques_ficha_archivos (id_parque, categoria, nombre, mime, data, doc_storage, doc_ruta, doc_bytes, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [idParque, cat, archivo_nombre || 'archivo', mime_type || 'application/octet-stream', d.blob, d.storage, d.ruta, d.bytes, quien]);
+    auditar({ req, accion: 'EDITAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: idParque,
+      detalle: `Subió documento (${cat}) al parque "${p.nombre}": ${archivo_nombre || ''}` });
+    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+  } catch (e) { console.error('[parques-base archivo subir]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* GET /parques-base/:idParque/archivos/:archivoId — sirve el documento. */
+exports.archivoVer = async (req, res) => {
+  try {
+    const [[a]] = await pool.query(
+      'SELECT nombre, mime, data, doc_ruta FROM parques_ficha_archivos WHERE id=? AND id_parque=?',
+      [Number(req.params.archivoId), Number(req.params.idParque)]);
+    if (!a || (!a.data && !a.doc_ruta)) return res.status(404).json({ success: false, data: null, error: 'Sin archivo' });
+    auditar({ req, accion: 'VER_DOCUMENTO', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: req.params.idParque,
+      detalle: `Visualizó documento del parque #${req.params.idParque}: ${a.nombre || ''}` });
+    return almacen.servir(res, { ruta: a.doc_ruta, blob: a.data, nombre: a.nombre || 'archivo', mime: a.mime });
+  } catch (e) { console.error('[parques-base archivo ver]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* DELETE /parques-base/:idParque/archivos/:archivoId
+   Capturar doc_ruta ANTES del DELETE y borrar el objeto DESPUÉS (regla del almacén). */
+exports.archivoEliminar = async (req, res) => {
+  try {
+    const idParque = Number(req.params.idParque), idArch = Number(req.params.archivoId);
+    const [[arch]] = await pool.query('SELECT doc_ruta, nombre, categoria FROM parques_ficha_archivos WHERE id=? AND id_parque=?', [idArch, idParque]);
+    if (!arch) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    await pool.query('DELETE FROM parques_ficha_archivos WHERE id=? AND id_parque=?', [idArch, idParque]);
+    if (arch.doc_ruta) await almacen.borrar(arch.doc_ruta);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'dealers-incorporacion', entidad: 'parque_ficha', entidad_id: idParque,
+      detalle: `Eliminó documento (${arch.categoria}) del parque #${idParque}: ${arch.nombre || ''}` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[parques-base archivo eliminar]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

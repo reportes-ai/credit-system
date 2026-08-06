@@ -54,6 +54,10 @@ const parques = require('../controllers/parques-base.controller');
 router.get('/parques-base',           verifyToken, requireFunc('parque_ficha'), parques.listar);
 router.post('/parques-base',          verifyToken, requireFunc('parque_ficha'), parques.crear);
 router.put('/parques-base/:idParque', verifyToken, requireFunc('parque_ficha'), parques.guardar);
+router.get('/parques-base/:idParque/archivos',                verifyToken, requireFunc('parque_ficha'), parques.archivosListar);
+router.post('/parques-base/:idParque/archivos',               verifyToken, requireFunc('parque_ficha'), parques.archivoSubir);
+router.get('/parques-base/:idParque/archivos/:archivoId',     verifyToken, requireFunc('parque_ficha'), parques.archivoVer);
+router.delete('/parques-base/:idParque/archivos/:archivoId',  verifyToken, requireFunc('parque_ficha'), parques.archivoEliminar);
 
 // Alertas de las etapas — leídas/escritas desde el mantenedor central de Alertas.
 router.get('/alertas-config',   verifyToken, ctrl.getAlertasConfig);
