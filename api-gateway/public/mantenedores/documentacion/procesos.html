@@ -127,6 +127,122 @@
 
   <p><b>Parques automotrices — mismo circuito, agregado por parque.</b> La comisión del parque (comisión por crédito + arriendo mensual) sigue el mismo flujo en <b>Post Venta → Emisión de Cartolas Parque</b>: la cartola del mes lista las operaciones del parque más la línea de arriendo; se <b>emite</b>, se <b>aprueba</b> (revisión) y se <b>envía</b> por correo al contacto de finanzas de la <a href="/dealers-incorporacion/parques.html">ficha del parque</a> (PDF + texto con el total a facturar). El parque factura el total y la factura se <b>registra formalmente</b> en Cartolas Parque (número, fecha, monto) con <b>cuadratura estricta</b> contra el total de la cartola — si no calza, se rechaza con la diferencia; al cuadrar se marca FACTURA RECIBIDA en todas las operaciones. Recién ahí se puede emitir la <b>ODP mensual</b> en Comisiones Parques a Pagar — la ODP nace de la factura, igual que en dealers. Todo es <b>reversable con motivo auditado</b>: el envío de la cartola (quita CARTOLA ENVIADA), la ODP emitida no pagada (anula el correlativo sin liberar el número) y el pago realizado (la ODP vuelve a "por pagar"). <b>Contabilización automática:</b> al aprobar el mes se devenga el gasto con arriendo y comisión en <b>cuentas separadas</b> (4002100 Arriendos / 4001100 Comisiones por Ventas contra el pasivo 2106012); al pagar, el pasivo se rebaja contra banco. Reglas paramétricas COMISION_PARQUES y COMISION_PARQUES_PAGADA en Reglas de Centralización.</p>
 
+  <figure style="margin:18px 0 22px;border:1px solid #e2e8f0;border-radius:12px;padding:14px;overflow-x:auto;background:#fff">
+  <svg viewBox="0 0 760 940" xmlns="http://www.w3.org/2000/svg" role="img" font-family="'Segoe UI',system-ui,sans-serif" style="min-width:680px;width:100%">
+    <title>Flujo completo del circuito de parques</title>
+    <style>
+      .pq-fase { font-size:11px; font-weight:700; fill:#0141A2; letter-spacing:1px; }
+      .pq-box { fill:#eff6ff; stroke:#0141A2; rx:8; }
+      .pq-fin { fill:#012d70; stroke:#012d70; rx:8; }
+      .pq-boxT { font-size:13px; font-weight:700; fill:#012d70; }
+      .pq-finT { font-size:13px; font-weight:700; fill:#ffffff; }
+      .pq-finS { font-size:11px; fill:#bcd7ff; }
+      .pq-boxS { font-size:11px; fill:#475569; }
+      .pq-flecha { stroke:#0141A2; stroke-width:1.5; fill:none; marker-end:url(#pqArr); }
+      .pq-rev { stroke:#b91c1c; stroke-width:1.2; stroke-dasharray:4 3; fill:none; marker-end:url(#pqArrR); }
+      .pq-revT { font-size:10px; fill:#b91c1c; }
+      .pq-ctb { font-size:10px; fill:#15803d; font-weight:600; }
+      .pq-gate { fill:#fffbeb; stroke:#d97706; rx:8; }
+      .pq-lane { stroke:#cbd5e1; stroke-dasharray:2 4; }
+    </style>
+    <defs>
+      <marker id="pqArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#0141A2"/></marker>
+      <marker id="pqArrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#b91c1c"/></marker>
+    </defs>
+    <text x="20" y="28" class="pq-fase">1 · INCORPORACIÓN — MISMA MÁQUINA QUE LA FICHA DEALER</text>
+    <line x1="20" y1="36" x2="740" y2="36" class="pq-lane"/>
+    <rect x="20" y="48" width="160" height="52" class="pq-box"/>
+    <text x="100" y="70" text-anchor="middle" class="pq-boxT">Ficha de parque</text>
+    <text x="100" y="87" text-anchor="middle" class="pq-boxS">Ejecutivo · entidad PARQUE</text>
+    <rect x="212" y="48" width="160" height="52" class="pq-box"/>
+    <text x="292" y="70" text-anchor="middle" class="pq-boxT">Informes + IA</text>
+    <text x="292" y="87" text-anchor="middle" class="pq-boxS">empresa y socios</text>
+    <rect x="404" y="48" width="150" height="52" class="pq-box"/>
+    <text x="479" y="70" text-anchor="middle" class="pq-boxT">Niveles aprueban</text>
+    <text x="479" y="87" text-anchor="middle" class="pq-boxS">imprimir · firmar · subir</text>
+    <rect x="586" y="48" width="154" height="52" class="pq-fin"/>
+    <text x="663" y="70" text-anchor="middle" class="pq-finT">Cierre → PARQUE</text>
+    <text x="663" y="87" text-anchor="middle" class="pq-finS">base + mantenedor</text>
+    <path d="M180 74 H206" class="pq-flecha"/><path d="M372 74 H398" class="pq-flecha"/><path d="M554 74 H580" class="pq-flecha"/>
+    <text x="20" y="146" class="pq-fase">2 · OPERACIÓN — CADA CRÉDITO OTORGADO EN EL PARQUE</text>
+    <line x1="20" y1="154" x2="740" y2="154" class="pq-lane"/>
+    <rect x="20" y="166" width="220" height="52" class="pq-box"/>
+    <text x="130" y="188" text-anchor="middle" class="pq-boxT">Crédito otorgado</text>
+    <text x="130" y="205" text-anchor="middle" class="pq-boxS">motor calcula com_parque</text>
+    <rect x="290" y="166" width="230" height="52" class="pq-box"/>
+    <text x="405" y="188" text-anchor="middle" class="pq-boxT">COMISIÓN A PAGAR</text>
+    <text x="405" y="205" text-anchor="middle" class="pq-boxS">Sistema · track PARQUE</text>
+    <rect x="570" y="166" width="170" height="52" class="pq-box"/>
+    <text x="655" y="188" text-anchor="middle" class="pq-boxT">Seguimiento</text>
+    <text x="655" y="205" text-anchor="middle" class="pq-boxS">8 etapas por operación</text>
+    <path d="M240 192 H284" class="pq-flecha"/><path d="M520 192 H564" class="pq-flecha"/>
+    <text x="20" y="264" class="pq-fase">3 · CARTOLA MENSUAL — EMISIÓN DE CARTOLAS PARQUE</text>
+    <line x1="20" y1="272" x2="740" y2="272" class="pq-lane"/>
+    <rect x="20" y="284" width="150" height="52" class="pq-box"/>
+    <text x="95" y="306" text-anchor="middle" class="pq-boxT">Aprobar mes</text>
+    <text x="95" y="323" text-anchor="middle" class="pq-boxS">snapshot congelado</text>
+    <rect x="202" y="284" width="150" height="52" class="pq-box"/>
+    <text x="277" y="306" text-anchor="middle" class="pq-boxT">Emitir cartola</text>
+    <text x="277" y="323" text-anchor="middle" class="pq-boxS">ops + arriendo</text>
+    <rect x="384" y="284" width="150" height="52" class="pq-box"/>
+    <text x="459" y="306" text-anchor="middle" class="pq-boxT">Aprobar cartola</text>
+    <text x="459" y="323" text-anchor="middle" class="pq-boxS">revisión conforme</text>
+    <rect x="566" y="284" width="174" height="52" class="pq-box"/>
+    <text x="653" y="306" text-anchor="middle" class="pq-boxT">Enviar al parque</text>
+    <text x="653" y="323" text-anchor="middle" class="pq-boxS">PDF + correo finanzas</text>
+    <path d="M170 310 H196" class="pq-flecha"/><path d="M352 310 H378" class="pq-flecha"/><path d="M534 310 H560" class="pq-flecha"/>
+    <text x="20" y="360" class="pq-ctb">⚖ Asiento devengo: DEBE 4002100 Arriendos + DEBE 4001100 Comisiones por Ventas → HABER 2106012</text>
+    <path d="M653 336 C653 370 500 375 460 375" class="pq-rev"/>
+    <text x="470" y="388" class="pq-revT">↶ Reversar envío (quita CARTOLA ENVIADA, permite reenviar)</text>
+    <text x="20" y="430" class="pq-fase">4 · FACTURA DEL PARQUE</text>
+    <line x1="20" y1="438" x2="740" y2="438" class="pq-lane"/>
+    <rect x="20" y="450" width="210" height="52" class="pq-box"/>
+    <text x="125" y="472" text-anchor="middle" class="pq-boxT">El parque factura</text>
+    <text x="125" y="489" text-anchor="middle" class="pq-boxS">el TOTAL de la cartola</text>
+    <rect x="280" y="450" width="230" height="52" class="pq-gate"/>
+    <text x="395" y="472" text-anchor="middle" class="pq-boxT">Registrar factura</text>
+    <text x="395" y="489" text-anchor="middle" class="pq-boxS">cuadratura exacta o rechazo</text>
+    <rect x="560" y="450" width="180" height="52" class="pq-box"/>
+    <text x="650" y="472" text-anchor="middle" class="pq-boxT">FACTURA RECIBIDA</text>
+    <text x="650" y="489" text-anchor="middle" class="pq-boxS">en todas las operaciones</text>
+    <path d="M230 476 H274" class="pq-flecha"/><path d="M510 476 H554" class="pq-flecha"/>
+    <text x="20" y="548" class="pq-fase">5 · ODP Y PAGO — COMISIONES PARQUES A PAGAR</text>
+    <line x1="20" y1="556" x2="740" y2="556" class="pq-lane"/>
+    <rect x="20" y="568" width="230" height="60" class="pq-gate"/>
+    <text x="135" y="590" text-anchor="middle" class="pq-boxT">Emitir ODP mensual</text>
+    <text x="135" y="607" text-anchor="middle" class="pq-boxS">solo con factura en todas</text>
+    <text x="135" y="620" text-anchor="middle" class="pq-boxS">las ops · Operaciones</text>
+    <rect x="300" y="568" width="190" height="60" class="pq-box"/>
+    <text x="395" y="590" text-anchor="middle" class="pq-boxT">ODP por pagar</text>
+    <text x="395" y="607" text-anchor="middle" class="pq-boxS">correlativo único global</text>
+    <text x="395" y="620" text-anchor="middle" class="pq-boxS">ledger Órdenes de Pago</text>
+    <rect x="540" y="568" width="200" height="60" class="pq-fin"/>
+    <text x="640" y="590" text-anchor="middle" class="pq-finT">Pagar</text>
+    <text x="640" y="607" text-anchor="middle" class="pq-finS">Tesorería / Gte. Finanzas</text>
+    <text x="640" y="620" text-anchor="middle" class="pq-finS">→ COMISIÓN PAGADA</text>
+    <path d="M250 598 H294" class="pq-flecha"/><path d="M490 598 H534" class="pq-flecha"/>
+    <text x="20" y="652" class="pq-ctb">⚖ Asiento pago: DEBE 2106012 (rebaja pasivo) → HABER 1101090 Banco</text>
+    <path d="M395 628 C395 668 250 672 190 672" class="pq-rev"/>
+    <text x="200" y="685" class="pq-revT">↶ Anular ODP (no pagada · número queda anulado, nunca se reutiliza)</text>
+    <path d="M640 628 C640 702 480 706 420 706" class="pq-rev"/>
+    <text x="430" y="719" class="pq-revT">↶ Revertir pago (la ODP vuelve a "por pagar")</text>
+    <line x1="20" y1="746" x2="740" y2="746" class="pq-lane"/>
+    <text x="20" y="772" class="pq-boxS">• El arriendo es del PARQUE (línea propia en la cartola y la ODP), no de un crédito: no aparece en el track por operación.</text>
+    <text x="20" y="792" class="pq-boxS">• ORDEN DE PAGO EMITIDA, ENVIADO A PAGO y COMISIÓN PAGADA se marcan solas desde el módulo de pago —</text>
+    <text x="30" y="808" class="pq-boxS">nunca a mano en el Seguimiento. Las etapas de cartola las marca Emisión de Cartolas Parque.</text>
+    <text x="20" y="828" class="pq-boxS">• Toda reversa exige motivo y queda en Auditoría. Cada asiento es idempotente por referencia (aprobar dos veces no duplica).</text>
+    <text x="20" y="848" class="pq-boxS">• Permisos: Analista Op. + Gte. Op. y Crédito operan (ficha, cartola, ODP) · Tesorero + Gte. Finanzas pagan.</text>
+    <rect x="20" y="876" width="14" height="14" class="pq-box"/>
+    <text x="42" y="887" class="pq-boxS">paso del flujo</text>
+    <rect x="140" y="876" width="14" height="14" class="pq-gate"/>
+    <text x="162" y="887" class="pq-boxS">candado (valida antes de dejar pasar)</text>
+    <line x1="390" y1="883" x2="420" y2="883" class="pq-rev"/>
+    <text x="428" y="887" class="pq-boxS">reversa con motivo auditado</text>
+    <text x="620" y="887" class="pq-ctb">⚖ asiento automático</text>
+  </svg>
+  <figcaption style="font-size:.8rem;color:#64748b;margin-top:6px;text-align:center">El circuito completo de parques: de la ficha de incorporación al pago de la factura, con sus candados, reversas y asientos.</figcaption>
+  </figure>
+
   <h2 id="p4">4. Pago de saldos precio</h2>
   <p><b>Qué y para qué:</b> pagarle al dealer el saldo del precio del vehículo una vez recibidos los fondos de la financiera.</p>
   <div class="meta">
