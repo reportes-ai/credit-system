@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.1 -->
+  <!-- v1.2 — RUT en glosa + Conciliar automáticos en lote -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -121,6 +121,8 @@
       <h5><i class="bi bi-wallet2"></i> Cuenta bancaria</h5>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn-ghost" onclick="abrirCuenta()"><i class="bi bi-plus-lg"></i> Nueva cuenta manual</button>
+        <button class="btn-primary2" style="background:#15803d" onclick="conciliarAuto()" id="btnAuto" disabled>
+          <i class="bi bi-magic"></i> Conciliar automáticos</button>
         <button class="btn-primary2" onclick="document.getElementById('fileCartola').click()" id="btnCargar" disabled>
           <i class="bi bi-upload"></i> Cargar cartola Excel</button>
         <input type="file" id="fileCartola" accept=".xlsx,.xls,.csv" style="display:none" onchange="previewCartola(this)">
@@ -237,6 +239,7 @@ async function cargarCuentas(){
     ? CUENTAS.map(c => `<option value="${c.id}">${c.banco} ${c.numero||''} ${c.alias?('— '+c.alias):''} ${c.es_manual?'(manual)':'(Fintoc)'} · ${c.pendientes||0} pend.</option>`).join('')
     : '<option value="">— crea una cuenta manual —</option>';
   $('btnCargar').disabled = !CUENTAS.length;
+  $('btnAuto').disabled = !CUENTAS.length;
   if (CUENTAS.length) cambiarCuenta();
 }
 function cuentaId(){ return $('selCuenta').value; }
@@ -266,6 +269,21 @@ function setTab(t){
   t==='pend' ? cargarPendientes() : cargarConciliados();
 }
 
+async function conciliarAuto(){
+  if (!cuentaId()) return;
+  if (!confirm('Se conciliarán SOLO los matches inequívocos (una sola sugerencia; en cargos con ODP, además RUT coincidente). Lo ambiguo queda pendiente para revisión manual. ¿Continuar?')) return;
+  const btn = $('btnAuto'); btn.disabled = true; const txt = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Conciliando…';
+  try {
+    const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/conciliar-auto`, { method:'POST', headers: HJ,
+      body: JSON.stringify({ desde: $('fDesde').value || null, hasta: $('fHasta').value || null }) })).json();
+    if (!j.success) throw new Error(j.error);
+    const r = j.data;
+    alert(`Conciliación automática:\n· ${r.conciliados} conciliados\n· ${r.ambiguos} ambiguos (revisar a mano)\n· ${r.sin_match} sin match\n(de ${r.revisados} pendientes)`);
+    await cargarTodo();
+  } catch(e){ alert('Error: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = txt;
+}
+
 async function cargarPendientes(){
   $('tablaWrap').innerHTML = '<div class="empty-state">Cargando…</div>';
   const j = await (await fetch(`/api/conciliacion/cuentas/${cuentaId()}/pendientes?${rango()}`, { headers: H })).json();
@@ -280,6 +298,7 @@ async function cargarPendientes(){
       <td class="text-right ${m.monto<0?'amt-neg':'amt-pos'}">${fmt(m.monto)}</td>
       <td>${m.sugerencias.length ? `<div class="sug">` + m.sugerencias.map(s => `
         <div class="sug-chip"><span class="tipo">${s.tipo}</span>
+          ${s.rut_ok ? '<span style="background:#dcfce7;color:#15803d;border-radius:5px;padding:1px 7px;font-size:.68rem;font-weight:700" title="El RUT de la glosa del banco coincide con el proveedor">RUT ✓</span>' : ''}
           <span style="flex:1">${s.detalle} · ${fFecha(s.fecha)}</span>
           <button class="btn-mini btn-ok" onclick='conciliar(${m.id}, ${JSON.stringify(s.tipo)}, ${JSON.stringify(String(s.ref))}, ${JSON.stringify(s.detalle)})'>
             <i class="bi bi-check-lg"></i> Conciliar</button>

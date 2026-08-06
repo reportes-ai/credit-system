@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const XLSX = require('xlsx');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const AF_RUT = require('../../../../api-gateway/public/js/rut-core'); // motor único de RUT
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -256,6 +257,17 @@ const importarCartola = async (req, res) => {
 const TOL_DIAS_PAGO = 3, TOL_DIAS_ODP = 5;
 const difDias = (a, b) => Math.abs((new Date(a) - new Date(b)) / 864e5);
 
+// RUT del destinatario embebido en la glosa del banco ("076545638K Transf. AUTOFACIL SPA").
+// Se valida el DV (módulo 11): los números de cuenta ("0123493974 Transf a…") casi nunca
+// pasan la validación, y si uno pasa, igual solo se usa para COMPARAR contra RUT conocidos.
+function rutEnGlosa(descripcion) {
+  const m = String(descripcion || '').match(/\b0*(\d{6,9}[0-9K])\b/i);
+  if (!m) return null;
+  const rut = AF_RUT.normalizar(m[1]);
+  return rut && AF_RUT.validar(rut) ? rut : null;
+}
+const mismoRut = (a, b) => a && b && AF_RUT.normalizar(a) === AF_RUT.normalizar(b);
+
 async function candidatos(desde, hasta) {
   const d1 = new Date(new Date(desde).getTime() - 7 * 864e5).toISOString().slice(0, 10);
   const d2 = new Date(new Date(hasta).getTime() + 7 * 864e5).toISOString().slice(0, 10);
@@ -287,7 +299,7 @@ async function candidatos(desde, hasta) {
   // 3) ODP pagadas (egresos)
   const [odps] = await pool.query(`
     SELECT numero ref, monto, COALESCE(fecha_pago, fecha_emision) fecha,
-           proveedor_nombre, concepto
+           proveedor_nombre, proveedor_rut, concepto
     FROM ordenes_pago
     WHERE estado='PAGADA' AND COALESCE(fecha_pago, fecha_emision) BETWEEN ? AND ?`, [d1, d2]);
 
@@ -311,13 +323,14 @@ function sugerirPara(mov, cand) {
         sug.push({ tipo: 'CUOTA', ref: c.ref, fecha: c.fecha,
           detalle: `Op ${c.num_op} · cuota(s) ${c.nums}` });
   } else if (monto < 0) {
+    const movRut = rutEnGlosa(mov.descripcion);
     for (const o of cand.odps)
       if (Math.abs(Number(o.monto) - Math.abs(monto)) < 1 && difDias(mov.fecha, o.fecha) <= TOL_DIAS_ODP)
-        sug.push({ tipo: 'ODP', ref: o.ref, fecha: o.fecha,
+        sug.push({ tipo: 'ODP', ref: o.ref, fecha: o.fecha, rut_ok: mismoRut(movRut, o.proveedor_rut),
           detalle: `${o.ref} · ${o.proveedor_nombre || ''} · ${(o.concepto || '').slice(0, 60)}` });
   }
-  // Las de fecha más cercana primero; máximo 5 por movimiento
-  sug.sort((a, b) => difDias(mov.fecha, a.fecha) - difDias(mov.fecha, b.fecha));
+  // RUT coincidente primero, luego fecha más cercana; máximo 5 por movimiento
+  sug.sort((a, b) => (b.rut_ok ? 1 : 0) - (a.rut_ok ? 1 : 0) || difDias(mov.fecha, a.fecha) - difDias(mov.fecha, b.fecha));
   return sug.slice(0, 5);
 }
 
@@ -380,6 +393,52 @@ const conciliar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Conciliación AUTOMÁTICA en lote ─────────────────────────────────────────
+   Concilia solo lo INEQUÍVOCO y deja el resto para revisión manual:
+   · el movimiento tiene UNA sola sugerencia (monto exacto, ya exigido),
+   · si es un cargo con ODP, además el RUT de la glosa coincide con el proveedor,
+   · y esa referencia no es candidata de NINGÚN otro movimiento pendiente
+     (dos movimientos peleando la misma referencia = ambigüedad = no se toca).
+   Todo queda reversible con Desconciliar y auditado como CONCILIAR (AUTO). */
+const conciliarAuto = async (req, res) => {
+  try {
+    const idConexion = parseInt(req.params.id, 10);
+    const { desde, hasta } = req.body || {};
+    const cond = ['id_conexion=?', 'COALESCE(conciliado,0)=0']; const args = [idConexion];
+    if (desde) { cond.push('fecha>=?'); args.push(desde); }
+    if (hasta) { cond.push('fecha<=?'); args.push(hasta); }
+    const [movs] = await pool.query(
+      `SELECT id, fecha, monto, descripcion FROM banco_movimientos
+       WHERE ${cond.join(' AND ')} ORDER BY fecha, id LIMIT 1000`, args);
+    if (!movs.length) return ok(res, { revisados: 0, conciliados: 0, ambiguos: 0, sin_match: 0 });
+
+    const cand = await candidatos(movs[0].fecha, movs[movs.length - 1].fecha);
+    const porMov = movs.map(m => ({ m, sug: sugerirPara(m, cand) }));
+
+    // Referencias reclamadas por más de un movimiento → ambiguas, no se auto-concilian
+    const veces = {};
+    for (const x of porMov) for (const s of x.sug) veces[s.tipo + ':' + s.ref] = (veces[s.tipo + ':' + s.ref] || 0) + 1;
+
+    const usuario = (req.user && (req.user.nombre || req.user.email) || 'sistema') + ' (auto)';
+    let conciliados = 0, ambiguos = 0, sinMatch = 0;
+    for (const { m, sug } of porMov) {
+      if (!sug.length) { sinMatch++; continue; }
+      const s = sug[0];
+      const unica = sug.length === 1 && veces[s.tipo + ':' + s.ref] === 1;
+      const confiable = s.tipo === 'ODP' ? (unica && s.rut_ok) : unica;
+      if (!confiable) { ambiguos++; continue; }
+      const [r] = await pool.query(
+        `UPDATE banco_movimientos SET conciliado=1, match_tipo=?, match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
+         WHERE id=? AND COALESCE(conciliado,0)=0`,
+        [s.tipo, String(s.ref), ('AUTO · ' + s.detalle).slice(0, 300), usuario, m.id]);
+      if (r.affectedRows === 1) conciliados++;
+    }
+    auditar({ req, accion: 'CONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: idConexion,
+      detalle: `Conciliación automática: ${conciliados} conciliados, ${ambiguos} ambiguos, ${sinMatch} sin match (de ${movs.length} pendientes)` });
+    ok(res, { revisados: movs.length, conciliados, ambiguos, sin_match: sinMatch });
+  } catch (e) { fail(res, e.message); }
+};
+
 const desconciliar = async (req, res) => {
   try {
     const { id_mov } = req.body || {};
@@ -416,6 +475,6 @@ const resumen = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
-module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, desconciliar, resumen,
+module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, conciliarAuto, desconciliar, resumen,
   // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
   parsearCartola, hashMovs };

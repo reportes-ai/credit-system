@@ -18,6 +18,7 @@ router.post('/cuentas-manuales',              verifyToken, puede, ctrl.crearCuen
 router.post('/cuentas/:id/cartola/preview',   verifyToken, puede, upload.single('archivo'), ctrl.previewCartola);
 router.post('/cuentas/:id/cartola/importar',  verifyToken, puede, upload.single('archivo'), ctrl.importarCartola);
 router.post('/conciliar',                     verifyToken, puede, ctrl.conciliar);
+router.post('/cuentas/:id/conciliar-auto',    verifyToken, puede, ctrl.conciliarAuto);
 router.post('/desconciliar',                  verifyToken, puede, ctrl.desconciliar);
 
 module.exports = router;
