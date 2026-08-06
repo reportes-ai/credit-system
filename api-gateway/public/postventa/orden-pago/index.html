@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.4 — Depositar en/Titular con banco, tipo cuenta, N° y RUT del dealer -->
+  <!-- v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -137,6 +137,7 @@ let CORREO = {
   firma: 'Saludos cordiales,\nÁrea de Operaciones',
 };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc = escH; // docHTML usa esc(): sin este alias, verOrden caía con "esc is not defined"
 function valsDe(r){
   return {
     nOrden: r.num_orden || ('ODP-' + (r.num_op||'')),
