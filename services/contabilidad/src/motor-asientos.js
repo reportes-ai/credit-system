@@ -171,9 +171,11 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['4001100', 'DEBE',  'monto', 'Gasto comisiones de ejecutivos'],
         ['2106060', 'HABER', 'monto', 'Comisiones ejecutivos por pagar'],
       ]],
-      ['COMISION_PARQUES', 'Comisiones/arriendo de parques del mes', 'Se dispara al aprobar las comisiones de parques del mes (Post Venta → Comisiones Parques). Campos: monto.', 'TRASPASO', 1, [
-        ['4002100', 'DEBE',  'monto', 'Gasto arriendo/comisión parque'],
-        ['2106012', 'HABER', 'monto', 'Comisiones parque por pagar'],
+      ['COMISION_PARQUES', 'Comisiones/arriendo de parques del mes', 'Se dispara al aprobar las comisiones de parques del mes (Post Venta → Comisiones Parques). El arriendo y la comisión son gastos de naturaleza distinta y van a cuentas separadas. Campos: arriendo, comision.', 'TRASPASO', 1, [
+        ['4002100', 'DEBE',  'arriendo', 'Arriendo de parque'],
+        ['4001100', 'DEBE',  'comision', 'Comisión por ventas parque'],
+        ['2106012', 'HABER', 'arriendo', 'Comisiones parque por pagar (arriendo)'],
+        ['2106012', 'HABER', 'comision', 'Comisiones parque por pagar (comisión)'],
       ]],
       ['COMISION_PARQUES_PAGADA', 'Comisión/arriendo de parque pagada (ODP)', 'Se dispara al confirmar el pago de la ODP mensual del parque (Post Venta → Comisiones Parques a Pagar): rebaja el pasivo contra banco. Campos: monto (total de la ODP).', 'EGRESO', 1, [
         ['2106012', 'DEBE',  'monto', 'Pago comisión/arriendo parque'],
@@ -196,6 +198,27 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
             [evento, cuenta, lado, campo, glosa]);
       }
     }
+    // Parche idempotente (v187.3): COMISION_PARQUES nació con un solo campo `monto`;
+    // el arriendo y la comisión son gastos distintos y se separan (4002100 / 4001100).
+    // Solo si la regla conserva el default viejo Y nunca ha generado un asiento —
+    // si el Administrador ya la editó o ya hay comprobantes, no se toca.
+    try {
+      const [[viejo]] = await pool.query(
+        "SELECT COUNT(*) n FROM ctb_reglas_lineas WHERE evento='COMISION_PARQUES' AND campo='monto'");
+      const [[usada]] = await pool.query(
+        "SELECT COUNT(*) n FROM ctb_eventos_log WHERE evento='COMISION_PARQUES' AND estado='CONTABILIZADO'");
+      if (viejo.n > 0 && usada.n === 0) {
+        await pool.query("DELETE FROM ctb_reglas_lineas WHERE evento='COMISION_PARQUES'");
+        for (const [cuenta, lado, campo, glosa] of [
+          ['4002100', 'DEBE',  'arriendo', 'Arriendo de parque'],
+          ['4001100', 'DEBE',  'comision', 'Comisión por ventas parque'],
+          ['2106012', 'HABER', 'arriendo', 'Comisiones parque por pagar (arriendo)'],
+          ['2106012', 'HABER', 'comision', 'Comisiones parque por pagar (comisión)'],
+        ]) await pool.query('INSERT INTO ctb_reglas_lineas (evento, cuenta, lado, campo, glosa) VALUES (?,?,?,?,?)', ['COMISION_PARQUES', cuenta, lado, campo, glosa]);
+        await pool.query("UPDATE ctb_reglas SET descripcion='Se dispara al aprobar las comisiones de parques del mes (Post Venta → Comisiones Parques). El arriendo y la comisión son gastos de naturaleza distinta y van a cuentas separadas. Campos: arriendo, comision.' WHERE evento='COMISION_PARQUES'");
+        console.log('[contabilidad] COMISION_PARQUES: arriendo y comisión separados');
+      }
+    } catch (e) { console.error('[contabilidad parche parques]', e.message); }
     console.log('[contabilidad] motor de asientos listo');
   } catch (e) { console.error('[contabilidad-motor migration]', e.message); }
 });

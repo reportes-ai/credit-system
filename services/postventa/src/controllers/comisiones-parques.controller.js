@@ -292,7 +292,7 @@ const aprobar = async (req, res) => {
       evento: 'COMISION_PARQUES',
       glosa: `Comisión/arriendo parque ${parque} — ${mes}`,
       ref: `PARQUE-${parque}-${mes}`,
-      montos: { monto: Math.round(Number(row.arriendo) || 0) + Math.round(Number(row.comision_creditos) || 0) },
+      montos: { arriendo: Math.round(Number(row.arriendo) || 0), comision: Math.round(Number(row.comision_creditos) || 0) },
     }).catch(e => console.error('[parques ctb devengo]', e.message));
     auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'parque_pago', detalle: `Aprobó comisión parque ${parque} ${mes}: arriendo ${CLP(row.arriendo)} + comisión ${CLP(row.comision_creditos)} (${row.ops} ops)` });
     res.json({ success: true, data: { etapa: 'APROBADA' }, error: null });
