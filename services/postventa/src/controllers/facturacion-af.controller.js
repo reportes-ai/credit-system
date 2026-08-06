@@ -94,7 +94,7 @@ exports.detalle = async (req, res) => {
 
     const esUAC = fin.includes('UNIDAD');
     const [ops] = await pool.query(`
-      SELECT c.num_op, c.monto_financiado, c.saldo_precio, c.plazo,
+      SELECT c.num_op, c.id_financiera, c.monto_financiado, c.saldo_precio, c.plazo,
              ROUND(COALESCE(c.monto_comision_fin,0)) colocacion,
              ROUND(COALESCE(c.com_rdh,0)+COALESCE(c.com_cesantia,0)+COALESCE(c.com_reparaciones,0)) seguros,
              ROUND(COALESCE(c.seguro_rdh,0)+COALESCE(c.seguro_cesantia,0)+COALESCE(c.seguro_rep_menor,0)) primas,
@@ -112,7 +112,7 @@ exports.detalle = async (req, res) => {
       const pctBase = concepto === 'SEGUROS' ? +o.primas : base;       // seguros: % sobre primas
       const chk = chkMap[o.num_op] || null;
       return {
-        num_op: o.num_op, cliente: o.cliente, plazo: o.plazo,
+        num_op: o.num_op, id_financiera: o.id_financiera, cliente: o.cliente, plazo: o.plazo,
         monto: base, primas: +o.primas,
         comision, pct: pctBase > 0 ? Math.round(10000 * comision / pctBase) / 100 : null,
         ok: chk ? !!chk.ok : false,

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 — desmarcar limpia el monto facturado; badge del grupo se refresca en vivo -->
+<!-- v1.5 — fullwidth + columna ID Financiera + exportar Excel por detalle -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -11,7 +11,7 @@
   <style>
     :root { --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
-    .wrap { max-width:1350px; margin:22px auto; padding:0 20px 70px; }
+    .wrap { max-width:none; margin:22px auto; padding:0 26px 70px; }
     .page-banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy-light) 60%,var(--accent)); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
     .page-banner i { font-size:2.2rem; opacity:.85; }
     .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
@@ -162,12 +162,16 @@ async function toggleConc(m, fin, concepto){
     window['ESUAC_'+rid] = true;
   }
 
-  h += `<div id="solBar-${rid}" style="margin-bottom:10px"></div>`;
+  h += `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <div id="solBar-${rid}" style="flex:1"></div>
+          <button class="btn btn-sm" style="background:#1B7A3D;color:#fff;font-weight:700" onclick="exportarExcel('${rid}')">
+            <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
+        </div>`;
   h += `<div style="overflow:auto"><table>
-    <thead><tr><th>N° Op</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
+    <thead><tr><th>N° Op</th><th>ID Financiera</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
     <th class="num">Comisión calculada</th><th class="num">%</th>${esUAC?'<th class="num">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
     <tbody>${j.data.ops.map((o,i)=>filaOp(rid,o,i)).join('')}</tbody>
-    <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="4">TOTAL (${j.data.ops.length} ops)</td>
+    <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="5">TOTAL (${j.data.ops.length} ops)</td>
       <td class="num">${fmt(j.data.ops.reduce((a,o)=>a+(+o.comision||0),0))}</td><td></td>${esUAC?'<td class="num" id="totAnt-'+rid+'"></td>':''}<td></td>
       <td class="num" id="totFact-${rid}"></td><td class="num" id="totDif-${rid}"></td><td></td></tr></tfoot>
   </table></div></div>`;
@@ -180,7 +184,7 @@ async function toggleConc(m, fin, concepto){
 function filaOp(rid, o, i){
   const base = (window['DET_'+rid] && window['DET_'+rid].concepto === 'SEGUROS') ? o.primas : o.monto;
   return `<tr>
-    <td><b>${o.num_op}</b></td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.cliente)}</td>
+    <td><b>${o.num_op}</b></td><td>${esc(o.id_financiera||'—')}</td><td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.cliente)}</td>
     <td class="num">${fmt(base)}</td><td class="num">${o.plazo||'—'}</td>
     <td class="num"><b>${fmt(o.comision)}</b></td><td class="num">${pctF(o.pct)}</td>
     ${window['ESUAC_'+rid]?`<td class="num"><input class="form-control fact" id="ant-${rid}-${i}" value="${o.anticipo!=null?fmtIn(o.anticipo):''}" ${window['DET_'+rid].antLock?'disabled title="Anticipo enviado a facturar"':''} onchange="cambioAnt('${rid}',${i})"></td>`:''}
@@ -319,6 +323,55 @@ async function guardarCheck(rid, i){
 }
 
 cargar();
+
+/* ── Exportar detalle a Excel (XLSX real, no CSV) ─────────────────────────── */
+function cargarXLSX(){
+  return new Promise((ok, err) => {
+    if (window.XLSX) return ok();
+    const s = document.createElement('script');
+    s.src = '/js/xlsx-style.min.js'; s.onload = ok; s.onerror = err;
+    document.head.appendChild(s);
+  });
+}
+async function exportarExcel(rid){
+  const d = window['DET_'+rid]; if (!d || !d.ops || !d.ops.length) return;
+  await cargarXLSX();
+  const esUAC = !!window['ESUAC_'+rid], esSeg = d.concepto === 'SEGUROS';
+  const baseLbl = esSeg ? 'Primas' : (esUAC ? 'Saldo Precio' : 'Monto Crédito');
+  const filas = d.ops.map(o => {
+    const fact = o.monto_facturado != null ? +o.monto_facturado : null;
+    const esperado = esUAC ? (+o.comision||0) - (+o.anticipo||0) : (+o.comision||0);
+    const dif = fact != null ? fact - esperado : null;
+    const r = {
+      'N° Op': o.num_op, 'ID Financiera': o.id_financiera || '',
+      'Cliente': o.cliente || '', [baseLbl]: esSeg ? +o.primas : +o.monto,
+      'Plazo': o.plazo || '', 'Comisión calculada': +o.comision || 0, '%': o.pct != null ? o.pct/100 : '',
+    };
+    if (esUAC) r['Anticipo (día 15)'] = o.anticipo != null ? +o.anticipo : '';
+    r['OK'] = o.ok ? 'SÍ' : '';
+    r[esUAC ? 'Facturado cierre' : 'Monto facturado'] = fact != null ? fact : '';
+    r['Dif $'] = dif != null ? dif : '';
+    r['Dif %'] = (dif != null && esperado) ? dif/esperado : '';
+    return r;
+  });
+  const ws = XLSX.utils.json_to_sheet(filas);
+  // formatos: montos con miles, % con dos decimales
+  const cols = Object.keys(filas[0]);
+  const iMonto = new Set(cols.map((c,i)=>/(Monto|Comisión|Anticipo|Facturado|Dif \$|Primas|Saldo)/.test(c)?i:-1).filter(i=>i>=0));
+  const iPct = new Set(cols.map((c,i)=>/^%$|Dif %/.test(c)?i:-1).filter(i=>i>=0));
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let R = 1; R <= range.e.r; R++) for (let C = 0; C <= range.e.c; C++) {
+    const cell = ws[XLSX.utils.encode_cell({r:R,c:C})];
+    if (!cell || typeof cell.v !== 'number') continue;
+    if (iMonto.has(C)) cell.z = '#,##0';
+    if (iPct.has(C)) cell.z = '0.00%';
+  }
+  ws['!cols'] = cols.map(c => ({ wch: Math.max(c.length + 2, 12) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, (d.concepto||'DETALLE').slice(0,28));
+  const nom = `Facturacion-AF ${d.fin} ${d.concepto} ${d.m}.xlsx`.replace(/\s+/g,' ');
+  XLSX.writeFile(wb, nom);
+}
 </script>
 <script>
   window.AF_TOPNAV = {
