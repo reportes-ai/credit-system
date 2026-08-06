@@ -7,7 +7,7 @@
   <title>Conciliación Bancaria — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.3 — fuente CTB: matchea contra asientos de banco de Contabilidad -->
+  <!-- v1.4 — reglas por descripción: recurrentes se concilian solos -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -63,6 +63,7 @@
     .t-TRX { background:#dbeafe; color:#1d4ed8; } .t-CUOTA { background:#dcfce7; color:#15803d; }
     .t-ODP { background:#fce7f3; color:#be185d; } .t-MANUAL { background:#f3f4f6; color:#374151; }
     .t-CTB { background:#fef9c3; color:#854d0e; }
+    .t-REGLA { background:#ede9fe; color:#6d28d9; }
     .tabs { display:flex; gap:6px; }
     .tab-btn { border:none; background:#e5e7eb; color:#374151; border-radius:8px 8px 0 0; padding:8px 18px; font-size:.83rem; font-weight:700; cursor:pointer; }
     .tab-btn.act { background:#fff; color:var(--navy); }
@@ -122,6 +123,7 @@
       <h5><i class="bi bi-wallet2"></i> Cuenta bancaria</h5>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn-ghost" onclick="abrirCuenta()"><i class="bi bi-plus-lg"></i> Nueva cuenta manual</button>
+        <button class="btn-ghost" onclick="abrirReglas()"><i class="bi bi-list-check"></i> Reglas</button>
         <button class="btn-primary2" style="background:#15803d" onclick="conciliarAuto()" id="btnAuto" disabled>
           <i class="bi bi-magic"></i> Conciliar automáticos</button>
         <button class="btn-primary2" onclick="document.getElementById('fileCartola').click()" id="btnCargar" disabled>
@@ -165,6 +167,27 @@
     </ul>
   </div>
 </div>
+
+<!-- Dialog: reglas por descripción -->
+<dialog id="dlgReglas" style="max-width:760px">
+  <div class="dlg-head"><i class="bi bi-list-check me-1"></i> Reglas de conciliación por descripción</div>
+  <div class="dlg-body">
+    <div style="font-size:.8rem;color:#6b7280;margin-bottom:12px">
+      Al usar «Conciliar automáticos», todo movimiento cuya descripción <b>contenga el patrón</b>
+      (y no supere el tope, si tiene) se concilia solo con la glosa de la regla. Ideal para
+      comisiones bancarias, IVA e impuestos recurrentes. Reversible con Desconciliar.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;background:#f8fafc;border-radius:10px;padding:12px">
+      <div style="flex:2;min-width:180px"><label class="f">La descripción contiene…</label><input id="rgPatron" class="form-control" placeholder="Comisión Mantención"></div>
+      <div><label class="f">Aplica a</label><select id="rgTipo" class="form-select"><option value="CARGO">Cargos</option><option value="ABONO">Abonos</option><option value="AMBOS">Ambos</option></select></div>
+      <div style="width:130px"><label class="f">Tope $ (opcional)</label><input id="rgMax" class="form-control" type="number" placeholder="sin tope"></div>
+      <div style="flex:2;min-width:180px"><label class="f">Glosa</label><input id="rgGlosa" class="form-control" placeholder="Comisión bancaria mensual"></div>
+      <button class="btn-primary2" onclick="crearRegla()"><i class="bi bi-plus-lg"></i> Agregar</button>
+    </div>
+    <div id="reglasWrap"></div>
+  </div>
+  <div class="dlg-foot"><button class="btn-ghost" onclick="dlgReglas.close()">Cerrar</button></div>
+</dialog>
 
 <!-- Dialog: nueva cuenta manual -->
 <dialog id="dlgCuenta">
@@ -270,6 +293,38 @@ function setTab(t){
   t==='pend' ? cargarPendientes() : cargarConciliados();
 }
 
+async function abrirReglas(){ await cargarReglas(); dlgReglas.showModal(); }
+async function cargarReglas(){
+  const j = await (await fetch('/api/conciliacion/reglas', { headers: H })).json();
+  const rows = j.data || [];
+  $('reglasWrap').innerHTML = rows.length ? `<table><thead><tr>
+      <th>Patrón</th><th>Aplica a</th><th class="text-right">Tope $</th><th>Glosa</th><th class="text-right">Usos</th><th></th>
+    </tr></thead><tbody>` + rows.map(r => `
+    <tr style="${r.activo?'':'opacity:.45'}">
+      <td><b>${r.patron}</b></td>
+      <td>${r.tipo}</td>
+      <td class="text-right">${r.monto_max!=null?fmt(r.monto_max):'—'}</td>
+      <td>${r.glosa}</td>
+      <td class="text-right">${Number(r.usos||0).toLocaleString('es-CL')}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-mini ${r.activo?'btn-warn':'btn-ok'}" onclick="toggleRegla(${r.id})">${r.activo?'Pausar':'Activar'}</button>
+        <button class="btn-mini btn-undo" onclick="eliminarRegla(${r.id}, ${JSON.stringify(r.patron)})"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>`).join('') + '</tbody></table>' : '<div class="empty-state">Sin reglas — agrega la primera arriba</div>';
+}
+async function crearRegla(){
+  const body = { patron: $('rgPatron').value, tipo: $('rgTipo').value, monto_max: $('rgMax').value, glosa: $('rgGlosa').value };
+  const j = await (await fetch('/api/conciliacion/reglas', { method:'POST', headers: HJ, body: JSON.stringify(body) })).json();
+  if (!j.success) return alert(j.error);
+  $('rgPatron').value = $('rgMax').value = $('rgGlosa').value = '';
+  cargarReglas();
+}
+async function toggleRegla(id){ await fetch(`/api/conciliacion/reglas/${id}/toggle`, { method:'PUT', headers: H }); cargarReglas(); }
+async function eliminarRegla(id, patron){
+  if (!confirm(`¿Eliminar la regla "${patron}"? Lo ya conciliado no se toca.`)) return;
+  await fetch(`/api/conciliacion/reglas/${id}`, { method:'DELETE', headers: H }); cargarReglas();
+}
+
 async function conciliarAuto(){
   if (!cuentaId()) return;
   if (!confirm('Se conciliarán SOLO los matches inequívocos (una sola sugerencia; en cargos con ODP, además RUT coincidente). Lo ambiguo queda pendiente para revisión manual. ¿Continuar?')) return;
@@ -279,7 +334,7 @@ async function conciliarAuto(){
       body: JSON.stringify({ desde: $('fDesde').value || null, hasta: $('fHasta').value || null }) })).json();
     if (!j.success) throw new Error(j.error);
     const r = j.data;
-    alert(`Conciliación automática:\n· ${r.conciliados} conciliados\n· ${r.ambiguos} ambiguos (revisar a mano)\n· ${r.sin_match} sin match\n(de ${r.revisados} pendientes)`);
+    alert(`Conciliación automática:\n· ${r.conciliados} conciliados${r.por_regla?` (${r.por_regla} por regla)`:''}\n· ${r.ambiguos} ambiguos (revisar a mano)\n· ${r.sin_match} sin match\n(de ${r.revisados} pendientes)`);
     await cargarTodo();
   } catch(e){ alert('Error: ' + e.message); }
   btn.disabled = false; btn.innerHTML = txt;

@@ -54,6 +54,27 @@ require('../../../../shared/migrate').enFila('conciliacion-bancaria', async () =
         created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
       )`);
 
+    // Reglas por descripción: conciliación automática de movimientos recurrentes
+    // (comisiones bancarias, IVA, impuestos) — paramétricas, con tope de monto
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conciliacion_reglas (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        patron     VARCHAR(120) NOT NULL,
+        tipo       ENUM('CARGO','ABONO','AMBOS') NOT NULL DEFAULT 'CARGO',
+        monto_max  BIGINT NULL,
+        glosa      VARCHAR(200) NOT NULL,
+        activo     TINYINT(1) NOT NULL DEFAULT 1,
+        creado_por VARCHAR(120) NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_patron (patron, tipo)
+      )`);
+    await pool.query(`
+      INSERT IGNORE INTO conciliacion_reglas (patron, tipo, monto_max, glosa, creado_por) VALUES
+      ('Comisión Transferencia de Fondos', 'CARGO', 5000,  'Comisión bancaria por transferencia', 'seed'),
+      ('IVA',                              'CARGO', 2000,  'IVA de comisión bancaria',            'seed'),
+      ('Impuesto Sobregiro',               'CARGO', 50000, 'Impuesto por sobregiro/LCA',          'seed'),
+      ('Interés Sobregiro',                'CARGO', 50000, 'Interés por sobregiro cta. cte.',     'seed')`);
+
     // Card en Tesorería + permiso Administrador
     const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Tesorería' OR ruta LIKE '/tesoreria%' LIMIT 1");
     if (mod) {
@@ -431,14 +452,39 @@ const conciliarAuto = async (req, res) => {
        WHERE ${cond.join(' AND ')} ORDER BY fecha, id LIMIT 1000`, args);
     if (!movs.length) return ok(res, { revisados: 0, conciliados: 0, ambiguos: 0, sin_match: 0 });
 
-    const cand = await candidatos(movs[0].fecha, movs[movs.length - 1].fecha);
-    const porMov = movs.map(m => ({ m, sug: sugerirPara(m, cand) }));
+    const usuario0 = (req.user && (req.user.nombre || req.user.email) || 'sistema') + ' (auto)';
+
+    // Paso 1: reglas por descripción (recurrentes chicos: comisiones, IVA, impuestos)
+    const [reglas] = await pool.query('SELECT * FROM conciliacion_reglas WHERE activo=1');
+    let porRegla = 0;
+    const restantes = [];
+    for (const m of movs) {
+      const r = reglas.find(x =>
+        String(m.descripcion || '').toUpperCase().includes(String(x.patron).toUpperCase()) &&
+        (x.tipo === 'AMBOS' || (x.tipo === 'CARGO' ? m.monto < 0 : m.monto > 0)) &&
+        (x.monto_max == null || Math.abs(Number(m.monto)) <= Number(x.monto_max)));
+      if (!r) { restantes.push(m); continue; }
+      const [u] = await pool.query(
+        `UPDATE banco_movimientos SET conciliado=1, match_tipo='REGLA', match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
+         WHERE id=? AND COALESCE(conciliado,0)=0`,
+        [String(r.id), ('REGLA · ' + r.glosa).slice(0, 300), usuario0, m.id]);
+      if (u.affectedRows === 1) porRegla++;
+    }
+    if (!restantes.length) {
+      auditar({ req, accion: 'CONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: idConexion,
+        detalle: `Conciliación automática: ${porRegla} por regla (de ${movs.length} pendientes)` });
+      return ok(res, { revisados: movs.length, conciliados: porRegla, por_regla: porRegla, ambiguos: 0, sin_match: 0 });
+    }
+
+    // Paso 2: matching contra TRX / cuotas / ODP / CTB
+    const cand = await candidatos(restantes[0].fecha, restantes[restantes.length - 1].fecha);
+    const porMov = restantes.map(m => ({ m, sug: sugerirPara(m, cand) }));
 
     // Referencias reclamadas por más de un movimiento → ambiguas, no se auto-concilian
     const veces = {};
     for (const x of porMov) for (const s of x.sug) veces[s.tipo + ':' + s.ref] = (veces[s.tipo + ':' + s.ref] || 0) + 1;
 
-    const usuario = (req.user && (req.user.nombre || req.user.email) || 'sistema') + ' (auto)';
+    const usuario = usuario0;
     let conciliados = 0, ambiguos = 0, sinMatch = 0;
     for (const { m, sug } of porMov) {
       if (!sug.length) { sinMatch++; continue; }
@@ -455,8 +501,50 @@ const conciliarAuto = async (req, res) => {
       if (r.affectedRows === 1) conciliados++;
     }
     auditar({ req, accion: 'CONCILIAR', modulo: 'tesoreria', entidad: 'banco_movimientos', entidad_id: idConexion,
-      detalle: `Conciliación automática: ${conciliados} conciliados, ${ambiguos} ambiguos, ${sinMatch} sin match (de ${movs.length} pendientes)` });
-    ok(res, { revisados: movs.length, conciliados, ambiguos, sin_match: sinMatch });
+      detalle: `Conciliación automática: ${porRegla} por regla + ${conciliados} por match, ${ambiguos} ambiguos, ${sinMatch} sin match (de ${movs.length} pendientes)` });
+    ok(res, { revisados: movs.length, conciliados: porRegla + conciliados, por_regla: porRegla, ambiguos, sin_match: sinMatch });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── Reglas por descripción (CRUD) ──────────────────────────────────────────── */
+const reglasListar = async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT r.*, (SELECT COUNT(*) FROM banco_movimientos b WHERE b.match_tipo='REGLA' AND b.match_ref=CAST(r.id AS CHAR)) usos
+      FROM conciliacion_reglas r ORDER BY r.activo DESC, r.patron`);
+    ok(res, rows);
+  } catch (e) { fail(res, e.message); }
+};
+const reglaCrear = async (req, res) => {
+  try {
+    const { patron, tipo, monto_max, glosa } = req.body || {};
+    if (!String(patron || '').trim() || !String(glosa || '').trim()) return fail(res, 'Patrón y glosa son obligatorios', 400);
+    const t = ['CARGO', 'ABONO', 'AMBOS'].includes(tipo) ? tipo : 'CARGO';
+    const mm = monto_max != null && monto_max !== '' ? Math.abs(parseInt(monto_max, 10)) || null : null;
+    const [r] = await pool.query(
+      'INSERT INTO conciliacion_reglas (patron, tipo, monto_max, glosa, creado_por) VALUES (?,?,?,?,?)',
+      [String(patron).trim().slice(0, 120), t, mm, String(glosa).trim().slice(0, 200), req.user && (req.user.nombre || req.user.email) || null]);
+    auditar({ req, accion: 'CREAR', modulo: 'tesoreria', entidad: 'conciliacion_reglas', entidad_id: r.insertId,
+      detalle: `Regla de conciliación: "${patron}" (${t}${mm ? ', tope $' + mm : ''}) → ${glosa}` });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.code === 'ER_DUP_ENTRY' ? 'Ya existe una regla con ese patrón y tipo' : e.message, 400); }
+};
+const reglaToggle = async (req, res) => {
+  try {
+    const [r] = await pool.query('UPDATE conciliacion_reglas SET activo=1-activo WHERE id=?', [req.params.id]);
+    if (!r.affectedRows) return fail(res, 'Regla no encontrada', 404);
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'conciliacion_reglas', entidad_id: req.params.id, detalle: 'Activó/desactivó regla de conciliación' });
+    ok(res, { ok: true });
+  } catch (e) { fail(res, e.message); }
+};
+const reglaEliminar = async (req, res) => {
+  try {
+    const [[r]] = await pool.query('SELECT * FROM conciliacion_reglas WHERE id=?', [req.params.id]);
+    if (!r) return fail(res, 'Regla no encontrada', 404);
+    await pool.query('DELETE FROM conciliacion_reglas WHERE id=?', [req.params.id]);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'tesoreria', entidad: 'conciliacion_reglas', entidad_id: req.params.id,
+      detalle: `Eliminó regla de conciliación "${r.patron}" (lo ya conciliado no se toca)` });
+    ok(res, { ok: true });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -497,5 +585,6 @@ const resumen = async (req, res) => {
 };
 
 module.exports = { cuentas, crearCuentaManual, previewCartola, importarCartola, pendientes, conciliados, conciliar, conciliarAuto, desconciliar, resumen,
+  reglasListar, reglaCrear, reglaToggle, reglaEliminar,
   // motor único de cartolas — reusado por Cuentas Corrientes (nunca un segundo parser)
   parsearCartola, hashMovs };

@@ -19,6 +19,12 @@ router.post('/cuentas/:id/cartola/preview',   verifyToken, puede, upload.single(
 router.post('/cuentas/:id/cartola/importar',  verifyToken, puede, upload.single('archivo'), ctrl.importarCartola);
 router.post('/conciliar',                     verifyToken, puede, ctrl.conciliar);
 router.post('/cuentas/:id/conciliar-auto',    verifyToken, puede, ctrl.conciliarAuto);
+
+// Reglas por descripción (paramétricas)
+router.get('/reglas',            verifyToken, ctrl.reglasListar);
+router.post('/reglas',           verifyToken, puede, ctrl.reglaCrear);
+router.put('/reglas/:id/toggle', verifyToken, puede, ctrl.reglaToggle);
+router.delete('/reglas/:id',     verifyToken, puede, ctrl.reglaEliminar);
 router.post('/desconciliar',                  verifyToken, puede, ctrl.desconciliar);
 
 module.exports = router;
