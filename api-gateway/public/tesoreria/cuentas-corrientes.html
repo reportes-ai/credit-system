@@ -7,7 +7,7 @@
   <title>Cuentas Corrientes — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.0 -->
+  <!-- v1.1 — buscador filtra al escribir (debounce) -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
@@ -70,7 +70,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge">v1.0</span>
+      <span class="version-badge">v1.1</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -121,7 +121,7 @@
       <div><label class="f">Desde</label><input type="date" id="fDesde" class="form-control" onchange="resetYcargar()"></div>
       <div><label class="f">Hasta</label><input type="date" id="fHasta" class="form-control" onchange="resetYcargar()"></div>
       <div style="min-width:220px;"><label class="f">Buscar</label>
-        <input id="fTexto" class="form-control" placeholder="Descripción, N° doc, N° mov…" onkeydown="if(event.key==='Enter')resetYcargar()"></div>
+        <input id="fTexto" class="form-control" placeholder="Descripción, N° doc, N° mov…" oninput="buscarDebounce()"></div>
       <div><label class="f">Tipo</label>
         <select id="fTipo" class="form-select" onchange="resetYcargar()">
           <option value="">Todos</option><option value="ABONO">Abonos</option><option value="CARGO">Cargos</option>
@@ -208,6 +208,8 @@ function cambiarCuenta(){
   resetYcargar();
 }
 function resetYcargar(){ PAG = 1; cargarMovs(); }
+let _tBuscar = null;
+function buscarDebounce(){ clearTimeout(_tBuscar); _tBuscar = setTimeout(resetYcargar, 350); }
 function pagina(d){ PAG = Math.max(1, PAG + d); cargarMovs(); }
 
 async function cargarMovs(){
