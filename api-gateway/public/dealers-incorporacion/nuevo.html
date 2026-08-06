@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.28 — cedulas de identidad de los firmantes obligatorias junto con la ficha firmada -->
+  <!-- v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1055,7 +1055,12 @@ async function cargar(){
     const editable = ['BORRADOR','RECHAZADA'].includes(f.estado);
     if (!editable) {
       document.querySelectorAll('.main input, .main select, .main textarea').forEach(el=>el.disabled=true);
-      if (f.estado==='AUTORIZADA' && $('fileFicha')) $('fileFicha').disabled=false;
+      // La ficha firmada y las cédulas de los firmantes se suben JUNTAS: si se
+      // habilita una, hay que habilitar la otra o el envío queda bloqueado.
+      if (['AUTORIZADA','PEND_CIERRE'].includes(f.estado)) {
+        if ($('fileFicha') && f.estado==='AUTORIZADA') $('fileFicha').disabled=false;
+        if ($('fileCedulas')) $('fileCedulas').disabled=false;
+      }
     }
     aplicarEstadoUI(f.estado, f);
     aplicarEntidadUI();
