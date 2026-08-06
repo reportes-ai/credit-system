@@ -303,16 +303,35 @@ async function candidatos(desde, hasta) {
     FROM ordenes_pago
     WHERE estado='PAGADA' AND COALESCE(fecha_pago, fecha_emision) BETWEEN ? AND ?`, [d1, d2]);
 
+  // 4) Asientos de banco en Contabilidad (diario AVSOFT + motor propio):
+  //    líneas contra cuentas 1101xxx — haber = plata que salió, debe = que entró
+  const [ctb] = await pool.query(`
+    SELECT m.id ref, m.debe, m.haber, m.glosa, m.cuenta, c.fecha,
+           COALESCE(c.origen_ref, CONCAT('#', c.id)) comprobante
+    FROM ctb_movimientos m
+    JOIN ctb_comprobantes c ON c.id = m.id_comprobante
+    WHERE c.estado='VIGENTE' AND m.cuenta LIKE '1101%'
+      AND c.fecha BETWEEN ? AND ? AND (m.debe > 0 OR m.haber > 0)`, [d1, d2]);
+
   return {
     trx:    trx.filter(t => !usada.has('TRX:' + t.ref)),
     cuotas: cuotas.filter(c => !usada.has('CUOTA:' + c.ref)),
     odps:   odps.filter(o => !usada.has('ODP:' + o.ref)),
+    ctb:    ctb.filter(x => !usada.has('CTB:' + x.ref)),
   };
 }
 
+const TOL_DIAS_CTB = 5;
 function sugerirPara(mov, cand) {
   const sug = [];
   const monto = Number(mov.monto);
+  // Asientos contables de banco (ambos sentidos): haber = cargo, debe = abono
+  for (const x of (cand.ctb || [])) {
+    const valor = monto < 0 ? Number(x.haber) : Number(x.debe);
+    if (valor > 0 && Math.abs(valor - Math.abs(monto)) < 1 && difDias(mov.fecha, x.fecha) <= TOL_DIAS_CTB)
+      sug.push({ tipo: 'CTB', ref: String(x.ref), fecha: x.fecha,
+        detalle: `${x.comprobante} · ${(x.glosa || '').slice(0, 60)} · cta ${x.cuenta}` });
+  }
   if (monto > 0) {
     for (const t of cand.trx)
       if (Math.abs(Number(t.monto) - monto) < 1 && difDias(mov.fecha, t.fecha) <= TOL_DIAS_PAGO)
@@ -370,7 +389,7 @@ const conciliados = async (req, res) => {
 const conciliar = async (req, res) => {
   try {
     const { id_mov, match_tipo, match_ref, detalle } = req.body || {};
-    const tipos = ['TRX', 'CUOTA', 'ODP', 'MANUAL'];
+    const tipos = ['TRX', 'CUOTA', 'ODP', 'CTB', 'MANUAL'];
     if (!id_mov || !tipos.includes(match_tipo)) return fail(res, 'id_mov y match_tipo válido son obligatorios', 400);
     if (match_tipo !== 'MANUAL' && !match_ref) return fail(res, 'match_ref es obligatorio para conciliación automática', 400);
     if (match_tipo === 'MANUAL' && !String(detalle || '').trim()) return fail(res, 'La conciliación manual requiere una glosa que la justifique', 400);
@@ -423,9 +442,11 @@ const conciliarAuto = async (req, res) => {
     let conciliados = 0, ambiguos = 0, sinMatch = 0;
     for (const { m, sug } of porMov) {
       if (!sug.length) { sinMatch++; continue; }
-      const s = sug[0];
-      const unica = sug.length === 1 && veces[s.tipo + ':' + s.ref] === 1;
-      const confiable = s.tipo === 'ODP' ? (unica && s.rut_ok) : unica;
+      // Elección: (a) ODP con RUT coincidente y única con RUT — gana aunque el
+      // mismo pago también aparezca como asiento CTB; (b) sugerencia única.
+      const conRut = sug.filter(s => s.rut_ok);
+      const s = (conRut.length === 1) ? conRut[0] : (sug.length === 1 ? sug[0] : null);
+      const confiable = s && veces[s.tipo + ':' + s.ref] === 1 && (s.tipo !== 'ODP' || s.rut_ok);
       if (!confiable) { ambiguos++; continue; }
       const [r] = await pool.query(
         `UPDATE banco_movimientos SET conciliado=1, match_tipo=?, match_ref=?, match_detalle=?, conciliado_por=?, fecha_conciliacion=NOW()
