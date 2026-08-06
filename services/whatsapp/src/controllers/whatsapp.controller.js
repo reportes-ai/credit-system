@@ -51,6 +51,10 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
     // Límite anti-abuso de preevaluaciones DealerNet (consultas pagadas) — paramétrico
     try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS dn_max_conv INT NOT NULL DEFAULT 2'); } catch (e) { if (e.errno !== 1060) throw e; }
     try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS dn_max_dia INT NOT NULL DEFAULT 30'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // Devolución automática al bot: una conversación derivada que nadie contesta queda
+    // muda para siempre (el bot se retira cuando entra un humano). Pasadas N horas sin
+    // actividad vuelve sola al bot. 0 = nunca devolver.
+    try { await pool.query('ALTER TABLE wsp_config ADD COLUMN IF NOT EXISTS devolver_bot_horas INT NOT NULL DEFAULT 24'); } catch (e) { if (e.errno !== 1060) throw e; }
     await pool.query("UPDATE wsp_config SET prompt_ia=? WHERE id=1 AND (prompt_ia IS NULL OR prompt_ia='')", [PROMPT_IA_DEF]);
   } catch (e) { console.error('[wsp_config migration]', e.message); }
 
@@ -975,11 +979,13 @@ exports.setConfig = async (req, res) => {
     const b = req.body || {};
     await pool.query(`UPDATE wsp_config SET bot_activo=?, horario_ini=?, horario_fin=?, dias_habiles=?,
         msg_bienvenida=?, msg_fuera_horario=?, msg_no_entiendo=?, msg_derivacion=?, prompt_ia=?, ventana_horas=?,
-        modo_24_7=?, dn_max_conv=?, dn_max_dia=? WHERE id=1`,
+        modo_24_7=?, dn_max_conv=?, dn_max_dia=?, devolver_bot_horas=? WHERE id=1`,
       [b.bot_activo ? 1 : 0, b.horario_ini || '09:00', b.horario_fin || '19:00', b.dias_habiles || '1,2,3,4,5,6',
        b.msg_bienvenida || '', b.msg_fuera_horario || '', b.msg_no_entiendo || '', b.msg_derivacion || '', b.prompt_ia || PROMPT_IA_DEF,
        Math.min(Math.max(parseInt(b.ventana_horas) || 23, 1), 24),
-       b.modo_24_7 ? 1 : 0, Math.max(parseInt(b.dn_max_conv) || 2, 1), Math.max(parseInt(b.dn_max_dia) || 30, 1)]);
+       b.modo_24_7 ? 1 : 0, Math.max(parseInt(b.dn_max_conv) || 2, 1), Math.max(parseInt(b.dn_max_dia) || 30, 1),
+       // 0 = nunca devolver; tope 720 h (30 días) para que un dedazo no deje conversaciones colgadas un año
+       Math.min(Math.max(parseInt(b.devolver_bot_horas) || 0, 0), 720)]);
     auditar({ req, accion: 'EDITAR', modulo: 'whatsapp', entidad: 'wsp_config', entidad_id: '1', detalle: 'Configuración del bot WhatsApp actualizada' });
     res.json({ success: true, data: null, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -1277,6 +1283,11 @@ exports.avisoVencCrearPlantillas = async (req, res) => {
   try { res.json({ success: true, data: await avisoVenc.crearPlantillas(), error: null }); }
   catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
 };
+
+/* Motor que devuelve al bot las conversaciones derivadas que nadie retomó
+   (services/whatsapp/src/devolver-bot.js). Se requiere acá para que quede
+   registrado en el scheduler al levantar el servicio. */
+require('../devolver-bot');
 
 /* ═══ AUTOMATIZACIONES DE COBRANZA (motor services/whatsapp/src/automatizacion-cobranza.js) ═══
    Secuencia numerada de plantillas HSM tipo=COBRANZA — panel expuesto en /cobranza/automatizaciones. */

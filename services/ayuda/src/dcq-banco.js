@@ -503,4 +503,8 @@ module.exports = [
   donde:'El QR impreso en el certificado.',
   como:'Cada certificado queda registrado con su huella digital (hash); el QR lleva a la verificación pública del documento.',
   quien:'Cualquier persona con el QR.', kw:'certificado qr verificar autentico firma' },
+{ slug:'wsp-bot-no-responde', cat:'Sistema', p:'¿Por qué el bot de WhatsApp no le responde a un cliente?',
+  donde:'WhatsApp → la conversación; la configuración en WhatsApp → Configuración.',
+  como:'Si la conversación está DERIVADA, el bot se calla a propósito para no hablarle por encima al ejecutivo que la tomó. Pasadas las horas configuradas sin actividad vuelve sola al bot y se suelta del ejecutivo; también puedes devolverla a mano desde la conversación. Si NINGÚN cliente recibe respuesta, el problema es otro: revisa que la URL del webhook en Meta apunte al dominio propio.',
+  quien:'Ejecutivos de atención; el Administrador ajusta las horas.', kw:'whatsapp bot no responde derivada mudo webhook facilito' },
 ];

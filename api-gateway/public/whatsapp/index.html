@@ -6,7 +6,7 @@
   <link rel="apple-touch-icon" href="/whatsapp/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.3 -->
+  <!-- v1.4 -->
   <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
   <link rel="manifest" href="/whatsapp/manifest.json">
   <meta name="theme-color" content="#075E54">
@@ -356,6 +356,10 @@
         <div class="fld"><label>Ventana de envío (horas desde el último mensaje del cliente)</label>
           <input type="number" id="gVentana" min="1" max="24" style="max-width:120px">
           <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Regla de WhatsApp: pasado este plazo la conversación se bloquea — solo reabre si el cliente escribe o con una plantilla vía campaña. Máximo 24; se recomienda 23 para no rozar el límite de Meta.</div>
+        </div>
+        <div class="fld"><label>Devolver al bot tras N horas sin actividad</label>
+          <input type="number" id="gDevBot" min="0" max="720" style="max-width:120px">
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:4px">Cuando un ejecutivo toma una conversación el bot se retira, para no hablarle por encima. Si nadie la retoma, el cliente le queda escribiendo a un número mudo: pasadas estas horas sin mensajes la conversación vuelve sola al bot y se suelta del ejecutivo. <b>0 = nunca devolver.</b> Las conversaciones cerradas no se reabren.</div>
         </div>
         <div class="fld"><label>Mensaje de bienvenida (primer contacto)</label><textarea id="gBienvenida"></textarea></div>
         <div class="fld"><label>Mensaje fuera de horario</label><textarea id="gFueraHorario"></textarea></div>
@@ -1075,6 +1079,8 @@ async function cargarConfig(){
     document.getElementById('g247').checked = c.modo_24_7 == null ? true : !!c.modo_24_7;
     document.getElementById('gDnConv').value = c.dn_max_conv||2;
     document.getElementById('gDnDia').value = c.dn_max_dia||30;
+    // 0 es un valor válido ("nunca devolver"), así que no sirve `|| 24`
+    document.getElementById('gDevBot').value = c.devolver_bot_horas == null ? 24 : c.devolver_bot_horas;
   }
 
   async function guardarConfig(){
@@ -1087,6 +1093,7 @@ async function cargarConfig(){
       ventana_horas: val('gVentana'),
       modo_24_7: document.getElementById('g247').checked ? 1 : 0,
       dn_max_conv: val('gDnConv'), dn_max_dia: val('gDnDia'),
+      devolver_bot_horas: val('gDevBot'),
     };
     const j = await (await fetch('/api/whatsapp/config',{method:'PUT',headers:HJ,body:JSON.stringify(body)})).json();
     alert(j.success ? 'Configuración guardada ✓' : (j.error||'Error'));

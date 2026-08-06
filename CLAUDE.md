@@ -192,7 +192,7 @@ Reglas de diseño que se derivan de este principio:
 ## Motores automáticos: un solo interruptor (`shared/scheduler.js`)
 > **Toda tarea de fondo se registra con `programar()`, nunca con un `setInterval` suelto.**
 
-Hay **27 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
+Hay **28 motores** que actúan sin que nadie los llame: aprueban comisiones, desisten aprobados
 vencidos, cierran castigos, generan devengos de vacaciones, escalan tickets y workflows, mandan
 correos programados y cobranza.
 
@@ -378,7 +378,7 @@ correos programados y cobranza.
   - Host alternativo en **Google Cloud Run**: servicio `afbs-standby`, región `us-east4`,
     accesible en **`afbs2.autofacilchile.cl`**. Usa la MISMA base de producción, así que
     reemplazar a Render no exige migrar nada.
-  - Duerme con **`MOTORES=off`**: atiende peticiones pero no ejecuta ninguno de los 27 motores
+  - Duerme con **`MOTORES=off`**: atiende peticiones pero no ejecuta ninguno de los 28 motores
     automáticos. Sin ese interruptor no se podía tener un standby desplegado — dos procesos
     contra la misma base disparan cada reloj dos veces, en silencio.
   - **Arranque en frío 5 s** (medido). **US$1/mes** dormido, US$27 prorrateado solo mientras

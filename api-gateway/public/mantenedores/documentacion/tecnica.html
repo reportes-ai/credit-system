@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.9 — política de claves aplicada de verdad, cambio de clave forzado en el servidor, firma del webhook de Meta y reintento de correlativos. v4.8 — host de contingencia en Cloud Run (afbs2), interruptor MOTORES=off y reconstruccion diaria. v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
+<!-- v5.0 — devolucion automatica de conversaciones al bot y la URL del webhook en el dominio propio. v4.9 — política de claves aplicada de verdad, cambio de clave forzado en el servidor, firma del webhook de Meta y reintento de correlativos. v4.8 — host de contingencia en Cloud Run (afbs2), interruptor MOTORES=off y reconstruccion diaria. v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -129,7 +129,8 @@
   <h2>Integraciones externas</h2>
   <table>
     <tr><th>Integración</th><th>Detalle</th></tr>
-    <tr><td>Meta Cloud API (WhatsApp)</td><td><code>shared/whatsapp.js</code> — Graph v21.0. Env: WSP_TOKEN (system user autofacil-bot, portafolio "Auto Facil Chile" — el portafolio "AutoFácil" está restringido para WhatsApp, no usar), WSP_PHONE_ID (16 dígitos), WSP_VERIFY. Webhook público /api/whatsapp/webhook. Sin credenciales → modo SIMULADO. Ventana 24h (config). Plantillas HSM vía /{waba}/message_templates (waba_id en wsp_config).</td></tr>
+    <tr><td>Meta Cloud API (WhatsApp)</td><td><code>shared/whatsapp.js</code> — Graph v21.0. Env: WSP_TOKEN (system user autofacil-bot, portafolio "Auto Facil Chile" — el portafolio "AutoFácil" está restringido para WhatsApp, no usar), WSP_PHONE_ID (16 dígitos), WSP_VERIFY. Webhook público /api/whatsapp/webhook. Sin credenciales → modo SIMULADO. Ventana 24h (config). Plantillas HSM vía /{waba}/message_templates (waba_id en wsp_config). <b>La URL del webhook en Meta debe apuntar al dominio propio</b> (<code>afbs.autofacilchile.cl</code>), nunca al host <code>*.onrender.com</code>: al trasladar Render a Virginia el hostname cambió, la URL vieja quedó devolviendo 503 y <b>se perdieron seis días de mensajes entrantes</b> (30-jul a 5-ago-2026) sin ningún aviso — Meta reintenta unas horas, no una semana. Verificar tras cualquier cambio de hosting.</td></tr>
+    <tr><td>Devolución automática al bot</td><td><code>services/whatsapp/src/devolver-bot.js</code> — motor <code>wsp-devolver-bot</code> (cada 10 min). Una conversación <code>DERIVADA</code> silencia al bot a propósito, para que no le hable por encima al ejecutivo que la tomó; el efecto secundario es que una derivación que nadie retoma deja al cliente escribiéndole a un número mudo <b>para siempre</b>. Pasadas <code>wsp_config.devolver_bot_horas</code> sin actividad vuelve a <code>BOT</code> y se suelta del ejecutivo (<code>asignada_a</code>, <code>area</code> a NULL). <b>0 = nunca devolver</b>, tope 720 h. Las <code>CERRADA</code> no se reabren: se cerraron a propósito.</td></tr>
     <tr><td>DealerNet WS</td><td>SOAP CentralDeInformacion (informes comerciales por RUT, pagado). <code>asegurarInformes</code> con caché (dias_bloqueo). Credenciales por env var.</td></tr>
     <tr><td>Correo</td><td><code>shared/mailer.js</code> (nodemailer SMTP, Brevo). Cuentas remitente sistema/cobranza. Respeta Modo Desarrollo (redirige todo a correos de prueba).</td></tr>
     <tr><td>Indicadores</td><td>UF, UTM, dólar, IPC y TMC: API oficial CMF (CMF_API_KEY), sincronización cada 12h (services/mantenedores/src/cmf-api.js, fuente única).</td></tr>
@@ -152,7 +153,7 @@
       (proyecto <code>autofacil-bs</code>, región <b>us-east4</b>, la misma zona que TiDB), accesible en
       <b><code>https://afbs2.autofacilchile.cl</code></b>. Usa la <b>MISMA base de producción</b>: no tiene datos propios,
       así que reemplazar a Render no exige migrar ni sincronizar nada.<br>
-      <b>Duerme con <code>MOTORES=off</code></b>: atiende peticiones pero <b>no ejecuta ninguno de los 27 motores
+      <b>Duerme con <code>MOTORES=off</code></b>: atiende peticiones pero <b>no ejecuta ninguno de los 28 motores
       automáticos</b>. Esa es la pieza que hace posible tenerlo desplegado y probado — si los dos hosts corrieran los
       motores contra la misma base, cada reloj dispararía dos veces y el daño sería silencioso (una comisión aprobada
       dos veces no se queja). Mientras duerme muestra una <b>cinta naranja de CONTINGENCIA</b> que desaparece sola al
