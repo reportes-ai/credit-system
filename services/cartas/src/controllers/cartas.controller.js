@@ -807,9 +807,23 @@ const getAll = async (req, res) => {
                    cr.pie AS cred_pie, cr.plazo AS cred_plazo, cr.comdea_real AS cred_comdea_real
                  FROM cartas_aprobacion ca
                  LEFT JOIN creditos cr ON cr.id = ca.id_credito_creado`;
-    const [rows] = verTodas
-      ? await pool.query(`${SEL} ORDER BY ca.fecha_creacion DESC`)
-      : await pool.query(`${SEL} WHERE ca.creado_por = ? ORDER BY ca.fecha_creacion DESC`, [login]);
+    /* Sin aprob_ver_todas: ve las cartas que ÉL digitó + las de SUS ejecutivos
+       (motor único de visibilidad — las cartas las digita Operaciones, así que
+       filtrar solo por creado_por dejaba al ejecutivo sin sus propias operaciones). */
+    let rows;
+    if (verTodas) {
+      [rows] = await pool.query(`${SEL} ORDER BY ca.fecha_creacion DESC`);
+    } else {
+      const { ejecutivosVisibles } = require('../../../../shared/visibilidad-ejecutivos');
+      const vis = await ejecutivosVisibles(req.usuario);
+      if (!vis.all && vis.lista && vis.lista.length) {
+        [rows] = await pool.query(
+          `${SEL} WHERE ca.creado_por = ? OR UPPER(TRIM(ca.ejecutivo)) IN (?) ORDER BY ca.fecha_creacion DESC`,
+          [login, vis.lista.map(e => String(e).trim().toUpperCase())]);
+      } else {
+        [rows] = await pool.query(`${SEL} WHERE ca.creado_por = ? ORDER BY ca.fecha_creacion DESC`, [login]);
+      }
+    }
     await _refreshIva();
     res.json({ success: true, data: rows.map(mapRow), verTodas, error: null });
   } catch (e) {
