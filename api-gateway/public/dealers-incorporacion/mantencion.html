@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.16 — etiqueta Cedula firmante en los adjuntos de revision -->
+  <!-- v1.17 — Comparar firmas: ficha firmada y cedulas lado a lado en la revision -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -351,6 +351,16 @@ function renderDealers(){
     </tr>`).join('')}</tbody></table>`;
 }
 
+/* Comparar firmas: al abrir, el modal se ensancha para que la ficha firmada y
+   las cédulas queden de verdad LADO A LADO; al cerrar vuelve al ancho normal. */
+function toggleCompararFirmas(){
+  const c=document.getElementById('cmpFirmas'); if(!c) return;
+  const abierto = c.style.display==='none';
+  c.style.display = abierto ? '' : 'none';
+  const d=document.getElementById('dlgVer');
+  if(d) d.style.width = abierto ? 'min(1250px,96vw)' : '';
+}
+
 /* ── Acciones ficha ── */
 async function verFicha(id, revisar, historico){
   try {
@@ -359,13 +369,37 @@ async function verFicha(id, revisar, historico){
     $('verTitulo').textContent = (revisar?'Revisar — ':historico?'Histórico — ':'')+(f.nombre_razon||f.rut||'Ficha')+' · '+(f.entidad==='PARQUE'?'Ficha de PARQUE':f.tipo==='AMBOS'?'Ambos':(f.tipo==='PARQUE'?'Parque':'General'));
     const row=(k,v)=>`<b>${k}</b><span>${escH(v??'—')}</span>`;
     // Adjuntos (ficha firmada + informes comerciales)
-    let adjHtml = '';
+    let adjHtml = '', cedulas = [];
     if (f.tiene_ficha) adjHtml += `<a class="btn btn-sky btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivo?token=${encodeURIComponent(token)}"><i class="bi bi-file-earmark-pdf"></i> Ficha firmada</a> `;
     try {
       const ra=await fetch('/api/dealer-incorporacion/fichas/'+id+'/archivos',{headers:H}); const ja=await ra.json();
       const CAT_LBL={EMPRESA:'Empresa',SOCIOS:'Socios',SOCIO1:'Socio 1',SOCIO2:'Socio 2',SOCIO3:'Socio 3',PODER_SIMPLE:'Poder Simple',PODER_REP_LEGAL:'Poderes Rep. Legal',CEDULA:'Cédula firmante'};
       (ja.data||[]).forEach(a=>{ adjHtml += `<a class="btn btn-light btn-sm" style="text-decoration:none" target="_blank" href="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}"><i class="bi bi-paperclip"></i> ${CAT_LBL[a.categoria]||a.categoria}: ${escH(a.nombre||'archivo')}</a> `; });
+      cedulas = (ja.data||[]).filter(a=>a.categoria==='CEDULA');
     } catch(e){}
+    // Comparar firmas: la ficha firmada y las cédulas de los firmantes LADO A LADO,
+    // para que el aprobador coteje la firma del documento contra la de la cédula.
+    let compHtml = '';
+    if (f.tiene_ficha && cedulas.length) {
+      const urlFicha = `/api/dealer-incorporacion/fichas/${id}/archivo?token=${encodeURIComponent(token)}`;
+      const paneles = cedulas.map(a=>`<div style="flex:1;min-width:260px">
+          <div style="font-size:.72rem;font-weight:700;color:#475569;margin-bottom:4px"><i class="bi bi-person-vcard me-1"></i>${escH(a.nombre||'cédula')}</div>
+          <iframe src="/api/dealer-incorporacion/fichas/${id}/archivos/${a.id}?token=${encodeURIComponent(token)}" style="width:100%;height:420px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc"></iframe>
+        </div>`).join('');
+      compHtml = `<div style="margin-top:14px">
+        <button class="btn btn-navy btn-sm" onclick="toggleCompararFirmas()"><i class="bi bi-vector-pen"></i> Comparar firmas (ficha + ${cedulas.length} cédula${cedulas.length===1?'':'s'})</button>
+        <div id="cmpFirmas" style="display:none;margin-top:10px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div style="flex:1.4;min-width:320px">
+              <div style="font-size:.72rem;font-weight:700;color:#475569;margin-bottom:4px"><i class="bi bi-file-earmark-pdf me-1"></i>Ficha firmada</div>
+              <iframe src="${urlFicha}" style="width:100%;height:420px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc"></iframe>
+            </div>
+            ${paneles}
+          </div>
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:6px">La firma de la ficha debe coincidir con la de la cédula del firmante. Si no calza, rechaza la ficha con el motivo.</div>
+        </div>
+      </div>`;
+    }
     // Diferencias vs datos cargados en el sistema
     let difHtml = '';
     if (Array.isArray(f.diferencias) && f.diferencias.length) {
@@ -414,7 +448,7 @@ async function verFicha(id, revisar, historico){
       cadenaHtml = `<div style="margin-top:14px;border:1px solid #c7d2fe;background:#eef2ff;border-radius:10px;padding:12px 14px">
         <b style="color:#3730a3;font-size:.82rem"><i class="bi bi-diagram-3 me-1"></i>Cadena de autorización</b>${items||'<div style="font-size:.8rem;color:#94a3b8;margin-top:4px">Sin autorizaciones aún</div>'}${pend}</div>`;
     }
-    $('verBody').innerHTML = `${(revisar||historico)?barraInformes(f):''}${fichaDocHTML(f)}${(f.apelacion||f.motivo_rechazo)?`<div class="kv" style="margin-top:10px">${f.apelacion?row('Apelación', f.apelacion):''}${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}</div>`:''}${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>${historico?timbreFicha(f):''}`;
+    $('verBody').innerHTML = `${(revisar||historico)?barraInformes(f):''}${fichaDocHTML(f)}${(f.apelacion||f.motivo_rechazo)?`<div class="kv" style="margin-top:10px">${f.apelacion?row('Apelación', f.apelacion):''}${f.motivo_rechazo?row('Motivo rechazo', f.motivo_rechazo):''}</div>`:''}${cadenaHtml}${espHtml}${firmaHtml}${difHtml}${faltHtml}${excHtml}<div style="margin-top:16px;display:flex;flex-wrap:wrap;gap:6px">${adjHtml||'<span style="font-size:.8rem;color:#94a3b8">Sin adjuntos</span>'}</div>${compHtml}${historico?timbreFicha(f):''}`;
     dlgVer.showModal();
     // Registrar que se revisó (para detectar "Aprobado sin revisión de ficha").
     if (revisar) { try { await fetch('/api/dealer-incorporacion/fichas/'+id+'/marcar-revisada',{method:'POST',headers:H}); } catch(_){} }
