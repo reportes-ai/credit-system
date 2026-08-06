@@ -175,6 +175,10 @@ require('../../../shared/migrate').enFila('contabilidad-motor', async () => {
         ['4002100', 'DEBE',  'monto', 'Gasto arriendo/comisión parque'],
         ['2106012', 'HABER', 'monto', 'Comisiones parque por pagar'],
       ]],
+      ['COMISION_PARQUES_PAGADA', 'Comisión/arriendo de parque pagada (ODP)', 'Se dispara al confirmar el pago de la ODP mensual del parque (Post Venta → Comisiones Parques a Pagar): rebaja el pasivo contra banco. Campos: monto (total de la ODP).', 'EGRESO', 1, [
+        ['2106012', 'DEBE',  'monto', 'Pago comisión/arriendo parque'],
+        ['1101090', 'HABER', 'monto', 'Salida de banco'],
+      ]],
       /* ── CARTERA PROPIA: solo créditos AUTOFÁCIL (recursos propios) ─────────
          En brokerage (AutoFin/Unidad) el crédito NO es nuestro: no hay colocación
          que activar. Solo se contabiliza cuando la operación es AUTOFACIL. */

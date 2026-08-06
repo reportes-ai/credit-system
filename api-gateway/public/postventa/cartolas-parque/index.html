@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.0 — cartola mensual por parque: emitir, aprobar, enviar (PDF + correo), reversas -->
+  <!-- v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -196,6 +196,8 @@ function cartolaHTML(r, i){
         ${!mail?'<span style="font-size:.7rem;color:#b45309">⚠ sin correo de finanzas en la <a href="/dealers-incorporacion/parques.html">ficha del parque</a></span>':''}
         ${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}')"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
           : (st.enviada?'<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Enviada — reversable en la pestaña Enviadas</span>':'<span style="font-size:.72rem;color:#94a3b8">Se envía una vez aprobada</span>')}
+        ${st.enviada && !st.factura ? `<button class="btn b-light" onclick="registrarFactura('${escA(r.parque)}',${r.total})"><i class="bi bi-receipt me-1"></i>Registrar factura</button>` : ''}
+        ${st.factura_datos ? `<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Factura ${escH(st.factura_datos.numero_factura)} · ${fmtCLP(st.factura_datos.monto_bruto)}</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -248,6 +250,18 @@ AutoFácil Crédito Automotriz`;
   window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
     '&cc=' + encodeURIComponent('comisiones@autofacilchile.cl') +
     '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
+  cargar();
+}
+
+async function registrarFactura(parque, total){
+  const numero = prompt('N° de la factura del parque '+parque+':'); if (numero===null || !numero.trim()) return;
+  const fecha = prompt('Fecha de la factura (AAAA-MM-DD, vacío = hoy):') || '';
+  const monto = prompt('Monto BRUTO de la factura (debe cuadrar con el total de la cartola: '+fmtCLP(total)+'):', total);
+  if (monto===null) return;
+  const j = await (await fetch('/api/comisiones-parques/cartola/factura', { method:'POST', headers:H,
+    body: JSON.stringify({ mes:mes(), parque, numero:numero.trim(), fecha:fecha.trim()||null, monto:String(monto).replace(/[^\d]/g,'') }) })).json();
+  if (!j.success) { alert(j.error||'Error'); return; }
+  alert('Factura registrada y cuadrada ✓ — FACTURA RECIBIDA marcada en las operaciones del parque.');
   cargar();
 }
 

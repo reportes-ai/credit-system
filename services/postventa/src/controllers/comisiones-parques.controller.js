@@ -71,6 +71,19 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
         if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)', [idf]);
       }
     }
+    // Facturas de parque: registro formal (número/fecha/monto) con cuadratura
+    // contra el total de la cartola — espejo de la factura del dealer.
+    await pool.query(`CREATE TABLE IF NOT EXISTS parques_facturas (
+      id             INT AUTO_INCREMENT PRIMARY KEY,
+      mes            VARCHAR(7)   NOT NULL,
+      parque         VARCHAR(120) NOT NULL,
+      numero_factura VARCHAR(40)  NOT NULL,
+      fecha_factura  DATE NULL,
+      monto_bruto    BIGINT NOT NULL,
+      registrado_por VARCHAR(150) NULL,
+      created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_parque_mes_fac (parque, mes)
+    )`);
     // Registro de cartolas de parque enviadas (reverso preciso por envío).
     await pool.query(`CREATE TABLE IF NOT EXISTS parques_cartolas_enviadas (
       id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -274,6 +287,13 @@ const aprobar = async (req, res) => {
         aprobada_por=IF(fecha_aprobada IS NULL, VALUES(aprobada_por), aprobada_por),
         fecha_aprobada=IF(fecha_aprobada IS NULL, NOW(), fecha_aprobada)`,
       [parque, mes + '-01', row.arriendo, row.comision_creditos, row.ops, quien]);
+    // Máxima 4: devengo del gasto al aprobar (regla COMISION_PARQUES, idempotente por ref)
+    require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: 'COMISION_PARQUES',
+      glosa: `Comisión/arriendo parque ${parque} — ${mes}`,
+      ref: `PARQUE-${parque}-${mes}`,
+      montos: { monto: Math.round(Number(row.arriendo) || 0) + Math.round(Number(row.comision_creditos) || 0) },
+    }).catch(e => console.error('[parques ctb devengo]', e.message));
     auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'parque_pago', detalle: `Aprobó comisión parque ${parque} ${mes}: arriendo ${CLP(row.arriendo)} + comisión ${CLP(row.comision_creditos)} (${row.ops} ops)` });
     res.json({ success: true, data: { etapa: 'APROBADA' }, error: null });
   } catch (e) { console.error('[comisiones-parques aprobar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -382,6 +402,13 @@ const pagar = async (req, res) => {
     });
 
     await marcarEtapaParqueOps(parque, mes, ['ENVIADO A PAGO', 'COMISION PAGADA'], quien);
+    // Máxima 4: el pago rebaja el pasivo contra banco (regla COMISION_PARQUES_PAGADA)
+    require('../../../contabilidad/src/motor-asientos').contabilizar({
+      evento: 'COMISION_PARQUES_PAGADA',
+      glosa: `Pago ${e.odp_numero} — parque ${parque} ${mes}`,
+      ref: `PARQUE-PAGO-${e.odp_numero}`,
+      montos: { monto: Math.round(Number(e.arriendo) || 0) + Math.round(Number(e.comision_creditos) || 0) },
+    }).catch(er => console.error('[parques ctb pago]', er.message));
     auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: e.id, detalle: `Confirmó pago ${e.odp_numero} — parque ${parque} ${mes}` });
     res.json({ success: true, data: { etapa: 'PAGO_REALIZADO' }, error: null });
   } catch (e) { console.error('[comisiones-parques pagar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -409,6 +436,8 @@ const cartolaEstado = async (req, res) => {
       JOIN creditos c ON c.id = s.id_credito
       WHERE s.parque IS NOT NULL AND DATE_FORMAT(c.mes,'%Y-%m') = ?
       GROUP BY s.parque`, [mes]);
+    const [facs] = await pool.query('SELECT parque, numero_factura, fecha_factura, monto_bruto FROM parques_facturas WHERE mes=?', [mes]);
+    const facMap = new Map(facs.map(f => [f.parque, f]));
     const [fichas] = await pool.query(`
       SELECT p.nombre, f.rut, f.razon_social, f.cf_email, f.cf_nombre, f.tipo_documento
       FROM parques_comisiones p LEFT JOIN parques_ficha f ON f.id_parque = p.id`);
@@ -418,11 +447,12 @@ const cartolaEstado = async (req, res) => {
       emitida: Number(r.em) >= r.ops, aprobada: Number(r.ap) >= r.ops,
       enviada: Number(r.en) >= r.ops, factura: Number(r.fa) >= r.ops,
       ficha: fMap.get(r.parque) || null,
+      factura_datos: facMap.get(r.parque) || null,
     }));
     // También los parques solo-arriendo (sin ops en el mes) con su ficha
     for (const [nombre, f] of fMap) {
       if (!data.some(d => d.parque === nombre))
-        data.push({ parque: nombre, ops: 0, emitida: false, aprobada: false, enviada: false, factura: false, ficha: f });
+        data.push({ parque: nombre, ops: 0, emitida: false, aprobada: false, enviada: false, factura: false, ficha: f, factura_datos: facMap.get(nombre) || null });
     }
     res.json({ success: true, data: { mes, rows: data }, error: null });
   } catch (e) { console.error('[cartola-estado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -495,6 +525,42 @@ const cartolaReversarEnvio = async (req, res) => {
   } catch (e) { console.error('[cartola reversar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* POST /cartola/factura {mes,parque,numero,fecha,monto} — registra la factura
+   del parque con CUADRATURA contra el total (snapshot si existe; si no, el
+   cálculo vivo). Al cuadrar, marca FACTURA RECIBIDA en todas las ops del mes. */
+const facturaRegistrar = async (req, res) => {
+  try {
+    const mes = mesParam(req), parque = String(req.body.parque || '').trim();
+    const numero = String(req.body.numero || '').trim();
+    const monto = Math.round(Number(req.body.monto) || 0);
+    if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    if (!numero) return res.status(400).json({ success: false, data: null, error: 'Número de factura requerido' });
+    if (monto <= 0) return res.status(400).json({ success: false, data: null, error: 'Monto de la factura requerido' });
+
+    // Total esperado: manda el snapshot aprobado; sin snapshot, el cálculo del mes.
+    let esperado = null;
+    const [[snap]] = await pool.query("SELECT arriendo, comision_creditos, etapa FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+    if (snap && snap.etapa !== 'EN_APROBACION') esperado = Math.round(Number(snap.arriendo)) + Math.round(Number(snap.comision_creditos));
+    else { const row = (await calcularMes(mes)).find(r => r.parque === parque); if (row) esperado = row.total; }
+    if (esperado == null) return res.status(404).json({ success: false, data: null, error: 'Parque sin movimiento en el mes' });
+    if (monto !== esperado)
+      return res.status(400).json({ success: false, data: null,
+        error: `La factura (${CLP(monto)}) no cuadra con el total de la cartola (${CLP(esperado)}). El parque debe facturar exactamente el total.` });
+
+    const quien = quienDe(req);
+    await pool.query(
+      `INSERT INTO parques_facturas (mes, parque, numero_factura, fecha_factura, monto_bruto, registrado_por)
+       VALUES (?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE numero_factura=VALUES(numero_factura), fecha_factura=VALUES(fecha_factura),
+         monto_bruto=VALUES(monto_bruto), registrado_por=VALUES(registrado_por)`,
+      [mes, parque, numero, req.body.fecha || null, monto, quien]);
+    await marcarEtapaParqueOps(parque, mes, ['FACTURA RECIBIDA'], quien);
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_parque',
+      detalle: `Registró factura ${numero} del parque ${parque} (${mes}) por ${CLP(monto)} — cuadrada contra la cartola` });
+    res.json({ success: true, data: { ok: true }, error: null });
+  } catch (e) { console.error('[parques factura]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ═══ REVERSAS DE ODP Y PAGO (con motivo, auditadas) ═══════════════════════ */
 
 /* POST /anular-odp {mes,parque,motivo} — solo con la ODP emitida y NO pagada.
@@ -540,5 +606,5 @@ const revertirPago = async (req, res) => {
 };
 
 module.exports = { listar, detalle, aprobar, emitir, pagar,
-  cartolaEstado, cartolaEmitir, cartolaAprobar, cartolaEnviar, cartolasEnviadas, cartolaReversarEnvio,
+  facturaRegistrar, cartolaEstado, cartolaEmitir, cartolaAprobar, cartolaEnviar, cartolasEnviadas, cartolaReversarEnvio,
   anularODP, revertirPago };

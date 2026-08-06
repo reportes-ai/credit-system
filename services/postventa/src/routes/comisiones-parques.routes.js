@@ -19,6 +19,7 @@ router.get('/cartola-estado',            verifyToken, cartola, c.cartolaEstado);
 router.post('/cartola/emitir',           verifyToken, cartola, c.cartolaEmitir);
 router.post('/cartola/aprobar',          verifyToken, requireFunc('pv_parques_aprobar'), c.cartolaAprobar);
 router.post('/cartola/enviar',           verifyToken, cartola, c.cartolaEnviar);
+router.post('/cartola/factura',          verifyToken, cartola, c.facturaRegistrar);
 router.get('/cartolas-enviadas',         verifyToken, cartola, c.cartolasEnviadas);
 router.delete('/cartolas-enviadas/:id',  verifyToken, requireFunc('pv_parques_aprobar'), c.cartolaReversarEnvio);
 

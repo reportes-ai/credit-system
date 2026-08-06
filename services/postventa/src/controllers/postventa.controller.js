@@ -501,8 +501,11 @@ const sync = async (req, res) => {
       UPDATE postventa_seguimiento s
         JOIN creditos c ON c.id = s.id_credito
         LEFT JOIN dealers d ON d.id_dealer = c.id_dealer
-      SET s.parque = (SELECT p.nombre FROM parques_comisiones p
-                       WHERE UPPER(p.nombre) = UPPER(TRIM(COALESCE(NULLIF(d.ccs_parque,''), c.parque, ''))) LIMIT 1),
+          OR (c.id_dealer IS NULL AND d.rut IS NOT NULL AND
+              REPLACE(REPLACE(UPPER(d.rut),'.',''),'-','') = REPLACE(REPLACE(UPPER(COALESCE(c.rut_dealer,'')),'.',''),'-',''))
+      SET s.parque = COALESCE(
+            (SELECT p.nombre FROM parques_comisiones p WHERE UPPER(p.nombre) = UPPER(TRIM(COALESCE(d.ccs_parque,''))) LIMIT 1),
+            (SELECT p.nombre FROM parques_comisiones p WHERE UPPER(p.nombre) = UPPER(TRIM(COALESCE(c.parque,''))) LIMIT 1)),
           s.com_parque = c.com_parque`).catch(e => console.error('[postventa sync parque]', e.message));
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
