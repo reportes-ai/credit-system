@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catálogo de Endpoints — AutoFácil</title>
+  <!-- v1.0 — inventario auto-generado del código: método, ruta, token y permisos; semáforo de lo desprotegido -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main { padding:24px 30px 60px; max-width:1240px; margin:0 auto; }
+    .banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:20px 26px; margin-bottom:18px; display:flex; gap:16px; align-items:center; }
+    .banner i { font-size:2rem; opacity:.85; } .banner h2 { margin:0; font-size:1.15rem; font-weight:700; } .banner p { margin:3px 0 0; font-size:.83rem; opacity:.85; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+    .stat { background:#fff; border-radius:12px; padding:12px 16px; box-shadow:0 1px 5px rgba(0,0,0,.07); cursor:pointer; border:2px solid transparent; }
+    .stat.on { border-color:var(--navy); }
+    .stat .n { font-size:1.4rem; font-weight:800; color:#012d70; }
+    .stat.rojo .n { color:#b91c1c; } .stat.ambar .n { color:#b45309; } .stat.verde .n { color:#15803d; }
+    .stat .l { font-size:.72rem; color:#64748b; font-weight:600; }
+    .barra { background:#fff; border-radius:12px; padding:10px 14px; box-shadow:0 1px 5px rgba(0,0,0,.07); margin-bottom:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .barra input, .barra select { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 11px; font-size:.84rem; }
+    .barra input { flex:1; min-width:260px; }
+    table.tb { width:100%; border-collapse:collapse; font-size:.8rem; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 1px 5px rgba(0,0,0,.07); }
+    .tb th { background:#f8fafc; color:#475569; text-align:left; padding:8px 12px; font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; position:sticky; top:60px; }
+    .tb td { padding:6px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+    .tb tr:hover td { background:#f8fafc; }
+    .met { font-weight:800; font-size:.7rem; border-radius:6px; padding:2px 8px; }
+    .m-GET{ background:#e0f2fe; color:#075985; } .m-POST{ background:#dcfce7; color:#166534; }
+    .m-PUT{ background:#fef9c3; color:#854d0e; } .m-DELETE{ background:#fee2e2; color:#991b1b; } .m-PATCH{ background:#f3e8ff; color:#7e22ce; }
+    .ruta { font-family:Consolas,monospace; font-size:.78rem; color:#0f172a; }
+    .perm { background:#eff6ff; color:#1d4ed8; border-radius:10px; padding:1px 8px; font-size:.7rem; font-weight:700; margin-right:3px; white-space:nowrap; display:inline-block; margin-bottom:2px; }
+    .al { font-size:.68rem; font-weight:800; border-radius:10px; padding:2px 9px; white-space:nowrap; }
+    .al-SIN { background:#fee2e2; color:#991b1b; } .al-PUB { background:#fff7ed; color:#9a3412; }
+    tr.f-SIN td { background:#fff5f5; }
+    .vacio { text-align:center; color:#94a3b8; padding:40px 0; }
+    .foot { background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.8rem; color:#334155; margin-top:18px; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Catálogo de Endpoints",current:true}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-hdd-network"></i><div>
+    <h2>Catálogo de Endpoints</h2>
+    <p>Inventario <b>auto-generado del código</b> en cada consulta — método, ruta, autenticación y permisos. Nunca se edita a mano, así que nunca miente. Su valor está en el semáforo: lo que aparece en rojo está expuesto a cualquier usuario logueado.</p>
+  </div></div>
+
+  <div class="stats">
+    <div class="stat" data-f="" onclick="setFiltro(this,'')"><div class="n" id="sTotal">—</div><div class="l">Endpoints totales</div></div>
+    <div class="stat verde" data-f="ok" onclick="setFiltro(this,'ok')"><div class="n" id="sPerm">—</div><div class="l">Con permiso requireFunc</div></div>
+    <div class="stat rojo" data-f="SIN_PERMISO" onclick="setFiltro(this,'SIN_PERMISO')"><div class="n" id="sSin">—</div><div class="l">Escritura SIN permiso (solo token)</div></div>
+    <div class="stat ambar" data-f="PUBLICA" onclick="setFiltro(this,'PUBLICA')"><div class="n" id="sPub">—</div><div class="l">Públicas (sin token — ¿deliberado?)</div></div>
+  </div>
+
+  <div class="barra">
+    <input id="fBuscar" placeholder="Buscar ruta, permiso o servicio…" oninput="render()">
+    <select id="fMetodo" onchange="render()">
+      <option value="">Todos los métodos</option>
+      <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option>
+    </select>
+    <select id="fServicio" onchange="render()"><option value="">Todos los servicios</option></select>
+    <span id="contador" style="font-size:.75rem;color:#64748b"></span>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table class="tb">
+      <thead><tr><th>Método</th><th>Ruta</th><th>Servicio</th><th>Token</th><th>Permisos (requireFunc)</th><th>Alerta</th></tr></thead>
+      <tbody id="tbody"><tr><td colspan="6" class="vacio">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="foot"><i class="bi bi-diagram-3 me-1"></i><b>Qué afecta este módulo:</b>
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <li><b>Nada</b> — es solo lectura del código fuente. No cambia rutas ni permisos.</li>
+      <li><b>Escritura SIN permiso</b> → candidatas a blindar con <code>requireFunc</code> (algunas son legítimas: cambiar la propia clave, marcar visto un aviso). La lista es el pendiente vivo de la auditoría de seguridad.</li>
+      <li><b>Públicas</b> → deben ser deliberadas: login, webhook de WhatsApp, verificación QR, portal cliente/dealer. Una pública que no calce en esa lista es un hallazgo.</li>
+      <li>Los permisos se administran en <a href="/usuarios/">Usuarios → Perfiles y Permisos</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
+<script>
+const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let ROWS = [], FILTRO = '';
+
+function setFiltro(el, f){
+  FILTRO = FILTRO === f ? '' : f;
+  document.querySelectorAll('.stat').forEach(s=>s.classList.toggle('on', s.dataset.f===FILTRO && FILTRO!==''));
+  render();
+}
+
+async function cargar(){
+  try {
+    const j = await (await fetch('/api/endpoints-catalogo', { headers: H })).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    ROWS = j.data.rows;
+    const r = j.data.resumen;
+    document.getElementById('sTotal').textContent = r.total.toLocaleString('es-CL');
+    document.getElementById('sPerm').textContent = r.con_permiso.toLocaleString('es-CL');
+    document.getElementById('sSin').textContent = r.escritura_sin_permiso;
+    document.getElementById('sPub').textContent = r.publicas;
+    const servicios = [...new Set(ROWS.map(x=>x.servicio))].sort();
+    document.getElementById('fServicio').innerHTML = '<option value="">Todos los servicios</option>' +
+      servicios.map(s=>`<option>${escH(s)}</option>`).join('');
+    render();
+  } catch(e){ document.getElementById('tbody').innerHTML = '<tr><td colspan="6" class="vacio">⚠️ '+escH(e.message)+'</td></tr>'; }
+}
+
+function render(){
+  const q = document.getElementById('fBuscar').value.toLowerCase();
+  const met = document.getElementById('fMetodo').value;
+  const srv = document.getElementById('fServicio').value;
+  const rows = ROWS.filter(r => {
+    if (FILTRO==='ok' && !r.permisos.length) return false;
+    if (FILTRO==='SIN_PERMISO' && r.alerta!=='SIN_PERMISO') return false;
+    if (FILTRO==='PUBLICA' && r.alerta!=='PUBLICA') return false;
+    if (met && r.metodo!==met) return false;
+    if (srv && r.servicio!==srv) return false;
+    if (q && !(r.ruta.toLowerCase().includes(q) || r.servicio.toLowerCase().includes(q) || r.permisos.some(p=>p.toLowerCase().includes(q)))) return false;
+    return true;
+  });
+  document.getElementById('contador').textContent = rows.length.toLocaleString('es-CL') + ' endpoint(s)';
+  document.getElementById('tbody').innerHTML = rows.length ? rows.slice(0,800).map(r=>`
+    <tr class="${r.alerta==='SIN_PERMISO'?'f-SIN':''}">
+      <td><span class="met m-${r.metodo}">${r.metodo}</span></td>
+      <td class="ruta">${escH(r.ruta)}</td>
+      <td style="font-size:.72rem;color:#64748b">${escH(r.servicio.replace('services/','').replace('api-gateway/src',''))}</td>
+      <td>${r.token?'🔒':'—'}</td>
+      <td>${r.permisos.map(p=>`<span class="perm">${escH(p)}</span>`).join('') || '<span style="color:#94a3b8">—</span>'}</td>
+      <td>${r.alerta==='SIN_PERMISO'?'<span class="al al-SIN">ESCRITURA SIN PERMISO</span>':r.alerta==='PUBLICA'?'<span class="al al-PUB">PÚBLICA</span>':''}</td>
+    </tr>`).join('') + (rows.length>800?'<tr><td colspan="6" class="vacio">… '+(rows.length-800)+' más — afina la búsqueda</td></tr>':'')
+    : '<tr><td colspan="6" class="vacio">Sin resultados</td></tr>';
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

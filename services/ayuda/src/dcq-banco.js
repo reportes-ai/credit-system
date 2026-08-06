@@ -519,4 +519,9 @@ module.exports = [
   donde:'Emisión de Cartolas Parque (pestaña Enviadas) y la misma pantalla del parque.',
   como:'Todo eslabón tiene reversa con motivo auditado: Reversar el envío quita solo CARTOLA ENVIADA (puedes reenviar); Anular ODP sirve mientras no esté pagada (el número queda anulado, nunca se reutiliza); Revertir pago deshace el pago y la ODP vuelve a "por pagar".',
   quien:'Quien tenga el permiso de cada acción; todo queda en Auditoría.', kw:'parque reversar anular odp cartola pago deshacer' },
+{ slug:'endpoints-catalogo', cat:'Mantenedores', p:'¿Dónde veo todas las APIs internas del sistema y sus permisos?',
+  donde:'Mantenedores → Catálogo de Endpoints.',
+  como:'Es un inventario auto-generado del código en cada consulta (nunca se edita a mano): los ~1.300 endpoints con su método, ruta, si exigen sesión y qué permisos los gobiernan. Sirve como auditoría: lo rojo son escrituras sin permiso (cualquier usuario logueado podría ejecutarlas) y lo ámbar son rutas públicas, que deben ser deliberadas (login, webhooks, QR).',
+  quien:'Solo Administrador (permiso mant_endpoints).', href:'/mantenedores/endpoints/',
+  kw:'endpoints api internas catalogo rutas permisos inventario auditoria' },
 ];
