@@ -262,6 +262,22 @@ const emitir = async (req, res) => {
     if (!e || e.etapa !== 'APROBADA')
       return res.status(400).json({ success: false, data: null, error: 'La comisión debe estar APROBADA antes de emitir la Orden de Pago' });
 
+    /* Mismas condiciones que el dealer: la ODP nace de la FACTURA, nunca antes.
+       Todas las operaciones del parque en el mes deben tener FACTURA RECIBIDA en
+       su track (la marca el módulo de Cartolas Parque, o a mano en Seguimiento
+       Comisión Parques). Un parque solo-arriendo (0 ops) pasa sin exigencia. */
+    const [[sinFactura]] = await pool.query(`
+      SELECT COUNT(*) n
+      FROM postventa_seguimiento s
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
+          WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
+      [parque, mes]);
+    if (sinFactura.n > 0)
+      return res.status(400).json({ success: false, data: null,
+        error: `No se puede emitir la Orden de Pago: ${sinFactura.n} operación(es) del parque aún sin FACTURA RECIBIDA en el Seguimiento Comisión Parques. La ODP nace de la factura, igual que en dealers.` });
+
     const arriendo = Math.round(Number(e.arriendo)), comision = Math.round(Number(e.comision_creditos));
     const total = arriendo + comision;
     const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
