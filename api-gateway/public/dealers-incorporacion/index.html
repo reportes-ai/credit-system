@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creación/Mantenedor de Dealer — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -95,6 +95,12 @@
       <p>Configura la cadena de autorización de las fichas: qué niveles aprueban, en qué orden, bajo qué condición (siempre / comisión sobre pizarra / depósito modificado) y con qué permiso.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Configurar</span>
     </a>
+    <a href="/dealers-incorporacion/parques.html" class="module-card" id="cardParques" style="display:none">
+      <div class="card-icon"><i class="bi bi-p-square"></i></div>
+      <h5>Creación de Parque</h5>
+      <p>Base de parques automotrices con su ficha comercial: RUT, representante legal, dirección, contactos y cuenta donde depositar. La base para emitirles cartola y que nos facturen, igual que a los dealers.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/dealers-liquidez/" class="module-card" id="cardLiquidez" style="display:none">
       <div class="card-icon"><i class="bi bi-cash-stack"></i></div>
       <h5>Plan Liquidez</h5>
@@ -132,6 +138,7 @@
     if (tiene('dealer_ficha_revisar','dealer_mantener','dealer_part_especial'))  { document.getElementById('cardMantencion').style.display = ''; alguna = true; }
     if (tiene('aprob_vendedores'))                        { document.getElementById('cardVendedores').style.display = ''; alguna = true; }
     if (tiene('dealer_aprob_config'))                     { document.getElementById('cardNiveles').style.display = '';    alguna = true; }
+    if (tiene('parque_ficha'))                            { document.getElementById('cardParques').style.display = '';    alguna = true; }
     if (tiene('dealer_plan_liquidez'))                    { document.getElementById('cardLiquidez').style.display = '';   alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
   })();

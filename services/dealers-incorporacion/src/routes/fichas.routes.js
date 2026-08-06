@@ -49,6 +49,12 @@ router.post('/niveles',         verifyToken, requireFunc('dealer_aprob_config'),
 router.put('/niveles/:id',      verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelGuardar);
 router.delete('/niveles/:id',   verifyToken, requireFunc('dealer_aprob_config'), ctrl.nivelEliminar);
 
+// Base de Parques — la ficha del parque como contraparte comercial (parques-base.controller.js).
+const parques = require('../controllers/parques-base.controller');
+router.get('/parques-base',           verifyToken, requireFunc('parque_ficha'), parques.listar);
+router.post('/parques-base',          verifyToken, requireFunc('parque_ficha'), parques.crear);
+router.put('/parques-base/:idParque', verifyToken, requireFunc('parque_ficha'), parques.guardar);
+
 // Alertas de las etapas — leídas/escritas desde el mantenedor central de Alertas.
 router.get('/alertas-config',   verifyToken, ctrl.getAlertasConfig);
 router.put('/alertas-config',   verifyToken, requireFunc('mantenedores_alertas'), ctrl.setAlertasConfig);
