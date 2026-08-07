@@ -767,5 +767,21 @@
   <div class="flujo"><span class="st ini">PROCESO DUEÑO DEL PASO</span><span class="ar">→</span><span class="st">setEtapa() escribe las TRES</span><span class="ar">→</span><span class="st fin">TODOS leen lo mismo</span></div>
   <div class="afecta"><b>Afecta:</b> listado de Créditos, cartolas y comisiones (§31), Vendedores con Ventas (§33), fundantes (§2), Post Venta, dashboard, cobranza y contabilidad — todo lo que filtra por “otorgado”. <b>Depende de:</b> otorgamiento de la carta (§1), anulación (§32), carga Trinidad (§30) y el desistimiento automático.</div>
 
+  <h2 id="p35">35. Excepciones Comerciales: simular, generar código y usarlo en la carta</h2>
+  <p><b>Qué y para qué:</b> el Ejecutivo Comercial "juega" con un negocio (precio, pie, seguros, baja de tasa Unidad, baja de comisión dealer) en el <b>Simulador de Excepciones</b> (<code>/excepciones/</code>) y, si la combinación respeta el piso de rentabilidad, el sistema mismo le autoriza la excepción con un <b>código único</b> — sin mail al gerente para los casos normales. Convierte la excepción en autoservicio, con presupuesto y auditoría.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Simula y genera códigos propios/comodín el <b>Ejecutivo Comercial</b> (y Supervisor). El código de <b>Gerencia</b> (caso puntual, con motivo obligatorio) lo genera solo el <b>Gerente de Operaciones</b> o su backup. El Validador lo puede consultar cualquiera con acceso al simulador.</div>
+    <div><b class="lbl">Prerequisitos</b>Parámetros en Mantenedores → <b>Excepciones Comerciales</b> (piso 75%, rebaja máx. de tasa 5% relativo, estrellas, comodín, vigencia 24 h). Tasas y UF vigentes.</div>
+  </div>
+  <ol>
+    <li><b>Simular:</b> precio + pie → saldo, % pie, % a financiar y la grilla 12/24/36/48 con cuota aproximada, dónde conviene cursar (Autofin / Unidad / Decides Tú) y la rentabilidad de cada lado. Desmarcar un seguro recalcula todo.</li>
+    <li><b>Jugar la excepción:</b> bajar tasa (máx. 5% relativo sobre la pizarra — más allá la op se fuerza a Autofin) o bajar la comisión del dealer (marcando calle/parque). El <b>piso</b>: la excepción nunca puede rentar menos del 75% de la alternativa más rentable; si se pasa, el sistema <b>propone la rebaja de comisión dealer (neta) exacta</b> que la devuelve al piso.</li>
+    <li><b>Generar el código:</b> consume una <b>estrella</b> (2 el primer mes; después ⌊otorgadas del mes anterior × 33%⌋ — con 2 colocadas son 0: el aliciente es colocar al menos 3). Sin estrellas puede usar su <b>comodín dorado</b> (1 cada 50 otorgadas acumuladas; exige rentabilidad &gt; comisión más alta × 1,10) o pedir un código de <b>Gerencia</b>. El código es aleatorio, vive en BD con el snapshot de la simulación y <b>vence a las 24 h</b> (la estrella vuelve si vence sin usar; al cierre del mes las estrellas expiran).</li>
+    <li><b>Usarlo en la Carta:</b> el código se ingresa en la Carta de Aprobación; el sistema valida saldo precio (± tolerancia), primeros dígitos del RUT y vigencia, y la carta queda "aprobada por código del sistema / autorización de Gerencia / Comodín N°XXXXXX". Un código = un solo uso.</li>
+    <li><b>Trazabilidad:</b> pestañas Mis códigos (del ejecutivo) y Registro completo (Gerencia); el <b>Validador</b> dice de qué operación es cualquier código, quién lo generó y si ya se usó.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">SIMULAR</span><span class="ar">→</span><span class="st">cumple piso 75%</span><span class="ar">→</span><span class="st">CÓDIGO (⭐/🏆/👔)</span><span class="ar">→</span><span class="st">carta con código</span><span class="ar">→</span><span class="st fin">USADO (un solo uso)</span></div>
+  <div class="afecta"><b>Afecta:</b> Cartas de Aprobación (§1) — el código estampa la aprobación de la excepción; rentabilidad por operación. <b>Depende de:</b> mantenedor Excepciones Comerciales, Tasas, UF, motores AF_RENT / comisión dealer / tier UAC, y del conteo de otorgadas del ejecutivo.</div>
+
 </body>
 </html>

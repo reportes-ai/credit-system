@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Excepciones — AutoFácil</title>
+  <!-- v1.0 -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#001345; --blue:#0141A2; --gold:#f59e0b; }
+    body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
+    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
+    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
+    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
+    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
+    .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
+    .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
+    .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
+    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
+    .wrap { max-width:1180px; margin:0 auto; padding:20px 24px 60px; }
+    h5.sec { font-weight:800; color:var(--navy); margin:0; }
+    .presu { display:flex; gap:14px; align-items:center; flex-wrap:wrap; background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:12px 20px; margin:14px 0; }
+    .presu .star { font-size:1.5rem; }
+    .presu .lbl { font-size:.78rem; color:#64748b; }
+    .presu .num { font-weight:800; color:var(--navy); font-size:1.05rem; }
+    .tabs { display:flex; gap:6px; margin:14px 0 12px; flex-wrap:wrap; }
+    .tab-btn { border:1.5px solid #d1d5db; background:#fff; border-radius:10px; padding:7px 16px; font-weight:700; font-size:.85rem; color:#475569; cursor:pointer; }
+    .tab-btn.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+    .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:14px; }
+    .frm label { font-size:.78rem; font-weight:700; color:#475569; display:block; margin-bottom:2px; }
+    .frm input[type=text], .frm input[type=number] { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:7px 10px; font-weight:700; color:var(--navy); }
+    .frm input:focus { outline:none; border-color:var(--blue); }
+    .kpi { font-size:.78rem; color:#64748b; }
+    .kpi b { color:var(--navy); font-size:1rem; }
+    table.gr { width:100%; border-collapse:collapse; font-size:.85rem; }
+    table.gr th { background:#f1f5f9; color:#334155; font-size:.75rem; text-transform:uppercase; padding:8px; text-align:center; }
+    table.gr td { padding:9px 8px; border-bottom:1px solid #f1f5f9; text-align:center; }
+    .lado-pill { border-radius:12px; padding:2px 10px; font-weight:800; font-size:.75rem; }
+    .lado-AF { background:#dbeafe; color:#1e40af; }
+    .lado-UAC { background:#ffedd5; color:#c2410c; }
+    .lado-TU { background:#dcfce7; color:#166534; }
+    .ok-piso { color:#16a34a; font-weight:800; }
+    .mal-piso { color:#dc2626; font-weight:800; }
+    .btn-cod { background:var(--gold); color:#fff; border:none; border-radius:8px; padding:5px 12px; font-weight:800; font-size:.78rem; cursor:pointer; }
+    .btn-cod:disabled { opacity:.4; cursor:default; }
+    .btn-azul { background:var(--blue); color:#fff; border:none; border-radius:9px; padding:9px 20px; font-weight:800; cursor:pointer; font-size:.88rem; }
+    .toast-af { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
+    .toast-af.err { background:#dc2626; }
+    .cod-big { font-size:2.2rem; font-weight:900; letter-spacing:6px; color:var(--navy); text-align:center; }
+    .est-pill { border-radius:10px; padding:2px 10px; font-weight:800; font-size:.72rem; }
+    .est-VIGENTE { background:#dcfce7; color:#166534; } .est-USADO { background:#dbeafe; color:#1e40af; } .est-VENCIDO { background:#fee2e2; color:#991b1b; }
+    dialog { border:none; border-radius:16px; padding:26px 30px; box-shadow:0 10px 40px rgba(0,0,0,.25); max-width:430px; width:92%; }
+    dialog::backdrop { background:rgba(0,19,69,.45); }
+    .nota { font-size:.75rem; color:#94a3b8; }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
+    <div class="breadcrumb-nav"><a href="/">Inicio</a><span>›</span><a href="/aprobaciones/">Cartas de Aprobación</a><span>›</span><span style="color:#fff;font-weight:600">Simulador de Excepciones</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="user-chip"><div class="avatar" id="avatarInicial">?</div><div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div><div class="perfil-badge" id="navPerfil">—</div></div></div>
+    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <h5 class="sec"><i class="bi bi-stars me-2" style="color:var(--gold)"></i>Simulador de Excepciones</h5>
+  </div>
+
+  <div class="presu" id="presu">Cargando presupuesto…</div>
+
+  <div class="tabs">
+    <button class="tab-btn on" data-t="sim" onclick="verTab('sim')"><i class="bi bi-calculator me-1"></i>Simular</button>
+    <button class="tab-btn" data-t="cods" onclick="verTab('cods')"><i class="bi bi-key me-1"></i>Mis códigos</button>
+    <button class="tab-btn" data-t="val" onclick="verTab('val')"><i class="bi bi-search me-1"></i>Validador</button>
+    <button class="tab-btn" data-t="ger" id="tabGer" style="display:none" onclick="verTab('ger')"><i class="bi bi-person-badge me-1"></i>Gerencia</button>
+  </div>
+
+  <!-- ══ SIMULAR ══ -->
+  <div id="t_sim">
+    <div class="card-af">
+      <div class="row g-3 frm">
+        <div class="col-md-2"><label>Precio del auto ($)</label><input type="number" id="fPrecio" min="0" oninput="calc()"></div>
+        <div class="col-md-2"><label>Pie ($)</label><input type="number" id="fPie" min="0" oninput="calc()"></div>
+        <div class="col-md-2"><label>RUT cliente</label><input type="text" id="fRut" placeholder="12.345.678-9"></div>
+        <div class="col-md-2"><label>Canal</label>
+          <select id="fCanal" class="form-select" style="font-weight:700" onchange="calc()">
+            <option value="calle">Calle</option><option value="patio">Parque (patio)</option>
+          </select></div>
+        <div class="col-md-4">
+          <label>Seguros incluidos</label>
+          <div style="display:flex;gap:14px;padding-top:6px;font-size:.85rem;font-weight:600">
+            <label style="font-weight:600"><input type="checkbox" id="sRdh" checked onchange="calc()"> RDH</label>
+            <label style="font-weight:600"><input type="checkbox" id="sCesa" checked onchange="calc()"> Cesantía</label>
+            <label style="font-weight:600"><input type="checkbox" id="sRep" checked onchange="calc()"> Rep. menores</label>
+          </div>
+        </div>
+      </div>
+      <div class="row g-3 frm" style="margin-top:2px">
+        <div class="col-md-3"><label>Baja de tasa (Unidad) — máx <span id="lblMaxTasa">5</span>% relativo</label>
+          <input type="range" id="fRebaja" class="form-range" min="0" max="5" step="0.5" value="0" oninput="calc()">
+          <div class="nota">Rebaja: <b id="lblRebaja">0%</b>. Sobre el máximo, la op se fuerza a Autofin.</div></div>
+        <div class="col-md-3"><label>Baja comisión dealer — nuevo monto bruto ($, vacío = pizarra)</label>
+          <input type="number" id="fComDealer" min="0" oninput="calc()"></div>
+        <div class="col-md-6" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+          <div class="kpi">Saldo precio<br><b id="kSaldo">—</b></div>
+          <div class="kpi">% pie<br><b id="kPie">—</b></div>
+          <div class="kpi">% a financiar<br><b id="kFin">—</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-af">
+      <table class="gr" id="grilla"><thead><tr>
+        <th>Plazo</th><th>Cuota aprox.</th><th>Dónde cursar</th>
+        <th>Rentab. AutoFin</th><th>Rentab. Unidad</th>
+        <th>Piso <span id="lblPiso">75%</span></th><th></th>
+      </tr></thead><tbody id="gBody"><tr><td colspan="7" style="color:#94a3b8">Ingresa precio y pie para simular</td></tr></tbody></table>
+      <div class="nota" style="margin-top:8px" id="notaPiso"></div>
+    </div>
+  </div>
+
+  <!-- ══ MIS CÓDIGOS ══ -->
+  <div id="t_cods" style="display:none">
+    <div class="card-af"><table class="gr"><thead><tr>
+      <th>Código</th><th>Tipo</th><th>Estado</th><th>RUT</th><th>Saldo precio</th><th>Plazo</th><th>Generado</th><th>Vence</th><th>Usado en</th>
+    </tr></thead><tbody id="codsBody"></tbody></table></div>
+  </div>
+
+  <!-- ══ VALIDADOR ══ -->
+  <div id="t_val" style="display:none">
+    <div class="card-af" style="max-width:560px">
+      <label style="font-size:.8rem;font-weight:700;color:#475569">Código a validar</label>
+      <div style="display:flex;gap:10px;margin-top:4px">
+        <input type="text" id="vCod" style="flex:1;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 12px;font-weight:800;letter-spacing:3px" maxlength="10" placeholder="000000">
+        <button class="btn-azul" onclick="validarCod()">Validar</button>
+      </div>
+      <div id="vRes" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <!-- ══ GERENCIA ══ -->
+  <div id="t_ger" style="display:none">
+    <div class="card-af" style="max-width:640px">
+      <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-person-badge me-1"></i>Generar código de Gerencia (caso puntual)</div>
+      <div class="row g-3 frm">
+        <div class="col-md-6"><label>Ejecutivo (a quién se autoriza)</label><input type="text" id="gEjec"></div>
+        <div class="col-md-3"><label>RUT cliente</label><input type="text" id="gRut"></div>
+        <div class="col-md-3"><label>Saldo precio ($)</label><input type="number" id="gSaldo" min="0"></div>
+        <div class="col-12"><label>Motivo (obligatorio)</label><input type="text" id="gCom" placeholder="ej: autorizado por gerencia comercial, mail del 07-08-2026"></div>
+      </div>
+      <div style="text-align:right;margin-top:12px"><button class="btn-azul" onclick="genGerencia()">Generar código</button></div>
+    </div>
+    <div class="card-af">
+      <div style="font-weight:800;color:var(--navy);margin-bottom:8px">Registro completo de códigos</div>
+      <table class="gr"><thead><tr>
+        <th>Código</th><th>Tipo</th><th>Estado</th><th>Ejecutivo</th><th>RUT</th><th>Saldo</th><th>Generado por</th><th>Fecha</th><th>Usado en</th><th>Comentario</th>
+      </tr></thead><tbody id="regBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlgCod">
+  <div style="text-align:center">
+    <div style="font-size:.85rem;color:#64748b;font-weight:700" id="dlgTipo">Código de excepción</div>
+    <div class="cod-big" id="dlgNum">——————</div>
+    <div class="nota" id="dlgVence"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+      <button class="btn-azul" onclick="navigator.clipboard.writeText(document.getElementById('dlgNum').textContent).then(()=>toast('Código copiado'))"><i class="bi bi-clipboard me-1"></i>Copiar</button>
+      <button class="tab-btn" onclick="document.getElementById('dlgCod').close()">Cerrar</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast-af"></div>
+
+<script src="/js/rentabilidad-core.js"></script>
+<script src="/js/comision-dealer.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
+<script>
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const YO = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+document.getElementById('navNombre').textContent = ((YO.nombre||'') + ' ' + (YO.apellido||'')).trim() || '—';
+document.getElementById('navPerfil').textContent = YO.perfil || '';
+document.getElementById('avatarInicial').textContent = (YO.nombre||'?')[0].toUpperCase();
+function logout(){ sessionStorage.clear(); location.href = '/login.html'; }
+function toast(msg, err){ const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast-af' + (err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 3200); }
+const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt$ = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+const fmtF = v => { if(!v) return '—'; const d = new Date(v); return isNaN(d)?'—':d.toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}); };
+
+let P = {}, T = {}, UF = null, OPS_UAC = 0, EX = {}, ESTADO = null;
+let SIMS = {};   // por plazo: resultado de la última simulación
+
+async function boot(){
+  try {
+    const [rp, rt, ru, ro, re, rperm] = await Promise.all([
+      fetch('/api/parametros-credito', { headers:H }),
+      fetch('/api/tasas/vigente', { headers:H }),
+      fetch('/api/uf/vigente', { headers:H }),
+      fetch('/api/parametros-credito/uac-ops-vigente', { headers:H }),
+      fetch('/api/excepciones/estado', { headers:H }),
+      fetch('/api/auth/mis-permisos', { headers:H }),
+    ]);
+    const jp = await rp.json(); if (jp.success) P = jp.data.obj || {};
+    const jt = await rt.json(); if (jt.success) T = jt.data || {};
+    const ju = await ru.json(); if (ju.success) UF = Number(ju.data?.valor) || null;
+    const jo = await ro.json(); if (jo.success) OPS_UAC = jo.data?.ops || 0;
+    const je = await re.json();
+    if (!je.success) { toast(je.error || 'Sin acceso al simulador', true); return; }
+    ESTADO = je.data; EX = je.data.params || {};
+    const jm = await rperm.json();
+    const funcs = (jm.funcionalidades || []);
+    if (funcs.includes('excepciones_gerencia') || (YO.perfil||'').toUpperCase().startsWith('ADMINISTRADOR')) {
+      document.getElementById('tabGer').style.display = '';
+      document.getElementById('gEjec').value = '';
+    }
+    pintarPresu();
+    document.getElementById('lblMaxTasa').textContent = EX.exc_tasa_rebaja_max_pct ?? 5;
+    document.getElementById('fRebaja').max = EX.exc_tasa_rebaja_max_pct ?? 5;
+    document.getElementById('lblPiso').textContent = (EX.exc_piso_pct ?? 75) + '%';
+  } catch(e){ toast('Error cargando datos: ' + e.message, true); }
+}
+function pintarPresu(){
+  const e = ESTADO;
+  const stars = '⭐'.repeat(Math.min(8, e.estrellas_disponibles)) || '—';
+  const coms  = '🏆'.repeat(Math.min(5, e.comodines_disponibles)) || '—';
+  document.getElementById('presu').innerHTML = `
+    <div><div class="lbl">Estrellas del mes (${e.es_primer_mes ? 'primer mes' : e.otorgadas_mes_anterior + ' otorgadas mes anterior × ' + (EX.exc_pct_mensual ?? 33) + '%'})</div>
+      <span class="star">${stars}</span> <span class="num">${e.estrellas_disponibles} de ${e.estrellas_total}</span></div>
+    <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">Comodín dorado (1 cada ${EX.exc_comodin_cada ?? 50} otorgadas · llevas ${e.otorgadas_historicas})</div>
+      <span class="star">${coms}</span> <span class="num">${e.comodines_disponibles}</span></div>
+    <div style="border-left:1px solid #e2e8f0;padding-left:14px" class="nota">Los códigos vencen a las ${EX.exc_vigencia_horas ?? 24} h — si vence sin usar, la estrella vuelve. Las estrellas no usadas expiran al cierre del mes.</div>`;
+}
+
+function verTab(t){
+  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t)?'':'none';
+  document.querySelectorAll('.tab-btn[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  if (t==='cods') cargarCodigos();
+  if (t==='ger') cargarRegistro();
+}
+
+/* ── Simulación ─────────────────────────────────────────────────────────── */
+function plazosCfg(){ return [EX.exc_plazo_1||12, EX.exc_plazo_2||24, EX.exc_plazo_3||36, EX.exc_plazo_4||48]; }
+
+function calc(){
+  const precio = Number(document.getElementById('fPrecio').value)||0;
+  const pie = Number(document.getElementById('fPie').value)||0;
+  const esPatio = document.getElementById('fCanal').value === 'patio';
+  const rebaja = Number(document.getElementById('fRebaja').value)||0;
+  document.getElementById('lblRebaja').textContent = rebaja + '%';
+  const comDealerNueva = document.getElementById('fComDealer').value === '' ? null : Number(document.getElementById('fComDealer').value);
+  const seg = { desg:true, rdh:document.getElementById('sRdh').checked, cesa:document.getElementById('sCesa').checked };
+  const gastos = { prenda:true, gps:true, rep:document.getElementById('sRep').checked, lim:true };
+  const body = document.getElementById('gBody');
+  if (!(precio>0) || pie<0 || pie>=precio) { body.innerHTML = '<tr><td colspan="7" style="color:#94a3b8">Ingresa precio y pie para simular</td></tr>'; return; }
+  const saldo = precio - pie;
+  document.getElementById('kSaldo').textContent = fmt$(saldo);
+  document.getElementById('kPie').textContent = (pie/precio*100).toFixed(1) + '%';
+  document.getElementById('kFin').textContent = (saldo/precio*100).toFixed(1) + '%';
+
+  const piso = (EX.exc_piso_pct ?? 75)/100;
+  const diffTu = (P.pref_diff_pct ?? 10);
+  SIMS = {};
+  let filas = '';
+  for (const plazo of plazosCfg()) {
+    const uacPct = window.AF_UAC_TIER ? window.AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo }, P) : null;
+    const inpBase = { valor:precio, pie, plazo, gastos, seguros:seg, esPatio, uacPct: uacPct!=null ? uacPct/100 : null };
+    const base = window.AF_RENT.calcular(inpBase, P, UF, T);
+    if (!base) { filas += `<tr><td>${plazo}</td><td colspan="6" style="color:#94a3b8">—</td></tr>`; continue; }
+    // Excepción: tasa cliente rebajada (relativa) + comisión dealer modificada
+    const tasaExc = base.tasaCli * (1 - rebaja/100);
+    const inpExc = { ...inpBase, tasaCli: rebaja>0 ? Math.floor(tasaExc*10000)/10000 : null, dealerComCLP: comDealerNueva };
+    const exc = window.AF_RENT.calcular(inpExc, P, UF, T);
+    const mejorBase = Math.max(base.af.rentab, base.uac.rentab);   // la más rentable SIN excepción
+    // Lado sugerido (con la excepción aplicada)
+    const dif = Math.abs(exc.af.rentab - exc.uac.rentab) / Math.max(1, Math.max(exc.af.rentab, exc.uac.rentab)) * 100;
+    const lado = dif < diffTu ? 'TU' : (exc.af.rentab >= exc.uac.rentab ? 'AF' : 'UAC');
+    const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;  // TU → conservador: AF
+    const cumple = rentExc >= mejorBase * piso;
+    // Si no cumple: proponer la rebaja de comisión dealer (neta) que devuelve al piso
+    let propuesta = '';
+    if (!cumple) {
+      const falta = Math.ceil(mejorBase * piso - rentExc);
+      const comActual = comDealerNueva != null ? comDealerNueva : exc.costos.dealer;
+      const comProp = Math.max(0, comActual - falta);
+      propuesta = `Propuesta: bajar comisión dealer a ${fmt$(comProp)} (neto −${fmt$(falta)})`;
+    }
+    SIMS[plazo] = { plazo, base, exc, lado, rentExc, mejorBase, cumple, rebaja, comDealerNueva, esPatio, seg, precio, pie, saldo, uacPct };
+    const ladoTxt = lado==='TU' ? 'Decides Tú' : (lado==='AF' ? 'Autofin' : 'Unidad');
+    filas += `<tr>
+      <td><b>${plazo}</b></td>
+      <td><b>${fmt$(exc.af.cuota)}</b></td>
+      <td><span class="lado-pill lado-${lado}">${ladoTxt}</span></td>
+      <td>${fmt$(exc.af.rentab)}${rebaja>0?` <span class="nota">(tasa ${(exc.tasaCliPct).toFixed(2)}%)</span>`:''}</td>
+      <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${uacPct}%)</span>`:''}</td>
+      <td class="${cumple?'ok-piso':'mal-piso'}">${cumple?'✓ cumple':'✗ bajo piso'}<div class="nota">${propuesta}</div></td>
+      <td><button class="btn-cod" ${cumple?'':'disabled'} onclick="pedirCodigo(${plazo})"><i class="bi bi-key me-1"></i>Código</button></td>
+    </tr>`;
+  }
+  body.innerHTML = filas;
+  document.getElementById('notaPiso').textContent =
+    `Piso: la excepción no puede rentar menos del ${EX.exc_piso_pct ?? 75}% de la alternativa más rentable sin excepción. ` +
+    `Baja de tasa sobre ${EX.exc_tasa_rebaja_max_pct ?? 5}% relativo fuerza la operación a Autofin. Cuotas aproximadas — el valor final lo da la financiera.`;
+}
+
+async function pedirCodigo(plazo){
+  const s = SIMS[plazo];
+  if (!s) return;
+  const rut = document.getElementById('fRut').value.trim();
+  if (rut.replace(/[^0-9]/g,'').length < 7) { toast('Ingresa el RUT del cliente antes de generar el código', true); return; }
+  let tipo = 'PROPIO';
+  if (ESTADO.estrellas_disponibles <= 0) {
+    if (ESTADO.comodines_disponibles > 0) {
+      // Comodín: rentab AF debe superar en % a la MÁS ALTA entre com dealer y ejecutivo
+      const factor = 1 + (EX.exc_comodin_factor_pct ?? 10)/100;
+      const mayorCom = Math.max(s.exc.costos.dealer, s.exc.costos.ejecutivo);
+      if (s.rentExc <= mayorCom * factor) { toast('El comodín exige que la rentabilidad supere en ' + (EX.exc_comodin_factor_pct??10) + '% a la comisión más alta (dealer/ejecutivo)', true); return; }
+      if (!confirm('No te quedan estrellas este mes. ¿Usar tu COMODÍN DORADO 🏆 para esta operación?')) return;
+      tipo = 'COMODIN';
+    } else { toast('Sin estrellas ni comodines disponibles. Puedes pedir un código de Gerencia.', true); return; }
+  }
+  try {
+    const r = await fetch('/api/excepciones/generar', { method:'POST', headers:H, body: JSON.stringify({
+      tipo, rut_cliente: rut, saldo_precio: s.saldo, plazo: s.plazo,
+      financiera: s.lado==='UAC' ? 'UNIDAD' : (s.lado==='AF' ? 'AUTOFIN' : 'DECIDES TU'),
+      snapshot: { precio:s.precio, pie:s.pie, saldo:s.saldo, plazo:s.plazo, canal:s.esPatio?'parque':'calle',
+                  seguros:s.seg, rebaja_tasa_pct:s.rebaja, com_dealer_clp:s.comDealerNueva,
+                  rentab_af:s.exc.af.rentab, rentab_uac:s.exc.uac.rentab, mejor_base:s.mejorBase, lado:s.lado, uac_pct:s.uacPct }
+    })});
+    const j = await r.json();
+    if (!j.success) { toast(j.error || 'No se pudo generar', true); return; }
+    document.getElementById('dlgTipo').textContent = tipo==='COMODIN' ? '🏆 Comodín dorado — código de excepción' : '⭐ Código de excepción';
+    document.getElementById('dlgNum').textContent = j.data.codigo;
+    document.getElementById('dlgVence').textContent = `Vence en ${j.data.vence_horas} horas. Úsalo en la Carta de Aprobación (campo Código de excepción).`;
+    document.getElementById('dlgCod').showModal();
+    const re = await fetch('/api/excepciones/estado', { headers:H }); const je = await re.json();
+    if (je.success) { ESTADO = je.data; pintarPresu(); }
+  } catch(e){ toast('Error de conexión', true); }
+}
+
+/* ── Mis códigos ────────────────────────────────────────────────────────── */
+async function cargarCodigos(){
+  const r = await fetch('/api/excepciones/mis-codigos', { headers:H }); const j = await r.json();
+  const b = document.getElementById('codsBody');
+  if (!j.success || !j.data.length) { b.innerHTML = '<tr><td colspan="9" style="color:#94a3b8">Sin códigos generados</td></tr>'; return; }
+  b.innerHTML = j.data.map(c => `<tr>
+    <td><b style="letter-spacing:2px">${escH(c.codigo)}</b></td>
+    <td>${c.tipo==='COMODIN'?'🏆':c.tipo==='GERENCIA'?'👔':'⭐'} ${escH(c.tipo)}</td>
+    <td><span class="est-pill est-${escH(c.estado)}">${escH(c.estado)}</span></td>
+    <td>${escH(c.rut_cliente)}</td><td>${fmt$(c.saldo_precio)}</td><td>${c.plazo||'—'}</td>
+    <td>${fmtF(c.generado_at)}</td><td>${fmtF(c.vence_at)}</td><td>${escH(c.usado_carta||'—')}</td></tr>`).join('');
+}
+
+/* ── Validador ──────────────────────────────────────────────────────────── */
+async function validarCod(){
+  const cod = document.getElementById('vCod').value.trim();
+  if (!cod) return;
+  const r = await fetch('/api/excepciones/validar/'+encodeURIComponent(cod), { headers:H }); const j = await r.json();
+  const d = document.getElementById('vRes');
+  if (!j.success) { d.innerHTML = '<div style="color:#dc2626">Error al validar</div>'; return; }
+  if (!j.data.existe) { d.innerHTML = '<div style="color:#dc2626;font-weight:800"><i class="bi bi-x-circle me-1"></i>El código NO existe en el sistema</div>'; return; }
+  const c = j.data;
+  d.innerHTML = `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;font-size:.86rem">
+    <div style="font-weight:800;color:var(--navy);margin-bottom:6px">${c.tipo==='COMODIN'?'🏆':c.tipo==='GERENCIA'?'👔':'⭐'} Código ${escH(c.codigo)} — <span class="est-pill est-${escH(c.estado)}">${escH(c.estado)}</span></div>
+    <div><b>Ejecutivo:</b> ${escH(c.ejecutivo)} · <b>Tipo:</b> ${escH(c.tipo)}</div>
+    <div><b>Cliente (RUT):</b> ${escH(c.rut_cliente)} · <b>Saldo precio:</b> ${fmt$(c.saldo_precio)} · <b>Plazo:</b> ${c.plazo||'—'}</div>
+    <div><b>Generado por:</b> ${escH(c.generado_por||'—')} el ${fmtF(c.generado_at)} · <b>Vence:</b> ${fmtF(c.vence_at)}</div>
+    ${c.usado_carta ? `<div><b>Usado en la carta:</b> ${escH(c.usado_carta)} el ${fmtF(c.usado_at)}</div>` : ''}
+    ${c.comentario ? `<div><b>Motivo:</b> ${escH(c.comentario)}</div>` : ''}
+  </div>`;
+}
+
+/* ── Gerencia ───────────────────────────────────────────────────────────── */
+async function genGerencia(){
+  const body = {
+    ejecutivo: document.getElementById('gEjec').value.trim(),
+    rut_cliente: document.getElementById('gRut').value.trim(),
+    saldo_precio: Number(document.getElementById('gSaldo').value)||0,
+    comentario: document.getElementById('gCom').value.trim(),
+  };
+  const r = await fetch('/api/excepciones/generar-gerencia', { method:'POST', headers:H, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!j.success) { toast(j.error||'Error', true); return; }
+  document.getElementById('dlgTipo').textContent = '👔 Autorización de Gerencia — código de excepción';
+  document.getElementById('dlgNum').textContent = j.data.codigo;
+  document.getElementById('dlgVence').textContent = 'Entrégalo al ejecutivo para su Carta de Aprobación.';
+  document.getElementById('dlgCod').showModal();
+  cargarRegistro();
+}
+async function cargarRegistro(){
+  const r = await fetch('/api/excepciones/registro', { headers:H }); const j = await r.json();
+  const b = document.getElementById('regBody');
+  if (!j.success || !j.data.length) { b.innerHTML = '<tr><td colspan="10" style="color:#94a3b8">Sin códigos</td></tr>'; return; }
+  b.innerHTML = j.data.map(c => `<tr>
+    <td><b style="letter-spacing:2px">${escH(c.codigo)}</b></td>
+    <td>${escH(c.tipo)}</td><td><span class="est-pill est-${escH(c.estado)}">${escH(c.estado)}</span></td>
+    <td>${escH(c.ejecutivo)}</td><td>${escH(c.rut_cliente)}</td><td>${fmt$(c.saldo_precio)}</td>
+    <td>${escH(c.generado_por||'—')}</td><td>${fmtF(c.generado_at)}</td>
+    <td>${escH(c.usado_carta||'—')}</td><td style="max-width:200px;font-size:.75rem">${escH(c.comentario||'')}</td></tr>`).join('');
+}
+
+boot();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
