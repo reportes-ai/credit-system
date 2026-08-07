@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.4 — cursación estándar no requiere código; excepción = rebaja tasa, baja comisión o lado contrario -->
+  <!-- v1.5 — tasa propuesta manual (mín. costo de fondo), $ en inputs, Nueva Comisión Dealer -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -105,18 +105,21 @@
         </div>
       </div>
       <div class="row g-3 frm" style="margin-top:2px">
-        <div class="col-md-4"><label>Baja de tasa (Unidad) — máx <span id="lblMaxTasa">5</span>% relativo</label>
-          <input type="range" id="fRebaja" class="form-range" min="0" max="5" step="0.5" value="0" oninput="calc()">
-          <div id="tasaBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:.82rem;color:#1e40af;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-            <span>Tasa pizarra: <b id="lblTasaPizarra">—</b></span>
+        <div class="col-md-2"><label>Tasa propuesta (% mensual)</label>
+          <input type="text" inputmode="decimal" id="fTasa" placeholder="pizarra" oninput="calc()">
+          <div class="nota" style="margin-top:3px">Vacío = pizarra. Mínimo: costo de fondo.</div></div>
+        <div class="col-md-4"><label>&nbsp;</label>
+          <div id="tasaBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#1e40af;gap:14px;align-items:center;flex-wrap:wrap">
+            <span>Pizarra: <b id="lblTasaPizarra">—</b></span>
             <span><i class="bi bi-arrow-right"></i></span>
-            <span>Nueva tasa: <b id="lblTasaNueva">—</b></span>
+            <span>Propuesta: <b id="lblTasaNueva">—</b></span>
             <span style="color:#c2410c">Rebaja: <b id="lblRebaja">0,0%</b></span>
+            <span class="nota">CF mín.: <b id="lblCF">—</b></span>
           </div>
-          <div class="nota" style="margin-top:3px">Sobre el máximo, la op se fuerza a Autofin.</div></div>
-        <div class="col-md-2"><label>Baja comisión dealer — nuevo monto bruto ($, vacío = pizarra)</label>
+          <div class="nota" style="margin-top:3px">Rebaja sobre <span id="lblMaxTasa">5</span>% relativo: en Unidad la op se fuerza a Autofin.</div></div>
+        <div class="col-md-2"><label>Nueva Comisión Dealer (vacío = pizarra)</label>
           <input type="text" inputmode="numeric" id="fComDealer" oninput="fmtMiles(this);calc()"></div>
-        <div class="col-md-6" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
+        <div class="col-md-4" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
           <div class="kpi">Saldo precio<br><b id="kSaldo">—</b></div>
           <div class="kpi">% pie<br><b id="kPie">—</b></div>
           <div class="kpi">% a financiar<br><b id="kFin">—</b></div>
@@ -205,8 +208,8 @@ function toast(msg, err){ const t = document.getElementById('toast'); t.textCont
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmt$ = n => '$' + Math.round(n||0).toLocaleString('es-CL');
 const fmtPct2 = f => (f*100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-/* Input de pesos: solo dígitos, con puntos de miles mientras se escribe */
-function fmtMiles(el){ const d = el.value.replace(/[^0-9]/g,''); el.value = d ? Number(d).toLocaleString('es-CL') : ''; }
+/* Input de pesos: solo dígitos, con $ y puntos de miles mientras se escribe */
+function fmtMiles(el){ const d = el.value.replace(/[^0-9]/g,''); el.value = d ? '$' + Number(d).toLocaleString('es-CL') : ''; }
 const numVal = id => Number((document.getElementById(id).value||'').replace(/[^0-9]/g,'')) || 0;
 /* Input RUT: 12.345.678-9 mientras se escribe */
 function fmtRut(el){
@@ -248,7 +251,6 @@ async function boot(){
     }
     pintarPresu();
     document.getElementById('lblMaxTasa').textContent = EX.exc_tasa_rebaja_max_pct ?? 5;
-    document.getElementById('fRebaja').max = EX.exc_tasa_rebaja_max_pct ?? 5;
     document.getElementById('lblPiso').textContent = (EX.exc_piso_pct ?? 75) + '%';
   } catch(e){ toast('Error cargando datos: ' + e.message, true); }
 }
@@ -278,8 +280,9 @@ function calc(){
   const precio = numVal('fPrecio');
   const pie = numVal('fPie');
   const esPatio = document.getElementById('fCanal').value === 'patio';
-  const rebaja = Number(document.getElementById('fRebaja').value)||0;
-  document.getElementById('lblRebaja').textContent = rebaja.toLocaleString('es-CL',{minimumFractionDigits:1}) + '%';
+  // Tasa propuesta manual (% mensual, coma o punto). Vacío = pizarra.
+  const tasaTxt = document.getElementById('fTasa').value.trim().replace(',', '.').replace('%','');
+  const tasaManual = tasaTxt === '' ? null : (parseFloat(tasaTxt) || 0) / 100;   // fracción mensual
   const comDealerNueva = document.getElementById('fComDealer').value.trim() === '' ? null : numVal('fComDealer');
   const seg = { desg:true, rdh:document.getElementById('sRdh').checked, cesa:document.getElementById('sCesa').checked };
   const gastos = { prenda:true, gps:true, rep:document.getElementById('sRep').checked, lim:true };
@@ -300,17 +303,25 @@ function calc(){
     const inpBase = { valor:precio, pie, plazo, gastos, seguros:seg, esPatio, uacPct };
     const base = window.AF_RENT.calcular(inpBase, P, UF, T);
     if (!base) { filas += `<tr><td>${plazo}</td><td colspan="6" style="color:#94a3b8">—</td></tr>`; continue; }
-    // Excepción: tasa cliente rebajada (relativa) + comisión dealer modificada
-    if (!tasaRef) tasaRef = { pizarra: base.tasaCli, esMayor: base.esMayor };
-    const tasaExc = base.tasaCli * (1 - rebaja/100);
-    const inpExc = { ...inpBase, tasaCli: rebaja>0 ? Math.floor(tasaExc*10000)/10000 : null, dealerComCLP: comDealerNueva };
+    // Excepción: tasa propuesta manual (piso absoluto: costo de fondo) + comisión dealer
+    const costoFondo = ((Number(T.tasa_mensual_mayor)||0) - (Number(T.spread_mayor)||0)) / 100;
+    let tasaExc = tasaManual != null ? Math.max(tasaManual, costoFondo) : base.tasaCli;
+    if (tasaExc > base.tasaCli) tasaExc = base.tasaCli;   // no se puede subir sobre la pizarra
+    const rebaja = base.tasaCli > 0 ? Math.max(0, (base.tasaCli - tasaExc) / base.tasaCli * 100) : 0;
+    if (!tasaRef) tasaRef = { pizarra: base.tasaCli, esMayor: base.esMayor, nueva: tasaExc, rebaja, costoFondo,
+                              clampCF: tasaManual != null && tasaManual < costoFondo };
+    const inpExc = { ...inpBase, tasaCli: rebaja > 0 ? tasaExc : null, dealerComCLP: comDealerNueva };
     const exc = window.AF_RENT.calcular(inpExc, P, UF, T);
+    // Rebaja sobre el máximo relativo → en UNIDAD no se puede: se fuerza Autofin
+    const maxReb = EX.exc_tasa_rebaja_max_pct ?? 5;
+    const uacBloqueada = rebaja > maxReb;
+    if (uacBloqueada && SEL[plazo] === 'UAC') delete SEL[plazo];
     const mejorBase = Math.max(base.af.rentab, base.uac.rentab);   // la más rentable SIN excepción
     // Lado a CURSAR: lo elige el ejecutivo (pills); default = el más rentable con la excepción.
     // El piso se evalúa SIEMPRE sobre el lado elegido: cursar Unidad a 48 con
     // Autofin rindiendo 4x NO cumple, aunque "exista" un lado que sí.
-    const sugerido = exc.af.rentab >= exc.uac.rentab ? 'AF' : 'UAC';
-    const lado = SEL[plazo] || sugerido;
+    const sugerido = (exc.af.rentab >= exc.uac.rentab || uacBloqueada) ? 'AF' : 'UAC';
+    const lado = uacBloqueada ? 'AF' : (SEL[plazo] || sugerido);
     const dif = Math.abs(exc.af.rentab - exc.uac.rentab) / Math.max(1, Math.max(exc.af.rentab, exc.uac.rentab)) * 100;
     const esTu = dif < diffTu;   // bajo el umbral da lo mismo dónde cursar
     const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;
@@ -329,7 +340,10 @@ function calc(){
                               : `Ni con comisión dealer $0 se alcanza el piso por este lado`;
     }
     SIMS[plazo] = { plazo, base, exc, lado, rentExc, mejorBase, cumple, rebaja, comDealerNueva, esPatio, seg, precio, pie, saldo, uacPct };
-    const pill = (l, txt) => `<span class="lado-pill lado-${l} ${lado===l?'':'off'}" style="cursor:pointer;${lado===l?'outline:2px solid currentColor':'opacity:.45'}" onclick="elegirLado(${plazo},'${l}')">${txt}</span>`;
+    const pill = (l, txt) => {
+      const bloq = l === 'UAC' && uacBloqueada;
+      return `<span class="lado-pill lado-${l}" title="${bloq?'Rebaja sobre el máximo: forzada a Autofin':''}" style="cursor:${bloq?'not-allowed':'pointer'};${lado===l?'outline:2px solid currentColor':'opacity:'+(bloq?'.25':'.45')}" onclick="${bloq?'':`elegirLado(${plazo},'${l}')`}">${txt}</span>`;
+    };
     filas += `<tr>
       <td><b>${plazo}</b></td>
       <td><b>${fmt$(exc.af.cuota)}</b></td>
@@ -348,7 +362,11 @@ function calc(){
     tb.style.display = 'flex';
     document.getElementById('lblTasaPizarra').textContent =
       fmtPct2(tasaRef.pizarra) + (tasaRef.esMayor ? ' (>200 UF)' : ' (≤200 UF)');
-    document.getElementById('lblTasaNueva').textContent = fmtPct2(tasaRef.pizarra * (1 - rebaja/100));
+    document.getElementById('lblTasaNueva').textContent =
+      fmtPct2(tasaRef.nueva) + (tasaRef.clampCF ? ' (tope: costo de fondo)' : '');
+    document.getElementById('lblRebaja').textContent =
+      tasaRef.rebaja.toLocaleString('es-CL',{minimumFractionDigits:1,maximumFractionDigits:1}) + '%';
+    document.getElementById('lblCF').textContent = fmtPct2(tasaRef.costoFondo);
   } else tb.style.display = 'none';
   document.getElementById('notaPiso').textContent =
     `Piso: la excepción no puede rentar menos del ${EX.exc_piso_pct ?? 75}% de la alternativa más rentable sin excepción. ` +
