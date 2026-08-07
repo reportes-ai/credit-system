@@ -373,12 +373,18 @@ const getAll = async (req, res) => {
     if (q && q.trim()) {
       const qNorm = q.trim().toUpperCase().replace(/\./g, '');
       const like  = `%${qNorm}%`;
+      /* Los DOS números buscan, cada uno por su lado. Con COALESCE, una operación
+         con numero_credito (ej. 2608005) dejaba de encontrarse por su N° OP real
+         (26080005), porque el fallback a num_op solo aplica cuando el otro es NULL
+         — 54 operaciones estaban así de invisibles. Buscar es distinto de mostrar:
+         para mostrar manda el N° OP; para buscar, cualquiera de los dos sirve. */
       whereBase += ` AND (
         UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
         UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
-        UPPER(COALESCE(ob.numero_credito, CAST(ob.num_op AS CHAR)))        LIKE ?
+        UPPER(COALESCE(ob.numero_credito, ''))                             LIKE ? OR
+        CAST(ob.num_op AS CHAR)                                            LIKE ?
       )`;
-      paramsBase.push(like, like, like);
+      paramsBase.push(like, like, like, like);
     }
 
     if (financiera && financiera !== 'TODAS') {
