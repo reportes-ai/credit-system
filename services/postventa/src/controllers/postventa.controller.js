@@ -538,6 +538,12 @@ const getAll = async (req, res) => {
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      /* Una operación ANULADA no tiene saldo precio ni comisión que pagar: sale
+         del seguimiento sola, sin borrar su historia. El sync solo INSERTA los
+         otorgados, pero nunca sacaba a los que se anulaban después, y quedaban
+         pidiendo etapas para siempre (10 casos al 07-08-2026). Se excluye solo
+         ANULADO — un PREPAGADO sí sigue: su saldo precio puede estar pendiente. */
+      WHERE c.id IS NULL OR COALESCE(c.estado_credito, '') <> 'ANULADO'
       ORDER BY s.fecha_otorgado DESC, s.id DESC LIMIT 1000`);
     const [etapas] = await pool.query(
       `SELECT id_seguimiento, track, etapa, usuario, fecha FROM postventa_etapas
