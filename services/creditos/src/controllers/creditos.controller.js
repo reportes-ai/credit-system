@@ -382,9 +382,10 @@ const getAll = async (req, res) => {
         UPPER(REPLACE(COALESCE(cl.rut, ''),'.',''))                        LIKE ? OR
         UPPER(COALESCE(cl.nombre_completo, ''))                            LIKE ? OR
         UPPER(COALESCE(ob.numero_credito, ''))                             LIKE ? OR
-        CAST(ob.num_op AS CHAR)                                            LIKE ?
+        CAST(ob.num_op AS CHAR)                                            LIKE ? OR
+        CAST(COALESCE(ob.id_financiera, '') AS CHAR)                       LIKE ?
       )`;
-      paramsBase.push(like, like, like, like);
+      paramsBase.push(like, like, like, like, like);
     }
 
     if (financiera && financiera !== 'TODAS') {
