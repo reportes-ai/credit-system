@@ -459,6 +459,10 @@ require('../../../../shared/migrate').enFila('ayuda-dcq', async () => {
         ultima_vez DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`);
 
+    // SIN_RESULTADO = la búsqueda no trajo nada · SIN_CLICK = trajo resultados
+    // pero el usuario no abrió ninguno (el banco no cubrió lo que buscaba).
+    await pool.query("ALTER TABLE dcq_sin_respuesta ADD COLUMN motivo VARCHAR(15) NOT NULL DEFAULT 'SIN_RESULTADO'").catch(() => {});
+
     const BANCO = require('../dcq-banco');
     for (const q of BANCO) {
       await pool.query(
@@ -500,9 +504,12 @@ const dcqSinRespuesta = async (req, res) => {
   try {
     const texto = String((req.body || {}).texto || '').trim().slice(0, 200).toLowerCase();
     if (texto.length < 4) return res.json({ success: true, data: null, error: null });
+    const motivo = (req.body || {}).motivo === 'SIN_CLICK' ? 'SIN_CLICK' : 'SIN_RESULTADO';
+    // Si el mismo texto alguna vez llegó SIN_RESULTADO, ese motivo (más grave) se queda.
     await pool.query(
-      `INSERT INTO dcq_sin_respuesta (texto, veces) VALUES (?, 1)
-       ON DUPLICATE KEY UPDATE veces = veces + 1, ultima_vez = NOW()`, [texto]);
+      `INSERT INTO dcq_sin_respuesta (texto, veces, motivo) VALUES (?, 1, ?)
+       ON DUPLICATE KEY UPDATE veces = veces + 1, ultima_vez = NOW(),
+         motivo = IF(motivo = 'SIN_RESULTADO', 'SIN_RESULTADO', VALUES(motivo))`, [texto, motivo]);
     res.json({ success: true, data: null, error: null });
   } catch (e) {
     // Nunca molestar al usuario por esto: es telemetría, no su tarea.
@@ -514,7 +521,7 @@ const dcqSinRespuesta = async (req, res) => {
 const dcqPendientes = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT texto, veces, DATE_FORMAT(ultima_vez,'%Y-%m-%d %H:%i') ultima_vez
+      `SELECT texto, veces, motivo, DATE_FORMAT(ultima_vez,'%Y-%m-%d %H:%i') ultima_vez
          FROM dcq_sin_respuesta WHERE resuelta = 0
         ORDER BY veces DESC, ultima_vez DESC LIMIT 200`);
     res.json({ success: true, data: rows, error: null });

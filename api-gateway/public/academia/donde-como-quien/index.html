@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dónde · Cómo · Quién — Academia AutoFácil</title>
-  <!-- v1.0 — buscador operativo precargado: dónde se hace, cómo y quién puede -->
+  <!-- v1.1 — también se anotan las búsquedas con resultados que nadie abrió (SIN_CLICK) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -269,6 +269,7 @@ function puntaje(q, tokens){
 
 function pintar(){
   const texto = document.getElementById('q').value;
+  flushBusqueda(texto);
   document.getElementById('clr').style.display = texto ? 'block' : 'none';
   const tokens = norm(texto).split(/\s+/).filter(t => t.length>2 && !STOP.has(t));
   let rows = BANCO.filter(q => !CAT || q.cat===CAT);
@@ -281,9 +282,13 @@ function pintar(){
   // Búsqueda con palabras reales y cero resultados → queda en la cola por responder
   if (!rows.length && tokens.length) anotarSinRespuesta(texto.trim());
   const abierta = tokens.length && rows.length <= 3;   // pocas → mostrarlas abiertas
+  // Sesión de búsqueda: si el usuario buscó, vio la lista y no abrió NINGUNA
+  // respuesta, el banco no cubrió lo que buscaba — queda anotado (SIN_CLICK).
+  // Con ≤3 resultados se abren solos, así que se consideran atendidos.
+  BUSQ = tokens.length ? { texto: texto.trim(), resultados: rows.length, abierta, ts: Date.now() } : null;
   document.getElementById('lista').innerHTML = rows.map((q,i)=>`
     <div class="qa ${abierta?'open':''}" id="qa${i}">
-      <div class="qhead" onclick="document.getElementById('qa${i}').classList.toggle('open')">
+      <div class="qhead" onclick="marcarLeida();document.getElementById('qa${i}').classList.toggle('open')">
         <span class="qcat">${esc(q.cat)}</span>
         <h3>${resaltar(q.pregunta, tokens)}</h3>
         <i class="bi bi-chevron-right chev"></i>
@@ -328,12 +333,33 @@ function resaltar(texto, tokens){
 let _tmrSin = null;
 function anotarSinRespuesta(texto){
   clearTimeout(_tmrSin);
-  _tmrSin = setTimeout(() => {
-    fetch('/api/ayuda/dcq/sin-respuesta', { method:'POST',
-      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+T() },
-      body: JSON.stringify({ texto }) }).catch(()=>{});
-  }, 1500);
+  _tmrSin = setTimeout(() => enviarSin(texto, 'SIN_RESULTADO'), 1500);
 }
+function enviarSin(texto, motivo){
+  fetch('/api/ayuda/dcq/sin-respuesta', { method:'POST', keepalive:true,
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+T() },
+    body: JSON.stringify({ texto, motivo }) }).catch(()=>{});
+}
+
+/* ── Búsquedas que encontraron "algo" pero no lo que se buscaba ──────────────
+   Si hubo resultados y el usuario no abrió ninguno, también es una pregunta
+   sin cubrir — antes esas eran invisibles. Se reporta al cambiar de búsqueda
+   (no al seguir tipeando la misma frase) o al salir de la página, y solo si
+   la lista estuvo a la vista al menos 4 s (para no anotar el camino de cada
+   tecla). Telemetría: si falla, nadie se entera. */
+let BUSQ = null;
+function marcarLeida(){ if (BUSQ) BUSQ.abierta = true; }
+function busqAbandonada(){
+  return BUSQ && !BUSQ.abierta && BUSQ.resultados > 0 && Date.now() - BUSQ.ts >= 4000;
+}
+function flushBusqueda(nuevoTexto){
+  if (!BUSQ) return;
+  const nvo = norm(nuevoTexto || ''), ant = norm(BUSQ.texto);
+  if (nvo && (nvo.startsWith(ant) || ant.startsWith(nvo))) return; // sigue escribiendo lo mismo
+  if (busqAbandonada()) enviarSin(BUSQ.texto, 'SIN_CLICK');
+  BUSQ = null;
+}
+addEventListener('pagehide', () => { if (busqAbandonada()) enviarSin(BUSQ.texto, 'SIN_CLICK'); });
 
 /* Cola de preguntas por responder — el mantenedor la revisa y escribe lo que falta */
 async function verPendientes(){
@@ -351,6 +377,7 @@ async function verPendientes(){
       filas.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9">
         <b style="min-width:34px;color:var(--navy);font-size:.8rem">${f.veces}×</b>
         <span style="flex:1;font-size:.86rem">${esc(f.texto)}</span>
+        ${f.motivo==='SIN_CLICK' ? '<span title="Encontró resultados pero no abrió ninguno" style="background:#fef3c7;color:#92400e;border-radius:6px;padding:2px 7px;font-size:.66rem;font-weight:600">no le sirvió</span>' : '<span title="La búsqueda no trajo ningún resultado" style="background:#fee2e2;color:#991b1b;border-radius:6px;padding:2px 7px;font-size:.66rem;font-weight:600">sin resultado</span>'}
         <span style="font-size:.7rem;color:#94a3b8">${esc(f.ultima_vez)}</span>
         <button onclick="abrirEditor(null, '${esc(f.texto).replace(/'/g,'&#39;')}')" style="background:var(--navy);color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:600;cursor:pointer">Responder</button>
         <button onclick="marcarResuelta('${encodeURIComponent(f.texto)}')" title="No amerita respuesta" style="background:#f1f5f9;color:#64748b;border:0;border-radius:6px;padding:4px 8px;font-size:.72rem;cursor:pointer">Descartar</button>
