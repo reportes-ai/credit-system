@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.5 — tasa propuesta manual (mín. costo de fondo), $ en inputs, Nueva Comisión Dealer -->
+  <!-- v1.6 — guía rápida al costado (estrella/comodín/gerencia, uso del código) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -85,7 +85,8 @@
   </div>
 
   <!-- ══ SIMULAR ══ -->
-  <div id="t_sim">
+  <div id="t_sim" style="display:grid;grid-template-columns:1fr 310px;gap:14px;align-items:start">
+   <div>
     <div class="card-af">
       <div class="row g-3 frm">
         <div class="col-md-2"><label>Precio del auto ($)</label><input type="text" inputmode="numeric" id="fPrecio" oninput="fmtMiles(this);calc()"></div>
@@ -135,6 +136,45 @@
       </tr></thead><tbody id="gBody"><tr><td colspan="7" style="color:#94a3b8">Ingresa precio y pie para simular</td></tr></tbody></table>
       <div class="nota" style="margin-top:8px" id="notaPiso"></div>
     </div>
+   </div>
+
+   <!-- Guía rápida -->
+   <aside class="card-af" style="position:sticky;top:74px;font-size:.82rem;color:#475569;line-height:1.5">
+    <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-info-circle me-1"></i>¿Cómo funciona?</div>
+    <div style="margin-bottom:10px">
+      <b style="color:var(--navy)">⭐ Estrella</b> — tu presupuesto mensual de excepciones.
+      El primer mes partes con 2; después ganas el 33% de tus otorgadas del mes anterior
+      (redondeado hacia abajo: con 2 colocadas son 0 — coloca al menos 3).
+      Generar un código gasta una estrella. Las que no uses <b>expiran al cierre del mes</b>.
+    </div>
+    <div style="margin-bottom:10px">
+      <b style="color:var(--navy)">🏆 Comodín dorado</b> — partes con 1 y ganas otro cada 50
+      otorgadas acumuladas. <b>No vence</b> y aprueba operaciones que una estrella no puede,
+      con una sola condición: que la rentabilidad AutoFácil supere en 10% a la comisión más
+      alta (dealer o ejecutivo). Se ofrece solo cuando ya no te quedan estrellas.
+    </div>
+    <div style="margin-bottom:10px">
+      <b style="color:var(--navy)">👔 Código de Gerencia</b> — para el caso puntual cuando no
+      tienes estrellas ni comodín: lo genera el Gerente de Operaciones con motivo escrito y
+      no descuenta tu presupuesto.
+    </div>
+    <div style="margin-bottom:10px">
+      <b style="color:var(--navy)">¿Cuándo necesito código?</b> Solo si tocas algo: bajar la
+      tasa, bajar la comisión del dealer, o cursar por el lado contrario al recomendado.
+      La cursación normal por el lado correcto <b>no gasta nada</b>.
+    </div>
+    <div style="margin-bottom:10px">
+      <b style="color:var(--navy)">¿Qué hago con el código?</b> Cópialo y escríbelo en la
+      <b>Carta de Aprobación</b> (campo Código de excepción). La carta queda "aprobada por
+      código del sistema N°XXXXXX". El código valida solo su operación (saldo precio + RUT),
+      <b>vence a las 24 h</b> y sirve <b>una sola vez</b>. Si vence sin usarse, la estrella
+      vuelve a tu presupuesto dentro del mismo mes.
+    </div>
+    <div>
+      <b style="color:var(--navy)">¿Dudas de un código?</b> En la pestaña <b>Validador</b>
+      cualquiera puede ver de qué operación es, quién lo generó, si está vigente y dónde se usó.
+    </div>
+   </aside>
   </div>
 
   <!-- ══ MIS CÓDIGOS ══ -->
@@ -267,7 +307,7 @@ function pintarPresu(){
 }
 
 function verTab(t){
-  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t)?'':'none';
+  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t) ? (x==='sim'?'grid':'') : 'none';
   document.querySelectorAll('.tab-btn[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   if (t==='cods') cargarCodigos();
   if (t==='ger') cargarRegistro();
