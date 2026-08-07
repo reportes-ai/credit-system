@@ -78,6 +78,18 @@ function mapEjecutivo(nombreTrinidad, mapaEjecutivos) {
   return mapaEjecutivos[nombreTrinidad.trim().toLowerCase()] || nombreTrinidad.trim();
 }
 
+/* AutoFin (08-2026) empezó a poner a SU ejecutivo en la columna "Ejecutivo" y
+   al nuestro lo manda en "Vendedor". Regla: si el Ejecutivo del export NO está
+   en la tabla de equivalencias pero el Vendedor SÍ, el ejecutivo real es el
+   del Vendedor (pasado por la misma tabla). Si ninguno está, queda el
+   Ejecutivo tal cual — y el nombre nuevo se agrega en Equivalencia Ejecutivos. */
+function mapEjecutivoConVendedor(ejTri, vendTri, mapaEjecutivos) {
+  const enMapa = n => !!n && Object.prototype.hasOwnProperty.call(mapaEjecutivos, n.trim().toLowerCase());
+  if (enMapa(ejTri))   return mapaEjecutivos[ejTri.trim().toLowerCase()];
+  if (enMapa(vendTri)) return mapaEjecutivos[vendTri.trim().toLowerCase()];
+  return ejTri ? ejTri.trim() : null;
+}
+
 /* ── Normaliza RUT (quita puntos, espacios) ─────────────────────── */
 function normRut(v) {
   if (!v) return null;
@@ -148,6 +160,7 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
 
       const estadoTri = normStr(get('Estado')) || normStr(get('ESTADO'));
       const ejTri     = normStr(get('Ejecutivo'));
+      const vendTri   = normStr(get('Vendedor'));
 
       const fechaCurse   = normDate(get('Fecha Curse'));
       const fechaIngreso = normDate(get('Fecha Ingreso'));
@@ -169,7 +182,7 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
         estado_credito:  estadoCredito,
         estado_eval:     estadoEval,
         producto:        normStr(get('Producto')),
-        ejecutivo:       mapEjecutivo(ejTri, mapaEjecutivos),
+        ejecutivo:       mapEjecutivoConVendedor(ejTri, vendTri, mapaEjecutivos),
         ejecutivo_tri:   ejTri,
         automotora:      normStr(get('Dealer')),
         valor_vehiculo:  normInt(get('Precio')),
@@ -404,7 +417,15 @@ exports.preview = async (req, res) => {
       porEstado[e] = (porEstado[e] || 0) + 1;
     }
 
-    return res.json({ success: true, data: { total: filas.length, nuevos, actualizados, porEstado, preview, canal: infoCanal } });
+    // Nombres sin equivalencia (ni por Ejecutivo ni por Vendedor): la lista
+    // que hay que ir agregando en Equivalencia Ejecutivos.
+    const enMapa = n => !!n && Object.prototype.hasOwnProperty.call(mapaEjecutivos, n.trim().toLowerCase());
+    const sinEq = [...new Set(filas
+      .filter(f => !enMapa(f.ejecutivo_tri) && !enMapa(f.vendedor))
+      .map(f => (f.vendedor || f.ejecutivo_tri || '').trim())
+      .filter(Boolean))].sort();
+
+    return res.json({ success: true, data: { total: filas.length, nuevos, actualizados, porEstado, preview, canal: infoCanal, sin_equivalencia: sinEq } });
   } catch (e) {
     console.error('[carga-trinidad preview]', e);
     return res.json({ success: false, error: e.message });

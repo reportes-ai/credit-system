@@ -216,7 +216,15 @@ async function triEjecutarPreview() {
       <div class="stat-item" style="border-left-color:#6366f1"><div class="lbl">Informe Canal</div><div class="val">${d.canal ? d.canal.total.toLocaleString('es-CL') : '—'}</div></div>`;
     const estHtml = Object.entries(d.porEstado).map(([e,c]) =>
       `<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 4px;background:#f1f5f9;border-radius:8px;padding:3px 10px;font-size:.78rem"><strong style="color:#0141A2">${c}</strong> ${e}</span>`).join('');
-    document.getElementById('triEstadosDist').innerHTML = `<div style="font-size:.78rem;color:#6b7280;font-weight:600;margin-bottom:6px">Distribución de estados Trinidad:</div>${estHtml}`;
+    let sinEqHtml = '';
+    if (d.sin_equivalencia && d.sin_equivalencia.length) {
+      sinEqHtml = `<div style="margin-top:10px;background:#fef3c7;border-left:4px solid #d97706;border-radius:8px;padding:10px 14px;font-size:.8rem;color:#92400e">
+        <b><i class="bi bi-exclamation-triangle me-1"></i>${d.sin_equivalencia.length} nombre(s) sin equivalencia</b> — agrégalos en
+        <a href="/carga-masiva/eq-ejecutivos/" style="color:#92400e;font-weight:700">Equivalencia Ejecutivos</a> y vuelve a cargar:<br>
+        ${d.sin_equivalencia.map(n => `<span style="display:inline-block;background:#fff;border-radius:6px;padding:2px 8px;margin:3px 3px 0 0">${n.replace(/</g,'&lt;')}</span>`).join('')}
+      </div>`;
+    }
+    document.getElementById('triEstadosDist').innerHTML = `<div style="font-size:.78rem;color:#6b7280;font-weight:600;margin-bottom:6px">Distribución de estados Trinidad:</div>${estHtml}${sinEqHtml}`;
     const colores = { 'Otorgado':'#dcfce7;color:#166534', 'Digitado':'#f1f5f9;color:#374151' };
     document.getElementById('triPreviewBody').innerHTML = d.preview.map(f2 => `
       <tr>
