@@ -81,6 +81,22 @@ async function revisar() {
     LIMIT 20`, [desde]);
   if (incompletos.length) avisos.push(`${incompletos.length} otorgado(s) con datos base incompletos: ${incompletos.map(r => `${r.num_op} (${r.falta})`).join(', ')}`);
 
+  // 6. Monto financiado ≤ saldo precio → el monto del crédito quedó mal leído.
+  //    El capital del pagaré (Total Pagaré AutoFin / Monto Bruto Unidad) SIEMPRE
+  //    es mayor al saldo precio: suma impuestos, primas y gastos. Igualdad exacta
+  //    = se guardó el saldo como monto (bug de parseUnidad corregido en v193.1;
+  //    casos reales: 26634853CV, 26631052DS, 26634247LS, 26626280KT, 26627944FC).
+  const [montoMalo] = await pool.query(`
+    SELECT num_op, DATE_FORMAT(COALESCE(mes,fecha_otorgado),'%Y-%m') m,
+           saldo_precio, monto_financiado
+    FROM creditos
+    WHERE UPPER(estado)='OTORGADO'
+      AND (UPPER(financiera) LIKE '%AUTOFIN%' OR UPPER(financiera) LIKE '%UNIDAD%')
+      AND COALESCE(monto_financiado,0) > 0 AND COALESCE(saldo_precio,0) > 0
+      AND monto_financiado <= saldo_precio
+      AND COALESCE(mes,fecha_otorgado) >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
+  if (montoMalo.length) criticos.push(`${montoMalo.length} op(s) con monto financiado MENOR O IGUAL al saldo precio (el capital del pagaré siempre es mayor: trae impuestos, primas y gastos — probable lectura del saldo como monto): ${montoMalo.map(r => `${r.num_op} (${r.m}: saldo $${Number(r.saldo_precio).toLocaleString('es-CL')} vs financiado $${Number(r.monto_financiado).toLocaleString('es-CL')})`).join(' · ')}`);
+
   return { criticos, avisos };
 }
 
