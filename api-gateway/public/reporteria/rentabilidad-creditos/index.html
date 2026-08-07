@@ -103,7 +103,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.15</span>
+      <span class="version-badge" id="versionBadge">v1.16</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -171,7 +171,7 @@
     <i class="bi bi-info-circle me-1"></i>
     Mismas fórmulas del <a class="mini-link" href="/simulador/" target="_blank">Simulador de Rentabilidad</a>.
     <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> 2,5% del saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
-    <b>Tasa cliente</b> = la real del crédito (si falta, TMC vigente por tramo). <b>Tier UAC</b> = vigente del mes (según N° de operaciones Unidad de Crédito otorgadas).
+    <b>Tasa cliente</b> = la real del crédito (si falta, TMC vigente por tramo). <b>Tier UAC</b> = motor único (tier del mes por N° de ops UAC; con Modelo 2, las ops de plazo largo reciben su % fijo).
     AutoFin = colocación + seguros; UAC = % sobre saldo precio (no paga seguros). Los créditos <b>AutoFácil (cartera propia)</b> se muestran como referencia y no entran en el conteo de óptimos.
   </div>
 </div>
@@ -191,6 +191,7 @@
 <script src="/js/rentabilidad-core.js"></script>
 <script src="/js/comision-dealer.js"></script>
 <script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
 <script src="/js/preferencia-financiera.js"></script>
 <script>
 /* ── Sesión ───────────────────────────────────────── */
@@ -297,21 +298,20 @@ async function cargarBase(){
   } catch(e){ console.error('base', e); }
 }
 
-/* ── Tier UAC vigente del mes (según N° ops Unidad de Crédito otorgadas) ── */
+/* ── Tier UAC vigente del mes — MOTOR ÚNICO /js/uac-tier.js ──────────────
+   Respeta el modelo activo del mantenedor (Modelo 2: las ops con plazo >=
+   corte reciben el % fijo de plazo largo, no el tier del mes). */
 function tierDelMes(mes){
-  const t1 = parseFloat(PARAMS.uac_ops_tier1_max)||5;
-  const t2 = parseFloat(PARAMS.uac_ops_tier2_max)||10;
-  const t3 = parseFloat(PARAMS.uac_ops_tier3_max)||15;
   const count = CREDITOS.filter(c =>
     (c.financiera||'').toUpperCase().includes('UNIDAD') &&
     c.fecha_otorgado && ym(c.fecha_otorgado)===mes
   ).length;
-  let n, pct;
-  if (count <= t1)      { n=1; pct=parseFloat(PARAMS.uac_pct_tier1)||14; }
-  else if (count <= t2) { n=2; pct=parseFloat(PARAMS.uac_pct_tier2)||16; }
-  else if (count <= t3) { n=3; pct=parseFloat(PARAMS.uac_pct_tier3)||18; }
-  else                  { n=4; pct=parseFloat(PARAMS.uac_pct_tier4)||20; }
-  return { n, pct, count };
+  const t = window.AF_UAC_TIER.tierUACInfo(count, PARAMS);
+  return { n: t.n, pct: t.pct, count };
+}
+/* % UAC efectivo de UNA operación (tier del mes + corte por plazo). */
+function pctUACOp(count, plazo, mes){
+  return window.AF_UAC_TIER.pctUACOperacion({ ops: count, plazo, mes }, PARAMS);
 }
 
 /* ── Recalcular para el mes seleccionado ──────────── */
@@ -339,7 +339,7 @@ function recalcular(){
       esPatio: (pq && pq!=='NO APLICA') || Number(c.com_parque||0)>0,
       dealerComCLP: Number(c.comision_dealer||0)||null,
       tasaCli: tasaMensualDecimal(c.tasa_mensual),   // normaliza unidades; si falta → TMC vigente
-      uacPct: tier.pct/100,
+      uacPct: pctUACOp(tier.count, plazo, mes),
     };
     // Sin plazo no se puede calcular (crédito incompleto) → se marca "Datos incompletos"
     const R = (plazo>0 && window.AF_RENT) ? (window.AF_RENT.calcular(inp, PARAMS, UF_HOY, TASAS) || null) : null;
