@@ -17,6 +17,17 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const A = require('../../../../shared/avisos');
+
+// Campanitas (motor único de avisos, configurable en Mantenedores → Avisos):
+// · al SOLICITAR suena donde quien puede aprobar (Gerente de Operaciones)
+// · al RESOLVER suena donde el analista que solicitó (aviso dirigido)
+A.registrarAviso({ evento: 'com_ajuste_solicitado', nombre: 'Ajuste de comisión por aprobar',
+  modulo: 'Comisiones', base_func: 'com_ejec_mod_aprobar', prioridad: 'alta',
+  descripcion: 'Un Analista de Operaciones solicitó modificar la comisión de una operación; espera la firma del Gerente de Operaciones.' });
+A.registrarAviso({ evento: 'com_ajuste_resuelto', nombre: 'Ajuste de comisión resuelto',
+  modulo: 'Comisiones', base_func: null, dirigido_a: 'El analista que solicitó el ajuste',
+  descripcion: 'El Gerente de Operaciones aprobó o rechazó un ajuste de comisión; se avisa a quien lo solicitó.' });
 
 require('../../../../shared/migrate').enFila('comisiones-ajustes', async () => {
   try {
@@ -123,6 +134,11 @@ const solicitar = async (req, res) => {
       [m, num_op, cr.ejecutivo, Number(comision_normal) || 0, Number(comision_modificada), String(comentario).trim(), req.usuario.id_usuario, nombre]);
     auditar({ req, accion: 'CREAR', modulo: 'comisiones', entidad: 'ajuste_comision_op', entidad_id: String(r.insertId),
       detalle: `Solicitó ajuste comisión op ${num_op} (${cr.ejecutivo}, ${m}): $${Math.round(comision_normal || 0).toLocaleString('es-CL')} → $${Math.round(comision_modificada).toLocaleString('es-CL')}` });
+    A.avisar('com_ajuste_solicitado', {
+      titulo: 'Ajuste de comisión por aprobar',
+      mensaje: `${nombre} solicitó modificar la comisión de la op ${num_op} (${cr.ejecutivo}, ${m}): $${Math.round(comision_normal || 0).toLocaleString('es-CL')} → $${Math.round(comision_modificada).toLocaleString('es-CL')}`,
+      href: '/comisiones/ajustes/', clave: `comaj:${r.insertId}`,
+    }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
     res.json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) { console.error('[ajustes solicitar]', e.message); res.status(500).json({ success: false, data: null, error: e.message }); }
 };
@@ -147,6 +163,13 @@ const resolver = async (req, res) => {
       [accion === 'aprobar' ? 'APROBADA' : 'RECHAZADA', req.usuario.id_usuario, nombre, accion === 'rechazar' ? String(motivo).trim() : null, a.id]);
     auditar({ req, accion: accion === 'aprobar' ? 'APROBAR' : 'RECHAZAR', modulo: 'comisiones', entidad: 'ajuste_comision_op', entidad_id: String(a.id),
       detalle: `${accion === 'aprobar' ? 'Aprobó' : 'Rechazó'} ajuste comisión op ${a.num_op} (${a.ejecutivo}, ${a.mes})${accion === 'rechazar' ? ': ' + motivo : ''}` });
+    // Retirar el pendiente del pool aprobador y avisar al analista que solicitó
+    A.retirar(`comaj:${a.id}`).catch(() => {});
+    if (a.solicitado_por_id) A.avisar('com_ajuste_resuelto', {
+      titulo: accion === 'aprobar' ? 'Ajuste de comisión APROBADO' : 'Ajuste de comisión RECHAZADO',
+      mensaje: `Op ${a.num_op} (${a.ejecutivo}, ${a.mes}): $${Math.round(a.comision_normal).toLocaleString('es-CL')} → $${Math.round(a.comision_modificada).toLocaleString('es-CL')} — ${accion === 'aprobar' ? 'aprobado por ' + nombre : 'rechazado por ' + nombre + ': ' + motivo}`,
+      href: '/comisiones/ajustes/',
+    }, { soloA: [a.solicitado_por_id] }).catch(() => {});
     res.json({ success: true, data: null, error: null });
   } catch (e) { console.error('[ajustes resolver]', e.message); res.status(500).json({ success: false, data: null, error: e.message }); }
 };
