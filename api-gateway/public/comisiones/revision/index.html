@@ -112,7 +112,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.21</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.22</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
@@ -406,7 +406,16 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
   const otorgados = (d.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
   const credHtml = otorgados.map(c => {
     const tieneAdicional = (c.incentivo_adicional_credito||0) > 0;
-    return `<tr>
+    // Ajuste aprobado en "Modificar Comisión Ejecutivo": la comisión modificada
+    // reemplaza a la normal de esta operación (se muestra tachada la normal).
+    const aj = c.ajuste_comision;
+    const celBase = aj
+      ? `<td style="text-align:right;font-weight:700" title="Ajuste aprobado por ${(aj.aprobado_por||'')}: ${(aj.comentario||'').replace(/"/g,'&quot;')}">
+           <s style="color:#9ca3af;font-weight:400">${fmt(aj.normal)}</s>
+           <span style="color:#b45309"> ${fmt(aj.modificada)}</span>
+           <i class="bi bi-pencil-square" style="color:#b45309;font-size:11px"></i></td>`
+      : `<td style="text-align:right;font-weight:600;color:#0141A2">${fmt(c.incentivo_base_credito||0)}</td>`;
+    return `<tr${aj?' style="background:#fffbeb"':''}>
       <td>${c.num_op||'—'}</td>
       <td>${c.nombre_cliente||'—'}</td>
       <td>${c.rut_cliente||'—'}</td>
@@ -415,7 +424,7 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
       <td style="text-align:right">${fmt(c.monto_financiado)}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_cesantia)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_cesantia)||0)>0?'✓ '+fmt(c.seguro_cesantia):'—'}</td>
       <td style="text-align:right;color:${(parseFloat(c.seguro_rep_menor)||0)>0?'#16a34a':'#9ca3af'}">${(parseFloat(c.seguro_rep_menor)||0)>0?'✓ '+fmt(c.seguro_rep_menor):'—'}</td>
-      <td style="text-align:right;font-weight:600;color:#0141A2">${fmt(c.incentivo_base_credito||0)}</td>
+      ${celBase}
       <td style="text-align:right;font-weight:600;color:${tieneAdicional?'#16a34a':'#9ca3af'}">${tieneAdicional?fmt(c.incentivo_adicional_credito):'—'}</td>
     </tr>`;
   }).join('');
@@ -492,9 +501,15 @@ function renderEjecutivo(d, idx, mes, sinComision = false) {
 
     ${dctosHtml(d)}
 
+    ${(d.ajustes_op&&d.ajustes_op.length) ? `<div class="desglose" style="border-left:4px solid #b45309">
+      <div class="desglose-title" style="color:#b45309"><i class="bi bi-pencil-square"></i>Ajustes de comisión por operación (aprobados en Modificar Comisión Ejecutivo)</div>
+      ${d.ajustes_op.map(a=>{const dif=Number(a.comision_modificada)-Number(a.comision_normal);return `<div class="desglose-row"><span>Op ${a.num_op}: ${fmt(a.comision_normal)} → <b>${fmt(a.comision_modificada)}</b> · aprobó ${escHtml(a.aprobado_por||'')} <span style="color:#94a3b8">(${escHtml(a.comentario||'')})</span></span><span style="color:${dif>=0?'#16a34a':'#dc2626'};font-weight:700">${dif>=0?'+':''}${fmt(dif)}</span></div>`;}).join('')}
+      <div class="desglose-row" style="margin-top:4px"><span><b>Total ajustes</b></span><span style="font-weight:800;color:${(d.total_ajustes_op||0)>=0?'#16a34a':'#dc2626'}">${(d.total_ajustes_op||0)>=0?'+':''}${fmt(d.total_ajustes_op||0)}</span></div>
+    </div>` : ''}
+
     <div class="total-final">
       <div><div class="tf-label">Incentivo Final Bruto</div><div class="tf-value">${fmt(d.incentivo_final)}</div></div>
-      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})})${(d.descuento_aplicado||0)>0?' − descuentos':''}</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
+      <div style="text-align:right"><div class="tf-sc">Con semana corrida (× ${(d.factor_semana_corrida||0).toLocaleString('es-CL',{minimumFractionDigits:4})})${(d.descuento_aplicado||0)>0?' − descuentos':''}${(d.ajustes_op&&d.ajustes_op.length)?' ± ajustes':''}</div><div class="tf-value">${fmt(d.con_semana_corrida)}</div></div>
     </div>
 
     <button class="toggle-creditos" onclick="toggleCreditos('${idx}')">
