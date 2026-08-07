@@ -443,6 +443,7 @@ app.use('/api/bono-jefe',  require('../../services/comisiones/src/routes/bono-je
 // Auditoría de movimientos (logins + bitácora transversal)
 app.use('/api/auditoria-mov', require('../../services/auditoria/src/routes/auditoria.routes'));
 require('../../services/auditoria/src/guardian-permisos');   // auditoría diaria de la matriz de permisos + aviso si falla
+require('../../services/auditoria/src/guardian-consistencia'); // cifras (ops/montos/rentabilidad) consistentes entre pantallas + aviso si divergen
 
 // Carga masiva de operaciones
 app.use('/api/carga-masiva',    require('../../services/creditos/src/routes/carga-masiva.routes'));
