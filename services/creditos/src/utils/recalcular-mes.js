@@ -410,6 +410,30 @@ async function normalizarEjecutivosMes(mesStr, log = []) {
       }
     }
   }
+  // ── Fallback por Vendedor (misma regla que la carga Trinidad) ──────────
+  // AutoFin pone a SU ejecutivo en "Ejecutivo" y al nuestro en "Vendedor".
+  // Si el ejecutivo del crédito no es un nombre Trinidad conocido ni un
+  // nombre AutoFácil ya bueno, pero su vendedor SÍ está en la tabla, el
+  // ejecutivo real es el del vendedor.
+  const buenos = new Set(mapRows.map(r => r.nombre_autofacil.toUpperCase().trim()));
+  const [cands] = await pool.query(
+    `SELECT id, ejecutivo, vendedor FROM creditos
+      WHERE DATE_FORMAT(mes, '%Y-%m') = ? AND vendedor IS NOT NULL AND vendedor != ''`,
+    [mesStr]
+  );
+  const porNombre = {};
+  for (const c of cands) {
+    const ej = (c.ejecutivo || '').toUpperCase().trim();
+    if (mapa[ej] || buenos.has(ej)) continue;               // resolvible por sí mismo
+    const av = mapa[(c.vendedor || '').toUpperCase().trim()];
+    if (!av || av === c.ejecutivo) continue;
+    await pool.query('UPDATE creditos SET ejecutivo = ?, updated_at = NOW() WHERE id = ?', [av, c.id]);
+    normalizados++;
+    const k = `${c.ejecutivo || '(vacío)'} → ${av} (por vendedor)`;
+    porNombre[k] = (porNombre[k] || 0) + 1;
+  }
+  for (const [k, n] of Object.entries(porNombre)) log.push(`👤 ${k}: ${n} ops`);
+
   if (normalizados > 0) log.push(`Ejecutivos normalizados: ${normalizados}`);
 }
 
