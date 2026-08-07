@@ -268,6 +268,20 @@ require('../../../../shared/migrate').enFila('ayuda', async () => {
          JSON.stringify(a.pasos||[]), JSON.stringify(a.submodulos||[]), a.siguiente||null]);
     }
     console.log('[ayuda] tabla OK + seed', SEED.length);
+
+    // Seed 2 — cobertura completa de páginas (formato corto). INSERT IGNORE:
+    // lo editado en el mantenedor de Ayuda nunca se pisa.
+    const SEED2 = require('../ayuda-seed2');
+    for (const a of SEED2) {
+      await pool.query(
+        `INSERT IGNORE INTO ayuda_paginas (ruta, titulo, icono, descripcion, pasos, submodulos, siguiente)
+         VALUES (?,?,?,?,?,?,?)`,
+        [a.r, a.t, a.i, a.d,
+         JSON.stringify((a.p || []).map(([titulo, detalle]) => ({ titulo, detalle }))),
+         JSON.stringify((a.s || []).map(([nombre, para_que]) => ({ nombre, para_que }))),
+         a.n || null]);
+    }
+    console.log('[ayuda] seed 2 (cobertura completa):', SEED2.length, 'páginas');
   } catch (e) { console.error('[ayuda migration]', e.message); }
 });
 
