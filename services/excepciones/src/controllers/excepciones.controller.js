@@ -120,8 +120,9 @@ async function presupuesto(ejecutivo, P) {
      WHERE tipo='PROPIO' AND UPPER(ejecutivo)=UPPER(?) AND estado IN ('VIGENTE','USADO')
        AND DATE_FORMAT(generado_at,'%Y-%m')=?`, [ejecutivo, mesActual]);
 
-  // Comodines: ganados históricos − emitidos no vencidos (se acumulan entre meses)
-  const ganados = Math.floor((hist.n || 0) / Math.max(1, Math.round(P.exc_comodin_cada ?? 50)));
+  // Comodines: inicial de bienvenida + ganados históricos − emitidos no vencidos (se acumulan)
+  const ganados = Math.round(P.exc_comodin_inicial ?? 1)
+    + Math.floor((hist.n || 0) / Math.max(1, Math.round(P.exc_comodin_cada ?? 50)));
   const [[comUsados]] = await pool.query(
     `SELECT COUNT(*) n FROM excepciones_codigos
      WHERE tipo='COMODIN' AND UPPER(ejecutivo)=UPPER(?) AND estado IN ('VIGENTE','USADO')`, [ejecutivo]);

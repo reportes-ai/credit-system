@@ -20,6 +20,7 @@ const DEFAULTS = [
   ['exc_pct_mensual',       33, '% de las otorgadas del mes anterior que se convierten en estrellas del mes (redondeo HACIA ABAJO: con 2 colocadas → 0; el aliciente es colocar al menos 3)'],
   ['exc_vigencia_horas',    24, 'Vigencia de un código de excepción (horas corridas desde que se genera); vencido sin usar, la estrella se devuelve dentro del mismo mes'],
   ['exc_comodin_cada',      50, 'Comodín dorado: se gana 1 cada N créditos OTORGADOS acumulados del ejecutivo'],
+  ['exc_comodin_inicial',    1, 'Comodines dorados de bienvenida: todo ejecutivo parte con esta cantidad'],
   ['exc_comodin_factor_pct',10, 'Comodín dorado: la rentabilidad AutoFácil debe superar en al menos este % a la MÁS ALTA entre la comisión del dealer y la del ejecutivo'],
   ['exc_tolerancia_saldo',   0, 'Tolerancia en $ entre el saldo precio de la simulación y el de la carta al validar un código (0 = deben calzar exacto)'],
   ['exc_codigo_digitos',     6, 'Largo del código de aprobación (dígitos)'],

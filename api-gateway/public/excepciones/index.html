@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.1 — fix: uacPct ya viene en fracción (doble división dejaba Unidad negativa) -->
+  <!-- v1.2 — tasa pizarra/nueva con 2 decimales, formato pesos y RUT, comodín de bienvenida -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,9 +88,9 @@
   <div id="t_sim">
     <div class="card-af">
       <div class="row g-3 frm">
-        <div class="col-md-2"><label>Precio del auto ($)</label><input type="number" id="fPrecio" min="0" oninput="calc()"></div>
-        <div class="col-md-2"><label>Pie ($)</label><input type="number" id="fPie" min="0" oninput="calc()"></div>
-        <div class="col-md-2"><label>RUT cliente</label><input type="text" id="fRut" placeholder="12.345.678-9"></div>
+        <div class="col-md-2"><label>Precio del auto ($)</label><input type="text" inputmode="numeric" id="fPrecio" oninput="fmtMiles(this);calc()"></div>
+        <div class="col-md-2"><label>Pie ($)</label><input type="text" inputmode="numeric" id="fPie" oninput="fmtMiles(this);calc()"></div>
+        <div class="col-md-2"><label>RUT cliente</label><input type="text" id="fRut" placeholder="12.345.678-9" oninput="fmtRut(this)"></div>
         <div class="col-md-2"><label>Canal</label>
           <select id="fCanal" class="form-select" style="font-weight:700" onchange="calc()">
             <option value="calle">Calle</option><option value="patio">Parque (patio)</option>
@@ -105,11 +105,17 @@
         </div>
       </div>
       <div class="row g-3 frm" style="margin-top:2px">
-        <div class="col-md-3"><label>Baja de tasa (Unidad) — máx <span id="lblMaxTasa">5</span>% relativo</label>
+        <div class="col-md-4"><label>Baja de tasa (Unidad) — máx <span id="lblMaxTasa">5</span>% relativo</label>
           <input type="range" id="fRebaja" class="form-range" min="0" max="5" step="0.5" value="0" oninput="calc()">
-          <div class="nota">Rebaja: <b id="lblRebaja">0%</b>. Sobre el máximo, la op se fuerza a Autofin.</div></div>
-        <div class="col-md-3"><label>Baja comisión dealer — nuevo monto bruto ($, vacío = pizarra)</label>
-          <input type="number" id="fComDealer" min="0" oninput="calc()"></div>
+          <div id="tasaBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;font-size:.82rem;color:#1e40af;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+            <span>Tasa pizarra: <b id="lblTasaPizarra">—</b></span>
+            <span><i class="bi bi-arrow-right"></i></span>
+            <span>Nueva tasa: <b id="lblTasaNueva">—</b></span>
+            <span style="color:#c2410c">Rebaja: <b id="lblRebaja">0,0%</b></span>
+          </div>
+          <div class="nota" style="margin-top:3px">Sobre el máximo, la op se fuerza a Autofin.</div></div>
+        <div class="col-md-2"><label>Baja comisión dealer — nuevo monto bruto ($, vacío = pizarra)</label>
+          <input type="text" inputmode="numeric" id="fComDealer" oninput="fmtMiles(this);calc()"></div>
         <div class="col-md-6" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
           <div class="kpi">Saldo precio<br><b id="kSaldo">—</b></div>
           <div class="kpi">% pie<br><b id="kPie">—</b></div>
@@ -153,8 +159,8 @@
       <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-person-badge me-1"></i>Generar código de Gerencia (caso puntual)</div>
       <div class="row g-3 frm">
         <div class="col-md-6"><label>Ejecutivo (a quién se autoriza)</label><input type="text" id="gEjec"></div>
-        <div class="col-md-3"><label>RUT cliente</label><input type="text" id="gRut"></div>
-        <div class="col-md-3"><label>Saldo precio ($)</label><input type="number" id="gSaldo" min="0"></div>
+        <div class="col-md-3"><label>RUT cliente</label><input type="text" id="gRut" placeholder="12.345.678-9" oninput="fmtRut(this)"></div>
+        <div class="col-md-3"><label>Saldo precio ($)</label><input type="text" inputmode="numeric" id="gSaldo" oninput="fmtMiles(this)"></div>
         <div class="col-12"><label>Motivo (obligatorio)</label><input type="text" id="gCom" placeholder="ej: autorizado por gerencia comercial, mail del 07-08-2026"></div>
       </div>
       <div style="text-align:right;margin-top:12px"><button class="btn-azul" onclick="genGerencia()">Generar código</button></div>
@@ -198,6 +204,18 @@ function logout(){ sessionStorage.clear(); location.href = '/login.html'; }
 function toast(msg, err){ const t = document.getElementById('toast'); t.textContent = msg; t.className = 'toast-af' + (err?' err':''); t.style.display='block'; setTimeout(()=>t.style.display='none', 3200); }
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmt$ = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+const fmtPct2 = f => (f*100).toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+/* Input de pesos: solo dígitos, con puntos de miles mientras se escribe */
+function fmtMiles(el){ const d = el.value.replace(/[^0-9]/g,''); el.value = d ? Number(d).toLocaleString('es-CL') : ''; }
+const numVal = id => Number((document.getElementById(id).value||'').replace(/[^0-9]/g,'')) || 0;
+/* Input RUT: 12.345.678-9 mientras se escribe */
+function fmtRut(el){
+  let v = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (!v) { el.value=''; return; }
+  const dv = v.length > 1 ? v.slice(-1) : '';
+  const cuerpo = (v.length > 1 ? v.slice(0,-1) : v).slice(0,9);
+  el.value = (Number(cuerpo)||'').toLocaleString('es-CL') + (dv ? '-'+dv : '');
+}
 const fmtF = v => { if(!v) return '—'; const d = new Date(v); return isNaN(d)?'—':d.toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}); };
 
 let P = {}, T = {}, UF = null, OPS_UAC = 0, EX = {}, ESTADO = null;
@@ -255,12 +273,12 @@ function verTab(t){
 function plazosCfg(){ return [EX.exc_plazo_1||12, EX.exc_plazo_2||24, EX.exc_plazo_3||36, EX.exc_plazo_4||48]; }
 
 function calc(){
-  const precio = Number(document.getElementById('fPrecio').value)||0;
-  const pie = Number(document.getElementById('fPie').value)||0;
+  const precio = numVal('fPrecio');
+  const pie = numVal('fPie');
   const esPatio = document.getElementById('fCanal').value === 'patio';
   const rebaja = Number(document.getElementById('fRebaja').value)||0;
-  document.getElementById('lblRebaja').textContent = rebaja + '%';
-  const comDealerNueva = document.getElementById('fComDealer').value === '' ? null : Number(document.getElementById('fComDealer').value);
+  document.getElementById('lblRebaja').textContent = rebaja.toLocaleString('es-CL',{minimumFractionDigits:1}) + '%';
+  const comDealerNueva = document.getElementById('fComDealer').value.trim() === '' ? null : numVal('fComDealer');
   const seg = { desg:true, rdh:document.getElementById('sRdh').checked, cesa:document.getElementById('sCesa').checked };
   const gastos = { prenda:true, gps:true, rep:document.getElementById('sRep').checked, lim:true };
   const body = document.getElementById('gBody');
@@ -273,7 +291,7 @@ function calc(){
   const piso = (EX.exc_piso_pct ?? 75)/100;
   const diffTu = (P.pref_diff_pct ?? 10);
   SIMS = {};
-  let filas = '';
+  let filas = '', tasaRef = null;
   for (const plazo of plazosCfg()) {
     // pctUACOperacion ya devuelve FRACCIÓN (0.14), igual que espera AF_RENT
     const uacPct = window.AF_UAC_TIER ? window.AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo }, P) : null;
@@ -281,6 +299,7 @@ function calc(){
     const base = window.AF_RENT.calcular(inpBase, P, UF, T);
     if (!base) { filas += `<tr><td>${plazo}</td><td colspan="6" style="color:#94a3b8">—</td></tr>`; continue; }
     // Excepción: tasa cliente rebajada (relativa) + comisión dealer modificada
+    if (!tasaRef) tasaRef = { pizarra: base.tasaCli, esMayor: base.esMayor };
     const tasaExc = base.tasaCli * (1 - rebaja/100);
     const inpExc = { ...inpBase, tasaCli: rebaja>0 ? Math.floor(tasaExc*10000)/10000 : null, dealerComCLP: comDealerNueva };
     const exc = window.AF_RENT.calcular(inpExc, P, UF, T);
@@ -311,6 +330,13 @@ function calc(){
     </tr>`;
   }
   body.innerHTML = filas;
+  const tb = document.getElementById('tasaBox');
+  if (tasaRef) {
+    tb.style.display = 'flex';
+    document.getElementById('lblTasaPizarra').textContent =
+      fmtPct2(tasaRef.pizarra) + (tasaRef.esMayor ? ' (>200 UF)' : ' (≤200 UF)');
+    document.getElementById('lblTasaNueva').textContent = fmtPct2(tasaRef.pizarra * (1 - rebaja/100));
+  } else tb.style.display = 'none';
   document.getElementById('notaPiso').textContent =
     `Piso: la excepción no puede rentar menos del ${EX.exc_piso_pct ?? 75}% de la alternativa más rentable sin excepción. ` +
     `Baja de tasa sobre ${EX.exc_tasa_rebaja_max_pct ?? 5}% relativo fuerza la operación a Autofin. Cuotas aproximadas — el valor final lo da la financiera.`;
@@ -388,7 +414,7 @@ async function genGerencia(){
   const body = {
     ejecutivo: document.getElementById('gEjec').value.trim(),
     rut_cliente: document.getElementById('gRut').value.trim(),
-    saldo_precio: Number(document.getElementById('gSaldo').value)||0,
+    saldo_precio: numVal('gSaldo'),
     comentario: document.getElementById('gCom').value.trim(),
   };
   const r = await fetch('/api/excepciones/generar-gerencia', { method:'POST', headers:H, body: JSON.stringify(body) });
