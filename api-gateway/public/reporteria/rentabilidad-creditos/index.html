@@ -49,6 +49,7 @@
     table.rt { width:100%; border-collapse:collapse; font-size:.78rem; table-layout:fixed; }
     table.rt th { background:#f0f4f8; padding:9px 8px; text-align:left; font-size:.64rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:sticky; top:0; z-index:1; }
     table.rt th.num, table.rt td.num { text-align:right; }
+    table.rt th.ctr, table.rt td.ctr { text-align:center; }
     table.rt td { padding:7px 8px; border-bottom:1px solid #f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     table.rt tbody tr:hover { background:#f8fafc; }
     .fin-badge { display:inline-block; font-size:.64rem; font-weight:700; border-radius:6px; padding:2px 6px; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
@@ -102,7 +103,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.13</span>
+      <span class="version-badge" id="versionBadge">v1.14</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -150,9 +151,9 @@
         <th class="num" style="width:9%">Monto Fin.</th>
         <th class="num" style="width:9%">Rent. AutoFin</th>
         <th class="num" style="width:9%">Rent. UAC</th>
-        <th style="width:8%">+ rentable</th>
+        <th class="ctr" style="width:8%">+ rentable</th>
         <th class="num" style="width:9%">Δ financ.</th>
-        <th style="width:9%">Más Rentable</th>
+        <th class="ctr" style="width:9%">Más Rentable</th>
       </tr></thead>
       <tbody id="tbody">
         <tr><td colspan="10" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
@@ -457,9 +458,9 @@ function render(){
       <td class="num">${fmtCLP(f.R.monto_fin)}</td>
       <td class="num rentcell ${afBest}" style="color:${f.rentAF>=UMBRAL_RENT?'#166534':'#dc2626'}" title="${f.rentAF<UMBRAL_RENT?'Bajo $100.000 — no conviene cursar por AutoFin':''}">${fmtCLP(f.rentAF)}</td>
       <td class="num rentcell ${uacBest}" style="color:${f.rentUAC>=UMBRAL_RENT?'#166534':'#dc2626'}" title="${f.rentUAC<UMBRAL_RENT?'Bajo $100.000 — no conviene cursar por UCA':''}">${fmtCLP(f.rentUAC)}</td>
-      <td>${masRentCell}</td>
+      <td class="ctr">${masRentCell}</td>
       <td class="num">${vsCell}</td>
-      <td>${prefCell}</td>
+      <td class="ctr">${prefCell}</td>
     </tr>`;
   }).join('');
 }
