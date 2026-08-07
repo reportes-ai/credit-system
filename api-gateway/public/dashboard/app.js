@@ -5104,7 +5104,7 @@ async function _reCargarBase(){
     // Rentabilidad REALIZADA = los campos guardados de la operación (los mismos
     // que suma el Dashboard): ingresos − com dealer − com parque. Fuente única,
     // respeta forzados y la cuadratura Trinidad. El modelo AF_RENT se usa SOLO
-    // para estimar cuánto habría dejado la otra financiera (lucro cesante).
+    // para estimar cuánto habría dejado la otra financiera (Rentabilidad perdida).
     const rent = Number(c.ingreso_neto_total)||0;
     const R = window.AF_RENT.calcular({
       valor, pie:Number(c.pie||0), plazo,
@@ -5162,7 +5162,7 @@ async function buildVRentEj(soloRender){
    +'<div class="kpi-box"><div class="kpi-label">Operaciones</div><div class="kpi-val">'+tot.ops.toLocaleString('es-CL')+'</div></div>'
    +'<div class="kpi-box"><div class="kpi-label">Promedio por operación</div><div class="kpi-val">'+_reCLP(tot.ops?tot.rent/tot.ops:0)+'</div></div>'
    +'<div class="kpi-box"><div class="kpi-label">% en la más rentable</div><div class="kpi-val">'+(tot.ops?Math.round(tot.optimas/tot.ops*100):0)+'%</div></div>'
-   +'<div class="kpi-box" style="border-left:3px solid #e53935"><div class="kpi-label">Lucro cesante</div><div class="kpi-val" style="color:#e53935">'+_reCLP(tot.lucro)+'</div></div>';
+   +'<div class="kpi-box" style="border-left:3px solid #e53935"><div class="kpi-label">Rentabilidad perdida</div><div class="kpi-val" style="color:#e53935">'+_reCLP(tot.lucro)+'</div></div>';
 
   // ── Charts (config-factories: el mismo config alimenta el chart chico y el popup HD)
   Object.values(_RE_CH).forEach(c=>{try{c.destroy();}catch(e){}});
@@ -5181,17 +5181,17 @@ async function buildVRentEj(soloRender){
     bar:()=>({type:'bar',plugins:[_pctBar],
       data:{labels:top.map(x=>corto(x.ej)),datasets:[
         {label:'Rentabilidad',data:top.map(x=>x.rent),backgroundColor:C.blue,borderRadius:4},
-        {label:'Lucro cesante',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
+        {label:'Rentabilidad perdida',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
       options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
         scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:60,minRotation:40}},y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}}}})}),
     evol:()=>({type:'line',
       data:{labels:m12,datasets:[
         {label:'Rentabilidad realizada',data:serie('rent'),borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
-        {label:'Lucro cesante',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
+        {label:'Rentabilidad perdida',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
       options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
         scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})}),
   };
-  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,evol:'Evolución mensual — realizada vs lucro cesante'};
+  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,evol:'Evolución mensual — realizada vs Rentabilidad perdida'};
   _RE_CH.bar  =new Chart(document.getElementById('ch-re-bar'),  window._RE_CFG.bar());
   _RE_CH.evol =new Chart(document.getElementById('ch-re-evol'), window._RE_CFG.evol());
   for(const k of ['bar','evol']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
@@ -5206,15 +5206,15 @@ async function buildVRentEj(soloRender){
     +'<div style="font-size:1rem;font-weight:800;color:'+color+'">'+pct+'</div></div>';
   document.getElementById('re-resumen').innerHTML =
       fila('Rentabilidad realizada', tot.rent,  pReal.toFixed(1).replace('.',',')+'%', '#166534', 0)
-    + fila('Lucro cesante',          tot.lucro, pLucro.toFixed(1).replace('.',',')+'%', '#e53935', 0)
+    + fila('Rentabilidad perdida',          tot.lucro, pLucro.toFixed(1).replace('.',',')+'%', '#e53935', 0)
     + fila('Ingreso potencial (si todo se cursara por el lado más rentable)', pot, '100%', '#1a3a6a', 1)
     + '<div style="background:#eef2fa;border-radius:6px;height:16px;overflow:hidden;display:flex">'
     +   '<div style="background:linear-gradient(90deg,#16a34a,#4caf50);width:'+pReal+'%" title="Realizado '+pReal.toFixed(1)+'%"></div>'
-    +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Lucro cesante '+pLucro.toFixed(1)+'%"></div></div>'
+    +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Rentabilidad perdida '+pLucro.toFixed(1)+'%"></div></div>'
     + '<div style="font-size:9px;color:#8aa0b8;line-height:1.5;margin-top:2px">'
     +   '<b>Realizada</b>: campos guardados de cada operación (ingresos − com. dealer − com. parque), lo mismo que suma Otorgados. '
     +   'El "Ingreso Neto" del Dashboard además resta arriendo parque y comisión ejecutivos (gastos del MES, no de la operación). '
-    +   '<b>Lucro cesante</b>: estimado con el calculador — cuánto más habría dejado la otra financiera.</div>';
+    +   '<b>Rentabilidad perdida</b>: estimado con el calculador — cuánto más habría dejado la otra financiera.</div>';
 
   // ── Tabla
   const filasHtml=lista.map(x=>{
@@ -5233,7 +5233,7 @@ async function buildVRentEj(soloRender){
     +'<thead><tr style="background:#eef2fa;color:#1a3a6a">'
     +'<th style="text-align:left;padding:7px 10px">Ejecutivo</th><th style="padding:7px 10px">Ops</th>'
     +'<th style="text-align:right;padding:7px 10px">Rentabilidad</th><th style="text-align:right;padding:7px 10px">Prom. / op</th>'
-    +'<th style="padding:7px 10px">% óptimas</th><th style="text-align:right;padding:7px 10px">Lucro cesante</th>'
+    +'<th style="padding:7px 10px">% óptimas</th><th style="text-align:right;padding:7px 10px">Rentabilidad perdida</th>'
     +'<th style="text-align:left;padding:7px 10px;width:26%">Participación</th></tr></thead>'
     +'<tbody>'+filasHtml+'</tbody>'
     +'<tfoot><tr style="background:#eef2fa;font-weight:700;color:#1a3a6a">'

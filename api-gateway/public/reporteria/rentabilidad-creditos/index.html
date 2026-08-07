@@ -103,7 +103,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.19</span>
+      <span class="version-badge" id="versionBadge">v1.20</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -360,7 +360,7 @@ function recalcular(){
         const rentOtra  = colo==='AF' ? rentUAC : rentAF;   // la otra financiera
         const rentMejor = Math.max(rentAF, rentUAC);
         esOptima = (colo===mejor);
-        diffCLP  = rentColo - rentMejor;                    // ≤ 0 (vs óptima → lucro cesante)
+        diffCLP  = rentColo - rentMejor;                    // ≤ 0 (vs óptima → Rentabilidad perdida)
         diffPct  = rentMejor!==0 ? (diffCLP/Math.abs(rentMejor))*100 : 0;
         // Diferencia FIRMADA entre la colocada y la otra (+ si fue la mejor, − si no)
         vsOtraCLP = rentColo - rentOtra;
@@ -391,14 +391,14 @@ function render(){
   const lucroCesante = subop.reduce((s,f)=> s + Math.abs(f.diffCLP||0), 0);
   // Rentabilidad REALIZADA = campos guardados de la operación (ingreso_neto_total),
   // la MISMA fuente que suma el Dashboard y la pestaña Rent x Ejec. El modelo
-  // AF_RENT queda para la comparación entre financieras (óptima / lucro cesante).
+  // AF_RENT queda para la comparación entre financieras (óptima / Rentabilidad perdida).
   // Solo AF/UAC (cartera propia es referencial), igual que la pestaña Rent x Ejec.
   const rentTotal = FILAS.reduce((s,f)=> s + ((f.colo==='AF'||f.colo==='UAC') ? (Number(f.c.ingreso_neto_total)||0) : 0), 0);
 
   document.getElementById('stats').innerHTML = `
     <div class="stat-card" style="--ac:#0141A2"><div class="lbl">Créditos otorgados</div><div class="val">${FILAS.length.toLocaleString('es-CL')}</div><div class="sub">en el mes seleccionado</div></div>
     <div class="stat-card" style="--ac:#059669"><div class="lbl">En la más rentable</div><div class="val">${optimos.toLocaleString('es-CL')} / ${comparables.length.toLocaleString('es-CL')}</div><div class="sub">${comparables.length? (optimos/comparables.length*100).toFixed(0):0}% óptimos</div></div>
-    <div class="stat-card" style="--ac:#dc2626"><div class="lbl">Lucro cesante</div><div class="val" style="color:${lucroCesante>0?'#dc2626':'#111827'}">${fmtCLP(lucroCesante)}</div><div class="sub">${subop.length} caso${subop.length===1?'':'s'} subóptimo${subop.length===1?'':'s'}</div></div>
+    <div class="stat-card" style="--ac:#dc2626"><div class="lbl">Rentabilidad perdida</div><div class="val" style="color:${lucroCesante>0?'#dc2626':'#111827'}">${fmtCLP(lucroCesante)}</div><div class="sub">${subop.length} caso${subop.length===1?'':'s'} subóptimo${subop.length===1?'':'s'}</div></div>
     <div class="stat-card" style="--ac:#10b981"><div class="lbl">Rentab. realizada</div><div class="val">${fmtCLP(rentTotal)}</div><div class="sub">campos guardados de las operaciones</div></div>`;
 
   // Tabla
