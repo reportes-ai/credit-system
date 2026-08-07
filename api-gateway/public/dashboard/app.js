@@ -5099,6 +5099,11 @@ async function _reCargarBase(){
     const plazo=Number(c.plazo||0); if(!plazo) continue;
     const valor=Number(c.valor_vehiculo)||(Number(c.saldo_precio||0)+Number(c.pie||0));
     const pq=String(c.parque||'').trim().toUpperCase();
+    // Rentabilidad REALIZADA = los campos guardados de la operación (los mismos
+    // que suma el Dashboard): ingresos − com dealer − com parque. Fuente única,
+    // respeta forzados y la cuadratura Trinidad. El modelo AF_RENT se usa SOLO
+    // para estimar cuánto habría dejado la otra financiera (lucro cesante).
+    const rent = Number(c.ingreso_neto_total)||0;
     const R = window.AF_RENT.calcular({
       valor, pie:Number(c.pie||0), plazo,
       seguros:{desg:true,rdh:true,cesa:true},
@@ -5107,11 +5112,11 @@ async function _reCargarBase(){
       tasaCli:_reTasa(c.tasa_mensual),
       uacPct: window.AF_UAC_TIER.pctUACOperacion({ops:uacMes[m]||0, plazo, mes:m}, P),
     }, P, UF, T);
-    if(!R) continue;
-    const rent = colo==='AF'?R.af.rentab:R.uac.rentab;
-    const mejor= Math.max(R.af.rentab,R.uac.rentab);
+    const rColo = R ? (colo==='AF'?R.af.rentab:R.uac.rentab) : 0;
+    const rOtra = R ? (colo==='AF'?R.uac.rentab:R.af.rentab) : 0;
+    const lucro = Math.max(0, rOtra - rColo);          // estimado con el calculador
     ops.push({ mes:m, ejecutivo:(c.ejecutivo||'(sin ejecutivo)').toUpperCase(),
-               rent, lucro:Math.max(0,mejor-rent), optima:rent>=mejor });
+               rent, lucro, optima:lucro===0 });
   }
   const meses=[...new Set(ops.map(o=>o.mes))].sort().reverse();
   return { ops, meses };
