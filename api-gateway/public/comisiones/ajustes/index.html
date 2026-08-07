@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Modificar Comisión Ejecutivo — AutoFácil</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <!-- v1.2 — input de comisión modificada con $ y puntos de miles es-CL -->
+  <!-- v1.3 — bandeja de aprobación con los DOS meses abiertos, badge de pendientes y columna Mes -->
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:#f2f5f9; color:#1f2937; }
@@ -79,7 +79,7 @@
     </div>
 
     <div class="card">
-      <div class="card-h"><i class="bi bi-hourglass-split"></i> Ajustes del mes (pendientes y resueltos)</div>
+      <div class="card-h"><i class="bi bi-hourglass-split"></i> Bandeja de ajustes — pendientes de aprobar y resueltos recientes <span id="pendBadge"></span></div>
       <div class="card-b" id="pendBox"><div class="hint">—</div></div>
     </div>
   </div>
@@ -140,13 +140,18 @@ async function cargarMes(){
   MES = document.getElementById('selMes').value;
   document.getElementById('opsBox').innerHTML = '<div class="hint">Calculando comisiones del mes…</div>';
   try {
-    const [rc, ra] = await Promise.all([
+    // La bandeja trae SIEMPRE los dos meses editables: un pendiente del mes
+    // anterior debe verse al entrar, sin depender del selector.
+    const [curso, ant] = mesesPermitidos();
+    const [rc, ra1, ra2] = await Promise.all([
       fetch('/api/comisiones/calculo?mes='+MES, { headers:H }),
-      fetch('/api/comisiones/ajustes?mes='+MES, { headers:H }),
+      fetch('/api/comisiones/ajustes?mes='+curso, { headers:H }),
+      fetch('/api/comisiones/ajustes?mes='+ant, { headers:H }),
     ]);
-    const [jc, ja] = await Promise.all([rc.json(), ra.json()]);
+    const [jc, ja1, ja2] = await Promise.all([rc.json(), ra1.json(), ra2.json()]);
     CALCULO = jc.data || [];
-    AJUSTES = ja.data || [];
+    AJUSTES = [...(ja1.data||[]), ...(ja2.data||[])];
+    AJUSTES.sort((a,b) => (a.estado==='PENDIENTE'?0:1) - (b.estado==='PENDIENTE'?0:1));
     const sel = document.getElementById('selEj');
     sel.innerHTML = '<option value="">— elige —</option>' +
       CALCULO.map(e => `<option value="${esc(e.ejecutivo)}">${esc(e.ejecutivo)}${(e.estado||'').toLowerCase().startsWith('aproba') ? ' (comisión APROBADA — no editable)' : ''}</option>`).join('');
@@ -174,7 +179,7 @@ function pintarOps(){
   const aprobada = (e.estado||'').toLowerCase().startsWith('aproba');
   const puedeSolicitar = PERMISOS.has('com_ejec_mod_solicitar') && !aprobada;
   const otorgados = (e.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
-  const ajMap = {}; AJUSTES.filter(a=>a.estado!=='RECHAZADA').forEach(a => ajMap[String(a.num_op)] = a);
+  const ajMap = {}; AJUSTES.filter(a=>a.mes===MES && a.estado!=='RECHAZADA').forEach(a => ajMap[String(a.num_op)] = a);
   box.innerHTML = (aprobada ? '<div class="aviso"><i class="bi bi-lock me-1"></i>La comisión de este ejecutivo ya está APROBADA para '+esc(MES)+': no admite modificaciones.</div>' : '') +
     (!e.cumple_minimo ? '<div class="aviso">Este ejecutivo aún no alcanza el mínimo del mes. La comisión mostrada es la BASE por colocación (sin el adicional): un ajuste al alza puede ayudarlo a superar el mínimo.</div>' : '') +
     `<div style="overflow-x:auto"><table><thead><tr>
@@ -215,16 +220,19 @@ async function solicitar(num_op, normal, i){
 
 function pintarPendientes(){
   const box = document.getElementById('pendBox');
-  if (!AJUSTES.length) { box.innerHTML = '<div class="hint">Sin ajustes en '+esc(MES)+'.</div>'; return; }
+  const nPend = AJUSTES.filter(a=>a.estado==='PENDIENTE').length;
+  document.getElementById('pendBadge').innerHTML = nPend
+    ? `<span class="chip ch-pen">${nPend} por aprobar</span>` : '';
+  if (!AJUSTES.length) { box.innerHTML = '<div class="hint">Sin ajustes en los meses abiertos.</div>'; return; }
   const puedeAprobar = PERMISOS.has('com_ejec_mod_aprobar');
   box.innerHTML = `<div style="overflow-x:auto"><table><thead><tr>
-      <th>N° Op</th><th>Ejecutivo</th><th class="num">Normal</th><th class="num">Modificada</th><th class="num">Δ $</th>
+      <th>Mes</th><th>N° Op</th><th>Ejecutivo</th><th class="num">Normal</th><th class="num">Modificada</th><th class="num">Δ $</th>
       <th>Comentario</th><th>Solicitó</th><th>Estado</th><th></th></tr></thead><tbody>` +
     AJUSTES.map(a => {
       const dif = Number(a.comision_modificada) - Number(a.comision_normal);
       const chip = a.estado==='PENDIENTE'?'ch-pen':a.estado==='APROBADA'?'ch-apr':'ch-rec';
-      return `<tr>
-        <td><b>${a.num_op}</b></td><td>${esc(a.ejecutivo)}</td>
+      return `<tr${a.estado==='PENDIENTE'?' style="background:#fffbeb"':''}>
+        <td>${esc(a.mes)}</td><td><b>${a.num_op}</b></td><td>${esc(a.ejecutivo)}</td>
         <td class="num">${clp(a.comision_normal)}</td><td class="num"><b>${clp(a.comision_modificada)}</b></td>
         <td class="num ${dif>=0?'dif-pos':'dif-neg'}">${dif>=0?'+':''}${clp(dif)}</td>
         <td class="hint" style="max-width:280px">${esc(a.comentario)}${a.rechazo_motivo?'<br><b style="color:#991b1b">Rechazo:</b> '+esc(a.rechazo_motivo):''}</td>
