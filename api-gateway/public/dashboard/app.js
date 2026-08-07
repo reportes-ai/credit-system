@@ -5207,7 +5207,11 @@ async function buildVRentEj(soloRender){
     + fila('Ingreso potencial (si todo se cursara por el lado más rentable)', pot, '100%', '#1a3a6a', 1)
     + '<div style="background:#eef2fa;border-radius:6px;height:16px;overflow:hidden;display:flex">'
     +   '<div style="background:linear-gradient(90deg,#16a34a,#4caf50);width:'+pReal+'%" title="Realizado '+pReal.toFixed(1)+'%"></div>'
-    +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Lucro cesante '+pLucro.toFixed(1)+'%"></div></div>';
+    +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Lucro cesante '+pLucro.toFixed(1)+'%"></div></div>'
+    + '<div style="font-size:9px;color:#8aa0b8;line-height:1.5;margin-top:2px">'
+    +   '<b>Realizada</b>: campos guardados de cada operación (ingresos − com. dealer − com. parque), lo mismo que suma Otorgados. '
+    +   'El "Ingreso Neto" del Dashboard además resta arriendo parque y comisión ejecutivos (gastos del MES, no de la operación). '
+    +   '<b>Lucro cesante</b>: estimado con el calculador — cuánto más habría dejado la otra financiera.</div>';
 
   // ── Tabla
   const filasHtml=lista.map(x=>{
