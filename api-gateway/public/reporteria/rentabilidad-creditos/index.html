@@ -102,7 +102,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.12</span>
+      <span class="version-badge" id="versionBadge">v1.13</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -152,7 +152,7 @@
         <th class="num" style="width:9%">Rent. UAC</th>
         <th style="width:8%">+ rentable</th>
         <th class="num" style="width:9%">Δ financ.</th>
-        <th style="width:9%">Según cuadro</th>
+        <th style="width:9%">Más Rentable</th>
       </tr></thead>
       <tbody id="tbody">
         <tr><td colspan="10" class="empty"><div class="spinner-border spinner-border-sm me-2"></div>Cargando…</td></tr>
@@ -232,7 +232,7 @@ let UMBRAL_RENT = 100000;   // rentabilidad mínima por operación; bajo esto �
 let UMBRAL_DIFF = 10;       // % de diferencia bajo el cual da lo mismo la financiera
 
 /* Cuadro de Preferencia de Financiera (mantenedor financiera_preferencia). El informe LO LEE:
-   si lo editas en el mantenedor, cambia la columna "Según cuadro" de acá. */
+   se usa solo como referencia (la columna "Más Rentable" sale del calculador). */
 let PREF_TABLA = [
   { cd:12, ch:15, sd:'2000000', sh:'3999999',  af:'NO', un:'SI', pref:'UNIDAD' },
   { cd:12, ch:15, sd:'4000000', sh:'200 UF',   af:'SI', un:'SI', pref:'UNIDAD' },
@@ -426,13 +426,16 @@ function render(){
         <td class="num chip-na" colspan="6">Datos incompletos (precio/plazo)</td>
       </tr>`;
     }
-    // Según el cuadro de Preferencia (editable en el mantenedor)
-    const prefLbl = { AF:'AutoFin', UAC:'UCA' }[f.pref] || '—';
-    let prefCell;
-    if (!f.pref || f.colo==='AFAC') prefCell = `<span class="chip-na">${prefLbl}</span>`;
-    else if (f.pref===f.colo) prefCell = `<span class="chip-ok"><i class="bi bi-check-circle-fill"></i> ${prefLbl}</span>`;
-    else prefCell = `<span class="chip-bad" title="Se cursó por ${finLbl}, el cuadro indicaba ${prefLbl}"><i class="bi bi-exclamation-triangle-fill"></i> ${prefLbl}</span>`;
+    // Columna "Más Rentable": el veredicto del CALCULADOR, solo con el ícono.
+    // Check verde = colocada en la más rentable (o diferencia < umbral: da lo mismo).
+    // Triángulo rojo = se cursó por el lado menos rentable.
     const masRent = f.mejor==='AF' ? 'AutoFin' : 'UCA';
+    let prefCell;
+    if (f.colo==='AFAC' || (f.colo!=='AF' && f.colo!=='UAC')) prefCell = '<span class="chip-na">—</span>';
+    else if (f.esOptima || Math.abs(f.vsOtraPct) < UMBRAL_DIFF)
+      prefCell = `<i class="bi bi-check-circle-fill" style="color:#16a34a;font-size:1.25rem" title="Colocada en la más rentable"></i>`;
+    else
+      prefCell = `<i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;font-size:1.25rem" title="Se cursó por ${finLbl}, la más rentable era ${masRent}"></i>`;
     let masRentCell, vsCell;
     if (f.colo==='AFAC'){
       masRentCell = `<span class="chip-na" title="referencial">${masRent}</span>`;
