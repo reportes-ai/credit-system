@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Modificar Comisión Ejecutivo — AutoFácil</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <!-- v1.1 — ID Financiera, RUT, financiera y comisión BASE por colocación (aunque no cumpla el mínimo) -->
+  <!-- v1.2 — input de comisión modificada con $ y puntos de miles es-CL -->
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:#f2f5f9; color:#1f2937; }
@@ -192,7 +192,8 @@ function pintarOps(){
         <td class="hint">${esc(aj.comentario)}</td>
         <td><span class="chip ${aj.estado==='APROBADA'?'ch-apr':'ch-pen'}">${aj.estado}</span></td></tr>`;
       return `<tr>${comunes}<td class="num">${clp(normal)}</td>
-        <td class="num"><input type="number" id="nm${i}" style="width:140px;text-align:right" placeholder="${Math.round(normal)}" ${puedeSolicitar?'':'disabled'}></td>
+        <td class="num" style="white-space:nowrap">$ <input type="text" inputmode="numeric" id="nm${i}" style="width:120px;text-align:right" placeholder="${Math.round(normal).toLocaleString('es-CL')}" ${puedeSolicitar?'':'disabled'}
+              oninput="this.value=(this.value.replace(/[^0-9]/g,'')?Number(this.value.replace(/[^0-9]/g,'')).toLocaleString('es-CL'):'')"></td>
         <td><input type="text" id="cm${i}" style="width:100%" placeholder="ej: mail del 14/02/2026 de Patricio Escobar a Operaciones" ${puedeSolicitar?'':'disabled'}></td>
         <td>${puedeSolicitar?`<button class="btn btn-azul" onclick="solicitar(${c.num_op}, ${Math.round(normal)}, ${i})">Solicitar</button>`:''}</td></tr>`;
     }).join('') + '</tbody></table></div>' +
@@ -200,7 +201,7 @@ function pintarOps(){
 }
 
 async function solicitar(num_op, normal, i){
-  const mod = document.getElementById('nm'+i).value;
+  const mod = document.getElementById('nm'+i).value.replace(/[^0-9]/g, '');   // viene con puntos de miles
   const com = document.getElementById('cm'+i).value;
   if (mod === '' || isNaN(Number(mod))) return alert('Ingresa la comisión modificada.');
   if (!com.trim() || com.trim().length < 15) return alert('El comentario es obligatorio: indica quién aprobó y los respaldos (ej: "mail del 14/02/2026 de Patricio Escobar a Operaciones").');
