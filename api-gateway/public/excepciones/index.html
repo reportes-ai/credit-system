@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.2 — tasa pizarra/nueva con 2 decimales, formato pesos y RUT, comodín de bienvenida -->
+  <!-- v1.3 — lado a cursar seleccionable; el piso 75% se evalúa sobre el lado ELEGIDO -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -220,6 +220,8 @@ const fmtF = v => { if(!v) return '—'; const d = new Date(v); return isNaN(d)?
 
 let P = {}, T = {}, UF = null, OPS_UAC = 0, EX = {}, ESTADO = null;
 let SIMS = {};   // por plazo: resultado de la última simulación
+let SEL = {};    // por plazo: lado elegido por el ejecutivo ('AF'|'UAC')
+function elegirLado(plazo, lado){ SEL[plazo] = lado; calc(); }
 
 async function boot(){
   try {
@@ -304,10 +306,14 @@ function calc(){
     const inpExc = { ...inpBase, tasaCli: rebaja>0 ? Math.floor(tasaExc*10000)/10000 : null, dealerComCLP: comDealerNueva };
     const exc = window.AF_RENT.calcular(inpExc, P, UF, T);
     const mejorBase = Math.max(base.af.rentab, base.uac.rentab);   // la más rentable SIN excepción
-    // Lado sugerido (con la excepción aplicada)
+    // Lado a CURSAR: lo elige el ejecutivo (pills); default = el más rentable con la excepción.
+    // El piso se evalúa SIEMPRE sobre el lado elegido: cursar Unidad a 48 con
+    // Autofin rindiendo 4x NO cumple, aunque "exista" un lado que sí.
+    const sugerido = exc.af.rentab >= exc.uac.rentab ? 'AF' : 'UAC';
+    const lado = SEL[plazo] || sugerido;
     const dif = Math.abs(exc.af.rentab - exc.uac.rentab) / Math.max(1, Math.max(exc.af.rentab, exc.uac.rentab)) * 100;
-    const lado = dif < diffTu ? 'TU' : (exc.af.rentab >= exc.uac.rentab ? 'AF' : 'UAC');
-    const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;  // TU → conservador: AF
+    const esTu = dif < diffTu;   // bajo el umbral da lo mismo dónde cursar
+    const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;
     const cumple = rentExc >= mejorBase * piso;
     // Si no cumple: proponer la rebaja de comisión dealer (neta) que devuelve al piso
     let propuesta = '';
@@ -315,14 +321,15 @@ function calc(){
       const falta = Math.ceil(mejorBase * piso - rentExc);
       const comActual = comDealerNueva != null ? comDealerNueva : exc.costos.dealer;
       const comProp = Math.max(0, comActual - falta);
-      propuesta = `Propuesta: bajar comisión dealer a ${fmt$(comProp)} (neto −${fmt$(falta)})`;
+      propuesta = comProp > 0 ? `Propuesta: bajar comisión dealer a ${fmt$(comProp)} (neto −${fmt$(falta)})`
+                              : `Ni con comisión dealer $0 se alcanza el piso por este lado`;
     }
     SIMS[plazo] = { plazo, base, exc, lado, rentExc, mejorBase, cumple, rebaja, comDealerNueva, esPatio, seg, precio, pie, saldo, uacPct };
-    const ladoTxt = lado==='TU' ? 'Decides Tú' : (lado==='AF' ? 'Autofin' : 'Unidad');
+    const pill = (l, txt) => `<span class="lado-pill lado-${l} ${lado===l?'':'off'}" style="cursor:pointer;${lado===l?'outline:2px solid currentColor':'opacity:.45'}" onclick="elegirLado(${plazo},'${l}')">${txt}</span>`;
     filas += `<tr>
       <td><b>${plazo}</b></td>
       <td><b>${fmt$(exc.af.cuota)}</b></td>
-      <td><span class="lado-pill lado-${lado}">${ladoTxt}</span></td>
+      <td style="white-space:nowrap">${pill('AF','Autofin')} ${pill('UAC','Unidad')}${esTu?`<div class="nota" style="color:#166534;font-weight:700">Decides Tú (dif &lt; ${diffTu}%)</div>`:''}</td>
       <td>${fmt$(exc.af.rentab)}${rebaja>0?` <span class="nota">(tasa ${(exc.tasaCliPct).toFixed(2)}%)</span>`:''}</td>
       <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${(uacPct*100).toFixed(0)}%)</span>`:''}</td>
       <td class="${cumple?'ok-piso':'mal-piso'}">${cumple?'✓ cumple':'✗ bajo piso'}<div class="nota">${propuesta}</div></td>
