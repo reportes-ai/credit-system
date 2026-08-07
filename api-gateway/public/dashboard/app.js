@@ -5153,29 +5153,43 @@ async function buildVRentEj(soloRender){
    +'<div class="kpi-box"><div class="kpi-label">% en la más rentable</div><div class="kpi-val">'+(tot.ops?Math.round(tot.optimas/tot.ops*100):0)+'%</div></div>'
    +'<div class="kpi-box" style="border-left:3px solid #e53935"><div class="kpi-label">Lucro cesante</div><div class="kpi-val" style="color:#e53935">'+_reCLP(tot.lucro)+'</div></div>';
 
-  // ── Charts
+  // ── Charts (config-factories: el mismo config alimenta el chart chico y el popup HD)
   Object.values(_RE_CH).forEach(c=>{try{c.destroy();}catch(e){}});
   const corto=n=>n.split(/\s+/).slice(0,2).join(' ');
   const top=lista.slice(0,14);
-  _RE_CH.bar=new Chart(document.getElementById('ch-re-bar'),{type:'bar',
-    data:{labels:top.map(x=>corto(x.ej)),datasets:[
-      {label:'Rentabilidad',data:top.map(x=>x.rent),backgroundColor:C.blue,borderRadius:4},
-      {label:'Lucro cesante',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
-    options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
-      scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:60,minRotation:40}},y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}}}})});
-  _RE_CH.donut=new Chart(document.getElementById('ch-re-donut'),{type:'doughnut',
-    data:{labels:top.map(x=>corto(x.ej)),datasets:[{data:top.map(x=>x.rent),
-      backgroundColor:[C.navy,C.blue,C.teal,C.green,C.orange,C.yellow,C.lblue,'#8e24aa','#d81b60','#5d4037','#455a64','#7cb342','#00acc1','#ffb300']}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},
-      tooltip:{callbacks:{label:c=>c.label+': '+_reCLP(c.raw)+' ('+(tot.rent?Math.round(c.raw/tot.rent*100):0)+'%)'}}}}});
+  // % del total sobre cada barra (dataset 0) y dentro de cada porción del donut
+  const _pctBar={id:'repct',afterDatasetsDraw(ch){const ds=ch.data.datasets[0];const meta=ch.getDatasetMeta(0);
+    const t=ds.data.reduce((a,b)=>a+b,0)||1;const ctx=ch.ctx;ctx.save();ctx.fillStyle='#1a3a6a';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
+    meta.data.forEach((bar,i)=>{const p=ds.data[i]/t*100;if(p>0)ctx.fillText(p.toFixed(1).replace('.',',')+'%',bar.x,bar.y-4);});ctx.restore();}};
+  const _pctDonut={id:'repctd',afterDatasetsDraw(ch){const ds=ch.data.datasets[0];const meta=ch.getDatasetMeta(0);
+    const t=ds.data.reduce((a,b)=>a+b,0)||1;const ctx=ch.ctx;ctx.save();ctx.fillStyle='#fff';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    meta.data.forEach((arc,i)=>{const p=ds.data[i]/t*100;if(p>=3.5){const pos=arc.tooltipPosition();ctx.fillText(Math.round(p)+'%',pos.x,pos.y);}});ctx.restore();}};
   const m12=_RE.meses.slice(0,12).reverse();
   const serie=k=>m12.map(m=>_RE.ops.filter(o=>o.mes===m).reduce((s,o)=>s+o[k],0));
-  _RE_CH.evol=new Chart(document.getElementById('ch-re-evol'),{type:'line',
-    data:{labels:m12,datasets:[
-      {label:'Rentabilidad realizada',data:serie('rent'),borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
-      {label:'Lucro cesante',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
-    options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
-      scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})});
+  window._RE_CFG={
+    bar:()=>({type:'bar',plugins:[_pctBar],
+      data:{labels:top.map(x=>corto(x.ej)),datasets:[
+        {label:'Rentabilidad',data:top.map(x=>x.rent),backgroundColor:C.blue,borderRadius:4},
+        {label:'Lucro cesante',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
+      options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
+        scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:60,minRotation:40}},y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}}}})}),
+    donut:()=>({type:'doughnut',plugins:[_pctDonut],
+      data:{labels:top.map(x=>corto(x.ej)+' ('+(tot.rent?(x.rent/tot.rent*100).toFixed(1).replace('.',','):0)+'%)'),datasets:[{data:top.map(x=>x.rent),
+        backgroundColor:[C.navy,C.blue,C.teal,C.green,C.orange,C.yellow,C.lblue,'#8e24aa','#d81b60','#5d4037','#455a64','#7cb342','#00acc1','#ffb300']}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},
+        tooltip:{callbacks:{label:c=>c.label+': '+_reCLP(c.raw)}}}}}),
+    evol:()=>({type:'line',
+      data:{labels:m12,datasets:[
+        {label:'Rentabilidad realizada',data:serie('rent'),borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
+        {label:'Lucro cesante',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
+      options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
+        scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})}),
+  };
+  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,donut:'Participación en la rentabilidad · '+fil.lbl,evol:'Evolución mensual — realizada vs lucro cesante'};
+  _RE_CH.bar  =new Chart(document.getElementById('ch-re-bar'),  window._RE_CFG.bar());
+  _RE_CH.donut=new Chart(document.getElementById('ch-re-donut'),window._RE_CFG.donut());
+  _RE_CH.evol =new Chart(document.getElementById('ch-re-evol'), window._RE_CFG.evol());
+  for(const k of ['bar','donut','evol']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
 
   // ── Tabla
   const filasHtml=lista.map(x=>{
@@ -5205,3 +5219,52 @@ async function buildVRentEj(soloRender){
     +'<td style="text-align:right;padding:7px 10px;color:#e53935">'+_reCLP(tot.lucro)+'</td><td></td></tr></tfoot></table>';
 }
 
+
+/* ── Popup HD de un gráfico de Rent x Ejec: zoom + Copiar + Exportar PNG ── */
+let _RE_POP = null;
+function _reAbrirPopup(key){
+  let bg = document.getElementById('rePopBg');
+  if (!bg){
+    bg = document.createElement('div'); bg.id='rePopBg';
+    bg.style.cssText='position:fixed;inset:0;background:rgba(10,20,40,.72);z-index:9900;display:none;align-items:center;justify-content:center';
+    bg.innerHTML='<div style="background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.4);width:min(1100px,94vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden">'
+      +'<div style="display:flex;align-items:center;gap:10px;padding:12px 18px;background:linear-gradient(90deg,#012d70,#0255c5);color:#fff">'
+      +'<b id="rePopTit" style="font-size:.95rem;flex:1"></b>'
+      +'<button onclick="_reCopiar()" style="background:#16a34a;color:#fff;border:0;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">📋 Copiar</button>'
+      +'<button onclick="_reExportar()" style="background:#2196F3;color:#fff;border:0;border-radius:7px;padding:6px 14px;font-size:.8rem;font-weight:600;cursor:pointer">⬇ Exportar PNG</button>'
+      +'<button onclick="document.getElementById(&quot;rePopBg&quot;).style.display=&quot;none&quot;;if(_RE_POP){_RE_POP.destroy();_RE_POP=null}" style="background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:7px;padding:6px 12px;font-size:.8rem;cursor:pointer">✕ Cerrar</button></div>'
+      +'<div style="padding:18px;flex:1;min-height:0"><div style="position:relative;height:min(62vh,560px)"><canvas id="rePopCv"></canvas></div></div>';
+    bg.addEventListener('click',e=>{ if(e.target===bg){ bg.style.display='none'; if(_RE_POP){_RE_POP.destroy();_RE_POP=null;} } });
+    document.body.appendChild(bg);
+  }
+  document.getElementById('rePopTit').textContent = (window._RE_TITULOS||{})[key] || 'Gráfico';
+  bg.style.display='flex';
+  if (_RE_POP){ _RE_POP.destroy(); _RE_POP=null; }
+  const cfg = window._RE_CFG[key]();
+  cfg.options = Object.assign({}, cfg.options, { devicePixelRatio: 3, animation: false });
+  _RE_POP = new Chart(document.getElementById('rePopCv'), cfg);
+  window._RE_POP_KEY = key;
+}
+function _rePopPng(cb){
+  if(!_RE_POP) return;
+  // Fondo blanco (el canvas es transparente y pegado en Word/correo se ve negro)
+  const src=_RE_POP.canvas, out=document.createElement('canvas');
+  out.width=src.width; out.height=src.height;
+  const ctx=out.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,out.width,out.height); ctx.drawImage(src,0,0);
+  out.toBlob(cb,'image/png');
+}
+function _reCopiar(){
+  _rePopPng(b=>{ if(!b) return;
+    navigator.clipboard.write([new ClipboardItem({'image/png':b})])
+      .then(()=>{ const t=document.getElementById('rePopTit'), o=t.textContent; t.textContent='✓ Copiado al portapapeles'; setTimeout(()=>t.textContent=o,1500); })
+      .catch(()=>alert('El navegador bloqueó el copiado; usa Exportar PNG.'));
+  });
+}
+function _reExportar(){
+  _rePopPng(b=>{ if(!b) return;
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(b);
+    a.download='rent-x-ejecutivo-'+(window._RE_POP_KEY||'grafico')+'.png';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  });
+}
