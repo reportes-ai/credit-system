@@ -15,12 +15,12 @@ const { auditar } = require('../../../../shared/audit');
 // Claves propias del mantenedor (whitelist del PUT)
 const DEFAULTS = [
   ['exc_piso_pct',          75, 'Piso de rentabilidad de una excepción: % mínimo respecto de la alternativa MÁS rentable'],
-  ['exc_tasa_min_unidad',    5, 'Tasa mínima a la que el ejecutivo puede bajar una operación Unidad (%); bajo esto la op se fuerza a Autofin'],
+  ['exc_tasa_rebaja_max_pct', 5, 'Rebaja MÁXIMA de tasa en Unidad: % relativo sobre la tasa pizarra (ej: pizarra 2,70% → mínimo 2,70 × 0,95 = 2,56%, redondeando hacia abajo). Si la baja pedida supera esto, la op se fuerza a Autofin'],
   ['exc_estrellas_mes1',     2, 'Estrellas (excepciones) del PRIMER mes de un ejecutivo nuevo'],
   ['exc_pct_mensual',       33, '% de las otorgadas del mes anterior que se convierten en estrellas del mes (redondeo HACIA ABAJO: con 2 colocadas → 0; el aliciente es colocar al menos 3)'],
   ['exc_vigencia_horas',    24, 'Vigencia de un código de excepción (horas corridas desde que se genera); vencido sin usar, la estrella se devuelve dentro del mismo mes'],
   ['exc_comodin_cada',      50, 'Comodín dorado: se gana 1 cada N créditos OTORGADOS acumulados del ejecutivo'],
-  ['exc_comodin_factor_pct',10, 'Comodín dorado: la rentabilidad AutoFácil debe superar a (comisión dealer + comisión ejecutivo) en al menos este %'],
+  ['exc_comodin_factor_pct',10, 'Comodín dorado: la rentabilidad AutoFácil debe superar en al menos este % a la MÁS ALTA entre la comisión del dealer y la del ejecutivo'],
   ['exc_tolerancia_saldo',   0, 'Tolerancia en $ entre el saldo precio de la simulación y el de la carta al validar un código (0 = deben calzar exacto)'],
   ['exc_codigo_digitos',     6, 'Largo del código de aprobación (dígitos)'],
   ['exc_plazo_1',           12, 'Simulador — plazo 1 (cuotas)'],
@@ -32,9 +32,17 @@ const CLAVES = new Set(DEFAULTS.map(d => d[0]));
 
 require('../../../../shared/migrate').enFila('excepciones-comerciales', async () => {
   try {
+    // Renombre 2026-08-07: exc_tasa_min_unidad era engañosa (no es tasa piso,
+    // es rebaja máxima relativa sobre la pizarra). Conserva el valor si existía.
+    await pool.query(`UPDATE IGNORE parametros_credito SET clave='exc_tasa_rebaja_max_pct'
+                      WHERE clave='exc_tasa_min_unidad'`).catch(() => {});
+    await pool.query(`DELETE FROM parametros_credito WHERE clave='exc_tasa_min_unidad'`).catch(() => {});
     for (const [clave, valor, descripcion] of DEFAULTS)
       await pool.query('INSERT IGNORE INTO parametros_credito (clave, valor, descripcion) VALUES (?, ?, ?)',
         [clave, valor, descripcion]);
+    // Refrescar descripciones (fuente de la letra chica del mantenedor)
+    for (const [clave, , descripcion] of DEFAULTS)
+      await pool.query('UPDATE parametros_credito SET descripcion=? WHERE clave=?', [descripcion, clave]);
 
     // Card del mantenedor + permiso (matriz de Perfiles)
     const [[ex]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='mantenedores_excepciones' LIMIT 1");
