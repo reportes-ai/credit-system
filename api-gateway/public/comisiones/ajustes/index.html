@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Modificar Comisión Ejecutivo — AutoFácil</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <!-- v1.0 — ajustes de comisión por operación: solicita Analista Ops, aprueba Gerente Ops; historia por mes/ejecutivo -->
+  <!-- v1.1 — ID Financiera, RUT, financiera y comisión BASE por colocación (aunque no cumpla el mínimo) -->
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     body { font-family:'Segoe UI',system-ui,sans-serif; background:#f2f5f9; color:#1f2937; }
@@ -99,7 +99,7 @@ const H = { 'Content-Type':'application/json', Authorization: 'Bearer ' + T() };
 const clp = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fD = v => v ? String(v).replace('T',' ').slice(0,16) : '—';
-let PERMISOS = new Set(), CALCULO = [], AJUSTES = [], MES = '';
+let PERMISOS = new Set(), CALCULO = [], AJUSTES = [], MES = '', VARS = {};
 
 function verTab(t){
   document.getElementById('vMod').style.display  = t==='mod' ? '' : 'none';
@@ -123,6 +123,12 @@ async function init(){
     (j.funcionalidades||[]).forEach(c=>PERMISOS.add(c));
     const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
     if ((yo?.perfil||'').toUpperCase().includes('ADMIN')) ['com_ejec_mod','com_ejec_mod_solicitar','com_ejec_mod_aprobar'].forEach(c=>PERMISOS.add(c));
+  } catch(e){}
+  // Variables del modelo (pct_24 / pct_mas24) para la comisión base por colocación
+  try {
+    const rv = await fetch('/api/comisiones/variables', { headers:H });
+    const jv = await rv.json();
+    (jv.data||[]).forEach(v => VARS[v.clave] = parseFloat(v.valor));
   } catch(e){}
   const sel = document.getElementById('selMes');
   const [curso, ant] = mesesPermitidos();
@@ -149,7 +155,15 @@ async function cargarMes(){
   } catch(e){ document.getElementById('opsBox').innerHTML = '<div class="hint">Error: '+esc(e.message)+'</div>'; }
 }
 
-function comisionOp(c){ return (Number(c.incentivo_base_credito)||0) + (Number(c.incentivo_adicional_credito)||0); }
+/* Comisión BASE por colocación (monto × % según plazo, mantenedor Variables),
+   SIN el adicional (bonos hasta 66%) y AUNQUE el ejecutivo no cumpla el mínimo
+   del mes: es la referencia sobre la que se pide el ajuste — y un ajuste al
+   alza puede justamente ayudarlo a superar el mínimo. */
+function comisionOp(c){
+  const monto = Number(c.monto_financiado)||0;
+  const pct = parseInt(c.plazo) < 24 ? (VARS.pct_24 ?? 0.0075) : (VARS.pct_mas24 ?? 0.01);
+  return monto * pct;
+}
 
 function pintarOps(){
   const ej = document.getElementById('selEj').value;
@@ -162,26 +176,25 @@ function pintarOps(){
   const otorgados = (e.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
   const ajMap = {}; AJUSTES.filter(a=>a.estado!=='RECHAZADA').forEach(a => ajMap[String(a.num_op)] = a);
   box.innerHTML = (aprobada ? '<div class="aviso"><i class="bi bi-lock me-1"></i>La comisión de este ejecutivo ya está APROBADA para '+esc(MES)+': no admite modificaciones.</div>' : '') +
-    (!e.cumple_minimo ? '<div class="aviso">Este ejecutivo no alcanza el mínimo del mes: las comisiones por operación figuran en $0 hasta que lo cumpla.</div>' : '') +
+    (!e.cumple_minimo ? '<div class="aviso">Este ejecutivo aún no alcanza el mínimo del mes. La comisión mostrada es la BASE por colocación (sin el adicional): un ajuste al alza puede ayudarlo a superar el mínimo.</div>' : '') +
     `<div style="overflow-x:auto"><table><thead><tr>
-      <th>N° Op</th><th>Cliente</th><th class="num">Monto Fin.</th><th class="num">Comisión normal</th>
-      <th class="num" style="width:150px">Comisión modificada</th><th style="width:30%">Comentario (quién aprobó + respaldos) <b style="color:#991b1b">*</b></th><th></th>
+      <th>N° Op</th><th>ID Financiera</th><th>Cliente</th><th>RUT</th><th>Financiera</th><th class="num">Monto Fin.</th><th class="num" title="Base por colocación (monto × % según plazo), sin el adicional de bonos">Comisión base</th>
+      <th class="num" style="width:150px">Comisión modificada</th><th style="width:26%">Comentario (quién aprobó + respaldos) <b style="color:#991b1b">*</b></th><th></th>
     </tr></thead><tbody>` +
     otorgados.map((c,i) => {
       const aj = ajMap[String(c.num_op)];
       const normal = comisionOp(c);
-      if (aj) return `<tr>
-        <td><b>${c.num_op}</b></td><td>${esc(c.nombre_cliente||'')}</td>
-        <td class="num">${clp(c.monto_financiado)}</td><td class="num">${clp(aj.comision_normal)}</td>
+      const comunes = `<td><b>${c.num_op}</b></td><td>${esc(c.id_financiera||'—')}</td><td>${esc(c.nombre_cliente||'')}</td>
+        <td class="hint">${esc(c.rut_cliente||'—')}</td><td>${esc(c.financiera||'—')}</td>
+        <td class="num">${clp(c.monto_financiado)}</td>`;
+      if (aj) return `<tr>${comunes}<td class="num">${clp(aj.comision_normal)}</td>
         <td class="num"><b>${clp(aj.comision_modificada)}</b></td>
         <td class="hint">${esc(aj.comentario)}</td>
         <td><span class="chip ${aj.estado==='APROBADA'?'ch-apr':'ch-pen'}">${aj.estado}</span></td></tr>`;
-      return `<tr>
-        <td><b>${c.num_op}</b></td><td>${esc(c.nombre_cliente||'')}</td>
-        <td class="num">${clp(c.monto_financiado)}</td><td class="num">${clp(normal)}</td>
+      return `<tr>${comunes}<td class="num">${clp(normal)}</td>
         <td class="num"><input type="number" id="nm${i}" style="width:140px;text-align:right" placeholder="${Math.round(normal)}" ${puedeSolicitar?'':'disabled'}></td>
         <td><input type="text" id="cm${i}" style="width:100%" placeholder="ej: mail del 14/02/2026 de Patricio Escobar a Operaciones" ${puedeSolicitar?'':'disabled'}></td>
-        <td>${puedeSolicitar?`<button class="btn btn-azul" onclick="solicitar(${c.num_op}, ${normal}, ${i})">Solicitar</button>`:''}</td></tr>`;
+        <td>${puedeSolicitar?`<button class="btn btn-azul" onclick="solicitar(${c.num_op}, ${Math.round(normal)}, ${i})">Solicitar</button>`:''}</td></tr>`;
     }).join('') + '</tbody></table></div>' +
     (PERMISOS.has('com_ejec_mod_solicitar') ? '' : '<div class="hint" style="margin-top:8px"><i class="bi bi-lock me-1"></i>Solo un Analista de Operaciones puede solicitar modificaciones.</div>');
 }

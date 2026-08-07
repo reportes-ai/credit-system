@@ -422,7 +422,7 @@ async function calcularMes(mes) {
       `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto,
               ob.monto_financiado, ob.plazo, ob.seguro_cesantia, ob.seguro_rep_menor,
               ob.seguro_rdh, ob.valor_vehiculo, ob.pie, ob.saldo_precio,
-              ob.fecha_otorgado, ob.num_op,
+              ob.fecha_otorgado, ob.num_op, ob.id_financiera,
               COALESCE(cl.nombre_completo, '') AS nombre_cliente,
               COALESCE(cl.rut, '')             AS rut_cliente
        FROM creditos ob
