@@ -129,6 +129,7 @@ function showV(id, el) {
     buildV2pl();
     window._v2pl=true;
   }
+  if(id==='vrentej') { buildVRentEj(); }
   if(id==='v3'&&!window._v3) { buildV3(); window._v3=true; }
   if(id==='v4') { buildV4(); window._v4=true; }
   if(id==='v5'&&!window._v5) { buildV5(); window._v5=true; }
@@ -3078,6 +3079,7 @@ const TABS_NAV = [
   { id:'v1b',   label:'✅ Otorgados' },
   { id:'v1',    label:'📊 Aprobados' },
   { id:'v2',    label:'💰 Rentabilidades' },
+  { id:'vrentej', label:'💵 Rent. x Ejec.' },
   { id:'v3',    label:'📈 Tendencia' },
   { id:'v5',    label:'👤 Ejecutivos' },
   { id:'v7',    label:'🔻 Funnel' },
@@ -5051,3 +5053,155 @@ async function cargarClimaCorrelacion() {
       `La correlación va de −1 a 1: cerca de 0 el clima no mueve la aguja; negativa = a más lluvia, menos colocación.`;
   } catch (e) { document.getElementById('clima-nota').textContent = 'No se pudo cargar el análisis de clima: ' + e.message; }
 }
+
+/* ═══════════ VISTA RENT x EJECUTIVO — rentabilidad AutoFácil por ejecutivo ═══════════
+   Motor único AF_RENT (el mismo del Simulador, la carta y el informe de Reportería) y
+   tier UAC por AF_UAC_TIER (con corte por plazo). Datos propios (fetch aparte del DASH
+   principal porque necesita tasa, parque y comisión real de cada crédito). */
+let _RE = null;                 // base cacheada { ops:[{mes,ejecutivo,rent,lucro,optima}], meses:[] }
+const _RE_CH = {};              // charts propios (destruidos en cada render)
+const _reCLP = n => '$' + Math.round(n||0).toLocaleString('es-CL');
+const _reM   = n => (n>=1e6 ? (n/1e6).toFixed(1).replace('.',',')+'M' : Math.round((n||0)/1e3)+'K');
+
+function _reTasa(v){ const n=Number(v)||0; if(n<=0) return null; if(n<0.5) return n; if(n<10) return n/100; return n/1200; }
+
+async function _reCargarBase(){
+  const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
+  const [rC,rUf,rPar,rTas] = await Promise.all([
+    fetch('/api/creditos/reporteria',{headers:H}), fetch('/api/uf/vigente',{headers:H}),
+    fetch('/api/parametros-credito',{headers:H}),  fetch('/api/tasas/vigente',{headers:H}),
+  ]);
+  const [jC,jUf,jPar,jTas] = await Promise.all([rC.json(),rUf.json(),rPar.json(),rTas.json()]);
+  const CRED = Array.isArray(jC.data)?jC.data:[];
+  const u = Array.isArray(jUf.data)?jUf.data[0]:jUf.data;
+  const UF = u&&u.valor?parseFloat(u.valor):null;
+  const P  = (jPar.success&&jPar.data&&jPar.data.obj)?jPar.data.obj:{};
+  const T  = jTas.data?(Array.isArray(jTas.data)?jTas.data[0]:jTas.data):{};
+  const ym = d => d?String(d).slice(0,7):null;
+
+  // Nº de ops UAC por mes (para el tier)
+  const uacMes = {};
+  for(const c of CRED){
+    if(String(c.estado||'').toUpperCase()!=='OTORGADO') continue;
+    const m=ym(c.fecha_otorgado); if(!m) continue;
+    if((c.financiera||'').toUpperCase().includes('UNIDAD')) uacMes[m]=(uacMes[m]||0)+1;
+  }
+  const ops=[];
+  for(const c of CRED){
+    if(String(c.estado||'').toUpperCase()!=='OTORGADO') continue;
+    const m=ym(c.fecha_otorgado); if(!m) continue;
+    const fin=(c.financiera||'').toUpperCase();
+    const colo = fin.includes('AUTOFIN')?'AF':(fin.includes('UNIDAD')?'UAC':null);
+    if(!colo) continue;                             // cartera propia: fuera
+    const plazo=Number(c.plazo||0); if(!plazo) continue;
+    const valor=Number(c.valor_vehiculo)||(Number(c.saldo_precio||0)+Number(c.pie||0));
+    const pq=String(c.parque||'').trim().toUpperCase();
+    const R = window.AF_RENT.calcular({
+      valor, pie:Number(c.pie||0), plazo,
+      seguros:{desg:true,rdh:true,cesa:true},
+      esPatio:(pq&&pq!=='NO APLICA')||Number(c.com_parque||0)>0,
+      dealerComCLP:Number(c.comision_dealer||0)||null,
+      tasaCli:_reTasa(c.tasa_mensual),
+      uacPct: window.AF_UAC_TIER.pctUACOperacion({ops:uacMes[m]||0, plazo, mes:m}, P),
+    }, P, UF, T);
+    if(!R) continue;
+    const rent = colo==='AF'?R.af.rentab:R.uac.rentab;
+    const mejor= Math.max(R.af.rentab,R.uac.rentab);
+    ops.push({ mes:m, ejecutivo:(c.ejecutivo||'(sin ejecutivo)').toUpperCase(),
+               rent, lucro:Math.max(0,mejor-rent), optima:rent>=mejor });
+  }
+  const meses=[...new Set(ops.map(o=>o.mes))].sort().reverse();
+  return { ops, meses };
+}
+
+function _reFiltrar(sel){
+  const ops=_RE.ops, meses=_RE.meses;
+  if(sel==='12M') return { rows:ops.filter(o=>meses.slice(0,12).includes(o.mes)), lbl:'últimos 12 meses' };
+  if(sel==='YTD'){ const y=(meses[0]||'').slice(0,4); return { rows:ops.filter(o=>o.mes.startsWith(y)), lbl:'año '+y }; }
+  return { rows:ops.filter(o=>o.mes===sel), lbl:sel };
+}
+
+async function buildVRentEj(soloRender){
+  const cont=document.getElementById('re-tabla');
+  if(!_RE){
+    cont.innerHTML='<div style="padding:30px;text-align:center;color:#888"><div class="spinner-border spinner-border-sm me-2"></div>Calculando rentabilidades…</div>';
+    try{ _RE=await _reCargarBase(); }
+    catch(e){ cont.innerHTML='<div style="padding:20px;color:#b91c1c">No se pudo calcular: '+e.message+'</div>'; return; }
+    const sel=document.getElementById('re-mes');
+    sel.innerHTML=_RE.meses.slice(0,18).map(m=>'<option value="'+m+'">Mes '+m+'</option>').join('')
+      +'<option value="YTD">Año en curso</option><option value="12M">Últimos 12 meses</option>';
+  }
+  const sel=document.getElementById('re-mes').value||_RE.meses[0];
+  const fil=_reFiltrar(sel), rows=fil.rows;
+  document.getElementById('re-lbl1').textContent='· '+fil.lbl;
+  document.getElementById('re-lbl2').textContent='· '+fil.lbl;
+
+  // ── Agregación por ejecutivo
+  const por={};
+  for(const o of rows){
+    const e=por[o.ejecutivo]||(por[o.ejecutivo]={ops:0,rent:0,lucro:0,optimas:0});
+    e.ops++; e.rent+=o.rent; e.lucro+=o.lucro; if(o.optima)e.optimas++;
+  }
+  const lista=Object.entries(por).map(([ej,v])=>Object.assign({ej,prom:v.rent/v.ops},v)).sort((a,b)=>b.rent-a.rent);
+  const tot=lista.reduce((s,x)=>({rent:s.rent+x.rent,ops:s.ops+x.ops,lucro:s.lucro+x.lucro,optimas:s.optimas+x.optimas}),{rent:0,ops:0,lucro:0,optimas:0});
+
+  // ── KPIs
+  document.getElementById('kpiRE').innerHTML=
+    '<div class="kpi-box highlight"><div class="kpi-label">Rentabilidad realizada</div><div class="kpi-val big">'+_reCLP(tot.rent)+'</div></div>'
+   +'<div class="kpi-box"><div class="kpi-label">Operaciones</div><div class="kpi-val">'+tot.ops.toLocaleString('es-CL')+'</div></div>'
+   +'<div class="kpi-box"><div class="kpi-label">Promedio por operación</div><div class="kpi-val">'+_reCLP(tot.ops?tot.rent/tot.ops:0)+'</div></div>'
+   +'<div class="kpi-box"><div class="kpi-label">% en la más rentable</div><div class="kpi-val">'+(tot.ops?Math.round(tot.optimas/tot.ops*100):0)+'%</div></div>'
+   +'<div class="kpi-box" style="border-left:3px solid #e53935"><div class="kpi-label">Lucro cesante</div><div class="kpi-val" style="color:#e53935">'+_reCLP(tot.lucro)+'</div></div>';
+
+  // ── Charts
+  Object.values(_RE_CH).forEach(c=>{try{c.destroy();}catch(e){}});
+  const corto=n=>n.split(/\s+/).slice(0,2).join(' ');
+  const top=lista.slice(0,14);
+  _RE_CH.bar=new Chart(document.getElementById('ch-re-bar'),{type:'bar',
+    data:{labels:top.map(x=>corto(x.ej)),datasets:[
+      {label:'Rentabilidad',data:top.map(x=>x.rent),backgroundColor:C.blue,borderRadius:4},
+      {label:'Lucro cesante',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
+    options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
+      scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:60,minRotation:40}},y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}}}})});
+  _RE_CH.donut=new Chart(document.getElementById('ch-re-donut'),{type:'doughnut',
+    data:{labels:top.map(x=>corto(x.ej)),datasets:[{data:top.map(x=>x.rent),
+      backgroundColor:[C.navy,C.blue,C.teal,C.green,C.orange,C.yellow,C.lblue,'#8e24aa','#d81b60','#5d4037','#455a64','#7cb342','#00acc1','#ffb300']}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},
+      tooltip:{callbacks:{label:c=>c.label+': '+_reCLP(c.raw)+' ('+(tot.rent?Math.round(c.raw/tot.rent*100):0)+'%)'}}}}});
+  const m12=_RE.meses.slice(0,12).reverse();
+  const serie=k=>m12.map(m=>_RE.ops.filter(o=>o.mes===m).reduce((s,o)=>s+o[k],0));
+  _RE_CH.evol=new Chart(document.getElementById('ch-re-evol'),{type:'line',
+    data:{labels:m12,datasets:[
+      {label:'Rentabilidad realizada',data:serie('rent'),borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
+      {label:'Lucro cesante',data:serie('lucro'),borderColor:C.red,borderDash:[5,4],tension:.3,pointRadius:3}]},
+    options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
+      scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})});
+
+  // ── Tabla
+  const filasHtml=lista.map(x=>{
+    const p=tot.rent?x.rent/tot.rent*100:0, po=x.ops?Math.round(x.optimas/x.ops*100):0;
+    const badge=po>=80?'#dcfce7;color:#166534':(po>=50?'#fef3c7;color:#92400e':'#fee2e2;color:#991b1b');
+    return '<tr style="border-bottom:1px solid #f0f2f5">'
+      +'<td style="padding:6px 10px;font-weight:600;color:#1a3a6a">'+x.ej+'</td>'
+      +'<td style="text-align:center;padding:6px 10px">'+x.ops+'</td>'
+      +'<td style="text-align:right;padding:6px 10px;font-weight:700;color:#166534">'+_reCLP(x.rent)+'</td>'
+      +'<td style="text-align:right;padding:6px 10px">'+_reCLP(x.prom)+'</td>'
+      +'<td style="text-align:center;padding:6px 10px"><span style="background:'+badge+';border-radius:8px;padding:1px 8px;font-weight:700">'+po+'%</span></td>'
+      +'<td style="text-align:right;padding:6px 10px;color:'+(x.lucro>0?'#e53935':'#888')+'">'+(x.lucro>0?_reCLP(x.lucro):'—')+'</td>'
+      +'<td style="padding:6px 10px"><div style="background:#eef2fa;border-radius:4px;height:14px;position:relative"><div style="background:linear-gradient(90deg,#2196F3,#64b5f6);border-radius:4px;height:14px;width:'+Math.max(2,p)+'%"></div><span style="position:absolute;top:0;left:6px;font-size:10px;color:#1a3a6a;font-weight:700">'+p.toFixed(1)+'%</span></div></td></tr>';
+  }).join('');
+  cont.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+    +'<thead><tr style="background:#eef2fa;color:#1a3a6a">'
+    +'<th style="text-align:left;padding:7px 10px">Ejecutivo</th><th style="padding:7px 10px">Ops</th>'
+    +'<th style="text-align:right;padding:7px 10px">Rentabilidad</th><th style="text-align:right;padding:7px 10px">Prom. / op</th>'
+    +'<th style="padding:7px 10px">% óptimas</th><th style="text-align:right;padding:7px 10px">Lucro cesante</th>'
+    +'<th style="text-align:left;padding:7px 10px;width:26%">Participación</th></tr></thead>'
+    +'<tbody>'+filasHtml+'</tbody>'
+    +'<tfoot><tr style="background:#eef2fa;font-weight:700;color:#1a3a6a">'
+    +'<td style="padding:7px 10px">Total</td><td style="text-align:center">'+tot.ops+'</td>'
+    +'<td style="text-align:right;padding:7px 10px">'+_reCLP(tot.rent)+'</td>'
+    +'<td style="text-align:right;padding:7px 10px">'+_reCLP(tot.ops?tot.rent/tot.ops:0)+'</td>'
+    +'<td style="text-align:center">'+(tot.ops?Math.round(tot.optimas/tot.ops*100):0)+'%</td>'
+    +'<td style="text-align:right;padding:7px 10px;color:#e53935">'+_reCLP(tot.lucro)+'</td><td></td></tr></tfoot></table>';
+}
+

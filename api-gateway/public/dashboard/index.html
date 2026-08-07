@@ -38,6 +38,7 @@
       <div class="tab active" data-viewid="v1b" onclick="showV('v1b',this)">✅ Otorgados</div>
       <div class="tab" data-viewid="v1" onclick="showV('v1',this)">📊 Aprobados</div>
       <div class="tab" data-viewid="v2" onclick="showV('v2',this)">💰 Rentabilidades</div>
+      <div class="tab" data-viewid="vrentej" onclick="showV('vrentej',this)">💵 Rent. x Ejec.</div>
       <div class="tab" data-viewid="v3" onclick="showV('v3',this)">📈 Tendencia</div>
       <div class="tab" data-viewid="v5" onclick="showV('v5',this)">👤 Ejecutivos</div>
       <div class="tab" data-viewid="v7" onclick="showV('v7',this)">🔻 Funnel</div>
@@ -1311,6 +1312,43 @@
 </div>
 
 
+<!-- ============================================================ VISTA RENT x EJECUTIVO ============================================================ -->
+<div id="vrentej" class="view">
+  <div class="dash-header">
+    <div class="dash-title">💵 Rentabilidad AutoFácil por Ejecutivo</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <select id="re-mes" onchange="buildVRentEj(true)" style="background:#fff;border:1px solid #dce3ed;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer"></select>
+      <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
+    </div>
+  </div>
+  <div class="kpi-strip" id="kpiRE"></div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:10px">
+    <div class="card">
+      <div class="card-head">Rentabilidad realizada por ejecutivo <span id="re-lbl1" style="font-weight:400;opacity:.7"></span></div>
+      <div class="ch" style="height:260px;padding:10px"><canvas id="ch-re-bar"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head light">Participación en la rentabilidad</div>
+      <div class="ch" style="height:260px;padding:10px"><canvas id="ch-re-donut"></canvas></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div class="card-head">Evolución mensual — rentabilidad realizada vs lucro cesante (últimos 12 meses)</div>
+    <div class="ch" style="height:200px;padding:10px"><canvas id="ch-re-evol"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-head">Detalle por ejecutivo <span id="re-lbl2" style="font-weight:400;opacity:.7"></span></div>
+    <div class="card-body" style="padding:0;overflow-x:auto" id="re-tabla"></div>
+  </div>
+  <div style="font-size:10px;color:#8aa0b8;margin-top:8px">
+    Motor único de rentabilidad (el mismo del Simulador y la carta) sobre créditos OTORGADOS, según la financiera colocada.
+    Tier UAC por mes con corte por plazo. Los créditos AutoFácil (cartera propia) no se incluyen. Lucro cesante = lo dejado de ganar por cursar por el lado menos rentable.
+  </div>
+</div>
+<script src="/js/rentabilidad-core.js"></script>
+<script src="/js/comision-dealer.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
 <script src="app.js" defer></script>
 <script src="/js/alertas-vencimiento.js" defer></script>
 <script src="/js/html2canvas.min.js"></script>
