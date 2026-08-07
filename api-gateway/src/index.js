@@ -303,6 +303,7 @@ app.use('/api/dealer-categorias',    require('../../services/mantenedores/src/ro
 app.use('/api/visitas',              require('../../services/mantenedores/src/routes/visitas.routes'));
 app.use('/api/terreno',              require('../../services/mantenedores/src/routes/visitas-terreno.routes'));
 app.use('/api/parametros-credito', require('../../services/mantenedores/src/routes/parametros.routes'));
+app.use('/api/excepciones-comerciales', require('../../services/mantenedores/src/routes/excepciones.routes'));
 app.use('/api/workflows',          require('../../services/mantenedores/src/routes/workflows.routes'));
 app.use('/api/uptime',             require('../../services/mantenedores/src/routes/uptime.routes'));
 app.use('/api/definiciones',       require('../../services/mantenedores/src/routes/definiciones.routes'));
