@@ -234,6 +234,10 @@ module.exports = [
   p:[['Revisa el período','Cada meta muestra su cumplimiento y aporte al bono.'],['Ajusta variables (con permiso)','Ponderaciones y topes son paramétricos.']],
   n:'El resultado alimenta la liquidación del período como las demás comisiones.' },
 
+{ r:'/comisiones/ajustes/', t:'Modificar Comisión Ejecutivo', i:'bi-pencil-square', d:'Ajusta la comisión de una operación puntual de un ejecutivo, con respaldo documentado y doble firma. El ajuste aprobado rige en la Revisión de Comisiones y en la rentabilidad de la operación.',
+  p:[['Solicita (Analista de Operaciones)','Elige mes (en curso o anterior, mientras no se cierre) y ejecutivo, ingresa la comisión modificada y el comentario obligatorio con quién aprobó y los respaldos (ej: mail del 14/02 de Gerencia).'],['Aprueba (Gerente de Operaciones o su backup)','Revisa el ajuste pendiente y aprueba o rechaza con motivo. Quien solicita nunca puede aprobar.'],['Consulta la Historia','La pestaña Historia agrupa por mes y ejecutivo: comisión normal, modificada, % y $ de variación, quién, cuándo y con qué comentario.']],
+  n:'Si la comisión del ejecutivo del mes ya está aprobada, no admite modificaciones: se corrige en el ciclo siguiente.' },
+
 /* ═══ DEALERS ═══ */
 { r:'/dealers-incorporacion/parques.html/', t:'Creación de Parque', i:'bi-p-circle', d:'La ficha de incorporación de un PARQUE por la misma máquina de dealers: datos, arriendo pactado y cadena de aprobación.',
   p:[['Llena la ficha del parque','Entidad PARQUE: sus términos son arriendo mensual, no comisión por operación.'],['Envía a autorización','Recorre los mismos niveles paramétricos que un dealer.']],

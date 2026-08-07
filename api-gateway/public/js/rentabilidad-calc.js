@@ -142,7 +142,10 @@
       com_patio  = 0;
     }
     const pctEj  = (P.pct_ejecutivo_fin || 2.12) / 100;
-    const com_ej = CORE ? CORE.comisionEjecutivo({ montoFin: monto_fin, pctEj }) : Math.round(monto_fin * pctEj);
+    // ejecComCLP: override en $ (ajuste aprobado en "Modificar Comisión Ejecutivo").
+    const com_ej = (inp.ejecComCLP != null && !isNaN(inp.ejecComCLP))
+      ? Math.round(Number(inp.ejecComCLP))
+      : (CORE ? CORE.comisionEjecutivo({ montoFin: monto_fin, pctEj }) : Math.round(monto_fin * pctEj));
     const total_cos = com_dealer + com_patio + com_ej;
 
     const cuota_af  = tasaCli > 0 ? Math.round(cuotaDe(tasaCli)) : Math.round(monto_fin / plazo);

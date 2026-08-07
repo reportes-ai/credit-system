@@ -15,4 +15,12 @@ router.post('/enviar-resumen',    verifyToken, requireFunc('comisiones_revision'
 router.get('/alertas-config',     verifyToken,                                     ctrl.getAlertasConfig);
 router.put('/alertas-config',     verifyToken, requireFunc('comisiones_revision'), ctrl.setAlertasConfig);
 
+// Ajustes de comisión por operación (solicita Analista Ops, aprueba Gerente Ops)
+const aj = require('../controllers/ajustes.controller');
+router.get ('/ajustes',              verifyToken, requireFunc('com_ejec_mod'),           aj.listar);
+router.get ('/ajustes-vigentes',     verifyToken,                                        aj.vigentes);
+router.get ('/ajustes/historia',     verifyToken, requireFunc('com_ejec_mod'),           aj.historia);
+router.post('/ajustes',              verifyToken, requireFunc('com_ejec_mod_solicitar'), aj.solicitar);
+router.post('/ajustes/:id/resolver', verifyToken, requireFunc('com_ejec_mod_aprobar'),   aj.resolver);
+
 module.exports = router;

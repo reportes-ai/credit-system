@@ -5067,11 +5067,13 @@ function _reTasa(v){ const n=Number(v)||0; if(n<=0) return null; if(n<0.5) retur
 
 async function _reCargarBase(){
   const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
-  const [rC,rUf,rPar,rTas] = await Promise.all([
+  const [rC,rUf,rPar,rTas,rAj] = await Promise.all([
     fetch('/api/creditos/reporteria',{headers:H}), fetch('/api/uf/vigente',{headers:H}),
     fetch('/api/parametros-credito',{headers:H}),  fetch('/api/tasas/vigente',{headers:H}),
+    fetch('/api/comisiones/ajustes-vigentes',{headers:H}),
   ]);
-  const [jC,jUf,jPar,jTas] = await Promise.all([rC.json(),rUf.json(),rPar.json(),rTas.json()]);
+  const [jC,jUf,jPar,jTas,jAj] = await Promise.all([rC.json(),rUf.json(),rPar.json(),rTas.json(),rAj.json()]);
+  const AJ={}; for(const a of (jAj.data||[])) AJ[String(a.num_op)]=Number(a.comision_modificada);
   const CRED = Array.isArray(jC.data)?jC.data:[];
   const u = Array.isArray(jUf.data)?jUf.data[0]:jUf.data;
   const UF = u&&u.valor?parseFloat(u.valor):null;
@@ -5111,6 +5113,7 @@ async function _reCargarBase(){
       dealerComCLP:Number(c.comision_dealer||0)||null,
       tasaCli:_reTasa(c.tasa_mensual),
       uacPct: window.AF_UAC_TIER.pctUACOperacion({ops:uacMes[m]||0, plazo, mes:m}, P),
+      ejecComCLP: AJ[String(c.num_op)],   // ajuste aprobado de comisión ejecutivo
     }, P, UF, T);
     const rColo = R ? (colo==='AF'?R.af.rentab:R.uac.rentab) : 0;
     const rOtra = R ? (colo==='AF'?R.uac.rentab:R.af.rentab) : 0;

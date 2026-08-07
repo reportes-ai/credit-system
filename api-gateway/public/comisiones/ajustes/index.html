@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modificar Comisión Ejecutivo — AutoFácil</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- v1.0 — ajustes de comisión por operación: solicita Analista Ops, aprueba Gerente Ops; historia por mes/ejecutivo -->
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:#f2f5f9; color:#1f2937; }
+    .wrap { max-width:none; margin:20px auto 70px; padding:0 26px; }
+    .banner { background:linear-gradient(135deg,#0f2a5c,#1e3a8a 60%,#2563eb); border-radius:14px; color:#fff; padding:20px 26px; margin-bottom:16px; display:flex; align-items:center; gap:16px; }
+    .banner i { font-size:2.2rem; opacity:.9; }
+    .banner h2 { font-size:1.15rem; margin:0 0 2px; }
+    .banner p { font-size:.8rem; opacity:.85; margin:0; }
+    .tabs { display:flex; gap:8px; margin-bottom:14px; }
+    .tabbtn { background:#fff; border:1.5px solid #d7dfeb; border-radius:9px; padding:8px 18px; font-size:.85rem; font-weight:700; color:#475569; cursor:pointer; }
+    .tabbtn.on { background:#1e3a8a; border-color:#1e3a8a; color:#fff; }
+    .card { background:#fff; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:14px; }
+    .card-h { padding:11px 16px; font-size:.8rem; font-weight:800; color:#1e3a8a; border-bottom:1px solid #eef2f7; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .card-b { padding:14px 16px; }
+    select, input[type=text], input[type=number], textarea { border:1.5px solid #d7dfeb; border-radius:8px; padding:7px 10px; font-size:.84rem; outline:none; font-family:inherit; }
+    select:focus, input:focus, textarea:focus { border-color:#1e3a8a; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { background:#eef2fa; color:#1e3a8a; text-align:left; padding:8px 10px; font-size:.7rem; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+    td { padding:7px 10px; border-bottom:1px solid #f1f5f9; }
+    .num { text-align:right; }
+    .btn { border:0; border-radius:8px; padding:7px 14px; font-size:.78rem; font-weight:700; cursor:pointer; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-azul { background:#1e3a8a; color:#fff; }
+    .btn-verde { background:#16a34a; color:#fff; }
+    .btn-rojo { background:#dc2626; color:#fff; }
+    .btn-gris { background:#eef2f7; color:#475569; }
+    .chip { display:inline-block; border-radius:8px; padding:2px 9px; font-size:.7rem; font-weight:800; }
+    .ch-pen { background:#fef3c7; color:#92400e; }
+    .ch-apr { background:#dcfce7; color:#166534; }
+    .ch-rec { background:#fee2e2; color:#991b1b; }
+    .dif-pos { color:#16a34a; font-weight:800; }
+    .dif-neg { color:#dc2626; font-weight:800; }
+    .acc { border:1px solid #e5eaf2; border-radius:10px; margin-bottom:8px; overflow:hidden; }
+    .acc-h { padding:11px 16px; background:#f8fafc; display:flex; align-items:center; gap:12px; cursor:pointer; font-weight:700; font-size:.86rem; color:#1e3a8a; }
+    .acc-b { display:none; padding:6px 12px 12px; }
+    .acc.open .acc-b { display:block; }
+    .hint { font-size:.74rem; color:#64748b; }
+    .aviso { background:#fef3c7; border-left:4px solid #d97706; border-radius:8px; padding:10px 14px; font-size:.78rem; color:#92400e; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [ {t:'Inicio', h:'/'}, {t:'Comisión Ejecutivos', h:'/comisiones/'}, {t:'Modificar Comisión Ejecutivo'} ] };</script>
+<script src="/js/topnav.js"></script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-pencil-square"></i>
+    <div>
+      <h2>Modificar Comisión Ejecutivo</h2>
+      <p>Ajuste de la comisión de una operación puntual, con respaldo y doble firma: solicita un Analista de Operaciones y aprueba el Gerente de Operaciones (o su backup). El ajuste aprobado rige en la Revisión de Comisiones y en la rentabilidad de la operación.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tabbtn on" id="tabMod" onclick="verTab('mod')"><i class="bi bi-pencil me-1"></i> Modificar</button>
+    <button class="tabbtn" id="tabHist" onclick="verTab('hist')"><i class="bi bi-clock-history me-1"></i> Historia</button>
+  </div>
+
+  <!-- ═══ PESTAÑA MODIFICAR ═══ -->
+  <div id="vMod">
+    <div class="card">
+      <div class="card-h">
+        <i class="bi bi-calendar3"></i> Mes
+        <select id="selMes" onchange="cargarMes()"></select>
+        <span id="mesEstado" class="hint"></span>
+        <span style="flex:1"></span>
+        <i class="bi bi-person"></i> Ejecutivo
+        <select id="selEj" onchange="pintarOps()"><option value="">— elige —</option></select>
+      </div>
+      <div class="card-b" id="opsBox"><div class="hint">Elige mes y ejecutivo para ver sus operaciones con la comisión del cálculo vigente.</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><i class="bi bi-hourglass-split"></i> Ajustes del mes (pendientes y resueltos)</div>
+      <div class="card-b" id="pendBox"><div class="hint">—</div></div>
+    </div>
+  </div>
+
+  <!-- ═══ PESTAÑA HISTORIA ═══ -->
+  <div id="vHist" style="display:none">
+    <div class="card">
+      <div class="card-h"><i class="bi bi-clock-history"></i> Historia de comisiones modificadas — por mes y ejecutivo</div>
+      <div class="card-b" id="histBox"><div class="hint">Cargando…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const T = () => sessionStorage.getItem('token');
+const H = { 'Content-Type':'application/json', Authorization: 'Bearer ' + T() };
+const clp = n => '$' + Math.round(Number(n)||0).toLocaleString('es-CL');
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fD = v => v ? String(v).replace('T',' ').slice(0,16) : '—';
+let PERMISOS = new Set(), CALCULO = [], AJUSTES = [], MES = '';
+
+function verTab(t){
+  document.getElementById('vMod').style.display  = t==='mod' ? '' : 'none';
+  document.getElementById('vHist').style.display = t==='hist' ? '' : 'none';
+  document.getElementById('tabMod').classList.toggle('on', t==='mod');
+  document.getElementById('tabHist').classList.toggle('on', t==='hist');
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(t==='hist' ? 'Historia' : null);
+  if (t==='hist') cargarHistoria();
+}
+
+function mesesPermitidos(){
+  const hoy = new Date();
+  const ym = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  return [ym(hoy), ym(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1))];
+}
+
+async function init(){
+  try {
+    const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+T() } });
+    const j = await r.json();
+    (j.funcionalidades||[]).forEach(c=>PERMISOS.add(c));
+    const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
+    if ((yo?.perfil||'').toUpperCase().includes('ADMIN')) ['com_ejec_mod','com_ejec_mod_solicitar','com_ejec_mod_aprobar'].forEach(c=>PERMISOS.add(c));
+  } catch(e){}
+  const sel = document.getElementById('selMes');
+  const [curso, ant] = mesesPermitidos();
+  sel.innerHTML = `<option value="${curso}">${curso} (en curso)</option><option value="${ant}">${ant} (anterior)</option>`;
+  cargarMes();
+}
+
+async function cargarMes(){
+  MES = document.getElementById('selMes').value;
+  document.getElementById('opsBox').innerHTML = '<div class="hint">Calculando comisiones del mes…</div>';
+  try {
+    const [rc, ra] = await Promise.all([
+      fetch('/api/comisiones/calculo?mes='+MES, { headers:H }),
+      fetch('/api/comisiones/ajustes?mes='+MES, { headers:H }),
+    ]);
+    const [jc, ja] = await Promise.all([rc.json(), ra.json()]);
+    CALCULO = jc.data || [];
+    AJUSTES = ja.data || [];
+    const sel = document.getElementById('selEj');
+    sel.innerHTML = '<option value="">— elige —</option>' +
+      CALCULO.map(e => `<option value="${esc(e.ejecutivo)}">${esc(e.ejecutivo)}${(e.estado||'').toLowerCase().startsWith('aproba') ? ' (comisión APROBADA — no editable)' : ''}</option>`).join('');
+    document.getElementById('mesEstado').textContent = CALCULO.length + ' ejecutivo(s) con movimiento';
+    pintarOps(); pintarPendientes();
+  } catch(e){ document.getElementById('opsBox').innerHTML = '<div class="hint">Error: '+esc(e.message)+'</div>'; }
+}
+
+function comisionOp(c){ return (Number(c.incentivo_base_credito)||0) + (Number(c.incentivo_adicional_credito)||0); }
+
+function pintarOps(){
+  const ej = document.getElementById('selEj').value;
+  const box = document.getElementById('opsBox');
+  if (!ej) { box.innerHTML = '<div class="hint">Elige mes y ejecutivo para ver sus operaciones con la comisión del cálculo vigente.</div>'; return; }
+  const e = CALCULO.find(x => x.ejecutivo === ej);
+  if (!e) { box.innerHTML = '<div class="hint">Sin datos.</div>'; return; }
+  const aprobada = (e.estado||'').toLowerCase().startsWith('aproba');
+  const puedeSolicitar = PERMISOS.has('com_ejec_mod_solicitar') && !aprobada;
+  const otorgados = (e.creditos||[]).filter(c => (c.estado_credito||'').toUpperCase()==='OTORGADO');
+  const ajMap = {}; AJUSTES.filter(a=>a.estado!=='RECHAZADA').forEach(a => ajMap[String(a.num_op)] = a);
+  box.innerHTML = (aprobada ? '<div class="aviso"><i class="bi bi-lock me-1"></i>La comisión de este ejecutivo ya está APROBADA para '+esc(MES)+': no admite modificaciones.</div>' : '') +
+    (!e.cumple_minimo ? '<div class="aviso">Este ejecutivo no alcanza el mínimo del mes: las comisiones por operación figuran en $0 hasta que lo cumpla.</div>' : '') +
+    `<div style="overflow-x:auto"><table><thead><tr>
+      <th>N° Op</th><th>Cliente</th><th class="num">Monto Fin.</th><th class="num">Comisión normal</th>
+      <th class="num" style="width:150px">Comisión modificada</th><th style="width:30%">Comentario (quién aprobó + respaldos) <b style="color:#991b1b">*</b></th><th></th>
+    </tr></thead><tbody>` +
+    otorgados.map((c,i) => {
+      const aj = ajMap[String(c.num_op)];
+      const normal = comisionOp(c);
+      if (aj) return `<tr>
+        <td><b>${c.num_op}</b></td><td>${esc(c.nombre_cliente||'')}</td>
+        <td class="num">${clp(c.monto_financiado)}</td><td class="num">${clp(aj.comision_normal)}</td>
+        <td class="num"><b>${clp(aj.comision_modificada)}</b></td>
+        <td class="hint">${esc(aj.comentario)}</td>
+        <td><span class="chip ${aj.estado==='APROBADA'?'ch-apr':'ch-pen'}">${aj.estado}</span></td></tr>`;
+      return `<tr>
+        <td><b>${c.num_op}</b></td><td>${esc(c.nombre_cliente||'')}</td>
+        <td class="num">${clp(c.monto_financiado)}</td><td class="num">${clp(normal)}</td>
+        <td class="num"><input type="number" id="nm${i}" style="width:140px;text-align:right" placeholder="${Math.round(normal)}" ${puedeSolicitar?'':'disabled'}></td>
+        <td><input type="text" id="cm${i}" style="width:100%" placeholder="ej: mail del 14/02/2026 de Patricio Escobar a Operaciones" ${puedeSolicitar?'':'disabled'}></td>
+        <td>${puedeSolicitar?`<button class="btn btn-azul" onclick="solicitar(${c.num_op}, ${normal}, ${i})">Solicitar</button>`:''}</td></tr>`;
+    }).join('') + '</tbody></table></div>' +
+    (PERMISOS.has('com_ejec_mod_solicitar') ? '' : '<div class="hint" style="margin-top:8px"><i class="bi bi-lock me-1"></i>Solo un Analista de Operaciones puede solicitar modificaciones.</div>');
+}
+
+async function solicitar(num_op, normal, i){
+  const mod = document.getElementById('nm'+i).value;
+  const com = document.getElementById('cm'+i).value;
+  if (mod === '' || isNaN(Number(mod))) return alert('Ingresa la comisión modificada.');
+  if (!com.trim() || com.trim().length < 15) return alert('El comentario es obligatorio: indica quién aprobó y los respaldos (ej: "mail del 14/02/2026 de Patricio Escobar a Operaciones").');
+  if (!confirm(`Op ${num_op}: ${clp(normal)} → ${clp(mod)}\n¿Enviar a aprobación del Gerente de Operaciones?`)) return;
+  const r = await fetch('/api/comisiones/ajustes', { method:'POST', headers:H,
+    body: JSON.stringify({ mes:MES, num_op, comision_normal:normal, comision_modificada:Number(mod), comentario:com.trim() }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error || 'No se pudo solicitar');
+  cargarMes();
+}
+
+function pintarPendientes(){
+  const box = document.getElementById('pendBox');
+  if (!AJUSTES.length) { box.innerHTML = '<div class="hint">Sin ajustes en '+esc(MES)+'.</div>'; return; }
+  const puedeAprobar = PERMISOS.has('com_ejec_mod_aprobar');
+  box.innerHTML = `<div style="overflow-x:auto"><table><thead><tr>
+      <th>N° Op</th><th>Ejecutivo</th><th class="num">Normal</th><th class="num">Modificada</th><th class="num">Δ $</th>
+      <th>Comentario</th><th>Solicitó</th><th>Estado</th><th></th></tr></thead><tbody>` +
+    AJUSTES.map(a => {
+      const dif = Number(a.comision_modificada) - Number(a.comision_normal);
+      const chip = a.estado==='PENDIENTE'?'ch-pen':a.estado==='APROBADA'?'ch-apr':'ch-rec';
+      return `<tr>
+        <td><b>${a.num_op}</b></td><td>${esc(a.ejecutivo)}</td>
+        <td class="num">${clp(a.comision_normal)}</td><td class="num"><b>${clp(a.comision_modificada)}</b></td>
+        <td class="num ${dif>=0?'dif-pos':'dif-neg'}">${dif>=0?'+':''}${clp(dif)}</td>
+        <td class="hint" style="max-width:280px">${esc(a.comentario)}${a.rechazo_motivo?'<br><b style="color:#991b1b">Rechazo:</b> '+esc(a.rechazo_motivo):''}</td>
+        <td class="hint">${esc(a.solicitado_por||'')}<br>${fD(a.solicitado_at)}</td>
+        <td><span class="chip ${chip}">${a.estado}</span>${a.aprobado_por?'<div class="hint">'+esc(a.aprobado_por)+'<br>'+fD(a.aprobado_at)+'</div>':''}</td>
+        <td style="white-space:nowrap">${a.estado==='PENDIENTE'&&puedeAprobar?`
+          <button class="btn btn-verde" onclick="resolver(${a.id},'aprobar')">Aprobar</button>
+          <button class="btn btn-rojo" onclick="resolver(${a.id},'rechazar')">Rechazar</button>`:''}</td></tr>`;
+    }).join('') + '</tbody></table></div>' +
+    (puedeAprobar ? '' : '<div class="hint" style="margin-top:8px"><i class="bi bi-lock me-1"></i>Solo el Gerente de Operaciones (o su backup activo) puede aprobar.</div>');
+}
+
+async function resolver(id, accion){
+  let motivo = null;
+  if (accion==='rechazar'){ motivo = prompt('Motivo del rechazo:'); if (!motivo || !motivo.trim()) return; }
+  else if (!confirm('¿Aprobar este ajuste? Desde ese momento rige en comisiones y rentabilidad.')) return;
+  const r = await fetch('/api/comisiones/ajustes/'+id+'/resolver', { method:'POST', headers:H, body: JSON.stringify({ accion, motivo }) });
+  const j = await r.json();
+  if (!j.success) return alert(j.error || 'No se pudo resolver');
+  cargarMes();
+}
+
+/* ── Historia: mes → ejecutivos → operaciones ── */
+async function cargarHistoria(){
+  const box = document.getElementById('histBox');
+  try {
+    const r = await fetch('/api/comisiones/ajustes/historia', { headers:H });
+    const j = await r.json();
+    const meses = j.data || [];
+    if (!meses.length) { box.innerHTML = '<div class="hint">Aún no hay comisiones modificadas.</div>'; return; }
+    box.innerHTML = meses.map((m,mi) => `
+      <div class="acc" id="am${mi}">
+        <div class="acc-h" onclick="document.getElementById('am${mi}').classList.toggle('open')">
+          <i class="bi bi-calendar3"></i> ${esc(m.mes)}
+          <span class="chip ch-pen" style="background:#e0e7ff;color:#3730a3">${m.n} modificación(es)</span>
+          <span style="flex:1"></span>
+          <span class="${m.total_dif>=0?'dif-pos':'dif-neg'}">${m.total_dif>=0?'+':''}${clp(m.total_dif)}</span>
+        </div>
+        <div class="acc-b">
+          ${m.ejecutivos.map((e,ei) => `
+            <div class="acc" id="ae${mi}_${ei}">
+              <div class="acc-h" style="background:#fff" onclick="event.stopPropagation();document.getElementById('ae${mi}_${ei}').classList.toggle('open')">
+                <i class="bi bi-person"></i> ${esc(e.ejecutivo)}
+                <span class="hint">${e.n} op(s)</span><span style="flex:1"></span>
+                <span class="${e.total_dif>=0?'dif-pos':'dif-neg'}">${e.total_dif>=0?'+':''}${clp(e.total_dif)}</span>
+              </div>
+              <div class="acc-b"><div style="overflow-x:auto"><table><thead><tr>
+                <th>N° Op</th><th class="num">Com. normal</th><th class="num">Com. modificada</th><th class="num">% variación</th><th class="num">Δ $</th>
+                <th>Modificó</th><th>Cuándo</th><th>Aprobó</th><th>Cuándo</th><th>Comentario</th><th>Estado</th>
+              </tr></thead><tbody>
+              ${e.ops.map(o => `<tr>
+                <td><b>${o.num_op}</b></td>
+                <td class="num">${clp(o.comision_normal)}</td>
+                <td class="num"><b>${clp(o.comision_modificada)}</b></td>
+                <td class="num ${o.dif>=0?'dif-pos':'dif-neg'}">${o.pct==null?'—':(o.pct>=0?'+':'')+o.pct.toFixed(1).replace('.',',')+'%'}</td>
+                <td class="num ${o.dif>=0?'dif-pos':'dif-neg'}">${o.dif>=0?'+':''}${clp(o.dif)}</td>
+                <td>${esc(o.solicitado_por||'')}</td><td class="hint">${fD(o.solicitado_at)}</td>
+                <td>${esc(o.aprobado_por||'')}</td><td class="hint">${fD(o.aprobado_at)}</td>
+                <td class="hint" style="max-width:300px">${esc(o.comentario)}${o.rechazo_motivo?'<br><b style="color:#991b1b">Rechazo:</b> '+esc(o.rechazo_motivo):''}</td>
+                <td><span class="chip ${o.estado==='APROBADA'?'ch-apr':'ch-rec'}">${o.estado}</span></td>
+              </tr>`).join('')}
+              </tbody></table></div></div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  } catch(e){ box.innerHTML = '<div class="hint">Error: '+esc(e.message)+'</div>'; }
+}
+
+init();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

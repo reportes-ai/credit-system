@@ -453,6 +453,14 @@ async function calcularMes(mes) {
     const dctos = await descuentosDelMes(mes, vars);
     Object.keys(dctos).forEach(ej => { if (!map[ej]) map[ej] = []; });
 
+    // Ajustes de comisión por operación APROBADOS (Modificar Comisión Ejecutivo):
+    // se aplican como línea de ajuste sobre el total a pagar, con su traza.
+    const [ajRows] = await pool.query(
+      "SELECT num_op, ejecutivo, comision_normal, comision_modificada, comentario, aprobado_por FROM comisiones_ajustes_op WHERE mes = ? AND estado = 'APROBADA'",
+      [mes]).catch(() => [[]]);
+    const ajustesPorEj = {};
+    for (const a of ajRows) (ajustesPorEj[a.ejecutivo] = ajustesPorEj[a.ejecutivo] || []).push(a);
+
     const resultado = Object.entries(map).map(([ejecutivo, creds]) => {
       const calc = calcularComision(creds, vars, mes);
       const aprob = aprobMap[ejecutivo] || { estado: 'pendiente' };
@@ -489,6 +497,23 @@ async function calcularMes(mes) {
       calc.saldo_descuento = total_descuentos - aplicado;
       calc.con_semana_corrida_bruto = bruto;
       calc.con_semana_corrida = bruto - aplicado;
+
+      // Ajustes por operación aprobados: la comisión modificada REEMPLAZA a la
+      // normal de esa op; la diferencia se suma/resta al total a pagar y cada
+      // crédito ajustado queda marcado para la vista de Revisión.
+      const ajs = ajustesPorEj[ejecutivo] || [];
+      if (ajs.length) {
+        let difTotal = 0;
+        for (const a of ajs) {
+          const dif = Number(a.comision_modificada) - Number(a.comision_normal);
+          difTotal += dif;
+          const cr = creds.find(c => String(c.num_op) === String(a.num_op));
+          if (cr) cr.ajuste_comision = { normal: Number(a.comision_normal), modificada: Number(a.comision_modificada), dif, comentario: a.comentario, aprobado_por: a.aprobado_por };
+        }
+        calc.ajustes_op = ajs;
+        calc.total_ajustes_op = difTotal;
+        calc.con_semana_corrida += difTotal;
+      }
 
       return { ejecutivo, mes, ...calc, estado: aprob.estado, notas: aprob.notas, aprobado_at: aprob.aprobado_at,
         ejec_estado: aprob.ejec_estado || 'pendiente', ejec_comentario: aprob.ejec_comentario || null, ejec_at: aprob.ejec_at || null, ejec_por: aprob.ejec_por || null, creditos: creds };
