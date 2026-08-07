@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.24 — breadcrumb sigue a la pestaña activa (Generador, Impresión, etc.) -->
+  <!-- v4.25 — card Simulador de Excepciones (permiso excepciones_simulador) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -234,6 +234,11 @@
     <button class="ap-card" id="cardMisCartas" onclick="showTab('lista')">
       <div class="card-icon"><i class="bi bi-list-ul"></i></div>
       <h6>Mis Cartas</h6><p>Estado de tus cartas: corrige rechazadas y haz seguimiento</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardExcepciones" onclick="location.href='/excepciones/'" style="display:none">
+      <div class="card-icon"><i class="bi bi-stars"></i></div>
+      <h6>Simulador de Excepciones</h6><p>Juega con el negocio, valida el piso de rentabilidad y genera tu código de excepción (estrellas y comodín)</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
     <button class="ap-card" id="cardInformes" onclick="showTab('informes')" style="display:none">
@@ -905,6 +910,7 @@ async function cargarPermisos(){
   if (can('aprob_revisar'))   document.getElementById('cardRevision').style.display = '';
   if (can('aprob_vigentes'))  document.getElementById('cardVigentes').style.display = '';
   if (can('aprob_ver_todas')) document.getElementById('cardInformes').style.display = '';
+  if (can('excepciones_simulador')) document.getElementById('cardExcepciones').style.display = '';
   // Cartolas (Emisión + Enviadas) se movieron a Post Venta; sus cards ya no se muestran aquí.
   if (can('aprob_desempeno')) document.getElementById('cardDesempeno').style.display = '';
   if (can('aprob_mantenedor')) document.getElementById('cardMantenedor').style.display = '';
