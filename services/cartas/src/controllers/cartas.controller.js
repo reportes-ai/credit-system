@@ -1525,12 +1525,18 @@ const parseUnidad = async (req, res) => {
       acreedor: c.acreedor || 'UNIDAD DE CREDITO',
       marca: c.marca || null, modelo: c.modelo || null, anio: c.anio || null, patente: c.patente || null,
       precioVenta: c.precioVenta || null, pie: c.pie || null, saldo: c.saldo || null,
-      plazo: c.plazo || null, tasaCredito: c.tasaCredito || null, montoCreditoCLP: c.montoCreditoCLP || null,
+      plazo: c.plazo || null, tasaCredito: c.tasaCredito || null,
+      /* Monto del crédito: manda la COTIZACIÓN (declara "Monto Bruto del Crédito"
+         explícito). La Carta Compromiso no lo trae y su fallback "Total a pagar"
+         puede ser la cuota → terminaba guardando el saldo (caso 26634853CV). */
+      montoCreditoCLP: q.montoCreditoCLP || c.montoCreditoCLP || null,
       partBruto: c.partBruto || null,
       concesionario: c.concesionario || null, rutConc: c.rutConc || null, vendedor: c.vendedor || null,
     };
     if (c.opOrigen && q.opOrigen && c.opOrigen !== q.opOrigen)
       out.warnings.push(`El N° de operación no coincide: Carta ${c.opOrigen} vs Cotización ${q.opOrigen}`);
+    if (c.montoCreditoCLP && q.montoCreditoCLP && c.montoCreditoCLP !== q.montoCreditoCLP)
+      out.warnings.push(`El monto del crédito difiere: Carta Compromiso $${c.montoCreditoCLP.toLocaleString('es-CL')} vs Cotización $${q.montoCreditoCLP.toLocaleString('es-CL')} — se usa el Monto Bruto de la Cotización.`);
     res.json({ success: true, data: out, error: null });
   } catch (e) { console.error('[parseUnidad]', e.message); res.status(500).json({ success: false, data: null, error: 'No se pudo procesar el documento' }); }
 };
