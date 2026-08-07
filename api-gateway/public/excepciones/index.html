@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.0 -->
+  <!-- v1.1 — fix: uacPct ya viene en fracción (doble división dejaba Unidad negativa) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -275,8 +275,9 @@ function calc(){
   SIMS = {};
   let filas = '';
   for (const plazo of plazosCfg()) {
+    // pctUACOperacion ya devuelve FRACCIÓN (0.14), igual que espera AF_RENT
     const uacPct = window.AF_UAC_TIER ? window.AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo }, P) : null;
-    const inpBase = { valor:precio, pie, plazo, gastos, seguros:seg, esPatio, uacPct: uacPct!=null ? uacPct/100 : null };
+    const inpBase = { valor:precio, pie, plazo, gastos, seguros:seg, esPatio, uacPct };
     const base = window.AF_RENT.calcular(inpBase, P, UF, T);
     if (!base) { filas += `<tr><td>${plazo}</td><td colspan="6" style="color:#94a3b8">—</td></tr>`; continue; }
     // Excepción: tasa cliente rebajada (relativa) + comisión dealer modificada
@@ -304,7 +305,7 @@ function calc(){
       <td><b>${fmt$(exc.af.cuota)}</b></td>
       <td><span class="lado-pill lado-${lado}">${ladoTxt}</span></td>
       <td>${fmt$(exc.af.rentab)}${rebaja>0?` <span class="nota">(tasa ${(exc.tasaCliPct).toFixed(2)}%)</span>`:''}</td>
-      <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${uacPct}%)</span>`:''}</td>
+      <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${(uacPct*100).toFixed(0)}%)</span>`:''}</td>
       <td class="${cumple?'ok-piso':'mal-piso'}">${cumple?'✓ cumple':'✗ bajo piso'}<div class="nota">${propuesta}</div></td>
       <td><button class="btn-cod" ${cumple?'':'disabled'} onclick="pedirCodigo(${plazo})"><i class="bi bi-key me-1"></i>Código</button></td>
     </tr>`;
