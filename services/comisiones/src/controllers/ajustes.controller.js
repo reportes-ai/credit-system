@@ -42,15 +42,16 @@ require('../../../../shared/migrate').enFila('comisiones-ajustes', async () => {
       (7800003, 150001, 'Modificar Comisión — solicitar (Analista de Operaciones)', 'com_ejec_mod_solicitar', NULL, NULL),
       (7800004, 150001, 'Modificar Comisión — aprobar (Gerente de Operaciones o backup)', 'com_ejec_mod_aprobar', NULL, NULL)`);
     const dar = async (perfil, funcs) => {
-      const [[p]] = await pool.query('SELECT id_perfil FROM perfiles WHERE UPPER(nombre) = ? LIMIT 1', [perfil]);
+      // LIKE: el nombre real es "Gerente de Operaciones y Crédito"
+      const [[p]] = await pool.query('SELECT id_perfil FROM perfiles WHERE UPPER(nombre) LIKE ? ORDER BY id_perfil LIMIT 1', [perfil]);
       if (!p) return;
       for (const f of funcs)
         await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
                           SELECT ?, id_funcionalidad FROM funcionalidades WHERE codigo = ?`, [p.id_perfil, f]);
     };
-    await dar('ADMINISTRADOR',            ['com_ejec_mod', 'com_ejec_mod_solicitar', 'com_ejec_mod_aprobar']);
-    await dar('ANALISTA DE OPERACIONES',  ['com_ejec_mod', 'com_ejec_mod_solicitar']);
-    await dar('GERENTE DE OPERACIONES',   ['com_ejec_mod', 'com_ejec_mod_aprobar']);
+    await dar('ADMINISTRADOR',             ['com_ejec_mod', 'com_ejec_mod_solicitar', 'com_ejec_mod_aprobar']);
+    await dar('ANALISTA DE OPERACIONES',   ['com_ejec_mod', 'com_ejec_mod_solicitar']);
+    await dar('GERENTE DE OPERACIONES%',   ['com_ejec_mod', 'com_ejec_mod_aprobar']);
     console.log('[comisiones-ajustes] tabla + permisos OK');
   } catch (e) { console.error('[comisiones-ajustes migration]', e.message); }
 });
