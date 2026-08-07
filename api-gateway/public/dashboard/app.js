@@ -5077,19 +5077,22 @@ async function _reCargarBase(){
   const UF = u&&u.valor?parseFloat(u.valor):null;
   const P  = (jPar.success&&jPar.data&&jPar.data.obj)?jPar.data.obj:{};
   const T  = jTas.data?(Array.isArray(jTas.data)?jTas.data[0]:jTas.data):{};
-  const ym = d => d?String(d).slice(0,7):null;
+  // Período de negocio: el campo MES manda (igual que el Dashboard); la fecha
+  // de otorgamiento es fallback. Sin esto, una op con mes julio otorgada el
+  // 30-06 se caía del mes y este informe no cuadraba con Otorgados.
+  const ym = c => c.mes ? String(c.mes).slice(0,7) : (c.fecha_otorgado ? String(c.fecha_otorgado).slice(0,7) : null);
 
   // Nº de ops UAC por mes (para el tier)
   const uacMes = {};
   for(const c of CRED){
     if(String(c.estado||'').toUpperCase()!=='OTORGADO') continue;
-    const m=ym(c.fecha_otorgado); if(!m) continue;
+    const m=ym(c); if(!m) continue;
     if((c.financiera||'').toUpperCase().includes('UNIDAD')) uacMes[m]=(uacMes[m]||0)+1;
   }
   const ops=[];
   for(const c of CRED){
     if(String(c.estado||'').toUpperCase()!=='OTORGADO') continue;
-    const m=ym(c.fecha_otorgado); if(!m) continue;
+    const m=ym(c); if(!m) continue;
     const fin=(c.financiera||'').toUpperCase();
     const colo = fin.includes('AUTOFIN')?'AF':(fin.includes('UNIDAD')?'UAC':null);
     if(!colo) continue;                             // cartera propia: fuera

@@ -103,7 +103,7 @@
   <div class="topnav-left">
     <a href="/" class="topnav-brand">
       <img src="/img/logo.png" alt="AutoFácil">
-      <span class="version-badge" id="versionBadge">v1.16</span>
+      <span class="version-badge" id="versionBadge">v1.17</span>
     </a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
@@ -214,6 +214,8 @@ const fmtCLP = v => { const n=Math.round(Number(v)||0); return '$'+n.toLocaleStr
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtRUT = r => { const c=String(r||'').replace(/[^0-9kK]/g,''); if(c.length<2) return r||''; const dv=c.slice(-1), num=c.slice(0,-1); return parseInt(num).toLocaleString('es-CL')+'-'+dv.toUpperCase(); };
 const ym = d => { if(!d) return ''; const x=new Date(d); return isNaN(x)?String(d).slice(0,7):`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}`; };
+// Período de negocio: el campo MES manda (igual que el Dashboard); fecha_otorgado es fallback.
+const mesOp = c => c.mes ? ym(c.mes) : ym(c.fecha_otorgado);
 /* tascli_real viene con unidades mezcladas según el origen del crédito:
    decimal mensual (0.0255), porcentaje mensual (2.55) o porcentaje anual (28).
    Lo normalizamos a decimal mensual. <=0 → null (el motor usa TMC vigente). */
@@ -272,7 +274,7 @@ function preferenteSegunTabla(plazo, saldo){
   }
   await cargarBase();
   // Mes por defecto = mes con datos más reciente (o mes actual)
-  const meses = [...new Set(CREDITOS.map(c=>ym(c.fecha_otorgado)).filter(Boolean))].sort().reverse();
+  const meses = [...new Set(CREDITOS.map(mesOp).filter(Boolean))].sort().reverse();
   document.getElementById('mesSel').value = meses[0] || ym(new Date());
   recalcular();
 })();
@@ -304,7 +306,7 @@ async function cargarBase(){
 function tierDelMes(mes){
   const count = CREDITOS.filter(c =>
     (c.financiera||'').toUpperCase().includes('UNIDAD') &&
-    c.fecha_otorgado && ym(c.fecha_otorgado)===mes
+    mesOp(c)===mes
   ).length;
   const t = window.AF_UAC_TIER.tierUACInfo(count, PARAMS);
   return { n: t.n, pct: t.pct, count };
@@ -324,7 +326,7 @@ function recalcular(){
 
   const otorgados = CREDITOS.filter(c =>
     (String(c.estado||'').toUpperCase()==='OTORGADO') &&
-    c.fecha_otorgado && ym(c.fecha_otorgado)===mes
+    mesOp(c)===mes
   );
 
   FILAS = otorgados.map(c => {
