@@ -43,8 +43,12 @@ require('../../../../shared/migrate').enFila('excepciones-comerciales', async ()
        VALUES (30001, 'Excepciones Comerciales', 'mantenedores_excepciones', '/mantenedores/excepciones-comerciales/', 'bi-stars')`);
     const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE UPPER(nombre) LIKE 'ADMINISTRADOR%' ORDER BY id_perfil LIMIT 1");
     if (adm) await pool.query(
-      `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-       SELECT ?, id_funcionalidad FROM funcionalidades WHERE codigo='mantenedores_excepciones'`, [adm.id_perfil]);
+      `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+       SELECT ?, id_funcionalidad, 1 FROM funcionalidades WHERE codigo='mantenedores_excepciones'`, [adm.id_perfil]);
+    // habilitado=1 explícito: el default de la columna es 0 y mis-permisos filtra por él
+    await pool.query(
+      `UPDATE permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+       SET pp.habilitado = 1 WHERE f.codigo='mantenedores_excepciones' AND pp.id_perfil = ?`, [adm.id_perfil]);
     console.log('[excepciones-comerciales] parámetros + card OK');
   } catch (e) { console.error('[excepciones-comerciales migration]', e.message); }
 });
