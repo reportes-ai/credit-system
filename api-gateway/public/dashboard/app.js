@@ -5176,11 +5176,6 @@ async function buildVRentEj(soloRender){
         {label:'Lucro cesante',data:top.map(x=>x.lucro),backgroundColor:'#ef9a9a',borderRadius:4}]},
       options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
         scales:{x:{ticks:{color:'#666',font:{size:9},maxRotation:60,minRotation:40}},y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}}}})}),
-    donut:()=>({type:'doughnut',plugins:[_pctDonut],
-      data:{labels:top.map(x=>corto(x.ej)+' ('+(tot.rent?(x.rent/tot.rent*100).toFixed(1).replace('.',','):0)+'%)'),datasets:[{data:top.map(x=>x.rent),
-        backgroundColor:[C.navy,C.blue,C.teal,C.green,C.orange,C.yellow,C.lblue,'#8e24aa','#d81b60','#5d4037','#455a64','#7cb342','#00acc1','#ffb300']}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:9},boxWidth:10}},
-        tooltip:{callbacks:{label:c=>c.label+': '+_reCLP(c.raw)}}}}}),
     evol:()=>({type:'line',
       data:{labels:m12,datasets:[
         {label:'Rentabilidad realizada',data:serie('rent'),borderColor:C.green,backgroundColor:'rgba(67,160,71,.12)',fill:true,tension:.3,pointRadius:3},
@@ -5188,11 +5183,26 @@ async function buildVRentEj(soloRender){
       options:chOpts({plugins:{legend:{display:true,labels:{font:{size:9}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+_reCLP(c.raw)}}},
         scales:{y:{ticks:{callback:v=>_reM(v),color:'#888',font:{size:9}}},x:{ticks:{color:'#888',font:{size:9}}}}})}),
   };
-  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,donut:'Participación en la rentabilidad · '+fil.lbl,evol:'Evolución mensual — realizada vs lucro cesante'};
+  window._RE_TITULOS={bar:'Rentabilidad realizada por ejecutivo · '+fil.lbl,evol:'Evolución mensual — realizada vs lucro cesante'};
   _RE_CH.bar  =new Chart(document.getElementById('ch-re-bar'),  window._RE_CFG.bar());
-  _RE_CH.donut=new Chart(document.getElementById('ch-re-donut'),window._RE_CFG.donut());
   _RE_CH.evol =new Chart(document.getElementById('ch-re-evol'), window._RE_CFG.evol());
-  for(const k of ['bar','donut','evol']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
+  for(const k of ['bar','evol']){const cv=document.getElementById('ch-re-'+k);cv.style.cursor='zoom-in';cv.onclick=()=>_reAbrirPopup(k);}
+
+  // ── Cuadro Realizado vs Potencial: cuánto se ganó, cuánto se dejó de ganar
+  //    y cuánto habría sido el ingreso cursando todo por el lado más rentable.
+  const pot = tot.rent + tot.lucro;
+  const pReal = pot ? tot.rent/pot*100 : 0, pLucro = pot ? tot.lucro/pot*100 : 0;
+  const fila=(lbl,val,pct,color,peso)=>'<div style="display:flex;align-items:center;justify-content:space-between;background:#f7f9fc;border-left:4px solid '+color+';border-radius:8px;padding:12px 14px">'
+    +'<div><div style="font-size:10px;color:#8aa0b8;text-transform:uppercase;letter-spacing:.03em">'+lbl+'</div>'
+    +'<div style="font-size:'+(peso?'1.35rem':'1.15rem')+';font-weight:800;color:'+color+'">'+_reCLP(val)+'</div></div>'
+    +'<div style="font-size:1rem;font-weight:800;color:'+color+'">'+pct+'</div></div>';
+  document.getElementById('re-resumen').innerHTML =
+      fila('Rentabilidad realizada', tot.rent,  pReal.toFixed(1).replace('.',',')+'%', '#166534', 0)
+    + fila('Lucro cesante',          tot.lucro, pLucro.toFixed(1).replace('.',',')+'%', '#e53935', 0)
+    + fila('Ingreso potencial (si todo se cursara por el lado más rentable)', pot, '100%', '#1a3a6a', 1)
+    + '<div style="background:#eef2fa;border-radius:6px;height:16px;overflow:hidden;display:flex">'
+    +   '<div style="background:linear-gradient(90deg,#16a34a,#4caf50);width:'+pReal+'%" title="Realizado '+pReal.toFixed(1)+'%"></div>'
+    +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Lucro cesante '+pLucro.toFixed(1)+'%"></div></div>';
 
   // ── Tabla
   const filasHtml=lista.map(x=>{
