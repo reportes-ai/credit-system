@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.3 — lado a cursar seleccionable; el piso 75% se evalúa sobre el lado ELEGIDO -->
+  <!-- v1.4 — cursación estándar no requiere código; excepción = rebaja tasa, baja comisión o lado contrario -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -315,6 +315,10 @@ function calc(){
     const esTu = dif < diffTu;   // bajo el umbral da lo mismo dónde cursar
     const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;
     const cumple = rentExc >= mejorBase * piso;
+    // ¿Hay EXCEPCIÓN? Solo si se tocó algo: rebaja de tasa, comisión dealer, o
+    // cursar por el lado contrario al sugerido (fuera del rango "Decides Tú").
+    // Cursación estándar por el lado correcto NO gasta estrella ni pide código.
+    const hayExcepcion = rebaja > 0 || comDealerNueva != null || (lado !== sugerido && !esTu);
     // Si no cumple: proponer la rebaja de comisión dealer (neta) que devuelve al piso
     let propuesta = '';
     if (!cumple) {
@@ -332,8 +336,10 @@ function calc(){
       <td style="white-space:nowrap">${pill('AF','Autofin')} ${pill('UAC','Unidad')}${esTu?`<div class="nota" style="color:#166534;font-weight:700">Decides Tú (dif &lt; ${diffTu}%)</div>`:''}</td>
       <td>${fmt$(exc.af.rentab)}${rebaja>0?` <span class="nota">(tasa ${(exc.tasaCliPct).toFixed(2)}%)</span>`:''}</td>
       <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${(uacPct*100).toFixed(0)}%)</span>`:''}</td>
-      <td class="${cumple?'ok-piso':'mal-piso'}">${cumple?'✓ cumple':'✗ bajo piso'}<div class="nota">${propuesta}</div></td>
-      <td><button class="btn-cod" ${cumple?'':'disabled'} onclick="pedirCodigo(${plazo})"><i class="bi bi-key me-1"></i>Código</button></td>
+      <td class="${!hayExcepcion?'':(cumple?'ok-piso':'mal-piso')}">${!hayExcepcion?'<span class="nota">estándar</span>':(cumple?'✓ cumple':'✗ bajo piso')}<div class="nota">${hayExcepcion?propuesta:''}</div></td>
+      <td>${hayExcepcion
+        ? `<button class="btn-cod" ${cumple?'':'disabled'} onclick="pedirCodigo(${plazo})"><i class="bi bi-key me-1"></i>Código</button>`
+        : `<span class="nota" style="font-weight:700;color:#16a34a"><i class="bi bi-check-circle me-1"></i>No requiere código</span>`}</td>
     </tr>`;
   }
   body.innerHTML = filas;
