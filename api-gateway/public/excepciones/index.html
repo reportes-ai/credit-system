@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.6 — guía rápida al costado (estrella/comodín/gerencia, uso del código) -->
+  <!-- v1.7 — comodín: poder propio (aprueba bajo piso), tope 5, conteo desde el lanzamiento -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -148,10 +148,12 @@
       Generar un código gasta una estrella. Las que no uses <b>expiran al cierre del mes</b>.
     </div>
     <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">🏆 Comodín dorado</b> — partes con 1 y ganas otro cada 50
-      otorgadas acumuladas. <b>No vence</b> y aprueba operaciones que una estrella no puede,
-      con una sola condición: que la rentabilidad AutoFácil supere en 10% a la comisión más
-      alta (dealer o ejecutivo). Se ofrece solo cuando ya no te quedan estrellas.
+      <b style="color:var(--navy)">🏆 Comodín dorado</b> — un poder DISTINTO a la estrella:
+      aprueba <b>cualquier operación, incluso bajo el piso del 75%</b>, con una sola condición:
+      que la rentabilidad AutoFácil supere en 10% a la comisión más alta (dealer o ejecutivo).
+      Partes con 1 de regalo y ganas otro cada 50 otorgadas desde el inicio del programa.
+      <b>No vence</b> y se acumulan <b>hasta 5</b>. La estrella, en cambio, solo aprueba
+      excepciones que sí cumplen el piso.
     </div>
     <div style="margin-bottom:10px">
       <b style="color:var(--navy)">👔 Código de Gerencia</b> — para el caso puntual cuando no
@@ -301,7 +303,7 @@ function pintarPresu(){
   document.getElementById('presu').innerHTML = `
     <div><div class="lbl">Estrellas del mes (${e.es_primer_mes ? 'primer mes' : e.otorgadas_mes_anterior + ' otorgadas mes anterior × ' + (EX.exc_pct_mensual ?? 33) + '%'})</div>
       <span class="star">${stars}</span> <span class="num">${e.estrellas_disponibles} de ${e.estrellas_total}</span></div>
-    <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">Comodín dorado (1 cada ${EX.exc_comodin_cada ?? 50} otorgadas · llevas ${e.otorgadas_historicas})</div>
+    <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">Comodín dorado (1 de regalo + 1 cada ${EX.exc_comodin_cada ?? 50} otorgadas desde el inicio · llevas ${e.otorgadas_desde_lanzamiento ?? 0} · máx ${EX.exc_comodin_max ?? 5})</div>
       <span class="star">${coms}</span> <span class="num">${e.comodines_disponibles}</span></div>
     <div style="border-left:1px solid #e2e8f0;padding-left:14px" class="nota">Los códigos vencen a las ${EX.exc_vigencia_horas ?? 24} h — si vence sin usar, la estrella vuelve. Las estrellas no usadas expiran al cierre del mes.</div>`;
 }
@@ -366,6 +368,10 @@ function calc(){
     const esTu = dif < diffTu;   // bajo el umbral da lo mismo dónde cursar
     const rentExc = lado === 'UAC' ? exc.uac.rentab : exc.af.rentab;
     const cumple = rentExc >= mejorBase * piso;
+    // Comodín dorado: poder DISTINTO a la estrella — aprueba aunque esté bajo el
+    // piso 75%, con su única condición: rentab > comisión más alta × (1+10%).
+    const mayorCom = Math.max(exc.costos.dealer, exc.costos.ejecutivo);
+    const comodinAplica = rentExc > mayorCom * (1 + (EX.exc_comodin_factor_pct ?? 10)/100);
     // ¿Hay EXCEPCIÓN? Solo si se tocó algo: rebaja de tasa, comisión dealer, o
     // cursar por el lado contrario al sugerido (fuera del rango "Decides Tú").
     // Cursación estándar por el lado correcto NO gasta estrella ni pide código.
@@ -379,7 +385,7 @@ function calc(){
       propuesta = comProp > 0 ? `Propuesta: bajar comisión dealer a ${fmt$(comProp)} (neto −${fmt$(falta)})`
                               : `Ni con comisión dealer $0 se alcanza el piso por este lado`;
     }
-    SIMS[plazo] = { plazo, base, exc, lado, rentExc, mejorBase, cumple, rebaja, comDealerNueva, esPatio, seg, precio, pie, saldo, uacPct };
+    SIMS[plazo] = { plazo, base, exc, lado, rentExc, mejorBase, cumple, comodinAplica, rebaja, comDealerNueva, esPatio, seg, precio, pie, saldo, uacPct };
     const pill = (l, txt) => {
       const bloq = l === 'UAC' && uacBloqueada;
       return `<span class="lado-pill lado-${l}" title="${bloq?'Rebaja sobre el máximo: forzada a Autofin':''}" style="cursor:${bloq?'not-allowed':'pointer'};${lado===l?'outline:2px solid currentColor':'opacity:'+(bloq?'.25':'.45')}" onclick="${bloq?'':`elegirLado(${plazo},'${l}')`}">${txt}</span>`;
@@ -390,9 +396,10 @@ function calc(){
       <td style="white-space:nowrap">${pill('AF','Autofin')} ${pill('UAC','Unidad')}${esTu?`<div class="nota" style="color:#166534;font-weight:700">Decides Tú (dif &lt; ${diffTu}%)</div>`:''}</td>
       <td>${fmt$(exc.af.rentab)}${rebaja>0?` <span class="nota">(tasa ${(exc.tasaCliPct).toFixed(2)}%)</span>`:''}</td>
       <td>${fmt$(exc.uac.rentab)}${uacPct!=null?` <span class="nota">(${(uacPct*100).toFixed(0)}%)</span>`:''}</td>
-      <td class="${!hayExcepcion?'':(cumple?'ok-piso':'mal-piso')}">${!hayExcepcion?'<span class="nota">estándar</span>':(cumple?'✓ cumple':'✗ bajo piso')}<div class="nota">${hayExcepcion?propuesta:''}</div></td>
+      <td class="${!hayExcepcion?'':(cumple?'ok-piso':'mal-piso')}">${!hayExcepcion?'<span class="nota">estándar</span>':(cumple?'✓ cumple':'✗ bajo piso')}
+        <div class="nota">${hayExcepcion ? (cumple ? propuesta : (comodinAplica ? 'Aprobable solo con Comodín dorado 🏆' : propuesta)) : ''}</div></td>
       <td>${hayExcepcion
-        ? `<button class="btn-cod" ${cumple?'':'disabled'} onclick="pedirCodigo(${plazo})"><i class="bi bi-key me-1"></i>Código</button>`
+        ? `<button class="btn-cod" ${(cumple || (comodinAplica && (ESTADO?.comodines_disponibles||0) > 0))?'':'disabled'} onclick="pedirCodigo(${plazo})">${cumple?'<i class="bi bi-key me-1"></i>Código':'🏆 Comodín'}</button>`
         : `<span class="nota" style="font-weight:700;color:#16a34a"><i class="bi bi-check-circle me-1"></i>No requiere código</span>`}</td>
     </tr>`;
   }
@@ -418,17 +425,22 @@ async function pedirCodigo(plazo){
   if (!s) return;
   const rut = document.getElementById('fRut').value.trim();
   if (rut.replace(/[^0-9]/g,'').length < 7) { toast('Ingresa el RUT del cliente antes de generar el código', true); return; }
-  let tipo = 'PROPIO';
-  if (ESTADO.estrellas_disponibles <= 0) {
-    if (ESTADO.comodines_disponibles > 0) {
-      // Comodín: rentab AF debe superar en % a la MÁS ALTA entre com dealer y ejecutivo
-      const factor = 1 + (EX.exc_comodin_factor_pct ?? 10)/100;
-      const mayorCom = Math.max(s.exc.costos.dealer, s.exc.costos.ejecutivo);
-      if (s.rentExc <= mayorCom * factor) { toast('El comodín exige que la rentabilidad supere en ' + (EX.exc_comodin_factor_pct??10) + '% a la comisión más alta (dealer/ejecutivo)', true); return; }
-      if (!confirm('No te quedan estrellas este mes. ¿Usar tu COMODÍN DORADO 🏆 para esta operación?')) return;
-      tipo = 'COMODIN';
-    } else { toast('Sin estrellas ni comodines disponibles. Puedes pedir un código de Gerencia.', true); return; }
-  }
+  /* Estrella y comodín son poderes DISTINTOS:
+     · Estrella: aprueba excepciones que cumplen el piso 75%.
+     · Comodín: aprueba CUALQUIER operación (incluso bajo el piso) con su única
+       condición: rentab > comisión más alta × 1,10. */
+  let tipo;
+  if (!s.cumple) {
+    if (!s.comodinAplica) { toast('Bajo el piso y no cumple la condición del comodín (rentabilidad debe superar en ' + (EX.exc_comodin_factor_pct??10) + '% a la comisión más alta). Solo queda pedir un código de Gerencia.', true); return; }
+    if ((ESTADO.comodines_disponibles||0) <= 0) { toast('Esta operación está bajo el piso: solo se aprueba con Comodín dorado y no te quedan. Puedes pedir un código de Gerencia.', true); return; }
+    if (!confirm('Esta operación está BAJO el piso del 75% — solo tu COMODÍN DORADO 🏆 puede aprobarla. ¿Usarlo?')) return;
+    tipo = 'COMODIN';
+  } else if ((ESTADO.estrellas_disponibles||0) > 0) {
+    tipo = 'PROPIO';
+  } else if (s.comodinAplica && (ESTADO.comodines_disponibles||0) > 0) {
+    if (!confirm('No te quedan estrellas este mes. ¿Usar tu COMODÍN DORADO 🏆 para esta operación?')) return;
+    tipo = 'COMODIN';
+  } else { toast('Sin estrellas disponibles' + ((ESTADO.comodines_disponibles||0)>0 ? ' (y la operación no cumple la condición del comodín)' : ' ni comodines') + '. Puedes pedir un código de Gerencia.', true); return; }
   try {
     const r = await fetch('/api/excepciones/generar', { method:'POST', headers:H, body: JSON.stringify({
       tipo, rut_cliente: rut, saldo_precio: s.saldo, plazo: s.plazo,
