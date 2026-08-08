@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.0 — escalera de estrellas: 1⭐ piso 75% · 2⭐ piso 50% · 3⭐ cualquier op (chao comodín) -->
+<!-- v3.1 — nivel 3 con piso 25% además de la condición del 10% -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -461,14 +461,14 @@ const on = id => $(id).classList.contains('on');
       inviable queda gris. ── */
 let LADO_SEL = null, DUO = null;
 /* Escalera de estrellas: nivel 1 (1⭐, piso 75%) · nivel 2 (2⭐, piso 50%) ·
-   nivel 3 (3⭐, cualquier op si rentab > comisión más alta × 1,10). */
+   nivel 3 (3⭐, piso 25% Y rentab > comisión más alta × 1,10 — doble candado). */
 function nivelDe(rent, mejor, costos){
-  const p1 = (EX.exc_piso_pct ?? 75) / 100, p2 = (EX.exc_piso2_pct ?? 50) / 100;
+  const p1 = (EX.exc_piso_pct ?? 75) / 100, p2 = (EX.exc_piso2_pct ?? 50) / 100, p3 = (EX.exc_piso3_pct ?? 25) / 100;
   const f3 = 1 + (EX.exc_nivel3_factor_pct ?? 10) / 100;
   const n = EXC_ESTADO?.niveles || { n1: 1, n2: EX.exc_piso2_estrellas ?? 2, n3: EX.exc_nivel3_estrellas ?? 3 };
   if (rent >= mejor * p1) return { nivel: 1, costo: n.n1, tag: '⭐' };
   if (rent >= mejor * p2) return { nivel: 2, costo: n.n2, tag: '⭐⭐' };
-  if (rent > Math.max(costos.dealer, costos.ejecutivo) * f3) return { nivel: 3, costo: n.n3, tag: '⭐⭐⭐' };
+  if (rent >= mejor * p3 && rent > Math.max(costos.dealer, costos.ejecutivo) * f3) return { nivel: 3, costo: n.n3, tag: '⭐⭐⭐' };
   return null;
 }
 function renderDuo(R0, D, plazo, saldo, R){
@@ -542,7 +542,7 @@ function renderDuo(R0, D, plazo, saldo, R){
         el.classList.add('viable'); tag.style.display = ''; tag.textContent = nv.tag;
         por.textContent = nv.nivel === 1 ? 'Puedes cursar aquí usando una estrella.'
           : nv.nivel === 2 ? `Piso del 50% — cuesta ${nv.costo} estrellas.`
-          : `Bajo los pisos — la jugada grande: ${nv.costo} estrellas.`;
+          : `Piso del 25% — la jugada grande: ${nv.costo} estrellas.`;
       } else { el.classList.add('dim'); por.textContent = 'Ni con estrellas: va por Gerencia.'; }
     }
     else { el.classList.add('dim'); por.textContent = 'No conviene por acá.'; }
@@ -679,7 +679,7 @@ async function cargarExcEstado(){
     if (EXC_ESTADO) {
       $('excChip').style.display = '';
       $('excChip').textContent = `⭐${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total}`;
-      $('excChip').title = `Estrellas del mes: ${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total} · nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (cualquier operación)`;
+      $('excChip').title = `Estrellas del mes: ${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total} · nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (piso 25%)`;
     }
     calcular();
   } catch(_) {}
@@ -776,7 +776,7 @@ function sugerencias(ctx){
     if (n3Lado[l].length) {
       const ps = n3Lado[l].map(x => x.p).join(' o ');
       out.push({ ico:'bi-star-fill', col:'#7c2d12', nivel:3, costo:NV.n3, fin: l, plazoCod: n3Lado[l][0].p, disabled: disp < NV.n3, dorada: true,
-        txt:`<b>${nomFin(l)} a ${ps}</b> está bajo ambos pisos — la jugada grande: <b>${NV.n3} estrellas</b> (nivel 3).` });
+        txt:`<b>${nomFin(l)} a ${ps}</b> renta entre el 25% y el 50%: la jugada grande — <b>${NV.n3} estrellas</b> (nivel 3).` });
     }
   }
 

@@ -92,7 +92,7 @@
     <div style="font-size:.86rem;color:#64748b;line-height:1.5;margin-bottom:14px">
       Ingresa el negocio (precio, pie, plazo) y la app te dice dónde cursar y qué jugadas puedes hacer
       con tus estrellas: <b>1⭐</b> excepción dentro del piso 75% · <b>2⭐</b> hasta el piso 50% ·
-      <b>3⭐</b> cualquier operación (si la rentabilidad supera en 10% a la comisión más alta).
+      <b>3⭐</b> hasta el piso 25% (y la rentabilidad debe superar en 10% a la comisión más alta).
       Las estrellas del mes no usadas expiran; el código vence a las 24 h y sirve una sola vez.</div>
     <a href="/donde-curso/" class="btn-azul" style="text-decoration:none;display:inline-block"><i class="bi bi-signpost-split me-1"></i>Abrir ¿Dónde Curso?</a>
    </div>
@@ -220,7 +220,7 @@ function pintarPresu(){
     <div><div class="lbl">Estrellas del mes (${e.es_primer_mes ? 'primer mes: de regalo' : e.otorgadas_mes_anterior + ' otorgadas mes anterior × ' + (EX.exc_pct_mensual ?? 33) + '%'})</div>
       <span class="star">${stars}</span> <span class="num">${e.estrellas_disponibles} de ${e.estrellas_total}</span></div>
     <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">La escalera</div>
-      <div style="font-size:.82rem;font-weight:600;color:#334155">${'⭐'.repeat(nv.n1)} piso 75% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n2)} piso 50% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n3)} cualquier operación</div></div>
+      <div style="font-size:.82rem;font-weight:600;color:#334155">${'⭐'.repeat(nv.n1)} piso 75% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n2)} piso 50% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n3)} piso 25%</div></div>
     <div style="border-left:1px solid #e2e8f0;padding-left:14px" class="nota">Los códigos vencen a las ${EX.exc_vigencia_horas ?? 24} h — si vence sin usar, sus estrellas vuelven. Las no usadas expiran al cierre del mes.</div>`;
 }
 
