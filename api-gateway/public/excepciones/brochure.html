@@ -49,12 +49,12 @@
 <!-- ══ Personaje "Estrella" — dibujo plano reutilizable en 4 poses ══ -->
 <svg width="0" height="0" style="position:absolute">
   <defs>
-    <g id="max-base">
+    <g id="max-cuerpo">
       <ellipse cx="100" cy="205" rx="46" ry="6" fill="#00000014"/>
       <rect x="83" y="166" width="15" height="28" rx="6.5" fill="#1e2a4a"/>
       <rect x="102" y="166" width="15" height="28" rx="6.5" fill="#16223c"/>
-      <ellipse cx="87" cy="198" rx="14" ry="7.5" fill="#4a2f1d"/>
-      <ellipse cx="113" cy="198" rx="14" ry="7.5" fill="#3a2315"/>
+      <ellipse cx="86" cy="198" rx="14" ry="7.5" fill="#4a2f1d"/>
+      <ellipse cx="114" cy="198" rx="14" ry="7.5" fill="#3a2315"/>
       <path d="M76 120 q24 -9 48 0 l6 44 q-30 9 -60 0 z" fill="#0141A2"/>
       <path d="M100 117 l-9 17 9 24 9 -24 z" fill="#fff"/>
       <path d="M100 121 l-4.5 5 3 15 1.5 4 1.5 -4 3 -15 z" fill="#f59e0b"/>
@@ -70,22 +70,9 @@
       <ellipse cx="100" cy="80" rx="43" ry="41" fill="#ffd9b3"/>
       <path d="M57 78 c0 -27 19 -39 43 -39 c24 0 43 12 43 39 l0 7 c-3 -11 -8 -16 -13 -18 c3 6 3 11 1 14 c-8 -14 -21 -18 -31 -18 c-11 0 -21 3 -28 10 c-7 6 -12 14 -15 12 z" fill="#4a2f1d"/>
       <path d="M64 60 q8 -12 20 -16 q-6 8 -6 14 q-8 0 -14 8z" fill="#5d3d26"/>
-      <rect x="74" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-5 82 66)"/>
-      <rect x="110" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(5 118 66)"/>
-      <ellipse cx="84" cy="82" rx="5" ry="6.6" fill="#1e293b"/>
-      <ellipse cx="116" cy="82" rx="5" ry="6.6" fill="#1e293b"/>
-      <circle cx="85.8" cy="79.4" r="1.9" fill="#fff"/>
-      <circle cx="117.8" cy="79.4" r="1.9" fill="#fff"/>
       <circle cx="68" cy="96" r="6" fill="#f4a26b" opacity=".5"/>
       <circle cx="132" cy="96" r="6" fill="#f4a26b" opacity=".5"/>
       <path d="M97.5 90 q2.5 3.2 5 0" stroke="#e8955c" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-      <path d="M82 99 q18 17 36 0 q-4 14 -18 14 q-14 0 -18 -14 z" fill="#8c3a17"/>
-      <path d="M84.5 100.5 q15.5 8 31 0 l-1.5 4.5 q-14 6 -28 0 z" fill="#fff"/>
-    </g>
-    <g id="brazo">
-      <rect x="0" y="0" width="14.5" height="35" rx="7.2" fill="#0141A2"/>
-      <rect x="1.6" y="27.5" width="11.3" height="4.6" rx="2.3" fill="#fff"/>
-      <circle cx="7.2" cy="38" r="6.8" fill="#ffd9b3"/>
     </g>
     <g id="star-g"><path d="M12 0 l3.2 7.4 8 .7 -6.1 5.3 1.8 7.9 -6.9-4.2 -6.9 4.2 1.8-7.9 -6.1-5.3 8-.7z" fill="#f59e0b"/><path d="M12 0 l3.2 7.4 8 .7 -6.1 5.3 -5.1 -13.4z" fill="#fbbf24"/></g>
   </defs>
@@ -95,11 +82,14 @@
   <div class="stars-bg">⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐</div>
   <!-- Pose 1: saludando con estrella en alto -->
   <svg width="220" height="215" viewBox="0 0 200 210" aria-hidden="true">
-    <use href="#brazo" transform="translate(64 152) rotate(150)"/>
-    <use href="#max-base"/>
-    <use href="#brazo" transform="translate(131 122) rotate(-152 7 0)"/>
-    <use href="#star-g" transform="translate(150 32) scale(1.7)"/>
-    <use href="#star-g" transform="translate(30 46) scale(.8)" opacity=".7"/>
+    <path d="M78 128 C 66 138, 62 148, 68 156" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="70" cy="158" r="7" fill="#ffd9b3"/>
+    <use href="#max-cuerpo"/>
+    <path d="M124 128 C 138 118, 146 96, 149 72" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="150" cy="66" r="7" fill="#ffd9b3"/>
+    <rect x="74" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-5 82 66)"/><rect x="110" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(5 118 66)"/><ellipse cx="84" cy="82" rx="5" ry="6.6" fill="#1e293b"/><circle cx="85.8" cy="79.4" r="1.9" fill="#fff"/><ellipse cx="116" cy="82" rx="5" ry="6.6" fill="#1e293b"/><circle cx="117.8" cy="79.4" r="1.9" fill="#fff"/>
+    <path d="M82 99 q18 17 36 0 q-4 14 -18 14 q-14 0 -18 -14 z" fill="#8c3a17"/>
+      <path d="M84.5 100.5 q15.5 8 31 0 l-1.5 4.5 q-14 6 -28 0 z" fill="#fff"/>
+    <use href="#star-g" transform="translate(138 30) scale(1.7)"/>
+    <use href="#star-g" transform="translate(28 46) scale(.8)" opacity=".7"/>
   </svg>
   <h1>Tus Estrellas.<br>Tu poder de negociación.</h1>
   <div class="sub">Imagina cerrar el negocio ahí mismo, frente al cliente, sin llamar a nadie.
@@ -117,14 +107,17 @@
       </div>
       <div class="dibujo">
         <!-- Pose 2: mostrando 3 estrellas -->
-        <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
-          <use href="#brazo" transform="translate(69 126) rotate(138 7 0)"/>
-          <use href="#brazo" transform="translate(131 126) rotate(-138 7 0)"/>
-          <use href="#max-base"/>
-          <use href="#star-g" transform="translate(14 30)"/>
-          <use href="#star-g" transform="translate(86 2) scale(1.3)"/>
-          <use href="#star-g" transform="translate(162 30)"/>
-        </svg>
+  <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
+    <path d="M78 128 C 62 122, 48 108, 40 92" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="38" cy="88" r="7" fill="#ffd9b3"/>
+    <path d="M122 128 C 138 122, 152 108, 160 92" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="162" cy="88" r="7" fill="#ffd9b3"/>
+    <use href="#max-cuerpo"/>
+    <rect x="74" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-8 82 66)"/><rect x="110" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(5 118 66)"/><ellipse cx="84" cy="82" rx="5" ry="6.6" fill="#1e293b"/><circle cx="85.8" cy="79.4" r="1.9" fill="#fff"/><path d="M110.5 84 q5.5 -7 11 0" stroke="#1e293b" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <path d="M82 99 q18 17 36 0 q-4 14 -18 14 q-14 0 -18 -14 z" fill="#8c3a17"/>
+      <path d="M84.5 100.5 q15.5 8 31 0 l-1.5 4.5 q-14 6 -28 0 z" fill="#fff"/>
+    <use href="#star-g" transform="translate(12 42)"/>
+    <use href="#star-g" transform="translate(86 2) scale(1.3)"/>
+    <use href="#star-g" transform="translate(160 42)"/>
+  </svg>
       </div>
     </div>
   </div>
@@ -145,17 +138,21 @@
     <div class="fila">
       <div class="dibujo">
         <!-- Pose 3: pensando frente a la escalera -->
-        <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
-          <use href="#brazo" transform="translate(66 128) rotate(12 7 0)"/>
-          <use href="#max-base"/>
-          <use href="#brazo" transform="translate(134 132) rotate(-118 7 0)"/>
-          <rect x="148" y="152" width="42" height="12" rx="2" fill="#e2e8f0"/>
-          <rect x="158" y="130" width="32" height="12" rx="2" fill="#cbd5e1"/>
-          <rect x="168" y="108" width="22" height="12" rx="2" fill="#94a3b8"/>
-          <use href="#star-g" transform="translate(170 86) scale(.85)"/>
-          <circle cx="150" cy="44" r="3" fill="#cbd5e1"/><circle cx="158" cy="34" r="4" fill="#cbd5e1"/>
-          <ellipse cx="176" cy="20" rx="16" ry="11" fill="#e2e8f0"/><text x="176" y="25" text-anchor="middle" font-size="13" fill="#0141A2" font-weight="bold">?</text>
-        </svg>
+  <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
+    <path d="M76 128 C 68 140, 66 152, 68 160" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="69" cy="162" r="7" fill="#ffd9b3"/>
+    <use href="#max-cuerpo"/>
+    <path d="M124 128 C 136 130, 130 116, 122 108" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="119" cy="105" r="6.5" fill="#ffd9b3"/>
+    <rect x="72" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-16 80 66)"/><rect x="112" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(2 120 66)"/>
+    <ellipse cx="86" cy="82" rx="5" ry="6.6" fill="#1e293b"/><circle cx="88.3" cy="78.6" r="1.9" fill="#fff"/>
+    <ellipse cx="118" cy="82" rx="5" ry="6.6" fill="#1e293b"/><circle cx="120.3" cy="78.6" r="1.9" fill="#fff"/>
+    <path d="M92 103 q6 4 12 -1" stroke="#7c3a12" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <rect x="148" y="152" width="42" height="12" rx="2" fill="#e2e8f0"/>
+    <rect x="158" y="130" width="32" height="12" rx="2" fill="#cbd5e1"/>
+    <rect x="168" y="108" width="22" height="12" rx="2" fill="#94a3b8"/>
+    <use href="#star-g" transform="translate(170 86) scale(.85)"/>
+    <circle cx="148" cy="46" r="3" fill="#cbd5e1"/><circle cx="156" cy="36" r="4" fill="#cbd5e1"/>
+    <ellipse cx="174" cy="22" rx="16" ry="11" fill="#e2e8f0"/><text x="174" y="27" text-anchor="middle" font-size="13" fill="#0141A2" font-weight="bold">?</text>
+  </svg>
       </div>
       <div class="txt">
         <h2>La escalera: mientras más grande la jugada, más estrellas</h2>
@@ -183,13 +180,15 @@
       </div>
       <div class="dibujo">
         <!-- Pose 4: mano al corazón (confianza) -->
-        <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
-          <use href="#brazo" transform="translate(124 122) rotate(-22 7 0)"/>
-          <use href="#max-base"/>
-          <use href="#brazo" transform="translate(62 148) rotate(118 7 0)"/>
-          <path d="M96 136 c-4 -7 -14 -6 -14 2 c0 7 10 12 14 15 c4 -3 14 -8 14 -15 c0 -8 -10 -9 -14 -2z" fill="#dc2626"/>
-          <path d="M90 136 c1 -3 4 -4 6 -2" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>
-        </svg>
+  <svg width="200" height="215" viewBox="0 0 200 210" aria-hidden="true">
+    <path d="M76 128 C 66 140, 64 152, 70 160" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="72" cy="162" r="7" fill="#ffd9b3"/>
+    <use href="#max-cuerpo"/>
+    <path d="M124 128 C 130 138, 118 142, 104 142" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="100" cy="142" r="6.5" fill="#ffd9b3"/>
+    <rect x="74" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-3 82 66)"/><rect x="110" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(3 118 66)"/><path d="M78.5 84 q5.5 -7 11 0" stroke="#1e293b" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M110.5 84 q5.5 -7 11 0" stroke="#1e293b" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <path d="M86 99 q14 11 28 0" stroke="#7c3a12" stroke-width="3.6" fill="none" stroke-linecap="round"/>
+    <path d="M96 138 c-4 -7 -14 -6 -14 2 c0 7 10 12 14 15 c4 -3 14 -8 14 -15 c0 -8 -10 -9 -14 -2z" fill="#dc2626"/>
+    <path d="M90 138 c1 -3 4 -4 6 -2" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>
+  </svg>
       </div>
     </div>
   </div>
@@ -233,15 +232,19 @@
 <div class="cta">
   <!-- Pose 5: celebrando -->
   <svg width="220" height="215" viewBox="0 0 200 210" aria-hidden="true">
-    <use href="#brazo" transform="translate(60 122) rotate(152 7 0)"/>
-    <use href="#brazo" transform="translate(140 122) rotate(-152 7 0)"/>
-    <use href="#max-base"/>
-    <use href="#star-g" transform="translate(14 10) scale(1.1)"/>
-    <use href="#star-g" transform="translate(160 10) scale(1.1)"/>
-    <rect x="42" y="40" width="6" height="6" rx="1" fill="#fbbf24" transform="rotate(24 45 43)"/>
-    <rect x="152" y="48" width="6" height="6" rx="1" fill="#86efac" transform="rotate(-18 155 51)"/>
-    <rect x="58" y="16" width="5" height="5" rx="1" fill="#93c5fd" transform="rotate(40 60 18)"/>
-    <rect x="138" y="26" width="5" height="5" rx="1" fill="#fda4af" transform="rotate(-30 140 28)"/>
+    <path d="M76 126 C 60 114, 50 96, 46 80" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="44" cy="76" r="7" fill="#ffd9b3"/>
+    <path d="M124 126 C 140 114, 150 96, 154 80" stroke="#0141A2" stroke-width="13" fill="none" stroke-linecap="round"/><circle cx="156" cy="76" r="7" fill="#ffd9b3"/>
+    <use href="#max-cuerpo"/>
+    <rect x="74" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(-10 82 66)"/><rect x="110" y="64" width="16" height="5.5" rx="2.75" fill="#4a2f1d" transform="rotate(10 118 66)"/><path d="M78.5 84 q5.5 -7 11 0" stroke="#1e293b" stroke-width="3.4" fill="none" stroke-linecap="round"/><path d="M110.5 84 q5.5 -7 11 0" stroke="#1e293b" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="100" cy="103" rx="13" ry="10" fill="#8c3a17"/>
+      <path d="M89 100 q11 5 22 0 l0 -3 -22 0z" fill="#fff"/>
+      <ellipse cx="100" cy="109" rx="6" ry="3.5" fill="#e0634a"/>
+    <use href="#star-g" transform="translate(14 12) scale(1.1)"/>
+    <use href="#star-g" transform="translate(160 12) scale(1.1)"/>
+    <rect x="42" y="42" width="6" height="6" rx="1" fill="#fbbf24" transform="rotate(24 45 45)"/>
+    <rect x="152" y="50" width="6" height="6" rx="1" fill="#86efac" transform="rotate(-18 155 53)"/>
+    <rect x="58" y="18" width="5" height="5" rx="1" fill="#93c5fd" transform="rotate(40 60 20)"/>
+    <rect x="138" y="28" width="5" height="5" rx="1" fill="#fda4af" transform="rotate(-30 140 30)"/>
     <circle cx="100" cy="8" r="3" fill="#fbbf24"/>
   </svg>
   <h2 style="color:#fff;font-size:1.8rem">Tu próximo negocio difícil ya tiene solución.</h2>
