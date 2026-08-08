@@ -76,7 +76,7 @@ async function sembrarDefaults() {
 const CAT_MAIL = { b_alertas: 'Alertas', b_funciones: 'Funciones (atribuciones)', b_correos: 'Recepción Correos del Business Suite' };
 
 const nombreDe = async (id) => {
-  try { const [[u]] = await pool.query('SELECT nombre, apellido, email FROM usuarios WHERE id_usuario=?', [id]); return u || null; }
+  try { const [[u]] = await pool.query('SELECT nombre, apellido, email, sexo FROM usuarios WHERE id_usuario=?', [id]); return u || null; }
   catch (_) { return null; }
 };
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -85,15 +85,16 @@ const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').re
 async function avisarSuplente({ suplente, titularNombre, autorNombre, activeCats, activado }) {
   if (!suplente || !suplente.email) return;
   const ns = `${suplente.nombre || ''} ${suplente.apellido || ''}`.trim();
+  const trato = require('../../../../shared/genero').estimado(suplente.sexo);
   let cuerpo;
   if (activado) {
     cuerpo = `
-      <p style="font-size:15px;color:#1e293b">Estimado ${esc(ns)}:</p>
+      <p style="font-size:15px;color:#1e293b">${trato} ${esc(ns)}:</p>
       <p style="font-size:15px;color:#334155">Por instrucciones de <strong>${esc(autorNombre)}</strong> se ha procedido a activar la funcionalidad de Back Up de <strong>${esc(titularNombre)}</strong>, por lo que las siguientes funcionalidades serán redirigidas a ti:</p>
       <ul style="font-size:15px;color:#334155;margin:6px 0 6px 18px;padding:0">${activeCats.map(c => `<li>${esc(c)}</li>`).join('')}</ul>`;
   } else {
     cuerpo = `
-      <p style="font-size:15px;color:#1e293b">Estimado ${esc(ns)}:</p>
+      <p style="font-size:15px;color:#1e293b">${trato} ${esc(ns)}:</p>
       <p style="font-size:15px;color:#334155">Por instrucciones de <strong>${esc(autorNombre)}</strong> se ha suspendido la funcionalidad de Back Up de <strong>${esc(titularNombre)}</strong>. Ya no recibirás las funcionalidades que estaban redirigidas a ti.</p>`;
   }
   const asunto = activado ? 'Back Up Designado Activado' : 'Back Up Designado Desactivado';

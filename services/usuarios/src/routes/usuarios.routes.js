@@ -7,6 +7,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 // (Administrador pasa siempre por bypass del middleware)
 
 router.get('/', verifyToken, ctrl.getAllUsuarios);
+router.get('/sexos', verifyToken, ctrl.getSexos);
 router.get('/:id', verifyToken, ctrl.getUsuarioById);
 router.post('/', verifyToken, requireFunc('usuarios.crear', 'usuarios_gestionar'), ctrl.createUsuario);
 router.put('/:id', verifyToken, requireFunc('usuarios.editar', 'usuarios_gestionar'), ctrl.updateUsuario);

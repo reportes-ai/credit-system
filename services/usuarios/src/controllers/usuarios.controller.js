@@ -640,4 +640,17 @@ const misEjecutivos = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, desbloquearUsuario, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos };
+/* GET /api/usuarios/sexos — mapa "NOMBRE APELLIDO" → M/F para personalizar
+   saludos (Estimado/Estimada) en correos que solo tienen el nombre del
+   destinatario (ej. detalle de comisiones al ejecutivo). Solo activos. */
+const getSexos = async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT UPPER(TRIM(CONCAT(nombre,' ',apellido))) n, sexo FROM usuarios WHERE estado='activo' AND sexo IS NOT NULL");
+    const mapa = {};
+    rows.forEach(r => { mapa[r.n] = r.sexo; });
+    res.json({ success: true, data: mapa, error: null });
+  } catch (e) { console.error('[sexos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getAllUsuarios, getUsuarioById, createUsuario, updateUsuario, deleteUsuario, eliminarDefinitivo, reactivarUsuario, resetClave, desbloquearUsuario, getPermisosUsuario, updatePermisosUsuario, getEjecutivosUsuario, updateEjecutivosUsuario, misEjecutivos, getSexos };

@@ -231,6 +231,11 @@ function toast(msg, ok=true) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
+/* Saludo con género: mapa NOMBRE→sexo desde la ficha de usuarios (una sola fuente) */
+let MAPA_SEXOS = {};
+fetch('/api/usuarios/sexos', { headers: H }).then(r=>r.json()).then(j=>{ if(j.success) MAPA_SEXOS = j.data || {}; }).catch(()=>{});
+const estimadoDe = nombre => { const s = MAPA_SEXOS[String(nombre||'').trim().toUpperCase()]; return s==='F' ? 'Estimada' : (s==='M' ? 'Estimado' : 'Estimado/a'); };
+
 async function cargar() {
   const mes = document.getElementById('filtroMes').value;
   if (!mes) return;
@@ -1089,7 +1094,7 @@ function generarInforme() {
   if (esIndividual) {
     const d = datos[0];
     const saludo = `
-      <p style="font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6">Estimado/a <strong>${d.ejecutivo}</strong>,</p>
+      <p style="font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6">${estimadoDe(d.ejecutivo)} <strong>${d.ejecutivo}</strong>,</p>
       <p style="font-size:14px;color:#374151;margin:0 0 14px;line-height:1.6">
         A continuación encontrarás el detalle de las comisiones a pagar en tu remuneración del mes de
         <strong>${mesPagoLabel}</strong>, correspondiente a tu producción del mes de <strong>${mesLabel}</strong>.
