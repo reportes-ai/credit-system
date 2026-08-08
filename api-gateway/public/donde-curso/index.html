@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 — duo de financieras: la contraria viable queda dorada y clickeable (animada); inviable en gris -->
+<!-- v2.5 — enforcement de tasa mínima: campo rojo bajo el límite, clamp al costo de fondo -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -385,7 +385,11 @@ function calcular(){
 
   // Tasa: si el ejecutivo no escribe una, manda la TMC automática del motor.
   const tasaTxt = ($('iTasa').value||'').replace(',','.').replace(/[^0-9.]/g,'');
-  const tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
+  let tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
+  // Piso ABSOLUTO: nunca bajo el costo de fondo — se ajusta y se avisa.
+  const cfAbs = ((parseFloat(T.tasa_mensual_mayor)||0) - (parseFloat(T.spread_mayor)||0)) / 100;
+  const bajoCF = tasaCli != null && cfAbs > 0 && tasaCli < cfAbs;
+  if (bajoCF) tasaCli = cfAbs;
   $('tasaAux').textContent = tasaTxt ? '(manual)' : '(pizarra)';
   // Comisión dealer real (editable): vacío = pizarra del canal/plazo
   const comTxt = ($('iComDealer').value||'').replace(/[^0-9]/g,'');
@@ -428,8 +432,23 @@ function calcular(){
       ? ('Pizarra dealer ' + fCLP(R0.costos.dealer) + ' + patio ' + fCLP(R0.costos.patio) + ' (parque)')
       : ('Pizarra ' + fCLP(R0.costos.dealer) + ' (calle)');
     const tMin = tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos: gts, seguros: seg, R0 });
-    $('tasaPiz').textContent = 'Pizarra ' + pizPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' +
-      (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
+    /* Enforcement visual del límite de tasa: bajo el mínimo permitido el campo
+       queda rojo y se dice claro (Unidad: rebaja máx 5% relativo; AutoFin: el
+       piso del 75%; bajo el costo de fondo se ajusta sin excepción posible). */
+    const tasaBaja = tasaCli != null && tMin != null && tasaCli < tMin - 0.00005;
+    $('iTasa').style.borderColor = (tasaBaja || bajoCF) ? '#dc2626' : '';
+    $('tasaPiz').style.color = (tasaBaja || bajoCF) ? '#dc2626' : '';
+    if (bajoCF) {
+      $('tasaPiz').textContent = '⛔ Esa tasa está bajo el costo de fondo: se calculó con el mínimo absoluto ' + pct2(cfAbs) + '.';
+    } else if (tasaBaja) {
+      const ladoNow = R0.af.rentab >= R0.uac.rentab ? 'AF' : 'UAC';
+      $('tasaPiz').textContent = '⛔ No puedes ofrecer ' + pct2(tasaCli) + ': el mínimo es ' + pct2(tMin) +
+        (ladoNow === 'UAC' ? ' (rebaja máx. 5% en Unidad).' : ' (piso del 75%).') +
+        ' Bajo eso, solo un comodín dorado 🏆 o Gerencia.';
+    } else {
+      $('tasaPiz').textContent = 'Pizarra ' + pizPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' +
+        (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
+    }
   }
   if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
   renderDuo(R0 || R, D, plazo, saldo);
