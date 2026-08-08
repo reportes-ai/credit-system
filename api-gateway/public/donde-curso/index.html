@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.2 — nivel 3 triple candado: piso 25% + rentab ≥ comisión más alta + mínimo $200.000 -->
+<!-- v3.3 — snapshots con rent_jugada/mejor_base para medir el costo del programa -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -508,10 +508,12 @@ function renderDuo(R0, D, plazo, saldo, R){
       const info = { click: false, tipo: null };
       if (nv && nv.nivel > 1) {
         info.click = true; info.tipo = 'PROPIO'; info.nivel = nv.nivel; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejorR);
         el.classList.add('viable'); tag.style.display = ''; tag.textContent = nv.tag;
         por.textContent = `Con esa tasa cuesta ${nv.costo} estrellas (nivel ${nv.nivel}).`;
       } else if (nv && nv.nivel === 1) {
         info.click = true; info.tipo = 'PROPIO'; info.nivel = 1; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejorR);
         el.classList.add('viable'); tag.style.display = ''; tag.textContent = '⭐';
         por.textContent = 'Puedes cursar aquí usando una estrella.';
       } else { el.classList.add('dim'); por.textContent = 'Con esa tasa no se puede por acá.'; }
@@ -542,6 +544,7 @@ function renderDuo(R0, D, plazo, saldo, R){
       const nv = nivelDe(rent, mejor, R0.costos);
       if (nv) {
         info.click = true; info.tipo = 'PROPIO'; info.nivel = nv.nivel; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejor);
         el.classList.add('viable'); tag.style.display = ''; tag.textContent = nv.tag;
         por.textContent = nv.nivel === 1 ? 'Puedes cursar aquí usando una estrella.'
           : nv.nivel === 2 ? `Piso del 50% — cuesta ${nv.costo} estrellas.`
@@ -587,6 +590,7 @@ async function genLado(l){
       body: JSON.stringify({ tipo: 'PROPIO', nivel: info.nivel || 1, rut_cliente: rut, saldo_precio: DUO.saldo, plazo: DUO.plazo,
         financiera: l === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
         snapshot: { origen: 'donde-curso-duo', jugada: 'Cambio de financiera a ' + (l==='UAC'?'Unidad':'Autofin') + ' a ' + DUO.plazo + ' cuotas',
+                    rent_jugada: info.rent ?? null, mejor_base: info.mejor ?? null,
                     valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
     const j = await r.json();
     if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
@@ -751,34 +755,34 @@ function sugerencias(ctx){
     const contra = B.af.rentab >= B.uac.rentab ? 'UAC' : 'AF';
     const rentC = contra === 'UAC' ? B.uac.rentab : B.af.rentab;
     const nv = nivelDe(rentC, mejor, B.costos);
-    if (nv && nv.nivel === 1) { abrePorLado[contra].push({ p, cuota: B.af.cuota }); continue; }
+    if (nv && nv.nivel === 1) { abrePorLado[contra].push({ p, cuota: B.af.cuota, rent: Math.round(rentC), mejor: Math.round(mejor) }); continue; }
     // ¿Bajando la comisión del dealer alcanza el nivel 1? (más barato que subir de nivel)
     const falta = Math.ceil(mejor * piso - rentC);
     const comProp = Math.max(0, B.costos.dealer - falta);
-    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp, piz: B.costos.dealer });
-    if (nv && nv.nivel === 2) n2Lado[contra].push({ p });
-    else if (nv && nv.nivel === 3) n3Lado[contra].push({ p });
+    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp, piz: B.costos.dealer, rent: Math.round(mejor*piso), mejor: Math.round(mejor) });
+    if (nv && nv.nivel === 2) n2Lado[contra].push({ p, rent: Math.round(rentC), mejor: Math.round(mejor) });
+    else if (nv && nv.nivel === 3) n3Lado[contra].push({ p, rent: Math.round(rentC), mejor: Math.round(mejor) });
   }
   for (const l of ['UAC', 'AF']) {
     if (abrePorLado[l].length) {
       const ps = abrePorLado[l].map(x => x.p).join(' o ');
       const cuo = abrePorLado[l][abrePorLado[l].length-1];
-      out.push({ ico:'bi-star-fill', col:'#f59e0b', nivel:1, costo:NV.n1, fin: l, plazoCod: cuo.p, disabled: disp < NV.n1,
+      out.push({ ico:'bi-star-fill', col:'#f59e0b', nivel:1, costo:NV.n1, fin: l, plazoCod: cuo.p, rent: cuo.rent, mejor: cuo.mejor, disabled: disp < NV.n1,
         txt:`Con una estrella puedes cursarlo en <b>${nomFin(l)} a ${ps} cuotas</b>${l==='AF'?` (cuota ${fCLP(cuo.cuota)} a ${cuo.p})`:''}. Cumple el piso.` });
     }
     if (comPorLado[l].length) {
       const det = comPorLado[l].map(x => `a ${x.p} cuotas dejándola en <b>${fCLP(x.comProp)}</b> (pizarra ${fCLP(x.piz)})`).join(' · ');
-      out.push({ ico:'bi-cash-coin', col:'#0141A2', nivel:1, costo:NV.n1, fin: l, plazoCod: comPorLado[l][0].p, disabled: disp < NV.n1,
+      out.push({ ico:'bi-cash-coin', col:'#0141A2', nivel:1, costo:NV.n1, fin: l, plazoCod: comPorLado[l][0].p, rent: comPorLado[l][0].rent, mejor: comPorLado[l][0].mejor, disabled: disp < NV.n1,
         txt:`Bajando la comisión del dealer abres <b>${nomFin(l)}</b> con 1⭐: ${det}.` });
     }
     if (n2Lado[l].length) {
       const ps = n2Lado[l].map(x => x.p).join(' o ');
-      out.push({ ico:'bi-star-fill', col:'#b45309', nivel:2, costo:NV.n2, fin: l, plazoCod: n2Lado[l][0].p, disabled: disp < NV.n2, dorada: true,
+      out.push({ ico:'bi-star-fill', col:'#b45309', nivel:2, costo:NV.n2, fin: l, plazoCod: n2Lado[l][0].p, rent: n2Lado[l][0].rent, mejor: n2Lado[l][0].mejor, disabled: disp < NV.n2, dorada: true,
         txt:`<b>${nomFin(l)} a ${ps}</b> queda bajo el piso del 75% pero sobre el 50%: se abre con <b>${NV.n2} estrellas</b> (nivel 2).` });
     }
     if (n3Lado[l].length) {
       const ps = n3Lado[l].map(x => x.p).join(' o ');
-      out.push({ ico:'bi-star-fill', col:'#7c2d12', nivel:3, costo:NV.n3, fin: l, plazoCod: n3Lado[l][0].p, disabled: disp < NV.n3, dorada: true,
+      out.push({ ico:'bi-star-fill', col:'#7c2d12', nivel:3, costo:NV.n3, fin: l, plazoCod: n3Lado[l][0].p, rent: n3Lado[l][0].rent, mejor: n3Lado[l][0].mejor, disabled: disp < NV.n3, dorada: true,
         txt:`<b>${nomFin(l)} a ${ps}</b> renta entre el 25% y el 50%: la jugada grande — <b>${NV.n3} estrellas</b> (nivel 3).` });
     }
   }
@@ -839,7 +843,7 @@ async function usarChip(i){
       headers: { ...H(), 'Content-Type':'application/json' },
       body: JSON.stringify({ tipo: 'PROPIO', nivel: s.nivel || 1, rut_cliente: rut, saldo_precio: saldo, plazo: s.plazoCod,
         financiera: s.fin === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
-        snapshot: { origen: 'donde-curso', jugada: s.txt.replace(/<[^>]+>/g,''), valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
+        snapshot: { origen: 'donde-curso', jugada: s.txt.replace(/<[^>]+>/g,''), rent_jugada: s.rent ?? null, mejor_base: s.mejor ?? null, valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
     const j = await r.json();
     if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
     $('dlgTipo').textContent = '⭐'.repeat(j.data.costo || 1) + ' Código de excepción — nivel ' + (j.data.nivel || 1);

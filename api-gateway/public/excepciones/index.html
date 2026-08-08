@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v2.0 — escalera de estrellas; la pestaña Simular apunta a ¿Dónde Curso? -->
+  <!-- v2.1 — pestaña Informe (Gerencia): KPIs, por ejecutivo y rentabilidad sacrificada -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -82,6 +82,7 @@
     <button class="tab-btn" data-t="cods" onclick="verTab('cods')"><i class="bi bi-key me-1"></i>Mis códigos</button>
     <button class="tab-btn" data-t="val" onclick="verTab('val')"><i class="bi bi-search me-1"></i>Validador</button>
     <button class="tab-btn" data-t="ger" id="tabGer" style="display:none" onclick="verTab('ger')"><i class="bi bi-person-badge me-1"></i>Gerencia</button>
+    <button class="tab-btn" data-t="inf" id="tabInf" style="display:none" onclick="verTab('inf')"><i class="bi bi-graph-up me-1"></i>Informe</button>
   </div>
 
   <!-- ══ SIMULAR ══ -->
@@ -133,6 +134,28 @@
       <table class="gr"><thead><tr>
         <th>Código</th><th>Tipo</th><th>Estado</th><th>Ejecutivo</th><th>RUT</th><th>Saldo</th><th>Generado por</th><th>Fecha</th><th>Usado en</th><th>Comentario</th>
       </tr></thead><tbody id="regBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ INFORME (Gerencia) ══ -->
+  <div id="t_inf" style="display:none">
+    <div class="card-af" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-weight:800;color:var(--navy)"><i class="bi bi-graph-up me-1"></i>Informe del programa de excepciones</div>
+      <input type="month" id="infMes" style="border:1.5px solid #d1d5db;border-radius:8px;padding:7px 10px;font-weight:700" onchange="cargarInforme()">
+    </div>
+    <div id="infKpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px"></div>
+    <div class="card-af">
+      <div style="font-weight:800;color:var(--navy);margin-bottom:8px">Por ejecutivo</div>
+      <table class="gr"><thead><tr>
+        <th>Ejecutivo</th><th>Códigos</th><th>Usados</th><th>Vencidos</th><th>⭐ gastadas</th><th>Rentab. sacrificada</th>
+      </tr></thead><tbody id="infEjecBody"></tbody></table>
+    </div>
+    <div class="card-af">
+      <div style="font-weight:800;color:var(--navy);margin-bottom:8px">Detalle de códigos del mes</div>
+      <table class="gr"><thead><tr>
+        <th>Código</th><th>Nivel</th><th>Estado</th><th>Ejecutivo</th><th>Saldo</th><th>Jugada</th><th>Sacrificio</th><th>Usado en</th>
+      </tr></thead><tbody id="infDetBody"></tbody></table>
+      <p class="nota" style="margin-top:8px">Rentabilidad sacrificada = lo que rentaba la mejor alternativa menos lo que renta la jugada aprobada (solo códigos usados; "—" = el código no registró las cifras). No descuenta los negocios que sin la excepción se habrían perdido.</p>
     </div>
   </div>
 </div>
@@ -207,6 +230,7 @@ async function boot(){
     const funcs = (jm.funcionalidades || []);
     if (funcs.includes('excepciones_gerencia') || (YO.perfil||'').toUpperCase().startsWith('ADMINISTRADOR')) {
       document.getElementById('tabGer').style.display = '';
+      document.getElementById('tabInf').style.display = '';
       document.getElementById('gEjec').value = '';
     }
     pintarPresu();
@@ -225,10 +249,41 @@ function pintarPresu(){
 }
 
 function verTab(t){
-  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t) ? '' : 'none';
+  for (const x of ['sim','cods','val','ger','inf']) document.getElementById('t_'+x).style.display = (x===t) ? '' : 'none';
   document.querySelectorAll('.tab-btn[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   if (t==='cods') cargarCodigos();
   if (t==='ger') cargarRegistro();
+  if (t==='inf') { if (!document.getElementById('infMes').value) document.getElementById('infMes').value = new Date().toISOString().slice(0,7); cargarInforme(); }
+}
+
+/* ── Informe del programa (Gerencia) ────────────────────────────────────── */
+async function cargarInforme(){
+  const mes = document.getElementById('infMes').value;
+  const r = await fetch('/api/excepciones/informe?mes=' + encodeURIComponent(mes), { headers: H });
+  const j = await r.json();
+  if (!j.success) { toast(j.error || 'Error al cargar el informe', true); return; }
+  const { tot, ejecutivos, detalle } = j.data;
+  const kpi = (lbl, val, sub) => `<div style="background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.07);padding:12px 16px">
+    <div style="font-size:.72rem;color:#64748b;font-weight:700">${lbl}</div>
+    <div style="font-size:1.35rem;font-weight:800;color:var(--navy)">${val}</div>${sub?`<div class="nota">${sub}</div>`:''}</div>`;
+  document.getElementById('infKpis').innerHTML =
+    kpi('Códigos generados', tot.generados, `⭐${tot.por_nivel[1]||0} · ⭐⭐${tot.por_nivel[2]||0} · ⭐⭐⭐${tot.por_nivel[3]||0} · 👔${tot.gerencia}`) +
+    kpi('Usados', tot.usados, `${tot.vigentes} vigentes · ${tot.vencidos} vencidos`) +
+    kpi('Estrellas gastadas', tot.estrellas_gastadas, '') +
+    kpi('Rentab. sacrificada', fmt$(tot.sacrificio), tot.sin_medir ? tot.sin_medir + ' código(s) sin medir' : 'todos medidos');
+  document.getElementById('infEjecBody').innerHTML = ejecutivos.length ? ejecutivos.map(e => `<tr>
+    <td style="text-align:left">${escH(e.ejecutivo)}</td><td>${e.generados}</td><td>${e.usados}</td><td>${e.vencidos}</td>
+    <td>${e.estrellas}</td><td>${fmt$(e.sacrificio)}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="color:#94a3b8">Sin códigos este mes</td></tr>';
+  document.getElementById('infDetBody').innerHTML = detalle.length ? detalle.map(c => `<tr>
+    <td><b style="letter-spacing:2px">${escH(c.codigo)}</b></td>
+    <td>${c.tipo==='GERENCIA'?'👔':'⭐'.repeat(c.nivel)}</td>
+    <td><span class="est-pill est-${escH(c.estado)}">${escH(c.estado)}</span></td>
+    <td style="text-align:left">${escH(c.ejecutivo)}</td><td>${fmt$(c.saldo_precio)}</td>
+    <td style="text-align:left;max-width:280px;font-size:.78rem">${escH(c.jugada)}</td>
+    <td>${c.sacrificio != null ? fmt$(c.sacrificio) : '—'}</td>
+    <td>${escH(c.usado_carta||'—')}</td></tr>`).join('')
+    : '<tr><td colspan="8" style="color:#94a3b8">Sin códigos este mes</td></tr>';
 }
 
 /* ── Simulación ─────────────────────────────────────────────────────────── */

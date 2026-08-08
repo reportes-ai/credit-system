@@ -300,4 +300,47 @@ const registro = async (req, res) => {
   } catch (e) { console.error('[excepciones registro]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getEstado, generar, generarGerencia, misCodigos, validar, usar, registro, consumirCodigo };
+/* ── GET /api/excepciones/informe?mes=YYYY-MM — reporte del programa (Gerencia) ──
+   KPIs del mes, detalle por ejecutivo y costo del programa: la rentabilidad
+   sacrificada se calcula de los snapshots (mejor_base − rent_jugada) de los
+   códigos USADOS que la traen; los que no, se listan como "sin medir". */
+const informe = async (req, res) => {
+  try {
+    await vencerCaducos();
+    const mes = /^\d{4}-\d{2}$/.test(String(req.query.mes || '')) ? req.query.mes
+      : new Date().toISOString().slice(0, 7);
+    const [rows] = await pool.query(
+      `SELECT codigo, tipo, estado, costo_estrellas, ejecutivo, rut_cliente, saldo_precio, plazo,
+              financiera, snapshot, comentario, generado_por, generado_at, vence_at, usado_carta, usado_at
+       FROM excepciones_codigos WHERE DATE_FORMAT(generado_at,'%Y-%m') = ? ORDER BY generado_at DESC`, [mes]);
+    const tot = { generados: 0, usados: 0, vencidos: 0, vigentes: 0, gerencia: 0,
+      estrellas_gastadas: 0, por_nivel: { 1: 0, 2: 0, 3: 0 }, sacrificio: 0, sin_medir: 0 };
+    const porEjec = {};
+    const detalle = rows.map(r => {
+      let s = {}; try { s = typeof r.snapshot === 'object' && r.snapshot ? r.snapshot : JSON.parse(r.snapshot || '{}'); } catch (_) {}
+      const nivel = s.nivel || (r.tipo === 'COMODIN' ? 3 : 1);
+      const costo = Number(r.costo_estrellas) || 1;
+      const sac = (r.estado === 'USADO' && isFinite(s.mejor_base) && isFinite(s.rent_jugada))
+        ? Math.max(0, s.mejor_base - s.rent_jugada) : null;
+      tot.generados++;
+      if (r.tipo === 'GERENCIA') tot.gerencia++;
+      else { tot.por_nivel[nivel] = (tot.por_nivel[nivel] || 0) + 1; }
+      if (r.estado === 'USADO') { tot.usados++; if (r.tipo !== 'GERENCIA') tot.estrellas_gastadas += costo; }
+      else if (r.estado === 'VENCIDO') tot.vencidos++;
+      else tot.vigentes++;
+      if (r.estado === 'USADO') { if (sac != null) tot.sacrificio += sac; else tot.sin_medir++; }
+      const e = porEjec[r.ejecutivo] = porEjec[r.ejecutivo] ||
+        { ejecutivo: r.ejecutivo, generados: 0, usados: 0, vencidos: 0, estrellas: 0, sacrificio: 0 };
+      e.generados++;
+      if (r.estado === 'USADO') { e.usados++; if (r.tipo !== 'GERENCIA') e.estrellas += costo; if (sac != null) e.sacrificio += sac; }
+      if (r.estado === 'VENCIDO') e.vencidos++;
+      return { codigo: r.codigo, tipo: r.tipo, nivel, costo, estado: r.estado, ejecutivo: r.ejecutivo,
+        rut_cliente: r.rut_cliente, saldo_precio: Number(r.saldo_precio), plazo: r.plazo, financiera: r.financiera,
+        jugada: s.jugada || r.comentario || '', sacrificio: sac, generado_at: r.generado_at,
+        usado_carta: r.usado_carta, usado_at: r.usado_at };
+    });
+    res.json({ success: true, data: { mes, tot, ejecutivos: Object.values(porEjec).sort((a, b) => b.usados - a.usados), detalle }, error: null });
+  } catch (e) { console.error('[excepciones informe]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getEstado, generar, generarGerencia, misCodigos, validar, usar, registro, informe, consumirCodigo };
