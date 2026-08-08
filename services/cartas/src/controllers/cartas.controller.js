@@ -1382,7 +1382,7 @@ function parseCotizacion(t) {
      intereses de todo el plazo) y deja el monto al doble. Verificado contra la
      base única: la cotización 616237 (op 89211) tiene Monto Bruto 6.792.662 y
      Costo Total 11.089.548 — INDEXA registra 6.792.662. */
-  return {
+  const out = {
     opOrigen:        g(/N°\s*0*(\d{4,})/),
     cae:             g(/CAE\s*::\s*([\d,]+)\s*%/),
     titular:         g(/Titular[\s\S]*?::\s*([A-ZÁÉÍÓÚÑ ]+?)\s*\n/),
@@ -1392,6 +1392,24 @@ function parseCotizacion(t) {
     plazo:           _numU(g(/Plazo del Cr[eé]dito[^\n:]*::?\s*(\d+)/i)),
     cuota:           _numU(g(/Valor de Cuota[^\n:]*::?\s*([\d.]+)/i)),
   };
+  /* Fallback POSICIONAL: hay un segundo layout donde pdf-parse aplana cada cuadro
+     en bloque — primero TODAS las etiquetas, después TODOS los valores "::" en el
+     mismo orden (ops 26080283/26080285: el bruto quedaba a 2 líneas de su etiqueta
+     y las anclas en línea no calzaban). Se aparean etiqueta n → valor n. */
+  if (out.montoCreditoCLP == null) {
+    const b = t.match(/Impuestos\s*\nNotar[ií]a\s*\nMonto Bruto del Cr[eé]dito[^\n]*\nGarant[ií]as Asociadas\s*\n::\s*([\d.]+)\s*\n::\s*([\d.]+)\s*\n::\s*([\d.]+)/i);
+    if (b) out.montoCreditoCLP = _numU(b[3]);
+  }
+  if (out.saldo == null) {
+    const b = t.match(/Monto L[ií]quido del Cr[eé]dito[^\n]*\nPlazo del Cr[eé]dito[^\n]*\nValor de Cuota[^\n]*\nCosto Total Cr[eé]dito[^\n]*\nCAE[^\n]*\n[^\n]*\n::\s*([\d.]+)\s*\n::\s*(\d+)\s*\n::\s*([\d.]+)\s*\n::\s*([\d.]+)/i);
+    if (b) {
+      out.saldo = _numU(b[1]);
+      if (out.plazo == null) out.plazo = _numU(b[2]);
+      if (out.cuota == null) out.cuota = _numU(b[3]);
+      if (out.costoTotal == null) out.costoTotal = _numU(b[4]);
+    }
+  }
+  return out;
 }
 // Carta de Aprobación Autofin (formato 2 columnas; pdf-parse lo aplana → anclas por contexto).
 function parseCartaAutofin(t) {
@@ -1536,7 +1554,7 @@ const parseUnidad = async (req, res) => {
             ? 'La Cotización venía escaneada: se leyó con IA (Haiku) — REVISA los datos antes de guardar.'
             : 'La Cotización es un PDF escaneado (imagen, sin texto) y la lectura IA no está disponible. Descarga el PDF original desde el sistema de Unidad — igual quedó adjunta para la revisión.');
         }
-        else out.cotizacion = parseCotizacion(txt);
+        else out.cotizacion = await completarConIA('COTIZACION_UNIDAD', cotizacion_base64, parseCotizacion(txt), CLAVES_COTIZACION, out.warnings);
       }
       catch (e) { out.warnings.push('No se pudo leer la Cotización: ' + e.message); }
     }
@@ -1587,6 +1605,7 @@ async function completarConIA(tipoDoc, b64, parsed, claves, warnings) {
 }
 const CLAVES_AUTOFIN = ['precioVenta', 'pie', 'montoCreditoCLP', 'tasaCredito', 'plazo', 'segRdh'];
 const CLAVES_COMPROMISO = ['saldo', 'montoCreditoCLP', 'plazo', 'tasaCredito'];
+const CLAVES_COTIZACION = ['montoCreditoCLP', 'saldo', 'plazo'];
 
 // POST /api/cartas/parse-autofin → extrae campos de la Carta de Aprobación Autofin
 const parseAutofin = async (req, res) => {
