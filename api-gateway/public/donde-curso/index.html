@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — leyenda comisión parque: dealer + patio por separado -->
+<!-- v2.3 — frase de comisión explícita: dejarla EN $X (pizarra $Y) -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -549,7 +549,7 @@ function sugerencias(ctx){
     if (rentC >= mejor * piso) { abrePorLado[contra].push({ p, cuota: B.af.cuota }); continue; }
     const falta = Math.ceil(mejor * piso - rentC);
     const comProp = Math.max(0, B.costos.dealer - falta);
-    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp });
+    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp, piz: B.costos.dealer });
     else if (rentC > Math.max(B.costos.dealer, B.costos.ejecutivo) * factCom) comodinLado[contra].push({ p });
   }
   for (const l of ['UAC', 'AF']) {
@@ -560,9 +560,9 @@ function sugerencias(ctx){
         txt:`Con una estrella puedes cursarlo en <b>${nomFin(l)} a ${ps} cuotas</b>${l==='AF'?` (cuota ${fCLP(cuo.cuota)} a ${cuo.p})`:''}. Cumple el piso.` });
     }
     if (comPorLado[l].length) {
-      const det = comPorLado[l].map(x => `a ${x.p} con ${fCLP(x.comProp)}`).join(' · ');
+      const det = comPorLado[l].map(x => `a ${x.p} cuotas dejándola en <b>${fCLP(x.comProp)}</b> (pizarra ${fCLP(x.piz)})`).join(' · ');
       out.push({ ico:'bi-cash-coin', col:'#0141A2', tipo:'PROPIO', fin: l, plazoCod: comPorLado[l][0].p, disabled: !hayStar,
-        txt:`Si bajas la comisión del dealer, abres <b>${nomFin(l)}</b>: ${det}.` });
+        txt:`Bajando la comisión del dealer abres <b>${nomFin(l)}</b>: ${det}.` });
     }
     if (comodinLado[l].length) {
       const ps = comodinLado[l].map(x => x.p).join(' o ');
