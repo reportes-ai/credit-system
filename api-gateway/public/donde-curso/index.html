@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — enforcement de tasa mínima: campo rojo bajo el límite, clamp al costo de fondo -->
+<!-- v2.6 — tasa inválida apaga las cards (gris), salvo que aplique el comodín -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -436,6 +436,7 @@ function calcular(){
        queda rojo y se dice claro (Unidad: rebaja máx 5% relativo; AutoFin: el
        piso del 75%; bajo el costo de fondo se ajusta sin excepción posible). */
     const tasaBaja = tasaCli != null && tMin != null && tasaCli < tMin - 0.00005;
+    window._TASA_INVALIDA = tasaBaja && !bajoCF;
     $('iTasa').style.borderColor = (tasaBaja || bajoCF) ? '#dc2626' : '';
     $('tasaPiz').style.color = (tasaBaja || bajoCF) ? '#dc2626' : '';
     if (bajoCF) {
@@ -451,7 +452,7 @@ function calcular(){
     }
   }
   if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
-  renderDuo(R0 || R, D, plazo, saldo);
+  renderDuo(R0 || R, D, plazo, saldo, R);
 }
 const on = id => $(id).classList.contains('on');
 
@@ -459,8 +460,32 @@ const on = id => $(id).classList.contains('on');
       veredicto mismo. La contraria viable con estrella queda dorada y clickeable;
       inviable queda gris. ── */
 let LADO_SEL = null, DUO = null;
-function renderDuo(R0, D, plazo, saldo){
+function renderDuo(R0, D, plazo, saldo, R){
   if (!R0 || D.veredicto === 'NINGUNA') { $('duo').style.display = 'none'; $('veredicto').style.display = ''; return; }
+  /* Tasa manual bajo el mínimo permitido: con esa tasa NINGÚN lado se abre con
+     estrella — ambas cards en gris, salvo que el comodín dorado aplique. */
+  if (window._TASA_INVALIDA && R) {
+    $('veredicto').style.display = 'none'; $('duo').style.display = 'flex';
+    const factC = 1 + (EX.exc_comodin_factor_pct ?? 10) / 100;
+    DUO = { plazo, saldo };
+    for (const l of ['AF', 'UAC']) {
+      const el = $('vc' + l), tag = $('tag' + l), por = $('por' + l), cta = $('cta' + l);
+      el.className = 'vcard ' + (l === 'AF' ? 'v-af' : 'v-un');
+      tag.style.display = 'none'; cta.style.display = 'none';
+      const rent = l === 'AF' ? R.af.rentab : R.uac.rentab;
+      const info = { click: false, tipo: null };
+      if (EXC_ON && rent > Math.max(R.costos.dealer, R.costos.ejecutivo) * factC) {
+        info.click = true; info.tipo = 'COMODIN';
+        el.classList.add('viable'); tag.style.display = ''; tag.textContent = '🏆';
+        por.textContent = 'Con esa tasa solo tu comodín dorado la aprueba.';
+      } else { el.classList.add('dim'); por.textContent = 'Con esa tasa no se puede por acá.'; }
+      DUO[l] = info;
+    }
+    if (LADO_SEL && (!DUO[LADO_SEL] || !DUO[LADO_SEL].tipo)) LADO_SEL = null;
+    if (LADO_SEL) { $('vc'+LADO_SEL).classList.add('big');
+      const c = $('cta'+LADO_SEL); c.style.display=''; c.textContent = 'Generar código 🏆'; }
+    return;
+  }
   $('veredicto').style.display = 'none';
   $('duo').style.display = 'flex';
   const esTu = D.veredicto === 'DECIDES_TU';
