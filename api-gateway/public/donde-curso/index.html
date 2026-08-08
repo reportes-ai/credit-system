@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — comisión dealer editable, saldo a media fila, tasa placeholder=pizarra y mínimo=piso 75% -->
+<!-- v2.2 — leyenda comisión parque: dealer + patio por separado -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -385,7 +385,11 @@ function calcular(){
     const pizPct = R0.tasaCliPct;
     $('iTasa').placeholder = pizPct.toFixed(2).replace('.',',');
     $('iComDealer').placeholder = '$' + fN(R0.costos.dealer);
-    $('comPiz').textContent = 'Pizarra ' + fCLP(R0.costos.dealer) + ' (' + (ES_PATIO?'parque':'calle') + ')';
+    /* Parque: el dealer y el patio cobran por separado — a plazos cortos la
+       pizarra del dealer es legítimamente $0 y solo comisiona el patio. */
+    $('comPiz').textContent = ES_PATIO
+      ? ('Pizarra dealer ' + fCLP(R0.costos.dealer) + ' + patio ' + fCLP(R0.costos.patio) + ' (parque)')
+      : ('Pizarra ' + fCLP(R0.costos.dealer) + ' (calle)');
     const tMin = tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos: gts, seguros: seg, R0 });
     $('tasaPiz').textContent = 'Pizarra ' + pizPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' +
       (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
