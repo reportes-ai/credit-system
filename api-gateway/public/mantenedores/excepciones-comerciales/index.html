@@ -68,7 +68,7 @@
   <div class="afecta-box">
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
-      <li><b>La escalera de estrellas</b> → rige en <a href="/donde-curso/">¿Dónde Curso?</a>: <b>1⭐</b> aprueba excepciones que rentan al menos el piso nivel 1 (75%) · <b>2⭐</b> hasta el piso nivel 2 (50%) · <b>3⭐</b> hasta el piso nivel 3 (25%), exigiendo ADEMÁS que la rentabilidad supere en el % configurado a la comisión más alta (dealer o ejecutivo). El sistema propone la rebaja de comisión dealer (neta) que devuelve una jugada al nivel 1.</li>
+      <li><b>La escalera de estrellas</b> → rige en <a href="/donde-curso/">¿Dónde Curso?</a>: <b>1⭐</b> aprueba excepciones que rentan al menos el piso nivel 1 (75%) · <b>2⭐</b> hasta el piso nivel 2 (50%) · <b>3⭐</b> hasta el piso nivel 3 (25%), exigiendo ADEMÁS que la rentabilidad sea al menos la comisión más alta (dealer o ejecutivo) y nunca bajo el mínimo absoluto en $. El sistema propone la rebaja de comisión dealer (neta) que devuelve una jugada al nivel 1.</li>
       <li><b>Rebaja máxima de tasa Unidad</b> → % relativo sobre la tasa pizarra (pizarra 2,70% → mínimo 2,56%, redondeando hacia abajo); una baja mayor fuerza la operación a Autofin.</li>
       <li><b>Estrellas mes 1 y % mensual</b> → presupuesto de cada Ejecutivo Comercial: 3 de regalo el primer mes (alcanzan justo para una jugada de nivel 3); después ⌊otorgadas del mes anterior × 33%⌋ — redondeo hacia abajo: el aliciente es colocar al menos 3 al mes.</li>
       <li><b>Vigencia del código (24 h)</b> → un código no usado dentro del plazo vence y sus estrellas se devuelven dentro del mismo mes; las estrellas no usadas al cierre del mes expiran.</li>
@@ -102,7 +102,8 @@ const GRUPOS = [
     ['exc_piso2_estrellas','Costo del nivel 2','⭐'],
     ['exc_piso3_pct','Piso NIVEL 3','%'],
     ['exc_nivel3_estrellas','Costo del nivel 3','⭐'],
-    ['exc_nivel3_factor_pct','Nivel 3: rentab. supera comisión más alta en','%'],
+    ['exc_nivel3_rent_min','Nivel 3: rentabilidad mínima absoluta','$'],
+    ['exc_nivel3_factor_pct','Nivel 3: recargo sobre la comisión más alta (0 = igualarla)','%'],
     ['exc_tasa_rebaja_max_pct','Rebaja máxima de tasa Unidad','%'],
   ]},
   { tit:'Presupuesto mensual de estrellas', icono:'bi-calendar-check', claves:[

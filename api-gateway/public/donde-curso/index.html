@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v3.1 — nivel 3 con piso 25% además de la condición del 10% -->
+<!-- v3.2 — nivel 3 triple candado: piso 25% + rentab ≥ comisión más alta + mínimo $200.000 -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -461,14 +461,17 @@ const on = id => $(id).classList.contains('on');
       inviable queda gris. ── */
 let LADO_SEL = null, DUO = null;
 /* Escalera de estrellas: nivel 1 (1⭐, piso 75%) · nivel 2 (2⭐, piso 50%) ·
-   nivel 3 (3⭐, piso 25% Y rentab > comisión más alta × 1,10 — doble candado). */
+   nivel 3 (3⭐, TRIPLE candado: piso 25% Y rentab ≥ comisión más alta Y
+   rentab ≥ mínimo absoluto en $ — hoy $200.000). */
 function nivelDe(rent, mejor, costos){
   const p1 = (EX.exc_piso_pct ?? 75) / 100, p2 = (EX.exc_piso2_pct ?? 50) / 100, p3 = (EX.exc_piso3_pct ?? 25) / 100;
-  const f3 = 1 + (EX.exc_nivel3_factor_pct ?? 10) / 100;
+  const f3 = 1 + (EX.exc_nivel3_factor_pct ?? 0) / 100;
+  const min3 = EX.exc_nivel3_rent_min ?? 200000;
   const n = EXC_ESTADO?.niveles || { n1: 1, n2: EX.exc_piso2_estrellas ?? 2, n3: EX.exc_nivel3_estrellas ?? 3 };
   if (rent >= mejor * p1) return { nivel: 1, costo: n.n1, tag: '⭐' };
   if (rent >= mejor * p2) return { nivel: 2, costo: n.n2, tag: '⭐⭐' };
-  if (rent >= mejor * p3 && rent > Math.max(costos.dealer, costos.ejecutivo) * f3) return { nivel: 3, costo: n.n3, tag: '⭐⭐⭐' };
+  if (rent >= mejor * p3 && rent >= Math.max(costos.dealer, costos.ejecutivo) * f3 && rent >= min3)
+    return { nivel: 3, costo: n.n3, tag: '⭐⭐⭐' };
   return null;
 }
 function renderDuo(R0, D, plazo, saldo, R){
