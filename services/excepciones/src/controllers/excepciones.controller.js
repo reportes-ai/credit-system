@@ -54,6 +54,9 @@ require('../../../../shared/migrate').enFila('excepciones-codigos', async () => 
         UNIQUE KEY uq_codigo (codigo),
         INDEX idx_ejec (ejecutivo), INDEX idx_estado (estado)
       )`);
+    // Escalera de estrellas (2026-08-08): cada código registra cuántas costó
+    try { await pool.query(`ALTER TABLE excepciones_codigos ADD COLUMN costo_estrellas INT NOT NULL DEFAULT 1`); }
+    catch (e) { if (e.errno !== 1060) console.error('[excepciones costo_estrellas]', e.message); }
 
     // Card + permisos de acción
     await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono) VALUES
@@ -114,34 +117,19 @@ async function presupuesto(ejecutivo, P) {
     ? Math.round(P.exc_estrellas_mes1 ?? 2)
     : Math.floor((prev.n || 0) * (P.exc_pct_mensual ?? 33) / 100);
 
-  // Consumidas este mes: PROPIO vigentes o usados (los VENCIDOS devuelven la estrella)
+  // Consumidas este mes: SUMA de costo_estrellas (nivel 1=1⭐, nivel 2=2⭐,
+  // nivel 3=3⭐) de códigos vivos o usados — los VENCIDOS devuelven sus estrellas.
   const [[usadas]] = await pool.query(
-    `SELECT COUNT(*) n FROM excepciones_codigos
-     WHERE tipo='PROPIO' AND UPPER(ejecutivo)=UPPER(?) AND estado IN ('VIGENTE','USADO')
+    `SELECT COALESCE(SUM(COALESCE(costo_estrellas,1)),0) n FROM excepciones_codigos
+     WHERE tipo IN ('PROPIO','COMODIN') AND UPPER(ejecutivo)=UPPER(?) AND estado IN ('VIGENTE','USADO')
        AND DATE_FORMAT(generado_at,'%Y-%m')=?`, [ejecutivo, mesActual]);
-
-  // Comodines: 1 de bienvenida + 1 cada 50 otorgadas DESDE el lanzamiento del
-  // programa (exc_comodin_desde, AAAAMM) — la historia previa no cuenta.
-  // No vencen, pero se juntan hasta exc_comodin_max (5).
-  const desdeYM = String(Math.round(P.exc_comodin_desde ?? 202608));
-  const desdeMes = `${desdeYM.slice(0, 4)}-${desdeYM.slice(4, 6)}`;
-  const [[nuevas]] = await pool.query(
-    `SELECT COUNT(*) n FROM creditos WHERE UPPER(estado)='OTORGADO' AND UPPER(TRIM(ejecutivo))=UPPER(?) AND DATE_FORMAT(mes,'%Y-%m') >= ?`,
-    [ejecutivo, desdeMes]);
-  const ganados = Math.round(P.exc_comodin_inicial ?? 1)
-    + Math.floor((nuevas.n || 0) / Math.max(1, Math.round(P.exc_comodin_cada ?? 50)));
-  const [[comUsados]] = await pool.query(
-    `SELECT COUNT(*) n FROM excepciones_codigos
-     WHERE tipo='COMODIN' AND UPPER(ejecutivo)=UPPER(?) AND estado IN ('VIGENTE','USADO')`, [ejecutivo]);
 
   return {
     ejecutivo, es_primer_mes: esPrimerMes,
     otorgadas_mes_anterior: prev.n || 0, otorgadas_historicas: hist.n || 0,
-    estrellas_total: estrellasTotal, estrellas_usadas: usadas.n || 0,
-    estrellas_disponibles: Math.max(0, estrellasTotal - (usadas.n || 0)),
-    comodines_ganados: ganados, comodines_usados: comUsados.n || 0,
-    comodines_disponibles: Math.min(Math.round(P.exc_comodin_max ?? 5), Math.max(0, ganados - (comUsados.n || 0))),
-    otorgadas_desde_lanzamiento: nuevas.n || 0,
+    estrellas_total: estrellasTotal, estrellas_usadas: Number(usadas.n) || 0,
+    estrellas_disponibles: Math.max(0, estrellasTotal - (Number(usadas.n) || 0)),
+    niveles: { n1: 1, n2: Math.round(P.exc_piso2_estrellas ?? 2), n3: Math.round(P.exc_nivel3_estrellas ?? 3) },
   };
 }
 
@@ -173,37 +161,38 @@ const generar = async (req, res) => {
   try {
     await vencerCaducos();
     const P = await params();
-    const { tipo = 'PROPIO', rut_cliente, saldo_precio, plazo, financiera, snapshot } = req.body || {};
-    if (!['PROPIO', 'COMODIN'].includes(tipo)) return res.status(400).json({ success: false, data: null, error: 'Tipo inválido' });
+    const { tipo = 'PROPIO', nivel = 1, rut_cliente, saldo_precio, plazo, financiera, snapshot } = req.body || {};
+    if (tipo !== 'PROPIO') return res.status(400).json({ success: false, data: null, error: 'Tipo inválido' });
     const rut = String(rut_cliente || '').trim();
     const saldo = Math.round(Number(saldo_precio) || 0);
     if (!/^[0-9.]+-?[0-9kK]?$/.test(rut) || rut.replace(/[^0-9]/g, '').length < 7)
       return res.status(400).json({ success: false, data: null, error: 'RUT del cliente inválido' });
     if (!(saldo > 0)) return res.status(400).json({ success: false, data: null, error: 'Saldo precio inválido' });
 
+    // Escalera: nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (cualquier op)
+    const niv = [1, 2, 3].includes(Math.round(nivel)) ? Math.round(nivel) : 1;
+    const costo = niv === 1 ? 1 : niv === 2 ? Math.round(P.exc_piso2_estrellas ?? 2) : Math.round(P.exc_nivel3_estrellas ?? 3);
     const ejecutivo = nombreDe(req);
     const pre = await presupuesto(ejecutivo, P);
-    if (tipo === 'PROPIO' && pre.estrellas_disponibles <= 0)
-      return res.status(400).json({ success: false, data: null, error: `Sin estrellas disponibles este mes (${pre.estrellas_usadas}/${pre.estrellas_total} usadas). Puedes pedir un código de Gerencia para un caso puntual.` });
-    if (tipo === 'COMODIN' && pre.comodines_disponibles <= 0)
-      return res.status(400).json({ success: false, data: null, error: 'No tienes comodines dorados disponibles.' });
+    if (pre.estrellas_disponibles < costo)
+      return res.status(400).json({ success: false, data: null, error: `Esta jugada de nivel ${niv} cuesta ${costo} estrella(s) y te quedan ${pre.estrellas_disponibles} (${pre.estrellas_usadas}/${pre.estrellas_total} usadas). Puedes pedir un código de Gerencia.` });
 
     const horas = Math.max(1, Math.round(P.exc_vigencia_horas ?? 24));
     let codigo = null;
     for (let i = 0; i < 8 && !codigo; i++) {
       const c = genCodigo(P.exc_codigo_digitos);
       const [r] = await pool.query(
-        `INSERT IGNORE INTO excepciones_codigos (codigo, tipo, ejecutivo, ejecutivo_id, rut_cliente, saldo_precio, plazo, financiera, snapshot, generado_por, generado_por_id, vence_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
-        [c, tipo, ejecutivo, req.usuario?.id_usuario || null, rut, saldo, parseInt(plazo) || null,
-         (financiera || '').slice(0, 20) || null, snapshot ? JSON.stringify(snapshot) : null,
+        `INSERT IGNORE INTO excepciones_codigos (codigo, tipo, costo_estrellas, ejecutivo, ejecutivo_id, rut_cliente, saldo_precio, plazo, financiera, snapshot, generado_por, generado_por_id, vence_at)
+         VALUES (?, 'PROPIO', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
+        [c, costo, ejecutivo, req.usuario?.id_usuario || null, rut, saldo, parseInt(plazo) || null,
+         (financiera || '').slice(0, 20) || null, snapshot ? JSON.stringify({ ...(snapshot || {}), nivel: niv }) : JSON.stringify({ nivel: niv }),
          ejecutivo, req.usuario?.id_usuario || null, horas]);
       if (r.affectedRows) codigo = c;
     }
     if (!codigo) return res.status(500).json({ success: false, data: null, error: 'No se pudo generar un código único, intenta de nuevo' });
     auditar({ req, accion: 'CREAR', modulo: 'excepciones', entidad: 'excepciones_codigos', entidad_id: codigo,
-      detalle: `Generó código de excepción ${tipo} (saldo $${saldo.toLocaleString('es-CL')}, RUT ${rut})` });
-    res.json({ success: true, data: { codigo, tipo, vence_horas: horas }, error: null });
+      detalle: `Generó código de excepción nivel ${niv} (${costo}⭐, saldo $${saldo.toLocaleString('es-CL')}, RUT ${rut})` });
+    res.json({ success: true, data: { codigo, tipo: 'PROPIO', nivel: niv, costo, vence_horas: horas }, error: null });
   } catch (e) { console.error('[excepciones generar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

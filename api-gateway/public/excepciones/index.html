@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v1.7 — comodín: poder propio (aprueba bajo piso), tope 5, conteo desde el lanzamiento -->
+  <!-- v2.0 — escalera de estrellas; la pestaña Simular apunta a ¿Dónde Curso? -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -85,101 +85,19 @@
   </div>
 
   <!-- ══ SIMULAR ══ -->
-  <div id="t_sim" style="display:grid;grid-template-columns:1fr 310px;gap:14px;align-items:start">
-   <div>
-    <div class="card-af">
-      <div class="row g-3 frm">
-        <div class="col-md-2"><label>Precio del auto ($)</label><input type="text" inputmode="numeric" id="fPrecio" oninput="fmtMiles(this);calc()"></div>
-        <div class="col-md-2"><label>Pie ($)</label><input type="text" inputmode="numeric" id="fPie" oninput="fmtMiles(this);calc()"></div>
-        <div class="col-md-2"><label>RUT cliente</label><input type="text" id="fRut" placeholder="12.345.678-9" oninput="fmtRut(this)"></div>
-        <div class="col-md-2"><label>Canal</label>
-          <select id="fCanal" class="form-select" style="font-weight:700" onchange="calc()">
-            <option value="calle">Calle</option><option value="patio">Parque (patio)</option>
-          </select></div>
-        <div class="col-md-4">
-          <label>Seguros incluidos</label>
-          <div style="display:flex;gap:14px;padding-top:6px;font-size:.85rem;font-weight:600">
-            <label style="font-weight:600"><input type="checkbox" id="sRdh" checked onchange="calc()"> RDH</label>
-            <label style="font-weight:600"><input type="checkbox" id="sCesa" checked onchange="calc()"> Cesantía</label>
-            <label style="font-weight:600"><input type="checkbox" id="sRep" checked onchange="calc()"> Rep. menores</label>
-          </div>
-        </div>
-      </div>
-      <div class="row g-3 frm" style="margin-top:2px">
-        <div class="col-md-2"><label>Tasa propuesta (% mensual)</label>
-          <input type="text" inputmode="decimal" id="fTasa" placeholder="pizarra" oninput="calc()">
-          <div class="nota" style="margin-top:3px">Vacío = pizarra. Mínimo: costo de fondo.</div></div>
-        <div class="col-md-4"><label>&nbsp;</label>
-          <div id="tasaBox" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#1e40af;gap:14px;align-items:center;flex-wrap:wrap">
-            <span>Pizarra: <b id="lblTasaPizarra">—</b></span>
-            <span><i class="bi bi-arrow-right"></i></span>
-            <span>Propuesta: <b id="lblTasaNueva">—</b></span>
-            <span style="color:#c2410c">Rebaja: <b id="lblRebaja">0,0%</b></span>
-            <span class="nota">CF mín.: <b id="lblCF">—</b></span>
-          </div>
-          <div class="nota" style="margin-top:3px">Rebaja sobre <span id="lblMaxTasa">5</span>% relativo: en Unidad la op se fuerza a Autofin.</div></div>
-        <div class="col-md-2"><label>Nueva Comisión Dealer (vacío = pizarra)</label>
-          <input type="text" inputmode="numeric" id="fComDealer" oninput="fmtMiles(this);calc()"></div>
-        <div class="col-md-4" style="display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap">
-          <div class="kpi">Saldo precio<br><b id="kSaldo">—</b></div>
-          <div class="kpi">% pie<br><b id="kPie">—</b></div>
-          <div class="kpi">% a financiar<br><b id="kFin">—</b></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card-af">
-      <table class="gr" id="grilla"><thead><tr>
-        <th>Plazo</th><th>Cuota aprox.</th><th>Dónde cursar</th>
-        <th>Rentab. AutoFin</th><th>Rentab. Unidad</th>
-        <th>Piso <span id="lblPiso">75%</span></th><th></th>
-      </tr></thead><tbody id="gBody"><tr><td colspan="7" style="color:#94a3b8">Ingresa precio y pie para simular</td></tr></tbody></table>
-      <div class="nota" style="margin-top:8px" id="notaPiso"></div>
-    </div>
+  <div id="t_sim">
+   <div class="card-af" style="max-width:640px;text-align:center;padding:30px">
+    <div style="font-size:2rem">🧭</div>
+    <div style="font-weight:800;color:var(--navy);font-size:1.05rem;margin:6px 0">El simulador ahora vive en ¿Dónde Curso?</div>
+    <div style="font-size:.86rem;color:#64748b;line-height:1.5;margin-bottom:14px">
+      Ingresa el negocio (precio, pie, plazo) y la app te dice dónde cursar y qué jugadas puedes hacer
+      con tus estrellas: <b>1⭐</b> excepción dentro del piso 75% · <b>2⭐</b> hasta el piso 50% ·
+      <b>3⭐</b> cualquier operación (si la rentabilidad supera en 10% a la comisión más alta).
+      Las estrellas del mes no usadas expiran; el código vence a las 24 h y sirve una sola vez.</div>
+    <a href="/donde-curso/" class="btn-azul" style="text-decoration:none;display:inline-block"><i class="bi bi-signpost-split me-1"></i>Abrir ¿Dónde Curso?</a>
    </div>
-
-   <!-- Guía rápida -->
-   <aside class="card-af" style="position:sticky;top:74px;font-size:.82rem;color:#475569;line-height:1.5">
-    <div style="font-weight:800;color:var(--navy);margin-bottom:8px"><i class="bi bi-info-circle me-1"></i>¿Cómo funciona?</div>
-    <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">⭐ Estrella</b> — tu presupuesto mensual de excepciones.
-      El primer mes partes con 2; después ganas el 33% de tus otorgadas del mes anterior
-      (redondeado hacia abajo: con 2 colocadas son 0 — coloca al menos 3).
-      Generar un código gasta una estrella. Las que no uses <b>expiran al cierre del mes</b>.
-    </div>
-    <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">🏆 Comodín dorado</b> — un poder DISTINTO a la estrella:
-      aprueba <b>cualquier operación, incluso bajo el piso del 75%</b>, con una sola condición:
-      que la rentabilidad AutoFácil supere en 10% a la comisión más alta (dealer o ejecutivo).
-      Partes con 1 de regalo y ganas otro cada 50 otorgadas desde el inicio del programa.
-      <b>No vence</b> y se acumulan <b>hasta 5</b>. La estrella, en cambio, solo aprueba
-      excepciones que sí cumplen el piso.
-    </div>
-    <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">👔 Código de Gerencia</b> — para el caso puntual cuando no
-      tienes estrellas ni comodín: lo genera el Gerente de Operaciones con motivo escrito y
-      no descuenta tu presupuesto.
-    </div>
-    <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">¿Cuándo necesito código?</b> Solo si tocas algo: bajar la
-      tasa, bajar la comisión del dealer, o cursar por el lado contrario al recomendado.
-      La cursación normal por el lado correcto <b>no gasta nada</b>.
-    </div>
-    <div style="margin-bottom:10px">
-      <b style="color:var(--navy)">¿Qué hago con el código?</b> Cópialo y escríbelo en la
-      <b>Carta de Aprobación</b> (campo Código de excepción). La carta queda "aprobada por
-      código del sistema N°XXXXXX". El código valida solo su operación (saldo precio + RUT),
-      <b>vence a las 24 h</b> y sirve <b>una sola vez</b>. Si vence sin usarse, la estrella
-      vuelve a tu presupuesto dentro del mismo mes.
-    </div>
-    <div>
-      <b style="color:var(--navy)">¿Dudas de un código?</b> En la pestaña <b>Validador</b>
-      cualquiera puede ver de qué operación es, quién lo generó, si está vigente y dónde se usó.
-    </div>
-   </aside>
   </div>
 
-  <!-- ══ MIS CÓDIGOS ══ -->
   <div id="t_cods" style="display:none">
     <div class="card-af"><table class="gr"><thead><tr>
       <th>Código</th><th>Tipo</th><th>Estado</th><th>RUT</th><th>Saldo precio</th><th>Plazo</th><th>Generado</th><th>Vence</th><th>Usado en</th>
@@ -292,24 +210,22 @@ async function boot(){
       document.getElementById('gEjec').value = '';
     }
     pintarPresu();
-    document.getElementById('lblMaxTasa').textContent = EX.exc_tasa_rebaja_max_pct ?? 5;
-    document.getElementById('lblPiso').textContent = (EX.exc_piso_pct ?? 75) + '%';
   } catch(e){ toast('Error cargando datos: ' + e.message, true); }
 }
 function pintarPresu(){
   const e = ESTADO;
+  const nv = e.niveles || { n1:1, n2:2, n3:3 };
   const stars = '⭐'.repeat(Math.min(8, e.estrellas_disponibles)) || '—';
-  const coms  = '🏆'.repeat(Math.min(5, e.comodines_disponibles)) || '—';
   document.getElementById('presu').innerHTML = `
-    <div><div class="lbl">Estrellas del mes (${e.es_primer_mes ? 'primer mes' : e.otorgadas_mes_anterior + ' otorgadas mes anterior × ' + (EX.exc_pct_mensual ?? 33) + '%'})</div>
+    <div><div class="lbl">Estrellas del mes (${e.es_primer_mes ? 'primer mes: de regalo' : e.otorgadas_mes_anterior + ' otorgadas mes anterior × ' + (EX.exc_pct_mensual ?? 33) + '%'})</div>
       <span class="star">${stars}</span> <span class="num">${e.estrellas_disponibles} de ${e.estrellas_total}</span></div>
-    <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">Comodín dorado (1 de regalo + 1 cada ${EX.exc_comodin_cada ?? 50} otorgadas desde el inicio · llevas ${e.otorgadas_desde_lanzamiento ?? 0} · máx ${EX.exc_comodin_max ?? 5})</div>
-      <span class="star">${coms}</span> <span class="num">${e.comodines_disponibles}</span></div>
-    <div style="border-left:1px solid #e2e8f0;padding-left:14px" class="nota">Los códigos vencen a las ${EX.exc_vigencia_horas ?? 24} h — si vence sin usar, la estrella vuelve. Las estrellas no usadas expiran al cierre del mes.</div>`;
+    <div style="border-left:1px solid #e2e8f0;padding-left:14px"><div class="lbl">La escalera</div>
+      <div style="font-size:.82rem;font-weight:600;color:#334155">${'⭐'.repeat(nv.n1)} piso 75% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n2)} piso 50% &nbsp;·&nbsp; ${'⭐'.repeat(nv.n3)} cualquier operación</div></div>
+    <div style="border-left:1px solid #e2e8f0;padding-left:14px" class="nota">Los códigos vencen a las ${EX.exc_vigencia_horas ?? 24} h — si vence sin usar, sus estrellas vuelven. Las no usadas expiran al cierre del mes.</div>`;
 }
 
 function verTab(t){
-  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t) ? (x==='sim'?'grid':'') : 'none';
+  for (const x of ['sim','cods','val','ger']) document.getElementById('t_'+x).style.display = (x===t) ? '' : 'none';
   document.querySelectorAll('.tab-btn[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   if (t==='cods') cargarCodigos();
   if (t==='ger') cargarRegistro();

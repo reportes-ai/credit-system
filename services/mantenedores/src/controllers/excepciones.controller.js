@@ -14,16 +14,15 @@ const { auditar } = require('../../../../shared/audit');
 
 // Claves propias del mantenedor (whitelist del PUT)
 const DEFAULTS = [
-  ['exc_piso_pct',          75, 'Piso de rentabilidad de una excepción: % mínimo respecto de la alternativa MÁS rentable'],
+  ['exc_piso_pct',          75, 'Piso NIVEL 1 (cuesta 1 estrella): la excepción debe rentar al menos este % de la alternativa más rentable'],
+  ['exc_piso2_pct',         50, 'Piso NIVEL 2 (cuesta 2 estrellas): % mínimo de la alternativa más rentable'],
+  ['exc_piso2_estrellas',    2, 'Estrellas que cuesta una excepción de NIVEL 2 (piso 50%)'],
+  ['exc_nivel3_estrellas',   3, 'Estrellas que cuesta el NIVEL 3: aprueba cualquier operación (única condición: rentabilidad > comisión más alta × factor)'],
+  ['exc_nivel3_factor_pct', 10, 'NIVEL 3: la rentabilidad AutoFácil debe superar en al menos este % a la MÁS ALTA entre la comisión del dealer y la del ejecutivo'],
   ['exc_tasa_rebaja_max_pct', 5, 'Rebaja MÁXIMA de tasa en Unidad: % relativo sobre la tasa pizarra (ej: pizarra 2,70% → mínimo 2,70 × 0,95 = 2,56%, redondeando hacia abajo). Si la baja pedida supera esto, la op se fuerza a Autofin'],
-  ['exc_estrellas_mes1',     2, 'Estrellas (excepciones) del PRIMER mes de un ejecutivo nuevo'],
+  ['exc_estrellas_mes1',     3, 'Estrellas (excepciones) del PRIMER mes de un ejecutivo nuevo — de regalo, alcanzan justo para una jugada de nivel 3'],
   ['exc_pct_mensual',       33, '% de las otorgadas del mes anterior que se convierten en estrellas del mes (redondeo HACIA ABAJO: con 2 colocadas → 0; el aliciente es colocar al menos 3)'],
-  ['exc_vigencia_horas',    24, 'Vigencia de un código de excepción (horas corridas desde que se genera); vencido sin usar, la estrella se devuelve dentro del mismo mes'],
-  ['exc_comodin_cada',      50, 'Comodín dorado: se gana 1 cada N créditos OTORGADOS acumulados del ejecutivo'],
-  ['exc_comodin_inicial',    1, 'Comodines dorados de bienvenida: todo ejecutivo parte con esta cantidad'],
-  ['exc_comodin_max',        5, 'Tope de comodines dorados acumulables (no vencen, pero se juntan hasta este máximo)'],
-  ['exc_comodin_desde', 202608, 'Mes (AAAAMM) desde el cual las otorgadas cuentan para ganar comodines (el conteo de "cada 50" parte aquí, no con la historia previa)'],
-  ['exc_comodin_factor_pct',10, 'Comodín dorado: la rentabilidad AutoFácil debe superar en al menos este % a la MÁS ALTA entre la comisión del dealer y la del ejecutivo'],
+  ['exc_vigencia_horas',    24, 'Vigencia de un código de excepción (horas corridas desde que se genera); vencido sin usar, sus estrellas se devuelven dentro del mismo mes'],
   ['exc_tolerancia_saldo',   0, 'Tolerancia en $ entre el saldo precio de la simulación y el de la carta al validar un código (0 = deben calzar exacto)'],
   ['exc_codigo_digitos',     6, 'Largo del código de aprobación (dígitos)'],
   ['exc_plazo_min_curse',   12, 'Plazo mínimo cursable (cuotas): bajo esto NINGUNA financiera toma la operación — ¿Dónde Curso? muestra ambas en gris'],
@@ -41,6 +40,14 @@ require('../../../../shared/migrate').enFila('excepciones-comerciales', async ()
     await pool.query(`UPDATE IGNORE parametros_credito SET clave='exc_tasa_rebaja_max_pct'
                       WHERE clave='exc_tasa_min_unidad'`).catch(() => {});
     await pool.query(`DELETE FROM parametros_credito WHERE clave='exc_tasa_min_unidad'`).catch(() => {});
+    // 2026-08-08: el comodín dorado se reemplaza por la escalera de estrellas
+    // (1⭐ piso 75% · 2⭐ piso 50% · 3⭐ cualquier op). Su factor pasa al nivel 3
+    // y el resto de sus claves se retira. Primer mes: 3 estrellas de regalo.
+    await pool.query(`UPDATE IGNORE parametros_credito SET clave='exc_nivel3_factor_pct'
+                      WHERE clave='exc_comodin_factor_pct'`).catch(() => {});
+    await pool.query(`DELETE FROM parametros_credito WHERE clave IN
+      ('exc_comodin_factor_pct','exc_comodin_cada','exc_comodin_inicial','exc_comodin_max','exc_comodin_desde')`).catch(() => {});
+    await pool.query(`UPDATE parametros_credito SET valor=3 WHERE clave='exc_estrellas_mes1' AND valor=2`).catch(() => {});
     for (const [clave, valor, descripcion] of DEFAULTS)
       await pool.query('INSERT IGNORE INTO parametros_credito (clave, valor, descripcion) VALUES (?, ?, ?)',
         [clave, valor, descripcion]);

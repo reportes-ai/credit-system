@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Excepciones Comerciales — AutoFácil</title>
-  <!-- v1.4 -->
+  <!-- v2.0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,11 +68,10 @@
   <div class="afecta-box">
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
-      <li><b>Piso de rentabilidad (75%)</b> → el Simulador de Excepciones rechaza toda combinación (baja de tasa / baja de comisión dealer) cuya rentabilidad quede bajo este % de la alternativa más rentable, y propone la rebaja de comisión dealer (neta, sin IVA) que devuelve la operación al piso.</li>
-      <li><b>Rebaja máxima de tasa Unidad</b> → % relativo sobre la tasa pizarra (pizarra 2,70% → mínimo 2,56%, redondeando hacia abajo); una baja mayor fuerza la operación a Autofin. La comparación de financieras usa el mismo motor de <a href="/donde-curso/">¿Dónde Curso?</a>.</li>
-      <li><b>Estrellas mes 1 y % mensual</b> → presupuesto de excepciones de cada Ejecutivo Comercial que mostrará la pantalla de <a href="/aprobaciones/">Cartas de Aprobación</a> (estrellas sobre el generador). El redondeo es hacia abajo: es el aliciente para colocar al menos 3 al mes.</li>
-      <li><b>Vigencia del código (24 h)</b> → un código no usado dentro del plazo vence y la estrella se devuelve dentro del mismo mes; las estrellas no usadas al cierre del mes expiran.</li>
-      <li><b>Comodín dorado</b> → poder distinto a la estrella: aprueba cualquier operación <b>incluso bajo el piso del 75%</b>, con la única condición de que la rentabilidad AutoFácil supere en el % configurado a la más alta entre la comisión del dealer y la del ejecutivo. 1 de bienvenida + 1 cada N otorgadas desde el mes de inicio (AAAAMM); no vence y se acumula hasta el tope.</li>
+      <li><b>La escalera de estrellas</b> → rige en <a href="/donde-curso/">¿Dónde Curso?</a>: <b>1⭐</b> aprueba excepciones que rentan al menos el piso nivel 1 (75%) · <b>2⭐</b> hasta el piso nivel 2 (50%) · <b>3⭐</b> cualquier operación, con la única condición de que la rentabilidad supere en el % configurado a la comisión más alta (dealer o ejecutivo). El sistema propone la rebaja de comisión dealer (neta) que devuelve una jugada al nivel 1.</li>
+      <li><b>Rebaja máxima de tasa Unidad</b> → % relativo sobre la tasa pizarra (pizarra 2,70% → mínimo 2,56%, redondeando hacia abajo); una baja mayor fuerza la operación a Autofin.</li>
+      <li><b>Estrellas mes 1 y % mensual</b> → presupuesto de cada Ejecutivo Comercial: 3 de regalo el primer mes (alcanzan justo para una jugada de nivel 3); después ⌊otorgadas del mes anterior × 33%⌋ — redondeo hacia abajo: el aliciente es colocar al menos 3 al mes.</li>
+      <li><b>Vigencia del código (24 h)</b> → un código no usado dentro del plazo vence y sus estrellas se devuelven dentro del mismo mes; las estrellas no usadas al cierre del mes expiran.</li>
       <li><b>Tolerancia de saldo y dígitos del código</b> → validación del código en la <a href="/aprobaciones/">Carta de Aprobación</a> y en el Validador público (saldo precio + primeros dígitos del RUT + vigencia).</li>
       <li><b>Plazos del simulador</b> → columnas de cuota aproximada (12 / 24 / 36 / 48) que sirven de approach en la negociación con el cliente; las cuotas se calculan con el motor de <a href="/cotizaciones/">Cotizaciones</a> y las tasas vigentes de <a href="/mantenedores/tasas/">Tasas</a>.</li>
       <li><b>Umbral "Decides Tú" (solo lectura)</b> → es el mismo <code>pref_diff_pct</code> de <a href="/donde-curso/">¿Dónde Curso?</a>; se edita en <a href="/mantenedores/parametros/">Parámetros</a> (una sola fuente).</li>
@@ -97,20 +96,17 @@ const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repla
 /* Agrupación y presentación de cada parámetro (nombre corto + unidad).
    Las descripciones largas vienen de la BD (parametros_credito.descripcion). */
 const GRUPOS = [
-  { tit:'Piso de rentabilidad y tasas', icono:'bi-shield-check', claves:[
-    ['exc_piso_pct','Piso de rentabilidad de la excepción','%'],
+  { tit:'La escalera de estrellas', icono:'bi-star-fill', claves:[
+    ['exc_piso_pct','Piso NIVEL 1 (1 estrella)','%'],
+    ['exc_piso2_pct','Piso NIVEL 2','%'],
+    ['exc_piso2_estrellas','Costo del nivel 2','⭐'],
+    ['exc_nivel3_estrellas','Costo del nivel 3 (cualquier op)','⭐'],
+    ['exc_nivel3_factor_pct','Nivel 3: rentab. supera comisión más alta en','%'],
     ['exc_tasa_rebaja_max_pct','Rebaja máxima de tasa Unidad','%'],
   ]},
-  { tit:'Estrellas (presupuesto mensual de excepciones)', icono:'bi-star-fill', claves:[
-    ['exc_estrellas_mes1','Estrellas del primer mes','un.'],
+  { tit:'Presupuesto mensual de estrellas', icono:'bi-calendar-check', claves:[
+    ['exc_estrellas_mes1','Estrellas del primer mes (regalo)','un.'],
     ['exc_pct_mensual','% de otorgadas del mes anterior','%'],
-  ]},
-  { tit:'Comodín dorado', icono:'bi-trophy-fill', claves:[
-    ['exc_comodin_cada','Otorgadas acumuladas por comodín','ops'],
-    ['exc_comodin_inicial','Comodines de bienvenida','un.'],
-    ['exc_comodin_max','Tope de comodines acumulables','un.'],
-    ['exc_comodin_desde','Otorgadas cuentan desde (AAAAMM)',''],
-    ['exc_comodin_factor_pct','Rentabilidad debe superar comisiones en','%'],
   ]},
   { tit:'Códigos de aprobación', icono:'bi-key-fill', claves:[
     ['exc_vigencia_horas','Vigencia del código','horas'],
