@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 — tasa inválida apaga las cards (gris), salvo que aplique el comodín -->
+<!-- v2.7 — plazo mínimo cursable (12): bajo eso ambas financieras en gris -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -462,6 +462,21 @@ const on = id => $(id).classList.contains('on');
 let LADO_SEL = null, DUO = null;
 function renderDuo(R0, D, plazo, saldo, R){
   if (!R0 || D.veredicto === 'NINGUNA') { $('duo').style.display = 'none'; $('veredicto').style.display = ''; return; }
+  /* Plazo mínimo cursable (mantenedor Excepciones): bajo eso NADIE toma la
+     operación — ambas financieras en gris, sin estrella ni comodín. */
+  const plazoMin = Math.round(EX.exc_plazo_min_curse ?? 12);
+  if (plazo < plazoMin) {
+    $('veredicto').style.display = 'none'; $('duo').style.display = 'flex';
+    DUO = { plazo, saldo, AF: { click:false, tipo:null }, UAC: { click:false, tipo:null } };
+    LADO_SEL = null;
+    for (const l of ['AF', 'UAC']) {
+      const el = $('vc' + l);
+      el.className = 'vcard dim ' + (l === 'AF' ? 'v-af' : 'v-un');
+      $('tag' + l).style.display = 'none'; $('cta' + l).style.display = 'none';
+      $('por' + l).textContent = 'No se cursa bajo ' + plazoMin + ' cuotas.';
+    }
+    return;
+  }
   /* Tasa manual bajo el mínimo permitido: con esa tasa NINGÚN lado se abre con
      estrella — ambas cards en gris, salvo que el comodín dorado aplique. */
   if (window._TASA_INVALIDA && R) {

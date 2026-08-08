@@ -26,6 +26,7 @@ const DEFAULTS = [
   ['exc_comodin_factor_pct',10, 'Comodín dorado: la rentabilidad AutoFácil debe superar en al menos este % a la MÁS ALTA entre la comisión del dealer y la del ejecutivo'],
   ['exc_tolerancia_saldo',   0, 'Tolerancia en $ entre el saldo precio de la simulación y el de la carta al validar un código (0 = deben calzar exacto)'],
   ['exc_codigo_digitos',     6, 'Largo del código de aprobación (dígitos)'],
+  ['exc_plazo_min_curse',   12, 'Plazo mínimo cursable (cuotas): bajo esto NINGUNA financiera toma la operación — ¿Dónde Curso? muestra ambas en gris'],
   ['exc_plazo_1',           12, 'Simulador — plazo 1 (cuotas)'],
   ['exc_plazo_2',           24, 'Simulador — plazo 2 (cuotas)'],
   ['exc_plazo_3',           36, 'Simulador — plazo 3 (cuotas)'],
