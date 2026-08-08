@@ -4,7 +4,7 @@
    porque sin ellos la app no puede responder nada. Los parámetros del negocio los
    guarda la app en localStorage, así que en el patio sin señal igual calcula, con
    los últimos valores conocidos y avisando que son de antes. */
-const CACHE = 'donde-curso-v2';   // v2: íconos propios
+const CACHE = 'donde-curso-v3';   // v3: vuelta a la clásica (la 2.0 vive en /donde-curso-2/)
 const SHELL = [
   '/donde-curso/', '/donde-curso/manifest.json',
   '/donde-curso/icon-192.png', '/donde-curso/icon-512.png',
