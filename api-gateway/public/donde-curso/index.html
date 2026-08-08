@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — una sola lectura: la leyenda nunca contradice el veredicto -->
+<!-- v2.0 — copiloto de excepciones: sugerencias en frases + codigo, tasa pizarra al lado de la manual -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -111,7 +111,10 @@
       <div class="t"><i class="bi bi-signpost-split-fill"></i> ¿Dónde curso?</div>
       <div class="u" id="uNombre">—</div>
     </div>
-    <button onclick="logout()" title="Salir"><i class="bi bi-box-arrow-right"></i></button>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="excChip" style="display:none;background:#fffbeb;border:1px solid #fde047;border-radius:14px;padding:3px 10px;font-size:.8rem;font-weight:700;color:#854d0e">⭐— 🏆—</span>
+      <button onclick="logout()" title="Salir"><i class="bi bi-box-arrow-right"></i></button>
+    </div>
   </header>
 
   <div class="wrap">
@@ -140,7 +143,8 @@
           <div class="fld"><label>Plazo (cuotas)</label>
             <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" value="48" oninput="calcular()"></div>
           <div class="fld"><label>Tasa cliente % <span class="aux" id="tasaAux">(auto)</span></label>
-            <input id="iTasa" type="text" inputmode="decimal" placeholder="auto" oninput="calcular()"></div>
+            <input id="iTasa" type="text" inputmode="decimal" placeholder="auto" oninput="calcular()">
+            <div class="aux" id="tasaPiz" style="margin-top:3px"></div></div>
         </div>
 
         <div class="fld"><label>Seguros incluidos</label>
@@ -170,6 +174,26 @@
         </div>
       </div>
     </div>
+
+    <!-- ¿Y SI...? — copiloto de excepciones (solo perfiles con excepciones_simulador).
+         El sistema explora las jugadas viables y las dice en frases; cada una
+         genera su código de excepción. Sin permiso, la sección no existe. -->
+    <div id="excSec" style="display:none">
+      <div style="font-size:.86rem;font-weight:700;color:#334155;margin:2px 0 8px"><i class="bi bi-stars" style="color:#f59e0b"></i> ¿El cliente pide otra cosa? Esto es lo que puedes hacer:</div>
+      <div id="excChips"></div>
+      <div class="fld" style="margin:8px 0 4px"><label>RUT cliente <span class="aux">(necesario para generar un código)</span></label>
+        <input id="iRut" type="text" placeholder="12.345.678-9" oninput="fmtRutDC(this)"></div>
+    </div>
+
+    <dialog id="dlgCod" style="border:none;border-radius:16px;padding:24px 28px;max-width:400px;width:92%;text-align:center">
+      <div style="font-size:.85rem;color:#64748b;font-weight:700" id="dlgTipo"></div>
+      <div style="font-size:2.4rem;font-weight:900;letter-spacing:6px;color:#001345" id="dlgNum"></div>
+      <div class="mini" id="dlgNota" style="margin-top:4px"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+        <button style="background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-weight:800" onclick="navigator.clipboard.writeText($('dlgNum').textContent).then(()=>toast('Código copiado'))"><i class="bi bi-clipboard"></i> Copiar</button>
+        <button style="background:#e2e8f0;border:none;border-radius:9px;padding:9px 20px;font-weight:700" onclick="$('dlgCod').close()">Cerrar</button>
+      </div>
+    </dialog>
 
     <!-- Sin cifras de rentabilidad ni de margen: la app le dice al ejecutivo
          DÓNDE cursar, no cuánto gana la empresa en cada financiera. -->
@@ -209,6 +233,7 @@ const $ = id => document.getElementById(id);
 let TOKEN = localStorage.getItem('token');
 let P = {}, T = {}, UF = null, OPS_UAC = 0, MES_UAC = '', PREF_TABLA = [];
 let ES_PATIO = true;
+let EXC_ON = false, EXC_ESTADO = null, EX = {};   // copiloto de excepciones (con permiso)
 
 const H  = () => ({ 'Authorization': 'Bearer ' + TOKEN });
 const fN = n => Math.round(n).toLocaleString('es-CL');
@@ -227,6 +252,9 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/donde-curso
     const j = await r.json();
     const u = (j.data && j.data.usuario) || j.usuario || {};
     $('uNombre').textContent = u.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : 'Ejecutivo';
+    // Copiloto de excepciones: solo con el permiso; los demás ven la app de siempre
+    EXC_ON = (j.funcionalidades || []).includes('excepciones_simulador');
+    if (EXC_ON) cargarExcEstado();
   } catch (e) { /* sin señal: seguimos con lo que haya en caché */ }
   $('appView').style.display = '';
   await cargarBase();
@@ -335,6 +363,13 @@ function calcular(){
   });
 
   pintar(R, D, plazo, saldo);
+  // Tasa pizarra + costo de fondo, al lado de la tasa manual (ayuda a simular)
+  const R0 = tasaCli ? AF_RENT.calcular({ valor, pie, plazo, esPatio: ES_PATIO, uacPct,
+    gastos: { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
+    seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') } }, P, UF, T) : R;
+  const cf = ((parseFloat(T.tasa_mensual_mayor)||0) - (parseFloat(T.spread_mayor)||0));
+  $('tasaPiz').textContent = R0 ? ('Pizarra ' + R0.tasaCliPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' + (cf>0 ? ' · mín. ' + cf.toFixed(2).replace('.',',') + '%' : '')) : '';
+  if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
 }
 const on = id => $(id).classList.contains('on');
 
@@ -345,6 +380,8 @@ function esperando(){
   $('avisoMin').style.display = 'none';
   ['dMonto','dCuota','dTasa'].forEach(i => $(i).textContent = '—');
   $('notaCuadro').textContent = '';
+  $('tasaPiz').textContent = '';
+  $('excSec').style.display = 'none';
 }
 
 function pintar(R, D, plazo, saldo){
@@ -398,6 +435,155 @@ function pintar(R, D, plazo, saldo){
     // Si el cuadro general difiere del cálculo real, no se muestra: manda el veredicto.
   }
   $('notaCuadro').innerHTML = nota;
+}
+
+/* ═══ COPILOTO DE EXCEPCIONES (solo con permiso excepciones_simulador) ═══════
+   El sistema explora las jugadas viables (lado contrario, tasa mínima, rebaja
+   de comisión, comodín) con los MISMOS motores del cálculo principal y las
+   dice en frases. Cada frase genera su código de excepción. */
+async function cargarExcEstado(){
+  try {
+    const [re, rp] = await Promise.all([
+      fetch(API + '/excepciones/estado', { headers: H() }),
+      fetch(API + '/excepciones-comerciales', { headers: H() }),
+    ]);
+    const je = await re.json(), jp = await rp.json();
+    if (je.success) EXC_ESTADO = je.data;
+    if (jp.success) EX = jp.data.obj || {};
+    if (EXC_ESTADO) {
+      $('excChip').style.display = '';
+      $('excChip').textContent = `⭐${EXC_ESTADO.estrellas_disponibles} 🏆${EXC_ESTADO.comodines_disponibles}`;
+      $('excChip').title = `${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total} estrellas del mes · ${EXC_ESTADO.comodines_disponibles} comodín(es)`;
+    }
+    calcular();
+  } catch(_) {}
+}
+function fmtRutDC(el){
+  let v = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (!v) { el.value=''; return; }
+  const dv = v.length > 1 ? v.slice(-1) : '';
+  const cuerpo = (v.length > 1 ? v.slice(0,-1) : v).slice(0,9);
+  el.value = (Number(cuerpo)||'').toLocaleString('es-CL') + (dv ? '-'+dv : '');
+}
+const nomFin = l => l === 'UAC' ? 'Unidad' : 'Autofin';
+const pct2 = f => (f*100).toFixed(2).replace('.',',') + '%';
+
+function sugerencias(ctx){
+  const { valor, pie, plazo, tasaCli, R } = ctx;
+  const sec = $('excSec'), out = [];
+  if (!EXC_ESTADO) { sec.style.display = 'none'; return; }
+  const gastos  = { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') };
+  const seguros = { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') };
+  const calcP = (p, tc, com) => {
+    const u = window.AF_UAC_TIER ? AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo: p, mes: MES_UAC }, P) : null;
+    return AF_RENT.calcular({ valor, pie, plazo: p, tasaCli: tc, dealerComCLP: com, esPatio: ES_PATIO, uacPct: u, gastos, seguros }, P, UF, T);
+  };
+  const piso    = (EX.exc_piso_pct ?? 75) / 100;
+  const diffTu  = (P.pref_diff_pct ?? 10);
+  const factCom = 1 + (EX.exc_comodin_factor_pct ?? 10) / 100;
+  const maxReb  = (EX.exc_tasa_rebaja_max_pct ?? 5) / 100;
+  const cf      = ((parseFloat(T.tasa_mensual_mayor) || 0) - (parseFloat(T.spread_mayor) || 0)) / 100;
+  const plazos  = [...new Set([plazo, EX.exc_plazo_1||12, EX.exc_plazo_2||24, EX.exc_plazo_3||36, EX.exc_plazo_4||48])].filter(p => p >= 6 && p <= 72);
+  const hayStar = (EXC_ESTADO.estrellas_disponibles || 0) > 0;
+  const hayCom  = (EXC_ESTADO.comodines_disponibles || 0) > 0;
+
+  // (a) + (c): por plazo, ¿el lado NO preferente se puede abrir? (cada plazo por separado)
+  const abrePorLado = { AF: [], UAC: [] }, comPorLado = { AF: [], UAC: [] }, comodinLado = { AF: [], UAC: [] };
+  for (const p of plazos) {
+    const B = calcP(p, null, null);
+    if (!B) continue;
+    const mejor = Math.max(B.af.rentab, B.uac.rentab);
+    const dif = Math.abs(B.af.rentab - B.uac.rentab) / Math.max(1, mejor) * 100;
+    if (dif < diffTu) continue;                       // Decides Tú: cursar el otro lado no es excepción
+    const contra = B.af.rentab >= B.uac.rentab ? 'UAC' : 'AF';
+    const rentC = contra === 'UAC' ? B.uac.rentab : B.af.rentab;
+    if (rentC >= mejor * piso) { abrePorLado[contra].push({ p, cuota: B.af.cuota }); continue; }
+    const falta = Math.ceil(mejor * piso - rentC);
+    const comProp = Math.max(0, B.costos.dealer - falta);
+    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp });
+    else if (rentC > Math.max(B.costos.dealer, B.costos.ejecutivo) * factCom) comodinLado[contra].push({ p });
+  }
+  for (const l of ['UAC', 'AF']) {
+    if (abrePorLado[l].length) {
+      const ps = abrePorLado[l].map(x => x.p).join(' o ');
+      const cuo = abrePorLado[l][abrePorLado[l].length-1];
+      out.push({ ico:'bi-star-fill', col:'#f59e0b', tipo:'PROPIO', fin: l, plazoCod: cuo.p, disabled: !hayStar,
+        txt:`Con una estrella puedes cursarlo en <b>${nomFin(l)} a ${ps} cuotas</b>${l==='AF'?` (cuota ${fCLP(cuo.cuota)} a ${cuo.p})`:''}. Cumple el piso.` });
+    }
+    if (comPorLado[l].length) {
+      const det = comPorLado[l].map(x => `a ${x.p} con ${fCLP(x.comProp)}`).join(' · ');
+      out.push({ ico:'bi-cash-coin', col:'#0141A2', tipo:'PROPIO', fin: l, plazoCod: comPorLado[l][0].p, disabled: !hayStar,
+        txt:`Si bajas la comisión del dealer, abres <b>${nomFin(l)}</b>: ${det}.` });
+    }
+    if (comodinLado[l].length) {
+      const ps = comodinLado[l].map(x => x.p).join(' o ');
+      out.push({ ico:'bi-trophy-fill', col:'#b45309', tipo:'COMODIN', fin: l, plazoCod: comodinLado[l][0].p, disabled: !hayCom, dorada: true,
+        txt:`<b>${nomFin(l)} a ${ps}</b> está bajo el piso incluso rebajando la comisión — solo tu <b>comodín dorado</b> lo aprueba.` });
+    }
+  }
+
+  // (b) Tasa mínima al plazo INGRESADO, sobre el lado del veredicto actual
+  const B0 = calcP(plazo, null, null);
+  if (B0) {
+    const ladoNow = B0.af.rentab >= B0.uac.rentab ? 'AF' : 'UAC';
+    const mejor0 = Math.max(B0.af.rentab, B0.uac.rentab);
+    const pizarra = B0.tasaCli;
+    if (ladoNow === 'AF' && cf > 0 && cf < pizarra) {
+      let lo = cf, hi = pizarra;                    // menor tasa que aún cumple el piso
+      for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2;
+        const Rm = calcP(plazo, mid, null);
+        if (Rm && Rm.af.rentab >= mejor0 * piso) hi = mid; else lo = mid; }
+      if (hi < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', tipo:'PROPIO', fin:'AF', plazoCod: plazo, disabled: !hayStar,
+        txt:`Puedes ofrecer tasa hasta <b>${pct2(hi)}</b> a ${plazo} cuotas (pizarra ${pct2(pizarra)}) y sigue cumpliendo el piso.` });
+    } else if (ladoNow === 'UAC') {
+      const tMin = Math.max(cf, pizarra * (1 - maxReb));
+      if (tMin < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', tipo:'PROPIO', fin:'UAC', plazoCod: plazo, disabled: !hayStar,
+        txt:`En Unidad puedes ofrecer tasa hasta <b>${pct2(tMin)}</b> a ${plazo} cuotas (rebaja máxima ${(maxReb*100).toFixed(0)}% sobre la pizarra ${pct2(pizarra)}).` });
+    }
+    // (d) Tasa manual escrita que deja la operación bajo el piso → territorio del comodín
+    if (tasaCli && R) {
+      const rentNow = ladoNow === 'UAC' ? R.uac.rentab : R.af.rentab;
+      if (rentNow < mejor0 * piso && rentNow > Math.max(R.costos.dealer, R.costos.ejecutivo) * factCom)
+        out.push({ ico:'bi-trophy-fill', col:'#b45309', tipo:'COMODIN', fin: ladoNow, plazoCod: plazo, disabled: !hayCom, dorada: true,
+          txt:`La tasa ${pct2(tasaCli)} deja la operación <b>bajo el piso</b> — solo tu <b>comodín dorado</b> puede aprobarla.` });
+    }
+  }
+
+  if (!out.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  window._EXC_CHIPS = out.slice(0, 5);
+  $('excChips').innerHTML = window._EXC_CHIPS.map((s, i) => `
+    <div style="background:${s.dorada?'#fffbeb':'#fff'};border:1.5px solid ${s.dorada?'#fde047':'#e2e8f0'};border-radius:12px;padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
+      <i class="bi ${s.ico}" style="font-size:1.2rem;color:${s.col}"></i>
+      <div style="flex:1;font-size:.85rem;line-height:1.45;color:#334155">${s.txt}</div>
+      <button ${s.disabled?'disabled':''} onclick="usarChip(${i})"
+        style="white-space:nowrap;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:.8rem;color:#fff;background:${s.dorada?'#b45309':'#f59e0b'};${s.disabled?'opacity:.4':''}">
+        Usar ${s.tipo==='COMODIN'?'🏆':'⭐'}</button>
+    </div>`).join('') +
+    `<p class="mini" style="margin:2px 0 0">${hayStar||hayCom ? 'El código vence a las 24 h y sirve una sola vez — se escribe en la Carta de Aprobación.' : 'Sin estrellas ni comodines este mes: para un caso puntual pide un código a Gerencia.'}</p>`;
+}
+
+async function usarChip(i){
+  const s = (window._EXC_CHIPS || [])[i];
+  if (!s) return;
+  const rut = ($('iRut').value || '').trim();
+  if (rut.replace(/[^0-9]/g,'').length < 7) { toast('Escribe el RUT del cliente para generar el código'); $('iRut').focus(); return; }
+  if (s.tipo === 'COMODIN' && !confirm('Esta jugada usa tu COMODÍN DORADO 🏆 (no vence, pero es escaso). ¿Continuar?')) return;
+  const saldo = parseMiles($('iValor').value) - parseMiles($('iPie').value);
+  try {
+    const r = await fetch(API + '/excepciones/generar', { method:'POST',
+      headers: { ...H(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ tipo: s.tipo, rut_cliente: rut, saldo_precio: saldo, plazo: s.plazoCod,
+        financiera: s.fin === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
+        snapshot: { origen: 'donde-curso', jugada: s.txt.replace(/<[^>]+>/g,''), valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
+    $('dlgTipo').textContent = s.tipo === 'COMODIN' ? '🏆 Comodín dorado — código de excepción' : '⭐ Código de excepción';
+    $('dlgNum').textContent = j.data.codigo;
+    $('dlgNota').textContent = `Vence en ${j.data.vence_horas || 24} h. Escríbelo en la Carta de Aprobación (campo Código de excepción).`;
+    $('dlgCod').showModal();
+    cargarExcEstado();
+  } catch(e){ toast('Sin conexión: el código necesita señal'); }
 }
 </script>
 </body>
