@@ -1659,12 +1659,25 @@ const subirDocumento = async (req, res) => {
       [rutasViejas] = await pool.query('SELECT doc_ruta FROM cartas_documentos WHERE id_carta=? AND tipo=? AND doc_ruta IS NOT NULL', [idCarta, tipo]);
       await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [idCarta, tipo]); // re-subida: reemplaza
     }
+    /* extracted lo calcula el SERVIDOR (el front nunca lo mandó y la columna
+       quedó muerta): lo que se leyó del documento queda junto al documento,
+       para auditar por qué un monto se guardó como se guardó. */
+    let ext = extracted || null;
+    if (!ext && String(mime || 'application/pdf').includes('pdf')) {
+      try {
+        const txt = (await pdf(buf)).text;
+        if (String(txt || '').replace(/\s/g, '').length < 40) ext = { escaneado: true };
+        else ext = tipo === 'COTIZACION_UNIDAD' ? parseCotizacion(txt)
+                 : tipo === 'COMPROMISO_UNIDAD' ? parseCartaCompromiso(txt)
+                 : parseCartaAutofin(txt);
+      } catch (e) { ext = { error_lectura: e.message }; }
+    }
     const d = await almacen.colocar({ ambito: 'cartas', clave: idCarta || 'sin-carta', buffer: buf, mime, nombre: nombre || 'documento.pdf' });
     const [r] = await pool.query(
       `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, doc_storage, doc_ruta, doc_bytes, extracted, subido_por, id_subido_por)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [idCarta, tipo, nombre || 'documento.pdf', mime || 'application/pdf', buf.length, d.blob, d.storage, d.ruta, d.bytes,
-       extracted ? JSON.stringify(extracted) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
+       ext ? JSON.stringify(ext) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
     for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
   } catch (e) { console.error('[subirDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
@@ -1731,4 +1744,5 @@ const verificable = async (req, res) => {
   } catch (e) { console.error('[cartas verificable]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable };
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable,
+  parseCotizacion, parseCartaCompromiso, parseCartaAutofin };   // para scripts/backfill-extracted-cartas.js
