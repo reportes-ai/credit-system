@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<!-- ¿Dónde Curso? 2.0 (BETA con copiloto de excepciones; la clásica sigue en /donde-curso/) · v3.3 — snapshots con rent_jugada/mejor_base para medir el costo del programa -->
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#012d70">
+<title>¿Dónde curso? 2.0 — AutoFácil</title>
+<link rel="manifest" href="/donde-curso/manifest.json">
+<link rel="apple-touch-icon" href="/donde-curso/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --cyan:#009AFE; --bg:#eef2f7; --line:#dbe3ec; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:#1f2937;
+         padding-bottom:env(safe-area-inset-bottom); }
+
+  /* ── Login ── */
+  #loginView { position:fixed; inset:0; background:linear-gradient(160deg,#012d70,#0141A2 55%,#009AFE);
+               display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px; z-index:1000; }
+  #loginView img { height:52px; filter:brightness(0) invert(1); margin-bottom:10px; }
+  #loginView .sub { color:rgba(255,255,255,.85); font-size:.8rem; font-weight:700; letter-spacing:2px;
+                    text-transform:uppercase; margin-bottom:30px; }
+  #loginView input { width:100%; max-width:340px; border:none; border-radius:12px; padding:14px 16px; font-size:1rem; margin-bottom:12px; }
+  #loginView button { width:100%; max-width:340px; border:none; border-radius:12px; padding:14px; font-size:1rem;
+                      font-weight:700; background:#fff; color:var(--navy-dark); cursor:pointer; }
+  #loginErr { color:#fecaca; font-size:.85rem; min-height:22px; margin-top:10px; font-weight:600; text-align:center; }
+
+  /* ── Cabecera ── */
+  header { background:linear-gradient(135deg,var(--navy-dark),var(--navy)); color:#fff; padding:14px 16px;
+           padding-top:calc(14px + env(safe-area-inset-top)); display:flex; align-items:center; gap:10px;
+           position:sticky; top:0; z-index:20; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+  header .t { font-weight:800; font-size:1.05rem; line-height:1.15; }
+  header .u { font-size:.72rem; opacity:.85; }
+  header button { margin-left:auto; background:rgba(255,255,255,.15); border:none; color:#fff;
+                  border-radius:9px; padding:8px 10px; font-size:.9rem; }
+
+  .wrap { max-width:560px; margin:0 auto; padding:14px 14px 40px; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 8px rgba(0,0,0,.07); margin-bottom:14px; overflow:hidden; }
+  .card > h2 { margin:0; background:var(--navy-dark); color:#fff; font-size:.82rem; font-weight:700;
+               letter-spacing:.5px; padding:11px 14px; display:flex; align-items:center; gap:8px; }
+  .card .body { padding:14px; }
+
+  label { display:block; font-size:.68rem; font-weight:700; color:#64748b; letter-spacing:.6px;
+          text-transform:uppercase; margin-bottom:5px; }
+  label .aux { color:var(--cyan); }
+  input[type=text], input[type=number], input[type=email], input[type=password] {
+    width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px 13px; font-size:1.05rem;
+    font-weight:600; color:#0f172a; background:#f8fafc; }
+  input:focus { outline:none; border-color:var(--cyan); background:#fff; }
+  input[readonly] { background:#eef4ff; color:var(--navy); border-style:dashed; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+  .fld { margin-bottom:13px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { flex:1 1 auto; min-width:calc(50% - 4px); border:1.5px solid var(--line); background:#fff; color:#64748b;
+          border-radius:10px; padding:11px 8px; font-size:.82rem; font-weight:700; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; gap:6px; }
+  .chip.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .seg { display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border:none; background:#fff; color:#64748b; padding:12px 6px; font-size:.85rem;
+                font-weight:700; cursor:pointer; }
+  .seg button.on { background:var(--navy); color:#fff; }
+
+  /* ── Veredicto ── */
+  #veredicto { border-radius:16px; padding:22px 18px; text-align:center; color:#fff; margin-bottom:14px;
+               box-shadow:0 4px 18px rgba(0,0,0,.16); }
+  #veredicto .lbl { font-size:.7rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:.85; }
+  #veredicto .fin { font-size:2.1rem; font-weight:900; line-height:1.1; margin:6px 0 4px; }
+  #veredicto .por { font-size:.88rem; font-weight:600; opacity:.95; }
+  .v-af  { background:linear-gradient(135deg,#065f46,#059669); }
+  .v-un  { background:linear-gradient(135deg,#7c2d12,#ea580c); }
+  .v-tu  { background:linear-gradient(135deg,#1e3a8a,#3b82f6); }
+  .v-no  { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
+  .v-esp { background:linear-gradient(135deg,#475569,#94a3b8); }
+
+  /* ── Duo de financieras: la recomendada grande; la otra chica al lado.
+        Viable con estrella = dorada y clickeable (crece con animación al
+        elegirla). Inviable = gris. ── */
+  #duo { display:none; gap:10px; margin-bottom:14px; align-items:stretch; }
+  .vcard { flex:1; border-radius:16px; padding:16px 12px; text-align:center; color:#fff;
+           box-shadow:0 4px 18px rgba(0,0,0,.16); transition:flex .38s ease, filter .3s, opacity .3s, transform .2s;
+           position:relative; overflow:hidden; min-width:0; }
+  .vcard.big { flex:2.4; }
+  .vcard .lbl { font-size:.62rem; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; opacity:.85; }
+  .vcard .fin { font-weight:900; line-height:1.12; margin:5px 0 3px; font-size:1.05rem; transition:font-size .38s ease; }
+  .vcard.big .fin { font-size:1.75rem; }
+  .vcard .por { font-size:.74rem; font-weight:600; opacity:.95; }
+  .vcard.big .por { font-size:.85rem; }
+  .vcard.dim { filter:grayscale(.92); opacity:.5; }
+  .vcard.viable { cursor:pointer; outline:2.5px solid #fde047; }
+  .vcard.viable:active { transform:scale(.97); }
+  .vcard .star-tag { position:absolute; top:8px; right:10px; font-size:1.05rem;
+                     animation:starpulse 1.6s ease-in-out infinite; }
+  @keyframes starpulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.28) rotate(8deg)} }
+  .vcard .cta { margin-top:8px; background:#fff; border:none; border-radius:9px; padding:8px 14px;
+                font-weight:800; font-size:.8rem; color:#78350f; cursor:pointer; }
+
+  .alerta { background:#fef3c7; border-left:4px solid #d97706; color:#78350f; border-radius:9px;
+            padding:11px 13px; font-size:.83rem; font-weight:600; margin-bottom:14px; display:flex; gap:9px; }
+
+  table.det { width:100%; border-collapse:collapse; font-size:.86rem; }
+  table.det td { padding:9px 4px; border-bottom:1px solid #f1f5f9; }
+  table.det td:last-child { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+  table.det tr.tot td { border-top:2px solid var(--line); border-bottom:none; font-size:.95rem;
+                        padding-top:11px; color:var(--navy-dark); }
+  .win { color:#059669; } .lose { color:#94a3b8; }
+  .mini { font-size:.74rem; color:#64748b; line-height:1.5; }
+
+  #toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(80px); background:#111827;
+           color:#fff; padding:11px 18px; border-radius:24px; font-size:.85rem; font-weight:600; opacity:0;
+           transition:.25s; z-index:900; max-width:90vw; text-align:center; }
+  #toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+</style>
+</head>
+<body>
+
+<div id="loginView" style="display:none;">
+  <img src="/img/logo.png" alt="AutoFácil" onerror="this.style.display='none'">
+  <div class="sub">¿Dónde curso? 2.0</div>
+  <input id="liEmail" type="email" placeholder="Correo" autocomplete="username" inputmode="email">
+  <input id="liClave" type="password" placeholder="Contraseña" autocomplete="current-password"
+         onkeydown="if(event.key==='Enter')doLogin()">
+  <button onclick="doLogin()">Entrar</button>
+  <div id="loginErr"></div>
+</div>
+
+<div id="appView" style="display:none;">
+  <header>
+    <div>
+      <div class="t"><i class="bi bi-signpost-split-fill"></i> ¿Dónde curso? <span style="background:#f59e0b;border-radius:8px;padding:1px 8px;font-size:.7rem;vertical-align:middle">2.0 BETA</span></div>
+      <div class="u" id="uNombre">—</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="excChip" style="display:none;background:#fffbeb;border:1px solid #fde047;border-radius:14px;padding:3px 10px;font-size:.8rem;font-weight:700;color:#854d0e">⭐— 🏆—</span>
+      <button onclick="logout()" title="Salir"><i class="bi bi-box-arrow-right"></i></button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div id="veredicto" class="v-esp">
+      <div class="lbl">Cursa en</div>
+      <div class="fin" id="vFin">—</div>
+      <div class="por" id="vPor">Completa el valor del vehículo y el pie.</div>
+    </div>
+
+    <div id="duo">
+      <div class="vcard v-af" id="vcAF" onclick="clickLado('AF')">
+        <span class="star-tag" id="tagAF" style="display:none"></span>
+        <div class="lbl">Cursa en</div><div class="fin">AUTOFIN</div>
+        <div class="por" id="porAF"></div>
+        <button class="cta" id="ctaAF" style="display:none" onclick="event.stopPropagation();genLado('AF')"></button>
+      </div>
+      <div class="vcard v-un" id="vcUAC" onclick="clickLado('UAC')">
+        <span class="star-tag" id="tagUAC" style="display:none"></span>
+        <div class="lbl">Cursa en</div><div class="fin">UNIDAD DE CRÉDITO</div>
+        <div class="por" id="porUAC"></div>
+        <button class="cta" id="ctaUAC" style="display:none" onclick="event.stopPropagation();genLado('UAC')"></button>
+      </div>
+    </div>
+
+    <div id="avisoMin" class="alerta" style="display:none">
+      <i class="bi bi-exclamation-triangle-fill"></i><span id="avisoMinTxt"></span>
+    </div>
+
+    <div class="card">
+      <h2><i class="bi bi-sliders"></i> DATOS DEL CRÉDITO</h2>
+      <div class="body">
+        <div class="row2">
+          <div class="fld"><label>Valor vehículo $</label>
+            <input id="iValor" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
+          <div class="fld"><label>Pie $</label>
+            <input id="iPie" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label>Saldo precio $ <span class="aux">(calculado)</span></label>
+            <input id="iSaldo" type="text" readonly></div>
+          <div class="fld"><label>Comisión dealer $ <span class="aux" id="comAux">(pizarra)</span></label>
+            <input id="iComDealer" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()">
+            <div class="aux" id="comPiz" style="margin-top:3px"></div></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label>Plazo (cuotas)</label>
+            <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" value="48" oninput="calcular()"></div>
+          <div class="fld"><label>Tasa cliente % <span class="aux" id="tasaAux">(auto)</span></label>
+            <input id="iTasa" type="text" inputmode="decimal" placeholder="auto" oninput="calcular()">
+            <div class="aux" id="tasaPiz" style="margin-top:3px"></div></div>
+        </div>
+
+        <div class="fld"><label>Seguros incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cDesg" onclick="tog(this)"><i class="bi bi-shield-check"></i> Desgravamen</div>
+            <div class="chip on" id="cRdh"  onclick="tog(this)"><i class="bi bi-car-front"></i> RDH</div>
+            <div class="chip on" id="cCesa" onclick="tog(this)"><i class="bi bi-briefcase"></i> Cesantía</div>
+            <div class="chip on" id="cRep"  onclick="tog(this)"><i class="bi bi-tools"></i> Rep. menores</div>
+          </div>
+        </div>
+
+        <!-- Mismos gastos y mismos defaults que el Simulador de Rentabilidad: la
+             limitación de dominio NO viene marcada (no toda operación la lleva). -->
+        <div class="fld"><label>Gastos incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cPrenda" onclick="tog(this)"><i class="bi bi-file-earmark-text"></i> Prenda</div>
+            <div class="chip on" id="cGps"    onclick="tog(this)"><i class="bi bi-geo-alt"></i> GPS</div>
+            <div class="chip"    id="cLim"    onclick="tog(this)"><i class="bi bi-slash-circle"></i> Limitación</div>
+          </div>
+        </div>
+
+        <div class="fld"><label>Tipo dealer</label>
+          <div class="seg">
+            <button id="sPatio" class="on" onclick="setDealer(true)"><i class="bi bi-shop"></i> Patio</button>
+            <button id="sCalle"        onclick="setDealer(false)"><i class="bi bi-car-front-fill"></i> Calle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ¿Y SI...? — copiloto de excepciones (solo perfiles con excepciones_simulador).
+         El sistema explora las jugadas viables y las dice en frases; cada una
+         genera su código de excepción. Sin permiso, la sección no existe. -->
+    <div id="excSec" style="display:none">
+      <div style="font-size:.86rem;font-weight:700;color:#334155;margin:2px 0 8px"><i class="bi bi-stars" style="color:#f59e0b"></i> ¿El cliente pide otra cosa? Esto es lo que puedes hacer:</div>
+      <div id="excChips"></div>
+      <div class="fld" style="margin:8px 0 4px"><label>RUT cliente <span class="aux">(necesario para generar un código)</span></label>
+        <input id="iRut" type="text" placeholder="12.345.678-9" oninput="fmtRutDC(this)"></div>
+    </div>
+
+    <dialog id="dlgCod" style="border:none;border-radius:16px;padding:24px 28px;max-width:400px;width:92%;text-align:center">
+      <div style="font-size:.85rem;color:#64748b;font-weight:700" id="dlgTipo"></div>
+      <div style="font-size:2.4rem;font-weight:900;letter-spacing:6px;color:#001345" id="dlgNum"></div>
+      <div class="mini" id="dlgNota" style="margin-top:4px"></div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+        <button style="background:#0141A2;color:#fff;border:none;border-radius:9px;padding:9px 20px;font-weight:800" onclick="navigator.clipboard.writeText($('dlgNum').textContent).then(()=>toast('Código copiado'))"><i class="bi bi-clipboard"></i> Copiar</button>
+        <button style="background:#e2e8f0;border:none;border-radius:9px;padding:9px 20px;font-weight:700" onclick="$('dlgCod').close()">Cerrar</button>
+      </div>
+    </dialog>
+
+    <!-- Sin cifras de rentabilidad ni de margen: la app le dice al ejecutivo
+         DÓNDE cursar, no cuánto gana la empresa en cada financiera. -->
+    <div class="card">
+      <h2><i class="bi bi-info-circle"></i> DE LA OPERACIÓN</h2>
+      <div class="body">
+        <table class="det">
+          <tr><td>Monto financiado</td><td id="dMonto">—</td></tr>
+          <tr><td>Cuota mensual</td><td id="dCuota">—</td></tr>
+          <tr><td>Tasa aplicada</td><td id="dTasa">—</td></tr>
+        </table>
+        <p class="mini" id="notaCuadro" style="margin:12px 0 0"></p>
+      </div>
+    </div>
+
+    <p class="mini" id="pie" style="text-align:center"></p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="/js/comision-dealer.js"></script>
+<script src="/js/rentabilidad-core.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
+<script src="/js/preferencia-financiera.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ¿DÓNDE CURSO? — PWA para el ejecutivo en el patio.
+
+   No calcula nada propio: arma los datos, se los pasa a los motores únicos
+   (AF_RENT para la rentabilidad, AF_PREF para la decisión) y muestra el
+   resultado. Si el cálculo cambia en el Simulador, cambia acá solo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const API = '/api';
+const $ = id => document.getElementById(id);
+let TOKEN = localStorage.getItem('token');
+let P = {}, T = {}, UF = null, OPS_UAC = 0, MES_UAC = '', PREF_TABLA = [];
+let ES_PATIO = true;
+let EXC_ON = false, EXC_ESTADO = null, EX = {};   // copiloto de excepciones (con permiso)
+
+const H  = () => ({ 'Authorization': 'Bearer ' + TOKEN });
+const fN = n => Math.round(n).toLocaleString('es-CL');
+const fCLP = n => '$' + fN(n);
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+
+/* 2.0 corre como página normal (la PWA instalable sigue siendo /donde-curso/) */
+
+/* ── Boot ── */
+(async function boot(){
+  if (!TOKEN) return mostrarLogin();
+  try {
+    const r = await fetch(API + '/auth/mis-permisos', { headers: H() });
+    if (r.status === 401 || r.status === 403) return mostrarLogin();
+    const j = await r.json();
+    const u = (j.data && j.data.usuario) || j.usuario || {};
+    $('uNombre').textContent = u.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : 'Ejecutivo';
+    // Copiloto de excepciones: solo con el permiso; los demás ven la app de siempre
+    EXC_ON = (j.funcionalidades || []).includes('excepciones_simulador');
+    if (EXC_ON) cargarExcEstado();
+  } catch (e) { /* sin señal: seguimos con lo que haya en caché */ }
+  $('appView').style.display = '';
+  await cargarBase();
+  calcular();
+})();
+
+function mostrarLogin(){ $('loginView').style.display=''; $('appView').style.display='none'; }
+async function doLogin(){
+  $('loginErr').textContent = '';
+  try {
+    const r = await fetch(API + '/auth/login', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: $('liEmail').value.trim(), password: $('liClave').value }) });
+    const j = await r.json();
+    if (!j.success) { $('loginErr').textContent = j.error || 'Credenciales inválidas'; return; }
+    TOKEN = j.data.token;
+    localStorage.setItem('token', TOKEN);
+    const u = j.data.usuario || {};
+    $('uNombre').textContent = ((u.nombre||'') + ' ' + (u.apellido||'')).trim() || 'Ejecutivo';
+    $('loginView').style.display = 'none';
+    $('appView').style.display = '';
+    await cargarBase();
+    calcular();
+  } catch (e) { $('loginErr').textContent = 'Sin conexión al servidor'; }
+}
+function logout(){ localStorage.removeItem('token'); location.reload(); }
+
+/* ── Base de cálculo. Se cachea en el teléfono: en el patio la señal falla y la
+      app tiene que seguir respondiendo con los últimos parámetros conocidos. ── */
+async function cargarBase(){
+  const cache = () => { try { return JSON.parse(localStorage.getItem('dc_base')||'null'); } catch(e){ return null; } };
+  try {
+    const [rp, rt, ru, rv, rf, rx] = await Promise.all([
+      fetch(API + '/parametros-credito',                 { headers:H() }),
+      fetch(API + '/tasas/vigente',                      { headers:H() }),
+      fetch(API + '/parametros-credito/uac-ops-vigente', { headers:H() }),
+      fetch(API + '/uf/vigente',                         { headers:H() }),
+      fetch(API + '/cartas-params/financiera_preferencia',{ headers:H() }),
+      fetch(API + '/excepciones-comerciales',            { headers:H() }),
+    ]);
+    const [jp, jt, ju, jv, jf, jx] = await Promise.all([rp.json(), rt.json(), ru.json(), rv.json(), rf.json(), rx.json()]);
+    if (jx.success && jx.data) EX = jx.data.obj || {};
+    if (jp.success && jp.data && jp.data.lista) { P = {}; jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); }); }
+    if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
+    if (ju.success && ju.data) { OPS_UAC = ju.data.ops || 0; MES_UAC = ju.data.mes || ''; }
+    const u = jv && jv.data ? (Array.isArray(jv.data) ? jv.data[0] : jv.data) : null;
+    if (u && u.valor) UF = parseFloat(u.valor);
+    try { const t = JSON.parse(jf.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } catch(e){}
+    localStorage.setItem('dc_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, EX, at: Date.now() }));
+    $('pie').textContent = 'UF de hoy $' + (UF?fN(UF):'—');
+  } catch (e) {
+    const c = cache();
+    if (c) {
+      P=c.P; T=c.T; UF=c.UF; OPS_UAC=c.OPS_UAC; MES_UAC=c.MES_UAC; PREF_TABLA=c.PREF_TABLA||[]; EX=c.EX||{};
+      const dias = Math.floor((Date.now()-(c.at||0))/86400000);
+      $('pie').textContent = 'Sin señal — usando datos guardados' + (dias?(' hace '+dias+' día'+(dias===1?'':'s')):' recién');
+      toast('Sin conexión: cálculo con los últimos parámetros');
+    } else {
+      $('pie').textContent = 'Sin conexión y sin datos guardados: conéctate una vez para poder calcular.';
+    }
+  }
+}
+
+/* ── Inputs ── */
+function fmtMiles(inp){
+  let raw = inp.value.replace(/[^0-9]/g,'');
+  inp.value = raw ? '$' + parseInt(raw,10).toLocaleString('es-CL') : '';
+}
+const parseMiles = s => parseInt((s||'').replace(/[^0-9]/g,''),10) || 0;
+function tog(el){ el.classList.toggle('on'); calcular(); }
+function setDealer(patio){
+  ES_PATIO = patio;
+  $('sPatio').classList.toggle('on', patio);
+  $('sCalle').classList.toggle('on', !patio);
+  calcular();
+}
+
+/* ── Cálculo + veredicto ── */
+function calcular(){
+  const valor = parseMiles($('iValor').value);
+  const pie   = parseMiles($('iPie').value);
+  const plazo = Math.min(72, Math.max(1, parseInt($('iPlazo').value) || 0));
+  const saldo = valor - pie;
+  $('iSaldo').value = saldo > 0 ? '$' + fN(saldo) : '';
+
+  if (!valor || !plazo || saldo <= 0 || !window.AF_RENT) return esperando();
+
+  // Tasa: si el ejecutivo no escribe una, manda la TMC automática del motor.
+  const tasaTxt = ($('iTasa').value||'').replace(',','.').replace(/[^0-9.]/g,'');
+  let tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
+  // Piso ABSOLUTO: nunca bajo el costo de fondo — se ajusta y se avisa.
+  const cfAbs = ((parseFloat(T.tasa_mensual_mayor)||0) - (parseFloat(T.spread_mayor)||0)) / 100;
+  const bajoCF = tasaCli != null && cfAbs > 0 && tasaCli < cfAbs;
+  if (bajoCF) tasaCli = cfAbs;
+  $('tasaAux').textContent = tasaTxt ? '(manual)' : '(pizarra)';
+  // Comisión dealer real (editable): vacío = pizarra del canal/plazo
+  const comTxt = ($('iComDealer').value||'').replace(/[^0-9]/g,'');
+  const comDealer = comTxt ? parseInt(comTxt,10) : null;
+  $('comAux').textContent = comTxt ? '(modificada)' : '(pizarra)';
+
+  // % UAC del tier vigente — motor único uac-tier.js (el mismo del backend).
+  let uacPct = null;
+  if (window.AF_UAC_TIER) uacPct = AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, P);
+
+  const R = AF_RENT.calcular({
+    valor, pie, plazo, tasaCli, dealerComCLP: comDealer, esPatio: ES_PATIO, uacPct,
+    gastos:  { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
+    seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
+  }, P, UF, T);
+  if (!R) return esperando();
+
+  const D = AF_PREF.decidir({
+    rentAF: R.af.rentab, rentUAC: R.uac.rentab, plazo, saldo,
+    tabla: PREF_TABLA, UF,
+    diffPct:    P.pref_diff_pct,
+    rentMinima: P.pref_rent_minima,
+  });
+
+  pintar(R, D, plazo, saldo);
+  /* Referencias junto a los campos editables:
+     · tasa: pizarra del tramo + hasta dónde puede llegar CUMPLIENDO el piso 75%
+     · comisión: la pizarra del canal/plazo como placeholder y leyenda */
+  const gts = { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') };
+  const seg = { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') };
+  const R0 = (tasaCli || comDealer != null)
+    ? AF_RENT.calcular({ valor, pie, plazo, esPatio: ES_PATIO, uacPct, gastos: gts, seguros: seg }, P, UF, T) : R;
+  if (R0) {
+    const pizPct = R0.tasaCliPct;
+    $('iTasa').placeholder = pizPct.toFixed(2).replace('.',',');
+    $('iComDealer').placeholder = '$' + fN(R0.costos.dealer);
+    /* Parque: el dealer y el patio cobran por separado — a plazos cortos la
+       pizarra del dealer es legítimamente $0 y solo comisiona el patio. */
+    $('comPiz').textContent = ES_PATIO
+      ? ('Pizarra dealer ' + fCLP(R0.costos.dealer) + ' + patio ' + fCLP(R0.costos.patio) + ' (parque)')
+      : ('Pizarra ' + fCLP(R0.costos.dealer) + ' (calle)');
+    const tMin = tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos: gts, seguros: seg, R0 });
+    /* Enforcement visual del límite de tasa: bajo el mínimo permitido el campo
+       queda rojo y se dice claro (Unidad: rebaja máx 5% relativo; AutoFin: el
+       piso del 75%; bajo el costo de fondo se ajusta sin excepción posible). */
+    const tasaBaja = tasaCli != null && tMin != null && tasaCli < tMin - 0.00005;
+    window._TASA_INVALIDA = tasaBaja && !bajoCF;
+    $('iTasa').style.borderColor = (tasaBaja || bajoCF) ? '#dc2626' : '';
+    $('tasaPiz').style.color = (tasaBaja || bajoCF) ? '#dc2626' : '';
+    if (bajoCF) {
+      $('tasaPiz').textContent = '⛔ Esa tasa está bajo el costo de fondo: se calculó con el mínimo absoluto ' + pct2(cfAbs) + '.';
+    } else if (tasaBaja) {
+      const ladoNow = R0.af.rentab >= R0.uac.rentab ? 'AF' : 'UAC';
+      $('tasaPiz').textContent = '⛔ No puedes ofrecer ' + pct2(tasaCli) + ': el mínimo es ' + pct2(tMin) +
+        (ladoNow === 'UAC' ? ' (rebaja máx. 5% en Unidad).' : ' (piso del 75%).') +
+        ' Bajo eso, cuesta más estrellas (⭐⭐ o ⭐⭐⭐) o va por Gerencia.';
+    } else {
+      $('tasaPiz').textContent = 'Pizarra ' + pizPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' +
+        (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
+    }
+  }
+  if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
+  renderDuo(R0 || R, D, plazo, saldo, R);
+}
+const on = id => $(id).classList.contains('on');
+
+/* ── Duo de financieras: la típica excepción (cambiar de financiera) vive en el
+      veredicto mismo. La contraria viable con estrella queda dorada y clickeable;
+      inviable queda gris. ── */
+let LADO_SEL = null, DUO = null;
+/* Escalera de estrellas: nivel 1 (1⭐, piso 75%) · nivel 2 (2⭐, piso 50%) ·
+   nivel 3 (3⭐, TRIPLE candado: piso 25% Y rentab ≥ comisión más alta Y
+   rentab ≥ mínimo absoluto en $ — hoy $200.000). */
+function nivelDe(rent, mejor, costos){
+  const p1 = (EX.exc_piso_pct ?? 75) / 100, p2 = (EX.exc_piso2_pct ?? 50) / 100, p3 = (EX.exc_piso3_pct ?? 25) / 100;
+  const f3 = 1 + (EX.exc_nivel3_factor_pct ?? 0) / 100;
+  const min3 = EX.exc_nivel3_rent_min ?? 200000;
+  const n = EXC_ESTADO?.niveles || { n1: 1, n2: EX.exc_piso2_estrellas ?? 2, n3: EX.exc_nivel3_estrellas ?? 3 };
+  if (rent >= mejor * p1) return { nivel: 1, costo: n.n1, tag: '⭐' };
+  if (rent >= mejor * p2) return { nivel: 2, costo: n.n2, tag: '⭐⭐' };
+  if (rent >= mejor * p3 && rent >= Math.max(costos.dealer, costos.ejecutivo) * f3 && rent >= min3)
+    return { nivel: 3, costo: n.n3, tag: '⭐⭐⭐' };
+  return null;
+}
+function renderDuo(R0, D, plazo, saldo, R){
+  if (!R0 || D.veredicto === 'NINGUNA') { $('duo').style.display = 'none'; $('veredicto').style.display = ''; return; }
+  /* Plazo mínimo cursable (mantenedor Excepciones): bajo eso NADIE toma la
+     operación — ambas financieras en gris, sin estrella ni comodín. */
+  const plazoMin = Math.round(EX.exc_plazo_min_curse ?? 12);
+  if (plazo < plazoMin) {
+    $('veredicto').style.display = 'none'; $('duo').style.display = 'flex';
+    DUO = { plazo, saldo, AF: { click:false, tipo:null }, UAC: { click:false, tipo:null } };
+    LADO_SEL = null;
+    for (const l of ['AF', 'UAC']) {
+      const el = $('vc' + l);
+      el.className = 'vcard dim ' + (l === 'AF' ? 'v-af' : 'v-un');
+      $('tag' + l).style.display = 'none'; $('cta' + l).style.display = 'none';
+      $('por' + l).textContent = 'No se cursa bajo ' + plazoMin + ' cuotas.';
+    }
+    return;
+  }
+  /* Tasa manual bajo el mínimo permitido: con esa tasa NINGÚN lado se abre con
+     estrella — ambas cards en gris, salvo que el comodín dorado aplique. */
+  if (window._TASA_INVALIDA && R) {
+    /* Tasa manual bajo el mínimo de nivel 1: la jugada puede seguir viva en un
+       nivel superior de la escalera (2⭐ / 3⭐); si no, todo gris. */
+    $('veredicto').style.display = 'none'; $('duo').style.display = 'flex';
+    const mejorR = Math.max(R0.af.rentab, R0.uac.rentab);
+    DUO = { plazo, saldo };
+    for (const l of ['AF', 'UAC']) {
+      const el = $('vc' + l), tag = $('tag' + l), por = $('por' + l), cta = $('cta' + l);
+      el.className = 'vcard ' + (l === 'AF' ? 'v-af' : 'v-un');
+      tag.style.display = 'none'; cta.style.display = 'none';
+      const rent = l === 'AF' ? R.af.rentab : R.uac.rentab;
+      const nv = EXC_ON ? nivelDe(rent, mejorR, R.costos) : null;
+      const info = { click: false, tipo: null };
+      if (nv && nv.nivel > 1) {
+        info.click = true; info.tipo = 'PROPIO'; info.nivel = nv.nivel; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejorR);
+        el.classList.add('viable'); tag.style.display = ''; tag.textContent = nv.tag;
+        por.textContent = `Con esa tasa cuesta ${nv.costo} estrellas (nivel ${nv.nivel}).`;
+      } else if (nv && nv.nivel === 1) {
+        info.click = true; info.tipo = 'PROPIO'; info.nivel = 1; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejorR);
+        el.classList.add('viable'); tag.style.display = ''; tag.textContent = '⭐';
+        por.textContent = 'Puedes cursar aquí usando una estrella.';
+      } else { el.classList.add('dim'); por.textContent = 'Con esa tasa no se puede por acá.'; }
+      DUO[l] = info;
+    }
+    if (LADO_SEL && (!DUO[LADO_SEL] || !DUO[LADO_SEL].tipo)) LADO_SEL = null;
+    if (LADO_SEL) { $('vc'+LADO_SEL).classList.add('big');
+      const c = $('cta'+LADO_SEL); c.style.display=''; c.textContent = 'Generar código ' + '⭐'.repeat(DUO[LADO_SEL].costo || 1); }
+    return;
+  }
+  $('veredicto').style.display = 'none';
+  $('duo').style.display = 'flex';
+  const esTu = D.veredicto === 'DECIDES_TU';
+  const pref = esTu ? null : (D.veredicto === 'AUTOFIN' ? 'AF' : 'UAC');
+  const mejor = Math.max(R0.af.rentab, R0.uac.rentab);
+  DUO = { plazo, saldo };
+  for (const l of ['AF', 'UAC']) {
+    const el = $('vc' + l), tag = $('tag' + l), por = $('por' + l), cta = $('cta' + l);
+    el.className = 'vcard ' + (l === 'AF' ? 'v-af' : 'v-un');
+    tag.style.display = 'none'; cta.style.display = 'none';
+    const rent = l === 'AF' ? R0.af.rentab : R0.uac.rentab;
+    const eleg = l === 'AF' ? D.elegible.af : D.elegible.uac;
+    const info = { click: false, tipo: null };
+    if (esTu) { el.classList.add('big'); por.textContent = 'Da lo mismo para la empresa — elige tú.'; }
+    else if (l === pref) { por.textContent = 'Es la que más conviene para esta operación.'; info.click = true; }
+    else if (!eleg) { el.classList.add('dim'); por.textContent = 'No toma este plazo con este saldo.'; }
+    else if (EXC_ON) {
+      const nv = nivelDe(rent, mejor, R0.costos);
+      if (nv) {
+        info.click = true; info.tipo = 'PROPIO'; info.nivel = nv.nivel; info.costo = nv.costo;
+        info.rent = Math.round(rent); info.mejor = Math.round(mejor);
+        el.classList.add('viable'); tag.style.display = ''; tag.textContent = nv.tag;
+        por.textContent = nv.nivel === 1 ? 'Puedes cursar aquí usando una estrella.'
+          : nv.nivel === 2 ? `Piso del 50% — cuesta ${nv.costo} estrellas.`
+          : `Piso del 25% — la jugada grande: ${nv.costo} estrellas.`;
+      } else { el.classList.add('dim'); por.textContent = 'Ni con estrellas: va por Gerencia.'; }
+    }
+    else { el.classList.add('dim'); por.textContent = 'No conviene por acá.'; }
+    DUO[l] = info;
+  }
+  if (LADO_SEL && (!DUO[LADO_SEL] || !DUO[LADO_SEL].tipo)) LADO_SEL = null;
+  if (!esTu) {
+    const grande = LADO_SEL || pref;
+    $('vc' + grande).classList.add('big');
+    if (LADO_SEL) {
+      const cta = $('cta' + LADO_SEL);
+      cta.style.display = '';
+      cta.textContent = 'Generar código ' + '⭐'.repeat(DUO[LADO_SEL].costo || 1);
+    }
+  }
+}
+function clickLado(l){
+  if (!DUO || !DUO[l]) return;
+  if (DUO[l].tipo) { LADO_SEL = (LADO_SEL === l) ? null : l; calcular(); }
+  else if (LADO_SEL) { LADO_SEL = null; calcular(); }
+}
+async function genLado(l){
+  const info = DUO && DUO[l];
+  if (!info || !info.tipo) return;
+  const rut = ($('iRut') ? $('iRut').value : '').trim();
+  if (rut.replace(/[^0-9]/g,'').length < 7) {
+    toast('Escribe el RUT del cliente para generar el código');
+    $('excSec').style.display = '';   // el campo RUT vive ahí; mostrarlo aunque no haya otras sugerencias
+    if ($('iRut')) $('iRut').focus(); return;
+  }
+  const costo = info.costo || 1;
+  if ((EXC_ESTADO?.estrellas_disponibles || 0) < costo) {
+    toast(`Esta jugada cuesta ${costo} estrella(s) y te quedan ${EXC_ESTADO?.estrellas_disponibles || 0}. Pide un código a Gerencia.`); return;
+  }
+  if (costo > 1 && !confirm(`Esta jugada es de NIVEL ${info.nivel} y cuesta ${'⭐'.repeat(costo)} (${costo} estrellas de tus ${EXC_ESTADO.estrellas_disponibles}). ¿Continuar?`)) return;
+  try {
+    const r = await fetch(API + '/excepciones/generar', { method:'POST',
+      headers: { ...H(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ tipo: 'PROPIO', nivel: info.nivel || 1, rut_cliente: rut, saldo_precio: DUO.saldo, plazo: DUO.plazo,
+        financiera: l === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
+        snapshot: { origen: 'donde-curso-duo', jugada: 'Cambio de financiera a ' + (l==='UAC'?'Unidad':'Autofin') + ' a ' + DUO.plazo + ' cuotas',
+                    rent_jugada: info.rent ?? null, mejor_base: info.mejor ?? null,
+                    valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
+    $('dlgTipo').textContent = '⭐'.repeat(j.data.costo || 1) + ' Código de excepción — nivel ' + (j.data.nivel || 1);
+    $('dlgNum').textContent = j.data.codigo;
+    $('dlgNota').textContent = `Vence en ${j.data.vence_horas || 24} h. Escríbelo en la Carta de Aprobación.`;
+    $('dlgCod').showModal();
+    LADO_SEL = null;
+    cargarExcEstado();
+  } catch(e){ toast('Sin conexión: el código necesita señal'); }
+}
+
+function esperando(){
+  $('veredicto').className = 'v-esp';
+  $('vFin').textContent = '—';
+  $('vPor').textContent = 'Completa el valor del vehículo, el pie y el plazo.';
+  $('avisoMin').style.display = 'none';
+  ['dMonto','dCuota','dTasa'].forEach(i => $(i).textContent = '—');
+  $('notaCuadro').textContent = '';
+  $('tasaPiz').textContent = '';
+  $('excSec').style.display = 'none';
+  $('duo').style.display = 'none';
+  $('veredicto').style.display = '';
+  LADO_SEL = null;
+}
+
+function pintar(R, D, plazo, saldo){
+  const MAP = {
+    AUTOFIN:    { cls:'v-af', txt:'AUTOFIN' },
+    UNIDAD:     { cls:'v-un', txt:'UNIDAD DE CRÉDITO' },
+    DECIDES_TU: { cls:'v-tu', txt:'DECIDES TÚ' },
+    NINGUNA:    { cls:'v-no', txt:'NINGUNA' },
+  };
+  const m = MAP[D.veredicto] || MAP.NINGUNA;
+  $('veredicto').className = m.cls;
+  $('vFin').textContent = m.txt;
+  /* El motivo que devuelve el motor trae el % de diferencia. Acá se traduce a
+     palabras: la app dice DÓNDE cursar, no cuánto gana la empresa en cada una.
+     El detalle numérico vive en el Simulador de Rentabilidad, con su permiso. */
+  let por;
+  if (D.veredicto === 'DECIDES_TU')      por = 'Da lo mismo para la empresa: elige tú según el dealer o la rapidez del curse.';
+  else if (D.veredicto === 'NINGUNA')    por = 'Ninguna financiera toma este plazo con este saldo.';
+  else if (!D.elegible.af || !D.elegible.uac) por = 'Es la única que toma este plazo con este saldo.';
+  else                                   por = 'Es la que más conviene para esta operación.';
+  $('vPor').textContent = por;
+
+  // Aviso de rentabilidad mínima: se cursa igual, pero que nadie diga que no se avisó.
+  if (D.bajoMinimo && D.veredicto !== 'NINGUNA') {
+    $('avisoMin').style.display = '';
+    $('avisoMinTxt').innerHTML = 'Esta operación queda <b>bajo el mínimo</b> que la empresa espera por operación. ' +
+      'Se puede cursar, pero conviene revisarla con tu supervisor antes.';
+  } else $('avisoMin').style.display = 'none';
+
+  $('dMonto').textContent = fCLP(R.monto_fin);
+  $('dCuota').textContent = fCLP(R.af.cuota);
+  $('dTasa').textContent  = R.tasaCliPct.toFixed(2).replace('.',',') + '% mensual · ' +
+                            (R.esMayor ? 'mayor' : 'menor') + ' 200 UF';
+
+  // Qué dijo el cuadro de preferencia (lo que hoy se mira en papel)
+  let nota = '';
+  if (!D.elegible.af || !D.elegible.uac) {
+    const fuera = !D.elegible.af ? 'AutoFin' : 'Unidad de Crédito';
+    nota = 'El cuadro de preferencia no habilita a <b>' + fuera + '</b> para ' + plazo +
+           ' cuotas con saldo ' + fCLP(saldo) + '.';
+  } else if (D.prefCuadro) {
+    const pc = D.prefCuadro === 'AF' ? 'AutoFin' : 'Unidad de Crédito';
+    const coincide = (D.veredicto === 'AUTOFIN' && D.prefCuadro === 'AF') ||
+                     (D.veredicto === 'UNIDAD'  && D.prefCuadro === 'UAC');
+    // Una sola lectura: la leyenda NUNCA contradice el veredicto de arriba.
+    if (coincide) {
+      nota = 'Coincide con el cuadro de preferencia: <b>' + pc + '</b> es la primera opción para este tramo.';
+    } else if (D.veredicto === 'DECIDES_TU') {
+      nota = 'El cuadro de preferencia sugiere <b>' + pc + '</b> para este tramo; puedes usarlo para desempatar.';
+    }
+    // Si el cuadro general difiere del cálculo real, no se muestra: manda el veredicto.
+  }
+  $('notaCuadro').innerHTML = nota;
+}
+
+/* ═══ COPILOTO DE EXCEPCIONES (solo con permiso excepciones_simulador) ═══════
+   El sistema explora las jugadas viables (lado contrario, tasa mínima, rebaja
+   de comisión, comodín) con los MISMOS motores del cálculo principal y las
+   dice en frases. Cada frase genera su código de excepción. */
+async function cargarExcEstado(){
+  try {
+    const [re, rp] = await Promise.all([
+      fetch(API + '/excepciones/estado', { headers: H() }),
+      fetch(API + '/excepciones-comerciales', { headers: H() }),
+    ]);
+    const je = await re.json(), jp = await rp.json();
+    if (je.success) EXC_ESTADO = je.data;
+    if (jp.success) EX = jp.data.obj || {};
+    if (EXC_ESTADO) {
+      $('excChip').style.display = '';
+      $('excChip').textContent = `⭐${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total}`;
+      $('excChip').title = `Estrellas del mes: ${EXC_ESTADO.estrellas_disponibles} de ${EXC_ESTADO.estrellas_total} · nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (piso 25%)`;
+    }
+    calcular();
+  } catch(_) {}
+}
+function fmtRutDC(el){
+  let v = el.value.replace(/[^0-9kK]/g,'').toUpperCase();
+  if (!v) { el.value=''; return; }
+  const dv = v.length > 1 ? v.slice(-1) : '';
+  const cuerpo = (v.length > 1 ? v.slice(0,-1) : v).slice(0,9);
+  el.value = (Number(cuerpo)||'').toLocaleString('es-CL') + (dv ? '-'+dv : '');
+}
+const nomFin = l => l === 'UAC' ? 'Unidad' : 'Autofin';
+const pct2 = f => (f*100).toFixed(2).replace('.',',') + '%';
+
+/* Hasta qué tasa puede llegar el ejecutivo CUMPLIENDO el piso 75% (fracción
+   mensual). AutoFin: bisección (la tasa mueve el ingreso), acotada por el costo
+   de fondo. Unidad: la tasa no cambia nuestro ingreso — el límite es la rebaja
+   máxima relativa del programa. */
+function tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos, seguros, R0 }){
+  if (!R0) return null;
+  const piso = (EX.exc_piso_pct ?? 75) / 100;
+  const cf = ((parseFloat(T.tasa_mensual_mayor) || 0) - (parseFloat(T.spread_mayor) || 0)) / 100;
+  const pizarra = R0.tasaCli;
+  const lado = R0.af.rentab >= R0.uac.rentab ? 'AF' : 'UAC';
+  if (lado === 'UAC') {
+    const t = Math.max(cf, pizarra * (1 - (EX.exc_tasa_rebaja_max_pct ?? 5) / 100));
+    return t < pizarra - 0.0001 ? t : null;
+  }
+  if (!(cf > 0) || cf >= pizarra) return null;
+  const mejor = Math.max(R0.af.rentab, R0.uac.rentab);
+  const rentA = t => { const r = AF_RENT.calcular({ valor, pie, plazo, tasaCli: t, esPatio: ES_PATIO, uacPct, gastos, seguros }, P, UF, T); return r ? r.af.rentab : -1; };
+  if (rentA(cf) >= mejor * piso) return cf;      // hasta el costo de fondo cumple
+  let lo = cf, hi = pizarra;
+  for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2;
+    if (rentA(mid) >= mejor * piso) hi = mid; else lo = mid; }
+  return hi < pizarra - 0.0001 ? hi : null;
+}
+
+function sugerencias(ctx){
+  const { valor, pie, plazo, tasaCli, R } = ctx;
+  const sec = $('excSec'), out = [];
+  if (!EXC_ESTADO) { sec.style.display = 'none'; return; }
+  const gastos  = { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') };
+  const seguros = { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') };
+  const calcP = (p, tc, com) => {
+    const u = window.AF_UAC_TIER ? AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo: p, mes: MES_UAC }, P) : null;
+    return AF_RENT.calcular({ valor, pie, plazo: p, tasaCli: tc, dealerComCLP: com, esPatio: ES_PATIO, uacPct: u, gastos, seguros }, P, UF, T);
+  };
+  const piso    = (EX.exc_piso_pct ?? 75) / 100;
+  const diffTu  = (P.pref_diff_pct ?? 10);
+  const maxReb  = (EX.exc_tasa_rebaja_max_pct ?? 5) / 100;
+  const cf      = ((parseFloat(T.tasa_mensual_mayor) || 0) - (parseFloat(T.spread_mayor) || 0)) / 100;
+  const plazos  = [...new Set([plazo, EX.exc_plazo_1||12, EX.exc_plazo_2||24, EX.exc_plazo_3||36, EX.exc_plazo_4||48])].filter(p => p >= (EX.exc_plazo_min_curse ?? 12) && p <= 72);
+  const NV = EXC_ESTADO.niveles || { n1:1, n2:2, n3:3 };
+  const disp = EXC_ESTADO.estrellas_disponibles || 0;
+  const hayStar = disp > 0;
+
+  // Por plazo, ¿el lado NO preferente se abre y en qué nivel de la escalera?
+  const abrePorLado = { AF: [], UAC: [] }, comPorLado = { AF: [], UAC: [] }, n2Lado = { AF: [], UAC: [] }, n3Lado = { AF: [], UAC: [] };
+  for (const p of plazos) {
+    const B = calcP(p, null, null);
+    if (!B) continue;
+    const mejor = Math.max(B.af.rentab, B.uac.rentab);
+    const dif = Math.abs(B.af.rentab - B.uac.rentab) / Math.max(1, mejor) * 100;
+    if (dif < diffTu) continue;                       // Decides Tú: cursar el otro lado no es excepción
+    const contra = B.af.rentab >= B.uac.rentab ? 'UAC' : 'AF';
+    const rentC = contra === 'UAC' ? B.uac.rentab : B.af.rentab;
+    const nv = nivelDe(rentC, mejor, B.costos);
+    if (nv && nv.nivel === 1) { abrePorLado[contra].push({ p, cuota: B.af.cuota, rent: Math.round(rentC), mejor: Math.round(mejor) }); continue; }
+    // ¿Bajando la comisión del dealer alcanza el nivel 1? (más barato que subir de nivel)
+    const falta = Math.ceil(mejor * piso - rentC);
+    const comProp = Math.max(0, B.costos.dealer - falta);
+    if (B.costos.dealer > 0 && comProp > 0) comPorLado[contra].push({ p, comProp, piz: B.costos.dealer, rent: Math.round(mejor*piso), mejor: Math.round(mejor) });
+    if (nv && nv.nivel === 2) n2Lado[contra].push({ p, rent: Math.round(rentC), mejor: Math.round(mejor) });
+    else if (nv && nv.nivel === 3) n3Lado[contra].push({ p, rent: Math.round(rentC), mejor: Math.round(mejor) });
+  }
+  for (const l of ['UAC', 'AF']) {
+    if (abrePorLado[l].length) {
+      const ps = abrePorLado[l].map(x => x.p).join(' o ');
+      const cuo = abrePorLado[l][abrePorLado[l].length-1];
+      out.push({ ico:'bi-star-fill', col:'#f59e0b', nivel:1, costo:NV.n1, fin: l, plazoCod: cuo.p, rent: cuo.rent, mejor: cuo.mejor, disabled: disp < NV.n1,
+        txt:`Con una estrella puedes cursarlo en <b>${nomFin(l)} a ${ps} cuotas</b>${l==='AF'?` (cuota ${fCLP(cuo.cuota)} a ${cuo.p})`:''}. Cumple el piso.` });
+    }
+    if (comPorLado[l].length) {
+      const det = comPorLado[l].map(x => `a ${x.p} cuotas dejándola en <b>${fCLP(x.comProp)}</b> (pizarra ${fCLP(x.piz)})`).join(' · ');
+      out.push({ ico:'bi-cash-coin', col:'#0141A2', nivel:1, costo:NV.n1, fin: l, plazoCod: comPorLado[l][0].p, rent: comPorLado[l][0].rent, mejor: comPorLado[l][0].mejor, disabled: disp < NV.n1,
+        txt:`Bajando la comisión del dealer abres <b>${nomFin(l)}</b> con 1⭐: ${det}.` });
+    }
+    if (n2Lado[l].length) {
+      const ps = n2Lado[l].map(x => x.p).join(' o ');
+      out.push({ ico:'bi-star-fill', col:'#b45309', nivel:2, costo:NV.n2, fin: l, plazoCod: n2Lado[l][0].p, rent: n2Lado[l][0].rent, mejor: n2Lado[l][0].mejor, disabled: disp < NV.n2, dorada: true,
+        txt:`<b>${nomFin(l)} a ${ps}</b> queda bajo el piso del 75% pero sobre el 50%: se abre con <b>${NV.n2} estrellas</b> (nivel 2).` });
+    }
+    if (n3Lado[l].length) {
+      const ps = n3Lado[l].map(x => x.p).join(' o ');
+      out.push({ ico:'bi-star-fill', col:'#7c2d12', nivel:3, costo:NV.n3, fin: l, plazoCod: n3Lado[l][0].p, rent: n3Lado[l][0].rent, mejor: n3Lado[l][0].mejor, disabled: disp < NV.n3, dorada: true,
+        txt:`<b>${nomFin(l)} a ${ps}</b> renta entre el 25% y el 50%: la jugada grande — <b>${NV.n3} estrellas</b> (nivel 3).` });
+    }
+  }
+
+  // (b) Tasa mínima al plazo INGRESADO, sobre el lado del veredicto actual
+  const B0 = calcP(plazo, null, null);
+  if (B0) {
+    const ladoNow = B0.af.rentab >= B0.uac.rentab ? 'AF' : 'UAC';
+    const mejor0 = Math.max(B0.af.rentab, B0.uac.rentab);
+    const pizarra = B0.tasaCli;
+    if (ladoNow === 'AF' && cf > 0 && cf < pizarra) {
+      let lo = cf, hi = pizarra;                    // menor tasa que aún cumple el piso
+      for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2;
+        const Rm = calcP(plazo, mid, null);
+        if (Rm && Rm.af.rentab >= mejor0 * piso) hi = mid; else lo = mid; }
+      if (hi < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'AF', plazoCod: plazo, disabled: disp < NV.n1,
+        txt:`Puedes ofrecer tasa hasta <b>${pct2(hi)}</b> a ${plazo} cuotas (pizarra ${pct2(pizarra)}) y sigue cumpliendo el piso.` });
+    } else if (ladoNow === 'UAC') {
+      const tMin = Math.max(cf, pizarra * (1 - maxReb));
+      if (tMin < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'UAC', plazoCod: plazo, disabled: disp < NV.n1,
+        txt:`En Unidad puedes ofrecer tasa hasta <b>${pct2(tMin)}</b> a ${plazo} cuotas (rebaja máxima ${(maxReb*100).toFixed(0)}% sobre la pizarra ${pct2(pizarra)}).` });
+    }
+    // (d) Tasa manual escrita que deja la operación bajo el piso 75% → escalera 2⭐/3⭐
+    if (tasaCli && R) {
+      const rentNow = ladoNow === 'UAC' ? R.uac.rentab : R.af.rentab;
+      const nvT = nivelDe(rentNow, mejor0, R.costos);
+      if (nvT && nvT.nivel > 1)
+        out.push({ ico:'bi-star-fill', col:'#b45309', nivel:nvT.nivel, costo:nvT.costo, fin: ladoNow, plazoCod: plazo, disabled: disp < nvT.costo, dorada: true,
+          txt:`La tasa ${pct2(tasaCli)} deja la operación bajo el piso del 75% — se aprueba con <b>${nvT.costo} estrellas</b> (nivel ${nvT.nivel}).` });
+    }
+  }
+
+  if (!out.length) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  window._EXC_CHIPS = out.slice(0, 5);
+  $('excChips').innerHTML = window._EXC_CHIPS.map((s, i) => `
+    <div style="background:${s.dorada?'#fffbeb':'#fff'};border:1.5px solid ${s.dorada?'#fde047':'#e2e8f0'};border-radius:12px;padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
+      <i class="bi ${s.ico}" style="font-size:1.2rem;color:${s.col}"></i>
+      <div style="flex:1;font-size:.85rem;line-height:1.45;color:#334155">${s.txt}</div>
+      <button ${s.disabled?'disabled':''} onclick="usarChip(${i})"
+        style="white-space:nowrap;border:none;border-radius:8px;padding:7px 12px;font-weight:800;font-size:.8rem;color:#fff;background:${s.dorada?'#b45309':'#f59e0b'};${s.disabled?'opacity:.4':''}">
+        Usar ${'⭐'.repeat(s.costo||1)}</button>
+    </div>`).join('') +
+    `<p class="mini" style="margin:2px 0 0">${hayStar ? 'El código vence a las 24 h y sirve una sola vez — se escribe en la Carta de Aprobación.' : 'Sin estrellas este mes: para un caso puntual pide un código a Gerencia.'}</p>`;
+}
+
+async function usarChip(i){
+  const s = (window._EXC_CHIPS || [])[i];
+  if (!s) return;
+  const rut = ($('iRut').value || '').trim();
+  if (rut.replace(/[^0-9]/g,'').length < 7) { toast('Escribe el RUT del cliente para generar el código'); $('iRut').focus(); return; }
+  const costo = s.costo || 1;
+  if ((EXC_ESTADO?.estrellas_disponibles || 0) < costo) { toast(`Esta jugada cuesta ${costo} estrella(s) y te quedan ${EXC_ESTADO?.estrellas_disponibles || 0}.`); return; }
+  if (costo > 1 && !confirm(`Esta jugada es de NIVEL ${s.nivel} y cuesta ${'⭐'.repeat(costo)} (${costo} de tus ${EXC_ESTADO.estrellas_disponibles} estrellas). ¿Continuar?`)) return;
+  const saldo = parseMiles($('iValor').value) - parseMiles($('iPie').value);
+  try {
+    const r = await fetch(API + '/excepciones/generar', { method:'POST',
+      headers: { ...H(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ tipo: 'PROPIO', nivel: s.nivel || 1, rut_cliente: rut, saldo_precio: saldo, plazo: s.plazoCod,
+        financiera: s.fin === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
+        snapshot: { origen: 'donde-curso', jugada: s.txt.replace(/<[^>]+>/g,''), rent_jugada: s.rent ?? null, mejor_base: s.mejor ?? null, valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
+    $('dlgTipo').textContent = '⭐'.repeat(j.data.costo || 1) + ' Código de excepción — nivel ' + (j.data.nivel || 1);
+    $('dlgNum').textContent = j.data.codigo;
+    $('dlgNota').textContent = `Vence en ${j.data.vence_horas || 24} h. Escríbelo en la Carta de Aprobación (campo Código de excepción).`;
+    $('dlgCod').showModal();
+    cargarExcEstado();
+  } catch(e){ toast('Sin conexión: el código necesita señal'); }
+}
+</script>
+</body>
+</html>
