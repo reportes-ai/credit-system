@@ -257,28 +257,37 @@ const validar = async (req, res) => {
   } catch (e) { console.error('[excepciones validar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-/* ── POST /api/excepciones/usar — consumir un código (lo llamará la Carta) ──
-   Valida: existe, VIGENTE, saldo ± tolerancia, primeros 3 dígitos del RUT. */
+/* Núcleo de validación+consumo — lo usa el endpoint /usar Y el guardado de la
+   Carta de Aprobación (llamada interna). Un código = un solo uso. */
+async function consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta }) {
+  await vencerCaducos();
+  const P = await params();
+  const [[c]] = await pool.query('SELECT * FROM excepciones_codigos WHERE codigo=?', [String(codigo || '').trim()]);
+  if (!c) return { ok: false, error: 'El código de excepción no existe' };
+  if (c.estado === 'USADO' && c.usado_carta && op_carta && c.usado_carta === String(op_carta).slice(0, 30))
+    return { ok: true, tipo: c.tipo, ejecutivo: c.ejecutivo, yaUsado: true };   // re-guardado de la misma carta
+  if (c.estado === 'USADO') return { ok: false, error: `Código ya usado en la carta ${c.usado_carta || ''} — un código sirve una sola vez` };
+  if (c.estado === 'VENCIDO') return { ok: false, error: 'Código de excepción vencido (la estrella volvió al ejecutivo)' };
+  const tol = Math.max(0, Math.round(P.exc_tolerancia_saldo ?? 0));
+  const saldo = Math.round(Number(saldo_precio) || 0);
+  if (Math.abs(saldo - Number(c.saldo_precio)) > tol)
+    return { ok: false, error: `El saldo precio no calza con la simulación del código ($${Number(c.saldo_precio).toLocaleString('es-CL')})` };
+  if (rutCuerpo3(rut_cliente) !== rutCuerpo3(c.rut_cliente))
+    return { ok: false, error: 'El RUT del cliente no calza con la simulación del código' };
+  await pool.query("UPDATE excepciones_codigos SET estado='USADO', usado_carta=?, usado_at=NOW() WHERE id=? AND estado='VIGENTE'",
+    [(op_carta || '').slice(0, 30) || null, c.id]);
+  return { ok: true, tipo: c.tipo, ejecutivo: c.ejecutivo };
+}
+
+/* ── POST /api/excepciones/usar — consumir un código vía API ────────────── */
 const usar = async (req, res) => {
   try {
-    await vencerCaducos();
-    const P = await params();
     const { codigo, saldo_precio, rut_cliente, op_carta } = req.body || {};
-    const [[c]] = await pool.query('SELECT * FROM excepciones_codigos WHERE codigo=?', [String(codigo || '').trim()]);
-    if (!c) return res.status(400).json({ success: false, data: null, error: 'El código no existe' });
-    if (c.estado === 'USADO') return res.status(400).json({ success: false, data: null, error: `Código ya usado en la carta ${c.usado_carta || ''} — un código sirve una sola vez` });
-    if (c.estado === 'VENCIDO') return res.status(400).json({ success: false, data: null, error: 'Código vencido (la estrella volvió al ejecutivo)' });
-    const tol = Math.max(0, Math.round(P.exc_tolerancia_saldo ?? 0));
-    const saldo = Math.round(Number(saldo_precio) || 0);
-    if (Math.abs(saldo - Number(c.saldo_precio)) > tol)
-      return res.status(400).json({ success: false, data: null, error: `El saldo precio no calza con la simulación del código ($${Number(c.saldo_precio).toLocaleString('es-CL')})` });
-    if (rutCuerpo3(rut_cliente) !== rutCuerpo3(c.rut_cliente))
-      return res.status(400).json({ success: false, data: null, error: 'El RUT del cliente no calza con la simulación del código' });
-    await pool.query("UPDATE excepciones_codigos SET estado='USADO', usado_carta=?, usado_at=NOW() WHERE id=? AND estado='VIGENTE'",
-      [(op_carta || '').slice(0, 30) || null, c.id]);
-    auditar({ req, accion: 'EDITAR', modulo: 'excepciones', entidad: 'excepciones_codigos', entidad_id: c.codigo,
-      detalle: `Código ${c.tipo} usado${op_carta ? ` en carta ${op_carta}` : ''}` });
-    res.json({ success: true, data: { codigo: c.codigo, tipo: c.tipo, ejecutivo: c.ejecutivo }, error: null });
+    const r = await consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta });
+    if (!r.ok) return res.status(400).json({ success: false, data: null, error: r.error });
+    auditar({ req, accion: 'EDITAR', modulo: 'excepciones', entidad: 'excepciones_codigos', entidad_id: String(codigo).trim(),
+      detalle: `Código ${r.tipo} usado${op_carta ? ` en carta ${op_carta}` : ''}` });
+    res.json({ success: true, data: { codigo: String(codigo).trim(), tipo: r.tipo, ejecutivo: r.ejecutivo }, error: null });
   } catch (e) { console.error('[excepciones usar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -294,4 +303,4 @@ const registro = async (req, res) => {
   } catch (e) { console.error('[excepciones registro]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getEstado, generar, generarGerencia, misCodigos, validar, usar, registro };
+module.exports = { getEstado, generar, generarGerencia, misCodigos, validar, usar, registro, consumirCodigo };

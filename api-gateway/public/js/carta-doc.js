@@ -54,7 +54,12 @@
 
     // Excepciones: NO van en la carta que se firma y entrega (tema interno, decisión
     // 2026-07-23). Siguen visibles en la revisión del analista y en el listado ("E").
-    const excepcionesSec = '';
+    /* Sello del código de excepción (Simulador de Excepciones, fase 3):
+       la carta impresa declara CON QUÉ CLAVE quedó aprobada la excepción. */
+    const excepcionesSec = c.codigoExcepcion ? `
+    <div style="margin:5px 0;padding:5px 8px;border:1px solid #f59e0b;border-radius:5px;background:#fffbeb;font-size:9px;font-weight:bold;color:#854d0e">
+      ★ EXCEPCIÓN APROBADA POR ${c.codigoExcepcionTipo === 'GERENCIA' ? 'AUTORIZACIÓN DE GERENCIA' : c.codigoExcepcionTipo === 'COMODIN' ? 'COMODÍN DORADO' : 'CÓDIGO DEL SISTEMA'} — Clave: ${esc(c.codigoExcepcion)}
+    </div>` : '';
 
     const qrHTML = opts.qr && opts.qr.qrHTML ? opts.qr.qrHTML : '';
     const fesTxt = opts.qr && opts.qr.fes ? esc(opts.qr.fes) : '';

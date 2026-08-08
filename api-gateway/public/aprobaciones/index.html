@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.25 — card Simulador de Excepciones (permiso excepciones_simulador) -->
+  <!-- v4.26 — fase 3: código de excepción en el modal, sello en carta y revisión, estrellas en el generador -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -307,6 +307,7 @@
 <div class="tab-pane" id="pane-nueva">
   <div class="card-af" style="max-width:1100px;margin:0 auto">
     <h5 style="font-weight:800;color:var(--navy);margin-bottom:4px" id="tituloForm"><i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación</h5>
+    <div id="excPresuBanner" style="display:none;background:#fefce8;border:1px solid #fde047;border-radius:9px;padding:7px 14px;margin:6px 0 8px;font-size:.83rem;color:#854d0e;font-weight:600"></div>
     <p style="font-size:.8rem;color:#64748b;margin-bottom:18px">Los datos de parques, concesionarios, vehículos y ejecutivos provienen de los mantenedores del sistema.</p>
     <div class="alert-inline" id="formAlert"></div>
     <div class="form-grid">
@@ -987,6 +988,24 @@ const TITULOS = { home:'', lista:'Mis Cartas', nueva:'Generador de Carta de Apro
   enviadas:'Cartolas Enviadas', params:'Preferencia Financiera', desempeno:'Desempeño Analistas de Crédito',
   vigentes:'Cartas de Aprobación Vigentes' };
 
+/* Estrellas y comodín del ejecutivo (Simulador de Excepciones) sobre el generador.
+   Silencioso: perfiles sin el permiso simplemente no ven el banner. */
+async function cargarExcPresu(){
+  const el = document.getElementById('excPresuBanner');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/excepciones/estado', { headers: hdr() });
+    if (!r.ok) { el.style.display = 'none'; return; }
+    const j = await r.json();
+    if (!j.success) { el.style.display = 'none'; return; }
+    const d = j.data;
+    el.innerHTML = `${'⭐'.repeat(Math.min(8, d.estrellas_disponibles)) || '—'} <b>${d.estrellas_disponibles} de ${d.estrellas_total}</b> excepciones del mes` +
+      ` &nbsp;·&nbsp; 🏆 <b>${d.comodines_disponibles}</b> comodín(es)` +
+      ` &nbsp;·&nbsp; <a href="/excepciones/" target="_blank" style="color:#854d0e">Simulador de Excepciones →</a>`;
+    el.style.display = '';
+  } catch(_) { el.style.display = 'none'; }
+}
+
 function showTab(t){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   const pane = document.getElementById('pane-'+t);
@@ -1006,6 +1025,7 @@ function showTab(t){
   }
   // Ayuda contextual por pestaña
   if (window.afAyudaSet) window.afAyudaSet('/aprobaciones/' + (t==='home' ? '' : t + '/'));
+  if (t==='nueva')     cargarExcPresu();
   if (t==='revision')  renderRevision();
   if (t==='vigentes')  renderVigentes();
   if (t==='impresion') renderImpresion();
@@ -2032,6 +2052,16 @@ function abrirModalExcepciones(carta, excList){
   document.getElementById('modalBody').innerHTML = `
     <p style="font-size:.85rem;color:#475569">Esta carta requiere <b>${excList.length} excepción(es)</b>.
     Debes justificar <b>cada una</b> antes de enviarla a aprobación — el analista verá tus comentarios.</p>
+    <div style="background:#fefce8;border:1.5px solid #fde047;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-weight:700;color:#854d0e;font-size:.85rem"><i class="bi bi-stars me-1"></i>¿Tienes un código del Simulador de Excepciones?</div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+        <input id="excCodigo" maxlength="10" placeholder="000000" oninput="this.value=this.value.replace(/[^0-9]/g,'');excCodigoEstado(null)"
+          style="width:130px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-weight:800;letter-spacing:3px;font-size:.9rem">
+        <button type="button" class="btn-mini" style="background:#f59e0b;color:#fff;padding:7px 14px" onclick="excValidarCodigo()"><i class="bi bi-search me-1"></i>Validar</button>
+        <span id="excCodigoMsg" style="font-size:.78rem;font-weight:600"></span>
+      </div>
+      <div style="font-size:.72rem;color:#a16207;margin-top:5px">Con un código válido la excepción queda aprobada por el sistema — la justificación se completa sola. Genéralo en <a href="/excepciones/" target="_blank">Simulador de Excepciones</a>.</div>
+    </div>
     ${excList.map((e,i)=>`
       <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;margin-bottom:10px">
         <div style="font-weight:700;color:#c2410c;font-size:.85rem"><i class="bi bi-exclamation-triangle me-1"></i>${i+1}. ${escH(e.detalle)}</div>
@@ -2044,23 +2074,63 @@ function abrirModalExcepciones(carta, excList){
     <button class="btn-af" onclick="confirmarExcepciones()"><i class="bi bi-send me-1"></i>Enviar a aprobación</button>`;
   document.getElementById('modalCarta').classList.add('show');
 }
+/* ── Código del Simulador de Excepciones (fase 3) ──
+   Front pre-valida (existencia, estado, calce saldo/RUT) para dar feedback;
+   el CONSUMO real del código es server-side al guardar la carta. */
+let EXC_COD_OK = null;   // {codigo, tipo} cuando la validación pasó
+function excCodigoEstado(ok, msg, tipo){
+  EXC_COD_OK = ok ? { codigo: document.getElementById('excCodigo').value.trim(), tipo } : null;
+  const el = document.getElementById('excCodigoMsg');
+  if (el) { el.textContent = msg || ''; el.style.color = ok===null ? '#64748b' : (ok ? '#16a34a' : '#dc2626'); }
+}
+async function excValidarCodigo(){
+  const cod = document.getElementById('excCodigo').value.trim();
+  if (!cod) { excCodigoEstado(null, ''); return; }
+  try {
+    const r = await fetch('/api/excepciones/validar/'+encodeURIComponent(cod), { headers: hdr() });
+    const j = await r.json();
+    const d = j.success ? j.data : null;
+    if (!d || !d.existe) return excCodigoEstado(false, '✗ El código no existe');
+    if (d.estado !== 'VIGENTE') return excCodigoEstado(false, '✗ Código ' + d.estado.toLowerCase());
+    const saldoC = Math.round(CARTA_PENDIENTE?.saldo || 0);
+    if (Math.abs(saldoC - Number(d.saldo_precio)) > 0 && Math.abs(saldoC - Number(d.saldo_precio)) > (Number(d.tolerancia)||0))
+      return excCodigoEstado(false, `✗ Saldo no calza (código: ${fmtCLP(d.saldo_precio)})`);
+    const r3 = s => String(s||'').replace(/[^0-9]/g,'').slice(0,3);
+    if (r3(CARTA_PENDIENTE?.rutCliente) !== r3(d.rut_cliente))
+      return excCodigoEstado(false, '✗ El RUT no calza con la simulación');
+    const tipoTxt = d.tipo==='GERENCIA' ? 'autorización de Gerencia' : d.tipo==='COMODIN' ? 'Comodín dorado' : 'código del sistema';
+    excCodigoEstado(true, `✓ Válido — ${tipoTxt} (${d.ejecutivo})`, d.tipo);
+  } catch(e){ excCodigoEstado(false, '✗ Error al validar'); }
+}
 async function confirmarExcepciones(){
   const comentarios = {};
   let falta = false;
   // Comentario válido: justificación real, no relleno (regla interna, no se muestra)
   const esValido = v => v.length >= 10 && v.includes(' ');
+  const selloCod = EXC_COD_OK ? (EXC_COD_OK.tipo==='GERENCIA' ? `Aprobada por autorización de Gerencia N°${EXC_COD_OK.codigo}`
+    : EXC_COD_OK.tipo==='COMODIN' ? `Aprobada por Comodín dorado N°${EXC_COD_OK.codigo}`
+    : `Aprobada por código del sistema N°${EXC_COD_OK.codigo}`) : null;
   EXC_PENDIENTES.forEach((e,i)=>{
-    const v = document.getElementById('excCom'+i).value.trim().replace(/\s+/g,' ');
+    let v = document.getElementById('excCom'+i).value.trim().replace(/\s+/g,' ');
+    // Con código válido la justificación se completa sola si viene vacía
+    if (!esValido(v) && selloCod) v = selloCod;
     const ok = esValido(v);
     document.getElementById('excComErr'+i).style.display = ok ? 'none' : 'block';
     document.getElementById('excCom'+i).style.borderColor = ok ? '#e2e8f0' : '#dc2626';
     if (!ok) falta = true; else comentarios[e.cod] = v;
   });
   if (falta) return;
+  // Si escribió un código pero no lo validó, validarlo ahora
+  if (document.getElementById('excCodigo').value.trim() && !EXC_COD_OK) {
+    await excValidarCodigo();
+    if (!EXC_COD_OK) return;   // código inválido: no se envía
+    return confirmarExcepciones();   // re-entra con el sello listo
+  }
   CARTA_PENDIENTE.excepcionesComentarios = comentarios;
+  CARTA_PENDIENTE.codigoExcepcion = EXC_COD_OK ? EXC_COD_OK.codigo : null;
   cerrarModal();
   await enviarCarta(CARTA_PENDIENTE);
-  CARTA_PENDIENTE = null; EXC_PENDIENTES = [];
+  CARTA_PENDIENTE = null; EXC_PENDIENTES = []; EXC_COD_OK = null;
 }
 
 async function enviarCarta(carta){
@@ -2378,8 +2448,10 @@ function abrirRevision(id){
         <b>${escH(EXC_LBL[e]||e)}</b>
         <div style="color:#475569;font-size:.8rem;margin-top:2px"><i class="bi bi-chat-left-text me-1"></i>${escH(coms[e]||'(sin justificación)')}</div>
       </div>`).join('');
+    const selloCodigo = c.codigoExcepcion ? `<div style="margin:8px 0 2px;padding:8px 10px;background:#fefce8;border:1px solid #fde047;border-radius:7px;color:#854d0e;font-size:.82rem;font-weight:700">
+      <i class="bi bi-stars me-1"></i>Excepción aprobada por ${c.codigoExcepcionTipo==='GERENCIA'?'autorización de Gerencia':c.codigoExcepcionTipo==='COMODIN'?'Comodín dorado':'código del sistema'} N°${escH(c.codigoExcepcion)}</div>` : '';
     excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
-      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${dimHTML}${items}</div>`;
+      <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${selloCodigo}${dimHTML}${items}</div>`;
   }
   document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
   udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise

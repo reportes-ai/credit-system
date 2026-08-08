@@ -335,6 +335,9 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_por_nombre VARCHAR(200) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_desistimiento DATETIME DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_desistimiento TEXT DEFAULT NULL`);
+    // Código de excepción del Simulador (fase 3): sella la aprobación automática
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS codigo_excepcion VARCHAR(10) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS codigo_excepcion_tipo VARCHAR(10) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS desistido_auto TINYINT(1) NOT NULL DEFAULT 0`);
     // Snapshot del TIER UAC vigente al emitir la carta (para la rentabilidad). Se puede recalcular por mes.
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS tier_uac_n INT DEFAULT NULL`);
@@ -510,6 +513,8 @@ function mapRow(r) {
     montoCreditoUF:           r.monto_credito_uf ? parseFloat(r.monto_credito_uf) : 0,
     excepciones:              parseJSON(r.excepciones) || [],
     excepcionesComentarios:   parseJSON(r.excepciones_comentarios),
+    codigoExcepcion:          r.codigo_excepcion || null,
+    codigoExcepcionTipo:      r.codigo_excepcion_tipo || null,
     numeroCreditoCreado:      r.numero_credito_creado || null,
     idCreditoCreado:          r.id_credito_creado || null,
     numOp:                    r.cred_num_op || null,                                  // NUESTRO N° de operación (creditos.num_op)
@@ -923,6 +928,21 @@ const upsert = async (req, res) => {
       if (v instanceof Date) return v;
       return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(String(v).trim()) ? new Date(v) : v;
     };
+    /* Código de excepción del Simulador (fase 3): se valida y CONSUME al guardar,
+       SERVER-SIDE (saldo ± tolerancia, RUT, vigencia, un solo uso). Si no pasa,
+       la carta no se guarda. Re-guardar la misma carta con su código ya usado
+       es válido (consumirCodigo lo reconoce por op_carta). */
+    let codExc = null, codExcTipo = null;
+    if (c.codigoExcepcion) {
+      const { consumirCodigo } = require('../../../excepciones/src/controllers/excepciones.controller');
+      const rc = await consumirCodigo({ codigo: c.codigoExcepcion, saldo_precio: c.saldo, rut_cliente: c.rutCliente, op_carta: c.opCarta });
+      if (!rc.ok) return res.status(400).json({ success: false, data: null, error: rc.error });
+      codExc = String(c.codigoExcepcion).trim(); codExcTipo = rc.tipo;
+    }
+    const sellarCodigo = (idCarta) => { if (codExc) pool.query(
+      'UPDATE cartas_aprobacion SET codigo_excepcion=?, codigo_excepcion_tipo=? WHERE id=?',
+      [codExc, codExcTipo, idCarta]).catch(e => console.error('[carta codigo excepcion]', e.message)); };
+
     const vals = [
       c.opCarta, c.opOrigen, c.tipo,
       c.ejecutivoIdx || null, c.ejecutivoNombre, c.ejecutivoMail, c.ejecutivoTel,
@@ -982,6 +1002,7 @@ const upsert = async (req, res) => {
         [...vals, c.id]
       );
       res.json({ success: true, data: { id: c.id }, error: null });
+      sellarCodigo(c.id);
       persistirPrimasCarta(c.id, c);
       // Sincronizar estado del crédito vinculado
       if (c.idCreditoCreado || c.id_credito_creado) {
@@ -1040,6 +1061,7 @@ const upsert = async (req, res) => {
          generaba UNA COMISIÓN POR CARTA — 9 operaciones quedaron con comisión
          duplicada por $4.499.700. La carta vigente es siempre la última. */
       anularCartasPrevias(r.insertId, c.id_financiera, req).catch(() => {});
+      sellarCodigo(r.insertId);
       persistirPrimasCarta(r.insertId, c);
       /* Carta nueva ya ENLAZADA a un crédito de carga masiva: sincronizar igual
          que en la edición — este camino no sincronizaba nada y las primas del
