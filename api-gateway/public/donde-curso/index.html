@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — copiloto de excepciones: sugerencias en frases + codigo, tasa pizarra al lado de la manual -->
+<!-- v2.1 — comisión dealer editable, saldo a media fila, tasa placeholder=pizarra y mínimo=piso 75% -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -137,8 +137,13 @@
           <div class="fld"><label>Pie $</label>
             <input id="iPie" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
         </div>
-        <div class="fld"><label>Saldo precio $ <span class="aux">(calculado)</span></label>
-          <input id="iSaldo" type="text" readonly></div>
+        <div class="row2">
+          <div class="fld"><label>Saldo precio $ <span class="aux">(calculado)</span></label>
+            <input id="iSaldo" type="text" readonly></div>
+          <div class="fld"><label>Comisión dealer $ <span class="aux" id="comAux">(pizarra)</span></label>
+            <input id="iComDealer" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()">
+            <div class="aux" id="comPiz" style="margin-top:3px"></div></div>
+        </div>
         <div class="row2">
           <div class="fld"><label>Plazo (cuotas)</label>
             <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" value="48" oninput="calcular()"></div>
@@ -286,26 +291,28 @@ function logout(){ localStorage.removeItem('token'); location.reload(); }
 async function cargarBase(){
   const cache = () => { try { return JSON.parse(localStorage.getItem('dc_base')||'null'); } catch(e){ return null; } };
   try {
-    const [rp, rt, ru, rv, rf] = await Promise.all([
+    const [rp, rt, ru, rv, rf, rx] = await Promise.all([
       fetch(API + '/parametros-credito',                 { headers:H() }),
       fetch(API + '/tasas/vigente',                      { headers:H() }),
       fetch(API + '/parametros-credito/uac-ops-vigente', { headers:H() }),
       fetch(API + '/uf/vigente',                         { headers:H() }),
       fetch(API + '/cartas-params/financiera_preferencia',{ headers:H() }),
+      fetch(API + '/excepciones-comerciales',            { headers:H() }),
     ]);
-    const [jp, jt, ju, jv, jf] = await Promise.all([rp.json(), rt.json(), ru.json(), rv.json(), rf.json()]);
+    const [jp, jt, ju, jv, jf, jx] = await Promise.all([rp.json(), rt.json(), ru.json(), rv.json(), rf.json(), rx.json()]);
+    if (jx.success && jx.data) EX = jx.data.obj || {};
     if (jp.success && jp.data && jp.data.lista) { P = {}; jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); }); }
     if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
     if (ju.success && ju.data) { OPS_UAC = ju.data.ops || 0; MES_UAC = ju.data.mes || ''; }
     const u = jv && jv.data ? (Array.isArray(jv.data) ? jv.data[0] : jv.data) : null;
     if (u && u.valor) UF = parseFloat(u.valor);
     try { const t = JSON.parse(jf.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } catch(e){}
-    localStorage.setItem('dc_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, at: Date.now() }));
+    localStorage.setItem('dc_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, EX, at: Date.now() }));
     $('pie').textContent = 'UF de hoy $' + (UF?fN(UF):'—');
   } catch (e) {
     const c = cache();
     if (c) {
-      P=c.P; T=c.T; UF=c.UF; OPS_UAC=c.OPS_UAC; MES_UAC=c.MES_UAC; PREF_TABLA=c.PREF_TABLA||[];
+      P=c.P; T=c.T; UF=c.UF; OPS_UAC=c.OPS_UAC; MES_UAC=c.MES_UAC; PREF_TABLA=c.PREF_TABLA||[]; EX=c.EX||{};
       const dias = Math.floor((Date.now()-(c.at||0))/86400000);
       $('pie').textContent = 'Sin señal — usando datos guardados' + (dias?(' hace '+dias+' día'+(dias===1?'':'s')):' recién');
       toast('Sin conexión: cálculo con los últimos parámetros');
@@ -342,14 +349,18 @@ function calcular(){
   // Tasa: si el ejecutivo no escribe una, manda la TMC automática del motor.
   const tasaTxt = ($('iTasa').value||'').replace(',','.').replace(/[^0-9.]/g,'');
   const tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
-  $('tasaAux').textContent = tasaTxt ? '(manual)' : '(auto)';
+  $('tasaAux').textContent = tasaTxt ? '(manual)' : '(pizarra)';
+  // Comisión dealer real (editable): vacío = pizarra del canal/plazo
+  const comTxt = ($('iComDealer').value||'').replace(/[^0-9]/g,'');
+  const comDealer = comTxt ? parseInt(comTxt,10) : null;
+  $('comAux').textContent = comTxt ? '(modificada)' : '(pizarra)';
 
   // % UAC del tier vigente — motor único uac-tier.js (el mismo del backend).
   let uacPct = null;
   if (window.AF_UAC_TIER) uacPct = AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, P);
 
   const R = AF_RENT.calcular({
-    valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct,
+    valor, pie, plazo, tasaCli, dealerComCLP: comDealer, esPatio: ES_PATIO, uacPct,
     gastos:  { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
     seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
   }, P, UF, T);
@@ -363,12 +374,22 @@ function calcular(){
   });
 
   pintar(R, D, plazo, saldo);
-  // Tasa pizarra + costo de fondo, al lado de la tasa manual (ayuda a simular)
-  const R0 = tasaCli ? AF_RENT.calcular({ valor, pie, plazo, esPatio: ES_PATIO, uacPct,
-    gastos: { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
-    seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') } }, P, UF, T) : R;
-  const cf = ((parseFloat(T.tasa_mensual_mayor)||0) - (parseFloat(T.spread_mayor)||0));
-  $('tasaPiz').textContent = R0 ? ('Pizarra ' + R0.tasaCliPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' + (cf>0 ? ' · mín. ' + cf.toFixed(2).replace('.',',') + '%' : '')) : '';
+  /* Referencias junto a los campos editables:
+     · tasa: pizarra del tramo + hasta dónde puede llegar CUMPLIENDO el piso 75%
+     · comisión: la pizarra del canal/plazo como placeholder y leyenda */
+  const gts = { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') };
+  const seg = { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') };
+  const R0 = (tasaCli || comDealer != null)
+    ? AF_RENT.calcular({ valor, pie, plazo, esPatio: ES_PATIO, uacPct, gastos: gts, seguros: seg }, P, UF, T) : R;
+  if (R0) {
+    const pizPct = R0.tasaCliPct;
+    $('iTasa').placeholder = pizPct.toFixed(2).replace('.',',');
+    $('iComDealer').placeholder = '$' + fN(R0.costos.dealer);
+    $('comPiz').textContent = 'Pizarra ' + fCLP(R0.costos.dealer) + ' (' + (ES_PATIO?'parque':'calle') + ')';
+    const tMin = tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos: gts, seguros: seg, R0 });
+    $('tasaPiz').textContent = 'Pizarra ' + pizPct.toFixed(2).replace('.',',') + '% (' + (R0.esMayor?'>':'≤') + '200 UF)' +
+      (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
+  }
   if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
 }
 const on = id => $(id).classList.contains('on');
@@ -467,6 +488,30 @@ function fmtRutDC(el){
 }
 const nomFin = l => l === 'UAC' ? 'Unidad' : 'Autofin';
 const pct2 = f => (f*100).toFixed(2).replace('.',',') + '%';
+
+/* Hasta qué tasa puede llegar el ejecutivo CUMPLIENDO el piso 75% (fracción
+   mensual). AutoFin: bisección (la tasa mueve el ingreso), acotada por el costo
+   de fondo. Unidad: la tasa no cambia nuestro ingreso — el límite es la rebaja
+   máxima relativa del programa. */
+function tasaMinimaPiso({ valor, pie, plazo, uacPct, gastos, seguros, R0 }){
+  if (!R0) return null;
+  const piso = (EX.exc_piso_pct ?? 75) / 100;
+  const cf = ((parseFloat(T.tasa_mensual_mayor) || 0) - (parseFloat(T.spread_mayor) || 0)) / 100;
+  const pizarra = R0.tasaCli;
+  const lado = R0.af.rentab >= R0.uac.rentab ? 'AF' : 'UAC';
+  if (lado === 'UAC') {
+    const t = Math.max(cf, pizarra * (1 - (EX.exc_tasa_rebaja_max_pct ?? 5) / 100));
+    return t < pizarra - 0.0001 ? t : null;
+  }
+  if (!(cf > 0) || cf >= pizarra) return null;
+  const mejor = Math.max(R0.af.rentab, R0.uac.rentab);
+  const rentA = t => { const r = AF_RENT.calcular({ valor, pie, plazo, tasaCli: t, esPatio: ES_PATIO, uacPct, gastos, seguros }, P, UF, T); return r ? r.af.rentab : -1; };
+  if (rentA(cf) >= mejor * piso) return cf;      // hasta el costo de fondo cumple
+  let lo = cf, hi = pizarra;
+  for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2;
+    if (rentA(mid) >= mejor * piso) hi = mid; else lo = mid; }
+  return hi < pizarra - 0.0001 ? hi : null;
+}
 
 function sugerencias(ctx){
   const { valor, pie, plazo, tasaCli, R } = ctx;
