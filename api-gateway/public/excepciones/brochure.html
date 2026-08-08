@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tus Estrellas — Programa de Excepciones AutoFácil</title>
+<!-- v1.0 — brochure comercial del programa de estrellas -->
+<style>
+  :root { --navy:#001345; --blue:#0141A2; --cyan:#009AFE; --gold:#f59e0b; --gold2:#fbbf24; }
+  * { box-sizing:border-box; margin:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; line-height:1.65; }
+  .hero { background:linear-gradient(150deg,#012d70,#0141A2 55%,#0255c5); color:#fff; padding:60px 24px 80px; text-align:center; position:relative; overflow:hidden; }
+  .hero h1 { font-size:2.4rem; font-weight:900; line-height:1.15; margin:18px 0 10px; }
+  .hero .sub { font-size:1.15rem; opacity:.92; max-width:640px; margin:0 auto; font-weight:600; }
+  .hero .stars-bg { position:absolute; inset:0; pointer-events:none; opacity:.12; font-size:2rem; }
+  .wrap { max-width:860px; margin:0 auto; padding:0 24px; }
+  section { padding:52px 0; }
+  section.gris { background:#f5f8fc; }
+  h2 { font-size:1.7rem; font-weight:900; color:var(--navy); margin-bottom:8px; }
+  .lead { font-size:1.05rem; color:#475569; margin-bottom:22px; }
+  .fila { display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+  .fila .txt { flex:1; min-width:280px; }
+  .fila .dibujo { flex:0 0 200px; text-align:center; }
+  .paso { display:flex; gap:16px; margin:18px 0; align-items:flex-start; }
+  .paso .n { flex:0 0 44px; height:44px; border-radius:50%; background:var(--gold); color:#fff; font-weight:900; font-size:1.3rem; display:flex; align-items:center; justify-content:center; }
+  .paso b { color:var(--navy); }
+  .escalera { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin:24px 0; }
+  .peldano { border-radius:16px; padding:22px 20px; border:2px solid #e2e8f0; background:#fff; }
+  .peldano.p1 { border-color:#86efac; } .peldano.p2 { border-color:var(--gold2); } .peldano.p3 { border-color:#f97316; }
+  .peldano .e { font-size:1.6rem; }
+  .peldano h3 { color:var(--navy); font-size:1.05rem; margin:6px 0 4px; }
+  .peldano p { font-size:.9rem; color:#475569; }
+  .quote { background:#fffbeb; border-left:5px solid var(--gold); border-radius:0 12px 12px 0; padding:18px 22px; margin:24px 0; font-size:1.05rem; font-weight:600; color:#78350f; }
+  .card3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top:20px; }
+  .card3 > div { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:20px; }
+  .card3 h3 { color:var(--navy); font-size:1rem; margin-bottom:6px; }
+  .card3 p { font-size:.9rem; color:#475569; }
+  ul.reglas { margin:14px 0 0 20px; }
+  ul.reglas li { margin:8px 0; }
+  .cta { background:linear-gradient(150deg,#012d70,#0255c5); color:#fff; text-align:center; padding:56px 24px; }
+  .cta a { display:inline-block; background:var(--gold); color:#fff; font-weight:900; font-size:1.1rem; text-decoration:none; border-radius:12px; padding:14px 34px; margin-top:18px; }
+  .pie { text-align:center; font-size:.8rem; color:#94a3b8; padding:22px; }
+  @media print { .cta a { display:none; } }
+</style>
+</head>
+<body>
+
+<!-- ══ Personaje "Estrella" — dibujo plano reutilizable en 4 poses ══ -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="max-base">
+      <ellipse cx="100" cy="188" rx="52" ry="8" fill="#00000012"/>
+      <rect x="76" y="108" width="48" height="62" rx="14" fill="#0141A2"/>
+      <rect x="88" y="108" width="24" height="34" rx="4" fill="#fff"/>
+      <path d="M96 108 l4 10 4-10z" fill="#f59e0b"/>
+      <rect x="80" y="164" width="16" height="26" rx="7" fill="#001345"/>
+      <rect x="104" y="164" width="16" height="26" rx="7" fill="#001345"/>
+      <circle cx="100" cy="74" r="34" fill="#ffd9b3"/>
+      <path d="M66 66 a34 34 0 0 1 68 0 c-8-14-22-20-34-20 s-26 6-34 20z" fill="#4a2f1d"/>
+      <circle cx="89" cy="74" r="3.6" fill="#1e293b"/>
+      <circle cx="111" cy="74" r="3.6" fill="#1e293b"/>
+      <path d="M90 88 q10 8 20 0" stroke="#1e293b" stroke-width="3" fill="none" stroke-linecap="round"/>
+    </g>
+    <g id="star-g"><path d="M12 0 l3.2 7.4 8 .7 -6.1 5.3 1.8 7.9 -6.9-4.2 -6.9 4.2 1.8-7.9 -6.1-5.3 8-.7z" fill="#f59e0b"/></g>
+  </defs>
+</svg>
+
+<div class="hero">
+  <div class="stars-bg">⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐ ⭐</div>
+  <!-- Pose 1: saludando con estrella en alto -->
+  <svg width="210" height="205" viewBox="0 0 200 200" aria-hidden="true">
+    <use href="#max-base"/>
+    <rect x="58" y="112" width="14" height="42" rx="7" fill="#0141A2" transform="rotate(38 65 116)"/>
+    <rect x="128" y="112" width="14" height="46" rx="7" fill="#0141A2" transform="rotate(-142 135 116)"/>
+    <use href="#star-g" transform="translate(140 44) scale(1.6)"/>
+  </svg>
+  <h1>Tus Estrellas.<br>Tu poder de negociación.</h1>
+  <div class="sub">Imagina cerrar el negocio ahí mismo, frente al cliente, sin llamar a nadie.
+  Desde este mes, esa decisión está en tu bolsillo.</div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="fila">
+      <div class="txt">
+        <h2>¿Qué son las estrellas?</h2>
+        <p class="lead">Son <b>tu presupuesto personal de excepciones</b>. Cada mes ganas estrellas según lo que colocaste el mes anterior, y las usas cuando un negocio necesita una jugada especial: cambiar de financiera, bajar la tasa o mover la comisión del dealer.</p>
+        <p>Antes tenías que pedir permiso, esperar el mail, y a veces el cliente se iba. <b>Ahora la respuesta la tienes tú, en segundos, en ¿Dónde Curso?</b> Y cada vez que colocas más, el sistema te da más poder: <b>tus resultados de hoy son tus estrellas de mañana</b>.</p>
+        <div class="quote">⭐ Partes con 3 estrellas de regalo tu primer mes. Después, cada 3 créditos que coloques te ganan una. Tú decides cuánto poder quieres tener.</div>
+      </div>
+      <div class="dibujo">
+        <!-- Pose 2: mostrando 3 estrellas -->
+        <svg width="200" height="205" viewBox="0 0 200 200" aria-hidden="true">
+          <use href="#max-base"/>
+          <rect x="58" y="112" width="14" height="44" rx="7" fill="#0141A2" transform="rotate(18 65 116)"/>
+          <rect x="128" y="112" width="14" height="44" rx="7" fill="#0141A2" transform="rotate(-18 135 116)"/>
+          <use href="#star-g" transform="translate(28 30)"/>
+          <use href="#star-g" transform="translate(88 14) scale(1.25)"/>
+          <use href="#star-g" transform="translate(152 30)"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="gris">
+  <div class="wrap">
+    <h2>Así de simple funciona</h2>
+    <p class="lead">Tres pasos, un minuto, cero llamadas.</p>
+    <div class="paso"><div class="n">1</div><div><b>Simula en ¿Dónde Curso?</b> — escribe precio y pie, y la app te dice al instante dónde conviene cursar y <b>qué jugadas puedes hacer</b>: "con una estrella lo cursas en Unidad a 48", "puedes ofrecer tasa hasta 2,69%", "bajando la comisión del dealer a $610.000 se abre".</div></div>
+    <div class="paso"><div class="n">2</div><div><b>Toca "Usar ⭐"</b> — confirmas, y el sistema te entrega un <b>código único de 6 dígitos</b>. Ese código ES la aprobación: nadie más tiene que firmar. Dura 24 horas y sirve una sola vez (y si no lo usas, la estrella vuelve a tu bolsillo).</div></div>
+    <div class="paso"><div class="n">3</div><div><b>Escríbelo en la Carta de Aprobación</b> — la carta queda "Aprobada por código del sistema N°XXXXXX" y el negocio sigue su curso normal. Listo. Cerraste tú.</div></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="fila">
+      <div class="dibujo">
+        <!-- Pose 3: pensando frente a la escalera -->
+        <svg width="200" height="205" viewBox="0 0 200 200" aria-hidden="true">
+          <use href="#max-base"/>
+          <rect x="58" y="112" width="14" height="44" rx="7" fill="#0141A2" transform="rotate(8 65 116)"/>
+          <rect x="122" y="96" width="14" height="40" rx="7" fill="#0141A2" transform="rotate(-105 129 100)"/>
+          <rect x="150" y="140" width="34" height="10" fill="#e2e8f0"/>
+          <rect x="158" y="120" width="26" height="10" fill="#cbd5e1"/>
+          <rect x="166" y="100" width="18" height="10" fill="#94a3b8"/>
+        </svg>
+      </div>
+      <div class="txt">
+        <h2>La escalera: mientras más grande la jugada, más estrellas</h2>
+        <p class="lead">Igual que en la cancha: la jugada simple sale sola, la jugada maestra se prepara.</p>
+      </div>
+    </div>
+    <div class="escalera">
+      <div class="peldano p1"><div class="e">⭐</div><h3>Nivel 1 — la jugada del día</h3><p>Excepciones donde la empresa mantiene al menos el <b>75%</b> de su mejor rentabilidad. Cambio de financiera, un ajuste de tasa razonable. Tu pan de cada semana.</p></div>
+      <div class="peldano p2"><div class="e">⭐⭐</div><h3>Nivel 2 — la jugada fuerte</h3><p>Hasta el piso del <b>50%</b>. Para ese cliente que vale la pena pelear. Cuesta el doble, así que la piensas dos veces — y eso está bien.</p></div>
+      <div class="peldano p3"><div class="e">⭐⭐⭐</div><h3>Nivel 3 — la jugada maestra</h3><p>El mes entero en una operación. Hasta el piso del <b>25%</b>, siempre que la empresa gane al menos <b>$200.000</b>. Para el negocio que no puedes dejar ir.</p></div>
+    </div>
+    <p style="font-size:.9rem;color:#64748b">¿Y si el negocio no cabe ni en el nivel 3? Existe la vía de Gerencia — para lo verdaderamente excepcional, como siempre. La diferencia es que ahora el 95% de los casos <b>ya no necesita esperar a nadie</b>.</p>
+  </div>
+</section>
+
+<section class="gris">
+  <div class="wrap">
+    <h2>Hablemos claro: esto cuesta plata</h2>
+    <p class="lead">Y por eso mismo es un voto de confianza.</p>
+    <div class="fila">
+      <div class="txt">
+        <p>Cada estrella que usas es <b>rentabilidad que la empresa deja de ganar en esa operación</b> — cientos de miles de pesos, a veces más. La empresa decidió ponerte esa plata en las manos, sin pedirte permiso caso a caso, porque confía en tu criterio comercial.</p>
+        <p style="margin-top:12px">Esa confianza funciona en ambas direcciones: <b>el sistema registra cada código</b> — quién lo generó, para qué operación, cuánto costó — y Gerencia revisa el informe todos los meses. No para pillarte: para <b>ver quién usa sus estrellas con inteligencia</b>. Porque una estrella bien usada no es un gasto…</p>
+        <div class="quote">…es un negocio que sin ella se iba a la competencia. El mejor vendedor no es el que nunca gasta estrellas: es el que cada estrella que gasta la convierte en un cliente.</div>
+      </div>
+      <div class="dibujo">
+        <!-- Pose 4: mano al corazón (confianza) -->
+        <svg width="200" height="205" viewBox="0 0 200 200" aria-hidden="true">
+          <use href="#max-base"/>
+          <rect x="60" y="112" width="14" height="42" rx="7" fill="#0141A2" transform="rotate(-52 67 116)"/>
+          <rect x="128" y="112" width="14" height="44" rx="7" fill="#0141A2" transform="rotate(-18 135 116)"/>
+          <path d="M97 124 c-3-5-11-5-11 1 c0 5 8 9 11 11 c3-2 11-6 11-11 c0-6-8-6-11-1z" fill="#dc2626"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>¿Qué ganas tú?</h2>
+    <div class="card3">
+      <div><h3>🏁 Cierras en el momento</h3><p>El cliente que está dudando frente a ti no vuelve mañana. Con tu código en 60 segundos, <b>el negocio se firma hoy</b>.</p></div>
+      <div><h3>💰 Más colocación, más comisión</h3><p>Cada negocio rescatado con una estrella es monto financiado que suma a tu comisión del mes. Y más colocación este mes = <b>más estrellas el próximo</b>. El círculo juega a tu favor.</p></div>
+      <div><h3>🎯 Autonomía de verdad</h3><p>Nada de "déjame consultarlo". Frente al dealer y al cliente, <b>tú eres quien decide</b>. Eso también se nota — y vende.</p></div>
+      <div><h3>📱 Todo en tu teléfono</h3><p>¿Dónde Curso? te muestra las jugadas posibles con los números ya resueltos. Tú solo eliges. Sin planillas, sin calculadora, sin adivinar.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="gris">
+  <div class="wrap">
+    <h2>Las reglas de oro</h2>
+    <ul class="reglas">
+      <li><b>Las estrellas del mes no se guardan.</b> Lo que no uses al cierre, expira. Úsalas cuando el negocio lo pida — no las colecciones ni las quemes por quemar.</li>
+      <li><b>El código dura 24 horas y sirve una vez.</b> Genéralo cuando el negocio esté maduro. Si vence sin usarse, tu estrella vuelve.</li>
+      <li><b>El código es de esa operación</b> — valida el saldo y el RUT del cliente. No es transferible ni reciclable, así que no hay enredos.</li>
+      <li><b>Cursar donde conviene no gasta nada.</b> La estrella es solo para la excepción. La app te dice cuándo es gratis y cuándo cuesta.</li>
+      <li><b>Todo queda registrado.</b> Tu historial es tu carta de presentación: un ejecutivo que convierte estrellas en negocios es un ejecutivo que crece.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Y esto recién empieza</h2>
+    <p class="lead">Lo que viene en los próximos meses:</p>
+    <div class="paso"><div class="n">✓</div><div><b>Ya disponible</b> — estrellas en ¿Dónde Curso?, códigos en la Carta de Aprobación, validador para consultar cualquier código.</div></div>
+    <div class="paso"><div class="n">📊</div><div><b>Ranking y reconocimiento</b> — cuando el programa tome vuelo, vas a poder ver quiénes son los que mejor convierten estrellas en negocios. Los primeros meses marcan la pauta: <b>los que partan ahora van a llevar ventaja</b>.</div></div>
+    <div class="paso"><div class="n">🔧</div><div><b>Calibración con datos reales</b> — los pisos (75/50/25) se revisarán con lo que muestre el informe mensual. Si el equipo demuestra buen criterio, el programa puede crecer. Está en nuestras manos.</div></div>
+  </div>
+</section>
+
+<div class="cta">
+  <!-- Pose 5: celebrando -->
+  <svg width="210" height="205" viewBox="0 0 200 200" aria-hidden="true">
+    <use href="#max-base"/>
+    <rect x="56" y="104" width="14" height="46" rx="7" fill="#0141A2" transform="rotate(145 63 108)"/>
+    <rect x="130" y="104" width="14" height="46" rx="7" fill="#0141A2" transform="rotate(-145 137 108)"/>
+    <use href="#star-g" transform="translate(30 18)"/>
+    <use href="#star-g" transform="translate(148 18)"/>
+  </svg>
+  <h2 style="color:#fff;font-size:1.8rem">Tu próximo negocio difícil ya tiene solución.</h2>
+  <p style="opacity:.9;max-width:520px;margin:8px auto 0">Abre ¿Dónde Curso?, mira tus estrellas arriba a la derecha, y la próxima vez que un cliente te diga "está cara la cuota"… ya sabes qué hacer.</p>
+  <a href="/donde-curso/">Abrir ¿Dónde Curso? ⭐</a>
+</div>
+
+<div class="pie">AutoFácil Crédito Automotriz · Programa de Excepciones Comerciales · Los parámetros vigentes (pisos, estrellas, vigencias) se administran en Mantenedores → Excepciones Comerciales.</div>
+
+</body>
+</html>
