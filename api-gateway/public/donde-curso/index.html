@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.3 — frase de comisión explícita: dejarla EN $X (pizarra $Y) -->
+<!-- v2.4 — duo de financieras: la contraria viable queda dorada y clickeable (animada); inviable en gris -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -76,6 +76,28 @@
   .v-no  { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
   .v-esp { background:linear-gradient(135deg,#475569,#94a3b8); }
 
+  /* ── Duo de financieras: la recomendada grande; la otra chica al lado.
+        Viable con estrella = dorada y clickeable (crece con animación al
+        elegirla). Inviable = gris. ── */
+  #duo { display:none; gap:10px; margin-bottom:14px; align-items:stretch; }
+  .vcard { flex:1; border-radius:16px; padding:16px 12px; text-align:center; color:#fff;
+           box-shadow:0 4px 18px rgba(0,0,0,.16); transition:flex .38s ease, filter .3s, opacity .3s, transform .2s;
+           position:relative; overflow:hidden; min-width:0; }
+  .vcard.big { flex:2.4; }
+  .vcard .lbl { font-size:.62rem; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; opacity:.85; }
+  .vcard .fin { font-weight:900; line-height:1.12; margin:5px 0 3px; font-size:1.05rem; transition:font-size .38s ease; }
+  .vcard.big .fin { font-size:1.75rem; }
+  .vcard .por { font-size:.74rem; font-weight:600; opacity:.95; }
+  .vcard.big .por { font-size:.85rem; }
+  .vcard.dim { filter:grayscale(.92); opacity:.5; }
+  .vcard.viable { cursor:pointer; outline:2.5px solid #fde047; }
+  .vcard.viable:active { transform:scale(.97); }
+  .vcard .star-tag { position:absolute; top:8px; right:10px; font-size:1.05rem;
+                     animation:starpulse 1.6s ease-in-out infinite; }
+  @keyframes starpulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.28) rotate(8deg)} }
+  .vcard .cta { margin-top:8px; background:#fff; border:none; border-radius:9px; padding:8px 14px;
+                font-weight:800; font-size:.8rem; color:#78350f; cursor:pointer; }
+
   .alerta { background:#fef3c7; border-left:4px solid #d97706; color:#78350f; border-radius:9px;
             padding:11px 13px; font-size:.83rem; font-weight:600; margin-bottom:14px; display:flex; gap:9px; }
 
@@ -122,6 +144,21 @@
       <div class="lbl">Cursa en</div>
       <div class="fin" id="vFin">—</div>
       <div class="por" id="vPor">Completa el valor del vehículo y el pie.</div>
+    </div>
+
+    <div id="duo">
+      <div class="vcard v-af" id="vcAF" onclick="clickLado('AF')">
+        <span class="star-tag" id="tagAF" style="display:none"></span>
+        <div class="lbl">Cursa en</div><div class="fin">AUTOFIN</div>
+        <div class="por" id="porAF"></div>
+        <button class="cta" id="ctaAF" style="display:none" onclick="event.stopPropagation();genLado('AF')"></button>
+      </div>
+      <div class="vcard v-un" id="vcUAC" onclick="clickLado('UAC')">
+        <span class="star-tag" id="tagUAC" style="display:none"></span>
+        <div class="lbl">Cursa en</div><div class="fin">UNIDAD DE CRÉDITO</div>
+        <div class="por" id="porUAC"></div>
+        <button class="cta" id="ctaUAC" style="display:none" onclick="event.stopPropagation();genLado('UAC')"></button>
+      </div>
     </div>
 
     <div id="avisoMin" class="alerta" style="display:none">
@@ -395,8 +432,91 @@ function calcular(){
       (tMin != null ? ' · puedes llegar a ' + (tMin*100).toFixed(2).replace('.',',') + '% cumpliendo el piso' : '');
   }
   if (EXC_ON) sugerencias({ valor, pie, saldo, plazo, tasaCli, uacPct, R, R0, D });
+  renderDuo(R0 || R, D, plazo, saldo);
 }
 const on = id => $(id).classList.contains('on');
+
+/* ── Duo de financieras: la típica excepción (cambiar de financiera) vive en el
+      veredicto mismo. La contraria viable con estrella queda dorada y clickeable;
+      inviable queda gris. ── */
+let LADO_SEL = null, DUO = null;
+function renderDuo(R0, D, plazo, saldo){
+  if (!R0 || D.veredicto === 'NINGUNA') { $('duo').style.display = 'none'; $('veredicto').style.display = ''; return; }
+  $('veredicto').style.display = 'none';
+  $('duo').style.display = 'flex';
+  const esTu = D.veredicto === 'DECIDES_TU';
+  const pref = esTu ? null : (D.veredicto === 'AUTOFIN' ? 'AF' : 'UAC');
+  const mejor = Math.max(R0.af.rentab, R0.uac.rentab);
+  const piso = (EX.exc_piso_pct ?? 75) / 100;
+  const factCom = 1 + (EX.exc_comodin_factor_pct ?? 10) / 100;
+  DUO = { plazo, saldo };
+  for (const l of ['AF', 'UAC']) {
+    const el = $('vc' + l), tag = $('tag' + l), por = $('por' + l), cta = $('cta' + l);
+    el.className = 'vcard ' + (l === 'AF' ? 'v-af' : 'v-un');
+    tag.style.display = 'none'; cta.style.display = 'none';
+    const rent = l === 'AF' ? R0.af.rentab : R0.uac.rentab;
+    const eleg = l === 'AF' ? D.elegible.af : D.elegible.uac;
+    const info = { click: false, tipo: null };
+    if (esTu) { el.classList.add('big'); por.textContent = 'Da lo mismo para la empresa — elige tú.'; }
+    else if (l === pref) { por.textContent = 'Es la que más conviene para esta operación.'; info.click = true; }
+    else if (!eleg) { el.classList.add('dim'); por.textContent = 'No toma este plazo con este saldo.'; }
+    else if (EXC_ON && rent >= mejor * piso && (EXC_ESTADO?.estrellas_disponibles || 0) >= 0) {
+      info.click = true; info.tipo = 'PROPIO';
+      el.classList.add('viable'); tag.style.display = ''; tag.textContent = '⭐';
+      por.textContent = 'Puedes cursar aquí usando una estrella.';
+    }
+    else if (EXC_ON && rent > Math.max(R0.costos.dealer, R0.costos.ejecutivo) * factCom) {
+      info.click = true; info.tipo = 'COMODIN';
+      el.classList.add('viable'); tag.style.display = ''; tag.textContent = '🏆';
+      por.textContent = 'Bajo el piso — solo tu comodín dorado la aprueba.';
+    }
+    else { el.classList.add('dim'); por.textContent = EXC_ON ? 'Queda bajo el piso: no se puede por acá.' : 'No conviene por acá.'; }
+    DUO[l] = info;
+  }
+  if (LADO_SEL && (!DUO[LADO_SEL] || !DUO[LADO_SEL].tipo)) LADO_SEL = null;
+  if (!esTu) {
+    const grande = LADO_SEL || pref;
+    $('vc' + grande).classList.add('big');
+    if (LADO_SEL) {
+      const cta = $('cta' + LADO_SEL);
+      cta.style.display = '';
+      cta.textContent = DUO[LADO_SEL].tipo === 'COMODIN' ? 'Generar código 🏆' : 'Generar código ⭐';
+    }
+  }
+}
+function clickLado(l){
+  if (!DUO || !DUO[l]) return;
+  if (DUO[l].tipo) { LADO_SEL = (LADO_SEL === l) ? null : l; calcular(); }
+  else if (LADO_SEL) { LADO_SEL = null; calcular(); }
+}
+async function genLado(l){
+  const info = DUO && DUO[l];
+  if (!info || !info.tipo) return;
+  const rut = ($('iRut') ? $('iRut').value : '').trim();
+  if (rut.replace(/[^0-9]/g,'').length < 7) {
+    toast('Escribe el RUT del cliente para generar el código');
+    $('excSec').style.display = '';   // el campo RUT vive ahí; mostrarlo aunque no haya otras sugerencias
+    if ($('iRut')) $('iRut').focus(); return;
+  }
+  if (info.tipo === 'COMODIN' && !confirm('Esta jugada usa tu COMODÍN DORADO 🏆. ¿Continuar?')) return;
+  if (info.tipo === 'PROPIO' && (EXC_ESTADO?.estrellas_disponibles || 0) <= 0) { toast('Sin estrellas disponibles este mes'); return; }
+  try {
+    const r = await fetch(API + '/excepciones/generar', { method:'POST',
+      headers: { ...H(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ tipo: info.tipo, rut_cliente: rut, saldo_precio: DUO.saldo, plazo: DUO.plazo,
+        financiera: l === 'UAC' ? 'UNIDAD' : 'AUTOFIN',
+        snapshot: { origen: 'donde-curso-duo', jugada: 'Cambio de financiera a ' + (l==='UAC'?'Unidad':'Autofin') + ' a ' + DUO.plazo + ' cuotas',
+                    valor: parseMiles($('iValor').value), pie: parseMiles($('iPie').value) } }) });
+    const j = await r.json();
+    if (!j.success) { toast(j.error || 'No se pudo generar el código'); return; }
+    $('dlgTipo').textContent = info.tipo === 'COMODIN' ? '🏆 Comodín dorado — código de excepción' : '⭐ Código de excepción';
+    $('dlgNum').textContent = j.data.codigo;
+    $('dlgNota').textContent = `Vence en ${j.data.vence_horas || 24} h. Escríbelo en la Carta de Aprobación.`;
+    $('dlgCod').showModal();
+    LADO_SEL = null;
+    cargarExcEstado();
+  } catch(e){ toast('Sin conexión: el código necesita señal'); }
+}
 
 function esperando(){
   $('veredicto').className = 'v-esp';
@@ -407,6 +527,9 @@ function esperando(){
   $('notaCuadro').textContent = '';
   $('tasaPiz').textContent = '';
   $('excSec').style.display = 'none';
+  $('duo').style.display = 'none';
+  $('veredicto').style.display = '';
+  LADO_SEL = null;
 }
 
 function pintar(R, D, plazo, saldo){
