@@ -355,7 +355,7 @@
       <span class="cta">Actualizar ahora →</span>
     </a>
     <div class="welcome-banner">
-      <h2>Bienvenido, <span id="bienvenidoNombre">—</span></h2>
+      <h2><span id="bienvenidoSaludo">Bienvenido</span>, <span id="bienvenidoNombre">—</span></h2>
       <p>Selecciona el módulo con el que deseas trabajar.</p>
     </div>
     <div class="section-title"><i class="bi bi-grid-3x3-gap-fill"></i> Módulos disponibles</div>
@@ -381,6 +381,8 @@
       document.getElementById('navPerfil').textContent = usuario.perfil || '';
       document.getElementById('avatarInicial').textContent = nombre.charAt(0).toUpperCase();
       document.getElementById('bienvenidoNombre').textContent = usuario.nombre;
+      // Saludo según sexo de la ficha (M/F); sin dato queda el neutro "Bienvenido"
+      if (usuario.sexo === 'F') document.getElementById('bienvenidoSaludo').textContent = 'Bienvenida';
       if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
     }
 

@@ -115,6 +115,7 @@ const login = async (req, res) => {
           apellido: usuario.apellido,
           email: usuario.email,
           perfil: usuario.perfil_nombre,
+          sexo: usuario.sexo || null,   // M/F — personaliza saludos (Bienvenido/Bienvenida)
           protegido: usuario.protegido === 1,
           // Página a la que entra directo tras el login (NULL = home). Ej: la cuenta
           // de la pantalla TV entra directo al Cuadro de Mando.
