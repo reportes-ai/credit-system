@@ -1651,7 +1651,7 @@ const subirDocumento = async (req, res) => {
     const idCarta = parseInt(req.params.id, 10) || null;
     const { tipo, nombre, mime, data_base64, extracted } = req.body || {};
     if (!data_base64) return res.status(400).json({ success: false, data: null, error: 'Archivo requerido' });
-    if (!['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD', 'CARTA_AUTOFIN'].includes(String(tipo)))
+    if (!['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD', 'CARTA_AUTOFIN', 'PANTALLAZO_AUTOFIN'].includes(String(tipo)))
       return res.status(400).json({ success: false, data: null, error: 'Tipo de documento inválido' });
     const buf = _toBuf(data_base64);
     if (!buf.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
@@ -1667,6 +1667,22 @@ const subirDocumento = async (req, res) => {
        quedó muerta): lo que se leyó del documento queda junto al documento,
        para auditar por qué un monto se guardó como se guardó. */
     let ext = extracted || null;
+    /* Pantallazo del sistema Autofin (imagen): Haiku lee el ID de solicitud y el
+       ESTADO (Revisión Firma / Cursado / etc.) — es el fundante del lado Autofin. */
+    if (!ext && tipo === 'PANTALLAZO_AUTOFIN') {
+      try {
+        const ia = require('../../../../shared/ia');
+        if (await ia.iaActiva('cartas_pdf_ia')) {
+          const { datos } = await require('../../../../shared/anthropic').analizar({
+            codigo: 'cartas_pdf_ia', json: true, max_tokens: 400,
+            documentos: [{ tipo: 'image', media_type: mime || 'image/png', data: data_base64.replace(/^data:[^;]+;base64,/, '') }],
+            system: 'Lees pantallazos del sistema de créditos Autofin (Chile). Respondes SOLO JSON; null cuando el dato no se ve. No inventes.',
+            prompt: 'Extrae: numero de solicitud o ID del credito visible (idSolicitud), ESTADO de la solicitud tal como aparece (estado — ej REVISIONFIRMA, REVISION FIRMA, CURSADO, APROBADO, PRE-CURSE), rut del cliente si se ve (rutCliente), fecha de curse si se ve (fechaCurse, YYYY-MM-DD).',
+          });
+          ext = datos || { error_lectura: 'IA sin respuesta' };
+        } else ext = { sin_ia: true };
+      } catch (e) { ext = { error_lectura: e.message }; }
+    }
     if (!ext && String(mime || 'application/pdf').includes('pdf')) {
       try {
         const txt = (await pdf(buf)).text;
@@ -1683,7 +1699,7 @@ const subirDocumento = async (req, res) => {
       [idCarta, tipo, nombre || 'documento.pdf', mime || 'application/pdf', buf.length, d.blob, d.storage, d.ruta, d.bytes,
        ext ? JSON.stringify(ext) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
     for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
-    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+    res.status(201).json({ success: true, data: { id: r.insertId, extracted: ext || null }, error: null });
     /* Revisor Automático (Unidad): con cada documento que llega intenta la
        revisión completa — aprueba solo cuando están ambos y todo cuadra. */
     if (idCarta && ['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD'].includes(String(tipo)))
