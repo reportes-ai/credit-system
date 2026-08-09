@@ -221,7 +221,7 @@ const generar = async (req, res) => {
 const generarGerencia = async (req, res) => {
   try {
     const P = await params();
-    const { rut_cliente, saldo_precio, plazo, ejecutivo, comentario } = req.body || {};
+    const { rut_cliente, saldo_precio, plazo, ejecutivo, comentario, financiera, snapshot } = req.body || {};
     const rut = String(rut_cliente || '').trim();
     const saldo = Math.round(Number(saldo_precio) || 0);
     if (!String(comentario || '').trim() || String(comentario).trim().length < 10)
@@ -233,10 +233,12 @@ const generarGerencia = async (req, res) => {
     for (let i = 0; i < 8 && !codigo; i++) {
       const c = genCodigo(P.exc_codigo_digitos);
       const [r] = await pool.query(
-        `INSERT IGNORE INTO excepciones_codigos (codigo, tipo, ejecutivo, rut_cliente, saldo_precio, plazo, comentario, generado_por, generado_por_id, vence_at)
-         VALUES (?, 'GERENCIA', ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
+        `INSERT IGNORE INTO excepciones_codigos (codigo, tipo, ejecutivo, rut_cliente, saldo_precio, plazo, financiera, comentario, snapshot, generado_por, generado_por_id, vence_at)
+         VALUES (?, 'GERENCIA', ?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR))`,
         [c, String(ejecutivo || nombreDe(req)).trim(), rut, saldo, parseInt(plazo) || null,
-         String(comentario).trim().slice(0, 400), nombreDe(req), req.usuario?.id_usuario || null, horas]);
+         (financiera || '').slice(0, 20) || null, String(comentario).trim().slice(0, 400),
+         snapshot ? JSON.stringify(snapshot) : null,
+         nombreDe(req), req.usuario?.id_usuario || null, horas]);
       if (r.affectedRows) codigo = c;
     }
     if (!codigo) return res.status(500).json({ success: false, data: null, error: 'No se pudo generar un código único' });
@@ -286,6 +288,9 @@ const validar = async (req, res) => {
       saldo_precio: Number(c.saldo_precio), plazo: c.plazo, financiera: c.financiera,
       comentario: c.comentario, generado_por: c.generado_por, generado_at: c.generado_at,
       vence_at: c.vence_at, usado_carta: c.usado_carta, usado_at: c.usado_at,
+      // Qué autoriza el código (GERENCIA lo trae desde la PWA Clave Gerencia):
+      // tasa_pct, financiera, comision_dealer, plazo — para el resumen de la carta.
+      snapshot: (() => { try { return typeof c.snapshot === 'object' ? c.snapshot : JSON.parse(c.snapshot || 'null'); } catch (_) { return null; } })(),
     }, error: null });
   } catch (e) { console.error('[excepciones validar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

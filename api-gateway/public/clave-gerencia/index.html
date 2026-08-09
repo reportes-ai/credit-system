@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — PWA Clave Gerencia: códigos de aprobación GERENCIA para Cartas -->
+<!-- v1.1 — condiciones del crédito + veredicto de financiera; la clave autoriza tasa/comisión/financiera -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -52,9 +52,40 @@
     width:100%; border:1.5px solid var(--line); border-radius:10px; padding:12px 13px; font-size:1.05rem;
     font-weight:600; color:#0f172a; background:#faf8ff; font-family:inherit; }
   input:focus, textarea:focus, select:focus { outline:none; border-color:var(--dios2); background:#fff; }
+  input[readonly] { background:#f3ecff; color:var(--dios2); border-style:dashed; }
   textarea { font-size:.95rem; font-weight:500; resize:vertical; min-height:74px; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
   .fld { margin-bottom:13px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { flex:1 1 auto; min-width:calc(50% - 4px); border:1.5px solid var(--line); background:#fff; color:#64748b;
+          border-radius:10px; padding:11px 8px; font-size:.82rem; font-weight:700; cursor:pointer;
+          display:flex; align-items:center; justify-content:center; gap:6px; }
+  .chip.on { background:var(--dios2); border-color:var(--dios2); color:#fff; }
+  .seg { display:flex; border:1.5px solid var(--line); border-radius:10px; overflow:hidden; }
+  .seg button { flex:1; border:none; background:#fff; color:#64748b; padding:12px 6px; font-size:.85rem;
+                font-weight:700; cursor:pointer; }
+  .seg button.on { background:var(--dios2); color:#fff; }
+  .seg button.sug { box-shadow:inset 0 -3px 0 var(--dios3); }
+
+  /* ── Veredicto ── */
+  #veredicto { border-radius:14px; padding:14px 16px; text-align:center; color:#fff; margin-bottom:14px;
+               box-shadow:0 3px 12px rgba(26,0,80,.2); }
+  #veredicto .lbl { font-size:.66rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:.85; }
+  #veredicto .fin { font-size:1.5rem; font-weight:900; line-height:1.15; margin-top:3px; }
+  .v-af  { background:linear-gradient(135deg,#065f46,#059669); }
+  .v-un  { background:linear-gradient(135deg,#7c2d12,#ea580c); }
+  .v-tu  { background:linear-gradient(135deg,#1e3a8a,#3b82f6); }
+  .v-no  { background:linear-gradient(135deg,#7f1d1d,#dc2626); }
+  .v-esp { background:linear-gradient(135deg,#475569,#94a3b8); }
+
+  /* ── Qué autoriza ── */
+  #autoriza { background:#f6f1ff; border:1.5px solid #ddd0f5; border-radius:12px; padding:12px 14px; margin-bottom:13px; }
+  #autoriza h3 { margin:0 0 8px; font-size:.7rem; font-weight:800; letter-spacing:1px; color:var(--dios2); text-transform:uppercase; }
+  #autoriza table { width:100%; border-collapse:collapse; font-size:.86rem; }
+  #autoriza td { padding:5px 2px; }
+  #autoriza td:last-child { text-align:right; font-weight:800; color:var(--dios1); font-variant-numeric:tabular-nums; }
+  #autoriza .cambio { color:#b45309; }
 
   .btn-gen { width:100%; border:none; border-radius:12px; padding:15px; font-size:1.05rem; font-weight:800;
              letter-spacing:.5px; color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px;
@@ -69,7 +100,7 @@
   #resultado .lbl { font-size:.7rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:.85; }
   #resultado .cod { font-size:3rem; font-weight:900; letter-spacing:8px; margin:8px 0 4px; font-variant-numeric:tabular-nums;
                     text-shadow:0 2px 8px rgba(0,0,0,.3); }
-  #resultado .det { font-size:.85rem; font-weight:600; opacity:.95; margin-bottom:14px; }
+  #resultado .det { font-size:.85rem; font-weight:600; opacity:.95; margin-bottom:14px; white-space:pre-line; }
   #resultado button { border:none; border-radius:10px; padding:11px 22px; font-size:.9rem; font-weight:700;
                       background:rgba(255,255,255,.92); color:var(--dios1); cursor:pointer; }
 
@@ -126,16 +157,75 @@
     <div id="errBox"></div>
 
     <div class="card">
-      <h2><i class="bi bi-pencil-square"></i> DATOS DE LA OPERACIÓN</h2>
+      <h2><i class="bi bi-sliders"></i> CONDICIONES DEL CRÉDITO</h2>
       <div class="body">
         <div class="fld"><label>RUT del cliente</label>
           <input id="iRut" type="text" inputmode="text" placeholder="12.345.678-9" oninput="fmtRut(this)"></div>
         <div class="row2">
-          <div class="fld"><label>Saldo precio $</label>
-            <input id="iSaldo" type="text" inputmode="numeric" oninput="fmtMiles(this)"></div>
-          <div class="fld"><label>Plazo <span class="aux">(opcional)</span></label>
-            <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" placeholder="cuotas"></div>
+          <div class="fld"><label>Valor vehículo $</label>
+            <input id="iValor" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
+          <div class="fld"><label>Pie $</label>
+            <input id="iPie" type="text" inputmode="numeric" oninput="fmtMiles(this);calcular()"></div>
         </div>
+        <div class="row2">
+          <div class="fld"><label>Saldo precio $ <span class="aux">(calc.)</span></label>
+            <input id="iSaldo" type="text" readonly></div>
+          <div class="fld"><label>Plazo (cuotas)</label>
+            <input id="iPlazo" type="number" inputmode="numeric" min="1" max="72" value="48" oninput="calcular()"></div>
+        </div>
+        <div class="row2">
+          <div class="fld"><label>Tasa cliente % <span class="aux" id="tasaAux">(auto)</span></label>
+            <input id="iTasa" type="text" inputmode="decimal" placeholder="auto" oninput="calcular()"></div>
+          <div class="fld"><label>Tipo dealer</label>
+            <div class="seg">
+              <button id="sPatio" class="on" onclick="setDealer(true)"><i class="bi bi-shop"></i> Patio</button>
+              <button id="sCalle" onclick="setDealer(false)"><i class="bi bi-car-front-fill"></i> Calle</button>
+            </div></div>
+        </div>
+
+        <div class="fld"><label>Seguros incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cDesg" onclick="tog(this)"><i class="bi bi-shield-check"></i> Desgravamen</div>
+            <div class="chip on" id="cRdh"  onclick="tog(this)"><i class="bi bi-car-front"></i> RDH</div>
+            <div class="chip on" id="cCesa" onclick="tog(this)"><i class="bi bi-briefcase"></i> Cesantía</div>
+            <div class="chip on" id="cRep"  onclick="tog(this)"><i class="bi bi-tools"></i> Rep. menores</div>
+          </div>
+        </div>
+        <!-- Mismos gastos y defaults que el Simulador: Limitación NO viene marcada -->
+        <div class="fld" style="margin-bottom:0"><label>Gastos incluidos</label>
+          <div class="chips">
+            <div class="chip on" id="cPrenda" onclick="tog(this)"><i class="bi bi-file-earmark-text"></i> Prenda</div>
+            <div class="chip on" id="cGps"    onclick="tog(this)"><i class="bi bi-geo-alt"></i> GPS</div>
+            <div class="chip"    id="cLim"    onclick="tog(this)"><i class="bi bi-slash-circle"></i> Limitación</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="veredicto" class="v-esp">
+      <div class="lbl">Conviene cursar en</div>
+      <div class="fin" id="vFin">—</div>
+    </div>
+
+    <div class="card">
+      <h2><i class="bi bi-key"></i> QUÉ AUTORIZA LA CLAVE</h2>
+      <div class="body">
+        <div class="fld"><label>Financiera autorizada <span class="aux" id="finAux"></span></label>
+          <div class="seg">
+            <button id="fAF"  onclick="setFin('AUTOFIN')">AUTOFIN</button>
+            <button id="fUAC" onclick="setFin('UNIDAD')">UNIDAD</button>
+          </div></div>
+
+        <div id="autoriza">
+          <h3><i class="bi bi-patch-check-fill"></i> Resumen de la autorización</h3>
+          <table>
+            <tr><td>Tasa cliente</td><td id="aTasa">—</td></tr>
+            <tr><td>Comisión dealer (pizarra)</td><td id="aComdea">—</td></tr>
+            <tr><td>Plazo</td><td id="aPlazo">—</td></tr>
+            <tr><td>Financiera</td><td id="aFin">—</td></tr>
+          </table>
+        </div>
+
         <div class="fld"><label>Ejecutivo de la carta</label>
           <input id="iEjec" type="text" list="dlEjec" placeholder="Nombre del ejecutivo">
           <datalist id="dlEjec"></datalist></div>
@@ -143,8 +233,8 @@
           <textarea id="iMotivo" placeholder="Por qué la Gerencia autoriza esta excepción (mínimo 10 caracteres)"></textarea></div>
         <button class="btn-gen" id="btnGen" onclick="generar()">
           <i class="bi bi-key-fill"></i> GENERAR CÓDIGO</button>
-        <p class="mini" style="margin:11px 0 0" id="notaVig">El código vence según la vigencia configurada en el
-          mantenedor de Excepciones Comerciales y sirve para UNA sola carta.</p>
+        <p class="mini" style="margin:11px 0 0">El código lleva adentro la tasa, la comisión pizarra y la financiera
+          autorizadas; vence según la vigencia del mantenedor de Excepciones Comerciales y sirve para UNA sola carta.</p>
       </div>
     </div>
 
@@ -152,28 +242,44 @@
       <h2><i class="bi bi-clock-history"></i> ÚLTIMOS CÓDIGOS DE GERENCIA</h2>
       <div class="body" id="hist"><p class="mini">Cargando…</p></div>
     </div>
+    <p class="mini" id="pie" style="text-align:center"></p>
   </div>
 </div>
 
 <div id="toast"></div>
 
+<script src="/js/comision-dealer.js"></script>
+<script src="/js/rentabilidad-core.js"></script>
+<script src="/js/rentabilidad-calc.js"></script>
+<script src="/js/uac-tier.js"></script>
+<script src="/js/preferencia-financiera.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   CLAVE GERENCIA — PWA para generar códigos de aprobación de GERENCIA que
-   destraban una Carta de Aprobación bajo el piso de rentabilidad.
+   CLAVE GERENCIA — PWA para generar códigos de aprobación de GERENCIA.
 
-   No calcula nada: el código nace en el servidor (POST /api/excepciones/
-   generar-gerencia, protegido por requireFunc('excepciones_gerencia')) y el
-   Revisor/formulario de Cartas lo valida y consume por el motor único.
+   Mini-simulador: arma las condiciones del crédito, se las pasa a los motores
+   únicos (AF_RENT rentabilidad, AF_PREF preferencia de financiera) y muestra
+   qué financiera conviene. La Gerencia puede autorizar OTRA tasa u OTRA
+   financiera: eso viaja en el snapshot del código, y el formulario de Cartas
+   lo muestra como resumen al validar la clave.
+
+   El código nace en el servidor (POST /api/excepciones/generar-gerencia,
+   requireFunc('excepciones_gerencia')) y se consume por el motor único.
    ═══════════════════════════════════════════════════════════════════════════ */
 const API = '/api';
 const $ = id => document.getElementById(id);
 let TOKEN = localStorage.getItem('token');
 let ULTIMO = '';
+let P = {}, T = {}, UF = null, OPS_UAC = 0, MES_UAC = '', PREF_TABLA = [];
+let ES_PATIO = true;
+let R = null, D = null;            // último cálculo del motor
+let FIN_SUGERIDA = null;           // veredicto del motor (AUTOFIN | UNIDAD | null)
+let FIN_ELEGIDA  = null;           // la que autoriza la Gerencia
 
 const H = (json) => Object.assign({ 'Authorization': 'Bearer ' + TOKEN },
   json ? { 'Content-Type': 'application/json' } : {});
 const fN = n => Math.round(n).toLocaleString('es-CL');
+const fCLP = n => '$' + fN(n);
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show');
   clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
 
@@ -190,8 +296,10 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/clave-geren
     $('uNombre').textContent = u.nombre ? (u.nombre + ' ' + (u.apellido || '')).trim() : '—';
   } catch (e) { return mostrarLogin(); }
   $('appView').style.display = '';
+  await cargarBase();
   cargarEjecutivos();
   cargarHistorial();
+  calcular();
 })();
 
 function mostrarLogin(){ $('loginView').style.display=''; $('appView').style.display='none'; }
@@ -208,11 +316,40 @@ async function doLogin(){
     $('uNombre').textContent = ((u.nombre||'') + ' ' + (u.apellido||'')).trim() || '—';
     $('loginView').style.display = 'none';
     $('appView').style.display = '';
+    await cargarBase();
     cargarEjecutivos();
     cargarHistorial();
+    calcular();
   } catch (e) { $('loginErr').textContent = 'Sin conexión al servidor'; }
 }
 function logout(){ localStorage.removeItem('token'); location.reload(); }
+
+/* ── Base de cálculo (mismos endpoints que ¿Dónde curso?, con caché local) ── */
+async function cargarBase(){
+  const cache = () => { try { return JSON.parse(localStorage.getItem('cg_base')||'null'); } catch(e){ return null; } };
+  try {
+    const [rp, rt, ru, rv, rf] = await Promise.all([
+      fetch(API + '/parametros-credito',                 { headers:H() }),
+      fetch(API + '/tasas/vigente',                      { headers:H() }),
+      fetch(API + '/parametros-credito/uac-ops-vigente', { headers:H() }),
+      fetch(API + '/uf/vigente',                         { headers:H() }),
+      fetch(API + '/cartas-params/financiera_preferencia',{ headers:H() }),
+    ]);
+    const [jp, jt, ju, jv, jf] = await Promise.all([rp.json(), rt.json(), ru.json(), rv.json(), rf.json()]);
+    if (jp.success && jp.data && jp.data.lista) { P = {}; jp.data.lista.forEach(r => { P[r.clave] = parseFloat(r.valor); }); }
+    if (jt.data) T = Array.isArray(jt.data) ? jt.data[0] : jt.data;
+    if (ju.success && ju.data) { OPS_UAC = ju.data.ops || 0; MES_UAC = ju.data.mes || ''; }
+    const u = jv && jv.data ? (Array.isArray(jv.data) ? jv.data[0] : jv.data) : null;
+    if (u && u.valor) UF = parseFloat(u.valor);
+    try { const t = JSON.parse(jf.data); if (Array.isArray(t) && t.length) PREF_TABLA = t; } catch(e){}
+    localStorage.setItem('cg_base', JSON.stringify({ P, T, UF, OPS_UAC, MES_UAC, PREF_TABLA, at: Date.now() }));
+    $('pie').textContent = 'UF de hoy $' + (UF?fN(UF):'—');
+  } catch (e) {
+    const c = cache();
+    if (c) { P=c.P; T=c.T; UF=c.UF; OPS_UAC=c.OPS_UAC; MES_UAC=c.MES_UAC; PREF_TABLA=c.PREF_TABLA||[];
+      $('pie').textContent = 'Sin señal — cálculo con los últimos parámetros guardados'; }
+  }
+}
 
 /* ── Selector de ejecutivos (misma lista de los selectores de Cartas) ── */
 async function cargarEjecutivos(){
@@ -237,28 +374,117 @@ function fmtRut(inp){
     inp.value = num.replace(/\B(?=(\d{3})+(?!\d))/g,'.') + '-' + dv;
   } else inp.value = v;
 }
+function tog(el){ el.classList.toggle('on'); calcular(); }
+const on = id => $(id).classList.contains('on');
+function setDealer(patio){
+  ES_PATIO = patio;
+  $('sPatio').classList.toggle('on', patio);
+  $('sCalle').classList.toggle('on', !patio);
+  calcular();
+}
+function setFin(f){ FIN_ELEGIDA = f; pintarFin(); }
+
+/* ── Cálculo con los motores únicos ── */
+function calcular(){
+  const valor = parseMiles($('iValor').value);
+  const pie   = parseMiles($('iPie').value);
+  const plazo = Math.min(72, Math.max(1, parseInt($('iPlazo').value) || 0));
+  const saldo = valor - pie;
+  $('iSaldo').value = saldo > 0 ? '$' + fN(saldo) : '';
+  R = D = null; FIN_SUGERIDA = null;
+
+  if (valor && plazo && saldo > 0 && window.AF_RENT) {
+    const tasaTxt = ($('iTasa').value||'').replace(',','.').replace(/[^0-9.]/g,'');
+    const tasaCli = tasaTxt ? parseFloat(tasaTxt)/100 : null;
+    $('tasaAux').textContent = tasaTxt ? '(manual)' : '(auto)';
+    let uacPct = null;
+    if (window.AF_UAC_TIER) uacPct = AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, P);
+    R = AF_RENT.calcular({
+      valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct,
+      gastos:  { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
+      seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
+    }, P, UF, T);
+    if (R && window.AF_PREF) {
+      D = AF_PREF.decidir({
+        rentAF: R.af.rentab, rentUAC: R.uac.rentab, plazo, saldo,
+        tabla: PREF_TABLA, UF, diffPct: P.pref_diff_pct, rentMinima: P.pref_rent_minima,
+      });
+      FIN_SUGERIDA = D.veredicto === 'AUTOFIN' ? 'AUTOFIN' : D.veredicto === 'UNIDAD' ? 'UNIDAD' : null;
+    }
+  }
+  // La financiera elegida sigue a la sugerida mientras la Gerencia no elija otra
+  if (!FIN_ELEGIDA || (FIN_SUGERIDA && FIN_ELEGIDA !== FIN_SUGERIDA && !window._finManual))
+    FIN_ELEGIDA = FIN_SUGERIDA;
+  pintarVeredicto();
+  pintarFin();
+}
+
+function pintarVeredicto(){
+  const v = $('veredicto');
+  if (!D) { v.className = 'v-esp'; $('vFin').textContent = '—'; return; }
+  const MAP = { AUTOFIN:{cls:'v-af',txt:'AUTOFIN'}, UNIDAD:{cls:'v-un',txt:'UNIDAD DE CRÉDITO'},
+                DECIDES_TU:{cls:'v-tu',txt:'DECIDES TÚ'}, NINGUNA:{cls:'v-no',txt:'NINGUNA'} };
+  const m = MAP[D.veredicto] || MAP.NINGUNA;
+  v.className = m.cls;
+  $('vFin').textContent = m.txt;
+}
+
+function pintarFin(){
+  const sug = FIN_SUGERIDA;
+  $('fAF').classList.toggle('on',  FIN_ELEGIDA === 'AUTOFIN');
+  $('fUAC').classList.toggle('on', FIN_ELEGIDA === 'UNIDAD');
+  $('fAF').classList.toggle('sug',  sug === 'AUTOFIN');
+  $('fUAC').classList.toggle('sug', sug === 'UNIDAD');
+  const cambia = sug && FIN_ELEGIDA && FIN_ELEGIDA !== sug;
+  $('finAux').textContent = !FIN_ELEGIDA ? '' : cambia ? '(cambia la sugerida: ' + sug + ')' :
+    sug === FIN_ELEGIDA ? '(la sugerida)' : '';
+  // Resumen de la autorización
+  const tasaManual = !!($('iTasa').value||'').trim();
+  $('aTasa').innerHTML = R ? (R.tasaCliPct.toFixed(2).replace('.',',') + '% mensual' +
+    (tasaManual ? ' <span class="cambio">(modificada)</span>' : ' (TMC auto)')) : '—';
+  $('aComdea').textContent = R ? fCLP(R.costos.dealer) : '—';
+  $('aPlazo').textContent = R ? (R.plazo + ' cuotas') : '—';
+  $('aFin').innerHTML = FIN_ELEGIDA ? (FIN_ELEGIDA + (cambia ? ' <span class="cambio">(cambio de financiera)</span>' : ''))
+    : (D && D.veredicto === 'DECIDES_TU' ? 'elige una' : '—');
+}
+// marcar elección manual de financiera para que calcular() no la pise
+['fAF','fUAC'].forEach(id => $(id).addEventListener('click', () => { window._finManual = true; }));
 
 /* ── Generar ── */
 async function generar(){
   $('errBox').style.display = 'none';
   const rut    = $('iRut').value.trim();
-  const saldo  = parseMiles($('iSaldo').value);
-  const plazo  = parseInt($('iPlazo').value) || null;
   const ejec   = $('iEjec').value.trim();
   const motivo = $('iMotivo').value.trim();
   if (rut.replace(/[^0-9]/g,'').length < 7) return err('Falta el RUT del cliente.');
-  if (!(saldo > 0))                          return err('Falta el saldo precio.');
-  if (motivo.length < 10)                    return err('El motivo es obligatorio (mínimo 10 caracteres).');
+  if (!R)                                   return err('Completa el valor del vehículo, el pie y el plazo.');
+  if (!FIN_ELEGIDA)                         return err('Elige la financiera que autoriza la clave.');
+  if (motivo.length < 10)                   return err('El motivo es obligatorio (mínimo 10 caracteres).');
 
+  const tasaManual = !!($('iTasa').value||'').trim();
+  const cambiaFin  = FIN_SUGERIDA && FIN_ELEGIDA !== FIN_SUGERIDA;
+  const snapshot = {
+    origen: 'clave-gerencia',
+    tasa_pct: Number(R.tasaCliPct.toFixed(4)), tasa_manual: tasaManual,
+    comision_dealer: R.costos.dealer, es_patio: ES_PATIO,
+    plazo: R.plazo, saldo: R.saldo, monto_fin: R.monto_fin,
+    financiera: FIN_ELEGIDA, financiera_sugerida: FIN_SUGERIDA, cambia_financiera: !!cambiaFin,
+    rentab_af: R.af.rentab, rentab_uac: R.uac.rentab,
+  };
   $('btnGen').disabled = true;
   try {
     const r = await fetch(API + '/excepciones/generar-gerencia', { method:'POST', headers:H(true),
-      body: JSON.stringify({ rut_cliente: rut, saldo_precio: saldo, plazo, ejecutivo: ejec || undefined, comentario: motivo }) });
+      body: JSON.stringify({ rut_cliente: rut, saldo_precio: R.saldo, plazo: R.plazo,
+        ejecutivo: ejec || undefined, comentario: motivo, financiera: FIN_ELEGIDA, snapshot }) });
     const j = await r.json();
     if (!j.success) return err(j.error || 'No se pudo generar el código.');
     ULTIMO = j.data.codigo;
     $('rCod').textContent = ULTIMO;
-    $('rDet').textContent = `${ejec || 'Cualquier ejecutivo'} · RUT ${rut} · saldo $${fN(saldo)}` + (plazo ? ` · ${plazo} cuotas` : '');
+    $('rDet').textContent =
+      `Autoriza: tasa ${R.tasaCliPct.toFixed(2).replace('.',',')}%${tasaManual?' (modificada)':''}` +
+      ` · com. dealer ${fCLP(R.costos.dealer)} (pizarra)\n${R.plazo} cuotas · ${FIN_ELEGIDA}` +
+      (cambiaFin ? ` (cambio de financiera)` : '') +
+      `\n${ejec || 'Cualquier ejecutivo'} · RUT ${rut} · saldo ${fCLP(R.saldo)}`;
     $('resultado').style.display = '';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     copiarCodigo(true);
@@ -266,7 +492,7 @@ async function generar(){
   } catch (e) { err('Sin conexión al servidor — el código se genera en el servidor, necesitas señal.'); }
   finally { $('btnGen').disabled = false; }
 }
-function err(m){ const b=$('errBox'); b.textContent=m; b.style.display=''; }
+function err(m){ const b=$('errBox'); b.textContent=m; b.style.display=''; window.scrollTo({top:0,behavior:'smooth'}); }
 
 async function copiarCodigo(silencio){
   if (!ULTIMO) return;
@@ -289,7 +515,8 @@ async function cargarHistorial(){
                      f.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit',hour12:false}) : '';
       return `<div class="hitem">
         <div class="cod">${x.codigo}</div>
-        <div class="inf"><b>${x.ejecutivo || '—'}</b> · RUT ${x.rut_cliente || '—'} · $${fN(Number(x.saldo_precio)||0)}<br>
+        <div class="inf"><b>${x.ejecutivo || '—'}</b> · RUT ${x.rut_cliente || '—'} · $${fN(Number(x.saldo_precio)||0)}
+          ${x.financiera ? ' · ' + x.financiera : ''}<br>
           ${ff}${x.usado_carta ? ' · carta ' + x.usado_carta : ''}</div>
         <span class="badge ${B[x.estado]||'b-ven'}">${x.estado}</span>
       </div>`;

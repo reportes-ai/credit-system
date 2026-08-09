@@ -1,10 +1,12 @@
 /* Service worker de "Clave Gerencia" — cascarón cache-first, API siempre a la red.
    Generar un código EXIGE conexión (el código nace en el servidor); el cascarón
    en caché solo garantiza que la app abra al tiro desde el teléfono. */
-const CACHE = 'clave-gerencia-v1';
+const CACHE = 'clave-gerencia-v2';
 const SHELL = [
   '/clave-gerencia/', '/clave-gerencia/manifest.json',
   '/clave-gerencia/icon-192.png', '/clave-gerencia/icon-512.png',
+  '/js/comision-dealer.js', '/js/rentabilidad-core.js', '/js/rentabilidad-calc.js',
+  '/js/uac-tier.js', '/js/preferencia-financiera.js',
   '/img/logo.png',
 ];
 
