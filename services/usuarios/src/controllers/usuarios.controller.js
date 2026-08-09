@@ -588,6 +588,7 @@ const updatePermisosUsuario = async (req, res) => {
       );
     }
 
+    require('../../../../shared/middleware/permisos').limpiarCachePermisos();   // efecto inmediato en las APIs (auditoría 2026-08-08)
     auditar({ req, accion: 'PERMISOS', modulo: 'usuarios', entidad: 'usuario', entidad_id: id,
       detalle: `Actualizó permisos individuales del usuario #${id} (${inserts.length} override/s)`, meta: { overrides: inserts.length } });
     res.json({ success: true, data: { mensaje: 'Permisos de usuario actualizados' }, error: null });

@@ -206,6 +206,23 @@ const misPermisos = async (req, res) => {
       [id_perfil]
     );
 
+    // Cards por override individual: si a la persona se le habilitó una
+    // funcionalidad de un módulo que su PERFIL no tiene, la card debe aparecer
+    // igual (auditoría 2026-08-08 — antes el permiso operaba pero sin card).
+    try {
+      const [modOv] = await pool.query(
+        `SELECT DISTINCT m.id_modulo, m.nombre, m.descripcion, m.icono, m.ruta, m.orden
+         FROM modulos m
+         JOIN funcionalidades f ON f.id_modulo = m.id_modulo
+         JOIN permisos_usuario pu ON pu.id_funcionalidad = f.id_funcionalidad
+         WHERE pu.id_usuario = ? AND pu.habilitado = 1 AND m.estado = 'activo'
+           AND f.codigo <> 'usuarios_contrasena'`,
+        [id_usuario]
+      );
+      for (const m of modOv) if (!modulos.some(x => x.id_modulo === m.id_modulo)) modulos.push(m);
+      modulos.sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    } catch (_) { /* tabla puede no existir */ }
+
     // Funcionalidades habilitadas con detalle (perfil base)
     const [perfilFuncs] = await pool.query(
       `SELECT f.codigo, f.nombre, f.href, f.icono, f.id_modulo, pp.habilitado

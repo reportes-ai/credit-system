@@ -506,6 +506,7 @@ const pasoSet = async (req, res) => {
     await pool.query('DELETE FROM permisos_usuario WHERE id_funcionalidad=?', [idf]);
     for (const id of si) await pool.query('INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES (?,?,1)', [id, idf]);
     for (const id of no) await pool.query('INSERT INTO permisos_usuario (id_usuario, id_funcionalidad, habilitado) VALUES (?,?,0)', [id, idf]);
+    require('../../../../shared/middleware/permisos').limpiarCachePermisos();   // efecto inmediato en las APIs (auditoría 2026-08-08)
     require('../../../../shared/audit').auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'workflow_paso',
       entidad_id: func, detalle: `Quiénes de "${f.nombre}" (${func}): ${perfiles.length} perfiles, ${si.length} personas forzadas, ${no.length} bloqueadas` });
     res.json({ success: true, data: { func }, error: null });
