@@ -95,6 +95,30 @@ const fM = v => {
   return v.toLocaleString('es-CL',{maximumFractionDigits:0});
 };
 const fN = v => v==null?'0':Math.round(v).toLocaleString('es-CL');
+
+/* Encabezado del Detalle de Operaciones Otorgadas con explicación por columna
+   (tooltip al pasar el puntero). Compartido por Rentabilidad y P&L Operativo. */
+const THEAD_RENTAB = `
+    <thead><tr>
+      <th title="N° de operación (correlativo AutoFácil)" style="cursor:help">OP</th>
+      <th title="Tramo del crédito: > si el Total a Financiar supera 200 UF (UF de la fecha de otorgado), < si no. Define qué tasa TMC aplica" style="cursor:help">&gt;=200UF</th>
+      <th title="Concesionario / dealer de la operación" style="text-align:left;cursor:help">Ccs</th>
+      <th title="Institución donde se cursó el crédito: AUTOFIN o UNIDAD DE CRÉDITO" style="cursor:help">Financiera</th>
+      <th title="Precio de venta del vehículo menos el pie" style="cursor:help">Saldo Precio</th>
+      <th title="Total a Financiar = saldo precio + gastos operacionales + primas de seguros capitalizadas" style="cursor:help">Total a Fin.</th>
+      <th title="Plazo del crédito en cuotas mensuales" style="cursor:help">Plazo</th>
+      <th title="Ingreso por colocación. AUTOFIN: valor presente de la cuota descontada al costo de fondo, menos el capital (el spread ganado). UNIDAD: % del tier vigente sobre el saldo precio" style="cursor:help">Ing.AutoFácil</th>
+      <th title="%_A = Ing.AutoFácil ÷ Total a Financiar" style="cursor:help">%_A</th>
+      <th title="Comisión bruta (IVA incluido) pactada con el dealer. Manda la carta (part_bruto); si no trae, la pizarra por plazo" style="cursor:help">Com.Dealer</th>
+      <th title="%_D = Com.Dealer ÷ Total a Financiar" style="cursor:help">%_D</th>
+      <th title="Comisión del parque: % patio sobre el saldo precio — solo operaciones de dealer Patio/Parque" style="cursor:help">Com Par</th>
+      <th title="%_P = Com.Parque ÷ Total a Financiar" style="cursor:help">%_P</th>
+      <th title="Total Comisiones Brokerage = Com.Dealer + Com.Seguros + Com.Parque" style="cursor:help">Total Com Broke</th>
+      <th title="%_t = Total Com Broke ÷ Total a Financiar" style="cursor:help">%_t</th>
+      <th title="Traspaso de AutoFin por los seguros (% de traspaso sobre cada prima: RDH, cesantía, rep. menores). UNIDAD no paga comisión de seguros" style="cursor:help">Com.Seguros</th>
+      <th title="Ingreso Bruto = Ing.AutoFácil + Com.Seguros (antes de descontar comisiones)" style="cursor:help">Ingreso Bruto</th>
+      <th title="%_B = Ingreso Bruto ÷ Total a Financiar" style="cursor:help">%_B</th>
+    </tr></thead>`;
 const pct = (a,b) => b ? ((a-b)/b*100).toFixed(1) : '—';
 
 const C = {
@@ -574,16 +598,7 @@ function buildRentabTable() {
   const tIgPct  = tot.fin?(tot.ig/tot.fin*100).toFixed(1):0;
 
   document.getElementById('t-rentab').innerHTML = `
-    <thead><tr>
-      <th>OP</th><th>&gt;=200UF</th><th style="text-align:left">Ccs</th><th>Financiera</th>
-      <th>Saldo Precio</th><th>Total a Fin.</th><th>Plazo</th>
-      <th>Ing.AutoFácil</th><th>%_A</th>
-      <th>Com.Dealer</th><th>%_D</th>
-      <th>Com Par</th><th>%_P</th>
-      <th>Total Com Broke</th><th>%_t</th>
-      <th>Com.Seguros</th>
-      <th>Ingreso Bruto</th><th>%_B</th>
-    </tr></thead>
+    ${THEAD_RENTAB}
     <tbody>${trs}</tbody>
     <tfoot><tr>
       <td colspan="4">Total / Prom.</td>
@@ -861,16 +876,7 @@ function buildRentabTablePL() {
   const tIgPct  = tot.fin?(tot.ig/tot.fin*100).toFixed(1):0;
 
   document.getElementById('t-rentab-pl').innerHTML = `
-    <thead><tr>
-      <th>OP</th><th>&gt;=200UF</th><th style="text-align:left">Ccs</th><th>Financiera</th>
-      <th>Saldo Precio</th><th>Total a Fin.</th><th>Plazo</th>
-      <th>Ing.AutoFácil</th><th>%_A</th>
-      <th>Com.Dealer</th><th>%_D</th>
-      <th>Com Par</th><th>%_P</th>
-      <th>Total Com Broke</th><th>%_t</th>
-      <th>Com.Seguros</th>
-      <th>Ingreso Bruto</th><th>%_B</th>
-    </tr></thead>
+    ${THEAD_RENTAB}
     <tbody>${trs}</tbody>
     <tfoot><tr>
       <td colspan="4">Total / Prom.</td>
