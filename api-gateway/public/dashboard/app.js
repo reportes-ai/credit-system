@@ -1461,7 +1461,7 @@ async function capturaEjecutivosWSP() {
     g.font = '600 12px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
     const hoy = new Date();
     g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
-      + ' · ' + hoy.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs', 12, 36);
+      + ' · ' + hoy.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' hrs', 12, 36);
     g.textAlign = 'right'; g.fillText('Q', W - 130, 30); g.fillText('Total Fin.', W - 16, 30); g.textAlign = 'left';
     filas.forEach((f, i) => {
       const y = HH + RH * i;
