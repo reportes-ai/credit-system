@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.33 — resumen clave GERENCIA distingue comisión modificada vs pizarra -->
+  <!-- v4.34 — Vigentes: columnas Financiera e ID Financiera + buscables -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -534,7 +534,7 @@
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>N° Op Carta</th><th>N° Operación</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Dealer</th><th>Ejecutivo</th><th>Fecha carta</th><th>Vence</th><th style="text-align:center">Vigencia</th><th style="text-align:right">Acciones</th></tr></thead>
+        <thead><tr><th>N° Op Carta</th><th>N° Operación</th><th>Financiera</th><th>ID Financiera</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Dealer</th><th>Ejecutivo</th><th>Fecha carta</th><th>Vence</th><th style="text-align:center">Vigencia</th><th style="text-align:right">Acciones</th></tr></thead>
         <tbody id="bodyVigentes"></tbody>
       </table>
     </div>
@@ -2964,11 +2964,11 @@ function renderVigentes(){
   const q = (document.getElementById('vigBuscar').value||'').toLowerCase();
   const rows = CARTAS
     .filter(c => c.status==='APROBADA' && !c.otorgado && !vigenciaDeCarta(c).vencida)
-    .filter(c => !q || [c.opCarta,c.numOp,c.numeroCredito,c.cliente,c.concesionario,c.ejecutivoNombre,c.rutCliente].some(v=>String(v||'').toLowerCase().includes(q)))
+    .filter(c => !q || [c.opCarta,c.numOp,c.numeroCredito,c.cliente,c.concesionario,c.ejecutivoNombre,c.rutCliente,c.opOrigen,c.acreedor].some(v=>String(v||'').toLowerCase().includes(q)))
     .sort((a,b)=> (vigenciaDeCarta(a).dias) - (vigenciaDeCarta(b).dias));
   document.getElementById('vigCount').textContent = rows.length + ' carta(s) vigente(s)';
   const body = document.getElementById('bodyVigentes');
-  if (!rows.length){ body.innerHTML='<tr><td colspan="11" style="text-align:center;color:#94a3b8;padding:24px">Sin cartas vigentes</td></tr>'; return; }
+  if (!rows.length){ body.innerHTML='<tr><td colspan="13" style="text-align:center;color:#94a3b8;padding:24px">Sin cartas vigentes</td></tr>'; return; }
   const fd = v => { const d=dDate(v); if(!d) return '—'; const x=new Date(d+'T00:00:00'); return isNaN(x)?'—':x.toLocaleDateString('es-CL'); };
   body.innerHTML = rows.map(c=>{
     const v = vigenciaDeCarta(c);
@@ -2977,6 +2977,8 @@ function renderVigentes(){
     return `<tr>
       <td><b>${escH(c.opCarta||'')}</b></td>
       <td style="font-size:.78rem">${escH(c.numOp||c.numeroCredito||'—')}</td>
+      <td><span style="background:${String(c.acreedor||'').toUpperCase().includes('UNIDAD')?'#fef3c7;color:#b45309':'#dbeafe;color:#1d4ed8'};border-radius:6px;padding:1px 8px;font-size:.68rem;font-weight:700">${escH(String(c.acreedor||'').toUpperCase().includes('UNIDAD')?'UNIDAD':(c.acreedor||'—'))}</span></td>
+      <td style="font-size:.78rem">${escH(c.opOrigen||'—')}</td>
       <td style="font-size:.72rem">${escH(c.tipo||'')}</td>
       <td style="font-size:.76rem">${escH(c.rutCliente||'—')}</td>
       <td>${escH(toTitle(c.cliente||''))}</td>
