@@ -1406,7 +1406,7 @@ const _pClassParam = p => p >= window.DASH_PARAMS.rentab_verde ? 'pct-ok'
 window.EJ_ACTIVOS = [];
 async function cargarEjecutivosActivos() {
   try {
-    const r = await fetch('/api/cartas-ejecutivos', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+    const r = await fetch('/api/cartas-ejecutivos?perfil=comercial', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
     const j = await r.json();
     if (j && j.success && Array.isArray(j.data)) window.EJ_ACTIVOS = j.data.map(e => e.nombre).filter(Boolean);
   } catch (e) { console.warn('[dash ejecutivos]', e.message); }

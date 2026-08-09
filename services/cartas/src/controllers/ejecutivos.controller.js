@@ -7,6 +7,10 @@ const pool = require('../../../../shared/config/database');
 // Misma forma de respuesta {id, nombre, mail, tel} que la lista anterior.
 const getAll = async (req, res) => {
   try {
+    // ?perfil=comercial → SOLO perfil Ejecutivo/Ejecutivo Comercial (lo usa el
+    // dashboard para listar la fuerza de venta completa, incluso en cero).
+    // Sin el parámetro, la lista amplia de siempre para los selectores.
+    const soloComercial = String(req.query.perfil || '') === 'comercial';
     const [rows] = await pool.query(
       `SELECT u.id_usuario AS id,
               -- Convención: PRIMER nombre + apellido PATERNO (nombre completo solo en documentos formales)
@@ -18,16 +22,17 @@ const getAll = async (req, res) => {
           AND p.nombre <> 'Administrador'
           AND (
             p.nombre IN ('Ejecutivo', 'Ejecutivo Comercial')
-            OR EXISTS (SELECT 1 FROM permisos_perfil pp
+            OR (NOT ? AND (EXISTS (SELECT 1 FROM permisos_perfil pp
                          JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
                         WHERE pp.id_perfil = u.id_perfil AND pp.habilitado = 1
                           AND f.codigo IN ('aprob_crear', 'creditos.crear'))
             OR EXISTS (SELECT 1 FROM permisos_usuario puu
                          JOIN funcionalidades f2 ON f2.id_funcionalidad = puu.id_funcionalidad
                         WHERE puu.id_usuario = u.id_usuario AND puu.habilitado = 1
-                          AND f2.codigo IN ('aprob_crear', 'creditos.crear'))
+                          AND f2.codigo IN ('aprob_crear', 'creditos.crear'))))
           )
-        ORDER BY nombre`
+        ORDER BY nombre`,
+      [soloComercial]
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
