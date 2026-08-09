@@ -1435,6 +1435,63 @@ function ejFaltantes(nombresConDatos) {
 // y en las tablas se agrupa en una sola fila "Externos Autofin".
 const ejEsNuestro = n => !window.EJ_NUESTROS.size || window.EJ_NUESTROS.has(String(n).trim().toUpperCase());
 
+// ── Captura para WhatsApp (botón de la cámara en Ejecutivos — Otorgados):
+// dibuja Ejecutivo / Q / Total Fin. en un canvas y lo COPIA al portapapeles
+// como imagen — llegar a WhatsApp y pegar con Ctrl+V. ──
+async function capturaEjecutivosWSP() {
+  try {
+    const filas = [...document.querySelectorAll('#t-ej1b tbody tr')].map(tr => {
+      const c = tr.querySelectorAll('td');
+      return { nombre: (c[0]?.innerText || '').replace(/^\d+\.\s*/, '').trim(),
+               q: (c[1]?.innerText || '').trim(), fin: (c[2]?.innerText || '').trim(),
+               gris: (tr.getAttribute('style') || '').includes('#94a3b8'),
+               rojo: (c[2]?.getAttribute('style') || '').includes('#e53935') };
+    }).filter(f => f.nombre);
+    const tot = document.querySelector('#t-ej1b tfoot tr');
+    const totC = tot ? tot.querySelectorAll('td') : [];
+    const S = 2, W = 380, RH = 26, HH = 34;
+    const H = HH + RH * (filas.length + 1) + 12;
+    const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+    const g = cv.getContext('2d'); g.scale(S, S);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    // Cabecera navy
+    g.fillStyle = '#012d70'; g.fillRect(0, 0, W, HH);
+    g.fillStyle = '#fff'; g.font = '700 12px Segoe UI, sans-serif';
+    g.fillText('EJECUTIVOS — OTORGADOS', 10, 15);
+    g.font = '600 10px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
+    const hoy = new Date();
+    g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }), 10, 28);
+    g.textAlign = 'right'; g.fillText('Q', W - 110, 22); g.fillText('Total Fin.', W - 14, 22); g.textAlign = 'left';
+    filas.forEach((f, i) => {
+      const y = HH + RH * i;
+      if (i % 2) { g.fillStyle = '#f4f7fb'; g.fillRect(0, y, W, RH); }
+      g.fillStyle = f.gris ? '#94a3b8' : '#1e293b';
+      g.font = (f.gris ? '400' : '600') + ' 11px Segoe UI, sans-serif';
+      g.fillText((i + 1) + '. ' + (f.nombre.length > 30 ? f.nombre.slice(0, 30) + '…' : f.nombre), 10, y + 17);
+      g.textAlign = 'right';
+      g.fillText(f.q, W - 110, y + 17);
+      if (f.rojo && !f.gris) { g.fillStyle = '#e53935'; g.font = '700 11px Segoe UI, sans-serif'; }
+      g.fillText(f.fin, W - 14, y + 17);
+      g.textAlign = 'left';
+    });
+    // Total
+    const yT = HH + RH * filas.length;
+    g.fillStyle = '#012d70'; g.fillRect(0, yT, W, RH);
+    g.fillStyle = '#fff'; g.font = '700 11px Segoe UI, sans-serif';
+    g.fillText('Total', 10, yT + 17);
+    g.textAlign = 'right';
+    g.fillText((totC[1]?.innerText || '').trim(), W - 110, yT + 17);
+    g.fillText((totC[2]?.innerText || '').trim(), W - 14, yT + 17);
+    g.textAlign = 'left';
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    alert('📸 Captura copiada — pégala en WhatsApp con Ctrl+V');
+  } catch (e) {
+    console.error('[captura wsp]', e);
+    alert('No se pudo copiar la captura: ' + e.message);
+  }
+}
+
 // ── Cargar datos frescos desde el JSON generado automáticamente ──
 async function cargarDatos() {
   await Promise.all([cargarParametros(), cargarEjecutivosActivos()]);

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.5 — externos Autofin agrupados en una fila (sin nombres ajenos en el ranking) -->
+<!-- v3.6 — boton camara: captura Ejecutivo/Q/Total al portapapeles para WhatsApp -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -308,7 +308,11 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-head">Ejecutivos — Otorgados</div>
+      <div class="card-head" style="display:flex;align-items:center;justify-content:space-between">Ejecutivos — Otorgados
+        <!-- botón discreto: copia al portapapeles una captura (Ejecutivo/Q/Total) para pegar en WhatsApp -->
+        <i class="bi bi-camera" onclick="capturaEjecutivosWSP()" title="Copiar captura para WhatsApp"
+           style="cursor:pointer;color:#8ecae6;font-size:.85rem;opacity:.7"></i>
+      </div>
       <!-- sin tope de alto: con todos los ejecutivos activos (incluso en cero) la tabla usa el cuadro completo, sin scroll -->
       <div class="scroll-t" style="max-height:none">
         <table class="tbl" id="t-ej1b"></table>
