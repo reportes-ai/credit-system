@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.8 — cap. 4: card Saldo Precio en Proceso de Pago (Tesoreria) — la planilla manual reconstruida en vivo, SLA 24/48/72h habiles parametrico, montos desde la ODP, export con nombre exigido. v4.6 — cap. 34 motor unico de ETAPA -->
+<!-- v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -73,6 +73,8 @@
     <a href="#p32">32. Anular una operación otorgada</a>
     <a href="#p33">33. Vendedores del dealer: base, ventas y trazabilidad</a>
     <a href="#p34">34. La ETAPA del crédito: quién la escribe y cómo se lee</a>
+    <a href="#p35">35. Excepciones Comerciales: la escalera de estrellas</a>
+    <a href="#p36">36. Revisor Automático de Cartas (Unidad y Autofin)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -776,12 +778,40 @@
   <ol>
     <li><b>Simular:</b> precio + pie → saldo, % pie, % a financiar y la grilla 12/24/36/48 con cuota aproximada, dónde conviene cursar (Autofin / Unidad / Decides Tú) y la rentabilidad de cada lado. Desmarcar un seguro recalcula todo.</li>
     <li><b>Jugar la excepción:</b> bajar tasa (máx. 5% relativo sobre la pizarra — más allá la op se fuerza a Autofin) o bajar la comisión del dealer (marcando calle/parque). El <b>piso</b>: la excepción nunca puede rentar menos del 75% de la alternativa más rentable; si se pasa, el sistema <b>propone la rebaja de comisión dealer (neta) exacta</b> que la devuelve al piso.</li>
-    <li><b>Generar el código:</b> consume una <b>estrella</b> (2 el primer mes; después ⌊otorgadas del mes anterior × 33%⌋ — con 2 colocadas son 0: el aliciente es colocar al menos 3). Sin estrellas puede usar su <b>comodín dorado</b> (1 cada 50 otorgadas acumuladas; exige rentabilidad &gt; comisión más alta × 1,10) o pedir un código de <b>Gerencia</b>. El código es aleatorio, vive en BD con el snapshot de la simulación y <b>vence a las 24 h</b> (la estrella vuelve si vence sin usar; al cierre del mes las estrellas expiran).</li>
+    <li><b>Generar el código — la ESCALERA DE ESTRELLAS:</b> <b>1⭐</b> aprueba jugadas que rentan ≥ piso nivel 1 (75% de la mejor alternativa) · <b>2⭐</b> hasta el piso nivel 2 (50%) · <b>3⭐</b> hasta el piso nivel 3 (25%), exigiendo ADEMÁS rentabilidad ≥ la comisión más alta (dealer o ejecutivo) y nunca bajo el mínimo absoluto ($200.000). Presupuesto: <b>3⭐ de regalo el primer mes</b>; después ⌊otorgadas del mes anterior × 33%⌋. Caso fuera de escalera → código de <b>Gerencia</b>. El código es aleatorio, vive en BD con el snapshot de la simulación y <b>vence a las 24 h</b> (las estrellas vuelven si vence sin usar; al cierre del mes expiran).</li>
     <li><b>Usarlo en la Carta:</b> el código se ingresa en la Carta de Aprobación; el sistema valida saldo precio (± tolerancia), primeros dígitos del RUT y vigencia, y la carta queda "aprobada por código del sistema / autorización de Gerencia / Comodín N°XXXXXX". Un código = un solo uso.</li>
     <li><b>Trazabilidad:</b> pestañas Mis códigos (del ejecutivo) y Registro completo (Gerencia); el <b>Validador</b> dice de qué operación es cualquier código, quién lo generó y si ya se usó.</li>
   </ol>
   <div class="flujo"><span class="st ini">SIMULAR</span><span class="ar">→</span><span class="st">cumple piso 75%</span><span class="ar">→</span><span class="st">CÓDIGO (⭐/🏆/👔)</span><span class="ar">→</span><span class="st">carta con código</span><span class="ar">→</span><span class="st fin">USADO (un solo uso)</span></div>
-  <div class="afecta"><b>Afecta:</b> Cartas de Aprobación (§1) — el código estampa la aprobación de la excepción; rentabilidad por operación. <b>Depende de:</b> mantenedor Excepciones Comerciales, Tasas, UF, motores AF_RENT / comisión dealer / tier UAC, y del conteo de otorgadas del ejecutivo.</div>
+  <div class="afecta"><b>Afecta:</b> Cartas de Aprobación (§1) — el código estampa la aprobación de la excepción; rentabilidad por operación; Revisor Automático (§36) — valida el código server-side. <b>Depende de:</b> mantenedor Excepciones Comerciales, Tasas, UF, motores AF_RENT / comisión dealer / tier UAC, y del conteo de otorgadas del ejecutivo. El simulador oficial vive en <b>¿Dónde Curso? 2.0</b> (<code>/donde-curso-2/</code>).</div>
+
+  <h2 id="p36">36. Revisor Automático de Cartas (Unidad y Autofin)</h2>
+  <p><b>Qué y para qué:</b> Business Suite <b>revisa y aprueba sola</b> las cartas de aprobación que cuadran, y deriva al Analista de Crédito solo las que no. Reemplaza la revisión humana rutinaria (¿el documento de la financiera dice lo mismo que se digitó?) por una validación de motor con respaldo firmado, dejando al analista únicamente los casos con diferencias.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El <b>Ejecutivo/Operaciones</b> digita la carta y sube los documentos (igual que siempre). <b>Business Suite</b> revisa y aprueba o deriva. El <b>Analista de Crédito</b> solo ve las derivadas, con el detalle de qué no calzó. El <b>Administrador</b> enciende/apaga cada motor.</div>
+    <div><b class="lbl">Prerequisitos</b>Interruptores en Mantenedores → <b>Excepciones Comerciales → Revisor Automático de Cartas</b> (switch UNIDAD y switch AUTOFIN, independientes; parten APAGADOS) + tolerancia en $. Tasas y UF vigentes; tabla de comisión del dealer al día.</div>
+  </div>
+  <h3>Documentos que exige</h3>
+  <ul>
+    <li><b>UNIDAD:</b> Carta Compromiso + Cotización (PDF). El servidor los lee al subirlos (parser de texto con fallback posicional para el layout en bloque; Haiku cuando el texto no deja leer las claves) y guarda lo leído en <code>extracted</code>, junto al documento.</li>
+    <li><b>AUTOFIN:</b> Carta de Aprobación (PDF) + <b>pantallazo del sistema Autofin</b> con la solicitud puntual (buscada por su ID) mostrando su estado. El generador ofrece dos vías: botón <b>📸 Capturar pantalla</b> (elige la ventana de Autofin y el sistema toma el cuadro completo) o pegar con <b>Ctrl+V</b> (Alt+ImprPant). Haiku lee ID y Estado del print al subirlo; si es un listado o no se ve el estado, avisa al ejecutivo al tiro.</li>
+  </ul>
+  <h3>Qué valida</h3>
+  <ol>
+    <li><b>Documento vs sistema:</b> ID financiera, RUT del cliente, saldo precio, plazo, monto bruto del crédito y tasa cursada — lo que dice el documento contra lo digitado (tolerancia en $ paramétrica).</li>
+    <li><b>Tasa pizarra/cursada:</b> rebaja máxima paramétrica (5% relativo) sobre la pizarra del tramo; toda rebaja exige código de excepción.</li>
+    <li><b>Comisión dealer (calle/parque y monto):</b> contra el motor único (tabla del dealer → pizarra); modificada exige código.</li>
+    <li><b>Excepciones ↔ código:</b> re-verifica el snapshot del código: nivel correcto de la escalera (75/50/25% con 1/2/3⭐), estrellas cobradas, mínimo absoluto y financiera. Código de Gerencia vale por sí mismo.</li>
+    <li><b>Solo AUTOFIN:</b> el pantallazo debe mostrar la solicitud en <b>Revisión Firma o Cursado</b> (ningún otro estado emite carta) y su ID debe calzar con la carta.</li>
+  </ol>
+  <h3>Resultado</h3>
+  <ul>
+    <li><b>Todo cuadra</b> → carta <b>APROBADA por "Business Suite (automática)"</b> + <b>checklist firmado</b> adjunto a sus documentos: cada validación con documento vs sistema, fecha y hora, timbre <b>APROBACIÓN AUTOMÁTICA</b>, Firma Electrónica Simple y QR verificable (<code>/verificar/CÓDIGO</code>, hash SHA-256). Campanita al ejecutivo.</li>
+    <li><b>Algo no cuadra o el motor está apagado</b> → la carta queda <b>PENDIENTE</b> en la cola del Analista como siempre, con un banner rojo en la revisión mostrando exactamente qué falló.</li>
+  </ul>
+  <div class="paso"><b>Bitácora para auditoría</b> (<code>/aprobaciones/bitacora-revisor/</code>, card en el módulo): registro <b>inmutable</b> de cada revisión — aprobadas y derivadas, con el detalle íntegro, el código de excepción y los links al checklist y a su verificación. El motor solo agrega filas; nunca edita ni borra.</div>
+  <div class="flujo"><span class="st ini">CARTA PENDIENTE + DOCS</span><span class="ar">→</span><span class="st">REVISOR (motor)</span><span class="ar">→</span><span class="st fin">APROBADA AUTO + checklist</span><span class="ar">/</span><span class="st mal">DERIVADA AL ANALISTA</span><span class="ar">→</span><span class="st">bitácora (siempre)</span></div>
+  <div class="afecta"><b>Afecta:</b> revisión de cartas (§1) — el pool humano recibe solo lo que no cuadra; auditoría. <b>Depende de:</b> lectura de documentos (<code>extracted</code>), Excepciones Comerciales (§35), Tasas, UF, motor de comisión dealer y el subsistema de IA (Haiku) para pantallazos y PDFs escaneados.</div>
 
 </body>
 </html>
