@@ -159,19 +159,26 @@ async function revisar(carta, p) {
   if (piz != null && tasaCarta != null) {
     const minPermitida = Math.floor(piz * (1 - (p.exc_tasa_rebaja_max_pct || 5) / 100) * 100) / 100;
     tasaRebajada = tasaCarta < piz - 0.005;
-    const tasaOk = tasaCarta >= minPermitida - 0.005;
-    add('Tasa pizarra / cursada', piz + '% pizarra', tasaCarta + '% cursada', tasaOk,
+    const dentroMax = tasaCarta >= minPermitida - 0.005;
+    // ✅ solo si no hay rebaja, o si la rebaja está dentro del máximo Y viene con código
+    add('Tasa pizarra / cursada', piz + '% pizarra', tasaCarta + '% cursada',
+        !tasaRebajada || (dentroMax && !!carta.codigo_excepcion),
         !tasaRebajada ? 'sin rebaja'
-        : tasaOk ? `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}% (mínimo ${minPermitida}%)`
-                 : `rebaja EXCEDE el máximo ${p.exc_tasa_rebaja_max_pct || 5}% (mínimo permitido ${minPermitida}%)`);
+        : !dentroMax ? `rebaja EXCEDE el máximo ${p.exc_tasa_rebaja_max_pct || 5}% (mínimo permitido ${minPermitida}%)`
+        : carta.codigo_excepcion ? `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}%, respaldada por código`
+        : `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}% pero SIN código de excepción`);
   }
 
   // 4. Comisión dealer: motor único vs carta
   const ce = await comisionEsperada(carta, p);
   const netaCarta = carta.part_neto != null ? Math.round(parseFloat(carta.part_neto)) : null;
   const comisionModificada = netaCarta != null && Math.abs(netaCarta - ce.neta) > tol;
+  // ✅ solo si va según motor, o si viene modificada CON código que la respalde
   add(`Comisión dealer (${ce.esParque ? 'parque' : 'calle'})`, fmt(ce.neta) + ' neta según motor', fmt(netaCarta) + ' neta en carta',
-      true, comisionModificada ? 'modificada: requiere código de excepción' : 'según pizarra/tabla del dealer');
+      !comisionModificada || !!carta.codigo_excepcion,
+      !comisionModificada ? 'según pizarra/tabla del dealer'
+      : carta.codigo_excepcion ? 'modificada, respaldada por código de excepción'
+      : 'modificada SIN código de excepción');
 
   // 5. Excepciones ↔ código
   const hayExcepcion = tasaRebajada || comisionModificada;
