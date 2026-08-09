@@ -846,6 +846,20 @@ const upsert = async (req, res) => {
       const [[prev]] = await pool.query('SELECT status FROM cartas_aprobacion WHERE id = ?', [c.id]);
       prevStatus = prev?.status || null;
     }
+    /* ── 4 OJOS EN EL SERVIDOR (auditoría del Revisor, hallazgo pre-existente) ──
+       Antes el principio vivía solo en el front: por API bastaba aprob_crear para
+       mandar status='APROBADA'. Ahora resolver una carta (APROBADA/RECHAZADA)
+       exige el permiso aprob_revisar Y que quien resuelve NO sea quien la creó
+       — la regla vale también para el Administrador, igual que en la pantalla.
+       El Revisor Automático no pasa por aquí (escribe directo con su firma). */
+    if (['APROBADA', 'RECHAZADA'].includes(c.status) && prevStatus !== c.status) {
+      const { tieneFunc } = require('../../../../shared/middleware/permisos');
+      if (!(await tieneFunc(req.usuario?.id_usuario, 'aprob_revisar')))
+        return res.status(403).json({ success: false, data: null, error: 'Aprobar o rechazar una carta exige el permiso de revisión (aprob_revisar).' });
+      const creador = String((c.id ? (await pool.query('SELECT creado_por FROM cartas_aprobacion WHERE id=?', [c.id]))[0][0]?.creado_por : c.creadoPor) || '').toLowerCase();
+      if (creador && creador === String(req.usuario?.email || '').toLowerCase())
+        return res.status(403).json({ success: false, data: null, error: 'Principio de 4 ojos: no puedes aprobar ni rechazar una carta que tú mismo creaste.' });
+    }
     // No se puede aprobar una carta ya vencida (fecha + vigencia < hoy).
     if (c.status === 'APROBADA' && prevStatus !== 'APROBADA' && c.fecha) {
       const dias = await vigenciaDias();
