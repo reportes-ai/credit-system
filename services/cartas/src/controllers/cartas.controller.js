@@ -1018,8 +1018,8 @@ const upsert = async (req, res) => {
         }
       }
       notificarCambios(c, prevStatus, req);
-      // Carta corregida que vuelve PENDIENTE con acreedor UNIDAD → nueva pasada del Revisor
-      if (c.status === 'PENDIENTE' && String(c.acreedor || '').toUpperCase().includes('UNIDAD'))
+      // Carta corregida que vuelve PENDIENTE (Unidad o Autofin) → nueva pasada del Revisor
+      if (c.status === 'PENDIENTE' && /UNIDAD|AUTOFIN/.test(String(c.acreedor || '').toUpperCase()))
         setImmediate(() => require('../revisor-unidad').procesarCarta(c.id));
     } else {
       // INSERT nuevo: crear crédito asociado primero — salvo que la carta ya venga
@@ -1700,10 +1700,9 @@ const subirDocumento = async (req, res) => {
        ext ? JSON.stringify(ext) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
     for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
     res.status(201).json({ success: true, data: { id: r.insertId, extracted: ext || null }, error: null });
-    /* Revisor Automático (Unidad): con cada documento que llega intenta la
-       revisión completa — aprueba solo cuando están ambos y todo cuadra. */
-    if (idCarta && ['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD'].includes(String(tipo)))
-      setImmediate(() => require('../revisor-unidad').procesarCarta(idCarta));
+    /* Revisor Automático (Unidad y Autofin): con cada documento que llega intenta
+       la revisión completa — aprueba solo cuando están todos y todo cuadra. */
+    if (idCarta) setImmediate(() => require('../revisor-unidad').procesarCarta(idCarta));
   } catch (e) { console.error('[subirDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

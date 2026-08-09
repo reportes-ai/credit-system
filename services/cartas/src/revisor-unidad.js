@@ -55,8 +55,10 @@ require('../../../shared/migrate').enFila('revisor-unidad', async () => {
       )`);
     for (const [clave, valor, descripcion] of [
       ['rev_unidad_activo', 0, 'Revisor Automático de cartas UNIDAD: 1 = Business Suite revisa y aprueba solo las que cuadran; 0 = todas al Analista de Crédito'],
-      ['rev_unidad_tolerancia', 1, 'Revisor Automático: tolerancia en $ al comparar los montos del documento Unidad contra lo digitado (redondeos)'],
+      ['rev_autofin_activo', 0, 'Revisor Automático de cartas AUTOFIN: 1 = Business Suite revisa y aprueba solo (exige pantallazo con la solicitud en Revisión Firma o Cursado); 0 = todas al Analista'],
+      ['rev_unidad_tolerancia', 1, 'Revisor Automático (ambas financieras): tolerancia en $ al comparar los montos del documento contra lo digitado (redondeos)'],
     ]) await pool.query('INSERT IGNORE INTO parametros_credito (clave, valor, descripcion) VALUES (?,?,?)', [clave, valor, descripcion]);
+    await pool.query("UPDATE parametros_credito SET descripcion='Revisor Automático (ambas financieras): tolerancia en $ al comparar los montos del documento contra lo digitado (redondeos)' WHERE clave='rev_unidad_tolerancia'");
     // Card "Bitácora Revisor Automático" en el módulo Cartas de Aprobación (300001)
     const [[fEx]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='aprob_bitacora_revisor' LIMIT 1");
     if (!fEx) await pool.query(
@@ -130,24 +132,41 @@ async function revisar(carta, p) {
   const tol = Number.isFinite(p.rev_unidad_tolerancia) ? p.rev_unidad_tolerancia : 1;
   const add = (item, doc, sistema, ok, nota) => { checks.push({ item, doc, sistema, ok: !!ok, nota: nota || null }); return ok; };
 
-  // 1. Documentos con lectura
+  const esAutofin = String(carta.acreedor || '').toUpperCase().includes('AUTOFIN');
+  const cerca = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) <= tol;
+
+  // 1. Documentos con lectura (Unidad: compromiso + cotización · Autofin: carta + pantallazo)
+  const TIPOS = esAutofin ? ['CARTA_AUTOFIN', 'PANTALLAZO_AUTOFIN'] : ['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD'];
   const [docs] = await pool.query(
-    "SELECT tipo, nombre, extracted FROM cartas_documentos WHERE id_carta=? AND tipo IN ('COMPROMISO_UNIDAD','COTIZACION_UNIDAD')", [carta.id]);
+    'SELECT tipo, nombre, extracted FROM cartas_documentos WHERE id_carta=? AND tipo IN (?)', [carta.id, TIPOS]);
   const parse = {};
   for (const d of docs) { try { parse[d.tipo] = typeof d.extracted === 'object' && d.extracted ? d.extracted : JSON.parse(d.extracted || 'null'); } catch (_) {} }
-  const comp = parse.COMPROMISO_UNIDAD, cot = parse.COTIZACION_UNIDAD;
-  if (!comp || !cot) return { checks, ok: false, motivo: docs.length < 2 ? 'Faltan documentos de Unidad (compromiso y/o cotización)' : 'Documento sin lectura' };
-  if (comp.escaneado || cot.escaneado || comp.error_lectura || cot.error_lectura)
+  const comp = esAutofin ? parse.CARTA_AUTOFIN : parse.COMPROMISO_UNIDAD;
+  const cot  = esAutofin ? null : parse.COTIZACION_UNIDAD;
+  const pz   = esAutofin ? parse.PANTALLAZO_AUTOFIN : null;
+  const faltan = TIPOS.filter(t => !parse[t]);
+  if (faltan.length) return { checks, ok: false, motivo: 'Faltan documentos: ' + faltan.map(t => t.replace(/_/g, ' ')).join(', ') };
+  for (const d of [comp, cot, pz]) if (d && (d.escaneado || d.error_lectura || d.sin_ia))
     return { checks, ok: false, motivo: 'Documento escaneado o ilegible: requiere ojo humano' };
 
+  // 1b. AUTOFIN: el pantallazo debe mostrar la solicitud en Revisión Firma o Cursado
+  if (esAutofin) {
+    const est = String(pz.estado || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const estadoOk = est.includes('REVISIONFIRMA') || est.includes('CURSADO');
+    add('Estado en Autofin (pantallazo)', pz.estado || 'no visible', 'Revisión Firma o Cursado', estadoOk,
+        estadoOk ? null : 'la carta solo puede emitirse con la solicitud en Revisión Firma o Cursado');
+    if (pz.idSolicitud) add('ID solicitud (pantallazo)', pz.idSolicitud, carta.id_financiera,
+        String(pz.idSolicitud) === String(carta.id_financiera || ''));
+  }
+
   // 2. Documento vs sistema
-  const cerca = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) <= tol;
-  add('ID Financiera', comp.opOrigen || cot.opOrigen, carta.id_financiera,
-      String(comp.opOrigen || cot.opOrigen || '') === String(carta.id_financiera || ''));
+  add('ID Financiera', comp.opOrigen || cot?.opOrigen, carta.id_financiera,
+      String(comp.opOrigen || cot?.opOrigen || '') === String(carta.id_financiera || ''));
   if (comp.rutCliente) add('RUT cliente', comp.rutCliente, carta.rut_cliente, normRut(comp.rutCliente) === normRut(carta.rut_cliente));
-  add('Saldo precio', fmt(cot.saldo ?? comp.saldo), fmt(carta.saldo), cerca(cot.saldo ?? comp.saldo, carta.saldo));
-  add('Plazo (cuotas)', cot.plazo ?? comp.plazo, carta.plazo, String(cot.plazo ?? comp.plazo ?? '') === String(carta.plazo ?? ''));
-  add('Monto bruto del crédito', fmt(cot.montoCreditoCLP), fmt(carta.monto_credito_clp), cerca(cot.montoCreditoCLP, carta.monto_credito_clp));
+  add('Saldo precio', fmt(cot?.saldo ?? comp.saldo), fmt(carta.saldo), cerca(cot?.saldo ?? comp.saldo, carta.saldo));
+  add('Plazo (cuotas)', cot?.plazo ?? comp.plazo, carta.plazo, String(cot?.plazo ?? comp.plazo ?? '') === String(carta.plazo ?? ''));
+  add('Monto bruto del crédito', fmt(esAutofin ? comp.montoCreditoCLP : cot?.montoCreditoCLP), fmt(carta.monto_credito_clp),
+      cerca(esAutofin ? comp.montoCreditoCLP : cot?.montoCreditoCLP, carta.monto_credito_clp));
 
   // 3. Tasa: doc vs sistema + rebaja máxima sobre pizarra
   const tasaDoc = comp.tasaCredito != null ? parseFloat(String(comp.tasaCredito).replace(',', '.')) : null;
@@ -202,7 +221,8 @@ async function revisar(carta, p) {
         add(`Piso de rentabilidad (${pct}%)`, fmt(Math.round(s.mejor_base * pct / 100)) + ' mínimo', fmt(Math.round(s.rent_jugada)) + ' jugada', cumple,
             niv === 3 ? `nivel 3: además mínimo absoluto ${fmt(p.exc_nivel3_rent_min || 200000)}` : null);
       }
-      add('Financiera del código', cod.financiera || '—', 'UNIDAD', String(cod.financiera || '').toUpperCase().includes('UNIDAD'));
+      const finEsperada = esAutofin ? 'AUTOFIN' : 'UNIDAD';
+      add('Financiera del código', cod.financiera || '—', finEsperada, String(cod.financiera || '').toUpperCase().includes(finEsperada));
     }
   } else {
     add('Excepciones', 'sin excepciones', 'cursación estándar', true);
@@ -221,7 +241,7 @@ async function generarChecklist(carta, checks) {
     rut: carta.rut_cliente, nombre: carta.cliente,
     datos: { op_carta: carta.op_carta, id_financiera: carta.id_financiera, checks, fecha_hora: fh },
     emitido_por: 'Business Suite — Revisor Automático',
-    firmante: { nombre: 'Business Suite', cargo: 'Revisor Automático de Cartas Unidad' },
+    firmante: { nombre: 'Business Suite', cargo: 'Revisor Automático de Cartas' },
   });
   const filas = checks.map(c => `
     <tr><td>${c.ok ? '✅' : '❌'}</td><td><b>${c.item}</b>${c.nota ? `<div class="nota">${c.nota}</div>` : ''}</td>
@@ -239,9 +259,9 @@ async function generarChecklist(carta, checks) {
   @media print { .noprint{display:none} }
 </style></head><body>
 <h1>Checklist de Revisión — Carta de Aprobación ${carta.op_carta}</h1>
-<div class="sub">Cliente ${carta.cliente || ''} · RUT ${carta.rut_cliente || ''} · Financiera UNIDAD DE CRÉDITO · ID ${carta.id_financiera || ''}<br>
+<div class="sub">Cliente ${carta.cliente || ''} · RUT ${carta.rut_cliente || ''} · Financiera ${carta.acreedor || ''} · ID ${carta.id_financiera || ''}<br>
 Dealer ${carta.nombre_dealer || ''} · ${fh}</div>
-<table><tr><th></th><th>Validación</th><th>Documento Unidad</th><th>Business Suite</th></tr>${filas}</table>
+<table><tr><th></th><th>Validación</th><th>Documento financiera</th><th>Business Suite</th></tr>${filas}</table>
 <div class="timbre">✔ APROBACIÓN AUTOMÁTICA — BUSINESS SUITE</div>
 <div class="firma">
   <div><b>Firmado electrónicamente por Business Suite</b> (Revisor Automático de Cartas Unidad)<br>
@@ -280,9 +300,12 @@ async function procesarCarta(idCarta) {
   try {
     const [[carta]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [idCarta]);
     if (!carta || carta.status !== 'PENDIENTE' || carta.otorgado) return;
-    if (!String(carta.acreedor || '').toUpperCase().includes('UNIDAD')) return;
+    const acr = String(carta.acreedor || '').toUpperCase();
+    const esAutofin = acr.includes('AUTOFIN');
+    if (!esAutofin && !acr.includes('UNIDAD')) return;
     const p = await params();
-    if (!(p.rev_unidad_activo > 0)) return;   // apagado: todo al analista, sin ruido
+    const activo = esAutofin ? p.rev_autofin_activo : p.rev_unidad_activo;
+    if (!(activo > 0)) return;   // apagado: todo al analista, sin ruido
 
     const r = await revisar(carta, p);
     await pool.query('UPDATE cartas_aprobacion SET revision_auto=? WHERE id=?',
@@ -300,7 +323,7 @@ async function procesarCarta(idCarta) {
     await pool.query(
       `UPDATE cartas_aprobacion SET status='APROBADA', aprobado_por='businesssuite',
         aprobado_por_nombre='Business Suite (automática)', aprobado_por_initials='BS',
-        fecha_aprobacion=NOW(), comentario_aprobacion='APROBACIÓN AUTOMÁTICA: documento Unidad validado contra el sistema por el Revisor de Business Suite. Checklist firmado adjunto en los documentos de la carta.'
+        fecha_aprobacion=NOW(), comentario_aprobacion='APROBACIÓN AUTOMÁTICA: documentos de la financiera validados contra el sistema por el Revisor de Business Suite. Checklist firmado adjunto en los documentos de la carta.'
        WHERE id=? AND status='PENDIENTE'`, [idCarta]);
     if (carta.id_credito_creado)
       await pool.query(`UPDATE creditos SET estado='CARTA_APROBACION', updated_at=NOW() WHERE id=? AND estado='INGRESO'`,
