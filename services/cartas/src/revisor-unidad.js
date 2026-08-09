@@ -31,10 +31,47 @@ require('../../../shared/migrate').enFila('revisor-unidad', async () => {
   try {
     try { await pool.query('ALTER TABLE cartas_aprobacion ADD COLUMN revision_auto JSON NULL'); }
     catch (e) { if (e.errno !== 1060) throw e; }
+    /* BITÁCORA INMUTABLE del Revisor: una fila por cada revisión completa
+       (aprobada o derivada), con el checklist íntegro — revision_auto de la
+       carta se sobreescribe en cada pasada; esta tabla NUNCA se edita. */
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS revisor_bitacora (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        id_carta        INT NOT NULL,
+        op_carta        VARCHAR(30) NULL,
+        id_financiera   VARCHAR(30) NULL,
+        cliente         VARCHAR(200) NULL,
+        rut_cliente     VARCHAR(20) NULL,
+        ejecutivo       VARCHAR(200) NULL,
+        creado_por      VARCHAR(200) NULL,
+        resultado       VARCHAR(12) NOT NULL,          /* APROBADA | DERIVADA */
+        motivo          VARCHAR(400) NULL,
+        checks          JSON NULL,
+        codigo_excepcion VARCHAR(20) NULL,
+        checklist_codigo VARCHAR(40) NULL,             /* documentos_verificables.codigo */
+        checklist_doc_id INT NULL,                     /* cartas_documentos.id del checklist */
+        created_at      DATETIME DEFAULT NOW(),
+        INDEX idx_carta (id_carta), INDEX idx_res (resultado), INDEX idx_fecha (created_at)
+      )`);
     for (const [clave, valor, descripcion] of [
       ['rev_unidad_activo', 0, 'Revisor Automático de cartas UNIDAD: 1 = Business Suite revisa y aprueba solo las que cuadran; 0 = todas al Analista de Crédito'],
       ['rev_unidad_tolerancia', 1, 'Revisor Automático: tolerancia en $ al comparar los montos del documento Unidad contra lo digitado (redondeos)'],
     ]) await pool.query('INSERT IGNORE INTO parametros_credito (clave, valor, descripcion) VALUES (?,?,?)', [clave, valor, descripcion]);
+    // Card "Bitácora Revisor Automático" en el módulo Cartas de Aprobación (300001)
+    const [[fEx]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='aprob_bitacora_revisor' LIMIT 1");
+    if (!fEx) await pool.query(
+      `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+       VALUES (300001, 'Bitácora Revisor Automático', 'aprob_bitacora_revisor', '/aprobaciones/bitacora-revisor/', 'bi-robot')`);
+    const [[adm]] = await pool.query("SELECT id_perfil FROM perfiles WHERE UPPER(nombre) LIKE 'ADMINISTRADOR%' ORDER BY id_perfil LIMIT 1");
+    if (adm) {
+      await pool.query(
+        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT ?, id_funcionalidad, 1 FROM funcionalidades WHERE codigo='aprob_bitacora_revisor'`, [adm.id_perfil]);
+      // habilitado=1 explícito: el default de la columna es 0 y mis-permisos filtra por él
+      await pool.query(
+        `UPDATE permisos_perfil pp JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad
+         SET pp.habilitado = 1 WHERE f.codigo='aprob_bitacora_revisor' AND pp.id_perfil = ?`, [adm.id_perfil]);
+    }
     console.log('[revisor-unidad] listo');
   } catch (e) { console.error('[revisor-unidad migration]', e.message); }
 });
@@ -211,12 +248,24 @@ Dealer ${carta.nombre_dealer || ''} · ${fh}</div>
   const buf = Buffer.from(html, 'utf8');
   const d = await almacen.colocar({ ambito: 'cartas', clave: carta.id, buffer: buf, mime: 'text/html', nombre: `checklist-${carta.op_carta}.html` });
   await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [carta.id, 'CHECKLIST_REVISOR']);
-  await pool.query(
+  const [ins] = await pool.query(
     `INSERT INTO cartas_documentos (id_carta, tipo, nombre, mime, tamano, data, doc_storage, doc_ruta, doc_bytes, extracted, subido_por)
      VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     [carta.id, 'CHECKLIST_REVISOR', `Checklist Revisor Automático ${carta.op_carta}.html`, 'text/html', buf.length,
      d.blob, d.storage, d.ruta, d.bytes, JSON.stringify({ codigo, checks }), 'businesssuite']);
-  return codigo;
+  return { codigo, docId: ins.insertId };
+}
+
+/* Fila inmutable en la bitácora del Revisor (nunca se edita ni se borra). */
+function anotarBitacora(carta, resultado, r, checklist) {
+  return pool.query(
+    `INSERT INTO revisor_bitacora (id_carta, op_carta, id_financiera, cliente, rut_cliente, ejecutivo, creado_por,
+       resultado, motivo, checks, codigo_excepcion, checklist_codigo, checklist_doc_id)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [carta.id, carta.op_carta, carta.id_financiera, carta.cliente, carta.rut_cliente, carta.ejecutivo, carta.creado_por,
+     resultado, r.motivo || null, JSON.stringify(r.checks || []), carta.codigo_excepcion || null,
+     checklist?.codigo || null, checklist?.docId || null]
+  ).catch(e => console.error('[revisor-unidad bitacora]', e.message));
 }
 
 /* ── ENTRADA: se dispara al subir documentos o re-guardar una carta UNIDAD ── */
@@ -233,11 +282,14 @@ async function procesarCarta(idCarta) {
       [JSON.stringify({ ok: r.ok, motivo: r.motivo, checks: r.checks, at: new Date().toISOString() }), idCarta]);
 
     if (!r.ok) {
+      // Sin ambos documentos aún no hay revisión completa: no ensuciar la bitácora
+      if (!/Faltan documentos/.test(r.motivo || '')) await anotarBitacora(carta, 'DERIVADA', r, null);
       console.log(`[revisor-unidad] carta ${carta.op_carta}: al analista — ${r.motivo}`);
       return;   // queda PENDIENTE en la cola humana con el detalle en revision_auto
     }
 
-    await generarChecklist(carta, r.checks);
+    const checklist = await generarChecklist(carta, r.checks);
+    await anotarBitacora(carta, 'APROBADA', r, checklist);
     await pool.query(
       `UPDATE cartas_aprobacion SET status='APROBADA', aprobado_por='businesssuite',
         aprobado_por_nombre='Business Suite (automática)', aprobado_por_initials='BS',
@@ -261,4 +313,23 @@ async function procesarCarta(idCarta) {
   } catch (e) { console.error('[revisor-unidad]', e.message); }
 }
 
-module.exports = { procesarCarta, revisar, params };   // revisar/params exportados para pruebas
+/* GET /api/cartas/revisor-bitacora?mes=YYYY-MM&resultado=APROBADA|DERIVADA
+   Bitácora de auditoría del Revisor (solo lectura; máx 500 filas por consulta). */
+async function bitacora(req, res) {
+  try {
+    const cond = [], vals = [];
+    if (/^\d{4}-\d{2}$/.test(req.query.mes || '')) { cond.push("DATE_FORMAT(created_at,'%Y-%m') = ?"); vals.push(req.query.mes); }
+    if (['APROBADA', 'DERIVADA'].includes(req.query.resultado || '')) { cond.push('resultado = ?'); vals.push(req.query.resultado); }
+    const where = cond.length ? 'WHERE ' + cond.join(' AND ') : '';
+    const [rows] = await pool.query(
+      `SELECT id, id_carta, op_carta, id_financiera, cliente, rut_cliente, ejecutivo, creado_por,
+              resultado, motivo, checks, codigo_excepcion, checklist_codigo, checklist_doc_id, created_at
+         FROM revisor_bitacora ${where} ORDER BY created_at DESC, id DESC LIMIT 500`, vals);
+    const [[tot]] = await pool.query(
+      `SELECT COUNT(*) n, SUM(resultado='APROBADA') aprobadas, SUM(resultado='DERIVADA') derivadas FROM revisor_bitacora ${where}`, vals);
+    rows.forEach(r => { try { r.checks = typeof r.checks === 'object' ? r.checks : JSON.parse(r.checks || '[]'); } catch (_) { r.checks = []; } });
+    res.json({ success: true, data: { rows, stats: { total: Number(tot.n) || 0, aprobadas: Number(tot.aprobadas) || 0, derivadas: Number(tot.derivadas) || 0 } }, error: null });
+  } catch (e) { console.error('[revisor-bitacora]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+}
+
+module.exports = { procesarCarta, revisar, params, bitacora };   // revisar/params exportados para pruebas

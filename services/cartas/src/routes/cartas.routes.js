@@ -24,6 +24,10 @@ router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.ot
 router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
 router.post('/carga-masiva', verifyToken, requireFunc('aprob_carga_masiva'), ctrl.cargaMasivaCartas);
 
+// Bitácora del Revisor Automático Unidad (auditoría, solo lectura)
+router.get('/revisor-bitacora', verifyToken, requireFunc('aprob_revisar'),
+  require('../revisor-unidad').bitacora);
+
 // Documentos Unidad: parseo para autocompletar + almacenamiento para revisión
 router.post('/parse-unidad',     verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.parseUnidad);
 router.post('/parse-autofin',    verifyToken, requireFunc('aprob_crear', 'aprob_revisar'), ctrl.parseAutofin);

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!-- v1.0 — Bitácora del Revisor Automático de Cartas Unidad: registro inmutable para auditoría -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitácora Revisor Automático — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { width:100%; padding:22px 26px 70px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; }
+  .card-af { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  select,input[type=month] { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; background:#fff; }
+  .chip { background:#f1f5f9; border-radius:9px; padding:6px 13px; font-size:.8rem; color:#334155; }
+  .chip b { color:var(--blue); }
+  table { width:100%; border-collapse:collapse; font-size:.8rem; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:9px; font-size:.7rem; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  td { padding:8px 9px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  tbody tr:hover { background:#f8fbff; }
+  .st { font-size:.68rem; font-weight:800; border-radius:6px; padding:2px 8px; white-space:nowrap; }
+  .st-APROBADA { background:#dcfce7; color:#15803d; } .st-DERIVADA { background:#fef3c7; color:#92400e; }
+  .btn-mini { border:none; border-radius:7px; padding:5px 10px; font-size:.72rem; font-weight:700; cursor:pointer; background:#eff6ff; color:var(--blue); }
+  .checks { display:none; background:#f8fafc; border-radius:8px; margin-top:6px; padding:8px 10px; font-size:.75rem; }
+  .checks.show { display:block; }
+  .checks table { font-size:.74rem; } .checks th { background:#e2e8f0; color:#334155; padding:4px 8px; }
+  .checks td { padding:4px 8px; }
+  .nota { color:#64748b; font-size:.7rem; }
+  a.ver { color:var(--blue); text-decoration:none; font-size:.74rem; } a.ver:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Cartas de Aprobación', href:'/aprobaciones/' },
+  { label:'Bitácora Revisor Automático', icon:'bi-robot', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-robot"></i><div>
+    <h2>Bitácora del Revisor Automático — Cartas Unidad</h2>
+    <p>Registro <b>inmutable</b> de cada revisión: qué validó Business Suite, qué aprobó solo y qué derivó al Analista. Cada aprobación conserva su checklist firmado y su código verificable.</p>
+  </div></div>
+
+  <div class="card-af">
+    <div class="bar">
+      <input type="month" id="fMes" onchange="cargar()">
+      <select id="fRes" onchange="cargar()">
+        <option value="">Aprobadas y derivadas</option>
+        <option value="APROBADA">Solo aprobadas automáticas</option>
+        <option value="DERIVADA">Solo derivadas al analista</option>
+      </select>
+      <span class="chip">Total <b id="sTot">—</b></span>
+      <span class="chip">✅ Aprobadas <b id="sApr">—</b></span>
+      <span class="chip">👤 Derivadas <b id="sDer">—</b></span>
+    </div>
+  </div>
+
+  <div class="card-af" style="padding:0;overflow-x:auto">
+    <table>
+      <thead><tr><th>Fecha y hora</th><th>Carta</th><th>ID Financiera</th><th>Cliente</th><th>Ejecutivo</th>
+        <th>Resultado</th><th>Motivo / Código</th><th>Respaldo</th><th></th></tr></thead>
+      <tbody id="tb"><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:26px">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const H = () => ({ Authorization: 'Bearer ' + sessionStorage.getItem('token') });
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtFH = d => new Date(d).toLocaleString('es-CL', { timeZone:'America/Santiago' });
+
+async function cargar(){
+  const mes = document.getElementById('fMes').value;
+  const resl = document.getElementById('fRes').value;
+  const qs = new URLSearchParams(); if (mes) qs.set('mes', mes); if (resl) qs.set('resultado', resl);
+  const tb = document.getElementById('tb');
+  try {
+    const r = await fetch('/api/cartas/revisor-bitacora?' + qs, { headers: H() });
+    const j = await r.json();
+    if (!j.success) { tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc2626;padding:26px">${esc(j.error||'Error')}</td></tr>`; return; }
+    const { rows, stats } = j.data;
+    document.getElementById('sTot').textContent = stats.total.toLocaleString('es-CL');
+    document.getElementById('sApr').textContent = stats.aprobadas.toLocaleString('es-CL');
+    document.getElementById('sDer').textContent = stats.derivadas.toLocaleString('es-CL');
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:26px">Sin revisiones registradas' + (mes||resl?' con estos filtros':'') + '. La bitácora se llena sola con cada revisión del motor.</td></tr>'; return; }
+    tb.innerHTML = rows.map(x => {
+      const checksHTML = (x.checks||[]).map(k => `<tr><td>${k.ok?'✅':'❌'}</td><td><b>${esc(k.item)}</b>${k.nota?`<div class="nota">${esc(k.nota)}</div>`:''}</td><td>${esc(String(k.doc??'—'))}</td><td>${esc(String(k.sistema??'—'))}</td></tr>`).join('');
+      return `<tr>
+        <td style="white-space:nowrap">${fmtFH(x.created_at)}</td>
+        <td><b>${esc(x.op_carta||'')}</b></td>
+        <td>${esc(x.id_financiera||'')}</td>
+        <td>${esc(x.cliente||'')}<div class="nota">${esc(x.rut_cliente||'')}</div></td>
+        <td style="font-size:.74rem">${esc(x.ejecutivo||'')}</td>
+        <td><span class="st st-${x.resultado}">${x.resultado==='APROBADA'?'✅ APROBADA AUTO':'👤 DERIVADA'}</span></td>
+        <td style="max-width:260px">${esc(x.motivo||'todo cuadró')}${x.codigo_excepcion?`<div class="nota">⭐ código excepción ${esc(x.codigo_excepcion)}</div>`:''}</td>
+        <td style="white-space:nowrap">
+          ${x.checklist_doc_id?`<a class="ver" href="#" onclick="verDoc(${x.checklist_doc_id});return false"><i class="bi bi-file-earmark-check"></i> Checklist</a><br>`:''}
+          ${x.checklist_codigo?`<a class="ver" href="/verificar/${esc(x.checklist_codigo)}" target="_blank"><i class="bi bi-qr-code"></i> Verificar ${esc(x.checklist_codigo)}</a>`:''}
+        </td>
+        <td><button class="btn-mini" onclick="this.closest('tr').nextElementSibling.querySelector('.checks').classList.toggle('show')">Detalle</button></td>
+      </tr>
+      <tr><td colspan="9" style="padding:0 9px"><div class="checks">
+        <table style="width:100%"><tr><th></th><th>Validación</th><th>Documento Unidad</th><th>Business Suite</th></tr>${checksHTML||'<tr><td colspan="4">sin detalle</td></tr>'}</table>
+      </div></td></tr>`;
+    }).join('');
+  } catch(e){ tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#dc2626;padding:26px">Error de conexión</td></tr>'; }
+}
+
+/* El documento exige el JWT en el header: se baja como blob y se abre en pestaña nueva. */
+async function verDoc(docId){
+  try {
+    const r = await fetch('/api/cartas/documentos/' + docId, { headers: H() });
+    if (!r.ok) return alert('No se pudo abrir el checklist');
+    const b = await r.blob();
+    window.open(URL.createObjectURL(b), '_blank');
+  } catch(e){ alert('No se pudo abrir el checklist'); }
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
