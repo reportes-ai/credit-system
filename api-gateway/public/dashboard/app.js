@@ -340,11 +340,18 @@ function buildV1() {
     <tbody>${ccsRows}</tbody>
     <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.saldo)}</td><td>—</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>—</td></tr></tfoot>`;
 
-  // Tabla ejecutivos — TODOS los activos, incluso en cero (van al final, en gris)
-  const ejConCeros = f.ejecutivos.concat(
-    ejFaltantes(f.ejecutivos.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, com_dealer:0, rentab_afa:0 })));
-  const ejRows = ejConCeros.map((e,i)=>`<tr${e.ops?'':' style="color:#94a3b8"'}>
-    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a></td>
+  // Tabla ejecutivos — TODOS los activos, incluso en cero (van al final, en
+  // gris). Los digitadores externos (Autofin) NO se listan por nombre: sus
+  // operaciones se agrupan en una sola fila "Externos Autofin" para que el
+  // total siga cuadrando con el resto del dashboard.
+  const ejPropios = f.ejecutivos.filter(e => ejEsNuestro(e.nombre));
+  const ejExt = f.ejecutivos.filter(e => !ejEsNuestro(e.nombre))
+    .reduce((a,e)=>({ nombre:'Externos Autofin', externo:true, ops:a.ops+e.ops, saldo:a.saldo+e.saldo, com_dealer:a.com_dealer+e.com_dealer, rentab_afa:a.rentab_afa+e.rentab_afa }), { nombre:'Externos Autofin', externo:true, ops:0, saldo:0, com_dealer:0, rentab_afa:0 });
+  const ejConCeros = ejPropios
+    .concat(ejExt.ops ? [ejExt] : [])
+    .concat(ejFaltantes(ejPropios.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, com_dealer:0, rentab_afa:0 })));
+  const ejRows = ejConCeros.map((e,i)=>`<tr${e.ops&&!e.externo?'':' style="color:#94a3b8"'}>
+    <td><span class="rank">${i+1}.</span>${e.externo ? e.nombre : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a>`}</td>
     <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.ops?e.saldo/e.ops:0)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
@@ -1275,14 +1282,18 @@ function buildV1b() {
     ejOt[k].cd += r.com_dealer; ejOt[k].afa += r.ing_autofacil;
   });
   // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio).
-  // Al final, TODOS los ejecutivos activos sin otorgados este mes (en gris,
-  // con la alerta roja de financiamiento igual encendida: cero es cero).
-  const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin)
-    .concat(ejFaltantes(Object.keys(ejOt)).map(n => [n, {ops:0, saldo:0, fin:0, cd:0, afa:0}]));
+  // Externos (Autofin) agrupados en una fila; al final, TODOS los ejecutivos
+  // activos sin otorgados este mes (en gris, con la alerta roja igual: cero es cero).
+  const entEj = Object.entries(ejOt);
+  const extOt = entEj.filter(([n]) => !ejEsNuestro(n))
+    .reduce((a,[,v])=>({ops:a.ops+v.ops, saldo:a.saldo+v.saldo, fin:a.fin+v.fin, cd:a.cd+v.cd, afa:a.afa+v.afa}), {ops:0, saldo:0, fin:0, cd:0, afa:0, externo:true});
+  const topEj = entEj.filter(([n]) => ejEsNuestro(n)).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin)
+    .concat(extOt.ops ? [['Externos Autofin', extOt]] : [])
+    .concat(ejFaltantes(entEj.filter(([n])=>ejEsNuestro(n)).map(([n])=>n)).map(n => [n, {ops:0, saldo:0, fin:0, cd:0, afa:0}]));
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < window.DASH_PARAMS.alerta_fin_ejecutivo ? 'color:#e53935;font-weight:700' : '';
-    return `<tr${v.ops?'':' style="color:#94a3b8"'}>
-    <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
+    return `<tr${v.ops&&!v.externo?'':' style="color:#94a3b8"'}>
+    <td><span class="rank">${i+1}.</span>${v.externo ? nombre : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a>`}</td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
     <td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
   </tr>`;}).join('');
@@ -1403,19 +1414,26 @@ const _pClassParam = p => p >= window.DASH_PARAMS.rentab_verde ? 'pct-ok'
 // ── Ejecutivos comerciales ACTIVOS (desde Usuarios, mismo padrón de los
 // selectores de cartas): las tablas de ejecutivos los muestran a TODOS,
 // aunque vayan en cero — el que no ha colocado también se ve. ──
-window.EJ_ACTIVOS = [];
+window.EJ_ACTIVOS = [];      // comerciales activos (para las filas en cero)
+window.EJ_NUESTROS = new Set(); // todo comercial del BS, activo o ex (para distinguir externos Autofin)
 async function cargarEjecutivosActivos() {
   try {
-    const r = await fetch('/api/cartas-ejecutivos?perfil=comercial', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+    const r = await fetch('/api/cartas-ejecutivos?perfil=comercial&incluir=inactivos', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
     const j = await r.json();
-    if (j && j.success && Array.isArray(j.data)) window.EJ_ACTIVOS = j.data.map(e => e.nombre).filter(Boolean);
+    if (j && j.success && Array.isArray(j.data)) {
+      window.EJ_ACTIVOS = j.data.filter(e => e.estado === 'activo').map(e => e.nombre).filter(Boolean);
+      window.EJ_NUESTROS = new Set(j.data.map(e => String(e.nombre).trim().toUpperCase()));
+    }
   } catch (e) { console.warn('[dash ejecutivos]', e.message); }
 }
-// Devuelve los nombres del padrón que NO están en la lista de nombres dada (case-insensitive)
+// Devuelve los nombres del padrón activo que NO están en la lista dada (case-insensitive)
 function ejFaltantes(nombresConDatos) {
   const tiene = new Set(nombresConDatos.map(n => String(n).trim().toUpperCase()));
   return (window.EJ_ACTIVOS || []).filter(n => !tiene.has(String(n).trim().toUpperCase()));
 }
+// ¿Es ejecutivo del BS (activo o ex)? Si no, es un digitador externo (Autofin)
+// y en las tablas se agrupa en una sola fila "Externos Autofin".
+const ejEsNuestro = n => !window.EJ_NUESTROS.size || window.EJ_NUESTROS.has(String(n).trim().toUpperCase());
 
 // ── Cargar datos frescos desde el JSON generado automáticamente ──
 async function cargarDatos() {

@@ -11,14 +11,17 @@ const getAll = async (req, res) => {
     // dashboard para listar la fuerza de venta completa, incluso en cero).
     // Sin el parámetro, la lista amplia de siempre para los selectores.
     const soloComercial = String(req.query.perfil || '') === 'comercial';
+    // ?incluir=inactivos → suma ex-ejecutivos (con su estado) — lo usa el
+    // dashboard para distinguir "nuestro ejecutivo" de un externo de Autofin.
+    const conInactivos = String(req.query.incluir || '') === 'inactivos';
     const [rows] = await pool.query(
       `SELECT u.id_usuario AS id,
               -- Convención: PRIMER nombre + apellido PATERNO (nombre completo solo en documentos formales)
               TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre,
-              u.email AS mail, u.telefono AS tel
+              u.email AS mail, u.telefono AS tel, u.estado
          FROM usuarios u
          JOIN perfiles p ON p.id_perfil = u.id_perfil
-        WHERE u.estado = 'activo'
+        WHERE (u.estado = 'activo' OR ?)
           AND p.nombre <> 'Administrador'
           AND (
             p.nombre IN ('Ejecutivo', 'Ejecutivo Comercial')
@@ -32,7 +35,7 @@ const getAll = async (req, res) => {
                           AND f2.codigo IN ('aprob_crear', 'creditos.crear'))))
           )
         ORDER BY nombre`,
-      [soloComercial]
+      [conInactivos, soloComercial]
     );
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
