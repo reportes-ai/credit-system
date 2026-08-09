@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Excepciones Comerciales — AutoFácil</title>
-  <!-- v2.1 — grupo Revisor Automático de Cartas Unidad (interruptor + tolerancia) -->
+  <!-- v2.2 — el motor se enciende con un switch (ENCENDIDO/APAGADO) en vez de 1/0 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -24,6 +24,13 @@
     .wrap { max-width:860px; margin:0 auto; padding:22px 24px 60px; }
     h5.sec { font-weight:800; color:var(--navy); margin:0 0 4px; }
     .grupo-tit { font-weight:800; color:var(--navy); font-size:.95rem; margin:22px 0 8px; display:flex; align-items:center; gap:8px; }
+    /* Interruptor (switch) para parámetros 1/0 */
+    .sw { position:relative; display:inline-block; width:52px; height:28px; flex:0 0 auto; cursor:pointer; }
+    .sw input { display:none; }
+    .sw-track { position:absolute; inset:0; background:#cbd5e1; border-radius:14px; transition:background .2s; }
+    .sw-track::after { content:''; position:absolute; top:3px; left:3px; width:22px; height:22px; background:#fff; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,.3); transition:left .2s; }
+    .sw input:checked + .sw-track { background:#16a34a; }
+    .sw input:checked + .sw-track::after { left:27px; }
     .p-card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:14px 20px; margin-bottom:10px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
     .p-card .info { flex:1; min-width:260px; }
     .p-card .nom { font-weight:800; color:var(--navy); font-size:.95rem; }
@@ -145,6 +152,16 @@ function render(){
   for (const g of GRUPOS) {
     h += `<div class="grupo-tit"><i class="bi ${g.icono}" style="color:#0141A2"></i>${g.tit}</div>`;
     for (const [clave, nom, unidad] of g.claves) {
+      if (unidad === '1/0') {   // interruptor: switch en vez de campo numérico
+        const on = Number(OBJ[clave]) > 0;
+        h += `<div class="p-card">
+          <div class="info"><div class="nom">${escH(nom)}</div><div class="desc">${escH(DESCS[clave]||'')}</div></div>
+          <input type="hidden" id="p_${clave}" value="${on ? 1 : 0}">
+          <label class="sw"><input type="checkbox" ${on?'checked':''} onchange="document.getElementById('p_${clave}').value=this.checked?1:0;this.closest('label').nextElementSibling.textContent=this.checked?'ENCENDIDO':'APAGADO';this.closest('label').nextElementSibling.style.color=this.checked?'#16a34a':'#94a3b8'"><span class="sw-track"></span></label>
+          <span class="unidad" style="font-weight:800;min-width:86px;color:${on?'#16a34a':'#94a3b8'}">${on?'ENCENDIDO':'APAGADO'}</span>
+        </div>`;
+        continue;
+      }
       h += `<div class="p-card">
         <div class="info"><div class="nom">${escH(nom)}</div><div class="desc">${escH(DESCS[clave]||'')}</div></div>
         <input type="number" step="any" min="0" id="p_${clave}" value="${OBJ[clave] ?? ''}">
