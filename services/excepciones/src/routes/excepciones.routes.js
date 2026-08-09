@@ -5,8 +5,10 @@ const ctrl = require('../controllers/excepciones.controller');
 
 router.get('/estado',       verifyToken, requireFunc('excepciones_simulador'), ctrl.getEstado);
 router.get('/mis-codigos',  verifyToken, requireFunc('excepciones_simulador'), ctrl.misCodigos);
-router.get('/registro',     verifyToken, requireFunc('excepciones_gerencia'), ctrl.registro);
-router.get('/informe',      verifyToken, requireFunc('excepciones_gerencia'), ctrl.informe);
+// Registro e informe: casilla propia (excepciones_registro) para poder darlos
+// sin la atribución de GENERAR códigos de Gerencia — la matriz manda.
+router.get('/registro',     verifyToken, requireFunc('excepciones_gerencia', 'excepciones_registro'), ctrl.registro);
+router.get('/informe',      verifyToken, requireFunc('excepciones_gerencia', 'excepciones_registro'), ctrl.informe);
 // validar/usar los ocupan el simulador y el formulario de cartas — nunca un token cualquiera
 router.get('/validar/:codigo', verifyToken, requireFunc('excepciones_simulador', 'aprob_crear', 'aprob_revisar'), ctrl.validar);
 router.post('/generar',     verifyToken, requireFunc('excepciones_generar'), ctrl.generar);

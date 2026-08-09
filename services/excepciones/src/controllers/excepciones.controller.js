@@ -62,7 +62,8 @@ require('../../../../shared/migrate').enFila('excepciones-codigos', async () => 
     await pool.query(`INSERT IGNORE INTO funcionalidades (id_funcionalidad, id_modulo, nombre, codigo, href, icono) VALUES
       (7930001, 300001, 'Simulador de Excepciones', 'excepciones_simulador', '/excepciones/', 'bi-stars'),
       (7930002, 300001, 'Excepciones — generar código propio/comodín', 'excepciones_generar', NULL, NULL),
-      (7930003, 300001, 'Excepciones — generar código de Gerencia', 'excepciones_gerencia', NULL, NULL)`);
+      (7930003, 300001, 'Excepciones — generar código de Gerencia', 'excepciones_gerencia', NULL, NULL),
+      (7930004, 300001, 'Excepciones — ver registro e informe', 'excepciones_registro', NULL, NULL)`);
     const dar = async (perfilLike, funcs) => {
       const [[p]] = await pool.query('SELECT id_perfil FROM perfiles WHERE UPPER(nombre) LIKE ? ORDER BY id_perfil LIMIT 1', [perfilLike]);
       if (!p) return;
@@ -73,7 +74,7 @@ require('../../../../shared/migrate').enFila('excepciones-codigos', async () => 
                           SET pp.habilitado = 1 WHERE f.codigo = ? AND pp.id_perfil = ?`, [f, p.id_perfil]);
       }
     };
-    await dar('ADMINISTRADOR',              ['excepciones_simulador', 'excepciones_generar', 'excepciones_gerencia']);
+    await dar('ADMINISTRADOR',              ['excepciones_simulador', 'excepciones_generar', 'excepciones_gerencia', 'excepciones_registro']);
     await dar('EJECUTIVO COMERCIAL',        ['excepciones_simulador', 'excepciones_generar']);
     await dar('SUPERVISOR COMERCIAL',       ['excepciones_simulador', 'excepciones_generar']);
     await dar('JEFE COMERCIAL',             ['excepciones_simulador']);
@@ -352,8 +353,10 @@ const registro = async (req, res) => {
     await vencerCaducos();
     const [rows] = await pool.query(
       `SELECT codigo, tipo, estado, ejecutivo, rut_cliente, saldo_precio, plazo, financiera,
-              comentario, generado_por, generado_at, vence_at, usado_carta, usado_at
+              comentario, snapshot, generado_por, generado_at, vence_at, usado_carta, usado_at
        FROM excepciones_codigos ORDER BY generado_at DESC LIMIT 500`);
+    // snapshot parseado: el registro muestra QUÉ aprueba cada código (tasa/comisión/financiera)
+    rows.forEach(r => { try { r.snapshot = typeof r.snapshot === 'object' ? r.snapshot : JSON.parse(r.snapshot || 'null'); } catch (_) { r.snapshot = null; } });
     res.json({ success: true, data: rows, error: null });
   } catch (e) { console.error('[excepciones registro]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
