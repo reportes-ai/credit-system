@@ -704,7 +704,7 @@ const otorgar = async (req, res) => {
                   fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
-              AND (estado IN ('CARTA_APROBACION','APROBADO','INGRESO')
+              AND (estado IN ('CARTA_APROBACION','APROBADO','INGRESO','DIGITADO')
                    /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
                    OR (estado IS NULL AND COALESCE(estado_credito,'') IN ('APROBADO','DIGITADO','PENDIENTE')))`,
