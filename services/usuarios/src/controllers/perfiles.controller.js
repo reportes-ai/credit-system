@@ -580,6 +580,26 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b09', async () => {
   } catch (e) { console.error('[retiro cartas antiguo]', e.message); }
 });
 
+/* ─── Retiro de casillas fantasma (ago-2026, auditoría §8) ────────────────────
+   clientes.eliminar / cotizaciones.aprobar / cotizaciones.editar prometían
+   controlar una acción que NUNCA se construyó server-side (no existe DELETE de
+   clientes ni aprobar/editar cotización): solo mostraban un botón muerto.
+   Se archivan en "Retirados" para que la matriz no mienta. Reversible. */
+require('../../../../shared/migrate').migrarAuto('perfiles_b10', async () => {
+  try {
+    const FLAG = 'retiro_casillas_fantasma_v1';
+    const [[ya]] = await pool.query('SELECT 1 ok FROM migraciones_aplicadas WHERE clave=? LIMIT 1', [FLAG]);
+    if (ya) return;
+    const [[ret]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Retirados' LIMIT 1");
+    if (!ret) return;
+    await pool.query(`UPDATE funcionalidades SET id_modulo=?, href=NULL
+                      WHERE codigo IN ('clientes.eliminar','cotizaciones.aprobar','cotizaciones.editar')`, [ret.id_modulo]);
+    await pool.query('INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES (?)', [FLAG]);
+    limpiarCachePermisos();
+    console.log('✓ Retiro casillas fantasma: clientes.eliminar, cotizaciones.aprobar, cotizaciones.editar archivadas');
+  } catch (e) { console.error('[retiro casillas fantasma]', e.message); }
+});
+
 const getAllPerfiles = async (req, res) => {
   try {
     // Perfiles en orden alfabético (A→Z).
