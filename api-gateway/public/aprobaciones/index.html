@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.30 — pantallazo Autofin: detecta listados (pedir la solicitud puntual) y guarda la respuesta IA cruda para depurar -->
+  <!-- v4.31 — recuadro pantallazo solo con el Revisor AUTOFIN encendido; banner sin comodines (escalera) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -342,8 +342,9 @@
             <button type="button" onclick="document.getElementById('docAutofin').click()" style="background:#111827;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer"><i class="bi bi-file-earmark-arrow-up me-1"></i>Subir Carta Aprobación</button>
             <span id="docAutofinName" style="font-size:.74rem;color:#16a34a;font-weight:600"></span>
           </div>
-          <!-- Pantallazo del sistema Autofin: prueba del ESTADO (Revisión Firma / Cursado) -->
-          <div style="margin-top:10px;border:1.5px dashed #94a3b8;border-radius:10px;padding:10px 12px;background:#f8fafc">
+          <!-- Pantallazo del sistema Autofin: prueba del ESTADO (Revisión Firma / Cursado).
+               Solo se muestra con el Revisor AUTOFIN encendido (rev_autofin_activo). -->
+          <div id="pzWrap" style="display:none;margin-top:10px;border:1.5px dashed #94a3b8;border-radius:10px;padding:10px 12px;background:#f8fafc">
             <div style="font-size:.78rem;font-weight:700;color:#334155;margin-bottom:6px"><i class="bi bi-camera me-1"></i>Pantallazo Autofin (estado de la solicitud) — obligatorio para revisar el Estado</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <button type="button" onclick="pzCapturar()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:.8rem;font-weight:700;cursor:pointer"><i class="bi bi-camera-fill me-1"></i>📸 Capturar pantalla</button>
@@ -869,7 +870,10 @@ async function cargarUFyTasas(){
     if (u?.valor) UF_HOY = parseFloat(u.valor);
     if (jTas.data) TASAS = jTas.data;
     if (jPar.success && jPar.data?.obj) { PARAMS_CRED = jPar.data.obj;
-      const vd = parseInt(PARAMS_CRED.vigencia_carta_dias, 10); if (vd > 0) VIGENCIA_DIAS = vd; }
+      const vd = parseInt(PARAMS_CRED.vigencia_carta_dias, 10); if (vd > 0) VIGENCIA_DIAS = vd;
+      // Recuadro del pantallazo Autofin: solo con el Revisor AUTOFIN encendido
+      const pz = document.getElementById('pzWrap');
+      if (pz) pz.style.display = parseFloat(PARAMS_CRED.rev_autofin_activo) > 0 ? '' : 'none'; }
     // Tier UAC vigente: sin esto la rentabilidad de la Unidad de Crédito se
     // calcularía con el tier 1 y el veredicto saldría sesgado a AutoFin.
     if (jUac.success && jUac.data) { OPS_UAC = jUac.data.ops || 0; MES_UAC = jUac.data.mes || ''; }
@@ -1015,9 +1019,8 @@ async function cargarExcPresu(){
     const j = await r.json();
     if (!j.success) { el.style.display = 'none'; return; }
     const d = j.data;
-    el.innerHTML = `${'⭐'.repeat(Math.min(8, d.estrellas_disponibles)) || '—'} <b>${d.estrellas_disponibles} de ${d.estrellas_total}</b> excepciones del mes` +
-      ` &nbsp;·&nbsp; 🏆 <b>${d.comodines_disponibles}</b> comodín(es)` +
-      ` &nbsp;·&nbsp; <a href="/excepciones/" target="_blank" style="color:#854d0e">Simulador de Excepciones →</a>`;
+    el.innerHTML = `${'⭐'.repeat(Math.min(8, d.estrellas_disponibles)) || '—'} <b>${d.estrellas_disponibles} de ${d.estrellas_total}</b> estrellas del mes` +
+      ` &nbsp;·&nbsp; <a href="/donde-curso-2/" target="_blank" style="color:#854d0e">¿Dónde Curso? 2.0 →</a>`;
     el.style.display = '';
   } catch(_) { el.style.display = 'none'; }
 }
