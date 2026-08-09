@@ -1449,39 +1449,40 @@ async function capturaEjecutivosWSP() {
     }).filter(f => f.nombre);
     const tot = document.querySelector('#t-ej1b tfoot tr');
     const totC = tot ? tot.querySelectorAll('td') : [];
-    const S = 2, W = 380, RH = 26, HH = 34;
+    const S = 2, W = 460, RH = 32, HH = 44;
     const H = HH + RH * (filas.length + 1) + 12;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
     const g = cv.getContext('2d'); g.scale(S, S);
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     // Cabecera navy
     g.fillStyle = '#012d70'; g.fillRect(0, 0, W, HH);
-    g.fillStyle = '#fff'; g.font = '700 12px Segoe UI, sans-serif';
-    g.fillText('EJECUTIVOS — OTORGADOS', 10, 15);
-    g.font = '600 10px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
+    g.fillStyle = '#fff'; g.font = '700 15px Segoe UI, sans-serif';
+    g.fillText('EJECUTIVOS — OTORGADOS', 12, 19);
+    g.font = '600 12px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
     const hoy = new Date();
-    g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }), 10, 28);
-    g.textAlign = 'right'; g.fillText('Q', W - 110, 22); g.fillText('Total Fin.', W - 14, 22); g.textAlign = 'left';
+    g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
+      + ' · ' + hoy.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs', 12, 36);
+    g.textAlign = 'right'; g.fillText('Q', W - 130, 30); g.fillText('Total Fin.', W - 16, 30); g.textAlign = 'left';
     filas.forEach((f, i) => {
       const y = HH + RH * i;
       if (i % 2) { g.fillStyle = '#f4f7fb'; g.fillRect(0, y, W, RH); }
       g.fillStyle = f.gris ? '#94a3b8' : '#1e293b';
-      g.font = (f.gris ? '400' : '600') + ' 11px Segoe UI, sans-serif';
-      g.fillText((i + 1) + '. ' + (f.nombre.length > 30 ? f.nombre.slice(0, 30) + '…' : f.nombre), 10, y + 17);
+      g.font = (f.gris ? '400' : '600') + ' 14px Segoe UI, sans-serif';
+      g.fillText((i + 1) + '. ' + (f.nombre.length > 30 ? f.nombre.slice(0, 30) + '…' : f.nombre), 12, y + 21);
       g.textAlign = 'right';
-      g.fillText(f.q, W - 110, y + 17);
-      if (f.rojo && !f.gris) { g.fillStyle = '#e53935'; g.font = '700 11px Segoe UI, sans-serif'; }
-      g.fillText(f.fin, W - 14, y + 17);
+      g.fillText(f.q, W - 130, y + 21);
+      if (f.rojo && !f.gris) { g.fillStyle = '#e53935'; g.font = '700 14px Segoe UI, sans-serif'; }
+      g.fillText(f.fin, W - 16, y + 21);
       g.textAlign = 'left';
     });
     // Total
     const yT = HH + RH * filas.length;
     g.fillStyle = '#012d70'; g.fillRect(0, yT, W, RH);
-    g.fillStyle = '#fff'; g.font = '700 11px Segoe UI, sans-serif';
-    g.fillText('Total', 10, yT + 17);
+    g.fillStyle = '#fff'; g.font = '700 14px Segoe UI, sans-serif';
+    g.fillText('Total', 12, yT + 21);
     g.textAlign = 'right';
-    g.fillText((totC[1]?.innerText || '').trim(), W - 110, yT + 17);
-    g.fillText((totC[2]?.innerText || '').trim(), W - 14, yT + 17);
+    g.fillText((totC[1]?.innerText || '').trim(), W - 130, yT + 21);
+    g.fillText((totC[2]?.innerText || '').trim(), W - 16, yT + 21);
     g.textAlign = 'left';
     const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
