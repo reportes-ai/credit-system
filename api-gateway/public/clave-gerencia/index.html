@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — condiciones del crédito + veredicto de financiera; la clave autoriza tasa/comisión/financiera -->
+<!-- v1.2 — ejecutivo en lista desplegable (o cualquier ejecutivo) -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -227,8 +227,7 @@
         </div>
 
         <div class="fld"><label>Ejecutivo de la carta</label>
-          <input id="iEjec" type="text" list="dlEjec" placeholder="Nombre del ejecutivo">
-          <datalist id="dlEjec"></datalist></div>
+          <select id="iEjec"><option value="">— Cualquier ejecutivo —</option></select></div>
         <div class="fld"><label>Motivo <span class="aux">(obligatorio, queda en auditoría)</span></label>
           <textarea id="iMotivo" placeholder="Por qué la Gerencia autoriza esta excepción (mínimo 10 caracteres)"></textarea></div>
         <button class="btn-gen" id="btnGen" onclick="generar()">
@@ -357,8 +356,9 @@ async function cargarEjecutivos(){
     const r = await fetch(API + '/cartas-ejecutivos', { headers: H() });
     const j = await r.json();
     if (j.success && Array.isArray(j.data))
-      $('dlEjec').innerHTML = j.data.map(e => `<option value="${e.nombre}">`).join('');
-  } catch (e) { /* sin lista: se escribe a mano */ }
+      $('iEjec').innerHTML = '<option value="">— Cualquier ejecutivo —</option>' +
+        j.data.map(e => `<option value="${e.nombre}">${e.nombre}</option>`).join('');
+  } catch (e) { /* sin lista: queda "cualquier ejecutivo" */ }
 }
 
 /* ── Inputs ── */
