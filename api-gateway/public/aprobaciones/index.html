@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.27 — Revisor Automático Unidad: informe del motor en la revisión (qué no cuadró, doc vs sistema) -->
+  <!-- v4.28 — card Bitácora Revisor Automático en el home del módulo -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -260,6 +260,11 @@
     <button class="ap-card" id="cardCargaMasiva" onclick="abrirCargaMasivaCartas()" style="display:none">
       <div class="card-icon"><i class="bi bi-upload"></i></div>
       <h6>Carga Masiva de Cartas</h6><p>Sube el Excel mensual (hoja DETALLE MES) y carga las cartas en bloque, enlazando a los créditos existentes</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </button>
+    <button class="ap-card" id="cardBitacoraRevisor" onclick="location.href='/aprobaciones/bitacora-revisor/'" style="display:none">
+      <div class="card-icon"><i class="bi bi-robot"></i></div>
+      <h6>Bitácora Revisor Automático</h6><p>Registro inmutable de cada revisión de Business Suite: aprobadas automáticas con su checklist firmado y derivadas al analista</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </button>
     <button class="ap-card" id="cardDetalleMes" onclick="location.href='/aprobaciones/detalle-mes/'" style="display:none">
@@ -917,6 +922,7 @@ async function cargarPermisos(){
   if (can('aprob_mantenedor')) document.getElementById('cardMantenedor').style.display = '';
   if (can('aprob_carga_masiva')) document.getElementById('cardCargaMasiva').style.display = '';
   if (can('aprob_detalle_mes') || can('aprob_informes')) document.getElementById('cardDetalleMes').style.display = '';
+  if (can('aprob_bitacora_revisor') || can('aprob_revisar')) document.getElementById('cardBitacoraRevisor').style.display = '';
 }
 const puede = c => ES_ADMIN || PERMISOS.has(c);
 
