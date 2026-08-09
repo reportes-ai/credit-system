@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — comisión dealer modificable: entra al motor y viaja en la clave -->
+<!-- v1.4 — lista de ejecutivos solo perfil comercial -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -358,7 +358,8 @@ async function cargarBase(){
 /* ── Selector de ejecutivos (misma lista de los selectores de Cartas) ── */
 async function cargarEjecutivos(){
   try {
-    const r = await fetch(API + '/cartas-ejecutivos', { headers: H() });
+    // Solo perfil Ejecutivo/Ejecutivo Comercial — sin la lista amplia (analistas, etc.)
+    const r = await fetch(API + '/cartas-ejecutivos?perfil=comercial', { headers: H() });
     const j = await r.json();
     if (j.success && Array.isArray(j.data))
       $('iEjec').innerHTML = '<option value="">— Cualquier ejecutivo —</option>' +
