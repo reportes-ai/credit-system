@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.34 — Vigentes: columnas Financiera e ID Financiera + buscables -->
+  <!-- v4.35 — Vigentes compacta: iconos en vertical y letra chica, sin scroll horizontal -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -533,7 +533,15 @@
       <input type="text" id="vigBuscar" placeholder="Buscar N° operación, cliente, dealer o ejecutivo…" oninput="renderVigentes()" style="flex:1;min-width:240px">
     </div>
     <div style="overflow-x:auto">
-      <table class="tbl">
+      <!-- Letra compacta + iconos verticales: la tabla entra sin scroll horizontal -->
+      <style>
+        #tblVigentes { font-size:.74rem; }
+        #tblVigentes th { font-size:.66rem; padding:8px 6px; }
+        #tblVigentes td { padding:7px 6px; }
+        #tblVigentes .btn-mini { padding:3px 7px; font-size:.72rem; }
+        #tblVigentes .acc-vert { display:inline-flex; flex-direction:column; gap:4px; vertical-align:middle; }
+      </style>
+      <table class="tbl" id="tblVigentes">
         <thead><tr><th>N° Op Carta</th><th>N° Operación</th><th>Financiera</th><th>ID Financiera</th><th>Tipo</th><th>RUT</th><th>Cliente</th><th>Dealer</th><th>Ejecutivo</th><th>Fecha carta</th><th>Vence</th><th style="text-align:center">Vigencia</th><th style="text-align:right">Acciones</th></tr></thead>
         <tbody id="bodyVigentes"></tbody>
       </table>
@@ -2988,11 +2996,15 @@ function renderVigentes(){
       <td style="font-size:.76rem">${v.vence?v.vence.toLocaleDateString('es-CL'):'—'}</td>
       <td style="text-align:center">${chip}</td>
       <td style="text-align:right;white-space:nowrap">
-        <button class="btn-mini bm-ver" onclick="verCarta(${c.id})" title="Ver"><i class="bi bi-eye"></i></button>
-        <button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})" title="Imprimir"><i class="bi bi-printer"></i></button>
-        ${puede('aprob_rentabilidad')?`<button class="btn-mini bm-rent" onclick="verRentabilidad(${c.id})" title="Rentabilidad"><i class="bi bi-cash-coin"></i></button>`:''}
-        <button class="btn-mini bm-otorgar" onclick="otorgarCarta(${c.id})"><i class="bi bi-check2-circle"></i> Otorgado</button>
-        <button class="btn-mini bm-desistir" onclick="desistirCarta(${c.id})"><i class="bi bi-x-circle"></i> Desistido</button>
+        <span class="acc-vert">
+          <button class="btn-mini bm-ver" onclick="verCarta(${c.id})" title="Ver"><i class="bi bi-eye"></i></button>
+          <button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})" title="Imprimir"><i class="bi bi-printer"></i></button>
+          ${puede('aprob_rentabilidad')?`<button class="btn-mini bm-rent" onclick="verRentabilidad(${c.id})" title="Rentabilidad"><i class="bi bi-cash-coin"></i></button>`:''}
+        </span>
+        <span class="acc-vert" style="margin-left:6px">
+          <button class="btn-mini bm-otorgar" onclick="otorgarCarta(${c.id})"><i class="bi bi-check2-circle"></i> Otorgado</button>
+          <button class="btn-mini bm-desistir" onclick="desistirCarta(${c.id})"><i class="bi bi-x-circle"></i> Desistido</button>
+        </span>
       </td>
     </tr>`;
   }).join('');
