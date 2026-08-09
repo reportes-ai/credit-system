@@ -159,6 +159,11 @@ async function revisar(carta, p) {
         String(pz.idSolicitud) === String(carta.id_financiera || ''));
   }
 
+  // 1c. Datos mínimos del sistema: sin tasa o sin comisión digitada NO se aprueba
+  //     a ciegas — esos checks quedarían saltados en silencio (auditoría, hallazgo 3).
+  if (carta.tasa_credito == null || carta.part_neto == null || carta.monto_credito_clp == null || !carta.saldo || !carta.plazo)
+    return { checks, ok: false, motivo: 'Carta con datos incompletos (tasa, comisión, montos o plazo): requiere ojo humano' };
+
   // 2. Documento vs sistema
   add('ID Financiera', comp.opOrigen || cot?.opOrigen, carta.id_financiera,
       String(comp.opOrigen || cot?.opOrigen || '') === String(carta.id_financiera || ''));
@@ -174,6 +179,7 @@ async function revisar(carta, p) {
   if (tasaDoc != null && tasaCarta != null)
     add('Tasa cursada (doc vs sistema)', tasaDoc + '%', tasaCarta + '%', Math.abs(tasaDoc - tasaCarta) <= 0.005);
   const piz = await tasaPizarra(carta.fecha, parseFloat(carta.saldo) || 0, p);
+  if (piz == null) return { checks, ok: false, motivo: 'Sin tasa pizarra vigente para la fecha de la carta: requiere ojo humano' };
   let tasaRebajada = false;
   if (piz != null && tasaCarta != null) {
     const minPermitida = Math.floor(piz * (1 - (p.exc_tasa_rebaja_max_pct || 5) / 100) * 100) / 100;
@@ -295,8 +301,16 @@ function anotarBitacora(carta, resultado, r, checklist) {
   ).catch(e => console.error('[revisor-unidad bitacora]', e.message));
 }
 
-/* ── ENTRADA: se dispara al subir documentos o re-guardar una carta UNIDAD ── */
+/* ── ENTRADA: se dispara al subir documentos o re-guardar una carta ────────
+   _enCurso: candado por carta — dos documentos subiendo a la vez disparaban
+   dos revisiones simultáneas (doble checklist y doble fila de bitácora). */
+const _enCurso = new Set();
 async function procesarCarta(idCarta) {
+  if (_enCurso.has(idCarta)) return;
+  _enCurso.add(idCarta);
+  try { await _procesarCarta(idCarta); } finally { _enCurso.delete(idCarta); }
+}
+async function _procesarCarta(idCarta) {
   try {
     const [[carta]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [idCarta]);
     if (!carta || carta.status !== 'PENDIENTE' || carta.otorgado) return;
@@ -306,6 +320,13 @@ async function procesarCarta(idCarta) {
     const p = await params();
     const activo = esAutofin ? p.rev_autofin_activo : p.rev_unidad_activo;
     if (!(activo > 0)) return;   // apagado: todo al analista, sin ruido
+    /* Vigencia (auditoría, hallazgo 2): el humano no puede aprobar una carta
+       vencida — el motor tampoco. El barrido la pasará a VENCIDA. */
+    if (carta.fecha) {
+      const dias = parseFloat(p.vigencia_carta_dias) > 0 ? parseFloat(p.vigencia_carta_dias) : 5;
+      const vence = new Date(carta.fecha); vence.setDate(vence.getDate() + dias); vence.setHours(23, 59, 59);
+      if (vence < new Date()) { console.log(`[revisor-unidad] carta ${carta.op_carta} vencida: no se aprueba`); return; }
+    }
 
     const r = await revisar(carta, p);
     await pool.query('UPDATE cartas_aprobacion SET revision_auto=? WHERE id=?',

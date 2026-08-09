@@ -1656,6 +1656,13 @@ const subirDocumento = async (req, res) => {
     const buf = _toBuf(data_base64);
     if (!buf.length) return res.status(400).json({ success: false, data: null, error: 'Archivo vacío' });
     if (buf.length > 12 * 1024 * 1024) return res.status(413).json({ success: false, data: null, error: 'Máximo 12 MB por archivo' });
+    /* AUDITORÍA REVISOR (hallazgo 4): con la carta ya resuelta no se reemplazan
+       documentos — el checklist firmado quedaría descolgado de lo adjunto. */
+    if (idCarta) {
+      const [[caDoc]] = await pool.query('SELECT status, otorgado FROM cartas_aprobacion WHERE id=? LIMIT 1', [idCarta]);
+      if (caDoc && (caDoc.otorgado || !['PENDIENTE', 'RECHAZADA'].includes(caDoc.status)))
+        return res.status(409).json({ success: false, data: null, error: `La carta está ${caDoc.otorgado ? 'OTORGADA' : caDoc.status}: sus documentos ya no se pueden reemplazar.` });
+    }
     /* Re-subida: la fila anterior se borra, así que hay que quedarse con su ruta
        antes o el objeto queda huérfano en el bucket para siempre. */
     let rutasViejas = [];
@@ -1663,10 +1670,11 @@ const subirDocumento = async (req, res) => {
       [rutasViejas] = await pool.query('SELECT doc_ruta FROM cartas_documentos WHERE id_carta=? AND tipo=? AND doc_ruta IS NOT NULL', [idCarta, tipo]);
       await pool.query('DELETE FROM cartas_documentos WHERE id_carta=? AND tipo=?', [idCarta, tipo]); // re-subida: reemplaza
     }
-    /* extracted lo calcula el SERVIDOR (el front nunca lo mandó y la columna
-       quedó muerta): lo que se leyó del documento queda junto al documento,
-       para auditar por qué un monto se guardó como se guardó. */
-    let ext = extracted || null;
+    /* extracted lo calcula SIEMPRE el SERVIDOR — nunca se acepta del cliente
+       (auditoría del Revisor, hallazgo 1: un extracted forjado por API haría
+       aprobar cartas con documentos que dicen otra cosa). */
+    void extracted;   // ignorado deliberadamente
+    let ext = null;
     /* Pantallazo del sistema Autofin (imagen): Haiku lee el ID de solicitud y el
        ESTADO (Revisión Firma / Cursado / etc.) — es el fundante del lado Autofin. */
     if (!ext && tipo === 'PANTALLAZO_AUTOFIN') {
