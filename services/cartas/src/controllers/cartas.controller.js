@@ -1673,13 +1673,14 @@ const subirDocumento = async (req, res) => {
       try {
         const ia = require('../../../../shared/ia');
         if (await ia.iaActiva('cartas_pdf_ia')) {
-          const { datos } = await require('../../../../shared/anthropic').analizar({
-            codigo: 'cartas_pdf_ia', json: true, max_tokens: 400,
+          const { datos, texto, stop_reason } = await require('../../../../shared/anthropic').analizar({
+            codigo: 'cartas_pdf_ia', json: true, max_tokens: 700,
             documentos: [{ tipo: 'image', media_type: mime || 'image/png', data: data_base64.replace(/^data:[^;]+;base64,/, '') }],
-            system: 'Lees pantallazos del sistema de créditos Autofin (Chile). Respondes SOLO JSON; null cuando el dato no se ve. No inventes.',
-            prompt: 'Extrae: numero de solicitud o ID del credito visible (idSolicitud), ESTADO de la solicitud tal como aparece (estado — ej REVISIONFIRMA, REVISION FIRMA, CURSADO, APROBADO, PRE-CURSE), rut del cliente si se ve (rutCliente), fecha de curse si se ve (fechaCurse, YYYY-MM-DD).',
+            system: 'Lees pantallazos del sistema de créditos Autofin (Chile). Respondes SOLO JSON; null cuando el dato no se ve o es ambiguo. No inventes.',
+            prompt: 'El pantallazo debe mostrar UNA solicitud puntual (su ficha o su fila única de búsqueda por ID). Extrae: numero de solicitud o ID visible (idSolicitud), ESTADO de ESA solicitud tal como aparece (estado — ej REVISIONFIRMA, REVISION FIRMA, CURSADO, APROBADA, PRE-CURSE), rut del cliente si se ve (rutCliente), fecha de curse si se ve (fechaCurse, YYYY-MM-DD). Si la imagen es un LISTADO con varias solicitudes y no está claro cuál es, responde {"idSolicitud":null,"estado":null,"listado":true}.',
           });
-          ext = datos || { error_lectura: 'IA sin respuesta' };
+          // La respuesta cruda queda guardada cuando no hubo JSON — sin ella no se puede depurar
+          ext = datos || { error_lectura: 'IA sin JSON', texto_ia: String(texto || '').slice(0, 400), stop_reason: stop_reason || null };
         } else ext = { sin_ia: true };
       } catch (e) { ext = { error_lectura: e.message }; }
     }

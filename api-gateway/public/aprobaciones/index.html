@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.29 — pantallazo Autofin: botón 📸 capturar pantalla + pegado Ctrl+V; IA lee el Estado al subirlo -->
+  <!-- v4.30 — pantallazo Autofin: detecta listados (pedir la solicitud puntual) y guarda la respuesta IA cruda para depurar -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2322,7 +2322,8 @@ async function udSubir(idCarta){
       if (tipo==='PANTALLAZO_AUTOFIN' && j && j.success) {
         const ex = j.data.extracted || {};
         if (ex.estado) console.log('[pantallazo] estado leído:', ex.estado, 'id:', ex.idSolicitud||'—');
-        else alert('⚠ El pantallazo de Autofin quedó adjunto, pero no se pudo leer el ESTADO de la solicitud. Verifica que capturaste la ventana completa (con el estado visible) — el revisor lo va a exigir.');
+        else if (ex.listado) alert('⚠ El pantallazo muestra el LISTADO de solicitudes. Busca la solicitud por su ID en Autofin y captura SU pantalla (donde se ve su estado) — el revisor lo va a exigir.');
+        else alert('⚠ El pantallazo de Autofin quedó adjunto, pero no se pudo leer el ESTADO de la solicitud. Captura la solicitud puntual (buscada por su ID, con el estado visible), no el listado — el revisor lo va a exigir.');
       }
     }
     catch(e){ console.error('udSubir',e); }
