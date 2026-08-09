@@ -5304,10 +5304,10 @@ async function buildVRentEj(soloRender){
   //    y cuánto habría sido el ingreso cursando todo por el lado más rentable.
   const pot = tot.rent + tot.lucro;
   const pReal = pot ? tot.rent/pot*100 : 0, pLucro = pot ? tot.lucro/pot*100 : 0;
-  const fila=(lbl,val,pct,color,peso)=>'<div style="display:flex;align-items:center;justify-content:space-between;background:#f7f9fc;border-left:4px solid '+color+';border-radius:8px;padding:12px 14px">'
-    +'<div><div style="font-size:10px;color:#8aa0b8;text-transform:uppercase;letter-spacing:.03em">'+lbl+'</div>'
+  const fila=(lbl,val,pct,color,peso)=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f7f9fc;border-left:4px solid '+color+';border-radius:8px;padding:10px 14px">'
+    +'<div style="flex:1;min-width:0"><div style="font-size:10px;color:#8aa0b8;text-transform:uppercase;letter-spacing:.03em">'+lbl+'</div>'
     +'<div style="font-size:'+(peso?'1.35rem':'1.15rem')+';font-weight:800;color:'+color+'">'+_reCLP(val)+'</div></div>'
-    +'<div style="font-size:1rem;font-weight:800;color:'+color+'">'+pct+'</div></div>';
+    +'<div style="font-size:1rem;font-weight:800;color:'+color+';white-space:nowrap">'+pct+'</div></div>';
   document.getElementById('re-resumen').innerHTML =
       fila('Rentabilidad realizada', tot.rent,  pReal.toFixed(1).replace('.',',')+'%', '#166534', 0)
     + fila('Rentabilidad perdida',          tot.lucro, pLucro.toFixed(1).replace('.',',')+'%', '#e53935', 0)
