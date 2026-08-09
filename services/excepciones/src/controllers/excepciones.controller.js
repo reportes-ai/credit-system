@@ -148,8 +148,10 @@ const getEstado = async (req, res) => {
   try {
     await vencerCaducos();
     const P = await params();
-    // Admin/Gerencia pueden mirar el presupuesto de otro ejecutivo
-    const ejecutivo = (req.query.ejecutivo && ['Administrador', 'Administrador de Sistema', 'Gerente de Operaciones y Crédito'].includes(req.usuario?.perfil_nombre))
+    // Admin/Gerencia pueden mirar el presupuesto de otro ejecutivo (por la
+    // matriz de permisos, no por nombre de perfil — auditoría 2026-08-08)
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    const ejecutivo = (req.query.ejecutivo && await tieneFunc(req.usuario?.id_usuario, 'excepciones_gerencia'))
       ? String(req.query.ejecutivo) : nombreDe(req);
     const pre = await presupuesto(ejecutivo, P);
     res.json({ success: true, data: { ...pre, params: P }, error: null });
@@ -169,8 +171,27 @@ const generar = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'RUT del cliente inválido' });
     if (!(saldo > 0)) return res.status(400).json({ success: false, data: null, error: 'Saldo precio inválido' });
 
-    // Escalera: nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (cualquier op)
-    const niv = [1, 2, 3].includes(Math.round(nivel)) ? Math.round(nivel) : 1;
+    // Escalera: nivel 1 = 1⭐ (piso 75%) · nivel 2 = 2⭐ (piso 50%) · nivel 3 = 3⭐ (piso 25%)
+    // SEGURIDAD (auditoría 2026-08-08): el nivel NO se le cree al cliente — se
+    // DERIVA de la rentabilidad de la jugada vs la mejor base. Un generar por
+    // API declarando nivel 1 para una jugada de nivel 3 cobraría 1⭐; acá el
+    // servidor recalcula el nivel y cobra el real. (El revisor además recomputa
+    // la rentabilidad contra la CARTA — esta es la primera reja, no la única.)
+    const s = snapshot || {};
+    // rent_jugada directo (¿Dónde Curso? 2.0) o rentab del lado (simulador
+    // clásico); "Decides Tú" (sin lado) toma el mejor de los dos.
+    const rent = Number(s.rent_jugada ?? (s.lado === 'UAC' ? s.rentab_uac : s.lado === 'AF' ? s.rentab_af
+      : Math.max(Number(s.rentab_af ?? -Infinity), Number(s.rentab_uac ?? -Infinity))));
+    const mejor = Number(s.mejor_base);
+    if (!isFinite(rent) || !isFinite(mejor) || !(mejor > 0))
+      return res.status(400).json({ success: false, data: null, error: 'La simulación no trae la rentabilidad de la jugada — vuelve a simular antes de pedir el código' });
+    const pisos = [P.exc_piso_pct ?? 75, P.exc_piso2_pct ?? 50, P.exc_piso3_pct ?? 25];
+    const niv = rent >= mejor * pisos[0] / 100 ? 1 : rent >= mejor * pisos[1] / 100 ? 2 : rent >= mejor * pisos[2] / 100 ? 3 : 0;
+    if (!niv)
+      return res.status(400).json({ success: false, data: null, error: `La jugada queda bajo el piso del nivel 3 (${pisos[2]}%) — solo un código de Gerencia puede aprobarla` });
+    if (niv === 3 && rent < Math.round(P.exc_nivel3_rent_min ?? 200000))
+      return res.status(400).json({ success: false, data: null, error: `Nivel 3 exige una rentabilidad mínima de $${Math.round(P.exc_nivel3_rent_min ?? 200000).toLocaleString('es-CL')} — solo queda pedir un código de Gerencia` });
+    if (Math.round(nivel) !== niv) console.warn(`[excepciones] nivel declarado ${nivel} ≠ nivel real ${niv} (${nombreDe(req)}) — se cobra el real`);
     const costo = niv === 1 ? 1 : niv === 2 ? Math.round(P.exc_piso2_estrellas ?? 2) : Math.round(P.exc_nivel3_estrellas ?? 3);
     const ejecutivo = nombreDe(req);
     const pre = await presupuesto(ejecutivo, P);
@@ -239,11 +260,26 @@ const misCodigos = async (req, res) => {
 };
 
 /* ── GET /api/excepciones/validar/:codigo — a qué operación pertenece ───── */
+/* Anti-enumeración: los códigos son de pocos dígitos — un usuario probando
+   códigos al azar encontraría vigentes (y el RUT/saldo del cliente). Tras
+   VALIDAR_MAX_FALLOS consultas falladas en la ventana, se corta. */
+const _fallosValidar = new Map();   // id_usuario → { n, exp }
+const VALIDAR_MAX_FALLOS = 15, VALIDAR_VENTANA_MS = 10 * 60 * 1000;
+
 const validar = async (req, res) => {
   try {
     await vencerCaducos();
+    const uid = req.usuario?.id_usuario || 0;
+    const f = _fallosValidar.get(uid);
+    if (f && f.exp > Date.now() && f.n >= VALIDAR_MAX_FALLOS)
+      return res.status(429).json({ success: false, data: null, error: 'Demasiados códigos inexistentes consultados — espera unos minutos' });
     const [[c]] = await pool.query('SELECT * FROM excepciones_codigos WHERE codigo=?', [String(req.params.codigo || '').trim()]);
-    if (!c) return res.json({ success: true, data: { existe: false }, error: null });
+    if (!c) {
+      const g = (f && f.exp > Date.now()) ? f : { n: 0, exp: Date.now() + VALIDAR_VENTANA_MS };
+      g.n++; _fallosValidar.set(uid, g);
+      return res.json({ success: true, data: { existe: false }, error: null });
+    }
+    _fallosValidar.delete(uid);
     res.json({ success: true, data: {
       existe: true, codigo: c.codigo, tipo: c.tipo, estado: c.estado,
       ejecutivo: c.ejecutivo, rut_cliente: c.rut_cliente,
@@ -256,7 +292,7 @@ const validar = async (req, res) => {
 
 /* Núcleo de validación+consumo — lo usa el endpoint /usar Y el guardado de la
    Carta de Aprobación (llamada interna). Un código = un solo uso. */
-async function consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta }) {
+async function consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta, ejecutivo_carta }) {
   await vencerCaducos();
   const P = await params();
   const [[c]] = await pool.query('SELECT * FROM excepciones_codigos WHERE codigo=?', [String(codigo || '').trim()]);
@@ -271,8 +307,21 @@ async function consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta }) {
     return { ok: false, error: `El saldo precio no calza con la simulación del código ($${Number(c.saldo_precio).toLocaleString('es-CL')})` };
   if (rutCuerpo3(rut_cliente) !== rutCuerpo3(c.rut_cliente))
     return { ok: false, error: 'El RUT del cliente no calza con la simulación del código' };
-  await pool.query("UPDATE excepciones_codigos SET estado='USADO', usado_carta=?, usado_at=NOW() WHERE id=? AND estado='VIGENTE'",
+  /* La estrella es del ejecutivo que la gastó: el código PROPIO/COMODIN solo
+     sirve en una carta de SU ejecutivo (auditoría 2026-08-08 — antes cualquiera
+     con el código podía quemarle la estrella a un colega). GERENCIA queda
+     libre: lo respalda el comentario del Gerente. */
+  if (c.tipo !== 'GERENCIA' && ejecutivo_carta !== undefined) {
+    const norm = (v) => String(v || '').trim().toUpperCase();
+    if (!norm(ejecutivo_carta) || norm(ejecutivo_carta) !== norm(c.ejecutivo))
+      return { ok: false, error: `El código pertenece a ${c.ejecutivo} — solo sirve en una carta de ese ejecutivo` };
+  }
+  /* affectedRows cierra la carrera: dos cartas guardadas en simultáneo con el
+     mismo código no pueden pasar las dos. */
+  const [up] = await pool.query("UPDATE excepciones_codigos SET estado='USADO', usado_carta=?, usado_at=NOW() WHERE id=? AND estado='VIGENTE'",
     [(op_carta || '').slice(0, 30) || null, c.id]);
+  if (!up.affectedRows)
+    return { ok: false, error: 'El código acaba de usarse en otra operación — un código sirve una sola vez' };
   return { ok: true, tipo: c.tipo, ejecutivo: c.ejecutivo };
 }
 
@@ -280,7 +329,11 @@ async function consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta }) {
 const usar = async (req, res) => {
   try {
     const { codigo, saldo_precio, rut_cliente, op_carta } = req.body || {};
-    const r = await consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta });
+    // Gerencia/Admin pueden consumir a nombre de otro; el resto, solo lo propio
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    const esGerencia = await tieneFunc(req.usuario?.id_usuario, 'excepciones_gerencia');
+    const r = await consumirCodigo({ codigo, saldo_precio, rut_cliente, op_carta,
+      ejecutivo_carta: esGerencia ? undefined : nombreDe(req) });
     if (!r.ok) return res.status(400).json({ success: false, data: null, error: r.error });
     auditar({ req, accion: 'EDITAR', modulo: 'excepciones', entidad: 'excepciones_codigos', entidad_id: String(codigo).trim(),
       detalle: `Código ${r.tipo} usado${op_carta ? ` en carta ${op_carta}` : ''}` });

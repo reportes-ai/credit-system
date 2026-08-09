@@ -7,9 +7,10 @@ router.get('/estado',       verifyToken, requireFunc('excepciones_simulador'), c
 router.get('/mis-codigos',  verifyToken, requireFunc('excepciones_simulador'), ctrl.misCodigos);
 router.get('/registro',     verifyToken, requireFunc('excepciones_gerencia'), ctrl.registro);
 router.get('/informe',      verifyToken, requireFunc('excepciones_gerencia'), ctrl.informe);
-router.get('/validar/:codigo', verifyToken, ctrl.validar);
+// validar/usar los ocupan el simulador y el formulario de cartas — nunca un token cualquiera
+router.get('/validar/:codigo', verifyToken, requireFunc('excepciones_simulador', 'aprob_crear', 'aprob_revisar'), ctrl.validar);
 router.post('/generar',     verifyToken, requireFunc('excepciones_generar'), ctrl.generar);
 router.post('/generar-gerencia', verifyToken, requireFunc('excepciones_gerencia'), ctrl.generarGerencia);
-router.post('/usar',        verifyToken, ctrl.usar);
+router.post('/usar',        verifyToken, requireFunc('excepciones_simulador', 'aprob_crear', 'aprob_revisar'), ctrl.usar);
 
 module.exports = router;

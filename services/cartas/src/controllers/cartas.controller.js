@@ -950,7 +950,8 @@ const upsert = async (req, res) => {
     let codExc = null, codExcTipo = null;
     if (c.codigoExcepcion) {
       const { consumirCodigo } = require('../../../excepciones/src/controllers/excepciones.controller');
-      const rc = await consumirCodigo({ codigo: c.codigoExcepcion, saldo_precio: c.saldo, rut_cliente: c.rutCliente, op_carta: c.opCarta });
+      const rc = await consumirCodigo({ codigo: c.codigoExcepcion, saldo_precio: c.saldo, rut_cliente: c.rutCliente, op_carta: c.opCarta,
+        ejecutivo_carta: c.ejecutivoNombre });   // la estrella es del ejecutivo de la CARTA (auditoría 2026-08-08)
       if (!rc.ok) return res.status(400).json({ success: false, data: null, error: rc.error });
       codExc = String(c.codigoExcepcion).trim(); codExcTipo = rc.tipo;
     }

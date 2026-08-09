@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- ¿Dónde Curso? 2.0 (BETA con copiloto de excepciones; la clásica sigue en /donde-curso/) · v3.3 — snapshots con rent_jugada/mejor_base para medir el costo del programa -->
+<!-- ¿Dónde Curso? 2.0 (BETA con copiloto de excepciones; la clásica sigue en /donde-curso/) · v3.4 — todos los chips llevan rent/mejor (el servidor deriva el nivel de la escalera) -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -798,12 +798,16 @@ function sugerencias(ctx){
       for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2;
         const Rm = calcP(plazo, mid, null);
         if (Rm && Rm.af.rentab >= mejor0 * piso) hi = mid; else lo = mid; }
-      if (hi < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'AF', plazoCod: plazo, disabled: disp < NV.n1,
-        txt:`Puedes ofrecer tasa hasta <b>${pct2(hi)}</b> a ${plazo} cuotas (pizarra ${pct2(pizarra)}) y sigue cumpliendo el piso.` });
+      if (hi < pizarra - 0.0001) { const Rh = calcP(plazo, hi, null);
+        out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'AF', plazoCod: plazo, disabled: disp < NV.n1,
+          rent: Math.round(Rh ? Rh.af.rentab : mejor0 * piso), mejor: Math.round(mejor0),
+          txt:`Puedes ofrecer tasa hasta <b>${pct2(hi)}</b> a ${plazo} cuotas (pizarra ${pct2(pizarra)}) y sigue cumpliendo el piso.` }); }
     } else if (ladoNow === 'UAC') {
       const tMin = Math.max(cf, pizarra * (1 - maxReb));
-      if (tMin < pizarra - 0.0001) out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'UAC', plazoCod: plazo, disabled: disp < NV.n1,
-        txt:`En Unidad puedes ofrecer tasa hasta <b>${pct2(tMin)}</b> a ${plazo} cuotas (rebaja máxima ${(maxReb*100).toFixed(0)}% sobre la pizarra ${pct2(pizarra)}).` });
+      if (tMin < pizarra - 0.0001) { const Rt = calcP(plazo, tMin, null);
+        out.push({ ico:'bi-percent', col:'#0141A2', nivel:1, costo:NV.n1, fin:'UAC', plazoCod: plazo, disabled: disp < NV.n1,
+          rent: Math.round(Rt ? Rt.uac.rentab : mejor0 * piso), mejor: Math.round(mejor0),
+          txt:`En Unidad puedes ofrecer tasa hasta <b>${pct2(tMin)}</b> a ${plazo} cuotas (rebaja máxima ${(maxReb*100).toFixed(0)}% sobre la pizarra ${pct2(pizarra)}).` }); }
     }
     // (d) Tasa manual escrita que deja la operación bajo el piso 75% → escalera 2⭐/3⭐
     if (tasaCli && R) {
@@ -811,6 +815,7 @@ function sugerencias(ctx){
       const nvT = nivelDe(rentNow, mejor0, R.costos);
       if (nvT && nvT.nivel > 1)
         out.push({ ico:'bi-star-fill', col:'#b45309', nivel:nvT.nivel, costo:nvT.costo, fin: ladoNow, plazoCod: plazo, disabled: disp < nvT.costo, dorada: true,
+          rent: Math.round(rentNow), mejor: Math.round(mejor0),
           txt:`La tasa ${pct2(tasaCli)} deja la operación bajo el piso del 75% — se aprueba con <b>${nvT.costo} estrellas</b> (nivel ${nvT.nivel}).` });
     }
   }
