@@ -636,7 +636,6 @@ const PAGINAS = [
   ['/auditoria', 'auditoria/index.html'],
   ['/atencion-remota', 'atencion-remota/index.html'],
   ['/portal-dealer', 'portal-dealer/index.html'],
-  ['/cartas-aprobacion', 'cartas-aprobacion/index.html'],
   ['/aprobaciones', 'aprobaciones/index.html'],
   ['/aprobaciones/mantenedor', 'aprobaciones/mantenedor/index.html'],
   ['/postventa', 'postventa/index.html'],
@@ -727,6 +726,8 @@ const REDIRECTS = [
   ['/tesoreria/brokerage', '/tesoreria/'],
   ['/creditos/fundantes', '/fundantes/'],
   ['/mantenedores/preferencia-financiera', '/aprobaciones/?tab=params'],
+  // Cartas de Aprobación Antiguo (app importada): retirada ago-2026, la reemplaza Aprobaciones.
+  ['/cartas-aprobacion', '/aprobaciones/'],
 ];
 for (const [desde, hacia] of REDIRECTS) {
   app.get([desde, desde + '/'], (req, res) => res.redirect(hacia));

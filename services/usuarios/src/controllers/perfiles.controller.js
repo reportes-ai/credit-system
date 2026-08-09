@@ -546,6 +546,40 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b08', async () => {
   } catch (e) { console.error('[retiro brokerage viejo]', e.message); }
 });
 
+/* ─── Retiro del módulo "Cartas de Aprobación Antiguo" (ago-2026) ─────────────
+   App importada de un sistema externo (/cartas-aprobacion/, solo Admin la veía);
+   la reemplazó por completo el módulo nuevo de Aprobaciones (/aprobaciones/).
+   OJO: 3 de sus casillas gatean endpoints VIVOS del servicio de cartas
+   (parámetros, ejecutivos) → se MUEVEN al módulo nuevo (300001) para que sigan
+   gobernables desde la grilla de Perfiles. El resto (solo botones del front
+   viejo) se archiva en "Retirados". Reversible: mover de vuelta y reactivar el
+   módulo 120001. La ruta /cartas-aprobacion redirige a /aprobaciones/. */
+require('../../../../shared/migrate').migrarAuto('perfiles_b09', async () => {
+  try {
+    const FLAG = 'retiro_cartas_antiguo_v1';
+    const [[ya]] = await pool.query('SELECT 1 ok FROM migraciones_aplicadas WHERE clave=? LIMIT 1', [FLAG]);
+    if (ya) return;
+
+    // Casillas vivas → módulo nuevo Cartas de Aprobación (300001)
+    await pool.query(`UPDATE funcionalidades SET id_modulo=300001
+                      WHERE codigo IN ('cartas_params_particip','cartas_mantenedores','cartas_manten_usuarios')`);
+
+    // Casillas solo-front-viejo → módulo Retirados
+    const [[ret]] = await pool.query("SELECT id_modulo FROM modulos WHERE nombre='Retirados' LIMIT 1");
+    if (ret) {
+      await pool.query(`UPDATE funcionalidades SET id_modulo=?, href=NULL
+                        WHERE codigo IN ('cartas_de_aprobación_ver','cartas_generador','cartas_revision',
+                                         'cartas_impresion','cartas_informes','cartas_cartolas_emision','cartas_cartolas_enviadas')`,
+        [ret.id_modulo]);
+    }
+
+    await pool.query("UPDATE modulos SET estado='inactivo' WHERE id_modulo=120001");
+    await pool.query('INSERT IGNORE INTO migraciones_aplicadas (clave) VALUES (?)', [FLAG]);
+    limpiarCachePermisos();
+    console.log('✓ Retiro Cartas Antiguo: módulo 120001 inactivo, 3 casillas vivas movidas al módulo nuevo, 7 archivadas');
+  } catch (e) { console.error('[retiro cartas antiguo]', e.message); }
+});
+
 const getAllPerfiles = async (req, res) => {
   try {
     // Perfiles en orden alfabético (A→Z).
