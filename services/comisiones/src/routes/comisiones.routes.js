@@ -6,8 +6,10 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 // Autorización paramétrica: obedece la matriz de Perfiles y Permisos
 router.get('/variables',          verifyToken,                                       ctrl.getVariables);
 router.put('/variables',          verifyToken, requireFunc('comisiones_variables'), ctrl.putVariables);
-router.get('/calculo',            verifyToken,                                       ctrl.getCalculo);
-router.get('/ejecutivos',         verifyToken,                                       ctrl.getEjecutivos);
+// Reportes propios del módulo: exigen Ver Comisión Ejecutivos (auditoría 2026-08-08).
+// ajustes-vigentes (más abajo) queda abierto: lo lee reportería de rentabilidad.
+router.get('/calculo',            verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getCalculo);
+router.get('/ejecutivos',         verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getEjecutivos);
 router.post('/aprobar',           verifyToken, requireFunc('comisiones_revision'),  ctrl.aprobar);
 router.post('/ejecutivo-responder', verifyToken,                                   ctrl.ejecutivoResponder);
 router.get('/resumen-config',     verifyToken, requireFunc('comisiones_revision'), ctrl.getResumenConfig);

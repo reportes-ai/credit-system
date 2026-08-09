@@ -18,7 +18,9 @@ router.get('/simulador-rapido', async (req, res) => {
   }
 });
 router.post('/',           requireFunc('cotizaciones.crear'), create);
-router.get('/',            getAll);
+// Listado del módulo: exige la casilla Ver Cotizaciones (auditoría 2026-08-08).
+// La búsqueda por RUT y el HTML quedan abiertos: los usa la ficha de Clientes.
+router.get('/',            requireFunc('cotizaciones.ver'), getAll);
 router.get('/rut/:rut',    getByRut);
 router.get('/:id/html',    getHtml);
 router.post('/:id/enviar', enviar);

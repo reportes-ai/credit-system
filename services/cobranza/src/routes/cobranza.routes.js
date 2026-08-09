@@ -13,10 +13,13 @@ router.post('/calcular-cobranza',     verifyToken, ctrl.calcularCobranza);
 router.post('/calcular-cobranza-lote',verifyToken, ctrl.calcularCobranzaLote);
 
 // Rutas estáticas primero
-router.get('/diagnostico',            verifyToken, ctrl.diagnostico);
-router.get('/dashboard',              verifyToken, ctrl.dashboard);
-router.get('/cartera',                verifyToken, ctrl.cartera);
-router.get('/provisiones',            verifyToken, ctrl.provisiones);
+// Vistas propias del módulo Cobranza: exigen la casilla Ver Cobranza (auditoría
+// 2026-08-08). Disponibilidad/mensajes/bitácora por id_credito quedan abiertas:
+// las consulta la ficha del crédito desde otros módulos.
+router.get('/diagnostico',            verifyToken, requireFunc('cobranza_ver'), ctrl.diagnostico);
+router.get('/dashboard',              verifyToken, requireFunc('cobranza_ver'), ctrl.dashboard);
+router.get('/cartera',                verifyToken, requireFunc('cobranza_ver'), ctrl.cartera);
+router.get('/provisiones',            verifyToken, requireFunc('cobranza_ver'), ctrl.provisiones);
 router.get('/mis-gestiones',          verifyToken, ctrl.misGestiones);
 router.post('/gestiones',             verifyToken, requireFunc('cobranza_gestionar', 'cobranza_prejudicial', 'cobranza_judicial', 'cobranza_mis'), ctrl.crearGestion);
 router.put('/gestiones/:id/confirmar',verifyToken, requireFunc('cobranza_gestionar'), ctrl.confirmarGestion);

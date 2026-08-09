@@ -656,6 +656,15 @@ const update = async (req, res) => {
     if (!prev.length) return res.status(404).json({ success: false, data: null, error: 'Crédito no encontrado' });
     const estadoAntes = prev[0]?.estado || null;
 
+    // Aprobar un crédito es una atribución propia, no basta con poder editarlo
+    // (auditoría 2026-08-08): la transición a APROBADO exige la casilla
+    // creditos.aprobar. Editar otros campos sigue bajo creditos.editar.
+    if (estado && String(estado).toUpperCase() === 'APROBADO' && String(estadoAntes || '').toUpperCase() !== 'APROBADO') {
+      const { tieneFunc } = require('../../../../shared/middleware/permisos');
+      if (!(await tieneFunc(req.usuario?.id_usuario, 'creditos.aprobar')))
+        return res.status(403).json({ success: false, data: null, error: 'No tienes la atribución de Aprobar Créditos (creditos.aprobar)' });
+    }
+
     // Detectar si es una edición completa (vienen campos financieros)
     const esEdicionCompleta = monto_financiado !== undefined || valor_vehiculo !== undefined;
 
