@@ -126,6 +126,60 @@ async function comisionEsperada(carta, p) {
   return { esParque, neta: Math.round(cd.comdea_real || 0) };
 }
 
+/* ── RENTABILIDAD REAL (server-side) ──────────────────────────────────────
+   El snapshot del código trae rent_jugada/mejor_base calculados por el
+   NAVEGADOR — un generar por API podría inflarlos. Acá se recomputa la
+   rentabilidad con el MISMO motor AF_RENT pero con los números de la CARTA:
+   no importa lo que el snapshot diga, la operación real debe cumplir el piso. */
+let _RENT = null;
+function motorRent() {
+  if (_RENT) return _RENT;
+  /* AF_RENT es window-only; se carga con un window temporal. OJO: dejar
+     global.window definido cuelga pdf-parse — por eso se borra al tiro. */
+  const had = global.window;
+  if (!had) global.window = {};
+  try {
+    global.window.AF_RENT_CORE = global.window.AF_RENT_CORE || require('../../../api-gateway/public/js/rentabilidad-core');
+    global.window.AF_COM_DEALER = global.window.AF_COM_DEALER || require('../../../api-gateway/public/js/comision-dealer');
+    require('../../../api-gateway/public/js/rentabilidad-calc');
+    _RENT = global.window.AF_RENT;
+  } finally { if (!had) delete global.window; }
+  return _RENT;
+}
+
+async function rentabilidadReal(carta, p, esAutofin) {
+  const AF_RENT = motorRent();
+  if (!AF_RENT) return null;
+  const fecha = carta.fecha || new Date();
+  const [[t]] = await pool.query(
+    'SELECT tasa_mensual_menor, tasa_mensual_mayor, spread_menor, spread_mayor FROM tasas WHERE fecha_desde <= ? ORDER BY fecha_desde DESC LIMIT 1', [fecha]);
+  const [[u]] = await pool.query('SELECT valor FROM uf WHERE fecha <= ? ORDER BY fecha DESC LIMIT 1', [fecha]);
+  if (!t || !u) return null;
+  const mes = new Date(fecha).toISOString().slice(0, 7);
+  const [[ops]] = await pool.query(
+    `SELECT COUNT(*) n FROM creditos WHERE DATE_FORMAT(mes,'%Y-%m') = ?
+       AND (financiera LIKE '%UNIDAD%' OR financiera LIKE '%UAC%') AND estado_credito IN ('OTORGADO','APROBADO')`, [mes]);
+  const uacPct = require('../../creditos/src/utils/uac-tier').pctUACOperacion(
+    { ops: Number(ops.n) || 0, plazo: parseInt(carta.plazo) || 0, mes }, p);
+  const base = {
+    valor: parseFloat(carta.precio_venta) || 0, pie: parseFloat(carta.pie) || 0,
+    plazo: parseInt(carta.plazo) || 0, esPatio: String(carta.parque || '').toUpperCase().includes('PARQUE'),
+    uacPct, corfo: false,
+  };
+  if (!(base.valor > 0) || !(base.plazo > 0)) return null;
+  const UF = parseFloat(u.valor);
+  // Jugada = los números REALES de la carta (tasa cursada + comisión pactada)
+  const jug = AF_RENT.calcular({ ...base, tasaCli: parseFloat(carta.tasa_credito) / 100 || null,
+    dealerComCLP: carta.part_bruto != null ? parseFloat(carta.part_bruto) : null }, p, UF, t);
+  // Mejor base = ambos lados con pizarra (tasa TMC/mantenedor + comisión pizarra)
+  const piz = AF_RENT.calcular({ ...base, tasaCli: null, dealerComCLP: null }, p, UF, t);
+  return {
+    jugada: esAutofin ? jug.af.rentab : jug.uac.rentab,
+    mejor: Math.max(piz.af.rentab, piz.uac.rentab),
+    comMax: Math.max(jug.costos.dealer, jug.costos.ejecutivo),
+  };
+}
+
 /* ── LA REVISIÓN ─────────────────────────────────────────────────────────── */
 async function revisar(carta, p) {
   const checks = [];
@@ -220,13 +274,22 @@ async function revisar(carta, p) {
       const niv = parseInt(s.nivel) || 1;
       const costoOk = { 1: 1, 2: p.exc_piso2_estrellas || 2, 3: p.exc_nivel3_estrellas || 3 }[niv];
       add('Estrellas del nivel', `nivel ${niv} → ${'⭐'.repeat(costoOk || 1)}`, `${cod.costo_estrellas}⭐ cobradas`, cod.costo_estrellas === costoOk);
-      if (s.rent_jugada != null && s.mejor_base != null && s.mejor_base > 0) {
-        const pct = { 1: p.exc_piso_pct || 75, 2: p.exc_piso2_pct || 50, 3: p.exc_piso3_pct || 25 }[niv];
-        const cumple = s.rent_jugada >= s.mejor_base * pct / 100 - tol
-                    && (niv !== 3 || s.rent_jugada >= (p.exc_nivel3_rent_min || 200000) - tol);
-        add(`Piso de rentabilidad (${pct}%)`, fmt(Math.round(s.mejor_base * pct / 100)) + ' mínimo', fmt(Math.round(s.rent_jugada)) + ' jugada', cumple,
-            niv === 3 ? `nivel 3: además mínimo absoluto ${fmt(p.exc_nivel3_rent_min || 200000)}` : null);
-      }
+      /* PISO DE RENTABILIDAD — recomputado en el SERVIDOR con los números de la
+         CARTA (auditoría: el snapshot lo calculó el navegador y podría venir
+         forjado por API; la operación real debe cumplir el piso, diga lo que
+         diga el snapshot). Holgura $2.000 por redondeos front/back. */
+      const pct = { 1: p.exc_piso_pct || 75, 2: p.exc_piso2_pct || 50, 3: p.exc_piso3_pct || 25 }[niv];
+      let rr = null;
+      try { rr = await rentabilidadReal(carta, p, esAutofin); } catch (e) { console.error('[revisor rentReal]', e.message); }
+      if (!rr) return { checks, ok: false, motivo: 'No se pudo recomputar la rentabilidad de la jugada: requiere ojo humano' };
+      const HOLGURA = 2000;
+      const cumple = rr.jugada >= rr.mejor * pct / 100 - HOLGURA
+                  && (niv !== 3 || (rr.jugada >= (p.exc_nivel3_rent_min || 200000) - HOLGURA
+                                    && rr.jugada >= rr.comMax * (1 + (p.exc_nivel3_factor_pct || 0) / 100) - HOLGURA));
+      add(`Piso de rentabilidad (${pct}%) — recomputado`, fmt(Math.round(rr.mejor * pct / 100)) + ' mínimo (server)',
+          fmt(Math.round(rr.jugada)) + ' rentab. real de la carta', cumple,
+          (niv === 3 ? `nivel 3: además ≥ comisión más alta ${fmt(rr.comMax)} y mínimo absoluto ${fmt(p.exc_nivel3_rent_min || 200000)}. ` : '')
+          + (s.rent_jugada != null ? `snapshot decía ${fmt(Math.round(s.rent_jugada))}` : 'snapshot sin medir'));
       const finEsperada = esAutofin ? 'AUTOFIN' : 'UNIDAD';
       add('Financiera del código', cod.financiera || '—', finEsperada, String(cod.financiera || '').toUpperCase().includes(finEsperada));
     }
