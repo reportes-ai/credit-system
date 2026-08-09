@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.32 — clave GERENCIA con snapshot: el resumen dice qué autoriza (tasa/comisión/plazo/financiera) -->
+  <!-- v4.33 — resumen clave GERENCIA distingue comisión modificada vs pizarra -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2123,7 +2123,8 @@ async function excValidarCodigo(){
     if (d.tipo === 'GERENCIA' && s && s.origen === 'clave-gerencia') {
       const partes = [];
       partes.push('tasa ' + Number(s.tasa_pct).toFixed(2).replace('.',',') + '%' + (s.tasa_manual ? ' (modificada)' : ''));
-      if (s.comision_dealer > 0) partes.push('comisión dealer ' + fmtCLP(s.comision_dealer) + ' (pizarra)');
+      if (s.comision_dealer > 0) partes.push('comisión dealer ' + fmtCLP(s.comision_dealer) +
+        (s.comision_manual ? ' (modificada' + (s.comision_pizarra > 0 ? '; pizarra ' + fmtCLP(s.comision_pizarra) : '') + ')' : ' (pizarra)'));
       if (s.plazo) partes.push('en ' + s.plazo + ' cuotas');
       if (s.financiera) partes.push('por ' + s.financiera + (s.cambia_financiera ? ' (cambio de financiera)' : ''));
       return excCodigoEstado(true, `✓ Autorización de Gerencia — autoriza ${partes.join(', ')}`, d.tipo);

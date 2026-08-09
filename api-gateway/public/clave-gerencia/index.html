@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.2 — ejecutivo en lista desplegable (o cualquier ejecutivo) -->
+<!-- v1.3 — comisión dealer modificable: entra al motor y viaja en la clave -->
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8">
@@ -216,11 +216,15 @@
             <button id="fUAC" onclick="setFin('UNIDAD')">UNIDAD</button>
           </div></div>
 
+        <div class="fld"><label>Comisión dealer $ <span class="aux" id="comdeaAux">(auto pizarra)</span></label>
+          <input id="iComdea" type="text" inputmode="numeric" placeholder="auto pizarra"
+                 oninput="fmtMiles(this);calcular()"></div>
+
         <div id="autoriza">
           <h3><i class="bi bi-patch-check-fill"></i> Resumen de la autorización</h3>
           <table>
             <tr><td>Tasa cliente</td><td id="aTasa">—</td></tr>
-            <tr><td>Comisión dealer (pizarra)</td><td id="aComdea">—</td></tr>
+            <tr><td>Comisión dealer</td><td id="aComdea">—</td></tr>
             <tr><td>Plazo</td><td id="aPlazo">—</td></tr>
             <tr><td>Financiera</td><td id="aFin">—</td></tr>
           </table>
@@ -272,6 +276,7 @@ let ULTIMO = '';
 let P = {}, T = {}, UF = null, OPS_UAC = 0, MES_UAC = '', PREF_TABLA = [];
 let ES_PATIO = true;
 let R = null, D = null;            // último cálculo del motor
+let PIZARRA = null;                // comisión dealer pizarra de referencia
 let FIN_SUGERIDA = null;           // veredicto del motor (AUTOFIN | UNIDAD | null)
 let FIN_ELEGIDA  = null;           // la que autoriza la Gerencia
 
@@ -399,8 +404,14 @@ function calcular(){
     $('tasaAux').textContent = tasaTxt ? '(manual)' : '(auto)';
     let uacPct = null;
     if (window.AF_UAC_TIER) uacPct = AF_UAC_TIER.pctUACOperacion({ ops: OPS_UAC, plazo, mes: MES_UAC }, P);
+    // Comisión dealer modificada: entra al motor ("la carta manda") y el
+    // veredicto de financiera se calcula con la comisión REAL autorizada.
+    const comdeaOv = parseMiles($('iComdea').value) || null;
+    PIZARRA = window.AF_COM_DEALER
+      ? Math.round(saldo * (ES_PATIO ? AF_COM_DEALER.pizarraParque(plazo, P) : AF_COM_DEALER.pizarraCalle(plazo, P)))
+      : null;
     R = AF_RENT.calcular({
-      valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct,
+      valor, pie, plazo, tasaCli, esPatio: ES_PATIO, uacPct, dealerComCLP: comdeaOv,
       gastos:  { prenda: on('cPrenda'), gps: on('cGps'), rep: on('cRep'), lim: on('cLim') },
       seguros: { desg: on('cDesg'), rdh: on('cRdh'), cesa: on('cCesa') },
     }, P, UF, T);
@@ -440,9 +451,13 @@ function pintarFin(){
     sug === FIN_ELEGIDA ? '(la sugerida)' : '';
   // Resumen de la autorización
   const tasaManual = !!($('iTasa').value||'').trim();
+  const comdeaManual = !!parseMiles($('iComdea').value);
   $('aTasa').innerHTML = R ? (R.tasaCliPct.toFixed(2).replace('.',',') + '% mensual' +
     (tasaManual ? ' <span class="cambio">(modificada)</span>' : ' (TMC auto)')) : '—';
-  $('aComdea').textContent = R ? fCLP(R.costos.dealer) : '—';
+  $('aComdea').innerHTML = R ? (fCLP(R.costos.dealer) +
+    (comdeaManual ? ' <span class="cambio">(modificada' + (PIZARRA != null ? '; pizarra ' + fCLP(PIZARRA) : '') + ')</span>'
+                  : ' (pizarra)')) : '—';
+  $('comdeaAux').textContent = comdeaManual ? (PIZARRA != null ? '(pizarra ' + fCLP(PIZARRA) + ')' : '(modificada)') : '(auto pizarra)';
   $('aPlazo').textContent = R ? (R.plazo + ' cuotas') : '—';
   $('aFin').innerHTML = FIN_ELEGIDA ? (FIN_ELEGIDA + (cambia ? ' <span class="cambio">(cambio de financiera)</span>' : ''))
     : (D && D.veredicto === 'DECIDES_TU' ? 'elige una' : '—');
@@ -462,11 +477,13 @@ async function generar(){
   if (motivo.length < 10)                   return err('El motivo es obligatorio (mínimo 10 caracteres).');
 
   const tasaManual = !!($('iTasa').value||'').trim();
+  const comdeaManual = !!parseMiles($('iComdea').value);
   const cambiaFin  = FIN_SUGERIDA && FIN_ELEGIDA !== FIN_SUGERIDA;
   const snapshot = {
     origen: 'clave-gerencia',
     tasa_pct: Number(R.tasaCliPct.toFixed(4)), tasa_manual: tasaManual,
-    comision_dealer: R.costos.dealer, es_patio: ES_PATIO,
+    comision_dealer: R.costos.dealer, comision_manual: comdeaManual,
+    comision_pizarra: PIZARRA, es_patio: ES_PATIO,
     plazo: R.plazo, saldo: R.saldo, monto_fin: R.monto_fin,
     financiera: FIN_ELEGIDA, financiera_sugerida: FIN_SUGERIDA, cambia_financiera: !!cambiaFin,
     rentab_af: R.af.rentab, rentab_uac: R.uac.rentab,
@@ -482,7 +499,7 @@ async function generar(){
     $('rCod').textContent = ULTIMO;
     $('rDet').textContent =
       `Autoriza: tasa ${R.tasaCliPct.toFixed(2).replace('.',',')}%${tasaManual?' (modificada)':''}` +
-      ` · com. dealer ${fCLP(R.costos.dealer)} (pizarra)\n${R.plazo} cuotas · ${FIN_ELEGIDA}` +
+      ` · com. dealer ${fCLP(R.costos.dealer)} ${comdeaManual?'(modificada)':'(pizarra)'}\n${R.plazo} cuotas · ${FIN_ELEGIDA}` +
       (cambiaFin ? ` (cambio de financiera)` : '') +
       `\n${ejec || 'Cualquier ejecutivo'} · RUT ${rut} · saldo ${fCLP(R.saldo)}`;
     $('resultado').style.display = '';
