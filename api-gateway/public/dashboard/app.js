@@ -340,10 +340,12 @@ function buildV1() {
     <tbody>${ccsRows}</tbody>
     <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.saldo)}</td><td>—</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>—</td></tr></tfoot>`;
 
-  // Tabla ejecutivos
-  const ejRows = f.ejecutivos.map((e,i)=>`<tr>
+  // Tabla ejecutivos — TODOS los activos, incluso en cero (van al final, en gris)
+  const ejConCeros = f.ejecutivos.concat(
+    ejFaltantes(f.ejecutivos.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, com_dealer:0, rentab_afa:0 })));
+  const ejRows = ejConCeros.map((e,i)=>`<tr${e.ops?'':' style="color:#94a3b8"'}>
     <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a></td>
-    <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.saldo/e.ops)}</td>
+    <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.ops?e.saldo/e.ops:0)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
   const totEJ = f.ejecutivos.reduce((a,e)=>({ops:a.ops+e.ops,saldo:a.saldo+e.saldo,cd:a.cd+e.com_dealer}),{ops:0,saldo:0,cd:0});
@@ -1272,11 +1274,14 @@ function buildV1b() {
     ejOt[k].ops++; ejOt[k].saldo += r.saldo_precio; ejOt[k].fin += r.total_a_financiar;
     ejOt[k].cd += r.com_dealer; ejOt[k].afa += r.ing_autofacil;
   });
-  // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio)
-  const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin);
+  // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio).
+  // Al final, TODOS los ejecutivos activos sin otorgados este mes (en gris,
+  // con la alerta roja de financiamiento igual encendida: cero es cero).
+  const topEj = Object.entries(ejOt).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin)
+    .concat(ejFaltantes(Object.keys(ejOt)).map(n => [n, {ops:0, saldo:0, fin:0, cd:0, afa:0}]));
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < window.DASH_PARAMS.alerta_fin_ejecutivo ? 'color:#e53935;font-weight:700' : '';
-    return `<tr>
+    return `<tr${v.ops?'':' style="color:#94a3b8"'}>
     <td><span class="rank">${i+1}.</span><a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a></td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
     <td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
@@ -1395,9 +1400,26 @@ const _pClassParam = p => p >= window.DASH_PARAMS.rentab_verde ? 'pct-ok'
   : p >= window.DASH_PARAMS.rentab_amarillo ? 'pct-hi'
   : p >= window.DASH_PARAMS.rentab_naranjo ? 'pct-warn' : 'pct-bad';
 
+// ── Ejecutivos comerciales ACTIVOS (desde Usuarios, mismo padrón de los
+// selectores de cartas): las tablas de ejecutivos los muestran a TODOS,
+// aunque vayan en cero — el que no ha colocado también se ve. ──
+window.EJ_ACTIVOS = [];
+async function cargarEjecutivosActivos() {
+  try {
+    const r = await fetch('/api/cartas-ejecutivos', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+    const j = await r.json();
+    if (j && j.success && Array.isArray(j.data)) window.EJ_ACTIVOS = j.data.map(e => e.nombre).filter(Boolean);
+  } catch (e) { console.warn('[dash ejecutivos]', e.message); }
+}
+// Devuelve los nombres del padrón que NO están en la lista de nombres dada (case-insensitive)
+function ejFaltantes(nombresConDatos) {
+  const tiene = new Set(nombresConDatos.map(n => String(n).trim().toUpperCase()));
+  return (window.EJ_ACTIVOS || []).filter(n => !tiene.has(String(n).trim().toUpperCase()));
+}
+
 // ── Cargar datos frescos desde el JSON generado automáticamente ──
 async function cargarDatos() {
-  await cargarParametros();
+  await Promise.all([cargarParametros(), cargarEjecutivosActivos()]);
   const loadingEl = document.getElementById('loading-overlay');
   try {
     const r = await fetch('/api/dashboard/datos', {
