@@ -9,7 +9,8 @@
    Uso:  node scripts/backfill-extracted-cartas.js          → simula (no escribe)
          node scripts/backfill-extracted-cartas.js --aplicar → escribe
 */
-global.window = global.window || {};
+/* OJO: NO definir global.window acá — pdf-parse (pdfjs) se cree en un navegador
+   y se cuelga esperando un worker ("No PDFJS.workerSrc specified"). */
 const pool = require('../shared/config/database');
 const almacen = require('../shared/almacen-docs');
 const pdf = require('pdf-parse');

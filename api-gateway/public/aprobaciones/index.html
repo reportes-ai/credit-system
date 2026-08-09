@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.26 — fase 3: código de excepción en el modal, sello en carta y revisión, estrellas en el generador -->
+  <!-- v4.27 — Revisor Automático Unidad: informe del motor en la revisión (qué no cuadró, doc vs sistema) -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2453,7 +2453,18 @@ function abrirRevision(id){
     excBanner = `<div style="background:#fff7ed;border:1.5px solid #fed7aa;color:#c2410c;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
       <b><i class="bi bi-exclamation-triangle me-1"></i>EXCEPCIONES SOLICITADAS (${c.excepciones.length})</b>${escH(tasaInfo)}${escH(ufInfo)}${selloCodigo}${dimHTML}${items}</div>`;
   }
-  document.getElementById('modalBody').innerHTML = excBanner + cartaHTML(c, true);
+  // Informe del Revisor Automático (Unidad): si el motor la revisó y no cuadró,
+  // el analista ve exactamente qué falló, con documento vs sistema lado a lado.
+  let revBanner = '';
+  if (c.revisionAuto && !c.revisionAuto.ok) {
+    const filas = (c.revisionAuto.checks||[]).map(k=>`<tr>
+      <td style="padding:2px 6px">${k.ok?'✅':'❌'}</td><td style="padding:2px 6px"><b>${escH(k.item)}</b>${k.nota?`<div style="color:#64748b;font-size:.72rem">${escH(k.nota)}</div>`:''}</td>
+      <td style="padding:2px 6px">${escH(String(k.doc??'—'))}</td><td style="padding:2px 6px">${escH(String(k.sistema??'—'))}</td></tr>`).join('');
+    revBanner = `<div style="background:#fef2f2;border:1.5px solid #fecaca;color:#991b1b;border-radius:9px;padding:10px 14px;font-size:.83rem;margin-bottom:12px">
+      <b><i class="bi bi-robot me-1"></i>REVISOR AUTOMÁTICO: derivada a revisión humana</b> — ${escH(c.revisionAuto.motivo||'')}
+      ${filas?`<table style="width:100%;margin-top:6px;font-size:.78rem;border-collapse:collapse"><tr style="color:#7f1d1d"><th></th><th style="text-align:left;padding:2px 6px">Validación</th><th style="text-align:left;padding:2px 6px">Documento</th><th style="text-align:left;padding:2px 6px">Sistema</th></tr>${filas}</table>`:''}</div>`;
+  }
+  document.getElementById('modalBody').innerHTML = revBanner + excBanner + cartaHTML(c, true);
   udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise
   document.getElementById('modalFoot').innerHTML = `
     <input id="motivoRechazo" placeholder="Comentario (obligatorio si rechazas, opcional si apruebas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">

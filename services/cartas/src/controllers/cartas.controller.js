@@ -515,6 +515,7 @@ function mapRow(r) {
     excepcionesComentarios:   parseJSON(r.excepciones_comentarios),
     codigoExcepcion:          r.codigo_excepcion || null,
     codigoExcepcionTipo:      r.codigo_excepcion_tipo || null,
+    revisionAuto:             parseJSON(r.revision_auto),
     numeroCreditoCreado:      r.numero_credito_creado || null,
     idCreditoCreado:          r.id_credito_creado || null,
     numOp:                    r.cred_num_op || null,                                  // NUESTRO N° de operación (creditos.num_op)
@@ -1017,6 +1018,9 @@ const upsert = async (req, res) => {
         }
       }
       notificarCambios(c, prevStatus, req);
+      // Carta corregida que vuelve PENDIENTE con acreedor UNIDAD → nueva pasada del Revisor
+      if (c.status === 'PENDIENTE' && String(c.acreedor || '').toUpperCase().includes('UNIDAD'))
+        setImmediate(() => require('../revisor-unidad').procesarCarta(c.id));
     } else {
       // INSERT nuevo: crear crédito asociado primero — salvo que la carta ya venga
       // ENLAZADA a un crédito existente (operación de carga masiva esperando carta).
@@ -1680,6 +1684,10 @@ const subirDocumento = async (req, res) => {
        ext ? JSON.stringify(ext) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
     for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
     res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+    /* Revisor Automático (Unidad): con cada documento que llega intenta la
+       revisión completa — aprueba solo cuando están ambos y todo cuadra. */
+    if (idCarta && ['COMPROMISO_UNIDAD', 'COTIZACION_UNIDAD'].includes(String(tipo)))
+      setImmediate(() => require('../revisor-unidad').procesarCarta(idCarta));
   } catch (e) { console.error('[subirDocumento]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

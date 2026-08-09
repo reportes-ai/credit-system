@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Excepciones Comerciales — AutoFácil</title>
-  <!-- v2.0 -->
+  <!-- v2.1 — grupo Revisor Automático de Cartas Unidad (interruptor + tolerancia) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,6 +68,7 @@
   <div class="afecta-box">
     <div class="tit"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
     <ul>
+      <li><b>Revisor Automático Unidad</b> → con el motor encendido, Business Suite revisa cada carta UNIDAD pendiente (documento vs sistema, tasa vs pizarra, comisión dealer, código de excepción) y la aprueba sola con un checklist firmado adjunto; lo que no cuadra queda para el Analista en <a href="/aprobaciones/?tab=revision">Aprobaciones</a>.</li>
       <li><b>La escalera de estrellas</b> → rige en <a href="/donde-curso-2/">¿Dónde Curso? 2.0</a>: <b>1⭐</b> aprueba excepciones que rentan al menos el piso nivel 1 (75%) · <b>2⭐</b> hasta el piso nivel 2 (50%) · <b>3⭐</b> hasta el piso nivel 3 (25%), exigiendo ADEMÁS que la rentabilidad sea al menos la comisión más alta (dealer o ejecutivo) y nunca bajo el mínimo absoluto en $. El sistema propone la rebaja de comisión dealer (neta) que devuelve una jugada al nivel 1.</li>
       <li><b>Rebaja máxima de tasa Unidad</b> → % relativo sobre la tasa pizarra (pizarra 2,70% → mínimo 2,56%, redondeando hacia abajo); una baja mayor fuerza la operación a Autofin.</li>
       <li><b>Estrellas mes 1 y % mensual</b> → presupuesto de cada Ejecutivo Comercial: 3 de regalo el primer mes (alcanzan justo para una jugada de nivel 3); después ⌊otorgadas del mes anterior × 33%⌋ — redondeo hacia abajo: el aliciente es colocar al menos 3 al mes.</li>
@@ -114,6 +115,10 @@ const GRUPOS = [
     ['exc_vigencia_horas','Vigencia del código','horas'],
     ['exc_codigo_digitos','Largo del código','dígitos'],
     ['exc_tolerancia_saldo','Tolerancia de saldo precio al validar','$'],
+  ]},
+  { tit:'Revisor Automático de Cartas Unidad', icono:'bi-robot', claves:[
+    ['rev_unidad_activo','Motor encendido (1 = Business Suite aprueba solo; 0 = todo al Analista)','1/0'],
+    ['rev_unidad_tolerancia','Tolerancia al comparar montos documento vs sistema','$'],
   ]},
   { tit:'Simulador — plazos', icono:'bi-calculator', claves:[
     ['exc_plazo_min_curse','Plazo mínimo cursable','cuotas'],

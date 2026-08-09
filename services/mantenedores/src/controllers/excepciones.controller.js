@@ -34,6 +34,8 @@ const DEFAULTS = [
   ['exc_plazo_4',           48, 'Simulador — plazo 4 (cuotas)'],
 ];
 const CLAVES = new Set(DEFAULTS.map(d => d[0]));
+// Revisor Automático de cartas UNIDAD (claves creadas por services/cartas/src/revisor-unidad.js)
+CLAVES.add('rev_unidad_activo'); CLAVES.add('rev_unidad_tolerancia');
 
 require('../../../../shared/migrate').enFila('excepciones-comerciales', async () => {
   try {
@@ -79,7 +81,7 @@ const getAll = async (_req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT clave, valor, descripcion, fecha_actualizacion FROM parametros_credito
-       WHERE clave LIKE 'exc\\_%' OR clave = 'pref_diff_pct' ORDER BY clave`);
+       WHERE clave LIKE 'exc\\_%' OR clave LIKE 'rev\\_unidad\\_%' OR clave = 'pref_diff_pct' ORDER BY clave`);
     const obj = {};
     rows.forEach(r => { obj[r.clave] = parseFloat(r.valor); });
     res.json({ success: true, data: { lista: rows, obj }, error: null });
