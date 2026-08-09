@@ -5257,7 +5257,17 @@ async function buildVRentEj(soloRender){
     const e=por[o.ejecutivo]||(por[o.ejecutivo]={ops:0,rent:0,lucro:0,optimas:0});
     e.ops++; e.rent+=o.rent; e.lucro+=o.lucro; if(o.optima)e.optimas++;
   }
-  const lista=Object.entries(por).map(([ej,v])=>Object.assign({ej,prom:v.rent/v.ops},v)).sort((a,b)=>b.rent-a.rent);
+  let lista=Object.entries(por).map(([ej,v])=>Object.assign({ej,prom:v.rent/v.ops},v)).sort((a,b)=>b.rent-a.rent);
+  // Mismo criterio que Otorgados/Aprobadas: externos Autofin agrupados en una fila
+  // y TODOS los Ejecutivos Comerciales activos del BS, aunque estén en cero.
+  const ext=lista.filter(x=>!ejEsNuestro(x.ej));
+  lista=lista.filter(x=>ejEsNuestro(x.ej));
+  if(ext.length){
+    const e=ext.reduce((s,x)=>({ops:s.ops+x.ops,rent:s.rent+x.rent,lucro:s.lucro+x.lucro,optimas:s.optimas+x.optimas}),{ops:0,rent:0,lucro:0,optimas:0});
+    lista.push(Object.assign({ej:'EXTERNOS AUTOFIN',externo:true,prom:e.ops?e.rent/e.ops:0},e));
+  }
+  ejFaltantes(lista.map(x=>x.ej)).forEach(n=>lista.push({ej:String(n).toUpperCase(),ops:0,rent:0,lucro:0,optimas:0,prom:0}));
+  lista.sort((a,b)=>b.rent-a.rent);
   const tot=lista.reduce((s,x)=>({rent:s.rent+x.rent,ops:s.ops+x.ops,lucro:s.lucro+x.lucro,optimas:s.optimas+x.optimas}),{rent:0,ops:0,lucro:0,optimas:0});
 
   // ── KPIs
@@ -5271,7 +5281,7 @@ async function buildVRentEj(soloRender){
   // ── Charts (config-factories: el mismo config alimenta el chart chico y el popup HD)
   Object.values(_RE_CH).forEach(c=>{try{c.destroy();}catch(e){}});
   const corto=n=>n.split(/\s+/).slice(0,2).join(' ');
-  const top=lista.slice(0,14);
+  const top=lista;   // todos los comerciales (los en cero muestran barra vacía)
   // % del total sobre cada barra (dataset 0) y dentro de cada porción del donut
   const _pctBar={id:'repct',afterDatasetsDraw(ch){const ds=ch.data.datasets[0];const meta=ch.getDatasetMeta(0);
     const t=ds.data.reduce((a,b)=>a+b,0)||1;const ctx=ch.ctx;ctx.save();ctx.fillStyle='#1a3a6a';ctx.font='bold 9px sans-serif';ctx.textAlign='center';
