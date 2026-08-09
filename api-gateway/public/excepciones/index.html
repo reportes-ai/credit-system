@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v2.2 — Gerencia con las variables del móvil (veredicto+autoriza); registro con columna Autoriza; permiso excepciones_registro -->
+  <!-- v2.3 — Validador muestra qué autoriza el código (tasa/comisión/financiera) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -236,6 +236,21 @@ function fmtRut(el){
   el.value = (Number(cuerpo)||'').toLocaleString('es-CL') + (dv ? '-'+dv : '');
 }
 const fmtF = v => { if(!v) return '—'; const d = new Date(v); return isNaN(d)?'—':d.toLocaleString('es-CL',{dateStyle:'short',timeStyle:'short'}); };
+/* Qué aprueba un código, leído del snapshot (Validador y Registro comparten esto) */
+function autorizaDe(c){
+  const s = c.snapshot;
+  if (!s) return c.financiera ? 'por ' + escH(c.financiera) : '';
+  const p = [];
+  if (s.tasa_pct != null) p.push('tasa ' + Number(s.tasa_pct).toFixed(2).replace('.',',') + '%' + (s.tasa_manual ? ' <b style="color:#b45309">(modificada)</b>' : ''));
+  if (s.comision_dealer > 0) p.push('comisión dealer ' + fmt$(s.comision_dealer) + (s.comision_manual
+    ? ' <b style="color:#b45309">(modificada' + (s.comision_pizarra > 0 ? '; pizarra ' + fmt$(s.comision_pizarra) : '') + ')</b>' : ' (pizarra)'));
+  if (s.rebaja_tasa_pct > 0) p.push('rebaja de tasa ' + Number(s.rebaja_tasa_pct).toFixed(1) + '%');
+  if (s.com_dealer_clp > 0) p.push('comisión dealer ' + fmt$(s.com_dealer_clp));
+  if (s.plazo || c.plazo) p.push('en ' + (s.plazo || c.plazo) + ' cuotas');
+  const fin = s.financiera || (s.lado === 'AF' ? 'AUTOFIN' : s.lado === 'UAC' ? 'UNIDAD' : null) || c.financiera;
+  if (fin) p.push('por <b>' + escH(fin) + '</b>' + (s.cambia_financiera ? ' <b style="color:#b45309">(cambio de financiera)</b>' : ''));
+  return p.join(' · ');
+}
 
 let P = {}, T = {}, UF = null, OPS_UAC = 0, EX = {}, ESTADO = null, PREF_TABLA = [];
 let SIMS = {};   // por plazo: resultado de la última simulación
@@ -503,6 +518,7 @@ async function validarCod(){
     <div><b>Ejecutivo:</b> ${escH(c.ejecutivo)} · <b>Tipo:</b> ${escH(c.tipo)}</div>
     <div><b>Cliente (RUT):</b> ${escH(c.rut_cliente)} · <b>Saldo precio:</b> ${fmt$(c.saldo_precio)} · <b>Plazo:</b> ${c.plazo||'—'}</div>
     <div><b>Generado por:</b> ${escH(c.generado_por||'—')} el ${fmtF(c.generado_at)} · <b>Vence:</b> ${fmtF(c.vence_at)}</div>
+    ${autorizaDe(c) ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 10px;margin-top:6px"><b><i class="bi bi-patch-check me-1"></i>Autoriza:</b> ${autorizaDe(c)}</div>` : ''}
     ${c.usado_carta ? `<div><b>Usado en la carta:</b> ${escH(c.usado_carta)} el ${fmtF(c.usado_at)}</div>` : ''}
     ${c.comentario ? `<div><b>Motivo:</b> ${escH(c.comentario)}</div>` : ''}
   </div>`;
@@ -612,24 +628,11 @@ async function cargarRegistro(){
   const r = await fetch('/api/excepciones/registro', { headers:H }); const j = await r.json();
   const b = document.getElementById('regBody');
   if (!j.success || !j.data.length) { b.innerHTML = '<tr><td colspan="11" style="color:#94a3b8">Sin códigos</td></tr>'; return; }
-  // Qué aprueba cada código: del snapshot (clave Gerencia trae tasa/comisión/financiera)
-  const autorizaTxt = (c) => {
-    const s = c.snapshot;
-    if (!s) return c.financiera ? escH(c.financiera) : '—';
-    const p = [];
-    if (s.tasa_pct != null) p.push('tasa ' + Number(s.tasa_pct).toFixed(2).replace('.',',') + '%' + (s.tasa_manual ? ' (mod.)' : ''));
-    if (s.comision_dealer > 0) p.push('com. ' + fmt$(s.comision_dealer) + (s.comision_manual ? ' (mod.)' : ' (pizarra)'));
-    if (s.rebaja_tasa_pct > 0) p.push('rebaja tasa ' + Number(s.rebaja_tasa_pct).toFixed(1) + '%');
-    if (s.com_dealer_clp > 0) p.push('com. ' + fmt$(s.com_dealer_clp));
-    const fin = s.financiera || c.financiera;
-    if (fin) p.push('por ' + escH(fin) + (s.cambia_financiera ? ' (cambio)' : ''));
-    return p.length ? p.join(' · ') : '—';
-  };
   b.innerHTML = j.data.map(c => `<tr>
     <td><b style="letter-spacing:2px">${escH(c.codigo)}</b></td>
     <td>${escH(c.tipo)}</td><td><span class="est-pill est-${escH(c.estado)}">${escH(c.estado)}</span></td>
     <td>${escH(c.ejecutivo)}</td><td>${escH(c.rut_cliente)}</td><td>${fmt$(c.saldo_precio)}</td>
-    <td style="max-width:220px;font-size:.75rem;text-align:left">${autorizaTxt(c)}</td>
+    <td style="max-width:220px;font-size:.75rem;text-align:left">${autorizaDe(c) || '—'}</td>
     <td>${escH(c.generado_por||'—')}</td><td>${fmtF(c.generado_at)}</td>
     <td>${escH(c.usado_carta||'—')}</td><td style="max-width:200px;font-size:.75rem">${escH(c.comentario||'')}</td></tr>`).join('');
 }
