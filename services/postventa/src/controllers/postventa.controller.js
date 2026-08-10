@@ -290,6 +290,15 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
         if (dirty) await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_comision_pagada'", [JSON.stringify(v)]);
       }
     } catch (_) {}
+    // Backfill: movimientos COMISION aún PENDIENTES cuyas operaciones ya están
+    // COMISION A PAGAR en Post Venta → A PAGAR (idempotente por el WHERE).
+    await pool.query(`
+      UPDATE cartolas_movimientos m
+      JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+      JOIN postventa_seguimiento s ON s.id_credito = ca.id_credito_creado
+      JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
+      SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
+      WHERE m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`).catch(e => console.error('[postventa backfill cartola a pagar]', e.message));
     // Idem para la cartola: ahora sale por el mailer con el marco corporativo.
     try {
       const [[rc2]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
@@ -687,6 +696,17 @@ async function marcarComisionAPagar(ids) {
   }
   await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?', [vals])
     .catch(e => console.error('[postventa comisionAPagar]', e.message));
+  // Emisión de Cartolas: el movimiento COMISION de la operación pasa solo de
+  // PENDIENTE → A PAGAR (el dropdown sigue editable; A DESCONTAR y los cambios
+  // manuales no se tocan).
+  const ph = ids.map(() => '?').join(',');
+  await pool.query(`
+    UPDATE cartolas_movimientos m
+    JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+    JOIN postventa_seguimiento s ON s.id_credito = ca.id_credito_creado
+    SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
+    WHERE s.id IN (${ph}) AND m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`, ids)
+    .catch(e => console.error('[postventa comisionAPagar cartola]', e.message));
 }
 
 /* Rut del dealer resuelto igual que getAll (creditos → dealers → seguimiento) */
