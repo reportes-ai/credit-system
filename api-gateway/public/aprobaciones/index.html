@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3563,14 +3563,19 @@ async function enviarCartola(gi, conc, rutC, total){
     '.pdf-cartola .tbl td{padding:5px 4px;word-break:break-word}';
   document.head.appendChild(estilo);
   bloque.classList.add('pdf-cartola');
+  let pdfBlob = null;
   try {
-    await html2pdf().set({
+    // Un solo render: el blob sirve para la descarga local Y para el correo.
+    pdfBlob = await html2pdf().set({
       filename,
       margin: 8,
       image: { type:'jpeg', quality: 0.95 },
       html2canvas: { scale: 2 },
       jsPDF: { unit:'mm', format:'letter', orientation:'landscape' },
-    }).from(bloque).save();
+    }).from(bloque).outputPdf('blob');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(pdfBlob); a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
   finally { bloque.classList.remove('pdf-cartola'); estilo.remove(); }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
@@ -3580,28 +3585,28 @@ async function enviarCartola(gi, conc, rutC, total){
   } catch(e) {}
   // Refresca para que las operaciones enviadas salgan de pendientes y muestren su Mes Cartola
   cargarMovimientos();
-  // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado).
-  //    Plantilla PARAMÉTRICA (Mantenedores Post Venta → correo_cartola_dealer):
-  //    asunto/cuerpo/firma editables y con interruptor para desactivar el correo.
-  //    CC: comisiones@ + los ejecutivos que generaron las operaciones de esta cartola
-  let tpl = null;
-  try {
-    const rc = await fetch('/api/postventa/config', { headers: hdr() });
-    tpl = ((await rc.json()).data || {}).correo_cartola_dealer || null;
-  } catch(e) {}
-  if (tpl && tpl.activo === false) return;   // correo desactivado desde el mantenedor
-  const datos = { dealer: conc, mes: nombreMes(mes), total: fmtCLP(total) };
-  const rell = t => String(t||'').replace(/\{(\w+)\}/g, (x,k) => datos[k] != null ? datos[k] : x);
+  // 3) Correo AUTOMÁTICO al dealer desde comisiones@ (HTML + PDF adjunto), con
+  //    copia a los ejecutivos de la cartola y al Jefe Comercial (los agrega el
+  //    servidor por perfil). Plantilla paramétrica en Mantenedores Post Venta,
+  //    con interruptor para desactivarlo. Ya no se abre Gmail.
   const idsGrupo = REV_IDS[gi] || [];
   const ejecMails = [...new Set((MOVS_ALL||[]).filter(m => idsGrupo.includes(m.id)).map(m => (m.ejecutivo_mail||'').trim() || _ejMail(m.ejecutivo)).filter(Boolean))];
-  const cc = ['comisiones@autofacilchile.cl', ...ejecMails].join(',');
-  const asunto = tpl ? rell(tpl.asunto).toUpperCase() : `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
-  const cuerpo = tpl
-    ? rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '')
-    : `Estimados ${conc}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a ${nombreMes(mes)}.\n\nTotal comisión bruta a pagar: ${fmtCLP(total)}\n\nSaludos cordiales,\nAutoFácil Crédito Automotriz`;
-  window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
-    '&cc=' + encodeURIComponent(cc) +
-    '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
+  try {
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1]);
+      r.onerror = rej; r.readAsDataURL(pdfBlob);
+    });
+    const rj = await (await fetch('/api/cartolas/correo', { method:'POST', headers: hdr(),
+      body: JSON.stringify({ mes_nombre: nombreMes(mes), dealer: conc, mail, total: fmtCLP(total),
+                             pdf_base64: b64, filename, ejec_cc: ejecMails }) })).json();
+    if (rj.success && rj.data && rj.data.enviado)
+      alert('📧 Cartola enviada por correo a ' + mail + (rj.data.cc ? '\nCC: ' + rj.data.cc : '')
+        + (rj.data.dev ? '\n\n⚠ Modo Desarrollo: desviado a las casillas de prueba.' : ''));
+    else if (rj.success && rj.data && rj.data.motivo)
+      alert('El envío quedó registrado, pero el correo NO salió: ' + rj.data.motivo);
+    else alert('El envío quedó registrado, pero el correo falló: ' + (rj.error || 'error desconocido'));
+  } catch(e) { alert('El envío quedó registrado, pero el correo falló: ' + e.message); }
 }
 
 /* ═══════════ CARTOLAS ENVIADAS ═══════════ */

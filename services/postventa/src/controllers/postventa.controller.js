@@ -276,7 +276,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
       activo: true,
       asunto: 'CARTOLA COMISIONES {mes} — {dealer}',
       cuerpo: 'Estimados {dealer}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}.\n\nTotal comisión bruta a pagar: {total}\n\nFavor emitir la factura a:\nAUTOFACIL SPA — RUT 76.545.638-K\nAv. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.\n\nCualquier duda quedamos atentos.',
-      firma: 'Saludos cordiales,\nAutoFácil Crédito Automotriz',
+      firma: '',   // el marco corporativo del mailer ya cierra con logo
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
       ['correo_cartola_dealer', JSON.stringify(CORREO_CARTOLA)]);
@@ -288,6 +288,14 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
         if (v && v.activo === undefined) { v.activo = true; dirty = true; }
         if (v && v.firma === 'Saludos cordiales,\nComisiones AutoFácil') { v.firma = ''; dirty = true; }
         if (dirty) await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_comision_pagada'", [JSON.stringify(v)]);
+      }
+    } catch (_) {}
+    // Idem para la cartola: ahora sale por el mailer con el marco corporativo.
+    try {
+      const [[rc2]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
+      if (rc2) { const v = JSON.parse(rc2.valor);
+        if (v && v.firma === 'Saludos cordiales,\nAutoFácil Crédito Automotriz') { v.firma = '';
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_cartola_dealer'", [JSON.stringify(v)]); }
       }
     } catch (_) {}
     console.log('[postventa] tablas OK');

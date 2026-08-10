@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.8 — aviso de pago sin firma (el marco corporativo ya cierra con logo) -->
+  <!-- v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -125,7 +125,7 @@
         <div class="fld"><label>Asunto</label><input id="ctaAsunto"></div>
         <div class="fld"><label>Cuerpo</label><textarea id="ctaCuerpo"></textarea></div>
         <div class="fld"><label>Firma</label><textarea id="ctaFirma" style="min-height:70px"></textarea></div>
-        <div class="ph">Variables: <code>{dealer}</code> <code>{mes}</code> <code>{total}</code>. Desactivado, el envío de la cartola sigue funcionando (PDF + registro) pero no abre el correo.</div>
+        <div class="ph">Variables: <code>{dealer}</code> <code>{mes}</code> <code>{total}</code>. El correo sale AUTOMÁTICO desde comisiones@ (HTML + PDF adjunto, CC ejecutivos y Jefe Comercial). Desactivado, el envío sigue (PDF + registro) pero sin correo.</div>
       </div>
       <div>
         <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-cash-coin me-1"></i>Aviso de pago al dealer (comisiones@)
@@ -156,7 +156,7 @@
       <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este recuadro</b><br>
       • <b>Destinatario</b> → a quién llega el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a> y <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a>).<br>
       • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.<br>
-      • <b>Cartola al dealer</b> → el correo que abre Gmail al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
+      • <b>Cartola al dealer</b> → el correo automático (comisiones@, HTML + PDF adjunto, CC ejecutivos y Jefe Comercial) al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
       • <b>Aviso de pago al dealer</b> → el correo automático desde comisiones@ cuando el Tesorero marca COMISIÓN PAGADA (<a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> o el módulo Órdenes de Pago). El interruptor lo activa/desactiva.
     </div>
   </div>
@@ -192,7 +192,7 @@ let CFG = {}, PERFILES = [];
 const DEF_SALDO_C = { asunto:'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
 const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
 
-const DEF_CARTOLA_C = { activo:true, asunto:'CARTOLA COMISIONES {mes} — {dealer}', cuerpo:'Estimados {dealer}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}.\n\nTotal comisión bruta a pagar: {total}\n\nFavor emitir la factura a:\nAUTOFACIL SPA — RUT 76.545.638-K\nAv. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.\n\nCualquier duda quedamos atentos.', firma:'Saludos cordiales,\nAutoFácil Crédito Automotriz' };
+const DEF_CARTOLA_C = { activo:true, asunto:'CARTOLA COMISIONES {mes} — {dealer}', cuerpo:'Estimados {dealer}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}.\n\nTotal comisión bruta a pagar: {total}\n\nFavor emitir la factura a:\nAUTOFACIL SPA — RUT 76.545.638-K\nAv. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.\n\nCualquier duda quedamos atentos.', firma:'' };
 const DEF_PAGADA_C  = { activo:true, asunto:'Comisión pagada — {doc} N° {numero_factura} ({dealer})', cuerpo:'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.', firma:'' };
 
 function pintaCorreos(){

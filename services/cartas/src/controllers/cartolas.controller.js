@@ -388,4 +388,43 @@ const reversarEnvio = async (req, res) => {
   }
 };
 
-module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio, reversarEnvio };
+/* ── POST /api/cartolas/correo — envía la cartola al dealer por correo (HTML +
+   PDF adjunto) desde comisiones@, con copia a los ejecutivos de la cartola y a
+   los Jefes Comerciales. Plantilla paramétrica correo_cartola_dealer
+   (Mantenedores Post Venta); con el interruptor apagado no envía.
+   El PDF lo genera el navegador (html2pdf) y llega en base64. ── */
+const enviarCorreoCartola = async (req, res) => {
+  try {
+    const { mes_nombre, dealer, mail, total, pdf_base64, filename, ejec_cc } = req.body || {};
+    if (!dealer || !mail) return res.status(400).json({ success: false, data: null, error: 'dealer y mail requeridos' });
+    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
+    const tpl = tRow ? JSON.parse(tRow.valor) : {};
+    if (tpl.activo === false)
+      return res.json({ success: true, data: { enviado: false, motivo: 'Plantilla desactivada en Mantenedores Post Venta' }, error: null });
+    const datos = { dealer, mes: mes_nombre || '', total: total || '' };
+    const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
+    // CC: ejecutivos de las operaciones + Jefes Comerciales activos (por perfil, paramétrico)
+    const [jefes] = await pool.query(
+      `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+       WHERE p.nombre = 'Jefe Comercial' AND u.estado = 'activo' AND u.email IS NOT NULL`);
+    const cc = [...new Set([...(Array.isArray(ejec_cc) ? ejec_cc : []), ...jefes.map(j => j.email)]
+      .map(x => String(x).trim().toLowerCase()).filter(Boolean))].join(',');
+    const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '');
+    const attachments = pdf_base64
+      ? [{ filename: filename || 'cartola.pdf', content: Buffer.from(pdf_base64, 'base64') }] : [];
+    const r = await enviarCorreo({
+      from: remitenteComisiones(), to: mail, cc: cc || undefined,
+      subject: rell(tpl.asunto) || ('Cartola comisiones — ' + dealer),
+      html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')), text: cuerpo, attachments });
+    auditar({ req, accion: 'CORREO_CARTOLA', modulo: 'cartas', entidad: 'cartola_enviada', entidad_id: null,
+      detalle: `Correo de cartola a ${mail} (CC: ${cc || '—'}) — ${dealer} (${mes_nombre || ''})` });
+    res.json({ success: r.ok, data: { enviado: r.ok, dev: !!r.dev, cc }, error: r.ok ? null : r.error });
+  } catch (e) {
+    console.error('[cartolas correo]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { sync, getMovimientos, crearMovimiento, updateMovimiento, deleteMovimiento, getEnviadas, registrarEnvio, reversarEnvio, enviarCorreoCartola };
