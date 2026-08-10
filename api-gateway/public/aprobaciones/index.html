@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -606,6 +606,11 @@
         <select id="ctaEstado" onchange="renderMovimientos()">
           <option value="">Todos</option><option>PENDIENTE</option><option>A PAGAR</option><option>A DESCONTAR</option>
         </select>
+        <!-- Toggle enviadas / no enviadas (por Mes Cartola estampado) -->
+        <div style="display:inline-flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;font-size:.78rem">
+          <button id="tgEnv" onclick="tgEnvio('ENV')" style="border:none;padding:7px 12px;cursor:pointer;background:#fff;color:#475569">✉ Enviadas</button>
+          <button id="tgNoEnv" onclick="tgEnvio('NOENV')" style="border:none;padding:7px 12px;cursor:pointer;background:#fff;color:#475569;border-left:1px solid #cbd5e1">⏳ No enviadas</button>
+        </div>
         <button class="btn-mini bm-anular" style="padding:8px 16px;font-size:.83rem" onclick="abrirModalPrepago()"><i class="bi bi-arrow-counterclockwise"></i> Ingreso Prepago o Anulación</button>
         <button class="btn-mini bm-ok" style="padding:8px 16px;font-size:.83rem" onclick="exportarMovimientos()"><i class="bi bi-file-earmark-excel"></i> Exportar Excel</button>
         <button class="btn-mini" id="btnSinCarta" style="padding:8px 16px;font-size:.83rem;background:#fff7ed;color:#9a3412;border:1px solid #fdba74" onclick="abrirSinCarta()"><i class="bi bi-plus-circle"></i> Otorgadas sin carta <span id="badgeSinCarta" style="display:none;background:#dc2626;color:#fff;border-radius:10px;padding:0 7px;font-size:.72rem;margin-left:4px"></span></button>
@@ -3221,6 +3226,15 @@ function aplicarMes(){
   if (typeof scContar === 'function') scContar();
 }
 function fdMov(v){ if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',{timeZone:'America/Santiago'})+' '+d.toLocaleTimeString('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}); }
+let FILTRO_ENVIO = '';   // '' = todas · ENV = con Mes Cartola · NOENV = sin enviar
+function tgEnvio(v){
+  FILTRO_ENVIO = FILTRO_ENVIO === v ? '' : v;   // segundo clic apaga el toggle
+  const on = 'border:none;padding:7px 12px;cursor:pointer;background:#0141A2;color:#fff;font-weight:700';
+  const off = 'border:none;padding:7px 12px;cursor:pointer;background:#fff;color:#475569';
+  document.getElementById('tgEnv').style.cssText = FILTRO_ENVIO==='ENV' ? on : off;
+  document.getElementById('tgNoEnv').style.cssText = (FILTRO_ENVIO==='NOENV' ? on : off) + ';border-left:1px solid #cbd5e1';
+  renderMovimientos();
+}
 function renderMovimientos(){
   const q = (document.getElementById('ctaBuscar').value||'').toLowerCase();
   const est = document.getElementById('ctaEstado').value;
@@ -3228,6 +3242,7 @@ function renderMovimientos(){
   const base = q ? MOVS_ALL : MOVS;
   const rows = base.filter(m =>
     (!est || m.estado_comision===est) &&
+    (FILTRO_ENVIO==='' || (FILTRO_ENVIO==='ENV' ? !!m.mes_cartola : !m.mes_cartola)) &&
     (!q || [m.concesionario,m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.num_carta].some(v=>String(v||'').toLowerCase().includes(q))));
   document.getElementById('ctaCount').textContent = rows.length + ' registro(s)';
   const body = document.getElementById('bodyMovs');
