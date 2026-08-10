@@ -815,7 +815,20 @@ const pagarOrden = async (req, res) => {
       if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);
     } else if (oc.origen === 'COMISION') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
-      if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'COMISION', 'COMISION PAGADA', ?)`, [s.id_seguimiento, quien]);
+      if (s) {
+        // La ODP de la titular cubre toda la cartola: COMISION PAGADA en el grupo
+        // de la factura, y aviso automático al dealer desde comisiones@.
+        try {
+          const pv = require('../../../postventa/src/controllers/postventa.controller');
+          const grupo = await pv.idsGrupoFactura(s.id_seguimiento);
+          const vals = grupo.map(g => [g, 'COMISION', 'COMISION PAGADA', quien]);
+          await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+          await pv.notificarPagoComisionDealer(s.id_seguimiento);
+        } catch (ePV) {
+          console.error('[ordenes-pago hook comision]', ePV.message);
+          await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'COMISION', 'COMISION PAGADA', ?)`, [s.id_seguimiento, quien]);
+        }
+      }
     }
 
     // 3) Congelar el documento "en duro": snapshot inmutable. La orden pagada ya no se recalcula.

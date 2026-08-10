@@ -46,6 +46,12 @@ function remitenteCobranza() {
   return process.env.MAIL_FROM_COBRANZA || 'Cobranza AutoFácil <cobranza@autofacilchile.cl>';
 }
 
+// Remitente de los correos de COMISIONES (aviso de pago al dealer, etc.). Igual que
+// cobranza: configurable por env MAIL_FROM_COMISIONES y debe estar verificado en Brevo.
+function remitenteComisiones() {
+  return process.env.MAIL_FROM_COMISIONES || 'Comisiones AutoFácil <comisiones@autofacilchile.cl>';
+}
+
 // Cuentas remitentes disponibles (deben estar verificadas en Brevo o el dominio autenticado).
 // Para los selectores "Desde" de correos programados / automatizaciones — evita enviar
 // desde la cuenta equivocada. Ampliar aquí cuando se verifiquen nuevos remitentes.
@@ -53,6 +59,7 @@ function cuentasRemitente() {
   return [
     { clave: 'sistema',  label: 'Sistema (afbs@)',      from: remitente() },
     { clave: 'cobranza', label: 'Cobranza (cobranza@)', from: remitenteCobranza() },
+    { clave: 'comisiones', label: 'Comisiones (comisiones@)', from: remitenteComisiones() },
   ];
 }
 function remitentePorClave(clave) {
@@ -141,4 +148,4 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
   }
 }
 
-module.exports = { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, cuentasRemitente, remitentePorClave, envolverHTML };
+module.exports = { enviarCorreo, mailConfigurado, remitente, remitenteCobranza, remitenteComisiones, cuentasRemitente, remitentePorClave, envolverHTML };

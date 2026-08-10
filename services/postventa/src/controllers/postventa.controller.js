@@ -49,6 +49,18 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
       { etapa:'SALDO PRECIO PAGADO',  estado:'PAGADO' },
     ];
     const DEF_COM = [
+      { etapa:'COMISION PENDIENTE',   estado:'PENDIENTE' },
+      { etapa:'COMISION A PAGAR',     estado:'PENDIENTE' },
+      { etapa:'CARTOLA EMITIDA',      estado:'PENDIENTE' },
+      { etapa:'CARTOLA ENVIADA',      estado:'PENDIENTE' },
+      { etapa:'FACTURA RECIBIDA',     estado:'PARA PAGO' },
+      { etapa:'ORDEN DE PAGO EMITIDA',estado:'PARA PAGO' },
+      { etapa:'ENVIADO A PAGO',       estado:'PARA PAGO' },
+      { etapa:'COMISION PAGADA',      estado:'PAGADO' },
+    ];
+    // El track PARQUE conserva su flujo propio (Comisiones Parques a Pagar marca
+    // emitida/aprobada/enviada por parque+mes) — no hereda el rediseño del dealer.
+    const DEF_PARQUE = [
       { etapa:'COMISION A PAGAR',     estado:'PENDIENTE' },
       { etapa:'CARTOLA EMITIDA',      estado:'PENDIENTE' },
       { etapa:'CARTOLA APROBADA',     estado:'PENDIENTE' },
@@ -70,7 +82,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     try { await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS parque VARCHAR(120) NULL'); } catch (_) {}
     try { await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS com_parque BIGINT NULL'); } catch (_) {}
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
-      ['etapas_parque', JSON.stringify(DEF_COM)]);   // mismas 8 etapas de comisión
+      ['etapas_parque', JSON.stringify(DEF_PARQUE)]);   // flujo propio del parque (conserva CARTOLA APROBADA)
     // Plantillas editables del correo a Contabilidad al emitir la Orden de Pago (saldo y comisión).
     const CORREO_SALDO = {
       asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
@@ -195,6 +207,69 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     for (const col of ['impuesto_pct DECIMAL(7,4) DEFAULT NULL', 'impuesto_monto BIGINT DEFAULT NULL', 'monto_liquido BIGINT DEFAULT NULL']) {
       try { await pool.query(`ALTER TABLE postventa_facturas_comision ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
     }
+    /* ── Rediseño flujo COMISIÓN (08-2026, pedido Pato):
+       COMISIÓN PENDIENTE (auto al otorgar) → COMISION A PAGAR (auto al marcar
+       FONDOS RECIBIDOS del saldo) → CARTOLA EMITIDA (analista cierra la cartola)
+       → CARTOLA ENVIADA (auto al enviar) → FACTURA RECIBIDA (una factura por
+       cartola, replicada a las demás ops) → ODP EMITIDA → ENVIADO A PAGO →
+       COMISION PAGADA (tesorero; correo automático al dealer desde comisiones@).
+       CARTOLA APROBADA se elimina: nunca tuvo un aprobador real (se marcaba
+       sola junto con el envío). */
+    // La factura se ingresa UNA vez y se replica a las otras ops de la cartola:
+    // la réplica no lleva montos (van solo en la titular, para no duplicar ni la
+    // ODP ni el asiento contable).
+    for (const col of ['es_replica TINYINT(1) NOT NULL DEFAULT 0', 'id_titular INT DEFAULT NULL']) {
+      try { await pool.query(`ALTER TABLE postventa_facturas_comision ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
+    }
+    try {
+      // 1) Config: insertar COMISIÓN PENDIENTE al inicio y eliminar CARTOLA APROBADA
+      //    (ajustando el array posicional de perfiles para no desalinear permisos).
+      const [[cRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='etapas_comision'");
+      if (cRow) {
+        const arr = JSON.parse(cRow.valor);
+        const [[pRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='etapa_perfiles_comision'");
+        const perms = pRow ? JSON.parse(pRow.valor) : null;
+        let cambio = false;
+        const iApr = arr.findIndex(x => x.etapa === 'CARTOLA APROBADA');
+        if (iApr >= 0) { arr.splice(iApr, 1); if (Array.isArray(perms)) perms.splice(iApr, 1); cambio = true; }
+        if (!arr.some(x => x.etapa === 'COMISION PENDIENTE')) {
+          arr.splice(0, 0, { etapa: 'COMISION PENDIENTE', estado: 'PENDIENTE' });
+          if (Array.isArray(perms)) perms.splice(0, 0, []);
+          cambio = true;
+        }
+        if (cambio) {
+          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='etapas_comision'", [JSON.stringify(arr)]);
+          if (Array.isArray(perms)) await pool.query("UPDATE postventa_config SET valor=? WHERE clave='etapa_perfiles_comision'", [JSON.stringify(perms)]);
+          console.log('[postventa] flujo COMISION actualizado (COMISION PENDIENTE / sin CARTOLA APROBADA)');
+        }
+      }
+      // 2) Backfill: todo otorgado con seguimiento arranca con COMISIÓN PENDIENTE.
+      await pool.query(`
+        INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+        SELECT s.id, 'COMISION', 'COMISION PENDIENTE', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
+        FROM postventa_seguimiento s
+        WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
+          WHERE e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION PENDIENTE')`);
+      // 3) Retro-limpieza: COMISION A PAGAR se marcaba al otorgar; ahora significa
+      //    "los fondos del saldo ya llegaron". Se desmarca SOLO donde es la única
+      //    marca del track (los flujos ya avanzados quedan como están) y el saldo
+      //    aún no tiene FONDOS RECIBIDOS.
+      await pool.query(`
+        DELETE e FROM postventa_etapas e
+        WHERE e.track='COMISION' AND e.etapa='COMISION A PAGAR'
+          AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
+            WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))
+          AND NOT EXISTS (SELECT 1 FROM postventa_etapas fr
+            WHERE fr.id_seguimiento = e.id_seguimiento AND fr.track='SALDO' AND fr.etapa='FONDOS RECIBIDOS')`);
+    } catch (e) { console.error('[postventa flujo comision v2]', e.message); }
+    // Plantilla del aviso de pago al dealer (sale desde comisiones@ al marcar COMISION PAGADA)
+    const CORREO_COM_PAGADA = {
+      asunto: 'Comisión pagada — {doc} N° {numero_factura} ({dealer})',
+      cuerpo: 'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.',
+      firma: 'Saludos cordiales,\nComisiones AutoFácil',
+    };
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
+      ['correo_comision_pagada', JSON.stringify(CORREO_COM_PAGADA)]);
     console.log('[postventa] tablas OK');
   } catch (e) { console.error('[postventa migration]', e.message); }
 });
@@ -488,12 +563,14 @@ const sync = async (req, res) => {
       FROM postventa_seguimiento s
       WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
         WHERE e.id_seguimiento = s.id AND e.track='SALDO' AND e.etapa='FUNDANTES PENDIENTES')`);
+    // COMISIÓN PENDIENTE se activa al otorgar; COMISION A PAGAR ya no (esa la
+    // marca FONDOS RECIBIDOS del saldo — la comisión se paga con la plata en mano).
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
-      SELECT s.id, 'COMISION', 'COMISION A PAGAR', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
+      SELECT s.id, 'COMISION', 'COMISION PENDIENTE', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
       FROM postventa_seguimiento s
       WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
-        WHERE e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR')`);
+        WHERE e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION PENDIENTE')`);
     /* Track PARQUE: atribución igual que Comisiones Parques a Pagar (dealers.ccs_parque
        vía el dealer del crédito; fallback texto creditos.parque; CALLE no es parque) y
        monto = creditos.com_parque, ya persistido por el motor único comision-dealer. */
@@ -558,8 +635,131 @@ const getAll = async (req, res) => {
   }
 };
 
+/* ── COMISION A PAGAR automática: se marca cuando el saldo precio de la misma
+   operación queda con FONDOS RECIBIDOS (la comisión se paga con la plata en mano).
+   Se llama desde setEtapa y desde los flujos de ODP de saldo que fuerzan esa etapa. */
+async function marcarComisionAPagar(ids) {
+  if (!Array.isArray(ids)) ids = [ids];
+  ids = ids.map(Number).filter(Boolean);
+  if (!ids.length) return;
+  const vals = [];
+  for (const id of ids) {
+    vals.push([id, 'COMISION', 'COMISION PENDIENTE', 'Sistema']);
+    vals.push([id, 'COMISION', 'COMISION A PAGAR', 'Sistema']);
+  }
+  await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?', [vals])
+    .catch(e => console.error('[postventa comisionAPagar]', e.message));
+}
+
+/* Rut del dealer resuelto igual que getAll (creditos → dealers → seguimiento) */
+async function rutDealerDe(idSeguimiento) {
+  const [[r]] = await pool.query(`
+    SELECT COALESCE(c.rut_dealer, d.rut, s.rut_dealer) AS rut, s.nombre_dealer
+    FROM postventa_seguimiento s
+    LEFT JOIN creditos c ON c.id = s.id_credito
+    LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
+    WHERE s.id = ?`, [idSeguimiento]);
+  return r || {};
+}
+
+/* ── La factura es UNA por cartola: al registrarla en una operación se replica
+   a las demás ops del mismo dealer que ya tienen CARTOLA ENVIADA y aún no tienen
+   factura. La réplica lleva el número y la fecha pero NO los montos (esos viven
+   solo en la titular: una sola ODP y un solo asiento contable). ── */
+async function replicarFacturaComision(idTitular, usuario) {
+  const [[fac]] = await pool.query('SELECT * FROM postventa_facturas_comision WHERE id_seguimiento=?', [idTitular]);
+  if (!fac || fac.es_replica) return 0;
+  const dl = await rutDealerDe(idTitular);
+  if (!dl.rut && !dl.nombre_dealer) return 0;
+  const [sibs] = await pool.query(`
+    SELECT s.id, s.num_op FROM postventa_seguimiento s
+    LEFT JOIN creditos c ON c.id = s.id_credito
+    LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
+    JOIN postventa_etapas ec ON ec.id_seguimiento = s.id AND ec.track='COMISION' AND ec.etapa='CARTOLA ENVIADA'
+    WHERE s.id <> ?
+      AND (
+        (? IS NOT NULL AND REPLACE(REPLACE(UPPER(COALESCE(c.rut_dealer, d.rut, s.rut_dealer,'')),'.',''),'-','') = REPLACE(REPLACE(UPPER(?),'.',''),'-',''))
+        OR (? IS NULL AND s.nombre_dealer = ?)
+      )
+      AND NOT EXISTS (SELECT 1 FROM postventa_etapas ef
+        WHERE ef.id_seguimiento = s.id AND ef.track='COMISION' AND ef.etapa='FACTURA RECIBIDA')`,
+    [idTitular, dl.rut || null, dl.rut || '', dl.rut || null, dl.nombre_dealer || '']);
+  for (const s of sibs) {
+    await pool.query(
+      `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE usuario=VALUES(usuario), fecha=NOW()`,
+      [s.id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
+    await pool.query(
+      `INSERT INTO postventa_facturas_comision
+         (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura,
+          es_terceros, es_boleta, es_replica, id_titular, usuario)
+       VALUES (?,?,?,?,?,?,?,?,1,?,?)
+       ON DUPLICATE KEY UPDATE fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura),
+         es_replica=1, id_titular=VALUES(id_titular), usuario=VALUES(usuario)`,
+      [s.id, s.num_op, fac.rut_dealer, fac.nombre_dealer, fac.fecha_factura, fac.numero_factura,
+       fac.es_terceros ? 1 : 0, fac.es_boleta ? 1 : 0, idTitular, usuario]);
+  }
+  return sibs.length;
+}
+
+/* ── Aviso automático al dealer cuando su comisión queda PAGADA: sale desde
+   comisiones@ (remitenteComisiones), plantilla paramétrica en postventa_config
+   'correo_comision_pagada'. Se envía UNA vez por factura (por la titular).
+   Nunca lanza: un correo caído no puede frenar el pago. ── */
+async function notificarPagoComisionDealer(idSeguimiento) {
+  try {
+    const [[d]] = await pool.query(`
+      SELECT s.num_op, fc.numero_factura, fc.es_boleta, fc.es_replica,
+             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
+             COALESCE(dl.correo, dl.cf_email) AS correo,
+             COALESCE(dl.tipo_cuenta, dl.cuenta_tipo) AS tipo_cuenta, dl.num_cuenta, dl.banco
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+      LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      WHERE s.id = ?`, [idSeguimiento]);
+    if (!d) return;
+    if (d.es_replica) return;                       // el aviso lo manda la titular (una factura = un correo)
+    if (!d.correo) { console.warn('[postventa aviso pago] dealer sin correo — OP', d.num_op); return; }
+    // OPs cubiertas por la factura (titular + réplicas)
+    const [reps] = await pool.query(
+      'SELECT num_op FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [idSeguimiento]);
+    const ops = [d.num_op, ...reps.map(r => r.num_op)].filter(Boolean).join(', ') || String(d.num_op || '');
+    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_comision_pagada'");
+    const tpl = tRow ? JSON.parse(tRow.valor) : {};
+    const datos = {
+      doc: d.es_boleta ? 'boleta' : 'factura',
+      numero_factura: d.numero_factura || '—',
+      dealer: d.dealer || '',
+      tipo_cuenta: (d.tipo_cuenta || 'cuenta corriente').toLowerCase(),
+      num_cuenta: d.num_cuenta || '—',
+      banco: d.banco || '—',
+      ops,
+    };
+    const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
+    const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + tpl.firma : '');
+    await enviarCorreo({
+      from: remitenteComisiones(),
+      to: d.correo,
+      subject: rell(tpl.asunto) || 'Comisión pagada',
+      html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')),
+      text: cuerpo,
+    });
+  } catch (e) { console.error('[postventa aviso pago dealer]', e.message); }
+}
+
+/* Grupo de la factura: la titular + sus réplicas (para propagar ODP/envío/pago) */
+async function idsGrupoFactura(id) {
+  const [[f]] = await pool.query('SELECT es_replica, id_titular FROM postventa_facturas_comision WHERE id_seguimiento=?', [id]);
+  const titular = f && f.es_replica && f.id_titular ? f.id_titular : Number(id);
+  const [reps] = await pool.query('SELECT id_seguimiento FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [titular]);
+  return [...new Set([Number(id), titular, ...reps.map(r => Number(r.id_seguimiento))])];
+}
+
 /* ── PUT /api/postventa/:id/etapa { track, etapa, marcar } ───────── */
-const ETAPAS_SISTEMA = ['FUNDANTES PENDIENTES', 'COMISION A PAGAR'];
+const ETAPAS_SISTEMA = ['FUNDANTES PENDIENTES', 'COMISION PENDIENTE'];
 const setEtapa = async (req, res) => {
   try {
     const { track, etapa, marcar } = req.body;
@@ -567,6 +767,13 @@ const setEtapa = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'track y etapa requeridos' });
     if (ETAPAS_SISTEMA.includes(etapa))
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
+    // En PARQUE la primera etapa sigue siendo COMISION A PAGAR (la marca el sync)
+    if (track === 'PARQUE' && etapa === 'COMISION A PAGAR')
+      return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
+    if (track === 'COMISION' && etapa === 'COMISION A PAGAR')
+      return res.status(400).json({ success: false, data: null, error: '"COMISION A PAGAR" se marca automáticamente al marcar FONDOS RECIBIDOS en el track Saldo Precio de la operación' });
+    if (track === 'COMISION' && etapa === 'CARTOLA ENVIADA')
+      return res.status(400).json({ success: false, data: null, error: '"CARTOLA ENVIADA" se marca automáticamente al enviar la cartola al dealer (Emisión de Cartolas)' });
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
     if (track === 'SALDO' && etapa === 'FUNDANTES RECIBIDOS')
       return res.status(400).json({ success: false, data: null, error: `"FUNDANTES RECIBIDOS" se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)` });
@@ -612,14 +819,26 @@ const setEtapa = async (req, res) => {
         if (!marcadasSet.has(etapaAnterior))
           return res.status(400).json({ success: false, data: null, error: `Debes marcar primero "${etapaAnterior}"` });
       }
+      // La cartola se emite con las operaciones hasta el último día del mes
+      // anterior: una otorgada este mes entra recién en la cartola siguiente.
+      if (track === 'COMISION' && etapa === 'CARTOLA EMITIDA' && !esAdmin) {
+        const [[sg]] = await pool.query('SELECT fecha_otorgado FROM postventa_seguimiento WHERE id=?', [req.params.id]);
+        const ini = new Date(); ini.setDate(1);
+        if (sg && sg.fecha_otorgado && new Date(sg.fecha_otorgado) >= new Date(ini.toISOString().slice(0, 10)))
+          return res.status(400).json({ success: false, data: null, error: 'La cartola incluye operaciones hasta el último día del mes anterior — esta operación se otorgó este mes y entra en la cartola siguiente' });
+      }
       await pool.query(
         `INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?,?,?,?)
          ON DUPLICATE KEY UPDATE usuario = VALUES(usuario), fecha = NOW()`,
         [req.params.id, track, etapa, usuario]);
       // FACTURA RECIBIDA de comisión: guardar datos de la factura/boleta (incl. excepciones)
+      // y replicarla a las demás operaciones de la misma cartola (una factura por cartola).
       if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA' && req.body.factura) {
         const f = req.body.factura;
         await guardarFacturaComision(req.params.id, f, usuario);
+        const n = await replicarFacturaComision(Number(req.params.id), usuario)
+          .catch(e => { console.error('[postventa replicar factura]', e.message); return 0; });
+        if (n) console.log(`[postventa] factura replicada a ${n} operación(es) de la cartola`);
       }
     } else {
       // Validación desmarcar: debe ser la última marcada
@@ -642,9 +861,29 @@ const setEtapa = async (req, res) => {
         'DELETE FROM postventa_etapas WHERE id_seguimiento = ? AND track = ? AND etapa = ?',
         [req.params.id, track, etapa]);
       // Al desmarcar FACTURA RECIBIDA de comisión, borrar los datos de la factura
-      if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA')
+      // (si era la titular, también sus réplicas: la factura es una sola).
+      if (track === 'COMISION' && etapa === 'FACTURA RECIBIDA') {
+        const [reps] = await pool.query(
+          'SELECT id_seguimiento FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [req.params.id]);
+        for (const r of reps) {
+          await pool.query(`DELETE FROM postventa_etapas WHERE id_seguimiento=? AND track='COMISION' AND etapa='FACTURA RECIBIDA'`, [r.id_seguimiento]);
+          await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento=?', [r.id_seguimiento]);
+        }
         await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento = ?', [req.params.id]);
+      }
+      // Al desmarcar FONDOS RECIBIDOS del saldo, revertir la COMISION A PAGAR
+      // automática (solo si la comisión no avanzó más allá).
+      if (track === 'SALDO' && etapa === 'FONDOS RECIBIDOS')
+        await pool.query(`
+          DELETE e FROM postventa_etapas e
+          WHERE e.id_seguimiento=? AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
+            AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
+              WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
+          [req.params.id]).catch(() => {});
     }
+    // Al marcar FONDOS RECIBIDOS: la comisión de la misma operación pasa a COMISION A PAGAR
+    if (marcar && track === 'SALDO' && etapa === 'FONDOS RECIBIDOS')
+      await marcarComisionAPagar(req.params.id);
     // Alerta event-driven: al marcar FONDOS RECIBIDOS avisar para emitir Orden de Pago
     if (marcar && track === 'SALDO' && etapa === 'FONDOS RECIBIDOS') {
       const c = await ctxSeguimiento(req.params.id);
@@ -1001,6 +1240,7 @@ const emitirOrdenPago = async (req, res) => {
     }
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    await marcarComisionAPagar(ids);   // FONDOS RECIBIDOS forzado arriba → la comisión pasa a A PAGAR
     // Alerta: orden emitida → Tesorería carga montos disponibles
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
@@ -1030,6 +1270,7 @@ const enviarAPago = async (req, res) => {
     }
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    await marcarComisionAPagar(ids);   // FONDOS RECIBIDOS forzado arriba → la comisión pasa a A PAGAR
     // Alerta: enviado a pago → Tesorería confirma el pago
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
@@ -1058,6 +1299,7 @@ const pagarSaldos = async (req, res) => {
       for (const e of etapas) vals.push([id, 'SALDO', e, usuario]);
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+    await marcarComisionAPagar(ids);   // el saldo quedó pagado → la comisión queda A PAGAR
     // Registrar el PAGO en el libro central op_correlativos → timbre PAGADO en el documento
     const idCaja = await cajaActivaDe(req.usuario?.id_usuario);
     for (const id of ids) {
@@ -1195,7 +1437,8 @@ const getComisionesAPagar = async (req, res) => {
            AND DATE(epg.fecha) = CURDATE()
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
-      WHERE NOT EXISTS (
+      WHERE COALESCE(fc.es_replica, 0) = 0   -- la factura replicada se paga por su titular (una ODP por cartola)
+        AND NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='COMISION PAGADA'
               AND DATE(ep.fecha) < CURDATE())
@@ -1234,7 +1477,8 @@ const getOrdenPagoComision = async (req, res) => {
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       -- Fallback: créditos sin id_dealer → dealer por razón social del seguimiento
       LEFT JOIN dealers  dn ON d.id_dealer IS NULL AND (dn.nombre_razon = s.nombre_dealer OR dn.nombre_indexa = s.nombre_dealer)
-      WHERE NOT EXISTS (
+      WHERE COALESCE(fc.es_replica, 0) = 0   -- la factura replicada se paga por su titular (una ODP por cartola)
+        AND NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='ORDEN DE PAGO EMITIDA')
       ORDER BY efa.fecha ASC, s.num_op ASC
@@ -1306,8 +1550,11 @@ const emitirOrdenPagoComision = async (req, res) => {
     const vals = [];
     for (const id of ids) {
       await asegurarOrdenComision(id, req.usuario);   // crea orden + correlativo si falta → aparece en módulo Órdenes de Pago
-      vals.push([id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
-      vals.push([id, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
+      // La ODP de la titular cubre TODA la cartola: la etapa avanza también en las réplicas
+      for (const gid of await idsGrupoFactura(id)) {
+        vals.push([gid, 'COMISION', 'FACTURA RECIBIDA', usuario]);
+        vals.push([gid, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
+      }
     }
     await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
     for (const id of ids) {
@@ -1329,11 +1576,12 @@ const enviarAPagoComision = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
     const usuario = loginDe(req.usuario);
     const vals = [];
-    for (const id of ids) {
-      vals.push([id, 'COMISION', 'FACTURA RECIBIDA', usuario]);
-      vals.push([id, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
-      vals.push([id, 'COMISION', 'ENVIADO A PAGO', usuario]);
-    }
+    for (const id of ids)
+      for (const gid of await idsGrupoFactura(id)) {
+        vals.push([gid, 'COMISION', 'FACTURA RECIBIDA', usuario]);
+        vals.push([gid, 'COMISION', 'ORDEN DE PAGO EMITIDA', usuario]);
+        vals.push([gid, 'COMISION', 'ENVIADO A PAGO', usuario]);
+      }
     await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
@@ -1359,7 +1607,8 @@ const pagarComisiones = async (req, res) => {
       return res.status(500).json({ success: false, data: null, error: 'Config de etapas no disponible' });
     const vals = [];
     for (const id of ids)
-      for (const e of etapas) vals.push([id, 'COMISION', e, usuario]);
+      for (const gid of await idsGrupoFactura(id))
+        for (const e of etapas) vals.push([gid, 'COMISION', e, usuario]);
     await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
     // Registrar el PAGO en el libro central op_correlativos → timbre PAGADO en el documento
     const idCaja = await cajaActivaDe(req.usuario?.id_usuario);
@@ -1372,6 +1621,7 @@ const pagarComisiones = async (req, res) => {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });
       await contabilizarComision(id, 'PAGO');   // rebaja el pasivo contra banco (líquido)
+      await notificarPagoComisionDealer(id);    // aviso al dealer desde comisiones@
     }
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
@@ -1435,7 +1685,7 @@ const marcarHistorico = async (req, res) => {
     if (!segs.length) return res.json({ success: true, data: { marcados: 0 }, error: null });
 
     const etapasSaldo   = ['FUNDANTES PENDIENTES','FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS','LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
-    const etapasComision = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA APROBADA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+    const etapasComision = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
     const fecha = '2025-12-31 23:59:59';
     const vals = [];
     for (const s of segs) {
@@ -1458,7 +1708,7 @@ const marcarHistorico = async (req, res) => {
    Estado actual = etapa más avanzada del track según el orden canónico.
    ════════════════════════════════════════════════════════════════ */
 const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
-const ORDEN_COMISION = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','CARTOLA APROBADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+const ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
 
 // id_seguimiento → { estado, fecha_estado, paso, etapas:[{etapa,fecha,usuario}] }
 async function etapasPorTrack(ids, track, orden) {
@@ -1735,4 +1985,6 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden };
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden,
+  // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
+  notificarPagoComisionDealer, idsGrupoFactura, marcarComisionAPagar };

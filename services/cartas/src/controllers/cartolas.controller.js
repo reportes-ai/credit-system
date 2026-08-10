@@ -311,7 +311,10 @@ const registrarEnvio = async (req, res) => {
            JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
            WHERE m.id IN (${ph})`, movIds);
         if (segs.length) {
-          const etapas = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA APROBADA','CARTOLA ENVIADA'];
+          // Rediseño 08-2026: CARTOLA APROBADA se eliminó y COMISION A PAGAR ya no
+          // se fuerza acá (esa la marca FONDOS RECIBIDOS del saldo). El envío deja
+          // la cartola emitida y enviada.
+          const etapas = ['COMISION PENDIENTE','CARTOLA EMITIDA','CARTOLA ENVIADA'];
           const vals = [];
           for (const s of segs) for (const e of etapas) vals.push([s.seg_id, 'COMISION', e, enviadoPor]);
           await pool.query(

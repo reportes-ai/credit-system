@@ -248,6 +248,16 @@ const resolver = async (req, res) => {
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
         WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
+    // Post Venta: una operación anulada no tiene comisión que pagar — se desactiva
+    // COMISIÓN PENDIENTE (solo si el flujo de comisión no había avanzado más allá).
+    await pool.query(`
+      DELETE e FROM postventa_etapas e
+      JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
+      WHERE s.id_credito = ? AND e.track='COMISION' AND e.etapa IN ('COMISION PENDIENTE','COMISION A PAGAR')
+        AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
+          WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
+      [a.id_credito]).catch(err => console.error('[anulacion comision pendiente]', err.message));
+
     await pool.query(
       `UPDATE anulaciones_operacion SET estado='APROBADA', cartola_retirada=?, cartola_nota=?,
               resuelto_por=?, resuelto_nombre=?, resuelto_at=NOW() WHERE id=?`,

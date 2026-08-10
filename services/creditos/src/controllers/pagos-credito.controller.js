@@ -629,6 +629,16 @@ const prepagar = async (req, res) => {
 
     await conn.commit();
 
+    // Post Venta: un crédito prepagado deja sin efecto la comisión pendiente del
+    // dealer — se desactiva COMISIÓN PENDIENTE (solo si el flujo no había avanzado).
+    await pool.query(`
+      DELETE e FROM postventa_etapas e
+      JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
+      WHERE s.id_credito = ? AND e.track='COMISION' AND e.etapa IN ('COMISION PENDIENTE','COMISION A PAGAR')
+        AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
+          WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
+      [id_credito]).catch(e => console.error('[prepago comision pendiente]', e.message));
+
     // Centralización contable: asiento del prepago con lo efectivamente cobrado (nunca bloquea)
     try {
       const [[sm]] = await pool.query(

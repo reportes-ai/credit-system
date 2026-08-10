@@ -264,7 +264,7 @@ async function marcarPostventaDesdeCarga(objs) {
     FROM creditos c
     WHERE c.num_op IN (?) AND c.fecha_otorgado IS NOT NULL AND c.estado_credito='OTORGADO'
       AND NOT EXISTS (SELECT 1 FROM postventa_seguimiento s WHERE s.id_credito = c.id)`, [ops]).catch(() => {});
-  for (const [track, etapa] of [['SALDO', 'FUNDANTES PENDIENTES'], ['COMISION', 'COMISION A PAGAR']]) {
+  for (const [track, etapa] of [['SALDO', 'FUNDANTES PENDIENTES'], ['COMISION', 'COMISION PENDIENTE']]) {
     await pool.query(`
       INSERT INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
       SELECT s.id, ?, ?, 'Sistema', COALESCE(s.fecha_otorgado, NOW())

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -314,8 +314,10 @@ function trackHTML(r, track, lista){
     const esSistema = i === 0;
 
     // Etapas automáticas: se marcan desde sus módulos (Emisión Orden de Pago /
-    // Saldos Precios a Pagar). No se marcan ni desmarcan a mano en Seguimiento.
-    const esAuto = track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa);
+    // Saldos Precios a Pagar / Emisión de Cartolas / Comisiones a Pagar).
+    // No se marcan ni desmarcan a mano en Seguimiento.
+    const esAuto = (track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa))
+                || (track==='COMISION' && ['COMISION A PAGAR','CARTOLA ENVIADA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(x.etapa));
 
     // ¿Puede marcar? Etapa anterior debe estar marcada
     const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
@@ -333,7 +335,30 @@ function trackHTML(r, track, lista){
        porQueBloqueado más abajo). `donde` agrega el enlace al módulo que manda
        sobre esa etapa, para no dejar a nadie buscando. */
     let title = '', donde = '', dondeTxt = '';
-    if (esAuto) {
+    if (esAuto && track==='COMISION') {
+      if (x.etapa==='COMISION A PAGAR') {
+        title = 'Se marca sola cuando el Saldo Precio de esta misma operación queda con «FONDOS RECIBIDOS»: la comisión se paga con la plata en mano.';
+      } else if (x.etapa==='CARTOLA ENVIADA') {
+        title = 'Se marca sola cuando el Analista envía la cartola al dealer desde Emisión de Cartolas.';
+        donde = '/cartas-aprobacion/cartolas/'; dondeTxt = 'Ir a Emisión de Cartolas';
+      } else if (x.etapa==='ORDEN DE PAGO EMITIDA') {
+        if (m) {
+          title = 'La orden ya se emitió. Para deshacerla hay que ANULAR la orden desde el Historial de Órdenes de Pago (solo Administrador, con motivo).';
+          donde = '/ordenes-pago/historial/?origen=' + track; dondeTxt = 'Ir al Historial a anular la orden';
+        } else {
+          title = 'Esta etapa la controla Emisión Orden de Pago de Comisión: se marca sola al emitir la orden (basta emitirla en UNA operación de la cartola).';
+          donde = '/postventa/orden-pago-comision/'; dondeTxt = 'Ir a Emisión Orden de Pago Comisión';
+        }
+      } else if (x.etapa==='ENVIADO A PAGO') {
+        title = 'La marca Contabilidad al dar el OK de la factura y presionar «Enviar a Pago» en Comisiones a Pagar.';
+        donde = '/postventa/comisiones-a-pagar/'; dondeTxt = 'Ir a Comisiones a Pagar';
+      } else {
+        title = 'La marca el Tesorero al registrar la transferencia en Comisiones a Pagar. Al marcarla, el dealer recibe automáticamente un correo desde comisiones@ avisando el pago de su factura.';
+        donde = '/postventa/comisiones-a-pagar/'; dondeTxt = 'Ir a Comisiones a Pagar';
+      }
+      title += ' Acá solo se refleja lo que pasó allá.';
+    }
+    else if (esAuto) {
       if (x.etapa==='FUNDANTES RECIBIDOS') {
         title = 'Esta etapa la controla Seguimiento de Fundantes: se marca sola al aprobar los fundantes de la operación.';
         donde = '/fundantes-seguimiento/'; dondeTxt = 'Ir a Seguimiento de Fundantes';

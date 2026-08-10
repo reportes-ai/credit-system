@@ -451,7 +451,7 @@ async function datosDelDealer(req) {
   // ── Post Venta: estado del saldo precio y de la comisión + fechas de pago + qué falta ──
   // (scopeado por rut_dealer; sin datos del cliente). Se calcula la etapa MÁS AVANZADA por pista.
   const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
-  const ORDEN_COMISION = ['COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','CARTOLA APROBADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','COMISION PAGADA'];
+  const ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
   let postventa = [];
   try {
     const [pv] = await pool.query(
