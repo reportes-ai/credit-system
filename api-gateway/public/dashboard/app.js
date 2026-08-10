@@ -1503,6 +1503,93 @@ async function capturaEjecutivosWSP(sel, titulo) {
   }
 }
 
+/* Captura para WhatsApp del Desempeño por Ejecutivo — SOLO los Ejecutivos
+   Comerciales del padrón (los digitadores externos de Autofin no van: la
+   imagen se les manda a ellos) y solo el mes más reciente en pantalla. */
+async function capturaDesempenoWSP() {
+  try {
+    const meses = (currentCols === '2026')
+      ? EJ_PERF.meses.filter(m => m.startsWith(String((EJ_PERF.meses[EJ_PERF.meses.length-1]||'').slice(0,4)))).reverse()
+      : currentCols === 'last6' ? EJ_PERF.meses.slice(-6).reverse() : [...EJ_PERF.meses].reverse();
+    const mes = meses[0];
+    if (!mes) { alert('No hay datos para capturar.'); return; }
+    const filas = EJ_PERF.ejecutivos
+      .filter(ej => ejEsNuestro(ej.nombre))
+      .map(ej => ({ n: fmtNombreCompleto(ej.nombre), d: ej.meses[mes] || {} }))
+      .filter(f => (f.d.ing || 0) > 0)
+      .sort((a, b) => (b.d.ot || 0) - (a.d.ot || 0) || (b.d.apro || 0) - (a.d.apro || 0));
+    if (!filas.length) { alert('No hay ejecutivos con operaciones en ' + mes); return; }
+
+    const cols = [
+      { k:'ing',  l:'Ing'  }, { k:'apro', l:'Apro' }, { k:'ot', l:'Ot' }, { k:'rec', l:'Rec' },
+      { k:'tc',   l:'TC'   }, { k:'ta',   l:'TA'   }, { k:'prom', l:'Prom' },
+    ];
+    const val = (d, k) => {
+      const v = d[k] || 0;
+      if (!v) return '—';
+      if (k === 'tc' || k === 'ta') return v.toFixed(1) + '%';
+      if (k === 'prom') return v.toFixed(1) + 'M';
+      return String(v);
+    };
+    const S = 2, NW = 190, CW = 52, W = NW + CW * cols.length, RH = 30, HH = 62;
+    const H = HH + 24 + RH * (filas.length + 1) + 22;
+    const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+    const g = cv.getContext('2d'); g.scale(S, S);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    // Cabecera navy
+    g.fillStyle = '#012d70'; g.fillRect(0, 0, W, HH);
+    g.fillStyle = '#fff'; g.font = '700 17px Segoe UI, sans-serif';
+    g.fillText('DESEMPEÑO POR EJECUTIVO', 12, 24);
+    g.font = '600 12px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
+    const hoy = new Date();
+    g.fillText((EJ_PERF.meses_labels?.[mes] || mes) + ' · '
+      + hoy.toLocaleDateString('es-CL', { day:'2-digit', month:'short', year:'numeric' })
+      + ' · ' + hoy.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', hour12:false }) + ' hrs', 12, 44);
+    // Fila de sub-encabezados
+    g.fillStyle = '#2a4a7a'; g.fillRect(0, HH, W, 24);
+    g.fillStyle = '#cce'; g.font = '700 11px Segoe UI, sans-serif';
+    g.fillText('Ejecutivo', 12, HH + 16);
+    g.textAlign = 'center';
+    cols.forEach((c, j) => g.fillText(c.l, NW + CW * j + CW / 2, HH + 16));
+    g.textAlign = 'left';
+    // Filas
+    filas.forEach((f, i) => {
+      const y = HH + 24 + RH * i;
+      if (i % 2) { g.fillStyle = '#f4f7fb'; g.fillRect(0, y, W, RH); }
+      g.fillStyle = '#1e293b'; g.font = '600 13px Segoe UI, sans-serif';
+      g.fillText((i + 1) + '. ' + (f.n.length > 22 ? f.n.slice(0, 22) + '…' : f.n), 12, y + 20);
+      g.textAlign = 'center'; g.font = '400 13px Segoe UI, sans-serif';
+      cols.forEach((c, j) => {
+        g.fillStyle = c.k === 'ot' ? '#012d70' : c.k === 'rec' ? '#b91c1c' : '#334155';
+        g.font = (c.k === 'ot' ? '700 ' : '400 ') + '13px Segoe UI, sans-serif';
+        g.fillText(val(f.d, c.k), NW + CW * j + CW / 2, y + 20);
+      });
+      g.textAlign = 'left';
+    });
+    // Total del equipo
+    const yT = HH + 24 + RH * filas.length;
+    const tot = cols.reduce((a, c) => (a[c.k] = filas.reduce((s, f) => s + (f.d[c.k] || 0), 0), a), {});
+    tot.tc = tot.apro ? +(tot.ot / tot.apro * 100).toFixed(1) : 0;
+    tot.ta = tot.ing ? +(tot.apro / tot.ing * 100).toFixed(1) : 0;
+    tot.prom = 0;   // el promedio de montos no se suma
+    g.fillStyle = '#012d70'; g.fillRect(0, yT, W, RH);
+    g.fillStyle = '#fff'; g.font = '700 13px Segoe UI, sans-serif';
+    g.fillText('Equipo (' + filas.length + ')', 12, yT + 20);
+    g.textAlign = 'center';
+    cols.forEach((c, j) => g.fillText(c.k === 'prom' ? '—' : val(tot, c.k), NW + CW * j + CW / 2, yT + 20));
+    g.textAlign = 'left';
+    g.fillStyle = '#94a3b8'; g.font = '400 10px Segoe UI, sans-serif';
+    g.fillText('Ing=Ingresados · Apro=Aprobados+Otorgados · Ot=Otorgados · Rec=Rechazados · TC=Ot/Apro · TA=Apro/Ing · Prom=Monto prom. otorgado', 12, H - 7);
+
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    alert('📸 Captura copiada — pégala en WhatsApp con Ctrl+V');
+  } catch (e) {
+    console.error('[captura desempeño]', e);
+    alert('No se pudo copiar la captura: ' + e.message);
+  }
+}
+
 // ── Cargar datos frescos desde el JSON generado automáticamente ──
 async function cargarDatos() {
   await Promise.all([cargarParametros(), cargarEjecutivosActivos()]);

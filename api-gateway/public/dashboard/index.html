@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.13 — Desempeno: Apro = APROBADO+OTORGADO (cuadra con Ejecutivos - Aprobadas) -->
+<!-- v3.14 — camarita WhatsApp en Desempeno por Ejecutivo (solo Ejec. Comerciales) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -645,7 +645,11 @@
 <!-- ============================================================ VISTA 5: DESEMPEÑO EJECUTIVOS ============================================================ -->
 <div id="v5" class="view">
   <div class="dash-header">
-    <div class="dash-title">👤 Desempeño por Ejecutivo</div>
+    <div class="dash-title">👤 Desempeño por Ejecutivo
+      <!-- captura para WhatsApp: solo Ejecutivos Comerciales, mes más reciente -->
+      <i class="bi bi-camera" onclick="capturaDesempenoWSP()" title="Copiar captura para WhatsApp (solo Ejecutivos Comerciales)"
+         style="cursor:pointer;color:#2d6abf;font-size:.8rem;opacity:.7;margin-left:8px"></i>
+    </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div class="period-badge" id="badge-periodo">📅 —</div>
       <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
