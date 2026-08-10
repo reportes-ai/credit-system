@@ -207,10 +207,23 @@ const crearMovimiento = async (req, res) => {
     if (!m.num_op) return res.status(400).json({ success: false, data: null, error: 'num_op requerido' });
 
     // Si la op tiene cartola COMISION, copiar datos del concesionario
-    const [[base]] = await pool.query(
+    let [[base]] = await pool.query(
       `SELECT * FROM cartolas_movimientos WHERE num_op = ? AND movimiento='COMISION' ORDER BY id DESC LIMIT 1`,
       [m.num_op]
     );
+    // Sin movimiento previo (ops viejas/INDEXA): los datos salen del CRÉDITO
+    // (fuente única) — antes el prepago quedaba sin dealer, ejecutivo ni saldo.
+    if (!base) {
+      const [[cr]] = await pool.query(
+        `SELECT c.automotora AS nombre_dealer, c.rut_dealer, c.ejecutivo, c.saldo_precio AS saldo,
+                COALESCE(NULLIF(cl.nombre_completo,''), NULLIF(TRIM(CONCAT(COALESCE(cl.nombres,''),' ',COALESCE(cl.apellido_paterno,''))),'')) AS nombre_cliente,
+                cl.rut AS rut_cliente
+           FROM creditos c
+           LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
+          WHERE CAST(c.id_financiera AS CHAR) = CAST(? AS CHAR) OR CAST(c.num_op AS CHAR) = CAST(? AS CHAR)
+          LIMIT 1`, [m.num_op, m.num_op]).catch(() => [[null]]);
+      base = cr || null;
+    }
     const [r] = await pool.query(
       `INSERT INTO cartolas_movimientos
         (mes, id_carta, num_op, movimiento, rut_dealer, nombre_dealer, mail, ejecutivo,
