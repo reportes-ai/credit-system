@@ -407,7 +407,8 @@ const enviarCorreoCartola = async (req, res) => {
     const [jefes] = await pool.query(
       `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
        WHERE p.nombre = 'Jefe Comercial' AND u.estado = 'activo' AND u.email IS NOT NULL`);
-    const cc = [...new Set([...(Array.isArray(ejec_cc) ? ejec_cc : []), ...jefes.map(j => j.email)]
+    const cc = [...new Set(['comisiones@autofacilchile.cl',   // copia a la casilla del área
+      ...(Array.isArray(ejec_cc) ? ejec_cc : []), ...jefes.map(j => j.email)]
       .map(x => String(x).trim().toLowerCase()).filter(Boolean))].join(',');
     const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
     const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

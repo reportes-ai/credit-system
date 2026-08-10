@@ -830,6 +830,7 @@ async function notificarPagoComisionDealer(idSeguimiento) {
     await enviarCorreo({
       from: remitenteComisiones(),
       to: d.correo,
+      cc: 'comisiones@autofacilchile.cl',   // copia a la casilla del área
       subject: rell(tpl.asunto) || 'Comisión pagada',
       html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')),
       text: cuerpo,

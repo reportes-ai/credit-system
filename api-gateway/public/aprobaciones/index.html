@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3622,7 +3622,7 @@ async function previewCorreoCartola(gi, conc, total){
     <div style="padding:12px 18px;font-size:.78rem;background:#f8fafc;border-bottom:1px solid #e2e8f0;line-height:1.7">
       <b>De:</b> Comisiones AutoFácil &lt;comisiones@autofacilchile.cl&gt;<br>
       <b>Para:</b> ${escH(mail)}<br>
-      <b>CC:</b> ${escH(ejecMails.join(', ') || '—')} <span style="color:#64748b">+ Jefes Comerciales (los agrega el servidor)</span><br>
+      <b>CC:</b> comisiones@autofacilchile.cl${ejecMails.length ? ', ' + escH(ejecMails.join(', ')) : ''} <span style="color:#64748b">+ Jefes Comerciales (los agrega el servidor)</span><br>
       <b>Asunto:</b> ${escH(rell(tpl.asunto))}<br>
       <b>Adjunto:</b> 📎 ${escH(mes.replace('-','.'))} CARTOLA COMISIONES - ${escH(conc.toUpperCase())}.pdf
       ${tpl.activo === false ? '<br><b style="color:#b91c1c">⚠ Plantilla DESACTIVADA en Mantenedores Post Venta: este correo NO se enviaría.</b>' : ''}
