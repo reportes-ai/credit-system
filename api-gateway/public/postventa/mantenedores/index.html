@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.7 — boton Enviar prueba de las plantillas del dealer (con PDF adjunto opcional) -->
+  <!-- v1.8 — aviso de pago sin firma (el marco corporativo ya cierra con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -193,7 +193,7 @@ const DEF_SALDO_C = { asunto:'Orden de Pago Saldo Precio N° {nOrden} — {deale
 const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
 
 const DEF_CARTOLA_C = { activo:true, asunto:'CARTOLA COMISIONES {mes} — {dealer}', cuerpo:'Estimados {dealer}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}.\n\nTotal comisión bruta a pagar: {total}\n\nFavor emitir la factura a:\nAUTOFACIL SPA — RUT 76.545.638-K\nAv. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.\n\nCualquier duda quedamos atentos.', firma:'Saludos cordiales,\nAutoFácil Crédito Automotriz' };
-const DEF_PAGADA_C  = { activo:true, asunto:'Comisión pagada — {doc} N° {numero_factura} ({dealer})', cuerpo:'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.', firma:'Saludos cordiales,\nComisiones AutoFácil' };
+const DEF_PAGADA_C  = { activo:true, asunto:'Comisión pagada — {doc} N° {numero_factura} ({dealer})', cuerpo:'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.', firma:'' };
 
 function pintaCorreos(){
   document.getElementById('cCont').value = (typeof CFG.correo_contabilidad === 'string' ? CFG.correo_contabilidad : 'contabilidad@autofacilchile.cl');

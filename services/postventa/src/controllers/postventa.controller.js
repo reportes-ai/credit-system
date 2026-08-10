@@ -266,7 +266,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     const CORREO_COM_PAGADA = {
       asunto: 'Comisión pagada — {doc} N° {numero_factura} ({dealer})',
       cuerpo: 'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.',
-      firma: 'Saludos cordiales,\nComisiones AutoFácil',
+      firma: '',   // la plantilla corporativa ya cierra con "Saludos," + logo
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
       ['correo_comision_pagada', JSON.stringify(CORREO_COM_PAGADA)]);
@@ -280,12 +280,14 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
       ['correo_cartola_dealer', JSON.stringify(CORREO_CARTOLA)]);
-    // Parche idempotente: agregar el interruptor `activo` al aviso de pago si falta.
+    // Parche idempotente: agregar el interruptor `activo` al aviso de pago si falta,
+    // y vaciar la firma default (la plantilla corporativa ya cierra con logo).
     try {
       const [[rp]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_comision_pagada'");
-      if (rp) { const v = JSON.parse(rp.valor);
-        if (v && v.activo === undefined) { v.activo = true;
-          await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_comision_pagada'", [JSON.stringify(v)]); }
+      if (rp) { const v = JSON.parse(rp.valor); let dirty = false;
+        if (v && v.activo === undefined) { v.activo = true; dirty = true; }
+        if (v && v.firma === 'Saludos cordiales,\nComisiones AutoFácil') { v.firma = ''; dirty = true; }
+        if (dirty) await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_comision_pagada'", [JSON.stringify(v)]);
       }
     } catch (_) {}
     console.log('[postventa] tablas OK');
