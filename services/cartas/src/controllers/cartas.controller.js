@@ -857,6 +857,15 @@ const getAll = async (req, res) => {
 const upsert = async (req, res) => {
   try {
     const c = req.body;
+    // Rellenos tipo "XXX" en el nombre del cliente (empresas sin apellidos): se
+    // limpian solos — el nombre real es lo que queda sin el relleno. Si TODO el
+    // nombre es relleno, se detiene la digitación (caso 266100081DI).
+    if (c.cliente) {
+      const limpio = String(c.cliente).replace(/\b[Xx]{3,}\b/g, ' ').replace(/\s{2,}/g, ' ').trim();
+      if (!limpio)
+        return res.status(400).json({ success: false, data: null, error: 'El nombre del cliente no puede ser un relleno (XXX...). Escribe el nombre real.' });
+      c.cliente = limpio;
+    }
     // Estado previo (para detectar transiciones que generan notificación)
     let prevStatus = null;
     if (c.id) {
