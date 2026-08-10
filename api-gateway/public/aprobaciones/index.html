@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.36 — PDF de cartola sin cortes: bloque al ancho real y hoja horizontal si es ancha -->
+  <!-- v4.37 — PDF de cartola desde clon fuera de pantalla con ancho fijo: no se corta ninguna columna ni los totales -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3549,20 +3549,31 @@ async function enviarCartola(gi, conc, rutC, total){
   //    más ancha que la card, el PDF salía cortado por la derecha. Se expande el
   //    bloque al ancho REAL del contenido antes de capturar (y se restaura al final);
   //    si es muy ancho, la hoja se gira a horizontal para que la letra no quede enana.
-  const prevW = bloque.style.width, prevOv = bloque.style.overflow, prevMax = bloque.style.maxWidth;
+  /* El PDF NO se saca de lo que se ve en pantalla (dependía del ancho del monitor y
+     se cortaba por la derecha: faltaban comisión, estado y el cuadro de totales).
+     Se clona el bloque en un contenedor FUERA DE PANTALLA de ancho fijo = la hoja,
+     con letra compacta. Así el resultado es el mismo en cualquier pantalla. */
+  const HOJA = 1080;                       // px ≈ carta horizontal con márgenes
+  const holder = document.createElement('div');
+  holder.id = 'cartolaPdfHolder';
+  holder.style.cssText = 'position:fixed;left:-20000px;top:0;width:' + HOJA + 'px;background:#fff;z-index:-1';
+  const estilo = document.createElement('style');
+  estilo.textContent = '#cartolaPdfHolder .tbl{font-size:11px;width:100%}' +
+    '#cartolaPdfHolder .tbl th,#cartolaPdfHolder .tbl td{padding:5px 6px}';
+  const clon = bloque.cloneNode(true);
+  clon.style.width = HOJA + 'px'; clon.style.maxWidth = 'none'; clon.style.overflow = 'visible'; clon.style.margin = '0';
+  clon.querySelectorAll('[data-html2canvas-ignore]').forEach(e => e.remove());   // mail y botón Enviar
+  holder.appendChild(estilo); holder.appendChild(clon); document.body.appendChild(holder);
   try {
-    const ancho = Math.max(bloque.scrollWidth,
-      ...Array.from(bloque.querySelectorAll('table')).map(t => t.scrollWidth + 40));
-    bloque.style.width = ancho + 'px'; bloque.style.maxWidth = 'none'; bloque.style.overflow = 'visible';
     await html2pdf().set({
       filename,
       margin: 8,
       image: { type:'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, windowWidth: ancho + 60 },
-      jsPDF: { unit:'mm', format:'letter', orientation: ancho > 900 ? 'landscape' : 'portrait' },
-    }).from(bloque).save();
+      html2canvas: { scale: 2, width: HOJA, windowWidth: HOJA },
+      jsPDF: { unit:'mm', format:'letter', orientation:'landscape' },
+    }).from(clon).save();
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
-  finally { bloque.style.width = prevW; bloque.style.maxWidth = prevMax; bloque.style.overflow = prevOv; }
+  finally { holder.remove(); }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
     await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
