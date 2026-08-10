@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3507,6 +3507,8 @@ function renderRevCartolas(){
         </div>
         <div style="display:flex;align-items:center;gap:8px" data-html2canvas-ignore>
           <input id="mailCta${gi}" value="${escH(mailBD)}" placeholder="correo@concesionario.cl" style="border:none;border-radius:7px;padding:6px 10px;font-size:.78rem;min-width:220px">
+          <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el PDF tal como se adjuntará" onclick="previewCartolaPDF(${gi},this.dataset.conc)" data-conc="${escH(conc)}"><i class="bi bi-file-earmark-pdf"></i> Ver PDF</button>
+          <button class="btn-mini" style="padding:8px 12px;font-size:.8rem;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35)" title="Ver el correo tal como llegará al dealer" onclick="previewCorreoCartola(${gi},this.dataset.conc,${subTotal})" data-conc="${escH(conc)}"><i class="bi bi-envelope-open"></i> Ver correo</button>
           <button class="btn-mini bm-ok" style="padding:8px 14px;font-size:.82rem" onclick="enviarCartola(${gi},this.dataset.conc,this.dataset.rut,${subTotal})" data-conc="${escH(conc)}" data-rut="${escH(rutC)}"><i class="bi bi-envelope"></i> Enviar Cartola</button>
         </div>
       </div>
@@ -3540,6 +3542,86 @@ function _ejMail(nombre){
   });
   return hit?.mail || null;
 }
+/* Genera el PDF de la cartola del bloque `gi` (mismo render que el adjunto).
+   Lo usan Enviar Cartola y la vista previa — un solo motor de render. */
+async function generarPdfCartola(gi, filename){
+  const bloque = document.getElementById('bloqueCta'+gi);
+  const estilo = document.createElement('style');
+  estilo.textContent =
+    '.pdf-cartola{overflow:visible!important}' +
+    '.pdf-cartola .tbl{font-size:10px}' +
+    '.pdf-cartola .tbl th{white-space:normal;font-size:9px;padding:5px 4px}' +
+    '.pdf-cartola .tbl td{padding:5px 4px;word-break:break-word}';
+  document.head.appendChild(estilo);
+  bloque.classList.add('pdf-cartola');
+  try {
+    return await html2pdf().set({
+      filename,
+      margin: 8,
+      image: { type:'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit:'mm', format:'letter', orientation:'landscape' },
+    }).from(bloque).outputPdf('blob');
+  } finally { bloque.classList.remove('pdf-cartola'); estilo.remove(); }
+}
+
+/* Vista previa del ADJUNTO: abre el PDF en una pestaña, sin registrar nada */
+async function previewCartolaPDF(gi, conc){
+  try {
+    const blob = await generarPdfCartola(gi, 'preview.pdf');
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch(e){ alert('Error generando la vista previa: ' + e.message); }
+}
+
+/* Vista previa del CORREO: mismo HTML corporativo que arma el servidor, con la
+   plantilla paramétrica y los destinatarios reales. Solo mirar — no envía. */
+async function previewCorreoCartola(gi, conc, total){
+  const mes = mesActual();
+  const mail = document.getElementById('mailCta'+gi).value.trim() || '(sin correo)';
+  let tpl = {};
+  try { tpl = ((await (await fetch('/api/postventa/config', { headers: hdr() })).json()).data || {}).correo_cartola_dealer || {}; } catch(e){}
+  const datos = { dealer: conc, mes: nombreMes(mes), total: fmtCLP(total) };
+  const rell = t => String(t||'').replace(/\{(\w+)\}/g, (x,k) => datos[k] != null ? datos[k] : x);
+  const idsGrupo = REV_IDS[gi] || [];
+  const ejecMails = [...new Set((MOVS_ALL||[]).filter(m => idsGrupo.includes(m.id)).map(m => (m.ejecutivo_mail||'').trim() || _ejMail(m.ejecutivo)).filter(Boolean))];
+  const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '');
+  // Réplica del marco corporativo del mailer (envolverHTML) para que la vista sea fiel
+  const marco = `
+    <div style="background:#eef2f7;padding:26px 12px;font-family:'Segoe UI',Arial,sans-serif">
+      <div style="max-width:540px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(2,32,82,.08)">
+        <div style="height:6px;background:linear-gradient(90deg,#012d70,#0141A2 55%,#009AFE)"></div>
+        <div style="padding:30px 32px;color:#1e293b;font-size:15px;line-height:1.65">
+          ${escH(cuerpo).replace(/\n/g,'<br>')}
+          <p style="margin:28px 0 8px">Saludos,</p>
+          <img src="/img/logo-bs.png" width="160" style="display:block;max-width:160px">
+        </div>
+      </div>
+      <p style="max-width:540px;margin:14px auto 0;text-align:center;color:#94a3b8;font-size:11px">Correo automático de AutoFácil Business Suite · por favor no respondas a este mensaje.</p>
+    </div>`;
+  let dlg = document.getElementById('dlgPreviewCorreo');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'dlgPreviewCorreo';
+    dlg.style.cssText = 'border:none;border-radius:14px;padding:0;width:640px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.35)';
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML = `
+    <div style="background:#012d70;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:.9rem"><i class="bi bi-envelope-open me-1"></i>Vista previa del correo</b>
+      <button onclick="this.closest('dialog').close()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:12px 18px;font-size:.78rem;background:#f8fafc;border-bottom:1px solid #e2e8f0;line-height:1.7">
+      <b>De:</b> Comisiones AutoFácil &lt;comisiones@autofacilchile.cl&gt;<br>
+      <b>Para:</b> ${escH(mail)}<br>
+      <b>CC:</b> ${escH(ejecMails.join(', ') || '—')} <span style="color:#64748b">+ Jefes Comerciales (los agrega el servidor)</span><br>
+      <b>Asunto:</b> ${escH(rell(tpl.asunto))}<br>
+      <b>Adjunto:</b> 📎 ${escH(mes.replace('-','.'))} CARTOLA COMISIONES - ${escH(conc.toUpperCase())}.pdf
+      ${tpl.activo === false ? '<br><b style="color:#b91c1c">⚠ Plantilla DESACTIVADA en Mantenedores Post Venta: este correo NO se enviaría.</b>' : ''}
+    </div>
+    <div style="max-height:60vh;overflow:auto">${marco}</div>`;
+  dlg.showModal();
+}
+
 async function enviarCartola(gi, conc, rutC, total){
   const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   const mail = document.getElementById('mailCta'+gi).value.trim();
@@ -3555,29 +3637,15 @@ async function enviarCartola(gi, conc, rutC, total){
      En modo PDF se deja que los títulos corten línea y se achica la letra: la tabla
      (width:100%) se ajusta sola al ancho de hoja que html2pdf le da al clon.
      Nada de contenedores propios: html2pdf ya clona el bloque en el suyo. */
-  const estilo = document.createElement('style');
-  estilo.textContent =
-    '.pdf-cartola{overflow:visible!important}' +
-    '.pdf-cartola .tbl{font-size:10px}' +
-    '.pdf-cartola .tbl th{white-space:normal;font-size:9px;padding:5px 4px}' +
-    '.pdf-cartola .tbl td{padding:5px 4px;word-break:break-word}';
-  document.head.appendChild(estilo);
-  bloque.classList.add('pdf-cartola');
   let pdfBlob = null;
   try {
-    // Un solo render: el blob sirve para la descarga local Y para el correo.
-    pdfBlob = await html2pdf().set({
-      filename,
-      margin: 8,
-      image: { type:'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit:'mm', format:'letter', orientation:'landscape' },
-    }).from(bloque).outputPdf('blob');
+    // Un solo render (generarPdfCartola, el mismo de la vista previa):
+    // el blob sirve para la descarga local Y para el adjunto del correo.
+    pdfBlob = await generarPdfCartola(gi, filename);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(pdfBlob); a.download = filename; a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 30000);
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
-  finally { bloque.classList.remove('pdf-cartola'); estilo.remove(); }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
     await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
