@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1326,6 +1326,8 @@ function renderLista(){
       acc.push(`<button class="btn-mini bm-edit" onclick="editarCarta(${c.id})"><i class="bi bi-pencil"></i>${c.status==='RECHAZADA'?' Corregir':''}</button>`);
     if (c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN && puede('aprob_revisar'))
       acc.push(`<button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-check2-square"></i> Revisar</button>`);
+    if (c.status==='APROBADA' && puede('aprob_corregir_dealer'))
+      acc.push(`<button class="btn-mini bm-edit" title="Corregir dealer (con motivo, queda en auditoría)" onclick="abrirCorregirDealer(${c.id})"><i class="bi bi-shop"></i></button>`);
     if (c.status==='APROBADA' && puede('aprob_revisar'))
       acc.push(`<button class="btn-mini bm-anular" onclick="anularCarta(${c.id})"><i class="bi bi-x-octagon"></i></button>`);
     if (puede('aprob_rentabilidad'))
@@ -2588,6 +2590,52 @@ async function resolverRevision(id, decision){
     await cargarCartas();
     renderRevision();
   } catch(e) { alert('Error de conexión'); }
+}
+
+/* Corregir dealer de una carta APROBADA (caso 89199: la carta decía Hugo
+   González y el negocio era de AUTEN). Motivo obligatorio; arrastra el cambio
+   a los movimientos de cartola NO enviados y queda en auditoría. */
+async function abrirCorregirDealer(id){
+  const c = CARTAS.find(x => x.id === id);
+  if (!c) return;
+  let dlg = document.getElementById('dlgCorrDealer');
+  if (!dlg) {
+    dlg = document.createElement('dialog');
+    dlg.id = 'dlgCorrDealer';
+    dlg.style.cssText = 'border:none;border-radius:14px;padding:0;width:440px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.35)';
+    document.body.appendChild(dlg);
+  }
+  const escV = s => String(s||'').replace(/"/g,'&quot;');
+  dlg.innerHTML = `
+    <div style="background:#012d70;color:#fff;padding:12px 18px;display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:.9rem"><i class="bi bi-shop me-1"></i>Corregir dealer — Carta ${escH(c.opCarta||'')}</b>
+      <button onclick="this.closest('dialog').close()" style="background:none;border:none;color:#fff;font-size:1.1rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:10px;font-size:.85rem">
+      <div style="background:#f8fafc;border-radius:8px;padding:8px 12px;color:#475569">Actual: <b>${escH(c.concesionario||'—')}</b> (${escH(c.rutConc||'—')})</div>
+      <label>Nuevo dealer<input id="cdNombre" value="${escV(c.concesionario)}" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px"></label>
+      <label>RUT nuevo dealer<input id="cdRut" value="${escV(c.rutConc)}" placeholder="76.123.456-7" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px"></label>
+      <label>Motivo (obligatorio)<textarea id="cdMotivo" style="width:100%;min-height:60px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px"></textarea></label>
+      <div style="font-size:.72rem;color:#92400e">Se corrige la carta y sus movimientos de cartola aún NO enviados. Queda registrado en Auditoría.</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button onclick="this.closest('dialog').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:8px 16px;cursor:pointer">Cancelar</button>
+        <button onclick="corregirDealer(${id})" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">Corregir</button>
+      </div>
+    </div>`;
+  dlg.showModal();
+}
+async function corregirDealer(id){
+  const nombre = document.getElementById('cdNombre').value.trim();
+  const rut = document.getElementById('cdRut').value.trim();
+  const motivo = document.getElementById('cdMotivo').value.trim();
+  if (!nombre || !rut) return alert('Indica el nombre y el RUT del dealer.');
+  if (!motivo) return alert('El motivo es obligatorio.');
+  const j = await fetch('/api/cartas/' + id + '/corregir-dealer', { method:'PUT', headers: hdr(),
+    body: JSON.stringify({ nombre_dealer: nombre, rut_dealer: rut, motivo }) }).then(r=>r.json()).catch(()=>null);
+  if (!j || !j.success) return alert((j && j.error) || 'No se pudo corregir.');
+  alert('✓ Dealer corregido' + (j.data.movimientos_actualizados ? ' (también ' + j.data.movimientos_actualizados + ' movimiento(s) de cartola)' : ''));
+  document.getElementById('dlgCorrDealer').close();
+  cargarCartas();
 }
 
 async function anularCarta(id){

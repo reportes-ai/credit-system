@@ -427,6 +427,23 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
       console.log('✓ cartas_ejecutivos: seeded con lista inicial de ejecutivos');
     }
   } catch (e) { console.error('[cartas ejecutivos seed]', e.message); }
+  // Casilla "Corregir dealer de carta aprobada" — por defecto SOLO Administrador
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='aprob_corregir_dealer'");
+    if (!ex) {
+      const [[mod]] = await pool.query(
+        "SELECT f.id_modulo FROM funcionalidades f WHERE f.codigo='aprob_crear' LIMIT 1");
+      if (mod) {
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?,?,?,NULL)',
+          [mod.id_modulo, 'Corregir dealer de carta aprobada', 'aprob_corregir_dealer']);
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           SELECT id_perfil, ?, IF(nombre='Administrador',1,0) FROM perfiles`, [ins.insertId]);
+        console.log('✓ funcionalidad aprob_corregir_dealer creada (solo Admin)');
+      }
+    }
+  } catch (e) { console.error('[cartas seed corregir-dealer]', e.message); }
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1791,5 +1808,40 @@ const verificable = async (req, res) => {
   } catch (e) { console.error('[cartas verificable]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable,
+/* ── PUT /api/cartas/:id/corregir-dealer — corrige el dealer de una carta ya
+   APROBADA (una pendiente/rechazada se corrige por el flujo normal de edición).
+   Casilla propia aprob_corregir_dealer (por defecto solo Administrador), motivo
+   obligatorio y auditado. Arrastra el cambio a los movimientos de cartola de la
+   carta que aún NO salieron en una cartola (los enviados son historia). ── */
+const corregirDealer = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { nombre_dealer, rut_dealer, motivo } = req.body || {};
+    if (!id || !String(nombre_dealer || '').trim() || !String(rut_dealer || '').trim())
+      return res.status(400).json({ success: false, data: null, error: 'nombre_dealer y rut_dealer requeridos' });
+    if (!String(motivo || '').trim())
+      return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio' });
+    const [[ca]] = await pool.query('SELECT id, op_carta, status, nombre_dealer, rut_dealer FROM cartas_aprobacion WHERE id=?', [id]);
+    if (!ca) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada' });
+    if (ca.status !== 'APROBADA')
+      return res.status(400).json({ success: false, data: null, error: 'Esta corrección es solo para cartas APROBADAS — una pendiente o rechazada se corrige con el lápiz de edición' });
+    const quien = req.usuario ? ([req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email) : 'Sistema';
+    const nom = String(nombre_dealer).trim(), rut = String(rut_dealer).trim().toUpperCase();
+    await pool.query('UPDATE cartas_aprobacion SET nombre_dealer=?, rut_dealer=? WHERE id=?', [nom, rut, id]);
+    const [mv] = await pool.query(
+      `UPDATE cartolas_movimientos SET nombre_dealer=?, rut_dealer=?,
+         observaciones = CONCAT(COALESCE(observaciones,''), ' | Dealer corregido ', ?, '→', ?, ' por ', ?, ': ', ?)
+       WHERE id_carta=? AND mes_cartola IS NULL`,
+      [nom, rut, ca.nombre_dealer || '—', nom, quien, String(motivo).trim().slice(0, 200), id]);
+    auditar({ req, accion: 'CORREGIR_DEALER', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: id,
+      detalle: `Corrigió dealer de la carta ${ca.op_carta}: ${ca.nombre_dealer || '—'} (${ca.rut_dealer || '—'}) → ${nom} (${rut}). Motivo: ${String(motivo).trim()}`,
+      meta: { antes: { nombre: ca.nombre_dealer, rut: ca.rut_dealer }, despues: { nombre: nom, rut }, movimientos: mv.affectedRows } });
+    res.json({ success: true, data: { id, movimientos_actualizados: mv.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[cartas corregirDealer]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable, corregirDealer,
   parseCotizacion, parseCartaCompromiso, parseCartaAutofin };   // para scripts/backfill-extracted-cartas.js

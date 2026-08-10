@@ -21,6 +21,8 @@ router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), 
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
 router.post('/:id/verificable', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.verificable);
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
+// Corregir dealer de una carta APROBADA — casilla propia (default solo Admin), motivo obligatorio, auditado
+router.put('/:id/corregir-dealer', verifyToken, requireFunc('aprob_corregir_dealer'), ctrl.corregirDealer);
 router.post('/:id/desistir', verifyToken, requireFunc('aprob_vigentes'), ctrl.desistir);
 router.post('/carga-masiva', verifyToken, requireFunc('aprob_carga_masiva'), ctrl.cargaMasivaCartas);
 
