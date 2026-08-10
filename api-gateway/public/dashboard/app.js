@@ -1444,16 +1444,20 @@ const ejEsNuestro = n => !window.EJ_NUESTROS.size || window.EJ_NUESTROS.has(Stri
 // ── Captura para WhatsApp (botón de la cámara en Ejecutivos — Otorgados):
 // dibuja Ejecutivo / Q / Total Fin. en un canvas y lo COPIA al portapapeles
 // como imagen — llegar a WhatsApp y pegar con Ctrl+V. ──
-async function capturaEjecutivosWSP() {
+/* Captura para WhatsApp del ranking de ejecutivos. Sirve para Otorgados
+   (#t-ej1b) y Aprobadas (#t-ej): ambas tablas tienen la misma forma
+   —Ejecutivo | Q | Total a Financiar— así que un solo motor las dibuja. */
+async function capturaEjecutivosWSP(sel, titulo) {
+  sel = sel || '#t-ej1b'; titulo = titulo || 'EJECUTIVOS — OTORGADOS';
   try {
-    const filas = [...document.querySelectorAll('#t-ej1b tbody tr')].map(tr => {
+    const filas = [...document.querySelectorAll(sel + ' tbody tr')].map(tr => {
       const c = tr.querySelectorAll('td');
       return { nombre: (c[0]?.innerText || '').replace(/^\d+\.\s*/, '').trim(),
                q: (c[1]?.innerText || '').trim(), fin: (c[2]?.innerText || '').trim(),
                gris: (tr.getAttribute('style') || '').includes('#94a3b8'),
                rojo: (c[2]?.getAttribute('style') || '').includes('#e53935') };
     }).filter(f => f.nombre);
-    const tot = document.querySelector('#t-ej1b tfoot tr');
+    const tot = document.querySelector(sel + ' tfoot tr');
     const totC = tot ? tot.querySelectorAll('td') : [];
     const S = 2, W = 460, RH = 32, HH = 44;
     const H = HH + RH * (filas.length + 1) + 12;
@@ -1463,7 +1467,7 @@ async function capturaEjecutivosWSP() {
     // Cabecera navy
     g.fillStyle = '#012d70'; g.fillRect(0, 0, W, HH);
     g.fillStyle = '#fff'; g.font = '700 15px Segoe UI, sans-serif';
-    g.fillText('EJECUTIVOS — OTORGADOS', 12, 19);
+    g.fillText(titulo, 12, 19);
     g.font = '600 12px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
     const hoy = new Date();
     g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
