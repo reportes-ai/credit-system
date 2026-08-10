@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.37 — PDF de cartola desde clon fuera de pantalla con ancho fijo: no se corta ninguna columna ni los totales -->
+  <!-- v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3549,31 +3549,30 @@ async function enviarCartola(gi, conc, rutC, total){
   //    más ancha que la card, el PDF salía cortado por la derecha. Se expande el
   //    bloque al ancho REAL del contenido antes de capturar (y se restaura al final);
   //    si es muy ancho, la hoja se gira a horizontal para que la letra no quede enana.
-  /* El PDF NO se saca de lo que se ve en pantalla (dependía del ancho del monitor y
-     se cortaba por la derecha: faltaban comisión, estado y el cuadro de totales).
-     Se clona el bloque en un contenedor FUERA DE PANTALLA de ancho fijo = la hoja,
-     con letra compacta. Así el resultado es el mismo en cualquier pantalla. */
-  const HOJA = 1080;                       // px ≈ carta horizontal con márgenes
-  const holder = document.createElement('div');
-  holder.id = 'cartolaPdfHolder';
-  holder.style.cssText = 'position:fixed;left:-20000px;top:0;width:' + HOJA + 'px;background:#fff;z-index:-1';
+  /* La tabla se salía de la hoja y el PDF quedaba cortado. La causa NO era el ancho
+     de la pantalla: `.tbl th` tiene white-space:nowrap, así que los encabezados
+     fuerzan un ancho mínimo mayor al contenedor y el capture recorta lo que sobra.
+     En modo PDF se deja que los títulos corten línea y se achica la letra: la tabla
+     (width:100%) se ajusta sola al ancho de hoja que html2pdf le da al clon.
+     Nada de contenedores propios: html2pdf ya clona el bloque en el suyo. */
   const estilo = document.createElement('style');
-  estilo.textContent = '#cartolaPdfHolder .tbl{font-size:11px;width:100%}' +
-    '#cartolaPdfHolder .tbl th,#cartolaPdfHolder .tbl td{padding:5px 6px}';
-  const clon = bloque.cloneNode(true);
-  clon.style.width = HOJA + 'px'; clon.style.maxWidth = 'none'; clon.style.overflow = 'visible'; clon.style.margin = '0';
-  clon.querySelectorAll('[data-html2canvas-ignore]').forEach(e => e.remove());   // mail y botón Enviar
-  holder.appendChild(estilo); holder.appendChild(clon); document.body.appendChild(holder);
+  estilo.textContent =
+    '.pdf-cartola{overflow:visible!important}' +
+    '.pdf-cartola .tbl{font-size:10px}' +
+    '.pdf-cartola .tbl th{white-space:normal;font-size:9px;padding:5px 4px}' +
+    '.pdf-cartola .tbl td{padding:5px 4px;word-break:break-word}';
+  document.head.appendChild(estilo);
+  bloque.classList.add('pdf-cartola');
   try {
     await html2pdf().set({
       filename,
       margin: 8,
       image: { type:'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, width: HOJA, windowWidth: HOJA },
+      html2canvas: { scale: 2 },
       jsPDF: { unit:'mm', format:'letter', orientation:'landscape' },
-    }).from(clon).save();
+    }).from(bloque).save();
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
-  finally { holder.remove(); }
+  finally { bloque.classList.remove('pdf-cartola'); estilo.remove(); }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
     await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
