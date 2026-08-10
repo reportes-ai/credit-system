@@ -290,6 +290,20 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
         if (dirty) await pool.query("UPDATE postventa_config SET valor=? WHERE clave='correo_comision_pagada'", [JSON.stringify(v)]);
       }
     } catch (_) {}
+    // Cierre: un movimiento pendiente cuya comisión YA está pagada (histórico
+    // fuera del circuito) no puede volver a ofrecerse en una cartola — se le
+    // estampa el mes del pago como mes_cartola (idempotente por el WHERE).
+    await pool.query(`
+      UPDATE cartolas_movimientos m
+      LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+      JOIN creditos c ON (ca.id_credito_creado IS NOT NULL AND c.id = ca.id_credito_creado)
+        OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
+      JOIN postventa_seguimiento s ON s.id_credito = c.id
+      JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'
+      SET m.mes_cartola = DATE_FORMAT(e.fecha,'%Y-%m'),
+          m.enviada_por = 'Histórico (comisión ya pagada)',
+          m.enviada_fecha = e.fecha
+      WHERE m.movimiento='COMISION' AND m.mes_cartola IS NULL`).catch(e => console.error('[postventa cierre movs pagados]', e.message));
     // Backfill: movimientos COMISION aún PENDIENTES cuyas operaciones ya están
     // COMISION A PAGAR en Post Venta → A PAGAR (idempotente por el WHERE).
     await pool.query(`
@@ -301,7 +315,10 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
       JOIN postventa_seguimiento s ON s.id_credito = c.id
       JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
       SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
-      WHERE m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`).catch(e => console.error('[postventa backfill cartola a pagar]', e.message));
+      WHERE m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'
+        AND m.mes_cartola IS NULL
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas pg
+          WHERE pg.id_seguimiento = s.id AND pg.track='COMISION' AND pg.etapa='COMISION PAGADA')`).catch(e => console.error('[postventa backfill cartola a pagar]', e.message));
     // Idem para la cartola: ahora sale por el mailer con el marco corporativo.
     try {
       const [[rc2]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
@@ -713,7 +730,10 @@ async function marcarComisionAPagar(ids) {
       OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
     JOIN postventa_seguimiento s ON s.id_credito = c.id
     SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
-    WHERE s.id IN (${ph}) AND m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`, ids)
+    WHERE s.id IN (${ph}) AND m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'
+      AND m.mes_cartola IS NULL
+      AND NOT EXISTS (SELECT 1 FROM postventa_etapas pg
+        WHERE pg.id_seguimiento = s.id AND pg.track='COMISION' AND pg.etapa='COMISION PAGADA')`, ids)
     .catch(e => console.error('[postventa comisionAPagar cartola]', e.message));
 }
 
