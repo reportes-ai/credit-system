@@ -248,22 +248,25 @@ async function revisar(carta, p) {
         : `rebaja dentro del máximo ${p.exc_tasa_rebaja_max_pct || 5}% pero SIN código de excepción`);
   }
 
-  // 4. Comisión dealer: motor único vs carta
+  // 4. Comisión dealer: motor único vs carta. Solo una comisión MAYOR al motor
+  //    es excepción (le cuesta plata a AutoFácil y necesita autorización); una
+  //    menor es a favor y pasa sola (pedido Pato 10-08-2026).
   const ce = await comisionEsperada(carta, p);
   const netaCarta = carta.part_neto != null ? Math.round(parseFloat(carta.part_neto)) : null;
-  const comisionModificada = netaCarta != null && Math.abs(netaCarta - ce.neta) > tol;
-  // ✅ solo si va según motor, o si viene modificada CON código que la respalde
+  const comisionModificada = netaCarta != null && netaCarta - ce.neta > tol;
+  const comisionMenor = netaCarta != null && ce.neta - netaCarta > tol;
   add(`Comisión dealer (${ce.esParque ? 'parque' : 'calle'})`, fmt(ce.neta) + ' neta según motor', fmt(netaCarta) + ' neta en carta',
       !comisionModificada || !!carta.codigo_excepcion,
-      !comisionModificada ? 'según pizarra/tabla del dealer'
-      : carta.codigo_excepcion ? 'modificada, respaldada por código de excepción'
-      : 'modificada SIN código de excepción');
+      comisionMenor ? 'menor al motor — a favor de AutoFácil, no requiere código'
+      : !comisionModificada ? 'según pizarra/tabla del dealer'
+      : carta.codigo_excepcion ? 'aumentada, respaldada por código de excepción'
+      : 'aumentada SIN código de excepción');
 
   // 5. Excepciones ↔ código
   const hayExcepcion = tasaRebajada || comisionModificada;
   if (hayExcepcion || carta.codigo_excepcion) {
     if (!carta.codigo_excepcion)
-      return { checks, ok: false, motivo: 'Hay excepción (tasa rebajada o comisión modificada) sin código del sistema' };
+      return { checks, ok: false, motivo: 'Hay excepción (tasa rebajada o comisión aumentada) sin código del sistema' };
     const [[cod]] = await pool.query(
       'SELECT tipo, estado, costo_estrellas, snapshot, financiera, saldo_precio, plazo FROM excepciones_codigos WHERE codigo=? LIMIT 1',
       [String(carta.codigo_excepcion).trim()]);
