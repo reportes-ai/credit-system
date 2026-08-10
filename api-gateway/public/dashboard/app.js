@@ -1531,8 +1531,19 @@ async function capturaDesempenoWSP() {
       if (k === 'prom') return v.toFixed(1) + 'M';
       return String(v);
     };
+    /* Mismos cortes de percentil que la tabla (window._EJ_PERC, calculado en
+       buildV5): rojo ≤P25 · naranjo P25-P50 · amarillo P50-P75 · verde >P75 */
+    const P = window._EJ_PERC || { tc:{}, ta:{} };
+    const rateColorWSP = (v, k) => {
+      const ps = P[k] || {};
+      if (!v || !ps.p25) return null;
+      if (v <= ps.p25) return { bg:'#e53935', tc:'#fff' };
+      if (v <= ps.p50) return { bg:'#fb8c00', tc:'#fff' };
+      if (v <= ps.p75) return { bg:'#fdd835', tc:'#555' };
+      return { bg:'#43a047', tc:'#fff' };
+    };
     const S = 2, NW = 190, CW = 52, W = NW + CW * cols.length, RH = 30, HH = 62;
-    const H = HH + 24 + RH * (filas.length + 1) + 22;
+    const H = HH + 24 + RH * (filas.length + 1) + 40;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
     const g = cv.getContext('2d'); g.scale(S, S);
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
@@ -1560,9 +1571,12 @@ async function capturaDesempenoWSP() {
       g.fillText((i + 1) + '. ' + (f.n.length > 22 ? f.n.slice(0, 22) + '…' : f.n), 12, y + 20);
       g.textAlign = 'center'; g.font = '400 13px Segoe UI, sans-serif';
       cols.forEach((c, j) => {
-        g.fillStyle = c.k === 'ot' ? '#012d70' : c.k === 'rec' ? '#b91c1c' : '#334155';
-        g.font = (c.k === 'ot' ? '700 ' : '400 ') + '13px Segoe UI, sans-serif';
-        g.fillText(val(f.d, c.k), NW + CW * j + CW / 2, y + 20);
+        const cx = NW + CW * j;
+        const col = (c.k === 'tc' || c.k === 'ta') ? rateColorWSP(f.d[c.k] || 0, c.k) : null;
+        if (col) { g.fillStyle = col.bg; g.fillRect(cx + 3, y + 4, CW - 6, RH - 8); }
+        g.fillStyle = col ? col.tc : (c.k === 'ot' ? '#012d70' : c.k === 'rec' ? '#b91c1c' : '#334155');
+        g.font = (c.k === 'ot' || col ? '700 ' : '400 ') + '13px Segoe UI, sans-serif';
+        g.fillText(val(f.d, c.k), cx + CW / 2, y + 20);
       });
       g.textAlign = 'left';
     });
@@ -1578,6 +1592,18 @@ async function capturaDesempenoWSP() {
     g.textAlign = 'center';
     cols.forEach((c, j) => g.fillText(c.k === 'prom' ? '—' : val(tot, c.k), NW + CW * j + CW / 2, yT + 20));
     g.textAlign = 'left';
+    // Leyenda de colores (mismos tramos de la pantalla)
+    const yL = yT + RH + 12;
+    g.font = '700 10px Segoe UI, sans-serif'; g.fillStyle = '#777';
+    g.fillText('TC / TA:', 12, yL + 8);
+    let xL = 58;
+    [['≤ P25','#e53935','#fff'],['P25–P50','#fb8c00','#fff'],['P50–P75','#fdd835','#555'],['> P75','#43a047','#fff']]
+      .forEach(([t, bg, tc]) => {
+        const w = g.measureText(t).width + 14;
+        g.fillStyle = bg; g.fillRect(xL, yL - 3, w, 15);
+        g.fillStyle = tc; g.textAlign = 'center'; g.fillText(t, xL + w / 2, yL + 8); g.textAlign = 'left';
+        xL += w + 6;
+      });
     g.fillStyle = '#94a3b8'; g.font = '400 10px Segoe UI, sans-serif';
     g.fillText('Ing=Ingresados · Apro=Aprobados+Otorgados · Ot=Otorgados · Rec=Rechazados · TC=Ot/Apro · TA=Apro/Ing · Prom=Monto prom. otorgado', 12, H - 7);
 
@@ -2065,6 +2091,9 @@ function buildV5() {
   });
   const tcP = { p25: percentile(tcVals,25), p50: percentile(tcVals,50), p75: percentile(tcVals,75) };
   const taP = { p25: percentile(taVals,25), p50: percentile(taVals,50), p75: percentile(taVals,75) };
+  // Un solo cálculo de percentiles: la captura para WhatsApp pinta con estos
+  // mismos cortes, para que la imagen y la pantalla no digan cosas distintas.
+  window._EJ_PERC = { tc: tcP, ta: taP };
 
   // Color heatmap: de blanco a azul oscuro (para otorgados y prom)
   const heatColor = (v) => {
