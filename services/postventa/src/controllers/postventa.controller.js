@@ -294,8 +294,11 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     // COMISION A PAGAR en Post Venta → A PAGAR (idempotente por el WHERE).
     await pool.query(`
       UPDATE cartolas_movimientos m
-      JOIN cartas_aprobacion ca ON ca.id = m.id_carta
-      JOIN postventa_seguimiento s ON s.id_credito = ca.id_credito_creado
+      LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+      JOIN creditos c
+        ON (ca.id_credito_creado IS NOT NULL AND c.id = ca.id_credito_creado)
+        OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
+      JOIN postventa_seguimiento s ON s.id_credito = c.id
       JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
       SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
       WHERE m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`).catch(e => console.error('[postventa backfill cartola a pagar]', e.message));
@@ -699,11 +702,16 @@ async function marcarComisionAPagar(ids) {
   // Emisión de Cartolas: el movimiento COMISION de la operación pasa solo de
   // PENDIENTE → A PAGAR (el dropdown sigue editable; A DESCONTAR y los cambios
   // manuales no se tocan).
+  // Enlace por carta (id_carta) o, para las "Otorgadas sin carta" (id_carta NULL),
+  // por número: su num_op puede traer el N° Operación o el ID Financiera.
   const ph = ids.map(() => '?').join(',');
   await pool.query(`
     UPDATE cartolas_movimientos m
-    JOIN cartas_aprobacion ca ON ca.id = m.id_carta
-    JOIN postventa_seguimiento s ON s.id_credito = ca.id_credito_creado
+    LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+    JOIN creditos c
+      ON (ca.id_credito_creado IS NOT NULL AND c.id = ca.id_credito_creado)
+      OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
+    JOIN postventa_seguimiento s ON s.id_credito = c.id
     SET m.estado_comision='A PAGAR', m.estado_usuario='Sistema', m.estado_fecha=NOW()
     WHERE s.id IN (${ph}) AND m.movimiento='COMISION' AND m.estado_comision='PENDIENTE'`, ids)
     .catch(e => console.error('[postventa comisionAPagar cartola]', e.message));
