@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3580,27 +3580,25 @@ async function enviarCartola(gi, conc, rutC, total){
   } catch(e) {}
   // Refresca para que las operaciones enviadas salgan de pendientes y muestren su Mes Cartola
   cargarMovimientos();
-  // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado)
+  // 3) Abrir Gmail con el texto del correo (adjuntar el PDF descargado).
+  //    Plantilla PARAMÉTRICA (Mantenedores Post Venta → correo_cartola_dealer):
+  //    asunto/cuerpo/firma editables y con interruptor para desactivar el correo.
   //    CC: comisiones@ + los ejecutivos que generaron las operaciones de esta cartola
+  let tpl = null;
+  try {
+    const rc = await fetch('/api/postventa/config', { headers: hdr() });
+    tpl = ((await rc.json()).data || {}).correo_cartola_dealer || null;
+  } catch(e) {}
+  if (tpl && tpl.activo === false) return;   // correo desactivado desde el mantenedor
+  const datos = { dealer: conc, mes: nombreMes(mes), total: fmtCLP(total) };
+  const rell = t => String(t||'').replace(/\{(\w+)\}/g, (x,k) => datos[k] != null ? datos[k] : x);
   const idsGrupo = REV_IDS[gi] || [];
   const ejecMails = [...new Set((MOVS_ALL||[]).filter(m => idsGrupo.includes(m.id)).map(m => (m.ejecutivo_mail||'').trim() || _ejMail(m.ejecutivo)).filter(Boolean))];
   const cc = ['comisiones@autofacilchile.cl', ...ejecMails].join(',');
-  const asunto = `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
-  const cuerpo =
-`Estimados ${conc}:
-
-Junto con saludar, adjuntamos la cartola de comisiones correspondiente a ${nombreMes(mes)}.
-
-Total comisión bruta a pagar: ${fmtCLP(total)}
-
-Favor emitir la factura a:
-AUTOFACIL SPA — RUT 76.545.638-K
-Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
-
-Cualquier duda quedamos atentos.
-
-Saludos cordiales,
-AutoFácil Crédito Automotriz`;
+  const asunto = tpl ? rell(tpl.asunto).toUpperCase() : `CARTOLA COMISIONES ${nombreMes(mes).toUpperCase()} — ${conc.toUpperCase()}`;
+  const cuerpo = tpl
+    ? rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '')
+    : `Estimados ${conc}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a ${nombreMes(mes)}.\n\nTotal comisión bruta a pagar: ${fmtCLP(total)}\n\nSaludos cordiales,\nAutoFácil Crédito Automotriz`;
   window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
     '&cc=' + encodeURIComponent(cc) +
     '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
