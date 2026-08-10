@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3467,7 +3467,11 @@ function renderRevCartolas(){
   if (!cont) return;
   const q = (document.getElementById('revCtaBuscar').value||'').toLowerCase();
   REV_IDS = {};
-  const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR'));
+  // La cartola lleva operaciones hasta el ÚLTIMO DÍA DEL MES ANTERIOR: una
+  // otorgada este mes entra recién en la cartola del mes siguiente (regla Pato
+  // 10-08). m.mes es el mes de otorgamiento del movimiento.
+  const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR')
+    && (!m.mes || m.mes < mesActual()));
   const grupos = {};
   PEND.forEach(m=>{
     const key = m.concesionario||'(sin concesionario)';
