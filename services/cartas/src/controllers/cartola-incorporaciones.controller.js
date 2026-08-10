@@ -137,19 +137,23 @@ function detectarExcepciones(f, motor) {
 /* GET /api/cartolas/sin-carta?mes=YYYY-MM → otorgadas del mes sin carta ni cartola */
 const sinCarta = async (req, res) => {
   try {
+    // mes='todos' (o ausente) barre TODOS los meses: una otorgada vieja sin carta
+    // no puede depender de que alguien adivine el selector correcto (caso 88027,
+    // otorgada en mayo e invisible con el selector en agosto).
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : null;
-    if (!mes) return res.status(400).json({ success: false, data: null, error: 'Indica el mes (YYYY-MM).' });
+    const condMes = mes ? "AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') = ?" : '';
     const [rows] = await pool.query(`
       SELECT c.id AS id_credito, c.num_op, c.id_financiera, c.automotora AS nombre_dealer, c.rut_dealer,
              c.tipo_ubicacion, c.saldo_precio, c.plazo, c.comdea_real AS comision, c.ejecutivo, c.financiera,
+             DATE_FORMAT(c.fecha_otorgado, '%Y-%m') AS mes_otorgado,
              (SELECT COUNT(*) FROM cartola_incorporaciones i WHERE i.id_credito = c.id AND i.estado <> 'RECHAZADA') AS ya_solicitada
         FROM creditos c
        WHERE c.estado_credito = 'OTORGADO'
-         AND DATE_FORMAT(c.fecha_otorgado, '%Y-%m') = ?
+         ${condMes}
          AND c.financiera IN ('AUTOFIN','UNIDAD DE CREDITO')
          AND NOT EXISTS (SELECT 1 FROM cartas_aprobacion ca WHERE ca.id_financiera = c.num_op)
          AND NOT EXISTS (SELECT 1 FROM cartolas_movimientos m WHERE m.num_op = c.id_financiera)
-       ORDER BY c.num_op`, [mes]);
+       ORDER BY c.fecha_otorgado DESC, c.num_op`, mes ? [mes] : []);
     /* Parque o calle: la carga masiva NO trae ese dato confiable, así que el default
        sale de la FICHA DEL DEALER (dealers.ccs_parque), que es un registro mantenido.
        El crédito solo sirve de respaldo. Si ambos discrepan se marca para que el
@@ -196,6 +200,13 @@ async function aplicar(f, usuario) {
                     plazo = ?, comdea_real = ?, updated_at = NOW() WHERE id = ?`,
     [f.nombre_dealer || null, f.rut_dealer || null, f.es_parque ? 'PARQUE' : 'CALLE',
      Number(f.saldo_precio) || 0, Number(f.plazo) || 0, Number(f.comision) || 0, c.id]);
+  // Si la comisión confirmada difiere del motor, dejarla FORZADA: sin esta marca
+  // el próximo recálculo la pisaría de vuelta al valor de pizarra (el recálculo
+  // solo respeta campos_forzados o carta, y estas ops no tienen carta).
+  try {
+    const { marcarForzadosCalculo } = require('../../../creditos/src/utils/recalcular-mes');
+    await marcarForzadosCalculo([c.id], { campos: ['comdea_real'] });
+  } catch (e) { console.error('[incorporaciones forzado]', e.message); }
   // 2) Movimiento de cartola (id_carta NULL = incorporada sin carta)
   // nombre_completo es la columna poblada en `clientes`; los campos separados
   // (nombres/apellido_paterno) están vacíos en buena parte de la base.

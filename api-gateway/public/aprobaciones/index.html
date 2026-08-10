@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3277,7 +3277,7 @@ function scMoneda(inp){ const n = scNum(inp.value); inp.value = n ? scFmt(n) : '
 async function scContar(){
   const b = document.getElementById('badgeSinCarta'); if (!b) return;
   try {
-    const j = await fetch('/api/cartolas/sin-carta?mes=' + encodeURIComponent(scMes()), { headers: hdr() }).then(r=>r.json());
+    const j = await fetch('/api/cartolas/sin-carta?mes=todos', { headers: hdr() }).then(r=>r.json());
     const n = (j && j.success) ? (j.data.items||[]).filter(x=>!x.ya_solicitada).length : 0;
     b.textContent = n; b.style.display = n ? '' : 'none';
     const btn = document.getElementById('btnSinCarta');
@@ -3286,15 +3286,16 @@ async function scContar(){
 }
 
 async function abrirSinCarta(){
-  const j = await fetch('/api/cartolas/sin-carta?mes=' + encodeURIComponent(scMes()), { headers: hdr() }).then(r=>r.json()).catch(()=>null);
+  // Todos los meses: una otorgada vieja sin carta no depende del selector (caso 88027)
+  const j = await fetch('/api/cartolas/sin-carta?mes=todos', { headers: hdr() }).then(r=>r.json()).catch(()=>null);
   if (!j || !j.success) return alert((j && j.error) || 'No se pudo cargar el listado.');
   SC = (j.data.items || []).filter(x => !x.ya_solicitada);
   const yaHechas = (j.data.items || []).length - SC.length;
   document.getElementById('scAviso').innerHTML = SC.length
-    ? '<b>' + SC.length + '</b> operación(es) otorgada(s) en ' + j.data.mes + ' sin carta de aprobación y sin movimiento en cartola.'
+    ? '<b>' + SC.length + '</b> operación(es) otorgada(s) sin carta de aprobación y sin movimiento en cartola (todos los meses).'
       + (yaHechas ? ' <span style="color:#92400e">(' + yaHechas + ' ya tienen solicitud en curso)</span>' : '')
       + '<br><span style="color:#64748b">Los valores que confirmes quedan guardados en la operación.</span>'
-    : '<span style="color:#166534">✓ No hay operaciones pendientes de incorporar en ' + j.data.mes + '.</span>';
+    : '<span style="color:#166534">✓ No hay operaciones pendientes de incorporar.</span>';
   scRender();
   document.getElementById('dlgSinCarta').showModal();
 }
@@ -3302,7 +3303,7 @@ async function abrirSinCarta(){
 function scRender(){
   document.getElementById('scBody').innerHTML = SC.map((x,i)=>`<tr>
     <td><input type="checkbox" class="scChk" data-i="${i}" checked onchange="scResumen()"></td>
-    <td><b>${x.num_op||''}</b><div style="font-size:.7rem;color:#94a3b8">${x.financiera||''}</div></td>
+    <td><b>${x.num_op||''}</b><div style="font-size:.7rem;color:#94a3b8">${x.financiera||''}${x.mes_otorgado?' · '+x.mes_otorgado:''}</div></td>
     <td style="position:relative">
       <input type="text" style="width:200px" id="scDl${i}" autocomplete="off" value="${(x.nombre_dealer||'').replace(/"/g,'&quot;')}"
              oninput="scBuscarDealer(${i},this.value)" onblur="setTimeout(()=>scCerrarLista(${i}),180)">
@@ -3396,7 +3397,7 @@ function scResumen(){
 
 async function scIncorporar(){
   const filas = [...document.querySelectorAll('.scChk:checked')].map(c=>SC[+c.dataset.i]).map(x=>({
-    id_credito:x.id_credito, num_op:x.num_op, mes:scMes(), nombre_dealer:x.nombre_dealer, rut_dealer:x.rut_dealer,
+    id_credito:x.id_credito, num_op:x.num_op, mes:x.mes_otorgado||scMes(), nombre_dealer:x.nombre_dealer, rut_dealer:x.rut_dealer,
     es_parque:x.es_parque, saldo_precio:x.saldo_precio, plazo:x.plazo, comision:x.comision }));
   if (!filas.length) return alert('Selecciona al menos una operación.');
   const j = await fetch('/api/cartolas/incorporar', { method:'POST', headers: hdr(), body: JSON.stringify({ filas }) }).then(r=>r.json()).catch(()=>null);
