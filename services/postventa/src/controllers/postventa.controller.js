@@ -584,6 +584,16 @@ const sync = async (req, res) => {
       WHERE (c.num_op IS NOT NULL OR c.numero_credito REGEXP '^[0-9]+$')
         AND (s.num_op IS NULL OR s.num_op <> COALESCE(c.num_op, CAST(c.numero_credito AS UNSIGNED)))
     `).catch(e => console.error('[postventa backfill num_op]', e.message));
+    // Saldo precio y comisión: TAMBIÉN espejo de creditos (fuente única, Máxima 2).
+    // Si Operaciones corrige el crédito después de otorgado, la ODP debe salir por
+    // el valor corregido — antes el seguimiento guardaba la foto del día del sync
+    // para siempre (OP 89246: ODP por $16,7M cuando el SP corregido era $11,6M).
+    await pool.query(`
+      UPDATE postventa_seguimiento s JOIN creditos c ON c.id = s.id_credito
+      SET s.saldo_precio = c.saldo_precio, s.comision = c.comdea_real
+      WHERE COALESCE(s.saldo_precio,-1) <> COALESCE(c.saldo_precio,-1)
+         OR COALESCE(s.comision,-1) <> COALESCE(c.comdea_real,-1)
+    `).catch(e => console.error('[postventa espejo sp/comision]', e.message));
     // Etapas "Sistema" automáticas para los nuevos
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
