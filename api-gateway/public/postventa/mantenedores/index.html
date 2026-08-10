@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v1.6 — plantillas parametricas correo cartola dealer y aviso de pago (comisiones@), con interruptor -->
+  <!-- v1.7 — boton Enviar prueba de las plantillas del dealer (con PDF adjunto opcional) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -138,6 +138,15 @@
       </div>
     </div>
 
+    <!-- Prueba de las plantillas al dealer: manda ambas (con datos de ejemplo) a los
+         destinatarios indicados; el PDF opcional viaja adjunto en la de cartola. -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 12px;margin:14px 0 0">
+      <b style="font-size:.78rem;color:#475569"><i class="bi bi-send me-1"></i>Probar plantillas del dealer:</b>
+      <input id="pruebaTo" placeholder="correo1, correo2" style="flex:1;min-width:240px;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:.8rem">
+      <label style="font-size:.76rem;color:#475569;cursor:pointer">PDF cartola (opcional): <input type="file" id="pruebaPdf" accept="application/pdf" style="font-size:.74rem"></label>
+      <button class="btn-af" id="btn-prueba" style="padding:6px 14px" onclick="probarCorreos()"><i class="bi bi-send me-1"></i>Enviar prueba</button>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:14px 0 16px">
       <span id="msg-correo" style="font-size:.83rem;display:none"></span>
       <button class="btn-af" id="btn-correo" onclick="guardarCorreos()"><i class="bi bi-check-lg me-1"></i>Guardar correos</button>
@@ -225,6 +234,34 @@ async function guardarCorreos(){
   } catch(e){ msg.textContent = 'Error: '+e.message; msg.style.cssText='display:inline;color:#b91c1c;font-size:.83rem'; }
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar correos';
   setTimeout(()=>{ msg.style.display='none'; }, 4000);
+}
+
+/* Envía las dos plantillas del dealer (datos de ejemplo) a los correos indicados.
+   OJO: manda las plantillas GUARDADAS — si editaste algo, guarda primero. */
+async function probarCorreos(){
+  const btn = document.getElementById('btn-prueba');
+  const to = document.getElementById('pruebaTo').value.trim();
+  if (!to) { alert('Indica al menos un correo destinatario.'); return; }
+  let adjunto = null;
+  const f = document.getElementById('pruebaPdf').files[0];
+  if (f) {
+    if (f.size > 8*1024*1024) { alert('El PDF supera 8 MB.'); return; }
+    const b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(',')[1]);
+      r.onerror = rej; r.readAsDataURL(f);
+    });
+    adjunto = { nombre: f.name, base64: b64 };
+  }
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  try {
+    const r = await fetch('/api/postventa/probar-correos', { method:'POST', headers:H, body: JSON.stringify({ to, adjunto }) });
+    const j = await r.json();
+    if (j.success) alert('✓ Enviados los 2 correos de prueba a: ' + to + (adjunto ? '\n(cartola con PDF adjunto)' : '')
+      + (j.data?.cartola?.dev ? '\n\n⚠ Modo Desarrollo activo: se desviaron a las casillas de prueba.' : ''));
+    else alert('Error: ' + (j.error || 'no se pudo enviar'));
+  } catch(e){ alert('Error: ' + e.message); }
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-send me-1"></i>Enviar prueba';
 }
 
 function pinta(track){

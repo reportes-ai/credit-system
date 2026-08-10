@@ -769,6 +769,45 @@ async function notificarPagoComisionDealer(idSeguimiento) {
   } catch (e) { console.error('[postventa aviso pago dealer]', e.message); }
 }
 
+/* ── POST /api/postventa/probar-correos — envía las DOS plantillas de correo al
+   dealer (cartola y aviso de pago) con datos de ejemplo, a los destinatarios
+   indicados. `adjunto` (base64, opcional) viaja en el correo de cartola.
+   Solo mantenedores (requireFunc en la ruta). ── */
+const probarCorreos = async (req, res) => {
+  try {
+    const to = String(req.body.to || '').trim();
+    if (!to) return res.status(400).json({ success: false, data: null, error: 'Destinatarios requeridos' });
+    const { enviarCorreo, remitente, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const aHtml = t => escH(t).replace(/\n/g, '<br>');
+    const rell = (t, datos) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
+    const [[cRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
+    const [[pRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_comision_pagada'");
+    const tCta = cRow ? JSON.parse(cRow.valor) : {};
+    const tPag = pRow ? JSON.parse(pRow.valor) : {};
+    const dCta = { dealer: 'AUTOMOTORA DE PRUEBA SPA', mes: 'Agosto 2026', total: '$1.234.567' };
+    const dPag = { doc: 'factura', numero_factura: '12345', dealer: 'AUTOMOTORA DE PRUEBA SPA',
+                   tipo_cuenta: 'cuenta corriente', num_cuenta: '00-123-45678-9', banco: 'BANCO DE CHILE', ops: '26080001, 26080002' };
+    const adj = [];
+    if (req.body.adjunto && req.body.adjunto.base64)
+      adj.push({ filename: req.body.adjunto.nombre || 'cartola.pdf', content: Buffer.from(req.body.adjunto.base64, 'base64') });
+    const cuerpoCta = rell(tCta.cuerpo, dCta) + (tCta.firma ? '\n\n' + rell(tCta.firma, dCta) : '');
+    const cuerpoPag = rell(tPag.cuerpo, dPag) + (tPag.firma ? '\n\n' + rell(tPag.firma, dPag) : '');
+    const r1 = await enviarCorreo({
+      from: remitente(), to,
+      subject: '[PRUEBA] ' + (rell(tCta.asunto, dCta) || 'Cartola'),
+      html: envolverHTML(aHtml(cuerpoCta)), text: cuerpoCta, attachments: adj });
+    const r2 = await enviarCorreo({
+      from: remitenteComisiones(), to,
+      subject: '[PRUEBA] ' + (rell(tPag.asunto, dPag) || 'Comisión pagada'),
+      html: envolverHTML(aHtml(cuerpoPag)), text: cuerpoPag });
+    res.json({ success: r1.ok && r2.ok, data: { cartola: r1, pagada: r2 }, error: (!r1.ok && r1.error) || (!r2.ok && r2.error) || null });
+  } catch (e) {
+    console.error('[postventa probarCorreos]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* Grupo de la factura: la titular + sus réplicas (para propagar ODP/envío/pago) */
 async function idsGrupoFactura(id) {
   const [[f]] = await pool.query('SELECT es_replica, id_titular FROM postventa_facturas_comision WHERE id_seguimiento=?', [id]);
@@ -2006,4 +2045,4 @@ module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
-  notificarPagoComisionDealer, idsGrupoFactura, marcarComisionAPagar };
+  notificarPagoComisionDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos };

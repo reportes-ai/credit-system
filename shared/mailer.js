@@ -92,7 +92,7 @@ function envolverHTML(cuerpoHtml) {
 
 // Nunca lanza: devuelve { ok, error?, messageId? } para no romper el flujo que lo llama.
 // `bcc` (copia oculta) y `from` (remitente puntual, ej. cobranza@) son opcionales.
-async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } = {}) {
+async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from, attachments } = {}) {
   try {
     if (!nodemailer) return { ok: false, error: 'Falta la dependencia nodemailer en el servidor' };
     const tx = getTransporter();
@@ -139,6 +139,7 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from } 
       text: textFinal || undefined,
       html: htmlFinal || undefined,
       replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined,
+      attachments: attachments && attachments.length ? attachments : undefined,   // [{filename, content(Buffer)|path}]
     });
     // `to` = destinatario EFECTIVO (en Modo Desarrollo es el correo de prueba, no el original).
     return { ok: true, messageId: info.messageId, to: toFinal, dev: !!dev.activo };

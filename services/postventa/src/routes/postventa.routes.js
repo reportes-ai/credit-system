@@ -12,6 +12,7 @@ router.get('/vendedores-ventas', verifyToken, requireFunc('postventa_vendedores_
 
 router.get('/config',       verifyToken, c.getConfig);
 router.put('/config/:clave',verifyToken, requireFunc('postventa_mantenedores'), c.setConfig);
+router.post('/probar-correos', verifyToken, requireFunc('postventa_mantenedores'), c.probarCorreos);
 router.get('/perfiles-lista', verifyToken, c.getPerfiles);
 router.get('/atribuciones',   verifyToken, c.getAtribuciones);
 router.get('/alertas-config', verifyToken, c.getAlertasConfig);
