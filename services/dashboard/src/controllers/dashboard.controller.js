@@ -83,7 +83,11 @@ function procesarDatos(rows) {
     if (!ejMap[r.ejecutivo][r.mes]) ejMap[r.ejecutivo][r.mes] = { ing:0,apro:0,ot:0,rec:0,monto_ot:0 };
     const d = ejMap[r.ejecutivo][r.mes];
     d.ing++;
-    if (!['RECHAZADO','ANULADO'].includes(r.estado_eval)) d.apro++;
+    // Aprobada = APROBADO + OTORGADO, misma definición que la tabla
+    // "Ejecutivos — Aprobadas" del dashboard. Antes contaba "todo lo que no
+    // está rechazado ni anulado", así que una DIGITADA (aún en evaluación)
+    // figuraba como aprobada y los dos informes no cuadraban.
+    if (['APROBADO','OTORGADO'].includes(r.estado_eval)) d.apro++;
     if (r.estado_eval === 'OTORGADO') { d.ot++; d.monto_ot += n(r.saldo_precio); }
     if (r.estado_eval === 'RECHAZADO') d.rec++;
   });
