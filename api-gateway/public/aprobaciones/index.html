@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.35 — Vigentes compacta: iconos en vertical y letra chica, sin scroll horizontal -->
+  <!-- v4.36 — PDF de cartola sin cortes: bloque al ancho real y hoja horizontal si es ancha -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3545,16 +3545,24 @@ async function enviarCartola(gi, conc, rutC, total){
   const mail = document.getElementById('mailCta'+gi).value.trim();
   const bloque = document.getElementById('bloqueCta'+gi);
   const filename = mes.replace('-','.') + ' CARTOLA COMISIONES - ' + conc.toUpperCase() + '.pdf';
-  // 1) Generar y descargar el PDF
+  // 1) Generar y descargar el PDF. El bloque tiene overflow:hidden: si la tabla es
+  //    más ancha que la card, el PDF salía cortado por la derecha. Se expande el
+  //    bloque al ancho REAL del contenido antes de capturar (y se restaura al final);
+  //    si es muy ancho, la hoja se gira a horizontal para que la letra no quede enana.
+  const prevW = bloque.style.width, prevOv = bloque.style.overflow, prevMax = bloque.style.maxWidth;
   try {
+    const ancho = Math.max(bloque.scrollWidth,
+      ...Array.from(bloque.querySelectorAll('table')).map(t => t.scrollWidth + 40));
+    bloque.style.width = ancho + 'px'; bloque.style.maxWidth = 'none'; bloque.style.overflow = 'visible';
     await html2pdf().set({
       filename,
       margin: 8,
       image: { type:'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit:'mm', format:'letter', orientation:'portrait' },
+      html2canvas: { scale: 2, windowWidth: ancho + 60 },
+      jsPDF: { unit:'mm', format:'letter', orientation: ancho > 900 ? 'landscape' : 'portrait' },
     }).from(bloque).save();
   } catch(e) { alert('Error generando PDF: '+e.message); return; }
+  finally { bloque.style.width = prevW; bloque.style.maxWidth = prevMax; bloque.style.overflow = prevOv; }
   // 2) Registrar el envío: estampa el mes de cartola en los movimientos y marca Post Venta
   try {
     await fetch('/api/cartolas/enviadas', { method:'POST', headers: hdr(),
