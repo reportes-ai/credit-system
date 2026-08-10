@@ -999,14 +999,29 @@ const setEtapa = async (req, res) => {
         await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento = ?', [req.params.id]);
       }
       // Al desmarcar FONDOS RECIBIDOS del saldo, revertir la COMISION A PAGAR
-      // automática (solo si la comisión no avanzó más allá).
-      if (track === 'SALDO' && etapa === 'FONDOS RECIBIDOS')
+      // automática (solo si la comisión no avanzó más allá) — y el movimiento de
+      // cartola que el automatismo dejó A PAGAR vuelve a PENDIENTE (simétrico).
+      if (track === 'SALDO' && etapa === 'FONDOS RECIBIDOS') {
         await pool.query(`
           DELETE e FROM postventa_etapas e
           WHERE e.id_seguimiento=? AND e.track='COMISION' AND e.etapa='COMISION A PAGAR'
             AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
               WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
           [req.params.id]).catch(() => {});
+        await pool.query(`
+          UPDATE cartolas_movimientos m
+          LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+          JOIN creditos c
+            ON (ca.id_credito_creado IS NOT NULL AND c.id = ca.id_credito_creado)
+            OR (m.id_carta IS NULL AND (CAST(m.num_op AS CHAR) = CAST(c.num_op AS CHAR) OR CAST(m.num_op AS CHAR) = CAST(c.id_financiera AS CHAR)))
+          JOIN postventa_seguimiento s ON s.id_credito = c.id
+          SET m.estado_comision='PENDIENTE', m.estado_usuario='Sistema', m.estado_fecha=NOW()
+          WHERE s.id=? AND m.movimiento='COMISION' AND m.estado_comision='A PAGAR'
+            AND m.estado_usuario='Sistema' AND m.mes_cartola IS NULL
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas ap
+              WHERE ap.id_seguimiento = s.id AND ap.track='COMISION' AND ap.etapa='COMISION A PAGAR')`,
+          [req.params.id]).catch(() => {});
+      }
     }
     // Al marcar FONDOS RECIBIDOS: la comisión de la misma operación pasa a COMISION A PAGAR
     if (marcar && track === 'SALDO' && etapa === 'FONDOS RECIBIDOS')
