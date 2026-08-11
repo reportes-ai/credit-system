@@ -100,11 +100,19 @@ async function calcularBSC(mesQ) {
       : mesChile();
     const cfg = await getCfg();
 
-    // Equipo: Ejecutivos Comerciales activos (convención: primer nombre + apellido paterno)
+    // Equipo: Ejecutivos Comerciales VIGENTES en el mes evaluado (convención: primer
+    // nombre + apellido paterno). Vigencia por la ficha de Usuarios: ingresó a más
+    // tardar el último día del mes y no estaba de baja antes de que el mes empezara
+    // — así un mes histórico no se diluye con quienes aún no entraban (Pato 2026-08-11).
     const [ejs] = await pool.query(
       `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(u.apellido),' ',1))) AS ejecutivo
          FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-        WHERE p.nombre='Ejecutivo Comercial' AND u.estado='activo' ORDER BY ejecutivo`);
+        WHERE p.nombre='Ejecutivo Comercial'
+          AND (u.estado='activo' OR u.fecha_baja IS NOT NULL)
+          AND u.fecha_ingreso IS NOT NULL
+          AND u.fecha_ingreso <= LAST_DAY(CONCAT(?,'-01'))
+          AND (u.fecha_baja IS NULL OR u.fecha_baja >= CONCAT(?,'-01'))
+        ORDER BY ejecutivo`, [mes, mes]);
 
     // Pilar 1: créditos OTORGADOS del mes
     const [ing] = await pool.query(
