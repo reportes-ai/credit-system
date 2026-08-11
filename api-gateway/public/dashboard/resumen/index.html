@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,7 +13,7 @@
   body { margin:0; color:var(--tx); font-family:'Segoe UI',system-ui,sans-serif;
          background:radial-gradient(1200px 600px at 75% -10%, #0d2247 0%, transparent 60%),
                     radial-gradient(900px 500px at -10% 30%, #101c38 0%, transparent 55%), var(--bg); min-height:100vh; }
-  .main { max-width:1340px; margin:0 auto; padding:22px 24px 80px; }
+  .main { max-width:1780px; margin:0 auto; padding:22px 28px 80px; }
   .fade { opacity:0; transform:translateY(10px); animation:up .5s forwards; }
   @keyframes up { to { opacity:1; transform:none; } }
   .head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
@@ -58,6 +58,7 @@
   .hd { text-align:center; font-size:.62rem; color:var(--mut); font-weight:800; }
   .hc { aspect-ratio:1.35; border-radius:7px; background:#0d1730; border:1px solid #14203a; position:relative; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:var(--mut); }
   .hc .q { position:absolute; top:2px; right:5px; font-size:.58rem; opacity:.85; }
+  .hc .e { position:absolute; bottom:2px; left:5px; font-size:.56rem; color:var(--gold); font-weight:800; opacity:.9; }
   .donutwrap { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
   .dleg { display:flex; flex-direction:column; gap:10px; font-size:.78rem; flex:1; min-width:150px; }
   .dleg .it { display:flex; align-items:center; gap:9px; }
@@ -81,6 +82,24 @@
   .p-bar > div { height:100%; border-radius:4px; background:linear-gradient(90deg,#0a4d8c,var(--accent),var(--accent2)); }
   .p-v { text-align:right; font-weight:800; font-size:.84rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .p-v small { display:block; color:var(--mut); font-weight:500; font-size:.66rem; }
+  .strip { grid-template-columns:repeat(6,1fr); margin-bottom:16px; }
+  @media (max-width:1200px){ .strip{ grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:700px){ .strip{ grid-template-columns:repeat(2,1fr);} }
+  .tile { background:var(--panel); border:1px solid var(--line); border-radius:15px; padding:13px 15px; }
+  .tile .k { color:var(--mut); font-size:.62rem; text-transform:uppercase; letter-spacing:.09em; font-weight:800; display:flex; gap:6px; align-items:center; }
+  .tile .k i { color:var(--accent); }
+  .tile .v { font-size:1.25rem; font-weight:850; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .tile .d { color:var(--mut); font-size:.66rem; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .yoy { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .yy { display:grid; grid-template-columns:1fr auto auto auto; gap:10px; align-items:center; background:#0d1730; border:1px solid var(--line); border-radius:12px; padding:10px 14px; font-size:.8rem; }
+  .yy .k { color:var(--mut); font-weight:700; }
+  .yy b { font-variant-numeric:tabular-nums; }
+  .rec { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .rc { display:flex; gap:12px; align-items:center; background:#0d1730; border:1px solid var(--line); border-radius:12px; padding:10px 14px; font-size:.8rem; }
+  .rc .ic { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex:none; background:rgba(255,197,61,.14); }
+  .rc small { display:block; color:var(--mut); font-size:.68rem; }
+  .rc b { font-variant-numeric:tabular-nums; }
+  .chase { margin-top:2px; padding:9px 13px; border-radius:11px; font-size:.76rem; background:rgba(47,230,167,.08); border:1px solid rgba(47,230,167,.3); }
   .foot { color:#5b6f92; font-size:.7rem; margin-top:20px; line-height:1.6; }
   .foot a { color:var(--accent); }
   .skel { color:var(--mut); font-size:.9rem; padding:60px; text-align:center; }
@@ -256,13 +275,23 @@ function pintar(){
   const maxD=Math.max(...Object.values(porDia),1);
   const prim=new Date(aa,mn-1,1).getDay(); // 0=Dom
   const off=(prim+6)%7; // Lun=0
+  // Q esperado por día: reparte el presupuesto según el peso histórico de cada
+  // día de la semana (últimos 3 meses cerrados — el sábado pesa más que el lunes)
+  const pesoDS=[0,0,0,0,0,0,0];
+  m12.slice(-4,-1).forEach((m,ix)=>{ RAW.filter(r=>r.mes===m&&esOt(r)).forEach(r=>{
+    const f=fRef(r); if(f) pesoDS[new Date(f+'T12:00:00').getDay()]++; }); });
+  const sumaPesosMes=(()=>{ let s=0; for(let d=1;d<=diasMes;d++) s+=pesoDS[new Date(aa,mn-1,d).getDay()]||0; return s; })();
+  const espDia=d=>{ if(!pp||!pp.ops||!sumaPesosMes) return null;
+    return pp.ops*(pesoDS[new Date(aa,mn-1,d).getDay()]||0)/sumaPesosMes; };
   let heat='<div class="heat">'+['L','M','M','J','V','S','D'].map(d=>`<div class="hd">${d}</div>`).join('');
   for(let i=0;i<off;i++) heat+='<div></div>';
   for(let d=1;d<=diasMes;d++){
-    const q=porDia[d]||0, t=q/maxD;
+    const q=porDia[d]||0, t=q/maxD, esp=espDia(d);
     const bg=q?`rgba(0,166,255,${0.15+t*0.75})`:'#0d1730';
     const fut=esActual&&d>diaCorte;
-    heat+=`<div class="hc" style="background:${fut?'transparent':bg};${fut?'border-style:dashed;opacity:.4;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}" title="${d}: ${q} otorgadas">${d}${q?`<span class="q">${q}</span>`:''}</div>`;
+    const bajoMeta=!fut&&esp!=null&&q<Math.round(esp)&&(!esActual||d<diaCorte);
+    heat+=`<div class="hc" style="background:${fut?'transparent':bg};${fut?'border-style:dashed;opacity:.55;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}${bajoMeta?'box-shadow:inset 0 0 0 1.5px rgba(255,107,122,.45);':''}"
+      title="${d}: ${q} otorgadas${esp!=null?' · esperado '+esp.toFixed(1):''}">${d}${q?`<span class="q">${q}</span>`:''}${esp!=null?`<span class="e">${Math.round(esp)}</span>`:''}</div>`;
   }
   heat+='</div>';
 
@@ -283,6 +312,31 @@ function pintar(){
         <div><div class="p-nm" title="${x[0]}">${x[0]}</div><div class="p-bar"><div style="width:${x[1].monto/mx*100}%"></div></div></div>
         <div class="p-v">$${mm1(x[1].monto)} MM<small>${x[1].n} ops · tk ${clp(x[1].monto/x[1].n)}</small></div></div>`; }).join('')
       || '<span class="sub">Sin operaciones</span>'; };
+
+  // ── Radiografía del mes ──
+  const conMonto=ot.filter(r=>r.monto_financiado>0&&r.tasa_cli>0);
+  const tasaProm=conMonto.length?conMonto.reduce((s,r)=>s+r.tasa_cli*r.monto_financiado,0)/sum(conMonto,'monto_financiado'):0;
+  const plazoProm=ot.length?sum(ot,'plazo')/ot.length:0;
+  const nMayor=ot.filter(r=>r.mayor_menor==='MAYOR 200UF').length;
+  const dealersAct=new Set(ot.map(r=>(r.automotora||'').trim()).filter(Boolean)).size;
+  const ejecAct=new Set(ot.map(r=>(r.ejecutivo||'').trim()).filter(Boolean)).size;
+  const opMax=ot.reduce((a,r)=>r.monto_financiado>(a?a.monto_financiado:0)?r:a,null);
+  const margen=monto?ingreso/monto*100:0;
+
+  // ── Año contra año (a igual día si el mes está en curso) ──
+  const mesYoY=(aa-1)+'-'+String(mn).padStart(2,'0');
+  const otYoY=RAW.filter(r=>r.mes===mesYoY&&esOt(r)&&(!esActual||(+(fRef(r).slice(8,10))||1)<=diaCorte));
+  const hayYoY=RAW.some(r=>r.mes===mesYoY);
+  const yoyRow=(k,act,ant,fmt)=>`<div class="yy"><span class="k">${k}</span><b>${fmt(act)}</b><span style="color:var(--mut);font-size:.7rem">vs ${fmt(ant)}</span>${delta(act,ant)}</div>`;
+
+  // ── Récords históricos (meses completos, excluye el mes en curso) ──
+  const histM=m12.filter(m=>m!==mesHoy).map(m=>{ const o=RAW.filter(r=>r.mes===m&&esOt(r)); return {m,n:o.length,monto:sum(o,'monto_financiado')}; });
+  const recM=histM.reduce((a,x)=>x.monto>(a?a.monto:0)?x:a,null);
+  const recOps=histM.reduce((a,x)=>x.n>(a?a.n:0)?x:a,null);
+  const diasHist={}; RAW.filter(esOt).forEach(r=>{ const f=fRef(r); if(f&&(!esActual||r.mes!==mes||+(f.slice(8,10))<=diaCorte)) diasHist[f]=(diasHist[f]||0)+1; });
+  const recDia=Object.entries(diasHist).reduce((a,x)=>x[1]>(a?a[1]:0)?x:a,null);
+  const persigue=esActual&&recM&&proyM>recM.monto; // ambos en $
+  const fechaLarga=f=>{ const d=new Date(f+'T12:00:00'); return d.getDate()+' '+MESN[d.getMonth()]+' '+String(d.getFullYear()).slice(2); };
 
   const kpi=(lbl,val,d,cmp,sp,col)=>`<div class="card kpi fade"><div class="lbl">${lbl}</div><div class="val">${val}</div>
     <div>${d} <span class="cmp">vs ${cmp}</span></div>${spark(sp,110,44,col)}</div>`;
@@ -331,7 +385,9 @@ function pintar(){
     <div class="card fade" style="animation-delay:.15s">
       <h3 class="t"><i class="bi bi-calendar3"></i> Pulso diario · ${mesLab(mes)}</h3>
       ${heat}
-      <div class="leg"><span>Intensidad = otorgadas del día (máx ${maxD})</span></div>
+      <div class="leg"><span><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--accent);margin-right:5px"></span>Q real del día (arriba der.)</span>
+      <span><span style="color:var(--gold);font-weight:800">n</span> Q esperado según presupuesto y peso del día (abajo izq.)</span>
+      <span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;box-shadow:inset 0 0 0 1.5px rgba(255,107,122,.7);margin-right:5px"></span>día bajo lo esperado</span></div>
     </div>
     <div class="card fade" style="animation-delay:.2s">
       <h3 class="t"><i class="bi bi-pie-chart-fill"></i> Mix por institución</h3>
@@ -354,12 +410,50 @@ function pintar(){
     </div>
   </div>
 
+  <div class="grid strip">
+    <div class="tile fade" style="animation-delay:.28s"><div class="k"><i class="bi bi-percent"></i> Tasa promedio</div>
+      <div class="v">${tasaProm.toLocaleString('es-CL',{maximumFractionDigits:2})}%</div><div class="d">ponderada por monto</div></div>
+    <div class="tile fade" style="animation-delay:.3s"><div class="k"><i class="bi bi-hourglass-split"></i> Plazo promedio</div>
+      <div class="v">${plazoProm.toLocaleString('es-CL',{maximumFractionDigits:0})} <small style="font-size:.75rem;color:var(--mut)">cuotas</small></div><div class="d">de las otorgadas del mes</div></div>
+    <div class="tile fade" style="animation-delay:.32s"><div class="k"><i class="bi bi-cash-stack"></i> Margen del mes</div>
+      <div class="v">${margen.toLocaleString('es-CL',{maximumFractionDigits:1})}%</div><div class="d">ingreso neto / monto financiado</div></div>
+    <div class="tile fade" style="animation-delay:.34s"><div class="k"><i class="bi bi-arrows-expand"></i> Mayor 200 UF</div>
+      <div class="v">${nOt?Math.round(nMayor/nOt*100):0}%</div><div class="d">${num(nMayor)} de ${num(nOt)} operaciones</div></div>
+    <div class="tile fade" style="animation-delay:.36s"><div class="k"><i class="bi bi-shop-window"></i> Dealers con negocio</div>
+      <div class="v">${num(dealersAct)}</div><div class="d">${num(ejecAct)} ejecutivos con curse</div></div>
+    <div class="tile fade" style="animation-delay:.38s"><div class="k"><i class="bi bi-gem"></i> Operación top</div>
+      <div class="v">${opMax?clp(opMax.monto_financiado):'—'}</div><div class="d" title="${opMax?opMax.automotora:''}">${opMax?(opMax.automotora||'—'):'sin operaciones'}</div></div>
+  </div>
+
+  <div class="grid row-2" style="margin-bottom:16px">
+    <div class="card fade" style="animation-delay:.4s">
+      <h3 class="t"><i class="bi bi-calendar2-range"></i> Año contra año · ${mesLab(mes)} vs ${mesLab(mesYoY)}${esActual?' <span style="text-transform:none;letter-spacing:0;font-weight:600">(a igual día)</span>':''}</h3>
+      ${hayYoY?`<div class="yoy">
+        ${yoyRow('Otorgadas', nOt, otYoY.length, num)}
+        ${yoyRow('Monto financiado', monto, sum(otYoY,'monto_financiado'), v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ingreso neto', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ticket promedio', tk, otYoY.length?sum(otYoY,'monto_financiado')/otYoY.length:0, clp)}
+      </div>`:'<span class="sub">Aún no hay datos del mismo mes del año anterior.</span>'}
+    </div>
+    <div class="card fade" style="animation-delay:.45s">
+      <h3 class="t"><i class="bi bi-stars" style="color:var(--gold)"></i> Salón de récords</h3>
+      <div class="rec">
+        ${recM?`<div class="rc"><div class="ic">🏆</div><div style="flex:1">Mejor mes en monto<small>${mesLab(recM.m)} · ${num(recM.n)} operaciones</small></div><b>$${mm1(recM.monto)} MM</b></div>`:''}
+        ${recOps?`<div class="rc"><div class="ic">🚀</div><div style="flex:1">Mejor mes en operaciones<small>${mesLab(recOps.m)} · $${mm1(recOps.monto)} MM</small></div><b>${num(recOps.n)} ops</b></div>`:''}
+        ${recDia?`<div class="rc"><div class="ic">⚡</div><div style="flex:1">Mejor día de la historia<small>${fechaLarga(recDia[0])}</small></div><b>${num(recDia[1])} otorgadas</b></div>`:''}
+        ${esActual&&recM?(persigue
+          ?`<div class="chase">🔥 <b>¡Mes récord a la vista!</b> A ritmo actual (${'$'+mm1(proyM)} MM) este mes <b>superaría</b> el récord de ${mesLab(recM.m)}.</div>`
+          :`<div class="chase" style="background:rgba(0,166,255,.07);border-color:rgba(0,166,255,.3)">Para batir el récord de ${mesLab(recM.m)} faltan <b>$${mm1(recM.monto-monto)} MM</b> en ${diasMes-diaCorte} días (${diasMes-diaCorte>0?'$'+mm1((recM.monto-monto)/(diasMes-diaCorte))+' MM/día':'—'}).</div>`):''}
+      </div>
+    </div>
+  </div>
+
   <div class="grid row-2">
-    <div class="card fade" style="animation-delay:.3s">
+    <div class="card fade" style="animation-delay:.5s">
       <h3 class="t"><i class="bi bi-trophy-fill" style="color:var(--gold)"></i> Podio ejecutivos · ${mesLab(mes)}</h3>
       <div class="podio">${podio(top('ejecutivo'))}</div>
     </div>
-    <div class="card fade" style="animation-delay:.35s">
+    <div class="card fade" style="animation-delay:.55s">
       <h3 class="t"><i class="bi bi-shop" style="color:var(--gold)"></i> Podio dealers · ${mesLab(mes)}</h3>
       <div class="podio">${podio(top('automotora'))}</div>
     </div>
