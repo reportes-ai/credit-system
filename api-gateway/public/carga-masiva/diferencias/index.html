@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!-- v1.0 — cola de diferencias entre la carga masiva y nuestros datos: elegir el nuestro, el del archivo o digitar un tercero -->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diferencias con la Carga — AutoFácil</title>
+<link href="/css/bootstrap.min.css" rel="stylesheet">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; --border:#e2e8f0; --muted:#64748b; }
+  body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+  .wrap { max-width:1100px; margin:0 auto; padding:22px 16px 80px; }
+  .page-banner { background:linear-gradient(135deg,var(--navy-dark),#0255c5 60%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:18px; }
+  .page-banner i { font-size:2.2rem; opacity:.85; }
+  .page-banner h2 { font-weight:700; margin:0; font-size:1.2rem; }
+  .page-banner p { opacity:.85; margin:0; font-size:.82rem; }
+  .op-card { background:#fff; border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .op-head { display:flex; flex-wrap:wrap; align-items:center; gap:10px; border-bottom:1px solid #f1f5f9; padding-bottom:10px; margin-bottom:12px; }
+  .op-head .op { font-weight:800; color:var(--navy-dark); font-size:1.02rem; }
+  .chip { font-size:.7rem; font-weight:700; border-radius:10px; padding:2px 9px; background:#eff6ff; color:#0141A2; }
+  .chip.gris { background:#f1f5f9; color:#475569; }
+  .dif { display:grid; grid-template-columns:170px 1fr 1fr 150px; gap:12px; align-items:center; padding:10px 0; border-bottom:1px dashed #eef2f7; }
+  .dif:last-child { border-bottom:none; }
+  .dif .lbl { font-weight:700; font-size:.85rem; color:#0f172a; }
+  .opt { border:2px solid var(--border); border-radius:10px; padding:9px 12px; cursor:pointer; transition:.12s; }
+  .opt:hover { border-color:#93c5fd; }
+  .opt.sel { border-color:var(--navy); background:#eff6ff; }
+  .opt .t { font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; }
+  .opt .v { font-size:1rem; font-weight:800; color:#0f172a; }
+  .manual input { width:100%; border:2px solid var(--border); border-radius:10px; padding:8px 10px; text-align:right; font-weight:700; font-size:.9rem; }
+  .manual input:focus { border-color:var(--navy); outline:none; }
+  .manual.sel input { border-color:#b45309; background:#fffbeb; }
+  .delta { font-size:.72rem; font-weight:700; margin-top:2px; }
+  .btn { border:none; border-radius:10px; padding:9px 18px; font-weight:700; font-size:.86rem; cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .btn-navy { background:var(--navy); color:#fff; }
+  .btn-line { background:#fff; border:1.5px solid var(--border); color:#334155; }
+  .vacio { text-align:center; color:#94a3b8; padding:60px 0; }
+  .toast { position:fixed; bottom:24px; right:24px; background:#16a34a; color:#fff; border-radius:10px; padding:12px 20px; font-weight:700; display:none; z-index:99; }
+  @media(max-width:820px){ .dif { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>
+  window.AF_TOPNAV = { breadcrumb: [
+    { label:'Inicio', href:'/' },
+    { label:'Carga Masiva Operaciones', href:'/carga-masiva/' },
+    { label:'Diferencias con la Carga', icon:'bi-shuffle', current:true }
+  ] };
+</script>
+
+<div class="wrap">
+  <div class="page-banner">
+    <i class="bi bi-shuffle"></i>
+    <div>
+      <h2>Diferencias con la Carga</h2>
+      <p>La carga masiva no pisa los montos de una operación que ya existe. Cuando el archivo trae otro valor, el caso queda acá: elige el nuestro, el del archivo, o escribe el del pagaré.</p>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+    <span id="resumen" style="font-size:.85rem;color:var(--muted)"></span>
+    <span style="flex:1"></span>
+    <button class="btn btn-line" onclick="verHistorial()"><i class="bi bi-clock-history"></i> Historial de resueltas</button>
+  </div>
+
+  <div id="lista"><div class="vacio"><i class="bi bi-hourglass-split"></i> Cargando…</div></div>
+</div>
+
+<dialog id="dlgHist" style="border:none;border-radius:14px;padding:0;max-width:900px;width:94%">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:15px 22px;display:flex;justify-content:space-between;align-items:center">
+    <b><i class="bi bi-clock-history"></i> Diferencias ya resueltas</b>
+    <button class="btn btn-line" onclick="document.getElementById('dlgHist').close()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div style="padding:16px 22px;max-height:70vh;overflow:auto" id="histBody"></div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script src="/js/topnav.js"></script>
+<script>
+'use strict';
+const H = { Authorization:'Bearer '+sessionStorage.getItem('token'), 'Content-Type':'application/json' };
+const clp = v => (v==null||v==='') ? '—' : '$'+Math.round(Number(v)).toLocaleString('es-CL');
+const esc = s => String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+let OPS = [];
+
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
+
+async function cargar(){
+  const j = await (await fetch('/api/carga-diferencias/lista',{headers:H})).json().catch(()=>({}));
+  const cont = document.getElementById('lista');
+  if (!j.success){ cont.innerHTML = `<div class="vacio">${esc(j.error||'Sin acceso')}</div>`; return; }
+  OPS = j.data;
+  const nCampos = OPS.reduce((a,o)=>a+o.campos.length,0);
+  document.getElementById('resumen').textContent = OPS.length
+    ? `${OPS.length} operación(es) con ${nCampos} dato(s) en conflicto`
+    : '';
+  if (!OPS.length){
+    cont.innerHTML = '<div class="vacio"><i class="bi bi-check2-circle" style="font-size:2rem;color:#16a34a"></i><p style="margin-top:10px">Sin diferencias pendientes. Todo lo cargado calza con nuestros datos.</p></div>';
+    return;
+  }
+  cont.innerHTML = OPS.map(o=>`
+    <div class="op-card" id="op-${o.id_credito}">
+      <div class="op-head">
+        <span class="op">N° Operación ${esc(o.num_op??'—')}</span>
+        <span class="chip">${esc(o.financiera||'—')}</span>
+        <span class="chip gris">ID Financiera ${esc(o.id_financiera||'—')}</span>
+        <span class="chip gris">${esc(o.mes||'—')}</span>
+        <span style="flex:1"></span>
+        <span style="font-size:.8rem;color:var(--muted)">${esc(o.cliente||'')} · ${esc(o.automotora||'')}</span>
+      </div>
+      ${o.campos.map(c=>fila(o,c)).join('')}
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px">
+        <button class="btn btn-navy" onclick="guardar(${o.id_credito})"><i class="bi bi-check2"></i> Guardar decisión</button>
+      </div>
+    </div>`).join('');
+}
+
+function fila(o, c){
+  const vs = Number(c.valor_sistema), va = Number(c.valor_archivo);
+  const d = va - vs;
+  const col = d > 0 ? '#166534' : '#b91c1c';
+  return `
+    <div class="dif" data-id="${c.id}">
+      <div class="lbl">${esc(c.etiqueta)}</div>
+      <div class="opt sel" data-op="SISTEMA" onclick="elegir(${c.id},'SISTEMA')">
+        <div class="t">Nuestro dato</div><div class="v">${clp(vs)}</div></div>
+      <div class="opt" data-op="ARCHIVO" onclick="elegir(${c.id},'ARCHIVO')">
+        <div class="t">Archivo de la carga</div><div class="v">${clp(va)}</div>
+        <div class="delta" style="color:${col}">${d>0?'+':''}${clp(Math.abs(d)).replace('$','')} ${d>0?'más':'menos'}</div></div>
+      <div class="opt manual" data-op="MANUAL" onclick="elegir(${c.id},'MANUAL')">
+        <div class="t">Otro valor</div>
+        <input type="text" placeholder="$ digitar" oninput="elegir(${c.id},'MANUAL')" onblur="fmt(this)">
+      </div>
+    </div>`;
+}
+function fmt(el){ const n = Number(String(el.value).replace(/[^\d]/g,'')); el.value = n ? '$'+n.toLocaleString('es-CL') : ''; }
+function elegir(id, op){
+  const row = document.querySelector(`.dif[data-id="${id}"]`);
+  row.querySelectorAll('.opt').forEach(x=>x.classList.toggle('sel', x.dataset.op===op));
+}
+
+async function guardar(idCredito){
+  const card = document.getElementById('op-'+idCredito);
+  const decisiones = [];
+  for (const row of card.querySelectorAll('.dif')) {
+    const sel = row.querySelector('.opt.sel');
+    const eleccion = sel ? sel.dataset.op : 'SISTEMA';
+    let valor = null;
+    if (eleccion === 'MANUAL') {
+      valor = String(row.querySelector('.manual input').value).replace(/[^\d]/g,'');
+      if (!valor) return alert('Escribe el valor para «'+row.querySelector('.lbl').textContent+'» o elige una de las dos opciones');
+    }
+    decisiones.push({ id: Number(row.dataset.id), id_credito: idCredito, eleccion, valor });
+  }
+  const resumen = decisiones.map(d=>d.eleccion).join(', ');
+  if (!confirm('Se aplicará: '+resumen+'.\n\nLo elegido queda en el crédito y la decisión se registra. ¿Continuar?')) return;
+  const j = await (await fetch('/api/carga-diferencias/resolver',{method:'POST',headers:H,body:JSON.stringify({decisiones})})).json().catch(()=>({}));
+  if (!j.success) return alert(j.error||'No se pudo guardar');
+  toast(`✓ ${j.data.aplicados} dato(s) actualizado(s), ${j.data.cerrados} confirmado(s) como estaban`);
+  cargar();
+}
+
+async function verHistorial(){
+  const j = await (await fetch('/api/carga-diferencias/historial',{headers:H})).json().catch(()=>({}));
+  const b = document.getElementById('histBody');
+  if (!j.success || !j.data.length){ b.innerHTML = '<div class="vacio">Todavía no hay diferencias resueltas</div>'; }
+  else b.innerHTML = `<table class="table table-sm" style="font-size:.83rem">
+      <thead><tr style="color:#0141A2"><th>Fecha</th><th>Quién</th><th>N° Op</th><th>Dato</th>
+        <th class="text-end">Nuestro</th><th class="text-end">Archivo</th><th class="text-end">Quedó</th><th>Decisión</th></tr></thead>
+      <tbody>${j.data.map(r=>`<tr>
+        <td>${new Date(r.resuelto_at).toLocaleString('es-CL')}</td><td>${esc(r.resuelto_por||'—')}</td>
+        <td>${esc(r.num_op??'—')}</td><td>${esc(r.etiqueta)}</td>
+        <td class="text-end">${clp(r.valor_sistema)}</td><td class="text-end">${clp(r.valor_archivo)}</td>
+        <td class="text-end" style="font-weight:700">${clp(r.valor_elegido)}</td><td>${esc(r.eleccion)}</td></tr>`).join('')}</tbody></table>`;
+  document.getElementById('dlgHist').showModal();
+}
+
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

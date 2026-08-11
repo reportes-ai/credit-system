@@ -48,6 +48,70 @@ require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
   }
 });
 
+/* ── Migración: cola de DIFERENCIAS carga vs sistema ─────────────
+   La carga no pisa los montos de una operación que ya existe (se digitaron y
+   revisaron acá). Pero callar la diferencia es peor: el error queda pegado para
+   siempre, como pasó con la op 6251839 (precio, pie, saldo y pagaré malos desde
+   el alta). Ahora cada discrepancia se anota y una persona decide cuál vale. */
+require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS carga_diferencias (
+        id            INT AUTO_INCREMENT PRIMARY KEY,
+        id_credito    INT NOT NULL,
+        num_op        BIGINT NULL,
+        id_financiera VARCHAR(30) NULL,
+        campo         VARCHAR(40) NOT NULL,
+        valor_sistema VARCHAR(60) NULL,
+        valor_archivo VARCHAR(60) NULL,
+        origen        VARCHAR(120) NULL,
+        estado        ENUM('PENDIENTE','RESUELTA') DEFAULT 'PENDIENTE',
+        valor_elegido VARCHAR(60) NULL,
+        eleccion      ENUM('SISTEMA','ARCHIVO','MANUAL') NULL,
+        resuelto_por  VARCHAR(160) NULL,
+        resuelto_at   DATETIME NULL,
+        created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_dif (id_credito, campo, estado),
+        INDEX idx_dif_estado (estado, id_credito)
+      )`);
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta LIKE '/carga-masiva%' LIMIT 1");
+    if (mod) await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
+        SELECT ?, 'carga_diferencias', 'Diferencias con la Carga', '/carga-masiva/diferencias/', 'bi-shuffle'
+        WHERE NOT EXISTS (SELECT 1 FROM funcionalidades WHERE codigo='carga_diferencias')`, [mod.id_modulo]);
+  } catch (e) { console.error('[carga_diferencias migration]', e.message); }
+});
+
+/* Campos que se contrastan contra el archivo. Solo lo que mueve plata o cálculo:
+   un texto distinto no vale la pena, un monto distinto sí. */
+const CAMPOS_DIF = [
+  { col: 'valor_vehiculo',   etiqueta: 'Precio del vehículo', tipo: 'peso' },
+  { col: 'pie',              etiqueta: 'Pie',                 tipo: 'peso' },
+  { col: 'saldo_precio',     etiqueta: 'Saldo precio',        tipo: 'peso' },
+  { col: 'monto_financiado', etiqueta: 'Monto del pagaré',    tipo: 'peso' },
+];
+const TOL_DIF = 1;   // $1 de redondeo no es una diferencia
+
+/* Anota (o actualiza) las diferencias pendientes de una operación. Nunca toca el
+   crédito: solo deja el caso para que una persona resuelva. */
+async function anotarDiferencias(idCredito, actual, archivo, origen) {
+  for (const c of CAMPOS_DIF) {
+    const vs = actual[c.col], va = archivo[c.col];
+    if (va == null || vs == null || Number(va) <= 0) continue;
+    const iguales = Math.abs(Number(vs) - Number(va)) <= TOL_DIF;
+    if (iguales) {
+      await pool.query("DELETE FROM carga_diferencias WHERE id_credito=? AND campo=? AND estado='PENDIENTE'", [idCredito, c.col]);
+      continue;
+    }
+    await pool.query(
+      `INSERT INTO carga_diferencias (id_credito, num_op, id_financiera, campo, valor_sistema, valor_archivo, origen)
+       VALUES (?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE valor_sistema=VALUES(valor_sistema), valor_archivo=VALUES(valor_archivo),
+                               origen=VALUES(origen), created_at=NOW()`,
+      [idCredito, actual.num_op || null, actual.id_financiera || null, c.col,
+       String(vs), String(va), (origen || '').slice(0, 120)]);
+  }
+}
+
 /* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
 async function cargarMapaEstados() {
   try {
@@ -444,6 +508,7 @@ exports.preview = async (req, res) => {
 exports.importar = async (req, res) => {
   try {
     const { solicitudes, canal } = archivosDe(req);
+    const nombreArchivo = [solicitudes?.originalname, canal?.originalname].filter(Boolean).join(' + ');
     if (!solicitudes && !canal) return res.json({ success: false, error: 'Archivo requerido' });
     const mapaCanal = canal ? parseCanal(canal.buffer) : null;
 
@@ -470,11 +535,19 @@ exports.importar = async (req, res) => {
 
     // Traer registros actuales (por num_op propio)
     const [existing] = await pool.query(
-      `SELECT num_op, estado_autofin, estado_credito FROM creditos
+      `SELECT id, num_op, id_financiera, estado_autofin, estado_credito,
+              valor_vehiculo, pie, saldo_precio, monto_financiado, mes FROM creditos
        WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
       numOps
     );
     const existMap = Object.fromEntries(existing.map(r => [r.num_op, r]));
+    // Para las ops que viven como AUTOFIN con id_financiera = ID Trinidad, los montos
+    // actuales se buscan por ese ID (el num_op nuestro es otro).
+    const [existAf] = await pool.query(
+      `SELECT id, num_op, id_financiera, valor_vehiculo, pie, saldo_precio, monto_financiado, mes
+         FROM creditos WHERE id_financiera IN (${numOps.map(() => '?').join(',')})`,
+      numOps.map(String));
+    const existAfMap = Object.fromEntries(existAf.map(r => [String(r.id_financiera), r]));
 
     // Detectar num_ops Trinidad que ya existen como id_financiera en un registro AUTOFIN
     // Esos no se insertan para evitar duplicados (el registro AUTOFIN es la fuente canónica)
@@ -546,6 +619,12 @@ exports.importar = async (req, res) => {
              fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
+          // Diferencias de montos contra el archivo → cola para resolver a mano
+          try {
+            const act = existAfMap[String(f.num_op)];
+            if (act && !(await isMesCerrado(String(act.mes || '').slice(0, 7))))
+              await anotarDiferencias(act.id, act, f, nombreArchivo);
+          } catch (e) { console.error('[dif AF]', e.message); }
           log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
           continue;
@@ -581,6 +660,10 @@ exports.importar = async (req, res) => {
              f.marca, f.modelo, f.vendedor, f.num_op]
           );
           actualizados++;
+          try {
+            if (actual.id && !(await isMesCerrado(String(actual.mes || '').slice(0, 7))))
+              await anotarDiferencias(actual.id, actual, f, nombreArchivo);
+          } catch (e) { console.error('[dif]', e.message); }
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
         } else {
