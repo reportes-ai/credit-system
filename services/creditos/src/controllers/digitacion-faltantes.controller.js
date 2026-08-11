@@ -288,12 +288,24 @@ exports.siguiente = async (req, res) => {
        pudo cambiar, así que la carta sugiere, no manda. */
     let sugerencias = null, avisoParque = null;
     try {
+      const COLS_CARTA = `op_carta, status, tipo_vehiculo, marca, modelo, anio, patente, vendedor,
+                          parque, rut_dealer, nombre_dealer, plazo`;
+      let ca = null;
       if (cr.id_financiera) {
-        const [[ca]] = await pool.query(
-          `SELECT op_carta, status, tipo_vehiculo, marca, modelo, anio, patente, vendedor,
-                  parque, rut_dealer, nombre_dealer, plazo
-             FROM cartas_aprobacion
+        [[ca]] = await pool.query(
+          `SELECT ${COLS_CARTA} FROM cartas_aprobacion
             WHERE id_financiera = ? ORDER BY id DESC LIMIT 1`, [cr.id_financiera]);
+      }
+      // Respaldo por RUT del cliente: hay cartas antiguas que quedaron sin el ID
+      // financiera grabado, y el dato igual está — no tiene sentido pedirlo a mano.
+      if (!ca && cr.rut_cliente) {
+        const rutN = String(cr.rut_cliente).replace(/[.\-\s]/g, '').toUpperCase();
+        if (rutN.length > 3) [[ca]] = await pool.query(
+          `SELECT ${COLS_CARTA} FROM cartas_aprobacion
+            WHERE UPPER(REPLACE(REPLACE(REPLACE(rut_cliente,'.',''),'-',''),' ','')) = ?
+            ORDER BY id DESC LIMIT 1`, [rutN]);
+      }
+      {
         if (ca) {
           const MAPA = { tipo_vehiculo:'tipo_vehiculo', marca:'marca', modelo:'modelo',
                          anio:'anio', patente:'patente', vendedor:'vendedor', rut_dealer:'rut_dealer' };
