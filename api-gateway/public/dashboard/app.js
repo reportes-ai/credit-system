@@ -3176,7 +3176,7 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
   const faltan = Math.max(Math.round(proyQ || 0) - delMes.length, 0);
   const espDia = d => (!esActual || d <= diaCorte || !pesosFut) ? null : faltan * (pesoDS[new Date(aa, mn - 1, d).getDay()] || 0) / pesosFut;
   const off = (new Date(aa, mn - 1, 1).getDay() + 6) % 7; // Lun=0
-  let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;max-width:245px;margin:0 auto">' +
+  let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;max-width:205px;margin:0 auto">' +
     ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<div style="text-align:center;font-size:.6rem;color:#94a3b8;font-weight:800">${d}</div>`).join('');
   for (let i = 0; i < off; i++) h += '<div></div>';
   for (let d = 1; d <= diasMes; d++) {
@@ -3191,7 +3191,7 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
       ${esp != null ? `<span style="position:absolute;bottom:1px;left:4px;font-size:.56rem;color:#b45309;font-weight:800">${Math.round(esp)}</span>` : ''}</div>`;
   }
   h += '</div>';
-  h += `<div style="margin-top:7px;font-size:.62rem;color:#64748b;line-height:1.45;max-width:245px;margin-left:auto;margin-right:auto">
+  h += `<div style="margin-top:6px;font-size:.6rem;color:#64748b;line-height:1.4;max-width:205px;margin-left:auto;margin-right:auto">
     <span style="color:#0141A2;font-weight:800">n</span> Q real del día ·
     <span style="color:#b45309;font-weight:800">n</span> meta diaria para llegar a la proyección de cierre (${Math.round(proyQ || 0)} ops), repartida según el peso histórico de cada día de la semana</div>`;
   cont.innerHTML = h;
