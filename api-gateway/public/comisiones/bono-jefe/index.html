@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.2 — informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -80,7 +80,7 @@
     <i class="bi bi-trophy"></i>
     <div>
       <h1>Bono Jefe Comercial — Balanced Scorecard</h1>
-      <p>Score del equipo comercial (Créditos · Montos · Nuevos Dealers) y premio del mes según la curva de incentivo</p>
+      <p>Score del equipo comercial (Créditos · Montos · Nuevos Dealers con Negocios) y premio del mes según la curva de incentivo</p>
     </div>
   </div>
 
@@ -108,8 +108,8 @@
           <tr>
             <th class="nom">#</th><th class="nom">Ejecutivo Comercial</th>
             <th class="grp-c">Otorgados</th><th class="grp-c">Puntaje</th>
-            <th class="grp-m">Monto Aprobado</th><th class="grp-m">Puntaje</th>
-            <th class="grp-d">Dealers Nuevos</th><th class="grp-d">Puntaje</th>
+            <th class="grp-m">Monto Otorgado</th><th class="grp-m">Puntaje</th>
+            <th class="grp-d">Dealers Nuevos c/ Negocios</th><th class="grp-d">Puntaje</th>
             <th>Score Final</th>
           </tr>
         </thead>
@@ -229,13 +229,20 @@ async function cargarBSC(){
   if (!j.success){ tb.innerHTML = `<tr><td colspan="9" class="no-data">${esc(j.error||'Sin acceso')}</td></tr>`; return; }
   DATA = j.data;
   const p = DATA.params;
+  const av = DATA.promedio || {};
+  // Logrado = promedio del equipo (la misma fila PROMEDIO de la tabla); puntaje = el que aporta ese pilar al score.
+  const logro = (v, ptj) => `<div class="fila" style="border-top:1px dashed #e2e8f0;margin-top:5px;padding-top:5px"><span>Logrado</span><b style="color:#0f766e">${v}</b></div>
+      <div class="fila"><span>Puntaje</span><b style="color:#b45309">${n2(ptj)} pts</b></div>`;
   document.getElementById('umbrales').innerHTML = `
     <div class="umb"><h6><i class="bi bi-check2-circle" style="color:#0369a1"></i> Créditos otorgados · pondera ${Math.round(p.pond_creditos*100)}%</h6>
-      <div class="fila"><span>Mínimo</span><b>${p.creditos_min}</b></div><div class="fila"><span>Esperado</span><b>${p.creditos_esperado}</b></div></div>
-    <div class="umb"><h6><i class="bi bi-cash-coin" style="color:#15803d"></i> Montos aprobados · pondera ${Math.round(p.pond_montos*100)}%</h6>
-      <div class="fila"><span>Mínimo</span><b>${clp(p.min_montos)}</b></div><div class="fila"><span>Esperado</span><b>${clp(p.esperado_montos)}</b></div></div>
-    <div class="umb"><h6><i class="bi bi-building-add" style="color:#7c3aed"></i> Nuevos dealers · pondera ${Math.round(p.pond_dealers*100)}%</h6>
-      <div class="fila"><span>Mínimo</span><b>${p.dealers_min}</b></div><div class="fila"><span>Esperado</span><b>${p.dealers_esperado}</b></div></div>
+      <div class="fila"><span>Mínimo</span><b>${p.creditos_min}</b></div><div class="fila"><span>Esperado</span><b>${p.creditos_esperado}</b></div>
+      ${logro(n2(av.otorgados), av.ptj_creditos)}</div>
+    <div class="umb"><h6><i class="bi bi-cash-coin" style="color:#15803d"></i> Montos Otorgados · pondera ${Math.round(p.pond_montos*100)}%</h6>
+      <div class="fila"><span>Mínimo</span><b>${clp(p.min_montos)}</b></div><div class="fila"><span>Esperado</span><b>${clp(p.esperado_montos)}</b></div>
+      ${logro(clp(av.monto_aprobado), av.ptj_montos)}</div>
+    <div class="umb"><h6><i class="bi bi-building-add" style="color:#7c3aed"></i> Nuevos Dealers con Negocios · pondera ${Math.round(p.pond_dealers*100)}%</h6>
+      <div class="fila"><span>Mínimo</span><b>${p.dealers_min}</b></div><div class="fila"><span>Esperado</span><b>${p.dealers_esperado}</b></div>
+      ${logro(n2(av.dealers_nuevos), av.ptj_dealers)}</div>
     <div class="umb"><h6><i class="bi bi-graph-up-arrow" style="color:#b45309"></i> Curva del premio</h6>
       <div class="fila"><span>Score mínimo</span><b>${p.score_min} pts</b></div><div class="fila"><span>% variable máx (en ${p.score_max})</span><b>${Math.round(p.pct_variable*100)}%</b></div></div>`;
 
