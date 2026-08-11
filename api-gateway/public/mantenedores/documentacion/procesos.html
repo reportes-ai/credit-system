@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.21 — cap. 38 Excepcion por rechazo de la financiera (regla del 60%). v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -76,6 +76,7 @@
     <a href="#p35">35. Excepciones Comerciales: la escalera de estrellas</a>
     <a href="#p36">36. Revisor Automático de Cartas (Unidad y Autofin)</a>
     <a href="#p37">37. Bono del Jefe Comercial (Balanced Scorecard)</a>
+    <a href="#p38">38. Excepción por rechazo de la financiera (regla del 60%)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -850,6 +851,29 @@
   </ul>
   <div class="flujo"><span class="st ini">MES CERRADO</span><span class="ar">→</span><span class="st">3 PILARES por ejecutivo</span><span class="ar">→</span><span class="st">PROMEDIO DEL EQUIPO</span><span class="ar">→</span><span class="st">SCORE</span><span class="ar">→</span><span class="st">CURVA</span><span class="ar">→</span><span class="st fin">PREMIO + SEMANA CORRIDA</span></div>
   <div class="afecta"><b>Afecta:</b> la renta del Jefe Comercial (Remuneraciones §12). <b>Depende de:</b> colocaciones del mes (§1, §9), fichas de Usuarios (fecha de ingreso/baja), mantenedor <b>Bono Jefe Comercial → Variables</b> (restringido) y el motor de semana corrida.</div>
+
+  <h2 id="p38">38. Excepción por rechazo de la financiera (regla del 60%)</h2>
+  <p><b>Qué y para qué:</b> darle al área comercial <b>independencia para salvar una operación rechazada</b> sin tener que renegociarla con el cliente, poniendo un piso claro a lo que la empresa gana. Vigente desde el <b>11-08-2026</b>.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El <b>Ejecutivo</b> pide la excepción. El <b>Jefe Comercial</b> autoriza las condiciones por correo. El <b>Analista de Crédito</b> aprueba la excepción en el sistema — esa aprobación es el respaldo.</div>
+    <div><b class="lbl">Prerequisitos</b>Operación <b>rechazada por una financiera</b>. Simulador de Rentabilidad con la comisión de dealer que se piensa ofrecer.</div>
+  </div>
+  <h3>La regla</h3>
+  <p>La operación puede cursarse en la <b>otra financiera, en las mismas condiciones ofrecidas al cliente</b>, siempre que a AutoFácil le quede <b>al menos el 60% del ingreso total</b>:</p>
+  <div class="max"><b>Ingreso Total − Comisión Dealer − Comisión Parque − Comisión Ejecutivo ≥ 60% del Ingreso Total</b></div>
+  <ol>
+    <li><b>Si no llega al 60%</b>, se puede <b>rebajar la comisión del dealer</b> hasta alcanzarlo. Es el único componente ajustable: parque y ejecutivo no se tocan.</li>
+    <li><b>Bajo el 60%, no se aprueba.</b> No hay excepción de la excepción.</li>
+    <li>El <b><a href="/simulador/">Simulador de Rentabilidad</a></b> muestra la <b>distribución porcentual del ingreso</b> (AutoFácil · dealer · parque · ejecutivo) y permite <b>editar la comisión del dealer</b> para ver al instante si cumple.</li>
+  </ol>
+  <h3>Respaldo</h3>
+  <ul>
+    <li>El <b>Jefe Comercial envía un correo</b> con las condiciones aprobadas.</li>
+    <li>El <b>Analista de Crédito aprueba la excepción en el sistema</b> — queda registrada y es el respaldo formal de la operación.</li>
+    <li>Los Analistas aprueban <b>dentro de los horarios de atención informados</b>; fuera de ese horario, autoriza el Jefe Comercial.</li>
+  </ul>
+  <div class="flujo"><span class="st mal">RECHAZADA EN UNA FINANCIERA</span><span class="ar">→</span><span class="st">SIMULAR EN LA OTRA</span><span class="ar">→</span><span class="st">¿AutoFácil ≥ 60%?</span><span class="ar">→</span><span class="st fin">EXCEPCIÓN APROBADA</span><span class="ar">/</span><span class="st mal">NO SE APRUEBA</span></div>
+  <div class="afecta"><b>Afecta:</b> elección de financiera (§26 ¿Dónde curso?), comisión del dealer de esa operación (§1), rentabilidad del crédito. <b>Depende de:</b> rechazo previo de una financiera, Simulador de Rentabilidad, Excepciones Comerciales (§35) para dejar el registro.</div>
 
 </body>
 </html>
