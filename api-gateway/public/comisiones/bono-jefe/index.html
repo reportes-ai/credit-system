@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -87,6 +87,7 @@
   <div class="tabs">
     <div class="tab active" id="tabBsc" onclick="verTab('bsc')"><i class="bi bi-clipboard-data me-1"></i> BSC del mes</div>
     <div class="tab" id="tabVars" onclick="verTab('vars')" style="display:none"><i class="bi bi-sliders me-1"></i> Variables (restringido)</div>
+    <div class="tab" id="tabBit" onclick="verTab('bit')" style="display:none"><i class="bi bi-shield-lock me-1"></i> Bitácora de cambios</div>
   </div>
 
   <!-- ══ TAB BSC ══ -->
@@ -173,6 +174,12 @@
         <div class="var-item"><label>CC (con copia)</label><input id="v_informe_cc" type="text" style="text-align:left" placeholder="correo3@..."><div class="hint">Separados por coma (opcional)</div></div>
       </div>
 
+      <div class="var-sec"><i class="bi bi-calendar-range"></i> Vigencia de este cambio</div>
+      <div class="vars-grid">
+        <div class="var-item"><label>Válido DESDE (mes/año)</label><input id="v_desde" type="month" style="text-align:left"><div class="hint">Obligatorio · no se permiten meses cerrados</div></div>
+        <div class="var-item"><label>Válido HASTA (mes/año)</label><input id="v_hasta" type="month" style="text-align:left"><div class="hint">En blanco = indefinido</div></div>
+      </div>
+
       <div style="margin-top:16px;display:flex;gap:10px">
         <button class="btn btn-navy" onclick="guardarVars()"><i class="bi bi-check2"></i> Guardar variables</button>
         <button class="btn btn-line" onclick="cargarVars()"><i class="bi bi-arrow-counterclockwise"></i> Deshacer</button>
@@ -195,11 +202,38 @@
         <li><b>Pilares y ponderaciones</b> → puntajes del <a href="/comisiones/bono-jefe/">BSC Bono Jefe Comercial</a> (pestaña BSC del mes)</li>
         <li><b>Curva del premio (mín/máx/%/k/fijo)</b> → premio variable y renta total del Jefe Comercial en el mismo BSC e informe paso a paso</li>
         <li><b>Fecha de ingreso / baja</b> de cada Ejecutivo Comercial (se edita en <a href="/usuarios/">Usuarios</a>, no aquí) → define quién compone el equipo de CADA mes y por tanto el promedio y el score</li>
+        <li><b>Vigencia desde / hasta</b> → define en qué meses rige este juego de variables. Los meses anteriores conservan las variables que tenían (no se recalculan) y un <b>mes cerrado no se puede tocar</b></li>
+        <li><b>Cada guardado</b> → queda en la <b>Bitácora de cambios</b> (pestaña de al lado): autor, fecha y hora, antes/después de cada variable y el efecto en el bono. Es inmutable y su acceso se designa por perfil (permiso <code>bono_jefe_bitacora</code> en <a href="/usuarios/perfiles.html">Perfiles</a>)</li>
         <li><b>Definición de los pilares</b> (créditos y montos OTORGADOS · dealers nuevos que CURSARON) → documentada en <a href="/mantenedores/documentacion/procesos.html#p37">Procesos §37</a></li>
       </ul>
     </div>
   </div>
+
+  <!-- ══ TAB BITÁCORA (auditoría: append-only, no editable ni borrable) ══ -->
+  <div id="vBit" style="display:none">
+    <div class="card">
+      <h5 style="color:var(--navy);margin-bottom:4px"><i class="bi bi-shield-lock me-1"></i> Bitácora de cambios de variables</h5>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">
+        Registro <b>inmutable</b>: cada guardado queda con su autor, fecha y hora, vigencia y el efecto en el bono.
+        No se puede editar ni borrar. Pincha una fila para ver el antes y después de cada variable.</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr>
+          <th class="nom">Fecha y hora</th><th class="nom">Usuario</th><th>Cambios</th>
+          <th class="nom">Válido desde</th><th class="nom">Válido hasta</th><th>Efecto en el bono</th><th></th>
+        </tr></thead>
+        <tbody id="bitBody"><tr><td colspan="7" class="no-data">Cargando…</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
 </div>
+
+<dialog id="dlgBit" style="border:none;border-radius:14px;padding:0;max-width:820px;width:94%">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center">
+    <div><b id="dlgBitTit">Cambio de variables</b><div id="dlgBitSub" style="font-size:.78rem;opacity:.85"></div></div>
+    <button class="btn btn-line" onclick="document.getElementById('dlgBit').close()"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div style="padding:18px 22px;max-height:70vh;overflow:auto" id="dlgBitBody"></div>
+</dialog>
 
 <div class="toast" id="toast"></div>
 
@@ -216,9 +250,65 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 function verTab(t){
   document.getElementById('tabBsc').classList.toggle('active', t==='bsc');
   document.getElementById('tabVars').classList.toggle('active', t==='vars');
+  document.getElementById('tabBit').classList.toggle('active', t==='bit');
   document.getElementById('vBsc').style.display = t==='bsc' ? '' : 'none';
   document.getElementById('vVars').style.display = t==='vars' ? '' : 'none';
+  document.getElementById('vBit').style.display = t==='bit' ? '' : 'none';
   if (t==='vars') { cargarVars(); cargarCurva(); }
+  if (t==='bit') cargarBitacora();
+  AF_TOPNAV_HOJA(t==='vars' ? 'Variables' : (t==='bit' ? 'Bitácora de cambios' : null));
+}
+
+/* ── Bitácora de cambios (solo lectura) ── */
+const fechaHora = s => { const d=new Date(s); return isNaN(d) ? '—' :
+  d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
+const mesTxt = m => m ? m : '<span style="color:#94a3b8">indefinido</span>';
+async function cargarBitacora(){
+  const tb = document.getElementById('bitBody');
+  tb.innerHTML = '<tr><td colspan="7" class="no-data">Cargando…</td></tr>';
+  const j = await (await fetch('/api/bono-jefe/bitacora',{headers:H()})).json().catch(()=>({}));
+  if (!j.success){ tb.innerHTML = `<tr><td colspan="7" class="no-data">${esc(j.error||'Sin acceso')}</td></tr>`; return; }
+  if (!j.data.length){ tb.innerHTML = '<tr><td colspan="7" class="no-data">Todavía no hay cambios registrados</td></tr>'; return; }
+  tb.innerHTML = j.data.map(r=>{
+    const dif = (r.bono_antes==null||r.bono_despues==null) ? null : r.bono_despues - r.bono_antes;
+    const col = dif==null ? '#64748b' : (dif>0 ? '#166534' : (dif<0 ? '#b91c1c' : '#64748b'));
+    return `<tr style="cursor:pointer" onclick="verCambio(${r.id})">
+      <td class="nom">${fechaHora(r.created_at)}</td>
+      <td class="nom">${esc(r.usuario_nombre||'—')}</td>
+      <td><b>${r.n_cambios}</b></td>
+      <td class="nom">${esc(r.vigente_desde||'—')}</td>
+      <td class="nom">${mesTxt(esc(r.vigente_hasta||''))}</td>
+      <td style="color:${col};font-weight:700">${dif==null?'—':(dif>0?'+':'')+clp(dif)}</td>
+      <td style="text-align:center"><i class="bi bi-eye"></i></td></tr>`;
+  }).join('');
+}
+async function verCambio(id){
+  const j = await (await fetch('/api/bono-jefe/bitacora/'+id,{headers:H()})).json().catch(()=>({}));
+  if (!j.success) return alert(j.error||'No se pudo abrir el detalle');
+  const d = j.data;
+  const fmtV = (v, f) => v==null||v==='' ? '—' : (f==='peso' ? clp(v) : (f==='pct' ? n2(v)+'%' : String(v).replace('.',',')));
+  const filas = d.detalle.map(x=>`
+    <tr style="${x.cambio?'background:#fffbeb':''}">
+      <td class="nom">${esc(x.etiqueta)}</td>
+      <td style="color:#64748b">${fmtV(x.antes,x.formato)}</td>
+      <td style="font-weight:${x.cambio?800:400};color:${x.cambio?'#0141A2':'#334155'}">${fmtV(x.despues,x.formato)}</td>
+      <td style="text-align:center">${x.cambio?'<i class="bi bi-arrow-right-circle-fill" style="color:#f59e0b"></i>':''}</td>
+    </tr>`).join('');
+  const dif = d.bono_diferencia;
+  const col = dif==null ? '#64748b' : (dif>0 ? '#166534' : (dif<0 ? '#b91c1c' : '#64748b'));
+  document.getElementById('dlgBitTit').textContent = `${d.n_cambios} variable(s) modificada(s)`;
+  document.getElementById('dlgBitSub').textContent =
+    `${esc(d.usuario_nombre||'—')} · ${fechaHora(d.created_at)} · vigencia ${d.vigente_desde} → ${d.vigente_hasta||'indefinido'}`;
+  document.getElementById('dlgBitBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px">
+      <div class="umb"><h6>Bono con variables antiguas</h6><div style="font-size:1.1rem;font-weight:800">${d.bono_antes==null?'—':clp(d.bono_antes)}</div></div>
+      <div class="umb"><h6>Bono con variables nuevas</h6><div style="font-size:1.1rem;font-weight:800">${d.bono_despues==null?'—':clp(d.bono_despues)}</div></div>
+      <div class="umb"><h6>Diferencia</h6><div style="font-size:1.1rem;font-weight:800;color:${col}">${dif==null?'—':(dif>0?'+':'')+clp(dif)}</div></div>
+    </div>
+    <p style="font-size:.76rem;color:#64748b;margin-bottom:10px">Simulación sobre el mes <b>${esc(d.mes_simulado||'—')}</b>: mismas métricas del equipo, calculadas con las variables antiguas y con las nuevas (total variable, con semana corrida).</p>
+    <table><thead><tr><th class="nom">Variable</th><th class="nom">Antes</th><th class="nom">Después</th><th></th></tr></thead>
+      <tbody>${filas}</tbody></table>`;
+  document.getElementById('dlgBit').showModal();
 }
 
 /* ── BSC ── */
@@ -316,6 +406,9 @@ async function cargarVars(){
     else if (PCT_KEYS.has(k)) el.value = n2(v)+'%';
     else el.value = v;
   });
+  // La vigencia parte propuesta en el mes en curso (el usuario la puede mover).
+  const d = document.getElementById('v_desde');
+  if (d && !d.value) d.value = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit'}).format(new Date()).slice(0,7);
 }
 async function guardarVars(){
   const variables = {};
@@ -328,9 +421,16 @@ async function guardarVars(){
     else if (PCT_KEYS.has(k)) variables[k] = parsePct(el.value);
     else variables[k] = String(el.value).replace(',','.');
   });
-  const j = await (await fetch('/api/bono-jefe/variables',{method:'PUT',headers:H(),body:JSON.stringify({variables})})).json();
+  const vigente_desde = document.getElementById('v_desde').value;
+  const vigente_hasta = document.getElementById('v_hasta').value;
+  if (!vigente_desde) return alert('Indica desde qué mes rige este cambio');
+  if (vigente_hasta && vigente_hasta < vigente_desde) return alert('El mes HASTA no puede ser anterior al DESDE');
+  if (!confirm(`Este cambio regirá desde ${vigente_desde} ${vigente_hasta?'hasta '+vigente_hasta:'en adelante (indefinido)'}.\n\nQueda registrado en la Bitácora de cambios, que no se puede editar ni borrar. ¿Guardar?`)) return;
+  const j = await (await fetch('/api/bono-jefe/variables',{method:'PUT',headers:H(),
+    body:JSON.stringify({variables, vigente_desde, vigente_hasta})})).json();
   if (!j.success) return alert(j.error||'No se pudo guardar');
-  toast('✓ Variables guardadas'); cargarVars(); cargarCurva(); cargarBSC();
+  toast(`✓ Guardado — ${j.data.n_cambios} cambio(s), vigente desde ${j.data.vigente_desde}`);
+  cargarVars(); cargarCurva(); cargarBSC();
 }
 async function cargarCurva(){
   const j = await (await fetch('/api/bono-jefe/curva',{headers:H()})).json();
@@ -389,8 +489,9 @@ function dibujarCurva(data){
     const jm = await (await fetch('/api/auth/mis-permisos',{headers:H()})).json();
     const codes = new Set((jm.funcionalidadesInfo||[]).map(f=>f.codigo));
     const yo = JSON.parse(sessionStorage.getItem('usuario')||'{}');
-    if (yo.perfil==='Administrador' || codes.has('bono_jefe_variables'))
-      document.getElementById('tabVars').style.display = '';
+    const admin = yo.perfil==='Administrador';
+    if (admin || codes.has('bono_jefe_variables')) document.getElementById('tabVars').style.display = '';
+    if (admin || codes.has('bono_jefe_bitacora'))  document.getElementById('tabBit').style.display = '';
   } catch(_){}
   cargarBSC();
 })();

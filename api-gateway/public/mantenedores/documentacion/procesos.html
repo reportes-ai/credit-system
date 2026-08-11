@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -836,6 +836,13 @@
     <li>Al premio variable se le suma la <b>semana corrida</b> (motor único, art. 45 CT — depende de los domingos y festivos de cada mes) y el resultado es la renta total del mes.</li>
     <li><b>Informe paso a paso</b> en pantalla y <b>envío por correo</b> a los destinatarios configurados, con el detalle de cómo se llegó a cada puntaje.</li>
   </ol>
+  <h3>Vigencia de las variables y bitácora de cambios</h3>
+  <p>Las variables del modelo <b>no se pisan</b>: cada guardado crea una <b>versión con vigencia</b>. En la pestaña Variables se indica <b>desde</b> qué mes rige el cambio y, opcionalmente, <b>hasta</b> cuándo (en blanco = indefinido). El cálculo de cada mes usa la versión que regía ese mes, así un mes ya informado no cambia porque después se ajusten los parámetros. <b>No se permiten cambios sobre un mes cerrado</b> (el sistema los rechaza).</p>
+  <ul>
+    <li><b>Bitácora de cambios</b> (pestaña propia): una fila por guardado con <b>fecha y hora, usuario, cantidad de cambios y vigencia desde/hasta</b>, más el <b>efecto en el bono</b>.</li>
+    <li>Al pinchar la fila se abre el <b>antes y después de cada variable</b> y la comparación del bono calculado con las variables antiguas, con las nuevas y su diferencia (misma métrica del equipo, solo cambian los parámetros).</li>
+    <li>Es un registro de <b>auditoría inmutable</b>: solo se agregan filas — no existe forma de editarlo ni borrarlo desde el sistema. El acceso se <b>designa por perfil</b> (permiso <code>bono_jefe_bitacora</code>), separado del permiso para editar las variables.</li>
+  </ul>
   <div class="flujo"><span class="st ini">MES CERRADO</span><span class="ar">→</span><span class="st">3 PILARES por ejecutivo</span><span class="ar">→</span><span class="st">PROMEDIO DEL EQUIPO</span><span class="ar">→</span><span class="st">SCORE</span><span class="ar">→</span><span class="st">CURVA</span><span class="ar">→</span><span class="st fin">PREMIO + SEMANA CORRIDA</span></div>
   <div class="afecta"><b>Afecta:</b> la renta del Jefe Comercial (Remuneraciones §12). <b>Depende de:</b> colocaciones del mes (§1, §9), fichas de Usuarios (fecha de ingreso/baja), mantenedor <b>Bono Jefe Comercial → Variables</b> (restringido) y el motor de semana corrida.</div>
 

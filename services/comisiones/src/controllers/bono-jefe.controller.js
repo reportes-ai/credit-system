@@ -46,13 +46,66 @@ require('../../../../shared/migrate').enFila('bono-jefe', async () => {
         SELECT ?, 'bono_jefe_variables', 'Variables Bono Jefe Comercial', NULL, NULL
         WHERE NOT EXISTS (SELECT 1 FROM funcionalidades WHERE codigo='bono_jefe_variables')`, [mod.id_modulo]);
     }
+    // BITÁCORA DE CAMBIOS = las VERSIONES de variables. Append-only: no hay endpoint
+    // que la edite ni la borre; el rango de vigencia se resuelve al leer.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS bono_jefe_versiones (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        vigente_desde  CHAR(7) NOT NULL,
+        vigente_hasta  CHAR(7) NULL,
+        valores        JSON NOT NULL,
+        anterior       JSON NULL,
+        n_cambios      INT DEFAULT 0,
+        bono_antes     BIGINT NULL,
+        bono_despues   BIGINT NULL,
+        mes_simulado   CHAR(7) NULL,
+        id_usuario     INT NULL,
+        usuario_nombre VARCHAR(160),
+        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_vig (vigente_desde, vigente_hasta)
+      )`);
+    // Permiso propio para ver la bitácora (se abre por la matriz de Perfiles)
+    const [[modS]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/soporte/' LIMIT 1");
+    if (modS) await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
+        SELECT ?, 'bono_jefe_bitacora', 'Bitácora de Cambios Bono Jefe Comercial', NULL, NULL
+        WHERE NOT EXISTS (SELECT 1 FROM funcionalidades WHERE codigo='bono_jefe_bitacora')`, [modS.id_modulo]);
     console.log('✓ bono_jefe_config lista');
   } catch (e) { console.error('[bono-jefe schema]', e.message); }
 });
 
-async function getCfg() {
+/* Claves numéricas que forman una VERSIÓN de variables (las de correo no versionan:
+   son operativas, no cambian el cálculo del bono). */
+const CLAVES_MODELO = ['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos',
+  'dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k',
+  'sueldo_fijo','factor_semana','semana_calc'];
+
+async function rawConfig() {
   const [rows] = await pool.query('SELECT clave, valor FROM bono_jefe_config');
-  const c = {}; rows.forEach(r => { c[r.clave] = parseFloat(r.valor); });
+  const c = {}; rows.forEach(r => { c[r.clave] = r.valor; });
+  return c;
+}
+/* Versión vigente para un mes: la de mayor vigente_desde que lo contenga.
+   Nunca se edita una fila de versión (la bitácora es inmutable): el rango se
+   resuelve al leer, así una versión nueva "tapa" a la anterior sin tocarla. */
+async function rawVersion(mes) {
+  if (!/^\d{4}-\d{2}$/.test(mes || '')) return null;
+  const [[v]] = await pool.query(
+    `SELECT valores FROM bono_jefe_versiones
+      WHERE vigente_desde <= ? AND (vigente_hasta IS NULL OR vigente_hasta >= ?)
+      ORDER BY vigente_desde DESC, id DESC LIMIT 1`, [mes, mes]).catch(() => [[null]]);
+  if (v) { try { return typeof v.valores === 'string' ? JSON.parse(v.valores) : v.valores; } catch { return null; } }
+  // Mes ANTERIOR a la primera versión: rigen las variables que había antes de ese
+  // cambio (el snapshot "anterior"), no las de hoy — un mes pasado no se altera
+  // porque después se ajusten las variables.
+  const [[p]] = await pool.query(
+    `SELECT anterior FROM bono_jefe_versiones WHERE vigente_desde > ?
+      ORDER BY vigente_desde ASC, id ASC LIMIT 1`, [mes]).catch(() => [[null]]);
+  if (!p || !p.anterior) return null;
+  try { return typeof p.anterior === 'string' ? JSON.parse(p.anterior) : p.anterior; } catch { return null; }
+}
+
+function cfgDe(raw) {
+  const c = {}; Object.entries(raw || {}).forEach(([k, v]) => { c[k] = parseFloat(v); });
   return {
     creditos_min: c.creditos_min ?? 5, creditos_esperado: c.creditos_esperado ?? 12, pond_creditos: (c.pond_creditos ?? 45) / 100,
     monto_por_op: c.monto_por_op ?? 6800000, pond_montos: (c.pond_montos ?? 40) / 100,
@@ -61,6 +114,10 @@ async function getCfg() {
     sueldo_fijo: c.sueldo_fijo ?? 1500000, factor_semana: c.factor_semana ?? 0.1667,
     semana_calc: c.semana_calc ?? 1,
   };
+}
+/* Config aplicable: la versión vigente del mes; si no hay ninguna, los valores actuales. */
+async function getCfg(mes) {
+  return cfgDe((mes && await rawVersion(mes)) || await rawConfig());
 }
 
 /* ── Puntajes por pilar (fórmulas idénticas al Excel) ── */
@@ -94,11 +151,13 @@ function premioDe(score, cfg, mes) {
 }
 
 /* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ── */
-async function calcularBSC(mesQ) {
+async function calcularBSC(mesQ, cfgOverride) {
     await SC.asegurarFeriados();
     const mes = /^\d{4}-\d{2}$/.test(mesQ || '') ? mesQ
       : mesChile();
-    const cfg = await getCfg();
+    // La config sale de la VERSIÓN vigente del mes evaluado (no de los valores de hoy):
+    // un mes ya calculado no cambia porque después se ajusten las variables.
+    const cfg = cfgOverride || await getCfg(mes);
 
     // Equipo: Ejecutivos Comerciales VIGENTES en el mes evaluado (convención: primer
     // nombre + apellido paterno). Vigencia por la ficha de Usuarios: ingresó a más
@@ -280,9 +339,24 @@ const setVariables = async (req, res) => {
   try {
     const vars = req.body && req.body.variables;
     if (!vars || typeof vars !== 'object') return res.status(400).json({ success: false, data: null, error: 'variables requeridas' });
-    const PERMITIDAS = new Set(['creditos_min','creditos_esperado','pond_creditos','monto_por_op','pond_montos',
-      'dealers_min','dealers_esperado','pond_dealers','score_min','score_max','pct_variable','k','sueldo_fijo','factor_semana','semana_calc']);
+    const PERMITIDAS = new Set(CLAVES_MODELO);
     const TEXTO = new Set(['informe_para', 'informe_cc']);   // correos separados por coma
+
+    // ── Vigencia del cambio (obligatoria "desde"; "hasta" vacío = indefinido) ──
+    const desde = String(req.body.vigente_desde || '').trim();
+    const hasta = String(req.body.vigente_hasta || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(desde))
+      return res.status(400).json({ success: false, data: null, error: 'Indica el mes DESDE cuándo rige este cambio' });
+    if (hasta && !/^\d{4}-\d{2}$/.test(hasta))
+      return res.status(400).json({ success: false, data: null, error: 'Mes HASTA inválido' });
+    if (hasta && hasta < desde)
+      return res.status(400).json({ success: false, data: null, error: 'El mes HASTA no puede ser anterior al DESDE' });
+    // Un mes cerrado ya está pagado y contabilizado: sus variables no se tocan.
+    const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+    if (await isMesCerrado(desde))
+      return res.status(400).json({ success: false, data: null, error: `El mes ${desde} está CERRADO: no se permiten cambios de variables sobre meses cerrados` });
+
+    const rawAntes = await rawConfig();
     const cambios = [];
     for (const [k, v] of Object.entries(vars)) {
       if (TEXTO.has(k)) {
@@ -297,8 +371,33 @@ const setVariables = async (req, res) => {
       await pool.query('UPDATE bono_jefe_config SET valor=? WHERE clave=?', [String(num), k]);
       cambios.push(`${k}=${num}`);
     }
-    auditar({ req, accion: 'EDITAR', modulo: 'bono-jefe', entidad: 'variables', entidad_id: 1, detalle: `Variables BSC Jefe Comercial: ${cambios.join(', ')}` });
-    res.json({ success: true, data: { cambios }, error: null });
+    // ── Versión + bitácora (append-only) ──
+    const rawDespues = await rawConfig();
+    const antes = {}, despues = {}, difs = [];
+    for (const k of CLAVES_MODELO) {
+      antes[k] = rawAntes[k]; despues[k] = rawDespues[k];
+      if (String(rawAntes[k] ?? '') !== String(rawDespues[k] ?? '')) difs.push(k);
+    }
+    // Efecto en el bono: mismo mes y mismas métricas, config vieja vs nueva.
+    let bonoAntes = null, bonoDespues = null, mesSim = desde;
+    try {
+      const a = await calcularBSC(mesSim, cfgDe(rawAntes));
+      const d = await calcularBSC(mesSim, cfgDe(rawDespues));
+      bonoAntes = Math.round(a.premio.total_variable);
+      bonoDespues = Math.round(d.premio.total_variable);
+    } catch (e) { console.error('[bono-jefe simulación]', e.message); }
+
+    const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
+    await pool.query(
+      `INSERT INTO bono_jefe_versiones (vigente_desde, vigente_hasta, valores, anterior, n_cambios,
+         bono_antes, bono_despues, mes_simulado, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [desde, hasta || null, JSON.stringify(despues), JSON.stringify(antes), difs.length,
+       bonoAntes, bonoDespues, mesSim, req.usuario?.id_usuario || null, nom]);
+
+    auditar({ req, accion: 'EDITAR', modulo: 'bono-jefe', entidad: 'variables', entidad_id: 1,
+      detalle: `Variables BSC Jefe Comercial (vigencia ${desde} → ${hasta || 'indefinido'}): ${cambios.join(', ')}` });
+    res.json({ success: true, data: { cambios, vigente_desde: desde, vigente_hasta: hasta || null, n_cambios: difs.length }, error: null });
   } catch (e) { console.error('[bono-jefe vars]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -314,4 +413,46 @@ const getCurva = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getBSC, getVariables, setVariables, getCurva, enviarInforme };
+/* ── BITÁCORA DE CAMBIOS (solo lectura; no existe endpoint que edite o borre) ── */
+const ETIQUETAS = {
+  creditos_min: 'Créditos — mínimo', creditos_esperado: 'Créditos — esperado', pond_creditos: 'Ponderación Créditos',
+  monto_por_op: 'Monto por operación', pond_montos: 'Ponderación Montos',
+  dealers_min: 'Dealers — mínimo', dealers_esperado: 'Dealers — esperado', pond_dealers: 'Ponderación Dealers',
+  score_min: 'Score mínimo', score_max: 'Score máximo', pct_variable: '% variable máximo', k: 'k (curvatura)',
+  sueldo_fijo: 'Sueldo fijo', factor_semana: 'Semana corrida', semana_calc: 'Semana corrida calculada',
+};
+const PESOS = new Set(['monto_por_op', 'sueldo_fijo']);
+const PCTS  = new Set(['pond_creditos', 'pond_montos', 'pond_dealers', 'pct_variable']);
+
+const getBitacora = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, created_at, usuario_nombre, n_cambios, vigente_desde, vigente_hasta,
+              bono_antes, bono_despues, mes_simulado
+         FROM bono_jefe_versiones ORDER BY id DESC LIMIT 500`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[bono-jefe bitacora]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+const getBitacoraDetalle = async (req, res) => {
+  try {
+    const [[v]] = await pool.query('SELECT * FROM bono_jefe_versiones WHERE id=? LIMIT 1', [req.params.id]);
+    if (!v) return res.status(404).json({ success: false, data: null, error: 'Registro no encontrado' });
+    const par = x => { try { return typeof x === 'string' ? JSON.parse(x) : (x || {}); } catch { return {}; } };
+    const antes = par(v.anterior), despues = par(v.valores);
+    const detalle = CLAVES_MODELO.map(k => ({
+      clave: k, etiqueta: ETIQUETAS[k] || k, formato: PESOS.has(k) ? 'peso' : (PCTS.has(k) ? 'pct' : 'num'),
+      antes: antes[k] ?? null, despues: despues[k] ?? null,
+      cambio: String(antes[k] ?? '') !== String(despues[k] ?? ''),
+    }));
+    res.json({ success: true, data: {
+      id: v.id, created_at: v.created_at, usuario_nombre: v.usuario_nombre, n_cambios: v.n_cambios,
+      vigente_desde: v.vigente_desde, vigente_hasta: v.vigente_hasta, mes_simulado: v.mes_simulado,
+      bono_antes: v.bono_antes, bono_despues: v.bono_despues,
+      bono_diferencia: (v.bono_despues == null || v.bono_antes == null) ? null : v.bono_despues - v.bono_antes,
+      detalle,
+    }, error: null });
+  } catch (e) { console.error('[bono-jefe bitacora det]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getBSC, getVariables, setVariables, getCurva, enviarInforme, getBitacora, getBitacoraDetalle };
