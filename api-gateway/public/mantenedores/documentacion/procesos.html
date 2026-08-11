@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -75,6 +75,7 @@
     <a href="#p34">34. La ETAPA del crédito: quién la escribe y cómo se lee</a>
     <a href="#p35">35. Excepciones Comerciales: la escalera de estrellas</a>
     <a href="#p36">36. Revisor Automático de Cartas (Unidad y Autofin)</a>
+    <a href="#p37">37. Bono del Jefe Comercial (Balanced Scorecard)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -812,6 +813,31 @@
   <div class="paso"><b>Bitácora para auditoría</b> (<code>/aprobaciones/bitacora-revisor/</code>, card en el módulo): registro <b>inmutable</b> de cada revisión — aprobadas y derivadas, con el detalle íntegro, el código de excepción y los links al checklist y a su verificación. El motor solo agrega filas; nunca edita ni borra.</div>
   <div class="flujo"><span class="st ini">CARTA PENDIENTE + DOCS</span><span class="ar">→</span><span class="st">REVISOR (motor)</span><span class="ar">→</span><span class="st fin">APROBADA AUTO + checklist</span><span class="ar">/</span><span class="st mal">DERIVADA AL ANALISTA</span><span class="ar">→</span><span class="st">bitácora (siempre)</span></div>
   <div class="afecta"><b>Afecta:</b> revisión de cartas (§1) — el pool humano recibe solo lo que no cuadra; auditoría. <b>Depende de:</b> lectura de documentos (<code>extracted</code>), Excepciones Comerciales (§35), Tasas, UF, motor de comisión dealer y el subsistema de IA (Haiku) para pantallazos y PDFs escaneados.</div>
+
+  <h2 id="p37">37. Bono del Jefe Comercial (Balanced Scorecard)</h2>
+  <p><b>Qué y para qué:</b> el bono variable del Jefe Comercial no se negocia mes a mes: se calcula solo, sobre el <b>desempeño promedio de su equipo</b> de Ejecutivos Comerciales en tres pilares del mes. El Jefe gana cuando el equipo entero rinde, no cuando una estrella tapa al resto.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El <b>motor</b> calcula (nadie digita el score) · <b>RRHH/Gerencia</b> revisa el mes y envía el informe · el <b>Administrador</b> mantiene las variables en la pestaña restringida.</div>
+    <div><b class="lbl">Prerequisitos</b>Mes de colocaciones cerrado · fichas de <b>Usuarios</b> con <code>fecha_ingreso</code> (y <code>fecha_baja</code> si corresponde) · variables del BSC y curva del premio configuradas.</div>
+  </div>
+  <h3>Los tres pilares</h3>
+  <ol>
+    <li><b>Créditos otorgados</b> (pondera 45%): operaciones en estado OTORGADO del mes, por ejecutivo. Bajo el mínimo el puntaje es 0; sobre lo esperado se alcanza el máximo del pilar; entre medio es proporcional.</li>
+    <li><b>Montos Otorgados</b> (pondera 40%): suma del <b>monto financiado</b> de esas mismas operaciones <b>OTORGADAS</b>. Los umbrales no se digitan: salen de <i>ops × monto por operación</i>. <i>Definición 11-08-2026: antes sumaba también las APROBADAS, lo que no calzaba con el nombre del pilar ni con lo que el negocio entiende por colocación.</i></li>
+    <li><b>Nuevos Dealers con Negocios</b> (pondera 15%): dealers que <b>cursaron su primera operación otorgada de la historia</b> durante el mes, atribuidos al ejecutivo de esa operación. <i>Definición 11-08-2026: antes se contaban fichas de incorporación aprobadas — una ficha aprobada no prueba que el dealer haya traído negocio.</i> Este pilar tiene tope en su ponderación.</li>
+  </ol>
+  <h3>Quiénes componen el equipo</h3>
+  <p>Los Ejecutivos Comerciales <b>vigentes en el mes evaluado</b> según la ficha de Usuarios: ingresaron a más tardar el último día del mes y no estaban de baja antes de que el mes empezara. Así un mes histórico no se diluye con quienes todavía no entraban (y quien ya salió sigue contando en los meses que sí trabajó).</p>
+  <h3>Del score al premio</h3>
+  <ol>
+    <li>Se promedian las <b>métricas</b> del equipo (no los puntajes) y sobre ese promedio se recalcula el puntaje de cada pilar.</li>
+    <li>La suma de los tres pilares es el <b>score del equipo</b> (0–100+). Cada tarjeta de la pantalla muestra mínimo, esperado, <b>logrado</b> y <b>puntaje</b>.</li>
+    <li>El score entra a la <b>curva exponencial</b> sobre el sueldo fijo: bajo el score mínimo el premio es 0; de ahí al máximo crece según la curva configurada.</li>
+    <li>Al premio variable se le suma la <b>semana corrida</b> (motor único, art. 45 CT — depende de los domingos y festivos de cada mes) y el resultado es la renta total del mes.</li>
+    <li><b>Informe paso a paso</b> en pantalla y <b>envío por correo</b> a los destinatarios configurados, con el detalle de cómo se llegó a cada puntaje.</li>
+  </ol>
+  <div class="flujo"><span class="st ini">MES CERRADO</span><span class="ar">→</span><span class="st">3 PILARES por ejecutivo</span><span class="ar">→</span><span class="st">PROMEDIO DEL EQUIPO</span><span class="ar">→</span><span class="st">SCORE</span><span class="ar">→</span><span class="st">CURVA</span><span class="ar">→</span><span class="st fin">PREMIO + SEMANA CORRIDA</span></div>
+  <div class="afecta"><b>Afecta:</b> la renta del Jefe Comercial (Remuneraciones §12). <b>Depende de:</b> colocaciones del mes (§1, §9), fichas de Usuarios (fecha de ingreso/baja), mantenedor <b>Bono Jefe Comercial → Variables</b> (restringido) y el motor de semana corrida.</div>
 
 </body>
 </html>
