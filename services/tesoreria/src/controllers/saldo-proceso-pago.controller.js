@@ -101,14 +101,21 @@ exports.listar = async (req, res) => {
     const hasta = /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta || '') ? req.query.hasta : null;
 
     const [segs] = await pool.query(`
-      SELECT s.id, s.num_op, s.nombre_dealer, s.rut_dealer, s.ejecutivo, s.financiera,
-             s.saldo_precio, s.fecha_otorgado,
-             c.parque, d.categoria_asignada,
+      SELECT s.id, s.num_op, s.nombre_dealer, s.ejecutivo, s.financiera,
+             s.saldo_precio,
+             COALESCE(s.fecha_otorgado, c.fecha_otorgado) AS fecha_otorgado,
+             /* RUT: el del seguimiento y, si quedó vacío, el del crédito o la ficha */
+             COALESCE(NULLIF(s.rut_dealer,''), NULLIF(c.rut_dealer,''), di.rut) AS rut_dealer,
+             c.parque, c.id_financiera,
+             /* Clasificación: ficha por id_dealer primero, por RUT de respaldo; asignada y si no, propuesta */
+             COALESCE(NULLIF(di.categoria_asignada,''), NULLIF(d.categoria_asignada,''),
+                      NULLIF(di.categoria_propuesta,''), NULLIF(d.categoria_propuesta,'')) AS categoria_asignada,
              ${ETAPA_SQL('c')} AS etapa_credito,
              oc.numero AS odp_numero, oc.monto AS odp_monto, oc.pagada AS odp_pagada
         FROM postventa_seguimiento s
         LEFT JOIN creditos c  ON c.id = s.id_credito
-        LEFT JOIN dealers  d  ON d.rut = s.rut_dealer
+        LEFT JOIN dealers  di ON di.id_dealer = c.id_dealer
+        LEFT JOIN dealers  d  ON d.rut = COALESCE(NULLIF(s.rut_dealer,''), c.rut_dealer)
         LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
         LEFT JOIN op_correlativos  oc ON oc.origen='SALDO' AND oc.origen_id = po.id AND oc.anulada=0
        ORDER BY s.id DESC LIMIT 20000`);
@@ -150,10 +157,14 @@ exports.listar = async (req, res) => {
       const venc = recep ? ymd(sumarHabiles(ampm === 'PM' ? sumarHabiles(recep, 1) : recep, Math.ceil(horas / 24))) : null;
 
       const pagado = et['SALDO PRECIO PAGADO'] || null;
+      const dRec = recep ? new Date(recep) : null;
       return {
         num_op: s.num_op,
+        id_financiera: s.id_financiera || null,
+        f_otorgado: ymd(s.fecha_otorgado),
         dealer: s.nombre_dealer, rut_dealer: s.rut_dealer,
         ejecutivo: s.ejecutivo, financiera: s.financiera,
+        hora_recepcion: dRec ? String(dRec.getHours()).padStart(2, '0') + ':' + String(dRec.getMinutes()).padStart(2, '0') : null,
         tipo_dealer: (s.parque && s.parque !== 'NO APLICA') ? 'PARQUE' : 'CALLE',
         clasificacion: s.categoria_asignada || null,
         monto: s.odp_monto != null ? Number(s.odp_monto) : Number(s.saldo_precio || 0),
@@ -179,7 +190,7 @@ exports.listar = async (req, res) => {
     if (hasta)   data = data.filter(r => r.f_recepcion && r.f_recepcion <= hasta);
     if (q) {
       const t = q.toUpperCase();
-      data = data.filter(r => [r.num_op, r.dealer, r.rut_dealer, r.ejecutivo, r.financiera, r.odp, r.estado]
+      data = data.filter(r => [r.num_op, r.id_financiera, r.dealer, r.rut_dealer, r.ejecutivo, r.financiera, r.odp, r.estado]
         .some(v => String(v == null ? '' : v).toUpperCase().includes(t)));
     }
 
