@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -186,6 +186,20 @@
             </div>
           </div>
 
+          <!-- Comisión dealer: parte con la de la tabla y se puede sobrescribir
+               para simular una negociación puntual (campo calculado vs forzado). -->
+          <div class="f-group">
+            <label>Comisión Dealer $ <small id="lblComDealer" style="color:#0369a1;font-weight:600">(según tabla)</small></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" id="iComDealer" class="auto" inputmode="numeric" style="flex:1"
+                oninput="comDealerManual=true;fmtMiles(this);simular()" placeholder="$0">
+              <button type="button" id="btnComAuto" onclick="resetComDealer()" title="Volver a la comisión de la tabla"
+                style="display:none;border:1.5px solid #d1d5db;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;color:#475569">
+                <i class="bi bi-arrow-counterclockwise"></i>
+              </button>
+            </div>
+          </div>
+
           <hr class="divider">
 
           <div class="f-group">
@@ -324,6 +338,9 @@ function tierUACn(ops) {
 }
 
 /* ── Helpers formato ──────────────────────────────────────────────── */
+let comDealerManual = false;   // ¿la comisión del dealer fue digitada a mano?
+function resetComDealer() { comDealerManual = false; simular(); }
+
 function fmtMiles(inp) {
   // Guardar posición del cursor relativa al final para no perderla al reformatear
   const selStart = inp.selectionStart;
@@ -563,6 +580,30 @@ function simular() {
   } else {
     com_dealer = Math.round(saldo * callePct);
     com_patio  = 0;
+  }
+  /* La comisión del dealer se puede sobrescribir para simular una negociación:
+     mientras nadie la toque sigue a la tabla (azul, "según tabla"); si se digita,
+     manda lo escrito (naranjo, "modificada") y el botón ↺ vuelve al cálculo. */
+  const comDealerTabla = com_dealer;
+  const elCom = document.getElementById('iComDealer');
+  if (comDealerManual) {
+    const v = parseMiles(elCom.value);
+    if (v > 0) com_dealer = v;
+  } else if (elCom) {
+    elCom.value = fN(comDealerTabla);
+  }
+  if (elCom) {
+    elCom.classList.toggle('auto', !comDealerManual);
+    elCom.style.background = comDealerManual ? '#fff7ed' : '';
+    elCom.style.color      = comDealerManual ? '#9a3412' : '';
+    elCom.style.fontWeight = comDealerManual ? '700' : '';
+    const lbl = document.getElementById('lblComDealer');
+    if (lbl) {
+      lbl.textContent = comDealerManual ? '(modificada)' : '(según tabla)';
+      lbl.style.color = comDealerManual ? '#b45309' : '#0369a1';
+    }
+    const btn = document.getElementById('btnComAuto');
+    if (btn) btn.style.display = comDealerManual ? '' : 'none';
   }
 
   // ── Comisión ejecutivo ─────────────────────────────────────────────
