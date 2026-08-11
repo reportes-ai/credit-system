@@ -72,8 +72,20 @@ const APP_URL = (process.env.APP_URL || 'https://afbs.autofacilchile.cl').replac
 
 // Envuelve el contenido en la plantilla corporativa: barra superior, cierre "Saludos,"
 // y el logo de Business Suite al pie. `cuerpoHtml` es el contenido específico del correo.
+// El logo va INCRUSTADO (cid:), no como URL: si el servidor está caído o
+// desplegando, Gmail cachea la imagen rota y el correo queda sin firma.
+const LOGO_CID = 'aflogobs';
+const LOGO_PATH = require('path').join(__dirname, '..', 'api-gateway', 'public', 'img', 'logo-bs-mail.png');
+let LOGO_BUF;
+function logoAdjunto() {
+  try {
+    if (LOGO_BUF === undefined) LOGO_BUF = require('fs').readFileSync(LOGO_PATH);
+    return { filename: 'logo-bs.png', content: LOGO_BUF, cid: LOGO_CID, contentDisposition: 'inline' };
+  } catch { LOGO_BUF = null; return null; }
+}
+
 function envolverHTML(cuerpoHtml) {
-  const logo = `${APP_URL}/img/logo-bs.png`;
+  const logo = `cid:${LOGO_CID}`;
   return `
   <div style="background:#eef2f7;padding:26px 12px;font-family:'Segoe UI',Arial,sans-serif">
     <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 8px 28px rgba(2,32,82,.08)">
@@ -139,7 +151,12 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from, a
       text: textFinal || undefined,
       html: htmlFinal || undefined,
       replyTo: replyTo || process.env.MAIL_REPLY_TO || undefined,
-      attachments: attachments && attachments.length ? attachments : undefined,   // [{filename, content(Buffer)|path}]
+      // El logo de la firma viaja incrustado cuando el HTML lo referencia por cid.
+      attachments: (() => {
+        const adj = [...(attachments || [])];
+        if (htmlFinal && htmlFinal.includes(`cid:${LOGO_CID}`)) { const l = logoAdjunto(); if (l) adj.push(l); }
+        return adj.length ? adj : undefined;
+      })(),   // [{filename, content(Buffer)|path}]
     });
     // `to` = destinatario EFECTIVO (en Modo Desarrollo es el correo de prueba, no el original).
     return { ok: true, messageId: info.messageId, to: toFinal, dev: !!dev.activo };
