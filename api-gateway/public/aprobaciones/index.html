@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -3535,24 +3535,33 @@ function renderRevCartolas(){
   // 10-08). m.mes es el mes de otorgamiento del movimiento.
   const PEND = MOVS_ALL.filter(m => !m.mes_cartola && (m.estado_comision==='A PAGAR' || m.estado_comision==='A DESCONTAR')
     && (!m.mes || m.mes < mesActual()));
-  const grupos = {};
+  /* Agrupación por RUT del dealer, NO por nombre: el mismo RUT venía escrito de
+     dos formas ("SOCIEDAD COMERCIAL ROJAS LIMITADA" y "... LTDA") y el dealer
+     recibía dos cartolas separadas por la misma plata. El nombre que se muestra
+     sale de la ficha del dealer (una sola fuente); si no hay RUT, se agrupa por
+     nombre como antes. */
+  const rutN = r => String(r||'').replace(/[.\-\s]/g,'').toUpperCase();
+  const grupos = {}, NOMBRE = {};
   PEND.forEach(m=>{
-    const key = m.concesionario||'(sin concesionario)';
+    const rk = rutN(m.rut_conc);
+    const key = rk || ('N:' + (m.concesionario||'(sin concesionario)'));
     (grupos[key] = grupos[key]||[]).push(m);
+    if (!NOMBRE[key]) NOMBRE[key] = (rk && (DEALERS.find(d=>rutN(d.rut)===rk)||{}).nombre) || m.concesionario || '(sin concesionario)';
   });
   // Búsqueda por cualquier campo: incluye el bloque completo del concesionario si
   // su nombre o cualquiera de sus movimientos coincide con el texto.
-  let nombres = Object.keys(grupos).sort();
-  if (q) nombres = nombres.filter(key => key.toLowerCase().includes(q) ||
-    grupos[key].some(m => [m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.ejecutivo,m.num_carta]
+  let nombres = Object.keys(grupos).sort((a,b)=>String(NOMBRE[a]).localeCompare(String(NOMBRE[b])));
+  if (q) nombres = nombres.filter(key => String(NOMBRE[key]).toLowerCase().includes(q) ||
+    grupos[key].some(m => [m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.ejecutivo,m.num_carta,m.rut_conc,m.concesionario]
       .some(v => String(v||'').toLowerCase().includes(q))));
   document.getElementById('revCtaCount').textContent = nombres.length + ' concesionario(s)';
   const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
-  cont.innerHTML = nombres.map((conc,gi)=>{
-    const movs = grupos[conc];
+  cont.innerHTML = nombres.map((key,gi)=>{
+    const movs = grupos[key];
+    const conc = NOMBRE[key];
     REV_IDS[gi] = movs.map(m=>m.id);
     const rutC = movs.find(m=>m.rut_conc)?.rut_conc || '';
-    const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>d.rut===rutC)?.mail || '';
+    const mailBD = movs.find(m=>m.mail)?.mail || DEALERS.find(d=>rutN(d.rut)===rutN(rutC))?.mail || '';
     const comisiones = movs.filter(m=>m.movimiento==='COMISION' && m.estado_comision==='A PAGAR').reduce((s,m)=>s+(+m.comision||0),0);
     const anulacion  = movs.filter(m=>m.movimiento==='ANULACION' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
     const prepago    = movs.filter(m=>m.movimiento==='PREPAGO' && m.estado_comision==='A DESCONTAR').reduce((s,m)=>s+(+m.comision||0),0);
