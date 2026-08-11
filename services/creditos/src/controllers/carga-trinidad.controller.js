@@ -337,19 +337,13 @@ async function aplicarCanal(mapaCanal, log) {
           if (cu > 0) { sets.push('cuota = ?'); vals.push(cu); }
         } catch (_) {}
       }
-      /* FECHA 1ª CUOTA derivada del contrato: el Canal trae FechaTerminoContrato
-         (vencimiento de la última cuota), así que la primera es Término − (plazo−1)
-         meses. Validado contra 1.075 operaciones que ya la tenían: 95% exacta (±1 día).
-         Fill-only y solo en meses abiertos: nunca pisa una fecha digitada, y donde el
-         dato existe manda el contrato. Sin esto, cada operación quedaba a mano. */
-      if (!cerrado && !r.fecha_primera_cuota && f.fecha_termino && plazoFin > 0) {
-        const t = new Date(f.fecha_termino + 'T00:00:00');
-        if (!isNaN(t)) {
-          t.setMonth(t.getMonth() - (plazoFin - 1));
-          const iso = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-          sets.push('fecha_primera_cuota = ?'); vals.push(iso);
-        }
-      }
+      /* FECHA 1ª CUOTA: NO se deriva del Informe Canal. Se intentó con
+         FechaTerminoContrato − (plazo−1) meses y la fecha resultante quedaba
+         desviada (el Canal redondea el término al 5 o al 10 y la FechaCurse que
+         trae es la de generación del informe, no el curse real): en la op 6251839
+         daba 05-10-2026 contra el 08-09-2026 que dice el pagaré. Una fecha de
+         primera cuota inventada corrompe la mora, así que el dato sale del
+         CUADRO DE PAGO del PDF de la carta Autofin (ver parseCarta) o se digita. */
       // Fecha de otorgamiento: la Fecha Curse del Canal MANDA para ops cursadas
       // (el sync antiguo dejaba la fecha del día de carga). Solo meses abiertos.
       const esCursadoCanal = /^(cursado|otorgad)/i.test(String(f.estado_canal || ''));
