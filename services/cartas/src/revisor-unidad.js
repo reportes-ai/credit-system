@@ -100,7 +100,10 @@ async function tasaPizarra(fecha, saldo, p) {
   return parseFloat(mayor ? t.tasa_mensual_mayor : t.tasa_mensual_menor) || null;
 }
 
-/* Comisión dealer esperada (neta) por el motor único: tabla del dealer → pizarra. */
+/* Comisión dealer esperada por el motor único (tabla del dealer → pizarra).
+   OJO: `comdea_real` viene BRUTA (IVA incluido) — así vive la comisión en todo
+   el sistema. Comparar contra `part_neto` de la carta daba SIEMPRE una supuesta
+   rebaja del 19% ("menor al motor") en operaciones que calzaban exactas. */
 async function comisionEsperada(carta, p) {
   const esParque = String(carta.parque || '').toUpperCase().includes('PARQUE');
   let dealerTabla = null;
@@ -123,7 +126,7 @@ async function comisionEsperada(carta, p) {
   }
   const cd = comisionDealer({ saldo: parseFloat(carta.saldo) || 0, plazo: parseInt(carta.plazo) || 0, esParque },
                             { dealerTabla, parqData, pizarra: p });
-  return { esParque, neta: Math.round(cd.comdea_real || 0) };
+  return { esParque, bruta: Math.round(cd.comdea_real || 0) };
 }
 
 /* ── RENTABILIDAD REAL (server-side) ──────────────────────────────────────
@@ -252,10 +255,11 @@ async function revisar(carta, p) {
   //    es excepción (le cuesta plata a AutoFácil y necesita autorización); una
   //    menor es a favor y pasa sola (pedido Pato 10-08-2026).
   const ce = await comisionEsperada(carta, p);
-  const netaCarta = carta.part_neto != null ? Math.round(parseFloat(carta.part_neto)) : null;
-  const comisionModificada = netaCarta != null && netaCarta - ce.neta > tol;
-  const comisionMenor = netaCarta != null && ce.neta - netaCarta > tol;
-  add(`Comisión dealer (${ce.esParque ? 'parque' : 'calle'})`, fmt(ce.neta) + ' neta según motor', fmt(netaCarta) + ' neta en carta',
+  // BRUTA contra BRUTA: la comisión del dealer siempre se maneja con IVA incluido.
+  const brutaCarta = carta.part_bruto != null ? Math.round(parseFloat(carta.part_bruto)) : null;
+  const comisionModificada = brutaCarta != null && brutaCarta - ce.bruta > tol;
+  const comisionMenor = brutaCarta != null && ce.bruta - brutaCarta > tol;
+  add(`Comisión dealer (${ce.esParque ? 'parque' : 'calle'})`, fmt(ce.bruta) + ' bruta según motor', fmt(brutaCarta) + ' bruta en carta',
       !comisionModificada || !!carta.codigo_excepcion,
       comisionMenor ? 'menor al motor — a favor de AutoFácil, no requiere código'
       : !comisionModificada ? 'según pizarra/tabla del dealer'
