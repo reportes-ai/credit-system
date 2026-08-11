@@ -1165,10 +1165,20 @@ const repositorio = async (req, res) => {
     // clientes.rut incluye DV → indexar por cuerpo sin DV
     const mCuerpo = new Map();
     clis.forEach(c => { const s = String(c.rutn || ''); if (s.length > 1) mCuerpo.set(s.slice(0, -1), c.nombre); });
+    // Fallback: el propio informe trae el nombre del titular (empresas y personas
+    // que aún no son clientes). Perfil Comercial (3435) y, si no, el Boletín (2101).
+    const [nomInf] = await pool.query(`
+      SELECT rut, SUBSTRING_INDEX(GROUP_CONCAT(nom ORDER BY created_at DESC SEPARATOR '||'),'||',1) AS nombre
+        FROM (SELECT rut, created_at,
+                COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(contenido,'$."DLNTPERCOMDLNTWS"."ROOT"."D"."@_nombre"')),''),
+                         NULLIF(JSON_UNQUOTE(JSON_EXTRACT(contenido,'$."REGCIVRNDPAHTTP"."d"."@_nombre"')),'')) AS nom
+                FROM dealernet_informes WHERE retcode='0') t
+       WHERE nom IS NOT NULL GROUP BY rut`).catch(() => [[]]);
+    const mInf = new Map(nomInf.map(x => [String(x.rut), x.nombre]));
     const data = rows.map(r => ({
       rut: r.rut, dv: r.dv, informes: Number(r.informes), ok: Number(r.ok),
       ultimo: r.ultimo, productos: r.productos, ultimo_usuario: r.ultimo_usuario,
-      nombre: mCuerpo.get(String(r.rut)) || null,
+      nombre: mCuerpo.get(String(r.rut)) || mInf.get(String(r.rut)) || null,
     })).sort((a, b) => new Date(b.ultimo) - new Date(a.ultimo));
     res.json({ success: true, data, error: null });
   } catch (e) { errSrv(res, e, 'repositorio'); }
