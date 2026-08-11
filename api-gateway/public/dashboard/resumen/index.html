@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -280,18 +280,20 @@ function pintar(){
   const pesoDS=[0,0,0,0,0,0,0];
   m12.slice(-4,-1).forEach((m,ix)=>{ RAW.filter(r=>r.mes===m&&esOt(r)).forEach(r=>{
     const f=fRef(r); if(f) pesoDS[new Date(f+'T12:00:00').getDay()]++; }); });
-  const sumaPesosMes=(()=>{ let s=0; for(let d=1;d<=diasMes;d++) s+=pesoDS[new Date(aa,mn-1,d).getDay()]||0; return s; })();
-  const espDia=d=>{ if(!pp||!pp.ops||!sumaPesosMes) return null;
-    return pp.ops*(pesoDS[new Date(aa,mn-1,d).getDay()]||0)/sumaPesosMes; };
+  // Proyección propia repartida en los días que quedan: lo que falta para llegar
+  // a proyOps se distribuye por el peso histórico de cada día de la semana
+  const proyOpsPre=esActual&&diaCorte>0?Math.round(ot.length/diaCorte*diasMes):ot.length;
+  const pesosFut=(()=>{ let s=0; for(let d=diaCorte+1;d<=diasMes;d++) s+=pesoDS[new Date(aa,mn-1,d).getDay()]||0; return s; })();
+  const espDia=d=>{ if(!esActual||d<=diaCorte||!pesosFut) return null;
+    return Math.max(proyOpsPre-ot.length,0)*(pesoDS[new Date(aa,mn-1,d).getDay()]||0)/pesosFut; };
   let heat='<div class="heat">'+['L','M','M','J','V','S','D'].map(d=>`<div class="hd">${d}</div>`).join('');
   for(let i=0;i<off;i++) heat+='<div></div>';
   for(let d=1;d<=diasMes;d++){
     const q=porDia[d]||0, t=q/maxD, esp=espDia(d);
     const bg=q?`rgba(0,166,255,${0.15+t*0.75})`:'#0d1730';
     const fut=esActual&&d>diaCorte;
-    const bajoMeta=!fut&&esp!=null&&q<Math.round(esp)&&(!esActual||d<diaCorte);
-    heat+=`<div class="hc" style="background:${fut?'transparent':bg};${fut?'border-style:dashed;opacity:.55;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}${bajoMeta?'box-shadow:inset 0 0 0 1.5px rgba(255,107,122,.45);':''}"
-      title="${d}: ${q} otorgadas${esp!=null?' · esperado '+esp.toFixed(1):''}">${d}${q?`<span class="q">${q}</span>`:''}${esp!=null?`<span class="e">${Math.round(esp)}</span>`:''}</div>`;
+    heat+=`<div class="hc" style="background:${fut?'rgba(255,197,61,.05)':bg};${fut?'border-color:rgba(255,197,61,.25);border-style:dashed;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}"
+      title="${d}: ${fut?(esp!=null?'para la proyección hay que hacer '+esp.toFixed(1):'—'):q+' otorgadas'}">${d}${!fut&&q?`<span class="q">${q}</span>`:''}${esp!=null?`<span class="e">${Math.round(esp)}</span>`:''}</div>`;
   }
   heat+='</div>';
 
@@ -385,28 +387,38 @@ function pintar(){
     <div class="card fade" style="animation-delay:.15s">
       <h3 class="t"><i class="bi bi-calendar3"></i> Pulso diario · ${mesLab(mes)}</h3>
       ${heat}
-      <div class="leg"><span><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--accent);margin-right:5px"></span>Q real del día (arriba der.)</span>
-      <span><span style="color:var(--gold);font-weight:800">n</span> Q esperado según presupuesto y peso del día (abajo izq.)</span>
-      <span><span style="display:inline-block;width:9px;height:9px;border-radius:3px;box-shadow:inset 0 0 0 1.5px rgba(255,107,122,.7);margin-right:5px"></span>día bajo lo esperado</span></div>
+      <div class="leg"><span><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--accent);margin-right:5px"></span>Q real del día</span>
+      <span><span style="color:var(--gold);font-weight:800">n</span> lo que hay que hacer ese día para llegar a la proyección (según el peso de cada día de semana)</span></div>
     </div>
-    <div class="card fade" style="animation-delay:.2s">
-      <h3 class="t"><i class="bi bi-pie-chart-fill"></i> Mix por institución</h3>
-      <div class="donutwrap">
-        ${donut(mixE.map(x=>[x[0],x[1],x[2]]), nOt)}
-        <div class="dleg">${mixE.map(x=>`<div class="it"><span class="sw" style="background:${x[2]}"></span>
-          <div style="flex:1">${x[0]}<small>$${mm1(x[3].ing)} MM ingreso</small></div>
-          <b>${Math.round(x[1]/Math.max(nOt,1)*100)}%</b></div>`).join('')||'<span class="sub">Sin datos</span>'}</div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card fade" style="animation-delay:.2s">
+        <h3 class="t"><i class="bi bi-pie-chart-fill"></i> Mix por institución</h3>
+        <div class="donutwrap">
+          ${donut(mixE.map(x=>[x[0],x[1],x[2]]), nOt)}
+          <div class="dleg">${mixE.map(x=>`<div class="it"><span class="sw" style="background:${x[2]}"></span>
+            <div style="flex:1">${x[0]}<small>$${mm1(x[3].ing)} MM ingreso</small></div>
+            <b>${Math.round(x[1]/Math.max(nOt,1)*100)}%</b></div>`).join('')||'<span class="sub">Sin datos</span>'}</div>
+        </div>
+      </div>
+      <div class="card fade" style="animation-delay:.25s;flex:1">
+        <h3 class="t"><i class="bi bi-funnel-fill"></i> Embudo del mes</h3>
+        <div class="fun">
+          <div class="fs"><div class="fill" style="background:#22335c;width:100%"></div><div class="in"><span>Ingresadas</span><span>${num(nT)}</span></div></div>
+          <div class="conv">↓ ${nT?Math.round(nAp/nT*100):0}% aprobación</div>
+          <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0a4d8c,var(--accent));width:${nT?Math.max(nAp/nT*100,14):0}%"></div><div class="in"><span>Aprobadas</span><span>${num(nAp)}</span></div></div>
+          <div class="conv">↓ ${nAp?Math.round(nOt/nAp*100):0}% curse</div>
+          <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0b7a58,var(--ok));width:${nT?Math.max(nOt/nT*100,10):0}%"></div><div class="in"><span>Otorgadas</span><span>${num(nOt)}</span></div></div>
+        </div>
       </div>
     </div>
-    <div class="card fade" style="animation-delay:.25s">
-      <h3 class="t"><i class="bi bi-funnel-fill"></i> Embudo del mes</h3>
-      <div class="fun">
-        <div class="fs"><div class="fill" style="background:#22335c;width:100%"></div><div class="in"><span>Ingresadas</span><span>${num(nT)}</span></div></div>
-        <div class="conv">↓ ${nT?Math.round(nAp/nT*100):0}% aprobación</div>
-        <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0a4d8c,var(--accent));width:${nT?Math.max(nAp/nT*100,14):0}%"></div><div class="in"><span>Aprobadas</span><span>${num(nAp)}</span></div></div>
-        <div class="conv">↓ ${nAp?Math.round(nOt/nAp*100):0}% curse</div>
-        <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0b7a58,var(--ok));width:${nT?Math.max(nOt/nT*100,10):0}%"></div><div class="in"><span>Otorgadas</span><span>${num(nOt)}</span></div></div>
-      </div>
+    <div class="card fade" style="animation-delay:.3s">
+      <h3 class="t"><i class="bi bi-calendar2-range"></i> Año contra año · ${mesLab(mes)} vs ${mesLab(mesYoY)}${esActual?' <span style="text-transform:none;letter-spacing:0;font-weight:600">(a igual día)</span>':''}</h3>
+      ${hayYoY?`<div class="yoy">
+        ${yoyRow('Otorgadas', nOt, otYoY.length, num)}
+        ${yoyRow('Monto financiado', monto, sum(otYoY,'monto_financiado'), v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ingreso neto', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ticket promedio', tk, otYoY.length?sum(otYoY,'monto_financiado')/otYoY.length:0, clp)}
+      </div>`:'<span class="sub">Aún no hay datos del mismo mes del año anterior.</span>'}
     </div>
   </div>
 
@@ -425,17 +437,8 @@ function pintar(){
       <div class="v">${opMax?clp(opMax.monto_financiado):'—'}</div><div class="d" title="${opMax?opMax.automotora:''}">${opMax?(opMax.automotora||'—'):'sin operaciones'}</div></div>
   </div>
 
-  <div class="grid row-2" style="margin-bottom:16px">
+  <div class="grid row-3">
     <div class="card fade" style="animation-delay:.4s">
-      <h3 class="t"><i class="bi bi-calendar2-range"></i> Año contra año · ${mesLab(mes)} vs ${mesLab(mesYoY)}${esActual?' <span style="text-transform:none;letter-spacing:0;font-weight:600">(a igual día)</span>':''}</h3>
-      ${hayYoY?`<div class="yoy">
-        ${yoyRow('Otorgadas', nOt, otYoY.length, num)}
-        ${yoyRow('Monto financiado', monto, sum(otYoY,'monto_financiado'), v=>'$'+mm1(v)+' MM')}
-        ${yoyRow('Ingreso neto', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
-        ${yoyRow('Ticket promedio', tk, otYoY.length?sum(otYoY,'monto_financiado')/otYoY.length:0, clp)}
-      </div>`:'<span class="sub">Aún no hay datos del mismo mes del año anterior.</span>'}
-    </div>
-    <div class="card fade" style="animation-delay:.45s">
       <h3 class="t"><i class="bi bi-stars" style="color:var(--gold)"></i> Salón de récords</h3>
       <div class="rec">
         ${recM?`<div class="rc"><div class="ic">🏆</div><div style="flex:1">Mejor mes en monto<small>${mesLab(recM.m)} · ${num(recM.n)} operaciones</small></div><b>$${mm1(recM.monto)} MM</b></div>`:''}
@@ -446,14 +449,11 @@ function pintar(){
           :`<div class="chase" style="background:rgba(0,166,255,.07);border-color:rgba(0,166,255,.3)">Para batir el récord de ${mesLab(recM.m)} faltan <b>$${mm1(recM.monto-monto)} MM</b> en ${diasMes-diaCorte} días (${diasMes-diaCorte>0?'$'+mm1((recM.monto-monto)/(diasMes-diaCorte))+' MM/día':'—'}).</div>`):''}
       </div>
     </div>
-  </div>
-
-  <div class="grid row-2">
-    <div class="card fade" style="animation-delay:.5s">
+    <div class="card fade" style="animation-delay:.45s">
       <h3 class="t"><i class="bi bi-trophy-fill" style="color:var(--gold)"></i> Podio ejecutivos · ${mesLab(mes)}</h3>
       <div class="podio">${podio(top('ejecutivo'))}</div>
     </div>
-    <div class="card fade" style="animation-delay:.55s">
+    <div class="card fade" style="animation-delay:.5s">
       <h3 class="t"><i class="bi bi-shop" style="color:var(--gold)"></i> Podio dealers · ${mesLab(mes)}</h3>
       <div class="podio">${podio(top('automotora'))}</div>
     </div>
