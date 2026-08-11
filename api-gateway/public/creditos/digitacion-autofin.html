@@ -942,12 +942,29 @@
     btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
 
     try {
-      const r = await fetch('/api/operaciones', {
+      let r = await fetch('/api/operaciones', {
         method:'POST',
         headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
         body: JSON.stringify(body)
       });
-      const data = await r.json();
+      let data = await r.json();
+      // Cuota que no cuadra con monto+tasa+plazo: avisa, muestra la esperada y decide.
+      if (!data.success && data.data && data.data.confirmar === 'cuota') {
+        if (confirm(data.error + '\n\n¿Guardar igual la cuota digitada?')) {
+          r = await fetch('/api/operaciones', {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+            body: JSON.stringify({ ...body, confirmar_cuota: 1 })
+          });
+          data = await r.json();
+        } else {
+          err.textContent = data.error;
+          err.style.display = 'block';
+          window.scrollTo(0,0);
+          btn.disabled = false; btn.innerHTML = '<i class="bi bi-save me-1"></i>Guardar operación';
+          return;
+        }
+      }
       if (data.success) {
         ok.innerHTML = `<i class="bi bi-check-circle me-2"></i>Operación guardada correctamente. N° Operación: <strong>${data.data.numero_credito || data.data.num_op || '—'}</strong> (ID: ${data.data.id})`;
         ok.style.display = 'block';

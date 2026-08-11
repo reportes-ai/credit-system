@@ -351,6 +351,16 @@ exports.guardar = async (req, res) => {
       `SELECT num_op, TIMESTAMPDIFF(SECOND, digit_lock_at, NOW()) AS lock_seg, ${CAMPOS.map(c => c.col).join(', ')} FROM creditos WHERE id=?`, [id]);
     if (!antes) return res.status(404).json({ success:false, data:null, error:'Crédito no encontrado' });
 
+    /* La cuota digitada tiene que cuadrar con monto+tasa+plazo. No bloquea (la
+       financiera redondea), pero exige confirmar: así no vuelve a colarse una
+       cuota calculada sobre el saldo precio, como en la op 26080010. */
+    if (!req.body?.confirmar_cuota) {
+      const num = k => { const v = (campos[k] !== undefined && campos[k] !== '') ? campos[k] : antes[k]; return v; };
+      const aviso = await require('../../../../shared/cuota-coherente').revisarCuota({
+        monto: num('monto_financiado'), tasa: num('tascli_real'), plazo: num('plazo'), cuota: num('cuota') });
+      if (aviso) return res.status(409).json({ success:false, data:{ confirmar:'cuota', ...aviso }, error: aviso.mensaje });
+    }
+
     const sets = [], vals = [], cambios = [];
     for (const [col, raw] of Object.entries(campos)) {
       if (!valid.has(col)) continue;

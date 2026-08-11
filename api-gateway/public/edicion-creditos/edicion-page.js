@@ -296,10 +296,21 @@ async function guardarFila(rowId) {
   const btn = document.getElementById('save-' + rowId);
   if (btn) btn.disabled = true;
   try {
-    const r = await fetch('/api/edicion-creditos/' + rowId, {
+    let r = await fetch('/api/edicion-creditos/' + rowId, {
       method: 'PUT', headers: H, body: JSON.stringify(cambios)
     });
-    const j = await r.json();
+    let j = await r.json();
+    // Cuota que no cuadra con monto+tasa+plazo: se avisa y se decide (no bloquea).
+    if (!j.success && j.data && j.data.confirmar === 'cuota') {
+      if (!confirm(j.error + '\n\n¿Guardar igual la cuota digitada?')) {
+        if (btn) btn.disabled = false;
+        return toast('Cambio no guardado — la cuota calculada es $' + Number(j.data.esperada).toLocaleString('es-CL'), 'err');
+      }
+      r = await fetch('/api/edicion-creditos/' + rowId, {
+        method: 'PUT', headers: H, body: JSON.stringify({ ...cambios, confirmar_cuota: 1 })
+      });
+      j = await r.json();
+    }
     if (!j.success) throw new Error(j.error);
     toast(`✓ ${j.data.campos_actualizados} campo(s) actualizado(s)`);
     delete window._MODS[rowId];

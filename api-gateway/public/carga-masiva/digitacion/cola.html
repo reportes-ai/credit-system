@@ -225,12 +225,22 @@ function recolectar(){
   return campos;
 }
 
-async function guardar(){
+async function guardar(confirmarCuota){
   if (!ACTUAL) return;
   const id = ACTUAL.id;
   try {
-    const r = await fetch('/api/digitacion-faltantes/'+id, { method:'POST', headers:H, body:JSON.stringify({ tipo: TIPO, campos: recolectar() }) });
+    const body = { tipo: TIPO, campos: recolectar() };
+    if (confirmarCuota) body.confirmar_cuota = 1;
+    const r = await fetch('/api/digitacion-faltantes/'+id, { method:'POST', headers:H, body:JSON.stringify(body) });
     const j = await r.json();
+    // La cuota no cuadra con monto+tasa+plazo: se muestra la esperada y se decide.
+    if (!j.success && j.data && j.data.confirmar === 'cuota') {
+      if (confirm(j.error + '\n\n¿Guardar igual la cuota digitada?')) return guardar(true);
+      const el = document.getElementById('f_cuota');
+      if (el) { el.value = el.dataset.money ? '$'+Number(j.data.esperada).toLocaleString('es-CL') : j.data.esperada; el.focus(); }
+      toast('Cuota corregida a la calculada — revisa y guarda', true);
+      return;
+    }
     if (!j.success) { toast(j.error||'Error al guardar', true); return; }
     toast('Guardado ✓');
     cargarSiguiente();

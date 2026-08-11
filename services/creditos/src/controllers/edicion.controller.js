@@ -207,6 +207,16 @@ const updateCredito = async (req, res) => {
     const colsSel = [...colsValidas].join(', ');
     const [[actual]] = await pool.query(`SELECT ${colsSel}, campos_forzados FROM creditos WHERE id = ?`, [id]);
 
+    /* Cuota que no cuadra con monto+tasa+plazo: avisa y pide confirmar
+       (motor único shared/cuota-coherente). Ver caso op 26080010. */
+    if (!cambios.confirmar_cuota) {
+      const vf = k => (cambios[k] !== undefined && cambios[k] !== '') ? cambios[k] : actual[k];
+      const aviso = await require('../../../../shared/cuota-coherente').revisarCuota({
+        monto: vf('monto_financiado'), tasa: vf('tascli_real'), plazo: vf('plazo'), cuota: vf('cuota') });
+      if (aviso) return res.status(409).json({ success:false, data:{ confirmar:'cuota', ...aviso }, error: aviso.mensaje });
+    }
+    delete cambios.confirmar_cuota;
+
     for (const [campo, nuevoVal] of Object.entries(cambios)) {
       if (!colsValidas.has(campo)) continue;
       const valorAntes = actual?.[campo];

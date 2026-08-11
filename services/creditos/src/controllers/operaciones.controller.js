@@ -244,6 +244,16 @@ const create = async (req, res) => {
     // contra fuentes que la traen en fracción (caso op 6121299).
     if (b.tascli_real != null && b.tascli_real !== '') b.tascli_real = core.normTasaMensualPct(b.tascli_real) || b.tascli_real;
 
+    /* Cuota digitada que no cuadra con monto+tasa+plazo: se avisa y se pide
+       confirmar (motor único shared/cuota-coherente). No bloquea — la financiera
+       redondea — pero impide repetir el caso 26080010, donde la cuota se calculó
+       sobre el saldo precio y nadie lo notó. */
+    if (Number(b.cuota) > 0 && !b.confirmar_cuota) {
+      const aviso = await require('../../../../shared/cuota-coherente').revisarCuota({
+        monto: b.monto_financiado, tasa: b.tascli_real, plazo: b.plazo, cuota: b.cuota });
+      if (aviso) return res.status(409).json({ success:false, data:{ confirmar:'cuota', ...aviso }, error: aviso.mensaje });
+    }
+
     // Cuota francesa automática (motor único) si viene la tripleta monto+tasa+plazo
     // y no digitaron cuota — antes las ops de Unidad quedaban con cuota vacía.
     if (!(Number(b.cuota) > 0)) {
