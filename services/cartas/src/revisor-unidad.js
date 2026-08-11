@@ -442,10 +442,15 @@ async function bitacora(req, res) {
     if (/^\d{4}-\d{2}$/.test(req.query.mes || '')) { cond.push("DATE_FORMAT(created_at,'%Y-%m') = ?"); vals.push(req.query.mes); }
     if (['APROBADA', 'DERIVADA'].includes(req.query.resultado || '')) { cond.push('resultado = ?'); vals.push(req.query.resultado); }
     const where = cond.length ? 'WHERE ' + cond.join(' AND ') : '';
+    // La financiera sale de la carta (acreedor): la bitácora no la duplica.
+    const whereB = where.replace(/created_at/g, 'b.created_at').replace(/resultado = \?/, 'b.resultado = ?');
     const [rows] = await pool.query(
-      `SELECT id, id_carta, op_carta, id_financiera, cliente, rut_cliente, ejecutivo, creado_por,
-              resultado, motivo, checks, codigo_excepcion, checklist_codigo, checklist_doc_id, created_at
-         FROM revisor_bitacora ${where} ORDER BY created_at DESC, id DESC LIMIT 500`, vals);
+      `SELECT b.id, b.id_carta, b.op_carta, b.id_financiera, b.cliente, b.rut_cliente, b.ejecutivo, b.creado_por,
+              b.resultado, b.motivo, b.checks, b.codigo_excepcion, b.checklist_codigo, b.checklist_doc_id, b.created_at,
+              COALESCE(NULLIF(TRIM(ca.acreedor),''), '—') AS financiera
+         FROM revisor_bitacora b
+         LEFT JOIN cartas_aprobacion ca ON ca.id = b.id_carta
+         ${whereB} ORDER BY b.created_at DESC, b.id DESC LIMIT 500`, vals);
     const [[tot]] = await pool.query(
       `SELECT COUNT(*) n, SUM(resultado='APROBADA') aprobadas, SUM(resultado='DERIVADA') derivadas FROM revisor_bitacora ${where}`, vals);
     rows.forEach(r => { try { r.checks = typeof r.checks === 'object' ? r.checks : JSON.parse(r.checks || '[]'); } catch (_) { r.checks = []; } });

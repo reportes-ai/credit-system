@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Bitácora del Revisor Automático de Cartas Unidad: registro inmutable para auditoría -->
+<!-- v1.1 — columna Financiera (acreedor de la carta) junto al ID Financiera · v1.0 — Bitácora del Revisor Automático de Cartas Unidad: registro inmutable para auditoría -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -64,9 +64,9 @@
 
   <div class="card-af" style="padding:0;overflow-x:auto">
     <table>
-      <thead><tr><th>Fecha y hora</th><th>Carta</th><th>ID Financiera</th><th>Cliente</th><th>Ejecutivo</th>
+      <thead><tr><th>Fecha y hora</th><th>Carta</th><th>ID Financiera</th><th>Financiera</th><th>Cliente</th><th>Ejecutivo</th>
         <th>Resultado</th><th>Motivo / Código</th><th>Respaldo</th><th></th></tr></thead>
-      <tbody id="tb"><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:26px">Cargando…</td></tr></tbody>
+      <tbody id="tb"><tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:26px">Cargando…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -85,18 +85,19 @@ async function cargar(){
   try {
     const r = await fetch('/api/cartas/revisor-bitacora?' + qs, { headers: H() });
     const j = await r.json();
-    if (!j.success) { tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:#dc2626;padding:26px">${esc(j.error||'Error')}</td></tr>`; return; }
+    if (!j.success) { tb.innerHTML = `<tr><td colspan="10" style="text-align:center;color:#dc2626;padding:26px">${esc(j.error||'Error')}</td></tr>`; return; }
     const { rows, stats } = j.data;
     document.getElementById('sTot').textContent = stats.total.toLocaleString('es-CL');
     document.getElementById('sApr').textContent = stats.aprobadas.toLocaleString('es-CL');
     document.getElementById('sDer').textContent = stats.derivadas.toLocaleString('es-CL');
-    if (!rows.length) { tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:26px">Sin revisiones registradas' + (mes||resl?' con estos filtros':'') + '. La bitácora se llena sola con cada revisión del motor.</td></tr>'; return; }
+    if (!rows.length) { tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:26px">Sin revisiones registradas' + (mes||resl?' con estos filtros':'') + '. La bitácora se llena sola con cada revisión del motor.</td></tr>'; return; }
     tb.innerHTML = rows.map(x => {
       const checksHTML = (x.checks||[]).map(k => `<tr><td>${k.ok?'✅':'❌'}</td><td><b>${esc(k.item)}</b>${k.nota?`<div class="nota">${esc(k.nota)}</div>`:''}</td><td>${esc(String(k.doc??'—'))}</td><td>${esc(String(k.sistema??'—'))}</td></tr>`).join('');
       return `<tr>
         <td style="white-space:nowrap">${fmtFH(x.created_at)}</td>
         <td><b>${esc(x.op_carta||'')}</b></td>
         <td>${esc(x.id_financiera||'')}</td>
+        <td style="font-size:.74rem;white-space:nowrap">${esc(x.financiera||'—')}</td>
         <td>${esc(x.cliente||'')}<div class="nota">${esc(x.rut_cliente||'')}</div></td>
         <td style="font-size:.74rem">${esc(x.ejecutivo||'')}</td>
         <td><span class="st st-${x.resultado}">${x.resultado==='APROBADA'?'✅ APROBADA AUTO':'👤 DERIVADA'}</span></td>
@@ -107,11 +108,11 @@ async function cargar(){
         </td>
         <td><button class="btn-mini" onclick="this.closest('tr').nextElementSibling.querySelector('.checks').classList.toggle('show')">Detalle</button></td>
       </tr>
-      <tr><td colspan="9" style="padding:0 9px"><div class="checks">
+      <tr><td colspan="10" style="padding:0 9px"><div class="checks">
         <table style="width:100%"><tr><th></th><th>Validación</th><th>Documento Unidad</th><th>Business Suite</th></tr>${checksHTML||'<tr><td colspan="4">sin detalle</td></tr>'}</table>
       </div></td></tr>`;
     }).join('');
-  } catch(e){ tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#dc2626;padding:26px">Error de conexión</td></tr>'; }
+  } catch(e){ tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#dc2626;padding:26px">Error de conexión</td></tr>'; }
 }
 
 /* El documento exige el JWT en el header: se baja como blob y se abre en pestaña nueva. */
