@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -155,6 +155,7 @@ async function cargar(){
     if (!j.success) throw new Error(j.error);
     try { const ji = await ri.json(); if (ji.success && ji.data) IMPUESTOS = ji.data; } catch(e){}
     try { const jc = await rc.json(); if (jc.success && jc.data && jc.data.correo_orden_comision) CORREO = { ...CORREO, ...jc.data.correo_orden_comision }; } catch(_){}
+    if (CORREO.activo === false) { const b=document.getElementById('btnEnviar'); if(b){ b.style.display='none'; } }
     DATA = j.data.rows || [];
     render();
   } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }

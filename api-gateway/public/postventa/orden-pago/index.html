@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -167,6 +167,7 @@ async function cargar(){
     if (!j.success) throw new Error(j.error);
     DATA = j.data.rows || []; FIJOS = j.data.fijos || {};
     try { const jc = await rc.json(); if (jc.success && jc.data && jc.data.correo_orden_saldo) CORREO = { ...CORREO, ...jc.data.correo_orden_saldo }; } catch(_){}
+    if (CORREO.activo === false) { const b=document.getElementById('btnEnviar'); if(b){ b.style.display='none'; } }
     render();
   } catch(e){ document.getElementById('tbody').innerHTML = `<tr><td colspan="8" class="vacio">Error: ${e.message}</td></tr>`; }
 }

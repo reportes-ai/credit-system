@@ -2035,6 +2035,13 @@ const enviarCorreoOrden = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Falta el contenido del correo' });
     if (html.length > 500000)
       return res.status(400).json({ success: false, data: null, error: 'El contenido del correo es demasiado grande' });
+    // Check Activo del mantenedor: si la plantilla está desactivada no se envía
+    try {
+      const clave = tipo === 'comision' ? 'correo_orden_comision' : 'correo_orden_saldo';
+      const [[pl]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [clave]);
+      if (pl) { const v = JSON.parse(pl.valor); if (v && v.activo === false)
+        return res.status(422).json({ success: false, data: null, error: 'Este correo está desactivado en Post Venta → Mantenedores' }); }
+    } catch (_) {}
     let to = 'contabilidad@autofacilchile.cl';
     try {
       const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
