@@ -3176,7 +3176,7 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
   const faltan = Math.max(Math.round(proyQ || 0) - delMes.length, 0);
   const espDia = d => (!esActual || d <= diaCorte || !pesosFut) ? null : faltan * (pesoDS[new Date(aa, mn - 1, d).getDay()] || 0) / pesosFut;
   const off = (new Date(aa, mn - 1, 1).getDay() + 6) % 7; // Lun=0
-  let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">' +
+  let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;max-width:330px;margin:0 auto">' +
     ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<div style="text-align:center;font-size:.6rem;color:#94a3b8;font-weight:800">${d}</div>`).join('');
   for (let i = 0; i < off; i++) h += '<div></div>';
   for (let d = 1; d <= diasMes; d++) {
@@ -3185,13 +3185,13 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
     const bg = fut ? '#fffbeb' : q ? `rgba(1,65,162,${(0.12 + t * 0.78).toFixed(2)})` : '#f1f5f9';
     const cTx = !fut && q && t > 0.55 ? '#fff' : '#475569';
     h += `<div title="${d}: ${fut ? (esp != null ? 'meta ' + esp.toFixed(1) + ' para la proyección' : '—') : q + ' otorgadas'}"
-      style="aspect-ratio:1.25;border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;
+      style="aspect-ratio:1;border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;
       font-size:.66rem;font-weight:700;color:${cTx};background:${bg};border:1px ${fut ? 'dashed #f59e0b66' : 'solid #e2e8f0'}">
       ${d}${!fut && q ? `<span style="position:absolute;top:1px;right:4px;font-size:.56rem;opacity:.9">${q}</span>` : ''}
       ${esp != null ? `<span style="position:absolute;bottom:1px;left:4px;font-size:.56rem;color:#b45309;font-weight:800">${Math.round(esp)}</span>` : ''}</div>`;
   }
   h += '</div>';
-  h += `<div style="margin-top:9px;font-size:.66rem;color:#64748b;line-height:1.5">
+  h += `<div style="margin-top:9px;font-size:.66rem;color:#64748b;line-height:1.5;max-width:330px;margin-left:auto;margin-right:auto">
     <span style="color:#0141A2;font-weight:800">n</span> Q real del día ·
     <span style="color:#b45309;font-weight:800">n</span> meta diaria para llegar a la proyección de cierre (${Math.round(proyQ || 0)} ops), repartida según el peso histórico de cada día de la semana</div>`;
   cont.innerHTML = h;
