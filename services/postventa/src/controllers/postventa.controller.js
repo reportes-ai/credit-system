@@ -1227,6 +1227,7 @@ const setConfig = async (req, res) => {
 };
 
 /* ── GET /api/postventa/saldos-a-pagar — ops liberadas a pago, no pagadas ── */
+const normRutSaldo = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
 const getSaldosAPagar = async (req, res) => {
   try {
     const [rows] = await pool.query(`
@@ -1262,6 +1263,27 @@ const getSaldosAPagar = async (req, res) => {
               AND DATE(ep.fecha) < CURDATE())
       ORDER BY efr.fecha ASC, s.num_op ASC
     `);
+    // Respaldo por RUT: créditos sin id_dealer enlazado quedaban sin cuenta/banco/
+    // categoría aunque la ficha del dealer exista (mismo RUT en otra operación sí
+    // los traía). Una sola fuente: la ficha; aquí solo se busca por otra llave.
+    const sinDatos = rows.filter(r => r.rut_dealer && (!r.num_cuenta || !r.banco || !r.categoria));
+    if (sinDatos.length) {
+      const ruts = [...new Set(sinDatos.map(r => normRutSaldo(r.rut_dealer)))];
+      const [ds] = await pool.query(
+        `SELECT rut, num_cuenta, banco,
+                COALESCE(NULLIF(categoria_asignada,''), NULLIF(categoria_propuesta,''), '') AS categoria,
+                COALESCE(NULLIF(nombre_indexa,''), nombre_razon) AS nombre
+           FROM dealers WHERE activo=1 OR activo IS NULL`);
+      const mapa = new Map();
+      ds.forEach(d => { const k = normRutSaldo(d.rut); if (k && !mapa.has(k)) mapa.set(k, d); });
+      sinDatos.forEach(r => {
+        const d = mapa.get(normRutSaldo(r.rut_dealer)); if (!d) return;
+        if (!r.num_cuenta) r.num_cuenta = d.num_cuenta;
+        if (!r.banco) r.banco = d.banco;
+        if (!r.categoria) r.categoria = d.categoria;
+        if (!r.nombre_dealer) r.nombre_dealer = d.nombre;
+      });
+    }
     // AUTOFIN: el monto a pagar/disponer = saldo + Transferencia + Limitación (la orden ya lo registra así).
     const fijos = await getFijosAutoFin();
     rows.forEach(r => { r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos); });
