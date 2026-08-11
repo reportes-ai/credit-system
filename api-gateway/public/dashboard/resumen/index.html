@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Resumen Ejecutivo del Dashboard: cockpit del mes con KPIs, presupuesto, tendencia, mix, embudo y rankings. Lee los MISMOS datos que el dashboard (/api/dashboard/datos) para cuadrar 1:1 -->
+<!-- v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,52 +7,84 @@
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <link href="/css/bootstrap-icons.css" rel="stylesheet">
 <style>
-  :root { --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44; --tx:#e2e8f0; --mut:#8ea3c2;
-          --accent:#009AFE; --ok:#34d399; --bad:#f87171; --warn:#fbbf24; --gold:#f0b429; }
-  * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--tx); font-family:'Segoe UI',system-ui,sans-serif; }
-  .main { max-width:1280px; margin:0 auto; padding:20px 22px 70px; }
-  .head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
-  .head h1 { margin:0; font-size:1.3rem; font-weight:800; letter-spacing:.02em; }
-  .head .sub { color:var(--mut); font-size:.78rem; }
-  .head select { background:var(--panel); color:var(--tx); border:1.5px solid var(--line); border-radius:9px; padding:7px 12px; font:inherit; font-size:.85rem; }
-  .grid { display:grid; gap:14px; }
-  .kpis { grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); margin-bottom:14px; }
-  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
-  .kpi .lbl { color:var(--mut); font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
-  .kpi .val { font-size:1.75rem; font-weight:800; margin:6px 0 2px; font-variant-numeric:tabular-nums; }
-  .kpi .cmp { font-size:.74rem; color:var(--mut); }
-  .delta { font-weight:800; border-radius:7px; padding:1px 7px; font-size:.72rem; }
-  .up { color:#052e16; background:var(--ok); } .down { color:#450a0a; background:var(--bad); } .flat { color:#0b1220; background:#94a3b8; }
-  .row2 { grid-template-columns:1.15fr .85fr; margin-bottom:14px; }
-  .row3 { grid-template-columns:1fr 1fr 1fr; margin-bottom:14px; }
-  @media (max-width:980px){ .row2,.row3{ grid-template-columns:1fr; } }
-  h3.t { margin:0 0 12px; font-size:.8rem; text-transform:uppercase; letter-spacing:.09em; color:var(--mut); font-weight:800; display:flex; align-items:center; gap:8px; }
-  h3.t i { color:var(--accent); }
-  .ringwrap { display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
-  .ringlbl { font-size:.78rem; color:var(--mut); line-height:1.7; }
-  .ringlbl b { color:var(--tx); font-size:.95rem; }
-  .proy { margin-top:8px; padding:8px 12px; border-radius:10px; background:var(--panel2); border:1px solid var(--line); font-size:.78rem; }
-  .bars { display:flex; align-items:flex-end; gap:6px; height:150px; margin-top:6px; }
-  .bcol { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
-  .b { width:100%; border-radius:6px 6px 2px 2px; background:linear-gradient(180deg,var(--accent),#0141A2); position:relative; min-height:3px; }
-  .b.cur { background:linear-gradient(180deg,var(--gold),#b45309); }
-  .b .tip { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:.6rem; color:var(--mut); white-space:nowrap; }
-  .blab { font-size:.6rem; color:var(--mut); white-space:nowrap; }
-  .rank { display:flex; flex-direction:column; gap:9px; }
-  .rk { display:grid; grid-template-columns:20px 1fr auto; gap:10px; align-items:center; font-size:.8rem; }
-  .rk .n { color:var(--mut); font-weight:800; } .rk .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .rk .bar { height:7px; border-radius:5px; background:var(--panel2); margin-top:4px; overflow:hidden; }
-  .rk .bar > div { height:100%; border-radius:5px; background:linear-gradient(90deg,#0141A2,var(--accent)); }
-  .rk .v { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; white-space:nowrap; }
-  .rk .v small { display:block; color:var(--mut); font-weight:400; font-size:.66rem; }
-  .fun { display:flex; flex-direction:column; gap:8px; }
-  .fstep { border-radius:10px; padding:9px 14px; display:flex; justify-content:space-between; align-items:center; font-size:.82rem; font-weight:700; }
-  .fpct { font-size:.7rem; color:var(--mut); text-align:right; margin:-2px 4px 2px 0; }
-  .leg { display:flex; gap:14px; flex-wrap:wrap; font-size:.75rem; color:var(--mut); margin-top:10px; }
-  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
-  .foot { color:#64748b; font-size:.7rem; margin-top:18px; }
+  :root { --bg:#070c16; --panel:rgba(17,26,46,.75); --line:#1c2a47; --tx:#eaf1fb; --mut:#7e93b8;
+          --accent:#00a6ff; --accent2:#37d0ff; --ok:#2fe6a7; --bad:#ff6b7a; --gold:#ffc53d; --violet:#a78bfa; }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--tx); font-family:'Segoe UI',system-ui,sans-serif;
+         background:radial-gradient(1200px 600px at 75% -10%, #0d2247 0%, transparent 60%),
+                    radial-gradient(900px 500px at -10% 30%, #101c38 0%, transparent 55%), var(--bg); min-height:100vh; }
+  .main { max-width:1340px; margin:0 auto; padding:22px 24px 80px; }
+  .fade { opacity:0; transform:translateY(10px); animation:up .5s forwards; }
+  @keyframes up { to { opacity:1; transform:none; } }
+  .head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .head h1 { margin:0; font-size:1.45rem; font-weight:800; letter-spacing:.01em; }
+  .head h1 span { background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .head select { background:#0d1730; color:var(--tx); border:1.5px solid var(--line); border-radius:11px; padding:8px 14px; font:inherit; font-size:.9rem; font-weight:700; cursor:pointer; }
+  .sub { color:var(--mut); font-size:.78rem; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:18px 20px;
+          backdrop-filter:blur(8px); box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  h3.t { margin:0 0 4px; font-size:.72rem; text-transform:uppercase; letter-spacing:.12em; color:var(--mut); font-weight:800; display:flex; align-items:center; gap:8px; }
+  h3.t i { color:var(--accent); font-size:.9rem; }
+  h3.t .r { margin-left:auto; display:flex; gap:6px; }
+  .grid { display:grid; gap:16px; }
+  .kpis { grid-template-columns:repeat(4,1fr); margin-bottom:16px; }
+  @media (max-width:1080px){ .kpis{ grid-template-columns:repeat(2,1fr);} }
+  .kpi { position:relative; overflow:hidden; }
+  .kpi .lbl { color:var(--mut); font-size:.68rem; text-transform:uppercase; letter-spacing:.1em; font-weight:800; }
+  .kpi .val { font-size:2rem; font-weight:850; margin:8px 0 4px; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .kpi .val small { font-size:.95rem; color:var(--mut); font-weight:700; }
+  .kpi .spark { position:absolute; right:12px; bottom:10px; opacity:.9; }
+  .delta { font-weight:800; border-radius:20px; padding:2px 9px; font-size:.7rem; display:inline-flex; align-items:center; gap:4px; }
+  .up { color:#062b1e; background:var(--ok); } .down { color:#3d060d; background:var(--bad); } .flat { color:#0b1220; background:#8fa3c0; }
+  .cmp { font-size:.72rem; color:var(--mut); margin-top:2px; }
+  .row-main { grid-template-columns:1.6fr 1fr; margin-bottom:16px; }
+  .row-3 { grid-template-columns:1.05fr 1fr 1.25fr; margin-bottom:16px; }
+  .row-2 { grid-template-columns:1fr 1fr; }
+  @media (max-width:1080px){ .row-main,.row-3,.row-2{ grid-template-columns:1fr; } }
+  .tog { border:1px solid var(--line); background:#0d1730; color:var(--mut); font-size:.68rem; font-weight:800; border-radius:8px; padding:4px 10px; cursor:pointer; letter-spacing:.05em; }
+  .tog.on { color:#04121f; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-color:transparent; }
+  .leg { display:flex; gap:16px; flex-wrap:wrap; font-size:.72rem; color:var(--mut); margin-top:10px; }
+  .dash { display:inline-block; width:16px; height:0; border-top:2.5px solid; margin-right:6px; vertical-align:middle; border-radius:2px; }
+  .gaugewrap { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .gnum { font-size:2.1rem; font-weight:850; margin-top:-58px; font-variant-numeric:tabular-nums; }
+  .glbl { color:var(--mut); font-size:.72rem; margin-bottom:10px; }
+  .gdet { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:.78rem; }
+  .gdet .b { background:#0d1730; border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+  .gdet .b .k { color:var(--mut); font-size:.64rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
+  .gdet .b .v { font-weight:800; font-size:.98rem; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .proy { margin-top:12px; width:100%; padding:11px 14px; border-radius:12px; font-size:.8rem; line-height:1.55;
+          background:linear-gradient(90deg, rgba(255,197,61,.12), transparent); border:1px solid rgba(255,197,61,.35); }
+  .heat { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-top:10px; }
+  .hd { text-align:center; font-size:.62rem; color:var(--mut); font-weight:800; }
+  .hc { aspect-ratio:1.35; border-radius:7px; background:#0d1730; border:1px solid #14203a; position:relative; display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:700; color:var(--mut); }
+  .hc .q { position:absolute; top:2px; right:5px; font-size:.58rem; opacity:.85; }
+  .donutwrap { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  .dleg { display:flex; flex-direction:column; gap:10px; font-size:.78rem; flex:1; min-width:150px; }
+  .dleg .it { display:flex; align-items:center; gap:9px; }
+  .dleg .sw { width:11px; height:11px; border-radius:4px; flex:none; }
+  .dleg b { font-variant-numeric:tabular-nums; }
+  .dleg small { color:var(--mut); display:block; font-size:.68rem; }
+  .fun { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .fs { position:relative; height:44px; border-radius:11px; overflow:hidden; background:#0d1730; border:1px solid var(--line); }
+  .fs .fill { position:absolute; inset:0; border-radius:11px; }
+  .fs .in { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:.82rem; font-weight:800; }
+  .fs .in small { font-weight:600; color:rgba(255,255,255,.75); font-size:.68rem; margin-left:8px; }
+  .conv { text-align:right; color:var(--mut); font-size:.68rem; padding-right:6px; }
+  .podio { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+  .p-it { display:grid; grid-template-columns:34px 1fr auto; gap:12px; align-items:center; }
+  .ava { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:850; color:#04121f; }
+  .m1 { background:linear-gradient(135deg,#ffe28a,var(--gold)); box-shadow:0 0 14px rgba(255,197,61,.4); }
+  .m2 { background:linear-gradient(135deg,#e8eef7,#9fb3cc); } .m3 { background:linear-gradient(135deg,#f3b58c,#c77b46); }
+  .mn { background:#1a2a4a; color:var(--mut); }
+  .p-nm { font-size:.84rem; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .p-bar { height:6px; border-radius:4px; background:#0d1730; margin-top:5px; overflow:hidden; }
+  .p-bar > div { height:100%; border-radius:4px; background:linear-gradient(90deg,#0a4d8c,var(--accent),var(--accent2)); }
+  .p-v { text-align:right; font-weight:800; font-size:.84rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .p-v small { display:block; color:var(--mut); font-weight:500; font-size:.66rem; }
+  .foot { color:#5b6f92; font-size:.7rem; margin-top:20px; line-height:1.6; }
   .foot a { color:var(--accent); }
-  .skel { color:var(--mut); font-size:.85rem; padding:30px; text-align:center; }
+  .skel { color:var(--mut); font-size:.9rem; padding:60px; text-align:center; }
+  svg text { font-family:'Segoe UI',system-ui,sans-serif; }
 </style>
 </head>
 <body>
@@ -64,184 +96,277 @@
 <div id="af-topnav"></div>
 
 <div class="main">
-  <div class="head">
-    <h1><i class="bi bi-speedometer2" style="color:var(--accent)"></i> Resumen Ejecutivo</h1>
+  <div class="head fade">
+    <h1><i class="bi bi-lightning-charge-fill" style="color:var(--gold)"></i> <span>Resumen Ejecutivo</span></h1>
     <select id="selMes" onchange="pintar()"></select>
-    <span class="sub" id="subInfo">Cargando…</span>
+    <span class="sub" id="subInfo"></span>
     <span style="flex:1"></span>
-    <a href="/dashboard/" style="color:var(--accent);font-size:.78rem;text-decoration:none"><i class="bi bi-bar-chart-line"></i> Ir al Dashboard completo</a>
+    <a href="/dashboard/" style="color:var(--accent);font-size:.78rem;text-decoration:none;font-weight:700"><i class="bi bi-bar-chart-line"></i> Dashboard completo</a>
   </div>
-
-  <div id="cont" class="skel">Cargando datos del dashboard…</div>
+  <div id="cont" class="skel">Cargando…</div>
 </div>
 
 <script src="/js/auth-guard.js"></script>
 <script>
+'use strict';
 const $ = s => document.querySelector(s);
-const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
-const mm  = v => (v/1e6).toLocaleString('es-CL',{maximumFractionDigits:1}) + ' MM';
 const num = v => Number(v).toLocaleString('es-CL');
+const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+const mm1 = v => (v/1e6).toLocaleString('es-CL',{maximumFractionDigits:1});
 const MESN = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const mesLab = m => MESN[+m.slice(5,7)-1] + ' ' + m.slice(2,4);
-const esOtorgada = r => r.estado_credito === 'OTORGADO' || r.estado_credito === 'PREPAGADO';
-const esAprobada = r => esOtorgada(r) || r.estado_credito === 'APROBADO' || r.estado_credito === 'CARTA_APROBACION';
+const esOt = r => r.estado_credito === 'OTORGADO' || r.estado_credito === 'PREPAGADO';
+const esAp = r => esOt(r) || r.estado_credito === 'APROBADO' || r.estado_credito === 'CARTA_APROBACION';
+const sum = (a,k) => a.reduce((s,r)=>s+(r[k]||0),0);
+const fRef = r => r.fecha_otorgado || r.fecha_estado || '';
+let RAW = [], PPTO = [], MODO = 'monto';
 
-let RAW = [], PPTO = [];
-
-async function cargar() {
-  const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
-  const [d, p] = await Promise.all([
-    fetch('/api/dashboard/datos', { headers: H }).then(r => r.json()),
-    fetch('/api/dashboard/presupuesto', { headers: H }).then(r => r.json()).catch(() => null),
-  ]);
-  if (!d.success) { $('#cont').textContent = 'No se pudieron cargar los datos.'; return; }
-  RAW = d.raw; PPTO = (p && p.data) || [];
-  // Selector: todos los meses con datos, el más reciente primero
-  const meses = [...new Set(RAW.map(r => r.mes))].filter(Boolean).sort().reverse();
-  $('#selMes').innerHTML = meses.map(m => `<option value="${m}">${mesLab(m)}</option>`).join('');
-  $('#subInfo').textContent = num(RAW.length) + ' operaciones · actualizado ' + new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+async function cargar(){
+  const H = { Authorization:'Bearer ' + sessionStorage.getItem('token') };
+  const [d,p] = await Promise.all([
+    fetch('/api/dashboard/datos',{headers:H}).then(r=>r.json()),
+    fetch('/api/dashboard/presupuesto',{headers:H}).then(r=>r.json()).catch(()=>null)]);
+  if(!d.success){ $('#cont').textContent='No se pudieron cargar los datos.'; return; }
+  RAW = d.raw; PPTO = (p&&p.data)||[];
+  const meses = [...new Set(RAW.map(r=>r.mes))].filter(Boolean).sort().reverse();
+  $('#selMes').innerHTML = meses.map(m=>`<option value="${m}">${mesLab(m)}</option>`).join('');
+  $('#subInfo').textContent = num(RAW.length)+' operaciones · '+new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
   pintar();
 }
 
-function delta(act, ant, fmt) {
-  if (!ant) return '<span class="delta flat">s/base</span>';
-  const p = (act - ant) / ant * 100;
-  const cls = p > 0.5 ? 'up' : p < -0.5 ? 'down' : 'flat';
-  const flecha = p > 0.5 ? '▲' : p < -0.5 ? '▼' : '＝';
-  return `<span class="delta ${cls}">${flecha} ${Math.abs(p).toLocaleString('es-CL',{maximumFractionDigits:1})}%</span> <span style="color:var(--mut)">vs ${fmt}</span>`;
+function delta(act,ant){
+  if(!ant) return '<span class="delta flat">s/base</span>';
+  const p=(act-ant)/ant*100, c=p>0.5?'up':p<-0.5?'down':'flat', f=p>0.5?'▲':p<-0.5?'▼':'＝';
+  return `<span class="delta ${c}">${f} ${Math.abs(p).toLocaleString('es-CL',{maximumFractionDigits:1})}%</span>`;
+}
+function spark(vals,w,h,color){
+  const mx=Math.max(...vals,1), mn=Math.min(...vals,0);
+  const pt=vals.map((v,i)=>[(i/(vals.length-1))*w, h-4-((v-mn)/(mx-mn||1))*(h-8)]);
+  const d='M'+pt.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L');
+  const last=pt[pt.length-1];
+  return `<svg width="${w}" height="${h}" class="spark"><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" opacity=".8"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="3" fill="${color}"/></svg>`;
 }
 
-function pintar() {
-  const mes = $('#selMes').value; if (!mes) return;
-  const hoy = new Date();
-  const mesHoy = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0'); // fecha LOCAL (no UTC)
-  const esMesActual = mes === mesHoy;
-  const diaCorte = esMesActual ? hoy.getDate() : 31;                 // mes cerrado: mes completo
-  const [aa, mmn] = mes.split('-').map(Number);
-  const mesAnt = mmn === 1 ? (aa-1) + '-12' : aa + '-' + String(mmn-1).padStart(2,'0');
-  const diasMes = new Date(aa, mmn, 0).getDate();
-
-  const delMes  = RAW.filter(r => r.mes === mes);
-  const ot      = delMes.filter(esOtorgada);
-  // Comparable: mes anterior A IGUAL DÍA (fecha otorgado, o fecha estado si falta)
-  const fRef = r => r.fecha_otorgado || r.fecha_estado || '';
-  const otAntIg = RAW.filter(r => r.mes === mesAnt && esOtorgada(r) && (+(fRef(r).slice(8,10)) || 1) <= diaCorte);
-  const sum = (arr, k) => arr.reduce((a, r) => a + (r[k] || 0), 0);
-
-  const monto = sum(ot, 'monto_financiado'), ingreso = sum(ot, 'ingreso_neto_total');
-  const montoAnt = sum(otAntIg, 'monto_financiado'), ingresoAnt = sum(otAntIg, 'ingreso_neto_total');
-  const ticket = ot.length ? monto / ot.length : 0;
-  const ticketAnt = otAntIg.length ? montoAnt / otAntIg.length : 0;
-  const cmpLbl = mesLab(mesAnt) + (esMesActual ? ' al día ' + diaCorte : '');
-
-  // ── Presupuesto y proyección ──
-  const pp = PPTO.find(x => x.mes === mes);
-  const pctOps = pp && pp.ops ? ot.length / pp.ops * 100 : null;
-  const pctMonto = pp && pp.monto ? (monto/1e6) / pp.monto * 100 : null;
-  const ritmo = esMesActual && diaCorte > 0 ? ot.length / diaCorte : null;
-  const proyOps = ritmo != null ? Math.round(ritmo * diasMes) : null;
-  const proyMonto = esMesActual && diaCorte > 0 ? monto / diaCorte * diasMes : null;
-
-  // ── Tendencia 12 meses (otorgadas) ──
-  const meses12 = [...new Set(RAW.map(r => r.mes))].filter(m => m && m <= mes).sort().slice(-12);
-  const serie = meses12.map(m => { const o = RAW.filter(r => r.mes === m && esOtorgada(r)); return { m, n:o.length, monto:sum(o,'monto_financiado') }; });
-  const maxM = Math.max(...serie.map(s => s.monto), 1);
-
-  // ── Mix por institución (otorgadas del mes) ──
-  const mix = {}; ot.forEach(r => { const k = r.institucion || 'OTRA'; (mix[k] = mix[k] || { n:0, ing:0 }); mix[k].n++; mix[k].ing += r.ingreso_neto_total || 0; });
-  const MIXCOL = { 'AUTOFIN':'#009AFE', 'UNIDAD DE CREDITO':'#f0b429', 'AUTOFACIL':'#34d399', 'OTRA':'#94a3b8' };
-
-  // ── Embudo ──
-  const nAprob = delMes.filter(esAprobada).length, nOt = ot.length, nTot = delMes.length;
-
-  // ── Rankings (otorgadas del mes) ──
-  const top = (key) => {
-    const m = {}; ot.forEach(r => { const k = (r[key]||'').trim() || '(sin dato)'; (m[k] = m[k] || { n:0, monto:0 }); m[k].n++; m[k].monto += r.monto_financiado||0; });
-    return Object.entries(m).sort((a,b) => b[1].monto - a[1].monto).slice(0,5);
+/* Curva acumulada dia a dia: mes actual vs mes anterior vs ritmo presupuesto */
+function curva(mes, mesAnt, pp, diaCorte, diasMes){
+  const W=760, H=280, P={l:52,r:16,t:16,b:26};
+  const serieDia = (m, dias) => {
+    const acc = new Array(dias+1).fill(0);
+    RAW.filter(r=>r.mes===m && esOt(r)).forEach(r=>{
+      const d = Math.min(+(fRef(r).slice(8,10))||1, dias);
+      acc[d] += MODO==='monto' ? (r.monto_financiado||0)/1e6 : 1;
+    });
+    for(let i=1;i<=dias;i++) acc[i]+=acc[i-1];
+    return acc;
   };
-  const topEj = top('ejecutivo'), topDl = top('automotora');
-  const rankHTML = arr => {
-    const mx = Math.max(...arr.map(x => x[1].monto), 1);
-    return arr.map((x,i) => `<div class="rk"><span class="n">${i+1}</span>
-      <div><div class="nm" title="${x[0]}">${x[0]}</div><div class="bar"><div style="width:${x[1].monto/mx*100}%"></div></div></div>
-      <div class="v">${mm(x[1].monto)}<small>${x[1].n} ops</small></div></div>`).join('') || '<span class="sub">Sin operaciones</span>';
-  };
+  const diasAnt = 31;
+  const cur = serieDia(mes, diasMes), ant = serieDia(mesAnt, diasAnt);
+  const meta = pp ? (MODO==='monto' ? +pp.monto : +pp.ops) : null;
+  const tope = Math.max(cur[diasMes], ant[diasAnt], meta||0, 1)*1.08;
+  const X = d => P.l + (d-1)/(Math.max(diasMes,diasAnt)-1)*(W-P.l-P.r);
+  const Y = v => H-P.b - v/tope*(H-P.t-P.b);
+  const path = (acc,dias,hasta) => { let s=''; for(let d=1; d<=Math.min(dias,hasta); d++) s+=(d===1?'M':'L')+X(d).toFixed(1)+','+Y(acc[d]).toFixed(1)+' '; return s; };
+  const pCur = path(cur,diasMes,diaCorte), pAnt = path(ant,diasAnt,31);
+  // area bajo la curva actual
+  const xFin = X(Math.min(diasMes,diaCorte));
+  const area = pCur + `L${xFin.toFixed(1)},${(H-P.b)} L${X(1).toFixed(1)},${H-P.b} Z`;
+  // grilla y
+  let g='';
+  for(let i=0;i<=4;i++){ const v=tope/4*i, y=Y(v);
+    g+=`<line x1="${P.l}" y1="${y}" x2="${W-P.r}" y2="${y}" stroke="#16233f" stroke-width="1"/>
+        <text x="${P.l-8}" y="${y+4}" text-anchor="end" fill="#5b6f92" font-size="10">${MODO==='monto'?'$'+Math.round(v)+'M':Math.round(v)}</text>`; }
+  for(let d=5; d<=Math.max(diasMes,diasAnt); d+=5)
+    g+=`<text x="${X(d)}" y="${H-8}" text-anchor="middle" fill="#5b6f92" font-size="10">${d}</text>`;
+  const metaLn = meta ? `<line x1="${P.l}" y1="${Y(meta)}" x2="${W-P.r}" y2="${Y(meta)}" stroke="var(--gold)" stroke-width="1.6" stroke-dasharray="3 5" opacity=".85"/>
+    <text x="${W-P.r}" y="${Y(meta)-6}" text-anchor="end" fill="var(--gold)" font-size="10" font-weight="700">meta ${MODO==='monto'?'$'+num(meta)+' MM':num(meta)+' ops'}</text>` : '';
+  const dot = pCur ? `<circle cx="${xFin.toFixed(1)}" cy="${Y(cur[Math.min(diasMes,diaCorte)]).toFixed(1)}" r="4.5" fill="var(--accent2)">
+      <animate attributeName="r" values="4.5;6.5;4.5" dur="2s" repeatCount="indefinite"/></circle>` : '';
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">
+    <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+    ${g}${metaLn}
+    <path d="${area}" fill="url(#ga)"/>
+    <path d="${pAnt}" fill="none" stroke="#66799c" stroke-width="2" stroke-dasharray="5 4" opacity=".9"/>
+    <path d="${pCur}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(0,166,255,.55))"/>
+    ${dot}</svg>`;
+}
 
-  // ── Anillo SVG de presupuesto ──
-  const ring = (pct, color) => {
-    const p = Math.min(pct||0, 100), r = 44, c = 2*Math.PI*r;
-    return `<svg width="112" height="112" viewBox="0 0 112 112">
-      <circle cx="56" cy="56" r="${r}" fill="none" stroke="var(--panel2)" stroke-width="11"/>
-      <circle cx="56" cy="56" r="${r}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"
-        stroke-dasharray="${c*p/100} ${c}" transform="rotate(-90 56 56)"/>
-      <text x="56" y="62" text-anchor="middle" fill="var(--tx)" font-size="20" font-weight="800">${pct==null?'—':Math.round(pct)+'%'}</text></svg>`;
-  };
+function gauge(pct){
+  const p=Math.min(pct==null?0:pct,120), r=74, cx=95, cy=95;
+  const a0=-210, a1=30, ang=a0+(a1-a0)*Math.min(p,100)/100;
+  const arc=(from,to,color,w,op)=>{
+    const f=from*Math.PI/180, t=to*Math.PI/180;
+    const x1=cx+r*Math.cos(f), y1=cy+r*Math.sin(f), x2=cx+r*Math.cos(t), y2=cy+r*Math.sin(t);
+    return `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${(to-from)>180?1:0} 1 ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; };
+  const col = pct==null?'#5b6f92': pct>=100?'var(--ok)': pct>=70?'var(--accent)':'var(--gold)';
+  return `<svg width="190" height="150" viewBox="0 0 190 150">
+    ${arc(a0,a1,'#14203a',13,1)}
+    ${pct!=null?arc(a0,ang,col,13,1):''}
+  </svg>`;
+}
 
-  $('#cont').className = '';
-  $('#cont').innerHTML = `
+function donut(entries, total){
+  const R=54, r2=36, cx=70, cy=70; let a=-90, out='';
+  entries.forEach(([k,v,color])=>{
+    const frac=v/Math.max(total,1), a2=a+frac*360;
+    if(frac<=0) return;
+    const big=frac>0.5?1:0;
+    const p=(ang)=>[cx+R*Math.cos(ang*Math.PI/180), cy+R*Math.sin(ang*Math.PI/180)];
+    const q=(ang)=>[cx+r2*Math.cos(ang*Math.PI/180), cy+r2*Math.sin(ang*Math.PI/180)];
+    const [x1,y1]=p(a),[x2,y2]=p(a2-0.7),[x3,y3]=q(a2-0.7),[x4,y4]=q(a);
+    out+=`<path d="M${x1},${y1} A${R},${R} 0 ${big} 1 ${x2},${y2} L${x3},${y3} A${r2},${r2} 0 ${big} 0 ${x4},${y4} Z" fill="${color}" opacity=".92"/>`;
+    a=a2;
+  });
+  return `<svg width="140" height="140" viewBox="0 0 140 140">${out}
+    <text x="70" y="66" text-anchor="middle" fill="var(--tx)" font-size="19" font-weight="800">${num(total)}</text>
+    <text x="70" y="82" text-anchor="middle" fill="var(--mut)" font-size="9">OTORGADAS</text></svg>`;
+}
+
+function pintar(){
+  const mes=$('#selMes').value; if(!mes) return;
+  const hoy=new Date();
+  const mesHoy=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0');
+  const esActual=mes===mesHoy;
+  const [aa,mn]=mes.split('-').map(Number);
+  const diasMes=new Date(aa,mn,0).getDate();
+  const diaCorte=esActual?hoy.getDate():diasMes;
+  const mesAnt=mn===1?(aa-1)+'-12':aa+'-'+String(mn-1).padStart(2,'0');
+
+  const delMes=RAW.filter(r=>r.mes===mes), ot=delMes.filter(esOt);
+  const otAntIg=RAW.filter(r=>r.mes===mesAnt && esOt(r) && (+(fRef(r).slice(8,10))||1)<=diaCorte);
+  const monto=sum(ot,'monto_financiado'), ingreso=sum(ot,'ingreso_neto_total');
+  const montoA=sum(otAntIg,'monto_financiado'), ingresoA=sum(otAntIg,'ingreso_neto_total');
+  const tk=ot.length?monto/ot.length:0, tkA=otAntIg.length?montoA/otAntIg.length:0;
+
+  // series 12m para sparklines
+  const m12=[...new Set(RAW.map(r=>r.mes))].filter(m=>m&&m<=mes).sort().slice(-12);
+  const s12=m12.map(m=>{ const o=RAW.filter(r=>r.mes===m&&esOt(r)); return { n:o.length, monto:sum(o,'monto_financiado'), ing:sum(o,'ingreso_neto_total'), tk:o.length?sum(o,'monto_financiado')/o.length:0 }; });
+
+  // presupuesto
+  const pp=PPTO.find(x=>x.mes===mes);
+  const pctOps=pp&&pp.ops?ot.length/pp.ops*100:null;
+  const pctM=pp&&pp.monto?(monto/1e6)/pp.monto*100:null;
+  const ritmo=diaCorte>0?ot.length/diaCorte:0;
+  const proyOps=esActual?Math.round(ritmo*diasMes):ot.length;
+  const proyM=esActual&&diaCorte>0?monto/diaCorte*diasMes:monto;
+
+  // heatmap del mes
+  const porDia={}; ot.forEach(r=>{ const d=+(fRef(r).slice(8,10))||0; if(d) porDia[d]=(porDia[d]||0)+1; });
+  const maxD=Math.max(...Object.values(porDia),1);
+  const prim=new Date(aa,mn-1,1).getDay(); // 0=Dom
+  const off=(prim+6)%7; // Lun=0
+  let heat='<div class="heat">'+['L','M','M','J','V','S','D'].map(d=>`<div class="hd">${d}</div>`).join('');
+  for(let i=0;i<off;i++) heat+='<div></div>';
+  for(let d=1;d<=diasMes;d++){
+    const q=porDia[d]||0, t=q/maxD;
+    const bg=q?`rgba(0,166,255,${0.15+t*0.75})`:'#0d1730';
+    const fut=esActual&&d>diaCorte;
+    heat+=`<div class="hc" style="background:${fut?'transparent':bg};${fut?'border-style:dashed;opacity:.4;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}" title="${d}: ${q} otorgadas">${d}${q?`<span class="q">${q}</span>`:''}</div>`;
+  }
+  heat+='</div>';
+
+  // mix institucion
+  const mixM={}; ot.forEach(r=>{ const k=r.institucion||'OTRA'; (mixM[k]=mixM[k]||{n:0,ing:0}); mixM[k].n++; mixM[k].ing+=r.ingreso_neto_total||0; });
+  const COL={'AUTOFIN':'#00a6ff','UNIDAD DE CREDITO':'#ffc53d','AUTOFACIL':'#2fe6a7','OTRA':'#8fa3c0'};
+  const mixE=Object.entries(mixM).sort((a,b)=>b[1].n-a[1].n).map(([k,v])=>[k,v.n,COL[k]||'#8fa3c0',v]);
+
+  // embudo
+  const nAp=delMes.filter(esAp).length, nOt=ot.length, nT=delMes.length;
+
+  // rankings
+  const top=k=>{ const m={}; ot.forEach(r=>{ const x=(r[k]||'').trim()||'(sin dato)'; (m[x]=m[x]||{n:0,monto:0}); m[x].n++; m[x].monto+=r.monto_financiado||0; });
+    return Object.entries(m).sort((a,b)=>b[1].monto-a[1].monto).slice(0,5); };
+  const podio=arr=>{ const mx=Math.max(...arr.map(x=>x[1].monto),1);
+    return arr.map((x,i)=>{ const ini=x[0].split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+      return `<div class="p-it"><div class="ava ${i<3?'m'+(i+1):'mn'}">${i<3?['🥇','🥈','🥉'][i]:ini}</div>
+        <div><div class="p-nm" title="${x[0]}">${x[0]}</div><div class="p-bar"><div style="width:${x[1].monto/mx*100}%"></div></div></div>
+        <div class="p-v">$${mm1(x[1].monto)} MM<small>${x[1].n} ops · tk ${clp(x[1].monto/x[1].n)}</small></div></div>`; }).join('')
+      || '<span class="sub">Sin operaciones</span>'; };
+
+  const kpi=(lbl,val,d,cmp,sp,col)=>`<div class="card kpi fade"><div class="lbl">${lbl}</div><div class="val">${val}</div>
+    <div>${d} <span class="cmp">vs ${cmp}</span></div>${spark(sp,110,44,col)}</div>`;
+  const cmpTxt=mesLab(mesAnt)+(esActual?' al día '+diaCorte:'');
+
+  $('#cont').className='';
+  $('#cont').innerHTML=`
   <div class="grid kpis">
-    <div class="card kpi"><div class="lbl">Otorgadas · ${mesLab(mes)}</div><div class="val">${num(nOt)}</div><div class="cmp">${delta(nOt, otAntIg.length, cmpLbl)}</div></div>
-    <div class="card kpi"><div class="lbl">Monto financiado</div><div class="val">$${mm(monto)}</div><div class="cmp">${delta(monto, montoAnt, cmpLbl)}</div></div>
-    <div class="card kpi"><div class="lbl">Ingreso neto total</div><div class="val">$${mm(ingreso)}</div><div class="cmp">${delta(ingreso, ingresoAnt, cmpLbl)}</div></div>
-    <div class="card kpi"><div class="lbl">Ticket promedio</div><div class="val">${clp(ticket)}</div><div class="cmp">${delta(ticket, ticketAnt, cmpLbl)}</div></div>
+    ${kpi('Otorgadas · '+mesLab(mes), num(nOt), delta(nOt,otAntIg.length), cmpTxt, s12.map(s=>s.n), 'var(--accent2)')}
+    ${kpi('Monto financiado', '$'+mm1(monto)+' <small>MM</small>', delta(monto,montoA), cmpTxt, s12.map(s=>s.monto), 'var(--ok)')}
+    ${kpi('Ingreso neto total', '$'+mm1(ingreso)+' <small>MM</small>', delta(ingreso,ingresoA), cmpTxt, s12.map(s=>s.ing), 'var(--violet)')}
+    ${kpi('Ticket promedio', clp(tk), delta(tk,tkA), cmpTxt, s12.map(s=>s.tk), 'var(--gold)')}
   </div>
 
-  <div class="grid row2">
-    <div class="card">
-      <h3 class="t"><i class="bi bi-graph-up-arrow"></i> Monto otorgado — últimos 12 meses</h3>
-      <div class="bars">${serie.map(s => `<div class="bcol">
-        <div class="b ${s.m===mes?'cur':''}" style="height:${Math.max(s.monto/maxM*100,2)}%" title="${mesLab(s.m)}: $${mm(s.monto)} · ${s.n} ops"><span class="tip">${s.n}</span></div>
-        <span class="blab">${mesLab(s.m)}</span></div>`).join('')}</div>
-      <div class="leg"><span><span class="dot" style="background:var(--accent)"></span>Monto financiado (alto de la barra)</span><span>El número sobre cada barra son las operaciones</span><span><span class="dot" style="background:var(--gold)"></span>Mes seleccionado</span></div>
-    </div>
-    <div class="card">
-      <h3 class="t"><i class="bi bi-bullseye"></i> Avance vs presupuesto · ${mesLab(mes)}</h3>
-      ${pp ? `<div class="ringwrap">
-        ${ring(pctOps, 'var(--accent)')}
-        <div class="ringlbl"><b>${num(nOt)}</b> de <b>${num(pp.ops)}</b> operaciones<br>
-        <b>$${mm(monto)}</b> de <b>$${num(pp.monto)} MM</b> (${pctMonto==null?'—':Math.round(pctMonto)+'%'})</div>
+  <div class="grid row-main">
+    <div class="card fade" style="animation-delay:.05s">
+      <h3 class="t"><i class="bi bi-activity"></i> La carrera del mes — acumulado día a día
+        <span class="r">
+          <button class="tog ${MODO==='monto'?'on':''}" onclick="MODO='monto';pintar()">MONTO</button>
+          <button class="tog ${MODO==='ops'?'on':''}" onclick="MODO='ops';pintar()">OPERACIONES</button>
+        </span></h3>
+      ${curva(mes,mesAnt,pp,diaCorte,diasMes)}
+      <div class="leg">
+        <span><span class="dash" style="border-color:var(--accent)"></span>${mesLab(mes)} (acumulado real)</span>
+        <span><span class="dash" style="border-color:#66799c;border-top-style:dashed"></span>${mesLab(mesAnt)} (mismo recorrido)</span>
+        ${pp?`<span><span class="dash" style="border-color:var(--gold);border-top-style:dotted"></span>Meta del presupuesto</span>`:''}
       </div>
-      ${esMesActual ? `<div class="proy"><i class="bi bi-crosshair" style="color:var(--warn)"></i>
-        A ritmo actual (${ritmo.toLocaleString('es-CL',{maximumFractionDigits:1})} ops/día) el mes cierra en
-        <b>${num(proyOps)} ops</b> y <b>$${mm(proyMonto)}</b> —
-        ${proyOps >= pp.ops ? '<b style="color:var(--ok)">cumple el presupuesto</b>' : `faltan <b style="color:var(--bad)">${num(pp.ops - proyOps)} ops</b> de ritmo`}.</div>` : ''}`
-      : '<span class="sub" style="color:var(--mut)">Sin presupuesto cargado para este mes.</span>'}
+    </div>
+    <div class="card fade gaugewrap" style="animation-delay:.1s">
+      <h3 class="t" style="align-self:stretch"><i class="bi bi-bullseye"></i> Presupuesto · ${mesLab(mes)}</h3>
+      ${gauge(pctOps)}
+      <div class="gnum">${pctOps==null?'—':Math.round(pctOps)+'%'}</div>
+      <div class="glbl">de las ${pp?num(pp.ops):'—'} operaciones presupuestadas</div>
+      <div class="gdet">
+        <div class="b"><div class="k">Ops</div><div class="v">${num(nOt)} / ${pp?num(pp.ops):'—'}</div></div>
+        <div class="b"><div class="k">Monto</div><div class="v">$${mm1(monto)} / ${pp?'$'+num(pp.monto):'—'} MM ${pctM!=null?'('+Math.round(pctM)+'%)':''}</div></div>
+        <div class="b"><div class="k">Ritmo</div><div class="v">${ritmo.toLocaleString('es-CL',{maximumFractionDigits:1})} ops/día</div></div>
+        <div class="b"><div class="k">${esActual?'Días restantes':'Días del mes'}</div><div class="v">${esActual?diasMes-diaCorte:diasMes}</div></div>
+      </div>
+      ${esActual&&pp?`<div class="proy"><i class="bi bi-crosshair" style="color:var(--gold)"></i> A este ritmo el mes cierra en <b>${num(proyOps)} ops</b> y <b>$${mm1(proyM)} MM</b> —
+        ${proyOps>=pp.ops?'<b style="color:var(--ok)">cumple el presupuesto</b>':`quedaría <b style="color:var(--bad)">${num(pp.ops-proyOps)} ops bajo la meta</b>`}.</div>`:''}
     </div>
   </div>
 
-  <div class="grid row3">
-    <div class="card">
-      <h3 class="t"><i class="bi bi-pie-chart"></i> Mix por institución (otorgadas)</h3>
-      ${Object.entries(mix).sort((a,b)=>b[1].n-a[1].n).map(([k,v]) => `<div class="rk" style="margin-bottom:9px"><span class="dot" style="background:${MIXCOL[k]||'#94a3b8'}"></span>
-        <div><div class="nm">${k}</div><div class="bar"><div style="width:${v.n/Math.max(nOt,1)*100}%;background:${MIXCOL[k]||'#94a3b8'}"></div></div></div>
-        <div class="v">${Math.round(v.n/Math.max(nOt,1)*100)}%<small>${v.n} ops · $${mm(v.ing)} ing.</small></div></div>`).join('') || '<span style="color:var(--mut);font-size:.8rem">Sin operaciones</span>'}
+  <div class="grid row-3">
+    <div class="card fade" style="animation-delay:.15s">
+      <h3 class="t"><i class="bi bi-calendar3"></i> Pulso diario · ${mesLab(mes)}</h3>
+      ${heat}
+      <div class="leg"><span>Intensidad = otorgadas del día (máx ${maxD})</span></div>
     </div>
-    <div class="card">
-      <h3 class="t"><i class="bi bi-funnel"></i> Embudo del mes</h3>
+    <div class="card fade" style="animation-delay:.2s">
+      <h3 class="t"><i class="bi bi-pie-chart-fill"></i> Mix por institución</h3>
+      <div class="donutwrap">
+        ${donut(mixE.map(x=>[x[0],x[1],x[2]]), nOt)}
+        <div class="dleg">${mixE.map(x=>`<div class="it"><span class="sw" style="background:${x[2]}"></span>
+          <div style="flex:1">${x[0]}<small>$${mm1(x[3].ing)} MM ingreso</small></div>
+          <b>${Math.round(x[1]/Math.max(nOt,1)*100)}%</b></div>`).join('')||'<span class="sub">Sin datos</span>'}</div>
+      </div>
+    </div>
+    <div class="card fade" style="animation-delay:.25s">
+      <h3 class="t"><i class="bi bi-funnel-fill"></i> Embudo del mes</h3>
       <div class="fun">
-        <div class="fstep" style="background:#1e2a44"><span>Ingresadas</span><span>${num(nTot)}</span></div>
-        <div class="fpct">${nTot?Math.round(nAprob/nTot*100):0}% aprobación</div>
-        <div class="fstep" style="background:#0141A2"><span>Aprobadas</span><span>${num(nAprob)}</span></div>
-        <div class="fpct">${nAprob?Math.round(nOt/nAprob*100):0}% curse</div>
-        <div class="fstep" style="background:linear-gradient(90deg,#047857,#34d399);color:#03291c"><span>Otorgadas</span><span>${num(nOt)}</span></div>
+        <div class="fs"><div class="fill" style="background:#22335c;width:100%"></div><div class="in"><span>Ingresadas</span><span>${num(nT)}</span></div></div>
+        <div class="conv">↓ ${nT?Math.round(nAp/nT*100):0}% aprobación</div>
+        <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0a4d8c,var(--accent));width:${nT?Math.max(nAp/nT*100,14):0}%"></div><div class="in"><span>Aprobadas</span><span>${num(nAp)}</span></div></div>
+        <div class="conv">↓ ${nAp?Math.round(nOt/nAp*100):0}% curse</div>
+        <div class="fs"><div class="fill" style="background:linear-gradient(90deg,#0b7a58,var(--ok));width:${nT?Math.max(nOt/nT*100,10):0}%"></div><div class="in"><span>Otorgadas</span><span>${num(nOt)}</span></div></div>
       </div>
     </div>
-    <div class="card">
-      <h3 class="t"><i class="bi bi-trophy"></i> Top ejecutivos · ${mesLab(mes)}</h3>
-      <div class="rank">${rankHTML(topEj)}</div>
+  </div>
+
+  <div class="grid row-2">
+    <div class="card fade" style="animation-delay:.3s">
+      <h3 class="t"><i class="bi bi-trophy-fill" style="color:var(--gold)"></i> Podio ejecutivos · ${mesLab(mes)}</h3>
+      <div class="podio">${podio(top('ejecutivo'))}</div>
+    </div>
+    <div class="card fade" style="animation-delay:.35s">
+      <h3 class="t"><i class="bi bi-shop" style="color:var(--gold)"></i> Podio dealers · ${mesLab(mes)}</h3>
+      <div class="podio">${podio(top('automotora'))}</div>
     </div>
   </div>
 
-  <div class="grid" style="grid-template-columns:1fr">
-    <div class="card">
-      <h3 class="t"><i class="bi bi-shop"></i> Top dealers · ${mesLab(mes)}</h3>
-      <div class="rank">${rankHTML(topDl)}</div>
-    </div>
-  </div>
-
-  <div class="foot"><i class="bi bi-info-circle"></i> Misma fuente que el <a href="/dashboard/">Dashboard</a> (operaciones desde ene-2025, deduplicadas por operación; otorgada = estado OTORGADO/PREPAGADO). La comparación de KPIs es contra el mes anterior <b>a igual día</b>. Presupuesto editable en Dashboard → Presupuesto.</div>`;
+  <div class="foot"><i class="bi bi-info-circle"></i> Misma fuente que el <a href="/dashboard/">Dashboard</a> (deduplicado por operación, desde ene-2025; otorgada = OTORGADO/PREPAGADO). Los KPIs comparan contra el mes anterior <b>a igual día</b>; la curva gris muestra el recorrido completo del mes anterior. Presupuesto editable en Dashboard → Presupuesto.</div>`;
 }
-
 cargar();
 </script>
 <script src="/js/topnav.js"></script>
