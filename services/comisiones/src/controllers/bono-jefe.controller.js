@@ -117,13 +117,23 @@ async function calcularBSC(mesQ) {
       `SELECT ejecutivo, COALESCE(SUM(monto_financiado),0) monto FROM creditos
         WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
           AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
-    // Pilar 3: NUEVOS dealers — fichas de incorporación de dealers APROBADAS en el mes
-    // (fecha_revision = cuando se aprobó), atribuidas al ejecutivo que ingresó la ficha
+    // Pilar 3: NUEVOS DEALERS CON NEGOCIOS — dealers que CURSARON su PRIMERA operación
+    // otorgada de la historia en el mes evaluado (definición Pato 2026-08-11; antes se
+    // contaban fichas de incorporación aprobadas, que no prueban que el dealer cursara).
+    // Se atribuye al ejecutivo de esa primera operación.
     const [nvd] = await pool.query(
-      `SELECT ejecutivo_nombre AS ejecutivo, COUNT(*) n
-         FROM dealer_fichas
-        WHERE estado='APROBADA' AND DATE_FORMAT(COALESCE(fecha_revision, updated_at),'%Y-%m')=?
-        GROUP BY ejecutivo_nombre`, [mes]);
+      `SELECT c.ejecutivo, COUNT(DISTINCT t.d) n
+         FROM (SELECT COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora)) d, MIN(mes) pri
+                 FROM creditos
+                WHERE estado_credito='OTORGADO'
+                  AND COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora)) IS NOT NULL
+                  AND COALESCE(NULLIF(TRIM(rut_dealer),''), TRIM(automotora))<>''
+                GROUP BY d) t
+         JOIN creditos c
+           ON COALESCE(NULLIF(TRIM(c.rut_dealer),''), TRIM(c.automotora)) = t.d
+          AND c.mes = t.pri AND c.estado_credito='OTORGADO'
+        WHERE DATE_FORMAT(t.pri,'%Y-%m')=? AND c.ejecutivo IS NOT NULL AND c.ejecutivo<>''
+        GROUP BY c.ejecutivo`, [mes]);
 
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     const keyEj = s => norm(s).split(' ').filter(Boolean).sort().join(' ');
@@ -166,7 +176,7 @@ async function calcularBSC(mesQ) {
       { titulo: 'Equipo evaluado', detalle: `${filas.length} Ejecutivos Comerciales activos en ${mes}. El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo, no sobre un ejecutivo individual.` },
       { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
       { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} otorgados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
-      { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (fichas de incorporación de dealers ingresadas por el ejecutivo y APROBADAS durante ${mes}). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
+      { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (dealers que cursaron su PRIMERA operación otorgada de la historia durante ${mes}, atribuidos al ejecutivo de esa operación). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
       { titulo: 'Score final del equipo', detalle: `${n2(avg.ptj_creditos)} + ${n2(avg.ptj_montos)} + ${n2(avg.ptj_dealers)} = ${n2(avg.score)} puntos.` },
       { titulo: 'Curva del premio', detalle: premio.pct_adicional === 0
           ? `El score (${n2(avg.score)}, se busca el entero ${premio.score_lookup}) no supera el mínimo de ${cfg.score_min} puntos → el premio del mes es $0. La curva parte a pagar sobre ${cfg.score_min} pts.`
