@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -77,6 +77,14 @@
     .res-row.costo .val { color:#dc2626; }
     .res-row.neutral { background:#f8fafc; }
 
+    /* Distribución del ingreso total (quién se queda con cada peso que entra) */
+    .dist-box { border:1.5px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-top:10px; background:#fff; }
+    .dist-title { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#475569; font-weight:800; margin-bottom:8px; }
+    .dist-barra { display:flex; height:10px; border-radius:6px; overflow:hidden; background:#f1f5f9; margin-bottom:10px; }
+    .dist-grid { display:grid; gap:8px; text-align:center; }
+    .dist-item .dn { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
+    .dist-item .dv { font-size:.88rem; font-weight:700; color:#0f172a; }
+    .dist-item .dp { font-size:1.02rem; font-weight:900; }
     .rentab-box { border-radius:12px; padding:16px 20px; margin-top:8px; display:flex; justify-content:space-between; align-items:center; }
     .rentab-box.pos { background:linear-gradient(135deg,#059669,#10b981); color:#fff; }
     .rentab-box.neg { background:linear-gradient(135deg,#dc2626,#ef4444); color:#fff; }
@@ -604,6 +612,36 @@ function simular() {
   marcarMejor(rentab_af, rentab_uac);
 }
 
+/* Distribución del INGRESO TOTAL: de cada peso que entra, cuánto se queda
+   AutoFácil y cuánto se va en comisiones. Es la misma plata mirada por el otro
+   lado (ingresos − costos = rentabilidad), pero en porcentaje se entiende de
+   inmediato con quién se está repartiendo el negocio. */
+function distribucion(total_ing, rentab, com_dealer, com_patio, com_ej, esPatio) {
+  if (!(total_ing > 0)) return '';
+  const p = v => (v / total_ing * 100);
+  const partes = [
+    { n: 'AutoFácil', v: rentab,     c: '#0f766e' },
+    { n: 'Dealer',    v: com_dealer, c: '#b45309' },
+    ...(esPatio && com_patio > 0 ? [{ n: 'Parque', v: com_patio, c: '#7c3aed' }] : []),
+    { n: 'Ejecutivo', v: com_ej,     c: '#0369a1' },
+  ];
+  const barra = partes.filter(x => x.v > 0)
+    .map(x => `<div style="width:${Math.max(0, p(x.v)).toFixed(2)}%;background:${x.c}" title="${x.n} ${fP(p(x.v))}"></div>`).join('');
+  return `
+    <div class="dist-box">
+      <div class="dist-title">Distribución del Ingreso Total <span style="font-weight:600;color:#64748b">(${fN(total_ing)})</span></div>
+      <div class="dist-barra">${barra}</div>
+      <div class="dist-grid" style="grid-template-columns:repeat(${partes.length},1fr)">
+        ${partes.map(x => `
+          <div class="dist-item">
+            <div class="dn" style="color:${x.c}">${x.n}</div>
+            <div class="dv">${fN(x.v)}</div>
+            <div class="dp" style="color:${x.c}">${fP(p(x.v))}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
 function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio, com_ej, rentab, pct, cuota, esPatio, esCorfo, tier_note }) {
   const total_ing = ing_tasa + ing_seg + (com_corfo || 0);
   const total_cos = com_dealer + com_patio + com_ej;
@@ -642,6 +680,7 @@ function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio,
         <span class="val" style="color:#dc2626">${fN(total_cos)}</span>
       </div>
     </div>
+    ${distribucion(total_ing, rentab, com_dealer, com_patio, com_ej, esPatio)}
     <div class="rentab-box ${rentab >= 0 ? 'pos' : 'neg'}">
       <div>
         <div class="rlbl">Rentabilidad AutoFácil</div>
