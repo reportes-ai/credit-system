@@ -1830,7 +1830,7 @@ const corregirDealer = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'nombre_dealer y rut_dealer requeridos' });
     if (!String(motivo || '').trim())
       return res.status(400).json({ success: false, data: null, error: 'El motivo es obligatorio' });
-    const [[ca]] = await pool.query('SELECT id, op_carta, status, nombre_dealer, rut_dealer FROM cartas_aprobacion WHERE id=?', [id]);
+    const [[ca]] = await pool.query('SELECT id, op_carta, status, nombre_dealer, rut_dealer, id_credito_creado FROM cartas_aprobacion WHERE id=?', [id]);
     if (!ca) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada' });
     if (ca.status !== 'APROBADA')
       return res.status(400).json({ success: false, data: null, error: 'Esta corrección es solo para cartas APROBADAS — una pendiente o rechazada se corrige con el lápiz de edición' });
@@ -1842,10 +1842,22 @@ const corregirDealer = async (req, res) => {
          observaciones = CONCAT(COALESCE(observaciones,''), ' | Dealer corregido ', ?, '→', ?, ' por ', ?, ': ', ?)
        WHERE id_carta=? AND mes_cartola IS NULL`,
       [nom, rut, ca.nombre_dealer || '—', nom, quien, String(motivo).trim().slice(0, 200), id]);
+    /* El CRÉDITO también lleva el dealer (comisiones, cartola, reportería): si se
+       corrige la carta y no el crédito quedan dos verdades para el mismo hecho.
+       Solo en meses abiertos — uno cerrado ya está liquidado. */
+    let credito = 0;
+    if (ca.id_credito_creado) {
+      const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+      const [[cr]] = await pool.query("SELECT id, DATE_FORMAT(mes,'%Y-%m') mes FROM creditos WHERE id=?", [ca.id_credito_creado]);
+      if (cr && !(await isMesCerrado(cr.mes))) {
+        const [rc] = await pool.query('UPDATE creditos SET automotora=?, rut_dealer=?, updated_at=NOW() WHERE id=?', [nom, rut, cr.id]);
+        credito = rc.affectedRows;
+      }
+    }
     auditar({ req, accion: 'CORREGIR_DEALER', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: id,
       detalle: `Corrigió dealer de la carta ${ca.op_carta}: ${ca.nombre_dealer || '—'} (${ca.rut_dealer || '—'}) → ${nom} (${rut}). Motivo: ${String(motivo).trim()}`,
-      meta: { antes: { nombre: ca.nombre_dealer, rut: ca.rut_dealer }, despues: { nombre: nom, rut }, movimientos: mv.affectedRows } });
-    res.json({ success: true, data: { id, movimientos_actualizados: mv.affectedRows }, error: null });
+      meta: { antes: { nombre: ca.nombre_dealer, rut: ca.rut_dealer }, despues: { nombre: nom, rut }, movimientos: mv.affectedRows, credito } });
+    res.json({ success: true, data: { id, movimientos_actualizados: mv.affectedRows, credito_actualizado: credito }, error: null });
   } catch (e) {
     console.error('[cartas corregirDealer]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
