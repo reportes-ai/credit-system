@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -104,6 +104,7 @@
       <div>
         <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-cash-stack me-1"></i>Saldo Precio
           <label style="float:right;font-size:.78rem;font-weight:600;color:#334155;cursor:pointer"><input type="checkbox" id="sActivo" style="vertical-align:-2px"> Activo</label></h6>
+        <div class="fld"><label>Remitente</label><select id="sRemitente" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:.84rem"></select></div>
         <div class="fld"><label>Asunto</label><input id="sAsunto"></div>
         <div class="fld"><label>Cuerpo (antes del cuadro de la orden)</label><textarea id="sCuerpo"></textarea></div>
         <div class="fld"><label>Firma (después del cuadro)</label><textarea id="sFirma" style="min-height:70px"></textarea></div>
@@ -112,6 +113,7 @@
       <div>
         <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-receipt me-1"></i>Comisión
           <label style="float:right;font-size:.78rem;font-weight:600;color:#334155;cursor:pointer"><input type="checkbox" id="cActivo" style="vertical-align:-2px"> Activo</label></h6>
+        <div class="fld"><label>Remitente</label><select id="cRemitente" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:.84rem"></select></div>
         <div class="fld"><label>Asunto</label><input id="cAsunto"></div>
         <div class="fld"><label>Cuerpo (antes del cuadro de la orden)</label><textarea id="cCuerpo"></textarea></div>
         <div class="fld"><label>Firma (después del cuadro)</label><textarea id="cFirma" style="min-height:70px"></textarea></div>
@@ -203,6 +205,13 @@ function pintaCorreos(){
   const c = { ...DEF_COM_C,   ...(CFG.correo_orden_comision||{}) };
   document.getElementById('sAsunto').value = s.asunto; document.getElementById('sCuerpo').value = s.cuerpo; document.getElementById('sFirma').value = s.firma;
   document.getElementById('sActivo').checked = s.activo !== false;
+  // Remitentes habilitados (los verificados en el motor de correo)
+  const CTAS = CFG._cuentas_remitente || [{clave:'sistema',label:'Sistema (afbs@)'}];
+  const opts = CTAS.map(x=>`<option value="${x.clave}">${x.label}</option>`).join('');
+  document.getElementById('sRemitente').innerHTML = opts;
+  document.getElementById('cRemitente').innerHTML = opts;
+  document.getElementById('sRemitente').value = CTAS.some(x=>x.clave===s.remitente) ? s.remitente : 'sistema';
+  document.getElementById('cRemitente').value = CTAS.some(x=>x.clave===c.remitente) ? c.remitente : 'sistema';
   document.getElementById('cAsunto').value = c.asunto; document.getElementById('cCuerpo').value = c.cuerpo; document.getElementById('cFirma').value = c.firma;
   document.getElementById('cActivo').checked = c.activo !== false;
   const ct = { ...DEF_CARTOLA_C, ...(CFG.correo_cartola_dealer||{}) };
@@ -217,8 +226,8 @@ async function guardarCorreos(){
   const btn = document.getElementById('btn-correo'), msg = document.getElementById('msg-correo');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Guardando…'; msg.style.display='none';
   const cont = document.getElementById('cCont').value.trim() || 'contabilidad@autofacilchile.cl';
-  const saldo = { activo:document.getElementById('sActivo').checked, asunto:document.getElementById('sAsunto').value, cuerpo:document.getElementById('sCuerpo').value, firma:document.getElementById('sFirma').value };
-  const com   = { activo:document.getElementById('cActivo').checked, asunto:document.getElementById('cAsunto').value, cuerpo:document.getElementById('cCuerpo').value, firma:document.getElementById('cFirma').value };
+  const saldo = { activo:document.getElementById('sActivo').checked, remitente:document.getElementById('sRemitente').value, asunto:document.getElementById('sAsunto').value, cuerpo:document.getElementById('sCuerpo').value, firma:document.getElementById('sFirma').value };
+  const com   = { activo:document.getElementById('cActivo').checked, remitente:document.getElementById('cRemitente').value, asunto:document.getElementById('cAsunto').value, cuerpo:document.getElementById('cCuerpo').value, firma:document.getElementById('cFirma').value };
   const cta   = { activo:document.getElementById('ctaActivo').checked, asunto:document.getElementById('ctaAsunto').value, cuerpo:document.getElementById('ctaCuerpo').value, firma:document.getElementById('ctaFirma').value };
   const pag   = { activo:document.getElementById('pagActivo').checked, asunto:document.getElementById('pagAsunto').value, cuerpo:document.getElementById('pagCuerpo').value, firma:document.getElementById('pagFirma').value };
   try {

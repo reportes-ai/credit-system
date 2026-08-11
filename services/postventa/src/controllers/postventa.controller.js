@@ -1205,6 +1205,8 @@ const getConfig = async (req, res) => {
     const [rows] = await pool.query('SELECT clave, valor FROM postventa_config');
     const out = {};
     rows.forEach(r => { try { out[r.clave] = JSON.parse(r.valor); } catch (_) {} });
+    // Cuentas remitente habilitadas (motor único shared/mailer) para los selects del mantenedor
+    try { out._cuentas_remitente = require('../../../../shared/mailer').cuentasRemitente().map(c => ({ clave: c.clave, label: c.label })); } catch (_) {}
     res.json({ success: true, data: out, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -2048,8 +2050,15 @@ const enviarCorreoOrden = async (req, res) => {
       if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
     } catch (_) {}
     const cc = (req.usuario && req.usuario.email) || undefined;
-    const { enviarCorreo } = require('../../../../shared/mailer');
-    const r = await enviarCorreo({ to, cc, subject: asunto || 'Orden de Pago — AutoFácil', html });
+    const { enviarCorreo, remitentePorClave } = require('../../../../shared/mailer');
+    // Remitente configurable por plantilla (mantenedor Post Venta); default sistema
+    let from;
+    try {
+      const clave = tipo === 'comision' ? 'correo_orden_comision' : 'correo_orden_saldo';
+      const [[pl]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [clave]);
+      if (pl) { const v = JSON.parse(pl.valor); if (v && v.remitente) from = remitentePorClave(v.remitente); }
+    } catch (_) {}
+    const r = await enviarCorreo({ to, cc, subject: asunto || 'Orden de Pago — AutoFácil', html, from });
     if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.error || 'No se pudo enviar el correo' });
     try {
       const { auditar } = require('../../../../shared/audit');
