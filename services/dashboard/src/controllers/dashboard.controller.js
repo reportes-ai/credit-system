@@ -16,6 +16,25 @@ require('../../../../shared/migrate').enFila('dashboard', async () => {
   } catch (e) {
     console.error('[dashboard] CREATE TABLE dashboard_config:', e.message);
   }
+  // Card "Resumen Ejecutivo" en el módulo Dashboard (v1.0)
+  try {
+    // El Dashboard no tiene módulo propio: se cuelga del mismo módulo que ver_dashboard
+    const [[mod]] = await pool.query("SELECT id_modulo FROM funcionalidades WHERE codigo='ver_dashboard' LIMIT 1");
+    if (mod) {
+      const [[fEx]] = await pool.query("SELECT 1 ok FROM funcionalidades WHERE codigo='dashboard_resumen' LIMIT 1");
+      if (!fEx) await pool.query(
+        `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+         VALUES (?, 'Resumen Ejecutivo', 'dashboard_resumen', '/dashboard/resumen/', 'bi-speedometer2')`, [mod.id_modulo]);
+      // Habilitado para quien ya puede ver el dashboard (misma información, condensada)
+      await pool.query(
+        `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+         SELECT pp.id_perfil, f2.id_funcionalidad, 1
+           FROM permisos_perfil pp
+           JOIN funcionalidades f ON f.id_funcionalidad = pp.id_funcionalidad AND f.codigo='ver_dashboard'
+           JOIN funcionalidades f2 ON f2.codigo='dashboard_resumen'
+          WHERE pp.habilitado = 1`);
+    }
+  } catch (e) { console.error('[dashboard] card resumen:', e.message); }
 });
 
 // ── Labels de meses ──────────────────────────────────────────────────────────

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<!-- v1.0 — Resumen Ejecutivo del Dashboard: cockpit del mes con KPIs, presupuesto, tendencia, mix, embudo y rankings. Lee los MISMOS datos que el dashboard (/api/dashboard/datos) para cuadrar 1:1 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resumen Ejecutivo — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --line:#1e2a44; --tx:#e2e8f0; --mut:#8ea3c2;
+          --accent:#009AFE; --ok:#34d399; --bad:#f87171; --warn:#fbbf24; --gold:#f0b429; }
+  * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--tx); font-family:'Segoe UI',system-ui,sans-serif; }
+  .main { max-width:1280px; margin:0 auto; padding:20px 22px 70px; }
+  .head { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+  .head h1 { margin:0; font-size:1.3rem; font-weight:800; letter-spacing:.02em; }
+  .head .sub { color:var(--mut); font-size:.78rem; }
+  .head select { background:var(--panel); color:var(--tx); border:1.5px solid var(--line); border-radius:9px; padding:7px 12px; font:inherit; font-size:.85rem; }
+  .grid { display:grid; gap:14px; }
+  .kpis { grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); margin-bottom:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
+  .kpi .lbl { color:var(--mut); font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+  .kpi .val { font-size:1.75rem; font-weight:800; margin:6px 0 2px; font-variant-numeric:tabular-nums; }
+  .kpi .cmp { font-size:.74rem; color:var(--mut); }
+  .delta { font-weight:800; border-radius:7px; padding:1px 7px; font-size:.72rem; }
+  .up { color:#052e16; background:var(--ok); } .down { color:#450a0a; background:var(--bad); } .flat { color:#0b1220; background:#94a3b8; }
+  .row2 { grid-template-columns:1.15fr .85fr; margin-bottom:14px; }
+  .row3 { grid-template-columns:1fr 1fr 1fr; margin-bottom:14px; }
+  @media (max-width:980px){ .row2,.row3{ grid-template-columns:1fr; } }
+  h3.t { margin:0 0 12px; font-size:.8rem; text-transform:uppercase; letter-spacing:.09em; color:var(--mut); font-weight:800; display:flex; align-items:center; gap:8px; }
+  h3.t i { color:var(--accent); }
+  .ringwrap { display:flex; gap:22px; align-items:center; flex-wrap:wrap; }
+  .ringlbl { font-size:.78rem; color:var(--mut); line-height:1.7; }
+  .ringlbl b { color:var(--tx); font-size:.95rem; }
+  .proy { margin-top:8px; padding:8px 12px; border-radius:10px; background:var(--panel2); border:1px solid var(--line); font-size:.78rem; }
+  .bars { display:flex; align-items:flex-end; gap:6px; height:150px; margin-top:6px; }
+  .bcol { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
+  .b { width:100%; border-radius:6px 6px 2px 2px; background:linear-gradient(180deg,var(--accent),#0141A2); position:relative; min-height:3px; }
+  .b.cur { background:linear-gradient(180deg,var(--gold),#b45309); }
+  .b .tip { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:.6rem; color:var(--mut); white-space:nowrap; }
+  .blab { font-size:.6rem; color:var(--mut); white-space:nowrap; }
+  .rank { display:flex; flex-direction:column; gap:9px; }
+  .rk { display:grid; grid-template-columns:20px 1fr auto; gap:10px; align-items:center; font-size:.8rem; }
+  .rk .n { color:var(--mut); font-weight:800; } .rk .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rk .bar { height:7px; border-radius:5px; background:var(--panel2); margin-top:4px; overflow:hidden; }
+  .rk .bar > div { height:100%; border-radius:5px; background:linear-gradient(90deg,#0141A2,var(--accent)); }
+  .rk .v { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; white-space:nowrap; }
+  .rk .v small { display:block; color:var(--mut); font-weight:400; font-size:.66rem; }
+  .fun { display:flex; flex-direction:column; gap:8px; }
+  .fstep { border-radius:10px; padding:9px 14px; display:flex; justify-content:space-between; align-items:center; font-size:.82rem; font-weight:700; }
+  .fpct { font-size:.7rem; color:var(--mut); text-align:right; margin:-2px 4px 2px 0; }
+  .leg { display:flex; gap:14px; flex-wrap:wrap; font-size:.75rem; color:var(--mut); margin-top:10px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
+  .foot { color:#64748b; font-size:.7rem; margin-top:18px; }
+  .foot a { color:var(--accent); }
+  .skel { color:var(--mut); font-size:.85rem; padding:30px; text-align:center; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Dashboard', href:'/dashboard/' },
+  { label:'Resumen Ejecutivo', icon:'bi-speedometer2', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="head">
+    <h1><i class="bi bi-speedometer2" style="color:var(--accent)"></i> Resumen Ejecutivo</h1>
+    <select id="selMes" onchange="pintar()"></select>
+    <span class="sub" id="subInfo">Cargando…</span>
+    <span style="flex:1"></span>
+    <a href="/dashboard/" style="color:var(--accent);font-size:.78rem;text-decoration:none"><i class="bi bi-bar-chart-line"></i> Ir al Dashboard completo</a>
+  </div>
+
+  <div id="cont" class="skel">Cargando datos del dashboard…</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
+const mm  = v => (v/1e6).toLocaleString('es-CL',{maximumFractionDigits:1}) + ' MM';
+const num = v => Number(v).toLocaleString('es-CL');
+const MESN = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const mesLab = m => MESN[+m.slice(5,7)-1] + ' ' + m.slice(2,4);
+const esOtorgada = r => r.estado_credito === 'OTORGADO' || r.estado_credito === 'PREPAGADO';
+const esAprobada = r => esOtorgada(r) || r.estado_credito === 'APROBADO' || r.estado_credito === 'CARTA_APROBACION';
+
+let RAW = [], PPTO = [];
+
+async function cargar() {
+  const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token') };
+  const [d, p] = await Promise.all([
+    fetch('/api/dashboard/datos', { headers: H }).then(r => r.json()),
+    fetch('/api/dashboard/presupuesto', { headers: H }).then(r => r.json()).catch(() => null),
+  ]);
+  if (!d.success) { $('#cont').textContent = 'No se pudieron cargar los datos.'; return; }
+  RAW = d.raw; PPTO = (p && p.data) || [];
+  // Selector: todos los meses con datos, el más reciente primero
+  const meses = [...new Set(RAW.map(r => r.mes))].filter(Boolean).sort().reverse();
+  $('#selMes').innerHTML = meses.map(m => `<option value="${m}">${mesLab(m)}</option>`).join('');
+  $('#subInfo').textContent = num(RAW.length) + ' operaciones · actualizado ' + new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+  pintar();
+}
+
+function delta(act, ant, fmt) {
+  if (!ant) return '<span class="delta flat">s/base</span>';
+  const p = (act - ant) / ant * 100;
+  const cls = p > 0.5 ? 'up' : p < -0.5 ? 'down' : 'flat';
+  const flecha = p > 0.5 ? '▲' : p < -0.5 ? '▼' : '＝';
+  return `<span class="delta ${cls}">${flecha} ${Math.abs(p).toLocaleString('es-CL',{maximumFractionDigits:1})}%</span> <span style="color:var(--mut)">vs ${fmt}</span>`;
+}
+
+function pintar() {
+  const mes = $('#selMes').value; if (!mes) return;
+  const hoy = new Date();
+  const mesHoy = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0'); // fecha LOCAL (no UTC)
+  const esMesActual = mes === mesHoy;
+  const diaCorte = esMesActual ? hoy.getDate() : 31;                 // mes cerrado: mes completo
+  const [aa, mmn] = mes.split('-').map(Number);
+  const mesAnt = mmn === 1 ? (aa-1) + '-12' : aa + '-' + String(mmn-1).padStart(2,'0');
+  const diasMes = new Date(aa, mmn, 0).getDate();
+
+  const delMes  = RAW.filter(r => r.mes === mes);
+  const ot      = delMes.filter(esOtorgada);
+  // Comparable: mes anterior A IGUAL DÍA (fecha otorgado, o fecha estado si falta)
+  const fRef = r => r.fecha_otorgado || r.fecha_estado || '';
+  const otAntIg = RAW.filter(r => r.mes === mesAnt && esOtorgada(r) && (+(fRef(r).slice(8,10)) || 1) <= diaCorte);
+  const sum = (arr, k) => arr.reduce((a, r) => a + (r[k] || 0), 0);
+
+  const monto = sum(ot, 'monto_financiado'), ingreso = sum(ot, 'ingreso_neto_total');
+  const montoAnt = sum(otAntIg, 'monto_financiado'), ingresoAnt = sum(otAntIg, 'ingreso_neto_total');
+  const ticket = ot.length ? monto / ot.length : 0;
+  const ticketAnt = otAntIg.length ? montoAnt / otAntIg.length : 0;
+  const cmpLbl = mesLab(mesAnt) + (esMesActual ? ' al día ' + diaCorte : '');
+
+  // ── Presupuesto y proyección ──
+  const pp = PPTO.find(x => x.mes === mes);
+  const pctOps = pp && pp.ops ? ot.length / pp.ops * 100 : null;
+  const pctMonto = pp && pp.monto ? (monto/1e6) / pp.monto * 100 : null;
+  const ritmo = esMesActual && diaCorte > 0 ? ot.length / diaCorte : null;
+  const proyOps = ritmo != null ? Math.round(ritmo * diasMes) : null;
+  const proyMonto = esMesActual && diaCorte > 0 ? monto / diaCorte * diasMes : null;
+
+  // ── Tendencia 12 meses (otorgadas) ──
+  const meses12 = [...new Set(RAW.map(r => r.mes))].filter(m => m && m <= mes).sort().slice(-12);
+  const serie = meses12.map(m => { const o = RAW.filter(r => r.mes === m && esOtorgada(r)); return { m, n:o.length, monto:sum(o,'monto_financiado') }; });
+  const maxM = Math.max(...serie.map(s => s.monto), 1);
+
+  // ── Mix por institución (otorgadas del mes) ──
+  const mix = {}; ot.forEach(r => { const k = r.institucion || 'OTRA'; (mix[k] = mix[k] || { n:0, ing:0 }); mix[k].n++; mix[k].ing += r.ingreso_neto_total || 0; });
+  const MIXCOL = { 'AUTOFIN':'#009AFE', 'UNIDAD DE CREDITO':'#f0b429', 'AUTOFACIL':'#34d399', 'OTRA':'#94a3b8' };
+
+  // ── Embudo ──
+  const nAprob = delMes.filter(esAprobada).length, nOt = ot.length, nTot = delMes.length;
+
+  // ── Rankings (otorgadas del mes) ──
+  const top = (key) => {
+    const m = {}; ot.forEach(r => { const k = (r[key]||'').trim() || '(sin dato)'; (m[k] = m[k] || { n:0, monto:0 }); m[k].n++; m[k].monto += r.monto_financiado||0; });
+    return Object.entries(m).sort((a,b) => b[1].monto - a[1].monto).slice(0,5);
+  };
+  const topEj = top('ejecutivo'), topDl = top('automotora');
+  const rankHTML = arr => {
+    const mx = Math.max(...arr.map(x => x[1].monto), 1);
+    return arr.map((x,i) => `<div class="rk"><span class="n">${i+1}</span>
+      <div><div class="nm" title="${x[0]}">${x[0]}</div><div class="bar"><div style="width:${x[1].monto/mx*100}%"></div></div></div>
+      <div class="v">${mm(x[1].monto)}<small>${x[1].n} ops</small></div></div>`).join('') || '<span class="sub">Sin operaciones</span>';
+  };
+
+  // ── Anillo SVG de presupuesto ──
+  const ring = (pct, color) => {
+    const p = Math.min(pct||0, 100), r = 44, c = 2*Math.PI*r;
+    return `<svg width="112" height="112" viewBox="0 0 112 112">
+      <circle cx="56" cy="56" r="${r}" fill="none" stroke="var(--panel2)" stroke-width="11"/>
+      <circle cx="56" cy="56" r="${r}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round"
+        stroke-dasharray="${c*p/100} ${c}" transform="rotate(-90 56 56)"/>
+      <text x="56" y="62" text-anchor="middle" fill="var(--tx)" font-size="20" font-weight="800">${pct==null?'—':Math.round(pct)+'%'}</text></svg>`;
+  };
+
+  $('#cont').className = '';
+  $('#cont').innerHTML = `
+  <div class="grid kpis">
+    <div class="card kpi"><div class="lbl">Otorgadas · ${mesLab(mes)}</div><div class="val">${num(nOt)}</div><div class="cmp">${delta(nOt, otAntIg.length, cmpLbl)}</div></div>
+    <div class="card kpi"><div class="lbl">Monto financiado</div><div class="val">$${mm(monto)}</div><div class="cmp">${delta(monto, montoAnt, cmpLbl)}</div></div>
+    <div class="card kpi"><div class="lbl">Ingreso neto total</div><div class="val">$${mm(ingreso)}</div><div class="cmp">${delta(ingreso, ingresoAnt, cmpLbl)}</div></div>
+    <div class="card kpi"><div class="lbl">Ticket promedio</div><div class="val">${clp(ticket)}</div><div class="cmp">${delta(ticket, ticketAnt, cmpLbl)}</div></div>
+  </div>
+
+  <div class="grid row2">
+    <div class="card">
+      <h3 class="t"><i class="bi bi-graph-up-arrow"></i> Monto otorgado — últimos 12 meses</h3>
+      <div class="bars">${serie.map(s => `<div class="bcol">
+        <div class="b ${s.m===mes?'cur':''}" style="height:${Math.max(s.monto/maxM*100,2)}%" title="${mesLab(s.m)}: $${mm(s.monto)} · ${s.n} ops"><span class="tip">${s.n}</span></div>
+        <span class="blab">${mesLab(s.m)}</span></div>`).join('')}</div>
+      <div class="leg"><span><span class="dot" style="background:var(--accent)"></span>Monto financiado (alto de la barra)</span><span>El número sobre cada barra son las operaciones</span><span><span class="dot" style="background:var(--gold)"></span>Mes seleccionado</span></div>
+    </div>
+    <div class="card">
+      <h3 class="t"><i class="bi bi-bullseye"></i> Avance vs presupuesto · ${mesLab(mes)}</h3>
+      ${pp ? `<div class="ringwrap">
+        ${ring(pctOps, 'var(--accent)')}
+        <div class="ringlbl"><b>${num(nOt)}</b> de <b>${num(pp.ops)}</b> operaciones<br>
+        <b>$${mm(monto)}</b> de <b>$${num(pp.monto)} MM</b> (${pctMonto==null?'—':Math.round(pctMonto)+'%'})</div>
+      </div>
+      ${esMesActual ? `<div class="proy"><i class="bi bi-crosshair" style="color:var(--warn)"></i>
+        A ritmo actual (${ritmo.toLocaleString('es-CL',{maximumFractionDigits:1})} ops/día) el mes cierra en
+        <b>${num(proyOps)} ops</b> y <b>$${mm(proyMonto)}</b> —
+        ${proyOps >= pp.ops ? '<b style="color:var(--ok)">cumple el presupuesto</b>' : `faltan <b style="color:var(--bad)">${num(pp.ops - proyOps)} ops</b> de ritmo`}.</div>` : ''}`
+      : '<span class="sub" style="color:var(--mut)">Sin presupuesto cargado para este mes.</span>'}
+    </div>
+  </div>
+
+  <div class="grid row3">
+    <div class="card">
+      <h3 class="t"><i class="bi bi-pie-chart"></i> Mix por institución (otorgadas)</h3>
+      ${Object.entries(mix).sort((a,b)=>b[1].n-a[1].n).map(([k,v]) => `<div class="rk" style="margin-bottom:9px"><span class="dot" style="background:${MIXCOL[k]||'#94a3b8'}"></span>
+        <div><div class="nm">${k}</div><div class="bar"><div style="width:${v.n/Math.max(nOt,1)*100}%;background:${MIXCOL[k]||'#94a3b8'}"></div></div></div>
+        <div class="v">${Math.round(v.n/Math.max(nOt,1)*100)}%<small>${v.n} ops · $${mm(v.ing)} ing.</small></div></div>`).join('') || '<span style="color:var(--mut);font-size:.8rem">Sin operaciones</span>'}
+    </div>
+    <div class="card">
+      <h3 class="t"><i class="bi bi-funnel"></i> Embudo del mes</h3>
+      <div class="fun">
+        <div class="fstep" style="background:#1e2a44"><span>Ingresadas</span><span>${num(nTot)}</span></div>
+        <div class="fpct">${nTot?Math.round(nAprob/nTot*100):0}% aprobación</div>
+        <div class="fstep" style="background:#0141A2"><span>Aprobadas</span><span>${num(nAprob)}</span></div>
+        <div class="fpct">${nAprob?Math.round(nOt/nAprob*100):0}% curse</div>
+        <div class="fstep" style="background:linear-gradient(90deg,#047857,#34d399);color:#03291c"><span>Otorgadas</span><span>${num(nOt)}</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="t"><i class="bi bi-trophy"></i> Top ejecutivos · ${mesLab(mes)}</h3>
+      <div class="rank">${rankHTML(topEj)}</div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns:1fr">
+    <div class="card">
+      <h3 class="t"><i class="bi bi-shop"></i> Top dealers · ${mesLab(mes)}</h3>
+      <div class="rank">${rankHTML(topDl)}</div>
+    </div>
+  </div>
+
+  <div class="foot"><i class="bi bi-info-circle"></i> Misma fuente que el <a href="/dashboard/">Dashboard</a> (operaciones desde ene-2025, deduplicadas por operación; otorgada = estado OTORGADO/PREPAGADO). La comparación de KPIs es contra el mes anterior <b>a igual día</b>. Presupuesto editable en Dashboard → Presupuesto.</div>`;
+}
+
+cargar();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
