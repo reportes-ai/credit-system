@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -419,6 +419,13 @@ function pintar(){
         ${yoyRow('Ingreso neto', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
         ${yoyRow('Ticket promedio', tk, otYoY.length?sum(otYoY,'monto_financiado')/otYoY.length:0, clp)}
       </div>`:'<span class="sub">Aún no hay datos del mismo mes del año anterior.</span>'}
+      <h3 class="t" style="margin-top:18px"><i class="bi bi-calendar2-week"></i> Mes contra mes · ${mesLab(mes)} vs ${mesLab(mesAnt)}${esActual?' <span style="text-transform:none;letter-spacing:0;font-weight:600">(a igual día)</span>':''}</h3>
+      <div class="yoy">
+        ${yoyRow('Otorgadas', nOt, otAntIg.length, num)}
+        ${yoyRow('Monto financiado', monto, montoA, v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ingreso neto', ingreso, ingresoA, v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ticket promedio', tk, tkA, clp)}
+      </div>
     </div>
   </div>
 
