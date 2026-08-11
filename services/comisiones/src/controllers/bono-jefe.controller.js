@@ -4,8 +4,8 @@
    El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo de
    Ejecutivos Comerciales en 3 pilares del mes:
      · CRÉDITOS otorgados    (pond. 45%)  — tramo mínimo/esperado
-     · MONTOS aprobados      (pond. 40%)  — umbrales = ops × monto por op
-     · NUEVOS DEALERS cursados (pond. 15%)
+     · MONTOS otorgados      (pond. 40%)  — umbrales = ops × monto por op
+     · NUEVOS DEALERS con negocios (pond. 15%)
    El score del equipo (0–100+) entra a una curva exponencial sobre el
    sueldo fijo: premio = fijo × %variable × (e^(k·x)−1)/(e^k−1), con
    x = (score−mínimo)/(máximo−mínimo); bajo el mínimo el premio es 0.
@@ -111,10 +111,11 @@ async function calcularBSC(mesQ) {
       `SELECT ejecutivo, COUNT(*) n FROM creditos
         WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
           AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
-    // Pilar 2: MONTOS aprobados del mes (aprobado u otorgado)
+    // Pilar 2: MONTOS OTORGADOS del mes (solo operaciones cursadas — definición Pato 2026-08-11;
+    // antes sumaba también las APROBADAS, lo que no calzaba con el nombre del pilar)
     const [apr] = await pool.query(
       `SELECT ejecutivo, COALESCE(SUM(monto_financiado),0) monto FROM creditos
-        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito IN ('APROBADO','OTORGADO')
+        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
           AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
     // Pilar 3: NUEVOS dealers — fichas de incorporación de dealers APROBADAS en el mes
     // (fecha_revision = cuando se aprobó), atribuidas al ejecutivo que ingresó la ficha
@@ -164,7 +165,7 @@ async function calcularBSC(mesQ) {
     const pasos = [
       { titulo: 'Equipo evaluado', detalle: `${filas.length} Ejecutivos Comerciales activos en ${mes}. El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo, no sobre un ejecutivo individual.` },
       { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
-      { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} aprobados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
+      { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} otorgados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
       { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (fichas de incorporación de dealers ingresadas por el ejecutivo y APROBADAS durante ${mes}). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
       { titulo: 'Score final del equipo', detalle: `${n2(avg.ptj_creditos)} + ${n2(avg.ptj_montos)} + ${n2(avg.ptj_dealers)} = ${n2(avg.score)} puntos.` },
       { titulo: 'Curva del premio', detalle: premio.pct_adicional === 0
