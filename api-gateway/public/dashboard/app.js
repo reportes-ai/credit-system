@@ -3011,6 +3011,7 @@ function buildVProy2() {
       <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${pQ ? Math.round(pQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${pM ? fM(pM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${pF ? fM(pF) : '—'}</b></td></tr></tfoot>`;
   };
   renderTablaProy2(mzQ, mzM, mzF);
+  renderPulsoProy2(rows, mesAct, mzQ);
   document.getElementById('proy2-nota').innerHTML =
     `<i class="bi bi-info-circle me-1"></i>Mezcla = ${(w*100).toFixed(0)}% curva hábil (mediana de ${curvasM.length} meses) + ${((1-w)*100).toFixed(0)}% tendencia (regresión de los últimos ${MESES_TREND} cierres). La distribución por institución es proporcional al avance real de cada una.`;
 
@@ -3051,6 +3052,7 @@ function buildVProy2() {
       document.getElementById('kpi-proy2-m').textContent = fM(fMz);
       document.getElementById('kpi-proy2-f').textContent = fM(fF);
       renderTablaProy2(fQ, fMz, fF);
+      renderPulsoProy2(rows, mesAct, fQ);
       renderMetodos(`
         <tr><td>Clima + calendario</td><td>${fM(clM)}</td><td>${Math.round(clQ)}</td><td>${fM(clF)}</td><td style="font-size:.74rem;color:#64748b">día a día lo que queda del mes: feriados, lluvia/seco (pronóstico) y sáb/dom con su rendimiento histórico</td></tr>
         <tr style="background:#eff6ff"><td><b>Final (recomendada)</b></td><td><b>${fM(fMz)}</b></td><td><b>${Math.round(fQ)}</b></td><td><b>${fM(fF)}</b></td><td style="font-size:.74rem;color:#64748b">promedio entre la mezcla estadística (${mzQ ? Math.round(mzQ) : '—'} ops) y el modelo clima/calendario (${Math.round(clQ)} ops)</td></tr>`);
@@ -3145,6 +3147,54 @@ function buildVProy2() {
   afChartZoom('ch-proy2-hist', 'Monto colocado mensual — histórico y proyectado');
   afChartZoom('ch-proy2-curva', 'Avance monto acumulado por día hábil — real vs esperado');
   cargarClimaCorrelacion();
+}
+
+/* ── PULSO DIARIO (Proyección Pro) ────────────────────────────────────────────
+   Calendario del mes: días pasados con su Q real (intensidad azul); días futuros
+   con la META diaria en dorado — lo que falta para llegar a la PROYECCIÓN de
+   cierre, repartido según el peso histórico de cada día de la semana (últimos
+   3 meses: el sábado pesa más que el lunes). Mismo motor visual que el
+   Resumen Ejecutivo (/dashboard/resumen/), alimentado por la proyección final. */
+function renderPulsoProy2(rows, mesAct, proyQ) {
+  const cont = document.getElementById('proy2-pulso');
+  if (!cont) return;
+  const hoy = new Date();
+  const [aa, mn] = mesAct.split('-').map(Number);
+  const diasMes = new Date(aa, mn, 0).getDate();
+  const esActual = mesAct === hoy.getFullYear() + '-' + String(hoy.getMonth() + 1).padStart(2, '0');
+  const diaCorte = esActual ? hoy.getDate() : diasMes;
+  const delMes = rows.filter(r => r.mes === mesAct);
+  const porDia = {};
+  delMes.forEach(r => { const d = +(String(r.fecha_otorgado || '').slice(8, 10)) || 0; if (d) porDia[d] = (porDia[d] || 0) + 1; });
+  const maxD = Math.max(...Object.values(porDia), 1);
+  // peso por día de semana de los 3 meses previos
+  const prevMeses = [...new Set(rows.map(r => r.mes))].filter(m => m < mesAct).sort().slice(-3);
+  const pesoDS = [0, 0, 0, 0, 0, 0, 0];
+  rows.filter(r => prevMeses.includes(r.mes) && r.fecha_otorgado).forEach(r => { pesoDS[new Date(r.fecha_otorgado + 'T12:00:00').getDay()]++; });
+  let pesosFut = 0;
+  for (let d = diaCorte + 1; d <= diasMes; d++) pesosFut += pesoDS[new Date(aa, mn - 1, d).getDay()] || 0;
+  const faltan = Math.max(Math.round(proyQ || 0) - delMes.length, 0);
+  const espDia = d => (!esActual || d <= diaCorte || !pesosFut) ? null : faltan * (pesoDS[new Date(aa, mn - 1, d).getDay()] || 0) / pesosFut;
+  const off = (new Date(aa, mn - 1, 1).getDay() + 6) % 7; // Lun=0
+  let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">' +
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<div style="text-align:center;font-size:.6rem;color:#94a3b8;font-weight:800">${d}</div>`).join('');
+  for (let i = 0; i < off; i++) h += '<div></div>';
+  for (let d = 1; d <= diasMes; d++) {
+    const q = porDia[d] || 0, t = q / maxD, esp = espDia(d);
+    const fut = esActual && d > diaCorte;
+    const bg = fut ? '#fffbeb' : q ? `rgba(1,65,162,${(0.12 + t * 0.78).toFixed(2)})` : '#f1f5f9';
+    const cTx = !fut && q && t > 0.55 ? '#fff' : '#475569';
+    h += `<div title="${d}: ${fut ? (esp != null ? 'meta ' + esp.toFixed(1) + ' para la proyección' : '—') : q + ' otorgadas'}"
+      style="aspect-ratio:1.25;border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;
+      font-size:.66rem;font-weight:700;color:${cTx};background:${bg};border:1px ${fut ? 'dashed #f59e0b66' : 'solid #e2e8f0'}">
+      ${d}${!fut && q ? `<span style="position:absolute;top:1px;right:4px;font-size:.56rem;opacity:.9">${q}</span>` : ''}
+      ${esp != null ? `<span style="position:absolute;bottom:1px;left:4px;font-size:.56rem;color:#b45309;font-weight:800">${Math.round(esp)}</span>` : ''}</div>`;
+  }
+  h += '</div>';
+  h += `<div style="margin-top:9px;font-size:.66rem;color:#64748b;line-height:1.5">
+    <span style="color:#0141A2;font-weight:800">n</span> Q real del día ·
+    <span style="color:#b45309;font-weight:800">n</span> meta diaria para llegar a la proyección de cierre (${Math.round(proyQ || 0)} ops), repartida según el peso histórico de cada día de la semana</div>`;
+  cont.innerHTML = h;
 }
 
 /* ── RITMO REQUERIDO PARA EL PRESUPUESTO ──────────────────────────────────────

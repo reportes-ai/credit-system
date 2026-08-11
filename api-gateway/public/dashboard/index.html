@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.16 — tab Resumen: acceso al Resumen Ejecutivo (/dashboard/resumen/) · v3.15 — captura Desempeno: TC/TA con los colores por percentil de la pantalla -->
+<!-- v3.17 — Proyeccion Pro: pulso diario con meta para la proyeccion junto a las tablas · v3.16 — tab Resumen: acceso al Resumen Ejecutivo (/dashboard/resumen/) · v3.15 — captura Desempeno: TC/TA con los colores por percentil de la pantalla -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -878,14 +878,22 @@
     <div class="logo-block"><a href="/"><img src="/img/logo.png" alt="AutoFácil" style="height:36px;display:block"></a></div>
   </div>
   <div class="kpi-strip" id="kpi-proy2"></div>
-  <div class="card">
-    <div class="card-head" style="justify-content:flex-start"><span>Proyección por institución — curva hábil + tendencia + clima/feriados/fin de semana</span></div>
-    <div style="overflow:auto"><table class="sumtbl" id="t-proy2"></table></div>
-    <div id="proy2-nota" style="padding:8px 14px;font-size:.74rem;color:#64748b"></div>
-  </div>
-  <div class="card" style="margin-top:14px">
-    <div class="card-head" style="justify-content:flex-start"><span>Ritmo requerido para cumplir el presupuesto</span></div>
-    <div style="overflow:auto" id="proy2-ritmo"></div>
+  <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:start">
+    <div>
+      <div class="card">
+        <div class="card-head" style="justify-content:flex-start"><span>Proyección por institución — curva hábil + tendencia + clima/feriados/fin de semana</span></div>
+        <div style="overflow:auto"><table class="sumtbl" id="t-proy2"></table></div>
+        <div id="proy2-nota" style="padding:8px 14px;font-size:.74rem;color:#64748b"></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-head" style="justify-content:flex-start"><span>Ritmo requerido para cumplir el presupuesto</span></div>
+        <div style="overflow:auto" id="proy2-ritmo"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head" style="justify-content:flex-start"><span>📅 Pulso diario — real y meta para la proyección</span></div>
+      <div id="proy2-pulso" style="padding:10px 14px 14px"></div>
+    </div>
   </div>
   <div class="card" style="margin-top:14px">
     <div class="card-head" style="justify-content:flex-start"><span>Los 3 métodos comparados (monto de cierre)</span></div>
