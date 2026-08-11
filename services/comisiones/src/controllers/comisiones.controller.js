@@ -44,6 +44,30 @@ require('../../../../shared/migrate').enFila('comisiones', async () => {
       );
     }
 
+    // BITÁCORA DE CAMBIOS = versiones de las variables. Append-only: no existe
+    // endpoint que la edite ni la borre; el rango de vigencia se resuelve al leer.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS comisiones_variables_versiones (
+        id             INT AUTO_INCREMENT PRIMARY KEY,
+        vigente_desde  CHAR(7) NOT NULL,
+        vigente_hasta  CHAR(7) NULL,
+        valores        JSON NOT NULL,
+        anterior       JSON NULL,
+        n_cambios      INT DEFAULT 0,
+        total_antes    BIGINT NULL,
+        total_despues  BIGINT NULL,
+        mes_simulado   CHAR(7) NULL,
+        id_usuario     INT NULL,
+        usuario_nombre VARCHAR(160),
+        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_cvv_vig (vigente_desde, vigente_hasta)
+      )`);
+    // Permiso propio para ver la bitácora (se designa desde la matriz de Perfiles)
+    const [[modC]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/comisiones/' LIMIT 1");
+    if (modC) await pool.query(`INSERT INTO funcionalidades (id_modulo, codigo, nombre, href, icono)
+        SELECT ?, 'comisiones_variables_bitacora', 'Bitácora de Cambios Variables Comisiones', NULL, NULL
+        WHERE NOT EXISTS (SELECT 1 FROM funcionalidades WHERE codigo='comisiones_variables_bitacora')`, [modC.id_modulo]);
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS comisiones_aprobaciones (
         id           INT AUTO_INCREMENT PRIMARY KEY,
@@ -213,11 +237,29 @@ async function autoAprobarComisiones() {
 programar('comisiones-auto-aprobar', autoAprobarComisiones, 30 * 60 * 1000, { arranqueMs: 20000 });
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
-async function getVars() {
+async function getVars(mes) {
+  const ver = mes ? await varsVersion(mes) : null;
+  if (ver) { const v = {}; Object.entries(ver).forEach(([k, x]) => { v[k] = parseFloat(x); }); return v; }
   const [rows] = await pool.query('SELECT clave, valor FROM comisiones_variables');
   const v = {};
   rows.forEach(r => { v[r.clave] = parseFloat(r.valor); });
   return v;
+}
+/* Versión de variables vigente para un mes. Igual que en el Bono Jefe Comercial:
+   las versiones NO se editan (la bitácora es inmutable), el rango se resuelve al
+   leer, y un mes anterior a la primera versión conserva las variables que tenía. */
+async function varsVersion(mes) {
+  if (!/^\d{4}-\d{2}$/.test(mes || '')) return null;
+  const par = x => { try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return null; } };
+  const [[v]] = await pool.query(
+    `SELECT valores FROM comisiones_variables_versiones
+      WHERE vigente_desde <= ? AND (vigente_hasta IS NULL OR vigente_hasta >= ?)
+      ORDER BY vigente_desde DESC, id DESC LIMIT 1`, [mes, mes]).catch(() => [[null]]);
+  if (v) return par(v.valores);
+  const [[p]] = await pool.query(
+    `SELECT anterior FROM comisiones_variables_versiones WHERE vigente_desde > ?
+      ORDER BY vigente_desde ASC, id ASC LIMIT 1`, [mes]).catch(() => [[null]]);
+  return p && p.anterior ? par(p.anterior) : null;
 }
 
 /* ═══ DESCUENTOS POR PREPAGO Y ANULACIÓN (cláusula novena del anexo) ═══════════
@@ -395,23 +437,96 @@ const getVariables = async (_req, res) => {
 /* ── PUT /api/comisiones/variables ───────────────────────────────────────── */
 const putVariables = async (req, res) => {
   try {
-    const updates = req.body; // { clave: valor, ... }
+    const { vigente_desde: desdeRaw, vigente_hasta: hastaRaw, variables, ...resto } = req.body || {};
+    const updates = (variables && typeof variables === 'object') ? variables : resto;   // { clave: valor, ... }
+
+    // ── Vigencia del cambio (obligatoria "desde"; "hasta" vacío = indefinido) ──
+    const desde = String(desdeRaw || '').trim();
+    const hasta = String(hastaRaw || '').trim();
+    if (!/^\d{4}-\d{2}$/.test(desde))
+      return res.status(400).json({ success: false, data: null, error: 'Indica el mes DESDE cuándo rige este cambio' });
+    if (hasta && !/^\d{4}-\d{2}$/.test(hasta))
+      return res.status(400).json({ success: false, data: null, error: 'Mes HASTA inválido' });
+    if (hasta && hasta < desde)
+      return res.status(400).json({ success: false, data: null, error: 'El mes HASTA no puede ser anterior al DESDE' });
+    // Un mes cerrado ya está liquidado y pagado: sus variables no se tocan.
+    const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+    if (await isMesCerrado(desde))
+      return res.status(400).json({ success: false, data: null, error: `El mes ${desde} está CERRADO: no se permiten cambios de variables sobre meses cerrados` });
+
+    const antes = await getVars();
     for (const [clave, valor] of Object.entries(updates)) {
-      await pool.query(
-        'UPDATE comisiones_variables SET valor = ? WHERE clave = ?',
-        [parseFloat(valor), clave]
-      );
+      const num = parseFloat(valor);
+      if (!Number.isFinite(num)) return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${clave}` });
+      await pool.query('UPDATE comisiones_variables SET valor = ? WHERE clave = ?', [num, clave]);
     }
-    auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'comision_variable', entidad_id: 'variables', detalle: `Actualizó variables de comisiones (${Object.keys(updates).length} variable/s)`, meta: updates });
-    res.json({ success: true, data: null, error: null });
+    const despues = await getVars();
+    const difs = Object.keys(despues).filter(k => Number(antes[k]) !== Number(despues[k]));
+
+    // Efecto: total de comisiones del equipo en el mes de inicio de vigencia,
+    // con las variables antiguas y con las nuevas (mismas operaciones).
+    let totAntes = null, totDespues = null;
+    try {
+      const suma = filas => Math.round(filas.reduce((s, f) => s + (Number(f.con_semana_corrida) || Number(f.incentivo_final) || 0), 0));
+      totAntes = suma(await calcularMes(desde, antes));
+      totDespues = suma(await calcularMes(desde, despues));
+    } catch (e) { console.error('[comisiones simulación]', e.message); }
+
+    const nom = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || req.usuario?.email || 'Sistema';
+    await pool.query(
+      `INSERT INTO comisiones_variables_versiones (vigente_desde, vigente_hasta, valores, anterior, n_cambios,
+         total_antes, total_despues, mes_simulado, id_usuario, usuario_nombre)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [desde, hasta || null, JSON.stringify(despues), JSON.stringify(antes), difs.length,
+       totAntes, totDespues, desde, req.usuario?.id_usuario || null, nom]);
+
+    auditar({ req, accion: 'EDITAR', modulo: 'comisiones', entidad: 'comision_variable', entidad_id: 'variables',
+      detalle: `Actualizó variables de comisiones (${difs.length} variable/s, vigencia ${desde} → ${hasta || 'indefinido'})`, meta: updates });
+    res.json({ success: true, data: { n_cambios: difs.length, vigente_desde: desde, vigente_hasta: hasta || null }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
 };
 
+/* ── BITÁCORA DE CAMBIOS de variables (solo lectura; sin endpoints de edición) ── */
+const getVariablesBitacora = async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, created_at, usuario_nombre, n_cambios, vigente_desde, vigente_hasta,
+              total_antes, total_despues, mes_simulado
+         FROM comisiones_variables_versiones ORDER BY id DESC LIMIT 500`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+const getVariablesBitacoraDetalle = async (req, res) => {
+  try {
+    const [[v]] = await pool.query('SELECT * FROM comisiones_variables_versiones WHERE id=? LIMIT 1', [req.params.id]);
+    if (!v) return res.status(404).json({ success: false, data: null, error: 'Registro no encontrado' });
+    const par = x => { try { return typeof x === 'string' ? JSON.parse(x) : (x || {}); } catch { return {}; } };
+    const antes = par(v.anterior), despues = par(v.valores);
+    const [meta] = await pool.query('SELECT clave, etiqueta, tipo FROM comisiones_variables');
+    const mMeta = new Map(meta.map(m => [m.clave, m]));
+    const claves = [...new Set([...Object.keys(antes), ...Object.keys(despues)])].sort();
+    const detalle = claves.map(k => ({
+      clave: k, etiqueta: (mMeta.get(k) || {}).etiqueta || k, tipo: (mMeta.get(k) || {}).tipo || 'factor',
+      antes: antes[k] ?? null, despues: despues[k] ?? null,
+      cambio: Number(antes[k]) !== Number(despues[k]),
+    }));
+    res.json({ success: true, data: {
+      id: v.id, created_at: v.created_at, usuario_nombre: v.usuario_nombre, n_cambios: v.n_cambios,
+      vigente_desde: v.vigente_desde, vigente_hasta: v.vigente_hasta, mes_simulado: v.mes_simulado,
+      total_antes: v.total_antes, total_despues: v.total_despues,
+      total_diferencia: (v.total_antes == null || v.total_despues == null) ? null : v.total_despues - v.total_antes,
+      detalle,
+    }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: e.message }); }
+};
+
 /* ── Cálculo del mes por ejecutivo (compartido por la vista y el resumen por correo) ── */
-async function calcularMes(mes) {
-    const vars = await getVars();
+async function calcularMes(mes, varsOverride) {
+    // Las variables salen de la VERSIÓN vigente del mes calculado: un mes ya
+    // liquidado no cambia porque después se ajusten los parámetros.
+    const vars = varsOverride || await getVars(mes);
     // La semana corrida legal necesita los feriados del mes. cargarFeriados() es
     // idempotente y barata (una query): así el cálculo nunca depende de que el
     // seed de boot haya alcanzado a correr.
@@ -767,5 +882,5 @@ const setAlertasConfig = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getVariables, putVariables, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen,
+module.exports = { getVariables, putVariables, getVariablesBitacora, getVariablesBitacoraDetalle, getCalculo, aprobar, ejecutivoResponder, getAlertasConfig, setAlertasConfig, getEjecutivos, getResumenConfig, enviarResumen,
   calcularMes };  // motor único: lo reusa Remuneraciones (RRHH) para las comisiones imponibles

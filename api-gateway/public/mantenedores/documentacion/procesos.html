@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -386,6 +386,7 @@
     <li><b>EMITIR</b>: congela, envía cada liquidación por correo y alimenta LRE, F29 (código 048) y la contabilidad.</li>
     <li><b>Pagar</b>: botón <b>Nómina Banco</b> → CSV de transferencias en lote (cuenta de pago desde la ficha, código SBIF, total y avisos) para el portal del banco; botón <b>Archivo Previred</b> → cotizaciones (con movimiento de personal automático); LRE en Contabilidad → DT.</li>
   </ol>
+  <p><b>Las variables del modelo tienen vigencia y bitácora</b> (igual que el Bono Jefe Comercial, §37). En <b>Comisión Ejecutivos → Mantenedor Variables</b> cada guardado indica <b>desde</b> qué mes rige y, opcionalmente, <b>hasta</b> cuándo (en blanco = indefinido); el cálculo de cada mes usa la versión que regía ese mes y <b>un mes cerrado no se puede tocar</b>. El botón <b>Bitácora de cambios</b> muestra, por guardado, autor, fecha y hora, cantidad de cambios y vigencia; al pinchar la fila aparece el <b>antes y después de cada variable</b> y el <b>efecto en la comisión del equipo</b> (mismas operaciones, calculadas con las variables antiguas y con las nuevas). Es un registro de auditoría <b>inmutable</b> —solo se agregan filas— con permiso propio (<code>comisiones_variables_bitacora</code>), separado del permiso para editar.</p>
   <div class="flujo"><span class="st ini">CALCULADA</span><span class="ar">→</span><span class="st">APROBADA</span><span class="ar">→</span><span class="st">EN LIBRO</span><span class="ar">→</span><span class="st fin">EMITIDA</span></div>
   <div class="afecta"><b>Afecta:</b> remuneraciones, LRE, F29, Contabilidad, Cierre de Mes (punto Comisiones). <b>Depende de:</b> colocaciones del mes (§1, §9), indicadores.</div>
 

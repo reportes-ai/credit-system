@@ -6,6 +6,10 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 // Autorización paramétrica: obedece la matriz de Perfiles y Permisos
 router.get('/variables',          verifyToken,                                       ctrl.getVariables);
 router.put('/variables',          verifyToken, requireFunc('comisiones_variables'), ctrl.putVariables);
+// Bitácora de cambios de variables: solo lectura, permiso propio. No hay ruta de
+// edición ni de borrado — la bitácora es inmutable por diseño.
+router.get('/variables/bitacora',     verifyToken, requireFunc('comisiones_variables_bitacora'), ctrl.getVariablesBitacora);
+router.get('/variables/bitacora/:id', verifyToken, requireFunc('comisiones_variables_bitacora'), ctrl.getVariablesBitacoraDetalle);
 // Reportes propios del módulo: exigen Ver Comisión Ejecutivos (auditoría 2026-08-08).
 // ajustes-vigentes (más abajo) queda abierto: lo lee reportería de rentabilidad.
 router.get('/calculo',            verifyToken, requireFunc('comisión_ejecutivos_ver'), ctrl.getCalculo);

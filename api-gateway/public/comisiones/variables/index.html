@@ -61,11 +61,11 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v5.9</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v6.0</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/comisiones/">Comisión Ejecutivos</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600">Mantenedor Variables</span>
+      <span style="color:#fff;font-weight:600" id="migaHoja">Mantenedor Variables</span>
     </div>
   </div>
   <div class="topnav-right">
@@ -89,6 +89,7 @@
     </div>
   </div>
 
+  <div id="vistaVars">
   <!-- Fórmula resumen -->
   <div class="formula-box">
     <h6><i class="bi bi-calculator"></i> Lógica del modelo</h6>
@@ -102,11 +103,57 @@
 
   <div id="formContainer"><div class="text-center p-4 text-secondary"><i class="bi bi-hourglass-split me-2"></i>Cargando variables...</div></div>
 
-  <div style="display:flex;justify-content:flex-end;margin-top:8px">
+  <!-- Vigencia del cambio -->
+  <div class="section-card" id="cardVigencia" style="display:none">
+    <h6><i class="bi bi-calendar-range"></i>Vigencia de este cambio</h6>
+    <div class="var-row">
+      <div><div class="var-label">Válido DESDE (mes/año)</div>
+        <div class="var-desc">Obligatorio · no se permiten cambios sobre meses cerrados</div></div>
+      <div class="var-input-wrap"><input class="var-input" type="month" id="vigDesde" style="width:170px"></div>
+    </div>
+    <div class="var-row">
+      <div><div class="var-label">Válido HASTA (mes/año)</div>
+        <div class="var-desc">En blanco = indefinido</div></div>
+      <div class="var-input-wrap"><input class="var-input" type="month" id="vigHasta" style="width:170px"></div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+    <button class="btn-guardar" id="btnBitacora" onclick="verBitacora(true)" style="display:none;background:#fff;color:#0f172a;border:1.5px solid #cbd5e1">
+      <i class="bi bi-shield-lock"></i>Bitácora de cambios
+    </button>
     <button class="btn-guardar" id="btnGuardar" onclick="guardar()" style="display:none">
       <i class="bi bi-floppy"></i>Guardar cambios
     </button>
   </div>
+  </div><!-- /vistaVars -->
+
+  <!-- ══ VISTA BITÁCORA (auditoría: append-only, no editable ni borrable) ══ -->
+  <div id="vistaBit" style="display:none">
+    <div class="section-card">
+      <h6><i class="bi bi-shield-lock"></i>Bitácora de cambios de variables</h6>
+      <p style="font-size:.83rem;color:#64748b;margin:0 0 12px">
+        Registro <b>inmutable</b>: cada guardado queda con su autor, fecha y hora, vigencia y el efecto en la comisión
+        del equipo. No se puede editar ni borrar. Pincha una fila para ver el antes y después de cada variable.</p>
+      <div style="overflow-x:auto"><table class="table table-sm align-middle" style="font-size:.84rem">
+        <thead><tr style="color:#0141A2">
+          <th>Fecha y hora</th><th>Usuario</th><th class="text-center">Cambios</th>
+          <th>Válido desde</th><th>Válido hasta</th><th class="text-end">Efecto en comisiones</th><th></th>
+        </tr></thead>
+        <tbody id="bitBody"><tr><td colspan="7" class="text-center text-secondary p-4">Cargando…</td></tr></tbody>
+      </table></div>
+      <button class="btn-guardar" onclick="verBitacora(false)" style="background:#fff;color:#0f172a;border:1.5px solid #cbd5e1">
+        <i class="bi bi-arrow-left"></i>Volver a las variables</button>
+    </div>
+  </div>
+
+  <dialog id="dlgBit" style="border:none;border-radius:14px;padding:0;max-width:840px;width:94%">
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#009AFE);color:#fff;padding:16px 22px;display:flex;justify-content:space-between;align-items:center">
+      <div><b id="dlgBitTit">Cambio de variables</b><div id="dlgBitSub" style="font-size:.78rem;opacity:.85"></div></div>
+      <button class="btn-logout" onclick="document.getElementById('dlgBit').close()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div style="padding:18px 22px;max-height:70vh;overflow:auto" id="dlgBitBody"></div>
+  </dialog>
 
   <!-- Qué afecta este mantenedor (obligatorio) -->
   <div style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;padding:16px 20px;margin-top:26px;font-size:.83rem;color:#475569">
@@ -129,6 +176,11 @@
           en <a href="/comisiones/revision/">Revisión de Comisiones</a> y baja el monto que llega a
           <a href="/rrhh/remuneraciones/">Remuneraciones</a>. El tramo se cuenta desde el
           <b>vencimiento de la primera cuota</b>, no desde el curse. Con el switch en 0 no se descuenta nada.</li>
+      <li><b>Vigencia desde / hasta</b> → en qué meses rige este juego de variables. Los meses anteriores conservan
+          las que tenían (no se recalculan) y un <b>mes cerrado no se puede tocar</b>.</li>
+      <li><b>Cada guardado</b> → queda en la <b>Bitácora de cambios</b> (botón arriba): autor, fecha y hora,
+          antes/después de cada variable y el efecto en la comisión del equipo. Es inmutable y su acceso se designa
+          por perfil (permiso <code>comisiones_variables_bitacora</code> en <a href="/usuarios/perfiles.html">Perfiles</a>).</li>
     </ul>
     <div style="margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;color:#7c2d12;background:#fff7ed;border-radius:6px;padding:10px 12px">
       <i class="bi bi-exclamation-triangle-fill me-1"></i>
@@ -239,7 +291,83 @@ async function cargar() {
   }).join('');
 
   document.getElementById('formContainer').innerHTML = html;
-  if (esAdmin) document.getElementById('btnGuardar').style.display = 'flex';
+  if (esAdmin) {
+    document.getElementById('btnGuardar').style.display = 'flex';
+    document.getElementById('cardVigencia').style.display = '';
+    const d = document.getElementById('vigDesde');
+    if (!d.value) d.value = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit'}).format(new Date()).slice(0,7);
+  }
+  // La bitácora tiene permiso propio: se designa desde la matriz de Perfiles.
+  try {
+    const jm = await (await fetch('/api/auth/mis-permisos',{headers:H})).json();
+    const codes = new Set((jm.funcionalidadesInfo||[]).map(f=>f.codigo));
+    if (esAdmin || codes.has('comisiones_variables_bitacora'))
+      document.getElementById('btnBitacora').style.display = 'flex';
+  } catch(_){}
+}
+
+/* ── Bitácora de cambios (solo lectura) ── */
+const clpF = v => '$'+Math.round(Number(v)||0).toLocaleString('es-CL');
+const escH = s => String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+const fechaHora = s => { const d=new Date(s); return isNaN(d)?'—':
+  d.toLocaleDateString('es-CL')+' '+d.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'}); };
+function verBitacora(ver){
+  document.getElementById('vistaVars').style.display = ver ? 'none' : '';
+  document.getElementById('vistaBit').style.display  = ver ? '' : 'none';
+  // Página con navbar propia: la miga se actualiza a mano (regla de breadcrumbs)
+  document.getElementById('migaHoja').textContent = ver ? 'Bitácora de Cambios' : 'Mantenedor Variables';
+  if (ver) cargarBitacora();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function cargarBitacora(){
+  const tb = document.getElementById('bitBody');
+  tb.innerHTML = '<tr><td colspan="7" class="text-center text-secondary p-4">Cargando…</td></tr>';
+  const j = await (await fetch('/api/comisiones/variables/bitacora',{headers:H})).json().catch(()=>({}));
+  if (!j.success){ tb.innerHTML = `<tr><td colspan="7" class="text-center text-secondary p-4">${escH(j.error||'Sin acceso')}</td></tr>`; return; }
+  if (!j.data.length){ tb.innerHTML = '<tr><td colspan="7" class="text-center text-secondary p-4">Todavía no hay cambios registrados</td></tr>'; return; }
+  tb.innerHTML = j.data.map(r=>{
+    const dif = (r.total_antes==null||r.total_despues==null) ? null : r.total_despues - r.total_antes;
+    const col = dif==null ? '#64748b' : (dif>0 ? '#166534' : (dif<0 ? '#b91c1c' : '#64748b'));
+    return `<tr style="cursor:pointer" onclick="verCambio(${r.id})">
+      <td>${fechaHora(r.created_at)}</td><td>${escH(r.usuario_nombre||'—')}</td>
+      <td class="text-center"><b>${r.n_cambios}</b></td>
+      <td>${escH(r.vigente_desde||'—')}</td>
+      <td>${r.vigente_hasta?escH(r.vigente_hasta):'<span class="text-secondary">indefinido</span>'}</td>
+      <td class="text-end" style="color:${col};font-weight:700">${dif==null?'—':(dif>0?'+':'')+clpF(dif)}</td>
+      <td class="text-center"><i class="bi bi-eye"></i></td></tr>`;
+  }).join('');
+}
+async function verCambio(id){
+  const j = await (await fetch('/api/comisiones/variables/bitacora/'+id,{headers:H})).json().catch(()=>({}));
+  if (!j.success) return mostrarToast(j.error||'No se pudo abrir el detalle', false);
+  const d = j.data;
+  const fmtV = (v, tipo) => v==null ? '—' :
+    (tipo==='monto' ? clpF(v) : (tipo==='porcentaje' ? (Number(v)*100).toFixed(2).replace('.',',')+'%' : String(Number(v)).replace('.',',')));
+  const filas = d.detalle.map(x=>`
+    <tr style="${x.cambio?'background:#fffbeb':''}">
+      <td>${escH(x.etiqueta)}</td>
+      <td class="text-end text-secondary">${fmtV(x.antes,x.tipo)}</td>
+      <td class="text-end" style="font-weight:${x.cambio?800:400};color:${x.cambio?'#0141A2':'#334155'}">${fmtV(x.despues,x.tipo)}</td>
+      <td class="text-center">${x.cambio?'<i class="bi bi-arrow-right-circle-fill" style="color:#f59e0b"></i>':''}</td></tr>`).join('');
+  const dif = d.total_diferencia;
+  const col = dif==null ? '#64748b' : (dif>0 ? '#166534' : (dif<0 ? '#b91c1c' : '#64748b'));
+  const cuadro = (t,v,c)=>`<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px">
+      <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:700">${t}</div>
+      <div style="font-size:1.05rem;font-weight:800;color:${c||'#0f172a'}">${v}</div></div>`;
+  document.getElementById('dlgBitTit').textContent = `${d.n_cambios} variable(s) modificada(s)`;
+  document.getElementById('dlgBitSub').textContent =
+    `${d.usuario_nombre||'—'} · ${fechaHora(d.created_at)} · vigencia ${d.vigente_desde} → ${d.vigente_hasta||'indefinido'}`;
+  document.getElementById('dlgBitBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+      ${cuadro('Comisiones con variables antiguas', d.total_antes==null?'—':clpF(d.total_antes))}
+      ${cuadro('Comisiones con variables nuevas', d.total_despues==null?'—':clpF(d.total_despues))}
+      ${cuadro('Diferencia', dif==null?'—':(dif>0?'+':'')+clpF(dif), col)}
+    </div>
+    <p style="font-size:.76rem;color:#64748b">Simulación sobre el mes <b>${escH(d.mes_simulado||'—')}</b>: las mismas operaciones del equipo, calculadas con las variables antiguas y con las nuevas (total con semana corrida).</p>
+    <table class="table table-sm" style="font-size:.84rem">
+      <thead><tr style="color:#0141A2"><th>Variable</th><th class="text-end">Antes</th><th class="text-end">Después</th><th></th></tr></thead>
+      <tbody>${filas}</tbody></table>`;
+  document.getElementById('dlgBit').showModal();
 }
 
 function marcarCambio() {}
@@ -255,10 +383,18 @@ async function guardar() {
       const esPct = inp.dataset.pct === 'true';
       updates[k] = esPct ? parseFloat(inp.value) / 100 : parseFloat(inp.value);
     });
-    const res  = await fetch('/api/comisiones/variables', { method:'PUT', headers:H, body:JSON.stringify(updates) });
+    const vigente_desde = document.getElementById('vigDesde').value;
+    const vigente_hasta = document.getElementById('vigHasta').value;
+    if (!vigente_desde) { mostrarToast('Indica desde qué mes rige este cambio', false); return; }
+    if (vigente_hasta && vigente_hasta < vigente_desde) { mostrarToast('El mes HASTA no puede ser anterior al DESDE', false); return; }
+    if (!confirm(`Este cambio regirá desde ${vigente_desde} ${vigente_hasta?'hasta '+vigente_hasta:'en adelante (indefinido)'}.
+
+Queda registrado en la Bitácora de cambios, que no se puede editar ni borrar. ¿Guardar?`)) return;
+    const res  = await fetch('/api/comisiones/variables', { method:'PUT', headers:H,
+      body:JSON.stringify({ variables: updates, vigente_desde, vigente_hasta }) });
     const json = await res.json();
     if (json.success) {
-      mostrarToast('Variables guardadas correctamente', true);
+      mostrarToast(`Guardado — ${json.data.n_cambios} cambio(s), vigente desde ${json.data.vigente_desde}`, true);
     } else {
       mostrarToast('Error: ' + json.error, false);
     }
