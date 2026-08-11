@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 — fullwidth + columna ID Financiera + exportar Excel por detalle -->
+<!-- v1.6 — fullwidth + columna ID Financiera + exportar Excel por detalle · titulos centrados en columnas numericas -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -169,7 +169,7 @@ async function toggleConc(m, fin, concepto){
         </div>`;
   h += `<div style="overflow:auto"><table>
     <thead><tr><th>N° Op</th><th>ID Financiera</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
-    <th class="num">Comisión calculada</th><th class="num">%</th>${esUAC?'<th class="num">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num">Dif $</th><th class="num">Dif %</th></tr></thead>
+    <th class="num">Comisión calculada</th><th class="num" style="text-align:center">%</th>${esUAC?'<th class="num" style="text-align:center">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num" style="text-align:center">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num" style="text-align:center">Dif $</th><th class="num" style="text-align:center">Dif %</th></tr></thead>
     <tbody>${j.data.ops.map((o,i)=>filaOp(rid,o,i)).join('')}</tbody>
     <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="5">TOTAL (${j.data.ops.length} ops)</td>
       <td class="num">${fmt(j.data.ops.reduce((a,o)=>a+(+o.comision||0),0))}</td><td></td>${esUAC?'<td class="num" id="totAnt-'+rid+'"></td>':''}<td></td>
