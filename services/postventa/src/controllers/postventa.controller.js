@@ -1232,6 +1232,7 @@ const getSaldosAPagar = async (req, res) => {
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
+             COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), '') AS categoria,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -21,7 +21,7 @@
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
     .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
-    .wrap { max-width:1500px; margin:0 auto; padding:20px 24px; }
+    .wrap { max-width:none; margin:0 auto; padding:20px 24px; }
     .head-row { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
     /* Recuadro resumen arriba */
     .resumen { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
@@ -183,8 +183,10 @@
           <tr>
             <th>N° OP</th>
             <th>ID Financiera</th>
+            <th>Financiera</th>
             <th>Rut Dealer</th>
             <th>Nombre Dealer</th>
+            <th>Categoría</th>
             <th>Cuenta Corriente</th>
             <th>Banco</th>
             <th>Fondos Recibidos</th>
@@ -196,7 +198,7 @@
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="8" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
+            <td colspan="10" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -261,7 +263,7 @@ function quienTxt(accion){
     DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
-  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="10" class="vacio">Error: ${e.message}</td></tr>`; }
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="12" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
 
 // Cada minuto: borrar al cambiar de día (00:00 Chile) y sincronizar el monto
@@ -327,9 +329,11 @@ function render(){
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><b>${escH(r.num_op)}</b></td>
-      <td>${escH(r.id_financiera||r.financiera||'—')}</td>
+      <td>${escH(r.id_financiera||'—')}</td>
+      <td>${escH(r.financiera||'—')}</td>
       <td>${escH(r.rut_dealer||'—')}</td>
       <td>${escH(r.nombre_dealer||'—')}</td>
+      <td>${escH(r.categoria||'—')}</td>
       <td>${escH(r.num_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
       <td>${fechaCL(r.fecha_fondos)}</td>
