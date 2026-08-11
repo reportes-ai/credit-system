@@ -1233,6 +1233,7 @@ const getSaldosAPagar = async (req, res) => {
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), '') AS categoria,
+             oc.id AS orden_id, oc.numero AS num_orden,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
@@ -1251,6 +1252,8 @@ const getSaldosAPagar = async (req, res) => {
            AND DATE(esp.fecha) = CURDATE()
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
+      LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
+      LEFT JOIN op_correlativos  oc ON oc.origen='SALDO' AND oc.origen_id = po.id AND oc.anulada = 0
       WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='SALDO' AND ep.etapa='SALDO PRECIO PAGADO'

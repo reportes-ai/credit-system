@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -182,6 +182,7 @@
         <thead>
           <tr>
             <th>N° OP</th>
+            <th>Orden de Pago</th>
             <th>ID Financiera</th>
             <th>Financiera</th>
             <th>Rut Dealer</th>
@@ -198,7 +199,7 @@
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="10" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
+            <td colspan="11" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -263,7 +264,7 @@ function quienTxt(accion){
     DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
-  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="12" class="vacio">Error: ${e.message}</td></tr>`; }
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="13" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
 
 // Cada minuto: borrar al cambiar de día (00:00 Chile) y sincronizar el monto
@@ -329,6 +330,7 @@ function render(){
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><b>${escH(r.num_op)}</b></td>
+      <td>${r.orden_id?`<a href="/ordenes-pago/historial/?origen=SALDO&ver=${r.orden_id}" target="_blank" title="Ver la Orden de Pago (datos de transferencia)" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.num_orden||'Ver')}</a>`:'—'}</td>
       <td>${escH(r.id_financiera||'—')}</td>
       <td>${escH(r.financiera||'—')}</td>
       <td>${escH(r.rut_dealer||'—')}</td>

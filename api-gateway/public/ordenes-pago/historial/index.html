@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -224,6 +224,10 @@ async function cargar(){
     const j = await r.json();
     DATA = j.data || [];
     pintaChips(j.resumen||{}, DATA.length);
+    /* ?ver=<id> — deep-link desde Saldos a Pagar: abre directo la orden para que
+       el cajero/tesorero vea los datos de transferencia antes de pagar. */
+    if (!window.__afDeepVer) { const vid = +(new URLSearchParams(location.search).get('ver')||0);
+      if (vid) { window.__afDeepVer = 1; if ((j.data||[]).some(x=>x.id===vid)) setTimeout(()=>ver(vid), 50); } }
     if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
       let acc = '';
