@@ -7,7 +7,7 @@
 (function(){
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
-const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET', '3901':'CCS WS' };
+const FTE = { '16':'Digitación', '107':'Digitación', '110':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET', '3901':'CCS WS' };
 const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
 const LOGO_DN = (location && location.origin ? location.origin : '') + '/img/logo-dealernet.png';
 const REPORT_CSS = `
@@ -142,6 +142,57 @@ function bodyComportamiento(prd){
     '<div class="rep-kv"><b>Nombre:</b> '+esc(cab['@_nom_superinten']||'')+'</div>'+
     '<div class="rep-h">Historial de Documentos M$</div>'+
     '<table class="rep-tb"><thead>'+head+'</thead><tbody>'+bd+'</tbody></table>';
+}
+const CE_CFG = {
+  '110': { root:'r11001', cab:'r110001', det:'r110012', rows:[
+    ['Al día e Impagos < 30 días','deuda_direct_vig'],['Impagos 30 y 90 días','deuda_morosa_30_90'],
+    ['Impagos 90 y 180 días','deuda_direct_venc'],['Impagos 180 días y 3 años','deuda_dir_venc_180d_3anos'],
+    ['Impagos >= 3 años','saldo_deud_cast_direct'],['Créditos de consumo','deuda_credito_consumo'],
+    ['Nro. Entidades Cred.Consumo','nro_inst_cred_consumo','int'],['Créditos comerciales','deuda_comercial'],
+    ['Créditos para vivienda','deuda_cred_hipotecario'],['Linea Crédito Disponible','mto_linea_disponible'],
+    ['Indirecta Impagos < 30 días','deuda_indirec_vig'],['Indirecta Impagos 30 días y 3 años','deuda_indirec_vencida'],
+    ['Indirecta Impagos >= 3 años','saldo_deud_cast_indirect'],['Nro. Entidades.Cred.Comer.','nro_inst_cred_com','int'],
+    ['Créditos Leasing al día','deuda_leasing'],['Créditos Leasing Impago','deuda_morosa_leasing'],
+    ['Créditos Contingentes','deuda_cred_contingentes'],['Operaciones financieras','deuda_ope_pacto'],
+    ['Instrum. deudas adquiridos','deuda_inv_financieras'],
+  ]},
+  '107': { root:'r1301', cab:'r13011', det:'r13012', rows:[
+    ['Al día e Impagos < 30 días','deuda_directa_vigente'],['Impagos 30 y 90 días','deuda_directa_mora_30_90'],
+    ['Impagos 90 y 180 días','deuda_directa_vencida'],['Impagos 180 días y 3 años','deuda_dir_venc_180d_3anos'],
+    ['Impagos >= 3 años','deuda_directa_castigada'],['Créditos de consumo','deuda_directa_consumo'],
+    ['Nro. Entidades Cred.Consumo','deuda_directa_num_acree','int'],['Créditos comerciales','deuda_directa_comercial'],
+    ['Créditos para vivienda','deuda_directa_hipoteca'],['Linea Crédito Disponible','deuda_directa_linea_cred_disp'],
+    ['Indirecta Impagos < 30 días','deuda_indirecta_vigente'],['Indirecta Impagos 30 días y 3 años','deuda_indirecta_vencida'],
+    ['Indirecta Impagos >= 3 años','deuda_indirecta_castigada'],['Nro. Entidades.Cred.Comer.','nro_inst_cred_com','int'],
+    ['Créditos Leasing al día','deuda_leasing'],['Créditos Leasing Impago','deuda_morosa_leasing'],
+    ['Créditos Contingentes','deuda_cred_contingentes'],
+  ]},
+};
+function bodyComportamientoExt(prd, d, cod){
+  const cfg = CE_CFG[cod]; if(!cfg) return noinfo();
+  const r = prd[cfg.root] || {}; const cab = r[cfg.cab] || {}; const periodos = arr(r[cfg.det]);
+  if(!periodos.length && cab['@_anomes']==null) return noinfo();
+  // Igual que el PDF DealerNet: el 0 se imprime "0", el resto con 2 decimales
+  const fmtMM = v => { const n=parseFloat(v); return isNaN(n) ? esc(String(v??'')) : (n===0 ? '0' : n.toLocaleString('es-CL',{minimumFractionDigits:2,maximumFractionDigits:2})); };
+  const titular = deepFind(prd,['nombre']) || '';
+  let h = '<div class="rep-h">Resumen</div>'+
+    (cod==='110' ? '<div class="rep-kv"><b>Nombre:</b> '+esc(titular||'—')+'</div>'+
+                   '<div class="rep-kv"><b>RUT:</b> '+esc(d ? rutFmt(d.rut,d.dv) : '')+'</div>' : '')+
+    '<div class="rep-kv"><b>Mes/Año:</b> '+anomes(cab['@_anomes'])+'</div>'+
+    '<div class="rep-kv"><b>Monto:</b> MM$ '+fmtMM(cab['@_deuda_total'])+'</div>';
+  // bloques de períodos por página, como el PDF (Consolidado 12, Extendido 9)
+  const COLS = cod==='107' ? 12 : 9;
+  for(let i=0; i<periodos.length; i+=COLS){
+    const blk = periodos.slice(i, i+COLS);
+    h += (i===0 ? '<div class="rep-h">Historial de Documentos MM$</div>' : '')+
+      '<table class="rep-tb" style="margin-bottom:10px"><thead><tr><th>Variables/Periodos</th>'+
+      blk.map(p=>'<th style="text-align:right">'+anomes(p['@_periodo'])+'</th>').join('')+'</tr></thead><tbody>'+
+      cfg.rows.map(([lbl,key,tipo])=>'<tr><td>'+lbl+'</td>'+blk.map(p=>{
+        const v = p['@_'+key];
+        return '<td style="text-align:right">'+(tipo==='int' ? esc(String(v??'0')) : fmtMM(v))+'</td>';
+      }).join('')+'</tr>').join('')+'</tbody></table>';
+  }
+  return h;
 }
 function bodyPerfilComercial(prd){
   const colect = gp(prd,'DLNTPERCOMDLNTWS','ROOT','D','result','colect');
@@ -306,10 +357,11 @@ function renderInforme(d){
   let cont = d.contenido; if(typeof cont==='string'){ try{cont=JSON.parse(cont);}catch(_){ } }
   const prd = cont || {};
   const cod = String(d.codigo_producto);
-  const titular = deepFind(prd,['nombre']) || '';
+  const titular = (cod==='3901' ? gp(prd,'BOLETINCCSWS','res','@_nombre') : null) || deepFind(prd,['nombre']) || '';
   let body;
   if(cod==='2101') body = bodyPension(d, prd);
   else if(cod==='16') body = bodyComportamiento(prd);
+  else if(cod==='110' || cod==='107') body = bodyComportamientoExt(prd, d, cod);
   else if(cod==='3435') body = bodyPerfilComercial(prd);
   else if(cod==='3425') body = bodyBoletinImpagos(prd);
   else if(cod==='3901') body = bodyBoletinCcs(prd);
@@ -330,5 +382,5 @@ function renderInforme(d){
     <div class="rep-legal">El presente informe ha sido emitido de conformidad con la ley N° 19.628 a partir de fuentes de información de acceso público. La información comprendida en este informe es para uso exclusivo de nuestros suscriptores y sólo puede ser utilizada con fines estrictamente comerciales.</div>
   </div>`;
 }
-  window.DNInforme = { render: renderInforme, renderTree: renderTree, esc: esc };
+  window.DNInforme = { render: renderInforme, renderTree, esc, deepFind, rutFmt, REPORT_CSS };
 })();
