@@ -39,11 +39,14 @@ if (!esPfx) { console.error('\nRevisa que sea el archivo correcto (.pfx o .p12).
 function pedirClave(prompt) {
   return new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    /* El prompt lo escribe readline (si se escribe a mano, su primer refresco
+       borra la línea y el usuario queda frente a una pantalla muda sin saber
+       que le están pidiendo algo). Se silencia SOLO lo que se teclea, callando
+       la salida justo después de pedir. */
     let mudo = false;
-    rl._writeToOutput = s => { if (!mudo) rl.output.write(s); };   // silencia lo tecleado
-    rl.output.write(prompt);
+    rl._writeToOutput = s => { if (!mudo) rl.output.write(s); };
+    rl.question(prompt, val => { mudo = false; rl.output.write(String.fromCharCode(10)); rl.close(); resolve(val); });
     mudo = true;
-    rl.question('', val => { mudo = false; rl.output.write(String.fromCharCode(10)); rl.close(); resolve(val); });
   });
 }
 
