@@ -341,10 +341,13 @@
       const allItems = [...nativeItems, ...extrasSubitem, ...extrasMods, ...extrasModsNew];
       // Card exclusiva de la cuenta protegida (no pasa por la matriz: ni otros admin la ven)
       if (esProt) allItems.push({ id:'mantencion-sistema', href:'/mantenedores/mantencion-sistema/', icon:'bi-cone-striped', titulo:'Mantención de Sistema', desc:'Aviso de mantención para todos los usuarios — cuenta protegida' });
-      const items = orden
+      let items = orden
         ? orden.map(id => allItems.find(i => i.id === id)).filter(Boolean)
             .concat(allItems.filter(i => !orden.includes(i.id)))
         : allItems;
+      // el orden guardado puede traer un id repetido (quedó de cuando había cards duplicadas) → una sola card
+      const idsVistos = new Set();
+      items = items.filter(i => idsVistos.has(i.id) ? false : idsVistos.add(i.id));
 
       // Agrupar por tema respetando el orden guardado dentro de cada grupo
       const porGrupo = new Map(GRUPOS_DEF.map(g => [g.key, []]));
