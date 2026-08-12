@@ -18,13 +18,16 @@ const mismoNumero = (a, b) => {
   if (isNaN(x) || isNaN(y)) return String(a).trim() === String(b).trim();
   return Math.abs(x - y) < 0.005;
 };
-const baseDe = op => String(op || '').replace(/-C\d+$/i, '');
-const siguiente = (op, usados) => {
+const baseDe = op => String(op || '').replace(/-[CR]\d+$/i, '');
+const sufijo = (op, usados, letra) => {
   const base = baseDe(op);
   const set = new Set(usados.map(u => u.toUpperCase()));
-  for (let n = 1; n <= 99; n++) { const c = `${base}-C${n}`; if (!set.has(c.toUpperCase())) return c; }
+  for (let n = 1; n <= 99; n++) { const c = `${base}-${letra}${n}`; if (!set.has(c.toUpperCase())) return c; }
   return null;
 };
+const siguiente = (op, usados) => sufijo(op, usados, 'C');
+// Número de una carta NUEVA: libre se respeta; ocupado sale redigitada (-R).
+const libre = (op, usados) => usados.includes(op) ? sufijo(op, usados, 'R') : op;
 
 test('la corrección numera con sufijo -C1 sobre el número original', () => {
   assert.equal(siguiente('266274695BB', ['266274695BB']), '266274695BB-C1');
@@ -58,6 +61,33 @@ test('nulos: ausente y ausente es igual; ausente contra valor, no', () => {
 test('los textos se comparan como texto, sin convertirlos a número', () => {
   assert.ok(mismoNumero('AUTOFIN', 'AUTOFIN'));
   assert.ok(!mismoNumero('AUTOFIN', 'UNIDAD DE CREDITO'));
+});
+
+/* Redigitación (-R): cuando la carta de una operación muere (vence, se desiste, se
+   anula o se rechaza), la operación se puede volver a digitar — es un flujo legítimo.
+   Pero el número se arma como año + ID financiera + iniciales, así que el mismo
+   ejecutivo redigitando producía el MISMO número y nacían duplicadas indistinguibles.
+   Este fue el origen de los 22 duplicados limpiados el 12-08-2026. */
+test('un número de carta libre se respeta tal cual, sin sufijo', () => {
+  assert.equal(libre('26999999ZZ', ['266274695BB']), '26999999ZZ');
+});
+
+test('redigitar una operación cuya carta murió da -R1, no un duplicado', () => {
+  assert.equal(libre('265313613TA', ['265313613TA']), '265313613TA-R1');
+});
+
+test('la segunda redigitación da -R2, no repite -R1', () => {
+  assert.equal(libre('265313613TA', ['265313613TA', '265313613TA-R1']), '265313613TA-R2');
+});
+
+test('no encadena sufijos: redigitar una -R1 da -R2, nunca -R1-R1', () => {
+  assert.equal(libre('265313613TA-R1', ['265313613TA', '265313613TA-R1']), '265313613TA-R2');
+});
+
+test('corrección y redigitación conviven sin pisarse (-C y -R por separado)', () => {
+  const usados = ['265313613TA', '265313613TA-R1'];
+  assert.equal(sufijo('265313613TA', usados, 'C'), '265313613TA-C1');   // la corrección no salta a -C2
+  assert.equal(sufijo('265313613TA', usados, 'R'), '265313613TA-R2');
 });
 
 /* El saldo manda: la carta no puede decir un precio y un pie que no lo den.

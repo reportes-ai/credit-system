@@ -1160,6 +1160,16 @@ const upsert = async (req, res) => {
         vals[vals.length - 2] = credCreado.numero_credito; // numero_credito_creado
         vals[vals.length - 1] = credCreado.id;             // id_credito_creado
       }
+      /* Redigitación: si el número ya existe (la carta anterior de esta operación
+         murió y se está volviendo a digitar), la nueva sale como -R1, -R2… El número
+         se arma con año + ID financiera + iniciales, así que sin esto nacía duplicada
+         y las dos se veían idénticas en pantalla. */
+      const opLibre = await opCartaLibre(c.opCarta);
+      if (opLibre !== c.opCarta) {
+        console.log(`[cartas] ${c.opCarta} ya existe → la nueva se emite como ${opLibre}`);
+        c.opCarta = opLibre;
+        vals[0] = opLibre;
+      }
       const [r] = await pool.query(
         `INSERT INTO cartas_aprobacion (
           op_carta, id_financiera, tipo,
@@ -1202,7 +1212,9 @@ const upsert = async (req, res) => {
       if (c.idCreditoCreado) sincronizarCreditoDesdeCarta(c, c.idCreditoCreado);
       // Snapshot del TIER UAC vigente al generar la carta (para la rentabilidad)
       tierUAC(c.fecha).then(t => pool.query('UPDATE cartas_aprobacion SET tier_uac_n=?, tier_uac_pct=? WHERE id=?', [t.n, t.pct, r.insertId])).catch(() => {});
-      res.status(201).json({ success: true, data: { id: r.insertId, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
+      // op_carta va en la respuesta: si hubo redigitación, el número asignado NO es el
+      // que mandó el navegador y la pantalla tiene que mostrar el real.
+      res.status(201).json({ success: true, data: { id: r.insertId, op_carta: c.opCarta, numero_credito_creado: credCreado?.numero_credito || null }, error: null });
       notificarCambios(c, null, req, r.insertId);
     }
   } catch (e) {
@@ -1949,18 +1961,39 @@ const mismoNumero = (a, b) => {
   return Math.abs(x - y) < 0.005;     // tolera el redondeo de DECIMAL, no un cambio real
 };
 
-/* Número de la carta corregida: mismo número con sufijo -C1, -C2…
-   No hay índice único en op_carta (hay 10 duplicados históricos), así que la
-   unicidad se garantiza acá, buscando el primer sufijo libre. */
-async function siguienteOpCorreccion(opOriginal) {
-  const base = String(opOriginal || '').replace(/-C\d+$/i, '');
-  const [rows] = await pool.query('SELECT op_carta FROM cartas_aprobacion WHERE op_carta = ? OR op_carta LIKE ?', [base, base + '-C%']);
+/* Motor único de numeración con sufijo. Dos sufijos, dos historias distintas:
+     -C  corrección  → se reemplaza una carta viva por otra con los mismos montos
+     -R  redigitación → la carta anterior murió (venció/desistió/anuló/rechazó) y la
+                        operación se vuelve a digitar desde cero
+   No hay UNIQUE en op_carta y no puede haberlo: el número se arma como
+   año + ID financiera + iniciales, así que redigitar la misma operación con el
+   mismo ejecutivo produce el MISMO número, y eso es un flujo legítimo. La
+   unicidad se garantiza acá, tomando el primer sufijo libre. */
+async function siguienteOpSufijo(opOriginal, letra) {
+  const base = String(opOriginal || '').replace(/-[CR]\d+$/i, '');
+  if (!base) return { op: opOriginal, n: 0 };
+  const [rows] = await pool.query(
+    'SELECT op_carta FROM cartas_aprobacion WHERE op_carta = ? OR op_carta LIKE ? OR op_carta LIKE ?',
+    [base, base + '-C%', base + '-R%']);
   const usados = new Set(rows.map(r => String(r.op_carta).toUpperCase()));
   for (let n = 1; n <= 99; n++) {
-    const cand = `${base}-C${n}`;
+    const cand = `${base}-${letra}${n}`;
     if (!usados.has(cand.toUpperCase())) return { op: cand, n };
   }
-  throw new Error('Demasiadas correcciones para esta carta.');
+  throw new Error(`Demasiadas cartas con el número ${base}.`);
+}
+const siguienteOpCorreccion = op => siguienteOpSufijo(op, 'C');
+
+/* Número para una carta NUEVA: si nadie usa ese número, se respeta tal cual.
+   Si ya existe (la operación se está redigitando porque su carta murió), sale con
+   sufijo -R1, -R2… en vez de nacer duplicada como pasaba hasta ahora. */
+async function opCartaLibre(op) {
+  const n = String(op || '').trim();
+  if (!n) return n;
+  const [[ex]] = await pool.query('SELECT id FROM cartas_aprobacion WHERE op_carta = ? LIMIT 1', [n]);
+  if (!ex) return n;
+  const { op: libre } = await siguienteOpSufijo(n, 'R');
+  return libre;
 }
 
 /* POST /api/cartas/:id/corregir  { campos:{...}, motivo } */

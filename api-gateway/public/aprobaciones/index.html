@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -301,7 +301,7 @@
     <div style="overflow-x:auto">
       <table class="tbl">
         <thead><tr>
-          <th>Operación</th><th>Fecha</th><th>Cliente</th><th>RUT</th><th>Tipo</th>
+          <th>Carta de Aprobación</th><th>Fecha</th><th>Cliente</th><th>RUT</th><th>Tipo</th>
           <th style="text-align:right">Saldo Precio</th><th>Estado</th><th>Creada por</th><th>Acciones</th>
         </tr></thead>
         <tbody id="bodyLista"><tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px">Cargando…</td></tr></tbody>
@@ -2489,7 +2489,7 @@ function renderRevision(){
   const list = pendientesRevision();
   const el = document.getElementById('listaRevision');
   if (!list.length) { el.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px"><i class="bi bi-check2-all" style="font-size:2rem"></i><div>No hay cartas pendientes de tu revisión</div></div>'; return; }
-  el.innerHTML = '<table class="tbl"><thead><tr><th>Operación</th><th>Fecha</th><th>Cliente</th><th>Ejecutivo</th><th>Financiera</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Creada por</th><th></th></tr></thead><tbody>' +
+  el.innerHTML = '<table class="tbl"><thead><tr><th>Carta de Aprobación</th><th>Fecha</th><th>Cliente</th><th>Ejecutivo</th><th>Financiera</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Creada por</th><th></th></tr></thead><tbody>' +
     list.map(c=>`<tr>
       <td><b>${escH(c.opCarta||'')}</b></td><td>${fmtFecha(c.fecha)}</td>
       <td>${escH(toTitle(c.cliente||''))}</td>
