@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -343,14 +343,26 @@ async function emitir(){
   if (!actual || !actual.length) return;
   const ids = actual.map(o => o.id);
   const nums = actual.map(o => o.num_op).join(', ');
-  if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar.`)) return;
+  if (!confirm(`¿Emitir la orden de pago de comisión de la${ids.length>1?'s':''} OP ${nums}? Pasará${ids.length>1?'n':''} a Comisiones a Pagar y el correo saldrá a Contabilidad.`)) return;
+  // Correo AUTOMÁTICO con la emisión (mismo fix que la orden de saldo: eran dos
+  // botones y las órdenes salían emitidas sin que Contabilidad se enterara).
+  const htmlDoc = document.getElementById('docWrap').innerHTML, asu = asuntoDe(actual);
   try {
     const r = await fetch('/api/postventa/orden-pago-comision/emitir', { method:'POST', headers:hdr(), body:JSON.stringify({ ids }) });
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     DATA = DATA.filter(x => !ids.includes(x.id));
     cerrar(); render();
-    toast(`Orden emitida — ${ids.length} operación(es) pasó a Comisiones a Pagar`);
+    let notaCorreo = '';
+    if (typeof CORREO === 'undefined' || CORREO.activo !== false) {
+      try {
+        const rc = await fetch('/api/postventa/enviar-correo-orden', { method:'POST', headers:hdr(),
+          body: JSON.stringify({ asunto: asu, html: htmlDoc, num_op: nums, tipo:'comision' }) });
+        const jc = await rc.json();
+        notaCorreo = jc.success ? ' y correo enviado a ' + (jc.data?.to||'Contabilidad') : ' — ⚠ el correo NO salió: ' + (jc.error||'');
+      } catch(e){ notaCorreo = ' — ⚠ el correo NO salió: ' + e.message; }
+    }
+    toast(`Orden emitida — ${ids.length} operación(es)` + notaCorreo);
   } catch(e){ toast('Error: '+e.message); }
 }
 

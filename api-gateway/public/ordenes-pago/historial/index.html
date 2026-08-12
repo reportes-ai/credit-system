@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -376,6 +376,8 @@ async function ver(id){
   try { const r=await fetch('/api/ordenes-pago/ordenes/'+row.id+'/documento',{headers:H}); if(chk401(r)) return; const j=await r.json(); if(!j.success||!j.data) throw 0; full=j.data; }
   catch(e){ toast('No se pudo cargar la orden'); return; }
   VISTA = full;
+  VISTA.origen = VISTA.origen || row.origen;   // el documento no siempre trae el origen; el listado sí
+  VISTA.numero = VISTA.numero || row.numero;
   document.getElementById('dTitulo').textContent = full.numero||'Orden';
   let extra = '';
   if (full.estado==='ANULADA') extra = `<p style="color:#b91c1c;font-size:.82rem;margin:0 0 10px"><i class="bi bi-x-octagon me-1"></i>Anulada por ${escH(full.anulada_nombre||'—')}${full.fecha_anulada?' · '+fdatetime(full.fecha_anulada):''}</p>`;
@@ -385,7 +387,11 @@ async function ver(id){
   // Anular y Enviar a Contabilidad solo aplican a órdenes generales (las de Post Venta se gestionan allí).
   const anularBtn = (row.editable && full.estado==='EMITIDA' && isAdmin) ? `<button class="btn-ghost" onclick="marcarVista('ANULADA')">Anular</button>`
     : (row.anulable_pv && isAdmin) ? `<button class="btn-ghost" onclick="anularPV(${row.id})">Anular</button>` : '';
-  const enviar    = (row.editable && PUEDE) ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
+  /* Enviar a Contabilidad: generales (endpoint propio) y TAMBIÉN las de Post
+     Venta (SALDO/COMISION, endpoint de postventa) — permite reenviar el correo
+     de una orden que se emitió sin avisar (caso ODP2610749/750 del 12-08). */
+  const esPV = row.origen === 'SALDO' || row.origen === 'COMISION';
+  const enviar    = ((row.editable || esPV) && PUEDE) ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
   const pagarBtn  = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
@@ -430,8 +436,13 @@ async function enviarCorreo(){
   if (!confirm(`¿Enviar la Orden de Pago ${o.numero||''} por correo a Contabilidad? Quedarás en copia.`)) return;
   const btn = document.getElementById('btnEnviar'); if(btn){ btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Enviando…'; }
   try {
-    const r = await fetch(`/api/ordenes-pago/ordenes/${o.id}/enviar-correo`, { method:'POST', headers:H,
-      body: JSON.stringify({ asunto: asuntoDe(o), html: emailHTML(o) }) });
+    // Las de Post Venta van por su endpoint (respeta plantilla, Activo y remitente del mantenedor)
+    const esPV = o.origen === 'SALDO' || o.origen === 'COMISION';
+    const r = await (esPV
+      ? fetch('/api/postventa/enviar-correo-orden', { method:'POST', headers:H,
+          body: JSON.stringify({ asunto: asuntoDe(o), html: emailHTML(o), num_op: o.numero, tipo: o.origen === 'COMISION' ? 'comision' : 'saldo' }) })
+      : fetch(`/api/ordenes-pago/ordenes/${o.id}/enviar-correo`, { method:'POST', headers:H,
+          body: JSON.stringify({ asunto: asuntoDe(o), html: emailHTML(o) }) }));
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'No se pudo enviar');
     toast('Correo enviado a '+(j.data?.to||'Contabilidad')+(j.data?.cc?(' (CC '+j.data.cc+')'):''));
