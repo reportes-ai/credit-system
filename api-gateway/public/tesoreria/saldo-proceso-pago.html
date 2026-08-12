@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — ID Financiera, Fecha Otorgado, Hora Recepcion; RUT y clasificacion con respaldo por id_dealer/RUT · v1.0 — Saldo Precio en Proceso de Pago: la planilla de Tesorería reconstruida en vivo desde Post Venta + export para la otra app -->
+<!-- v1.2 — Saldo Precio (antes Monto a Pagar) + Limitacion, Transferencia y Monto a Pagar Total al final; Excel igual · v1.1 — ID Financiera, Fecha Otorgado, Hora Recepcion; RUT y clasificacion con respaldo por id_dealer/RUT · v1.0 — Saldo Precio en Proceso de Pago: la planilla de Tesorería reconstruida en vivo desde Post Venta + export para la otra app -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -72,12 +72,13 @@
         <thead><tr>
           <th>N° OP</th><th>ID Financiera</th><th>Dealer</th><th>RUT Dealer</th><th>Ejecutivo</th>
           <th>Fecha Otorgado</th>
-          <th>Monto a Pagar</th><th>Recepción Fundantes</th><th>Hora Recep.</th><th>AM/PM</th>
+          <th>Saldo Precio</th><th>Recepción Fundantes</th><th>Hora Recep.</th><th>AM/PM</th>
           <th>Vence (SLA)</th><th>Días p/ Pago</th><th>Etapa</th>
           <th>Fund. Enviados</th><th>Liberado</th><th>N° ODP</th><th>Ingreso Banco</th><th>Pagado</th>
           <th>Tipo</th><th>Clasif.</th><th>Financiera</th>
+          <th>Limitación</th><th>Transferencia</th><th>Monto a Pagar Total</th>
         </tr></thead>
-        <tbody id="body"><tr><td colspan="18" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
+        <tbody id="body"><tr><td colspan="24" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -111,7 +112,7 @@ async function cargar(){
   if (document.getElementById('fTodo').checked) qs.set('todo','1');
   const j = await fetch('/api/saldo-proceso-pago?'+qs.toString(), { headers:H }).then(r=>r.json()).catch(()=>null);
   if (!j || !j.success) { document.getElementById('body').innerHTML =
-    '<tr><td colspan="18" style="color:#b91c1c;padding:20px">'+esc(j&&j.error||'Error al cargar')+'</td></tr>'; return; }
+    '<tr><td colspan="24" style="color:#b91c1c;padding:20px">'+esc(j&&j.error||'Error al cargar')+'</td></tr>'; return; }
   DATA = j.data;
   if (!FLUJO.length) { FLUJO = j.flujo || [];
     document.getElementById('fEstado').innerHTML = '<option value="">Todas las etapas</option>' +
@@ -132,7 +133,7 @@ function render(r){
     <td>${esc(x.rut_dealer||'—')}</td>
     <td>${esc(x.ejecutivo||'—')}</td>
     <td>${fd(x.f_otorgado)}</td>
-    <td class="num"><b>${clp(x.monto)}</b>${x.monto_preliminar?'<br><span class="prelim">saldo puro, sin ODP aún</span>':''}</td>
+    <td class="num"><b>${clp(x.monto)}</b></td>
     <td>${fd(x.f_recepcion)}</td>
     <td>${esc(x.hora_recepcion||'—')}</td>
     <td>${esc(x.ampm||'—')}</td>
@@ -149,7 +150,10 @@ function render(r){
     <td><span class="tag">${esc(x.tipo_dealer)}</span></td>
     <td>${esc(x.clasificacion||'—')}</td>
     <td>${esc(x.financiera||'—')}</td>
-  </tr>`).join('') : '<tr><td colspan="21" style="color:#94a3b8;padding:20px">Sin operaciones en proceso. 🎉</td></tr>';
+    <td class="num">${x.limitacion?clp(x.limitacion):'—'}</td>
+    <td class="num">${x.transferencia?clp(x.transferencia):'—'}</td>
+    <td class="num"><b>${clp(x.monto_total)}</b>${x.monto_preliminar?'<br><span class="prelim">calculado, sin ODP aún</span>':''}</td>
+  </tr>`).join('') : '<tr><td colspan="24" style="color:#94a3b8;padding:20px">Sin operaciones en proceso. 🎉</td></tr>';
 }
 
 /* Export para cargar en la otra aplicación. Nombre exigido:
@@ -158,13 +162,15 @@ function exportar(){
   const rows = DATA.map(x => ({
     'OP': x.num_op, 'ID FINANCIERA': x.id_financiera, 'DEALER': x.dealer, 'RUT DEALER': x.rut_dealer, 'EJECUTIVO/A': x.ejecutivo,
     'FECHA OTORGADO': fd(x.f_otorgado),
-    'MONTO': x.monto, 'FECHA RECEPCION FUNDANTES': fd(x.f_recepcion), 'HORA RECEPCION': x.hora_recepcion, 'AM-PM': x.ampm,
+    'SALDO PRECIO': x.monto, 'FECHA RECEPCION FUNDANTES': fd(x.f_recepcion), 'HORA RECEPCION': x.hora_recepcion, 'AM-PM': x.ampm,
     'FECHA VENCIMIENTO SLA': fd(x.f_venc_sla), 'DIAS PARA PAGO': x.dias_para_pago,
     'ETAPA': x.estado, 'FECHA FUNDANTES ENVIADOS': fd(x.f_fund_enviados),
     'FECHA LIBERADO': fd(x.f_liberado), 'N°ODP': x.odp,
     'FECHA INGRESO AL BANCO': fd(x.f_banco), 'FECHA PAGO': fd(x.f_pagado),
     'TIPO DEALER': x.tipo_dealer, 'CLASIFICACION DEALER': x.clasificacion,
     'FINANCIERA': x.financiera,
+    'LIMITACION': x.limitacion || 0, 'TRANSFERENCIA': x.transferencia || 0,
+    'MONTO A PAGAR TOTAL': x.monto_total,
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();

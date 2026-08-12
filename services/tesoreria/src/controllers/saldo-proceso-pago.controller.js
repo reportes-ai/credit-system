@@ -34,6 +34,10 @@ const pool = require('../../../../shared/config/database');
 // Motor único de etapa: una operación ANULADA o DESISTIDA no se paga, aunque
 // su seguimiento de Post Venta haya quedado a medio camino.
 const { ETAPA_SQL } = require('../../../../shared/etapa-credito');
+// Motor único de los fijos AutoFin (Limitación al dominio + Transferencia/inscripción):
+// el MISMO que usa la Orden de Pago de saldo. Solo AUTOFIN los suma; viven en el
+// mantenedor Parámetros de Crédito (autofin_limitacion / autofin_inscripcion).
+const { getFijosAutoFin, esAutoFin } = require('../../../postventa/src/controllers/postventa.controller');
 
 /* Card en la landing de Tesorería + permiso (anti-hardcode) */
 require('../../../../shared/migrate').enFila('saldo-proceso-pago', async () => {
@@ -144,6 +148,7 @@ exports.listar = async (req, res) => {
     const vivas = segs.filter(s => !['ANULADO', 'DESISTIDO', 'RECHAZADO', 'NO OTORGADO']
       .includes(String(s.etapa_credito || '').toUpperCase()));
 
+    const fijos = await getFijosAutoFin();   // Limitación + Transferencia (solo AUTOFIN)
     let data = vivas.map(s => {
       const et = etapasDe.get(s.id) || {};
       let estadoActual = 'SIN ETAPAS';
@@ -167,8 +172,16 @@ exports.listar = async (req, res) => {
         hora_recepcion: dRec ? String(dRec.getHours()).padStart(2, '0') + ':' + String(dRec.getMinutes()).padStart(2, '0') : null,
         tipo_dealer: (s.parque && s.parque !== 'NO APLICA') ? 'PARQUE' : 'CALLE',
         clasificacion: s.categoria_asignada || null,
-        monto: s.odp_monto != null ? Number(s.odp_monto) : Number(s.saldo_precio || 0),
-        monto_preliminar: s.odp_monto == null,             // sin ODP aún: saldo puro, sin gastos
+        /* Desglose del pago: saldo precio + fijos AutoFin (Limitación y Transferencia,
+           mismo motor que la ODP; $0 fuera de AUTOFIN). El TOTAL es la ODP cuando
+           existe (monto congelado al emitir) y la suma calculada si aún no hay. */
+        monto: Number(s.saldo_precio || 0),
+        limitacion: esAutoFin(s.financiera) ? (fijos.autofin_limitacion || 0) : 0,
+        transferencia: esAutoFin(s.financiera) ? (fijos.autofin_inscripcion || 0) : 0,
+        monto_total: s.odp_monto != null ? Number(s.odp_monto)
+          : Number(s.saldo_precio || 0)
+            + (esAutoFin(s.financiera) ? (fijos.autofin_limitacion || 0) + (fijos.autofin_inscripcion || 0) : 0),
+        monto_preliminar: s.odp_monto == null,             // sin ODP aún: total calculado, no congelado
         odp: s.odp_numero || null,
         estado: estadoActual,
         pagado: !!pagado,
@@ -196,7 +209,7 @@ exports.listar = async (req, res) => {
 
     const resumen = {
       n: data.length,
-      monto: data.reduce((a, r) => a + (r.monto || 0), 0),
+      monto: data.reduce((a, r) => a + (r.monto_total || 0), 0),   // el chip Total = lo que realmente se paga
       atrasados: data.filter(r => r.dias_para_pago != null && r.dias_para_pago < 0).length,
       por_estado: {},
     };
