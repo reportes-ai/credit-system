@@ -2027,17 +2027,23 @@ const corregirCarta = async (req, res) => {
     nueva.fecha_creacion         = new Date();
     nueva.reemplazada_por_id     = null;
     nueva.reemplazada_por_op     = null;
-    // El RUT desglosado se recalcula: si se corrigió el RUT, los espejos deben seguirlo.
-    const parteRut = (v, dv) => { const s = String(v || '').replace(/[.\s]/g, '').toUpperCase(); const p = s.split('-'); return dv ? (p[1] || null) : (p[0] || null); };
-    nueva.rut_cliente_cuerpo = parteRut(nueva.rut_cliente, false);
-    nueva.rut_cliente_dv     = parteRut(nueva.rut_cliente, true);
-    nueva.rut_dealer_cuerpo  = parteRut(nueva.rut_dealer, false);
-    nueva.rut_dealer_dv      = parteRut(nueva.rut_dealer, true);
+    /* Los espejos del RUT (rut_cliente_cuerpo/dv, rut_dealer_cuerpo/dv) son columnas
+       VIRTUAL GENERATED: la base las recalcula sola desde el RUT y rechaza el INSERT
+       si se les manda un valor. Se sacan de la copia. */
+    const [gen] = await pool.query(
+      "SELECT COLUMN_NAME FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='cartas_aprobacion' AND EXTRA LIKE '%GENERATED%'");
+    for (const g of gen) delete nueva[g.COLUMN_NAME];
 
+    /* Las columnas JSON (excepciones, excepciones_comentarios, revision_auto) vuelven
+       de la BD ya parseadas. Si se pasan como objeto/array, mysql2 EXPANDE el array en
+       una lista separada por comas — y un array vacío se expande a nada, dejando un
+       hueco en el VALUES y rompiendo el INSERT. Hay que serializarlas de vuelta. */
+    const aValor = v => (v != null && typeof v === 'object' && !(v instanceof Date) && !Buffer.isBuffer(v))
+      ? JSON.stringify(v) : v;
     const cols = Object.keys(nueva);
     const [ins] = await pool.query(
       `INSERT INTO cartas_aprobacion (${cols.map(c => `\`${c}\``).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
-      cols.map(c => nueva[c]));
+      cols.map(c => aValor(nueva[c])));
     const idNueva = ins.insertId;
 
     // 4) La original queda REEMPLAZADA y apuntando a su reemplazo.
