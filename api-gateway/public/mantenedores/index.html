@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores — AutoFácil</title>
-  <!-- v1.2 los extras del placement se filtran por permisos (fuga a perfiles sin acceso) -->
+  <!-- v1.3 dedup de cards por href (Estado Cartera duplicaba Etapas y Estados) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/Sortable.min.js"></script>
@@ -303,7 +303,10 @@
       Object.entries(placement).forEach(([sec, arr]) => {
         if (sec !== 'mantenedores' && Array.isArray(arr)) arr.forEach(k => asignadasFuera.add(k));
       });
+      const hrefsVistos = new Set(); // dos funcionalidades pueden apuntar a la misma página (ej. Estado Cartera → estado-creditos) → una sola card
       const nativeItems = funcInfo.map(f => {
+        if (hrefsVistos.has(f.href)) return null;
+        hrefsVistos.add(f.href);
         const seg = f.href.replace('/mantenedores/', '').replace(/^\//, '').replace(/\/$/, '');
         if (SOLO_DIOS.has(seg) || DEALERNET.has(seg) || DEALERS_HIJAS.has(seg)) return null;
         if (placement[seg] && placement[seg] !== 'mantenedores') return null;
