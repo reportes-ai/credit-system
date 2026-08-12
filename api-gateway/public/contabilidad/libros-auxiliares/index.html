@@ -377,9 +377,29 @@ async function rcvEstadoCargar(){
     el.style.display = 'block';
     if (!d.configurado) { el.innerHTML = '<i class="bi bi-cloud-slash text-danger me-1"></i>RCV SII sin configurar (faltan env vars en Render).'; return; }
     const ult = (d.logs || [])[0];
+    /* Cuando la última sync falló, mostramos el diagnóstico del certificado: SimpleAPI
+       contesta lo mismo si la clave está mala o si el base64 llegó cortado, y sin esto
+       no había cómo distinguirlo desde afuera. Nunca muestra los valores, solo el estado. */
+    const g = d.diagnostico;
+    let ayuda = '';
+    if (g && ult && ult.resultado === 'ERROR') {
+      const falta = [];
+      if (!g.apikey) falta.push('SIMPLEAPI_KEY');
+      if (!g.rut_empresa) falta.push('SII_RUT_EMPRESA');
+      if (!g.clave_sii) falta.push('SII_CLAVE');
+      if (!g.cert_cargado) falta.push('SII_CERT_B64');
+      if (g.cert_cargado && !g.cert_pass) falta.push('SII_CERT_PASS');
+      ayuda = `<div style="margin-top:7px;padding:9px 12px;background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:8px;color:#7c2d12;font-size:.83rem">
+        <b><i class="bi bi-wrench-adjustable me-1"></i>Diagnóstico del certificado</b><br>
+        ${falta.length ? 'Falta configurar en Render: <b>' + falta.join(', ') + '</b>.<br>' : ''}
+        ${g.cert_cargado ? `Certificado: <b>${fmt(g.cert_bytes)} bytes</b>${g.cert_es_pfx===false?' — <b>no parece un .pfx</b>':''}${g.base64_con_espacios?' · <b>el base64 tiene espacios o saltos de línea</b> (debe ir en una sola línea)':''}.<br>` : ''}
+        ${g.mensaje ? '<b>' + g.mensaje + '</b>' : ''}
+      </div>`;
+    }
     el.innerHTML = `<i class="bi bi-cloud-check text-success me-1"></i>RCV SII conectado · ${d.mes}: <b>${fmt(d.sii?.docs||0)}</b> docs del SII (IVA $${fmt(d.sii?.iva||0)})` +
       (d.auxiliar ? ` vs auxiliar <b>${fmt(d.auxiliar.docs||0)}</b> docs` : '') +
-      (ult ? ` · última sync ${String(ult.created_at||'').slice(0,16).replace('T',' ')} ${ult.resultado==='ERROR'?'<span class="text-danger">ERROR: '+(ult.detalle||'')+'</span>':'OK'}` : ' · aún sin sincronizaciones');
+      (ult ? ` · última sync ${String(ult.created_at||'').slice(0,16).replace('T',' ')} ${ult.resultado==='ERROR'?'<span class="text-danger">ERROR: '+(ult.detalle||'')+'</span>':'OK'}` : ' · aún sin sincronizaciones') +
+      ayuda;
   } catch (_) {}
 }
 rcvEstadoCargar();

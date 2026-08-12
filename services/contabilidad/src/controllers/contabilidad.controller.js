@@ -2770,7 +2770,10 @@ exports.rcvEstado = async (req, res) => {
         `SELECT COUNT(*) docs, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total
            FROM ctb_compras_aux WHERE mes=?`, [mes]);
     } catch (_) {}
-    ok(res, { configurado: rcv.configurado(), mes, sii, auxiliar: aux, logs });
+    // Diagnóstico del certificado: dice cuál dato falta o falla, sin exponer ninguno.
+    let diag = null;
+    try { diag = rcv.diagnosticoCert ? rcv.diagnosticoCert() : null; } catch (_) {}
+    ok(res, { configurado: rcv.configurado(), mes, sii, auxiliar: aux, logs, diagnostico: diag });
   } catch (e) { fail(res, e.message); }
 };
 

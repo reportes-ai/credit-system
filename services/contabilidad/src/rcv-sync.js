@@ -33,6 +33,44 @@ const cfg = () => ({
 });
 const configurado = () => { const c = cfg(); return !!(c.key && c.rutEmpresa && c.clave); };
 
+/* Diagnóstico del certificado, SIN exponer ningún secreto: solo dice si cada dato
+   está puesto y si el .pfx se abre con la clave. Existe porque SimpleAPI responde
+   "The specified network password is not correct" tanto si la clave está mala como
+   si el base64 llegó cortado, y desde afuera no se distingue una cosa de la otra.
+   El propio Node puede abrir un PKCS#12: si él tampoco puede, es la clave. */
+function diagnosticoCert() {
+  const c = cfg();
+  const d = {
+    apikey: !!c.key, rut_empresa: !!c.rutEmpresa, rut_usuario: !!c.rutUsuario,
+    clave_sii: !!c.clave, cert_cargado: !!c.certB64, cert_pass: !!c.certPass,
+    cert_bytes: 0, cert_es_pfx: null, cert_abre: null, base64_con_espacios: false, mensaje: '',
+  };
+  if (!c.certB64) { d.mensaje = 'No hay certificado cargado (SII_CERT_B64 vacía).'; return d; }
+  d.base64_con_espacios = /\s/.test(c.certB64);
+  let buf;
+  try { buf = Buffer.from(c.certB64, 'base64'); } catch (_) { d.mensaje = 'SII_CERT_B64 no es base64 válido.'; return d; }
+  d.cert_bytes = buf.length;
+  // Un .pfx (PKCS#12) es DER y empieza con SEQUENCE largo: 0x30 0x82
+  d.cert_es_pfx = buf.length > 300 && buf[0] === 0x30 && buf[1] === 0x82;
+  if (!d.cert_es_pfx) {
+    d.mensaje = d.cert_bytes < 300
+      ? `El certificado quedó en ${d.cert_bytes} bytes: el base64 llegó cortado. Pégalo completo, en UNA sola línea.`
+      : 'Los bytes no corresponden a un archivo .pfx — revisa que el base64 sea del certificado y no de otro archivo.';
+    return d;
+  }
+  try {
+    require('tls').createSecureContext({ pfx: buf, passphrase: c.certPass || '' });
+    d.cert_abre = true;
+    d.mensaje = 'El certificado se abre correctamente con la clave configurada.';
+  } catch (e) {
+    d.cert_abre = false;
+    d.mensaje = /mac verify|password|decrypt/i.test(e.message || '')
+      ? 'El archivo .pfx está bien, pero SII_CERT_PASS no es su clave.'
+      : 'No se pudo abrir el certificado: ' + String(e.message || '').slice(0, 120);
+  }
+  return d;
+}
+
 require('../../../shared/migrate').enFila('ctb-rcv-sii', async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ctb_rcv_compras (
@@ -154,4 +192,4 @@ async function tick() {
 setTimeout(tick, 45000);                       // al arrancar (tras migraciones)
 programar('rcv-sii', tick, 12 * 60 * 60 * 1000);        // cada 12h, corre solo si tocan los 2 días
 
-module.exports = { sincronizar, sincronizarMes, configurado };
+module.exports = { sincronizar, sincronizarMes, configurado, diagnosticoCert };
