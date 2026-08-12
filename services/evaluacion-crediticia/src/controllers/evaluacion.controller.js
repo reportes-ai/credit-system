@@ -13,29 +13,8 @@ const almacen = require('../../../../shared/almacen-docs');
 const normRut = v => v ? String(v).replace(/\./g, '').toUpperCase().trim() : null;
 
 // ── Sincroniza la deuda vigente del informe DealerNet (cód. 16) a informacion_comercial ──
-// Mismo mapeo que usa la página de Información Comercial (r1603, M$ → pesos ×1000).
-const _wgp = (o, ...ks) => { for (const k of ks) { if (o == null) return undefined; o = o[k]; } return o; };
-const _warr = x => x == null ? [] : (Array.isArray(x) ? x : [x]);
-function extraerDeudaDN(cont) {
-  const cab = _wgp(cont, 'r1603', 'r16031') || {};
-  const per = _warr(_wgp(cont, 'r1603', 'r16032'))[0];
-  if (!per && cab['@_anomes'] == null) return null;
-  const p = per || {};
-  const n = v => { const x = Number(v); return isNaN(x) ? 0 : Math.round(x * 1000); };
-  return {
-    deuda_vigente_total: n(p['@_deuda_direc_vig']),
-    deuda_vigente_inst:  (Number(p['@_nro_acree_cred_consumo']) || 0) + (Number(p['@_nro_inst_cred_com']) || 0),
-    deuda_hipotecaria:   n(p['@_deuda_cred_hipoteca']),
-    deuda_comercial:     n(p['@_deuda_comercial']),
-    deuda_comercial_inst: Number(p['@_nro_inst_cred_com']) || 0,
-    deuda_consumo:       n(p['@_deuda_cred_consumo']),
-    deuda_consumo_inst:  Number(p['@_nro_acree_cred_consumo']) || 0,
-    deuda_morosa:        n(p['@_deuda_morosa']),
-    deuda_vencida:       n(p['@_deuda_venci_direc']),
-    deuda_castigada:     n(p['@_deuda_cast_directa']),
-    linea_disponible:    n(p['@_linea_cred_disponible']),
-  };
-}
+// La conversión M$ → pesos vive en el motor único shared/dealernet-deuda.js.
+const { extraerDeuda: extraerDeudaDN } = require('../../../../shared/dealernet-deuda');
 async function sincronizarComercialDealernet(rutDash) {
   try {
     const dig = rutDash.replace(/[.\s-]/g, '').toUpperCase();

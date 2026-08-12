@@ -8,6 +8,7 @@ const pool = require('../../../../shared/config/database');
 const ia = require('../../../../shared/ia');
 const { analizar } = require('../../../../shared/anthropic');
 const { auditar } = require('../../../../shared/audit');
+const dnDeuda = require('../../../../shared/dealernet-deuda');   // M$ → pesos (motor único)
 
 const CODIGO = 'informe_crediticio';
 
@@ -96,7 +97,7 @@ const promptDe = datos => `Analiza los siguientes antecedentes DealerNet y respo
   "factores_positivos": ["aspectos favorables"],
   "recomendacion": "sugerencia breve para el analista (no es decisión final)"
 }
-Montos en pesos chilenos como enteros sin puntos. Si no hay causas judiciales, devuelve "causas_judiciales": [].
+Montos en pesos chilenos como enteros sin puntos: los ANTECEDENTES ya vienen convertidos a pesos, NO los vuelvas a multiplicar ni los expreses en miles. Si no hay causas judiciales, devuelve "causas_judiciales": [].
 
 ANTECEDENTES:
 ${datos}`;
@@ -116,8 +117,15 @@ async function analizarRut({ rut, nombre, id_usuario = null, modelo } = {}) {
   const seen = new Set(), ult = [];
   for (const r of rows) { if (seen.has(r.codigo_producto)) continue; seen.add(r.codigo_producto); ult.push(r); }
 
+  /* El informe de deuda CMF (cód. 16) viene en MILES de pesos. Se convierte ANTES de
+     armar el prompt: si se le pasa crudo, la IA reporta "CLP 789" donde hay $789.000. */
+  let deudaCMF = null;
   const datos = ult.map(i => {
     let c = i.contenido; if (typeof c === 'string') { try { c = JSON.parse(c); } catch {} }
+    if (c && typeof c === 'object' && c.r1603) {
+      deudaCMF = dnDeuda.extraerDeuda(c);
+      c = dnDeuda.aPesos(c);
+    }
     let s = (typeof c === 'string') ? c : JSON.stringify(c);
     if (s.length > 6000) s = s.slice(0, 6000) + '…';
     return `### ${i.nombre_producto || i.codigo_producto}\n${s}`;
@@ -127,6 +135,16 @@ async function analizarRut({ rut, nombre, id_usuario = null, modelo } = {}) {
   const r = await analizar({ codigo: CODIGO, id_usuario, system: SYSTEM, prompt: promptDe(datos), json: true, max_tokens: 4000, modelo });
   const x = r.datos;
   if (!x) return { ok: false, motivo: 'sin_analisis', texto: r.texto };
+
+  /* Los montos de deuda CMF los manda el motor, no el modelo: son un dato duro del
+     informe y la IA solo los relata. Los protestos vienen de otro producto y quedan
+     como los leyó ella. */
+  if (deudaCMF) {
+    x.deudas = { ...(x.deudas || {}),
+      deuda_vigente_total: deudaCMF.deuda_vigente_total,
+      deuda_morosa:        deudaCMF.deuda_morosa,
+      deuda_castigada:     deudaCMF.deuda_castigada };
+  }
 
   const productos = ult.map(i => i.nombre_producto || i.codigo_producto).join(', ');
   let id = null;

@@ -10,6 +10,7 @@
  */
 const pool = require('../../../../shared/config/database');
 const ia = require('../../../../shared/ia');
+const dnDeuda = require('../../../../shared/dealernet-deuda');   // M$ → pesos (motor único)
 const { analizar } = require('../../../../shared/anthropic');
 const { auditar } = require('../../../../shared/audit');
 const almacen = require('../../../../shared/almacen-docs');
@@ -134,6 +135,8 @@ exports.evaluar = async (req, res) => {
     for (const r of (dnRows || [])) { if (seen.has(r.codigo_producto)) continue; seen.add(r.codigo_producto); dnUlt.push(r); }
     const dealernetTxt = dnUlt.map(i => {
       let c = i.contenido; if (typeof c === 'string') { try { c = JSON.parse(c); } catch {} }
+      // la deuda CMF (cód. 16) viene en MILES: se pasa a pesos antes del prompt
+      if (c && typeof c === 'object' && c.r1603) c = dnDeuda.aPesos(c);
       let s = (typeof c === 'string') ? c : JSON.stringify(c);
       if (s.length > 5000) s = s.slice(0, 5000) + '…';
       return `### ${i.nombre_producto || i.codigo_producto}\n${s}`;
