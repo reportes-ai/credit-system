@@ -351,6 +351,17 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS seg_rep DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gps_monto DECIMAL(12,2) DEFAULT NULL`);
     await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS gastos_monto DECIMAL(12,2) DEFAULT NULL`);
+    /* Corrección de Cartas de Aprobación: la corrección NO edita la carta emitida —
+       emite una carta NUEVA (sufijo -C1, -C2…) y deja la anterior en REEMPLAZADA
+       apuntando a su reemplazo. Estas columnas son la cadena entre ambas. */
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS reemplazada_por_id INT DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS reemplazada_por_op VARCHAR(40) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS corrige_a_id INT DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS corrige_a_op VARCHAR(40) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS correccion_n INT NOT NULL DEFAULT 0`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS motivo_correccion VARCHAR(400) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS corregida_por_nombre VARCHAR(200) DEFAULT NULL`);
+    await pool.query(`ALTER TABLE cartas_aprobacion ADD COLUMN IF NOT EXISTS fecha_correccion_carta DATETIME DEFAULT NULL`);
     // Dónde vive el PDF adjunto (shared/almacen-docs.js): 161 documentos = 10,5 MB.
     for (const ddl of almacen.sqlColumnas('cartas_documentos')) {
       try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[cartas docs almacen]', e.message); }
@@ -444,6 +455,25 @@ require('../../../../shared/migrate').enFila('cartas', async () => {
       }
     }
   } catch (e) { console.error('[cartas seed corregir-dealer]', e.message); }
+  /* Módulo "Corrección Cartas de Aprobación": card + permiso, ambos en BD (anti-hardcode).
+     Por defecto SOLO Administrador — reemplaza un documento ya emitido y firmado. */
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM funcionalidades WHERE codigo='aprob_crear' LIMIT 1");
+    if (mod) {
+      const alta = async (nombre, codigo, href, icono) => {
+        const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=?', [codigo]);
+        if (ex) return;
+        const [ins] = await pool.query(
+          'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
+          [mod.id_modulo, nombre, codigo, href, icono]);
+        await pool.query(
+          `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+           SELECT id_perfil, ?, IF(nombre='Administrador',1,0) FROM perfiles`, [ins.insertId]);
+        console.log(`✓ funcionalidad ${codigo} creada (solo Admin)`);
+      };
+      await alta('Corrección Cartas de Aprobación', 'aprob_corregir_carta', '/cartas-correccion/', 'bi-pencil-square');
+    }
+  } catch (e) { console.error('[cartas seed corregir-carta]', e.message); }
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -535,6 +565,15 @@ function mapRow(r) {
     revisionAuto:             parseJSON(r.revision_auto),
     numeroCreditoCreado:      r.numero_credito_creado || null,
     idCreditoCreado:          r.id_credito_creado || null,
+    // Cadena de corrección (solo lectura: upsert usa lista explícita de columnas, no vuelven a la BD)
+    reemplazadaPorId:         r.reemplazada_por_id || null,
+    reemplazadaPorOp:         r.reemplazada_por_op || null,
+    corrigeAId:               r.corrige_a_id || null,
+    corrigeAOp:               r.corrige_a_op || null,
+    correccionN:              r.correccion_n || 0,
+    motivoCorreccion:         r.motivo_correccion || null,
+    corregidaPorNombre:       r.corregida_por_nombre || null,
+    fechaCorreccionCarta:     r.fecha_correccion_carta || null,
     numOp:                    r.cred_num_op || null,                                  // NUESTRO N° de operación (creditos.num_op)
     numeroCredito:            r.cred_numero_credito || r.numero_credito_creado || null,
   };
@@ -952,7 +991,7 @@ const upsert = async (req, res) => {
     if (c.opOrigen) {
       const [[caDup]] = await pool.query(
         `SELECT op_carta FROM cartas_aprobacion
-          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA')
+          WHERE id_financiera = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA','REEMPLAZADA')
             AND id <> COALESCE(?, 0) LIMIT 1`, [c.opOrigen, c.id || null]);
       if (caDup) return res.status(409).json({ success: false, data: null,
         error: `El ID de la financiera ${c.opOrigen} ya se encuentra ingresado (carta ${caDup.op_carta}).` });
@@ -990,7 +1029,7 @@ const upsert = async (req, res) => {
         // bloquear o crear un gemelo. Al otorgar, ese mismo crédito pasa a OTORGADO.
         const [[caViva]] = await pool.query(
           `SELECT op_carta FROM cartas_aprobacion
-            WHERE id_credito_creado = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA')
+            WHERE id_credito_creado = ? AND status NOT IN ('ELIMINADA','ANULADA','RECHAZADA','DESISTIDA','VENCIDA','REEMPLAZADA')
               AND id <> COALESCE(?, 0) LIMIT 1`, [crDup.id, c.id || null]);
         if (caViva) return res.status(409).json({ success: false, data: null,
           error: `El ID de la financiera ${c.opOrigen} ya tiene una carta viva (${caViva.op_carta}).` });
@@ -1866,6 +1905,214 @@ const verificable = async (req, res) => {
   } catch (e) { console.error('[cartas verificable]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CORRECCIÓN DE CARTAS DE APROBACIÓN
+   Una carta emitida ya salió al dealer, tiene QR y firma electrónica: por eso
+   NO se edita. Corregir = emitir una carta NUEVA (sufijo -C1, -C2…) y dejar la
+   anterior en REEMPLAZADA apuntando a su reemplazo.
+
+   Reglas del negocio:
+   · La carta nueva queda anexada al MISMO crédito, y para eso los cuatro campos
+     que definen la operación —monto del crédito, saldo precio, tasa y cuotas—
+     deben quedar idénticos. Si alguno cambia, la corrección se bloquea: eso ya
+     no es corregir un dato, es otra operación (va por anulación + carta nueva).
+   · El QR y la FES de la carta vieja quedan NO VIGENTES, con el motivo
+     "Reemplazada por la carta N° X" visible en /verificar.
+   · El movimiento de cartola que aún no salió sigue a la carta nueva; uno ya
+     enviado es historia y no se toca (misma regla que corregir dealer).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// Campos que la corrección puede cambiar. Todo lo que no esté acá no se toca.
+const CAMPOS_CORREGIBLES = [
+  'id_financiera', 'tipo', 'fecha', 'acreedor',
+  'ejecutivo', 'ejecutivo_mail', 'ejecutivo_tel',
+  'cliente', 'rut_cliente',
+  'tipo_vehiculo', 'marca', 'modelo', 'anio', 'patente', 'prenda',
+  'precio_venta', 'pie',
+  'parque', 'nombre_dealer', 'rut_dealer', 'vendedor',
+  'part_neto', 'part_iva', 'part_bruto',
+  'seg_rdh', 'seg_cesantia', 'seg_rep', 'gps_monto', 'gastos_monto',
+];
+// Los que definen la operación: si cambian, ya no es la misma y no puede colgar del mismo crédito.
+const CAMPOS_BLOQUEADOS = [
+  { col: 'monto_credito_clp', lbl: 'Monto del crédito' },
+  { col: 'saldo',             lbl: 'Saldo precio' },
+  { col: 'tasa_credito',      lbl: 'Tasa' },
+  { col: 'plazo',             lbl: 'Cuotas' },
+];
+
+const mismoNumero = (a, b) => {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  const x = Number(a), y = Number(b);
+  if (isNaN(x) || isNaN(y)) return String(a).trim() === String(b).trim();
+  return Math.abs(x - y) < 0.005;     // tolera el redondeo de DECIMAL, no un cambio real
+};
+
+/* Número de la carta corregida: mismo número con sufijo -C1, -C2…
+   No hay índice único en op_carta (hay 10 duplicados históricos), así que la
+   unicidad se garantiza acá, buscando el primer sufijo libre. */
+async function siguienteOpCorreccion(opOriginal) {
+  const base = String(opOriginal || '').replace(/-C\d+$/i, '');
+  const [rows] = await pool.query('SELECT op_carta FROM cartas_aprobacion WHERE op_carta = ? OR op_carta LIKE ?', [base, base + '-C%']);
+  const usados = new Set(rows.map(r => String(r.op_carta).toUpperCase()));
+  for (let n = 1; n <= 99; n++) {
+    const cand = `${base}-C${n}`;
+    if (!usados.has(cand.toUpperCase())) return { op: cand, n };
+  }
+  throw new Error('Demasiadas correcciones para esta carta.');
+}
+
+/* POST /api/cartas/:id/corregir  { campos:{...}, motivo } */
+const corregirCarta = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { campos = {}, motivo } = req.body || {};
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'ID inválido.' });
+    if (!String(motivo || '').trim())
+      return res.status(400).json({ success: false, data: null, error: 'El motivo de la corrección es obligatorio.' });
+
+    const [[orig]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!orig) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+
+    if (orig.status !== 'APROBADA' && orig.status !== 'OTORGADA')
+      return res.status(400).json({ success: false, data: null,
+        error: `Solo se corrigen cartas aprobadas u otorgadas. Esta está ${orig.status} — una pendiente o rechazada se corrige con el lápiz de edición.` });
+    if (orig.reemplazada_por_id)
+      return res.status(400).json({ success: false, data: null,
+        error: `Esta carta ya fue reemplazada por la N° ${orig.reemplazada_por_op}. Corrige esa, que es la vigente.` });
+
+    // 1) Los cuatro campos que definen la operación deben quedar idénticos.
+    const trabados = CAMPOS_BLOQUEADOS.filter(f =>
+      campos[f.col] !== undefined && !mismoNumero(campos[f.col], orig[f.col]));
+    if (trabados.length)
+      return res.status(422).json({ success: false, data: null,
+        error: `No se puede corregir ${trabados.map(f => f.lbl).join(', ')}: ${trabados.length > 1 ? 'esos campos definen' : 'ese campo define'} la operación y la carta quedaría sin calzar con el crédito. Para cambiarlo hay que anular la operación y emitir una carta nueva.` });
+
+    // 2) La carta no puede contradecirse: precio − pie tiene que seguir dando el saldo.
+    const precio = campos.precio_venta !== undefined ? Number(campos.precio_venta) : Number(orig.precio_venta);
+    const pie    = campos.pie          !== undefined ? Number(campos.pie)          : Number(orig.pie);
+    if (!isNaN(precio) && !isNaN(pie) && orig.saldo != null && !mismoNumero(precio - pie, orig.saldo))
+      return res.status(422).json({ success: false, data: null,
+        error: `Precio venta menos pie da ${Math.round(precio - pie).toLocaleString('es-CL')} y el saldo precio de la operación es ${Math.round(Number(orig.saldo)).toLocaleString('es-CL')}. Ajusta precio y pie para que cuadren, o la carta quedaría contradiciéndose.` });
+
+    // 3) Fila nueva = copia de la original con los campos corregidos encima.
+    const nueva = { ...orig };
+    delete nueva.id;
+    const cambios = [];
+    for (const col of CAMPOS_CORREGIBLES) {
+      if (campos[col] === undefined) continue;
+      const antes = orig[col], ahora = campos[col] === '' ? null : campos[col];
+      const igual = (antes == null && ahora == null) ||
+        (antes != null && ahora != null && (mismoNumero(antes, ahora) || String(antes).trim() === String(ahora).trim()));
+      if (igual) continue;
+      nueva[col] = ahora;
+      cambios.push({ campo: col, antes: antes == null ? null : String(antes), ahora: ahora == null ? null : String(ahora) });
+    }
+    if (!cambios.length)
+      return res.status(400).json({ success: false, data: null, error: 'No cambiaste ningún dato: la carta corregida sería idéntica a la actual.' });
+
+    const quien = req.usuario ? ([req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email) : 'Sistema';
+    const { op: opNueva, n } = await siguienteOpCorreccion(orig.op_carta);
+
+    // Hereda la aprobación original (los montos no cambiaron) y el vínculo al crédito.
+    nueva.op_carta               = opNueva;
+    nueva.status                 = 'APROBADA';
+    nueva.corrige_a_id           = orig.id;
+    nueva.corrige_a_op           = orig.op_carta;
+    nueva.correccion_n           = n;
+    nueva.motivo_correccion      = String(motivo).trim().slice(0, 400);
+    nueva.corregida_por_nombre   = quien;
+    nueva.fecha_correccion_carta = new Date();
+    nueva.fecha_creacion         = new Date();
+    nueva.reemplazada_por_id     = null;
+    nueva.reemplazada_por_op     = null;
+    // El RUT desglosado se recalcula: si se corrigió el RUT, los espejos deben seguirlo.
+    const parteRut = (v, dv) => { const s = String(v || '').replace(/[.\s]/g, '').toUpperCase(); const p = s.split('-'); return dv ? (p[1] || null) : (p[0] || null); };
+    nueva.rut_cliente_cuerpo = parteRut(nueva.rut_cliente, false);
+    nueva.rut_cliente_dv     = parteRut(nueva.rut_cliente, true);
+    nueva.rut_dealer_cuerpo  = parteRut(nueva.rut_dealer, false);
+    nueva.rut_dealer_dv      = parteRut(nueva.rut_dealer, true);
+
+    const cols = Object.keys(nueva);
+    const [ins] = await pool.query(
+      `INSERT INTO cartas_aprobacion (${cols.map(c => `\`${c}\``).join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+      cols.map(c => nueva[c]));
+    const idNueva = ins.insertId;
+
+    // 4) La original queda REEMPLAZADA y apuntando a su reemplazo.
+    await pool.query(
+      `UPDATE cartas_aprobacion SET status='REEMPLAZADA', reemplazada_por_id=?, reemplazada_por_op=?,
+         motivo_correccion=?, corregida_por_nombre=?, fecha_correccion_carta=NOW() WHERE id=?`,
+      [idNueva, opNueva, String(motivo).trim().slice(0, 400), quien, id]);
+
+    // 5) QR + Firma Electrónica Simple de la vieja: NO VIGENTE con el motivo a la vista.
+    let qrAnulados = 0;
+    try {
+      const [docs] = await pool.query(
+        "SELECT codigo FROM documentos_verificables WHERE tipo='carta_aprobacion' AND ref_tabla='cartas_aprobacion' AND ref_id=? AND anulado=0",
+        [String(id)]);
+      const { anularVerificable } = require('../../../../shared/verificacion');
+      for (const d of docs) { await anularVerificable(d.codigo, `No vigente — reemplazada por la carta N° ${opNueva}`); qrAnulados++; }
+    } catch (e) { console.error('[cartas corregir qr]', e.message); }
+
+    // 6) La comisión que aún no salió en cartola sigue a la carta nueva; la enviada es historia.
+    let cartola = 0;
+    try {
+      const [mv] = await pool.query(
+        `UPDATE cartolas_movimientos SET id_carta=?, num_carta=?, nombre_dealer=?, rut_dealer=?, ejecutivo=?,
+            nombre_cliente=?, rut_cliente=?, vendedor=?, acreedor=?, comision=?,
+            observaciones = CONCAT(COALESCE(observaciones,''), ' | Carta corregida ', ?, '→', ?, ' por ', ?, ': ', ?)
+          WHERE id_carta=? AND mes_cartola IS NULL`,
+        [idNueva, opNueva, nueva.nombre_dealer, nueva.rut_dealer, nueva.ejecutivo,
+         nueva.cliente, nueva.rut_cliente, nueva.vendedor, nueva.acreedor, nueva.part_bruto,
+         orig.op_carta, opNueva, quien, String(motivo).trim().slice(0, 200), id]);
+      cartola = mv.affectedRows;
+    } catch (e) { console.error('[cartas corregir cartola]', e.message); }
+
+    auditar({ req, accion: 'CORREGIR', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: idNueva,
+      detalle: `Corrigió la carta ${orig.op_carta} → ${opNueva} (${cambios.map(c => c.campo).join(', ')}). Motivo: ${String(motivo).trim()}`,
+      rut: nueva.rut_cliente });
+
+    res.json({ success: true, error: null, data: {
+      id: idNueva, opCarta: opNueva, correccionN: n,
+      reemplaza: { id, opCarta: orig.op_carta },
+      cambios, qrAnulados, cartolaActualizada: cartola,
+      creditoEnlazado: orig.numero_credito_creado || null,
+    } });
+  } catch (e) {
+    console.error('[cartas corregir]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'No se pudo corregir la carta: ' + e.message });
+  }
+};
+
+/* GET /api/cartas/:id/cadena — historial de correcciones de una carta (ambos sentidos). */
+const cadenaCorrecciones = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'ID inválido.' });
+    const [[c]] = await pool.query('SELECT id, op_carta, corrige_a_id FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!c) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+    let raizId = c.id, guard = 0;
+    while (guard++ < 50) {                                  // sube hasta la carta original
+      const [[p]] = await pool.query('SELECT id, corrige_a_id FROM cartas_aprobacion WHERE id=? LIMIT 1', [raizId]);
+      if (!p || !p.corrige_a_id) break;
+      raizId = p.corrige_a_id;
+    }
+    const cadena = [];
+    let cur = raizId; guard = 0;
+    while (cur && guard++ < 50) {                            // y baja siguiendo los reemplazos
+      const [[r]] = await pool.query(
+        `SELECT id, op_carta, status, correccion_n, motivo_correccion, corregida_por_nombre,
+                fecha_correccion_carta, fecha_creacion, reemplazada_por_id FROM cartas_aprobacion WHERE id=? LIMIT 1`, [cur]);
+      if (!r) break;
+      cadena.push({ ...r, esActual: r.id === id, vigente: !r.reemplazada_por_id });
+      cur = r.reemplazada_por_id;
+    }
+    res.json({ success: true, data: cadena, error: null });
+  } catch (e) { console.error('[cartas cadena]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 /* ── PUT /api/cartas/:id/corregir-dealer — corrige el dealer de una carta ya
    APROBADA (una pendiente/rechazada se corrige por el flujo normal de edición).
    Casilla propia aprob_corregir_dealer (por defecto solo Administrador), motivo
@@ -1913,5 +2160,5 @@ const corregirDealer = async (req, res) => {
   }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, fichaCompleta, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable, corregirDealer,
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, fichaCompleta, corregirCarta, cadenaCorrecciones, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable, corregirDealer,
   parseCotizacion, parseCartaCompromiso, parseCartaAutofin };   // para scripts/backfill-extracted-cartas.js

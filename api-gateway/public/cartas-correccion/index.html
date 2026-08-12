@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<!-- v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Corrección Cartas de Aprobación — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --blue:#0141A2; --accent:#009AFE; --amber:#c2410c; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .main { max-width:1240px; margin:0 auto; padding:22px 26px 80px; }
+  .banner { background:linear-gradient(135deg,var(--navy),var(--blue) 55%,var(--accent)); border-radius:16px; color:#fff; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.3rem; opacity:.9; }
+  .banner h2 { margin:0 0 3px; font-size:1.22rem; font-weight:700; }
+  .banner p { margin:0; opacity:.9; font-size:.85rem; max-width:900px; line-height:1.45; }
+  .card-af { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); margin-bottom:16px; }
+  .card-af > h3 { margin:0 0 12px; font-size:.86rem; font-weight:800; color:var(--navy); display:flex; align-items:center; gap:7px; }
+  .card-af > h3 i { color:var(--blue); }
+  input[type=text], input[type=number], input[type=date], select, textarea { border:1.5px solid #d1d5db; border-radius:9px; padding:8px 12px; font:inherit; font-size:.85rem; background:#fff; width:100%; }
+  input:focus, select:focus, textarea:focus { outline:none; border-color:var(--blue); }
+  .buscador { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .buscador input { flex:1; min-width:280px; }
+  .btnx { border:none; border-radius:9px; padding:9px 17px; font-size:.83rem; font-weight:700; cursor:pointer; background:var(--blue); color:#fff; white-space:nowrap; }
+  .btnx:disabled { background:#93c5fd; cursor:not-allowed; }
+  .btn-gh { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  .btn-ok { background:#16a34a; }
+  table.res { width:100%; border-collapse:collapse; font-size:.79rem; }
+  table.res th { background:var(--navy); color:#fff; text-align:left; padding:8px; font-size:.67rem; text-transform:uppercase; letter-spacing:.03em; }
+  table.res td { padding:7px 8px; border-bottom:1px solid #f1f5f9; }
+  table.res tbody tr:hover { background:#f8fbff; cursor:pointer; }
+  .st { font-size:.65rem; font-weight:800; border-radius:6px; padding:2px 8px; }
+  .st-APROBADA{background:#dcfce7;color:#15803d}.st-REEMPLAZADA{background:#f3e8ff;color:#7e22ce}
+  .st-VENCIDA{background:#fef3c7;color:#92400e}.st-ANULADA{background:#fee2e2;color:#991b1b}
+  .st-DESISTIDA{background:#e2e8f0;color:#475569}.st-RECHAZADA{background:#fee2e2;color:#991b1b}
+  .st-PENDIENTE{background:#dbeafe;color:#1d4ed8}
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; }
+  .f label { display:block; font-size:.72rem; font-weight:700; color:#475569; margin-bottom:4px; }
+  .f label .chg { color:var(--amber); font-weight:800; margin-left:4px; }
+  .f.mod input, .f.mod select { border-color:var(--amber); background:#fffbeb; }
+  .bloq { background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:9px; padding:8px 12px; font-size:.85rem; color:#475569; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .bloq b { color:#0f172a; }
+  .bloq i { color:#64748b; }
+  .aviso { border-radius:10px; padding:11px 15px; font-size:.83rem; line-height:1.5; margin-bottom:14px; }
+  .aviso.warn { background:#fff7ed; border:1px solid #fed7aa; border-left:4px solid var(--amber); color:#7c2d12; }
+  .aviso.info { background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid var(--blue); color:#1e3a5f; }
+  .aviso.bad  { background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #dc2626; color:#991b1b; }
+  .aviso.ok   { background:#f0fdf4; border:1px solid #bbf7d0; border-left:4px solid #16a34a; color:#166534; }
+  .cadena { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:.8rem; }
+  .cad-it { border:1.5px solid #e2e8f0; border-radius:9px; padding:6px 11px; background:#fff; }
+  .cad-it.vig { border-color:#16a34a; background:#f0fdf4; font-weight:700; }
+  .cad-it.act { box-shadow:0 0 0 3px #0141A222; }
+  .muted { color:#94a3b8; }
+  .sec-tit { font-size:.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.06em; margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid #eef2f7; }
+</style>
+</head>
+<body>
+<script>window.AF_TOPNAV = { breadcrumb: [
+  { label:'Inicio', href:'/' },
+  { label:'Cartas de Aprobación', href:'/aprobaciones/' },
+  { label:'Corrección Cartas de Aprobación', icon:'bi-pencil-square', current:true }
+] };</script>
+<div id="af-topnav"></div>
+
+<div class="main">
+  <div class="banner"><i class="bi bi-pencil-square"></i><div>
+    <h2>Corrección Cartas de Aprobación</h2>
+    <p>Una carta ya emitida salió al dealer con su QR y su firma electrónica, así que no se edita: se corrige emitiendo una carta <b>nueva</b>. La anterior queda REEMPLAZADA, con su QR y su firma marcados como no vigentes, y la nueva sigue colgando del mismo crédito.</p>
+  </div></div>
+
+  <!-- ── Paso 1: buscar la carta ── -->
+  <div class="card-af">
+    <h3><i class="bi bi-search"></i> 1 · Busca la carta que quieres corregir</h3>
+    <div class="buscador">
+      <input type="text" id="q" placeholder="N° de carta, ID Financiera, N° de operación, cliente o RUT…" onkeydown="if(event.key==='Enter')buscar()">
+      <button class="btnx" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
+    </div>
+    <div id="resWrap" style="margin-top:12px"></div>
+  </div>
+
+  <!-- ── Paso 2: corregir ── -->
+  <div id="editorWrap"></div>
+</div>
+
+<script src="/js/rut-core.js"></script>
+<script>
+const TK = sessionStorage.getItem('token');
+if (!TK) location.href = '/login.html';
+const hdr = () => ({ 'Content-Type':'application/json', Authorization:'Bearer ' + TK });
+const E = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fCLP = v => (v==null||v==='') ? '—' : '$' + (Math.round(Number(v))||0).toLocaleString('es-CL');
+const fFec = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleDateString('es-CL'); };
+const fFecHora = v => { if(!v) return '—'; const d=new Date(v); return isNaN(d)?'—':d.toLocaleString('es-CL'); };
+const ymd = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toISOString().slice(0,10); };
+
+let CARTAS = [];      // resultado de la búsqueda
+let SEL = null;       // carta seleccionada (del listado)
+let FICHA = null;     // ficha completa de la carta seleccionada
+
+/* ── Buscar ─────────────────────────────────────────────────────────────── */
+async function buscar(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const wrap = document.getElementById('resWrap');
+  if (q.length < 2) { wrap.innerHTML = '<div class="aviso info">Escribe al menos 2 caracteres para buscar.</div>'; return; }
+  wrap.innerHTML = '<div class="muted" style="padding:10px">Buscando…</div>';
+  try {
+    const r = await fetch('/api/cartas', { headers: hdr() });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error||'No se pudo leer las cartas');
+    const norm = s => String(s==null?'':s).toLowerCase();
+    const soloNum = s => String(s==null?'':s).replace(/[^0-9kK]/g,'');
+    CARTAS = (j.data||[]).filter(c =>
+      norm(c.opCarta).includes(q) || norm(c.opOrigen).includes(q) ||
+      norm(c.numeroCreditoCreado).includes(q) || norm(c.numOp).includes(q) ||
+      norm(c.cliente).includes(q) ||
+      (soloNum(q).length>=5 && soloNum(c.rutCliente).includes(soloNum(q)))
+    ).slice(0, 60);
+    pintarResultados();
+  } catch(e){ wrap.innerHTML = `<div class="aviso bad">${E(e.message)}</div>`; }
+}
+
+function corregible(c){ return (c.status==='APROBADA' || c.status==='OTORGADA'); }
+
+function pintarResultados(){
+  const wrap = document.getElementById('resWrap');
+  if (!CARTAS.length) { wrap.innerHTML = '<div class="aviso info">Ninguna carta calza con esa búsqueda.</div>'; return; }
+  wrap.innerHTML = `<table class="res"><thead><tr>
+      <th>N° Carta</th><th>Fecha</th><th>Cliente</th><th>Dealer</th><th>Financiera</th>
+      <th style="text-align:right">Saldo</th><th>Estado</th><th>N° Operación</th><th></th></tr></thead><tbody>` +
+    CARTAS.map((c,i)=>`<tr onclick="elegir(${i})">
+      <td><b>${E(c.opCarta)}</b></td>
+      <td>${fFec(c.fecha)}</td>
+      <td>${E(c.cliente)}</td>
+      <td style="font-size:.74rem">${E(c.concesionario)}</td>
+      <td style="font-size:.74rem">${E(c.acreedor)}</td>
+      <td style="text-align:right">${fCLP(c.saldo)}</td>
+      <td><span class="st st-${E(c.status)}">${E(c.status)}</span></td>
+      <td>${E(c.numeroCreditoCreado||c.numOp||'—')}</td>
+      <td>${corregible(c)
+        ? '<button class="btnx" style="padding:5px 12px;font-size:.75rem">Corregir</button>'
+        : '<span class="muted" style="font-size:.72rem">no corregible</span>'}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+/* ── Elegir carta y cargar su ficha completa ────────────────────────────── */
+async function elegir(i){
+  SEL = CARTAS[i]; FICHA = null;
+  const ed = document.getElementById('editorWrap');
+  if (!corregible(SEL)) {
+    ed.innerHTML = `<div class="card-af"><div class="aviso warn">
+      La carta <b>${E(SEL.opCarta)}</b> está <b>${E(SEL.status)}</b>. Solo se corrigen cartas <b>aprobadas u otorgadas</b>:
+      una pendiente o rechazada se corrige con el lápiz de edición en Cartas de Aprobación, que no necesita reemplazo.</div></div>`;
+    ed.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+  ed.innerHTML = '<div class="card-af"><div class="muted">Cargando la ficha de la carta…</div></div>';
+  ed.scrollIntoView({behavior:'smooth', block:'start'});
+  try {
+    const [rf, rc] = await Promise.all([
+      fetch('/api/cartas/'+SEL.id+'/ficha',  { headers: hdr() }),
+      fetch('/api/cartas/'+SEL.id+'/cadena', { headers: hdr() }),
+    ]);
+    const jf = await rf.json(); const jc = await rc.json();
+    if (!jf.success) throw new Error(jf.error||'No se pudo leer la ficha');
+    FICHA = jf.data;
+    pintarEditor(jc.success ? (jc.data||[]) : []);
+  } catch(e){ ed.innerHTML = `<div class="card-af"><div class="aviso bad">${E(e.message)}</div></div>`; }
+}
+
+/* ── Editor ─────────────────────────────────────────────────────────────── */
+const CAMPOS = [
+  { sec:'Identificación',        col:'idFinanciera', post:'id_financiera', lbl:'ID Financiera' },
+  { sec:'Identificación',        col:'tipo',         post:'tipo',          lbl:'Tipo', opciones:['DEALER PARQUE','DEALER CALLE'] },
+  { sec:'Identificación',        col:'acreedor',     post:'acreedor',      lbl:'Financiera', opciones:['AUTOFIN','UNIDAD DE CREDITO','AUTOFÁCIL','EUROCAPITAL'] },
+  { sec:'Identificación',        col:'fecha',        post:'fecha',         lbl:'Fecha de la carta', tipo:'date' },
+  { sec:'Ejecutivo comercial',   col:'ejecutivo',     post:'ejecutivo',      lbl:'Ejecutivo' },
+  { sec:'Ejecutivo comercial',   col:'ejecutivoMail', post:'ejecutivo_mail', lbl:'Correo' },
+  { sec:'Ejecutivo comercial',   col:'ejecutivoTel',  post:'ejecutivo_tel',  lbl:'Teléfono' },
+  { sec:'Cliente',               col:'cliente',    post:'cliente',     lbl:'Nombre del cliente' },
+  { sec:'Cliente',               col:'rutCliente', post:'rut_cliente', lbl:'RUT del cliente' },
+  { sec:'Vehículo',              col:'tipoVehiculo', post:'tipo_vehiculo', lbl:'Tipo' },
+  { sec:'Vehículo',              col:'marca',        post:'marca',         lbl:'Marca' },
+  { sec:'Vehículo',              col:'modelo',       post:'modelo',        lbl:'Modelo' },
+  { sec:'Vehículo',              col:'anio',         post:'anio',          lbl:'Año' },
+  { sec:'Vehículo',              col:'patente',      post:'patente',       lbl:'Placa patente' },
+  { sec:'Vehículo',              col:'prenda',       post:'prenda',        lbl:'Prenda', opciones:['SI','NO'] },
+  { sec:'Montos de la venta',    col:'precioVenta',  post:'precio_venta',  lbl:'Precio venta', tipo:'number' },
+  { sec:'Montos de la venta',    col:'pie',          post:'pie',           lbl:'Pie', tipo:'number' },
+  { sec:'Dealer',                col:'nombreDealer', post:'nombre_dealer', lbl:'Dealer' },
+  { sec:'Dealer',                col:'rutDealer',    post:'rut_dealer',    lbl:'RUT del dealer' },
+  { sec:'Dealer',                col:'parque',       post:'parque',        lbl:'Parque' },
+  { sec:'Dealer',                col:'vendedor',     post:'vendedor',      lbl:'Vendedor' },
+  { sec:'Comisión',              col:'partNeto',  post:'part_neto',  lbl:'Participación neta', tipo:'number' },
+  { sec:'Comisión',              col:'partIVA',   post:'part_iva',   lbl:'IVA', tipo:'number' },
+  { sec:'Comisión',              col:'partBruto', post:'part_bruto', lbl:'Participación bruta', tipo:'number' },
+  { sec:'Primas y accesorios',   col:'segRdh',      post:'seg_rdh',      lbl:'Desgravamen / RDH', tipo:'number' },
+  { sec:'Primas y accesorios',   col:'segCesantia', post:'seg_cesantia', lbl:'Cesantía', tipo:'number' },
+  { sec:'Primas y accesorios',   col:'segRep',      post:'seg_rep',      lbl:'Repactación', tipo:'number' },
+  { sec:'Primas y accesorios',   col:'gps',         post:'gps_monto',    lbl:'GPS', tipo:'number' },
+  { sec:'Primas y accesorios',   col:'gastos',      post:'gastos_monto', lbl:'Gastos', tipo:'number' },
+];
+
+function pintarEditor(cadena){
+  const d = FICHA;
+  const secs = [...new Set(CAMPOS.map(c=>c.sec))];
+  const campoHTML = c => {
+    const v = d[c.col];
+    const val = c.tipo==='date' ? ymd(v) : (v==null?'':v);
+    const inp = c.opciones
+      ? `<select id="cc_${c.col}" onchange="marcarCambio('${c.col}')">${
+          ['', ...c.opciones].map(o=>`<option value="${E(o)}"${String(val).toUpperCase()===o.toUpperCase()?' selected':''}>${E(o||'—')}</option>`).join('')
+        }${c.opciones.some(o=>o.toUpperCase()===String(val).toUpperCase())||!val?'':`<option value="${E(val)}" selected>${E(val)}</option>`}</select>`
+      : `<input type="${c.tipo||'text'}" id="cc_${c.col}" value="${E(val)}" oninput="marcarCambio('${c.col}')">`;
+    return `<div class="f" id="fw_${c.col}"><label>${E(c.lbl)}<span class="chg" id="chg_${c.col}"></span></label>${inp}</div>`;
+  };
+  const bloq = (lbl, val, nota) => `<div class="bloq"><span><i class="bi bi-lock-fill me-1"></i>${E(lbl)}</span><b>${val}</b></div>`;
+
+  const cadHTML = cadena.length > 1
+    ? `<div class="card-af"><h3><i class="bi bi-diagram-3"></i> Historial de correcciones</h3><div class="cadena">` +
+      cadena.map((x,i)=>`${i?'<i class="bi bi-arrow-right muted"></i>':''}
+        <span class="cad-it ${x.vigente?'vig':''} ${x.esActual?'act':''}" title="${E(x.motivo_correccion||'')}">
+          ${E(x.op_carta)} <span class="muted" style="font-size:.72rem">${x.vigente?'· vigente':'· reemplazada'}</span>
+        </span>`).join('') + '</div></div>'
+    : '';
+
+  document.getElementById('editorWrap').innerHTML = cadHTML + `
+    <div class="card-af">
+      <h3><i class="bi bi-pencil-square"></i> 2 · Corrige lo que haga falta en la carta ${E(d.opCarta)}</h3>
+
+      <div class="aviso warn">
+        <b><i class="bi bi-lock-fill me-1"></i>Estos cuatro campos no se pueden corregir aquí.</b>
+        Definen la operación, y si cambian la carta deja de calzar con el crédito al que está anexada.
+        Para modificarlos hay que anular la operación por el flujo de Operaciones y emitir una carta nueva.
+      </div>
+      <div class="grid" style="margin-bottom:6px">
+        ${bloq('Monto del crédito', fCLP(d.montoCreditoCLP))}
+        ${bloq('Saldo precio', fCLP(d.saldo))}
+        ${bloq('Tasa', d.tasaCredito!=null? (Number(d.tasaCredito).toFixed(2).replace('.',',')+'%') : '—')}
+        ${bloq('Cuotas', d.plazo? (d.plazo+' cuotas') : '—')}
+      </div>
+      <div class="aviso info" style="margin-top:10px">
+        <i class="bi bi-link-45deg me-1"></i>El saldo precio manda: <b>precio venta − pie</b> tiene que seguir dando
+        ${fCLP(d.saldo)}. Si corriges uno, ajusta el otro.
+        ${d.numeroCreditoCreado ? `La carta corregida seguirá anexada al crédito <b>${E(d.numeroCreditoCreado)}</b>.` : ''}
+      </div>
+
+      ${secs.map(s=>`<div class="sec-tit">${E(s)}</div><div class="grid">${
+        CAMPOS.filter(c=>c.sec===s).map(campoHTML).join('')}</div>`).join('')}
+
+      <div class="sec-tit">Motivo de la corrección</div>
+      <textarea id="ccMotivo" rows="2" placeholder="Por qué se corrige (queda en la carta anterior, en la auditoría y en la cartola). Ej.: el RUT del cliente venía con un dígito cambiado."></textarea>
+
+      <div id="ccMsg"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+        <button class="btnx btn-gh" onclick="document.getElementById('editorWrap').innerHTML=''">Cancelar</button>
+        <button class="btnx btn-ok" id="ccBtn" onclick="confirmar()"><i class="bi bi-check2-circle me-1"></i>Emitir carta corregida</button>
+      </div>
+    </div>`;
+}
+
+function valorActual(c){ const v = FICHA[c.col]; return c.tipo==='date' ? ymd(v) : (v==null?'':String(v)); }
+
+function marcarCambio(col){
+  const c = CAMPOS.find(x=>x.col===col); if(!c) return;
+  const el = document.getElementById('cc_'+col);
+  const cambio = String(el.value).trim() !== String(valorActual(c)).trim();
+  document.getElementById('fw_'+col).classList.toggle('mod', cambio);
+  document.getElementById('chg_'+col).textContent = cambio ? '· modificado' : '';
+}
+
+function juntarCambios(){
+  const out = {};
+  for (const c of CAMPOS) {
+    const el = document.getElementById('cc_'+c.col); if(!el) continue;
+    const nuevo = String(el.value).trim();
+    if (nuevo === String(valorActual(c)).trim()) continue;
+    out[c.post] = nuevo === '' ? '' : nuevo;
+  }
+  return out;
+}
+
+/* ── Confirmar y emitir ─────────────────────────────────────────────────── */
+async function confirmar(){
+  const msg = document.getElementById('ccMsg');
+  const motivo = document.getElementById('ccMotivo').value.trim();
+  const cambios = juntarCambios();
+  const n = Object.keys(cambios).length;
+  if (!n) { msg.innerHTML = '<div class="aviso warn" style="margin-top:12px">No cambiaste ningún dato todavía.</div>'; return; }
+  if (!motivo) { msg.innerHTML = '<div class="aviso warn" style="margin-top:12px">El motivo de la corrección es obligatorio.</div>'; return; }
+
+  const lbl = k => (CAMPOS.find(c=>c.post===k)||{}).lbl || k;
+  const detalle = Object.keys(cambios).map(k=>'· '+lbl(k)).join('\n');
+  if (!confirm(`Se va a emitir una carta NUEVA con ${n} ${n===1?'corrección':'correcciones'}:\n\n${detalle}\n\n`
+    + `La carta ${FICHA.opCarta} quedará REEMPLAZADA y su QR y firma electrónica dejarán de estar vigentes.\n\n¿Confirmas?`)) return;
+
+  const btn = document.getElementById('ccBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
+  try {
+    const r = await fetch('/api/cartas/'+SEL.id+'/corregir', { method:'POST', headers: hdr(),
+      body: JSON.stringify({ campos: cambios, motivo }) });
+    const j = await r.json();
+    if (!j.success) { msg.innerHTML = `<div class="aviso bad" style="margin-top:12px">${E(j.error)}</div>`;
+      btn.disabled=false; btn.innerHTML='<i class="bi bi-check2-circle me-1"></i>Emitir carta corregida'; return; }
+    const d = j.data;
+    document.getElementById('editorWrap').innerHTML = `
+      <div class="card-af">
+        <div class="aviso ok">
+          <div style="font-size:1rem;font-weight:800;margin-bottom:6px"><i class="bi bi-check-circle-fill me-1"></i>Carta corregida emitida: N° ${E(d.opCarta)}</div>
+          La carta <b>${E(d.reemplaza.opCarta)}</b> quedó REEMPLAZADA con el mensaje «Reemplazada por la carta N° ${E(d.opCarta)}».
+          ${d.qrAnulados ? `Su QR y su firma electrónica ya aparecen como <b>no vigentes</b> en la verificación pública.` : 'Esa carta no tenía QR emitido.'}
+          ${d.creditoEnlazado ? `La nueva sigue anexada al crédito <b>${E(d.creditoEnlazado)}</b>.` : ''}
+          ${d.cartolaActualizada ? ` Se actualizó su comisión pendiente en la cartola.` : ''}
+        </div>
+        <div class="sec-tit">Qué se corrigió</div>
+        <table class="res"><thead><tr><th>Campo</th><th>Antes</th><th>Ahora</th></tr></thead><tbody>${
+          d.cambios.map(c=>`<tr style="cursor:default"><td><b>${E((CAMPOS.find(x=>x.post===c.campo)||{}).lbl||c.campo)}</b></td>
+            <td class="muted">${E(c.antes==null?'—':c.antes)}</td><td>${E(c.ahora==null?'—':c.ahora)}</td></tr>`).join('')
+        }</tbody></table>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+          <button class="btnx btn-gh" onclick="document.getElementById('editorWrap').innerHTML='';buscar()">Corregir otra carta</button>
+          <a class="btnx" style="text-decoration:none" href="/aprobaciones/" target="_blank"><i class="bi bi-printer me-1"></i>Ir a imprimir la carta nueva</a>
+        </div>
+      </div>`;
+    document.getElementById('editorWrap').scrollIntoView({behavior:'smooth', block:'start'});
+  } catch(e){
+    msg.innerHTML = `<div class="aviso bad" style="margin-top:12px">Error de conexión: ${E(e.message)}</div>`;
+    btn.disabled=false; btn.innerHTML='<i class="bi bi-check2-circle me-1"></i>Emitir carta corregida';
+  }
+}
+</script>
+
+<!-- Qué afecta este módulo -->
+<div style="max-width:1240px;margin:0 auto 40px;padding:0 26px">
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #0141A2;border-radius:10px;padding:14px 18px;font-size:.82rem;color:#475569;line-height:1.6">
+    <div style="font-weight:800;color:#012d70;margin-bottom:7px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta esta corrección</div>
+    <ul style="margin:0;padding-left:20px">
+      <li><b>Carta anterior</b> → pasa a REEMPLAZADA y deja de ser imprimible en <a href="/aprobaciones/">Cartas de Aprobación</a>.</li>
+      <li><b>QR y Firma Electrónica Simple</b> → la verificación pública muestra la carta anterior como no vigente, con el número de la que la reemplaza.</li>
+      <li><b>Crédito</b> → la carta nueva queda anexada al mismo crédito; por eso monto, saldo precio, tasa y cuotas no se pueden tocar acá.</li>
+      <li><b>Cartola de comisiones</b> → el movimiento que aún no sale en una cartola sigue a la carta nueva; uno ya enviado es historia y no se toca. Ver <a href="/aprobaciones/">Detalle Mes</a>.</li>
+      <li><b>Auditoría</b> → cada corrección queda registrada con quién, cuándo, qué campos y el motivo, en <a href="/auditoria/">Auditoría</a>.</li>
+    </ul>
+  </div>
+</div>
+
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

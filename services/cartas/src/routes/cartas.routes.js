@@ -22,6 +22,11 @@ router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), 
 // Solo lectura, para quien crea, revisa o gestiona cartas vigentes.
 router.get('/:id/ficha', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.fichaCompleta);
 
+// Corrección de Cartas de Aprobación: emite una carta NUEVA (-C1, -C2…) y deja la
+// anterior REEMPLAZADA, con su QR y firma marcados como no vigentes.
+router.get('/:id/cadena',   verifyToken, requireFunc('aprob_corregir_carta', 'aprob_crear', 'aprob_revisar'), ctrl.cadenaCorrecciones);
+router.post('/:id/corregir', verifyToken, requireFunc('aprob_corregir_carta'), ctrl.corregirCarta);
+
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
 router.post('/:id/verificable', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.verificable);
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);
