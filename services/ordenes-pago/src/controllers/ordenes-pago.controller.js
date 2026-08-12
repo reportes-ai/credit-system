@@ -363,7 +363,7 @@ const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otr
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, datos bancarios, etc.) para forzar el re-congelado idempotente.
 // v6 (31-07-2026): datos de transferencia estructurados también en las órdenes generales.
-const DOC_VERSION = 6;
+const DOC_VERSION = 7;   // v7: tipo de cuenta por defecto "Cuenta Corriente" cuando la ficha no lo indica
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -391,7 +391,7 @@ async function construirDocumento(oc) {
       const [[p]] = await pool.query(
         'SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [op.id_proveedor]);
       if (p && p.numero_cuenta) deposito = {
-        banco: p.banco || null, tipo_cuenta: p.tipo_cuenta || null, num_cuenta: p.numero_cuenta,
+        banco: p.banco || null, tipo_cuenta: p.tipo_cuenta || 'Cuenta Corriente', num_cuenta: p.numero_cuenta,
         titular: p.nombre || op.proveedor_nombre || null, rut: p.rut || op.proveedor_rut || null,
       };
     }
@@ -452,7 +452,7 @@ async function construirDocumento(oc) {
   }
   const deposito = dep.num_cuenta ? {
     banco: dep.banco || null,
-    tipo_cuenta: dep.tipo_cuenta || dep.cuenta_tipo || null,
+    tipo_cuenta: dep.tipo_cuenta || dep.cuenta_tipo || 'Cuenta Corriente',
     num_cuenta: dep.num_cuenta,
     titular: dep.titular || row.dealer_nombre || null,
     rut: dep.rut_pago || row.dealer_rut || null,
@@ -569,7 +569,7 @@ const crearOrden = async (req, res) => {
       const [[p]] = await pool.query('SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [idProv]);
       if (!p) return res.status(400).json({ success: false, data: null, error: 'Proveedor no encontrado' });
       provNombre = p.nombre; provRut = p.rut;
-      destino = [p.tipo_cuenta, p.numero_cuenta].filter(Boolean).join(' ') + (p.banco ? ' · ' + p.banco : '');
+      destino = [p.tipo_cuenta || (p.numero_cuenta ? 'Cuenta Corriente' : null), p.numero_cuenta].filter(Boolean).join(' ') + (p.banco ? ' · ' + p.banco : '');
       destino = norm(destino) || null;
     }
     if (!provNombre) return res.status(400).json({ success: false, data: null, error: 'Debe indicar el proveedor' });

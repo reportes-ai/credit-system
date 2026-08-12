@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -254,7 +254,7 @@ function docHTML(r){
       <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${r.nombre_dealer||''}</td></tr>
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${concepto}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
-      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}">${r.num_cuenta? `<b>${r.banco||''}</b>${r.tipo_cuenta?' · '+r.tipo_cuenta:''} · Cta. N° <b>${r.num_cuenta}</b>` : '—'}</td></tr>
+      <tr><td style="${SresL}">Depositar en</td><td style="${SresV}">${r.num_cuenta? `<b>${r.banco||''}</b> · ${r.tipo_cuenta||'Cuenta Corriente'} · Cta. N° <b>${r.num_cuenta}</b>` : '—'}</td></tr>
       <tr><td style="${SresL}">Titular</td><td style="${SresV}">${r.nombre_cuenta||r.nombre_dealer||'—'}${(r.rut_pago||r.rut_dealer)?' · RUT '+(r.rut_pago||r.rut_dealer):''}</td></tr>
       <tr><td style="${SresL}">Valor total</td><td style="${SresV}">${fmt(total)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
