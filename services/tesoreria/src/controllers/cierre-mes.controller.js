@@ -347,16 +347,21 @@ const guardarConfig = async (req, res) => {
    Una vez al día (a la hora configurada): para el mes a cerrar (mes anterior),
    si NO está cerrado, a cada responsable con ítems pendientes cuya fecha límite
    ya llegó se le manda UN correo con su lista. */
-let _ultimoRecordatorio = null;   // 'YYYY-MM-DD' del último envío
+/* El candado "una vez al día" vive en la BD, NO en memoria: una variable se
+   borra con cada deploy/reinicio y el motor volvía a disparar 2 minutos después
+   de cada arranque — el 12-08-2026 Cristina recibió el mismo correo 6 veces en
+   20 minutos porque hubo 6 deploys seguidos. */
 async function tickRecordatorios() {
   try {
     const hoy = new Date().toISOString().slice(0, 10);
-    if (_ultimoRecordatorio === hoy) return;
+    if ((await cfgGet('recordatorio_ultimo')) === hoy) return;
     const hora = parseInt(await cfgGet('recordatorio_hora'), 10) || 9;
     if (new Date().getHours() < hora) return;
+    const marcarHoy = () => pool.query(
+      "INSERT INTO cierre_mes_config (clave, valor) VALUES ('recordatorio_ultimo', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)", [hoy]);
     const mes = mesDefault();
     const est = await estadoMes(mes);
-    if (est.cerrado) { _ultimoRecordatorio = hoy; return; }
+    if (est.cerrado) { await marcarHoy(); return; }
     const porUsuario = new Map();   // id_usuario → { email, nombre, items: [] }
     for (const it of est.items) {
       if (it.estado === 'OK' || it.limite > hoy) continue;
@@ -367,6 +372,9 @@ async function tickRecordatorios() {
         porUsuario.get(r.id_usuario).items.push(it);
       }
     }
+    // Marcar ANTES de enviar: si el envío se cae a la mitad, mañana repite igual
+    // (el recordatorio es diario), pero nunca duplica dentro del mismo día.
+    await marcarHoy();
     for (const [, u] of porUsuario) {
       const lis = u.items.map(i =>
         `<li style="margin-bottom:6px"><b>${i.nombre}</b> — vencía el ${i.limite.split('-').reverse().join('-')}
@@ -384,7 +392,6 @@ async function tickRecordatorios() {
       }).catch(e => console.error('[cierre-mes recordatorio]', e.message));
     }
     if (porUsuario.size) console.log(`[cierre-mes] recordatorios enviados a ${porUsuario.size} responsable(s) — cierre ${mes}`);
-    _ultimoRecordatorio = hoy;
   } catch (e) { console.error('[cierre-mes tick]', e.message); }
 }
 setTimeout(tickRecordatorios, 2 * 60 * 1000);
