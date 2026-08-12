@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -723,7 +723,7 @@ function renderOps(rows){
       <div class="op-foot"><span>Otorgado: ${fmtFecha(o.fecha_otorgado)}</span>
         <span class="op-monto">Saldo Precio: ${fmtMonto(monto)}${sp?` · <span style="color:${sp.c}">${esc(sp.t)}</span>`:''}</span></div>
       ${(o.comision_dealer!=null&&Number(o.comision_dealer)>0)?`<div class="op-foot" style="padding-top:2px"><span></span>
-        <span style="font-size:.84rem;font-weight:600;color:#334155">Comisión: ${fmtMonto(o.comision_dealer)}${co?` · <span style="color:${co.c}">${esc(co.t)}</span>`:''}</span></div>`:''}
+        <span class="op-monto">Comisión: ${fmtMonto(o.comision_dealer)}${co?` · <span style="color:${co.c}">${esc(co.t)}</span>`:''}</span></div>`:''}
     </div>`;
   }).join('');
 }
