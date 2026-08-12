@@ -686,6 +686,55 @@ const rentabilidadTier = async (req, res) => {
   } catch (e) { console.error('[cartas rentabilidadTier]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* GET /api/cartas/:id/ficha — TODO lo que se digitó al crear la carta.
+   Existe aparte del listado a propósito: la carta impresa va al dealer y solo muestra
+   lo que a él le corresponde, mientras que el revisor necesita ver la ficha completa
+   (tasa, monto del crédito, primas de seguros, GPS, gastos, excepciones, trazabilidad).
+   Es de SOLO LECTURA y no se suma a mapCarta() porque ese objeto se re-envía por POST
+   al aprobar, y devolver aquí las primas haría que se reescribieran en el crédito. */
+const fichaCompleta = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'ID inválido.' });
+    const [[r]] = await pool.query('SELECT * FROM cartas_aprobacion WHERE id=? LIMIT 1', [id]);
+    if (!r) return res.status(404).json({ success: false, data: null, error: 'Carta no encontrada.' });
+    const num = v => v == null || v === '' ? null : Number(v);
+    res.json({ success: true, error: null, data: {
+      // Identificación
+      opCarta: r.op_carta, idFinanciera: r.id_financiera, tipo: r.tipo, acreedor: r.acreedor,
+      fecha: r.fecha, status: r.status,
+      // Ejecutivo
+      ejecutivo: r.ejecutivo, ejecutivoMail: r.ejecutivo_mail, ejecutivoTel: r.ejecutivo_tel,
+      // Cliente
+      cliente: r.cliente, rutCliente: r.rut_cliente,
+      // Vehículo
+      tipoVehiculo: r.tipo_vehiculo, marca: r.marca, modelo: r.modelo, anio: r.anio,
+      patente: r.patente, prenda: r.prenda,
+      // Operación
+      precioVenta: num(r.precio_venta), pie: num(r.pie), saldo: num(r.saldo), plazo: num(r.plazo),
+      tasaCredito: num(r.tasa_credito), montoCreditoCLP: num(r.monto_credito_clp), montoCreditoUF: num(r.monto_credito_uf),
+      // Primas y accesorios (NO van en la carta al dealer)
+      segRdh: num(r.seg_rdh), segCesantia: num(r.seg_cesantia), segRep: num(r.seg_rep),
+      gps: num(r.gps_monto), gastos: num(r.gastos_monto),
+      // Dealer y comisión
+      parque: r.parque, nombreDealer: r.nombre_dealer, rutDealer: r.rut_dealer, vendedor: r.vendedor,
+      partNeto: num(r.part_neto), partIVA: num(r.part_iva), partBruto: num(r.part_bruto),
+      tierUacN: num(r.tier_uac_n), tierUacPct: num(r.tier_uac_pct),
+      // Excepciones
+      excepciones: parseJSON(r.excepciones) || [], excepcionesComentarios: parseJSON(r.excepciones_comentarios),
+      codigoExcepcion: r.codigo_excepcion, codigoExcepcionTipo: r.codigo_excepcion_tipo,
+      // Trazabilidad
+      fechaCreacion: r.fecha_creacion, creadoPorNombre: r.creado_por_nombre,
+      aprobadoPorNombre: r.aprobado_por_nombre, fechaAprobacion: r.fecha_aprobacion,
+      comentarioAprobacion: r.comentario_aprobacion,
+      rechazadoPorNombre: r.rechazado_por_nombre, fechaRechazo: r.fecha_rechazo, motivoRechazo: r.motivo_rechazo,
+      fechaCorreccion: r.fecha_correccion, corregidoPor: r.corregido_por,
+      otorgado: !!r.otorgado, fechaOtorgado: r.fecha_otorgado,
+      numeroCreditoCreado: r.numero_credito_creado,
+    } });
+  } catch (e) { console.error('[cartas ficha]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 // POST /api/cartas/:id/otorgar — la carta vigente pasa a OTORGADA: marca otorgado,
 // pone el crédito vinculado en OTORGADO y genera la cartola de comisión del mes.
 const otorgar = async (req, res) => {
@@ -1864,5 +1913,5 @@ const corregirDealer = async (req, res) => {
   }
 };
 
-module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable, corregirDealer,
+module.exports = { getAll, upsert, otorgar, desistir, getVigencia, setVigencia, rentabilidadTier, fichaCompleta, cargaMasivaCartas, parseUnidad, parseAutofin, subirDocumento, listarDocumentos, verDocumento, verificable, corregirDealer,
   parseCotizacion, parseCartaCompromiso, parseCartaAutofin };   // para scripts/backfill-extracted-cartas.js

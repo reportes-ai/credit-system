@@ -18,6 +18,10 @@ router.put('/vigencia', verifyToken, requireFunc('aprob_mantenedor'), ctrl.setVi
 // Rentabilidad de la carta (tier UAC vigente). Acceso restringido.
 router.get('/:id/rentabilidad', verifyToken, requireFunc('aprob_rentabilidad'), ctrl.rentabilidadTier);
 
+// Ficha completa: todo lo digitado al crear la carta (la impresa muestra solo lo del dealer).
+// Solo lectura, para quien crea, revisa o gestiona cartas vigentes.
+router.get('/:id/ficha', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.fichaCompleta);
+
 // Cartas de Aprobación Vigentes: otorgar (→ crédito OTORGADO + cartola) o desistir (→ DESISTIDA)
 router.post('/:id/verificable', verifyToken, requireFunc('aprob_crear', 'aprob_revisar', 'aprob_vigentes'), ctrl.verificable);
 router.post('/:id/otorgar',  verifyToken, requireFunc('aprob_vigentes'), ctrl.otorgar);

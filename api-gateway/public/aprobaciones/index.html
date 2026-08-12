@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -2560,6 +2560,7 @@ function abrirRevision(id){
   udRenderDocs(c.id);   // adjuntar documentos Unidad/Autofin para que el analista los revise
   document.getElementById('modalFoot').innerHTML = `
     <input id="motivoRechazo" placeholder="Comentario (obligatorio si rechazas, opcional si apruebas)" style="flex:1;min-width:220px;border:1.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:.83rem">
+    <button class="btn-sec" style="padding:9px 18px;font-size:.85rem" onclick="verFichaCarta(${c.id}, true)"><i class="bi bi-card-list"></i> Ficha completa</button>
     ${puede('aprob_rentabilidad') ? `<button class="btn-mini bm-rent" style="padding:9px 18px;font-size:.85rem" onclick="verRentabilidad(${c.id}, true)"><i class="bi bi-cash-coin"></i> Rentabilidad</button>` : ''}
     <button class="btn-mini bm-no" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'RECHAZADA')"><i class="bi bi-x-lg"></i> Rechazar</button>
     <button class="btn-mini bm-ok" style="padding:9px 18px;font-size:.85rem" onclick="resolverRevision(${c.id},'APROBADA')"><i class="bi bi-check-lg"></i> Aprobar</button>`;
@@ -2673,11 +2674,116 @@ function verCarta(id){
   udRenderDocs(c.id);
   document.getElementById('modalFoot').innerHTML =
     (c.status==='APROBADA' ? `<button class="btn-mini bm-print" style="padding:9px 18px;font-size:.85rem" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir PDF</button>` : '') +
+    `<button class="btn-sec" style="padding:9px 18px;font-size:.85rem" onclick="verFichaCarta(${c.id})"><i class="bi bi-card-list"></i> Ficha completa</button>` +
     (puede('aprob_rentabilidad') ? `<button class="btn-mini bm-rent" style="padding:9px 18px;font-size:.85rem" onclick="verRentabilidad(${c.id})"><i class="bi bi-cash-coin"></i> Rentabilidad</button>` : '') +
     `<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>`;
   document.getElementById('modalCarta').classList.add('show');
 }
 function cerrarModal(){ document.getElementById('modalCarta').classList.remove('show'); }
+
+/* ── Ficha completa de la carta ────────────────────────────────────────
+   La carta impresa va al DEALER y por eso solo muestra lo que a él le corresponde.
+   Quien revisa necesita ver todo lo que se digitó al crearla: tasa, monto del
+   crédito, primas de seguros, GPS, gastos, excepciones y la trazabilidad.
+   Se lee de /api/cartas/:id/ficha (solo lectura) para no tocar el objeto que se
+   re-envía al aprobar. */
+async function verFichaCarta(id, fromRev){
+  const c = CARTAS.find(x=>x.id===id); if(!c) return;
+  document.getElementById('modalTitulo').innerHTML = '<i class="bi bi-card-list me-2"></i>Ficha completa — '+escH(c.opCarta||'');
+  document.getElementById('modalBody').innerHTML = '<div style="padding:26px;text-align:center;color:#94a3b8">Cargando ficha…</div>';
+  document.getElementById('modalFoot').innerHTML = fromRev
+    ? `<button class="btn-sec" onclick="abrirRevision(${id})"><i class="bi bi-arrow-left me-1"></i>Volver a la revisión</button>`
+    : '<button class="btn-sec" onclick="cerrarModal()">Cerrar</button>';
+  document.getElementById('modalCarta').classList.add('show');
+  let d = null;
+  try { const r = await fetch('/api/cartas/'+id+'/ficha', { headers: hdr() }); const j = await r.json(); if(j.success) d = j.data; }
+  catch(e){}
+  document.getElementById('modalBody').innerHTML = d
+    ? fichaHTML(d)
+    : '<p style="color:#b91c1c;padding:16px">No se pudo cargar la ficha de la carta.</p>';
+}
+
+function fichaHTML(d){
+  const f = fmtCLP, F = fmtFecha;
+  const T = v => (v==null || v==='') ? '—' : escH(String(v));
+  const M = v => (v==null || v==='') ? '—' : f(v);
+  const P = v => (v==null || v==='') ? '—' : (Number(v).toFixed(2).replace('.',',')+'%');
+  const FH = v => { if(!v) return '—'; const x=new Date(v); return isNaN(x)?'—':x.toLocaleString('es-CL'); };
+  // marca los campos que el dealer NO ve en la carta impresa
+  const r  = (k,v,priv) => `<div class="fr"><span>${escH(k)}${priv?'<i class="bi bi-eye-slash" title="No aparece en la carta que recibe el dealer" style="margin-left:5px;color:#c2410c;font-size:.72rem"></i>':''}</span><b>${v}</b></div>`;
+  const blq = (tit,ico,filas) => `<div class="fb"><div class="fbh"><i class="bi ${ico}"></i> ${escH(tit)}</div><div class="fbc">${filas}</div></div>`;
+
+  const exc = (d.excepciones||[]).length
+    ? '<ul style="margin:4px 0 0;padding-left:18px;color:#c2410c">' + d.excepciones.map(e=>{
+        const com = (d.excepcionesComentarios||{})[e];
+        const lbl = (typeof EXC_LBL!=='undefined' && EXC_LBL[e]) || e;
+        return `<li><b>${escH(lbl)}</b>${com?`<div style="color:#64748b;font-size:.78rem">${escH(com)}</div>`:''}</li>`;
+      }).join('') + '</ul>'
+    : '<span style="color:#94a3b8">sin excepciones</span>';
+
+  const totalPrimas = ['segRdh','segCesantia','segRep','gps','gastos'].reduce((s,k)=>s+(Number(d[k])||0),0);
+
+  return `<style>
+    .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px}
+    .fb{border:1px solid #e3e8ef;border-radius:11px;overflow:hidden}
+    .fbh{background:#f8fafc;border-bottom:1px solid #e3e8ef;padding:8px 13px;font-weight:800;font-size:.8rem;color:#0f172a}
+    .fbh i{color:#0141A2;margin-right:5px}
+    .fbc{padding:9px 13px}
+    .fr{display:flex;justify-content:space-between;gap:14px;padding:4px 0;font-size:.83rem;color:#475569;border-bottom:1px solid #f6f8fb}
+    .fr:last-child{border-bottom:none}
+    .fr b{color:#0f172a;text-align:right;font-weight:700}
+  </style>
+  <div style="background:#fff7ed;border:1px solid #fed7aa;border-left:4px solid #c2410c;border-radius:9px;padding:9px 13px;font-size:.81rem;color:#7c2d12;margin-bottom:12px">
+    <i class="bi bi-eye-slash me-1"></i>Los campos marcados con este ícono <b>no aparecen en la carta que recibe el dealer</b>: son datos internos de la ficha.
+  </div>
+  <div class="fgrid">
+    ${blq('Identificación','bi-hash',
+      r('N° Op Carta', T(d.opCarta)) + r('ID Financiera', T(d.idFinanciera)) + r('Tipo', T(d.tipo)) +
+      r('Financiera', T(d.acreedor)) + r('Fecha carta', T(F(d.fecha))) + r('Estado', T(d.status)) +
+      r('N° Operación', T(d.numeroCreditoCreado), true))}
+
+    ${blq('Cliente','bi-person',
+      r('Nombre', T(d.cliente)) + r('RUT', T(d.rutCliente)))}
+
+    ${blq('Ejecutivo comercial','bi-person-badge',
+      r('Nombre', T(d.ejecutivo)) + r('Correo', T(d.ejecutivoMail)) + r('Teléfono', T(d.ejecutivoTel)))}
+
+    ${blq('Vehículo','bi-car-front',
+      r('Tipo', T(d.tipoVehiculo)) + r('Marca', T(d.marca)) + r('Modelo', T(d.modelo)) +
+      r('Año', T(d.anio)) + r('Patente', T(d.patente)) + r('Prenda', T(d.prenda)))}
+
+    ${blq('Operación','bi-cash-stack',
+      r('Precio venta', M(d.precioVenta)) + r('Pie', M(d.pie)) + r('Saldo precio', M(d.saldo)) +
+      r('Plazo', d.plazo?T(d.plazo+' cuotas'):'—') +
+      r('Tasa del crédito', P(d.tasaCredito), true) +
+      r('Monto del crédito', M(d.montoCreditoCLP), true) +
+      r('Monto en UF', d.montoCreditoUF?T(Number(d.montoCreditoUF).toFixed(2).replace('.',',')+' UF'):'—', true))}
+
+    ${blq('Primas y accesorios','bi-shield-check',
+      r('Desgravamen / RDH', M(d.segRdh), true) + r('Cesantía', M(d.segCesantia), true) +
+      r('Repactación', M(d.segRep), true) + r('GPS', M(d.gps), true) + r('Gastos', M(d.gastos), true) +
+      `<div class="fr" style="border-top:1px solid #e5e7eb;margin-top:3px;padding-top:5px"><span><b>Total</b></span><b>${totalPrimas?f(totalPrimas):'—'}</b></div>`)}
+
+    ${blq('Dealer y comisión','bi-shop',
+      r('Dealer', T(d.nombreDealer)) + r('RUT dealer', T(d.rutDealer)) + r('Parque', T(d.parque)) +
+      r('Vendedor', T(d.vendedor)) +
+      r('Participación neta', M(d.partNeto)) + r('IVA', M(d.partIVA)) + r('Participación bruta', M(d.partBruto)) +
+      r('Tier UAC', d.tierUacN?T('N°'+d.tierUacN+' · '+P(d.tierUacPct)):'—', true))}
+
+    ${blq('Excepciones','bi-exclamation-triangle',
+      `<div style="font-size:.83rem">${exc}</div>` +
+      (d.codigoExcepcion ? r('Código', T(d.codigoExcepcion)+' ('+T(d.codigoExcepcionTipo)+')', true) : ''))}
+
+    ${blq('Trazabilidad','bi-clock-history',
+      r('Creada', T(FH(d.fechaCreacion)), true) + r('Creada por', T(d.creadoPorNombre), true) +
+      (d.fechaCorreccion ? r('Corregida', T(FH(d.fechaCorreccion))+' · '+T(d.corregidoPor), true) : '') +
+      (d.aprobadoPorNombre ? r('Aprobada por', T(d.aprobadoPorNombre)+' · '+T(FH(d.fechaAprobacion)), true) : '') +
+      (d.comentarioAprobacion ? r('Comentario', T(d.comentarioAprobacion), true) : '') +
+      (d.rechazadoPorNombre ? r('Rechazada por', T(d.rechazadoPorNombre)+' · '+T(FH(d.fechaRechazo)), true) : '') +
+      (d.motivoRechazo ? r('Motivo rechazo', T(d.motivoRechazo), true) : '') +
+      r('Otorgada', d.otorgado?('Sí · '+T(FH(d.fechaOtorgado))):'No', true))}
+  </div>`;
+}
 
 /* ── Rentabilidad de la carta (AutoFin vs UAC, tier vigente) ───────── */
 function verRentabilidad(id, fromRev){
