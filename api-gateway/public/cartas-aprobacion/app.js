@@ -4165,7 +4165,7 @@ async function renderImpTable(){
   // Las últimas primero (por fecha de creación; fallback a fecha de la carta).
   list.sort((a,b) => new Date(b.fechaCreacion||b.fecha||0) - new Date(a.fechaCreacion||a.fecha||0));
   if(!list.length){
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888;padding:20px">No hay cartas</td></tr>';
+    tbody.innerHTML='<tr><td colspan="12" style="text-align:center;color:#888;padding:20px">No hay cartas</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(c=>`
@@ -4173,9 +4173,13 @@ async function renderImpTable(){
       <td style="font-size:11px">${c.opCarta}</td>
       <td style="font-size:11px">${c.tipo}</td>
       <td style="font-size:12px">${c.cliente}</td>
+      <td style="font-size:11px;white-space:nowrap">${c.rutCliente||'-'}</td>
       <td style="font-size:12px">${c.concesionario}</td>
+      <td style="font-size:11px">${c.acreedor||'-'}</td>
+      <td style="font-size:12px">${c.ejecutivoNombre||'-'}</td>
       <td><span class="badge-status ${c.status==='APROBADA'?'badge-aprobada':c.status==='RECHAZADA'?'badge-rechazada':c.status==='ANULADA'?'badge-anulada':c.status==='ELIMINADA'?'badge-eliminada':c.status==='VENCIDA'?'badge-vencida':'badge-pendiente'}">${c.status}</span></td>
       <td style="font-size:12px">${c.aprobadoPorNombre||'-'}</td>
+      <td style="font-size:11px;white-space:nowrap">${c.fechaCreacion?new Date(c.fechaCreacion).toLocaleDateString('es-CL'):'-'}</td>
       <td style="font-size:12px;font-family:monospace;font-weight:700;color:#1565C0">${c.numeroCreditoCreado||'-'}</td>
       <td>
         <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="verCarta(${c.id},false)">Ver</button>
