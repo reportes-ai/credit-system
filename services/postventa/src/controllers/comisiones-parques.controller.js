@@ -102,8 +102,9 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
 });
 
 /* ── Cálculo del mes: agrega lo ya persistido por operación ──────────────────
-   Atribución igual que dealer-potencial: 1) dealers.ccs_parque vía rut_dealer;
-   2) fallback texto creditos.parque. Solo créditos OTORGADOS del mes cierre. */
+   Atribución: 1) creditos.parque (el de la CARTA: dónde cursó ESA operación);
+   2) fallback dealers.ccs_parque (ficha = parque de HOY, puede haber cambiado).
+   Solo créditos OTORGADOS del mes cierre. */
 async function calcularMes(mes /* 'YYYY-MM' */) {
   const [parques] = await pool.query(
     'SELECT nombre, arriendo, comision_pct FROM parques_comisiones WHERE activo=1 ORDER BY orden, nombre');
@@ -121,7 +122,11 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
   const porParque = new Map(); // nombre canónico -> { ops:[], comision }
   for (const c of creds) {
     const d = dealerByRut.get(rutNorm(c.rut_dealer));
-    const key = canon.get(norm(d?.ccs_parque)) || canon.get(norm(c.parque));
+    /* El parque de la OPERACIÓN manda (viene de la carta): la ficha del dealer
+       dice su parque de HOY, y un dealer puede haberse cambiado. Caso real: op
+       89213 de NIBARO cursó en AUTOCENTER MAIPU pero su ficha ya decía CARMOONS
+       y la comisión salía en la cartola del parque equivocado. */
+    const key = canon.get(norm(c.parque)) || canon.get(norm(d?.ccs_parque));
     if (!key) continue; // dealer calle o parque no registrado en el mantenedor
     if (!porParque.has(key)) porParque.set(key, { ops: [], comision: 0 });
     const g = porParque.get(key);
