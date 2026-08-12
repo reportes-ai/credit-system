@@ -40,18 +40,26 @@ function pedirClave(prompt) {
   return new Promise(resolve => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
     /* El prompt lo escribe readline (si se escribe a mano, su primer refresco
-       borra la línea y el usuario queda frente a una pantalla muda sin saber
-       que le están pidiendo algo). Se silencia SOLO lo que se teclea, callando
-       la salida justo después de pedir. */
+       borra la línea y deja al usuario frente a una pantalla muda). Y se echa
+       un asterisco por tecla en vez de callar del todo: sin ninguna señal no
+       hay cómo saber si el teclado está registrando o si el terminal se colgó. */
     let mudo = false;
-    rl._writeToOutput = s => { if (!mudo) rl.output.write(s); };
+    rl._writeToOutput = s => { rl.output.write(mudo ? '*' : s); };
     rl.question(prompt, val => { mudo = false; rl.output.write(String.fromCharCode(10)); rl.close(); resolve(val); });
     mudo = true;
   });
 }
 
 (async () => {
-  const clave = await pedirClave('Clave del certificado (no se muestra): ');
+  const clave = await pedirClave('Clave del certificado (se enmascara): ');
+  // Confirma que el teclado sí registró, sin revelar nada: solo cuántos caracteres
+  // llegaron. Si aquí sale 0, el problema es el terminal, no la clave.
+  console.log(`   (recibí ${clave.length} caracteres)`);
+  if (!clave.length) {
+    console.log('\n⚠ No llegó ningún carácter. Vuelve a intentarlo escribiendo la clave a mano;');
+    console.log('  si estás pegando con el mouse, prueba con Ctrl+V o clic derecho.\n');
+    process.exit(3);
+  }
   let abre = false, motivo = '';
   try { tls.createSecureContext({ pfx: buf, passphrase: clave }); abre = true; }
   catch (e) { motivo = /mac verify|password|decrypt/i.test(e.message || '') ? 'clave incorrecta' : e.message; }
