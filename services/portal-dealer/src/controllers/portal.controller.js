@@ -217,17 +217,28 @@ exports.operaciones = async (req, res) => {
     const page  = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 100));
     const off   = (page - 1) * limit;
-    const filtroEstado = String(req.query.estado || '').trim().toUpperCase();
+    let filtroEstado = String(req.query.estado || '').trim().toUpperCase();
+
+    /* Vista por defecto del portal: SOLO las otorgadas de los últimos 3 meses.
+       Un dealer con años de historia veía cientos de desistidas y rechazadas
+       antiguas antes que su negocio vigente. El selector sigue permitiendo
+       cualquier estado y "todos". */
+    let filtroExtra = '';
+    if (filtroEstado === '__OT3M') {
+      filtroEstado = 'OTORGADO';
+      filtroExtra = " AND t.fecha_orden >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)";
+    }
 
     // El estado es una columna derivada (ESTADO_SQL); se filtra con WHERE sobre
     // la subconsulta aliada `t`, no con HAVING.
     // total (mismo scope, sin paginar) — sobre subconsulta para poder filtrar por estado calculado
     const [[cnt]] = await pool.query(
       `SELECT COUNT(*) AS total FROM (
-         SELECT ${ESTADO_SQL} AS estado
+         SELECT ${ESTADO_SQL} AS estado,
+                COALESCE(ob.fecha_otorgado, ob.created_at) AS fecha_orden
          FROM creditos ob
          WHERE ${sc.where} AND ${NO_ANULADA}
-       ) t ${filtroEstado ? 'WHERE t.estado = ?' : ''}`,
+       ) t ${filtroEstado ? 'WHERE t.estado = ?' + filtroExtra : ''}`,
       filtroEstado ? [...sc.params, filtroEstado] : sc.params);
 
     const [rows] = await pool.query(
@@ -248,7 +259,7 @@ exports.operaciones = async (req, res) => {
         FROM creditos ob
         LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
         WHERE ${sc.where} AND ${NO_ANULADA}
-      ) t ${filtroEstado ? 'WHERE t.estado = ?' : ''}
+      ) t ${filtroEstado ? 'WHERE t.estado = ?' + filtroExtra : ''}
       ORDER BY fecha_orden DESC, id DESC
       LIMIT ? OFFSET ?`,
       filtroEstado ? [...sc.params, filtroEstado, limit, off] : [...sc.params, limit, off]);
@@ -417,6 +428,48 @@ exports.cartolas = async (req, res) => {
   } catch (err) {
     console.error('[portal-dealer] cartolas:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar las cartolas.' });
+  }
+};
+
+/* ── GET /api/portal-dealer/cartolas/:id — detalle de UNA cartola enviada ─────
+   El detalle sale de mov_ids: la foto exacta de lo que se le envió al dealer,
+   no una reconstrucción por mes/rut que podría diferir si algo se corrigió
+   después. Anti-fuga: la cartola debe ser del RUT de la sesión. */
+exports.cartolaDetalle = async (req, res) => {
+  try {
+    const sc = dealerScope(req);
+    if (!sc.hasScope) return res.status(403).json({ success: false, data: null, error: 'Cuenta sin dealer vinculado.' });
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'Cartola inválida.' });
+
+    const rut = await rutEfectivo(req);
+    const [[ce]] = await pool.query(
+      `SELECT id, mes, total_bruto, fecha_envio, mov_ids FROM cartolas_enviadas
+       WHERE id = ? AND ? <> '' AND REPLACE(REPLACE(REPLACE(UPPER(COALESCE(rut_dealer,'')),'.',''),'-',''),' ','') = ?`,
+      [id, rut, rut]);
+    if (!ce) return res.status(404).json({ success: false, data: null, error: 'Cartola no encontrada.' });
+    logDealer(req, 'ver_cartola_detalle', String(id));
+
+    let ids = [];
+    try { ids = JSON.parse(ce.mov_ids || '[]'); } catch (_) {}
+    ids = (Array.isArray(ids) ? ids : []).map(Number).filter(Boolean);
+    let movs = [];
+    if (ids.length) {
+      const [m] = await pool.query(
+        `SELECT num_op, nombre_cliente, saldo, comision, movimiento, num_carta, vendedor
+         FROM cartolas_movimientos WHERE id IN (?) ORDER BY movimiento, num_op`, [ids]);
+      movs = m;
+    }
+    return res.json({ success: true, error: null, data: {
+      id: ce.id, mes: ce.mes, total_bruto: ce.total_bruto, fecha_envio: ce.fecha_envio,
+      movimientos: movs.map(m => ({
+        num_op: m.num_op, cliente: m.nombre_cliente || '', saldo: m.saldo,
+        comision: m.comision, movimiento: m.movimiento || 'COMISION', num_carta: m.num_carta || '',
+      })),
+    } });
+  } catch (err) {
+    console.error('[portal-dealer] cartolaDetalle:', err.message);
+    return res.status(500).json({ success: false, data: null, error: 'No se pudo cargar el detalle de la cartola.' });
   }
 };
 

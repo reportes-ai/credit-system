@@ -9,6 +9,7 @@ const c = require('../controllers/portal.controller');
 router.get('/resumen',     verifyDealer, c.resumen);
 router.get('/operaciones', verifyDealer, c.operaciones);
 router.get('/cartolas',    verifyDealer, c.cartolas);
+router.get('/cartolas/:id', verifyDealer, c.cartolaDetalle);
 router.get('/simulador',   verifyDealer, c.simulador);
 router.post('/preaprobacion',               verifyDealer, c.preaprobar);
 router.post('/preaprobacion/:id/contactar', verifyDealer, c.preaprobacionContactar);
