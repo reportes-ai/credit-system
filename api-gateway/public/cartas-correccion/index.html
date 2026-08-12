@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — buscador por N° carta, N° operacion, ID financiera, RUT y nombre; sin tildes ni puntos, con columnas para ver por que calzo · v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
+<!-- v1.2 — buscador de dealers en la ficha: escribe y elige, el RUT y el parque siguen al nombre · v1.1 — buscador por N° carta, N° operacion, ID financiera, RUT y nombre; sin tildes ni puntos, con columnas para ver por que calzo · v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -51,6 +51,16 @@
   .cad-it.vig { border-color:#16a34a; background:#f0fdf4; font-weight:700; }
   .cad-it.act { box-shadow:0 0 0 3px #0141A222; }
   .muted { color:#94a3b8; }
+  /* buscador de dealers dentro de la ficha */
+  .ac-wrap { position:relative; }
+  .ac-list { display:none; position:absolute; z-index:40; left:0; right:0; top:100%; margin-top:2px;
+             background:#fff; border:1.5px solid #d1d5db; border-radius:9px; max-height:250px; overflow-y:auto;
+             box-shadow:0 8px 24px rgba(0,0,0,.14); }
+  .ac-it { padding:7px 11px; font-size:.82rem; cursor:pointer; border-bottom:1px solid #f5f7fa; line-height:1.35; }
+  .ac-it:last-child { border-bottom:none; }
+  .ac-it:hover { background:#eff6ff; }
+  .ac-it b { display:block; color:#0f172a; font-weight:600; }
+  .ac-rut { color:#64748b; font-size:.73rem; }
   .sec-tit { font-size:.72rem; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.06em; margin:16px 0 8px; padding-bottom:5px; border-bottom:1px solid #eef2f7; }
 </style>
 </head>
@@ -97,6 +107,12 @@ let CARTAS = [];      // resultado de la búsqueda
 let SEL = null;       // carta seleccionada (del listado)
 let FICHA = null;     // ficha completa de la carta seleccionada
 
+/* Normalizadores compartidos por los dos buscadores de la página (cartas y dealers):
+   sin tildes para el texto —en Chile nadie escribe "Nicolás" en un buscador— y sin
+   puntos ni guiones para RUT y números, para que dé lo mismo cómo se escriban. */
+const texto = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const clave = s => String(s==null?'':s).toUpperCase().replace(/[^0-9A-Z]/g,'');
+
 /* ── Buscar ─────────────────────────────────────────────────────────────── */
 async function buscar(){
   const q = document.getElementById('q').value.trim().toLowerCase();
@@ -107,11 +123,7 @@ async function buscar(){
     const r = await fetch('/api/cartas', { headers: hdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'No se pudo leer las cartas');
-    /* Se busca por los cinco campos con que la gente identifica una carta.
-       Sin tildes (en Chile nadie escribe "Nicolás" en un buscador) y sin puntos
-       ni guiones en RUT y números, para que dé lo mismo cómo se escriban. */
-    const texto = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-    const clave = s => String(s==null?'':s).toUpperCase().replace(/[^0-9A-Z]/g,'');
+    // Se busca por los cinco campos con que la gente identifica una carta.
     const qT = texto(q), qC = clave(q), esNum = /^[0-9.\-\s]+$/.test(q.trim());
     CARTAS = (j.data||[]).filter(c => {
       if (clave(c.opCarta).includes(qC) && qC) return true;               // N° de carta (con o sin -C1/-R1)
@@ -201,7 +213,7 @@ const CAMPOS = [
   { sec:'Vehículo',              col:'prenda',       post:'prenda',        lbl:'Prenda', opciones:['SI','NO'] },
   { sec:'Montos de la venta',    col:'precioVenta',  post:'precio_venta',  lbl:'Precio venta', tipo:'number' },
   { sec:'Montos de la venta',    col:'pie',          post:'pie',           lbl:'Pie', tipo:'number' },
-  { sec:'Dealer',                col:'nombreDealer', post:'nombre_dealer', lbl:'Dealer' },
+  { sec:'Dealer',                col:'nombreDealer', post:'nombre_dealer', lbl:'Dealer', busca:'dealer' },
   { sec:'Dealer',                col:'rutDealer',    post:'rut_dealer',    lbl:'RUT del dealer' },
   { sec:'Dealer',                col:'parque',       post:'parque',        lbl:'Parque' },
   { sec:'Dealer',                col:'vendedor',     post:'vendedor',      lbl:'Vendedor' },
@@ -225,6 +237,10 @@ function pintarEditor(cadena){
       ? `<select id="cc_${c.col}" onchange="marcarCambio('${c.col}')">${
           ['', ...c.opciones].map(o=>`<option value="${E(o)}"${String(val).toUpperCase()===o.toUpperCase()?' selected':''}>${E(o||'—')}</option>`).join('')
         }${c.opciones.some(o=>o.toUpperCase()===String(val).toUpperCase())||!val?'':`<option value="${E(val)}" selected>${E(val)}</option>`}</select>`
+      : c.busca === 'dealer'
+      ? `<div class="ac-wrap"><input type="text" id="cc_${c.col}" value="${E(val)}" autocomplete="off"
+            oninput="marcarCambio('${c.col}');filtrarDealers()" onfocus="filtrarDealers()"
+            placeholder="Escribe para buscar el dealer…"><div class="ac-list" id="acDealers"></div></div>`
       : `<input type="${c.tipo||'text'}" id="cc_${c.col}" value="${E(val)}" oninput="marcarCambio('${c.col}')">`;
     return `<div class="f" id="fw_${c.col}"><label>${E(c.lbl)}<span class="chg" id="chg_${c.col}"></span></label>${inp}</div>`;
   };
@@ -272,6 +288,72 @@ function pintarEditor(cadena){
       </div>
     </div>`;
 }
+
+/* ── Buscador de dealers ────────────────────────────────────────────────────
+   Lee la MISMA fuente que la creación de cartas (/api/dealers → ficha del dealer),
+   nunca una copia: el nombre y el RUT que se escriben en la carta salen de ahí.
+   Se carga una vez y se filtra en memoria, como en el generador. */
+let DEALERS = [], dealersCargando = null;
+async function cargarDealers(){
+  if (DEALERS.length) return DEALERS;
+  if (dealersCargando) return dealersCargando;
+  dealersCargando = (async () => {
+    try {
+      const r = await fetch('/api/dealers?limit=3000', { headers: hdr() });
+      const j = await r.json();
+      const rows = (j && j.data && (j.data.rows || j.data)) || [];
+      DEALERS = rows.map(d => ({
+        nombre: d.nombre_indexa || d.nombre_razon || d.nombre || '',
+        rut: d.rut || '',
+        parque: String(d.ccs_parque || '').trim(),
+      })).filter(d => d.nombre);
+    } catch (e) { DEALERS = []; }
+    return DEALERS;
+  })();
+  return dealersCargando;
+}
+
+/* En la ficha del dealer, ccs_parque vale CALLE o el nombre del parque
+   (PARQUE AUTOMALL, PARQUE MAIPU…). Solo esos últimos son parque de verdad. */
+const esParque = d => { const p = String(d.parque||'').trim().toUpperCase(); return !!p && p !== 'CALLE' && p !== 'PARTICULAR'; };
+
+async function filtrarDealers(){
+  const inp = document.getElementById('cc_nombreDealer');
+  const lista = document.getElementById('acDealers');
+  if (!inp || !lista) return;
+  await cargarDealers();
+  if (!DEALERS.length) {
+    lista.innerHTML = '<div class="ac-it" style="color:#94a3b8;cursor:default">No se pudo cargar la lista de dealers</div>';
+    lista.style.display = 'block'; return;
+  }
+  const q = texto(inp.value);
+  const hit = (q ? DEALERS.filter(d => texto(d.nombre).includes(q) || clave(d.rut).includes(clave(inp.value))) : DEALERS).slice(0, 25);
+  if (!hit.length) {
+    lista.innerHTML = '<div class="ac-it" style="color:#94a3b8;cursor:default">Ningún dealer calza — se guardará el texto tal cual</div>';
+    lista.style.display = 'block'; return;
+  }
+  lista.innerHTML = hit.map(d => `<div class="ac-it" onclick="elegirDealer(${DEALERS.indexOf(d)})">
+      <b>${E(d.nombre)}</b><span class="ac-rut">${E(d.rut)}${esParque(d) ? ' · '+E(d.parque) : ' · calle'}</span>
+    </div>`).join('');
+  lista.style.display = 'block';
+}
+
+function elegirDealer(i){
+  const d = DEALERS[i]; if (!d) return;
+  const n = document.getElementById('cc_nombreDealer');
+  const r = document.getElementById('cc_rutDealer');
+  if (n) { n.value = d.nombre; marcarCambio('nombreDealer'); }
+  if (r) { r.value = d.rut;    marcarCambio('rutDealer'); }   // el RUT sigue al nombre: una sola fuente
+  const p = document.getElementById('cc_parque');
+  if (p) { p.value = esParque(d) ? d.parque : ''; marcarCambio('parque'); }   // un dealer de calle no tiene parque
+  document.getElementById('acDealers').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ac-wrap')) {
+    const l = document.getElementById('acDealers'); if (l) l.style.display = 'none';
+  }
+});
 
 function valorActual(c){ const v = FICHA[c.col]; return c.tipo==='date' ? ymd(v) : (v==null?'':String(v)); }
 
