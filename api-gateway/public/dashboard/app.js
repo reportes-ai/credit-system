@@ -2150,12 +2150,16 @@ function buildV5() {
     `<th colspan="7" style="background:#00838f;color:#fff;text-align:center;border-right:2px solid #fff;padding:5px 2px;font-size:10px;white-space:nowrap">${p.lbl}</th>`
   ).join('');
 
-  // THEAD — fila 2: sub-columnas
-  const subHeader = sc => subCols.map(s =>
-    `<th style="background:#2a4a7a;color:#cce;text-align:center;padding:3px 2px;font-size:9px;min-width:${s.w}px;white-space:nowrap">${s.lbl}</th>`
-  ).join('');
-  const subHeaders = meses.map(() => subHeader()).join('') +
-    promCols.map(() => subHeader()).join('');
+  /* THEAD — fila 2: sub-columnas. Ing, Apro y Ot son CLICKEABLES: abren el
+     desglose día a día de ese mes (los promedios no, no son de un mes). */
+  const DESGLOSABLES = { ing:'Ingresados', apro:'Aprobados', ot:'Otorgados' };
+  const subHeader = (mes) => subCols.map(s => {
+    const clic = mes && DESGLOSABLES[s.k];
+    return `<th style="background:#2a4a7a;color:${clic?'#fff':'#cce'};text-align:center;padding:3px 2px;font-size:9px;min-width:${s.w}px;white-space:nowrap${clic?';cursor:pointer;text-decoration:underline dotted':''}"
+      ${clic ? `onclick="desgloseDiario('${mes}','${s.k}')" title="Ver ${DESGLOSABLES[s.k]} día a día"` : ''}>${s.lbl}</th>`;
+  }).join('');
+  const subHeaders = meses.map(m => subHeader(m)).join('') +
+    promCols.map(() => subHeader(null)).join('');
 
   document.getElementById('thead-ej-perf').innerHTML = `
     <tr>
@@ -2201,6 +2205,119 @@ function buildV5() {
   }).join('');
 
   document.getElementById('tbody-ej-perf').innerHTML = rows;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DESGLOSE DIARIO — al pinchar Ing / Apro / Ot de un mes se abre la matriz
+   ejecutivo × día, del día más reciente al más antiguo.
+
+   El día de cada operación sale de fecha_otorgado, que en `creditos` está
+   poblada también en rechazadas y digitadas: NO marca el otorgamiento sino la
+   fecha de la operación. Es el mismo criterio del Resumen Ejecutivo, para que
+   los dos informes no cuenten días distintos.
+   ══════════════════════════════════════════════════════════════════════════ */
+function desgloseDiario(mes, metrica) {
+  const TIT = { ing:'Ingresados', apro:'Aprobados', ot:'Otorgados' };
+  const cumple = {
+    ing:  () => true,
+    apro: r => r.estado_eval === 'APROBADO' || r.estado_eval === 'OTORGADO',
+    ot:   r => r.estado_eval === 'OTORGADO',
+  }[metrica];
+  if (!cumple) return;
+
+  const [aa, mm] = mes.split('-').map(Number);
+  const diasMes = new Date(aa, mm, 0).getDate();
+  const dias = Array.from({ length: diasMes }, (_, i) => diasMes - i);   // descendente
+
+  /* ejecutivo → { dia: cantidad }. Las operaciones sin fecha van a un balde
+     aparte ("s/f") en vez de desaparecer: si no, el desglose sumaría menos que
+     la tabla mensual y el descuadre haría dudar de las dos. */
+  const porEj = {}, sinF = {};
+  (window.RAW_DATA || []).forEach(r => {
+    if (r.mes !== mes || !r.ejecutivo || !cumple(r)) return;
+    porEj[r.ejecutivo] = porEj[r.ejecutivo] || {};
+    const d = +String(r.fecha_otorgado || r.fecha_ot || r.fecha_estado || '').slice(8, 10);
+    if (d) porEj[r.ejecutivo][d] = (porEj[r.ejecutivo][d] || 0) + 1;
+    else sinF[r.ejecutivo] = (sinF[r.ejecutivo] || 0) + 1;
+  });
+  const totSinFecha = Object.values(sinF).reduce((a, b) => a + b, 0);
+
+  const filas = Object.entries(porEj)
+    .map(([ej, dd]) => ({ ej, dd, sf: sinF[ej] || 0,
+                          tot: Object.values(dd).reduce((a, b) => a + b, 0) + (sinF[ej] || 0) }))
+    .sort((a, b) => b.tot - a.tot || String(a.ej).localeCompare(String(b.ej)));
+
+  const totalMes = filas.reduce((s, f) => s + f.tot, 0);
+  const totDia = d => filas.reduce((s, f) => s + (f.dd[d] || 0), 0);
+  const maxCel = Math.max(1, ...filas.flatMap(f => dias.map(d => f.dd[d] || 0)));
+
+  // Domingo en rojo y sábado en gris, como en la planilla del equipo
+  const tipoDia = d => { const g = new Date(aa, mm - 1, d).getDay(); return g === 0 ? 'dom' : g === 6 ? 'sab' : 'hab'; };
+  const bgHead  = { dom:'#e53935', sab:'#9e9e9e', hab:'#1a3a6a' };
+  const lblDia  = d => `${String(d).padStart(2,'0')}-${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][mm-1]}`;
+
+  const th = (totSinFecha ? `<th style="background:#b45309;color:#fff;padding:5px 3px;font-size:9px;text-align:center;min-width:44px" title="Operaciones sin fecha: se muestran aparte para que el total cuadre con la tabla mensual">s/f</th>` : '')
+    + dias.map(d => `<th style="background:${bgHead[tipoDia(d)]};color:#fff;padding:5px 3px;font-size:9px;text-align:center;min-width:44px;white-space:nowrap">${lblDia(d)}</th>`).join('');
+
+  const celda = (v) => {
+    if (!v) return `<td style="text-align:center;padding:3px;font-size:10px;color:#e53935;font-weight:700;background:#fff">0</td>`;
+    const int = Math.min(v / maxCel, 1);
+    return `<td style="text-align:center;padding:3px;font-size:10px;font-weight:600;color:${int>0.6?'#fff':'#1a3a6a'};background:rgba(26,58,106,${(0.10+int*0.75).toFixed(2)})">${v}</td>`;
+  };
+
+  const tb = filas.map((f, i) => `<tr style="border-bottom:1px solid #eef1f5">
+      <td style="padding:4px 8px;font-size:10px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff;border-right:1px solid #dce3ed">
+        <span style="color:#aaa">${i+1}.</span> ${fmtNombreCompleto(f.ej)}</td>
+      <td style="text-align:center;padding:4px;font-size:11px;font-weight:800;background:#eef3fb;color:#1a3a6a">${f.tot}</td>
+      ${totSinFecha ? `<td style="text-align:center;padding:3px;font-size:10px;font-weight:600;color:${f.sf?'#b45309':'#e53935'};background:${f.sf?'#fff7ed':'#fff'}">${f.sf||0}</td>` : ''}
+      ${dias.map(d => celda(f.dd[d] || 0)).join('')}
+    </tr>`).join('');
+
+  const tfoot = `<tr style="background:#1a3a6a;color:#fff;font-weight:800">
+      <td style="padding:5px 8px;font-size:10px;position:sticky;left:0;background:#1a3a6a">TOTAL</td>
+      <td style="text-align:center;padding:5px;font-size:11px">${totalMes}</td>
+      ${totSinFecha ? `<td style="text-align:center;padding:5px;font-size:10px">${totSinFecha}</td>` : ''}
+      ${dias.map(d => `<td style="text-align:center;padding:5px;font-size:10px">${totDia(d)}</td>`).join('')}
+    </tr>`;
+
+  let ov = document.getElementById('ovDesglose');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'ovDesglose';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:11000;display:flex;align-items:center;justify-content:center;padding:24px';
+    ov.addEventListener('click', e => { if (e.target === ov) ov.style.display = 'none'; });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:14px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.4)" onclick="event.stopPropagation()">
+      <div style="background:linear-gradient(135deg,#012d70,#1a3a6a);color:#fff;padding:13px 20px;display:flex;align-items:center;gap:12px">
+        <i class="bi bi-calendar3"></i>
+        <div style="flex:1">
+          <div style="font-weight:800;font-size:1rem">${TIT[metrica]} día a día — ${EJ_PERF.meses_labels[mes] || mes}</div>
+          <div style="font-size:.76rem;opacity:.85">${filas.length} ejecutivos · ${totalMes} operaciones · el día es la fecha de la operación</div>
+        </div>
+        <button onclick="document.getElementById('ovDesglose').style.display='none'"
+          style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:1rem">✕</button>
+      </div>
+      <div style="overflow:auto;flex:1">
+        ${filas.length ? `<table style="border-collapse:collapse;width:100%">
+          <thead><tr>
+            <th style="background:#1a3a6a;color:#fff;text-align:left;padding:5px 8px;font-size:10px;position:sticky;left:0;z-index:2;min-width:180px">Ejecutivo</th>
+            <th style="background:#00838f;color:#fff;padding:5px;font-size:10px;min-width:70px">Acumulado</th>
+            ${th}
+          </tr></thead>
+          <tbody>${tb}</tbody>
+          <tfoot style="position:sticky;bottom:0">${tfoot}</tfoot>
+        </table>` : '<div style="padding:40px;text-align:center;color:#94a3b8">Sin operaciones en ese mes.</div>'}
+      </div>
+      <div style="padding:9px 20px;border-top:1px solid #eef1f5;font-size:10px;color:#8a93a0;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#e53935;border-radius:2px;vertical-align:middle;margin-right:4px"></span>domingo</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#9e9e9e;border-radius:2px;vertical-align:middle;margin-right:4px"></span>sábado</span>
+        <span>Solo cantidad de operaciones. Más oscuro = más operaciones ese día.</span>
+        ${totSinFecha ? `<span style="color:#b45309"><b>s/f</b> = ${totSinFecha} sin fecha de operación; van aparte para que el acumulado cuadre con la tabla mensual.</span>` : ''}
+      </div>
+    </div>`;
 }
 // ──────────────────────────────────────────────────────────────
 // BLOQUE ORIGINAL línea 2416
