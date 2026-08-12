@@ -1,5 +1,12 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
+const { AsyncLocalStorage } = require('async_hooks');
+
+/* Contexto por request: quién es el usuario autenticado. Lo consumen los motores
+   compartidos (ej. el log de correos del mailer) sin que cada controller tenga
+   que pasar el usuario a mano. Fuera de un request devuelve null (= Sistema). */
+const alsUsuario = new AsyncLocalStorage();
+function usuarioActual() { return alsUsuario.getStore() || null; }
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET no está definido en las variables de entorno');
@@ -120,7 +127,10 @@ const verifyToken = async (req, res, next) => {
 
   req.usuario = payload;
   req.user    = req.usuario;   // alias para controllers que usan req.user
-  next();
+  alsUsuario.run({
+    id_usuario: payload.id_usuario || null,
+    nombre: [payload.nombre, payload.apellido].filter(Boolean).join(' ').trim() || null,
+  }, next);
 };
 
 const requirePerfil = (...perfiles) => (req, res, next) => {
@@ -130,4 +140,4 @@ const requirePerfil = (...perfiles) => (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, requirePerfil, cerrarSesiones, olvidarSesion, JWT_SECRET, JWT_EXPIRES };
+module.exports = { verifyToken, requirePerfil, cerrarSesiones, olvidarSesion, usuarioActual, JWT_SECRET, JWT_EXPIRES };

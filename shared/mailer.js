@@ -102,6 +102,48 @@ function envolverHTML(cuerpoHtml) {
   </div>`;
 }
 
+/* ── Log de correos enviados (Auditoría → Correos Enviados) ──────────────────
+   TODO correo que pasa por este motor queda registrado: remitente, quién lo
+   disparó (usuario del request via usuarioActual(), o "Sistema" si fue un motor
+   automático), destinatarios, asunto, el HTML final y el resultado. */
+let _logListo = null;
+function logCorreo(d) {
+  (async () => {
+    try {
+      const pool = require('./config/database');
+      if (!_logListo) _logListo = pool.query(`
+        CREATE TABLE IF NOT EXISTS correos_log (
+          id            INT AUTO_INCREMENT PRIMARY KEY,
+          fecha         DATETIME DEFAULT CURRENT_TIMESTAMP,
+          remitente     VARCHAR(160) NULL,
+          enviado_por   VARCHAR(120) NULL,
+          id_usuario    INT NULL,
+          destinatarios TEXT NULL,
+          cc            TEXT NULL,
+          bcc           TEXT NULL,
+          asunto        VARCHAR(300) NULL,
+          html          MEDIUMTEXT NULL,
+          ok            TINYINT NOT NULL DEFAULT 1,
+          error         VARCHAR(400) NULL,
+          dev           TINYINT NOT NULL DEFAULT 0,
+          message_id    VARCHAR(200) NULL,
+          INDEX ix_correos_fecha (fecha),
+          INDEX ix_correos_rem (remitente)
+        )`);
+      await _logListo;
+      const j = v => v == null ? null : (Array.isArray(v) ? v.join(', ') : String(v));
+      let quien = null;
+      try { quien = require('./middleware/auth').usuarioActual(); } catch (_) {}
+      await pool.query(
+        `INSERT INTO correos_log (remitente, enviado_por, id_usuario, destinatarios, cc, bcc, asunto, html, ok, error, dev, message_id)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [String(d.from || '').slice(0, 160), (quien && quien.nombre) || 'Sistema', (quien && quien.id_usuario) || null,
+         j(d.to), j(d.cc), j(d.bcc), String(d.subject || '').slice(0, 300), d.html || null,
+         d.ok ? 1 : 0, d.error ? String(d.error).slice(0, 400) : null, d.dev ? 1 : 0, d.messageId || null]);
+    } catch (e) { console.error('[mailer log]', e.message); }
+  })();
+}
+
 // Nunca lanza: devuelve { ok, error?, messageId? } para no romper el flujo que lo llama.
 // `bcc` (copia oculta) y `from` (remitente puntual, ej. cobranza@) son opcionales.
 async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from, attachments } = {}) {
@@ -159,9 +201,12 @@ async function enviarCorreo({ to, cc, bcc, subject, html, text, replyTo, from, a
       })(),   // [{filename, content(Buffer)|path}]
     });
     // `to` = destinatario EFECTIVO (en Modo Desarrollo es el correo de prueba, no el original).
+    logCorreo({ from: from || remitente(), to, cc, bcc, subject: subjectFinal, html: htmlFinal,
+                ok: true, dev: dev.activo, messageId: info.messageId });
     return { ok: true, messageId: info.messageId, to: toFinal, dev: !!dev.activo };
   } catch (e) {
     console.error('[mailer]', e.message);
+    logCorreo({ from: from || remitente(), to, cc, bcc, subject, html, ok: false, error: e.message });
     return { ok: false, error: e.message };
   }
 }

@@ -11,5 +11,7 @@ router.get('/logins/export',      verifyToken, requireFunc('auditoria_ver'), ctr
 router.get('/dealers',            verifyToken, requireFunc('auditoria_ver'), ctrl.getBitacoraDealers);
 router.get('/filtros',            verifyToken, requireFunc('auditoria_ver'), ctrl.getFiltros);
 router.get('/backups',            verifyToken, requireFunc('auditoria_ver'), ctrl.getBackups);
+router.get('/correos',            verifyToken, requireFunc('auditoria_ver'), ctrl.getCorreos);
+router.get('/correos/:id',        verifyToken, requireFunc('auditoria_ver'), ctrl.getCorreoDetalle);
 
 module.exports = router;

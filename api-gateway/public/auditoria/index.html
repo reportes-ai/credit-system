@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v2.2 — breadcrumb con Mantenedores (la card de Auditoría vive ahí via placement) -->
+  <!-- v2.3 — pestaña Correos Enviados: log de todo correo del sistema por remitente, con vista del correo · v2.2 — breadcrumb con Mantenedores -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -68,6 +68,13 @@
     .vacio { text-align:center; color:#64748b; padding:30px; font-family:monospace; }
     .toast-af { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast-af.err { background:#dc2626; }
+    .subtabs { display:flex; }
+    .stab { background:#fff; border:1px solid #d8e0ea; color:#475569; border-radius:18px; padding:5px 14px; font-weight:700; font-size:.8rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .stab.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .stab .n { background:rgba(0,0,0,.12); border-radius:10px; padding:0 7px; font-size:.7rem; }
+    .stab.on .n { background:rgba(255,255,255,.25); }
+    dialog#dlgCorreo { border:none; border-radius:14px; padding:0; width:min(760px,94vw); box-shadow:0 20px 60px rgba(0,0,0,.35); }
+    dialog#dlgCorreo::backdrop { background:rgba(0,0,0,.45); }
   </style>
 </head>
 <body>
@@ -92,8 +99,11 @@
     <div class="tab" id="tabAprob" onclick="setTab('aprob')"><i class="bi bi-check2-circle"></i>Aprobaciones</div>
     <div class="tab" id="tabExcep" onclick="setTab('excep')"><i class="bi bi-exclamation-triangle"></i>Excepciones</div>
     <div class="tab" id="tabDealers" onclick="setTab('dealers')"><i class="bi bi-shop"></i>Dealers</div>
+    <div class="tab" id="tabCorreos" onclick="setTab('correos')"><i class="bi bi-envelope-paper"></i>Correos Enviados</div>
     <div class="tab" id="tabBackups" onclick="setTab('backups')"><i class="bi bi-people"></i>BackUps <b style="color:#ef4444">*</b></div>
   </div>
+
+  <div class="subtabs" id="subRemitentes" style="display:none;gap:6px;flex-wrap:wrap;margin:0 0 10px"></div>
 
   <div class="filtros">
     <div class="fld"><label>Desde</label><input id="f-desde" type="date"></div>
@@ -126,6 +136,19 @@
 
 <div id="toast" class="toast-af"></div>
 
+<dialog id="dlgCorreo">
+  <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px">
+    <i class="bi bi-envelope-open"></i>
+    <div style="flex:1;min-width:0">
+      <div id="dcAsunto" style="font-weight:800;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+      <div id="dcMeta" style="font-size:.74rem;opacity:.8">—</div>
+    </div>
+    <button onclick="document.getElementById('dlgCorreo').close()" style="background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer">✕</button>
+  </div>
+  <div id="dcDest" style="padding:10px 18px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.8rem;color:#374151"></div>
+  <iframe id="dcFrame" sandbox="" style="width:100%;height:60vh;border:none;background:#fff"></iframe>
+</dialog>
+
 <script>
 const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login.html';
@@ -143,19 +166,21 @@ const TZ = { timeZone:'America/Santiago' };
 const fFecha = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleDateString('es-CL',TZ); };
 const fHora  = v => { if(!v) return ''; const d=new Date(v); return isNaN(d)?'':d.toLocaleTimeString('es-CL',{...TZ,hour12:false}); };
 
-let TAB = 'logins', PAGE = 1, PAGES = 1;
+let TAB = 'logins', PAGE = 1, PAGES = 1, REMITENTE_SEL = '';
 
 function setTab(t){
   TAB = t; PAGE = 1;
-  for (const [id, key] of [['tabLogins','logins'],['tabMov','mov'],['tabAprob','aprob'],['tabExcep','excep'],['tabDealers','dealers'],['tabBackups','backups']])
+  for (const [id, key] of [['tabLogins','logins'],['tabMov','mov'],['tabAprob','aprob'],['tabExcep','excep'],['tabDealers','dealers'],['tabCorreos','correos'],['tabBackups','backups']])
     document.getElementById(id).classList.toggle('on', t===key);
-  const mov = t==='mov', bk = t==='backups', dl = t==='dealers', grp = (t==='aprob'||t==='excep');
+  const mov = t==='mov', bk = t==='backups', dl = t==='dealers', co = t==='correos', grp = (t==='aprob'||t==='excep');
   document.getElementById('wrapAccion').style.display = mov?'':'none';
   document.getElementById('wrapModulo').style.display = (mov||grp)?'':'none';
   document.getElementById('wrapQ').style.display      = bk?'none':'';       // buscador en todas las pestañas
   document.getElementById('wrapCategoria').style.display = dl?'':'none';
   document.getElementById('f-usuario').parentElement.style.display = dl?'none':'';
-  document.getElementById('btnExport').style.display = (bk||dl)?'none':'';
+  document.getElementById('btnExport').style.display = (bk||dl||co)?'none':'';
+  document.getElementById('subRemitentes').style.display = co?'flex':'none';
+  if (!co) REMITENTE_SEL = '';
   document.querySelector('.filtros').style.display = bk?'none':'';
   document.querySelector('.pager').style.display   = bk?'none':'';
   cargar();
@@ -181,6 +206,10 @@ function qs(extra){
   if (TAB==='dealers'){
     const cat = document.getElementById('f-categoria').value, q = document.getElementById('f-q').value.trim();
     if (cat) p.set('categoria', cat); if (q) p.set('q', q);
+  }
+  if (TAB==='correos'){
+    if (REMITENTE_SEL) p.set('remitente', REMITENTE_SEL);
+    if (qTxt) p.set('q', qTxt);
   }
   if (extra) for (const [k,v] of Object.entries(extra)) p.set(k, v);
   return p;
@@ -225,6 +254,22 @@ async function cargar(){
       document.getElementById('pgPrev').disabled = j.data.page<=1;
       document.getElementById('pgNext').disabled = j.data.page>=PAGES;
       renderDealers(j.data.rows);
+    } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
+    return;
+  }
+  if (TAB==='correos'){
+    const url = '/api/auditoria-mov/correos?' + qs({ page:PAGE, limit:100 }).toString();
+    try {
+      const r = await fetch(url, { headers:H }); const j = await r.json();
+      if (!j.success){ tb.innerHTML = '<tr><td class="vacio">Error al cargar</td></tr>'; return; }
+      PAGES = j.data.pages || 1;
+      document.getElementById('resumen').textContent = `${j.data.total} correo(s) enviado(s)`;
+      document.getElementById('rango').textContent = '';
+      document.getElementById('pgInfo').textContent = `Página ${j.data.page} de ${PAGES}`;
+      document.getElementById('pgPrev').disabled = j.data.page<=1;
+      document.getElementById('pgNext').disabled = j.data.page>=PAGES;
+      renderRemitentes(j.data.remitentes || []);
+      renderCorreos(j.data.rows);
     } catch(e){ tb.innerHTML = '<tr><td class="vacio">Error de conexión</td></tr>'; }
     return;
   }
@@ -319,6 +364,53 @@ function renderDealers(rows){
   </tr>`).join('');
 }
 
+/* ── Correos Enviados ── */
+// El remitente viene como 'AutoFácil <afbs@autofacilchile.cl>' → mostrar solo la cuenta
+const remCorto = r => { const m = String(r||'').match(/<([^>]+)>/); return m ? m[1] : (r || '—'); };
+function renderRemitentes(rems){
+  const cont = document.getElementById('subRemitentes');
+  const total = rems.reduce((s,r)=>s+Number(r.n||0),0);
+  cont.innerHTML = [`<div class="stab ${REMITENTE_SEL===''?'on':''}" onclick="setRemitente('')">Todos <span class="n">${total}</span></div>`]
+    .concat(rems.map(r =>
+      `<div class="stab ${REMITENTE_SEL===r.remitente?'on':''}" onclick="setRemitente(this.dataset.r)" data-r="${escH(r.remitente||'')}">${escH(remCorto(r.remitente))} <span class="n">${r.n}</span></div>`))
+    .join('');
+}
+function setRemitente(r){ REMITENTE_SEL = r; PAGE = 1; cargar(); }
+function renderCorreos(rows){
+  document.getElementById('thead').innerHTML =
+    '<tr><th>Fecha</th><th>Hora</th><th>Remitente</th><th>Enviado por</th><th>Destinatarios</th><th>CC</th><th>Asunto</th><th>Estado</th></tr>';
+  const tb = document.getElementById('tbody');
+  if (!rows.length){ tb.innerHTML='<tr><td colspan="8" class="vacio">Sin correos en el rango/filtros seleccionados (el log parte desde v207.49)</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const esSis = !r.enviado_por || r.enviado_por === 'Sistema';
+    return `<tr style="cursor:pointer" onclick="verCorreo(${r.id})" title="Pincha para ver el correo">
+    <td class="c-fecha">${fFecha(r.fecha)}</td>
+    <td>${fHora(r.fecha)}</td>
+    <td class="c-mod" style="text-transform:none">${escH(remCorto(r.remitente))}</td>
+    <td class="c-user"${esSis?' style="color:#67e8f9"':''}>${esSis?'<i class="bi bi-robot"></i> Sistema':escH(r.enviado_por)}</td>
+    <td class="c-detalle" style="min-width:180px">${escH(r.destinatarios||'')}</td>
+    <td class="c-detalle" style="min-width:120px;color:#7d8aa3">${escH(r.cc||'')}</td>
+    <td class="c-detalle">${escH(r.asunto||'')}${r.dev?' <span style="color:#fbbf24" title="Modo Desarrollo: redirigido a correos de prueba">[DEV]</span>':''}</td>
+    <td>${r.ok?'<span class="estado-on">● enviado</span>':`<span style="color:#fca5a5" title="${escH(r.error||'')}">✕ falló</span>`}</td>
+  </tr>`;}).join('');
+}
+async function verCorreo(id){
+  try {
+    const r = await fetch('/api/auditoria-mov/correos/'+id, { headers:H });
+    const j = await r.json();
+    if (!j.success){ toast(j.error||'No se pudo cargar el correo', true); return; }
+    const c = j.data;
+    document.getElementById('dcAsunto').textContent = c.asunto || '(sin asunto)';
+    document.getElementById('dcMeta').textContent =
+      `${remCorto(c.remitente)} · ${c.enviado_por||'Sistema'} · ${fFecha(c.fecha)} ${fHora(c.fecha)}` + (c.ok?'' : ' · ✕ FALLÓ: '+(c.error||''));
+    document.getElementById('dcDest').innerHTML =
+      `<b>Para:</b> ${escH(c.destinatarios||'—')}` +
+      (c.cc?`<br><b>CC:</b> ${escH(c.cc)}`:'') + (c.bcc?`<br><b>CCO:</b> ${escH(c.bcc)}`:'');
+    document.getElementById('dcFrame').srcdoc = c.html || '<p style="font-family:sans-serif;color:#64748b;padding:20px">Este correo se envió solo con texto plano o sin contenido HTML registrado.</p>';
+    document.getElementById('dlgCorreo').showModal();
+  } catch(e){ toast('Error de conexión', true); }
+}
+
 function renderBackups(rows){
   document.getElementById('thead').innerHTML =
     '<tr><th>Titular <b style="color:#ef4444">*</b></th><th>BackUp</th><th>Categorías</th><th>Desde</th><th>Hasta</th><th>Activado por</th></tr>';
@@ -346,7 +438,7 @@ function limpiar(){
   PAGE=1; cargar();
 }
 function exportar(){
-  if (TAB==='dealers' || TAB==='backups') return;
+  if (TAB==='dealers' || TAB==='backups' || TAB==='correos') return;
   const base = (TAB==='mov'||esGrupo()) ? '/api/auditoria-mov/movimientos/export?' : '/api/auditoria-mov/logins/export?';
   const p = qs({ token });
   window.location.href = base + p.toString();

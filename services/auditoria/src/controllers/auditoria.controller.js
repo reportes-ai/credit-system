@@ -229,4 +229,54 @@ const getBitacoraDealers = async (req, res) => {
   } catch (e) { console.error('[auditoria dealers]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins, getBackups, getBitacoraDealers };
+/* ── Correos enviados (log del motor único shared/mailer.js) ───────────────── */
+function whereCorreos(qy) {
+  const where = [], vals = [];
+  if (qy.desde) { where.push('fecha >= ?'); vals.push(qy.desde + ' 00:00:00'); }
+  if (qy.hasta) { where.push('fecha <= ?'); vals.push(qy.hasta + ' 23:59:59'); }
+  if (qy.remitente) { where.push('remitente = ?'); vals.push(qy.remitente); }
+  if (qy.usuario) {
+    if (/^\d+$/.test(qy.usuario)) { where.push('id_usuario = ?'); vals.push(parseInt(qy.usuario)); }
+    else if (qy.usuario === 'Sistema') { where.push("(enviado_por = 'Sistema' OR enviado_por IS NULL)"); }
+    else { where.push('enviado_por LIKE ?'); vals.push('%' + qy.usuario + '%'); }
+  }
+  if (qy.q) {
+    where.push('(asunto LIKE ? OR destinatarios LIKE ? OR cc LIKE ? OR enviado_por LIKE ?)');
+    const like = '%' + qy.q + '%'; vals.push(like, like, like, like);
+  }
+  return { whereStr: where.length ? 'WHERE ' + where.join(' AND ') : '', vals };
+}
+
+// GET /api/auditoria-mov/correos — listado (sin el html, que pesa) + remitentes para las pestañas
+const getCorreos = async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(500, Math.max(10, parseInt(req.query.limit) || 100));
+    const offset = (page - 1) * limit;
+    const { whereStr, vals } = whereCorreos(req.query);
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) total FROM correos_log ${whereStr}`, vals);
+    const [rows] = await pool.query(
+      `SELECT id, fecha, remitente, enviado_por, destinatarios, cc, bcc, asunto, ok, error, dev
+       FROM correos_log ${whereStr} ORDER BY fecha DESC, id DESC LIMIT ? OFFSET ?`,
+      [...vals, limit, offset]);
+    const [rems] = await pool.query('SELECT remitente, COUNT(*) n FROM correos_log GROUP BY remitente ORDER BY n DESC');
+    res.json({ success: true, data: { rows, total, page, limit, pages: Math.ceil(total / limit), remitentes: rems }, error: null });
+  } catch (e) {
+    // Tabla aún no creada (ningún correo enviado desde este deploy): vacío, no error.
+    if (/doesn't exist|ER_NO_SUCH_TABLE/i.test(e.message)) return res.json({ success: true, data: { rows: [], total: 0, page: 1, limit: 100, pages: 1, remitentes: [] }, error: null });
+    console.error('[auditoria correos]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+// GET /api/auditoria-mov/correos/:id — el correo completo (para verlo al pinchar)
+const getCorreoDetalle = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'ID inválido' });
+    const [[row]] = await pool.query('SELECT * FROM correos_log WHERE id = ?', [id]);
+    if (!row) return res.status(404).json({ success: false, data: null, error: 'Correo no encontrado' });
+    res.json({ success: true, data: row, error: null });
+  } catch (e) { console.error('[auditoria correo detalle]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { getMovimientos, getLogins, getFiltros, exportMovimientos, exportLogins, getBackups, getBitacoraDealers, getCorreos, getCorreoDetalle };
