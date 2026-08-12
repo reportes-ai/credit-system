@@ -3171,10 +3171,13 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
   const prevMeses = [...new Set(rows.map(r => r.mes))].filter(m => m < mesAct).sort().slice(-3);
   const pesoDS = [0, 0, 0, 0, 0, 0, 0];
   rows.filter(r => prevMeses.includes(r.mes) && r.fecha_otorgado).forEach(r => { pesoDS[new Date(r.fecha_otorgado + 'T12:00:00').getDay()]++; });
+  // el reparto de la meta incluye HOY: lo que falta se mide contra lo real hasta AYER,
+  // así el día de hoy muestra su meta junto al real que lleva
   let pesosFut = 0;
-  for (let d = diaCorte + 1; d <= diasMes; d++) pesosFut += pesoDS[new Date(aa, mn - 1, d).getDay()] || 0;
-  const faltan = Math.max(Math.round(proyQ || 0) - delMes.length, 0);
-  const espDia = d => (!esActual || d <= diaCorte || !pesosFut) ? null : faltan * (pesoDS[new Date(aa, mn - 1, d).getDay()] || 0) / pesosFut;
+  for (let d = diaCorte; d <= diasMes; d++) pesosFut += pesoDS[new Date(aa, mn - 1, d).getDay()] || 0;
+  const antesHoy = Object.entries(porDia).reduce((s, [d, q]) => s + (+d < diaCorte ? q : 0), 0);
+  const faltan = Math.max(Math.round(proyQ || 0) - antesHoy, 0);
+  const espDia = d => (!esActual || d < diaCorte || !pesosFut) ? null : faltan * (pesoDS[new Date(aa, mn - 1, d).getDay()] || 0) / pesosFut;
   const off = (new Date(aa, mn - 1, 1).getDay() + 6) % 7; // Lun=0
   let h = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;max-width:228px;margin:0 auto">' +
     ['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<div style="text-align:center;font-size:.6rem;color:#94a3b8;font-weight:800">${d}</div>`).join('');
@@ -3184,9 +3187,10 @@ function renderPulsoProy2(rows, mesAct, proyQ) {
     const fut = esActual && d > diaCorte;
     const bg = fut ? '#fffbeb' : q ? `rgba(1,65,162,${(0.12 + t * 0.78).toFixed(2)})` : '#f1f5f9';
     const cTx = !fut && q && t > 0.55 ? '#fff' : '#475569';
-    h += `<div title="${d}: ${fut ? (esp != null ? 'meta ' + esp.toFixed(1) + ' para la proyección' : '—') : q + ' otorgadas'}"
+    const esHoy = esActual && d === diaCorte;
+    h += `<div title="${d}: ${fut ? (esp != null ? 'meta ' + esp.toFixed(1) + ' para la proyección' : '—') : q + ' otorgadas' + (esHoy && esp != null ? ' · meta hoy ' + esp.toFixed(1) : '')}"
       style="aspect-ratio:1;border-radius:6px;position:relative;display:flex;align-items:center;justify-content:center;
-      font-size:.66rem;font-weight:700;color:${cTx};background:${bg};border:1px ${fut ? 'dashed #f59e0b66' : 'solid #e2e8f0'}">
+      font-size:.66rem;font-weight:700;color:${cTx};background:${bg};border:${esHoy ? '2px solid #0141A2' : `1px ${fut ? 'dashed #f59e0b66' : 'solid #e2e8f0'}`}">
       ${d}${!fut && q ? `<span style="position:absolute;top:1px;right:4px;font-size:.56rem;opacity:.9">${q}</span>` : ''}
       ${esp != null ? `<span style="position:absolute;bottom:1px;left:4px;font-size:.56rem;color:#b45309;font-weight:800">${Math.round(esp)}</span>` : ''}</div>`;
   }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.6 — hoy muestra real + meta del dia (borde destacado) · v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -283,17 +283,19 @@ function pintar(){
   // Proyección propia repartida en los días que quedan: lo que falta para llegar
   // a proyOps se distribuye por el peso histórico de cada día de la semana
   const proyOpsPre=esActual&&diaCorte>0?Math.round(ot.length/diaCorte*diasMes):ot.length;
-  const pesosFut=(()=>{ let s=0; for(let d=diaCorte+1;d<=diasMes;d++) s+=pesoDS[new Date(aa,mn-1,d).getDay()]||0; return s; })();
-  const espDia=d=>{ if(!esActual||d<=diaCorte||!pesosFut) return null;
-    return Math.max(proyOpsPre-ot.length,0)*(pesoDS[new Date(aa,mn-1,d).getDay()]||0)/pesosFut; };
+  // el reparto incluye HOY: lo pendiente se mide contra lo real hasta AYER, así hoy muestra real + meta
+  const pesosFut=(()=>{ let s=0; for(let d=diaCorte;d<=diasMes;d++) s+=pesoDS[new Date(aa,mn-1,d).getDay()]||0; return s; })();
+  const otAntesHoy=Object.entries(porDia).reduce((s,[d,q])=>s+((+d)<diaCorte?q:0),0);
+  const espDia=d=>{ if(!esActual||d<diaCorte||!pesosFut) return null;
+    return Math.max(proyOpsPre-otAntesHoy,0)*(pesoDS[new Date(aa,mn-1,d).getDay()]||0)/pesosFut; };
   let heat='<div class="heat">'+['L','M','M','J','V','S','D'].map(d=>`<div class="hd">${d}</div>`).join('');
   for(let i=0;i<off;i++) heat+='<div></div>';
   for(let d=1;d<=diasMes;d++){
     const q=porDia[d]||0, t=q/maxD, esp=espDia(d);
     const bg=q?`rgba(0,166,255,${0.15+t*0.75})`:'#0d1730';
-    const fut=esActual&&d>diaCorte;
-    heat+=`<div class="hc" style="background:${fut?'rgba(255,197,61,.05)':bg};${fut?'border-color:rgba(255,197,61,.25);border-style:dashed;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}"
-      title="${d}: ${fut?(esp!=null?'para la proyección hay que hacer '+esp.toFixed(1):'—'):q+' otorgadas'}">${d}${!fut&&q?`<span class="q">${q}</span>`:''}${esp!=null?`<span class="e">${Math.round(esp)}</span>`:''}</div>`;
+    const fut=esActual&&d>diaCorte, esHoy=esActual&&d===diaCorte;
+    heat+=`<div class="hc" style="background:${fut?'rgba(255,197,61,.05)':bg};${fut?'border-color:rgba(255,197,61,.25);border-style:dashed;':''}${esHoy?'border-color:var(--accent2);border-width:2px;':''}${q&&t>0.55?'color:#04121f;font-weight:800;':''}"
+      title="${d}: ${fut?(esp!=null?'para la proyección hay que hacer '+esp.toFixed(1):'—'):q+' otorgadas'+(esHoy&&esp!=null?' · meta hoy '+esp.toFixed(1):'')}">${d}${!fut&&q?`<span class="q">${q}</span>`:''}${esp!=null?`<span class="e">${Math.round(esp)}</span>`:''}</div>`;
   }
   heat+='</div>';
 
