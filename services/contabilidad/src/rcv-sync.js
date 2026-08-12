@@ -122,10 +122,12 @@ const fechaYmd = v => { const s = String(v || '').slice(0, 10); return /^\d{4}-\
 
 async function consultarComprasSII(mes, anio) {
   const c = cfg();
-  // La API valida RutCertificado SIEMPRE (aunque no viaje el .pfx): es el RUT del
-  // TITULAR del certificado, que puede no ser el usuario que entra al SII.
-  const input = { RutUsuario: c.rutUsuario, PasswordSII: c.clave, RutEmpresa: c.rutEmpresa,
-                  Ambiente: 1, RutCertificado: c.rutCert, Password: c.certPass || '' };
+  /* Con certificado se mandan RutCertificado + Password (el titular del certificado
+     puede no ser el usuario que entra al SII). SIN certificado esos dos campos se
+     OMITEN del todo: mandarlos vacíos hace que la API responda "Password de
+     certificado no informado" en vez de intentar solo con la Clave Tributaria. */
+  const input = { RutUsuario: c.rutUsuario, PasswordSII: c.clave, RutEmpresa: c.rutEmpresa, Ambiente: 1 };
+  if (c.certB64 || c.certPass) { input.RutCertificado = c.rutCert; input.Password = c.certPass || ''; }
   const form = new FormData();
   if (c.certB64)
     form.append('certificado', new Blob([Buffer.from(c.certB64, 'base64')], { type: 'application/x-pkcs12' }), 'certificado.pfx');
