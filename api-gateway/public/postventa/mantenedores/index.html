@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -126,20 +126,39 @@
         <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-envelope-paper me-1"></i>Cartola al dealer
           <label style="float:right;font-size:.78rem;font-weight:600;color:#334155;cursor:pointer"><input type="checkbox" id="ctaActivo" style="vertical-align:-2px"> Activo</label>
         </h6>
+        <div class="ph" style="margin:0 0 8px"><b>Destinatario:</b> correo del dealer (su ficha) · <b>CC:</b> comisiones@, ejecutivos de las operaciones y Jefes Comerciales</div>
         <div class="fld"><label>Asunto</label><input id="ctaAsunto"></div>
         <div class="fld"><label>Cuerpo</label><textarea id="ctaCuerpo"></textarea></div>
         <div class="fld"><label>Firma</label><textarea id="ctaFirma" style="min-height:70px"></textarea></div>
-        <div class="ph">Variables: <code>{dealer}</code> <code>{mes}</code> <code>{total}</code>. El correo sale AUTOMÁTICO desde comisiones@ (HTML + PDF adjunto, CC ejecutivos y Jefe Comercial). Desactivado, el envío sigue (PDF + registro) pero sin correo.</div>
+        <div class="ph">Variables: <code>{dealer}</code> <code>{mes}</code> <code>{total}</code>. El correo sale AUTOMÁTICO desde comisiones@ (HTML + PDF adjunto). Desactivado, el envío sigue (PDF + registro) pero sin correo.</div>
       </div>
       <div>
         <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-cash-coin me-1"></i>Aviso de pago al dealer (comisiones@)
           <label style="float:right;font-size:.78rem;font-weight:600;color:#334155;cursor:pointer"><input type="checkbox" id="pagActivo" style="vertical-align:-2px"> Activo</label>
         </h6>
+        <div class="ph" style="margin:0 0 8px"><b>Destinatario:</b> correo del dealer (su ficha) · <b>CC:</b> comisiones@</div>
         <div class="fld"><label>Asunto</label><input id="pagAsunto"></div>
         <div class="fld"><label>Cuerpo</label><textarea id="pagCuerpo"></textarea></div>
         <div class="fld"><label>Firma</label><textarea id="pagFirma" style="min-height:70px"></textarea></div>
         <div class="ph">Variables: <code>{doc}</code> <code>{numero_factura}</code> <code>{dealer}</code> <code>{tipo_cuenta}</code> <code>{num_cuenta}</code> <code>{banco}</code> <code>{ops}</code>. Sale automáticamente al marcar COMISIÓN PAGADA.</div>
       </div>
+    </div>
+
+    <div class="correo-cols" style="margin-top:18px">
+      <div>
+        <h6 style="font-weight:800;color:#0141A2;margin:6px 0 10px"><i class="bi bi-cash-stack me-1"></i>Pago de Saldo Precio al dealer
+          <label style="float:right;font-size:.78rem;font-weight:600;color:#334155;cursor:pointer"><input type="checkbox" id="psActivo" style="vertical-align:-2px"> Activo</label>
+        </h6>
+        <div class="ph" style="margin:0 0 8px"><b>Destinatario:</b> correo del dealer (su ficha) · <b>CC:</b> ejecutivo comercial de la operación, Jefes Comerciales (por perfil) y el grupo de Operaciones</div>
+        <div class="fld"><label>Remitente</label><select id="psRemitente"></select></div>
+        <div class="fld"><label>CC grupo Operaciones</label><input id="psCcOps" placeholder="operaciones@autofacilchile.cl"></div>
+        <div class="fld"><label>Asunto</label><input id="psAsunto"></div>
+        <div class="fld"><label>Cuerpo</label><textarea id="psCuerpo"></textarea></div>
+        <div class="fld"><label>Firma</label><textarea id="psFirma" style="min-height:70px"></textarea></div>
+        <div class="ph">Variables: <code>{dealer}</code> <code>{num_op}</code> <code>{monto}</code> <code>{fecha_pago}</code> <code>{financiera}</code> <code>{tipo_cuenta}</code> <code>{num_cuenta}</code> <code>{banco}</code>.
+          Se detona AUTOMÁTICO cuando el Tesorero paga el saldo precio (Órdenes de Pago o Saldos Precios a Pagar). <b>Nace inactivo</b>: revisa el texto y enciende el interruptor cuando esté listo.</div>
+      </div>
+      <div></div>
     </div>
 
     <!-- Prueba de las plantillas al dealer: manda ambas (con datos de ejemplo) a los
@@ -161,7 +180,8 @@
       • <b>Destinatario</b> → a quién llega el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a> y <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a>).<br>
       • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.<br>
       • <b>Cartola al dealer</b> → el correo automático (comisiones@, HTML + PDF adjunto, CC ejecutivos y Jefe Comercial) al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
-      • <b>Aviso de pago al dealer</b> → el correo automático desde comisiones@ cuando el Tesorero marca COMISIÓN PAGADA (<a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> o el módulo Órdenes de Pago). El interruptor lo activa/desactiva.
+      • <b>Aviso de pago al dealer</b> → el correo automático desde comisiones@ cuando el Tesorero marca COMISIÓN PAGADA (<a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> o el módulo Órdenes de Pago). El interruptor lo activa/desactiva.<br>
+      • <b>Pago de Saldo Precio al dealer</b> → el correo automático al dealer (CC ejecutivo, Jefes Comerciales y grupo Operaciones) cuando el Tesorero paga el saldo precio (<a href="/ordenes-pago/historial/">Órdenes de Pago</a> o <a href="/postventa/saldos-a-pagar/">Saldos Precios a Pagar</a>). <b>Nace inactivo</b> — el interruptor lo enciende.
     </div>
   </div>
 </div>
@@ -198,6 +218,7 @@ const DEF_COM_C = { asunto:'Orden de Pago de Comisión N° {nOrden} — {dealer}
 
 const DEF_CARTOLA_C = { activo:true, asunto:'CARTOLA COMISIONES {mes} — {dealer}', cuerpo:'Estimados {dealer}:\n\nJunto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}.\n\nTotal comisión bruta a pagar: {total}\n\nFavor emitir la factura a:\nAUTOFACIL SPA — RUT 76.545.638-K\nAv. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.\n\nCualquier duda quedamos atentos.', firma:'' };
 const DEF_PAGADA_C  = { activo:true, asunto:'Comisión pagada — {doc} N° {numero_factura} ({dealer})', cuerpo:'Estimados {dealer}:\n\nLes informamos que la {doc} N° {numero_factura} ha sido pagada mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}, de acuerdo a sus instrucciones.\n\nOperación(es): {ops}.', firma:'' };
+const DEF_PAGO_SALDO = { activo:false, remitente:'', cc_operaciones:'operaciones@autofacilchile.cl', asunto:'Saldo Precio pagado — OP {num_op} ({dealer})', cuerpo:'Estimados {dealer}:\n\nLes informamos que el Saldo Precio de la operación N° {num_op}, por {monto}, fue pagado el {fecha_pago} mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}.\n\nCualquier duda, quedamos atentos.', firma:'Saludos cordiales,\nAutoFácil Crédito Automotriz' };
 
 function pintaCorreos(){
   document.getElementById('cCont').value = (typeof CFG.correo_contabilidad === 'string' ? CFG.correo_contabilidad : 'contabilidad@autofacilchile.cl');
@@ -220,6 +241,13 @@ function pintaCorreos(){
   document.getElementById('ctaAsunto').value = ct.asunto; document.getElementById('ctaCuerpo').value = ct.cuerpo; document.getElementById('ctaFirma').value = ct.firma || '';
   document.getElementById('pagActivo').checked = pg.activo !== false;
   document.getElementById('pagAsunto').value = pg.asunto; document.getElementById('pagCuerpo').value = pg.cuerpo; document.getElementById('pagFirma').value = pg.firma || '';
+  // Pago de Saldo Precio al dealer — OJO: nace INACTIVO (activo === true para encender)
+  const ps = { ...DEF_PAGO_SALDO, ...(CFG.correo_pago_saldo||{}) };
+  document.getElementById('psActivo').checked = ps.activo === true;
+  document.getElementById('psRemitente').innerHTML = opts;
+  document.getElementById('psRemitente').value = CTAS.some(x=>x.clave===ps.remitente) ? ps.remitente : 'sistema';
+  document.getElementById('psCcOps').value = ps.cc_operaciones || '';
+  document.getElementById('psAsunto').value = ps.asunto; document.getElementById('psCuerpo').value = ps.cuerpo; document.getElementById('psFirma').value = ps.firma || '';
 }
 
 async function guardarCorreos(){
@@ -230,6 +258,7 @@ async function guardarCorreos(){
   const com   = { activo:document.getElementById('cActivo').checked, remitente:document.getElementById('cRemitente').value, asunto:document.getElementById('cAsunto').value, cuerpo:document.getElementById('cCuerpo').value, firma:document.getElementById('cFirma').value };
   const cta   = { activo:document.getElementById('ctaActivo').checked, asunto:document.getElementById('ctaAsunto').value, cuerpo:document.getElementById('ctaCuerpo').value, firma:document.getElementById('ctaFirma').value };
   const pag   = { activo:document.getElementById('pagActivo').checked, asunto:document.getElementById('pagAsunto').value, cuerpo:document.getElementById('pagCuerpo').value, firma:document.getElementById('pagFirma').value };
+  const psal  = { activo:document.getElementById('psActivo').checked, remitente:document.getElementById('psRemitente').value, cc_operaciones:document.getElementById('psCcOps').value.trim(), asunto:document.getElementById('psAsunto').value, cuerpo:document.getElementById('psCuerpo').value, firma:document.getElementById('psFirma').value };
   try {
     const rs = await Promise.all([
       fetch('/api/postventa/config/correo_contabilidad',    { method:'PUT', headers:H, body: JSON.stringify({ valor: cont }) }),
@@ -237,11 +266,12 @@ async function guardarCorreos(){
       fetch('/api/postventa/config/correo_orden_comision',  { method:'PUT', headers:H, body: JSON.stringify({ valor: com }) }),
       fetch('/api/postventa/config/correo_cartola_dealer',  { method:'PUT', headers:H, body: JSON.stringify({ valor: cta }) }),
       fetch('/api/postventa/config/correo_comision_pagada', { method:'PUT', headers:H, body: JSON.stringify({ valor: pag }) }),
+      fetch('/api/postventa/config/correo_pago_saldo',      { method:'PUT', headers:H, body: JSON.stringify({ valor: psal }) }),
     ]);
     const ok = (await Promise.all(rs.map(r=>r.json()))).every(j=>j.success);
     if (ok) {
       CFG.correo_contabilidad = cont; CFG.correo_orden_saldo = saldo; CFG.correo_orden_comision = com;
-      CFG.correo_cartola_dealer = cta; CFG.correo_comision_pagada = pag;
+      CFG.correo_cartola_dealer = cta; CFG.correo_comision_pagada = pag; CFG.correo_pago_saldo = psal;
       msg.textContent = '✓ Guardado'; msg.style.cssText = 'display:inline;color:#15803d;font-weight:700;font-size:.83rem';
     } else { msg.textContent = 'Error al guardar'; msg.style.cssText = 'display:inline;color:#b91c1c;font-size:.83rem'; }
   } catch(e){ msg.textContent = 'Error: '+e.message; msg.style.cssText='display:inline;color:#b91c1c;font-size:.83rem'; }

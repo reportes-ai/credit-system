@@ -98,6 +98,20 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
       ['correo_orden_saldo', JSON.stringify(CORREO_SALDO),
        'correo_orden_comision', JSON.stringify(CORREO_COMISION),
        'correo_contabilidad', JSON.stringify('contabilidad@autofacilchile.cl')]);
+    /* Aviso al DEALER cuando Tesorería paga su saldo precio. NACE INACTIVO
+       (activo:false) para que Pato revise el texto antes de que salga el primero.
+       CC: ejecutivo comercial de la operación + Jefes Comerciales (por perfil,
+       paramétrico) + el grupo de Operaciones (editable acá). */
+    const CORREO_PAGO_SALDO = {
+      activo: false,
+      remitente: '',
+      cc_operaciones: 'operaciones@autofacilchile.cl',
+      asunto: 'Saldo Precio pagado — OP {num_op} ({dealer})',
+      cuerpo: 'Estimados {dealer}:\n\nLes informamos que el Saldo Precio de la operación N° {num_op}, por {monto}, fue pagado el {fecha_pago} mediante transferencia a la {tipo_cuenta} {num_cuenta} del banco {banco}.\n\nCualquier duda, quedamos atentos.',
+      firma: 'Saludos cordiales,\nAutoFácil Crédito Automotriz',
+    };
+    await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)',
+      ['correo_pago_saldo', JSON.stringify(CORREO_PAGO_SALDO)]);
     // Parche idempotente: alinear el asunto del saldo al formato de comisión (solo si conserva el default viejo).
     try {
       const [[rc]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_orden_saldo'");
@@ -792,6 +806,66 @@ async function replicarFacturaComision(idTitular, usuario) {
    comisiones@ (remitenteComisiones), plantilla paramétrica en postventa_config
    'correo_comision_pagada'. Se envía UNA vez por factura (por la titular).
    Nunca lanza: un correo caído no puede frenar el pago. ── */
+/* Aviso al DEALER cuando Tesorería paga su SALDO PRECIO (gatillado por pagarOrden
+   de origen SALDO). Plantilla correo_pago_saldo del mantenedor — nace INACTIVA.
+   CC: ejecutivo comercial de la operación + Jefes Comerciales activos (por perfil)
+   + grupo de Operaciones (editable en el mantenedor). */
+async function notificarPagoSaldoDealer(idSeguimiento) {
+  try {
+    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_pago_saldo'");
+    const tpl = tRow ? JSON.parse(tRow.valor) : {};
+    if (tpl.activo !== true) return;                 // nace inactivo: solo manda si Pato lo enciende
+    const [[d]] = await pool.query(`
+      SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera,
+             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
+             COALESCE(dl.correo, dl.cf_email) AS correo,
+             COALESCE(dl.tipo_cuenta, dl.cuenta_tipo) AS tipo_cuenta, dl.num_cuenta, dl.banco
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+      WHERE s.id = ?`, [idSeguimiento]);
+    if (!d) return;
+    if (!d.correo) { console.warn('[postventa aviso pago saldo] dealer sin correo — OP', d.num_op); return; }
+
+    // CC: ejecutivo de la operación (email desde usuarios) + Jefes Comerciales + grupo Operaciones
+    const cc = new Set();
+    if (String(tpl.cc_operaciones || '').trim()) cc.add(String(tpl.cc_operaciones).trim().toLowerCase());
+    try {
+      const [[ej]] = await pool.query(
+        `SELECT email FROM usuarios WHERE UPPER(TRIM(CONCAT(nombre,' ',COALESCE(apellido,'')))) = UPPER(TRIM(?)) AND email IS NOT NULL LIMIT 1`,
+        [d.ejecutivo || '']);
+      if (ej && ej.email) cc.add(String(ej.email).toLowerCase());
+    } catch (_) {}
+    try {
+      const [jefes] = await pool.query(
+        `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
+         WHERE p.nombre = 'Jefe Comercial' AND u.estado = 'activo' AND u.email IS NOT NULL`);
+      jefes.forEach(j => cc.add(String(j.email).toLowerCase()));
+    } catch (_) {}
+
+    const fmt = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+    const datos = {
+      dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(d.saldo_precio),
+      fecha_pago: new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }),
+      financiera: d.financiera || '',
+      tipo_cuenta: (d.tipo_cuenta || 'cuenta corriente').toLowerCase(),
+      num_cuenta: d.num_cuenta || '—', banco: d.banco || '—',
+    };
+    const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
+    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
+    const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '');
+    await enviarCorreo({
+      from: remitentePorClave(tpl.remitente),
+      to: d.correo,
+      cc: [...cc].join(','),
+      subject: rell(tpl.asunto) || 'Saldo Precio pagado',
+      html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')),
+      text: cuerpo,
+    });
+  } catch (e) { console.error('[postventa aviso pago saldo]', e.message); }
+}
+
 async function notificarPagoComisionDealer(idSeguimiento) {
   try {
     const [[d]] = await pool.query(`
@@ -1481,6 +1555,9 @@ const pagarSaldos = async (req, res) => {
     for (const id of ids) {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('pago_realizado', { op: c.num_op, id_seguimiento: id, ejecutivo: c.ejecutivo });
+      // Aviso al dealer (plantilla correo_pago_saldo, nace inactiva) — misma señal
+      // que cuando el pago entra por la ODP de Tesorería (pagarOrden origen SALDO).
+      notificarPagoSaldoDealer(id).catch(e => console.error('[postventa aviso pago saldo]', e.message));
     }
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
@@ -2171,4 +2248,4 @@ module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
-  notificarPagoComisionDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos };
+  notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos };

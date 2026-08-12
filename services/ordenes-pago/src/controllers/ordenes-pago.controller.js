@@ -812,7 +812,15 @@ const pagarOrden = async (req, res) => {
       } catch (e) { console.error('[ordenes-pago hook liquidez]', e.message); }
     } else if (oc.origen === 'SALDO') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
-      if (s) await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);
+      if (s) {
+        await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);
+        // Aviso al dealer (plantilla correo_pago_saldo del mantenedor Post Venta;
+        // nace inactiva). Aislado: un correo caído jamás debe romper el pago.
+        try {
+          const pv = require('../../../postventa/src/controllers/postventa.controller');
+          if (pv.notificarPagoSaldoDealer) pv.notificarPagoSaldoDealer(s.id_seguimiento).catch(e => console.error('[ordenes-pago aviso saldo]', e.message));
+        } catch (e) { console.error('[ordenes-pago hook saldo]', e.message); }
+      }
     } else if (oc.origen === 'COMISION') {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
       if (s) {
