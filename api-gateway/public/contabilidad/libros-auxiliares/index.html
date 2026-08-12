@@ -393,6 +393,7 @@ async function rcvEstadoCargar(){
         <b><i class="bi bi-wrench-adjustable me-1"></i>Diagnóstico del certificado</b><br>
         ${falta.length ? 'Falta configurar en Render: <b>' + falta.join(', ') + '</b>.<br>' : ''}
         ${g.cert_cargado ? `Certificado: <b>${fmt(g.cert_bytes)} bytes</b>${g.cert_es_pfx===false?' — <b>no parece un .pfx</b>':''}${g.base64_con_espacios?' · <b>el base64 tiene espacios o saltos de línea</b> (debe ir en una sola línea)':''}.<br>` : ''}
+        RUT empresa <b>${g.rut_empresa_val||'—'}</b> · usuario SII <b>${g.rut_usuario_val||'—'}</b> · titular del certificado <b>${g.rut_cert_val||'—'}</b><br>
         ${g.mensaje ? '<b>' + g.mensaje + '</b>' : ''}
       </div>`;
     }

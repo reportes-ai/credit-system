@@ -15,6 +15,7 @@
      SII_CLAVE         Clave Tributaria del SII
      SII_CERT_B64      (opcional) certificado digital .pfx en base64
      SII_CERT_PASS     (opcional) clave del certificado
+     SII_RUT_CERT      (opcional) RUT del TITULAR del certificado, si no es el usuario
    El RCV es la FUENTE OFICIAL del libro de compras: ctb_rcv_compras es espejo
    read-only del SII (se reemplaza el mes completo en cada sync); el auxiliar
    ctb_compras_aux sigue siendo el libro operativo — el panel compara ambos.
@@ -30,6 +31,11 @@ const cfg = () => ({
   clave: process.env.SII_CLAVE || '',
   certB64: process.env.SII_CERT_B64 || '',
   certPass: process.env.SII_CERT_PASS || '',
+  /* El titular del certificado NO siempre es el usuario que entra al SII: el
+     certificado puede ser de un tercero (contador, socio) autorizado a representar
+     a la empresa. Antes se asumía que eran el mismo y eso da "RUT Certificado no
+     válido". Si no se informa, se mantiene el comportamiento anterior. */
+  rutCert: process.env.SII_RUT_CERT || process.env.SII_RUT_USUARIO || process.env.SII_RUT_EMPRESA || '',
 });
 const configurado = () => { const c = cfg(); return !!(c.key && c.rutEmpresa && c.clave); };
 
@@ -43,6 +49,8 @@ function diagnosticoCert() {
   const d = {
     apikey: !!c.key, rut_empresa: !!c.rutEmpresa, rut_usuario: !!c.rutUsuario,
     clave_sii: !!c.clave, cert_cargado: !!c.certB64, cert_pass: !!c.certPass,
+    // Los RUT no son secretos y sin verlos no se puede diagnosticar un cruce mal puesto.
+    rut_empresa_val: c.rutEmpresa || null, rut_usuario_val: c.rutUsuario || null, rut_cert_val: c.rutCert || null,
     cert_bytes: 0, cert_es_pfx: null, cert_abre: null, base64_con_espacios: false, mensaje: '',
   };
   if (!c.certB64) { d.mensaje = 'No hay certificado cargado (SII_CERT_B64 vacía).'; return d; }
@@ -114,9 +122,10 @@ const fechaYmd = v => { const s = String(v || '').slice(0, 10); return /^\d{4}-\
 
 async function consultarComprasSII(mes, anio) {
   const c = cfg();
-  // La API valida RutCertificado SIEMPRE (aunque no viaje el .pfx): va el RUT del usuario.
+  // La API valida RutCertificado SIEMPRE (aunque no viaje el .pfx): es el RUT del
+  // TITULAR del certificado, que puede no ser el usuario que entra al SII.
   const input = { RutUsuario: c.rutUsuario, PasswordSII: c.clave, RutEmpresa: c.rutEmpresa,
-                  Ambiente: 1, RutCertificado: c.rutUsuario, Password: c.certPass || '' };
+                  Ambiente: 1, RutCertificado: c.rutCert, Password: c.certPass || '' };
   const form = new FormData();
   if (c.certB64)
     form.append('certificado', new Blob([Buffer.from(c.certB64, 'base64')], { type: 'application/x-pkcs12' }), 'certificado.pfx');
