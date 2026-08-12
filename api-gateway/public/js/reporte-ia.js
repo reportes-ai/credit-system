@@ -22,10 +22,20 @@
     const fecha = d.fecha ? new Date(d.fecha).toLocaleString('es-CL') : '—';
     const lst = (a, vac) => (a && a.length) ? '<ul style="margin:3px 0 0;padding-left:18px">' + a.map(x => `<li>${E(typeof x === 'string' ? x : JSON.stringify(x))}</li>`).join('') + '</ul>' : `<span style="color:#94a3b8">${vac}</span>`;
     const causas = (d.causas || []).map(c => `<li><b>${E(c.tipo || '')}</b> · ${E(c.materia || c.caratula || '')}${c.fecha ? ' · ' + E(c.fecha) : ''}${c.demandante ? ' · ' + E(c.demandante) : ''}${c.tribunal ? ' · ' + E(c.tribunal) : ''}</li>`).join('');
+    /* Reportes anteriores al 12-08-2026: la deuda CMF de DealerNet viene en MILES y el
+       análisis la relataba como pesos ("CLP 789" por $789.000). Se avisa y se ofrece
+       rehacerlo — no se regeneran todos de una porque cada análisis cuesta. */
+    const aviso = d.montos_pesos === false ? `
+      <div style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:.79rem;color:#78350f;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="flex:1;min-width:220px"><i class="bi bi-exclamation-triangle-fill me-1"></i><b>Montos en miles.</b>
+        Este reporte se generó antes de corregir la unidad: las cifras de deuda están en miles de pesos (donde dice 789 son $789.000). Regenéralo para verlas en pesos.</span>
+        <button onclick="AF_REP_IA.analizar('${E(ent.rut)}', this)" style="background:#b45309;color:#fff;border:none;border-radius:7px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;white-space:nowrap"><i class="bi bi-arrow-clockwise me-1"></i>Regenerar</button>
+      </div>` : '';
     return head + `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <span style="font-size:.72rem;font-weight:800;color:${rg.c};background:${rg.b};border-radius:8px;padding:3px 10px">RIESGO ${E(d.nivel_riesgo || '—')}</span>
         <span style="font-size:.78rem;color:#64748b"><i class="bi bi-clock-history"></i> ${E(fecha)}</span></div>
+      ${aviso}
       <div style="margin-bottom:7px;font-size:.85rem"><b>Resumen:</b> ${E(d.resumen || '—')}</div>
       <div style="margin-bottom:7px;font-size:.85rem"><b>Deudas/morosidades:</b> ${E(d.deudas || '—')}</div>
       <div style="margin-bottom:7px;font-size:.85rem"><b>Causas judiciales:</b>${causas ? `<ul style="margin:3px 0 0;padding-left:18px;color:#991b1b">${causas}</ul>` : ' <span style="color:#94a3b8">sin causas</span>'}</div>
@@ -71,6 +81,7 @@
   // Analiza el RUT a demanda (POST /api/ia/informe-dealernet) y refresca la sección.
   // Cubre los casos en que el análisis al enviar la ficha falló (timeout DealerNet, IA off).
   async function analizar(rut, btn) {
+    const htmlBtn = btn ? btn.innerHTML : '';   // el botón puede ser "Analizar ahora" o "Regenerar"
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analizando…'; }
     try {
       const r = await fetch('/api/ia/informe-dealernet', { method: 'POST',
@@ -84,7 +95,7 @@
       else if (d && btn) { btn.parentElement.parentElement.outerHTML = seccionHTML({ tag: '', nombre: '', rut }, d); }
     } catch (e) {
       alert('No se pudo analizar: ' + e.message);
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-stars me-1"></i>Analizar ahora con IA'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = htmlBtn; }
     }
   }
 

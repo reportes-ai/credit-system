@@ -38,7 +38,17 @@ require('../../../../shared/migrate').enFila('informe-dealernet', async () => {
       costo_usd     DECIMAL(12,6) NULL,
       INDEX idx_fecha (fecha), INDEX idx_rut (rut) )`);
     try { await pool.query('ALTER TABLE ia_informes_dealernet ADD COLUMN IF NOT EXISTS causas JSON NULL'); } catch (e) { if (e.errno !== 1060) console.error('[ia informe-dn alter]', e.message); }
+    /* Hasta el 12-08-2026 el prompt recibía la deuda CMF en MILES (DealerNet la publica
+       en M$) y el reporte la relataba como pesos: decía "CLP 789" donde había $789.000.
+       Los reportes anteriores al arreglo quedan marcados para avisarlo en pantalla. */
+    try { await pool.query('ALTER TABLE ia_informes_dealernet ADD COLUMN IF NOT EXISTS montos_pesos TINYINT(1) NOT NULL DEFAULT 1'); } catch (e) { if (e.errno !== 1060) console.error('[ia informe-dn alter mp]', e.message); }
   } catch (e) { console.error('[ia informe-dn init]', e.message); }
+});
+
+/* Marca UNA sola vez los reportes previos al arreglo de unidades (los que ya existían). */
+require('../../../../shared/migrate').migrar('ia-informe-dn-montos-miles', async () => {
+  const [r] = await pool.query('UPDATE ia_informes_dealernet SET montos_pesos=0 WHERE fecha < ?', ['2026-08-12 12:00:00']);
+  console.log(`[ia informe-dn] ${r.affectedRows} reportes marcados con montos CMF en miles`);
 });
 
 const rutNum = r => { const c = String(r || '').replace(/[.\s-]/g, '').toUpperCase(); return c.length > 1 ? c.slice(0, -1) : c; };
@@ -97,7 +107,8 @@ const promptDe = datos => `Analiza los siguientes antecedentes DealerNet y respo
   "factores_positivos": ["aspectos favorables"],
   "recomendacion": "sugerencia breve para el analista (no es decisión final)"
 }
-Montos en pesos chilenos como enteros sin puntos: los ANTECEDENTES ya vienen convertidos a pesos, NO los vuelvas a multiplicar ni los expreses en miles. Si no hay causas judiciales, devuelve "causas_judiciales": [].
+UNIDADES: los ANTECEDENTES ya vienen convertidos a PESOS chilenos. NO los multipliques ni los expreses en miles ni en M$. En el objeto "deudas" los montos van como enteros sin puntos. En los textos que lee una persona (resumen, deudas_morosidades, alertas, factores_positivos, recomendación) escribe los montos en pesos con separador de miles y signo peso, así: $789.000 — nunca "CLP 789" ni "M$ 789".
+Si no hay causas judiciales, devuelve "causas_judiciales": [].
 
 ANTECEDENTES:
 ${datos}`;
@@ -213,9 +224,9 @@ exports.porRut = async (req, res) => {
     const rut = rutNum(req.params.rut);
     if (!rut) return res.status(400).json({ success: false, data: null, error: 'RUT inválido' });
     const [[r]] = await pool.query(
-      `SELECT id, fecha, rut, nivel_riesgo, resumen, deudas, causas, alertas, factores, recomendacion, productos, modelo
+      `SELECT id, fecha, rut, nivel_riesgo, resumen, deudas, causas, alertas, factores, recomendacion, productos, modelo, montos_pesos
        FROM ia_informes_dealernet WHERE rut = ? ORDER BY fecha DESC LIMIT 1`, [rut]);
     if (!r) return res.json({ success: true, data: null, error: null });
-    res.json({ success: true, data: { ...r, causas: arr(r.causas), alertas: arr(r.alertas), factores: arr(r.factores) }, error: null });
+    res.json({ success: true, data: { ...r, causas: arr(r.causas), alertas: arr(r.alertas), factores: arr(r.factores), montos_pesos: r.montos_pesos !== 0 }, error: null });
   } catch (e) { console.error('[ia informe-dn porRut]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
