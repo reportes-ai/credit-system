@@ -2227,7 +2227,6 @@ function desgloseDiario(mes, metrica) {
 
   const [aa, mm] = mes.split('-').map(Number);
   const diasMes = new Date(aa, mm, 0).getDate();
-  const dias = Array.from({ length: diasMes }, (_, i) => diasMes - i);   // descendente
 
   /* ejecutivo → { dia: cantidad }. Las operaciones sin fecha van a un balde
      aparte ("s/f") en vez de desaparecer: si no, el desglose sumaría menos que
@@ -2241,6 +2240,16 @@ function desgloseDiario(mes, metrica) {
     else sinF[r.ejecutivo] = (sinF[r.ejecutivo] || 0) + 1;
   });
   const totSinFecha = Object.values(sinF).reduce((a, b) => a + b, 0);
+
+  /* Días a mostrar: el mes EN CURSO llega hasta hoy y la tabla va creciendo sola
+     (sin esto, media tabla eran columnas de ceros del futuro). Se estira si hay
+     operaciones fechadas más adelante, para no perder ninguna y que el acumulado
+     siga cuadrando con la tabla mensual. */
+  const hoy = new Date();
+  const esMesActual = (aa === hoy.getFullYear() && mm === hoy.getMonth() + 1);
+  const diaMax = Math.max(0, ...Object.values(porEj).flatMap(dd => Object.keys(dd).map(Number)));
+  const ultimoDia = Math.min(diasMes, Math.max(esMesActual ? hoy.getDate() : diasMes, diaMax));
+  const dias = Array.from({ length: ultimoDia }, (_, i) => ultimoDia - i);   // descendente
 
   const filas = Object.entries(porEj)
     .map(([ej, dd]) => ({ ej, dd, sf: sinF[ej] || 0,
