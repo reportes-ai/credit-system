@@ -173,6 +173,27 @@ function logDealer(req, accion, detalle) {
 }
 
 // ── GET /api/portal-dealer/resumen ─────────────────────────────────────────
+/* Estados del SALDO PRECIO de cara al dealer: las etapas internas del track SALDO
+   agrupadas en los 4 pasos que le hablan a él. El MISMO mapa lo usan el resumen
+   (tarjetas), el filtro del listado y el frontend — un solo lugar. */
+const BUCKETS_SALDO = {
+  FP:  { titulo: 'Fundantes pendientes', etapas: ['FUNDANTES PENDIENTES'] },
+  FR:  { titulo: 'Fundantes recibidos',  etapas: ['FUNDANTES RECIBIDOS', 'FUNDANTES ENVIADOS'] },
+  LP:  { titulo: 'Liberado a pago',      etapas: ['LIBERADO A PAGO', 'FONDOS RECIBIDOS', 'ORDEN DE PAGO EMITIDA', 'ENVIADO A PAGO'] },
+  PAG: { titulo: 'Saldo precio pagado',  etapas: ['SALDO PRECIO PAGADO'] },
+};
+const bucketDeEtapa = etapa => {
+  const e = String(etapa || '').toUpperCase();
+  for (const [k, b] of Object.entries(BUCKETS_SALDO)) if (b.etapas.includes(e)) return k;
+  return 'FP';   // otorgada sin seguimiento aún = fundantes pendientes en la práctica
+};
+const ETAPA_SALDO_SQL = `(SELECT e.etapa FROM postventa_seguimiento s
+     JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'SALDO'
+    WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1)`;
+const ETAPA_COMISION_SQL = `(SELECT e.etapa FROM postventa_seguimiento s
+     JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'COMISION'
+    WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1)`;
+
 exports.resumen = async (req, res) => {
   try {
     const sc = dealerScope(req);
@@ -196,9 +217,29 @@ exports.resumen = async (req, res) => {
       else if (['RECHAZADO', 'DESISTIDO', 'ANULADO'].includes(e)) canceladas += Number(r.cnt);
       else en_proceso += Number(r.cnt);
     }
+    /* Pipeline del dinero del dealer: sus otorgadas de los últimos 3 meses (el
+       mismo universo de la vista por defecto), agrupadas por estado del saldo
+       precio con cantidad y suma. Alimenta las tarjetas pinchables. */
+    const [sp] = await pool.query(
+      `SELECT t.etapa_saldo, COUNT(*) AS n, COALESCE(SUM(t.saldo_precio),0) AS sp FROM (
+         SELECT ob.saldo_precio, ${ETAPA_SALDO_SQL} AS etapa_saldo,
+                ${ESTADO_SQL} AS estado,
+                COALESCE(ob.fecha_otorgado, ob.created_at) AS fecha_orden
+         FROM creditos ob
+         WHERE ${sc.where} AND ${NO_ANULADA}
+       ) t WHERE t.estado='OTORGADO' AND t.fecha_orden >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+       GROUP BY t.etapa_saldo`, sc.params);
+    const saldo_estados = {};
+    for (const k of Object.keys(BUCKETS_SALDO)) saldo_estados[k] = { titulo: BUCKETS_SALDO[k].titulo, n: 0, saldo: 0 };
+    for (const r of sp) {
+      const b = bucketDeEtapa(r.etapa_saldo);
+      saldo_estados[b].n += Number(r.n);
+      saldo_estados[b].saldo += Number(r.sp);
+    }
+
     return res.json({
       success: true,
-      data: { vinculado: true, total, otorgadas, en_proceso, canceladas, por_estado, catalogos: await catalogos() },
+      data: { vinculado: true, total, otorgadas, en_proceso, canceladas, por_estado, saldo_estados, catalogos: await catalogos() },
       error: null,
     });
   } catch (err) {
@@ -228,6 +269,17 @@ exports.operaciones = async (req, res) => {
       filtroEstado = 'OTORGADO';
       filtroExtra = " AND t.fecha_orden >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)";
     }
+    /* Filtro por estado del saldo precio (tarjetas del inicio): mismo universo
+       que las tarjetas — otorgadas de los últimos 3 meses — más el bucket. */
+    const bucket = BUCKETS_SALDO[String(req.query.saldo || '').trim().toUpperCase()];
+    if (bucket) {
+      filtroEstado = 'OTORGADO';
+      filtroExtra = " AND t.fecha_orden >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)"
+        + (String(req.query.saldo).toUpperCase() === 'FP'
+            ? ` AND (t.etapa_saldo IS NULL OR t.etapa_saldo IN (${bucket.etapas.map(() => '?').join(',')}))`
+            : ` AND t.etapa_saldo IN (${bucket.etapas.map(() => '?').join(',')})`);
+    }
+    const paramsBucket = bucket ? bucket.etapas : [];
 
     // El estado es una columna derivada (ESTADO_SQL); se filtra con WHERE sobre
     // la subconsulta aliada `t`, no con HAVING.
@@ -235,11 +287,12 @@ exports.operaciones = async (req, res) => {
     const [[cnt]] = await pool.query(
       `SELECT COUNT(*) AS total FROM (
          SELECT ${ESTADO_SQL} AS estado,
+                ${ETAPA_SALDO_SQL} AS etapa_saldo,
                 COALESCE(ob.fecha_otorgado, ob.created_at) AS fecha_orden
          FROM creditos ob
          WHERE ${sc.where} AND ${NO_ANULADA}
        ) t ${filtroEstado ? 'WHERE t.estado = ?' + filtroExtra : ''}`,
-      filtroEstado ? [...sc.params, filtroEstado] : sc.params);
+      filtroEstado ? [...sc.params, filtroEstado, ...paramsBucket] : sc.params);
 
     const [rows] = await pool.query(
       `SELECT * FROM (
@@ -253,12 +306,11 @@ exports.operaciones = async (req, res) => {
           ob.tipo_vehiculo, ob.marca, ob.modelo, ob.anio, ob.patente,
           ob.fecha_otorgado, ob.monto_financiado, ob.saldo_precio, ob.plazo, ob.cuota,
           ob.comdea_real                                       AS comision_dealer,
-          /* Estado del SALDO PRECIO: última etapa del track SALDO en Post Venta.
-             Al dealer se le muestran 4 pasos (pendientes/recibidos/liberado/pagado);
-             la mecánica interna de tesorería (ODP, fondos, envío) no le aporta. */
-          (SELECT e.etapa FROM postventa_seguimiento s
-             JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'SALDO'
-            WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1) AS etapa_saldo,
+          /* Estados del SALDO PRECIO y de la COMISIÓN: última etapa de cada track
+             en Post Venta. Al dealer se le muestran agrupados en pasos simples;
+             la mecánica interna de tesorería no le aporta. */
+          ${ETAPA_SALDO_SQL}                                   AS etapa_saldo,
+          ${ETAPA_COMISION_SQL}                                AS etapa_comision,
           ${ESTADO_SQL}                                        AS estado,
           ${ESTADO_CARTERA_SQL}                                AS estado_cartera,
           COALESCE(ob.fecha_otorgado, ob.created_at)           AS fecha_orden
@@ -268,7 +320,7 @@ exports.operaciones = async (req, res) => {
       ) t ${filtroEstado ? 'WHERE t.estado = ?' + filtroExtra : ''}
       ORDER BY fecha_orden DESC, id DESC
       LIMIT ? OFFSET ?`,
-      filtroEstado ? [...sc.params, filtroEstado, limit, off] : [...sc.params, limit, off]);
+      filtroEstado ? [...sc.params, filtroEstado, ...paramsBucket, limit, off] : [...sc.params, limit, off]);
 
     return res.json({
       success: true,

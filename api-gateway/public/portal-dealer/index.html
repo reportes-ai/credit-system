@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -288,7 +288,7 @@
             <h3>Mis operaciones</h3>
             <div class="ops-filtros">
               <input id="opBuscar" placeholder="Buscar cliente, patente…" oninput="filtrarOps()">
-              <select id="opEstado" onchange="cargarOperaciones(1)"><option value="">Todos los estados</option></select>
+              <select id="opEstado" onchange="SALDO_SEL='';renderKpis({vinculado:true,saldo_estados:window.__SE||{}});cargarOperaciones(1)"><option value="">Todos los estados</option></select>
             </div>
           </div>
           <div id="opsList"><div class="empty">Cargando…</div></div>
@@ -626,6 +626,7 @@ async function cargarDashboard(){
     if(j.success){
       const d=j.data; CAT=d.catalogos||CAT;
       document.getElementById('noVinc').classList.toggle('hidden', d.vinculado!==false);
+      window.__SE = d.saldo_estados || {};   // para repintar las tarjetas al pinchar
       renderKpis(d);
       const sel=document.getElementById('opEstado');
       const estados=Object.keys(d.por_estado||{}).sort();
@@ -639,10 +640,29 @@ async function cargarDashboard(){
   } catch(_){}
   cargarOperaciones(1);
 }
+/* Tarjetas del pipeline del saldo precio: cantidad + suma por estado, sobre las
+   otorgadas de los últimos 3 meses. Pinchar una filtra el listado a solo esas;
+   pinchar de nuevo vuelve a la vista normal. */
+let SALDO_SEL = '';
+const SALDO_COLORES = { FP:'#b45309', FR:'#1d4ed8', LP:'#6d28d9', PAG:'#15803d' };
 function renderKpis(d){
   if(d.vinculado===false){ document.getElementById('kpis').innerHTML=''; return; }
-  const k=[['Operaciones',d.total],['Otorgadas',d.otorgadas],['En proceso',d.en_proceso],['Canceladas',d.canceladas]];
-  document.getElementById('kpis').innerHTML=k.map(([l,n])=>`<div class="kpi"><div class="n">${Number(n||0).toLocaleString('es-CL')}</div><div class="l">${l}</div></div>`).join('');
+  const se=d.saldo_estados||{};
+  document.getElementById('kpis').innerHTML=['FP','FR','LP','PAG'].map(k=>{
+    const b=se[k]||{titulo:k,n:0,saldo:0};
+    const on=SALDO_SEL===k;
+    return `<div class="kpi" onclick="filtrarSaldo('${k}')" style="cursor:pointer;${on?`box-shadow:0 0 0 2.5px ${SALDO_COLORES[k]};`:''}" title="Ver solo estas operaciones">
+      <div class="n" style="color:${SALDO_COLORES[k]}">${Number(b.n||0).toLocaleString('es-CL')}</div>
+      <div class="l">${esc(b.titulo)}</div>
+      <div style="font-size:.82rem;font-weight:800;color:#0f172a;margin-top:2px">${fmtMonto(b.saldo)}</div>
+    </div>`;
+  }).join('');
+}
+function filtrarSaldo(k){
+  SALDO_SEL = (SALDO_SEL===k) ? '' : k;      // volver a pinchar deselecciona
+  const sel=document.getElementById('opEstado'); if(sel) sel.value='__OT3M';
+  renderKpis({vinculado:true, saldo_estados: window.__SE||{}});
+  cargarOperaciones(1);
 }
 let OPS=[];
 async function cargarOperaciones(page){
@@ -650,7 +670,7 @@ async function cargarOperaciones(page){
   cont.innerHTML='<div class="empty">Cargando…</div>';
   const estado=document.getElementById('opEstado').value;
   try {
-    const r=await fetch('/api/portal-dealer/operaciones?page='+(page||1)+'&estado='+encodeURIComponent(estado),{ headers:{ Authorization:'Bearer '+dToken } });
+    const r=await fetch('/api/portal-dealer/operaciones?page='+(page||1)+'&estado='+encodeURIComponent(estado)+(SALDO_SEL?'&saldo='+SALDO_SEL:''),{ headers:{ Authorization:'Bearer '+dToken } });
     const j=await r.json();
     if(!j.success) throw 0;
     CAT=j.data.catalogos||CAT;
@@ -670,6 +690,18 @@ function saldoEstado(etapa){
   if(e==='SALDO PRECIO PAGADO') return {t:'Saldo precio pagado', c:'#15803d', b:'#dcfce7'};
   return {t:'Liberado a pago', c:'#6d28d9', b:'#ede9fe'};   // LIBERADO/FONDOS/ODP/ENVIADO A PAGO
 }
+/* Estado de la COMISIÓN de cara al dealer: las 9 etapas internas del track
+   COMISION agrupadas en los pasos que a él le hablan. */
+function comisionEstado(etapa){
+  const e=String(etapa||'').toUpperCase();
+  if(!e) return null;
+  if(e==='COMISION PENDIENTE'||e==='COMISION A PAGAR') return {t:'Comisión pendiente', c:'#b45309'};
+  if(e==='CARTOLA EMITIDA'||e==='CARTOLA APROBADA') return {t:'Cartola en preparación', c:'#0e7490'};
+  if(e==='CARTOLA ENVIADA') return {t:'Cartola enviada', c:'#1d4ed8'};
+  if(e==='FACTURA RECIBIDA') return {t:'Factura recibida', c:'#6d28d9'};
+  if(e==='COMISION PAGADA') return {t:'Comisión pagada', c:'#15803d'};
+  return {t:'En pago', c:'#6d28d9'};   // ORDEN DE PAGO EMITIDA / ENVIADO A PAGO
+}
 function renderOps(rows){
   const cont=document.getElementById('opsList');
   if(!rows.length){ cont.innerHTML='<div class="empty">No hay operaciones para mostrar.</div>'; return; }
@@ -678,17 +710,20 @@ function renderOps(rows){
     const cli=[o.cliente_nombre, o.cliente_rut].filter(Boolean).join(' · ');
     const cartera=o.estado_cartera?`<span class="pill" style="background:${colorCartera(o.estado_cartera)}">${esc(nombreCartera(o.estado_cartera))}</span>`:'';
     const sp=saldoEstado(o.etapa_saldo);
-    const spPill=sp?`<span class="pill" style="background:${sp.b};color:${sp.c};font-weight:700">${esc(sp.t)}</span>`:'';
+    const co=comisionEstado(o.etapa_comision);
     // El monto que le importa al dealer es SU saldo precio, no el monto del crédito
     const monto=o.saldo_precio!=null&&o.saldo_precio!==''?o.saldo_precio:o.monto_financiado;
     return `<div class="op-card clickable" onclick="verDetalle(${o.id})">
       <div class="op-top">
         <span class="op-num">Op #${esc(o.num_op||o.id)}</span>
-        <span class="op-tags">${cartera}${spPill}<span class="pill" style="background:${colorEtapa(o.estado)}">${esc(nombreEtapa(o.estado))}</span></span>
+        <span class="op-tags">${cartera}<span class="pill" style="background:${colorEtapa(o.estado)}">${esc(nombreEtapa(o.estado))}</span></span>
       </div>
       <div class="op-cli">${esc(cli||'—')}</div>
       <div class="op-veh">${esc(veh||'—')}${o.financiera?(' · '+esc(o.financiera)):''}</div>
-      <div class="op-foot"><span>Otorgado: ${fmtFecha(o.fecha_otorgado)}</span><span class="op-monto" title="Saldo precio">${fmtMonto(monto)}</span></div>
+      <div class="op-foot"><span>Otorgado: ${fmtFecha(o.fecha_otorgado)}</span>
+        <span class="op-monto">Saldo Precio: ${fmtMonto(monto)}${sp?` · <span style="color:${sp.c}">${esc(sp.t)}</span>`:''}</span></div>
+      ${(o.comision_dealer!=null&&Number(o.comision_dealer)>0)?`<div class="op-foot" style="padding-top:2px"><span></span>
+        <span style="font-size:.84rem;font-weight:600;color:#334155">Comisión: ${fmtMonto(o.comision_dealer)}${co?` · <span style="color:${co.c}">${esc(co.t)}</span>`:''}</span></div>`:''}
     </div>`;
   }).join('');
 }
