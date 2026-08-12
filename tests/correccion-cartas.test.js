@@ -90,6 +90,36 @@ test('corrección y redigitación conviven sin pisarse (-C y -R por separado)', 
   assert.equal(sufijo('265313613TA', usados, 'R'), '265313613TA-R2');
 });
 
+/* Buscador de la Corrección: se identifica una carta por cinco cosas distintas
+   (N° de carta, N° de operación, ID de la financiera, RUT y nombre del cliente) y
+   nadie escribe el RUT ni las tildes igual dos veces. */
+const texto = s => String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const clave = s => String(s == null ? '' : s).toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+test('el RUT calza escrito de cualquier forma', () => {
+  const guardado = clave('7031537-8');
+  for (const escrito of ['7.031.537-8', '7031537-8', '70315378', '7.031.537 - 8'])
+    assert.ok(guardado.includes(clave(escrito)), escrito);
+});
+
+test('el nombre calza sin tildes y sin importar mayúsculas', () => {
+  const c = texto('José Guillermo Gutiérrez Vera');
+  assert.ok(c.includes(texto('jose')));
+  assert.ok(c.includes(texto('GUTIÉRREZ')));
+  assert.ok(c.includes(texto('gutierrez')));
+});
+
+test('el N° de carta calza aunque tenga sufijo de corrección o redigitación', () => {
+  assert.ok(clave('266274695BB-C1').includes(clave('266274695BB')));
+  assert.ok(clave('266274695BB-R1').includes(clave('266274695bb')));
+});
+
+test('un RUT no se confunde con un número de carta', () => {
+  // "465475" es el ID de la financiera de una carta; no debe traer RUTs que lo contengan por casualidad
+  assert.ok(clave('26465475AS').includes(clave('465475')));
+  assert.ok(!clave('7031537-8').includes(clave('465475')));
+});
+
 /* El saldo manda: la carta no puede decir un precio y un pie que no lo den.
    Es la validación que evita emitir una carta que se contradice a sí misma. */
 test('precio menos pie tiene que seguir dando el saldo de la operación', () => {

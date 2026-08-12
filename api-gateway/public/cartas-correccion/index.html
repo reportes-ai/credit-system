@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
+<!-- v1.1 — buscador por N° carta, N° operacion, ID financiera, RUT y nombre; sin tildes ni puntos, con columnas para ver por que calzo · v1.0 — Corrección Cartas de Aprobación: emite una carta nueva (-C1, -C2…), deja la anterior REEMPLAZADA y su QR/FES no vigente -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -72,7 +72,7 @@
   <div class="card-af">
     <h3><i class="bi bi-search"></i> 1 · Busca la carta que quieres corregir</h3>
     <div class="buscador">
-      <input type="text" id="q" placeholder="N° de carta, ID Financiera, N° de operación, cliente o RUT…" onkeydown="if(event.key==='Enter')buscar()">
+      <input type="text" id="q" placeholder="N° de carta · N° de operación · ID de la financiera · RUT o nombre del cliente" onkeydown="if(event.key==='Enter')buscar()">
       <button class="btnx" onclick="buscar()"><i class="bi bi-search me-1"></i>Buscar</button>
     </div>
     <div id="resWrap" style="margin-top:12px"></div>
@@ -107,39 +107,54 @@ async function buscar(){
     const r = await fetch('/api/cartas', { headers: hdr() });
     const j = await r.json();
     if (!j.success) throw new Error(j.error||'No se pudo leer las cartas');
-    const norm = s => String(s==null?'':s).toLowerCase();
-    const soloNum = s => String(s==null?'':s).replace(/[^0-9kK]/g,'');
-    CARTAS = (j.data||[]).filter(c =>
-      norm(c.opCarta).includes(q) || norm(c.opOrigen).includes(q) ||
-      norm(c.numeroCreditoCreado).includes(q) || norm(c.numOp).includes(q) ||
-      norm(c.cliente).includes(q) ||
-      (soloNum(q).length>=5 && soloNum(c.rutCliente).includes(soloNum(q)))
-    ).slice(0, 60);
-    pintarResultados();
+    /* Se busca por los cinco campos con que la gente identifica una carta.
+       Sin tildes (en Chile nadie escribe "Nicolás" en un buscador) y sin puntos
+       ni guiones en RUT y números, para que dé lo mismo cómo se escriban. */
+    const texto = s => String(s==null?'':s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const clave = s => String(s==null?'':s).toUpperCase().replace(/[^0-9A-Z]/g,'');
+    const qT = texto(q), qC = clave(q), esNum = /^[0-9.\-\s]+$/.test(q.trim());
+    CARTAS = (j.data||[]).filter(c => {
+      if (clave(c.opCarta).includes(qC) && qC) return true;               // N° de carta (con o sin -C1/-R1)
+      if (qC && clave(c.opOrigen).includes(qC)) return true;              // ID de la financiera
+      if (qC && clave(c.numeroCreditoCreado).includes(qC)) return true;   // N° de operación
+      if (qC && clave(c.numOp).includes(qC)) return true;
+      if (qC && esNum && clave(c.rutCliente).includes(qC)) return true;   // RUT del cliente
+      return qT && texto(c.cliente).includes(qT);                         // nombre del cliente
+    }).slice(0, 60);
+    pintarResultados(q);
   } catch(e){ wrap.innerHTML = `<div class="aviso bad">${E(e.message)}</div>`; }
 }
 
 function corregible(c){ return (c.status==='APROBADA' || c.status==='OTORGADA'); }
 
-function pintarResultados(){
+function pintarResultados(q){
   const wrap = document.getElementById('resWrap');
-  if (!CARTAS.length) { wrap.innerHTML = '<div class="aviso info">Ninguna carta calza con esa búsqueda.</div>'; return; }
+  if (!CARTAS.length) {
+    wrap.innerHTML = `<div class="aviso info">
+      <b>Ninguna carta calza con «${E(q||'')}».</b> Se busca por N° de carta, N° de operación,
+      ID de la financiera, RUT y nombre del cliente — da lo mismo si escribes el RUT con puntos o sin ellos.
+      Si el número que tienes es de la financiera, prueba también con el N° de operación nuestro.</div>`;
+    return;
+  }
   wrap.innerHTML = `<table class="res"><thead><tr>
-      <th>N° Carta</th><th>Fecha</th><th>Cliente</th><th>Dealer</th><th>Financiera</th>
-      <th style="text-align:right">Saldo</th><th>Estado</th><th>N° Operación</th><th></th></tr></thead><tbody>` +
+      <th>N° Carta</th><th>Fecha</th><th>Cliente</th><th>RUT</th><th>ID Financiera</th><th>N° Operación</th>
+      <th>Dealer</th><th>Financiera</th><th style="text-align:right">Saldo</th><th>Estado</th><th></th></tr></thead><tbody>` +
     CARTAS.map((c,i)=>`<tr onclick="elegir(${i})">
       <td><b>${E(c.opCarta)}</b></td>
       <td>${fFec(c.fecha)}</td>
       <td>${E(c.cliente)}</td>
+      <td style="font-size:.74rem;white-space:nowrap">${E(c.rutCliente||'—')}</td>
+      <td style="font-size:.74rem">${E(c.opOrigen||'—')}</td>
+      <td style="font-size:.74rem">${E(c.numeroCreditoCreado||c.numOp||'—')}</td>
       <td style="font-size:.74rem">${E(c.concesionario)}</td>
       <td style="font-size:.74rem">${E(c.acreedor)}</td>
       <td style="text-align:right">${fCLP(c.saldo)}</td>
       <td><span class="st st-${E(c.status)}">${E(c.status)}</span></td>
-      <td>${E(c.numeroCreditoCreado||c.numOp||'—')}</td>
       <td>${corregible(c)
         ? '<button class="btnx" style="padding:5px 12px;font-size:.75rem">Corregir</button>'
         : '<span class="muted" style="font-size:.72rem">no corregible</span>'}</td>
-    </tr>`).join('') + '</tbody></table>';
+    </tr>`).join('') + '</tbody></table>' +
+    (CARTAS.length >= 60 ? '<div class="muted" style="font-size:.75rem;margin-top:7px">Se muestran las primeras 60 — afina la búsqueda si no ves la que buscas.</div>' : '');
 }
 
 /* ── Elegir carta y cargar su ficha completa ────────────────────────────── */
