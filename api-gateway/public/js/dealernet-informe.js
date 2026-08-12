@@ -7,7 +7,7 @@
 (function(){
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 /* ── Render de informe con el formato DealerNet ──────────────────────────── */
-const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET' };
+const FTE = { '16':'Digitación', '2101':'Registro Civil', '3425':'DealerNET', '3435':'DealerNET', '3901':'CCS WS' };
 const LOGO = (location && location.origin ? location.origin : '') + '/img/logo.png';
 const LOGO_DN = (location && location.origin ? location.origin : '') + '/img/logo-dealernet.png';
 const REPORT_CSS = `
@@ -183,6 +183,76 @@ function bodyBoletinSimple(prd){
   return '<div class="rep-tree">'+renderTree(body)+'</div>';
 }
 // Boletín Impagos Vigentes (3425): Resumen (tipo acreedor × año) + Detalle de causas.
+/* ── Boletín Impagos CCS (cód. 3901) ──────────────────────────────────────
+   Réplica del informe original: estado (Con/Sin Deuda) + Resumen por índice y
+   año + Detalle del Boletín de Informaciones Comerciales (bic) + Detalle de
+   Morosidad en línea (mol). Sin esto caía al árbol crudo del web service. */
+function bodyBoletinCcs(prd){
+  const P = gp(prd,'BOLETINCCSWS');
+  if(!P) return noinfo();
+  const res = gp(P,'res') || {};
+  const fdmy = s => { const x=String(s||''); return /^\d{4}-\d{2}-\d{2}$/.test(x) ? x.split('-').reverse().join('/') : (x||'--'); };
+  const plata = v => { const n=Number(v); return isNaN(n)?esc(String(v??'--')):'$'+n.toLocaleString('es-CL'); };
+  const conDeuda = !/sin/i.test(String(res['@_glsretorno']||''));
+
+  let h = `<div class="rep-kv"><span class="pill-${conDeuda?'bad':'ok'}">${esc((res['@_glsretorno']||'—').toUpperCase())}</span></div>
+    <div class="rep-kv"><b>Nombre:</b> ${esc(res['@_nombre']||'—')}</div>
+    <div class="rep-kv"><b>Rut:</b> ${esc(res['@_rut']||'—')}</div>`;
+
+  // ── Resumen: índice × año, con fila Total ──
+  const indice = arr(gp(P,'indice','d'));
+  const totalano = arr(gp(P,'totalano','d'));
+  let anos = totalano.map(x=>String(x['@_a'])).filter(Boolean);
+  if(!anos.length) anos = indice.flatMap(r=>arr(r.a).map(a=>String(a['@_n'])));
+  anos = [...new Set(anos)].sort((a,b)=>Number(a)-Number(b));
+  if(indice.length){
+    h += '<div class="rep-h">Resumen</div><table class="rep-tb"><thead>'+
+      '<tr><th rowspan="2">Índice</th><th colspan="'+(anos.length||1)+'" style="text-align:center">Cantidad</th></tr>'+
+      '<tr>'+(anos.length?anos:['']).map(a=>'<th style="text-align:right">'+esc(a)+'</th>').join('')+'</tr></thead><tbody>';
+    indice.forEach(r=>{
+      const byYear={}; arr(r.a).forEach(a=>byYear[String(a['@_n'])]=a['@_valor']);
+      h += '<tr><td>'+esc(r['@_nombre']||'')+'</td>'+anos.map(a=>'<td style="text-align:right">'+esc(String(byYear[a]??'--'))+'</td>').join('')+'</tr>';
+    });
+    const totByYear={}; totalano.forEach(t=>totByYear[String(t['@_a'])]=t['@_c']);
+    h += '<tr style="font-weight:700"><td>Total</td>'+anos.map(a=>'<td style="text-align:right">'+esc(String(totByYear[a]??'--'))+'</td>').join('')+'</tr>';
+    h += '</tbody></table>';
+  }
+
+  // ── Detalle Boletín de Informaciones Comerciales (bic), agrupado por tipo ──
+  const bic = arr(gp(P,'bic'));
+  if(bic.length){
+    h += '<div class="rep-h">Detalle Boletín de Informaciones Comerciales</div>';
+    const grupos = {};
+    bic.forEach(b=>{ const g=b['@_glosatipodocumento']||'Documento'; (grupos[g]=grupos[g]||[]).push(b); });
+    for(const [g,rows] of Object.entries(grupos)){
+      h += '<div class="rep-kv" style="margin-top:6px"><b>'+esc(g)+(g.endsWith('a')?'s':'')+'</b></div>'+
+        '<table class="rep-tb"><thead><tr><th>Fecha publicación</th><th>Fecha vencimiento</th><th>Tipo crédito</th>'+
+        '<th>N° documento</th><th style="text-align:right">Monto</th><th>Tipo de emisor</th><th>Emisor</th><th>Ciudad</th><th>Boletín</th></tr></thead><tbody>'+
+        rows.map(b=>'<tr><td>'+fdmy(b['@_fechapublicacion'])+'</td><td>'+fdmy(b['@_fechavencimiento'])+'</td>'+
+          '<td>'+esc(b['@_glosatipodocumentoimpago']||'--')+(b['@_tipodocumentoimpago']?' ('+esc(b['@_tipodocumentoimpago'])+')':'')+'</td>'+
+          '<td>'+esc(b['@_nrooperacion']||'--')+'</td><td style="text-align:right">'+plata(b['@_montodeuda'])+'</td>'+
+          '<td>'+esc(b['@_glosatipoemisor']||'--')+(b['@_tipoemisor']?' ('+esc(b['@_tipoemisor'])+')':'')+'</td>'+
+          '<td>'+esc(b['@_glosaemisor']||'--')+'</td><td>'+esc(b['@_localidadpublicacion']||'--')+'</td>'+
+          '<td>'+esc(b['@_nroboletin']||'--')+'</td></tr>').join('')+'</tbody></table>';
+    }
+  }
+
+  // ── Detalle Morosidad en Sistemas Financiero/Comercial — morosidad en línea (mol) ──
+  const mol = arr(gp(P,'mol'));
+  if(mol.length){
+    h += '<div class="rep-h">Detalle Morosidad en Sistemas Financiero/Comercial — Morosidad en línea</div>'+
+      '<table class="rep-tb"><thead><tr><th>Fecha vencimiento</th><th>Tipo documento</th><th>N° operación</th>'+
+      '<th style="text-align:right">Monto</th><th>Emisor</th></tr></thead><tbody>'+
+      mol.map(m=>'<tr><td>'+fdmy(m['@_fechaVencimiento'])+'</td>'+
+        '<td>'+esc(m['@_glosaTipoDocumento']||'--')+(m['@_tipoDocumento']?' ('+esc(m['@_tipoDocumento'])+')':'')+'</td>'+
+        '<td>'+esc(m['@_nroOperacion']||'--')+'</td><td style="text-align:right">'+plata(m['@_montoDeuda'])+'</td>'+
+        '<td>'+esc(m['@_glosaEmisor']||'--')+'</td></tr>').join('')+'</tbody></table>';
+  }
+
+  if(!bic.length && !mol.length && !indice.length) h += noinfo();
+  return h;
+}
+
 function bodyBoletinImpagos(prd){
   const wsTag = Object.keys(prd).filter(k=>!k.startsWith('@_'))[0];
   const P = gp(prd, wsTag, 'ROOT','D','result','PRODUCTO');
@@ -242,6 +312,7 @@ function renderInforme(d){
   else if(cod==='16') body = bodyComportamiento(prd);
   else if(cod==='3435') body = bodyPerfilComercial(prd);
   else if(cod==='3425') body = bodyBoletinImpagos(prd);
+  else if(cod==='3901') body = bodyBoletinCcs(prd);
   else body = '<div class="rep-note">Datos recibidos del Web Service:</div><div class="rep-tree">'+renderTree(prd)+'</div>';
   const f = new Date(d.created_at);
   const meta = `<div class="rep-meta">
