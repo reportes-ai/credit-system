@@ -2207,6 +2207,107 @@ function buildV5() {
   document.getElementById('tbody-ej-perf').innerHTML = rows;
 }
 
+/* Captura del desglose diario lista para pegar en WhatsApp. Dibuja el canvas
+   desde window._DESG (lo que se acaba de pintar), no desde el DOM: así la
+   imagen y la pantalla no pueden decir cosas distintas. */
+async function capturaDesgloseWSP() {
+  const D = window._DESG;
+  if (!D || !D.filas.length) { alert('No hay datos para capturar.'); return; }
+  try {
+    const TIT = { ing:'INGRESADOS', apro:'APROBADOS', ot:'OTORGADOS' };
+    const sf = D.totSinFecha > 0;                       // columna s/f solo si existe el caso
+    const S = 2, WN = 190, WA = 62, WD = 40;            // nombre, acumulado, día
+    const nCols = D.dias.length + (sf ? 1 : 0);
+    const W = WN + WA + WD * nCols;
+    const HH = 50, RH = 26, HD = 24;
+    const H = HH + HD + RH * (D.filas.length + 1) + 26;
+
+    const cv = document.createElement('canvas'); cv.width = W * S; cv.height = H * S;
+    const g = cv.getContext('2d'); g.scale(S, S);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    g.textBaseline = 'middle';
+
+    // Cabecera
+    g.fillStyle = '#012d70'; g.fillRect(0, 0, W, HH);
+    g.fillStyle = '#fff'; g.font = '700 16px Segoe UI, sans-serif';
+    g.fillText(`${TIT[D.metrica]} DÍA A DÍA — ${(EJ_PERF.meses_labels[D.mes] || D.mes).toUpperCase()}`, 12, 20);
+    g.font = '600 11px Segoe UI, sans-serif'; g.fillStyle = '#bcd3f5';
+    const ahora = new Date();
+    g.fillText(`${D.filas.length} ejecutivos · ${D.totalMes} operaciones · ` +
+      ahora.toLocaleDateString('es-CL', { day:'2-digit', month:'short', year:'numeric' }) + ' ' +
+      ahora.toLocaleTimeString('es-CL', { hour:'2-digit', minute:'2-digit', hour12:false }) + ' hrs', 12, 38);
+
+    // Fila de días (domingo rojo, sábado gris — igual que en pantalla)
+    const MES3 = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][D.mm-1];
+    const tipo = d => { const w = new Date(D.aa, D.mm-1, d).getDay(); return w===0?'dom':w===6?'sab':'hab'; };
+    const bgD = { dom:'#e53935', sab:'#9e9e9e', hab:'#1a3a6a' };
+    g.fillStyle = '#1a3a6a'; g.fillRect(0, HH, WN + WA, HD);
+    g.fillStyle = '#00838f'; g.fillRect(WN, HH, WA, HD);
+    g.fillStyle = '#fff'; g.font = '700 10px Segoe UI, sans-serif';
+    g.fillText('EJECUTIVO', 10, HH + HD/2);
+    g.textAlign = 'center'; g.fillText('ACUM.', WN + WA/2, HH + HD/2);
+    let x = WN + WA;
+    if (sf) { g.fillStyle = '#b45309'; g.fillRect(x, HH, WD, HD); g.fillStyle = '#fff'; g.fillText('s/f', x + WD/2, HH + HD/2); x += WD; }
+    D.dias.forEach(d => {
+      g.fillStyle = bgD[tipo(d)]; g.fillRect(x, HH, WD, HD);
+      g.fillStyle = '#fff'; g.font = '700 9px Segoe UI, sans-serif';
+      g.fillText(`${String(d).padStart(2,'0')}-${MES3}`, x + WD/2, HH + HD/2);
+      x += WD;
+    });
+
+    // Filas
+    D.filas.forEach((f, i) => {
+      const y = HH + HD + RH * i;
+      g.fillStyle = i % 2 ? '#f4f7fb' : '#fff'; g.fillRect(0, y, W, RH);
+      g.textAlign = 'left'; g.fillStyle = '#1e293b'; g.font = '600 12px Segoe UI, sans-serif';
+      const nom = fmtNombreCompleto(f.ej);
+      g.fillText(`${i+1}. ${nom.length > 26 ? nom.slice(0,26)+'…' : nom}`, 10, y + RH/2);
+      g.textAlign = 'center';
+      g.fillStyle = '#eef3fb'; g.fillRect(WN, y, WA, RH);
+      g.fillStyle = '#1a3a6a'; g.font = '800 12px Segoe UI, sans-serif';
+      g.fillText(String(f.tot), WN + WA/2, y + RH/2);
+      let cx = WN + WA;
+      const pinta = (v, naranjo) => {
+        if (v) {
+          const int = Math.min(v / D.maxCel, 1);
+          g.fillStyle = naranjo ? '#fff7ed' : `rgba(26,58,106,${(0.10+int*0.75).toFixed(2)})`;
+          g.fillRect(cx, y, WD, RH);
+          g.fillStyle = naranjo ? '#b45309' : (int > 0.6 ? '#fff' : '#1a3a6a');
+          g.font = '700 11px Segoe UI, sans-serif';
+        } else { g.fillStyle = '#e53935'; g.font = '700 11px Segoe UI, sans-serif'; }
+        g.fillText(String(v), cx + WD/2, y + RH/2);
+        cx += WD;
+      };
+      if (sf) pinta(f.sf || 0, true);
+      D.dias.forEach(d => pinta(f.dd[d] || 0, false));
+    });
+
+    // Total
+    const yT = HH + HD + RH * D.filas.length;
+    g.fillStyle = '#1a3a6a'; g.fillRect(0, yT, W, RH);
+    g.fillStyle = '#fff'; g.font = '800 12px Segoe UI, sans-serif';
+    g.textAlign = 'left'; g.fillText('TOTAL', 10, yT + RH/2);
+    g.textAlign = 'center'; g.fillText(String(D.totalMes), WN + WA/2, yT + RH/2);
+    let tx = WN + WA;
+    if (sf) { g.fillText(String(D.totSinFecha), tx + WD/2, yT + RH/2); tx += WD; }
+    D.dias.forEach(d => {
+      g.fillText(String(D.filas.reduce((s, f) => s + (f.dd[d] || 0), 0)), tx + WD/2, yT + RH/2);
+      tx += WD;
+    });
+
+    // Pie
+    g.textAlign = 'left'; g.fillStyle = '#8a93a0'; g.font = '400 10px Segoe UI, sans-serif';
+    g.fillText('Solo cantidad de operaciones · domingo en rojo, sábado en gris' + (sf ? ' · s/f = sin fecha de operación' : ''), 10, yT + RH + 13);
+
+    const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    alert('📸 Captura copiada — pégala en WhatsApp con Ctrl+V');
+  } catch (e) {
+    console.error('[captura desglose]', e);
+    alert('No se pudo copiar la captura: ' + e.message);
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    DESGLOSE DIARIO — al pinchar Ing / Apro / Ot de un mes se abre la matriz
    ejecutivo × día, del día más reciente al más antiguo.
@@ -2259,6 +2360,8 @@ function desgloseDiario(mes, metrica) {
   const totalMes = filas.reduce((s, f) => s + f.tot, 0);
   const totDia = d => filas.reduce((s, f) => s + (f.dd[d] || 0), 0);
   const maxCel = Math.max(1, ...filas.flatMap(f => dias.map(d => f.dd[d] || 0)));
+  // Se guarda lo pintado para que la captura dibuje exactamente esto, sin releer el DOM
+  window._DESG = { mes, metrica, filas, dias, totalMes, totSinFecha, maxCel, aa, mm };
 
   // Domingo en rojo y sábado en gris, como en la planilla del equipo
   const tipoDia = d => { const g = new Date(aa, mm - 1, d).getDay(); return g === 0 ? 'dom' : g === 6 ? 'sab' : 'hab'; };
@@ -2306,6 +2409,8 @@ function desgloseDiario(mes, metrica) {
           <div style="font-weight:800;font-size:1rem">${TIT[metrica]} día a día — ${EJ_PERF.meses_labels[mes] || mes}</div>
           <div style="font-size:.76rem;opacity:.85">${filas.length} ejecutivos · ${totalMes} operaciones · el día es la fecha de la operación</div>
         </div>
+        <i class="bi bi-camera" onclick="capturaDesgloseWSP()" title="Copiar captura para WhatsApp"
+          style="cursor:pointer;font-size:1.15rem;padding:5px 9px;border-radius:8px;background:rgba(255,255,255,.18)"></i>
         <button onclick="document.getElementById('ovDesglose').style.display='none'"
           style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:1rem">✕</button>
       </div>
