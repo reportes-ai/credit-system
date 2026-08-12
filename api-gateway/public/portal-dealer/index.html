@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -659,6 +659,17 @@ async function cargarOperaciones(page){
     renderPager(j.data.page, j.data.pages);
   } catch(_){ cont.innerHTML='<div class="empty">No se pudieron cargar tus operaciones.</div>'; }
 }
+/* Estado del SALDO PRECIO para el dealer: las 8 etapas internas de Post Venta se
+   agrupan en los 4 pasos que a él le importan — la mecánica de tesorería (ODP,
+   fondos, envío a pago) es "liberado a pago" desde su punto de vista. */
+function saldoEstado(etapa){
+  const e=String(etapa||'').toUpperCase();
+  if(!e) return null;
+  if(e==='FUNDANTES PENDIENTES') return {t:'Fundantes pendientes', c:'#b45309', b:'#fef3c7'};
+  if(e==='FUNDANTES RECIBIDOS'||e==='FUNDANTES ENVIADOS') return {t:'Fundantes recibidos', c:'#1d4ed8', b:'#dbeafe'};
+  if(e==='SALDO PRECIO PAGADO') return {t:'Saldo precio pagado', c:'#15803d', b:'#dcfce7'};
+  return {t:'Liberado a pago', c:'#6d28d9', b:'#ede9fe'};   // LIBERADO/FONDOS/ODP/ENVIADO A PAGO
+}
 function renderOps(rows){
   const cont=document.getElementById('opsList');
   if(!rows.length){ cont.innerHTML='<div class="empty">No hay operaciones para mostrar.</div>'; return; }
@@ -666,14 +677,18 @@ function renderOps(rows){
     const veh=[o.marca,o.modelo,o.anio].filter(Boolean).join(' ')+(o.patente?(' · '+o.patente):'');
     const cli=[o.cliente_nombre, o.cliente_rut].filter(Boolean).join(' · ');
     const cartera=o.estado_cartera?`<span class="pill" style="background:${colorCartera(o.estado_cartera)}">${esc(nombreCartera(o.estado_cartera))}</span>`:'';
+    const sp=saldoEstado(o.etapa_saldo);
+    const spPill=sp?`<span class="pill" style="background:${sp.b};color:${sp.c};font-weight:700">${esc(sp.t)}</span>`:'';
+    // El monto que le importa al dealer es SU saldo precio, no el monto del crédito
+    const monto=o.saldo_precio!=null&&o.saldo_precio!==''?o.saldo_precio:o.monto_financiado;
     return `<div class="op-card clickable" onclick="verDetalle(${o.id})">
       <div class="op-top">
         <span class="op-num">Op #${esc(o.num_op||o.id)}</span>
-        <span class="op-tags">${cartera}<span class="pill" style="background:${colorEtapa(o.estado)}">${esc(nombreEtapa(o.estado))}</span></span>
+        <span class="op-tags">${cartera}${spPill}<span class="pill" style="background:${colorEtapa(o.estado)}">${esc(nombreEtapa(o.estado))}</span></span>
       </div>
       <div class="op-cli">${esc(cli||'—')}</div>
       <div class="op-veh">${esc(veh||'—')}${o.financiera?(' · '+esc(o.financiera)):''}</div>
-      <div class="op-foot"><span>Otorgado: ${fmtFecha(o.fecha_otorgado)}</span><span class="op-monto">${fmtMonto(o.monto_financiado)}</span></div>
+      <div class="op-foot"><span>Otorgado: ${fmtFecha(o.fecha_otorgado)}</span><span class="op-monto" title="Saldo precio">${fmtMonto(monto)}</span></div>
     </div>`;
   }).join('');
 }

@@ -251,8 +251,14 @@ exports.operaciones = async (req, res) => {
           COALESCE(cl.rut, '')                                 AS cliente_rut,
           COALESCE(ob.financiera, 'AUTOFACIL')                 AS financiera,
           ob.tipo_vehiculo, ob.marca, ob.modelo, ob.anio, ob.patente,
-          ob.fecha_otorgado, ob.monto_financiado, ob.plazo, ob.cuota,
+          ob.fecha_otorgado, ob.monto_financiado, ob.saldo_precio, ob.plazo, ob.cuota,
           ob.comdea_real                                       AS comision_dealer,
+          /* Estado del SALDO PRECIO: última etapa del track SALDO en Post Venta.
+             Al dealer se le muestran 4 pasos (pendientes/recibidos/liberado/pagado);
+             la mecánica interna de tesorería (ODP, fondos, envío) no le aporta. */
+          (SELECT e.etapa FROM postventa_seguimiento s
+             JOIN postventa_etapas e ON e.id_seguimiento = s.id AND e.track = 'SALDO'
+            WHERE s.id_credito = ob.id ORDER BY e.fecha DESC, e.id DESC LIMIT 1) AS etapa_saldo,
           ${ESTADO_SQL}                                        AS estado,
           ${ESTADO_CARTERA_SQL}                                AS estado_cartera,
           COALESCE(ob.fecha_otorgado, ob.created_at)           AS fecha_orden
