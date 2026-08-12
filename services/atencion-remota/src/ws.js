@@ -44,6 +44,9 @@ function initAtencionWS(server) {
     try {
       const { token } = url.parse(req.url, true).query;
       const d = jwt.verify(token, JWT_SECRET);
+      // "Ver como dealer" es solo lectura: dejarlo chatear sería escribir A NOMBRE
+      // del dealer. El portal esconde el chat en ese modo; esto es el cinturón.
+      if (d.tipo === 'dealer' && d.ver_como) return ws.close(4003, 'ver-como: solo lectura');
       ident = d.tipo === 'dealer'
         ? { tipo: 'dealer', id: d.id_cuenta, id_cuenta: d.id_cuenta, id_dealer: d.id_dealer, rut: d.rut, nombre: d.nombre || 'Dealer', email: d.email }
         : { tipo: 'user', id: d.id_usuario, nombre: [d.nombre, d.apellido].filter(Boolean).join(' ') || 'Ejecutivo' };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Atención Remota — AutoFácil</title>
-  <!-- v2.3 — pop-up grande con sonido al llegar un dealer en espera: Atender / Estoy ocupado (avisa al dealer sin tomar) / Saltar (si hay otro ejecutivo); re-avisa cada 2 min -->
+  <!-- v2.4 — boton Ver el portal como este dealer (solo lectura, 30 min, auditado) · v2.3 — pop-up grande con sonido al llegar un dealer en espera: Atender / Estoy ocupado (avisa al dealer sin tomar) / Saltar (si hay otro ejecutivo); re-avisa cada 2 min -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -236,6 +236,10 @@
         <div class="fld"><label>Email de acceso</label><input type="email" id="cuEmail" placeholder="dealer@correo.cl"></div>
         <div class="fld"><label>Contraseña inicial</label><input type="text" id="cuPass" placeholder="Mínimo 6 caracteres"></div>
         <button class="btn-primary2" onclick="crearCuenta()"><i class="bi bi-check-lg me-1"></i>Crear cuenta</button>
+        <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #e2e8f0">
+          <button class="btn-primary2" style="background:#6d28d9" onclick="verPortalComo()"><i class="bi bi-eye me-1"></i>Ver el portal como este dealer</button>
+          <p style="font-size:.74rem;color:#94a3b8;margin:7px 0 0">Abre el portal tal como lo ve el dealer seleccionado, en solo lectura y sin crear cuenta. Dura 30 minutos y queda auditado.</p>
+        </div>
       </div>
       <div class="card">
         <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-people me-1"></i>Cuentas existentes</h3>
@@ -661,6 +665,19 @@ document.getElementById('cuDealer').addEventListener('change', function(){
   document.getElementById('cuNombre').value = d.nombre_razon || d.nombre_indexa || '';
   if(d.correo) document.getElementById('cuEmail').value=d.correo;
 });
+/* "Ver como dealer": pide el token de mirada y abre el portal en otra pestaña.
+   El token viaja en el HASH de la URL para que no quede en logs del servidor. */
+async function verPortalComo(){
+  const id_dealer = document.getElementById('cuDealer').value;
+  if (!id_dealer) { alert('Primero busca y selecciona el dealer en la lista de arriba.'); return; }
+  try {
+    const r = await fetch('/api/atencion-remota/dealer/ver-como', { method:'POST', headers:H, body: JSON.stringify({ id_dealer }) });
+    const j = await r.json();
+    if (!j.success) { alert(j.error || 'No se pudo abrir el portal'); return; }
+    window.open('/portal-dealer/#vc=' + j.data.token, '_blank');
+  } catch(e){ alert('Error de conexión: ' + e.message); }
+}
+
 async function crearCuenta(){
   const id_dealer=document.getElementById('cuDealer').value||null;
   const nombre=document.getElementById('cuNombre').value.trim();

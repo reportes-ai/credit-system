@@ -35,6 +35,8 @@ router.get('/cuentas',     verifyToken, requireFunc('atencion_remota'), C.listar
 router.post('/cuentas',    verifyToken, requireFunc('atencion_remota'), C.crearCuenta);
 router.put('/cuentas/:id', verifyToken, requireFunc('atencion_remota'), C.actualizarCuenta);
 router.post('/cuentas/:id/regenerar-link', verifyToken, requireFunc('atencion_remota'), C.regenerarLink);
+// "Ver como dealer": token de mirada de solo lectura sobre el portal (auditado, 30 min)
+router.post('/dealer/ver-como', verifyToken, requireFunc('atencion_remota'), C.verComoDealer);
 
 router.get('/solicitudes',              verifyToken, requireFunc('atencion_remota'), C.listarSolicitudes);
 router.post('/solicitudes/:id/aprobar', verifyToken, requireFunc('atencion_remota'), C.aprobarSolicitud);

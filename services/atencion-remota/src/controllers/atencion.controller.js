@@ -392,6 +392,14 @@ const verifyDealer = async (req, res, next) => {
   try {
     const d = jwt.verify(rawToken(req), JWT_SECRET);
     if (d.tipo !== 'dealer') throw new Error('no-dealer');
+    /* "Ver como dealer": token emitido a un usuario INTERNO para mirar el portal
+       tal como lo ve un dealer. No tiene cuenta (id_cuenta) y es SOLO LECTURA:
+       cualquier escritura se corta acá, no en cada handler. */
+    if (d.ver_como) {
+      if (req.method !== 'GET')
+        return res.status(403).json({ success: false, data: null, error: 'Estás en modo "Ver como dealer": puedes mirar, no operar.' });
+      req.dealer = d; return next();
+    }
     const v = await cuentaVigente(d.id_cuenta);
     if (v.ok && v.row && v.row.revocada)
       return res.status(401).json({ success: false, data: null, error: 'Tu cuenta fue desactivada. Contacta a AutoFácil.' });
@@ -403,6 +411,12 @@ const verifyAny = async (req, res, next) => {
   try {
     const d = jwt.verify(rawToken(req), JWT_SECRET);
     req.auth = d; req.esDealer = d.tipo === 'dealer';
+    if (req.esDealer && d.ver_como) {
+      // Mirada interna: mismas reglas que en verifyDealer — solo lectura, sin cuenta.
+      if (req.method !== 'GET')
+        return res.status(403).json({ success: false, data: null, error: 'Estás en modo "Ver como dealer": puedes mirar, no operar.' });
+      return next();
+    }
     if (req.esDealer) {
       // Dealer: su acceso se acota por pertenencia en cada handler, pero validamos
       // que la cuenta siga activa (corte inmediato al desactivar).
@@ -612,6 +626,28 @@ const crearCuenta = async (req, res) => {
     auditar({ req, accion: 'CREAR', modulo: 'atencion-remota', entidad: 'dealer_cuenta', entidad_id: r.insertId, detalle: `Creó cuenta de portal para dealer ${nombre || email}`, rut });
     res.status(201).json({ success: true, data: { id: r.insertId, acceso_token: acceso }, error: null });
   } catch (e) { errSrv(res, e, 'crearCuenta'); }
+};
+
+/* POST /dealer/ver-como {id_dealer} — SOLO USO INTERNO (verifyToken + permiso).
+   Emite un token de dealer marcado ver_como para mirar el portal EXACTAMENTE como
+   lo ve ese dealer, sin crear cuenta ni compartir claves. Solo lectura (el candado
+   está en verifyDealer/verifyAny) y expira a los 30 minutos. Auditado: mirar los
+   datos de un dealer con nombre y apellido de quien miró. */
+const verComoDealer = async (req, res) => {
+  try {
+    const idDealer = parseInt(req.body && req.body.id_dealer, 10);
+    if (!idDealer) return res.status(400).json({ success: false, data: null, error: 'id_dealer requerido' });
+    const [[d]] = await pool.query('SELECT id_dealer, rut, nombre_razon, nombre_indexa FROM dealers WHERE id_dealer=?', [idDealer]);
+    if (!d) return res.status(404).json({ success: false, data: null, error: 'El dealer no existe' });
+    const nombre = d.nombre_razon || d.nombre_indexa || `Dealer ${d.id_dealer}`;
+    const quien = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
+    const token = jwt.sign(
+      { tipo: 'dealer', ver_como: true, id_dealer: d.id_dealer, rut: d.rut, nombre, por: quien },
+      JWT_SECRET, { expiresIn: '30m' });
+    auditar({ req, accion: 'VER_COMO', modulo: 'atencion-remota', entidad: 'portal_dealer', entidad_id: d.id_dealer,
+      detalle: `Abrió el portal del dealer como ${nombre} (solo lectura, 30 min)`, rut: d.rut });
+    res.json({ success: true, data: { token, dealer: { id_dealer: d.id_dealer, rut: d.rut, nombre } }, error: null });
+  } catch (e) { errSrv(res, e, 'verComoDealer'); }
 };
 
 const actualizarCuenta = async (req, res) => {
@@ -881,7 +917,7 @@ module.exports = {
   // middlewares
   verifyDealer, verifyAny, cuentaVigente,
   // dealer
-  dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink,
+  dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink, verComoDealer,
   // ejecutivo
   getCola, getMensajes,
   // comunes

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -580,6 +580,23 @@ function entrarApp(){
   document.getElementById('hdNombre').textContent = dInfo?.nombre || 'Atención AutoFácil';
   document.getElementById('dealerNombre').textContent = dInfo?.nombre || 'Dealer';
   if (dInfo?.bienvenida) document.getElementById('preMsg').textContent = dInfo.bienvenida;
+  /* Modo "Ver como dealer" (uso interno): cinta morada siempre visible + sin chat
+     (el servidor lo rechaza igual: escribir ahí sería hablar A NOMBRE del dealer). */
+  if (dInfo?.ver_como) {
+    const chatBtn = document.querySelector('.pn-btn[data-tab="chat"]'); if (chatBtn) chatBtn.style.display = 'none';
+    if (!document.getElementById('vcBanner')) {
+      const b = document.createElement('div');
+      b.id = 'vcBanner';
+      b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(90deg,#6d28d9,#8b5cf6);color:#fff;padding:9px 18px;display:flex;align-items:center;gap:12px;font-size:.86rem;box-shadow:0 -3px 14px rgba(0,0,0,.3)';
+      b.innerHTML = '<span style="font-size:1.05rem">👁</span>' +
+        '<span><b>Viendo el portal como ' + (dInfo.nombre || 'dealer') + '</b> — modo de solo lectura: puedes navegar, no operar. El dealer no ve esta cinta.</span>' +
+        '<button onclick="limpiarSesion();window.close();setTimeout(()=>location.href=\'/\',200)" style="margin-left:auto;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:8px;padding:5px 14px;font-weight:700;cursor:pointer">Salir del modo</button>';
+      document.body.appendChild(b);
+      document.body.style.paddingBottom = '46px';
+    }
+    cargarDashboard();
+    return;               // sin websocket, sin videollamada, sin tour
+  }
   ARTC.init({ role:'dealer', selfName: dInfo?.nombre||'Dealer', iceUrl:'/api/atencion-remota/ice', token:dToken, signal:(convId,kind,payload)=>wsSend({t:'rtc',id:convId,kind,payload}) });
   cargarDashboard();
   connect();
@@ -958,6 +975,20 @@ function entrarDemo(){
 
 /* ── Arranque ── */
 (function(){
+  /* "Ver como dealer" (interno): el token viene en el HASH — nunca llega al
+     servidor ni a sus logs. Se guarda en sesión y se limpia la URL al tiro. */
+  if (location.hash.startsWith('#vc=')) {
+    const t = location.hash.slice(4);
+    try {
+      const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+      if (p.tipo === 'dealer' && p.ver_como) {
+        guardarSesion(t, { id_dealer: p.id_dealer, rut: p.rut, nombre: p.nombre, ver_como: true });
+        history.replaceState(null, '', location.pathname);
+        entrarApp(); return;
+      }
+    } catch(_){}
+    history.replaceState(null, '', location.pathname);
+  }
   const qs=new URLSearchParams(location.search);
   if(qs.get('demo')){ entrarDemo(); return; }            // previsualización del tour sin login
   const rs=qs.get('reset');
