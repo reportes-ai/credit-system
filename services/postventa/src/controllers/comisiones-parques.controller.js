@@ -84,6 +84,27 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
       created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uq_parque_mes_fac (parque, mes)
     )`);
+    /* FOTO de las operaciones de cada cartola de parque (regla 2026-08-13).
+       La cartola dejó de ser "las otorgadas del mes": ahora junta arrastre de
+       meses anteriores, así que sin una foto por operación no hay cómo saber
+       qué cartola cobró qué op (y una op de junio cobrada en julio se volvería
+       a cobrar en agosto). Mismo patrón mov_ids de la cartola dealer. */
+    await pool.query(`CREATE TABLE IF NOT EXISTS parques_pagos_ops (
+      id           INT AUTO_INCREMENT PRIMARY KEY,
+      parque       VARCHAR(120) NOT NULL,
+      mes          DATE NOT NULL,
+      num_op       VARCHAR(30) NOT NULL,
+      dealer       VARCHAR(200) NULL,
+      ejecutivo    VARCHAR(150) NULL,
+      saldo_precio DECIMAL(14,0) NOT NULL DEFAULT 0,
+      com_parque   DECIMAL(14,0) NOT NULL DEFAULT 0,
+      created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_parque_mes_op (parque, mes, num_op),
+      INDEX idx_num_op (num_op)
+    )`);
+    // Corte del universo (ver universoDesde): editable en postventa_config.
+    await pool.query(
+      "INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('parques_universo_desde','2026-07')");
     // Registro de cartolas de parque enviadas (reverso preciso por envío).
     await pool.query(`CREATE TABLE IF NOT EXISTS parques_cartolas_enviadas (
       id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -104,16 +125,66 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
 /* ── Cálculo del mes: agrega lo ya persistido por operación ──────────────────
    Atribución: 1) creditos.parque (el de la CARTA: dónde cursó ESA operación);
    2) fallback dealers.ccs_parque (ficha = parque de HOY, puede haber cambiado).
-   Solo créditos OTORGADOS del mes cierre. */
+
+   REGLA DEL UNIVERSO (Pato, 2026-08-13): entran a la cartola del mes T las
+   operaciones OTORGADAS en T **o antes** (arrastre) cuya comisión de parque
+   aún no se cobró, y cuyo saldo precio quedó AL MENOS "LIBERADO A PAGO" al
+   cierre de T. Antes era "todas las otorgadas del mes" a secas: cobraba ops
+   cuyos fundantes seguían pendientes, y las que se liberaban tarde no las
+   cobraba nunca nadie.
+   - "Al menos liberado": cualquier etapa del track SALDO desde LIBERADO A PAGO
+     en adelante, con fecha dentro de T (una op puede saltar etapas el mismo día).
+   - "No cobrada": no está en la FOTO (parques_pagos_ops) de otra cartola, ni
+     arrastra CARTOLA ENVIADA / COMISION PAGADA de un flujo antiguo sin foto.
+     OJO: COMISION A PAGAR NO excluye — es la etapa INICIAL del track (significa
+     "pendiente de pago", la tienen todas las ops vivas).
+   Con la cartola del mes CONGELADA (aprobada o posterior) manda su FOTO. */
+const ETAPAS_LIBERADO = "('LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO')";
+
+/* Desde qué mes de otorgamiento rige este circuito (paramétrico en
+   postventa_config, clave parques_universo_desde). Todo lo anterior al corte se
+   pagó por FUERA del sistema (planilla, era pre-módulo): sin este piso, el
+   arrastre metería a la primera cartola ~1.000 operaciones 2025 ya pagadas. */
+async function universoDesde() {
+  try {
+    const [[r]] = await pool.query(
+      "SELECT valor FROM postventa_config WHERE clave='parques_universo_desde' LIMIT 1");
+    if (r && /^\d{4}-\d{2}$/.test(String(r.valor).trim())) return String(r.valor).trim();
+  } catch (_) {}
+  return '2026-07';
+}
+
+async function opsElegibles(mes /* 'YYYY-MM' */) {
+  const finMes = mes + '-01';
+  const desde = await universoDesde();
+  const [creds] = await pool.query(`
+    SELECT DISTINCT c.num_op, c.rut_dealer, c.parque, c.com_parque, c.saldo_precio, c.ejecutivo, c.automotora
+    FROM creditos c
+    JOIN postventa_seguimiento s ON s.id_credito = c.id
+    WHERE c.estado='OTORGADO'
+      AND c.mes >= ?
+      AND c.mes <= LAST_DAY(?)
+      AND EXISTS (SELECT 1 FROM postventa_etapas le
+                   WHERE le.id_seguimiento = s.id AND le.track='SALDO'
+                     AND le.etapa IN ${ETAPAS_LIBERADO}
+                     AND le.fecha < DATE_ADD(?, INTERVAL 1 MONTH))
+      AND NOT EXISTS (SELECT 1 FROM parques_pagos_ops po
+                       WHERE po.num_op = c.num_op AND DATE_FORMAT(po.mes,'%Y-%m') <> ?)
+      AND NOT EXISTS (SELECT 1 FROM postventa_etapas px
+                       WHERE px.id_seguimiento = s.id AND px.track='PARQUE'
+                         AND px.etapa IN ('COMISION PAGADA','CARTOLA ENVIADA')
+                         AND NOT EXISTS (SELECT 1 FROM parques_pagos_ops po2
+                                          WHERE po2.num_op = c.num_op AND DATE_FORMAT(po2.mes,'%Y-%m') = ?))`,
+    [desde + '-01', finMes, finMes, mes, mes]);
+  return creds;
+}
+
 async function calcularMes(mes /* 'YYYY-MM' */) {
   const [parques] = await pool.query(
     'SELECT nombre, arriendo, comision_pct FROM parques_comisiones WHERE activo=1 ORDER BY orden, nombre');
   const canon = new Map(parques.map(p => [norm(p.nombre), p.nombre]));
 
-  const [creds] = await pool.query(`
-    SELECT c.num_op, c.rut_dealer, c.parque, c.com_parque, c.saldo_precio, c.ejecutivo, c.automotora
-    FROM creditos c
-    WHERE c.estado='OTORGADO' AND DATE_FORMAT(c.mes,'%Y-%m') = ?`, [mes]);
+  const creds = await opsElegibles(mes);
 
   const [dealers] = await pool.query('SELECT rut, ccs_parque, nombre_razon FROM dealers');
   const rutNorm = r => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
@@ -139,8 +210,28 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
     });
   }
 
+  /* Cartola congelada → manda su FOTO, no el cálculo vivo (una op que avanzó de
+     etapa después de aprobar no puede desaparecer del documento aprobado). */
+  const [ests] = await pool.query(
+    "SELECT parque, etapa FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
+  const congelados = new Set(ests.filter(e => e.etapa !== 'EN_APROBACION').map(e => e.parque));
+  const [fotos] = await pool.query(
+    "SELECT parque, num_op, dealer, ejecutivo, saldo_precio, com_parque FROM parques_pagos_ops WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
+  const fotoPorParque = new Map();
+  for (const f of fotos) {
+    if (!fotoPorParque.has(f.parque)) fotoPorParque.set(f.parque, []);
+    fotoPorParque.get(f.parque).push({
+      num_op: f.num_op, dealer: f.dealer || '—', ejecutivo: f.ejecutivo || '—',
+      saldo_precio: Math.round(Number(f.saldo_precio) || 0), com_parque: Math.round(Number(f.com_parque) || 0),
+    });
+  }
+
   return parques.map(p => {
-    const g = porParque.get(p.nombre) || { ops: [], comision: 0 };
+    let g = porParque.get(p.nombre) || { ops: [], comision: 0 };
+    if (congelados.has(p.nombre) && fotoPorParque.has(p.nombre)) {
+      const ops = fotoPorParque.get(p.nombre);
+      g = { ops, comision: ops.reduce((a, o) => a + o.com_parque, 0) };
+    }
     return {
       parque: p.nombre,
       arriendo: Math.round(Number(p.arriendo) || 0),
@@ -153,11 +244,41 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
   });
 }
 
+/* Reescribe la FOTO de (parque, mes) desde el cálculo vivo. Se llama en cada
+   hito del flujo mientras el mes siga EN_APROBACION; al aprobar queda fija. */
+async function fotografiarOps(parque, mes) {
+  const [[pm]] = await pool.query(
+    "SELECT etapa FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+  if (pm && pm.etapa !== 'EN_APROBACION') return; // congelada: la foto no se toca
+  const row = (await calcularMes(mes)).find(r => r.parque === parque);
+  await pool.query("DELETE FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+  if (row?.detalle?.length) {
+    const vals = row.detalle.map(o => [parque, mes + '-01', o.num_op, o.dealer, o.ejecutivo, o.saldo_precio, o.com_parque]);
+    await pool.query(
+      'INSERT INTO parques_pagos_ops (parque, mes, num_op, dealer, ejecutivo, saldo_precio, com_parque) VALUES ?', [vals]);
+  }
+}
+
 /* Refleja el hito en el track PARQUE del Seguimiento por operación: marca la(s)
    etapa(s) en todos los créditos del parque cuyo mes de cierre es `mes`.
    Espejo del patrón COMISION: las etapas de ODP/pago se marcan desde su módulo. */
 async function marcarEtapaParqueOps(parque, mes, etapas, usuario) {
+  /* Con FOTO del mes, las etapas se marcan sobre ESAS operaciones (que pueden
+     ser de meses anteriores por el arrastre). Sin foto (flujo antiguo), por mes. */
+  const [[conFoto]] = await pool.query(
+    "SELECT COUNT(*) n FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
   for (const etapa of etapas) {
+    if (conFoto.n > 0) {
+      await pool.query(`
+        INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
+        SELECT s.id, 'PARQUE', ?, ?, NOW()
+        FROM postventa_seguimiento s
+        JOIN creditos c ON c.id = s.id_credito
+        JOIN parques_pagos_ops po ON po.num_op = c.num_op
+        WHERE po.parque = ? AND DATE_FORMAT(po.mes,'%Y-%m') = ?`,
+        [etapa, usuario, parque, mes]).catch(e => console.error('[parques marcar etapa foto]', e.message));
+      continue;
+    }
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
       SELECT s.id, 'PARQUE', ?, ?, NOW()
@@ -170,7 +291,20 @@ async function marcarEtapaParqueOps(parque, mes, etapas, usuario) {
 
 /* Reversa exacta de marcarEtapaParqueOps: quita etapa(s) del track PARQUE. */
 async function desmarcarEtapaParqueOps(parque, mes, etapas) {
+  const [[conFoto]] = await pool.query(
+    "SELECT COUNT(*) n FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
   for (const etapa of etapas) {
+    if (conFoto.n > 0) {
+      await pool.query(`
+        DELETE pe FROM postventa_etapas pe
+        JOIN postventa_seguimiento s ON s.id = pe.id_seguimiento
+        JOIN creditos c ON c.id = s.id_credito
+        JOIN parques_pagos_ops po ON po.num_op = c.num_op
+        WHERE pe.track='PARQUE' AND pe.etapa=?
+          AND po.parque = ? AND DATE_FORMAT(po.mes,'%Y-%m') = ?`,
+        [etapa, parque, mes]).catch(e => console.error('[parques desmarcar etapa foto]', e.message));
+      continue;
+    }
     await pool.query(`
       DELETE pe FROM postventa_etapas pe
       JOIN postventa_seguimiento s ON s.id = pe.id_seguimiento
@@ -280,6 +414,8 @@ const aprobar = async (req, res) => {
     const row = calc.find(r => r.parque === parque);
     if (!row) return res.status(404).json({ success: false, data: null, error: 'Parque no encontrado' });
     const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
+    // La FOTO de operaciones queda escrita ANTES de congelar (después ya no se toca)
+    await fotografiarOps(parque, mes);
     // Snapshot: los montos quedan congelados al aprobar
     await pool.query(`
       INSERT INTO parques_pagos_mes (parque, mes, arriendo, comision_creditos, ops, etapa, aprobada_por, fecha_aprobada)
@@ -318,14 +454,28 @@ const emitir = async (req, res) => {
        Todas las operaciones del parque en el mes deben tener FACTURA RECIBIDA en
        su track (la marca el módulo de Cartolas Parque, o a mano en Seguimiento
        Comisión Parques). Un parque solo-arriendo (0 ops) pasa sin exigencia. */
-    const [[sinFactura]] = await pool.query(`
-      SELECT COUNT(*) n
-      FROM postventa_seguimiento s
-      JOIN creditos c ON c.id = s.id_credito
-      WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?
-        AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
-          WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
-      [parque, mes]);
+    /* Con FOTO (la comisión ya está APROBADA acá, así que existe) la exigencia
+       es sobre las operaciones de la cartola; sin foto, flujo antiguo por mes. */
+    const [[foto]] = await pool.query(
+      "SELECT COUNT(*) n FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
+    const [[sinFactura]] = foto.n > 0
+      ? await pool.query(`
+          SELECT COUNT(*) n
+          FROM parques_pagos_ops po
+          JOIN creditos c ON c.num_op = po.num_op
+          JOIN postventa_seguimiento s ON s.id_credito = c.id
+          WHERE po.parque = ? AND DATE_FORMAT(po.mes,'%Y-%m') = ?
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
+              WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
+          [parque, mes])
+      : await pool.query(`
+          SELECT COUNT(*) n
+          FROM postventa_seguimiento s
+          JOIN creditos c ON c.id = s.id_credito
+          WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?
+            AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
+              WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
+          [parque, mes]);
     if (sinFactura.n > 0)
       return res.status(400).json({ success: false, data: null,
         error: `No se puede emitir la Orden de Pago: ${sinFactura.n} operación(es) del parque aún sin FACTURA RECIBIDA en el Seguimiento Comisión Parques. La ODP nace de la factura, igual que en dealers.` });
@@ -433,8 +583,23 @@ const cartolaEstado = async (req, res) => {
   try {
     const mes = mesParam(req);
     if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes (YYYY-MM) requerido' });
-    // Una etapa está "hecha" cuando TODAS las ops del parque/mes la tienen.
-    const [rows] = await pool.query(`
+    // Una etapa está "hecha" cuando TODAS las ops de la cartola la tienen.
+    // Con FOTO del mes mandan sus operaciones (pueden ser de meses anteriores
+    // por el arrastre); los parques sin foto siguen con el criterio por mes.
+    const [rowsFoto] = await pool.query(`
+      SELECT po.parque,
+             COUNT(*) ops,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA EMITIDA'))  em,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA APROBADA')) ap,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA ENVIADA'))  en,
+             SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='FACTURA RECIBIDA')) fa
+      FROM parques_pagos_ops po
+      JOIN creditos c ON c.num_op = po.num_op
+      JOIN postventa_seguimiento s ON s.id_credito = c.id
+      WHERE DATE_FORMAT(po.mes,'%Y-%m') = ?
+      GROUP BY po.parque`, [mes]);
+    const conFoto = new Set(rowsFoto.map(r => r.parque));
+    const [rowsMes] = await pool.query(`
       SELECT s.parque,
              COUNT(*) ops,
              SUM(EXISTS(SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='PARQUE' AND e.etapa='CARTOLA EMITIDA'))  em,
@@ -445,6 +610,7 @@ const cartolaEstado = async (req, res) => {
       JOIN creditos c ON c.id = s.id_credito
       WHERE s.parque IS NOT NULL AND DATE_FORMAT(c.mes,'%Y-%m') = ?
       GROUP BY s.parque`, [mes]);
+    const rows = [...rowsFoto, ...rowsMes.filter(r => !conFoto.has(r.parque))];
     const [facs] = await pool.query('SELECT parque, numero_factura, fecha_factura, monto_bruto FROM parques_facturas WHERE mes=?', [mes]);
     const facMap = new Map(facs.map(f => [f.parque, f]));
     const [fichas] = await pool.query(`
@@ -474,6 +640,7 @@ const cartolaEmitir = async (req, res) => {
   try {
     const mes = mesParam(req), parque = String(req.body.parque || '').trim();
     if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    await fotografiarOps(parque, mes);   // la cartola emitida es una foto, no un cálculo que cambia solo
     await marcarEtapaParqueOps(parque, mes, ['CARTOLA EMITIDA'], quienDe(req));
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'cartola_parque', detalle: `Emitió cartola parque ${parque} (${mes})` });
     res.json({ success: true, data: { ok: true }, error: null });
@@ -485,6 +652,7 @@ const cartolaAprobar = async (req, res) => {
   try {
     const mes = mesParam(req), parque = String(req.body.parque || '').trim();
     if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
+    await fotografiarOps(parque, mes);
     await marcarEtapaParqueOps(parque, mes, ['CARTOLA EMITIDA', 'CARTOLA APROBADA'], quienDe(req));
     auditar({ req, accion: 'APROBAR', modulo: 'postventa', entidad: 'cartola_parque', detalle: `Aprobó cartola parque ${parque} (${mes})` });
     res.json({ success: true, data: { ok: true }, error: null });
@@ -504,6 +672,7 @@ const cartolaEnviar = async (req, res) => {
       [mes, parque, String(req.body.mail || '') || null,
        Math.round(Number(req.body.arriendo) || 0), Math.round(Number(req.body.comision) || 0),
        Math.round(Number(req.body.total) || 0), quien]);
+    await fotografiarOps(parque, mes);   // por si el envío llega sin pasar por emitir
     await marcarEtapaParqueOps(parque, mes, ['COMISION A PAGAR', 'CARTOLA EMITIDA', 'CARTOLA APROBADA', 'CARTOLA ENVIADA'], quien);
     auditar({ req, accion: 'ENVIAR_CARTOLA', modulo: 'postventa', entidad: 'cartola_parque', entidad_id: r.insertId,
       detalle: `Envió cartola parque ${parque} (${mes}) por ${CLP(Number(req.body.total) || 0)}` });
