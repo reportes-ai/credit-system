@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -75,7 +75,7 @@
   <div id="cont"><div class="vacio">Cargando…</div></div>
 </div>
 
-<script src="/js/html2pdf.bundle.min.js"></script>
+<script src="/js/pdf-simple.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
@@ -196,7 +196,7 @@ function cartolaHTML(r, i){
         <label style="font-size:.75rem;font-weight:700;color:#475569">Correo del parque:</label>
         <input id="mail${i}" value="${escA(mail)}" placeholder="finanzas@parque.cl">
         ${!mail?'<span style="font-size:.7rem;color:#b45309">⚠ sin correo de finanzas en la <a href="/dealers-incorporacion/parques.html">ficha del parque</a></span>':''}
-        ${r.ops>0 ? `<button class="btn b-light" onclick="verPdf(${i},'${escA(r.parque)}')" title="Ver el PDF que se va a adjuntar, sin enviar"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF</button> `:''}${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}',this)"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
+        ${r.ops>0 ? `<button class="btn b-light" onclick="verPdf(${i})" title="Ver el PDF que se va a adjuntar, sin enviar"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF</button> `:''}${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}',this)"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
           : (st.enviada?'<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Enviada — reversable en la pestaña Enviadas</span>':'<span style="font-size:.72rem;color:#94a3b8">Se envía una vez aprobada</span>')}
         ${st.enviada && !st.factura ? `<button class="btn b-light" onclick="registrarFactura('${escA(r.parque)}',${r.total})"><i class="bi bi-receipt me-1"></i>Registrar factura</button>` : ''}
         ${st.factura_datos ? `<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Factura ${escH(st.factura_datos.numero_factura)} · ${fmtCLP(st.factura_datos.monto_bruto)}</span>` : ''}
@@ -215,44 +215,83 @@ async function accion(cual, parque){
 /* Envía la cartola al parque: el correo sale del SERVIDOR con el PDF adjunto
    (espejo de la cartola dealer). El texto, la copia y el interruptor están en
    Mantenedores → Correos del Sistema, plantilla "Cartola mensual → al PARQUE". */
-/* Genera el PDF de la cartola.
-   OJO — html2canvas captura relativo al VIEWPORT y al scroll de la página: con
-   la cartola de un parque de más abajo (siempre scrolleada) el canvas salía del
-   área equivocada y el PDF llegaba EN BLANCO. En vez de corregir el desfase con
-   scrollY —que depende de cómo esté la pantalla en ese momento— se lleva la
-   página al tope, se captura y se devuelve el scroll: el escenario es SIEMPRE el
-   mismo, así que el resultado es predecible.
-   Después se valida que el archivo tenga contenido, porque desde que el PDF va
-   directo al correo ya no lo ve nadie antes de que salga al parque. */
-async function pdfCartola(i, filename){
-  const el = document.getElementById('bloque'+i);
-  if (!el) throw new Error('No se encontró la cartola en pantalla');
-  // El logo tiene que estar cargado antes de capturar, o sale un hueco
-  await Promise.all([...el.querySelectorAll('img')].map(img => img.complete ? null :
-    new Promise(ok => { img.onload = img.onerror = ok; })));
-  const scrollPrevio = window.scrollY;
-  window.scrollTo(0, 0);
-  await new Promise(r => setTimeout(r, 250));   // que el navegador repinte antes de capturar
-  try {
-    const blob = await html2pdf().set({
-      filename, margin:8, image:{ type:'jpeg', quality:0.95 },
-      html2canvas:{ scale:2, useCORS:true, scrollX:0, scrollY:0 },
-      jsPDF:{ unit:'mm', format:'letter', orientation:'portrait' },
-    }).from(el).outputPdf('blob');
-    // Una hoja en blanco pesa unos pocos KB; con la tabla dibujada nunca baja de ~20 KB
-    if (!blob || blob.size < 15000)
-      throw new Error('El PDF salió vacío o incompleto (' + Math.round((blob?.size||0)/1024) + ' KB). No se envió nada.');
-    return blob;
-  } finally { window.scrollTo(0, scrollPrevio); }
+/* Genera el PDF de la cartola DIBUJÁNDOLO (shared/pdf-simple.js), no
+   fotografiando la pantalla. html2canvas depende de cómo esté el navegador en
+   ese instante — scroll, imágenes a medio cargar, el clon que hace la librería —
+   y cuando falla no avisa: devuelve una hoja EN BLANCO. El 13-08-2026 un parque
+   recibió así su cartola vacía. Dibujado sale igual siempre, el texto queda
+   seleccionable y el archivo pesa una fracción. */
+function pdfCartola(i){
+  const r = ROWS[i];
+  const ops = DETALLES[r.parque] || [];
+  const f = (ESTADOS.get(r.parque) || {}).ficha || {};
+  const doc = AF_PDF.crear();
+  const AZUL=[1,65,162], NAVY=[1,45,112], GRIS=[100,116,139], TINTA=[30,41,59];
+  const M = 14, FIN = doc.hoja.ancho - M;
+  let y = 20;
+
+  doc.texto(M, y, 'CARTOLA COMISIONES Y ARRIENDO', { size:13, bold:true, color:NAVY });
+  doc.texto(M, y + 6.5, String(r.parque || '').toUpperCase(), { size:11, bold:true, color:NAVY });
+  const ficha = [f.razon_social || '', f.rut ? 'RUT ' + f.rut : ''].filter(Boolean).join('  -  ');
+  if (ficha) doc.texto(M, y + 12, ficha, { size:8, color:GRIS });
+  doc.texto(M, y + 16.5, 'Periodo: ' + nombreMes(mes()), { size:8, color:GRIS });
+  doc.texto(FIN, y, 'AutoFacil', { size:13, bold:true, color:AZUL, align:'right' });
+  doc.texto(FIN, y + 4.5, 'Credito Automotriz', { size:7, color:GRIS, align:'right' });
+  y += 24;
+
+  // N° OP · Otorgado · Dealer · Ejecutivo · Saldo Precio · Comisión
+  const X = { op:M+2, ot:M+22, de:M+44, ej:M+100, sp:FIN-32, co:FIN-2 };
+  const cabecera = () => {
+    doc.rect(M, y, FIN - M, 7, AZUL);
+    const o = { size:7.5, bold:true, color:[255,255,255] };
+    doc.texto(X.op, y+4.8, 'N OP', o); doc.texto(X.ot, y+4.8, 'Otorgado', o);
+    doc.texto(X.de, y+4.8, 'Dealer', o); doc.texto(X.ej, y+4.8, 'Ejecutivo', o);
+    doc.texto(X.sp, y+4.8, 'Saldo Precio', { ...o, align:'right' });
+    doc.texto(X.co, y+4.8, 'Comision', { ...o, align:'right' });
+    y += 7;
+  };
+  cabecera();
+
+  const fOt = v => { const m = String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : '-'; };
+  const corta = (t, mm) => { t = String(t || ''); while (doc.ancho(t, 7.5) > mm && t.length > 4) t = t.slice(0, -2); return t; };
+  for (const o of ops) {
+    if (y > doc.hoja.alto - 45) { doc.paginaNueva(); y = 20; cabecera(); }
+    const e = { size:7.5, color:TINTA };
+    doc.texto(X.op, y+4.4, String(o.num_op || ''), e);
+    doc.texto(X.ot, y+4.4, fOt(o.fecha_otorgado), e);
+    doc.texto(X.de, y+4.4, corta(o.dealer, 54), e);
+    doc.texto(X.ej, y+4.4, corta(o.ejecutivo, 40), e);
+    doc.texto(X.sp, y+4.4, fmtCLP(o.saldo_precio), { ...e, align:'right' });
+    doc.texto(X.co, y+4.4, fmtCLP(o.com_parque),  { ...e, align:'right' });
+    doc.linea(M, y + 6.2, FIN, y + 6.2, [226,232,240]);
+    y += 6.2;
+  }
+
+  const linea = (txt, monto, destacada) => {
+    doc.rect(M, y, FIN - M, 7.5, destacada ? [238,242,255] : [248,250,252]);
+    const o = { size: destacada ? 9 : 8, bold:true, color: destacada ? NAVY : [51,65,85] };
+    doc.texto(M + 2, y + 5, txt, o);
+    doc.texto(X.co, y + 5, fmtCLP(monto), { ...o, align:'right' });
+    y += 7.5;
+  };
+  linea(`Comision por creditos (${r.ops} operacion${r.ops===1?'':'es'})`, r.comision_creditos, false);
+  linea('Arriendo mensual', r.arriendo, false);
+  linea('TOTAL', r.total, true);
+
+  y += 9;
+  doc.texto(M, y, 'Documento generado por AutoFacil Business Suite - favor emitir la(s) factura(s) a', { size:7, color:GRIS });
+  doc.texto(M, y + 3.5, 'AUTOFACIL SPA - RUT 76.545.638-K, segun el regimen tributario del parque.', { size:7, color:GRIS });
+
+  const blob = doc.salida();
+  if (!blob || blob.size < 800) throw new Error('El PDF salio vacio. No se envio nada.');
+  return blob;
 }
 
 /* Ver el PDF antes de mandarlo — el mismo archivo que se adjunta, sin enviar ni
-   registrar nada. Es la única forma de saber que el parque recibirá algo legible. */
-async function verPdf(i, parque){
-  try {
-    const blob = await pdfCartola(i, 'previsualizacion.pdf');
-    window.open(URL.createObjectURL(blob), '_blank');
-  } catch(e){ alert('No se pudo generar el PDF: ' + e.message); }
+   registrar nada. */
+function verPdf(i){
+  try { window.open(URL.createObjectURL(pdfCartola(i)), '_blank'); }
+  catch(e){ alert('No se pudo generar el PDF: ' + e.message); }
 }
 
 async function enviarCartola(i, parque, btn){
@@ -266,7 +305,7 @@ async function enviarCartola(i, parque, btn){
   try {
     // 1) La cartola en PDF (el mismo bloque que se ve en pantalla: detalle de
     //    operaciones + línea de arriendo + total) convertida a base64
-    const blob = await pdfCartola(i, filename);
+    const blob = pdfCartola(i);
     const base64 = await new Promise((ok,err)=>{ const fr=new FileReader();
       fr.onload=()=>ok(String(fr.result).replace(/^data:[^;]+;base64,/,'')); fr.onerror=err; fr.readAsDataURL(blob); });
 
