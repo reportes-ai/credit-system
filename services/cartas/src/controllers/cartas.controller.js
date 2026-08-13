@@ -873,7 +873,26 @@ const otorgar = async (req, res) => {
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
                    OR (estado IS NULL AND UPPER(COALESCE(estado_credito,'')) IN ('APROBADO','DIGITADO','PENDIENTE')))`,
           [...valoresEtapa('OTORGADO'), partB, partB, ...args]
-        ).catch(e => console.error('[carta otorgar→credito]', e.message));
+        ).then(async ([r]) => {
+          /* El fallo era MUDO: si el UPDATE no tocaba ninguna fila, la carta
+             quedaba otorgada y el crédito atrás, sin que nadie se enterara hasta
+             que alguien notara la venta faltante en el dashboard (26080532,
+             13-08-2026). Si no se movió, se avisa a quien otorgó y queda en el
+             log — nunca más en silencio. */
+          if (r && r.affectedRows === 0) {
+            const detalle = `La carta ${ca.op_carta} quedó OTORGADA pero su crédito NO pasó a OTORGADO ` +
+              `(no calzó ninguna condición: id_credito_creado=${ca.id_credito_creado || '—'}, id_financiera=${ca.id_financiera || '—'}). ` +
+              `Revisar el estado del crédito: la operación no aparecerá en el dashboard ni en comisiones.`;
+            console.error('[carta otorgar→credito] SIN EFECTO —', detalle);
+            try {
+              await pool.query(
+                `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, clave, prioridad, sonar)
+                 VALUES (?,?,?,?,?,?,'alta',1)`,
+                [req.usuario?.id_usuario || 1, 'alerta', 'Carta otorgada sin crédito OTORGADO',
+                 detalle, '/creditos/', `otorgar-sin-efecto:${ca.op_carta}`]);
+            } catch (_) {}
+          }
+        }).catch(e => console.error('[carta otorgar→credito]', e.message));
         // El crédito de la carta nace sin num_op → correlativo AutoFácil (motor único).
         try {
           const [[sinOp]] = await pool.query(

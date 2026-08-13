@@ -269,6 +269,13 @@ correos programados y cobranza.
 - Modal transparente → usar `<dialog>` nativo con `showModal()`, no divs custom
 - `</script>` accidental en un .js rompe toda la página sin mensaje de error claro
 - Stats de página vs stats totales: siempre query separada sin LIMIT para conteos reales
+- **La BD es CASE-SENSITIVE** (todas las columnas son `utf8mb4_bin`): `'Digitado'` y
+  `'DIGITADO'` son valores DISTINTOS para SQL. Comparar siempre con `UPPER(col) IN (...)`
+  y escribir los estados en MAYÚSCULAS. Costó una venta perdida: la op 26080532 quedó
+  con la carta OTORGADA y el crédito en `'Digitado'`, invisible en dashboard y comisiones.
+- **Un UPDATE que no afecta filas NO es un error**: `.catch()` solo ve excepciones. En
+  operaciones críticas (otorgar, pagar, cerrar) revisar `affectedRows` y avisar si es 0 —
+  si no, el proceso falla en silencio y se descubre semanas después.
 
 ## Flujo de Deploy
 - Push a main → Render detecta y deploya automáticamente (~2-3 min)

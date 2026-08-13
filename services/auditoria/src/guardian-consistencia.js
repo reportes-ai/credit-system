@@ -68,6 +68,30 @@ async function revisar() {
     HAVING ABS(dif) > 10 LIMIT 20`, [desde]);
   if (descuadre.length) criticos.push(`${descuadre.length} op(s) con ingreso_neto_total que no cuadra con sus componentes (recálculo pendiente o edición a medias): ${descuadre.map(r => `${r.num_op} (dif $${Number(r.dif).toLocaleString('es-CL')})`).join(', ')}`);
 
+  /* 6. CARTA OTORGADA con el crédito atrás — el caso 26080532 (13-08-2026): la
+        carta se otorgó, el crédito quedó en 'Digitado'/PENDIENTE y la venta
+        desapareció del dashboard y de las comisiones sin que nadie se enterara.
+        La causa de aquella vez ya está tapada (collation binaria + comparación
+        en mayúsculas), pero el síntoma se vigila igual: cualquier causa nueva
+        que deje la carta y el crédito desalineados aparece acá al día siguiente. */
+  const [otorgadaSinCredito] = await pool.query(`
+    SELECT ca.op_carta, cr.num_op, cr.estado_credito, ca.ejecutivo
+      FROM cartas_aprobacion ca JOIN creditos cr ON cr.id = ca.id_credito_creado
+     WHERE ca.otorgado = 1 AND UPPER(COALESCE(cr.estado_eval,'')) <> 'OTORGADO'
+       AND ca.fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
+  if (otorgadaSinCredito.length) criticos.push(
+    `${otorgadaSinCredito.length} carta(s) OTORGADA(S) cuyo crédito NO quedó en OTORGADO — esas ventas no aparecen en el dashboard ni en comisiones: ` +
+    otorgadaSinCredito.map(r => `${r.op_carta} → op ${r.num_op} está "${r.estado_credito}" (${r.ejecutivo || 'sin ejecutivo'})`).join(' · '));
+
+  /* 7. Etapa escrita con otra capitalización: la base es case-sensitive, así que
+        'Digitado' es invisible para quien compara con 'DIGITADO'. Debería ser
+        siempre 0 — la carga Trinidad normaliza en cada arranque. */
+  const [mixtos] = await pool.query(`
+    SELECT COUNT(*) n FROM creditos
+     WHERE (estado <> UPPER(estado) OR estado_credito <> UPPER(estado_credito) OR estado_eval <> UPPER(estado_eval))`);
+  if (mixtos[0] && mixtos[0].n > 0) criticos.push(
+    `${mixtos[0].n} crédito(s) con la etapa escrita en minúsculas: la base distingue mayúsculas, así que quedan invisibles para los procesos que comparan en MAYÚSCULAS (fue la causa de la venta perdida el 13-08-2026).`);
+
   // 5. Otorgados con datos base incompletos
   const [incompletos] = await pool.query(`
     SELECT num_op,

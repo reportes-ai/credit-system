@@ -30,14 +30,32 @@ require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
     console.error('[carga-trinidad migration uppercase]', e.message);
   }
   try {
+    /* La etapa SIEMPRE en MAYÚSCULAS. Las tres columnas tienen collation BINARIA
+       (utf8mb4_bin): 'Digitado' y 'DIGITADO' son valores DISTINTOS para SQL, así
+       que una fila escrita con otra capitalización queda invisible para todo
+       proceso que compare en mayúsculas — y el fallo es MUDO, el UPDATE no
+       revienta, simplemente no toca ninguna fila. Así se perdió la op 26080532
+       al otorgarla (13-08-2026): carta OTORGADA y crédito en PENDIENTE.
+       Corre en cada arranque: si algún proceso vuelve a escribir en minúscula,
+       queda parejo al siguiente boot. */
+    for (const col of ['estado', 'estado_credito', 'estado_eval']) {
+      const [r] = await pool.query(
+        `UPDATE creditos SET ${col} = UPPER(${col})
+          WHERE ${col} IS NOT NULL AND ${col} <> '' AND ${col} <> UPPER(${col})`);
+      if (r.affectedRows > 0) console.log(`[carga-trinidad] ${r.affectedRows} filas normalizadas a MAYÚSCULAS en ${col}`);
+    }
+  } catch (e) {
+    console.error('[carga-trinidad migration normalizar etapa]', e.message);
+  }
+  try {
     // Parchar registros de Trinidad sin estado_eval usando el estado_credito existente
     const [r] = await pool.query(`
       UPDATE creditos SET estado_eval =
-        CASE estado_credito
-          WHEN 'Otorgado'  THEN 'OTORGADO'
-          WHEN 'Aprobado'  THEN 'APROBADO'
-          WHEN 'Rechazado' THEN 'RECHAZADO'
-          WHEN 'Digitado'  THEN 'PENDIENTE'
+        CASE UPPER(estado_credito)
+          WHEN 'OTORGADO'  THEN 'OTORGADO'
+          WHEN 'APROBADO'  THEN 'APROBADO'
+          WHEN 'RECHAZADO' THEN 'RECHAZADO'
+          WHEN 'DIGITADO'  THEN 'PENDIENTE'
           ELSE UPPER(estado_credito)
         END
       WHERE (estado_eval IS NULL OR estado_eval = '') AND estado_credito IS NOT NULL AND estado_credito != ''
@@ -132,9 +150,15 @@ async function cargarMapaEjecutivos() {
   } catch { return {}; }
 }
 
+/* SIEMPRE en MAYÚSCULAS: `estado_credito` tiene collation BINARIA (utf8mb4_bin),
+   así que 'Digitado' y 'DIGITADO' son valores DISTINTOS para cualquier consulta.
+   Escribir con otra capitalización dejaba la operación invisible para los
+   procesos que comparan en mayúsculas — así se perdió la 26080532 al otorgarla
+   (13-08-2026): la carta quedó otorgada y el crédito en PENDIENTE. */
 function mapEstado(estadoTrinidad, mapaEstados) {
-  if (!estadoTrinidad) return 'Digitado';
-  return mapaEstados[estadoTrinidad.trim().toLowerCase()] || 'Digitado';
+  const norm = v => String(v || '').trim().toUpperCase();
+  if (!estadoTrinidad) return 'DIGITADO';
+  return norm(mapaEstados[estadoTrinidad.trim().toLowerCase()]) || 'DIGITADO';
 }
 
 function mapEjecutivo(nombreTrinidad, mapaEjecutivos) {
@@ -237,7 +261,8 @@ function parseExcel(buffer, mapaEstados = {}, mapaEjecutivos = {}) {
 
       const estadoCredito = mapEstado(estadoTri, mapaEstados);
       // Derivar estado_eval (usado por el dashboard) desde estado_credito
-      const EVAL_MAP = { 'Otorgado':'OTORGADO', 'Aprobado':'APROBADO', 'Rechazado':'RECHAZADO', 'Digitado':'PENDIENTE' };
+      // Claves en MAYÚSCULAS: mapEstado normaliza, así que 'DIGITADO' es lo que llega
+      const EVAL_MAP = { 'OTORGADO':'OTORGADO', 'APROBADO':'APROBADO', 'RECHAZADO':'RECHAZADO', 'DIGITADO':'PENDIENTE' };
       const estadoEval = EVAL_MAP[estadoCredito] || estadoCredito?.toUpperCase() || null;
 
       return {
@@ -781,7 +806,7 @@ exports.importar = async (req, res) => {
 exports.reprocesarEstados = async (req, res) => {
   try {
     const mapaEstados = await cargarMapaEstados();
-    const EVAL_MAP = { 'Otorgado':'OTORGADO', 'Aprobado':'APROBADO', 'Rechazado':'RECHAZADO', 'Digitado':'PENDIENTE' };
+    const EVAL_MAP = { 'OTORGADO':'OTORGADO', 'APROBADO':'APROBADO', 'RECHAZADO':'RECHAZADO', 'DIGITADO':'PENDIENTE' };
 
     // Traer todos los créditos con estado_autofin
     const [creditos] = await pool.query(
