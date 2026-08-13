@@ -229,20 +229,8 @@ const obtener = async codigo => {
 
 /* Reemplaza {VARIABLE} por su valor. Lo que no venga en datos queda vacío, nunca
    como "{VARIABLE}" a la vista del destinatario. */
-/* Acepta {MAYUSCULAS} y {minusculas} (las plantillas de dealer usan minúscula).
-   Una variable sin dato queda vacía, nunca "{VARIABLE}" a la vista del que recibe. */
-const render = (texto, datos = {}) =>
-  String(texto || '').replace(/\{(\w+)\}/g, (_, k) =>
-    (datos[k] != null ? String(datos[k])
-      : datos[k.toUpperCase()] != null ? String(datos[k.toUpperCase()])
-      : datos[k.toLowerCase()] != null ? String(datos[k.toLowerCase()]) : ''));
-
-/* El cuerpo se escribe en TEXTO PLANO (legible y editable por cualquiera) y el
-   motor lo convierte a HTML. Si alguien pega HTML de verdad, se respeta tal cual:
-   así el mantenedor no obliga a nadie a escribir etiquetas para mandar un correo. */
-const esHTML = t => /<(p|div|table|br|h[1-6]|ul|ol|strong|b|span)\b/i.test(String(t || ''));
-const aHTML = t => esHTML(t) ? String(t)
-  : String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+// Formato y variables: motor puro compartido (probado en tests/correo-formato.test.js)
+const { esHTML, aHTML, render } = require('./correo-formato');
 
 /* Correos de los usuarios activos de una lista de perfiles (CSV). */
 async function correosDePerfiles(csv) {
@@ -302,4 +290,4 @@ async function comoTpl(codigo, claveLegado) {
   return { asunto: '', cuerpo: '', firma: '', activo: true, cc: '' };
 }
 
-module.exports = { enviar, obtener, render, correosDePerfiles, comoTpl, SEMILLAS };
+module.exports = { enviar, obtener, render, aHTML, esHTML, correosDePerfiles, comoTpl, SEMILLAS };

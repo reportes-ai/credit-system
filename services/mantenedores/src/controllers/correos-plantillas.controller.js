@@ -83,7 +83,8 @@ const prueba = async (req, res) => {
       html: envolverHTML(
         '<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px;margin-bottom:14px;font-size:.85rem;color:#9a3412">' +
         '<b>Correo de PRUEBA</b> — datos de ejemplo. El envío real usa los datos de la operación y va a sus destinatarios.</div>' +
-        plantillas.render(p.cuerpo, EJEMPLO)),
+        // aHTML: respeta los saltos de línea del texto plano, igual que el envío real
+        plantillas.aHTML(plantillas.render(p.cuerpo, EJEMPLO))),
     });
     auditar({ req, accion: 'ENVIAR', modulo: 'mantenedores', entidad: 'correo_plantilla',
       detalle: `Envió prueba del correo "${p.nombre}" (${codigo}) a ${email}` });
