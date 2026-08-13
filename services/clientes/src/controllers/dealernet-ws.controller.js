@@ -161,6 +161,22 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
     )`);
     await pool.query("INSERT IGNORE INTO dealernet_config (clave, valor) VALUES ('dias_bloqueo','15'), ('dias_vigencia','180')");
 
+    /* Informes que llegaron sin datos (retcode "Ok" pero sin nodo de contenido).
+       No sirven para concluir nada, así que NO ocupan el cupo de días del
+       repositorio: se marcan para poder reintentarlos. Backfill de una vez para
+       los que ya estaban guardados — si no, quedarían bloqueando 15 días. */
+    await pool.query(`ALTER TABLE dealernet_informes ADD COLUMN sin_datos TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+    await require('../../../../shared/migrate').migrar('dealernet-sin-datos-v1', async () => {
+      const [rows] = await pool.query('SELECT id, contenido FROM dealernet_informes');
+      const vacios = rows.filter(r => {
+        let c = r.contenido;
+        if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return false; } }
+        return !informeConDatos(c);
+      }).map(r => r.id);
+      if (vacios.length) await pool.query('UPDATE dealernet_informes SET sin_datos=1 WHERE id IN (?)', [vacios]);
+      console.log('[dealernet] informes sin datos marcados:', vacios.length);
+    });
+
     // Módulo/card propio "Informes DealerNet" (anti-hardcode: vive en BD).
     await pool.query(
       `INSERT IGNORE INTO modulos (id_modulo, nombre, descripcion, icono, ruta, orden, estado)
@@ -584,6 +600,16 @@ function splitProductos(parsed, productosPedidos) {
   return out;
 }
 
+/* ¿El informe trae datos de verdad? El WS puede responder retcode 0 "Ok" con solo
+   los metadatos del producto (@_cod, @_gls) y ningún nodo de contenido. Esa respuesta
+   NO sirve para concluir nada y NO debe ocupar el cupo de 15 días del repositorio:
+   hay que poder reintentar. Criterio único, usado al guardar y por el backfill. */
+function informeConDatos(contenido) {
+  if (contenido == null) return false;
+  if (typeof contenido !== 'object') return String(contenido).trim() !== '';
+  return Object.keys(contenido).some(k => !k.startsWith('@_') && contenido[k] != null);
+}
+
 async function guardarInformes({ num, dv, productosPedidos, r, idConsulta, usuario }) {
   const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
   const nombreDe = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || null;
@@ -596,12 +622,12 @@ async function guardarInformes({ num, dv, productosPedidos, r, idConsulta, usuar
   const ids = [];
   for (const it of lista) {
     const [ins] = await pool.query(
-      `INSERT INTO dealernet_informes (rut, dv, codigo_producto, nombre_producto, retcode, retmsg, ws_tag, contenido, pdf_url, id_consulta, id_usuario, usuario_nombre)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO dealernet_informes (rut, dv, codigo_producto, nombre_producto, retcode, retmsg, ws_tag, contenido, pdf_url, id_consulta, id_usuario, usuario_nombre, sin_datos)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [num, dv, it.codigo, nombreDe(it.codigo), r.retcode, (r.retmsg || '').slice(0, 255), it.ws_tag,
        it.contenido != null ? JSON.stringify(it.contenido) : null, it.pdf_url, idConsulta,
-       usuario?.id_usuario || null, nombreUsr]);
-    ids.push({ id: ins.insertId, codigo: it.codigo });
+       usuario?.id_usuario || null, nombreUsr, informeConDatos(it.contenido) ? 0 : 1]);
+    ids.push({ id: ins.insertId, codigo: it.codigo, sin_datos: informeConDatos(it.contenido) ? 0 : 1 });
   }
   return ids;
 }
@@ -708,7 +734,7 @@ const verificarRepositorio = async (req, res) => {
     for (const cod of productos) {
       const [[ult]] = await pool.query(
         `SELECT id, created_at, DATEDIFF(NOW(), created_at) dias FROM dealernet_informes
-         WHERE rut=? AND codigo_producto=? AND retcode='0' ORDER BY created_at DESC LIMIT 1`, [num, cod]);
+         WHERE rut=? AND codigo_producto=? AND retcode='0' AND sin_datos=0 ORDER BY created_at DESC LIMIT 1`, [num, cod]);
       let estado = 'libre', ultimo = null;
       if (ult) {
         const dias = Number(ult.dias);
@@ -739,7 +765,7 @@ const solicitarInformes = async (req, res) => {
     for (const cod of productos) {
       const [[ult]] = await pool.query(
         `SELECT id, DATEDIFF(NOW(), created_at) dias FROM dealernet_informes
-         WHERE rut=? AND codigo_producto=? AND retcode='0' ORDER BY created_at DESC LIMIT 1`, [num, cod]);
+         WHERE rut=? AND codigo_producto=? AND retcode='0' AND sin_datos=0 ORDER BY created_at DESC LIMIT 1`, [num, cod]);
       if (ult && Number(ult.dias) < cfg.dias_bloqueo) bloqueados.push({ codigo: cod, dias: Number(ult.dias), id_informe: ult.id });
       else aPedir.push(cod);
     }
@@ -851,7 +877,7 @@ async function asegurarInformes({ rut, productos, usuario }) {
   const ultimoDe = async (cod) => {
     const [[u]] = await pool.query(
       `SELECT id, contenido, DATEDIFF(NOW(), created_at) dias, created_at FROM dealernet_informes
-       WHERE rut=? AND codigo_producto=? AND retcode='0' ORDER BY created_at DESC LIMIT 1`, [num, cod]);
+       WHERE rut=? AND codigo_producto=? AND retcode='0' AND sin_datos=0 ORDER BY created_at DESC LIMIT 1`, [num, cod]);
     return u || null;
   };
 

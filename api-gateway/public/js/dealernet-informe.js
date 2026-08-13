@@ -25,6 +25,17 @@ const REPORT_CSS = `
   .pill-ok { background:#dcfce7; color:#15803d; font-weight:800; padding:2px 10px; border-radius:11px; }
   .pill-bad { background:#fee2e2; color:#b91c1c; font-weight:800; padding:2px 10px; border-radius:11px; }
   .pill-warn { background:#fef3c7; color:#92400e; font-weight:800; padding:2px 10px; border-radius:11px; }
+  /* Timbre de informe sin respuesta: tiene que verse ANTES que cualquier otra cosa,
+     para que nadie lea "sin deuda" donde el servicio no contestó. */
+  .rep-sello { position:relative; border:5px solid #dc2626; border-radius:14px; color:#dc2626;
+    text-align:center; padding:26px 18px; margin:14px 0 18px; background:#fff5f5; overflow:hidden; }
+  .rep-sello .s-t { font-size:2rem; font-weight:900; letter-spacing:2px; line-height:1.1; }
+  .rep-sello .s-s { font-size:1.05rem; font-weight:800; margin-top:6px; }
+  .rep-sello .s-n { font-size:.82rem; color:#7f1d1d; margin-top:10px; font-weight:600; }
+  .rep-sello::before, .rep-sello::after { content:''; position:absolute; left:-8%; top:50%; width:116%;
+    border-top:5px solid #dc2626; opacity:.55; }
+  .rep-sello::before { transform:rotate(-11deg); } .rep-sello::after { transform:rotate(11deg); }
+  @media print { .rep-sello { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
   .rep-note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:.78rem; margin-bottom:10px; }
   .rep-sep { border:none; border-top:1px dashed #e2e8f0; margin:8px 0; }
   .rep-legal { margin-top:18px; padding-top:8px; border-top:1px solid #eef2f7; font-size:.68rem; color:#94a3b8; font-style:italic; }
@@ -68,7 +79,12 @@ function bodyPension(d, cont){
   const pill = sinDato ? 'pill-warn' : (sin ? 'pill-ok' : 'pill-bad');
   const texto = sinDato ? 'SIN INFORMACIÓN' : inddeu.toUpperCase();
   const accion = d.pdf_url ? `<button class="btn-ghost" onclick="descargarPdf(${d.id})"><i class="bi bi-file-earmark-pdf"></i> Certificado</button>` : '—';
-  return `${sinDato ? '<div class="rep-note"><b>⚠ La consulta no devolvió datos.</b> El servicio respondió sin resultado para este RUT, así que <b>no se puede afirmar que no tenga deuda</b>. Vuelve a solicitar el informe; si insiste, verifícalo en el certificado del Registro Civil antes de decidir.</div>' : ''}
+  return `${sinDato ? `<div class="rep-sello">
+      <div class="s-t">SIN INFORMACIÓN</div>
+      <div class="s-s">Intente más tarde</div>
+      <div class="s-n">El servicio no devolvió resultado para este RUT. NO significa que no tenga deuda.<br>
+        Vuelve a solicitar el informe — este intento no ocupa el bloqueo de días del repositorio.</div>
+    </div>` : ''}
     <div class="rep-kv"><b>Nombre:</b> ${esc(nombre)||'—'}</div>
     <div class="rep-kv"><b>Rut:</b> ${esc(d.rut)}-${esc(d.dv||'')}</div>
     <div class="rep-h">Resultado Búsqueda</div>
