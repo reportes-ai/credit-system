@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.3 — la cartola y el aviso de pago al dealer se editan en Mantenedores → Correos del Sistema (todos los correos en un solo lugar) · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -121,12 +121,13 @@
       </div>
     </div>
 
-    <div style="margin-top:18px;background:#eff6ff;border-left:4px solid #0141A2;border-radius:8px;padding:13px 16px;font-size:.86rem;color:#1e3a8a">
-      <b><i class="bi bi-envelope-at me-1"></i>Los correos al dealer se editan en Correos del Sistema</b><br>
-      La <b>cartola al dealer</b> y el <b>aviso de pago al dealer</b> se mudaron al mantenedor
-      <a href="/mantenedores/correos/"><b>Mantenedores → Correos del Sistema</b></a>, donde están TODOS los correos
-      automáticos en un solo lugar (dealers y parques): texto, destinatarios por perfil, copia (CC), interruptor
-      y botón de prueba. El texto que tenías configurado se mantuvo tal cual y el envío no cambió.
+    <!-- Plantillas paramétricas (correos_plantillas): cartola y comisión pagada al
+         dealer + los correos del circuito de parques. Viven acá, junto al resto de
+         los correos de Post Venta, para que todo se administre en un solo lugar. -->
+    <div style="margin-top:22px;border-top:2px solid #e2e8f0;padding-top:16px">
+      <h6 style="font-weight:800;color:#0141A2;margin:0 0 4px"><i class="bi bi-envelope-at me-1"></i>Correos de Cartolas, Comisiones y Parques</h6>
+      <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. Cada uno se guarda por separado y queda auditado; <b>Enviar prueba</b> manda el correo con datos de ejemplo solo a la casilla que indiques.</div>
+      <div id="plantCont"><div style="color:#94a3b8;font-size:.82rem;padding:14px 0">Cargando correos…</div></div>
     </div>
 
     <div class="correo-cols" style="margin-top:18px">
@@ -165,6 +166,9 @@
       • <b>Destinatario</b> → a quién llega el correo de la orden de pago (<a href="/postventa/orden-pago/">Emisión Orden de Pago Saldo Precio</a> y <a href="/postventa/orden-pago-comision/">Emisión Orden de Pago Comisión</a>).<br>
       • <b>Asunto / Cuerpo / Firma</b> → el texto del correo que arma cada página al pulsar «Enviar Correo». El cuadro de la orden se inserta automáticamente entre el cuerpo y la firma.<br>
       • <b>Cartola al dealer</b> → el correo automático (comisiones@, HTML + PDF adjunto, CC ejecutivos y Jefe Comercial) al pulsar «Enviar Cartola» en <a href="/aprobaciones/">Emisión de Cartolas</a> (pestaña Revisión Cartolas). El interruptor lo activa/desactiva.<br>
+      • <b>Cartola al parque</b> → el correo con la cartola en PDF (detalle de operaciones + arriendo) al pulsar «Enviar cartola» en <a href="/postventa/cartolas-parque/">Emisión de Cartolas Parque</a>.<br>
+      • <b>Orden de Pago de parque → Contabilidad</b> → aviso al emitir la ODP en <a href="/postventa/comisiones-parques/">Comisiones Parques a Pagar</a>.<br>
+      • <b>Pago realizado (parque / equipo comercial)</b> → los dos avisos al confirmar el pago del parque. El del parque va al contacto financiero de su <a href="/dealers-incorporacion/parques.html">ficha</a>; el interno, a los perfiles que elijas.<br>
       • <b>Aviso de pago al dealer</b> → el correo automático desde comisiones@ cuando el Tesorero marca COMISIÓN PAGADA (<a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> o el módulo Órdenes de Pago). El interruptor lo activa/desactiva.<br>
       • <b>Pago de Saldo Precio al dealer</b> → el correo automático al dealer (CC ejecutivo, Jefes Comerciales y grupo Operaciones) cuando el Tesorero paga el saldo precio (<a href="/ordenes-pago/historial/">Órdenes de Pago</a> o <a href="/postventa/saldos-a-pagar/">Saldos Precios a Pagar</a>). <b>Nace inactivo</b> — el interruptor lo enciende.
     </div>
@@ -196,6 +200,7 @@ let CFG = {}, PERFILES = [];
   pinta('saldo');
   pinta('comision');
   pintaCorreos();
+  cargarPlantillas();
 })();
 
 const DEF_SALDO_C = { asunto:'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})', cuerpo:'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.', firma:'Saludos cordiales,\nÁrea de Operaciones' };
@@ -361,6 +366,97 @@ async function guardar(track){
   btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Guardar';
   setTimeout(()=>{ msg.style.display='none'; }, 4000);
 }
+
+/* ── Correos de Cartolas, Comisiones y Parques (tabla correos_plantillas) ──
+   Mismo mantenedor, un solo lugar para todos los correos de Post Venta. Cada
+   plantilla se guarda por separado: así un error de tipeo en una no arrastra
+   a las demás, y la auditoría dice exactamente cuál se tocó. */
+let PLANTS = [], PLANT_PERFILES = [];
+
+async function cargarPlantillas(){
+  try {
+    const j = await (await fetch('/api/correos-plantillas', { headers:H })).json();
+    if (!j.success) throw new Error(j.error);
+    PLANTS = j.data.rows || []; PLANT_PERFILES = j.data.perfiles || [];
+    pintarPlantillas();
+  } catch(e){
+    document.getElementById('plantCont').innerHTML =
+      '<div style="color:#b91c1c;font-size:.82rem;padding:10px 0">No se pudieron cargar: '+escP(e.message)+'</div>';
+  }
+}
+const escP  = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escPA = s => escP(s).replace(/"/g,'&quot;');
+
+function pintarPlantillas(){
+  let ambitoPrev = '';
+  document.getElementById('plantCont').innerHTML = PLANTS.map((r,i) => {
+    const perfSel = PLANT_PERFILES.map(p => {
+      const on = String(r.para_perfiles||'').split(',').map(x=>x.trim()).includes(p);
+      return `<option value="${escPA(p)}"${on?' selected':''}>${escP(p)}</option>`;
+    }).join('');
+    const vars = String(r.variables||'').split(/\s+/).filter(Boolean)
+      .map(v => `<code style="cursor:pointer" onclick="pegarVar(${i},'${escPA(v)}')">${escP(v)}</code>`).join(' ');
+    const tituloAmbito = r.ambito !== ambitoPrev
+      ? `<div style="font-size:.74rem;font-weight:800;color:#3730a3;background:#eef2ff;border-radius:10px;padding:4px 12px;display:inline-block;margin:14px 0 8px">${escP(r.ambito)}</div>` : '';
+    ambitoPrev = r.ambito;
+    return tituloAmbito + `<div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:12px;${r.activo?'':'opacity:.6;background:#fafafa'}" id="pl${i}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <b style="color:#012d70;font-size:.9rem">${escP(r.nombre)}${r.activo?'':' <span style="font-size:.66rem;background:#fee2e2;color:#991b1b;border-radius:10px;padding:2px 8px">APAGADO</span>'}</b>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="font-size:.78rem;font-weight:700;color:#334155;cursor:pointer"><input type="checkbox" id="plAc${i}"${r.activo?' checked':''} onchange="document.getElementById('pl'+${i}).style.opacity=this.checked?1:.6"> Activo</label>
+          <button class="btn-af" style="padding:5px 12px;background:#eff6ff;color:#1d4ed8" onclick="probarPlantilla(${i})"><i class="bi bi-send-check me-1"></i>Prueba</button>
+          <button class="btn-af" style="padding:5px 12px" onclick="guardarPlantilla(${i})"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+        </div>
+      </div>
+      <div class="ph" style="margin:0 0 8px">${escP(r.descripcion||'')}</div>
+      <div class="fld"><label>Asunto</label><input id="plAs${i}" value="${escPA(r.asunto)}"></div>
+      <div class="fld"><label>Cuerpo (acepta HTML)</label><textarea id="plCu${i}">${escP(r.cuerpo)}</textarea></div>
+      <div class="correo-cols">
+        <div class="fld"><label>Destinatarios por perfil</label>
+          <select id="plPf${i}" multiple size="4" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px;font-size:.82rem">${perfSel}</select>
+          <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Ctrl+clic para varios. Vacío = solo el destinatario propio del proceso (dealer o parque).</div></div>
+        <div class="fld"><label>Copia (CC) — separados por coma</label>
+          <input id="plCc${i}" value="${escPA(r.cc)}" placeholder="ej: operaciones@autofacilchile.cl"></div>
+      </div>
+      ${vars ? `<div class="ph">Variables (pincha para insertarla en el cuerpo): ${vars}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function pegarVar(i, v){
+  const ta = document.getElementById('plCu'+i); const p = ta.selectionStart ?? ta.value.length;
+  ta.value = ta.value.slice(0,p) + v + ta.value.slice(ta.selectionEnd ?? p);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = p + v.length;
+}
+
+async function guardarPlantilla(i){
+  const r = PLANTS[i];
+  const body = {
+    asunto: document.getElementById('plAs'+i).value,
+    cuerpo: document.getElementById('plCu'+i).value,
+    para_perfiles: [...document.getElementById('plPf'+i).selectedOptions].map(o=>o.value).join(','),
+    cc: document.getElementById('plCc'+i).value,
+    activo: document.getElementById('plAc'+i).checked ? 1 : 0,
+  };
+  try {
+    const j = await (await fetch('/api/correos-plantillas/'+encodeURIComponent(r.codigo), { method:'PUT', headers:H, body:JSON.stringify(body) })).json();
+    if (!j.success) throw new Error(j.error);
+    await cargarPlantillas();
+    alert('Correo "'+r.nombre+'" guardado ✓');
+  } catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+
+async function probarPlantilla(i){
+  const r = PLANTS[i];
+  const email = prompt('¿A qué correo mando la prueba de "'+r.nombre+'"?\n(datos de ejemplo, solo a esta casilla)', (yo&&yo.email)||'');
+  if (!email) return;
+  try {
+    const j = await (await fetch('/api/correos-plantillas/'+encodeURIComponent(r.codigo)+'/prueba', { method:'POST', headers:H, body:JSON.stringify({ email }) })).json();
+    if (!j.success) throw new Error(j.error);
+    alert('Prueba enviada a '+email+' ✓');
+  } catch(e){ alert('No se pudo enviar: '+e.message); }
+}
+
 </script>
 <script src="/js/app-version.js"></script>
 </body>

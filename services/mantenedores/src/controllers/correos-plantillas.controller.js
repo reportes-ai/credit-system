@@ -6,24 +6,11 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const plantillas = require('../../../../shared/plantillas-correo');
 
-// Registro de funcionalidad + permiso (sin tocar código al agregar el módulo)
-require('../../../../shared/migrate').enFila('correos-plantillas-func', async () => {
-  try {
-    const [[mod]] = await pool.query(
-      "SELECT id_modulo FROM modulos WHERE nombre='Mantenedores' OR ruta LIKE '/mantenedores%' LIMIT 1");
-    if (!mod) return;
-    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='mant_correos' LIMIT 1");
-    let idf = ex?.id_funcionalidad;
-    if (!idf) {
-      const [ins] = await pool.query(
-        'INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)',
-        [mod.id_modulo, 'Correos del Sistema', 'mant_correos', '/mantenedores/correos/', 'bi-envelope-at']);
-      idf = ins.insertId;
-    }
-    const [[pp]] = await pool.query('SELECT 1 v FROM permisos_perfil WHERE id_perfil=1 AND id_funcionalidad=? LIMIT 1', [idf]);
-    if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idf]);
-  } catch (e) { console.error('[correos-plantillas func]', e.message); }
-});
+/* SIN funcionalidad propia: los correos se administran DENTRO de Post Venta →
+   Mantenedores (decisión de Pato 13-08-2026, "todos los correos en una sola
+   parte"), así que la pantalla y el permiso son los de esa página
+   (postventa_mantenedores). Una card aparte solo volvería a partir en dos lo
+   que se acaba de juntar. /mantenedores/correos/ queda redirigiendo allá. */
 
 // GET /api/correos-plantillas
 const listar = async (req, res) => {
@@ -78,9 +65,14 @@ const prueba = async (req, res) => {
     const p = await plantillas.obtener(codigo);
     if (!p) return res.status(404).json({ success: false, data: null, error: 'Plantilla no encontrada' });
 
+    // Ejemplos para TODAS las variables en uso (parques en MAYÚSCULA, dealer en minúscula)
     const EJEMPLO = { ODP: 'ODP2600123', PARQUE: 'PARQUE EJEMPLO', PERIODO: '2026-07',
-      ARRIENDO: '$250.000', COMISION: '$1.234.567', OPS: 8, TOTAL: '$1.484.567',
-      QUIEN: req.usuario ? [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') : 'Sistema' };
+      PERIODO_LARGO: 'julio 2026', ARRIENDO: '$250.000', COMISION: '$1.234.567',
+      OPS: 8, TOTAL: '$1.484.567',
+      QUIEN: req.usuario ? [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') : 'Sistema',
+      dealer: 'AUTOMOTORA DE PRUEBA SPA', mes: 'julio 2026', total: '$1.234.567',
+      doc: 'factura', numero_factura: '12345', tipo_cuenta: 'cuenta corriente',
+      num_cuenta: '00-123-45678-9', banco: 'BANCO DE CHILE', ops: '26080001, 26080002' };
 
     const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
     if (!mailConfigurado()) return res.status(400).json({ success: false, data: null, error: 'El correo del sistema no está configurado' });
