@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantención Dealers — AutoFácil</title>
-  <!-- v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
+  <!-- v1.19 — Editar Dealer con las mismas listas de la ficha: banco oficial y categoria CALLE/PARTICULAR/parques del mantenedor, con buscador y rechazo de valores fuera de lista · v1.18 — la advertencia de posible SIN FIRMA aclara que NO bloquea el cierre -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -115,12 +115,20 @@
       <div class="fld"><label>RUT</label><input id="d_rut"></div>
       <div class="fld"><label>Nombre Razón Social</label><input id="d_nombre_razon"></div>
       <div class="fld"><label>Nombre Dealer</label><input id="d_nombre_indexa"></div>
-      <div class="fld"><label>Categoría (CCS/Parque)</label><input id="d_ccs_parque"></div>
+      <!-- Mismas listas que la ficha original (regla 13-08): parque desde el mantenedor
+           Arriendos y Comisiones + CALLE/PARTICULAR; banco desde la lista oficial. -->
+      <div class="fld"><label>Categoría (CCS/Parque)</label><input id="d_ccs_parque" list="d_parquesLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dCanonico('d_ccs_parque','d_parquesLista')"><datalist id="d_parquesLista"><option>CALLE</option><option>PARTICULAR</option></datalist></div>
       <div class="fld full"><label>Dirección</label><input id="d_direccion"></div>
       <div class="fld"><label>Contacto</label><input id="d_contacto"></div>
       <div class="fld"><label>Teléfono</label><input id="d_telefono"></div>
       <div class="fld"><label>Correo</label><input id="d_correo"></div>
-      <div class="fld"><label>Banco</label><input id="d_banco"></div>
+      <div class="fld"><label>Banco</label><input id="d_banco" list="d_bancosLista" placeholder="Escribe para buscar…" autocomplete="off" onblur="dBancoCanonico()"><datalist id="d_bancosLista">
+        <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
+        <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
+        <option>Banco Falabella</option><option>Banco Ripley</option><option>Banco Consorcio</option>
+        <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
+        <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
+      </datalist></div>
       <div class="fld"><label>N° Cuenta</label><input id="d_num_cuenta"></div>
       <div class="fld"><label>RUT Pago</label><input id="d_rut_pago"></div>
       <div class="fld"><label>Activo</label><select id="d_activo"><option value="1">Sí</option><option value="0">No</option></select></div>
@@ -594,8 +602,33 @@ function editarDealer(id){
     + (d.part_especial_por?`<div style="margin-top:6px;font-size:.78rem;color:#5b21b6"><i class="bi bi-patch-check-fill me-1"></i>Participación especial aprobada por <b>${escH(d.part_especial_por)}</b></div>`:'');
   dlgDealer.showModal();
 }
+/* Mismas listas que la ficha original: lo escrito se normaliza al nombre oficial
+   y lo que no está en la lista se rechaza al guardar (regla Pato 13-08). */
+const dLista = dl => [...document.querySelectorAll('#'+dl+' option')].map(o=>o.value);
+function dCanonico(inputId, dl){
+  const el=$(inputId); const v=String(el.value||'').trim(); if(!v){ el.style.borderColor=''; return true; }
+  const n=v.toLowerCase();
+  let m = dLista(dl).filter(b=>b.toLowerCase()===n);
+  if(!m.length) m = dLista(dl).filter(b=>b.toLowerCase().includes(n));
+  if(m.length===1){ el.value=m[0]; el.style.borderColor=''; return true; }
+  const ok = dLista(dl).some(b=>b.toLowerCase()===n);
+  el.style.borderColor = ok ? '' : '#dc2626';
+  return ok;
+}
+const dBancoCanonico = () => dCanonico('d_banco','d_bancosLista');
+async function cargarParquesLista(){
+  try {
+    const j = await (await fetch('/api/parques-comisiones?activos=1',{headers:H})).json();
+    const dl=$('d_parquesLista'); if(!dl) return;
+    dl.innerHTML = '<option>CALLE</option><option>PARTICULAR</option>' +
+      ((j&&j.data)||[]).map(p=>`<option value="${escH(p.nombre)}"></option>`).join('');
+  } catch(e){}
+}
+cargarParquesLista();
 async function guardarDealer(){
   const id=$('d_id').value;
+  if(!dCanonico('d_banco','d_bancosLista')) { toast('Banco: "'+$('d_banco').value+'" no está en la lista de bancos — elígelo de las sugerencias', true); return; }
+  if(!dCanonico('d_ccs_parque','d_parquesLista')) { toast('Categoría: "'+$('d_ccs_parque').value+'" no es CALLE, PARTICULAR ni un parque del mantenedor Arriendos y Comisiones', true); return; }
   const body={ numero_ind:DEALERS.find(x=>x.id_dealer==id)?.numero_ind||null,
     rut:$('d_rut').value.trim(), nombre_razon:$('d_nombre_razon').value.trim(), nombre_indexa:$('d_nombre_indexa').value.trim(),
     ccs_parque:$('d_ccs_parque').value.trim(), direccion:$('d_direccion').value.trim(),
