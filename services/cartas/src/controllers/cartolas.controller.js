@@ -410,17 +410,17 @@ const enviarCorreoCartola = async (req, res) => {
   try {
     const { mes_nombre, dealer, mail, total, pdf_base64, filename, ejec_cc } = req.body || {};
     if (!dealer || !mail) return res.status(400).json({ success: false, data: null, error: 'dealer y mail requeridos' });
-    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
-    const tpl = tRow ? JSON.parse(tRow.valor) : {};
+    // La plantilla vive en el mantenedor único Correos del Sistema (antes en postventa_config)
+    const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_cartola_envio', 'correo_cartola_dealer');
     if (tpl.activo === false)
-      return res.json({ success: true, data: { enviado: false, motivo: 'Plantilla desactivada en Mantenedores Post Venta' }, error: null });
+      return res.json({ success: true, data: { enviado: false, motivo: 'Plantilla desactivada en Mantenedores → Correos del Sistema' }, error: null });
     const datos = { dealer, mes: mes_nombre || '', total: total || '' };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
     // CC: ejecutivos de las operaciones + Jefes Comerciales activos (por perfil, paramétrico)
     const [jefes] = await pool.query(
       `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
        WHERE p.nombre = 'Jefe Comercial' AND u.estado = 'activo' AND u.email IS NOT NULL`);
-    const cc = [...new Set(['comisiones@autofacilchile.cl',   // copia a la casilla del área
+    const cc = [...new Set([...String(tpl.cc || '').split(','),   // copia fija del mantenedor
       ...(Array.isArray(ejec_cc) ? ejec_cc : []), ...jefes.map(j => j.email)]
       .map(x => String(x).trim().toLowerCase()).filter(Boolean))].join(',');
     const { enviarCorreo, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');

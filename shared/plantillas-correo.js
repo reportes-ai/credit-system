@@ -39,6 +39,52 @@ const SEMILLAS = [
     cc: '',
     variables: '{ODP} {PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
   },
+  /* ── Cartolas y comisiones de DEALER ──────────────────────────────────────
+     Vivían en postventa_config como JSON {asunto,cuerpo,firma,activo}, editables
+     en Post Venta → Mantenedores. Se traen acá para que TODOS los correos del
+     sistema se administren en un solo lugar. `importarDe` hace que la semilla
+     tome el texto que ya estaba configurado, en vez de pisarlo con el default.
+     El envío no cambió: sigue saliendo de comisiones@ con su CC dinámico
+     (ejecutivos de la cartola + Jefes Comerciales), al que ahora se suma el CC
+     fijo de la plantilla. */
+  {
+    codigo: 'dealer_cartola_envio',
+    ambito: 'Post Venta — Dealers',
+    nombre: 'Cartola mensual → al DEALER (con PDF adjunto)',
+    descripcion: 'Se manda al pulsar "Enviar Cartola" en Emisión de Cartolas (Cartas de Aprobación → Revisión Cartolas). Sale desde comisiones@ con la cartola en PDF adjunta. Además del CC de acá, siempre copia a los ejecutivos de las operaciones y a los Jefes Comerciales.',
+    importarDe: 'correo_cartola_dealer',
+    asunto: 'Cartola de comisiones {mes} — {dealer}',
+    cuerpo: `Estimados {dealer}:
+
+Junto con saludar, adjuntamos la cartola de comisiones correspondiente a {mes}, por un total de {total}.
+
+Favor emitir la factura por el total indicado.
+
+Saludos cordiales,
+AutoFácil Crédito Automotriz`,
+    para_perfiles: '',
+    cc: 'comisiones@autofacilchile.cl',
+    variables: '{dealer} {mes} {total}',
+  },
+  {
+    codigo: 'dealer_comision_pagada',
+    ambito: 'Post Venta — Dealers',
+    nombre: 'Comisión pagada → al DEALER',
+    descripcion: 'Se manda al confirmar el pago de la comisión de un dealer, una vez por factura. Sale desde comisiones@ al correo del dealer.',
+    importarDe: 'correo_comision_pagada',
+    asunto: 'Pago de comisión — {dealer}',
+    cuerpo: `Estimados {dealer}:
+
+Les informamos que se realizó el pago de la comisión correspondiente a su {doc} N° {numero_factura}, a la {tipo_cuenta} N° {num_cuenta} del {banco}.
+
+Operaciones incluidas: {ops}
+
+Saludos cordiales,
+AutoFácil Crédito Automotriz`,
+    para_perfiles: '',
+    cc: 'comisiones@autofacilchile.cl',
+    variables: '{dealer} {doc} {numero_factura} {tipo_cuenta} {num_cuenta} {banco} {ops}',
+  },
   {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
@@ -123,11 +169,26 @@ require('./migrate').enFila('correos-plantillas', async () => {
   /* INSERT IGNORE: la semilla define el texto ORIGINAL, nunca pisa lo que el
      Administrador haya editado después (ese es el punto de tenerlo en mantenedor). */
   for (const p of SEMILLAS) {
+    let { asunto, cuerpo, cc } = p, activo = 1;
+    /* Plantilla que ya existía en postventa_config: se importa TAL COMO ESTÁ
+       configurada hoy (con su firma pegada al cuerpo y su interruptor), para
+       que mudarla de mantenedor no cambie ni una coma de lo que se envía. */
+    if (p.importarDe) {
+      try {
+        const [[old]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [p.importarDe]);
+        const v = old ? JSON.parse(old.valor) : null;
+        if (v) {
+          if (v.asunto) asunto = v.asunto;
+          if (v.cuerpo) cuerpo = v.cuerpo + (v.firma ? '\n\n' + v.firma : '');
+          if (v.activo === false) activo = 0;
+        }
+      } catch (e) { console.error('[correos importar ' + p.importarDe + ']', e.message); }
+    }
     await pool.query(
       `INSERT IGNORE INTO correos_plantillas
          (codigo, ambito, nombre, descripcion, asunto, cuerpo, para_perfiles, cc, variables, activo)
-       VALUES (?,?,?,?,?,?,?,?,?,1)`,
-      [p.codigo, p.ambito, p.nombre, p.descripcion, p.asunto, p.cuerpo, p.para_perfiles, p.cc, p.variables]);
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [p.codigo, p.ambito, p.nombre, p.descripcion, asunto, cuerpo, p.para_perfiles, cc, p.variables, activo]);
     // La descripción y las variables son documentación, no contenido editable: se refrescan.
     await pool.query('UPDATE correos_plantillas SET descripcion=?, variables=?, ambito=?, nombre=? WHERE codigo=?',
       [p.descripcion, p.variables, p.ambito, p.nombre, p.codigo]);
@@ -141,8 +202,13 @@ const obtener = async codigo => {
 
 /* Reemplaza {VARIABLE} por su valor. Lo que no venga en datos queda vacío, nunca
    como "{VARIABLE}" a la vista del destinatario. */
+/* Acepta {MAYUSCULAS} y {minusculas} (las plantillas de dealer usan minúscula).
+   Una variable sin dato queda vacía, nunca "{VARIABLE}" a la vista del que recibe. */
 const render = (texto, datos = {}) =>
-  String(texto || '').replace(/\{([A-Z_0-9]+)\}/g, (_, k) => (datos[k] == null ? '' : String(datos[k])));
+  String(texto || '').replace(/\{(\w+)\}/g, (_, k) =>
+    (datos[k] != null ? String(datos[k])
+      : datos[k.toUpperCase()] != null ? String(datos[k.toUpperCase()])
+      : datos[k.toLowerCase()] != null ? String(datos[k.toLowerCase()]) : ''));
 
 /* Correos de los usuarios activos de una lista de perfiles (CSV). */
 async function correosDePerfiles(csv) {
@@ -184,4 +250,20 @@ async function enviar({ codigo, to = [], datos = {}, adjuntos } = {}) {
   }
 }
 
-module.exports = { enviar, obtener, render, correosDePerfiles, SEMILLAS };
+/* Adaptador para los envíos que ya tenían su propia mecánica (cartola y comisión
+   pagada del dealer: remitente comisiones@, CC dinámico con los ejecutivos y los
+   Jefes Comerciales, cuerpo en texto plano). Devuelve el MISMO shape que traían
+   de postventa_config, así que solo cambia DE DÓNDE sale la plantilla — el envío
+   queda intacto. `firma` va vacía porque al importar quedó pegada al cuerpo.
+   Si la plantilla aún no existe, cae a postventa_config y nada se detiene. */
+async function comoTpl(codigo, claveLegado) {
+  const p = await obtener(codigo);
+  if (p) return { asunto: p.asunto, cuerpo: p.cuerpo, firma: '', activo: !!p.activo, cc: p.cc || '' };
+  if (claveLegado) {
+    const [[old]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [claveLegado]).catch(() => [[null]]);
+    if (old) { try { return { ...JSON.parse(old.valor), cc: '' }; } catch (_) {} }
+  }
+  return { asunto: '', cuerpo: '', firma: '', activo: true, cc: '' };
+}
+
+module.exports = { enviar, obtener, render, correosDePerfiles, comoTpl, SEMILLAS };

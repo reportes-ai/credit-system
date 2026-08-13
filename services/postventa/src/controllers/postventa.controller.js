@@ -917,8 +917,8 @@ async function notificarPagoComisionDealer(idSeguimiento) {
     const [reps] = await pool.query(
       'SELECT num_op FROM postventa_facturas_comision WHERE id_titular=? AND es_replica=1', [idSeguimiento]);
     const ops = [d.num_op, ...reps.map(r => r.num_op)].filter(Boolean).join(', ') || String(d.num_op || '');
-    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_comision_pagada'");
-    const tpl = tRow ? JSON.parse(tRow.valor) : {};
+    // La plantilla vive en el mantenedor único Correos del Sistema (antes en postventa_config)
+    const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_comision_pagada', 'correo_comision_pagada');
     if (tpl.activo === false) return;               // interruptor del mantenedor: aviso desactivado
     const datos = {
       doc: d.es_boleta ? 'boleta' : 'factura',
@@ -936,7 +936,7 @@ async function notificarPagoComisionDealer(idSeguimiento) {
     await enviarCorreo({
       from: remitenteComisiones(),
       to: d.correo,
-      cc: 'comisiones@autofacilchile.cl',   // copia a la casilla del área
+      cc: tpl.cc || undefined,              // copia fija del mantenedor
       subject: rell(tpl.asunto) || 'Comisión pagada',
       html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')),
       text: cuerpo,
@@ -956,10 +956,10 @@ const probarCorreos = async (req, res) => {
     const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const aHtml = t => escH(t).replace(/\n/g, '<br>');
     const rell = (t, datos) => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
-    const [[cRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_cartola_dealer'");
-    const [[pRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_comision_pagada'");
-    const tCta = cRow ? JSON.parse(cRow.valor) : {};
-    const tPag = pRow ? JSON.parse(pRow.valor) : {};
+    // Las plantillas viven en el mantenedor único Correos del Sistema
+    const _plant = require('../../../../shared/plantillas-correo');
+    const tCta = await _plant.comoTpl('dealer_cartola_envio', 'correo_cartola_dealer');
+    const tPag = await _plant.comoTpl('dealer_comision_pagada', 'correo_comision_pagada');
     const dCta = { dealer: 'AUTOMOTORA DE PRUEBA SPA', mes: 'Agosto 2026', total: '$1.234.567' };
     const dPag = { doc: 'factura', numero_factura: '12345', dealer: 'AUTOMOTORA DE PRUEBA SPA',
                    tipo_cuenta: 'cuenta corriente', num_cuenta: '00-123-45678-9', banco: 'BANCO DE CHILE', ops: '26080001, 26080002' };
