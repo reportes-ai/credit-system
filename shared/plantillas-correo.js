@@ -103,9 +103,8 @@ Junto con saludar, adjuntamos la cartola de comisiones y arriendo correspondient
 
 Comisión por créditos ({OPS} operaciones): {COMISION}
 Arriendo mensual: {ARRIENDO}
-TOTAL BRUTO A PAGAR (IVA incluido): {TOTAL}
 
-Favor emitir la factura por el total indicado a:
+Favor emitir la(s) factura(s) a:
 AUTOFACIL SPA — RUT 76.545.638-K
 Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
 

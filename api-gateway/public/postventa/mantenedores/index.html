@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v2.7 — los montos seguidos salen como tabla en el correo · v2.6 — el cuerpo se envia con parrafos de verdad (bug: la prueba lo mandaba todo pegado) · v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -126,7 +126,7 @@
          los correos de Post Venta, para que todo se administre en un solo lugar. -->
     <div style="margin-top:22px;border-top:2px solid #e2e8f0;padding-top:16px">
       <h6 style="font-weight:800;color:#0141A2;margin:0 0 4px"><i class="bi bi-envelope-at me-1"></i>Correos de Cartolas, Comisiones y Parques</h6>
-      <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. El cuerpo se escribe en <b>texto normal</b> (el sistema le da el formato al enviarlo). Cada correo indica <b>a quién va dirigido</b>; los perfiles y el CC son copias que se suman. Cada uno se guarda por separado y queda auditado; <b>Prueba</b> lo manda con datos de ejemplo solo a la casilla que indiques.</div>
+      <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. El cuerpo se escribe en <b>texto normal</b> y el sistema le da el formato al enviarlo: una línea en blanco separa párrafos, y <b>dos o más líneas seguidas del tipo «Concepto: $monto» salen como tabla</b> (si la etiqueta empieza con TOTAL, la fila va destacada). Cada correo indica <b>a quién va dirigido</b>; los perfiles y el CC son copias que se suman. Cada uno se guarda por separado y queda auditado; <b>Prueba</b> lo manda con datos de ejemplo solo a la casilla que indiques.</div>
       <div id="plantCont"><div style="color:#94a3b8;font-size:.82rem;padding:14px 0">Cargando correos…</div></div>
     </div>
 

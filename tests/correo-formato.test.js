@@ -13,7 +13,7 @@ test('una línea en blanco separa párrafos', () => {
 });
 
 test('el salto simple es <br>, no párrafo nuevo', () => {
-  const html = aHTML('Comisión: $100\nArriendo: $250\nTotal: $350');
+  const html = aHTML('Primera línea\nSegunda línea\nTercera línea');
   assert.strictEqual(html.match(/<p /g).length, 1);
   assert.strictEqual(html.match(/<br>/g).length, 2);
 });
@@ -21,10 +21,11 @@ test('el salto simple es <br>, no párrafo nuevo', () => {
 test('el texto NUNCA sale pegado en un solo bloque', () => {
   const cuerpo = 'Estimados PARQUE:\n\nAdjuntamos la cartola.\n\nComisión: $1\nArriendo: $2\n\nSaludos,\nAutoFácil';
   const html = aHTML(cuerpo);
-  // 4 párrafos y ninguna pareja de textos sin etiqueta de separación entre medio
-  assert.strictEqual(html.match(/<p /g).length, 4);
-  assert.ok(/cartola\.<\/p><p /.test(html), 'cada párrafo cierra antes de que empiece el siguiente');
-  assert.ok(/\$1<br>Arriendo/.test(html), 'las líneas del detalle van con salto simple');
+  // 3 párrafos + el bloque de montos, que se va como tabla
+  assert.strictEqual(html.match(/<p /g).length, 3);
+  assert.ok(html.includes('<table'));
+  assert.ok(/cartola\.<\/p>/.test(html), 'cada párrafo cierra antes de que empiece el siguiente');
+  assert.ok(/Saludos,<br>AutoFácil/.test(html), 'dentro de un párrafo el salto simple es <br>');
 });
 
 test('si viene HTML de verdad, se respeta tal cual', () => {
@@ -52,4 +53,32 @@ test('una variable sin dato queda vacía, nunca {ASI} a la vista del cliente', (
   assert.strictEqual(render('Total: {TOTAL}', {}), 'Total: ');
   assert.strictEqual(render('', {}), '');
   assert.strictEqual(render(null, {}), '');
+});
+
+/* Dos o más líneas de monto seguidas se leen mejor como tabla que como texto
+   corrido — es lo que pidió Pato mirando el correo real (13-08-2026). */
+test('un bloque de montos se convierte en tabla', () => {
+  const html = aHTML('Comisión por créditos (4 operaciones): $547.250\nArriendo mensual: $250.000');
+  assert.ok(html.includes('<table'));
+  assert.strictEqual(html.match(/<tr>/g).length, 3);   // encabezado + 2 filas
+  assert.ok(html.includes('Comisión por créditos (4 operaciones)'));
+  assert.ok(html.includes('$547.250'));
+});
+
+test('una línea de monto suelta NO arma tabla', () => {
+  const html = aHTML('Total pagado: $100');
+  assert.ok(!html.includes('<table'));
+  assert.ok(html.includes('<p '));
+});
+
+test('un texto que termina en dos puntos no se confunde con un monto', () => {
+  const html = aHTML('Favor emitir la(s) factura(s) a:\nAUTOFACIL SPA — RUT 76.545.638-K');
+  assert.ok(!html.includes('<table'), 'sin signo $ no es una línea de monto');
+  assert.ok(/<p[^>]*>Favor emitir/.test(html));
+});
+
+test('la fila TOTAL se destaca', () => {
+  const html = aHTML('Arriendo mensual: $250.000\nTOTAL A PAGAR: $1.000.000');
+  assert.ok(html.includes('<table'));
+  assert.ok(/font-weight:700[^"]*"[^>]*>TOTAL A PAGAR/.test(html), 'la fila de total va en negrita');
 });
