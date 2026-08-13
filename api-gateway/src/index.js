@@ -316,6 +316,7 @@ app.use('/api/tipos-documento',      require('../../services/mantenedores/src/ro
 app.use('/api/plantillas-documento', require('../../services/mantenedores/src/routes/plantillas.routes'));
 app.use('/api/cuentas-bancarias',    require('../../services/mantenedores/src/routes/cuentas-bancarias.routes'));
 app.use('/api/parques-comisiones',   require('../../services/mantenedores/src/routes/parques.routes'));
+app.use('/api/correos-plantillas',   require('../../services/mantenedores/src/routes/correos-plantillas.routes'));
 app.use('/api/sql-console',               require('../../services/mantenedores/src/routes/sql-console.routes'));
 app.use('/api/punto-restauracion',        require('../../services/mantenedores/src/routes/punto-restauracion.routes'));
 app.use('/api/recalculo-programado',      require('../../services/mantenedores/src/routes/recalculo-programado.routes'));

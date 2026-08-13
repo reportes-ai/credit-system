@@ -501,24 +501,14 @@ const emitir = async (req, res) => {
       href: '/ordenes-pago/', clave: `parqueop:${odp.numero}`,
     });
 
-    // Correo a Contabilidad con el desglose
-    try {
-      const { enviarCorreo, mailConfigurado, envolverHTML } = require('../../../../shared/mailer');
-      const to = destinatarios.map(u => u.email).filter(Boolean);
-      if (mailConfigurado() && to.length) {
-        const html = envolverHTML(`
-          <h2 style="color:#012d70">Orden de Pago ${odp.numero} — Comisión Parque</h2>
-          <p><b>Parque:</b> ${parque}<br><b>Período:</b> ${mes}</p>
-          <table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
-            <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
-            <tr><td>Arriendo mensual</td><td align="right">${CLP(arriendo)}</td></tr>
-            <tr><td>Comisión por créditos (${e.ops} operaciones)</td><td align="right">${CLP(comision)}</td></tr>
-            <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL A PAGAR</td><td align="right">${CLP(total)}</td></tr>
-          </table>
-          <p>Emitida por ${quien}. La orden queda <b>por pagar</b> en el módulo Órdenes de Pago.</p>`);
-        await enviarCorreo({ to, subject: `OP ${odp.numero} — Comisión Parque ${parque} ${mes} (${CLP(total)})`, html });
-      }
-    } catch (me) { console.error('[comisiones-parques mail]', me.message); }
+    // Correo a Contabilidad con el desglose — texto, destinatarios y CC salen del
+    // mantenedor Correos del Sistema (plantilla parque_odp_contabilidad).
+    await require('../../../../shared/plantillas-correo').enviar({
+      codigo: 'parque_odp_contabilidad',
+      to: destinatarios.map(u => u.email).filter(Boolean),
+      datos: { ODP: odp.numero, PARQUE: parque, PERIODO: mes, ARRIENDO: CLP(arriendo),
+               COMISION: CLP(comision), OPS: e.ops, TOTAL: CLP(total), QUIEN: quien },
+    });
 
     await marcarEtapaParqueOps(parque, mes, ['ORDEN DE PAGO EMITIDA'], quien);
     auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_parque', entidad_id: odp.id, detalle: `Emitió ${odp.numero}: ${concepto}` });
@@ -564,6 +554,27 @@ const pagar = async (req, res) => {
     });
 
     await marcarEtapaParqueOps(parque, mes, ['ENVIADO A PAGO', 'COMISION PAGADA'], quien);
+
+    /* Avisos por correo del pago — texto, interruptor y CC en el mantenedor
+       Correos del Sistema. Uno va al PARQUE (al correo de su ficha) y otro al
+       equipo comercial. Best-effort: el motor no lanza, así que un correo
+       caído no deja el pago a medias. */
+    {
+      const datos = { PARQUE: parque, PERIODO: mes, ARRIENDO: CLP(e.arriendo),
+        COMISION: CLP(e.comision_creditos), OPS: e.ops, TOTAL: CLP(total),
+        ODP: e.odp_numero || '—', QUIEN: quien };
+      const plant = require('../../../../shared/plantillas-correo');
+      // Correo del parque: contacto financiero de la ficha o, si no hay, el de confirmación
+      const [[f]] = await pool.query(`
+        SELECT f.cf_email, f.correo_confirmacion FROM parques_comisiones p
+          LEFT JOIN parques_ficha f ON f.id_parque = p.id WHERE p.nombre = ? LIMIT 1`, [parque])
+        .catch(() => [[null]]);
+      const mailParque = (f?.cf_email || f?.correo_confirmacion || '').trim();
+      if (mailParque) plant.enviar({ codigo: 'parque_pago_aviso', to: [mailParque], datos });
+      else console.warn('[parques pago] sin correo en la ficha de', parque);
+      plant.enviar({ codigo: 'parque_pago_jefe_comercial', datos });   // destinatarios por perfil
+    }
+
     // Máxima 4: el pago rebaja el pasivo contra banco (regla COMISION_PARQUES_PAGADA)
     require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: 'COMISION_PARQUES_PAGADA',
