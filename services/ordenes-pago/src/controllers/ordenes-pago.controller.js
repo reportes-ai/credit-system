@@ -829,6 +829,12 @@ const pagarOrden = async (req, res) => {
       const [[s]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes WHERE id=?', [oc.origen_id]);
       if (s) {
         await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES (?, 'SALDO', 'SALDO PRECIO PAGADO', ?)`, [s.id_seguimiento, quien]);
+        // Contrapartida contable del egreso (Máxima 4): sin esto la cuenta de
+        // paso 2102045 solo crecía. Idempotente por ref; aislado, nunca rompe el pago.
+        try {
+          const pv = require('../../../postventa/src/controllers/postventa.controller');
+          if (pv.contabilizarSaldoPrecio) await pv.contabilizarSaldoPrecio(s.id_seguimiento, 'SALDO PRECIO PAGADO');
+        } catch (e) { console.error('[ordenes-pago contab saldo]', e.message); }
         // Aviso al dealer (plantilla correo_pago_saldo del mantenedor Post Venta;
         // nace inactiva). Aislado: un correo caído jamás debe romper el pago.
         try {
@@ -846,6 +852,8 @@ const pagarOrden = async (req, res) => {
           const grupo = await pv.idsGrupoFactura(s.id_seguimiento);
           const vals = grupo.map(g => [g, 'COMISION', 'COMISION PAGADA', quien]);
           await pool.query(`INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
+          // Mismo hueco que en saldo precio: pagar desde acá no rebajaba el pasivo de la comisión.
+          if (pv.contabilizarComision) await pv.contabilizarComision(s.id_seguimiento, 'PAGO');
           await pv.notificarPagoComisionDealer(s.id_seguimiento);
         } catch (ePV) {
           console.error('[ordenes-pago hook comision]', ePV.message);

@@ -423,7 +423,9 @@ async function contabilizarComision(idSeguimiento, momento) {
 /* Saldo precio: CUENTA DE PASO (Máxima 4). AutoFácil es intermediario — la
    financiera transfiere el saldo y se entrega ÍNTEGRO al dealer. No es ingreso ni
    gasto: entra y sale por un pasivo transitorio, sin tocar el resultado. */
-async function contabilizarSaldoPrecio(idSeguimiento, etapa) {
+// `fecha` (opcional, YYYY-MM-DD): para regularizar pagos antiguos con la fecha en
+// que ocurrieron. Sin ella, el asiento se emite con la fecha de hoy.
+async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
   try {
     const [[s]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.financiera, po.num_orden, po.monto AS odp_monto,
@@ -450,7 +452,7 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa) {
     const detalle = [s.num_orden, s.nombre_dealer].filter(Boolean).join(' · ');
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: recibido ? 'SALDO_FONDOS_RECIBIDOS' : 'SALDO_PRECIO_PAGADO',
-      fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
+      fecha: /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
       glosa: `Saldo precio OP ${s.num_op} — ${recibido ? 'fondos recibidos' : 'pagado a ' + (s.nombre_dealer || 'dealer')}`.slice(0, 300),
       ref: `SP-${s.num_op}-${recibido ? 'IN' : 'OUT'}`, montos: { monto }, num_op: s.num_op || null,
       rut: s.rut_dealer || null, detalle,
@@ -1601,6 +1603,12 @@ const pagarSaldos = async (req, res) => {
     await pool.query(
       `INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?`, [vals]);
     await marcarComisionAPagar(ids);   // el saldo quedó pagado → la comisión queda A PAGAR
+    /* Contrapartida contable del egreso (Máxima 4). Este camino —el que se usa
+       de verdad para pagar— marcaba la etapa con un INSERT directo y se saltaba
+       la contabilización, que solo se disparaba al marcar la etapa a mano en
+       Seguimiento. Resultado: la cuenta de paso 2102045 solo crecía. El motor es
+       idempotente por ref (SP-<op>-OUT), así que no duplica. */
+    for (const id of ids) await contabilizarSaldoPrecio(id, 'SALDO PRECIO PAGADO');
     // Registrar el PAGO en el libro central op_correlativos → timbre PAGADO en el documento
     const idCaja = await cajaActivaDe(req.usuario?.id_usuario);
     for (const id of ids) {
@@ -2311,4 +2319,5 @@ module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
+  contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
   getFijosAutoFin, esAutoFin, montoSaldoOrden };
