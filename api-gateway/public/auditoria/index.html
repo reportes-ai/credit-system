@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auditoría — AutoFácil</title>
-  <!-- v2.3 — pestaña Correos Enviados: log de todo correo del sistema por remitente, con vista del correo · v2.2 — breadcrumb con Mantenedores -->
+  <!-- v2.4 — fix: al reabrir el MISMO correo el cuerpo salia en blanco (el iframe no recarga si el srcdoc no cambia) · v2.3 — pestaña Correos Enviados: log de todo correo del sistema por remitente, con vista del correo · v2.2 — breadcrumb con Mantenedores -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -406,8 +406,20 @@ async function verCorreo(id){
     document.getElementById('dcDest').innerHTML =
       `<b>Para:</b> ${escH(c.destinatarios||'—')}` +
       (c.cc?`<br><b>CC:</b> ${escH(c.cc)}`:'') + (c.bcc?`<br><b>CCO:</b> ${escH(c.bcc)}`:'');
-    document.getElementById('dcFrame').srcdoc = c.html || '<p style="font-family:sans-serif;color:#64748b;padding:20px">Este correo se envió solo con texto plano o sin contenido HTML registrado.</p>';
-    document.getElementById('dlgCorreo').showModal();
+    /* El <iframe> se RECREA en cada apertura. Reusarlo dejaba el cuerpo en blanco
+       al volver a abrir el mismo correo: cerrar el <dialog> descarta el documento
+       del iframe, y como el srcdoc se reasignaba con el MISMO texto, el navegador
+       no lo recarga. Verificado en Chrome (13-08-2026). */
+    const dlg = document.getElementById('dlgCorreo');
+    dlg.showModal();
+    const viejo = document.getElementById('dcFrame');
+    const f = document.createElement('iframe');
+    f.id = 'dcFrame'; f.setAttribute('sandbox', '');   // sin scripts: el HTML del correo no se ejecuta
+    f.style.cssText = viejo.style.cssText;
+    viejo.replaceWith(f);
+    // El logo viaja incrustado en el correo real (cid:); acá se sirve desde el sitio.
+    f.srcdoc = (c.html || '<p style="font-family:sans-serif;color:#64748b;padding:20px">Este correo se envió solo con texto plano o sin contenido HTML registrado.</p>')
+      .replace(/cid:aflogobs/g, location.origin + '/img/logo-bs-mail.png');
   } catch(e){ toast('Error de conexión', true); }
 }
 
