@@ -863,10 +863,15 @@ const otorgar = async (req, res) => {
                   fecha_otorgado=COALESCE(fecha_otorgado, CURDATE()),
                   comdea_real = CASE WHEN ? > 0 THEN ? ELSE comdea_real END, updated_at=NOW()
             WHERE (${cond.join(' OR ')})
-              AND (estado IN ('CARTA_APROBACION','APROBADO','INGRESO','DIGITADO')
+              /* UPPER en las dos ramas: estas columnas tienen collation BINARIA
+                 (utf8mb4_bin), o sea distinguen mayúsculas. La carga Trinidad
+                 escribe 'Digitado' y la comparación contra 'DIGITADO' no calzaba:
+                 la carta quedaba otorgada y el crédito PENDIENTE, invisible en el
+                 dashboard y en comisiones (caso 26080532, Karen Méndez 13-08-2026). */
+              AND (UPPER(COALESCE(estado,'')) IN ('CARTA_APROBACION','APROBADO','INGRESO','DIGITADO')
                    /* Créditos de carga masiva: estado NULL, el estado vive en estado_credito.
                       Sin esta rama, otorgar la carta no movía la operación a OTORGADO. */
-                   OR (estado IS NULL AND COALESCE(estado_credito,'') IN ('APROBADO','DIGITADO','PENDIENTE')))`,
+                   OR (estado IS NULL AND UPPER(COALESCE(estado_credito,'')) IN ('APROBADO','DIGITADO','PENDIENTE')))`,
           [...valoresEtapa('OTORGADO'), partB, partB, ...args]
         ).catch(e => console.error('[carta otorgar→credito]', e.message));
         // El crédito de la carta nace sin num_op → correlativo AutoFácil (motor único).
