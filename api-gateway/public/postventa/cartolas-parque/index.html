@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -188,15 +188,15 @@ function cartolaHTML(r, i){
           ${filas || '<tr><td colspan="6" style="color:#94a3b8">Sin operaciones en el período</td></tr>'}
           <tr class="linea"><td colspan="5">Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'})</td><td class="r">${fmtCLP(r.comision_creditos)}</td></tr>
           <tr class="linea"><td colspan="5">Arriendo mensual</td><td class="r">${fmtCLP(r.arriendo)}</td></tr>
-          <tr class="total"><td colspan="5">TOTAL A PAGAR (bruto, IVA incluido)</td><td class="r">${fmtCLP(r.total)}</td></tr>
+          <tr class="total"><td colspan="5">TOTAL</td><td class="r">${fmtCLP(r.total)}</td></tr>
         </table>
-        <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor facturar por el total indicado.</div>
+        <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor emitir la(s) factura(s) a AUTOFACIL SPA — RUT 76.545.638-K, según el régimen tributario del parque.</div>
       </div>
       <div class="mailrow">
         <label style="font-size:.75rem;font-weight:700;color:#475569">Correo del parque:</label>
         <input id="mail${i}" value="${escA(mail)}" placeholder="finanzas@parque.cl">
         ${!mail?'<span style="font-size:.7rem;color:#b45309">⚠ sin correo de finanzas en la <a href="/dealers-incorporacion/parques.html">ficha del parque</a></span>':''}
-        ${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}',this)"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
+        ${r.ops>0 ? `<button class="btn b-light" onclick="verPdf(${i},'${escA(r.parque)}')" title="Ver el PDF que se va a adjuntar, sin enviar"><i class="bi bi-file-earmark-pdf me-1"></i>Ver PDF</button> `:''}${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}',this)"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
           : (st.enviada?'<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Enviada — reversable en la pestaña Enviadas</span>':'<span style="font-size:.72rem;color:#94a3b8">Se envía una vez aprobada</span>')}
         ${st.enviada && !st.factura ? `<button class="btn b-light" onclick="registrarFactura('${escA(r.parque)}',${r.total})"><i class="bi bi-receipt me-1"></i>Registrar factura</button>` : ''}
         ${st.factura_datos ? `<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Factura ${escH(st.factura_datos.numero_factura)} · ${fmtCLP(st.factura_datos.monto_bruto)}</span>` : ''}
@@ -215,6 +215,37 @@ async function accion(cual, parque){
 /* Envía la cartola al parque: el correo sale del SERVIDOR con el PDF adjunto
    (espejo de la cartola dealer). El texto, la copia y el interruptor están en
    Mantenedores → Correos del Sistema, plantilla "Cartola mensual → al PARQUE". */
+/* Genera el PDF de la cartola.
+   OJO — html2canvas captura relativo al VIEWPORT: con la página scrolleada (y la
+   cartola de un parque de más abajo siempre lo está) el canvas sale del área
+   equivocada y el PDF llega EN BLANCO. Le pasamos el desplazamiento actual y las
+   medidas de la ventana; después se valida que el archivo tenga contenido real,
+   porque acá el PDF ya no lo ve nadie antes de salir al parque. */
+async function pdfCartola(i, filename){
+  const el = document.getElementById('bloque'+i);
+  if (!el) throw new Error('No se encontró la cartola en pantalla');
+  const blob = await html2pdf().set({
+    filename, margin:8, image:{ type:'jpeg', quality:0.95 },
+    html2canvas:{ scale:2, scrollX:0, scrollY:-window.scrollY,
+                  windowWidth:document.documentElement.scrollWidth,
+                  windowHeight:document.documentElement.scrollHeight, useCORS:true },
+    jsPDF:{ unit:'mm', format:'letter', orientation:'portrait' },
+  }).from(el).outputPdf('blob');
+  // Una hoja en blanco pesa unos pocos KB; con la tabla dibujada nunca baja de ~20 KB
+  if (!blob || blob.size < 15000)
+    throw new Error('El PDF salió vacío o incompleto (' + Math.round((blob?.size||0)/1024) + ' KB). No se envió nada. Vuelve a intentarlo con la cartola a la vista.');
+  return blob;
+}
+
+/* Ver el PDF antes de mandarlo — el mismo archivo que se adjunta, sin enviar ni
+   registrar nada. Es la única forma de saber que el parque recibirá algo legible. */
+async function verPdf(i, parque){
+  try {
+    const blob = await pdfCartola(i, 'previsualizacion.pdf');
+    window.open(URL.createObjectURL(blob), '_blank');
+  } catch(e){ alert('No se pudo generar el PDF: ' + e.message); }
+}
+
 async function enviarCartola(i, parque, btn){
   const r = ROWS.find(x=>x.parque===parque); if (!r) return;
   const mail = document.getElementById('mail'+i).value.trim();
@@ -226,9 +257,7 @@ async function enviarCartola(i, parque, btn){
   try {
     // 1) La cartola en PDF (el mismo bloque que se ve en pantalla: detalle de
     //    operaciones + línea de arriendo + total) convertida a base64
-    const blob = await html2pdf().set({ filename, margin:8, image:{type:'jpeg',quality:0.95},
-      html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'letter',orientation:'portrait'} })
-      .from(document.getElementById('bloque'+i)).outputPdf('blob');
+    const blob = await pdfCartola(i, filename);
     const base64 = await new Promise((ok,err)=>{ const fr=new FileReader();
       fr.onload=()=>ok(String(fr.result).replace(/^data:[^;]+;base64,/,'')); fr.onerror=err; fr.readAsDataURL(blob); });
 
