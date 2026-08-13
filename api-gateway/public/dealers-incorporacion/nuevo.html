@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.31 — banco con buscador (input+datalist): escribe "chile" y sugiere Banco de Chile; acepta bancos fuera de la lista · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -304,7 +304,7 @@
                nombre ("chile" encuentra Banco de Chile) y acepta bancos fuera de la lista.
                Con select, tipear saltaba por primera letra (C→Coopeuch) y un valor
                importado fuera de la lista dejaba el campo vacío al imprimir. -->
-          <input id="banco" list="bancosLista" placeholder="Escribe para buscar…" autocomplete="off" oninput="actualizarTercero()" onchange="actualizarTercero()">
+          <input id="banco" list="bancosLista" placeholder="Escribe para buscar…" autocomplete="off" oninput="actualizarTercero()" onchange="bancoCanonico();actualizarTercero()" onblur="bancoCanonico()">
           <datalist id="bancosLista">
             <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
             <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
@@ -510,8 +510,8 @@ function aplicarDealer(d){
   if(['PARQUE','GENERAL','AMBOS'].includes(d.tipo)) setRadio('tipo', d.tipo);
   setVal('nombre_parque', d.nombre_parque); setVal('direccion_parque', d.direccion_parque); setVal('comuna_parque', d.comuna_parque);
   if(d.tipo_documento) setRadio('tipo_documento', d.tipo_documento);
-  // banco es input+datalist: acepta cualquier valor guardado, sin lista que falsee "depósito cambió".
-  setVal('banco', d.banco); setVal('rut_cuenta', d.rut_cuenta); setVal('num_cuenta', d.num_cuenta);
+  // banco importado se normaliza al nombre oficial de la lista ('CHILE' → 'Banco de Chile')
+  setVal('banco', d.banco); bancoCanonico(); setVal('rut_cuenta', d.rut_cuenta); setVal('num_cuenta', d.num_cuenta);
   setVal('tipo_cuenta', d.tipo_cuenta); setVal('nombre_cuenta', d.nombre_cuenta);
   onTipo();   // ajusta etiquetas + defaults de comisión según tipo
   ['com_6_12','com_13_24','com_25_36','com_37'].forEach(k=>{ if(d[k]!=null && d[k]!=='') setVal(k, d[k]); });
@@ -653,6 +653,20 @@ function calcCuentaTipo(){
   const body = val('rut_cuenta').replace(/[^0-9kK]/gi,'').slice(0,-1).replace(/\D/g,'');
   if(!body) return '';
   return parseInt(body,10) > 50000000 ? 'EMPRESA' : 'PERSONA';
+}
+/* El banco DEBE ser de la lista (datalist bancosLista). El input permite BUSCAR
+   escribiendo, y al salir del campo se normaliza al nombre oficial: "chile" o el
+   legado "CHILE" → "Banco de Chile". Si no calza con ninguno, queda marcado y
+   validarEnvio lo rechaza. */
+function bancosLista(){ return [...document.querySelectorAll('#bancosLista option')].map(o=>o.value); }
+function bancoEnLista(v){ const n=String(v||'').trim().toLowerCase(); return bancosLista().some(b=>b.toLowerCase()===n); }
+function bancoCanonico(){
+  const el=$('banco'); const v=String(el.value||'').trim(); if(!v) { el.style.borderColor=''; return; }
+  const n=v.toLowerCase();
+  let m = bancosLista().filter(b=>b.toLowerCase()===n);                    // 1) igual exacto
+  if(!m.length) m = bancosLista().filter(b=>b.toLowerCase().includes(n));  // 2) contiene lo escrito
+  if(m.length===1){ el.value=m[0]; el.style.borderColor=''; }
+  else el.style.borderColor = bancoEnLista(v) ? '' : '#dc2626';
 }
 function onTipoCuenta(){
   const ct = calcCuentaTipo();
@@ -963,6 +977,9 @@ function validarEnvio(){
     if(val(id) && !emailOK(val(id))) errs.push(lbl+' inválido');
   for(const [id,lbl] of [['cc_telefono','Teléfono comercial'],['cf_telefono','Teléfono financiero']])
     if(val(id) && !telOK(val(id))) errs.push(lbl+' inválido');
+  // El banco DEBE ser de la lista (regla Pato 13-08): el buscador ayuda a encontrarlo,
+  // pero no se aceptan bancos inventados. bancoCanonico() ya normalizó lo normalizable.
+  if(val('banco') && !bancoEnLista(val('banco'))) errs.push('Banco de Transferencia: "'+val('banco')+'" no está en la lista de bancos — elígelo de las sugerencias');
   // Representante Legal (del contacto marcado o del recuadro propio)
   const rl = repLegalData();
   if(!rl.nombre)   errs.push('Falta: Representante Legal — nombre');
@@ -1023,6 +1040,7 @@ async function cargar(){
     if (!val('provincia')) onComuna();
     setRadio('tipo_documento', f.tipo_documento);
     if (!val('tipo_cuenta')) setVal('tipo_cuenta','Cuenta Corriente');
+    bancoCanonico();   // 'CHILE' guardado → 'Banco de Chile' (nombre oficial de la lista)
     onTipoCuenta();
     // Representante Legal
     setVal('rl_nombre', f.rl_nombre); setVal('rl_telefono', f.rl_telefono); setVal('rl_email', f.rl_email);
