@@ -40,6 +40,30 @@ const SEMILLAS = [
     variables: '{ODP} {PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
   },
   {
+    codigo: 'parque_cartola_envio',
+    ambito: 'Post Venta — Parques',
+    nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',
+    descripcion: 'Se manda al pulsar "Enviar cartola" en Emisión de Cartolas Parque. Lleva la cartola en PDF adjunta, con el detalle de cada operación y la línea de arriendo. Es el documento con el que el parque emite su factura.',
+    asunto: 'CARTOLA COMISIONES {PERIODO_LARGO} — {PARQUE}',
+    cuerpo: `<p>Estimados {PARQUE}:</p>
+<p>Junto con saludar, adjuntamos la <b>cartola de comisiones y arriendo</b> correspondiente a {PERIODO_LARGO}, con el detalle de las operaciones del período.</p>
+<table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
+  <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
+  <tr><td>Comisión por créditos ({OPS} operaciones)</td><td align="right">{COMISION}</td></tr>
+  <tr><td>Arriendo mensual</td><td align="right">{ARRIENDO}</td></tr>
+  <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL BRUTO A PAGAR (IVA incluido)</td><td align="right">{TOTAL}</td></tr>
+</table>
+<p>Favor emitir la <b>factura por el total indicado</b> a:<br>
+<b>AUTOFACIL SPA</b> — RUT 76.545.638-K<br>
+Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.</p>
+<p>Recibida la factura, el pago se procesa vía Orden de Pago.</p>
+<p>Cualquier duda quedamos atentos.</p>
+<p>Saludos cordiales,<br><b>AutoFácil — Crédito Automotriz</b></p>`,
+    para_perfiles: '',
+    cc: 'operaciones@autofacilchile.cl',
+    variables: '{PARQUE} {PERIODO} {PERIODO_LARGO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
+  },
+  {
     codigo: 'parque_pago_aviso',
     ambito: 'Post Venta — Parques',
     nombre: 'Pago realizado → aviso al PARQUE',

@@ -679,22 +679,49 @@ const cartolaAprobar = async (req, res) => {
 
 /* POST /cartola/enviar {mes,parque,mail,arriendo,comision,total} — registra el
    envío y marca las 4 etapas de cartola en cada operación (patrón dealer). */
+const MESES_LARGO = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const mesLargo = m => (MESES_LARGO[parseInt(String(m).slice(5), 10) - 1] || '') + ' ' + String(m).slice(0, 4);
+
 const cartolaEnviar = async (req, res) => {
   try {
     const mes = mesParam(req), parque = String(req.body.parque || '').trim();
     if (!mes || !parque) return res.status(400).json({ success: false, data: null, error: 'mes y parque requeridos' });
     const quien = quienDe(req);
+    const mail = String(req.body.mail || '').trim();
+    const arriendo = Math.round(Number(req.body.arriendo) || 0);
+    const comision = Math.round(Number(req.body.comision) || 0);
+    const totalC   = Math.round(Number(req.body.total) || 0);
+
+    /* El correo sale del SERVIDOR con la cartola en PDF adjunta (espejo de la
+       cartola dealer): antes se abría Gmail y el PDF había que adjuntarlo a
+       mano, así que el envío ni quedaba registrado en Correos Enviados.
+       Texto, CC e interruptor viven en el mantenedor Correos del Sistema. */
+    let envio = { enviado: false, motivo: 'sin correo del parque' };
+    if (mail) {
+      const adj = req.body.adjunto && req.body.adjunto.base64
+        ? [{ filename: req.body.adjunto.nombre || `cartola-${parque}-${mes}.pdf`,
+             content: Buffer.from(req.body.adjunto.base64, 'base64') }]
+        : undefined;
+      const [[row]] = await pool.query(
+        "SELECT ops FROM parques_pagos_mes WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]).catch(() => [[null]]);
+      envio = await require('../../../../shared/plantillas-correo').enviar({
+        codigo: 'parque_cartola_envio', to: [mail], adjuntos: adj,
+        datos: { PARQUE: parque, PERIODO: mes, PERIODO_LARGO: mesLargo(mes),
+                 ARRIENDO: CLP(arriendo), COMISION: CLP(comision), TOTAL: CLP(totalC),
+                 OPS: row?.ops ?? (req.body.ops || ''), QUIEN: quien },
+      });
+    }
+
     const [r] = await pool.query(
       `INSERT INTO parques_cartolas_enviadas (mes, parque, mail, arriendo, comision, total, enviado_por)
        VALUES (?,?,?,?,?,?,?)`,
-      [mes, parque, String(req.body.mail || '') || null,
-       Math.round(Number(req.body.arriendo) || 0), Math.round(Number(req.body.comision) || 0),
-       Math.round(Number(req.body.total) || 0), quien]);
+      [mes, parque, mail || null, arriendo, comision, totalC, quien]);
     await fotografiarOps(parque, mes);   // por si el envío llega sin pasar por emitir
     await marcarEtapaParqueOps(parque, mes, ['COMISION A PAGAR', 'CARTOLA EMITIDA', 'CARTOLA APROBADA', 'CARTOLA ENVIADA'], quien);
     auditar({ req, accion: 'ENVIAR_CARTOLA', modulo: 'postventa', entidad: 'cartola_parque', entidad_id: r.insertId,
-      detalle: `Envió cartola parque ${parque} (${mes}) por ${CLP(Number(req.body.total) || 0)}` });
-    res.status(201).json({ success: true, data: { id: r.insertId }, error: null });
+      detalle: `Envió cartola parque ${parque} (${mes}) por ${CLP(totalC)} a ${mail || '(sin correo)'}` +
+               (envio.enviado ? ` — correo enviado${envio.cc?.length ? ' (CC ' + envio.cc.join(', ') + ')' : ''}` : ` — SIN correo: ${envio.motivo}`) });
+    res.status(201).json({ success: true, data: { id: r.insertId, correo: envio }, error: null });
   } catch (e) { console.error('[cartola enviar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -196,7 +196,7 @@ function cartolaHTML(r, i){
         <label style="font-size:.75rem;font-weight:700;color:#475569">Correo del parque:</label>
         <input id="mail${i}" value="${escA(mail)}" placeholder="finanzas@parque.cl">
         ${!mail?'<span style="font-size:.7rem;color:#b45309">⚠ sin correo de finanzas en la <a href="/dealers-incorporacion/parques.html">ficha del parque</a></span>':''}
-        ${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}')"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
+        ${puedeEnviar ? `<button class="btn b-amber" onclick="enviarCartola(${i},'${escA(r.parque)}',this)"><i class="bi bi-envelope-arrow-up me-1"></i>Enviar cartola (PDF + correo)</button>`
           : (st.enviada?'<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Enviada — reversable en la pestaña Enviadas</span>':'<span style="font-size:.72rem;color:#94a3b8">Se envía una vez aprobada</span>')}
         ${st.enviada && !st.factura ? `<button class="btn b-light" onclick="registrarFactura('${escA(r.parque)}',${r.total})"><i class="bi bi-receipt me-1"></i>Registrar factura</button>` : ''}
         ${st.factura_datos ? `<span style="font-size:.72rem;color:#15803d;font-weight:700">✓ Factura ${escH(st.factura_datos.numero_factura)} · ${fmtCLP(st.factura_datos.monto_bruto)}</span>` : ''}
@@ -212,47 +212,39 @@ async function accion(cual, parque){
   cargar();
 }
 
-async function enviarCartola(i, parque){
+/* Envía la cartola al parque: el correo sale del SERVIDOR con el PDF adjunto
+   (espejo de la cartola dealer). El texto, la copia y el interruptor están en
+   Mantenedores → Correos del Sistema, plantilla "Cartola mensual → al PARQUE". */
+async function enviarCartola(i, parque, btn){
   const r = ROWS.find(x=>x.parque===parque); if (!r) return;
   const mail = document.getElementById('mail'+i).value.trim();
   if (!mail) { alert('Indica el correo del parque (queda mejor guardarlo en su ficha).'); return; }
   const m = mes();
   const filename = m.replace('-','.') + ' CARTOLA COMISIONES - ' + parque.toUpperCase() + '.pdf';
-  // 1) PDF de la cartola
+  const txt = btn?.innerHTML;
+  if (btn){ btn.disabled = true; btn.innerHTML = 'Enviando…'; }
   try {
-    await html2pdf().set({ filename, margin:8, image:{type:'jpeg',quality:0.95},
+    // 1) La cartola en PDF (el mismo bloque que se ve en pantalla: detalle de
+    //    operaciones + línea de arriendo + total) convertida a base64
+    const blob = await html2pdf().set({ filename, margin:8, image:{type:'jpeg',quality:0.95},
       html2canvas:{scale:2}, jsPDF:{unit:'mm',format:'letter',orientation:'portrait'} })
-      .from(document.getElementById('bloque'+i)).save();
-  } catch(e){ alert('Error generando PDF: '+e.message); return; }
-  // 2) Registrar el envío (marca las etapas de cartola en cada operación)
-  const j = await (await fetch('/api/comisiones-parques/cartola/enviar', { method:'POST', headers:H,
-    body: JSON.stringify({ mes:m, parque, mail, arriendo:r.arriendo, comision:r.comision_creditos, total:r.total }) })).json();
-  if (!j.success) { alert(j.error||'Error registrando el envío'); return; }
-  // 3) Gmail con el texto (adjuntar el PDF descargado) — texto espejo de la cartola dealer
-  const asunto = `CARTOLA COMISIONES ${nombreMes(m).toUpperCase()} — ${parque.toUpperCase()}`;
-  const cuerpo =
-`Estimados ${parque}:
+      .from(document.getElementById('bloque'+i)).outputPdf('blob');
+    const base64 = await new Promise((ok,err)=>{ const fr=new FileReader();
+      fr.onload=()=>ok(String(fr.result).replace(/^data:[^;]+;base64,/,'')); fr.onerror=err; fr.readAsDataURL(blob); });
 
-Junto con saludar, adjuntamos la cartola de comisiones y arriendo correspondiente a ${nombreMes(m)}.
+    // 2) El servidor manda el correo con el adjunto y registra el envío
+    const j = await (await fetch('/api/comisiones-parques/cartola/enviar', { method:'POST', headers:H,
+      body: JSON.stringify({ mes:m, parque, mail, arriendo:r.arriendo, comision:r.comision_creditos,
+        total:r.total, ops:r.ops, adjunto:{ nombre:filename, base64 } }) })).json();
+    if (!j.success) throw new Error(j.error||'Error registrando el envío');
 
-Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'}): ${fmtCLP(r.comision_creditos)}
-Arriendo mensual: ${fmtCLP(r.arriendo)}
-Total bruto a pagar (IVA incluido): ${fmtCLP(r.total)}
-
-Favor emitir la factura por el total indicado a:
-AUTOFACIL SPA — RUT 76.545.638-K
-Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
-
-Recibida la factura, el pago se procesa vía Orden de Pago.
-
-Cualquier duda quedamos atentos.
-
-Saludos cordiales,
-AutoFácil Crédito Automotriz`;
-  window.open('https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(mail) +
-    '&cc=' + encodeURIComponent('comisiones@autofacilchile.cl') +
-    '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo), '_blank');
-  cargar();
+    const c = j.data?.correo || {};
+    alert(c.enviado
+      ? 'Cartola enviada a ' + mail + (c.cc?.length ? '\n(con copia a ' + c.cc.join(', ') + ')' : '') + '\nEl PDF va adjunto.'
+      : 'Envío registrado, pero el correo NO salió: ' + (c.motivo||'motivo desconocido') +
+        '\nRevisa la plantilla en Mantenedores → Correos del Sistema.');
+  } catch(e){ alert('Error enviando la cartola: ' + e.message); }
+  finally { if (btn){ btn.disabled = false; btn.innerHTML = txt; } cargar(); }
 }
 
 async function registrarFactura(parque, total){
