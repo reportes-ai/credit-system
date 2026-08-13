@@ -425,15 +425,35 @@ async function contabilizarComision(idSeguimiento, momento) {
    gasto: entra y sale por un pasivo transitorio, sin tocar el resultado. */
 async function contabilizarSaldoPrecio(idSeguimiento, etapa) {
   try {
-    const [[s]] = await pool.query('SELECT num_op, saldo_precio, nombre_dealer FROM postventa_seguimiento WHERE id=?', [idSeguimiento]);
-    const monto = Math.round(Number(s && s.saldo_precio) || 0);
+    const [[s]] = await pool.query(`
+      SELECT s.num_op, s.saldo_precio, s.financiera, po.num_orden, po.monto AS odp_monto,
+             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
+             COALESCE(c.rut_dealer, dl.rut) AS rut_dealer
+        FROM postventa_seguimiento s
+        LEFT JOIN creditos c ON c.id = s.id_credito
+        LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+        LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
+       WHERE s.id = ?`, [idSeguimiento]);
+    if (!s) return;
+    /* El monto contable es el TOTAL de la orden, no el saldo precio pelado: en
+       AUTOFIN la financiera gira —y al dealer se le transfiere— saldo +
+       Limitación + Transferencia (confirmado con Pato el 13-08-2026). Con el
+       saldo pelado, la cuenta de paso 2102045 quedaba descuadrada en $45.380 por
+       operación. Se usa el monto CONGELADO de la orden cuando ya existe; si aún
+       no se emite (caso FONDOS RECIBIDOS), lo calcula el motor único. */
+    const monto = Math.round(s.odp_monto != null
+      ? Number(s.odp_monto)
+      : montoSaldoOrden(s.financiera, s.saldo_precio, await getFijosAutoFin()));
     if (!monto) return;
     const recibido = etapa === 'FONDOS RECIBIDOS';
+    // Trazabilidad en el libro: N° de orden de pago + dealer en cada línea del asiento.
+    const detalle = [s.num_orden, s.nombre_dealer].filter(Boolean).join(' · ');
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento: recibido ? 'SALDO_FONDOS_RECIBIDOS' : 'SALDO_PRECIO_PAGADO',
       fecha: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }),
       glosa: `Saldo precio OP ${s.num_op} — ${recibido ? 'fondos recibidos' : 'pagado a ' + (s.nombre_dealer || 'dealer')}`.slice(0, 300),
       ref: `SP-${s.num_op}-${recibido ? 'IN' : 'OUT'}`, montos: { monto }, num_op: s.num_op || null,
+      rut: s.rut_dealer || null, detalle,
     });
   } catch (e) { console.error('[contabilizarSaldoPrecio]', e.message); }
 }
@@ -817,12 +837,14 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
     if (tpl.activo !== true) return;                 // nace inactivo: solo manda si Pato lo enciende
     const [[d]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera,
+             po.monto AS odp_monto, po.num_orden,
              COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
              COALESCE(dl.correo, dl.cf_email) AS correo,
              COALESCE(dl.tipo_cuenta, dl.cuenta_tipo) AS tipo_cuenta, dl.num_cuenta, dl.banco
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+      LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
       WHERE s.id = ?`, [idSeguimiento]);
     if (!d) return;
     if (!d.correo) { console.warn('[postventa aviso pago saldo] dealer sin correo — OP', d.num_op); return; }
@@ -844,8 +866,16 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
     } catch (_) {}
 
     const fmt = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
+    /* {monto} = lo que se le TRANSFIRIÓ al dealer, no el saldo precio pelado: en
+       AUTOFIN la orden suma Limitación + Transferencia, y el correo avisaba un
+       monto menor al depositado. Manda el monto congelado de la orden; si aún no
+       existe, el motor único lo calcula igual que al emitirla. */
+    const montoPagado = d.odp_monto != null
+      ? Number(d.odp_monto)
+      : montoSaldoOrden(d.financiera, d.saldo_precio, await getFijosAutoFin());
     const datos = {
-      dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(d.saldo_precio),
+      dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(montoPagado),
+      saldo_precio: fmt(d.saldo_precio), num_orden: d.num_orden || '',
       fecha_pago: new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }),
       financiera: d.financiera || '',
       tipo_cuenta: (d.tipo_cuenta || 'cuenta corriente').toLowerCase(),

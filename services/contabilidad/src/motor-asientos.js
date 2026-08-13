@@ -228,7 +228,12 @@ const log = (evento, ref, estado, detalle, id_comprobante = null) =>
     [evento, ref || null, estado, (detalle || '').slice(0, 400), id_comprobante]).catch(() => {});
 
 /* Contabiliza un evento de negocio. Nunca lanza. Devuelve id del comprobante o null. */
-async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null }) {
+/* `detalle` (opcional): trazabilidad que se agrega a la glosa de CADA línea del
+   asiento — típicamente el N° de orden de pago y el tercero (dealer/proveedor).
+   El libro mayor muestra la glosa del movimiento, no la del comprobante, así que
+   sin esto las líneas salían genéricas ("Saldo precio por pagar al dealer") y no
+   se podía saber a qué orden ni a qué dealer correspondía cada monto. */
+async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = null, rut = null, detalle = null }) {
   try {
     const [[regla]] = await pool.query('SELECT * FROM ctb_reglas WHERE evento=?', [evento]);
     if (!regla) { await log(evento, ref, 'SIN_REGLA', 'Evento sin regla configurada'); return null; }
@@ -249,7 +254,8 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
       const monto = Math.round(Number(montos[l.campo]) || 0);
       if (!monto) continue;
       if (monto < 0) { await log(evento, ref, 'ERROR', `Campo ${l.campo} negativo (${monto})`); return null; }
-      movs.push({ cuenta: l.cuenta, glosa: l.glosa, debe: l.lado === 'DEBE' ? monto : 0, haber: l.lado === 'HABER' ? monto : 0 });
+      const glosaLinea = [l.glosa, detalle].filter(Boolean).join(' · ').slice(0, 300);   // ctb_movimientos.glosa = varchar(300)
+      movs.push({ cuenta: l.cuenta, glosa: glosaLinea, debe: l.lado === 'DEBE' ? monto : 0, haber: l.lado === 'HABER' ? monto : 0 });
       if (l.lado === 'DEBE') debe += monto; else haber += monto;
     }
     if (!debe && !haber) { await log(evento, ref, 'ERROR', 'Todos los montos en cero'); return null; }
