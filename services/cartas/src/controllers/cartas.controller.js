@@ -80,6 +80,36 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
   ).catch(e => console.error('[carta→credito datos]', e.message));
 }
 
+/* ── TIPO DE CARTA vs FICHA DEL DEALER (motor único, caso 266256964FM) ──
+   La ficha del dealer (dealers.ccs_parque) es la FUENTE ÚNICA de si es de parque
+   o de calle, y el TIPO de la carta decide qué comisión se paga. El front filtra
+   el autocompletado por tipo, pero un dealer digitado a mano (p. ej. con la ficha
+   inactiva, que no sale en la lista) se lo saltaba: carta CALLE con dealer de
+   PARQUE MAIPU → comisión de calle. Grave y silencioso, así que se valida acá,
+   donde no hay cómo saltárselo. Sin ficha para el RUT no se puede afirmar nada
+   → pasa (dealer nuevo en incorporación). Devuelve null si está OK. */
+async function tipoVsFichaDealer(tipo, rutDealer, parqueCarta) {
+  const t = String(tipo || '').toUpperCase();
+  const rut = String(rutDealer || '').replace(/\./g, '').trim().toUpperCase();
+  if (!rut || (!t.includes('PARQUE') && !t.includes('CALLE'))) return null;
+  const [[f]] = await pool.query(
+    `SELECT nombre_razon, ccs_parque FROM dealers
+      WHERE REPLACE(UPPER(rut),'.','') = ? LIMIT 1`, [rut]).catch(() => [[null]]);
+  if (!f) return null;
+  const p = String(f.ccs_parque || '').trim().toUpperCase();
+  const fichaEsParque = !!p && p !== 'CALLE' && p !== 'PARTICULAR';
+  if (fichaEsParque && t.includes('CALLE'))
+    return `${f.nombre_razon} es dealer de ${p} según su ficha: la carta no puede ser DEALER CALLE (pagaría la comisión equivocada). Emite la carta como DEALER PARQUE con ese parque, o corrige primero la ficha del dealer si cambió de ubicación.`;
+  if (!fichaEsParque && t.includes('PARQUE'))
+    return `${f.nombre_razon} es dealer de calle según su ficha: la carta no puede ser DEALER PARQUE. Emítela como DEALER CALLE, o corrige primero la ficha del dealer si ahora opera en un parque.`;
+  if (fichaEsParque && t.includes('PARQUE')) {
+    const pc = String(parqueCarta || '').trim().toUpperCase();
+    if (pc && pc !== p)
+      return `La carta dice ${pc} pero la ficha de ${f.nombre_razon} dice ${p}. El parque de la carta debe salir de la ficha del dealer; si el dealer se cambió de parque, corrige primero su ficha.`;
+  }
+  return null;
+}
+
 /* FECHA 1ª CUOTA de la carta → crédito enlazado. Es el ÚNICO origen automático del
    dato (el Informe Canal no lo trae, ver carga-trinidad.controller.js) y hasta ahora
    se leía del PDF solo en el autofill de Digitación: quien subía la carta al módulo
@@ -1006,6 +1036,11 @@ const upsert = async (req, res) => {
       if (vence < hoy)
         return res.status(400).json({ success: false, data: null,
           error: `La carta está vencida (${dias} días corridos desde su fecha) y no puede aprobarse.` });
+    }
+    // El tipo de la carta debe calzar con la ficha del dealer (comisión correcta).
+    {
+      const errTipo = await tipoVsFichaDealer(c.tipo, c.rutConc || c.rut_conc, c.parque);
+      if (errTipo) return res.status(422).json({ success: false, data: null, error: errTipo });
     }
     // Regla de negocio (2026-07-23): el ID de la financiera es ÚNICO por operación.
     // Si ya existe en otra carta viva o en un crédito VIVO, se detiene la digitación
@@ -2075,6 +2110,12 @@ const corregirCarta = async (req, res) => {
     }
     if (!cambios.length)
       return res.status(400).json({ success: false, data: null, error: 'No cambiaste ningún dato: la carta corregida sería idéntica a la actual.' });
+
+    // La carta corregida también debe calzar con la ficha del dealer (mismo motor que al emitir).
+    {
+      const errTipo = await tipoVsFichaDealer(nueva.tipo, nueva.rut_dealer, nueva.parque);
+      if (errTipo) return res.status(422).json({ success: false, data: null, error: errTipo });
+    }
 
     const quien = req.usuario ? ([req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email) : 'Sistema';
     const { op: opNueva, n } = await siguienteOpCorreccion(orig.op_carta);
