@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Administración de Cajas — AutoFácil</title>
+  <!-- v1.1 — segregacion de funciones: interruptor "quien emite la orden no puede pagarla" (nace activo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -153,6 +154,12 @@
         <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">Días habilitados</label>
         <div id="hpDias" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
+      <hr style="margin:20px 0 16px;border-color:#e5e7eb">
+      <p style="font-size:.85rem;color:#64748b;margin:0 0 10px"><b style="color:#012d70">Segregación de funciones.</b> Quien emite o manda a pago una orden no puede ser quien registra su pago: el pago siempre lo confirma una segunda persona. Desactivarlo permite que la misma persona emita y pague.</p>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="hpDoble">
+        <label class="form-check-label" for="hpDoble" style="font-weight:600">Quien emite la orden no puede pagarla</label>
+      </div>
       <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
         <button class="btn btn-primary btn-sm" id="hpGuardar" onclick="guardarHorario()"><i class="bi bi-save me-1"></i>Guardar horario</button>
         <span id="hpEstado" style="font-size:.83rem"></span>
@@ -166,6 +173,7 @@
     <ul style="font-size:.85rem;color:#374151;margin:0;padding-left:18px;line-height:1.75">
       <li><b>Cajas y asignaciones</b> → definen quién tiene <b>Caja Activa</b> para registrar pagos en <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a> y en la <a href="/tesoreria/caja/">Caja operativa</a>; los movimientos quedan en el <a href="/tesoreria/cierre-caja.html">Cierre de Caja</a>.</li>
       <li><b>Horario de pagos</b> → ventana horaria y días habilitados para pagar. Fuera de ese horario, el sistema rechaza el pago de <a href="/ordenes-pago/historial/">Órdenes de Pago</a> y demás egresos de caja.</li>
+      <li><b>Quien emite la orden no puede pagarla</b> → control de cuatro ojos. Con esto activo, el botón <b>Pagar</b> queda bloqueado en <a href="/ordenes-pago/historial/">Órdenes de Pago → Historial</a> para quien emitió esa orden (aplica también a Saldo Precio, Comisiones y <a href="/postventa/comisiones-parques/">Comisiones de Parques</a>); el pago lo registra otra persona con Caja Activa.</li>
     </ul>
   </div>
 </div>
@@ -341,6 +349,8 @@ async function cargarHorario(){
     document.getElementById('hpDias').innerHTML = HP_DIAS.map(([k,n]) =>
       `<label style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 12px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="hp_${k}" ${h[k]?'checked':''}>${n}</label>`).join('');
     document.getElementById('hpActivo').checked = !!h.activo;
+    // Nace activa: si la columna aún no existe en la BD, se muestra encendida.
+    document.getElementById('hpDoble').checked = h.doble_persona === undefined ? true : !!Number(h.doble_persona);
     document.getElementById('hpInicio').value = String(h.hora_inicio || '09:00').slice(0,5);
     document.getElementById('hpFin').value    = String(h.hora_fin    || '16:00').slice(0,5);
     const est = document.getElementById('hpEstado');
@@ -351,7 +361,8 @@ async function cargarHorario(){
   }catch(e){}
 }
 async function guardarHorario(){
-  const body = { activo: document.getElementById('hpActivo').checked, hora_inicio: document.getElementById('hpInicio').value, hora_fin: document.getElementById('hpFin').value };
+  const body = { activo: document.getElementById('hpActivo').checked, hora_inicio: document.getElementById('hpInicio').value, hora_fin: document.getElementById('hpFin').value,
+                 doble_persona: document.getElementById('hpDoble').checked };
   HP_DIAS.forEach(([k]) => body[k] = document.getElementById('hp_'+k).checked);
   const btn = document.getElementById('hpGuardar'); const est = document.getElementById('hpEstado');
   btn.disabled = true;

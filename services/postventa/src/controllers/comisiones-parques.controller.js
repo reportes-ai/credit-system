@@ -384,6 +384,10 @@ const pagar = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Debe existir una Orden de Pago emitida para confirmar el pago' });
 
     const quien = `${req.user?.nombre || ''} ${req.user?.apellido || ''}`.trim() || 'sistema';
+    // Segregación de funciones: quien emitió la orden del parque no puede pagarla.
+    const seg = await require('../../../../shared/segregacion-pagos')
+      .validarPagador({ nombreEmisor: e.emitida_por, nombrePagador: quien, idPagador: null });
+    if (!seg.ok) return res.status(403).json({ success: false, data: null, error: seg.motivo });
     await pagarCorrelativo({ numero: e.odp_numero, id_usuario: req.user?.id_usuario, usuario_nombre: quien });
     await pool.query("UPDATE parques_pagos_mes SET etapa='PAGO_REALIZADO', pagada_por=?, fecha_pagada=NOW() WHERE id=?", [quien, e.id]);
 

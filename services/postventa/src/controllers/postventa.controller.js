@@ -1527,6 +1527,28 @@ const enviarAPago = async (req, res) => {
   }
 };
 
+/* ── Segregación de funciones (shared/segregacion-pagos.js) ───────────────────
+   Devuelve los num_op del lote que ESTA MISMA persona mandó a pago. Quien manda
+   a pago no confirma el pago: es el control de cuatro ojos sobre el egreso.
+   Si el parámetro está desactivado en el mantenedor Cajas, devuelve vacío. */
+async function opsMandadasAPagoPor(ids, usuario, track = 'SALDO') {
+  try {
+    const seg = require('../../../../shared/segregacion-pagos');
+    if (!(await seg.exigeDoblePersona())) return [];
+    const [rows] = await pool.query(
+      `SELECT s.num_op, pe.usuario
+         FROM postventa_etapas pe JOIN postventa_seguimiento s ON s.id = pe.id_seguimiento
+        WHERE pe.id_seguimiento IN (?) AND pe.track = ? AND pe.etapa = 'ENVIADO A PAGO'`,
+      [ids, track]);
+    const choque = [];
+    for (const r of rows) {   // la comparación la hace el motor, nunca una copia local
+      const v = await seg.validarPagador({ nombreEmisor: r.usuario, nombrePagador: usuario });
+      if (!v.ok) choque.push(r.num_op);
+    }
+    return choque;
+  } catch (e) { console.error('[postventa segregacion]', e.message); return []; }
+}
+
 /* ── POST /api/postventa/saldos-a-pagar/pagar { ids:[] } — marca SALDO PRECIO PAGADO ── */
 const pagarSaldos = async (req, res) => {
   try {
@@ -1534,6 +1556,11 @@ const pagarSaldos = async (req, res) => {
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
     const usuario = loginDe(req.usuario);
+    // Segregación de funciones: quien mandó la operación a pago no confirma su pago.
+    const choque = await opsMandadasAPagoPor(ids, usuario);
+    if (choque.length)
+      return res.status(403).json({ success: false, data: null,
+        error: `Tú mandaste a pago ${choque.length === 1 ? 'la operación' : 'las operaciones'} ${choque.join(', ')}: el pago debe confirmarlo otra persona (segregación de funciones).` });
     const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave='etapas_saldo'`);
     const etapas = (cfgRow ? JSON.parse(cfgRow.valor) : []).map(x => x.etapa);
     if (!etapas.length)
@@ -1848,6 +1875,11 @@ const pagarComisiones = async (req, res) => {
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ success: false, data: null, error: 'Sin operaciones seleccionadas' });
     const usuario = loginDe(req.usuario);
+    // Segregación de funciones: quien mandó la comisión a pago no confirma su pago.
+    const choque = await opsMandadasAPagoPor(ids, usuario, 'COMISION');
+    if (choque.length)
+      return res.status(403).json({ success: false, data: null,
+        error: `Tú mandaste a pago ${choque.length === 1 ? 'la comisión de la operación' : 'las comisiones de las operaciones'} ${choque.join(', ')}: el pago debe confirmarlo otra persona (segregación de funciones).` });
     const [[cfgRow]] = await pool.query(`SELECT valor FROM postventa_config WHERE clave='etapas_comision'`);
     const etapas = (cfgRow ? JSON.parse(cfgRow.valor) : []).map(x => x.etapa);
     if (!etapas.length)

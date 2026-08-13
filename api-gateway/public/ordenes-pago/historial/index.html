@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -231,7 +231,10 @@ async function cargar(){
     if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
       let acc = '';
-      if (o.pagable && MICAJA) acc += `<button class="icon-btn" title="Pagar" onclick="pagar(${o.id})"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
+      // Segregación de funciones: la orden que emitió esta misma persona la paga otro.
+      if (o.pagable && MICAJA && o.emitida_por_mi)
+        acc += `<button class="icon-btn" title="La emitiste tú: el pago lo registra otra persona" disabled style="opacity:.4;cursor:not-allowed"><i class="bi bi-cash-coin"></i></button>`;
+      else if (o.pagable && MICAJA) acc += `<button class="icon-btn" title="Pagar" onclick="pagar(${o.id})"><i class="bi bi-cash-coin" style="color:#16a34a"></i></button>`;
       if (o.editable && o.estado==='EMITIDA' && isAdmin) acc += `<button class="icon-btn" title="Anular (solo Admin)" onclick="marcar(${o.id},'ANULADA')"><i class="bi bi-x-octagon" style="color:#dc2626"></i></button>`;
       // Post Venta: mismo ícono, vía propia — además de anular el número hay que
       // deshacer las etapas del seguimiento para que pueda volver a emitirse.
@@ -392,7 +395,11 @@ async function ver(id){
      de una orden que se emitió sin avisar (caso ODP2610749/750 del 12-08). */
   const esPV = row.origen === 'SALDO' || row.origen === 'COMISION';
   const enviar    = ((row.editable || esPV) && PUEDE) ? `<button class="btn-af" id="btnEnviar" onclick="enviarCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar a Contabilidad</button>` : '';
-  const pagarBtn  = (row.pagable && MICAJA) ? `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>` : '';
+  const pagarBtn  = (row.pagable && MICAJA)
+    ? (row.emitida_por_mi
+        ? `<button class="btn-af" disabled style="opacity:.45;cursor:not-allowed" title="Segregación de funciones: quien emite la orden no registra su pago"><i class="bi bi-cash-coin me-1"></i>Pagar (la emitiste tú)</button>`
+        : `<button class="btn-af" onclick="pagar(${row.id})"><i class="bi bi-cash-coin me-1"></i>Pagar</button>`)
+    : '';
   foot.innerHTML = `<button class="btn-ghost" onclick="document.getElementById('dlg').close()">Cerrar</button>
     <button class="btn-ghost" onclick="copiarDoc()"><i class="bi bi-clipboard me-1"></i>Copiar</button>
     <button class="btn-ghost" onclick="descargarDoc()"><i class="bi bi-download me-1"></i>Descargar</button>

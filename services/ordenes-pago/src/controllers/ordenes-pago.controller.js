@@ -11,6 +11,7 @@ const pool = require('../../../../shared/config/database');
 const RUT = require('../../../../api-gateway/public/js/rut-core');  // enforcement: RUT canónico
 const { auditar } = require('../../../../shared/audit');
 const { emitirCorrelativo, anularCorrelativo } = require('../../../../shared/ordenes-pago');
+const segregacion = require('../../../../shared/segregacion-pagos');   // quien emite no paga
 
 /* ── Migración: tablas + módulo/funcionalidades/permisos (idempotente) ──────── */
 require('../../../../shared/migrate').enFila('ordenes-pago', async () => {
@@ -292,7 +293,7 @@ const listarOrdenes = async (req, res) => {
     }
     const [rows] = await pool.query(`
       SELECT oc.id, oc.numero, oc.origen, oc.origen_id, oc.concepto, oc.monto, oc.created_at AS fecha_emision,
-             oc.usuario_nombre, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
+             oc.usuario_nombre, oc.id_usuario, oc.anulada, oc.anulada_nombre, oc.fecha_anulada, oc.pagada, oc.fecha_pagada,
              op.proveedor_nombre AS g_prov, op.tipo_documento AS g_tipodoc, op.numero_documento AS g_numdoc,
              op.estado AS g_estado, op.fecha_pago AS g_fechapago,
              pfc.numero_factura AS c_factura,
@@ -311,6 +312,11 @@ const listarOrdenes = async (req, res) => {
 
     const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otros' };
     const estFiltro = norm(req.query.estado).toUpperCase();
+    // Segregación de funciones: las que emitió el propio usuario no las puede pagar él.
+    // Se marca acá para que el botón lo diga en pantalla y no falle recién al apretarlo.
+    const yo = (req.usuario || {});
+    const dobleP = await segregacion.exigeDoblePersona();
+    const nombreYo = String([yo.nombre, yo.apellido].filter(Boolean).join(' ')).trim().toLowerCase();
     let data = rows.map(r => {
       const esGen = r.origen === 'GENERAL';
       const proveedor = esGen ? r.g_prov : (r.origen === 'SALDO' ? r.s_dealer : r.c_dealer);
@@ -320,8 +326,12 @@ const listarOrdenes = async (req, res) => {
       else estado = (r.origen === 'SALDO' ? r.saldo_pagado : r.comision_pagada) ? 'PAGADA' : 'EMITIDA';
       const documento = esGen ? [r.g_tipodoc, r.g_numdoc].filter(Boolean).join(' ')
                               : (r.origen === 'COMISION' && r.c_factura ? 'Factura ' + r.c_factura : '');
+      const emitidaPorMi = dobleP && (
+        (r.id_usuario != null && yo.id_usuario != null && Number(r.id_usuario) === Number(yo.id_usuario)) ||
+        (r.id_usuario == null && nombreYo && String(r.usuario_nombre || '').trim().toLowerCase() === nombreYo));
       return {
         id: r.id, op_id: r.origen_id, origen: r.origen, origen_label: ORIGEN_LBL[r.origen] || r.origen,
+        emitida_por_mi: !!emitidaPorMi,
         numero: r.numero, concepto: r.concepto || '—', monto: r.monto, fecha_emision: r.fecha_emision,
         usuario_nombre: r.usuario_nombre, proveedor_nombre: proveedor || '—', documento: documento || '—',
         estado, fecha_pago: r.fecha_pagada || (esGen ? r.g_fechapago : null),
@@ -792,6 +802,11 @@ const pagarOrden = async (req, res) => {
     if (oc.pagada)  return res.status(409).json({ success: false, data: null, error: 'La orden ya está pagada' });
 
     const quien = nombreUsuario(req);
+    // Segregación de funciones: quien emitió la orden no puede registrar su pago.
+    const seg = await segregacion.validarPagador({
+      idEmisor: oc.id_usuario, nombreEmisor: oc.usuario_nombre, idPagador: idU, nombrePagador: quien });
+    if (!seg.ok) return res.status(403).json({ success: false, data: null, error: seg.motivo });
+
     const metodo = norm((req.body || {}).metodo_pago) || null;
     const fechaPago = fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10);
 

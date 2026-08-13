@@ -51,6 +51,8 @@ const initTablas = async () => {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   await pool.query(`INSERT IGNORE INTO caja_horario_pago (id) VALUES (1)`);
+  // Segregación de funciones: quien emite una orden no puede pagarla. Nace ACTIVA.
+  await pool.query(`ALTER TABLE caja_horario_pago ADD COLUMN doble_persona TINYINT(1) NOT NULL DEFAULT 1`).catch(() => {});
 };
 // Migraciones: perfil Tesorero + funcionalidad /tesoreria/caja/
 require('../../../../shared/migrate').enFila('cajas', async () => {
@@ -309,14 +311,18 @@ const putHorario = async (req, res) => {
   try {
     const dias = DIAS_COL.map(d => (b[d] ? 1 : 0));
     const activo = b.activo ? 1 : 0;
+    // Segregación: si no viene en el body (pantallas antiguas), se conserva lo guardado.
+    const doble = b.doble_persona === undefined ? null : (b.doble_persona ? 1 : 0);
     await pool.query(
-      `INSERT INTO caja_horario_pago (id, activo, hora_inicio, hora_fin, dia_lun,dia_mar,dia_mie,dia_jue,dia_vie,dia_sab,dia_dom)
-       VALUES (1,?,?,?,?,?,?,?,?,?,?)
+      `INSERT INTO caja_horario_pago (id, activo, hora_inicio, hora_fin, dia_lun,dia_mar,dia_mie,dia_jue,dia_vie,dia_sab,dia_dom, doble_persona)
+       VALUES (1,?,?,?,?,?,?,?,?,?,?, COALESCE(?,1))
        ON DUPLICATE KEY UPDATE activo=VALUES(activo), hora_inicio=VALUES(hora_inicio), hora_fin=VALUES(hora_fin),
          dia_lun=VALUES(dia_lun), dia_mar=VALUES(dia_mar), dia_mie=VALUES(dia_mie), dia_jue=VALUES(dia_jue),
-         dia_vie=VALUES(dia_vie), dia_sab=VALUES(dia_sab), dia_dom=VALUES(dia_dom)`,
-      [activo, ini, fin, ...dias]);
-    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'caja_horario', entidad_id: 1, detalle: `Actualizó horario de pagos: ${activo ? 'activo' : 'sin restricción'} ${ini.slice(0, 5)}-${fin.slice(0, 5)}` });
+         dia_vie=VALUES(dia_vie), dia_sab=VALUES(dia_sab), dia_dom=VALUES(dia_dom),
+         doble_persona=COALESCE(?, doble_persona)`,
+      [activo, ini, fin, ...dias, doble, doble]);
+    require('../../../../shared/segregacion-pagos').olvidarCache();
+    auditar({ req, accion: 'EDITAR', modulo: 'tesoreria', entidad: 'caja_horario', entidad_id: 1, detalle: `Actualizó horario de pagos: ${activo ? 'activo' : 'sin restricción'} ${ini.slice(0, 5)}-${fin.slice(0, 5)}${doble === null ? '' : ' · quien emite no paga: ' + (doble ? 'SÍ' : 'no')}` });
     ok(res, { saved: true });
   } catch (e) { err(res, e); }
 };
