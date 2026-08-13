@@ -53,7 +53,7 @@ test('el /Length del stream es el largo real del contenido', () => {
   assert.strictEqual(fin - ini, Number(m[1]), 'el /Length declarado debe ser el largo real');
 });
 
-test('el archivo es ASCII: las tildes y el signo peso van escapados', () => {
+test('sin imágenes el archivo es ASCII: las tildes van escapadas', () => {
   const doc = PDF.crear();
   doc.texto(14, 20, 'Comisión $1.234.567 — año 2026', { size: 10 });
   const s = pdfDe(doc);
@@ -76,4 +76,35 @@ test('el texto alineado a la derecha no se sale de la hoja', () => {
   const doc = PDF.crear();
   const ancho = doc.ancho('$1.234.567', 8);
   assert.ok(ancho > 0 && ancho < 40, 'la medida del texto debe ser razonable en mm');
+});
+
+/* El logo va incrustado como JPEG (DCTDecode): el PDF lo entiende nativamente,
+   así que no hay que descomprimir nada. Antes el encabezado era texto plano y se
+   veía pobre en un documento que va a un tercero. */
+test('una imagen JPEG queda incrustada como XObject y referenciada por la página', () => {
+  const LOGO = require('../api-gateway/public/js/logo-pdf');
+  const doc = PDF.crear();
+  doc.texto(14, 20, 'Con logo', { size: 10 });
+  doc.imagen(160, 14, 42, 42 * LOGO.alto / LOGO.ancho, LOGO);
+  const s = pdfDe(doc);
+  assert.ok(s.includes('/Subtype /Image'), 'el objeto de imagen existe');
+  assert.ok(s.includes('/Filter /DCTDecode'), 'se incrusta como JPEG');
+  assert.ok(s.includes(`/Width ${LOGO.ancho} /Height ${LOGO.alto}`), 'con sus dimensiones reales');
+  assert.ok(/\/Resources <<.*?\/XObject << \/Im1 \d+ 0 R >>/.test(s), 'la página declara el recurso');
+  assert.ok(s.includes('/Im1 Do'), 'y lo dibuja');
+});
+
+test('con imagen, los offsets del xref siguen exactos (los bytes del JPEG no los corren)', () => {
+  const LOGO = require('../api-gateway/public/js/logo-pdf');
+  const doc = PDF.crear();
+  doc.imagen(160, 14, 42, 10.5, LOGO);
+  doc.texto(14, 40, 'Texto después de la imagen', { size: 9 });
+  const s = pdfDe(doc);
+  const inicio = parseInt(s.slice(s.lastIndexOf('startxref') + 9), 10);
+  const cab = s.slice(inicio).match(/^xref\n0 (\d+)\n/);
+  const tabla = s.slice(inicio + cab[0].length);
+  for (let i = 1; i < Number(cab[1]); i++) {
+    const off = parseInt(tabla.slice(i * 20, i * 20 + 10), 10);
+    assert.ok(s.startsWith(`${i} 0 obj`, off), `la entrada ${i} debe apuntar a su objeto`);
+  }
 });

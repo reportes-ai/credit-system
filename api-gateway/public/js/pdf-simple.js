@@ -50,12 +50,17 @@
     return a;
   })();
 
+  /* base64 → string binario (1 char = 1 byte), en navegador y en Node. */
+  const deBase64 = b64 => (typeof atob === 'function')
+    ? atob(b64) : Buffer.from(b64, 'base64').toString('binary');
+
   const num = n => (Math.round(Number(n) * 100) / 100).toString();
   const col = c => (Array.isArray(c) ? c : [0, 0, 0]).map(v => num(v / 255)).join(' ');
 
   function crear(opts = {}) {
     const hoja = opts.hoja || CARTA;
     const paginas = [];
+    const imgs = [];          // imágenes incrustadas, compartidas por todas las hojas
     let actual = [];
     const aY = mm => (hoja.alto - mm) * MM;   // mm desde arriba → puntos desde abajo
 
@@ -90,6 +95,16 @@
         actual.push(`${col(color)} RG ${num(grosor * MM)} w ${num(x1 * MM)} ${num(aY(y1))} m ${num(x2 * MM)} ${num(aY(y2))} l S`);
         return api;
       },
+      /* Imagen JPEG (base64). Se incrusta tal cual con DCTDecode: el PDF entiende
+         JPEG nativamente, así que no hay que descomprimir ni recodificar nada.
+         PNG no sirve directo — su compresión no es la del PDF y la
+         transparencia habría que aplanarla igual. */
+      imagen(x, y, anchoMM, altoMM, img) {
+        if (!img || !img.jpegB64) return api;
+        const id = imgs.push({ b64: img.jpegB64, w: img.ancho, h: img.alto }) ;
+        actual.push(`q ${num(anchoMM * MM)} 0 0 ${num(altoMM * MM)} ${num(x * MM)} ${num(aY(y + altoMM))} cm /Im${id} Do Q`);
+        return api;
+      },
       paginaNueva() { paginas.push(actual); actual = []; return api; },
 
       /* Ensambla el archivo. El xref exige el offset EXACTO de cada objeto: se
@@ -103,11 +118,25 @@
         /* /Info e /ID los espera todo lector estricto; sin ellos, el de pdf-parse
            (pdfjs) rechaza el archivo. El ID es un hash simple del contenido: no
            tiene que ser único en el mundo, solo estar presente y ser estable. */
-        const idInfo = 3 + hojas.length * 2 + 2;
+        const idImg0 = 3 + hojas.length * 2 + 2;          // ids de las imágenes
+        const idInfo = idImg0 + imgs.length;
         let h = 0x811c9dc5;
         for (const c of hojas.flat().join('').slice(0, 4000)) { h ^= c.charCodeAt(0); h = (h * 0x01000193) >>> 0; }
         const ID = (h.toString(16) + '0123456789abcdef0123456789abcdef').slice(0, 32).toUpperCase();
         objs[idInfo] = `<< /Producer (AutoFacil Business Suite) /Title (Documento) >>`;
+        /* Cada imagen es un XObject con el JPEG crudo dentro del stream. Los bytes
+           se manejan como latin1 (1 char = 1 byte), que es como se escribe el
+           archivo: así los offsets del xref siguen siendo exactos. */
+        const recursoImg = imgs.length
+          ? ' /XObject << ' + imgs.map((_, k) => `/Im${k + 1} ${idImg0 + k} 0 R`).join(' ') + ' >>' : '';
+        imgs.forEach((im, k) => {
+          const bytes = deBase64(im.b64);
+          objs[idImg0 + k] = `<< /Type /XObject /Subtype /Image /Width ${im.w} /Height ${im.h} ` +
+            `/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>
+stream
+${bytes}
+endstream`;
+        });
 
         objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
         objs[2] = `<< /Type /Pages /Kids [${idsPagina.map(i => `${i} 0 R`).join(' ')}] /Count ${hojas.length} >>`;
@@ -116,7 +145,7 @@
         hojas.forEach((cont, i) => {
           const idP = idsPagina[i], idC = idP + 1;
           objs[idP] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(hoja.ancho * MM)} ${num(hoja.alto * MM)}] ` +
-                      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${idC} 0 R >>`;
+                      `/Resources << /Font << /F1 3 0 R /F2 4 0 R >>${recursoImg} >> /Contents ${idC} 0 R >>`;
           const flujo = cont.join('\n');
           objs[idC] = `<< /Length ${flujo.length} >>\nstream\n${flujo}\nendstream`;
         });

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.9 — logo oficial embebido en el PDF · v1.8 — el PDF se DIBUJA (shared/pdf-simple.js), validado con pdftotext y PyMuPDF · v1.7 — el PDF se DIBUJA con jsPDF (no captura de pantalla): no puede salir en blanco, texto seleccionable · v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -76,6 +76,7 @@
 </div>
 
 <script src="/js/pdf-simple.js"></script>
+<script src="/js/logo-pdf.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
@@ -235,8 +236,10 @@ function pdfCartola(i){
   const ficha = [f.razon_social || '', f.rut ? 'RUT ' + f.rut : ''].filter(Boolean).join('  -  ');
   if (ficha) doc.texto(M, y + 12, ficha, { size:8, color:GRIS });
   doc.texto(M, y + 16.5, 'Periodo: ' + nombreMes(mes()), { size:8, color:GRIS });
-  doc.texto(FIN, y, 'AutoFacil', { size:13, bold:true, color:AZUL, align:'right' });
-  doc.texto(FIN, y + 4.5, 'Credito Automotriz', { size:7, color:GRIS, align:'right' });
+  // Logo oficial embebido (js/logo-pdf.js); si faltara, cae al texto
+  if (window.AF_LOGO_PDF) doc.imagen(FIN - 42, y - 5, 42, 42 * AF_LOGO_PDF.alto / AF_LOGO_PDF.ancho, AF_LOGO_PDF);
+  else { doc.texto(FIN, y, 'AutoFacil', { size:13, bold:true, color:AZUL, align:'right' });
+         doc.texto(FIN, y + 4.5, 'Credito Automotriz', { size:7, color:GRIS, align:'right' }); }
   y += 24;
 
   // N° OP · Otorgado · Dealer · Ejecutivo · Saldo Precio · Comisión
