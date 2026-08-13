@@ -80,6 +80,30 @@ function sincronizarCreditoDesdeCarta(c, idCred) {
   ).catch(e => console.error('[carta→credito datos]', e.message));
 }
 
+/* FECHA 1ª CUOTA de la carta → crédito enlazado. Es el ÚNICO origen automático del
+   dato (el Informe Canal no lo trae, ver carga-trinidad.controller.js) y hasta ahora
+   se leía del PDF solo en el autofill de Digitación: quien subía la carta al módulo
+   Cartas dejaba la operación en "datos faltantes" igual (op 2608036).
+   FILL-ONLY: jamás pisa lo digitado ni una fecha ya existente — una fecha de primera
+   cuota equivocada corrompe la mora. Enlaza como _ligarCreditoEstado: FK explícita o
+   num_op = id_financiera. Best-effort: nunca bloquea la subida del documento. */
+async function aplicarFecha1aCuotaDesdeCarta(idCarta, iso) {
+  if (!idCarta || !iso) return 0;
+  try {
+    const [[ca]] = await pool.query(
+      'SELECT id_credito_creado, id_financiera FROM cartas_aprobacion WHERE id = ?', [idCarta]);
+    if (!ca) return 0;
+    const cond = [], args = [];
+    if (ca.id_credito_creado) { cond.push('id = ?'); args.push(ca.id_credito_creado); }
+    if (ca.id_financiera)     { cond.push('num_op = ?'); args.push(ca.id_financiera); }
+    if (!cond.length) return 0;
+    const [r] = await pool.query(
+      `UPDATE creditos SET fecha_primera_cuota = ?, updated_at = NOW()
+        WHERE (${cond.join(' OR ')}) AND fecha_primera_cuota IS NULL`, [iso, ...args]);
+    return r.affectedRows;
+  } catch (e) { console.error('[carta→credito fecha 1a cuota]', e.message); return 0; }
+}
+
 /* Crea registro en creditos a partir de una carta y devuelve { id, numero_credito } */
 async function crearCreditoDesdeCartas(c) {
   const rutNorm = RUT.normalizar(c.rut_cliente || c.rutCliente) || (c.rut_cliente || c.rutCliente || '').replace(/\./g, '').toUpperCase().trim();
@@ -1618,6 +1642,10 @@ function parseCartaAutofin(t) {
     anio: g(/\n(\d{4})\n:?Año/),
     patente: g(/PPU\s+([A-Z]{4}\d{2}|[A-Z]{2}\d{4})/),
     precioVenta, pie, saldo, plazo,
+    /* Fecha 1ª cuota: el ÚNICO origen real del dato (el Informe Canal no lo trae).
+       Motor único en shared/fecha-primera-cuota.js. */
+    fechaPrimeraCuota: require('../../../../shared/fecha-primera-cuota')
+      .fechaPrimeraCuota(t, fechaRaw ? fechaRaw.split('/').reverse().join('-') : null),
     // AutoFin trae 4 decimales; se toman solo los 2 primeros TRUNCADOS hacia abajo
     // (2,8683 → 2,86), nunca al más próximo ni al alza, para no quedar sobre la pizarra.
     tasaCredito: tasaRaw ? (Math.floor(Number(tasaRaw.replace(',', '.')) * 100 + 1e-6) / 100).toFixed(2) : null,
@@ -1850,6 +1878,9 @@ const subirDocumento = async (req, res) => {
        ext ? JSON.stringify(ext) : null, req.usuario?.email || null, req.usuario?.id_usuario || null]);
     for (const v of rutasViejas) await almacen.borrar(v.doc_ruta);
     res.status(201).json({ success: true, data: { id: r.insertId, extracted: ext || null }, error: null });
+    // La carta Autofin es la única fuente de la fecha de 1ª cuota → al crédito (fill-only)
+    if (idCarta && tipo === 'CARTA_AUTOFIN' && ext && ext.fechaPrimeraCuota)
+      setImmediate(() => aplicarFecha1aCuotaDesdeCarta(idCarta, ext.fechaPrimeraCuota));
     /* Revisor Automático (Unidad y Autofin): con cada documento que llega intenta
        la revisión completa — aprueba solo cuando están todos y todo cuadra. */
     if (idCarta) setImmediate(() => require('../revisor-unidad').procesarCarta(idCarta));

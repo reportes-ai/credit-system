@@ -903,17 +903,11 @@ exports.parseCarta = async (req, res) => {
     // Gastos operacionales = Impuesto de timbre + Inscripción (van sumados en la carta)
     data.gastos_operacionales = (data.impuesto_timbre || 0) + (data.inscripcion || 0);
 
-    // Fecha primera cuota = primera fecha del cuadro de pago (la más temprana posterior al curse)
-    const curseD = data.fecha_curse ? new Date(data.fecha_curse + 'T00:00:00') : null;
-    let primera = null;
-    for (const ds of (allText.match(/\d{2}\/\d{2}\/\d{4}/g) || [])) {
-      const m = ds.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      const d = new Date(+m[3], +m[2] - 1, +m[1]);
-      if (curseD && d > curseD && (!primera || d < primera)) primera = d;
-    }
-    data.fecha_primera_cuota = primera
-      ? `${primera.getFullYear()}-${String(primera.getMonth() + 1).padStart(2, '0')}-${String(primera.getDate()).padStart(2, '0')}`
-      : null;
+    // Fecha primera cuota = primera fecha del cuadro de pago posterior al curse.
+    // Motor único: shared/fecha-primera-cuota.js (lo mismo que usa el parser de
+    // cartas al subir el PDF; antes esta lógica vivía duplicada acá).
+    data.fecha_primera_cuota = require('../../../../shared/fecha-primera-cuota')
+      .fechaPrimeraCuota(allText, data.fecha_curse);
 
     return res.json({ success: true, data, error: null });
   } catch (e) {
