@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1013,6 +1013,10 @@ async function cargar(){
     if (f.entidad === 'PARQUE') ENTIDAD = 'PARQUE';   // al reabrir, el modo lo manda la ficha
     setRadio('tipo', f.tipo); onTipo();
     await cargarEjecutivos(f.ejecutivo_nombre);
+    // El banco puede venir escrito distinto a la lista (ficha importada/antigua: 'CHILE').
+    // Si no está entre las opciones se agrega — si no, el select queda vacío y la ficha
+    // se IMPRIME sin banco aunque el dato esté en el sistema (caso Carmen 13-08-2026).
+    if (f.banco) { const sel=$('banco'); if (sel && ![...sel.options].some(o=>o.value===f.banco)) { const op=document.createElement('option'); op.value=f.banco; op.textContent=f.banco; sel.appendChild(op); } }
     ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','tipo_cuenta','nombre_cuenta','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
