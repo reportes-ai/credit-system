@@ -5012,12 +5012,11 @@ function _abrirDetalleOps(nombre, tipo, pred) {
   const desde = document.getElementById('sel-desde')?.value || '';
   const hasta  = document.getElementById('sel-hasta')?.value  || '';
 
-  // Filtrar RAW_DATA según tipo
-  // Usar fecha_otorgado si existe (igual que comisiones), si no usar mes
-  let ops = (window.RAW_DATA || []).filter(r => {
-    const mesRef = (r.fecha_otorgado || r.fecha_ot) ? (r.fecha_otorgado || r.fecha_ot).slice(0,7) : r.mes;
-    return pred(r) && mesRef >= desde && mesRef <= hasta;
-  });
+  // Filtrar RAW_DATA según tipo — por MES CONTABLE (r.mes), el MISMO criterio de las
+  // cards y de todo el dashboard. Este popup era el único que filtraba por fecha de
+  // otorgamiento y por eso mostraba 23 cuando la card decía 22 (la op 88150 se otorgó
+  // el 01-06 pero su mes contable es mayo: ya contó en el cierre de mayo).
+  let ops = (window.RAW_DATA || []).filter(r => pred(r) && r.mes >= desde && r.mes <= hasta);
   if (tipo === 'ot') {
     ops = ops.filter(r => r.estado_eval === 'OTORGADO');
   } else {
