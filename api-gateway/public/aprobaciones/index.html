@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -1337,6 +1337,12 @@ function renderLista(){
     if (c.status==='APROBADA') acc.push(`<button class="btn-mini bm-print" onclick="imprimirCarta(${c.id})"><i class="bi bi-printer"></i> Imprimir</button>`);
     if ((c.status==='PENDIENTE'||c.status==='RECHAZADA') && c.creadoPor===MI_LOGIN && puede('aprob_crear'))
       acc.push(`<button class="btn-mini bm-edit" onclick="editarCarta(${c.id})"><i class="bi bi-pencil"></i>${c.status==='RECHAZADA'?' Corregir':''}</button>`);
+    /* Corregir es del AUTOR de la carta. Antes el botón simplemente no aparecía y
+       se leía como "el sistema está bloqueado": ahora se muestra apagado diciendo
+       de quién depende, para que sepan a quién pedírselo. */
+    else if ((c.status==='PENDIENTE'||c.status==='RECHAZADA') && c.creadoPor!==MI_LOGIN && puede('aprob_crear'))
+      acc.push(`<button class="btn-mini bm-edit" disabled style="opacity:.45;cursor:not-allowed"
+        title="Solo ${escH(c.creadoPorNombre||c.creadoPor||'quien la creó')} puede corregir esta carta y reemplazar sus documentos"><i class="bi bi-pencil"></i>${c.status==='RECHAZADA'?' Corregir':''}</button>`);
     if (c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN && puede('aprob_revisar'))
       acc.push(`<button class="btn-mini bm-ok" onclick="abrirRevision(${c.id})"><i class="bi bi-check2-square"></i> Revisar</button>`);
     if (c.status==='APROBADA' && puede('aprob_corregir_dealer'))
@@ -2303,6 +2309,10 @@ async function udFill(f){
 async function onUnidadDoc(input, tipo){
   const file = input.files && input.files[0];
   if(!file) return;
+  /* El <input file> se vacía SIEMPRE al terminar (abajo y en cada salida). Sin eso,
+     volver a elegir el MISMO archivo no dispara 'change' y el botón parece muerto:
+     era lo que pasaba al corregir una carta rechazada y reemplazar el documento
+     observado por otra versión del mismo PDF. */
   if(file.type!=='application/pdf' && !/\.pdf$/i.test(file.name)){ udMsg('Solo se aceptan archivos PDF.','err'); input.value=''; return; }
   const span = tipo==='COMPROMISO_UNIDAD' ? 'docCompromisoName' : 'docCotizacionName';
   try {
@@ -2324,6 +2334,7 @@ async function onUnidadDoc(input, tipo){
     if (sinDatos) udMsg('⚠ '+(warn||'No se pudieron extraer datos del documento.'), 'warn');
     else udMsg('✓ Datos cargados desde Unidad. '+part+'Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok');
   } catch(e){ console.error('onUnidadDoc',e); udMsg('Error al procesar el documento.','err'); }
+  finally { input.value=''; }   // permite volver a elegir el MISMO archivo
 }
 async function onAutofinDoc(input){
   const file = input.files && input.files[0];
@@ -2347,6 +2358,7 @@ async function onAutofinDoc(input){
     const warn = (j.data.warnings||[]).join(' ');
     udMsg('✓ Datos cargados desde Autofin. Selecciona el Tipo de Carta y revisa antes de guardar. '+(warn?('⚠ '+warn):''), warn?'warn':'ok','autofinDocsMsg');
   } catch(e){ console.error('onAutofinDoc',e); udMsg('Error al procesar la carta.','err','autofinDocsMsg'); }
+  finally { input.value=''; }   // idem: re-subir el mismo archivo debe funcionar
 }
 async function udSubir(idCarta){
   if(!idCarta || !window._unidadDocs) return;
