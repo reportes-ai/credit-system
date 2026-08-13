@@ -27,11 +27,23 @@
 
    Uso:  node scripts/regularizar-comisiones-parque-migracion.js            → simula
          node scripts/regularizar-comisiones-parque-migracion.js --aplicar  → escribe
+
+   Opciones (por defecto el tramo 2026-01..2026-07 de la corrida original):
+     --desde=YYYY-MM  --hasta=YYYY-MM     tramo de meses contables a regularizar
+     --solo-liberadas=YYYY-MM-DD          solo las operaciones cuyo saldo precio
+                                          quedó LIBERADO A PAGO (o posterior) antes
+                                          de esa fecha. Se usó para 2025: se
+                                          regularizó lo que estaba liberado al
+                                          31-07-2026 y nada más, para no tapar
+                                          comisiones que todavía no corresponde pagar.
 */
 const pool = require('../shared/config/database');
 
+const arg = (n, def) => { const a = process.argv.find(x => x.startsWith('--' + n + '=')); return a ? a.split('=')[1] : def; };
 const APLICAR = process.argv.includes('--aplicar');
-const DESDE = '2026-01-01', HASTA = '2026-07-31';   // agosto 2026 queda fuera
+const DESDE = arg('desde', '2026-01') + '-01';
+const HASTA = arg('hasta', '2026-07') + '-31';   // agosto 2026 queda fuera
+const SOLO_LIBERADAS = arg('solo-liberadas', null);
 const USUARIO = 'Migración';
 
 /* Las 50 operaciones con SALDO PRECIO pendiente (planilla "a pagar.xlsx", 13-08-2026).
@@ -63,7 +75,12 @@ const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
            DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado
       FROM creditos c
       LEFT JOIN postventa_seguimiento s ON s.id_credito = c.id
-     WHERE c.estado='OTORGADO' AND c.mes BETWEEN ? AND ?`, [DESDE, HASTA]);
+     WHERE c.estado='OTORGADO' AND c.mes BETWEEN ? AND ?` +
+    (SOLO_LIBERADAS ? `
+       AND EXISTS (SELECT 1 FROM postventa_etapas le WHERE le.id_seguimiento=s.id AND le.track='SALDO'
+             AND le.etapa IN ('LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO')
+             AND le.fecha < ?)` : ''),
+    SOLO_LIBERADAS ? [DESDE, HASTA, SOLO_LIBERADAS] : [DESDE, HASTA]);
 
   const porMesParque = new Map();   // 'YYYY-MM|PARQUE' -> ops[]
   let excluidas = 0, sinParque = 0, sinSeg = 0;
