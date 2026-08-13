@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -144,8 +144,9 @@ function cartolaHTML(r, i){
   const st = ESTADOS.get(r.parque) || { emitida:false, aprobada:false, enviada:false, factura:false, ficha:null };
   const f = st.ficha || {};
   const ops = DETALLES[r.parque] || [];
+  const fOt = s => { const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : '—'; };
   const filas = ops.map(o => `<tr>
-      <td>${escH(o.num_op||'')}</td><td>${escH(o.dealer||'')}</td><td>${escH(o.ejecutivo||'')}</td>
+      <td>${escH(o.num_op||'')}</td><td>${fOt(o.fecha_otorgado)}</td><td>${escH(o.dealer||'')}</td><td>${escH(o.ejecutivo||'')}</td>
       <td class="r">${fmtCLP(o.saldo_precio)}</td><td class="r">${fmtCLP(o.com_parque)}</td>
     </tr>`).join('');
   const mail = f.cf_email || '';
@@ -182,11 +183,11 @@ function cartolaHTML(r, i){
           <img src="/img/logo.png" style="height:26px">
         </div>
         <table class="det">
-          <tr><th>N° OP</th><th>Dealer</th><th>Ejecutivo</th><th class="r">Saldo Precio</th><th class="r">Comisión</th></tr>
-          ${filas || '<tr><td colspan="5" style="color:#94a3b8">Sin operaciones en el período</td></tr>'}
-          <tr class="linea"><td colspan="4">Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'})</td><td class="r">${fmtCLP(r.comision_creditos)}</td></tr>
-          <tr class="linea"><td colspan="4">Arriendo mensual</td><td class="r">${fmtCLP(r.arriendo)}</td></tr>
-          <tr class="total"><td colspan="4">TOTAL A PAGAR (bruto, IVA incluido)</td><td class="r">${fmtCLP(r.total)}</td></tr>
+          <tr><th>N° OP</th><th>Otorgado</th><th>Dealer</th><th>Ejecutivo</th><th class="r">Saldo Precio</th><th class="r">Comisión</th></tr>
+          ${filas || '<tr><td colspan="6" style="color:#94a3b8">Sin operaciones en el período</td></tr>'}
+          <tr class="linea"><td colspan="5">Comisión por créditos (${r.ops} operación${r.ops===1?'':'es'})</td><td class="r">${fmtCLP(r.comision_creditos)}</td></tr>
+          <tr class="linea"><td colspan="5">Arriendo mensual</td><td class="r">${fmtCLP(r.arriendo)}</td></tr>
+          <tr class="total"><td colspan="5">TOTAL A PAGAR (bruto, IVA incluido)</td><td class="r">${fmtCLP(r.total)}</td></tr>
         </table>
         <div style="font-size:.66rem;color:#94a3b8;margin-top:6px">Documento generado por AutoFácil Business Suite · favor facturar por el total indicado.</div>
       </div>

@@ -102,6 +102,7 @@ require('../../../../shared/migrate').enFila('comisiones-parques', async () => {
       UNIQUE KEY uq_parque_mes_op (parque, mes, num_op),
       INDEX idx_num_op (num_op)
     )`);
+    await pool.query('ALTER TABLE parques_pagos_ops ADD COLUMN IF NOT EXISTS fecha_otorgado DATE NULL');
     // Corte del universo (ver universoDesde): editable en postventa_config.
     await pool.query(
       "INSERT IGNORE INTO postventa_config (clave, valor) VALUES ('parques_universo_desde','2026-07')");
@@ -158,7 +159,8 @@ async function opsElegibles(mes /* 'YYYY-MM' */) {
   const finMes = mes + '-01';
   const desde = await universoDesde();
   const [creds] = await pool.query(`
-    SELECT DISTINCT c.num_op, c.rut_dealer, c.parque, c.com_parque, c.saldo_precio, c.ejecutivo, c.automotora
+    SELECT DISTINCT c.num_op, c.rut_dealer, c.parque, c.com_parque, c.saldo_precio, c.ejecutivo, c.automotora,
+           DATE_FORMAT(c.fecha_otorgado,'%Y-%m-%d') fecha_otorgado
     FROM creditos c
     JOIN postventa_seguimiento s ON s.id_credito = c.id
     WHERE c.estado='OTORGADO'
@@ -205,7 +207,7 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
     g.comision += monto;
     g.ops.push({
       num_op: c.num_op, dealer: d?.nombre_razon || c.automotora || '—',
-      ejecutivo: c.ejecutivo || '—',
+      ejecutivo: c.ejecutivo || '—', fecha_otorgado: c.fecha_otorgado || null,
       saldo_precio: Math.round(Number(c.saldo_precio) || 0), com_parque: monto,
     });
   }
@@ -216,12 +218,13 @@ async function calcularMes(mes /* 'YYYY-MM' */) {
     "SELECT parque, etapa FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
   const congelados = new Set(ests.filter(e => e.etapa !== 'EN_APROBACION').map(e => e.parque));
   const [fotos] = await pool.query(
-    "SELECT parque, num_op, dealer, ejecutivo, saldo_precio, com_parque FROM parques_pagos_ops WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
+    "SELECT parque, num_op, dealer, ejecutivo, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') fecha_otorgado, saldo_precio, com_parque FROM parques_pagos_ops WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
   const fotoPorParque = new Map();
   for (const f of fotos) {
     if (!fotoPorParque.has(f.parque)) fotoPorParque.set(f.parque, []);
     fotoPorParque.get(f.parque).push({
       num_op: f.num_op, dealer: f.dealer || '—', ejecutivo: f.ejecutivo || '—',
+      fecha_otorgado: f.fecha_otorgado || null,
       saldo_precio: Math.round(Number(f.saldo_precio) || 0), com_parque: Math.round(Number(f.com_parque) || 0),
     });
   }
@@ -253,9 +256,9 @@ async function fotografiarOps(parque, mes) {
   const row = (await calcularMes(mes)).find(r => r.parque === parque);
   await pool.query("DELETE FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
   if (row?.detalle?.length) {
-    const vals = row.detalle.map(o => [parque, mes + '-01', o.num_op, o.dealer, o.ejecutivo, o.saldo_precio, o.com_parque]);
+    const vals = row.detalle.map(o => [parque, mes + '-01', o.num_op, o.dealer, o.ejecutivo, o.fecha_otorgado || null, o.saldo_precio, o.com_parque]);
     await pool.query(
-      'INSERT INTO parques_pagos_ops (parque, mes, num_op, dealer, ejecutivo, saldo_precio, com_parque) VALUES ?', [vals]);
+      'INSERT INTO parques_pagos_ops (parque, mes, num_op, dealer, ejecutivo, fecha_otorgado, saldo_precio, com_parque) VALUES ?', [vals]);
   }
 }
 
