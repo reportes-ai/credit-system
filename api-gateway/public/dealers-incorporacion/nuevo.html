@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.31 — banco con buscador (input+datalist): escribe "chile" y sugiere Banco de Chile; acepta bancos fuera de la lista · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -300,14 +300,18 @@
           </select></div>
         <div class="fld"><label>Nombre de la cuenta</label><input id="nombre_cuenta" placeholder="Titular de la cuenta"></div>
         <div class="fld"><label>Banco de Transferencia</label>
-          <select id="banco" onchange="actualizarTercero()">
-            <option value="">— Seleccionar banco —</option>
+          <!-- input+datalist (no select): permite BUSCAR escribiendo cualquier parte del
+               nombre ("chile" encuentra Banco de Chile) y acepta bancos fuera de la lista.
+               Con select, tipear saltaba por primera letra (C→Coopeuch) y un valor
+               importado fuera de la lista dejaba el campo vacío al imprimir. -->
+          <input id="banco" list="bancosLista" placeholder="Escribe para buscar…" autocomplete="off" oninput="actualizarTercero()" onchange="actualizarTercero()">
+          <datalist id="bancosLista">
             <option>Banco de Chile</option><option>BancoEstado</option><option>Banco Santander</option>
             <option>BCI</option><option>Itaú</option><option>Scotiabank</option><option>Banco Security</option>
             <option>Banco Falabella</option><option>Banco Ripley</option><option>Banco Consorcio</option>
             <option>Banco BICE</option><option>Banco Internacional</option><option>Banco BTG Pactual</option>
             <option>Coopeuch</option><option>Banco del Desarrollo</option><option>HSBC</option><option>Tenpo</option><option>Mercado Pago</option>
-          </select></div>
+          </datalist></div>
         <div class="fld"><label>Email Confirmación</label><input id="correo_confirmacion" type="email" oninput="onEmail(this,'ecEmailHint')"><small id="ecEmailHint" class="vmsg"></small></div>
       </div>
     </div>
@@ -506,8 +510,7 @@ function aplicarDealer(d){
   if(['PARQUE','GENERAL','AMBOS'].includes(d.tipo)) setRadio('tipo', d.tipo);
   setVal('nombre_parque', d.nombre_parque); setVal('direccion_parque', d.direccion_parque); setVal('comuna_parque', d.comuna_parque);
   if(d.tipo_documento) setRadio('tipo_documento', d.tipo_documento);
-  // El banco puede venir de datos importados con un nombre fuera de la lista → asegurarlo como opción (así round-trip y no falsea "depósito cambió").
-  if(d.banco){ const sel=$('banco'); if(sel && ![...sel.options].some(o=>o.value===d.banco)){ const op=document.createElement('option'); op.value=d.banco; op.textContent=d.banco; sel.appendChild(op); } }
+  // banco es input+datalist: acepta cualquier valor guardado, sin lista que falsee "depósito cambió".
   setVal('banco', d.banco); setVal('rut_cuenta', d.rut_cuenta); setVal('num_cuenta', d.num_cuenta);
   setVal('tipo_cuenta', d.tipo_cuenta); setVal('nombre_cuenta', d.nombre_cuenta);
   onTipo();   // ajusta etiquetas + defaults de comisión según tipo
@@ -1013,10 +1016,8 @@ async function cargar(){
     if (f.entidad === 'PARQUE') ENTIDAD = 'PARQUE';   // al reabrir, el modo lo manda la ficha
     setRadio('tipo', f.tipo); onTipo();
     await cargarEjecutivos(f.ejecutivo_nombre);
-    // El banco puede venir escrito distinto a la lista (ficha importada/antigua: 'CHILE').
-    // Si no está entre las opciones se agrega — si no, el select queda vacío y la ficha
-    // se IMPRIME sin banco aunque el dato esté en el sistema (caso Carmen 13-08-2026).
-    if (f.banco) { const sel=$('banco'); if (sel && ![...sel.options].some(o=>o.value===f.banco)) { const op=document.createElement('option'); op.value=f.banco; op.textContent=f.banco; sel.appendChild(op); } }
+    // banco es input+datalist: cualquier valor guardado (ej 'CHILE') carga e imprime
+    // tal cual — con el select antiguo quedaba vacío al imprimir (caso Carmen 13-08).
     ['fecha_solicitud','rut','nombre_razon','nombre_fantasia','direccion','comuna','provincia','region','cc_nombre','cc_telefono','cc_email','cf_nombre','cf_telefono','cf_email','com_6_12','com_13_24','com_25_36','com_37','tipo_cuenta','nombre_cuenta','banco','rut_cuenta','num_cuenta','correo_confirmacion','observaciones']
       .forEach(k => setVal(k, k==='fecha_solicitud' && f[k] ? String(f[k]).slice(0,10) : f[k]));
     if (!val('provincia')) onComuna();
