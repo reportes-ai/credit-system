@@ -616,8 +616,12 @@ const cartolaEstado = async (req, res) => {
     const rows = [...rowsFoto, ...rowsMes.filter(r => !conFoto.has(r.parque))];
     const [facs] = await pool.query('SELECT parque, numero_factura, fecha_factura, monto_bruto FROM parques_facturas WHERE mes=?', [mes]);
     const facMap = new Map(facs.map(f => [f.parque, f]));
+    /* El correo de la cartola: contacto financiero si la ficha lo tiene, si no el
+       correo de confirmación que se registró al crear el parque (hoy es el que
+       viene lleno en las 3 fichas — leer solo cf_email dejaba la cartola sin
+       destinatario aunque el dato estuviera en la ficha). */
     const [fichas] = await pool.query(`
-      SELECT p.nombre, f.rut, f.razon_social, f.cf_email, f.cf_nombre, f.tipo_documento
+      SELECT p.nombre, f.rut, f.razon_social, f.cf_email, f.cf_nombre, f.correo_confirmacion, f.tipo_documento
       FROM parques_comisiones p LEFT JOIN parques_ficha f ON f.id_parque = p.id`);
     const fMap = new Map(fichas.map(f => [f.nombre, f]));
     const data = rows.map(r => ({

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -149,7 +149,8 @@ function cartolaHTML(r, i){
       <td>${escH(o.num_op||'')}</td><td>${fOt(o.fecha_otorgado)}</td><td>${escH(o.dealer||'')}</td><td>${escH(o.ejecutivo||'')}</td>
       <td class="r">${fmtCLP(o.saldo_precio)}</td><td class="r">${fmtCLP(o.com_parque)}</td>
     </tr>`).join('');
-  const mail = f.cf_email || '';
+  // Contacto financiero de la ficha; si no lo tiene, el correo de confirmación del parque
+  const mail = f.cf_email || f.correo_confirmacion || '';
   const puedeEmitir  = r.ops > 0 && !st.emitida;
   const puedeAprobar = r.ops > 0 && st.emitida && !st.aprobada;
   const puedeEnviar  = (r.ops === 0) || (st.aprobada && !st.enviada);
