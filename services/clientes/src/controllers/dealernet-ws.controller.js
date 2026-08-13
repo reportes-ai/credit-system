@@ -795,6 +795,15 @@ function analizarInforme(codigo, contenido) {
   const esPenal = PENAL_CODIGOS.includes(String(codigo));
   if (contenido == null) return { tieneRegistros: false, grave: false, severidad: 'sin_datos', nota: 'sin datos' };
 
+  /* RESPUESTA VACÍA ≠ LIMPIO (13-08-2026). El WS puede contestar retcode 0 "Ok" con
+     solo los metadatos del producto (@_cod, @_gls) y ningún nodo de datos. Eso pasaba
+     el chequeo de arriba y terminaba clasificado como 'bueno' / "sin observaciones
+     negativas": un deudor de pensión de alimentos real se informaba como limpio.
+     Sin datos no se puede afirmar nada — se marca sin_datos para que se reintente. */
+  const conDatos = Object.keys(contenido).some(k => !k.startsWith('@_') && contenido[k] != null);
+  if (!conDatos) return { tieneRegistros: false, grave: false, severidad: 'sin_datos',
+    nota: 'la consulta no devolvió datos — reintentar antes de concluir' };
+
   // Los informes DealerNet son DATOS ESTRUCTURADOS (campos @_...): se clasifica por los MONTOS
   // e INDICADORES reales, no buscando palabras sueltas — antes "sin deuda" o una deuda vigente
   // (normal, al día) marcaban "malo" por contener la palabra "deuda". Ahora solo penaliza lo que

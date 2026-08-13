@@ -24,6 +24,7 @@ const REPORT_CSS = `
   .rep-tb td { padding:6px 8px; border:1px solid #eef2f7; vertical-align:top; }
   .pill-ok { background:#dcfce7; color:#15803d; font-weight:800; padding:2px 10px; border-radius:11px; }
   .pill-bad { background:#fee2e2; color:#b91c1c; font-weight:800; padding:2px 10px; border-radius:11px; }
+  .pill-warn { background:#fef3c7; color:#92400e; font-weight:800; padding:2px 10px; border-radius:11px; }
   .rep-note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:8px 12px; font-size:.78rem; margin-bottom:10px; }
   .rep-sep { border:none; border-top:1px dashed #e2e8f0; margin:8px 0; }
   .rep-legal { margin-top:18px; padding-top:8px; border-top:1px solid #eef2f7; font-size:.68rem; color:#94a3b8; font-style:italic; }
@@ -58,14 +59,22 @@ function renderTree(o, depth=0){
 function bodyPension(d, cont){
   const nombre = deepFind(cont,['nombre']) || '';
   const inddeu = String(deepFind(cont,['inddeu']) || '').trim();
-  const sin = !inddeu || /sin/i.test(inddeu);
+  /* SIN RESPUESTA ≠ SIN DEUDA (13-08-2026). Cuando el WS contesta "Ok" pero sin el
+     nodo de datos, esto pintaba "SIN DEUDA" en verde: un deudor real de pensión de
+     alimentos se informaba como limpio. Ausencia de dato = SIN INFORMACIÓN, y hay
+     que reconsultar. Nunca afirmar lo que el informe no dice. */
+  const sinDato = !inddeu;
+  const sin = !sinDato && /sin/i.test(inddeu);
+  const pill = sinDato ? 'pill-warn' : (sin ? 'pill-ok' : 'pill-bad');
+  const texto = sinDato ? 'SIN INFORMACIÓN' : inddeu.toUpperCase();
   const accion = d.pdf_url ? `<button class="btn-ghost" onclick="descargarPdf(${d.id})"><i class="bi bi-file-earmark-pdf"></i> Certificado</button>` : '—';
-  return `<div class="rep-kv"><b>Nombre:</b> ${esc(nombre)||'—'}</div>
+  return `${sinDato ? '<div class="rep-note"><b>⚠ La consulta no devolvió datos.</b> El servicio respondió sin resultado para este RUT, así que <b>no se puede afirmar que no tenga deuda</b>. Vuelve a solicitar el informe; si insiste, verifícalo en el certificado del Registro Civil antes de decidir.</div>' : ''}
+    <div class="rep-kv"><b>Nombre:</b> ${esc(nombre)||'—'}</div>
     <div class="rep-kv"><b>Rut:</b> ${esc(d.rut)}-${esc(d.dv||'')}</div>
     <div class="rep-h">Resultado Búsqueda</div>
     <table class="rep-tb"><thead><tr><th>Ruta deudor</th><th>Nombre deudor</th><th>Resultado consulta</th><th>Acción</th></tr></thead>
     <tbody><tr><td>${esc(d.rut)}-${esc(d.dv||'')}</td><td>${esc(nombre||'—')}</td>
-    <td><span class="pill-${sin?'ok':'bad'}">${esc((inddeu||'SIN DEUDA').toUpperCase())}</span></td><td>${accion}</td></tr></tbody></table>
+    <td><span class="${pill}">${esc(texto)}</span></td><td>${accion}</td></tr></tbody></table>
     ${d.pdf_url?'<div class="muted" style="margin-top:8px"><i class="bi bi-shield-check"></i> Se conserva el <b>certificado</b> emitido por el Registro Civil.</div>':''}`;
 }
 /* ── Helpers de navegación / formato ─────────────────────────────────────── */
