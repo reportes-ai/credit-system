@@ -26,17 +26,21 @@ const SEMILLAS = [
     nombre: 'Orden de Pago de parque → Contabilidad',
     descripcion: 'Se manda al EMITIR la orden de pago de la comisión de un parque. Es el aviso a Contabilidad y Tesorería de que hay una ODP por pagar.',
     asunto: 'OP {ODP} — Comisión Parque {PARQUE} {PERIODO} ({TOTAL})',
-    cuerpo: `<h2 style="color:#012d70">Orden de Pago {ODP} — Comisión Parque</h2>
-<p><b>Parque:</b> {PARQUE}<br><b>Período:</b> {PERIODO}</p>
-<table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
-  <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
-  <tr><td>Arriendo mensual</td><td align="right">{ARRIENDO}</td></tr>
-  <tr><td>Comisión por créditos ({OPS} operaciones)</td><td align="right">{COMISION}</td></tr>
-  <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL A PAGAR</td><td align="right">{TOTAL}</td></tr>
-</table>
-<p>Emitida por {QUIEN}. La orden queda <b>por pagar</b> en el módulo Órdenes de Pago.</p>`,
+    cuerpo: `Estimado Equipo de Contabilidad:
+
+Adjunto encontrarán la Orden de Pago N° {ODP} de la comisión del parque {PARQUE}, período {PERIODO}.
+
+Arriendo mensual: {ARRIENDO}
+Comisión por créditos ({OPS} operaciones): {COMISION}
+TOTAL A PAGAR: {TOTAL}
+
+Emitida por {QUIEN}. La orden queda por pagar en el módulo Órdenes de Pago.
+
+Saludos cordiales,
+Área de Operaciones`,
     para_perfiles: 'Administrador,Tesorero',
     cc: '',
+    destinatario: 'Los perfiles marcados aquí abajo (Contabilidad y Tesorería)',
     variables: '{ODP} {PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
   },
   /* ── Cartolas y comisiones de DEALER ──────────────────────────────────────
@@ -64,6 +68,7 @@ Saludos cordiales,
 AutoFácil Crédito Automotriz`,
     para_perfiles: '',
     cc: 'comisiones@autofacilchile.cl',
+    destinatario: 'El correo del DEALER (de su ficha) + ejecutivos de las operaciones y Jefes Comerciales',
     variables: '{dealer} {mes} {total}',
   },
   {
@@ -83,6 +88,7 @@ Saludos cordiales,
 AutoFácil Crédito Automotriz`,
     para_perfiles: '',
     cc: 'comisiones@autofacilchile.cl',
+    destinatario: 'El correo del DEALER (de su ficha)',
     variables: '{dealer} {doc} {numero_factura} {tipo_cuenta} {num_cuenta} {banco} {ops}',
   },
   {
@@ -91,22 +97,27 @@ AutoFácil Crédito Automotriz`,
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',
     descripcion: 'Se manda al pulsar "Enviar cartola" en Emisión de Cartolas Parque. Lleva la cartola en PDF adjunta, con el detalle de cada operación y la línea de arriendo. Es el documento con el que el parque emite su factura.',
     asunto: 'CARTOLA COMISIONES {PERIODO_LARGO} — {PARQUE}',
-    cuerpo: `<p>Estimados {PARQUE}:</p>
-<p>Junto con saludar, adjuntamos la <b>cartola de comisiones y arriendo</b> correspondiente a {PERIODO_LARGO}, con el detalle de las operaciones del período.</p>
-<table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
-  <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
-  <tr><td>Comisión por créditos ({OPS} operaciones)</td><td align="right">{COMISION}</td></tr>
-  <tr><td>Arriendo mensual</td><td align="right">{ARRIENDO}</td></tr>
-  <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL BRUTO A PAGAR (IVA incluido)</td><td align="right">{TOTAL}</td></tr>
-</table>
-<p>Favor emitir la <b>factura por el total indicado</b> a:<br>
-<b>AUTOFACIL SPA</b> — RUT 76.545.638-K<br>
-Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.</p>
-<p>Recibida la factura, el pago se procesa vía Orden de Pago.</p>
-<p>Cualquier duda quedamos atentos.</p>
-<p>Saludos cordiales,<br><b>AutoFácil — Crédito Automotriz</b></p>`,
+    cuerpo: `Estimados {PARQUE}:
+
+Junto con saludar, adjuntamos la cartola de comisiones y arriendo correspondiente a {PERIODO_LARGO}, con el detalle de las operaciones del período.
+
+Comisión por créditos ({OPS} operaciones): {COMISION}
+Arriendo mensual: {ARRIENDO}
+TOTAL BRUTO A PAGAR (IVA incluido): {TOTAL}
+
+Favor emitir la factura por el total indicado a:
+AUTOFACIL SPA — RUT 76.545.638-K
+Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.
+
+Recibida la factura, el pago se procesa vía Orden de Pago.
+
+Cualquier duda quedamos atentos.
+
+Saludos cordiales,
+AutoFácil Crédito Automotriz`,
     para_perfiles: '',
     cc: 'operaciones@autofacilchile.cl',
+    destinatario: 'El correo del PARQUE (contacto financiero de su ficha, o su correo de confirmación)',
     variables: '{PARQUE} {PERIODO} {PERIODO_LARGO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {QUIEN}',
   },
   {
@@ -115,20 +126,23 @@ Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.</p>
     nombre: 'Pago realizado → aviso al PARQUE',
     descripcion: 'Se manda al CONFIRMAR el pago de la comisión de un parque. Va al correo de la ficha del parque (contacto financiero, o el correo de confirmación).',
     asunto: 'AutoFácil — Pago de comisión y arriendo {PERIODO} ({TOTAL})',
-    cuerpo: `<h2 style="color:#012d70">Pago realizado — {PARQUE}</h2>
-<p>Estimados,</p>
-<p>Les informamos que se realizó el pago correspondiente al período <b>{PERIODO}</b>, según el siguiente detalle:</p>
-<table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
-  <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
-  <tr><td>Arriendo mensual</td><td align="right">{ARRIENDO}</td></tr>
-  <tr><td>Comisión por créditos ({OPS} operaciones)</td><td align="right">{COMISION}</td></tr>
-  <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL PAGADO</td><td align="right">{TOTAL}</td></tr>
-</table>
-<p>Orden de pago N° <b>{ODP}</b>.</p>
-<p>Ante cualquier consulta, quedamos a su disposición.</p>
-<p>Saludos cordiales,<br><b>AutoFácil — Crédito Automotriz</b></p>`,
+    cuerpo: `Estimados {PARQUE}:
+
+Les informamos que se realizó el pago correspondiente al período {PERIODO}, según el siguiente detalle:
+
+Arriendo mensual: {ARRIENDO}
+Comisión por créditos ({OPS} operaciones): {COMISION}
+TOTAL PAGADO: {TOTAL}
+
+Orden de pago N° {ODP}.
+
+Ante cualquier consulta, quedamos a su disposición.
+
+Saludos cordiales,
+AutoFácil Crédito Automotriz`,
     para_perfiles: '',
     cc: '',
+    destinatario: 'El correo del PARQUE (contacto financiero de su ficha, o su correo de confirmación)',
     variables: '{PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {ODP} {QUIEN}',
   },
   {
@@ -137,17 +151,16 @@ Av. Presidente Kennedy N° 5757, Piso 16 Of. 1601, Las Condes.</p>
     nombre: 'Pago realizado → aviso interno (Jefe Comercial)',
     descripcion: 'Se manda al CONFIRMAR el pago de la comisión de un parque, al equipo comercial, para que sepan que el parque ya recibió su pago.',
     asunto: 'Comisión pagada — {PARQUE} {PERIODO} ({TOTAL})',
-    cuerpo: `<h2 style="color:#012d70">Comisión de parque pagada</h2>
-<p>Se confirmó el pago de la comisión y arriendo del parque <b>{PARQUE}</b>, período <b>{PERIODO}</b>.</p>
-<table cellpadding="8" style="border-collapse:collapse;border:1px solid #e2e8f0">
-  <tr style="background:#012d70;color:#fff"><th align="left">Concepto</th><th align="right">Monto</th></tr>
-  <tr><td>Arriendo mensual</td><td align="right">{ARRIENDO}</td></tr>
-  <tr><td>Comisión por créditos ({OPS} operaciones)</td><td align="right">{COMISION}</td></tr>
-  <tr style="font-weight:700;background:#f1f5f9"><td>TOTAL PAGADO</td><td align="right">{TOTAL}</td></tr>
-</table>
-<p>Orden de pago N° <b>{ODP}</b> · confirmada por {QUIEN}.</p>`,
+    cuerpo: `Se confirmó el pago de la comisión y arriendo del parque {PARQUE}, período {PERIODO}.
+
+Arriendo mensual: {ARRIENDO}
+Comisión por créditos ({OPS} operaciones): {COMISION}
+TOTAL PAGADO: {TOTAL}
+
+Orden de pago N° {ODP} · confirmada por {QUIEN}.`,
     para_perfiles: 'Jefe Comercial',
     cc: '',
+    destinatario: 'Los perfiles marcados aquí abajo (equipo comercial interno)',
     variables: '{PARQUE} {PERIODO} {ARRIENDO} {COMISION} {OPS} {TOTAL} {ODP} {QUIEN}',
   },
 ];
@@ -163,9 +176,12 @@ require('./migrate').enFila('correos-plantillas', async () => {
     para_perfiles VARCHAR(300) NOT NULL DEFAULT '',
     cc            VARCHAR(500) NOT NULL DEFAULT '',
     variables     VARCHAR(500) NULL,
+    destinatario  VARCHAR(200) NULL,
     activo        TINYINT(1) NOT NULL DEFAULT 1,
     updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   )`);
+  // Tablas ya creadas antes de que existiera la columna
+  await pool.query('ALTER TABLE correos_plantillas ADD COLUMN IF NOT EXISTS destinatario VARCHAR(200) NULL').catch(() => {});
   /* INSERT IGNORE: la semilla define el texto ORIGINAL, nunca pisa lo que el
      Administrador haya editado después (ese es el punto de tenerlo en mantenedor). */
   for (const p of SEMILLAS) {
@@ -190,8 +206,19 @@ require('./migrate').enFila('correos-plantillas', async () => {
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [p.codigo, p.ambito, p.nombre, p.descripcion, asunto, cuerpo, p.para_perfiles, cc, p.variables, activo]);
     // La descripción y las variables son documentación, no contenido editable: se refrescan.
-    await pool.query('UPDATE correos_plantillas SET descripcion=?, variables=?, ambito=?, nombre=? WHERE codigo=?',
-      [p.descripcion, p.variables, p.ambito, p.nombre, p.codigo]);
+    await pool.query('UPDATE correos_plantillas SET descripcion=?, variables=?, ambito=?, nombre=?, destinatario=? WHERE codigo=?',
+      [p.descripcion, p.variables, p.ambito, p.nombre, p.destinatario || null, p.codigo]);
+  }
+});
+
+/* Los 4 correos de parques nacieron con el cuerpo en HTML crudo: en el
+   mantenedor se veían como una maraña de etiquetas. Se pasan a texto plano UNA
+   vez, y solo si nadie los editó todavía (siguen idénticos a como se sembraron). */
+require('./migrate').migrar('correos-parques-texto-plano', async () => {
+  for (const p of SEMILLAS.filter(x => x.codigo.startsWith('parque_'))) {
+    await pool.query(
+      "UPDATE correos_plantillas SET cuerpo=? WHERE codigo=? AND cuerpo LIKE '<%'",
+      [p.cuerpo, p.codigo]);
   }
 });
 
@@ -209,6 +236,13 @@ const render = (texto, datos = {}) =>
     (datos[k] != null ? String(datos[k])
       : datos[k.toUpperCase()] != null ? String(datos[k.toUpperCase()])
       : datos[k.toLowerCase()] != null ? String(datos[k.toLowerCase()]) : ''));
+
+/* El cuerpo se escribe en TEXTO PLANO (legible y editable por cualquiera) y el
+   motor lo convierte a HTML. Si alguien pega HTML de verdad, se respeta tal cual:
+   así el mantenedor no obliga a nadie a escribir etiquetas para mandar un correo. */
+const esHTML = t => /<(p|div|table|br|h[1-6]|ul|ol|strong|b|span)\b/i.test(String(t || ''));
+const aHTML = t => esHTML(t) ? String(t)
+  : String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
 
 /* Correos de los usuarios activos de una lista de perfiles (CSV). */
 async function correosDePerfiles(csv) {
@@ -237,10 +271,12 @@ async function enviar({ codigo, to = [], datos = {}, adjuntos } = {}) {
     if (!dest.length) return { enviado: false, motivo: 'sin destinatarios' };
     const cc = String(p.cc || '').split(',').map(s => s.trim()).filter(Boolean);
 
+    const cuerpo = render(p.cuerpo, datos);
     await enviarCorreo({
       to: dest, cc: cc.length ? cc : undefined,
       subject: render(p.asunto, datos),
-      html: envolverHTML(render(p.cuerpo, datos)),
+      html: envolverHTML(aHTML(cuerpo)),
+      text: esHTML(cuerpo) ? undefined : cuerpo,
       attachments: adjuntos,
     });
     return { enviado: true, to: dest, cc };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores Post Venta — AutoFácil</title>
-  <!-- v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
+  <!-- v2.5 — cuerpos en texto plano legible (el motor los pasa a HTML) + cada correo dice a quien va dirigido · v2.4 — TODOS los correos acá: cartolas y comisiones de dealer + los 4 de parques, cada uno con su interruptor, CC y prueba · v2.2 — destinatarios visibles en cada plantilla + correo Pago de Saldo Precio al dealer (nace inactivo, CC ejecutivo/JC/Operaciones) · v2.1 — selector de remitente por plantilla (cuentas habilitadas del motor de correo) · v2.0 — check Activo en correos de Orden de Pago Saldo Precio y Comision · v1.9 — correo de cartola automatico desde comisiones@; firmas vacias (marco con logo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -126,7 +126,7 @@
          los correos de Post Venta, para que todo se administre en un solo lugar. -->
     <div style="margin-top:22px;border-top:2px solid #e2e8f0;padding-top:16px">
       <h6 style="font-weight:800;color:#0141A2;margin:0 0 4px"><i class="bi bi-envelope-at me-1"></i>Correos de Cartolas, Comisiones y Parques</h6>
-      <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. Cada uno se guarda por separado y queda auditado; <b>Enviar prueba</b> manda el correo con datos de ejemplo solo a la casilla que indiques.</div>
+      <div class="ph" style="margin:0 0 12px">Texto, destinatarios por perfil, copia (CC) e interruptor de cada correo automático. El cuerpo se escribe en <b>texto normal</b> (el sistema le da el formato al enviarlo). Cada correo indica <b>a quién va dirigido</b>; los perfiles y el CC son copias que se suman. Cada uno se guarda por separado y queda auditado; <b>Prueba</b> lo manda con datos de ejemplo solo a la casilla que indiques.</div>
       <div id="plantCont"><div style="color:#94a3b8;font-size:.82rem;padding:14px 0">Cargando correos…</div></div>
     </div>
 
@@ -411,10 +411,13 @@ function pintarPlantillas(){
       <div class="ph" style="margin:0 0 8px">${escP(r.descripcion||'')}</div>
       <div class="fld"><label>Asunto</label><input id="plAs${i}" value="${escPA(r.asunto)}"></div>
       <div class="fld"><label>Cuerpo (acepta HTML)</label><textarea id="plCu${i}">${escP(r.cuerpo)}</textarea></div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:7px 11px;font-size:.76rem;color:#15803d;margin-bottom:10px">
+        <b><i class="bi bi-person-check me-1"></i>Va dirigido a:</b> ${escP(r.destinatario || 'el destinatario propio del proceso')}
+      </div>
       <div class="correo-cols">
-        <div class="fld"><label>Destinatarios por perfil</label>
+        <div class="fld"><label>Copias internas por perfil (opcional)</label>
           <select id="plPf${i}" multiple size="4" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:6px;font-size:.82rem">${perfSel}</select>
-          <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Ctrl+clic para varios. Vacío = solo el destinatario propio del proceso (dealer o parque).</div></div>
+          <div style="font-size:.7rem;color:#94a3b8;margin-top:3px">Ctrl+clic para varios. Se SUMAN al destinatario de arriba; dejarlo vacío no impide el envío.</div></div>
         <div class="fld"><label>Copia (CC) — separados por coma</label>
           <input id="plCc${i}" value="${escPA(r.cc)}" placeholder="ej: operaciones@autofacilchile.cl"></div>
       </div>
