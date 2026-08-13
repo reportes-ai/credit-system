@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Cartolas Parque — AutoFácil</title>
-  <!-- v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
+  <!-- v1.6 — PDF: se captura con la pagina al tope (determinista) en vez de corregir el desfase de scroll · v1.5 — el PDF salia en blanco con la pagina scrolleada (fix scrollY + validacion de tamaño) · boton Ver PDF · la cartola ya no dice IVA incluido · v1.4 — la cartola se manda desde el servidor con el PDF adjunto y plantilla del mantenedor (antes abria Gmail y habia que adjuntar a mano) · v1.3 — el correo del parque cae al correo_confirmacion de la ficha si no hay contacto financiero · v1.2 — columna Otorgado en la cartola (regla de arrastre: pueden venir ops de meses anteriores) · v1.1 — registrar factura del parque con cuadratura -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -216,25 +216,34 @@ async function accion(cual, parque){
    (espejo de la cartola dealer). El texto, la copia y el interruptor están en
    Mantenedores → Correos del Sistema, plantilla "Cartola mensual → al PARQUE". */
 /* Genera el PDF de la cartola.
-   OJO — html2canvas captura relativo al VIEWPORT: con la página scrolleada (y la
-   cartola de un parque de más abajo siempre lo está) el canvas sale del área
-   equivocada y el PDF llega EN BLANCO. Le pasamos el desplazamiento actual y las
-   medidas de la ventana; después se valida que el archivo tenga contenido real,
-   porque acá el PDF ya no lo ve nadie antes de salir al parque. */
+   OJO — html2canvas captura relativo al VIEWPORT y al scroll de la página: con
+   la cartola de un parque de más abajo (siempre scrolleada) el canvas salía del
+   área equivocada y el PDF llegaba EN BLANCO. En vez de corregir el desfase con
+   scrollY —que depende de cómo esté la pantalla en ese momento— se lleva la
+   página al tope, se captura y se devuelve el scroll: el escenario es SIEMPRE el
+   mismo, así que el resultado es predecible.
+   Después se valida que el archivo tenga contenido, porque desde que el PDF va
+   directo al correo ya no lo ve nadie antes de que salga al parque. */
 async function pdfCartola(i, filename){
   const el = document.getElementById('bloque'+i);
   if (!el) throw new Error('No se encontró la cartola en pantalla');
-  const blob = await html2pdf().set({
-    filename, margin:8, image:{ type:'jpeg', quality:0.95 },
-    html2canvas:{ scale:2, scrollX:0, scrollY:-window.scrollY,
-                  windowWidth:document.documentElement.scrollWidth,
-                  windowHeight:document.documentElement.scrollHeight, useCORS:true },
-    jsPDF:{ unit:'mm', format:'letter', orientation:'portrait' },
-  }).from(el).outputPdf('blob');
-  // Una hoja en blanco pesa unos pocos KB; con la tabla dibujada nunca baja de ~20 KB
-  if (!blob || blob.size < 15000)
-    throw new Error('El PDF salió vacío o incompleto (' + Math.round((blob?.size||0)/1024) + ' KB). No se envió nada. Vuelve a intentarlo con la cartola a la vista.');
-  return blob;
+  // El logo tiene que estar cargado antes de capturar, o sale un hueco
+  await Promise.all([...el.querySelectorAll('img')].map(img => img.complete ? null :
+    new Promise(ok => { img.onload = img.onerror = ok; })));
+  const scrollPrevio = window.scrollY;
+  window.scrollTo(0, 0);
+  await new Promise(r => setTimeout(r, 250));   // que el navegador repinte antes de capturar
+  try {
+    const blob = await html2pdf().set({
+      filename, margin:8, image:{ type:'jpeg', quality:0.95 },
+      html2canvas:{ scale:2, useCORS:true, scrollX:0, scrollY:0 },
+      jsPDF:{ unit:'mm', format:'letter', orientation:'portrait' },
+    }).from(el).outputPdf('blob');
+    // Una hoja en blanco pesa unos pocos KB; con la tabla dibujada nunca baja de ~20 KB
+    if (!blob || blob.size < 15000)
+      throw new Error('El PDF salió vacío o incompleto (' + Math.round((blob?.size||0)/1024) + ' KB). No se envió nada.');
+    return blob;
+  } finally { window.scrollTo(0, scrollPrevio); }
 }
 
 /* Ver el PDF antes de mandarlo — el mismo archivo que se adjunta, sin enviar ni
