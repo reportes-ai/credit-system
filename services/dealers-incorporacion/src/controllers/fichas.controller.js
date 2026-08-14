@@ -1136,8 +1136,19 @@ async function finalizarDealer(f) {
   // parque en el mantenedor (dealers 907 y 908). Se deriva aquí para creación y modificación.
   const ccsParque = f.tipo === 'GENERAL' ? 'CALLE' : (f.nombre_parque || null);
   // MODIFICACIÓN: ACTUALIZA el dealer de origen (no crea uno nuevo; el RUT es UNIQUE). ccs_parque se preserva.
-  if (f.id_dealer_origen) {
-    const [[dl]] = await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
+  // REINCORPORACIÓN: la ficha puede venir sin dealer de origen y con un RUT que YA existe
+  // (típico: dealer antiguo desactivado que vuelve). `dealers.rut` es UNIQUE, así que el INSERT
+  // reventaba y el cierre moría con "Error interno del servidor". Se actualiza el que existe y
+  // se reactiva, en vez de crear un duplicado imposible.
+  const rutNorm = RUT.normalizar(f.rut) || f.rut;
+  let dlExistente = null;
+  if (!f.id_dealer_origen && rutNorm) {
+    const [[dr]] = await pool.query('SELECT id_dealer, numero, activo FROM dealers WHERE rut=?', [rutNorm]);
+    if (dr) dlExistente = dr;
+  }
+  if (f.id_dealer_origen || dlExistente) {
+    const [[dl]] = dlExistente ? [[dlExistente]]
+      : await pool.query('SELECT id_dealer, numero FROM dealers WHERE id_dealer=?', [f.id_dealer_origen]);
     if (dl) {
       await pool.query(
         `UPDATE dealers SET rut=?, nombre_indexa=?, nombre_razon=?, tipo_ficha=?, ccs_parque=COALESCE(?,ccs_parque), direccion=?,
@@ -1156,6 +1167,8 @@ async function finalizarDealer(f) {
          f.direccion_parque || null, f.comuna_parque || null,
          f.cuenta_tipo, f.tipo_cuenta, f.nombre_cuenta, f.num_cuenta, f.banco, RUT.normalizar(f.rut_cuenta) || f.rut_cuenta,
          f.tipo_documento === 'FACTURA' ? 1 : 0, f.observaciones, partPor, partFecha, dl.id_dealer]);
+      // Un dealer que vuelve por ficha nueva queda operativo (antes seguía apagado y no aparecía)
+      if (dlExistente && !dlExistente.activo) await pool.query('UPDATE dealers SET activo=1 WHERE id_dealer=?', [dl.id_dealer]);
       return { idDealer: dl.id_dealer, numero: dl.numero, esMod: true };
     }
   }
@@ -1264,7 +1277,13 @@ const cerrar = async (req, res) => {
     auditar({ req, accion: 'APROBAR', modulo: 'dealers', entidad: 'dealer_ficha', entidad_id: f.id,
       detalle: `Cerró la ficha de ${f.nombre_razon || f.rut || ''} → dealer N°${numero}${esMod ? ' (modificación)' : ''}`, rut: f.rut, meta: { id_dealer: idDealer, numero, modificacion: esMod } });
     res.json({ success: true, data: { estado: 'APROBADA', id_dealer: idDealer, numero, modificacion: esMod }, error: null });
-  } catch (e) { console.error('[fichas cerrar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+  } catch (e) {
+    console.error('[fichas cerrar]', e.message);
+    // Choque de UNIQUE (RUT ya en dealers/parques): decir QUÉ pasó, no "error interno"
+    if (e.code === 'ER_DUP_ENTRY')
+      return res.status(400).json({ success: false, data: null, error: 'Ya existe un registro con ese RUT en el sistema: ' + e.message });
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
 };
 
 /* ── POST /fichas/:id/rechazar — exige motivo y avisa al ejecutivo ─────────── */
