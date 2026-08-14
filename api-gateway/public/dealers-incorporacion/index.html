@@ -101,6 +101,12 @@
       <p>Base de parques automotrices con su ficha comercial: RUT, representante legal, dirección, contactos y cuenta donde depositar. La base para emitirles cartola y que nos facturen, igual que a los dealers.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/dealers-incorporacion/permisos.html" class="module-card" id="cardPermisos" style="display:none">
+      <div class="card-icon"><i class="bi bi-shield-lock"></i></div>
+      <h5>Permisos de Edición</h5>
+      <p>Qué perfil puede editar dealers y qué campo puede tocar cada uno, por separado en la ficha de dealer y en el modal de Dealers vigentes. Lo bloqueado se muestra en gris y tampoco se guarda por la fuerza.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Configurar</span>
+    </a>
     <a href="/dealers-liquidez/" class="module-card" id="cardLiquidez" style="display:none">
       <div class="card-icon"><i class="bi bi-cash-stack"></i></div>
       <h5>Plan Liquidez</h5>
@@ -139,6 +145,7 @@
     if (tiene('aprob_vendedores'))                        { document.getElementById('cardVendedores').style.display = ''; alguna = true; }
     if (tiene('dealer_aprob_config'))                     { document.getElementById('cardNiveles').style.display = '';    alguna = true; }
     if (tiene('parque_ficha'))                            { document.getElementById('cardParques').style.display = '';    alguna = true; }
+    if (tiene('dealer_campos_permisos'))                  { document.getElementById('cardPermisos').style.display = '';   alguna = true; }
     if (tiene('dealer_plan_liquidez'))                    { document.getElementById('cardLiquidez').style.display = '';   alguna = true; }
     if (!alguna) document.getElementById('sinSubmodulos').style.display = '';
   })();
