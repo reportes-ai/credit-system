@@ -1427,13 +1427,24 @@ const _pClassParam = p => p >= window.DASH_PARAMS.rentab_verde ? 'pct-ok'
 window.EJ_ACTIVOS = [];      // comerciales activos (para las filas en cero)
 window.EJ_NUESTROS = new Set(); // todo comercial del BS, activo o ex (para distinguir externos Autofin)
 async function cargarEjecutivosActivos() {
+  const H = { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') };
   try {
-    const r = await fetch('/api/cartas-ejecutivos?perfil=comercial&incluir=inactivos', { headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
-    const j = await r.json();
-    if (j && j.success && Array.isArray(j.data)) {
-      window.EJ_ACTIVOS = j.data.filter(e => e.estado === 'activo').map(e => e.nombre).filter(Boolean);
-      window.EJ_NUESTROS = new Set(j.data.map(e => String(e.nombre).trim().toUpperCase()));
+    /* Dos padrones distintos, a propósito:
+       · EJ_ACTIVOS  = la fuerza de venta de HOY (para mostrar en cero a quien no vendió).
+       · EJ_NUESTROS = toda la gente del sistema, con el perfil que tenga hoy. Sirve solo
+         para distinguir "de la casa" de un digitador externo de Autofin, que no tiene
+         cuenta. Antes usaba el mismo padrón comercial y por eso las operaciones de quien
+         ascendía (Damaris Sanhueza → Jefe Comercial) caían en "Externos Autofin". */
+    const [rc, ru] = await Promise.all([
+      fetch('/api/cartas-ejecutivos?perfil=comercial&incluir=inactivos', { headers: H }).then(r => r.json()).catch(() => null),
+      fetch('/api/cartas-ejecutivos?padron=usuarios', { headers: H }).then(r => r.json()).catch(() => null),
+    ]);
+    if (rc && rc.success && Array.isArray(rc.data)) {
+      window.EJ_ACTIVOS = rc.data.filter(e => e.estado === 'activo').map(e => e.nombre).filter(Boolean);
+      window.EJ_NUESTROS = new Set(rc.data.map(e => String(e.nombre).trim().toUpperCase()));
     }
+    if (ru && ru.success && Array.isArray(ru.data))
+      ru.data.forEach(e => { if (e.nombre) window.EJ_NUESTROS.add(String(e.nombre).trim().toUpperCase()); });
   } catch (e) { console.warn('[dash ejecutivos]', e.message); }
 }
 // Devuelve los nombres del padrón activo que NO están en la lista dada (case-insensitive)

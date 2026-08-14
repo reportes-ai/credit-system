@@ -11,6 +11,20 @@ const getAll = async (req, res) => {
     // dashboard para listar la fuerza de venta completa, incluso en cero).
     // Sin el parámetro, la lista amplia de siempre para los selectores.
     const soloComercial = String(req.query.perfil || '') === 'comercial';
+    /* ?padron=usuarios → TODA la gente del sistema, con el perfil que tenga hoy.
+       Lo usa el dashboard para saber quién es "de la casa": un digitador de Autofin
+       no tiene cuenta, así que sigue saliendo como externo. Sin esto, el que cursó
+       como ejecutivo y después ascendió (caso Damaris Sanhueza → Jefe Comercial)
+       perdía sus operaciones dentro de la fila "Externos Autofin". */
+    if (String(req.query.padron || '') === 'usuarios') {
+      const [todos] = await pool.query(
+        `SELECT u.id_usuario AS id,
+                TRIM(CONCAT(SUBSTRING_INDEX(TRIM(u.nombre),' ',1), ' ', SUBSTRING_INDEX(TRIM(COALESCE(u.apellido,'')),' ',1))) AS nombre,
+                u.estado, p.nombre AS perfil
+           FROM usuarios u LEFT JOIN perfiles p ON p.id_perfil = u.id_perfil
+          ORDER BY nombre`);
+      return res.json({ success: true, data: todos, error: null });
+    }
     // ?incluir=inactivos → suma ex-ejecutivos (con su estado) — lo usa el
     // dashboard para distinguir "nuestro ejecutivo" de un externo de Autofin.
     const conInactivos = String(req.query.incluir || '') === 'inactivos';
