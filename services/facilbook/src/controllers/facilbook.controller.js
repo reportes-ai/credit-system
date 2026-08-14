@@ -9,6 +9,20 @@
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const A = require('../../../../shared/avisos');
+
+/* Aviso de muro nuevo. Va al MISMO motor que el resto: quién lo recibe, si suena,
+   con qué sonido y cuánto dura el cartel se configura en Mantenedores › Avisos.
+   Solo las PUBLICACIONES avisan — los comentarios no, para no volverlo ruido. */
+A.registrarAviso({
+  evento: 'facilbook_post',
+  nombre: 'Publicación nueva en Facilbook',
+  modulo: 'Facilbook',
+  descripcion: 'Alguien publicó algo en el muro. Avisa al resto del equipo (nunca al autor). Los comentarios no avisan.',
+  base_func: 'facilbook',
+  prioridad: 'normal',
+  sonido_tipo: 'dingdong',
+});
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
 const fail = (res, msg, code = 500) => res.status(code).json({ success: false, data: null, error: msg });
@@ -175,6 +189,14 @@ exports.crearPost = async (req, res) => {
       const b = b64aBuffer(f);
       if (b) await pool.query(`INSERT INTO fb_fotos (id_post, foto, mime) VALUES (?,?,?)`, [r.insertId, b.buf, b.mime]);
     }
+    // Aviso al resto del equipo (al autor no: el motor lo excluye)
+    const autor = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || 'Alguien';
+    A.avisar('facilbook_post', {
+      titulo: '📣 ' + autor + ' publicó en Facilbook',
+      mensaje: texto ? texto.slice(0, 140) : 'Compartió una foto',
+      href: '/facilbook/#post' + r.insertId,
+      tipo: 'facilbook',
+    }, { excluir: [req.usuario.id_usuario] }).catch(() => {});
     ok(res, { id: r.insertId });
   } catch (e) { fail(res, e.message); }
 };

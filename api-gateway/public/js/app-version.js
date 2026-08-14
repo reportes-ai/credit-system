@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v207.95';
+const APP_VERSION = 'v207.96';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -739,6 +739,19 @@ document.addEventListener('DOMContentLoaded', () => {
       ringTipo = ((masNueva(unreadSonoras.filter(n => n.prioridad === 'alta')) || masNueva(unreadSonoras) || {}).son_tipo) || 'campana';
       if (unread >= 0 && noLeidas > unread && haySonido) dingDing();
       unread = noLeidas;
+
+      /* Cartel push: los avisos marcados con banner en Mantenedores › Avisos
+         (p.ej. una publicación nueva en Facilbook) además bajan el cartel de
+         arriba. Se muestra UNA vez por aviso y por navegador. */
+      (rows || []).filter(n => n.banner && !n.leida).forEach(n => {
+        let vistos; try { vistos = JSON.parse(localStorage.getItem('af_banner_vistos') || '[]'); } catch (_) { vistos = []; }
+        if (vistos.includes(n.id)) return;
+        if (!window.afMostrarAnuncio) return;   // aún no carga el motor del cartel: se muestra en el siguiente ciclo
+        vistos.push(n.id);
+        localStorage.setItem('af_banner_vistos', JSON.stringify(vistos.slice(-300)));
+        window.afMostrarAnuncio(n.titulo + (n.mensaje ? ' — ' + n.mensaje : ''),
+          { dur: n.banner_dur || 6, icon: '📣', bg: '#0f172a' });
+      });
 
       // Alertas de prioridad alta: campanita "shake" (visual) + sonido insistente configurable
       const btnBell = document.getElementById('afBellBtn');

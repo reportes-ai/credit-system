@@ -62,6 +62,12 @@ require('../../../../shared/migrate').enFila('notificaciones', async () => {
                         WHERE NOT EXISTS (SELECT 1 FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=4960001)`,
                        [idPerfil, idPerfil]).catch(() => {});
     }
+    /* Cartel push por aviso (14-08-2026): además de la campanita, ciertos eventos
+       bajan el banner arriba. Se decide por evento en el mantenedor de Avisos. */
+    for (const sql of [
+      'ALTER TABLE notificaciones ADD COLUMN banner TINYINT(1) NOT NULL DEFAULT 0',
+      'ALTER TABLE notificaciones ADD COLUMN banner_dur INT NOT NULL DEFAULT 6',
+    ]) await pool.query(sql).catch(e => { if (e.errno !== 1060) console.error('[notif banner]', e.message); });
     console.log('[notif] tablas OK');
   } catch (e) { console.error('[notif migration]', e.message); }
 });
@@ -91,7 +97,7 @@ setTimeout(initVapid, 3000);
 
 /* ── Núcleo: notificar a una lista de usuarios ───────────────────
    Inserta la notificación in-app y envía web push a sus dispositivos. */
-async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, sonar, son_tipo, son_cada, son_max, clave } = {}) {
+async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, sonar, son_tipo, son_cada, son_max, clave, banner, banner_dur } = {}) {
   let ids = [...new Set((idUsuarios || []).filter(Boolean))];
   if (!ids.length) return;
   // Suplencias: agrega a los suplentes activos (categoría Alertas) de cada destinatario.
@@ -103,14 +109,18 @@ async function notificar(idUsuarios, { tipo, titulo, mensaje, href, prioridad, s
   const sTipo = son_tipo || 'campana';
   const sCada = Math.max(5, parseInt(son_cada) || 30);
   const sMax  = Math.max(1, parseInt(son_max) || 5);
+  // banner: además de la campanita, baja el cartel push arriba (lo pide el mantenedor
+  // de Avisos por evento). banner_dur = segundos en pantalla.
+  const ban  = banner ? 1 : 0;
+  const banD = Math.min(120, Math.max(2, parseInt(banner_dur) || 6));
   // clave: agrupa avisos del mismo evento (p.ej. un pool); permite anularlos de golpe
   // para el resto cuando alguien lo toma (DELETE ... WHERE clave = ?).
   try {
     for (const id of ids) {
       await pool.query(
-        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, prioridad, sonar, son_cada, son_max, son_tipo, clave)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        [id, tipo || null, titulo, mensaje || null, href || null, prio, son, sCada, sMax, sTipo, clave || null]
+        `INSERT INTO notificaciones (id_usuario, tipo, titulo, mensaje, href, prioridad, sonar, son_cada, son_max, son_tipo, clave, banner, banner_dur)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, tipo || null, titulo, mensaje || null, href || null, prio, son, sCada, sMax, sTipo, clave || null, ban, banD]
       );
     }
   } catch (e) { console.error('[notif insert]', e.message); }

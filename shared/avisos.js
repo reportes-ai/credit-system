@@ -51,12 +51,19 @@ require('./migrate').enFila('avisos', async () => {
         dirigido_a    VARCHAR(160) NULL,   -- si el aviso tiene DUEÑO, a quién va (texto para el mantenedor)
         prioridad     VARCHAR(10) NOT NULL DEFAULT 'normal',
         sonido        TINYINT(1) NOT NULL DEFAULT 1,
+        banner        TINYINT(1) NOT NULL DEFAULT 0,   -- además de la campanita, baja el cartel push
+        banner_dur    INT NOT NULL DEFAULT 6,          -- segundos que queda el cartel en pantalla
         sonido_tipo   VARCHAR(20) NOT NULL DEFAULT 'campana',
         updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )`);
     // Avisos DIRIGIDOS (03-08-2026): los que van al dueño del hecho y no al pool.
     await pool.query('ALTER TABLE avisos_config ADD COLUMN dirigido_a VARCHAR(160) NULL')
       .catch(e => { if (e.errno !== 1060) console.error('[avisos dirigido_a]', e.message); });
+    // Cartel push por evento (14-08-2026)
+    for (const sql of [
+      'ALTER TABLE avisos_config ADD COLUMN banner TINYINT(1) NOT NULL DEFAULT 0',
+      'ALTER TABLE avisos_config ADD COLUMN banner_dur INT NOT NULL DEFAULT 6',
+    ]) await pool.query(sql).catch(e => { if (e.errno !== 1060) console.error('[avisos banner]', e.message); });
     /* base_func admite VARIOS permisos separados por coma y VARCHAR(60) quedaba
        corto: 'fundantes_seguimiento,fundantes_validar,fundantes_operaciones' son
        61 caracteres, así que el registro de ese evento fallaba en SILENCIO y su
@@ -175,6 +182,9 @@ async function avisar(evento, opciones = {}, { excluir = [], extra = [], soloA =
       prioridad: opciones.prioridad || (cfg && cfg.prioridad) || 'normal',
       sonar:     opciones.sonar !== undefined && opciones.sonar !== null ? opciones.sonar : (cfg ? (cfg.sonido ? 1 : 0) : 1),
       son_tipo:  opciones.son_tipo || (cfg && cfg.sonido_tipo) || 'campana',
+      // Cartel push: lo decide el mantenedor por evento (no cada módulo por su cuenta)
+      banner:     cfg ? (cfg.banner ? 1 : 0) : 0,
+      banner_dur: (cfg && cfg.banner_dur) || 6,
     });
     return dest.length;
   } catch (e) { console.error('[avisar]', evento, e.message); return 0; }

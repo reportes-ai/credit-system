@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor Avisos — AutoFácil</title>
-  <!-- v1.1 — marca los avisos DIRIGIDOS (van al dueño del hecho; la config queda de respaldo) -->
+  <!-- v1.2 — cartel push por evento (con su duracion en segundos) · v1.1 — marca los avisos DIRIGIDOS (van al dueño del hecho; la config queda de respaldo) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -85,6 +85,9 @@
           una cuenta protegida o un usuario de prueba).</li>
       <li><b>Activo / prioridad / sonido</b> → si el aviso se emite, y cómo se comporta la campana
           (prioridad alta insiste con sonido hasta que se lee).</li>
+      <li><b>Cartel push en pantalla</b> → además de la campanita, baja el cartel desde arriba en
+          cualquier pantalla del sistema, con la duración en segundos que se elija. Se usa, por
+          ejemplo, en las publicaciones nuevas de <a href="/facilbook/">Facilbook</a>.</li>
       <li><b>Cartas</b> → <a href="/aprobaciones/">Aprobaciones</a> · <b>Créditos</b> →
           <a href="/creditos/">Créditos</a> · <b>Fundantes</b> → <a href="/fundantes-operaciones/">Fundantes Operaciones</a>
           · <b>Plan Liquidez</b> → <a href="/dealers-liquidez/hojas/">Hojas de Liquidación</a>.</li>
@@ -199,6 +202,11 @@
               <div class="fila-sw"><input type="checkbox" id="son-${id}" ${e.sonido?'checked':''}><span>Con sonido</span>
                 <select id="sti-${id}">${DATA.sonidos.map(s=>`<option ${e.sonido_tipo===s?'selected':''}>${s}</option>`).join('')}</select>
               </div>
+              <div class="fila-sw"><input type="checkbox" id="ban-${id}" ${e.banner?'checked':''}><span>Cartel push en pantalla</span>
+                <select id="bdu-${id}" title="Segundos que queda el cartel">
+                  ${[4,6,8,10,15,20,30].map(n=>`<option value="${n}" ${Number(e.banner_dur||6)===n?'selected':''}>${n} s</option>`).join('')}
+                </select>
+              </div>
             </div>
             <div class="dest">
               <b>Hoy le llega a ${dest.length} persona${dest.length===1?'':'s'}:</b>
@@ -232,6 +240,8 @@
       prioridad: document.getElementById('pri-'+id).value,
       sonido: document.getElementById('son-'+id).checked ? 1 : 0,
       sonido_tipo: document.getElementById('sti-'+id).value,
+      banner: document.getElementById('ban-'+id).checked ? 1 : 0,
+      banner_dur: parseInt(document.getElementById('bdu-'+id).value) || 6,
     };
     try {
       const j = await (await fetch('/api/avisos/'+encodeURIComponent(evento), {

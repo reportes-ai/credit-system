@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.4 -->
+<!-- v1.5 — selector de emojis en publicaciones y comentarios + aviso al equipo cuando alguien publica -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -82,6 +82,9 @@
   .comInput { display:flex; gap:8px; align-items:center; padding-bottom:10px; }
   .comInput input { flex:1; border:none; background:var(--bg); border-radius:16px; padding:8px 14px; font:inherit; }
   .comInput input:focus { outline:none; }
+  .comInput .emo-btn { border:none; background:none; font-size:1.15rem; cursor:pointer; padding:2px 4px; border-radius:8px; }
+  .comInput .emo-btn:hover { background:var(--bg); }
+  #emoPanel .emo:hover { background:#f0f2f5; }
   /* marketplace */
   .mk-head { display:flex; align-items:center; gap:12px; padding:14px; }
   .mk-head img { width:54px; height:54px; border-radius:12px; }
@@ -148,6 +151,7 @@
       <div class="previews" id="pvPost"></div>
       <div class="acciones">
         <button class="btn-foto" onclick="pickFotos('post')"><i class="bi bi-image-fill"></i> Foto</button>
+        <button class="btn-foto" onclick="abrirEmojis(this,'txtPost')" title="Emojis">😊 Emoji</button>
         <button class="btn-pub" id="btnPub" disabled onclick="publicar()">Publicar</button>
       </div>
     </div>
@@ -305,8 +309,62 @@ function postHTML(p) {
     </div>
     <div class="coms">${coms}</div>
     <div class="comInput">${avatarHTML(YO?.nombre, YO?.id_usuario)}
-      <input placeholder="Escribe un comentario…" onkeydown="if(event.key==='Enter')comentar(${p.id},this)"></div>
+      <input placeholder="Escribe un comentario…" onkeydown="if(event.key==='Enter')comentar(${p.id},this)">
+      <button class="emo-btn" title="Emojis" onclick="abrirEmojis(this, this.previousElementSibling)">😊</button></div>
   </div>`;
+}
+
+/* ── Emojis ──────────────────────────────────────────────────────────────
+   Un solo panel que sirve al composer y a cualquier caja de comentario: se
+   ancla al botón que lo abrió e inserta en la posición del cursor. */
+const EMOJIS = [
+  ['Caras','😀😃😄😁😆😅🤣😂🙂😉😊😇🥰😍🤩😘😗😚🤗🤔🤨😐😑😶🙄😏😣😥😮🤐😯😪😴😌😛😜🤪😝🤤😒😓😔😕🙃🤑😲🙁😖😞😟😤😢😭😦😧😨😩🤯😬😰😱🥵🥶😳🤪😵😡😠🤬😷🤒🤕🤢🤮🥴😈👻💀🤖🎃'],
+  ['Gestos','👍👎👌✌️🤞🤟🤘👏🙌🤝🙏💪🫶👋🤙💅👆👇👉👈✋🖐️🖖🫡🤲'],
+  ['Corazones','❤️🧡💛💚💙💜🖤🤍🤎💔❣️💕💞💓💗💖💘💝'],
+  ['Trabajo','💼📈📉📊💰💵💳🏦🚗🔑📝📌📎🗓️⏰📞📧💻🖥️🖨️📱🔔✅❌⚠️🚀🎯🏆🥇🔥⭐🌟✨💡🧾🤝'],
+  ['Fiesta','🎉🎊🥳🍰🎂🍾🥂🍻☕🍕🍔🌮🍫🍺🎁🎈🎵🎶⚽🏀🎾🏋️🏃🚴🏖️🌞🌈'],
+];
+let EMO_DESTINO = null;
+function abrirEmojis(btn, destino){
+  EMO_DESTINO = typeof destino === 'string' ? document.getElementById(destino) : destino;
+  let p = document.getElementById('emoPanel');
+  if (!p) {
+    p = document.createElement('div');
+    p.id = 'emoPanel';
+    p.style.cssText = 'position:absolute;z-index:600;background:#fff;border:1px solid #d5d9e0;border-radius:12px;'
+      + 'box-shadow:0 12px 32px rgba(0,0,0,.18);padding:10px 12px;width:320px;max-height:260px;overflow:auto;display:none';
+    p.innerHTML = EMOJIS.map(([g, ch]) => `<div style="margin-bottom:6px">
+      <div style="font-size:.66rem;font-weight:800;text-transform:uppercase;color:#8a8d91;margin-bottom:2px">${g}</div>
+      <div>${[...ch].map(e=>`<button type="button" class="emo" style="border:none;background:none;font-size:1.25rem;line-height:1.5;cursor:pointer;padding:1px 3px;border-radius:6px">${e}</button>`).join('')}</div>
+    </div>`).join('');
+    document.body.appendChild(p);
+    p.addEventListener('click', ev => {
+      const b = ev.target.closest('.emo'); if (!b) return;
+      insertarEmoji(b.textContent);
+    });
+    document.addEventListener('click', ev => {
+      if (p.style.display === 'none') return;
+      if (p.contains(ev.target) || ev.target.closest('[onclick*="abrirEmojis"]')) return;
+      p.style.display = 'none';
+    });
+  }
+  if (p.style.display === 'block' && p._dueno === btn) { p.style.display = 'none'; return; }
+  p._dueno = btn;
+  const r = btn.getBoundingClientRect();
+  p.style.display = 'block';
+  p.style.left = Math.max(8, Math.min(window.innerWidth - 336, r.left + window.scrollX)) + 'px';
+  // Si no cabe abajo, se abre hacia arriba
+  const abajo = window.innerHeight - r.bottom;
+  p.style.top = (abajo > 270 ? r.bottom + window.scrollY + 6 : r.top + window.scrollY - p.offsetHeight - 6) + 'px';
+}
+function insertarEmoji(e){
+  const el = EMO_DESTINO; if (!el) return;
+  const ini = el.selectionStart ?? el.value.length, fin = el.selectionEnd ?? el.value.length;
+  el.value = el.value.slice(0, ini) + e + el.value.slice(fin);
+  el.focus();
+  const pos = ini + e.length;
+  try { el.setSelectionRange(pos, pos); } catch(_) {}
+  if (el.id === 'txtPost') chkPub();
 }
 
 async function like(id, btn) {

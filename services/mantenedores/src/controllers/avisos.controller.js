@@ -64,9 +64,10 @@ const guardar = async (req, res) => {
 
     await pool.query(
       `UPDATE avisos_config SET usa_func=?, incluir_admin=?, perfiles=?, usuarios=?, excluir=?,
-              activo=?, prioridad=?, sonido=?, sonido_tipo=? WHERE evento=?`,
+              activo=?, prioridad=?, sonido=?, sonido_tipo=?, banner=?, banner_dur=? WHERE evento=?`,
       [b.usa_func ? 1 : 0, b.incluir_admin ? 1 : 0, csv(b.perfiles), csv(b.usuarios), csv(b.excluir),
-       b.activo ? 1 : 0, b.prioridad === 'alta' ? 'alta' : 'normal', b.sonido ? 1 : 0, sonTipo, evento]);
+       b.activo ? 1 : 0, b.prioridad === 'alta' ? 'alta' : 'normal', b.sonido ? 1 : 0, sonTipo,
+       b.banner ? 1 : 0, Math.min(120, Math.max(2, parseInt(b.banner_dur) || 6)), evento]);
 
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'aviso', entidad_id: evento,
       detalle: `Configuró destinatarios del aviso "${actual.nombre}"`, meta: b });
