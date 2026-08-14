@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -103,6 +103,9 @@
     #buscar { border:1.5px solid #d1d5db; border-radius:8px; padding:7px 12px; font-size:.85rem; width:260px; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.88rem; z-index:2000; display:none; }
     .toast.err { background:#dc2626; }
+    /* Popup con la Orden de Pago (documento dibujado por /js/odp-documento.js) */
+    #dlgODP::backdrop { background:rgba(15,23,42,.55); }
+    .btn-ghost { background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:7px 12px; font-size:.82rem; cursor:pointer; color:#334155; }
   </style>
 </head>
 <body>
@@ -330,7 +333,7 @@ function render(){
   tb.innerHTML = rows.map(r => `
     <tr id="row_${r.id}" class="${r.pagado?'sel':(r.enviado?'row-enviado':(r.sel?'row-sel':''))}">
       <td><b>${escH(r.num_op)}</b></td>
-      <td>${r.orden_id?`<a href="/ordenes-pago/historial/?origen=SALDO&ver=${r.orden_id}" target="_blank" title="Ver la Orden de Pago (datos de transferencia)" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.num_orden||'Ver')}</a>`:'—'}</td>
+      <td>${r.orden_id?`<a href="javascript:void 0" onclick="verODP(${r.orden_id})" title="Ver la Orden de Pago (datos de transferencia)" style="color:#0141A2;font-weight:700;text-decoration:none"><i class="bi bi-file-earmark-text"></i> ${escH(r.num_orden||'Ver')}</a>`:'—'}</td>
       <td>${escH(r.id_financiera||'—')}</td>
       <td>${escH(r.financiera||'—')}</td>
       <td>${escH(r.rut_dealer||'—')}</td>
@@ -640,7 +643,40 @@ function descargarCSV(){
   a.click(); URL.revokeObjectURL(a.href);
   toast(`CSV de ${m.length} pago(s) descargado`);
 }
+
+/* ── Ver la Orden de Pago SIN salir de esta pantalla ──────────────────────
+   Antes abría el historial completo en otra pestaña. El documento lo dibuja
+   el motor único /js/odp-documento.js — el mismo que usa el historial, así
+   que no hay una segunda versión del documento que mantener. */
+async function verODP(ordenId){
+  const dlg = document.getElementById('dlgODP');
+  document.getElementById('odpTitulo').textContent = 'Orden de Pago';
+  document.getElementById('odpBody').innerHTML = '<p style="color:#94a3b8;padding:20px 0;text-align:center">Cargando…</p>';
+  dlg.showModal();
+  try {
+    const r = await fetch('/api/ordenes-pago/ordenes/'+ordenId+'/documento', { headers:H });
+    const j = await r.json();
+    if (!j.success || !j.data) throw new Error(j.error||'No se pudo cargar la orden');
+    document.getElementById('odpTitulo').textContent = j.data.numero || 'Orden de Pago';
+    document.getElementById('odpBody').innerHTML = AF_ODP_DOC.html(j.data);
+  } catch(e){
+    document.getElementById('odpBody').innerHTML = '<p style="color:#b91c1c;padding:20px 0;text-align:center">'+escH(e.message)+'</p>';
+  }
+}
 </script>
+<dialog id="dlgODP" style="border:none;border-radius:16px;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:880px;width:96%">
+  <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:15px 20px;font-weight:700;display:flex;justify-content:space-between">
+    <span id="odpTitulo">Orden de Pago</span>
+    <i class="bi bi-x-lg" style="cursor:pointer" onclick="document.getElementById('dlgODP').close()"></i>
+  </div>
+  <div style="padding:18px 20px;font-size:.86rem;color:#334155" id="odpBody"></div>
+  <div style="padding:13px 20px;border-top:1px solid #eef2f7;display:flex;justify-content:flex-end;gap:10px">
+    <button class="btn-ghost" onclick="document.getElementById('dlgODP').close()">Cerrar</button>
+    <a class="btn-ghost" style="text-decoration:none;color:#334155" href="/ordenes-pago/historial/?origen=SALDO" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir en Órdenes de Pago</a>
+  </div>
+</dialog>
+<script src="/js/timbre-pagado.js"></script>
+<script src="/js/odp-documento.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
