@@ -3213,6 +3213,7 @@ function buildVProy2() {
   // ── Ingreso Neto proyectado: neto operacional (motor, incluye arriendo prorrateado
   //    y com. dealer/parque) proyectado con la misma mezcla, menos el arriendo de
   //    parques sin colocación (promedio 3 meses) y la comisión de ejecutivos (tendencia).
+  window.__proy2NetoPintar = null; window.__proy2NetoEsc = 1; // se limpia en cada render
   (async () => {
     const kv = document.getElementById('kpi-proy2-neto'), ks = document.getElementById('kpi-proy2-neto-sub');
     try {
@@ -3238,9 +3239,18 @@ function buildVProy2() {
           if (r.success) comSerie.push((r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0)); } catch (e) {}
       }
       const comEjProj = lin(comSerie);
-      const netoFinal = mzN - arrFijo - comEjProj;
-      kv.textContent = fM(netoFinal);
-      ks.textContent = `neto oper. ${fM(mzN)} − arriendo fijo ${fM(arrFijo)} − com. ejec. ${fM(comEjProj)}`;
+      /* El neto debe colgar de la MISMA proyección que muestran las otras cajas.
+         La mezcla estadística es solo el primer paso; cuando llega el modelo
+         clima/calendario la proyección final cambia, y el neto se reescala con
+         ella (misma facturación → mismo neto). Sin esto, la caja mostraba el
+         neto de un cierre más alto que el Q/monto/facturación de al lado. */
+      window.__proy2NetoPintar = (esc) => {
+        const e = esc || 1;
+        const mzNe = mzN * e;
+        kv.textContent = fM(mzNe - arrFijo - comEjProj);
+        ks.textContent = `neto oper. ${fM(mzNe)} − arriendo fijo ${fM(arrFijo)} − com. ejec. ${fM(comEjProj)}`;
+      };
+      window.__proy2NetoPintar(window.__proy2NetoEsc || 1);
     } catch (e) { kv.textContent = '—'; ks.textContent = 'sin datos suficientes'; }
   })();
 
@@ -3299,6 +3309,9 @@ function buildVProy2() {
       document.getElementById('kpi-proy2-f').textContent = fM(fF);
       renderTablaProy2(fQ, fMz, fF);
       renderPulsoProy2(rows, mesAct, fQ);
+      // El ingreso neto se reescala a la proyección final (misma base que la facturación)
+      window.__proy2NetoEsc = mzF > 0 ? fF / mzF : 1;
+      if (window.__proy2NetoPintar) window.__proy2NetoPintar(window.__proy2NetoEsc);
       renderMetodos(`
         <tr><td>Clima + calendario</td><td>${fM(clM)}</td><td>${Math.round(clQ)}</td><td>${fM(clF)}</td><td style="font-size:.74rem;color:#64748b">día a día lo que queda del mes: feriados, lluvia/seco (pronóstico) y sáb/dom con su rendimiento histórico</td></tr>
         <tr style="background:#eff6ff"><td><b>Final (recomendada)</b></td><td><b>${fM(fMz)}</b></td><td><b>${Math.round(fQ)}</b></td><td><b>${fM(fF)}</b></td><td style="font-size:.74rem;color:#64748b">promedio entre la mezcla estadística (${mzQ ? Math.round(mzQ) : '—'} ops) y el modelo clima/calendario (${Math.round(clQ)} ops)</td></tr>`);
