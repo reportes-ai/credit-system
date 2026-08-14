@@ -5,8 +5,8 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 
 // Cada usuario consulta SUS permisos (sin permiso especial: es su propia foto).
 router.get('/mios', verifyToken, ctrl.mios);
-// La matriz completa y su edición son del mantenedor de Dealers.
-router.get('/',     verifyToken, requireFunc('mantenedores_dealers'), ctrl.getMatriz);
-router.put('/',     verifyToken, requireFunc('mantenedores_dealers'), ctrl.guardar);
+// La matriz vive en Creación/Mantenedor de Dealer › Permisos de Edición.
+router.get('/',     verifyToken, requireFunc('dealer_campos_permisos'), ctrl.getMatriz);
+router.put('/',     verifyToken, requireFunc('dealer_campos_permisos'), ctrl.guardar);
 
 module.exports = router;

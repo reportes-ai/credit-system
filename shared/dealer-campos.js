@@ -93,6 +93,24 @@ enFila('dealer-campos-permisos', async () => {
     actualizado_por VARCHAR(120) NULL,
     PRIMARY KEY (id_perfil, pantalla, campo)
   )`);
+
+  // Card en el landing de Creación/Mantenedor de Dealer (módulo 370001) + permiso.
+  // Va por BD, como todas: nada de listas fijas en el frontend.
+  try {
+    const codigo = 'dealer_campos_permisos';
+    const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [codigo]);
+    let idf = ex?.id_funcionalidad;
+    if (!idf) {
+      const [r] = await pool.query(
+        `INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+         VALUES (370001, 'Permisos de Edición', ?, '/dealers-incorporacion/permisos.html', 'bi-shield-lock')`, [codigo]);
+      idf = r.insertId;
+    }
+    for (const idp of [1]) {   // solo Administrador: reparte atribuciones sobre los demás perfiles
+      const [[pp]] = await pool.query('SELECT 1 ok FROM permisos_perfil WHERE id_perfil=? AND id_funcionalidad=? LIMIT 1', [idp, idf]);
+      if (!pp) await pool.query('INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idp, idf]);
+    }
+  } catch (e) { console.error('[dealer_campos_permisos funcionalidad]', e.message); }
 });
 
 /* Bloqueos de un perfil: { FICHA: Set(campos), DEALER: Set(campos) }.
