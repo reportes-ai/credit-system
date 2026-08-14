@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -1226,7 +1226,28 @@ function printHTML(html, cls){
   window.print();
 }
 
-cargar();
+/* ── Permisos por campo (Mantenedores › Dealers › Permisos de edición) ─────
+   Los campos que el perfil no puede editar quedan visibles pero en gris. El
+   candado de verdad está en el backend, que descarta esos campos al guardar. */
+async function aplicarPermisosCampos(){
+  let P = null;
+  try { const j = await (await fetch('/api/dealer-campos/mios',{headers:H})).json(); if (j.success) P = j.data.FICHA; } catch(e){}
+  if (!P || !(P.bloqueados||[]).length) return;   // sin restricciones: nada que hacer
+  P.bloqueados.forEach(campo => {
+    document.querySelectorAll('#'+CSS.escape(campo)+', [name="'+campo+'"]').forEach(el => {
+      el.disabled = true;
+      el.style.background = '#f1f5f9'; el.style.color = '#64748b';
+      el.title = 'Tu perfil no puede editar este campo (Mantenedores › Dealers › Permisos de edición)';
+    });
+  });
+  const banner = document.createElement('div');
+  banner.style.cssText = 'margin:10px 0;font-size:.82rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px';
+  banner.innerHTML = '<i class="bi bi-lock me-1"></i>Los campos en gris no los edita tu perfil. Si necesitas cambiarlos, pídelo a quien tenga la atribución.';
+  const cont = document.querySelector('.main') || document.body;
+  cont.insertBefore(banner, cont.firstChild);
+}
+
+cargar().then(aplicarPermisosCampos);
 </script>
 <script src="/js/app-version.js"></script>
 </body>

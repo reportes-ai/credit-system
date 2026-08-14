@@ -666,7 +666,14 @@ const editar = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Solo el ejecutivo que la creó puede editarla' });
     if (!['BORRADOR', 'RECHAZADA'].includes(f.estado))
       return res.status(400).json({ success: false, data: null, error: 'La ficha está en revisión o aprobada; no se puede editar' });
-    const v = armarValores(req.body);
+    /* Permisos por campo (Mantenedores › Dealers › Permisos de edición): lo que
+       el perfil no puede tocar simplemente no entra al UPDATE, así conserva su
+       valor. El gris del formulario es el aviso; esto es el candado. */
+    const DC = require('../../../../shared/dealer-campos');
+    if (!(await DC.puedeAcceder(req.usuario, 'FICHA')))
+      return res.status(403).json({ success: false, data: null, error: 'Tu perfil no puede editar fichas de dealer' });
+    const { body: cuerpo } = await DC.filtrarCuerpo(req.usuario, 'FICHA', req.body);
+    const v = armarValores(cuerpo);
     const setCols = Object.keys(v).map(k => `${k}=?`);
     const setVals = Object.values(v);
     // Excepciones (si vienen en el payload): validar comentarios y persistir.

@@ -160,6 +160,17 @@ const createDealer = async (req, res) => {
 
 const updateDealer = async (req, res) => {
   try {
+    /* Permisos por campo (Mantenedores › Dealers › Permisos de edición): si el
+       perfil no puede tocar un campo, se conserva el valor que ya tenía. Pintar
+       el input en gris no basta — sin esto un POST a mano se saltaría la regla. */
+    const DC = require('../../../../shared/dealer-campos');
+    if (!(await DC.puedeAcceder(req.usuario, 'DEALER')))
+      return res.status(403).json({ success: false, data: null, error: 'Tu perfil no puede editar dealers' });
+    const { quitados } = await DC.filtrarCuerpo(req.usuario, 'DEALER', req.body);
+    if (quitados.length) {
+      const [[actual]] = await pool.query('SELECT * FROM dealers WHERE id_dealer=?', [req.params.id]);
+      if (actual) quitados.forEach(c => { req.body[c] = actual[c]; });
+    }
     const r = req.body;
     r.rut = RUT.normalizar(r.rut) || r.rut;
     r.rut_pago = RUT.normalizar(r.rut_pago) || r.rut_pago;
