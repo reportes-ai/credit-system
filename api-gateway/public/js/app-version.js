@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v207.96';
+const APP_VERSION = 'v207.97';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -1281,6 +1281,58 @@ document.addEventListener('DOMContentLoaded', () => {
   function mostrarAnuncio(texto, opts) { bannerPush(texto, opts); }
   window.afMostrarAnuncio = mostrarAnuncio;   // "Probar" desde el mantenedor de Alertas
 
+  /* ── Cambio de la Tasa Máxima Convencional ────────────────────────────────
+     La CMF publica la TMC una vez al mes y el sistema la carga solo. Como cambia
+     el techo legal de TODA la operación, se avisa con un modal que NO se cierra
+     solo: queda hasta que la persona apriete ENTENDIDO (y ahí no vuelve a salir
+     para ese período). Muestra la tasa anterior y la nueva en los dos tramos. */
+  function avisoTMC(t) {
+    if (!t || !t.id) return;
+    if (document.getElementById('afTmcDlg')) return;                 // ya está en pantalla
+    if (localStorage.getItem('af_tmc_visto') === String(t.id)) return;  // ya la leyó
+    const pc = v => (v == null ? '—' : Number(v).toLocaleString('es-CL', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + '%');
+    const fch = d => { if (!d) return ''; const s = String(d).slice(0, 10).split('-'); return s[2] + '-' + s[1] + '-' + s[0]; };
+    const a = t.anterior || {};
+    const fila = (rot, ant, nue) => `<tr>
+      <td style="padding:7px 10px;border-bottom:1px solid #eef2f7">${rot}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;text-align:right;color:#94a3b8;text-decoration:line-through">${pc(ant)}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:800;color:#0141A2">${pc(nue)}</td></tr>`;
+    const d = document.createElement('dialog');
+    d.id = 'afTmcDlg';
+    d.style.cssText = 'border:none;border-radius:16px;padding:0;max-width:520px;width:94%;box-shadow:0 24px 70px rgba(0,0,0,.4);'
+      + "font-family:'Segoe UI',system-ui,sans-serif;color:#1e293b";
+    d.innerHTML = `
+      <div style="background:linear-gradient(135deg,#012d70,#0255c5);color:#fff;padding:18px 22px">
+        <div style="font-size:1.05rem;font-weight:800">📈 Se actualizó la Tasa Máxima Convencional</div>
+        <div style="opacity:.85;font-size:.82rem;margin-top:3px">Vigente del ${fch(t.desde)} al ${fch(t.hasta)} · fuente CMF</div>
+      </div>
+      <div style="padding:18px 22px">
+        <table style="width:100%;border-collapse:collapse;font-size:.87rem">
+          <thead><tr>
+            <th style="text-align:left;padding:6px 10px;font-size:.68rem;text-transform:uppercase;color:#94a3b8">Tramo</th>
+            <th style="text-align:right;padding:6px 10px;font-size:.68rem;text-transform:uppercase;color:#94a3b8">Anterior</th>
+            <th style="text-align:right;padding:6px 10px;font-size:.68rem;text-transform:uppercase;color:#94a3b8">Nueva</th>
+          </tr></thead>
+          <tbody>
+            ${fila('≤ 200 UF · anual', a.anual_menor, t.nueva.anual_menor)}
+            ${fila('≤ 200 UF · <b>mensual</b>', a.mensual_menor, t.nueva.mensual_menor)}
+            ${fila('> 200 UF · anual', a.anual_mayor, t.nueva.anual_mayor)}
+            ${fila('> 200 UF · <b>mensual</b>', a.mensual_mayor, t.nueva.mensual_mayor)}
+          </tbody>
+        </table>
+        <p style="font-size:.8rem;color:#64748b;margin:12px 0 0">Es el techo legal de la tasa que se puede cobrar. Las operaciones nuevas deben cursarse dentro de este límite.</p>
+      </div>
+      <div style="padding:14px 22px 18px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #f1f5f9">
+        <a href="/mantenedores/tasas/" style="align-self:center;font-size:.82rem;color:#0141A2;text-decoration:none">Ver el detalle en Tasas</a>
+        <button id="afTmcOk" style="background:linear-gradient(135deg,#0141A2,#0255c5);color:#fff;border:none;border-radius:9px;padding:9px 22px;font-weight:800;cursor:pointer">ENTENDIDO</button>
+      </div>`;
+    document.body.appendChild(d);
+    // No se cierra con Escape ni clic afuera: sale solo con el botón
+    d.addEventListener('cancel', ev => ev.preventDefault());
+    d.querySelector('#afTmcOk').onclick = () => { localStorage.setItem('af_tmc_visto', String(t.id)); d.close(); d.remove(); };
+    d.showModal();
+  }
+
   // ── Comunicados manuales dirigidos ──
   const COM_ON = {};   // id → handle de banner permanente en pantalla
   function comSeen() { try { return JSON.parse(localStorage.getItem('af_com_seen') || '[]'); } catch (_) { return []; } }
@@ -1324,6 +1376,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       // Comunicados manuales dirigidos (persona/área/perfil/empresa)
       manejarComunicados(j.data.comunicados);
+      // Cambio mensual de la Tasa Máxima Convencional
+      if (j.data.tmc) avisoTMC(j.data.tmc);
       const g = j.data.juego, nombre = g && g.nombre;
       const key = nombre ? (nombre + '|' + (g.nonce || '')) : null;
       if (key && key !== actual) {

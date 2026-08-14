@@ -86,6 +86,38 @@ async function leerDev() {
   return { activo: m.dev_activo === '1', correos, whatsapp: m.dev_whatsapp || '' };
 }
 
+/* Cambio de TMC (una vez al mes, ~día 15): se avisa a TODOS con un modal que no
+   se va hasta apretar ENTENDIDO. Viaja pegado a este endpoint —que ya se pollea—
+   para no agregar otra consulta a TiDB por cada usuario y cada página.
+   Caché 10 min: la TMC cambia una vez al mes, no hace falta ir a la base seguido. */
+let _tmcCache = { ts: 0, val: null };
+async function leerTMC() {
+  if (_tmcCache.val !== null && Date.now() - _tmcCache.ts < 10 * 60 * 1000) return _tmcCache.val;
+  let val = null;
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_tasa, fecha_desde, fecha_hasta, tasa_anual_menor, tasa_mensual_menor,
+              tasa_anual_mayor, tasa_mensual_mayor, fecha_creacion
+         FROM tasas ORDER BY fecha_desde DESC LIMIT 2`);
+    const n = rows[0], a = rows[1];
+    // Solo se avisa dentro de los 15 días siguientes al cambio: pasado eso ya es noticia vieja.
+    if (n && (Date.now() - new Date(n.fecha_creacion || n.fecha_desde).getTime()) < 15 * 24 * 3600 * 1000) {
+      const num = v => (v == null ? null : Number(v));
+      val = {
+        id: n.id_tasa,
+        desde: n.fecha_desde, hasta: n.fecha_hasta,
+        nueva: { anual_menor: num(n.tasa_anual_menor), mensual_menor: num(n.tasa_mensual_menor),
+                 anual_mayor: num(n.tasa_anual_mayor), mensual_mayor: num(n.tasa_mensual_mayor) },
+        anterior: a ? { anual_menor: num(a.tasa_anual_menor), mensual_menor: num(a.tasa_mensual_menor),
+                        anual_mayor: num(a.tasa_anual_mayor), mensual_mayor: num(a.tasa_mensual_mayor),
+                        desde: a.fecha_desde, hasta: a.fecha_hasta } : null,
+      };
+    }
+  } catch (e) { console.error('[mantenimiento tmc]', e.message); }
+  _tmcCache = { ts: Date.now(), val };
+  return val;
+}
+
 /* GET /api/mantenimiento → { activo, mensaje, es_bg }. El mensaje en reposo solo va a BG-ADMIN. */
 const getEstado = async (req, res) => {
   try {
@@ -97,7 +129,7 @@ const getEstado = async (req, res) => {
     const comunicados = await comunicadosParaUsuario(req.usuario);
     res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo,
       juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje, nonce: jg.nonce } : null,
-      anuncio, comunicados }, error: null });
+      anuncio, comunicados, tmc: await leerTMC() }, error: null });
   } catch (e) { console.error('[mantenimiento getEstado]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
