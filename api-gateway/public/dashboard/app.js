@@ -1143,18 +1143,18 @@ function buildV1b() {
   const headJ = document.getElementById('head-jan1b');
   if (headJ) headJ.textContent = `Resumen Mes Anterior — Otorgados (${MES_NOM[_dJ.getMonth()]})`;
   document.getElementById('t-jan1b').innerHTML = `
-    <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
+    <thead><tr><th>Métrica</th><th>Valor</th><th>% s/ financiado</th></tr></thead>
     <tbody>
-      <tr><td>Operaciones Otorgadas</td><td>${jTotOps}</td></tr>
-      <tr><td>Total Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td></tr>
-      <tr><td>Ing. x Colocaciones</td><td>${fM(jTotAFA)}</td></tr>
-      <tr><td>Ing. x Seguros</td><td>${fM(jTotSeg)}</td></tr>
-      <tr><td><b>Total Ingresos</b></td><td><b>${fM(jTotAFA + jTotSeg)}</b></td></tr>
-      <tr><td>Com. Dealer</td><td>${fM(jTotCD)}</td></tr>
-      <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td></tr>
-      <tr><td>Arriendo Parque</td><td id="jan1b-arr">${fM(jTotArr)}</td></tr>
-      <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td></tr>
-      <tr><td><b>Ingreso Neto</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td></tr>
+      <tr><td>Operaciones Otorgadas</td><td>${jTotOps}</td><td>—</td></tr>
+      <tr><td>Total Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td><td>100%</td></tr>
+      <tr><td>Ing. x Colocaciones</td><td>${fM(jTotAFA)}</td><td>${pctFin(jTotAFA, jTotFin)}</td></tr>
+      <tr><td>Ing. x Seguros</td><td>${fM(jTotSeg)}</td><td>${pctFin(jTotSeg, jTotFin)}</td></tr>
+      <tr><td><b>Total Ingresos</b></td><td><b>${fM(jTotAFA + jTotSeg)}</b></td><td><b>${pctFin(jTotAFA + jTotSeg, jTotFin)}</b></td></tr>
+      <tr><td>Com. Dealer</td><td>${fM(jTotCD)}</td><td>${pctFin(jTotCD, jTotFin)}</td></tr>
+      <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td><td>${pctFin(jTotPar, jTotFin)}</td></tr>
+      <tr><td>Arriendo Parque</td><td id="jan1b-arr">${fM(jTotArr)}</td><td id="jan1b-arr-pct">${pctFin(jTotArr, jTotFin)}</td></tr>
+      <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td><td id="jan1b-comej-pct"></td></tr>
+      <tr><td><b>Ingreso Neto</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td><td><b id="jan1b-neto-pct">${pctFin(jTotNeto, jTotFin)}</b></td></tr>
     </tbody>`;
   // Comisión de ejecutivos del mes anterior — motor único del módulo Comisiones
   cargarComisionEjecutivosMesAnt();
@@ -1174,16 +1174,21 @@ function buildV1b() {
       if (!r.success) throw new Error(r.error);
       const tot = (r.data || []).reduce((a, e) => a + (parseFloat(e.incentivo_final) || 0), 0);
       cell.textContent = fM(tot);
+      const setC = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+      setC('jan1b-comej-pct', pctFin(tot, jTotFin));
       // Arriendo fijo del mes completo: los parques SIN colocación también suman
       const arrFijo = await getArrFijoMes();
       const arrFaltante = Math.max(0, (arrFijo || 0) - jTotArr);
       if (arrFijo > 0) {
         const arrCell = document.getElementById('jan1b-arr');
         if (arrCell) arrCell.textContent = fM(arrFijo);
+        setC('jan1b-arr-pct', pctFin(arrFijo, jTotFin));
       }
       // Ingreso Neto final = neto del motor − com. ejecutivos − arriendo de parques sin colocación
+      const netoFin = jTotNeto - tot - arrFaltante;
       const netoCell = document.getElementById('jan1b-neto');
-      if (netoCell) netoCell.textContent = fM(jTotNeto - tot - arrFaltante);
+      if (netoCell) netoCell.textContent = fM(netoFin);
+      setC('jan1b-neto-pct', pctFin(netoFin, jTotFin));
     } catch (e) { cell.textContent = '—'; }
   }
 
