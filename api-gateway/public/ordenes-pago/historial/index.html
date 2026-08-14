@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -60,9 +60,13 @@
     .btn-af { background:linear-gradient(135deg,#0141A2,#0255c5); color:#fff; border:none; border-radius:9px; padding:8px 18px; font-size:.85rem; font-weight:700; cursor:pointer; }
     .kv { display:grid; grid-template-columns:130px 1fr; gap:4px 12px; }
     .kv .k { color:#94a3b8; font-size:.78rem; text-transform:uppercase; font-weight:700; }
+    /* Deep-link ?ver= desde Saldos Precios a Pagar: se abre SOLO la orden,
+       sin el historial completo detrás. Al cerrar, la pestaña se cierra. */
+    body.solo-orden .main-content { display:none; }
   </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).get('ver')) document.body.className = 'solo-orden';</script>
 <nav class="topnav">
   <div style="display:flex;align-items:center;gap:16px">
     <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
@@ -227,7 +231,17 @@ async function cargar(){
     /* ?ver=<id> — deep-link desde Saldos a Pagar: abre directo la orden para que
        el cajero/tesorero vea los datos de transferencia antes de pagar. */
     if (!window.__afDeepVer) { const vid = +(new URLSearchParams(location.search).get('ver')||0);
-      if (vid) { window.__afDeepVer = 1; if ((j.data||[]).some(x=>x.id===vid)) setTimeout(()=>ver(vid), 50); } }
+      if (vid) { window.__afDeepVer = 1;
+        if ((j.data||[]).some(x=>x.id===vid)) {
+          setTimeout(()=>ver(vid), 50);
+          // Solo la orden: al cerrarla se cierra la pestaña; si el navegador no
+          // deja cerrarla, queda el historial a la vista en vez de una página en blanco.
+          document.getElementById('dlg').addEventListener('close', () => {
+            window.close();
+            document.body.classList.remove('solo-orden');
+          });
+        } else { document.body.classList.remove('solo-orden'); toast('No se encontró la orden en el filtro actual'); }
+      } }
     if (!DATA.length) { tb.innerHTML='<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px">Sin órdenes para el filtro.</td></tr>'; return; }
     tb.innerHTML = DATA.map(o => {
       let acc = '';
