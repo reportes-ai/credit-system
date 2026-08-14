@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 — hoy muestra real + meta del dia (borde destacado) · v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
+<!-- v2.7 — gauge del presupuesto: proyeccion en tono claro y brecha al presupuesto en rojo · v2.6 — hoy muestra real + meta del dia (borde destacado) · v2.5 — restauracion tras truncado + carrera por operaciones por defecto · v2.3 — mes contra mes (a igual dia) bajo el año contra año · v2.2 — heatmap con Q requerido para la proyeccion (solo dias futuros), layout rebalanceado (mix+embudo apilados, YoY arriba, records junto a podios) · v2.1 — Q esperado en el heatmap (peso por dia de semana), radiografia del mes, año contra año, salon de records, pantalla completa · v2.0 — rediseño completo: curva acumulada del mes vs mes anterior vs ritmo presupuesto, heatmap de dias, donut institucion, gauge presupuesto, sparklines por KPI, podio con medallas · v1.0 — primera version -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -48,6 +48,8 @@
   .gaugewrap { display:flex; flex-direction:column; align-items:center; gap:4px; }
   .gnum { font-size:2.1rem; font-weight:850; margin-top:-58px; font-variant-numeric:tabular-nums; }
   .glbl { color:var(--mut); font-size:.72rem; margin-bottom:10px; }
+  .gleg { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:.68rem; color:var(--mut); margin:-4px 0 12px; }
+  .gleg .gsw { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
   .gdet { width:100%; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:.78rem; }
   .gdet .b { background:#0d1730; border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
   .gdet .b .k { color:var(--mut); font-size:.64rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
@@ -211,17 +213,24 @@ function curva(mes, mesAnt, pp, diaCorte, diasMes){
     ${dot}</svg>`;
 }
 
-function gauge(pct){
-  const p=Math.min(pct==null?0:pct,120), r=74, cx=95, cy=95;
-  const a0=-210, a1=30, ang=a0+(a1-a0)*Math.min(p,100)/100;
+// pct = % real a hoy · proy = % con que cerraría el mes al ritmo actual.
+// El tramo real va sólido; de ahí hasta la proyección va el MISMO color más claro
+// y lo que falta para el presupuesto queda en rojo.
+function gauge(pct, proy){
+  const r=74, cx=95, cy=95;
+  const a0=-210, a1=30, ang=p=>a0+(a1-a0)*Math.min(Math.max(p,0),100)/100;
   const arc=(from,to,color,w,op)=>{
+    if(to-from<0.4) return '';
     const f=from*Math.PI/180, t=to*Math.PI/180;
     const x1=cx+r*Math.cos(f), y1=cy+r*Math.sin(f), x2=cx+r*Math.cos(t), y2=cy+r*Math.sin(t);
     return `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 ${(to-from)>180?1:0} 1 ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${color}" stroke-width="${w}" stroke-linecap="round" opacity="${op}"/>`; };
   const col = pct==null?'#5b6f92': pct>=100?'var(--ok)': pct>=70?'var(--accent)':'var(--gold)';
+  const pr = (pct==null||proy==null)?null:Math.max(proy,pct);
   return `<svg width="190" height="150" viewBox="0 0 190 150">
     ${arc(a0,a1,'#14203a',13,1)}
-    ${pct!=null?arc(a0,ang,col,13,1):''}
+    ${pr!=null&&pr<100?arc(ang(pr),a1,'var(--bad)',13,.6):''}
+    ${pr!=null?arc(ang(pct),ang(pr),col,13,.34):''}
+    ${pct!=null?arc(a0,ang(pct),col,13,1):''}
   </svg>`;
 }
 
@@ -269,6 +278,8 @@ function pintar(){
   const ritmo=diaCorte>0?ot.length/diaCorte:0;
   const proyOps=esActual?Math.round(ritmo*diasMes):ot.length;
   const proyM=esActual&&diaCorte>0?monto/diaCorte*diasMes:monto;
+  // % con que cerraría el mes al ritmo de hoy (solo tiene sentido en el mes en curso)
+  const pctProy=esActual&&pp&&pp.ops?proyOps/pp.ops*100:null;
 
   // heatmap del mes
   const porDia={}; ot.forEach(r=>{ const d=+(fRef(r).slice(8,10))||0; if(d) porDia[d]=(porDia[d]||0)+1; });
@@ -371,9 +382,14 @@ function pintar(){
     </div>
     <div class="card fade gaugewrap" style="animation-delay:.1s">
       <h3 class="t" style="align-self:stretch"><i class="bi bi-bullseye"></i> Presupuesto · ${mesLab(mes)}</h3>
-      ${gauge(pctOps)}
+      ${gauge(pctOps, pctProy)}
       <div class="gnum">${pctOps==null?'—':Math.round(pctOps)+'%'}</div>
       <div class="glbl">de las ${pp?num(pp.ops):'—'} operaciones presupuestadas</div>
+      ${pctProy!=null?`<div class="gleg">
+        <span><i class="gsw" style="background:${pctOps>=100?'var(--ok)':pctOps>=70?'var(--accent)':'var(--gold)'}"></i>Hoy ${Math.round(pctOps)}%</span>
+        <span><i class="gsw" style="background:${pctOps>=100?'var(--ok)':pctOps>=70?'var(--accent)':'var(--gold)'};opacity:.34"></i>Proyección ${Math.round(pctProy)}%</span>
+        ${pctProy<100?`<span><i class="gsw" style="background:var(--bad);opacity:.6"></i>Faltaría ${num(Math.max(pp.ops-proyOps,0))} ops</span>`:''}
+      </div>`:''}
       <div class="gdet">
         <div class="b"><div class="k">Ops</div><div class="v">${num(nOt)} / ${pp?num(pp.ops):'—'}</div></div>
         <div class="b"><div class="k">Monto</div><div class="v">$${mm1(monto)} / ${pp?'$'+num(pp.monto):'—'} MM ${pctM!=null?'('+Math.round(pctM)+'%)':''}</div></div>
