@@ -731,7 +731,10 @@ function renderTicker(noticias) {
 
   // Sin fuentes activas / sin noticias → placeholder estático
   if (!noticias || !noticias.length) {
-    track.innerHTML = '<span class="news-item"><span class="news-dot"></span>Sin fuentes de noticias activas</span>';
+    // Distingue el caso real: si el usuario apagó TODOS los toggles vs. si el origen no respondió
+    const todosApagados = NEWS_SRC_MAP.every((_, i) => document.getElementById(`ncpFeed${i}`)?.checked === false);
+    const msg = todosApagados ? 'Sin fuentes de noticias activas' : 'Noticias no disponibles por ahora';
+    track.innerHTML = `<span class="news-item"><span class="news-dot"></span>${msg}</span>`;
     return;
   }
 

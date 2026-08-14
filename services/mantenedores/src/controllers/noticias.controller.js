@@ -1,6 +1,37 @@
 const https = require('https');
 const http  = require('http');
 const pool  = require('../../../../shared/config/database');
+const { enFila } = require('../../../../shared/migrate');
+
+/* Último resultado bueno persistido: si TODAS las fuentes fallan (Google bloquea
+   a la IP del datacenter, cae un medio), la cinta muestra esto en vez de quedar
+   en blanco. Una sola fila (id=1). */
+enFila('noticias-cache', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS noticias_cache (
+    id TINYINT PRIMARY KEY,
+    datos LONGTEXT NOT NULL,
+    actualizado DATETIME NOT NULL
+  )`);
+});
+
+async function guardarCache(items) {
+  try {
+    await pool.query(
+      `INSERT INTO noticias_cache (id, datos, actualizado) VALUES (1, ?, NOW())
+       ON DUPLICATE KEY UPDATE datos=VALUES(datos), actualizado=VALUES(actualizado)`,
+      [JSON.stringify(items)]
+    );
+  } catch (e) { console.warn('[noticias] no se pudo guardar el respaldo:', e.message); }
+}
+
+async function leerCache() {
+  try {
+    const [[row]] = await pool.query('SELECT datos, actualizado FROM noticias_cache WHERE id=1');
+    if (!row) return null;
+    const items = JSON.parse(row.datos);
+    return Array.isArray(items) && items.length ? { items, actualizado: row.actualizado } : null;
+  } catch (_) { return null; }
+}
 
 /* Google News RSS — siempre disponible, sin API key */
 /* Antigüedad máxima de las noticias (días) — editable en el selector de feeds.
@@ -26,6 +57,45 @@ function buildFeeds(dias) {
   ];
 }
 
+/* Respaldo: RSS de medios chilenos directos. Google News bloquea/vacía las
+   peticiones desde IP de datacenter (Render), estos no. No traen categoría, así
+   que cada titular se clasifica por palabras clave a una de las 5 fuentes del
+   panel — lo que no calza queda en 'Google News' (general). */
+const RESPALDOS = [
+  'https://www.df.cl/noticias/site/list/port/rss.xml',
+  'https://www.latercera.com/arcio/rss/category/pulso/',
+  'https://www.latercera.com/arcio/rss/category/nacional/',
+  'https://www.ex-ante.cl/feed/',
+];
+
+const CLASIF = [
+  { src: 'Automotriz', re: /\bautom(o|ó)tri|veh(i|í)culo|autos?\b|camioneta|concesionari|patente/i },
+  { src: 'Banca',      re: /\bbanc(o|a|os)\b|banco central|tpm|tasa de pol(i|í)tica|hipotecari/i },
+  { src: 'Finanzas',   re: /cr(e|é)dito|deuda|bolsa|acciones|inversi(o|ó)n|fondo|financ|tasa/i },
+  { src: 'Economía',   re: /econom|inflaci(o|ó)n|\bipc\b|\bpib\b|imacec|empleo|d(o|ó)lar|presupuesto|salario|sueldo/i },
+];
+
+function clasificar(titulo) {
+  for (const c of CLASIF) if (c.re.test(titulo)) return c.src;
+  return 'Google News';
+}
+
+/* Trae los respaldos y devuelve solo items de las categorías que quedaron vacías */
+async function traerRespaldos(faltantes, maxAgeMs) {
+  const res = await Promise.allSettled(
+    RESPALDOS.map(u => fetchUrl(u).then(xml => parseRSS(xml, null, maxAgeMs, 25)))
+  );
+  const out = [];
+  res.forEach(r => {
+    if (r.status !== 'fulfilled') return;
+    r.value.forEach(i => {
+      const src = clasificar(i.titulo);
+      if (faltantes.has(src)) out.push({ ...i, src });
+    });
+  });
+  return out;
+}
+
 function fetchUrl(rawUrl, redirects = 0) {
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('Too many redirects'));
@@ -46,7 +116,7 @@ function fetchUrl(rawUrl, redirects = 0) {
   });
 }
 
-function parseRSS(xml, src, maxAgeMs) {
+function parseRSS(xml, src, maxAgeMs, tope = 10) {
   const items = [];
   const itemRe  = /<item[\s>]([\s\S]*?)<\/item>/gi;
   const titleRe = /<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/i;
@@ -64,6 +134,7 @@ function parseRSS(xml, src, maxAgeMs) {
     if (t && t[1].trim()) {
       // Limpiar el " - Fuente" que agrega Google al final del título
       let titulo = t[1]
+        .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n))   // &#34; &#039; … (medios chilenos)
         .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#039;/g,"'")
         .replace(/ - [^-]{3,40}$/, '') // quita " - NombreFuente" al final
         .trim();
@@ -71,7 +142,7 @@ function parseRSS(xml, src, maxAgeMs) {
         items.push({ titulo, link: l ? l[1].trim() : '#', src });
       }
     }
-    if (items.length >= 10) break;
+    if (items.length >= tope) break;
   }
   return items;
 }
@@ -94,6 +165,15 @@ const getNoticias = async (_req, res) => {
     let items = [];
     resultados.forEach(r => { if (r.status === 'fulfilled') items = items.concat(r.value); });
 
+    // Categorías que Google no pudo llenar → completar con los medios chilenos
+    const TODAS = buildFeeds(dias).map(f => f.src);
+    const conDatos = new Set(items.map(i => i.src));
+    const faltantes = new Set(TODAS.filter(s => !conDatos.has(s)));
+    if (faltantes.size) {
+      try { items = items.concat(await traerRespaldos(faltantes, maxAgeMs)); }
+      catch (e) { console.warn('[noticias] respaldos fallaron:', e.message); }
+    }
+
     // Mezclar alternando fuentes
     const byFeed = {};
     items.forEach(i => { (byFeed[i.src] = byFeed[i.src] || []).push(i); });
@@ -106,12 +186,22 @@ const getNoticias = async (_req, res) => {
       if (mezclado.length >= 24) break;
     }
 
-    if (!mezclado.length)
+    // Nada fresco de ningún origen → servir el último resultado bueno guardado
+    if (!mezclado.length) {
+      const previo = await leerCache();
+      if (previo) {
+        cache = previo.items; cacheTs = Date.now(); cacheDias = dias;
+        return res.json({ success: true, data: previo.items, error: null, desde: previo.actualizado });
+      }
       return res.json({ success: false, data: [], error: 'No se pudieron cargar noticias' });
+    }
 
     cache = mezclado; cacheTs = Date.now(); cacheDias = dias;
+    guardarCache(mezclado);
     res.json({ success: true, data: mezclado, error: null });
   } catch (e) {
+    const previo = await leerCache();
+    if (previo) return res.json({ success: true, data: previo.items, error: null, desde: previo.actualizado });
     res.status(500).json({ success: false, data: [], error: e.message });
   }
 };
