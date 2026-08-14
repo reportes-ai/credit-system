@@ -1230,6 +1230,9 @@ function printHTML(html, cls){
    Los campos que el perfil no puede editar quedan visibles pero en gris. El
    candado de verdad está en el backend, que descarta esos campos al guardar. */
 async function aplicarPermisosCampos(){
+  // Solo aplica al EDITAR/CORREGIR una ficha existente. Crear una ficha nueva es
+  // otra atribución (dealer_ficha_crear): quien puede crearla la llena entera.
+  if (!FICHA_ID) return;
   let P = null;
   try { const j = await (await fetch('/api/dealer-campos/mios',{headers:H})).json(); if (j.success) P = j.data.FICHA; } catch(e){}
   if (!P || !(P.bloqueados||[]).length) return;   // sin restricciones: nada que hacer

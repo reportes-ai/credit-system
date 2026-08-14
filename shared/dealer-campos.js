@@ -5,7 +5,8 @@
    El Administrador define en el mantenedor (Mantenedores › Dealers ›
    Permisos de edición) qué perfil edita qué campo, en las dos pantallas
    donde se toca un dealer:
-     · FICHA  → la ficha de incorporación/modificación (/dealers-incorporacion/nuevo.html)
+     · FICHA  → EDITAR un borrador o CORREGIR una ficha rechazada (nuevo.html?id=…).
+       Crear una ficha nueva no pasa por aquí: eso es dealer_ficha_crear.
      · DEALER → el modal "Editar Dealer" de Dealers vigentes (mantencion.html)
 
    Reglas:

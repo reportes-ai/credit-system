@@ -108,8 +108,10 @@
       <li><b>Puede abrir la edición (Ficha)</b> → muestra u oculta <b>Corregir / Editar</b> en
         <a href="/dealers-incorporacion/mantencion.html">Mis fichas</a>.</li>
       <li><b>Campos de la ficha</b> (identificación, ubicación, contactos, comisiones, datos de pago)
-        → se bloquean en <a href="/dealers-incorporacion/nuevo.html">la ficha de dealer</a>, tanto al
-        crear como al corregir una rechazada.</li>
+        → se bloquean al <b>editar un borrador o corregir una ficha rechazada</b> en
+        <a href="/dealers-incorporacion/nuevo.html">la ficha de dealer</a>.</li>
+      <li><b>Crear una ficha nueva NO se controla aquí</b>: eso es el permiso <code>dealer_ficha_crear</code>
+        de Perfiles, y quien lo tiene llena la ficha completa. Esta pantalla es solo sobre <b>editar</b>.</li>
       <li><b>Perfil Administrador</b> → nunca se restringe, igual que en el resto del sistema.</li>
       <li><b>Un perfil sin nada marcado no edita nada</b>: los permisos nacen apagados y se habilitan aquí, campo por campo o con <b>Marcar todo</b>.</li>
       <li>Los cambios se aplican en la <b>siguiente apertura</b> de la ficha o del dealer (la caché
@@ -160,7 +162,7 @@ function permCargarPerfil(){
 
   const PANTALLAS = [
     { key:'DEALER', titulo:'Dealers vigentes — modal “Editar Dealer”', icono:'bi-building' },
-    { key:'FICHA',  titulo:'Ficha de dealer — crear, editar y corregir', icono:'bi-file-earmark-text' },
+    { key:'FICHA',  titulo:'Ficha de dealer — editar y corregir', icono:'bi-file-earmark-text' },
   ];
   document.getElementById('permCuerpo').innerHTML = PANTALLAS.map(p => {
     const campos = PERM.campos[p.key] || [];
