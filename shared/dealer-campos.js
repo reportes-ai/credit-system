@@ -9,9 +9,9 @@
      · DEALER → el modal "Editar Dealer" de Dealers vigentes (mantencion.html)
 
    Reglas:
-   - **Por omisión todo está permitido.** Solo lo que el Administrador apaga
-     queda bloqueado; así ningún perfil pierde lo que hoy puede hacer por el
-     solo hecho de estrenar el mantenedor.
+   - **Por omisión NADA está permitido**: un perfil nuevo nace sin poder editar
+     nada, y el Administrador va marcando lo que cada uno puede tocar. La tabla
+     guarda lo HABILITADO (`puede_editar=1`); lo que no figura, no se edita.
    - `Administrador` nunca se bloquea (misma convención que el resto del sistema).
    - `__ACCESO__` es el campo especial que decide si el perfil ve el botón
      (Editar / Corregir) de esa pantalla.
@@ -113,14 +113,15 @@ enFila('dealer-campos-permisos', async () => {
   } catch (e) { console.error('[dealer_campos_permisos funcionalidad]', e.message); }
 });
 
-/* Bloqueos de un perfil: { FICHA: Set(campos), DEALER: Set(campos) }.
-   Caché corta — la matriz cambia poco y se consulta en cada apertura de ficha. */
+/* Lo PERMITIDO de un perfil: { FICHA: Set(campos), DEALER: Set(campos) }.
+   La tabla guarda lo habilitado; lo que no está, no se edita. Caché corta —
+   la matriz cambia poco y se consulta en cada apertura de ficha. */
 let cache = { ts: 0, filas: null };
 const CACHE_MS = 60 * 1000;
 
-async function bloqueosDe(idPerfil) {
+async function permitidosDe(idPerfil) {
   if (!cache.filas || Date.now() - cache.ts > CACHE_MS) {
-    const [rows] = await pool.query('SELECT id_perfil, pantalla, campo FROM dealer_campos_permisos WHERE puede_editar=0');
+    const [rows] = await pool.query('SELECT id_perfil, pantalla, campo FROM dealer_campos_permisos WHERE puede_editar=1');
     cache = { ts: Date.now(), filas: rows };
   }
   const out = { FICHA: new Set(), DEALER: new Set() };
@@ -134,31 +135,35 @@ const esAdmin = (usuario) => (usuario && usuario.perfil_nombre) === 'Administrad
 
 /* Permisos del usuario que hace la petición, listos para el frontend. */
 async function permisosDe(usuario) {
-  const base = { FICHA: { acceso: true, bloqueados: [] }, DEALER: { acceso: true, bloqueados: [] } };
-  if (esAdmin(usuario) || !usuario || !usuario.id_perfil) return base;
-  const b = await bloqueosDe(usuario.id_perfil);
+  const todo = { FICHA: { acceso: true, bloqueados: [] }, DEALER: { acceso: true, bloqueados: [] } };
+  if (esAdmin(usuario) || !usuario || !usuario.id_perfil) return todo;
+  const ok = await permitidosDe(usuario.id_perfil);
+  const out = {};
   PANTALLAS.forEach(p => {
-    base[p].acceso = !b[p].has(ACCESO);
-    base[p].bloqueados = [...b[p]].filter(c => c !== ACCESO);
+    out[p] = {
+      acceso: ok[p].has(ACCESO),
+      bloqueados: (CAMPOS[p] || []).map(c => c.campo).filter(c => !ok[p].has(c)),
+    };
   });
-  return base;
+  return out;
 }
 
 /* Deja fuera del cuerpo los campos que este usuario NO puede editar, para que un
    POST armado a mano no pase por encima del mantenedor. Devuelve los quitados. */
 async function filtrarCuerpo(usuario, pantalla, body) {
   if (esAdmin(usuario) || !usuario || !usuario.id_perfil) return { body, quitados: [] };
-  const b = (await bloqueosDe(usuario.id_perfil))[pantalla] || new Set();
-  if (!b.size) return { body, quitados: [] };
+  const ok = (await permitidosDe(usuario.id_perfil))[pantalla] || new Set();
   const quitados = [];
   const limpio = { ...body };
-  b.forEach(c => { if (c !== ACCESO && Object.prototype.hasOwnProperty.call(limpio, c)) { delete limpio[c]; quitados.push(c); } });
+  (CAMPOS[pantalla] || []).forEach(({ campo }) => {
+    if (!ok.has(campo) && Object.prototype.hasOwnProperty.call(limpio, campo)) { delete limpio[campo]; quitados.push(campo); }
+  });
   return { body: limpio, quitados };
 }
 
 async function puedeAcceder(usuario, pantalla) {
   if (esAdmin(usuario) || !usuario || !usuario.id_perfil) return true;
-  return !(await bloqueosDe(usuario.id_perfil))[pantalla].has(ACCESO);
+  return (await permitidosDe(usuario.id_perfil))[pantalla].has(ACCESO);
 }
 
 module.exports = { CAMPOS, PANTALLAS, ACCESO, permisosDe, filtrarCuerpo, puedeAcceder, invalidarCache };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Permisos de Edición de Dealers — AutoFácil</title>
-  <!-- v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
+  <!-- v1.1 — botones Marcar/Desmarcar todo por bloque + los perfiles nacen SIN permisos (la tabla guarda lo habilitado) · v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -87,7 +87,8 @@
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <label style="font-size:.8rem;font-weight:700;color:#374151;text-transform:uppercase">Perfil</label>
       <select id="permPerfil" class="form-select form-select-sm" style="width:260px" onchange="permCargarPerfil()"></select>
-      <span style="font-size:.82rem;color:#64748b">Marcado = ese perfil <b>puede editar</b> el campo. Lo desmarcado se muestra en gris y no se guarda aunque lo manden a la fuerza.</span>
+      <span style="font-size:.82rem;color:#64748b">Marcado = ese perfil <b>puede editar</b> el campo. Lo desmarcado se muestra en gris y no se guarda aunque lo manden a la fuerza.
+        <b>Los perfiles nacen sin nada marcado</b> (salvo Administrador): aquí se habilita lo que cada uno puede tocar.</span>
       <button class="btn btn-success btn-sm" style="margin-left:auto" onclick="permGuardar()"><i class="bi bi-save me-1"></i>Guardar</button>
     </div>
     <div id="permAdminMsg" style="display:none;margin-top:10px;font-size:.82rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px">
@@ -110,6 +111,7 @@
         → se bloquean en <a href="/dealers-incorporacion/nuevo.html">la ficha de dealer</a>, tanto al
         crear como al corregir una rechazada.</li>
       <li><b>Perfil Administrador</b> → nunca se restringe, igual que en el resto del sistema.</li>
+      <li><b>Un perfil sin nada marcado no edita nada</b>: los permisos nacen apagados y se habilitan aquí, campo por campo o con <b>Marcar todo</b>.</li>
       <li>Los cambios se aplican en la <b>siguiente apertura</b> de la ficha o del dealer (la caché
         del motor dura 60 segundos).</li>
     </ul>
@@ -129,8 +131,8 @@ function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 /* ── Permisos de edición por perfil y por campo ───────────────────────────
    La matriz vive en dealer_campos_permisos y la aplica shared/dealer-campos.js:
    la ficha y el modal Editar Dealer pintan en gris lo bloqueado, y el backend
-   descarta esos campos al guardar. Por omisión todo está permitido: aquí solo
-   se APAGA lo que un perfil no debe tocar. */
+   descarta esos campos al guardar. Los perfiles nacen SIN nada habilitado: aquí
+   se enciende lo que cada uno puede tocar. */
 let PERM = null;   // { perfiles, campos, acceso, reglas }
 async function permCargar(){
   if (PERM) return;
@@ -152,8 +154,9 @@ function permCargarPerfil(){
   const idPerfil = +document.getElementById('permPerfil').value;
   const admin = permEsAdmin();
   document.getElementById('permAdminMsg').style.display = admin ? '' : 'none';
-  const bloqueado = (pantalla, campo) => !admin && PERM.reglas.some(r =>
-    r.id_perfil===idPerfil && r.pantalla===pantalla && r.campo===campo && !r.puede_editar);
+  // La tabla guarda lo HABILITADO: un perfil sin filas nace con todo desmarcado.
+  const permitido = (pantalla, campo) => admin || PERM.reglas.some(r =>
+    r.id_perfil===idPerfil && r.pantalla===pantalla && r.campo===campo && r.puede_editar);
 
   const PANTALLAS = [
     { key:'DEALER', titulo:'Dealers vigentes — modal “Editar Dealer”', icono:'bi-building' },
@@ -165,9 +168,15 @@ function permCargarPerfil(){
     const chk = (campo, label, extra='') =>
       `<label style="display:flex;align-items:center;gap:8px;font-size:.84rem;color:#374151;padding:3px 0${extra}">
         <input type="checkbox" class="form-check-input mt-0" data-pantalla="${p.key}" data-campo="${campo}"
-          ${bloqueado(p.key,campo)?'':'checked'} ${admin?'disabled':''}> ${label}</label>`;
+          ${permitido(p.key,campo)?'checked':''} ${admin?'disabled':''}> ${label}</label>`;
     return `<div style="background:#fff;border-radius:12px;padding:14px 18px">
-      <h6 style="font-weight:700;color:#0141A2;margin:0 0 4px"><i class="bi ${p.icono} me-1"></i>${p.titulo}</h6>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <h6 style="font-weight:700;color:#0141A2;margin:0"><i class="bi ${p.icono} me-1"></i>${p.titulo}</h6>
+        <span style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-outline-primary" style="font-size:.74rem;padding:2px 9px" onclick="permTodos('${p.key}',true)" ${admin?'disabled':''}>Marcar todo</button>
+          <button class="btn btn-sm btn-outline-secondary" style="font-size:.74rem;padding:2px 9px" onclick="permTodos('${p.key}',false)" ${admin?'disabled':''}>Desmarcar todo</button>
+        </span>
+      </div>
       <div style="border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:8px">
         ${chk(PERM.acceso, '<b>Puede abrir la edición</b> (ve el botón Editar/Corregir)')}
       </div>
@@ -179,15 +188,20 @@ function permCargarPerfil(){
   }).join('');
 }
 
+/* Marcar / desmarcar todo un bloque (incluye "puede abrir la edición") */
+function permTodos(pantalla, valor){
+  document.querySelectorAll(`#permCuerpo input[data-pantalla="${pantalla}"]`).forEach(el => { el.checked = valor; });
+}
+
 async function permGuardar(){
   if (permEsAdmin()) { alert('El perfil Administrador no se restringe.'); return; }
   const idPerfil = +document.getElementById('permPerfil').value;
-  const bloqueos = { FICHA:[], DEALER:[] };
+  const permitidos = { FICHA:[], DEALER:[] };
   document.querySelectorAll('#permCuerpo input[type=checkbox]').forEach(el => {
-    if (!el.checked) bloqueos[el.dataset.pantalla].push(el.dataset.campo);
+    if (el.checked) permitidos[el.dataset.pantalla].push(el.dataset.campo);
   });
   try {
-    const r = await fetch('/api/dealer-campos', { method:'PUT', headers:H, body: JSON.stringify({ id_perfil:idPerfil, bloqueos }) });
+    const r = await fetch('/api/dealer-campos', { method:'PUT', headers:H, body: JSON.stringify({ id_perfil:idPerfil, permitidos }) });
     const j = await r.json(); if (!j.success) throw new Error(j.error);
     // Releer para que la vista quede con lo que quedó guardado, no con lo que se envió
     PERM = null; await permCargar();

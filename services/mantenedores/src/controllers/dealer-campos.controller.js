@@ -18,12 +18,12 @@ const getMatriz = async (_req, res) => {
   } catch (e) { console.error('[dealer-campos matriz]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-/* PUT /api/dealer-campos — reemplaza las reglas de UN perfil (envía solo lo bloqueado).
+/* PUT /api/dealer-campos — reemplaza las reglas de UN perfil (envía lo PERMITIDO).
    Guardar por perfil evita pisar el trabajo de otro administrador editando otra fila. */
 const guardar = async (req, res) => {
   try {
     const idPerfil = parseInt(req.body.id_perfil);
-    const bloqueos = req.body.bloqueos || {};   // { FICHA:[campos], DEALER:[campos] }
+    const permitidos = req.body.permitidos || {};   // { FICHA:[campos], DEALER:[campos] }
     if (!idPerfil) return res.status(400).json({ success: false, data: null, error: 'Falta el perfil' });
     const [[p]] = await pool.query('SELECT nombre FROM perfiles WHERE id_perfil=?', [idPerfil]);
     if (!p) return res.status(404).json({ success: false, data: null, error: 'Perfil no encontrado' });
@@ -35,8 +35,8 @@ const guardar = async (req, res) => {
     const filas = [];
     const quien = [req.usuario.nombre, req.usuario.apellido].filter(Boolean).join(' ') || req.usuario.email;
     DC.PANTALLAS.forEach(pa => {
-      (bloqueos[pa] || []).forEach(campo => {
-        if (validos[pa].has(campo)) filas.push([idPerfil, pa, campo, 0, quien]);
+      (permitidos[pa] || []).forEach(campo => {
+        if (validos[pa].has(campo)) filas.push([idPerfil, pa, campo, 1, quien]);
       });
     });
 
@@ -47,8 +47,8 @@ const guardar = async (req, res) => {
     DC.invalidarCache();
 
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer_campos_permisos', entidad_id: idPerfil,
-      detalle: `Permisos de edición de dealers del perfil ${p.nombre}: ${filas.length} restricción(es)`, meta: bloqueos });
-    res.json({ success: true, data: { id_perfil: idPerfil, restricciones: filas.length }, error: null });
+      detalle: `Permisos de edición de dealers del perfil ${p.nombre}: ${filas.length} campo(s) habilitado(s)`, meta: permitidos });
+    res.json({ success: true, data: { id_perfil: idPerfil, habilitados: filas.length }, error: null });
   } catch (e) { console.error('[dealer-campos guardar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
