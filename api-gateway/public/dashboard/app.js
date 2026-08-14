@@ -375,7 +375,9 @@ function buildV1() {
     .concat(ejExt.ops ? [ejExt] : [])
     .concat(ejFaltantes(ejPropios.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, com_dealer:0, rentab_afa:0 })));
   const ejRows = ejConCeros.map((e,i)=>`<tr${e.ops&&!e.externo?'':' style="color:#94a3b8"'}>
-    <td><span class="rank">${i+1}.</span>${e.externo ? e.nombre : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a>`}</td>
+    <td><span class="rank">${i+1}.</span>${e.externo
+      ? `<a class="ej-link" onclick="abrirDetalleExternos('ap')">${e.nombre}</a>`
+      : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a>`}</td>
     <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.ops?e.saldo/e.ops:0)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
@@ -1292,14 +1294,16 @@ function buildV1b() {
   // activos sin otorgados este mes (en gris, con la alerta roja igual: cero es cero).
   const entEj = Object.entries(ejOt);
   const extOt = entEj.filter(([n]) => !ejEsNuestro(n))
-    .reduce((a,[,v])=>({ops:a.ops+v.ops, saldo:a.saldo+v.saldo, fin:a.fin+v.fin, cd:a.cd+v.cd, afa:a.afa+v.afa}), {ops:0, saldo:0, fin:0, cd:0, afa:0, externo:true});
+    .reduce((a,[,v])=>({ops:a.ops+v.ops, saldo:a.saldo+v.saldo, fin:a.fin+v.fin, cd:a.cd+v.cd, afa:a.afa+v.afa, externo:true}), {ops:0, saldo:0, fin:0, cd:0, afa:0, externo:true});
   const topEj = entEj.filter(([n]) => ejEsNuestro(n)).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin)
     .concat(extOt.ops ? [['Externos Autofin', extOt]] : [])
     .concat(ejFaltantes(entEj.filter(([n])=>ejEsNuestro(n)).map(([n])=>n)).map(n => [n, {ops:0, saldo:0, fin:0, cd:0, afa:0}]));
   const ejRows2 = topEj.map(([nombre,v],i)=>{
     const finStyle = v.fin < window.DASH_PARAMS.alerta_fin_ejecutivo ? 'color:#e53935;font-weight:700' : '';
     return `<tr${v.ops&&!v.externo?'':' style="color:#94a3b8"'}>
-    <td><span class="rank">${i+1}.</span>${v.externo ? nombre : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a>`}</td>
+    <td><span class="rank">${i+1}.</span>${v.externo
+      ? `<a class="ej-link" onclick="abrirDetalleExternos('ot')">${nombre}</a>`
+      : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${nombre.replace(/'/g,"\\'")}','ot')">${nombre.length>24?nombre.substring(0,24)+'…':nombre}</a>`}</td>
     <td>${v.ops}</td><td style="${finStyle}">${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td>
     <td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td>
   </tr>`;}).join('');
@@ -5000,6 +5004,12 @@ let _modalData = { ops: [], titulo: '', totSaldo: 0, totFin: 0, totCD: 0, totIng
 
 function abrirDetalleEjecutivo(nombre, tipo) {
   _abrirDetalleOps(nombre, tipo, r => r.ejecutivo === nombre);
+}
+/* "Externos Autofin" NO es un ejecutivo: es la fila que agrupa a todos los
+   digitadores que no son del BS. Filtrar por ese nombre no encontraba nada y el
+   popup salía vacío aunque la fila mostrara operaciones. */
+function abrirDetalleExternos(tipo) {
+  _abrirDetalleOps('Externos Autofin', tipo, r => !ejEsNuestro(r.ejecutivo));
 }
 // Mismo modal de operaciones, filtrado por institución (link en el cuadro Instituciones)
 function abrirDetalleInstitucion(k, tipo) {
