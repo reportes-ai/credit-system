@@ -2,7 +2,31 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v207.86';
+const APP_VERSION = 'v207.87';
+
+/* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
+   El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
+   es implícitamente rel="noopener", y sin opener el navegador NO clona el
+   sessionStorage a la pestaña nueva: la página abierta no ve token y rebota
+   a login (pasaba al pinchar la ODP en Saldos Precios a Pagar, y en los ~29
+   enlaces internos con target="_blank" del sistema).
+   window.open() por script sí conserva el opener → el sessionStorage se clona.
+   Solo intercepta enlaces internos; los externos siguen igual (sin opener). */
+(function () {
+  if (window.__afAbrirPestana) return;
+  window.__afAbrirPestana = true;
+  document.addEventListener('click', function (e) {
+    const a = e.target && e.target.closest && e.target.closest('a[target="_blank"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (a.hasAttribute('download') || /noopener/i.test(a.rel || '')) return;
+    const href = a.getAttribute('href') || '';
+    if (!href || href.startsWith('#') || /^(mailto|tel|javascript|blob|data):/i.test(href)) return;
+    let u; try { u = new URL(href, location.href); } catch { return; }
+    if (u.origin !== location.origin) return;   // externo: se deja como está
+    e.preventDefault();
+    window.open(u.href, '_blank');              // con opener → hereda sessionStorage
+  }, true);
+})();
 
 /* ── Guardián global de sesión ─────────────────────────────────────────
    El auth-guard solo revisa el token al CARGAR la página. Como el token dura
