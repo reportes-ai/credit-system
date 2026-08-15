@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alertas — Mantenedor — AutoFácil</title>
-  <!-- v1.7 — Avisos popup de inicio parametrizables (activar/desactivar + días) -->
+  <!-- v1.8 — Los anuncios push quedan en cola: se muestran al volver a entrar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -203,7 +203,7 @@
       <li><b>Destino</b> → perfiles que reciben el aviso; <b>CREADOR</b> = quien creó el registro; <b>TODOS</b> = todos los usuarios.</li>
       <li><b>Eventos de Pago — Post Venta</b> → avisos del flujo de <a href="/postventa/saldos-a-pagar/">Saldos a Pagar</a> y <a href="/postventa/comisiones-a-pagar/">Comisiones a Pagar</a> (fondos cargados, enviado a pago, orden emitida, pago). Editarlos aquí también los cambia en la configuración de Post Venta (misma fuente).</li>
       <li><b>Eventos — Dealers</b> → avisos del flujo de <a href="/dealers-incorporacion/">fichas de Dealer</a> en cada etapa: por autorizar (a cada nivel), autorizada (al ejecutivo), firmada (al cierre), creado/actualizado y rechazada. Los destinatarios base salen de la <a href="/dealers-incorporacion/niveles.html">cadena de niveles</a>; aquí sumas perfiles/usuarios y controlas activo, prioridad y sonido.</li>
-      <li><b>Anuncios en pantalla (push)</b> → banner que baja desde arriba a <b>todos los usuarios</b> cuando ocurre el evento (hoy: <b>Crédito otorgado</b>, al apretar Otorgado en <a href="/aprobaciones/">Cartas Vigentes</a>). Configurable: mensaje (con variables como <code>{ejecutivo}</code>), colores, ancho, sonido y tiempos.</li>
+      <li><b>Anuncios en pantalla (push)</b> → banner que baja desde arriba a <b>todos los usuarios</b> cuando ocurre el evento (hoy: <b>Crédito otorgado</b>, al apretar Otorgado en <a href="/aprobaciones/">Cartas Vigentes</a>). Configurable: mensaje (con variables como <code>{ejecutivo}</code>), colores, ancho, sonido y tiempos. <b>No se pierden</b>: quien tenía la pestaña cerrada los ve y escucha al volver a entrar (hasta los últimos 5 de las últimas 12 horas, encadenados uno tras otro).</li>
       <li><b>Enviar comunicado</b> → mensaje manual en pantalla a <b>toda la empresa / un perfil / un área (centro de costo) / una persona</b>; por tiempo o <b>permanente</b> (con X para cerrar). Aparece en ~12s a los usuarios conectados; los permanentes se quitan al <b>Desactivar</b>.</li>
     </ul>
   </div>

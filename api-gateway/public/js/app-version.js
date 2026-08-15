@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v208.3';
+const APP_VERSION = 'v208.4';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -1385,19 +1385,29 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   async function chk() {
     try {
-      const r = await fetch('/api/mantenimiento?_=' + Date.now(), { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
+      const vistoAn = localStorage.getItem('af_anuncio_id');
+      const r = await fetch('/api/mantenimiento?_=' + Date.now() + (vistoAn ? '&anuncio_desde=' + encodeURIComponent(vistoAn) : ''),
+        { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' });
       const j = await r.json();
       if (!j.success) return;
       window.__AF_ESBG = !!j.data.es_bg;
-      // Anuncio push global (p.ej. "Juan Pérez acaba de colocar un nuevo crédito").
-      // Sonido tipo aeropuerto y, 2s después, baja el banner. Dedup por nonce (1 vez por navegador).
+      /* Anuncios push globales (p.ej. "Juan Pérez acaba de colocar un nuevo crédito").
+         Sonido tipo aeropuerto y, unos segundos después, baja el banner. El servidor
+         manda los que este navegador aún no ha visto — incluidos los ocurridos con la
+         pestaña cerrada — y avanzamos la marca en localStorage. */
       const an = j.data.anuncio;
-      if (an && an.nonce && localStorage.getItem('af_anuncio_nonce') !== String(an.nonce)) {
-        localStorage.setItem('af_anuncio_nonce', String(an.nonce));
-        const o = an.opts || {};
-        const antes = Math.min(10, Math.max(0, parseInt(o.antes) != null ? parseInt(o.antes) : 2)) * 1000;
-        if (o.sonido && o.sonido !== 'none') { try { if (window.afPlaySound) window.afPlaySound(o.sonido); } catch (e) {} }
-        setTimeout(() => mostrarAnuncio(an.texto, o), antes);
+      if (an) {
+        localStorage.setItem('af_anuncio_id', String(an.ultimo || 0));
+        (an.lista || []).forEach((a, i) => {
+          const o = a.opts || {};
+          const antes = Math.min(10, Math.max(0, parseInt(o.antes) != null ? parseInt(o.antes) : 2)) * 1000;
+          const dur   = Math.min(30, Math.max(2, parseInt(o.dur) || 6)) * 1000;
+          // Los acumulados se encadenan uno tras otro, no todos encima
+          const base = i * (antes + dur + 900);
+          if (o.sonido && o.sonido !== 'none')
+            setTimeout(() => { try { if (window.afPlaySound) window.afPlaySound(o.sonido); } catch (e) {} }, base);
+          setTimeout(() => mostrarAnuncio(a.texto, o), base + antes);
+        });
       }
       // Comunicados manuales dirigidos (persona/área/perfil/empresa)
       manejarComunicados(j.data.comunicados);

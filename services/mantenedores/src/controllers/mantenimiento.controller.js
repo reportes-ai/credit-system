@@ -125,7 +125,9 @@ const getEstado = async (req, res) => {
     const bg = await esBreakGlass(req.usuario.id_usuario);
     const dev = await leerDev();
     const jg = await leerJuego();
-    const anuncio = await leerAnuncio();
+    // El cliente manda el id del último anuncio que ya mostró (localStorage): así los
+    // que ocurrieron con la pestaña cerrada le suenan al volver.
+    const anuncio = await leerAnuncio(req.query.anuncio_desde);
     const comunicados = await comunicadosParaUsuario(req.usuario);
     res.json({ success: true, data: { activo: cfg.activo, mensaje: (cfg.activo || bg) ? cfg.mensaje : '', es_bg: bg, dev_activo: dev.activo,
       juego: (jg.activo && JUEGOS_OK.includes(jg.nombre)) ? { nombre: jg.nombre, mensaje: jg.mensaje, nonce: jg.nonce } : null,

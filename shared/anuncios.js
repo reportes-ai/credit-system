@@ -4,14 +4,20 @@
    - Config PARAMÉTRICA por evento en tabla anuncios_config (mantenedor de Alertas):
      activo, mensaje (plantilla con tokens {ejecutivo}…), colores, ancho, sonido,
      segundos antes del banner y duración visible.
-   - Canal de entrega: tabla mantenimiento_config (la misma que humoradas/mantención),
-     claves anuncio_*. El front (app-version.js) lo detecta en su poll de
-     /api/mantenimiento. Frescura: solo se entrega si tiene < FRESH_MS (no molestar a
-     quien recién abre la app). Dedup por nonce en el cliente.
+   - Canal de entrega: COLA en tabla anuncios_cola. El front (app-version.js) manda en
+     su poll de /api/mantenimiento el id del último anuncio que ya mostró y recibe los
+     posteriores. Así el que tenía la pestaña cerrada los escucha al volver — antes se
+     publicaba un solo anuncio "fresco" por 45s y quien no estaba conectado en esa
+     ventana no se enteraba nunca (pedido de Pato, 16-08-2026: todos deben saber que
+     un ejecutivo colocó un crédito).
+   - Acotado por VENTANA_HORAS y MAX_PENDIENTES: al volver tras dos días no se
+     encadenan veinte campanas, suenan los últimos y listo.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('./config/database');
 
-const FRESH_MS = 45000;   // 45s: cubre el poll de 12s y no molesta a quien entra tarde
+const VENTANA_HORAS   = 12;   // más viejo que esto ya no se anuncia al reconectar
+const MAX_PENDIENTES  = 5;    // tope de anuncios encadenados en una misma vuelta
+const RETENCION_DIAS  = 7;    // la cola se poda sola
 
 // Eventos que pueden disparar un anuncio (extensible). tokens = variables del mensaje.
 const EVENTOS = [
@@ -49,6 +55,14 @@ const ready = (async () => {
       duracion_seg   INT          NOT NULL DEFAULT 6,
       updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS anuncios_cola (
+      id        BIGINT       NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      evento    VARCHAR(40)  NOT NULL,
+      texto     VARCHAR(200) NOT NULL,
+      opts      VARCHAR(500) NOT NULL DEFAULT '{}',
+      creado_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_cola_fecha (creado_at)
+    )`);
     for (const e of EVENTOS) {
       const d = e.default;
       await pool.query(
@@ -63,9 +77,6 @@ const ready = (async () => {
 const aplicarVars = (tpl, vars) =>
   String(tpl == null ? '' : tpl).replace(/\{(\w+)\}/g, (_, k) => (vars && vars[k] != null) ? String(vars[k]) : '');
 
-const setKv = (k, v) =>
-  pool.query("INSERT INTO mantenimiento_config (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)", [k, v]);
-
 // Dispara el anuncio de un evento, aplicando su plantilla y opciones de presentación.
 async function publicarAnuncio(evento, vars) {
   try {
@@ -76,24 +87,33 @@ async function publicarAnuncio(evento, vars) {
     if (!texto) return;
     const opts = { bg: cfg.color_fondo, fg: cfg.color_texto, ancho: cfg.ancho_pct,
                    sonido: cfg.sonido, antes: cfg.segundos_antes, dur: cfg.duracion_seg };
-    const now = String(Date.now());
-    await setKv('anuncio_texto', texto);
-    await setKv('anuncio_opts', JSON.stringify(opts));
-    await setKv('anuncio_nonce', now);   // instancia → el cliente lo muestra una vez
-    await setKv('anuncio_at', now);      // marca de tiempo para la frescura
+    await pool.query('INSERT INTO anuncios_cola (evento, texto, opts) VALUES (?,?,?)',
+      [evento, texto, JSON.stringify(opts).slice(0, 500)]);
+    await pool.query('DELETE FROM anuncios_cola WHERE creado_at < NOW() - INTERVAL ? DAY', [RETENCION_DIAS]);
   } catch (e) { console.error('[anuncios publicar]', e.message); }
 }
 
-// Lee el anuncio vigente (o null si no hay / venció la frescura). Incluye opciones.
-async function leerAnuncio() {
+/* Anuncios que el cliente todavía no mostró. `desde` = id del último que ya mostró
+   (lo guarda en localStorage, así sobrevive a cerrar la pestaña).
+   Devuelve SIEMPRE `ultimo` para que un navegador nuevo parta desde el presente y no
+   le suene el historial completo la primera vez. */
+async function leerAnuncio(desde) {
   try {
-    const [rows] = await pool.query("SELECT clave, valor FROM mantenimiento_config WHERE clave IN ('anuncio_texto','anuncio_opts','anuncio_nonce','anuncio_at')");
-    const m = {}; rows.forEach(r => { m[r.clave] = r.valor; });
-    if (!m.anuncio_texto || !m.anuncio_nonce) return null;
-    if (Date.now() - parseInt(m.anuncio_at || '0', 10) > FRESH_MS) return null;
-    let opts = {}; try { opts = JSON.parse(m.anuncio_opts || '{}'); } catch (_) {}
-    return { texto: m.anuncio_texto, nonce: m.anuncio_nonce, opts };
-  } catch (e) { return null; }
+    const [[mx]] = await pool.query('SELECT MAX(id) AS ultimo FROM anuncios_cola');
+    const ultimo = mx && mx.ultimo != null ? Number(mx.ultimo) : 0;
+    const d = Number.parseInt(desde, 10);
+    if (!Number.isFinite(d) || d < 0) return { ultimo, lista: [] };   // primera vez → solo la marca
+    if (d >= ultimo) return { ultimo, lista: [] };
+    const [rows] = await pool.query(
+      `SELECT id, texto, opts FROM anuncios_cola
+        WHERE id > ? AND creado_at >= NOW() - INTERVAL ? HOUR
+        ORDER BY id DESC LIMIT ?`, [d, VENTANA_HORAS, MAX_PENDIENTES]);
+    const lista = rows.reverse().map(r => {
+      let opts = {}; try { opts = typeof r.opts === 'object' && r.opts ? r.opts : JSON.parse(r.opts || '{}'); } catch (_) {}
+      return { id: Number(r.id), texto: r.texto, opts };
+    });
+    return { ultimo, lista };
+  } catch (e) { return { ultimo: 0, lista: [] }; }
 }
 
 // Para el mantenedor: lista de eventos con su config actual.
