@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v208.2';
+const APP_VERSION = 'v208.3';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -706,15 +706,40 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+  /* UN solo AudioContext por sesión, despertado con el primer gesto del usuario.
+     Antes se creaba uno nuevo en cada sonido: el navegador lo entrega SUSPENDIDO
+     mientras la pestaña no haya recibido un clic, así que el anuncio de crédito
+     otorgado bajaba mudo (reclamo del 15-08-2026). Ya reanudado, suena siempre. */
+  let audioCtx = null;
+  function ctxAudio() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!audioCtx || audioCtx.state === 'closed') audioCtx = new AC();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      return audioCtx;
+    } catch (e) { return null; }
+  }
+  function despertarAudio() {
+    const ctx = ctxAudio(); if (!ctx) return;
+    // Buffer mudo: varios navegadores solo desbloquean tras reproducir algo de verdad
+    try {
+      const s = ctx.createBufferSource();
+      s.buffer = ctx.createBuffer(1, 1, 22050);
+      s.connect(ctx.destination); s.start(0);
+    } catch (e) {}
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(ev =>
+    document.addEventListener(ev, despertarAudio, { once: true, capture: true }));
+
   function reproducir(tipo) {
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = ctxAudio(); if (!ctx) return;
       if (tipo === 'dingdong') sDingDong(ctx);
       else if (tipo === 'alarma') sAlarma(ctx);
       else if (tipo === 'aplausos') sAplausos(ctx);
       else if (tipo === 'anuncio') sAnuncio(ctx);
       else sCampana(ctx);
-      setTimeout(() => ctx.close(), tipo === 'anuncio' ? 5500 : 2500);
     } catch (e) {}
   }
   const dingDing = () => reproducir(ringTipo);
