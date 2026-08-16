@@ -1220,7 +1220,11 @@ const upsert = async (req, res) => {
           anulado_por=?, fecha_anulacion=?,
           eliminado_por=?, fecha_eliminacion=?,
           fecha_correccion=?, corregido_por=?,
-          otorgado=?, fecha_otorgado=?,
+          /* El otorgamiento lo sella su propio endpoint con NOW() (más arriba,
+             "UPDATE ... otorgado=1, fecha_otorgado=NOW()"). Este UPDATE de guardar
+             lo pisaba con el valor del navegador y lo corría 4 horas: 42 cartas
+             quedaron otorgadas ANTES de su propia aprobación. Aquí ya no se mueve. */
+          otorgado=?, fecha_otorgado = COALESCE(fecha_otorgado, ?),
           tasa_credito=?, monto_credito_clp=?, monto_credito_uf=?,
           excepciones=?, excepciones_comentarios=?,
           numero_credito_creado=?, id_credito_creado=?
