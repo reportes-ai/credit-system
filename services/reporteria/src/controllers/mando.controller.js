@@ -242,7 +242,13 @@ exports.mando = async (req, res) => {
       ORDER BY fecha_creacion LIMIT 1`);
     let cartaEspera = null;
     if (cartaPend) {
-      let s = Number(cartaPend.s); if (s < 0) s += 14400;
+      /* Antes acá se sumaban 14400 segundos cuando la espera salía negativa, para
+         compensar que fecha_creacion venía corrida 4 h. Esa causa se cerró (la
+         columna ya la sella el servidor) y las filas viejas se corrigieron, así
+         que el parche sobraba — y mentía: daba por buena una espera inventada, y
+         asumía 4 h fijas, que en horario de verano son 3. Una espera negativa
+         significa fecha futura, o sea un dato malo: se descarta, no se maquilla. */
+      const s = Number(cartaPend.s);
       if (s >= (cfgMando.carta_alerta_min || 5) * 60 && s < 30 * 86400)
         cartaEspera = { op_carta: cartaPend.op_carta || cartaPend.id, segundos: s };
     }
