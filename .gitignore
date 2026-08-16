@@ -1,5 +1,6 @@
-# Claude Code worktree internals
-.claude/
+# Claude Code worktree internals (las skills del proyecto SÍ van al repo)
+.claude/*
+!.claude/skills/
 
 # Logs
 logs
