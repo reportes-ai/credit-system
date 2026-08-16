@@ -9,21 +9,22 @@ Objetivo: dejar a Pato un semáforo claro de qué falta para cerrar el mes. Esta
 
 El mes a revisar es el que Pato indique; si no indica, el mes calendario anterior al actual (hora de Chile).
 
-## Pasos
+## Pasos (queries verificadas contra el esquema real el 16-08-2026)
 
-1. **Estado del checklist paramétrico**: consultar `cierre_checklist_items` (activos) y `cierre_mes_checks` del mes — listar cada punto con su responsable, si está OK y si venció su día hábil límite. Ver si el mes ya está en `ctb_meses_cerrados` (si ya está cerrado, reportarlo y parar).
+1. **Candado y checklist**: `ctb_meses_cerrados` tiene columnas `(mes 'YYYY-MM', cerrado_por, created_at)` — si el mes está ahí, reportar cerrado y parar. Checklist: `cierre_checklist_items` (activos, 7 obligatorios sembrados) contra `cierre_mes_checks` del mes. OJO: al 16-08-2026 `ctb_meses_cerrados` y `cierre_mes_checks` estaban VACÍAS (el módulo nunca se había usado) — si sigue así, ese es el hallazgo principal.
 
-2. **Eventos contables sin asiento**: `ctb_eventos_log` del mes con `estado <> 'CONTABILIZADO'` — agrupar por estado (SIN_REGLA / DESCUADRE / ERROR) y tipo de evento. Cada SIN_REGLA es una regla que falta cablear en Reglas de Centralización: nombrarla.
+2. **Eventos contables sin asiento**: `ctb_eventos_log` con `created_at` del mes y `estado <> 'CONTABILIZADO'` — agrupar por `evento, estado` (SIN_REGLA / DESCUADRE / ERROR / MES_CERRADO). Cada SIN_REGLA es una regla que falta cablear en Reglas de Centralización: nombrarla.
 
 3. **Chequeos espejo de los check_auto** (mismas fuentes que usa la pantalla):
-   - Conciliación: `banco_movimientos` del mes sin conciliar.
-   - Transitorias: cuentas activas con saldo sin aplicar.
-   - ODP: órdenes EMITIDAS sin pagar del mes.
-   - Provisiones: snapshot del mes presente en `contab_saldos_mensuales`.
+   - Conciliación: `banco_movimientos` del mes con `(conciliado IS NULL OR conciliado=0)`.
+   - Transitorias: `cuentas_transitorias` con `UPPER(estado)='ACTIVA' AND monto_original > monto_utilizado` (no existe columna `activo`).
+   - ODP: `ordenes_pago` con `UPPER(estado)='EMITIDA'` creadas antes del fin del mes.
+   - Provisiones: filas del mes en `contab_saldos_mensuales` (columna `mes` = 'YYYY-MM').
 
 4. **Coherencia de fechas**: correr el vigía (`require('./shared/vigia-relojes').revisar()`) para descartar marcas del futuro antes de congelar el mes.
 
-5. **Cuadratura de comisiones y cartolas**: verificar que no queden cartas OTORGADAS con crédito en estado distinto (gotcha op 26080532: comparar SIEMPRE con UPPER()) y que las cartolas del mes estén emitidas.
+5. **Cuadratura cartas vs créditos** (gotcha op 26080532): `cartas_aprobacion` NO tiene columna `estado` — usar el flag `otorgado` y el enlace `numero_credito_creado`:
+   `SELECT COUNT(*) FROM cartas_aprobacion ca JOIN creditos c ON c.num_op = ca.numero_credito_creado WHERE ca.otorgado=1 AND UPPER(c.estado) <> 'OTORGADO'` — debe dar 0.
 
 ## Entrega
 
