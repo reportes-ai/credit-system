@@ -51,7 +51,13 @@ async function revisar() {
   // 1) El reloj de la BD debe decir hora de Chile (el pool hace SET time_zone).
   const [[bd]] = await pool.query("SELECT NOW() ahora, @@session.time_zone tz");
   const nodeChile = ahoraChileNode();
-  const difSeg = Math.abs((new Date(String(bd.ahora).replace(' ', 'T')) - new Date(nodeChile.replace(' ', 'T'))) / 1000);
+  // mysql2 entrega NOW() como objeto Date interpretado con el offset de Chile del pool.
+  // Se compara en ÉPOCA contra Date.now(): si el SET time_zone de la sesión se pierde,
+  // NOW() devuelve otra pared horaria y la época queda corrida 3-4 h. Comparar contra el
+  // string local de Node daría falsa alarma en Render (Node corre en UTC), y parsear el
+  // Date como string da NaN y deja el chequeo mudo.
+  const bdMs = bd.ahora instanceof Date ? bd.ahora.getTime() : Date.parse(String(bd.ahora).replace(' ', 'T'));
+  const difSeg = Math.abs((bdMs - Date.now()) / 1000);
   if (difSeg > MARGEN_RELOJ_SEG) {
     hallazgos.push(`NOW() de la BD (${bd.ahora}, tz=${bd.tz}) difiere ${Math.round(difSeg / 60)} min de la hora de Chile (${nodeChile}). El SET time_zone del pool pudo perderse.`);
   }
