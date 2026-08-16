@@ -284,7 +284,7 @@ exports.contratarDesdeCarta = async (req, res) => {
     await pool.query(`UPDATE rh_cartas_oferta SET estado='CONTRATADA' WHERE id=?`, [id]);
     // Onboarding automático desde la fecha de ingreso (o hoy)
     try { await crearProceso({ tipo: 'ONBOARDING', persona: c.candidato, rut: c.rut, id_ref: r.insertId,
-      fecha_base: c.fecha_ingreso ? String(c.fecha_ingreso).slice(0, 10) : new Date().toISOString().slice(0, 10),
+      fecha_base: require('../../../../shared/fecha-chile').isoDe(c.fecha_ingreso) || require('../../../../shared/fecha-chile').hoyISO(),
       creado_por: req.usuario.id_usuario }); } catch (e) { console.error('[onb auto]', e.message); }
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'rh_contrato', entidad_id: r.insertId, detalle: `Contrato desde carta oferta #${id} (${c.candidato})` });
     ok(res, { id: r.insertId });

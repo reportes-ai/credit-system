@@ -13,7 +13,7 @@ const err = (res, e, code = 500) => res.status(code).json({ success: false, data
  */
 const getCierre = async (req, res) => {
   try {
-    const hoy     = new Date().toISOString().slice(0, 10);
+    const hoy     = require('../../../../shared/fecha-chile').hoyISO(); // día de CHILE: con el UTC, de noche el cierre mostraba mañana (vacío)
     const desde   = req.query.desde || hoy;
     const hasta   = req.query.hasta || hoy;
     const id_usuario = req.query.id_usuario || null;

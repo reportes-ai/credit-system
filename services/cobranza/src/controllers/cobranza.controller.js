@@ -461,7 +461,7 @@ exports.disponibilidad = async (req, res) => {
       const ultimaRemota = new Date(remGests[0].created_at);
       const proxRemota = new Date(ultimaRemota);
       proxRemota.setDate(ultimaRemota.getDate() + 2);
-      const proxRemotaStr = proxRemota.toISOString().slice(0, 10);
+      const proxRemotaStr = require('../../../../shared/fecha-chile').isoDe(proxRemota); // día de Chile (el UTC bloqueaba un día extra de noche)
       if (proxRemotaStr > hoyChile()) {
         proxima_remota_disponible = proxRemotaStr;
         dias_para_proxima_remota = Math.ceil((proxRemota - hoy) / 86400000);
@@ -683,7 +683,7 @@ exports.crearGestion = async (req, res) => {
         const hoy = new Date(hoyChile());
         const diffDias = Math.floor((hoy - ultimaRemota) / 86400000);
         if (diffDias < 2) {
-          const proxFecha = new Date(ultimaRemota.getTime() + 2 * 86400000).toISOString().slice(0, 10);
+          const proxFecha = require('../../../../shared/fecha-chile').isoDe(new Date(ultimaRemota.getTime() + 2 * 86400000)); // día de Chile
           return fail(res, `Debe esperar al menos 2 días entre gestiones remotas. Próxima disponible: ${proxFecha}`);
         }
       }

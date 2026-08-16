@@ -1084,8 +1084,8 @@ const setEtapa = async (req, res) => {
       if (!esAdmin) {
         const fechaMarca = marcadas.find(m => m.etapa === etapa)?.fecha;
         if (fechaMarca) {
-          const hoy = new Date().toISOString().slice(0, 10);
-          const diaM = new Date(fechaMarca).toISOString().slice(0, 10);
+          const F = require('../../../../shared/fecha-chile');
+          const hoy = F.hoyISO(), diaM = F.isoDe(fechaMarca); // día de Chile: con UTC no se podía desmarcar de noche lo marcado en la tarde
           if (diaM !== hoy)
             return res.status(403).json({ success: false, data: null, error: 'Solo puedes desmarcar etapas marcadas hoy' });
         }

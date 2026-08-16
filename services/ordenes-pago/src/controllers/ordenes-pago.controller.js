@@ -587,7 +587,7 @@ const crearOrden = async (req, res) => {
     // El sistema calcula bruto/neto/impuesto y A pagar a partir del tipo de documento.
     const m = await calcularDoc(tipoDoc, base, valor);
 
-    const fechaEmision = fdate(b.fecha_emision) || new Date().toISOString().slice(0, 10);
+    const fechaEmision = fdate(b.fecha_emision) || require('../../../../shared/fecha-chile').hoyISO(); // día de Chile, no UTC
     const [r] = await pool.query(
       `INSERT INTO ordenes_pago
         (id_proveedor, proveedor_nombre, proveedor_rut, concepto, categoria, tipo_documento, numero_documento, fecha_documento,
@@ -626,7 +626,7 @@ const cambiarEstadoOrden = async (req, res) => {
     if (o.estado === 'PAGADA')
       return res.status(409).json({ success: false, data: null, error: 'La orden ya está pagada y queda en duro: no puede modificarse ni anularse' });
 
-    const fechaPago = estado === 'PAGADA' ? (fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10)) : null;
+    const fechaPago = estado === 'PAGADA' ? (fdate((req.body || {}).fecha_pago) || require('../../../../shared/fecha-chile').hoyISO()) : null; // día de Chile
     const metodo = estado === 'PAGADA' ? (norm((req.body || {}).metodo_pago) || null) : null;
 
     if (estado === 'ANULADA') {
@@ -808,7 +808,7 @@ const pagarOrden = async (req, res) => {
     if (!seg.ok) return res.status(403).json({ success: false, data: null, error: seg.motivo });
 
     const metodo = norm((req.body || {}).metodo_pago) || null;
-    const fechaPago = fdate((req.body || {}).fecha_pago) || new Date().toISOString().slice(0, 10);
+    const fechaPago = fdate((req.body || {}).fecha_pago) || require('../../../../shared/fecha-chile').hoyISO(); // día de Chile, no UTC
 
     // 1) Registro central (egreso de caja).
     await pool.query(

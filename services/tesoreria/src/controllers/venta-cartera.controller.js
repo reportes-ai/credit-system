@@ -90,7 +90,7 @@ exports.vender = async (req, res) => {
     const b = req.body || {};
     const comprador = String(b.comprador || '').trim().toUpperCase();
     const ventas = Array.isArray(b.ventas) ? b.ventas : [];
-    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_venta)) ? b.fecha_venta : new Date().toISOString().slice(0, 10);
+    const fecha = /^\d{4}-\d{2}-\d{2}$/.test(String(b.fecha_venta)) ? b.fecha_venta : require('../../../../shared/fecha-chile').hoyISO(); // día de Chile: el UTC nocturno movía la venta al día (o mes) siguiente
     if (!comprador) return res.status(400).json({ success: false, data: null, error: 'Falta el comprador' });
     if (!ventas.length) return res.status(400).json({ success: false, data: null, error: 'Sin operaciones a vender' });
     const usuario = ((req.usuario.nombre || '') + ' ' + (req.usuario.apellido || '')).trim() || req.usuario.email || '';

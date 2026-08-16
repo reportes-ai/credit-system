@@ -303,7 +303,7 @@ exports.preguntar = async (req, res) => {
       .filter(h => h && h.pregunta && h.resumen).slice(-3)
       .map(h => ({ pregunta: String(h.pregunta).slice(0, 300), resumen: String(h.resumen).slice(0, 600) }));
 
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = require('../../../../shared/fecha-chile').hoyISO(); // día de Chile: de noche el UTC hacía responder por el período equivocado
     const system =
       'Eres el analista de finanzas de AutoFácil Chile (crédito automotriz). Respondes preguntas sobre la CONTABILIDAD ' +
       'propia: ingresos, gastos, presupuesto, márgenes, balance, caja, proveedores, honorarios, remuneraciones. ' +

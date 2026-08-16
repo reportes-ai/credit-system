@@ -92,7 +92,7 @@ exports.crear = async (req, res) => {
     if (String(b.relato || '').trim().length < 30) return fail(res, 'Describe los hechos con más detalle (mínimo 30 caracteres)', 400);
     const anonima = b.anonima ? 1 : 0;
     const codigo = crypto.randomBytes(4).toString('hex').toUpperCase();
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = require('../../../../shared/fecha-chile').hoyISO(); // día de CHILE: de noche el UTC ya es mañana y corría el plazo legal
     const limite = sumarHabiles(hoy, 30); // Ley Karin: investigación en 30 días hábiles (se aplica a todas como estándar)
     await pool.query(
       `INSERT INTO rh_denuncias (codigo, tipo, anonima, id_denunciante, denunciado, relato, fecha_limite) VALUES (?,?,?,?,?,?,?)`,

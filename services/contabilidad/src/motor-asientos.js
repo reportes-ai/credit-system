@@ -261,7 +261,8 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
     if (!debe && !haber) { await log(evento, ref, 'ERROR', 'Todos los montos en cero'); return null; }
     if (debe !== haber) { await log(evento, ref, 'DESCUADRE', `Debe ${debe} ≠ Haber ${haber} — revisa la regla`); return null; }
 
-    const f = /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : new Date().toISOString().slice(0, 10);
+    // Día de CHILE, no UTC: de noche el UTC ya es mañana y fin de mes mandaba el asiento al mes siguiente
+    const f = /^\d{4}-\d{2}-\d{2}$/.test(fecha || '') ? fecha : require('../../../shared/fecha-chile').hoyISO();
     // Candado de mes cerrado: el evento queda en el log para regularizarlo a mano
     const [[cerrado]] = await pool.query('SELECT mes FROM ctb_meses_cerrados WHERE mes=?', [f.slice(0, 7)]);
     if (cerrado) { await log(evento, ref, 'MES_CERRADO', `El mes ${f.slice(0, 7)} está cerrado con candado — asiento NO contabilizado; reabrir el mes y reprocesar, o digitarlo en el mes abierto`); return null; }

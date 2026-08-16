@@ -330,7 +330,7 @@ const aprobar = async (req, res) => {
 
     const u = req.usuario || {};
     const resolutor = nombreUsuario(u);
-    const fechaPago = odp.fecha_pago || new Date().toISOString().slice(0, 10);
+    const fechaPago = odp.fecha_pago || require('../../../../shared/fecha-chile').hoyISO(); // día de Chile: el UTC fechaba pagos nocturnos a mañana
     const obsPago   = `ODP #${odp.id_odp} aprobada por ${resolutor || 'Tesorería'}`;
 
     for (const c of cuotas) {
