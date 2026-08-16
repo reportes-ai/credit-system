@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v5.6 — correos_log (Auditoria → Correos Enviados), Ver como dealer (JWT ver_como en el hash), dealernet_informes.sin_datos. v5.5 — blindaje excepciones/codigos + auditoria de permisos (cache, cards por override, casillas cableadas, retiro Cartas Antiguo). v5.4 — Revisor Automatico de Cartas (motor, tablas revisor_bitacora/extracted, gotcha pdf-parse). v5.3 — Catalogo de Endpoints auto-generado (auditoria de permisos viva). v5.2 — revision E2E de parques: atribucion unificada, factura con cuadratura y contabilidad con cuentas separadas. v5.1 — circuito de parques: entidad PARQUE en la ficha, track PARQUE en Post Venta, cartolas y reversas. v5.0 — devolucion automatica de conversaciones al bot y la URL del webhook en el dominio propio. v4.9 — política de claves aplicada de verdad, cambio de clave forzado en el servidor, firma del webhook de Meta y reintento de correlativos. v4.8 — host de contingencia en Cloud Run (afbs2), interruptor MOTORES=off y reconstruccion diaria. v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
+<!-- v5.7 — Fechas y horas: motor unico shared/fecha-chile.js, timestamps sellados por el servidor, las tres trampas (toISOString, new Date('YYYY-MM-DD'), BETWEEN sobre DATETIME) y el episodio de las 4 horas con sus scripts de reparacion. v5.6 — correos_log (Auditoria → Correos Enviados), Ver como dealer (JWT ver_como en el hash), dealernet_informes.sin_datos. v5.5 — blindaje excepciones/codigos + auditoria de permisos (cache, cards por override, casillas cableadas, retiro Cartas Antiguo). v5.4 — Revisor Automatico de Cartas (motor, tablas revisor_bitacora/extracted, gotcha pdf-parse). v5.3 — Catalogo de Endpoints auto-generado (auditoria de permisos viva). v5.2 — revision E2E de parques: atribucion unificada, factura con cuadratura y contabilidad con cuentas separadas. v5.1 — circuito de parques: entidad PARQUE en la ficha, track PARQUE en Post Venta, cartolas y reversas. v5.0 — devolucion automatica de conversaciones al bot y la URL del webhook en el dominio propio. v4.9 — política de claves aplicada de verdad, cambio de clave forzado en el servidor, firma del webhook de Meta y reintento de correlativos. v4.8 — host de contingencia en Cloud Run (afbs2), interruptor MOTORES=off y reconstruccion diaria. v4.7 — la campanita que no se calla: cadena de sucesion en avisos de Post Venta (sucede/porPeriodo), avisos sin clave son irretirables (Atencion Remota) y la clave rota carta:undefined. v4.6 — motor unico de ETAPA -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -98,6 +98,7 @@
     <tr><td>certificados.calcularPrepago</td><td>Monto de prepago (cuotas + comisión + interés corriente). Usado por certificado y prepago en caja.</td></tr>
     <tr><td>recalcular-mes.js / recalcularPorOps</td><td>Comisiones e ingresos del negocio; corre solo ante toda vía de cambio; respeta forzados y meses cerrados.</td></tr>
     <tr><td>penetracion.js</td><td>% de penetración de seguros sobre universo elegible por producto.</td></tr>
+    <tr><td>shared/fecha-chile.js</td><td>Qué día es en Chile, y aritmética de calendario sobre <code>'YYYY-MM-DD'</code>. Único lugar donde se decide una fecha desde JS — ver "Fechas y horas" más abajo.</td></tr>
     <tr><td>shared/uf.js</td><td>Lookup UF por fecha (memoria). Tramo mayor/menor 200 UF se recalcula con UF de fecha_otorgado.</td></tr>
     <tr><td><b>shared/etapa-credito.js</b></td><td><b>Etapa del crédito.</b> La etapa vive en TRES columnas de <code>creditos</code> (<code>estado</code>, <code>estado_credito</code>, <code>estado_eval</code>) por herencia histórica. <b>Escribir</b>: <code>setEtapa()</code> / <code>SET_ETAPA_SQL</code> tocan las tres en el mismo UPDATE — nunca un <code>SET estado_credito=…</code> suelto. <b>Leer</b>: <code>ETAPA_SQL(alias)</code>, la expresión canónica (<code>estado</code> manda; las palabras de cartera VIGENTE/EN MORA/… se reinterpretan como OTORGADO). <code>SET_ESTADO_SQL</code> es para procesos que sincronizan desde fuera (Trinidad, edición manual), donde las otras dos difieren legítimamente: acompaña <code>estado</code> sin pisar la cartera. <code>desalineados()</code> es la lista de pendientes: si algo aparece ahí, algún proceso escribió la etapa sin pasar por el motor. Lo usan cartas (otorgar), anulaciones, carga Trinidad, edición de operaciones y desistimiento automático.</td></tr>
     <tr><td>shared/verificacion.js</td><td>Documentos verificables + FES: hash, firmante, QR público, detección de adulteración.</td></tr>
@@ -235,6 +236,47 @@ DEALERNET_USR / DEALERNET_PWD                         → informes comerciales</
       <b>Switch de emergencia</b>: iniciar instancia → restaurar último dump (con el fix de FK) → en Render cambiar <code>DB_HOST</code>=34.176.225.253, <code>DB_PORT</code>=3306, <code>DB_USER</code>, <code>DB_PASSWORD</code> → redeploy automático. Al recuperar TiDB: revertir las 4 env vars (guardarlas antes) y volver a detener la instancia. No hay sync automático: lo digitado en contingencia se migra a mano.<br>
       <b>📕 RUNBOOK DE EMERGENCIAS (autocontenido, para pasárselo a cualquier técnico o a la IA en plena emergencia): <code>docs/RUNBOOK-contingencia-bd.md</code> en el repo</b> — mapa "qué se cayó → qué hacer" que cubre TiDB (probado), Render, GitHub, Google Cloud, DNS/dominio, borrado accidental de datos, filtración de claves y caída de servicios externos; con comandos exactos, el script del fix de FK y las cifras de verificación. Declara explícitamente qué planes están probados y cuáles no. Guía para no técnicos: <b>Mantenedores → Definiciones → "Respaldo de la Base de Datos"</b>.</td></tr>
   </table>
+
+  <h2>Fechas y horas: reglas que no se negocian</h2>
+  <p>La base guarda en hora de Chile (el pool fija <code>SET time_zone</code> por conexión, <code>-04:00</code> o <code>-03:00</code> según horario de verano). <code>NOW()</code>, <code>CURDATE()</code> y <code>DEFAULT CURRENT_TIMESTAMP</code> entregan hora de Chile y son confiables. Todo lo que se rompió alguna vez vino de salirse de ahí.</p>
+
+  <div class="max"><b>1. Un timestamp de trazabilidad lo sella el SERVIDOR, nunca el navegador.</b> Cuándo se creó, aprobó, rechazó, anuló u otorgó algo se escribe con <code>NOW()</code> y queda inmutable (<code>COALESCE(col, ?)</code> o un <code>CASE</code> que conserve el valor existente). <b>2. Distinto de una fecha de NEGOCIO</b> —fecha de curse, de pago, de vencimiento— que el usuario elige a propósito y sí viaja en el formulario. <b>3. Para saber qué día es, <code>shared/fecha-chile.js</code>.</b> Nunca <code>new Date().toISOString().slice(0,10)</code>.</div>
+
+  <h3>El motor: <code>shared/fecha-chile.js</code></h3>
+  <table>
+    <tr><th>Función</th><th>Para qué</th></tr>
+    <tr><td>hoyISO()</td><td>Qué día es hoy en Chile, <code>'YYYY-MM-DD'</code>. Reemplaza a <code>toISOString().slice(0,10)</code>.</td></tr>
+    <tr><td>isoDe(fecha)</td><td>El día de un Date (o de algo que vino de la base), en hora de Chile. Devuelve <code>null</code> si el valor es basura, no una fecha inventada.</td></tr>
+    <tr><td>desdeISO(iso)</td><td><code>'YYYY-MM-DD'</code> → Date anclado al MEDIODÍA, seguro para sumar o restar sin caerse al día vecino.</td></tr>
+    <tr><td>sumarDias / sumarMeses</td><td>Aritmética de calendario sobre <code>'YYYY-MM-DD'</code>, de vuelta en <code>'YYYY-MM-DD'</code>.</td></tr>
+    <tr><td>primerDiaMes(iso)</td><td>Primer día del mes de esa fecha (o del mes en curso).</td></tr>
+    <tr><td>finDelDia(iso)</td><td>Cota superior para comparar contra una columna CON HORA: <code>'2026-07-31 23:59:59.999999'</code>.</td></tr>
+  </table>
+  <p>Cubierto por <code>tests/fecha-chile.test.js</code> (9 pruebas, sin base de datos). Dentro de SQL sigue siendo preferible <code>DATE_FORMAT()</code>/<code>CURDATE()</code>: no salen de la base y no hay conversión que equivocar.</p>
+
+  <h3>Las tres trampas</h3>
+  <table>
+    <tr><th>Trampa</th><th>Qué pasa y cómo se evita</th></tr>
+    <tr><td>toISOString()</td><td>Devuelve <b>UTC siempre</b>, así que entre las 20:00 y la medianoche entrega el día SIGUIENTE. Rompió: rangos "hasta hoy" que incluían mañana (cobranza), un informe contable que la última noche del mes se armaba con el mes siguiente (castigos) y certificados fechados al día siguiente. → <code>isoDe()</code> / <code>hoyISO()</code>.</td></tr>
+    <tr><td>new Date('YYYY-MM-DD')</td><td>Una fecha sin hora se parsea como <b>medianoche UTC</b> = 20:00 del día ANTERIOR en Chile. → <code>desdeISO()</code>, que ancla al mediodía.</td></tr>
+    <tr><td>BETWEEN sobre columna con hora</td><td><code>BETWEEN '2026-07-01' AND '2026-07-31'</code> compara la cota alta contra la medianoche del 31 y <b>se come el día entero, en silencio</b>: el informe sale igual, con menos filas. Y <code>= '2026-07-31'</code> no devuelve NADA, porque ninguna fila cae exactamente a medianoche. → <code>finDelDia()</code>. El Diseño de Consulta ya lo resuelve solo: si la columna lleva hora y el usuario escribe una fecha suelta, la cota se estira al final del día (BETWEEN, &lt;=, &gt;, =, &lt;&gt; y fecha pelada); sobre columnas DATE no toca nada.</td></tr>
+  </table>
+
+  <h3>El episodio de las 4 horas (agosto 2026) — por qué existen estas reglas</h3>
+  <p>El UPDATE que guarda una carta de aprobación escribía sus fechas con el valor que devolvía el navegador. El servidor las guardaba en hora de Chile, el navegador las recibía en UTC y las mandaba de vuelta tal cual: <b>cada re-guardado corría la fecha 4 horas</b>. Con dos ediciones, la carta saltaba al día siguiente.</p>
+  <p>Se descubrió porque el Centro de Control marcaba 2 cartas emitidas un domingo en que no se emitió ninguna. El diagnóstico completo: <b>504 de 532 cartas</b> figuraban creadas después de su propia aprobación, 62 aprobadas después de estar otorgadas y 13 de 16 rechazos con la hora mala.</p>
+  <p><b>La fuente de verdad para repararlo fue <code>auditoria_movimientos</code></b>: registra cada acción con la hora del servidor y el cliente no puede tocarla. Regla que dejó: solo se corrige lo que se puede probar. Se exigió que el desfase fuera múltiplo exacto de 4 horas —la firma del bug— y se respetaron las cartas aprobadas o rechazadas más de una vez, donde quedarse con el primer registro habría pisado un dato bueno.</p>
+  <table>
+    <tr><th>Script (scripts/)</th><th>Qué corrigió</th></tr>
+    <tr><td>corregir-fecha-creacion-cartas.js</td><td>79 cartas con hora exacta, contra el <code>created_at</code> del crédito que nace en el mismo acto.</td></tr>
+    <tr><td>corregir-fecha-creacion-cartas-sin-credito.js</td><td>69 sin crédito ancla: se resta el mínimo de saltos de 4 h que las deja antes de su aprobación. Es un piso, no la hora exacta.</td></tr>
+    <tr><td>alinear-fecha-creacion-migracion.js</td><td>371 de la migración del 13-06: no fueron víctimas del bug (esa era la hora de la carga), se alinearon a la fecha de su documento.</td></tr>
+    <tr><td>corregir-fecha-aprobacion-cartas.js</td><td>62 aprobaciones, contra la auditoría.</td></tr>
+    <tr><td>corregir-fecha-otorgado-cartas.js</td><td>42 otorgamientos. Solo la carta: la <code>fecha_otorgado</code> de <code>creditos</code> es la fecha de curse y no se toca.</td></tr>
+    <tr><td>corregir-fecha-rechazo-cartas.js</td><td>10 rechazos, seis de ellos cambiaban de día y ensuciaban el KPI de los analistas.</td></tr>
+  </table>
+  <p>Todos simulan por defecto y solo escriben con <code>--aplicar</code>, dejan respaldo JSON del antes y después, y llevan el valor viejo en el <code>WHERE</code> para no pisar a otro proceso. Lo que no calzó con la firma del bug quedó intacto: hoy sobreviven 2 cartas de corrección (nacen el día que se corrigen pero heredan la aprobación de la original, es por diseño) y 7 otorgamientos donde se guardó una fecha de curse sin hora.</p>
+  <p><b>Efecto colateral que conviene recordar:</b> al sanear los datos quedó sin objeto un parche del Centro de Control que sumaba 14400 segundos a la espera de la carta pendiente. Se retiró: además de sobrar, asumía 4 horas fijas y en horario de verano habrían sido 3. Una espera negativa es un dato malo y se descarta, no se maquilla.</p>
 
   <h2>Convenciones de código</h2>
   <pre>Tablas BD: snake_case · Rutas HTTP: kebab-case · Funciones JS: camelCase · Archivos: kebab-case.js
