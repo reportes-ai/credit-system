@@ -23,6 +23,8 @@ router.post('/',           requireFunc('cotizaciones.crear'), create);
 router.get('/',            requireFunc('cotizaciones.ver'), getAll);
 router.get('/rut/:rut',    getByRut);
 router.get('/:id/html',    getHtml);
-router.post('/:id/enviar', enviar);
+// Enviar por correo = parte del flujo de cotizar: misma casilla que crear
+// (auditoría requireFunc 2026-08-16: antes cualquier autenticado la disparaba).
+router.post('/:id/enviar', requireFunc('cotizaciones.crear'), enviar);
 
 module.exports = router;

@@ -7,6 +7,12 @@ const { tieneFunc } = require('../../../../shared/middleware/permisos');
    Keys de configuración (mantenedores) exigen su permiso; las keys OPERATIVAS del
    flujo de cartas (dealers, cartolas, comisiones, financiera, …) quedan abiertas a
    autenticados — las escribe cartas-aprobacion/app.js en la operación normal. */
+/* Keys OPERATIVAS del flujo de cartas: las escribe cartas-aprobacion/app.js en la
+   operación normal (dbSetParam) — abiertas a cualquier autenticado, a propósito. */
+const KEYS_OPERATIVAS = new Set([
+  'dealers', 'brand_model_years', 'financiera', 'cartolas', 'cartolas_enviadas', 'comisiones',
+]);
+
 const KEY_PERMISOS = {
   pol_docs_respaldo:      ['política_ver'],
   financiera_preferencia: ['mant_pref_financiera'],
@@ -37,7 +43,11 @@ const setParam = async (req, res) => {
   try {
     const { value } = req.body;
     if (value === undefined) return res.status(400).json({ success: false, data: null, error: 'value requerido' });
-    const permisos = KEY_PERMISOS[req.params.key];
+    /* Auditoría requireFunc 2026-08-16: una key DESCONOCIDA ya no queda abierta —
+       exige cartas_mantenedores. Así una key de config nueva nace protegida aunque
+       se olvide anotarla en KEY_PERMISOS. */
+    const permisos = KEY_PERMISOS[req.params.key]
+      || (KEYS_OPERATIVAS.has(req.params.key) ? null : ['cartas_mantenedores']);
     if (permisos) {
       const uid = (req.usuario || req.user || {}).id_usuario;
       if (!uid || !(await tieneFunc(uid, ...permisos)))
