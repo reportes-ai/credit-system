@@ -445,14 +445,17 @@ async function climaRango(desde, hasta) {
 exports.getClimaCorrelacion = async (req, res) => {
   try {
     const meses = Math.min(24, Math.max(3, parseInt(req.query.meses) || 12));
-    const hoy = new Date();
-    const desde = new Date(hoy.getFullYear(), hoy.getMonth() - meses, 1).toISOString().slice(0, 10);
-    const hasta = new Date(hoy.getTime() - 2 * 86400000).toISOString().slice(0, 10);   // archive llega hasta ~anteayer
+    /* Fechas en hora de CHILE (motor único shared/fecha-chile). Con toISOString()
+       el primer día de la serie retrocedía un día: new Date(y, m, 1) construye
+       medianoche local y la conversión a UTC la manda al mes anterior. */
+    const F = require('../../../../shared/fecha-chile');
+    const desde = F.primerDiaMes(F.sumarMeses(F.hoyISO(), -meses));
+    const hasta = F.sumarDias(F.hoyISO(), -2);   // archive llega hasta ~anteayer
     const [ops] = await pool.query(
       `SELECT DATE(fecha_otorgado) f, COUNT(*) q, SUM(COALESCE(monto_financiado,0)) m
        FROM creditos WHERE estado_eval='OTORGADO' AND fecha_otorgado BETWEEN ? AND ?
        GROUP BY 1`, [desde, hasta]);
-    const qPorDia = new Map(ops.map(r => [new Date(r.f).toISOString().slice(0, 10), { q: Number(r.q), m: Number(r.m) }]));
+    const qPorDia = new Map(ops.map(r => [F.isoDe(r.f), { q: Number(r.q), m: Number(r.m) }]));
     const clima = await climaRango(desde, hasta);
     const { esFeriado, cargarFeriados } = require('../../../../shared/feriados');
     await cargarFeriados();   // asegurar el set en frío (carga async al boot)

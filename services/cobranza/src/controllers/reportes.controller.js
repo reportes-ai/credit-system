@@ -5,6 +5,7 @@
    Todo read-only; no altera datos. Reusa el motor de mora del controller principal.
    ───────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
+const F    = require('../../../../shared/fecha-chile');   // motor único: qué día es en Chile
 const cob  = require('./cobranza.controller');
 const MORA_SQL          = cob._motor.MORA_SQL;
 const getCobranzaConfig = cob._motor.getCobranzaConfig;
@@ -16,9 +17,11 @@ const fail = (res, e, c = 500) => res.status(c).json({ success: false, data: nul
 function rango(req) {
   const hasta = (req.query.hasta && /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta)) ? req.query.hasta : null;
   const desde = (req.query.desde && /^\d{4}-\d{2}-\d{2}$/.test(req.query.desde)) ? req.query.desde : null;
-  const h = hasta || new Date().toISOString().slice(0, 10);
-  let d = desde;
-  if (!d) { const x = new Date(h); x.setMonth(x.getMonth() - 6); d = x.toISOString().slice(0, 10); }
+  // Hora de CHILE (shared/fecha-chile): con toISOString(), después de las 20:00
+  // el "hasta hoy" ya incluía mañana, y el new Date('YYYY-MM-DD') del inicio se
+  // parseaba como medianoche UTC y retrocedía un día.
+  const h = hasta || F.hoyISO();
+  const d = desde || F.sumarMeses(h, -6);
   return { desde: d, hasta: h };
 }
 

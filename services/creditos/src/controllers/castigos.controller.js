@@ -303,7 +303,9 @@ const ultimoDiaMes = mes => { const [y, m] = mes.split('-').map(Number); return 
 
 const contable = async (req, res) => {
   try {
-    const hoyISO = new Date().toISOString().slice(0, 10);
+    // Hora de CHILE: con toISOString(), la última noche del mes el informe ya
+    // se armaba con el mes siguiente (motor único en shared/fecha-chile).
+    const hoyISO = require('../../../../shared/fecha-chile').hoyISO();
     const mesActual = hoyISO.slice(0, 7);
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : mesActual;
     const esMesActual = mes === mesActual;
