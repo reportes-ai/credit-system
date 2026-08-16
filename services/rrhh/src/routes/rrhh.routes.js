@@ -57,7 +57,7 @@ router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 
 // Solicitudes del colaborador — permisos por rol validados adentro (jefatura/RRHH/gerencia)
 const sol = require('../controllers/solicitudes.controller');
 router.get('/solicitudes/tipos',        verifyToken, sol.tipos);
-router.post('/solicitudes/tipos',       verifyToken, sol.tipoGuardar);
+router.post('/solicitudes/tipos',       verifyToken, requireFunc('rh_colaboradores'), sol.tipoGuardar);
 router.get('/solicitudes/mias',         verifyToken, sol.mias);
 router.get('/solicitudes/por-aprobar',  verifyToken, sol.porAprobar);
 router.get('/solicitudes/todas',        verifyToken, sol.todas);
@@ -81,11 +81,11 @@ router.get('/turnos-calendario/preview', verifyToken, requireFunc('rh_jornada', 
 router.post('/turnos-calendario', verifyToken, requireFunc('rh_jornada', 'rh_remuneraciones'), jor.calendarioGrabar);
 // Firmas FES de contratos/finiquitos — pendientes/firmar/deDocumento validan titular o permisos adentro
 const fir = require('../controllers/firmas.controller');
-router.post('/firmas/enviar',            verifyToken, fir.enviar);
+router.post('/firmas/enviar',            verifyToken, requireFunc('rh_contratos', 'rh_colaboradores', 'rh_aprobar'), fir.enviar);
 router.get('/firmas/pendientes',         verifyToken, fir.pendientes);
 router.get('/firmas/mis-documentos',     verifyToken, fir.misDocumentos);
 router.get('/firmas/repositorio',        verifyToken, fir.repositorio);
-router.post('/firmas/subir',             verifyToken, fir.subirFirmado);
+router.post('/firmas/subir',             verifyToken, requireFunc('rh_contratos', 'rh_colaboradores', 'rh_aprobar'), fir.subirFirmado);
 router.get('/firmas/documentos/:idUsuario', verifyToken, fir.misDocumentos);
 router.post('/firmas/firmar',            verifyToken, fir.firmar);
 router.get('/firmas/:entidad/:id',       verifyToken, fir.deDocumento);
@@ -133,18 +133,18 @@ const enc = require('../controllers/encuestas.controller');
 router.get('/encuestas/pendientes',       verifyToken, enc.pendientes);
 router.post('/encuestas/responder',       verifyToken, enc.responder);
 router.get('/encuestas',                  verifyToken, enc.lista);
-router.post('/encuestas',                 verifyToken, enc.guardar);
-router.post('/encuestas/:id/abrir',       verifyToken, enc.abrir);
-router.post('/encuestas/:id/cerrar',      verifyToken, enc.cerrar);
-router.delete('/encuestas/:id',           verifyToken, enc.eliminar);
+router.post('/encuestas',                 verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), enc.guardar);
+router.post('/encuestas/:id/abrir',       verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), enc.abrir);
+router.post('/encuestas/:id/cerrar',      verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), enc.cerrar);
+router.delete('/encuestas/:id',           verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), enc.eliminar);
 router.get('/encuestas/:id/resultados',   verifyToken, enc.resultados);
-router.post('/encuestas/:id/informe-ia',  verifyToken, enc.informeIA);
+router.post('/encuestas/:id/informe-ia',  verifyToken, requireFunc('rh_colaboradores', 'rh_aprobar'), enc.informeIA);
 // Canal de Compliance — crear/seguimiento cualquiera logueado; gestión valida compliance_gestionar adentro
 const compl = require('../controllers/compliance.controller');
 router.post('/compliance/denuncias',            verifyToken, compl.crear);
 router.get('/compliance/seguimiento/:codigo',   verifyToken, compl.seguimiento);
 router.get('/compliance/denuncias',             verifyToken, compl.lista);
-router.post('/compliance/denuncias/:id/gestionar', verifyToken, compl.gestionar);
+router.post('/compliance/denuncias/:id/gestionar', verifyToken, requireFunc('compliance_gestionar'), compl.gestionar);
 // Cursos y Capacitaciones — gestión RRHH; /cursos/mios lo ve cada uno (valida adentro)
 const cur = require('../controllers/cursos.controller');
 router.get('/cursos/mios',            verifyToken, cur.deUsuario);

@@ -745,7 +745,8 @@ async function tick() {
 require('../../../../shared/scheduler').programar('correos-programados', tick, 60000, { arranqueMs: 15000 });
 
 /* ── Endpoints ── */
-const esAdmin = req => req.usuario && req.usuario.perfil_nombre === 'Administrador';
+/* La autorización de escrituras vive en la ruta: requireFunc('mantenedores_correos_programados')
+   (migrado 2026-08-16; antes esAdmin() por nombre de perfil, que no obedecía la matriz). */
 
 const listar = async (req, res) => {
   try {
@@ -758,7 +759,6 @@ const listar = async (req, res) => {
 
 const actualizar = async (req, res) => {
   try {
-    if (!esAdmin(req)) return res.status(403).json({ success: false, data: null, error: 'Solo Administrador puede configurar correos programados' });
     const { activo, hora, dias, destinatarios, remitente } = req.body || {};
     const sets = [], vals = [];
     if (activo !== undefined) { sets.push('activo=?'); vals.push(activo ? 1 : 0); }
@@ -786,7 +786,6 @@ const actualizar = async (req, res) => {
 
 const enviarAhora = async (req, res) => {
   try {
-    if (!esAdmin(req)) return res.status(403).json({ success: false, data: null, error: 'Solo Administrador' });
     const [[r]] = await pool.query('SELECT * FROM correos_programados WHERE codigo=?', [req.params.codigo]);
     if (!r) return res.status(404).json({ success: false, data: null, error: 'Reporte no encontrado' });
     const result = await ejecutarReporte(r, { auto: false });
