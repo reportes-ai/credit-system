@@ -80,9 +80,20 @@ exports.tablas = async (req, res) => {
 const AGGS = { SUM: 'SUM', COUNT: 'COUNT', AVG: 'AVG', MIN: 'MIN', MAX: 'MAX' };
 const PROHIBIDO = /;|--|\/\*|\b(insert|update|delete|drop|alter|create|grant|union|select|sleep|benchmark|load_file|outfile|into)\b/i;
 
+/* Columnas con HORA: el usuario escribe fechas, no instantes.
+   "BETWEEN 2026-07-01 AND 2026-07-31" sobre un DATETIME compara la cota alta
+   contra las 00:00 del 31 y se come el día 31 entero — en silencio, que es lo
+   peor: el informe sale, con menos filas. Lo mismo "<= 2026-07-31", y un
+   "= 2026-07-31" no devuelve NADA porque ninguna fila cae exactamente a
+   medianoche. Cuando la columna lleva hora y el valor es solo fecha, la cota se
+   estira al final del día. Sobre columnas DATE no se toca nada. */
+const ES_SOLO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const esConHora = tipo => /^(datetime|timestamp)/i.test(String(tipo || ''));
+const finDelDia = v => `${v} 23:59:59.999999`;
+
 // Criterio estilo Access sobre UNA columna: >=100, <>'X', LIKE "a*", IN (1,2),
 // BETWEEN a AND b, IS NULL, texto pelado = igualdad. Devuelve SQL o lanza.
-function criterioSQL(colExpr, cri) {
+function criterioSQL(colExpr, cri, tipoCol) {
   let c = String(cri || '').trim();
   if (!c) return null;
   if (PROHIBIDO.test(c)) throw new Error(`Criterio no permitido: ${cri}`);
@@ -100,19 +111,34 @@ function criterioSQL(colExpr, cri) {
     if (!vals.length) throw new Error(`IN vacío: ${cri}`);
     return `${colExpr} ${m[1] ? 'NOT ' : ''}IN (${vals.join(',')})`;
   }
+  const conHora = esConHora(tipoCol);
+  // Sobre columna con hora, una fecha suelta rinde el día completo
+  const diaEntero = v => `${colExpr} BETWEEN ${pool.escape(v)} AND ${pool.escape(finDelDia(v))}`;
+
   if (/^between\s+/i.test(c)) {
     const m = c.match(/^between\s+["']?([^"']+?)["']?\s+(?:and|y)\s+["']?([^"']+?)["']?$/i);
     if (!m) throw new Error(`BETWEEN inválido: ${cri}`);
-    return `${colExpr} BETWEEN ${pool.escape(m[1].trim())} AND ${pool.escape(m[2].trim())}`;
+    const desde = m[1].trim();
+    let hasta = m[2].trim();
+    if (conHora && ES_SOLO_FECHA.test(hasta)) hasta = finDelDia(hasta);
+    return `${colExpr} BETWEEN ${pool.escape(desde)} AND ${pool.escape(hasta)}`;
   }
   const m = c.match(/^(<>|>=|<=|=|>|<)\s*["']?(.*?)["']?$/);
   if (m) {
     if (m[2].includes('%')) return `${colExpr} ${m[1] === '=' ? 'LIKE' : m[1] === '<>' ? 'NOT LIKE' : m[1]} ${pool.escape(m[2])}`;
+    if (conHora && ES_SOLO_FECHA.test(m[2])) {
+      // '<=' y '>' se refieren al día completo; '=' es el día entero; '<>' lo excluye
+      if (m[1] === '<=' || m[1] === '>') return `${colExpr} ${m[1]} ${pool.escape(finDelDia(m[2]))}`;
+      if (m[1] === '=')  return diaEntero(m[2]);
+      if (m[1] === '<>') return `${colExpr} NOT BETWEEN ${pool.escape(m[2])} AND ${pool.escape(finDelDia(m[2]))}`;
+    }
     return `${colExpr} ${m[1]} ${pool.escape(m[2])}`;
   }
   // texto pelado → igualdad (con comodín → LIKE)
   const v = c.replace(/^["']|["']$/g, '');
-  return v.includes('%') ? `${colExpr} LIKE ${pool.escape(v)}` : `${colExpr} = ${pool.escape(v)}`;
+  if (v.includes('%')) return `${colExpr} LIKE ${pool.escape(v)}`;
+  if (conHora && ES_SOLO_FECHA.test(v)) return diaEntero(v);
+  return `${colExpr} = ${pool.escape(v)}`;
 }
 
 async function construirSQL(modelo) {
@@ -176,7 +202,10 @@ async function construirSQL(modelo) {
     if (f.orden === 'ASC' || f.orden === 'DESC') orderBy.push(`${exprSel} ${f.orden}`);
     // criterios (fila "Criterios" y fila "o")
     for (const [cri, esO] of [[f.criterio, false], [f.o, true]]) {
-      const sqlCri = criterioSQL(AGGS[f.total] ? exprSel : expr, cri);
+      /* El tipo va solo si NO hay agregación: SUM(fecha) ya no es una fecha.
+         Sirve para que un criterio con fecha suelta cubra el día completo. */
+      const tipoCol = AGGS[f.total] ? null : (s[aliasDe[f.alias]] || []).find(x => x.col === f.col)?.tipo;
+      const sqlCri = criterioSQL(AGGS[f.total] ? exprSel : expr, cri, tipoCol);
       if (!sqlCri) continue;
       const destino = AGGS[f.total] ? having : where;
       if (esO && destino.length) destino[destino.length - 1] = `(${destino[destino.length - 1]} OR ${sqlCri})`;
