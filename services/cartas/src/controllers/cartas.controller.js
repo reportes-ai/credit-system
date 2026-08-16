@@ -1197,7 +1197,13 @@ const upsert = async (req, res) => {
           plazo=?, acreedor=?, parque=?,
           nombre_dealer=?, rut_dealer=?, vendedor=?,
           part_neto=?, part_iva=?, part_bruto=?,
-          fecha=?, fecha_creacion=?,
+          /* fecha_creacion NO se reescribe al editar: es la fecha de nacimiento de la
+             carta. El navegador recibe ese valor en UTC y lo devolvía tal cual, así que
+             cada re-guardado la corría 4 horas y terminaba cayendo al día siguiente
+             (el Centro de Control marcaba cartas de ayer como de hoy; 504 de 532 cartas
+             quedaron "creadas" después de su propia aprobación). COALESCE sobre una
+             columna NOT NULL conserva siempre la que ya está, sin mover los parámetros. */
+          fecha=?, fecha_creacion=COALESCE(fecha_creacion, ?),
           creado_por=?, creado_por_nombre=?, creado_por_initials=?,
           status=?,
           aprobado_por=?, aprobado_por_nombre=?, aprobado_por_initials=?,
