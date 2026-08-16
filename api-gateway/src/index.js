@@ -39,6 +39,7 @@ app.use(express.json({
 }));
 app.use(require('../../shared/presencia').middleware); // telemetría "conectados" (Cuadro de Mando)
 require('../../shared/uptime');                         // monitor de uptime por servicio (cada 5 min → uptime_checks)
+require('../../shared/vigia-relojes');                  // chequeo diario 08:00: relojes coherentes, sin marcas del futuro
 
 // ── Sanitizar errores 500: el detalle técnico va al log, nunca al cliente ──
 // (los 4xx pasan intactos: son mensajes de negocio como "mes cerrado".
