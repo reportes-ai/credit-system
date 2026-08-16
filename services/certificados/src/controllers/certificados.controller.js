@@ -94,7 +94,13 @@ require('../../../../shared/migrate').enFila('certificados', async () => {
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 const N = v => (v == null || v === '') ? 0 : Number(v);
-const iso = d => d ? new Date(d).toISOString().slice(0, 10) : null;
+/* Fecha en hora de CHILE, no en UTC. Con toISOString() un certificado emitido
+   después de las 20:00 salía con la fecha del día SIGUIENTE — y su vigencia se
+   calculaba sobre esa fecha ya corrida, regalando un día en un documento con
+   firma y QR verificable. Peor: al reimprimirlo desde el historial la consulta
+   usa DATE_FORMAT y mostraba el día correcto, así que el mismo certificado decía
+   dos fechas distintas. 'en-CA' entrega el formato YYYY-MM-DD. */
+const iso = d => d ? new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }) : null;
 
 const TIPOS = {
   CERT_CREDITO_VIGENTE: 'Certificado de Crédito Vigente',
@@ -118,7 +124,7 @@ function rutPuntos(r) {
 }
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 function fechaLargaES(isoStr) { if (!isoStr) return '—'; const [y, m, d] = String(isoStr).slice(0, 10).split('-').map(Number); return `${d} de ${MESES[m - 1]} de ${y}`; }
-function addDiasLargo(isoStr, n) { const dt = new Date(String(isoStr).slice(0, 10) + 'T00:00:00'); dt.setDate(dt.getDate() + (n || 0)); return fechaLargaES(dt.toISOString().slice(0, 10)); }
+function addDiasLargo(isoStr, n) { const dt = new Date(String(isoStr).slice(0, 10) + 'T00:00:00'); dt.setDate(dt.getDate() + (n || 0)); return fechaLargaES(dt.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' })); }
 function renderTpl(tpl, vars) { return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (k in vars) ? String(vars[k] == null ? '' : vars[k]) : m); }
 
 // Plantillas por defecto (se siembran; el admin las edita en el mantenedor).

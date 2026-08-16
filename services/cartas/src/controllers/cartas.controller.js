@@ -1215,11 +1215,18 @@ const upsert = async (req, res) => {
              para no desalinear el resto de los valores. */
           fecha_aprobacion = CASE WHEN fecha_aprobacion IS NOT NULL THEN fecha_aprobacion
                                   WHEN ? IS NULL THEN NULL ELSE NOW() END,
+          /* Las cuatro marcas de desenlace se sellan igual que la aprobación: una
+             sola vez y con la hora del SERVIDOR. Venían del navegador y cada
+             re-guardado las corría 4 horas — de 16 rechazos, 13 quedaron con la
+             hora mala (hasta 14 h), y eso alimenta el KPI de los analistas y la
+             bitácora del crédito. La anulación además la sella bien su propio
+             endpoint con NOW(), y este UPDATE se la volvía a pisar. */
           rechazado_por=?, rechazado_por_nombre=?,
-          fecha_rechazo=?, motivo_rechazo=?,
-          anulado_por=?, fecha_anulacion=?,
-          eliminado_por=?, fecha_eliminacion=?,
-          fecha_correccion=?, corregido_por=?,
+          fecha_rechazo = CASE WHEN fecha_rechazo IS NOT NULL THEN fecha_rechazo
+                               WHEN ? IS NULL THEN NULL ELSE NOW() END, motivo_rechazo=?,
+          anulado_por=?, fecha_anulacion = COALESCE(fecha_anulacion, ?),
+          eliminado_por=?, fecha_eliminacion = COALESCE(fecha_eliminacion, ?),
+          fecha_correccion = COALESCE(fecha_correccion, ?), corregido_por=?,
           /* El otorgamiento lo sella su propio endpoint con NOW() (más arriba,
              "UPDATE ... otorgado=1, fecha_otorgado=NOW()"). Este UPDATE de guardar
              lo pisaba con el valor del navegador y lo corría 4 horas: 42 cartas
