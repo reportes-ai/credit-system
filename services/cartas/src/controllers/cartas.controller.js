@@ -1207,7 +1207,14 @@ const upsert = async (req, res) => {
           creado_por=?, creado_por_nombre=?, creado_por_initials=?,
           status=?,
           aprobado_por=?, aprobado_por_nombre=?, aprobado_por_initials=?,
-          fecha_aprobacion=?,
+          /* La aprobación se sella UNA vez y con la hora del SERVIDOR. Antes se
+             guardaba la que mandaba el navegador: cada re-guardado la corría +4 h
+             y 62 cartas terminaron "aprobadas" después de estar otorgadas. Si ya
+             tiene fecha, no se mueve; si recién se aprueba, manda NOW(). El
+             parámetro se sigue consumiendo (solo como señal de "viene aprobada")
+             para no desalinear el resto de los valores. */
+          fecha_aprobacion = CASE WHEN fecha_aprobacion IS NOT NULL THEN fecha_aprobacion
+                                  WHEN ? IS NULL THEN NULL ELSE NOW() END,
           rechazado_por=?, rechazado_por_nombre=?,
           fecha_rechazo=?, motivo_rechazo=?,
           anulado_por=?, fecha_anulacion=?,
