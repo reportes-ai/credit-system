@@ -1,0 +1,63 @@
+# ─────────────────────────────────────────────────────────────────
+# REVISIÓN MATINAL — relojes, contabilidad sin asiento y salud del sistema.
+#
+# Antes esto vivía como tarea programada de Claude Code en el equipo de Pato, y
+# ahí el reloj dependía de que la app estuviera abierta: el 17-08-2026 la
+# revisión de las 08:30 salió recién a las 09:28. Acá corre igual, con el
+# computador apagado.
+#
+# El horario lo decide el script, no este cron: GitHub Actions no entiende de
+# husos y Chile cambia de hora dos veces al año. Se dispara a las 11:30 y 12:30
+# UTC y `scripts/revision-matinal.js` deja pasar solo la corrida que cae en las
+# 08:xx de Chile — la otra sale en dos segundos sin tocar la base. Así el
+# horario no se desfasa solo en septiembre y en abril.
+#
+# Todos los chequeos son de SOLO LECTURA. El job falla si hay hallazgos: esa
+# falla es la señal (GitHub avisa por correo), además del resumen en la pestaña
+# Actions y del correo a ALERTA_ERRORES_MAIL si los secrets MAIL_* están puestos.
+# ─────────────────────────────────────────────────────────────────
+name: Revisión matinal
+
+on:
+  schedule:
+    # 11:30 y 12:30 UTC = las 08:30 de Chile en verano y en invierno.
+    # Lunes a sábado (el script descarta la corrida que no corresponde).
+    - cron: '30 11,12 * * 1-6'
+  workflow_dispatch: {}    # a mano desde la pestaña Actions (se salta la guardia horaria)
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm ci --omit=dev
+
+      - name: Revisión matinal
+        env:
+          # MOTORES=off: este proceso solo LEE. Sin esto, cargar el vigía de
+          # relojes registraría su temporizador y tendríamos un segundo proceso
+          # con relojes propios apuntando a la base de producción.
+          MOTORES: 'off'
+          DB_HOST:     ${{ secrets.DB_HOST }}
+          DB_PORT:     ${{ secrets.DB_PORT }}
+          DB_USER:     ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME:     ${{ secrets.DB_NAME }}
+          # Opcionales: si no están, el aviso queda en la falla del job y en el
+          # resumen. El chequeo NO depende del correo para funcionar.
+          ALERTA_ERRORES_MAIL: ${{ secrets.ALERTA_ERRORES_MAIL }}
+          MAIL_HOST: ${{ secrets.MAIL_HOST }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+          # Lanzamiento manual: se salta la guardia horaria, si no un
+          # workflow_dispatch fuera de las 08:xx no revisaría nada.
+          REVISION_FORZAR: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+        run: node scripts/revision-matinal.js

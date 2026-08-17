@@ -75,7 +75,7 @@ async function revisar() {
 
   if (!hallazgos.length) {
     console.log(`✓ [vigia-relojes] Relojes coherentes (BD=${bd.ahora}, Node=${nodeChile}, tz=${bd.tz})`);
-    return;
+    return hallazgos;
   }
 
   console.error('⚠️ [vigia-relojes] HALLAZGOS:\n - ' + hallazgos.join('\n - '));
@@ -93,6 +93,7 @@ async function revisar() {
         Ver "Fechas y horas" en la Documentación Técnica. Este vigía solo acusa; no corrige nada solo.</p>`,
     });
   } catch (e) { /* la alerta nunca debe causar otro error */ }
+  return hallazgos;
 }
 
 /* Corre cada 30 min pero actúa UNA vez al día, pasadas las 08:00 de Chile.
