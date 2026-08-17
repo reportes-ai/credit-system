@@ -99,35 +99,51 @@ require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
   } catch (e) { console.error('[carga_diferencias migration]', e.message); }
 });
 
-/* Campos que se contrastan contra el archivo. Solo lo que mueve plata o cálculo:
-   un texto distinto no vale la pena, un monto distinto sí. */
-const CAMPOS_DIF = [
-  { col: 'valor_vehiculo',   etiqueta: 'Precio del vehículo', tipo: 'peso' },
-  { col: 'pie',              etiqueta: 'Pie',                 tipo: 'peso' },
-  { col: 'saldo_precio',     etiqueta: 'Saldo precio',        tipo: 'peso' },
-  { col: 'monto_financiado', etiqueta: 'Monto del pagaré',    tipo: 'peso' },
-];
-const TOL_DIF = 1;   // $1 de redondeo no es una diferencia
+/* Qué campos se contrastan: catálogo ÚNICO en shared/campos-carga-dif.js (lo
+   comparte con el módulo que las resuelve). Para sumar un campo, se agrega allá. */
+const { CAMPOS_DIF, ORDEN_GRUPOS, difieren, aTexto } = require('../../../../shared/campos-carga-dif');
 
 /* Anota (o actualiza) las diferencias pendientes de una operación. Nunca toca el
-   crédito: solo deja el caso para que una persona resuelva. */
+   crédito: solo deja el caso para que una persona resuelva.
+   Devuelve lo anotado en ESTA pasada, para poder mostrarlo al final de la carga
+   sin tener que ir a buscarlo a otra pantalla. */
 async function anotarDiferencias(idCredito, actual, archivo, origen) {
-  for (const c of CAMPOS_DIF) {
-    const vs = actual[c.col], va = archivo[c.col];
-    if (va == null || vs == null || Number(va) <= 0) continue;
-    const iguales = Math.abs(Number(vs) - Number(va)) <= TOL_DIF;
-    if (iguales) {
-      await pool.query("DELETE FROM carga_diferencias WHERE id_credito=? AND campo=? AND estado='PENDIENTE'", [idCredito, c.col]);
-      continue;
-    }
-    await pool.query(
-      `INSERT INTO carga_diferencias (id_credito, num_op, id_financiera, campo, valor_sistema, valor_archivo, origen)
-       VALUES (?,?,?,?,?,?,?)
-       ON DUPLICATE KEY UPDATE valor_sistema=VALUES(valor_sistema), valor_archivo=VALUES(valor_archivo),
-                               origen=VALUES(origen), created_at=NOW()`,
-      [idCredito, actual.num_op || null, actual.id_financiera || null, c.col,
-       String(vs), String(va), (origen || '').slice(0, 120)]);
-  }
+  /* Se resuelve POR OPERACIÓN, no campo por campo: son diez campos y una carga
+     actualiza cientos de operaciones, así que una consulta por campo eran miles
+     de idas a la base — y TiDB cobra por consulta, no solo por lo que guarda.
+     Así queda en tres: cerrar las que ya cuadran, anotar las que no, y pedir sus
+     id (que la pantalla necesita para poder resolverlas). */
+  const dif = [], iguales = [];
+  for (const c of CAMPOS_DIF) (difieren(c, actual[c.col], archivo[c.col]) ? dif : iguales).push(c);
+
+  // Lo que ahora coincide deja de ser un caso: ya no hay nada que decidir.
+  if (iguales.length) await pool.query(
+    "DELETE FROM carga_diferencias WHERE id_credito=? AND estado='PENDIENTE' AND campo IN (?)",
+    [idCredito, iguales.map(c => c.col)]);
+  if (!dif.length) return [];
+
+  await pool.query(
+    `INSERT INTO carga_diferencias (id_credito, num_op, id_financiera, campo, valor_sistema, valor_archivo, origen)
+     VALUES ?
+     ON DUPLICATE KEY UPDATE valor_sistema=VALUES(valor_sistema), valor_archivo=VALUES(valor_archivo),
+                             origen=VALUES(origen), created_at=NOW()`,
+    [dif.map(c => [idCredito, actual.num_op || null, actual.id_financiera || null, c.col,
+                   aTexto(c, actual[c.col]), aTexto(c, archivo[c.col]), (origen || '').slice(0, 120)])]);
+
+  /* Los id se piden después: en un INSERT nuevo los daría insertId, pero cuando
+     la diferencia ya estaba anotada el ON DUPLICATE no devuelve el id existente.
+     Sin id, la fila se vería en pantalla pero no se podría resolver. */
+  const [rows] = await pool.query(
+    "SELECT id, campo FROM carga_diferencias WHERE id_credito=? AND estado='PENDIENTE' AND campo IN (?)",
+    [idCredito, dif.map(c => c.col)]);
+  const idPorCampo = Object.fromEntries(rows.map(r => [r.campo, r.id]));
+
+  return dif.filter(c => idPorCampo[c.col]).map(c => ({
+    id: idPorCampo[c.col], id_credito: idCredito, num_op: actual.num_op || null,
+    id_financiera: actual.id_financiera || null,
+    campo: c.col, etiqueta: c.etiqueta, tipo: c.tipo, grupo: c.grupo,
+    valor_sistema: aTexto(c, actual[c.col]), valor_archivo: aTexto(c, archivo[c.col]),
+  }));
 }
 
 /* ── Carga mapa de estados desde BD (con fallback hardcoded) ────── */
@@ -558,18 +574,23 @@ exports.importar = async (req, res) => {
 
     const numOps = filas.map(f => f.num_op);
 
+    /* Las columnas que se traen son las que se contrastan contra el archivo
+       (shared/campos-carga-dif.js). `fecha_otorgado` va con DATE_FORMAT: como
+       Date se compararía contra el string del Excel y toda fila saldría distinta. */
+    const COLS_ACT = `valor_vehiculo, pie, saldo_precio, monto_financiado,
+              marca, modelo, automotora, vendedor, producto,
+              DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') AS fecha_otorgado`;
     // Traer registros actuales (por num_op propio)
     const [existing] = await pool.query(
-      `SELECT id, num_op, id_financiera, estado_autofin, estado_credito,
-              valor_vehiculo, pie, saldo_precio, monto_financiado, mes FROM creditos
-       WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
+      `SELECT id, num_op, id_financiera, estado_autofin, estado_credito, mes, ${COLS_ACT}
+         FROM creditos WHERE num_op IN (${numOps.map(() => '?').join(',')})`,
       numOps
     );
     const existMap = Object.fromEntries(existing.map(r => [r.num_op, r]));
     // Para las ops que viven como AUTOFIN con id_financiera = ID Trinidad, los montos
     // actuales se buscan por ese ID (el num_op nuestro es otro).
     const [existAf] = await pool.query(
-      `SELECT id, num_op, id_financiera, valor_vehiculo, pie, saldo_precio, monto_financiado, mes
+      `SELECT id, num_op, id_financiera, mes, ${COLS_ACT}
          FROM creditos WHERE id_financiera IN (${numOps.map(() => '?').join(',')})`,
       numOps.map(String));
     const existAfMap = Object.fromEntries(existAf.map(r => [String(r.id_financiera), r]));
@@ -592,6 +613,7 @@ exports.importar = async (req, res) => {
     const log          = [];
     const detallesIns  = [];   // para historial inserts
     const cambiosLog   = [];   // para historial cambios
+    const difsCorrida  = [];   // diferencias detectadas en ESTA carga (informe final)
     const cursadosIds        = [];   // num_ops (campo num_op en BD)
     const cursadosIdFinanciera = []; // num_ops Trinidad que están como id_financiera en BD
 
@@ -648,7 +670,7 @@ exports.importar = async (req, res) => {
           try {
             const act = existAfMap[String(f.num_op)];
             if (act && !(await isMesCerrado(String(act.mes || '').slice(0, 7))))
-              await anotarDiferencias(act.id, act, f, nombreArchivo);
+              difsCorrida.push(...await anotarDiferencias(act.id, act, f, nombreArchivo));
           } catch (e) { console.error('[dif AF]', e.message); }
           log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIdFinanciera.push(String(f.num_op));
@@ -687,7 +709,7 @@ exports.importar = async (req, res) => {
           actualizados++;
           try {
             if (actual.id && !(await isMesCerrado(String(actual.mes || '').slice(0, 7))))
-              await anotarDiferencias(actual.id, actual, f, nombreArchivo);
+              difsCorrida.push(...await anotarDiferencias(actual.id, actual, f, nombreArchivo));
           } catch (e) { console.error('[dif]', e.message); }
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
           if ((f.estado_credito||'').toLowerCase() === 'otorgado') cursadosIds.push(f.num_op);
@@ -789,9 +811,31 @@ exports.importar = async (req, res) => {
       } catch(e) { log.push(`⚠ No se pudieron cargar datos de cursados: ${e.message}`); }
     }
 
+    /* ── Informe de diferencias de ESTA carga, agrupado por tipo ──────────────
+       Todas quedan guardadas en `carga_diferencias`; acá se mandan las primeras
+       para poder resolverlas en el mismo momento, sin cambiar de pantalla. El
+       tope evita una respuesta enorme cuando el archivo trae cientos — y se
+       informa cuántas quedaron fuera, para que el resto no desaparezca callado
+       (están todas en /carga-masiva/diferencias/). */
+    const TOPE_DIF = 300;
+    const grupos = [];
+    for (const g of ORDEN_GRUPOS) {
+      const filasG = difsCorrida.filter(d => d.grupo === g);
+      if (filasG.length) grupos.push({ grupo: g, total: filasG.length, filas: filasG.slice(0, TOPE_DIF) });
+    }
+    const mostradas = grupos.reduce((a, g) => a + g.filas.length, 0);
+    const diferencias = {
+      total: difsCorrida.length,
+      mostradas,
+      ocultas: difsCorrida.length - mostradas,
+      operaciones: new Set(difsCorrida.map(d => d.id_credito)).size,
+      grupos,
+    };
+    if (difsCorrida.length) log.push(`⚖ ${difsCorrida.length} diferencia(s) con el archivo en ${diferencias.operaciones} operación(es) — nada se pisó, hay que elegir`);
+
     return res.json({
       success: true,
-      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, canal: resCanal, log, cursados },
+      data: { total: filas.length, insertados, actualizados, omitidos_futuro: omitidosFuturo, errores, canal: resCanal, log, cursados, diferencias },
     });
   } catch (e) {
     console.error('[carga-trinidad importar]', e);
@@ -942,4 +986,4 @@ exports.parseCarta = async (req, res) => {
 };
 
 // Internos expuestos para scripts de operación y pruebas (mismo motor, cero duplicación)
-exports._interno = { parseCanal, aplicarCanal, esArchivoCanal, normInt };
+exports._interno = { parseCanal, aplicarCanal, esArchivoCanal, normInt, anotarDiferencias };

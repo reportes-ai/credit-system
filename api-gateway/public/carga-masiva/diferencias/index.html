@@ -119,21 +119,40 @@ async function cargar(){
     </div>`).join('');
 }
 
+/* El contraste con la carga dejó de ser solo de montos: ahora también se
+   comparan dealer, vendedor, marca, modelo, producto y la fecha de otorgamiento.
+   Cada uno se muestra y se digita según su tipo — formatear una marca como peso
+   dejaba "$NaN" en pantalla. El tipo lo manda el backend desde el catálogo único
+   (shared/campos-carga-dif.js). */
+function valFmt(v, tipo){
+  if (v === null || v === undefined || String(v).trim() === '') return '—';
+  if (tipo === 'peso')  return clp(Number(v));
+  if (tipo === 'fecha') { const p = String(v).split('-'); return p.length===3 ? `${p[2]}-${p[1]}-${p[0]}` : esc(v); }
+  return esc(v);
+}
+
 function fila(o, c){
-  const vs = Number(c.valor_sistema), va = Number(c.valor_archivo);
-  const d = va - vs;
-  const col = d > 0 ? '#166534' : '#b91c1c';
+  const tipo = c.tipo || 'peso';
+  // La comparación numérica ("$200.000 más") solo tiene sentido entre montos.
+  let delta = '';
+  if (tipo === 'peso') {
+    const d = Number(c.valor_archivo) - Number(c.valor_sistema);
+    delta = `<div class="delta" style="color:${d>0?'#166534':'#b91c1c'}">${d>0?'+':''}${clp(Math.abs(d)).replace('$','')} ${d>0?'más':'menos'}</div>`;
+  }
+  const inputManual = tipo === 'fecha'
+    ? `<input type="date" oninput="elegir(${c.id},'MANUAL')">`
+    : `<input type="text" placeholder="${tipo==='peso'?'$ digitar':'escribir'}" oninput="elegir(${c.id},'MANUAL')" ${tipo==='peso'?'onblur="fmt(this)"':''}>`;
   return `
-    <div class="dif" data-id="${c.id}">
+    <div class="dif" data-id="${c.id}" data-tipo="${tipo}">
       <div class="lbl">${esc(c.etiqueta)}</div>
       <div class="opt sel" data-op="SISTEMA" onclick="elegir(${c.id},'SISTEMA')">
-        <div class="t">Nuestro dato</div><div class="v">${clp(vs)}</div></div>
+        <div class="t">Nuestro dato</div><div class="v">${valFmt(c.valor_sistema, tipo)}</div></div>
       <div class="opt" data-op="ARCHIVO" onclick="elegir(${c.id},'ARCHIVO')">
-        <div class="t">Archivo de la carga</div><div class="v">${clp(va)}</div>
-        <div class="delta" style="color:${col}">${d>0?'+':''}${clp(Math.abs(d)).replace('$','')} ${d>0?'más':'menos'}</div></div>
+        <div class="t">Archivo de la carga</div><div class="v">${valFmt(c.valor_archivo, tipo)}</div>
+        ${delta}</div>
       <div class="opt manual" data-op="MANUAL" onclick="elegir(${c.id},'MANUAL')">
         <div class="t">Otro valor</div>
-        <input type="text" placeholder="$ digitar" oninput="elegir(${c.id},'MANUAL')" onblur="fmt(this)">
+        ${inputManual}
       </div>
     </div>`;
 }
@@ -151,7 +170,10 @@ async function guardar(idCredito){
     const eleccion = sel ? sel.dataset.op : 'SISTEMA';
     let valor = null;
     if (eleccion === 'MANUAL') {
-      valor = String(row.querySelector('.manual input').value).replace(/[^\d]/g,'');
+      // Solo a los montos se les quitan los separadores: hacerlo con un dealer
+      // ("DERCO") dejaba el valor vacío y la decisión se rechazaba sin explicar.
+      const crudo = String(row.querySelector('.manual input').value).trim();
+      valor = row.dataset.tipo === 'peso' ? crudo.replace(/[^\d]/g,'') : crudo;
       if (!valor) return alert('Escribe el valor para «'+row.querySelector('.lbl').textContent+'» o elige una de las dos opciones');
     }
     decisiones.push({ id: Number(row.dataset.id), id_credito: idCredito, eleccion, valor });
@@ -174,8 +196,8 @@ async function verHistorial(){
       <tbody>${j.data.map(r=>`<tr>
         <td>${new Date(r.resuelto_at).toLocaleString('es-CL')}</td><td>${esc(r.resuelto_por||'—')}</td>
         <td>${esc(r.num_op??'—')}</td><td>${esc(r.etiqueta)}</td>
-        <td class="text-end">${clp(r.valor_sistema)}</td><td class="text-end">${clp(r.valor_archivo)}</td>
-        <td class="text-end" style="font-weight:700">${clp(r.valor_elegido)}</td><td>${esc(r.eleccion)}</td></tr>`).join('')}</tbody></table>`;
+        <td class="text-end">${valFmt(r.valor_sistema, r.tipo)}</td><td class="text-end">${valFmt(r.valor_archivo, r.tipo)}</td>
+        <td class="text-end" style="font-weight:700">${valFmt(r.valor_elegido, r.tipo)}</td><td>${esc(r.eleccion)}</td></tr>`).join('')}</tbody></table>`;
   document.getElementById('dlgHist').showModal();
 }
 

@@ -14,13 +14,12 @@ const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
 const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
 
-const ETIQUETAS = {
-  valor_vehiculo:   'Precio del vehículo',
-  pie:              'Pie',
-  saldo_precio:     'Saldo precio',
-  monto_financiado: 'Monto del pagaré',
-};
-const COLS_OK = new Set(Object.keys(ETIQUETAS));
+/* Qué campos existen y cómo se llaman: catálogo ÚNICO en shared/campos-carga-dif.js,
+   el mismo que usa la carga para detectarlas. Antes la lista estaba acá y también
+   allá, así que un campo agregado en un lado aparecía sin nombre en el otro. */
+const { POR_COL, normFecha } = require('../../../../shared/campos-carga-dif');
+const ETIQUETAS = Object.fromEntries(Object.entries(POR_COL).map(([k, v]) => [k, v.etiqueta]));
+const COLS_OK = new Set(Object.keys(POR_COL));
 
 const errSrv = (res, e, ctx) => {
   console.error(`[carga-diferencias ${ctx}]`, e.message);
@@ -59,6 +58,9 @@ exports.lista = async (_req, res) => {
       });
       ops.get(r.id_credito).campos.push({
         id: r.id, campo: r.campo, etiqueta: ETIQUETAS[r.campo] || r.campo,
+        // tipo y grupo viajan a la pantalla: sin ellos un dealer o una fecha se
+        // mostrarían como "$NaN" (la vista formateaba todo como peso).
+        tipo: POR_COL[r.campo]?.tipo || 'peso', grupo: POR_COL[r.campo]?.grupo || 'Montos',
         valor_sistema: r.valor_sistema, valor_archivo: r.valor_archivo,
       });
     }
@@ -75,6 +77,7 @@ exports.resolver = async (req, res) => {
     if (!decisiones.length) return res.status(400).json({ success: false, data: null, error: 'Sin decisiones' });
     const usuario = [req.usuario?.nombre, req.usuario?.apellido].filter(Boolean).join(' ') || 'Sistema';
     let aplicados = 0, cerrados = 0;
+    const omitidosCerrado = [];   // operaciones de meses cerrados: se informan, no se tocan
 
     for (const d of decisiones) {
       const [[dif]] = await pool.query("SELECT * FROM carga_diferencias WHERE id=? AND estado='PENDIENTE'", [d.id]);
@@ -82,16 +85,33 @@ exports.resolver = async (req, res) => {
 
       const [[cr]] = await pool.query('SELECT id, num_op, DATE_FORMAT(mes,\'%Y-%m\') mes FROM creditos WHERE id=?', [dif.id_credito]);
       if (!cr) continue;
-      // Un mes cerrado ya está liquidado: la diferencia se informa, no se aplica.
-      if (await isMesCerrado(cr.mes))
-        return res.status(400).json({ success: false, data: null, error: `La operación ${cr.num_op} está en un mes CERRADO (${cr.mes})` });
+      /* Un mes cerrado ya está liquidado: la diferencia se informa, no se aplica.
+         Se SALTA esa decisión y se sigue con las demás. Antes cortaba el lote
+         entero con un 400; desde que las diferencias se resuelven en masa al
+         terminar la carga, una sola operación de un mes cerrado habría dejado
+         sin aplicar las otras doscientas. */
+      if (await isMesCerrado(cr.mes)) { omitidosCerrado.push(`${cr.num_op} (${cr.mes})`); continue; }
 
+      /* El valor se valida SEGÚN EL TIPO del campo: desde que el contraste dejó
+         de ser solo de montos, exigir un número > 0 habría rechazado un dealer
+         o una marca — y peor, un `Number('MITSUBISHI')` es NaN, así que la
+         elección se caía sin decir por qué. */
+      const tipo = POR_COL[dif.campo]?.tipo || 'peso';
       let valor = null, eleccion = String(d.eleccion || '').toUpperCase();
-      if (eleccion === 'ARCHIVO') valor = Number(dif.valor_archivo);
-      else if (eleccion === 'MANUAL') valor = Math.round(Number(String(d.valor ?? '').replace(/[^\d]/g, '')));
-      else eleccion = 'SISTEMA';
-      if (eleccion !== 'SISTEMA' && !(Number.isFinite(valor) && valor > 0))
-        return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${ETIQUETAS[dif.campo]}` });
+      const crudo = eleccion === 'ARCHIVO' ? dif.valor_archivo : String(d.valor ?? '');
+      if (eleccion === 'ARCHIVO' || eleccion === 'MANUAL') {
+        if (tipo === 'peso')       valor = Math.round(Number(String(crudo).replace(/[^\d-]/g, '')));
+        else if (tipo === 'fecha') valor = normFecha(crudo) || null;
+        else                       valor = String(crudo).trim() || null;
+      } else eleccion = 'SISTEMA';
+
+      if (eleccion !== 'SISTEMA') {
+        const valido = tipo === 'peso'  ? (Number.isFinite(valor) && valor > 0)
+                     : tipo === 'fecha' ? /^\d{4}-\d{2}-\d{2}$/.test(String(valor || ''))
+                     : !!valor;
+        if (!valido)
+          return res.status(400).json({ success: false, data: null, error: `Valor inválido para ${ETIQUETAS[dif.campo]}` });
+      }
 
       if (eleccion !== 'SISTEMA') {
         await pool.query(`UPDATE creditos SET ${dif.campo} = ?, updated_at = NOW() WHERE id = ?`, [valor, dif.id_credito]);
@@ -119,7 +139,7 @@ exports.resolver = async (req, res) => {
       } catch (_) {}
     }
 
-    res.json({ success: true, data: { aplicados, cerrados }, error: null });
+    res.json({ success: true, data: { aplicados, cerrados, omitidos_mes_cerrado: omitidosCerrado }, error: null });
   } catch (e) { errSrv(res, e, 'resolver'); }
 };
 
@@ -131,6 +151,8 @@ exports.historial = async (_req, res) => {
              d.valor_elegido, d.eleccion, d.resuelto_por, d.resuelto_at, d.origen
         FROM carga_diferencias d WHERE d.estado='RESUELTA'
        ORDER BY d.resuelto_at DESC LIMIT 300`);
-    res.json({ success: true, data: rows.map(r => ({ ...r, etiqueta: ETIQUETAS[r.campo] || r.campo })), error: null });
+    res.json({ success: true, data: rows.map(r => ({
+      ...r, etiqueta: ETIQUETAS[r.campo] || r.campo, tipo: POR_COL[r.campo]?.tipo || 'peso',
+    })), error: null });
   } catch (e) { errSrv(res, e, 'historial'); }
 };

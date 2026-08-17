@@ -58,6 +58,22 @@
     .result-box.error { background:#fff0f0; border-color:#fca5a5; }
     .log-line { font-size:.82rem; font-family:monospace; color:#374151; padding:2px 0; }
     .log-line.err { color:#dc2626; }
+    /* ── Informe de diferencias (BD vs Trinidad) ── */
+    .dif-box { background:#fffbeb; border:1.5px solid #fcd34d; border-radius:12px; padding:20px 24px; margin-top:18px; }
+    .dif-grupo { margin-top:16px; }
+    .dif-grupo h4 { font-size:.8rem; font-weight:800; color:#92400e; text-transform:uppercase; letter-spacing:.6px; margin:0 0 8px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .dif-tabla { width:100%; font-size:.8rem; background:#fff; border-radius:10px; overflow:hidden; }
+    .dif-tabla th { background:#fef3c7; color:#78350f; font-weight:700; padding:7px 10px; text-align:left; font-size:.74rem; text-transform:uppercase; letter-spacing:.4px; }
+    .dif-tabla td { padding:7px 10px; border-bottom:1px solid #f8f5ec; vertical-align:middle; }
+    .dif-tabla tr:last-child td { border-bottom:none; }
+    .dif-opt { display:flex; align-items:center; gap:8px; cursor:pointer; border-radius:8px; padding:4px 8px; }
+    .dif-opt:hover { background:#f8fafc; }
+    .dif-opt input { width:16px; height:16px; cursor:pointer; accent-color:#0141A2; flex:none; }
+    .dif-opt.elegido { background:#eff6ff; outline:1.5px solid #bfdbfe; }
+    .dif-val { font-family:'Segoe UI',system-ui,sans-serif; font-weight:700; color:#111827; }
+    .dif-val.vacio { color:#9ca3af; font-weight:400; font-style:italic; }
+    .btn-mini { background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:2px 10px; font-size:.72rem; font-weight:600; color:#374151; cursor:pointer; }
+    .btn-mini:hover { background:#f3f4f6; }
     #toast { position:fixed; bottom:24px; right:24px; padding:12px 22px; border-radius:10px; color:#fff; font-weight:600; font-size:.88rem; display:flex; align-items:center; gap:8px; box-shadow:0 4px 20px rgba(0,0,0,.2); transform:translateY(80px); opacity:0; transition:.28s; z-index:9999; }
     #toast.show { transform:translateY(0); opacity:1; }
     #toast.ok  { background:#166534; }
@@ -68,7 +84,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v7.0</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v7.1</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -147,6 +163,8 @@
     <div id="triPaso3" style="display:none;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:20px">
       <div class="section-title"><i class="bi bi-check2-circle" style="color:#16a34a"></i>Resultado de la importación</div>
       <div id="triResultadoContent"></div>
+      <!-- Informe de diferencias: la carga NO pisa lo digitado, acá se elige cuál valor queda -->
+      <div id="triDiferencias"></div>
     </div>
   </div>
 </div>
@@ -263,11 +281,142 @@ async function triEjecutarImport() {
         </details>
       </div>`;
     document.getElementById('triPaso3').style.display = '';
+    triPintarDiferencias(d.diferencias);
     toast(`✓ ${d.insertados} insertados · ${d.actualizados} actualizados`, true);
 
     // Los datos faltantes de créditos otorgados se completan desde el Dashboard → tab Otorgados → "Completar datos"
   } catch(ex) { toast('Error: '+ex.message, false); }
   finally { btn.disabled=false; btn.innerHTML='<i class="bi bi-cloud-upload"></i>Importar / Actualizar'; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DIFERENCIAS CON EL ARCHIVO — qué dice el sistema y qué dice Trinidad.
+
+   La carga NO pisa lo que ya está digitado y revisado acá: donde los dos valores
+   no coinciden se muestra el par y una persona elige. Nada se aplica solo.
+
+   Lo que NO se elige queda PENDIENTE en /carga-masiva/diferencias/ — por eso los
+   controles parten sin marcar: cerrar 300 casos con un default sería "revisado"
+   sin que nadie los haya mirado, y ese es justamente el error que este informe
+   viene a evitar.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const esc = s => String(s ?? '').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+function difFmt(valor, tipo) {
+  if (valor === null || valor === undefined || String(valor).trim() === '')
+    return '<span class="dif-val vacio">(vacío)</span>';
+  if (tipo === 'peso')  return `<span class="dif-val">$${Number(valor).toLocaleString('es-CL')}</span>`;
+  if (tipo === 'fecha') { const p = String(valor).split('-'); return `<span class="dif-val">${p.length===3?`${p[2]}-${p[1]}-${p[0]}`:esc(valor)}</span>`; }
+  return `<span class="dif-val">${esc(valor)}</span>`;
+}
+
+function triPintarDiferencias(dif) {
+  const cont = document.getElementById('triDiferencias');
+  if (!dif || !dif.total) { cont.innerHTML = ''; return; }
+
+  const gruposHtml = dif.grupos.map(g => `
+    <div class="dif-grupo">
+      <h4><i class="bi bi-tag-fill"></i>${esc(g.grupo)} <span style="color:#b45309;font-weight:600">(${g.total})</span>
+        <button class="btn-mini" onclick="difMarcarGrupo('${esc(g.grupo)}','SISTEMA')">Todo del sistema</button>
+        <button class="btn-mini" onclick="difMarcarGrupo('${esc(g.grupo)}','ARCHIVO')">Todo de Trinidad</button>
+      </h4>
+      <table class="dif-tabla">
+        <thead><tr>
+          <th style="width:110px">N° Op</th><th style="width:150px">Campo</th>
+          <th>Valor en el sistema</th><th>Valor en Trinidad</th>
+        </tr></thead>
+        <tbody>${g.filas.map(f => `
+          <tr data-grupo="${esc(g.grupo)}">
+            <td><strong>${esc(f.num_op || f.id_financiera || '—')}</strong></td>
+            <td style="color:#6b7280">${esc(f.etiqueta)}</td>
+            <td><label class="dif-opt" id="lbl_${f.id}_S">
+              <input type="radio" name="dif_${f.id}" value="SISTEMA"
+                     data-id="${f.id}" data-credito="${f.id_credito}" onchange="difOnPick(${f.id})">
+              ${difFmt(f.valor_sistema, f.tipo)}</label></td>
+            <td><label class="dif-opt" id="lbl_${f.id}_A">
+              <input type="radio" name="dif_${f.id}" value="ARCHIVO"
+                     data-id="${f.id}" data-credito="${f.id_credito}" onchange="difOnPick(${f.id})">
+              ${difFmt(f.valor_archivo, f.tipo)}</label></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+
+  cont.innerHTML = `
+    <div class="dif-box">
+      <div style="font-size:1rem;font-weight:800;color:#92400e;margin-bottom:4px">
+        <i class="bi bi-shuffle me-2"></i>${dif.total} diferencia(s) con el archivo, en ${dif.operaciones} operación(es)
+      </div>
+      <div style="font-size:.82rem;color:#78350f">
+        No se pisó ningún dato: marca cuál valor queda. Lo que no elijas sigue pendiente en
+        <a href="/carga-masiva/diferencias/" style="color:#92400e;font-weight:700">Diferencias con la Carga</a>.
+      </div>
+      ${dif.ocultas ? `<div style="font-size:.8rem;color:#92400e;margin-top:8px;background:#fef3c7;border-radius:8px;padding:6px 10px">
+        <i class="bi bi-info-circle me-1"></i>Se muestran ${dif.mostradas} de ${dif.total}; las otras ${dif.ocultas} están completas en
+        <a href="/carga-masiva/diferencias/" style="color:#92400e;font-weight:700">Diferencias con la Carga</a>.</div>` : ''}
+      ${gruposHtml}
+      <div style="margin-top:16px;display:flex;align-items:center;gap:12px">
+        <button class="btn-main" id="btnDifAplicar" onclick="difAplicar()" disabled>
+          <i class="bi bi-check2-square"></i><span id="btnDifTxt">Aplicar elección</span>
+        </button>
+        <span style="font-size:.78rem;color:#78350f" id="difResumenSel">Ninguna elegida todavía</span>
+      </div>
+    </div>`;
+}
+
+function difOnPick(id) {
+  for (const s of ['S', 'A']) document.getElementById(`lbl_${id}_${s}`)?.classList.remove('elegido');
+  const sel = document.querySelector(`input[name="dif_${id}"]:checked`);
+  if (sel) document.getElementById(`lbl_${id}_${sel.value === 'SISTEMA' ? 'S' : 'A'}`)?.classList.add('elegido');
+  difActualizarBoton();
+}
+
+function difMarcarGrupo(grupo, eleccion) {
+  document.querySelectorAll(`#triDiferencias tr[data-grupo="${grupo}"]`).forEach(tr => {
+    const r = tr.querySelector(`input[value="${eleccion}"]`);
+    if (r && !r.disabled) { r.checked = true; difOnPick(r.dataset.id); }
+  });
+}
+
+function difSeleccionadas() {
+  return [...document.querySelectorAll('#triDiferencias input[type=radio]:checked')]
+    .filter(r => !r.disabled)
+    .map(r => ({ id: Number(r.dataset.id), id_credito: Number(r.dataset.credito), eleccion: r.value }));
+}
+
+function difActualizarBoton() {
+  const n = difSeleccionadas().length;
+  const btn = document.getElementById('btnDifAplicar');
+  if (!btn) return;
+  btn.disabled = n === 0;
+  document.getElementById('btnDifTxt').textContent = n ? `Aplicar ${n} elección(es)` : 'Aplicar elección';
+  document.getElementById('difResumenSel').textContent = n ? `${n} elegida(s); el resto queda pendiente` : 'Ninguna elegida todavía';
+}
+
+async function difAplicar() {
+  const decisiones = difSeleccionadas();
+  if (!decisiones.length) return;
+  const btn = document.getElementById('btnDifAplicar');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aplicando...';
+  try {
+    const r = await fetch('/api/carga-diferencias/resolver', {
+      method: 'POST', headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisiones }),
+    }).then(x => x.json());
+    if (!r.success) { toast('Error: ' + r.error, false); return; }
+    // Las resueltas se congelan en pantalla: ya no son una decisión pendiente.
+    for (const d of decisiones) {
+      document.querySelectorAll(`input[name="dif_${d.id}"]`).forEach(i => { i.disabled = true; });
+      const fila = document.querySelector(`input[name="dif_${d.id}"]`)?.closest('tr');
+      if (fila) { fila.style.opacity = '.55'; fila.title = 'Resuelta'; }
+    }
+    difActualizarBoton();
+    const om = r.data.omitidos_mes_cerrado || [];
+    toast(`✓ ${r.data.aplicados} valor(es) actualizados · ${r.data.cerrados} confirmados como están` +
+          (om.length ? ` · ${om.length} omitidas por mes cerrado` : ''), true);
+    if (om.length) alert('No se tocaron estas operaciones porque su mes está CERRADO:\n\n' + om.join('\n'));
+  } catch (ex) { toast('Error: ' + ex.message, false); }
+  finally { btn.innerHTML = '<i class="bi bi-check2-square"></i><span id="btnDifTxt">Aplicar elección</span>'; difActualizarBoton(); }
 }
 
 // Datos faltantes se completan desde Dashboard → Otorgados → "Completar datos"
