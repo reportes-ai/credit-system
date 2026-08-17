@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!-- v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pendientes Abiertos — Business Suite AutoFácil</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .doc { max-width:1000px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; font-size:.95rem; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  table { border-collapse:collapse; width:100%; font-size:.85rem; margin:12px 0; }
+  th { background:#f1f5f9; text-align:left; padding:7px 10px; color:#334155; }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; overflow-wrap:break-word; }
+  td:first-child { font-family:Consolas,monospace; color:var(--navy); width:52px; font-weight:700; }
+  td:nth-child(2) { width:30%; font-weight:600; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:.85em; }
+  .max { background:#fef2f2; border-left:4px solid #dc2626; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  .nota { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  .toc { background:#f8fafc; border-radius:10px; padding:14px 18px; margin:18px 0; font-size:.88rem; }
+  .toc a { display:inline-block; margin:3px 14px 3px 0; color:var(--accent); text-decoration:none; font-weight:600; }
+  @media print { #af-topnav { display:none; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Pendientes Abiertos",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
+<div class="doc">
+  <h1><i class="bi bi-list-check me-2"></i>Pendientes Abiertos</h1>
+  <p>Todo lo que está abierto en el Business Suite, en un solo lugar. Antes vivía repartido entre la lista técnica del repositorio, los backlogs de ideas aprobadas y lo que cada módulo anotaba por su cuenta. <b>Actualizado al 17-08-2026.</b></p>
+
+  <div class="nota"><b>Regla de esta lista:</b> cuando algo se cierra se marca con su fecha, <b>no se borra</b> — así queda la historia de por qué se hizo. Cuando nace un pendiente nuevo, entra acá <b>en el mismo momento</b> en que se detecta, igual que la máxima de documentar el proceso junto con construirlo.</div>
+
+  <div class="toc">
+    <a href="#s1">1. Seguridad e infraestructura</a><a href="#s2">2. Contabilidad</a><a href="#s3">3. Datos y migraciones</a>
+    <a href="#s4">4. Módulos con fase pendiente</a><a href="#s5">5. Backlog aprobado</a><a href="#s6">6. Calidad y proceso</a><a href="#s7">7. Herramientas y agenda</a>
+  </div>
+
+  <h2 id="s1">1. Seguridad e infraestructura</h2>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Estado y detalle</th></tr>
+    <tr><td>1.1</td><td>Claves de integración en el host de contingencia</td><td>El standby de Cloud Run (<code>afbs2.autofacilchile.cl</code>) tiene las 16 variables del núcleo, pero no las de CMF, IA, WhatsApp, DealerNet, Google, Fintoc, SII ni Workera. Promovido opera <b>todo el negocio</b>; no operan indicadores, IA, WhatsApp, DealerNet ni SII. Degradación deliberada.</td></tr>
+    <tr><td>1.2</td><td>El repositorio de GitHub es público</td><td>Propuesto hacerlo privado (Render sigue funcionando igual). <b>Sin respuesta.</b> No hay secretos commiteados —está auditado—, pero la lógica de negocio completa es visible.</td></tr>
+    <tr><td>1.3</td><td>Aseo tras el rescate del certificado del SII</td><td>Copiar el <code>.pfx</code> al pendrive/caja fuerte, la clave al gestor de contraseñas, y borrar de Descargas los archivos intermedios en base64. El archivo y su clave <b>viven separados</b>, siempre.</td></tr>
+    <tr><td>1.4</td><td>MFA obligatorio para todo el equipo</td><td>La cuenta que administra la infraestructura ya lo tiene (04-08-2026, con códigos de respaldo en papel). Falta exigirlo a ~40 personas desde la consola de Workspace: necesita aviso, plazo y acompañamiento.</td></tr>
+    <tr><td>1.5</td><td>Prueba de restauración real del respaldo</td><td>El dump nocturno corre y se guarda 30 días, pero <b>nunca se ha restaurado de verdad</b>. Hacerlo contra un branch de TiDB.</td></tr>
+    <tr><td>1.6</td><td>2FA en el login del Suite</td><td>Para perfiles administradores (TOTP). Distinto del punto 1.4, que es la cuenta de Google.</td></tr>
+    <tr><td>1.7</td><td>Cobertura de auditoría en acciones críticas</td><td>El módulo Auditoría existe; falta confirmar que registra explícitamente cerrar mes, eliminar crédito, cambiar permisos de perfil y carga masiva.</td></tr>
+  </table>
+
+  <h2 id="s2">2. Contabilidad — el reemplazo de AVSOFT</h2>
+  <div class="max"><b>Máxima:</b> todo movimiento de dinero se contabiliza. Un ingreso o egreso que no genera asiento obliga a digitarlo aparte, y ahí volvimos al sistema anterior. Los puntos de abajo son exactamente esa deuda.</div>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Estado y detalle</th></tr>
+    <tr><td>2.1</td><td>Disparador de comisiones internas y colocación propia</td><td>Tres reglas <b>creadas y editables, pero que nadie dispara</b>: comisión de ejecutivos, comisión de parques y crédito otorgado AutoFácil. Dudas a resolver: ¿la comisión del ejecutivo se contabiliza al aprobar (recalculando el total del mes) o al emitir la orden de pago? ¿La colocación propia se dispara al marcar OTORGADO, y contra banco directo o cuenta transitoria?</td></tr>
+    <tr><td>2.2</td><td>Traer al auxiliar el RCV ya sincronizado</td><td>Desde la v210.4 el botón existe. Falta <b>correrlo</b>: 88 documentos de agosto pendientes, más los meses anteriores. Partir marcando pocos para revisar los asientos antes de soltar el resto.</td></tr>
+    <tr><td>2.3</td><td>Notas de crédito del RCV</td><td>Las tipo 61 quedan fuera del importador porque en el auxiliar van con signo negativo. Hoy se digitan aparte; automatizarlo está pendiente.</td></tr>
+    <tr><td>2.4</td><td>Nunca se ha cerrado un mes</td><td>La tabla de meses cerrados está vacía, así que el candado <b>jamás ha actuado</b>: hoy nada impide digitar sobre un período ya informado. Decidir desde qué mes se empieza a cerrar.</td></tr>
+    <tr><td>2.5</td><td>Conciliación y pagos al día</td><td>Al corte de julio: 112 movimientos bancarios sin conciliar y 4 órdenes de pago emitidas e impagas.</td></tr>
+    <tr><td>2.6</td><td>Facturación electrónica (emitir DTE)</td><td>Acordado y <b>no contratado</b>. Lo que hoy tenemos con el SII solo <b>lee</b> el registro de compras; emitir es otro servicio.</td></tr>
+    <tr><td>2.7</td><td>Mes contable vs fecha de curse</td><td>8 operaciones de 2026 cursadas el 1 o 2 del mes quedaron en el cierre del mes anterior. Decidir la convención. <b>Toca meses ya cerrados y sus comisiones</b> — no se hace a la ligera.</td></tr>
+    <tr><td>2.8</td><td>Costos de servicios por escenario</td><td>La vista única ya existe en Salud y Uptime. Falta lo que se pidió originalmente: cuánto cuesta cada servicio <b>en contingencia</b>, <b>si crece el volumen</b>, y <b>qué pasa si se deja de pagar</b>. Los precios que faltan se confirman en cada panel: no se inventan.</td></tr>
+  </table>
+
+  <h2 id="s3">3. Datos y migraciones</h2>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Estado y detalle</th></tr>
+    <tr><td>3.1</td><td>Cartera INDEXA — Etapa 3</td><td>Migradas 4.425 + 1.319 operaciones; falta la etapa final.</td></tr>
+    <tr><td>3.2</td><td>26 huérfanos en el bucket de documentos</td><td>Objetos sin fila que los apunte, quedados del barrido de migración.</td></tr>
+    <tr><td>3.3</td><td>Historial de mora para el Score</td><td>El módulo está construido; le falta el histórico de INDEXA para calibrar por segmento.</td></tr>
+    <tr><td>3.4</td><td>Operaciones a nombre de un ejecutivo suspendido</td><td>Se siguen digitando operaciones con el nombre de un ejecutivo inactivo desde mayo, en dos variantes de escritura. Revisar con Operaciones a quién corresponden de verdad: afecta atribución y comisión.</td></tr>
+    <tr><td>3.5</td><td>Actividades económicas del SII</td><td>674 códigos cargados; falta cablearlos a los giros de clientes y proveedores.</td></tr>
+  </table>
+
+  <h2 id="s4">4. Módulos con fase pendiente</h2>
+  <table>
+    <tr><th>#</th><th>Módulo</th><th>Qué falta</th></tr>
+    <tr><td>4.1</td><td>Plan de Liquidez</td><td>El motor de cálculo del anticipo de comisiones.</td></tr>
+    <tr><td>4.2</td><td>Portal del Cliente</td><td>La sección de datos bancarios.</td></tr>
+    <tr><td>4.3</td><td>Atención Remota</td><td>El video (chat y documentos ya operan).</td></tr>
+    <tr><td>4.4</td><td>Excepciones Comerciales</td><td>La fase 2.</td></tr>
+    <tr><td>4.5</td><td>Seguimiento de Cartas por WhatsApp</td><td>Construido: falta aprobar la plantilla en Meta y activar el toggle.</td></tr>
+    <tr><td>4.6</td><td>Mi Día — calendario</td><td>Crear el Client ID de Google y cargarlo en el servidor.</td></tr>
+    <tr><td>4.7</td><td>Conector Workera (reloj control)</td><td>Fase 1 lista; faltan las variables en el servidor y la fase 2 (atrasos).</td></tr>
+    <tr><td>4.8</td><td>Conexiones Bancarias (Fintoc)</td><td>En ambiente de prueba, <b>no contratado</b>.</td></tr>
+    <tr><td>4.9</td><td>Fusión de cards de Mantenedores</td><td>7 fusiones aprobadas en concepto, ninguna ejecutada (implican redirecciones, permisos y footer "Qué afecta"). Partir por <b>Avisos + Alertas + Alertas de Saldos</b>, la de mayor valor: hoy tres cards confunden.</td></tr>
+  </table>
+
+  <h2 id="s5">5. Backlog aprobado, sin construir</h2>
+  <table>
+    <tr><th>#</th><th>Idea</th><th>Estado</th></tr>
+    <tr><td>5.1</td><td>Agente de voz para cobranza</td><td><b>En pausa.</b> Fase 1 definida: nota de voz por WhatsApp. Faltan las credenciales del servicio. Ojo con el compliance de cobranza y usar el Modo Desarrollo para no contactar deudores reales en pruebas.</td></tr>
+    <tr><td>5.2</td><td>Simulador what-if</td><td>"Cómo afecta un alza de tasa a los créditos sobre y bajo 200 UF" no es una consulta a los datos sino una <b>simulación</b>: módulo aparte sobre el motor de rentabilidad. Sin priorizar.</td></tr>
+    <tr><td>5.3</td><td>Onboarding 100% digital del cliente</td><td>Firma electrónica + verificación de identidad con foto de cédula e IA.</td></tr>
+    <tr><td>5.4</td><td>Motor de pricing dinámico</td><td>Tasa sugerida por perfil de riesgo y rentabilidad objetivo.</td></tr>
+    <tr><td>5.5</td><td>Predicción de mora con IA</td><td>Probabilidad de caer en mora el mes siguiente, para cobranza preventiva.</td></tr>
+    <tr><td>5.6</td><td>Simulador público embebible</td><td>Cotizador para el sitio web e Instagram que capture leads directo al CRM.</td></tr>
+    <tr><td>5.7</td><td>Detección de duplicados al digitar</td><td>Avisar en vivo "este RUT con un monto parecido ya existe" antes de guardar.</td></tr>
+  </table>
+
+  <h2 id="s6">6. Calidad y proceso</h2>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Detalle</th></tr>
+    <tr><td>6.1</td><td>Paso a producción formal</td><td>Hoy <b>publicar = producción</b>. El ambiente de staging ya existe; falta la separación real con su procedimiento. Postergado en su momento, sigue abierto como pendiente mayor.</td></tr>
+    <tr><td>6.2</td><td>Checklist de pruebas manuales pre-deploy</td><td>~15 casos críticos a verificar antes de un cambio grande. No requiere código, solo disciplina.</td></tr>
+    <tr><td>6.3</td><td>Reglas de negocio comentadas en el código</td><td>Prioridad: comisiones, datos del dashboard y los tramos de 200 UF.</td></tr>
+    <tr><td>6.4</td><td>Caché de consultas frecuentes</td><td>UF y mantenedores. Tiene retorno directo: la base cobra por consulta.</td></tr>
+    <tr><td>6.5</td><td>Servir los archivos estáticos desde un CDN</td><td>Sacar HTML, CSS y JS del servidor de aplicación.</td></tr>
+    <tr><td>6.6</td><td>Contactos múltiples para cobranza</td><td>Titular, aval y familiar en su propia tabla. <b>No</b> tocar la ficha del cliente.</td></tr>
+  </table>
+
+  <h2 id="s7">7. Herramientas y agenda</h2>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Detalle</th></tr>
+    <tr><td>7.1</td><td>Modo enseñanza asistido</td><td>No estaba disponible en la sesión donde se probó; reintentar en una sesión nueva.</td></tr>
+    <tr><td>7.2</td><td>Revisión de código en la nube</td><td>Quedan 2 revisiones del ciclo. Se lanzan antes de cambios grandes.</td></tr>
+    <tr><td>7.3</td><td>Demo a la auditoría externa</td><td>Lunes 17-08-2026 a las 17:00, en el ambiente de staging. Guion paso a paso listo, ambiente alineado y proveedor de prueba creado.</td></tr>
+    <tr><td>7.4</td><td>Estreno del Revisor Automático Autofin</td><td>Con una solicitud real; los switches del motor deben quedar encendidos en el mantenedor de Excepciones Comerciales.</td></tr>
+  </table>
+
+  <h2>Dónde más aparece esta lista</h2>
+  <ul>
+    <li><code>docs/PENDIENTES.md</code> en el repositorio — el espejo de esta página, para el trabajo técnico.</li>
+    <li><code>CLAUDE.md</code> → "Pendientes de Madurez del Sistema", con puntero acá.</li>
+    <li>El footer <b>"Qué afecta este mantenedor"</b> de cada mantenedor: la versión in-situ, variable por variable.</li>
+  </ul>
+</div>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

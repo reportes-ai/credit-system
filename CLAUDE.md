@@ -329,8 +329,13 @@ correos programados y cobranza.
 ---
 
 ## Pendientes de Madurez del Sistema
-> Estas tareas no son urgentes pero deben abordarse antes de considerar el sistema "producción estable".
-> Ordenadas por prioridad. Marcar con ✅ cuando se implementen.
+> **La lista COMPLETA y consolidada de todo lo abierto vive en `docs/PENDIENTES.md`**
+> (versión navegable: `/mantenedores/documentacion/pendientes.html`, card "Pendientes
+> Abiertos" en la Suite de Documentación). Ahí están además de lo técnico: contabilidad,
+> migraciones, módulos con fase pendiente, backlog aprobado, calidad y agenda.
+> **Un pendiente nuevo se anota ahí en el mismo momento en que se detecta**, igual que la
+> máxima de documentar el proceso junto con construirlo. Lo de abajo es la parte
+> técnico-transversal, con su historial de cierres.
 
 ### 🔴 Crítico (seguridad y datos)
 
