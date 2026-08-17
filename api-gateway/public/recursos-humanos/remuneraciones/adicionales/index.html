@@ -56,6 +56,11 @@
         <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Premio concurso interno"></div>
       <div class="col-md-2" id="wOtroImp" style="display:none"><label class="form-label small fw-semibold mb-1">¿Imponible?</label>
         <select id="fOtroImp" class="form-select form-select-sm"><option value="1">Sí, imponible</option><option value="0">No imponible</option></select></div>
+      <!-- HORAS EXTRAS: se digitan las horas y el monto lo calcula el sistema con
+           el sueldo base de la ficha. El monto queda de solo lectura para que no
+           convivan dos cifras distintas de lo mismo. -->
+      <div class="col-md-2" id="wHoras" style="display:none"><label class="form-label small fw-semibold mb-1">Horas extras</label>
+        <input id="fHoras" class="form-control form-control-sm text-end" inputmode="decimal" placeholder="0" step="0.5" min="0" oninput="calcHE()"></div>
       <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Monto $</label>
         <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
       <div class="col-md-2 d-flex align-items-end pb-1">
@@ -66,7 +71,8 @@
         <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
       </div>
     </div>
-    <div class="small text-muted mt-2" id="hintImp"></div>
+    <div class="small mt-2" id="heDetalle" style="color:#0141A2"></div>
+    <div class="small text-muted mt-1" id="hintImp"></div>
   </div>
 
   <div id="secD" style="display:none">
@@ -81,6 +87,11 @@
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.8rem">
     <div class="fw-bold mb-1"><i class="bi bi-diagram-3 me-1"></i>Cómo se integran</div>
     Los adicionales <b>imponibles</b> entran como "Otros Imponibles" en el <a href="/recursos-humanos/remuneraciones/liquidaciones/">libro de liquidaciones</a> del mes (pagan AFP/salud/impuesto); los <b>no imponibles</b> y los marcados <b>Líquido</b> entran como "Otros No Imponibles" (se pagan tal cual). Si en el libro editas esas celdas a mano, tu valor manda. Al <b>emitir</b> el mes, este módulo queda bloqueado.
+    <div class="mt-2"><b>HORAS EXTRAS</b> → se digitan las <b>horas</b> y el monto lo calcula el sistema:
+    <i>sueldo base × 7 ÷ (30 × jornada semanal) × 1,5</i> (art. 32 del Código del Trabajo). El sueldo base y la jornada salen de la
+    <a href="/recursos-humanos/colaboradores/">ficha del colaborador</a>; la jornada general (44 h) y el recargo (50%) son configurables
+    en <code>rh_config</code> → <code>he_jornada_semanal</code> y <code>he_recargo_pct</code>. Quien tiene <b>jornada del art. 22</b> no genera horas extras,
+    y a quien no tenga sueldo base en su ficha no se le puede calcular: en ambos casos el sistema lo dice y no deja guardar.</div>
   </div>
 </div>
 
@@ -106,11 +117,55 @@ function tab(m){
   secI.style.display = m==='I'?'':'none'; secD.style.display = m==='D'?'':'none';
 }
 
+const esHE = () => fCausal.value === 'HORAS EXTRAS';
+
 function causalUI(){
   const otro = fCausal.value==='OTRO';
   wOtro.style.display = otro?'':'none'; wOtroImp.style.display = otro?'':'none';
+  // En horas extras el monto no se digita: lo pone el cálculo.
+  document.getElementById('wHoras').style.display = esHE()?'':'none';
+  const m = document.getElementById('fMonto');
+  m.readOnly = esHE(); m.classList.toggle('bg-light', esHE());
+  m.placeholder = esHE() ? 'lo calcula el sistema' : '0';
+  if (!esHE()) { document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML=''; }
+  else calcHE();
   hintImp();
 }
+
+/* ── Cálculo de la hora extra ─────────────────────────────────────────────────
+   Lo hace el SERVIDOR (shared/horas-extras.js) y no la pantalla: es el mismo
+   motor que recalcula al guardar, así que lo que se ve en pantalla es
+   exactamente lo que se va a pagar. Un cálculo propio acá sería una segunda
+   versión de la regla, que tarde o temprano difiere de la primera. */
+let heTimer;
+function calcHE(){
+  clearTimeout(heTimer);
+  heTimer = setTimeout(async () => {
+    const det = document.getElementById('heDetalle');
+    const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
+    if (!esHE() || !fColab.value || !(horas > 0)) {
+      if (esHE() && !fColab.value) det.innerHTML = '<i class="bi bi-person me-1"></i>Elige al colaborador para calcular su hora extra.';
+      else if (esHE()) det.innerHTML = '';
+      document.getElementById('fMonto').value = esHE() ? '' : document.getElementById('fMonto').value;
+      return;
+    }
+    try {
+      const j = await (await fetch(`/api/rrhh/remuneraciones/hora-extra?id_usuario=${fColab.value}&horas=${horas}`,{headers:H})).json();
+      if (!j.success) { det.innerHTML = `<span class="text-danger">${esc(j.error)}</span>`; return; }
+      const d = j.data;
+      if (!d.aplica) {   // art. 22 o ficha sin sueldo base: se dice por qué, no se deja en 0
+        document.getElementById('fMonto').value = '';
+        det.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>${esc(d.motivo)}</span>`;
+        return;
+      }
+      document.getElementById('fMonto').value = fmt(d.monto);
+      det.innerHTML = `<i class="bi bi-calculator me-1"></i><b>${d.horas} h</b> × $${fmt(d.valor_hora_extra)} = <b>$${fmt(d.monto)}</b>
+        <span class="text-muted">· sueldo base $${fmt(d.sueldo_base)} · jornada ${d.jornada_semanal} h · recargo ${d.recargo_pct}% (art. 32)</span>`;
+    } catch(e){ det.innerHTML = `<span class="text-danger">No se pudo calcular: ${esc(e.message)}</span>`; }
+  }, 250);
+}
+// Cambiar de colaborador cambia el sueldo base, o sea el valor de la hora.
+document.addEventListener('change', e=>{ if (e.target.id==='fColab') calcHE(); });
 function hintImp(){
   if (!CAUSALES) return;
   const c = fCausal.value; if (!c) return;
@@ -149,7 +204,9 @@ function render(){
     <div class="card-kpi"><div class="v">$${fmt(t.imponible+t.no_imponible+t.liquido)}</div><div class="l">Total del mes</div></div>`;
   document.getElementById('tbDet').innerHTML = D.adicionales.map(a=>`<tr>
     <td>${esc(a.nombre_actual||a.nombre)}</td>
-    <td>${esc(a.causal)}${a.causal_texto?` — <i>${esc(a.causal_texto)}</i>`:''}</td>
+    <td>${esc(a.causal)}${a.causal_texto?` — <i>${esc(a.causal_texto)}</i>`:''}${
+      // El cálculo queda a la vista: sin esto el monto es un número sin explicación
+      a.cantidad ? ` <span class="text-muted small">(${(+a.cantidad)} h × $${fmt(Math.round(a.valor_unitario))})</span>` : ''}</td>
     <td>${a.es_liquido?'<span class="pill liq">LÍQUIDO</span>':a.imponible?'<span class="pill imp">Imponible</span>':'<span class="pill noimp">No imponible</span>'}</td>
     <td class="text-right num">$${fmt(a.monto)}</td>
     <td>${esc(a.creado_por||'')}</td>
@@ -159,14 +216,19 @@ function render(){
 }
 
 async function guardar(){
+  const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
   const body = { mes: fMes.value, id_usuario: fColab.value, causal: fCausal.value,
-    causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked, monto: montoVal() };
+    causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked,
+    monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
-  if (!body.monto) return alert('Ingresa el monto');
+  // En horas extras manda la cantidad de horas: el monto lo recalcula el servidor.
+  if (esHE()) { if (!(horas > 0)) return alert('Indica cuántas horas extras se pagan'); }
+  else if (!body.monto) return alert('Ingresa el monto');
   const r = await fetch('/api/rrhh/remuneraciones/adicionales',{method:'POST',headers:H,body:JSON.stringify(body)});
   const j = await r.json(); if (!j.success) return alert(j.error);
   // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
   fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
+  document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';
   fColab.focus();
   cargar();
 }
@@ -180,9 +242,12 @@ async function eliminar(id){
 
 function exportar(){
   if (!D?.adicionales.length) return;
-  const filas = [['Mes','Colaborador','Causal','Detalle','Tipo','Monto','Ingresado por','Fecha'],
-    ...D.adicionales.map(a=>[a.mes,a.nombre_actual||a.nombre,a.causal,a.causal_texto||'',a.es_liquido?'LIQUIDO':a.imponible?'IMPONIBLE':'NO IMPONIBLE',a.monto,a.creado_por||'',String(a.created_at).slice(0,10)]),
-    [],['','','','TOTAL IMPONIBLE','',D.totales.imponible],['','','','TOTAL NO IMPONIBLE','',D.totales.no_imponible],['','','','TOTAL LIQUIDO','',D.totales.liquido]];
+  const filas = [['Mes','Colaborador','Causal','Detalle','Tipo','Horas','Valor hora','Monto','Ingresado por','Fecha'],
+    ...D.adicionales.map(a=>[a.mes,a.nombre_actual||a.nombre,a.causal,a.causal_texto||'',a.es_liquido?'LIQUIDO':a.imponible?'IMPONIBLE':'NO IMPONIBLE',a.cantidad||'',a.valor_unitario?Math.round(a.valor_unitario):'',a.monto,a.creado_por||'',String(a.created_at).slice(0,10)]),
+    // Los totales van bajo la columna Monto, que con Horas y Valor hora corrió al índice 7.
+    [],['','','','TOTAL IMPONIBLE','','','',D.totales.imponible],
+       ['','','','TOTAL NO IMPONIBLE','','','',D.totales.no_imponible],
+       ['','','','TOTAL LIQUIDO','','','',D.totales.liquido]];
   const html = '<table>'+filas.map((f,i)=>'<tr>'+f.map(c=>`<t${i?'d':'h'}>${esc(c==null?'':c)}</t${i?'d':'h'}>`).join('')+'</tr>').join('')+'</table>';
   const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>'+html+'</body></html>'],{type:'application/vnd.ms-excel'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);

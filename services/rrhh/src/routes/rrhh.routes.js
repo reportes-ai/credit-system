@@ -162,6 +162,8 @@ router.get('/remuneraciones/nomina-banco',    verifyToken, requireFunc('rh_remun
 router.get('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.getPreviredConfig);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
 router.get('/remuneraciones/adicionales',        verifyToken, requireFunc('rh_remuneraciones'), rem.getAdicionales);
+// Valor de la hora extra del colaborador (sueldo base de su ficha + jornada y recargo paramétricos)
+router.get('/remuneraciones/hora-extra',         verifyToken, requireFunc('rh_remuneraciones'), rem.getHoraExtra);
 router.post('/remuneraciones/adicionales',       verifyToken, requireFunc('rh_remuneraciones'), rem.crearAdicional);
 router.delete('/remuneraciones/adicionales/:id', verifyToken, requireFunc('rh_remuneraciones'), rem.eliminarAdicional);
 router.get('/remuneraciones/descuentos',         verifyToken, requireFunc('rh_remuneraciones'), rem.getDescuentos);

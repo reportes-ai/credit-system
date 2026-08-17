@@ -147,6 +147,72 @@ require('../../../../shared/migrate').enFila('rrhh-adicionales', async () => {
   } catch (e) { console.error('[rrhh-adicionales migration]', e.message); }
 });
 
+/* ── HORAS EXTRAS: se ingresan las HORAS y el monto lo calcula el sistema ──────
+   Antes había que traer el monto calculado de afuera; ahora se digita la
+   cantidad de horas y el valor sale del motor único (shared/horas-extras.js),
+   con el sueldo base de la ficha. Se guardan las horas y el valor unitario para
+   que la liquidación sea explicable: "10 h × $10.341", no un monto suelto que
+   nadie sabe de dónde salió.
+
+   La jornada semanal y el recargo son PARÁMETROS (rh_config): la ley los sigue
+   moviendo —44 h desde abril 2026, 42 h en 2027, 40 h en 2028— y ese día se
+   cambian en la configuración, no en el código. */
+require('../../../../shared/migrate').enFila('rrhh-adicionales-he', async () => {
+  try {
+    await pool.query('ALTER TABLE rh_adicionales ADD COLUMN cantidad DECIMAL(6,2) NULL COMMENT "horas extras digitadas"');
+  } catch (e) { if (e.errno !== 1060) console.error('[adic cantidad]', e.message); }
+  try {
+    await pool.query('ALTER TABLE rh_adicionales ADD COLUMN valor_unitario DECIMAL(12,2) NULL COMMENT "valor de la hora extra al momento del cálculo"');
+  } catch (e) { if (e.errno !== 1060) console.error('[adic valor_unitario]', e.message); }
+  try {
+    await pool.query(`INSERT IGNORE INTO rh_config (clave, valor) VALUES
+      ('he_jornada_semanal', '44'), ('he_recargo_pct', '50')`);
+  } catch (e) { console.error('[adic config he]', e.message); }
+});
+
+/* Parámetros de la hora extra, con los valores legales por defecto si no están. */
+async function paramsHE() {
+  const HE = require('../../../../shared/horas-extras');
+  try {
+    const [rows] = await pool.query("SELECT clave, valor FROM rh_config WHERE clave IN ('he_jornada_semanal','he_recargo_pct')");
+    const m = Object.fromEntries(rows.map(r => [r.clave, parseFloat(r.valor)]));
+    return {
+      jornadaSemanal: m.he_jornada_semanal > 0 ? m.he_jornada_semanal : HE.JORNADA_SEMANAL_DEFAULT,
+      recargoPct: Number.isFinite(m.he_recargo_pct) ? m.he_recargo_pct : HE.RECARGO_PCT_DEFAULT,
+    };
+  } catch (e) { return { jornadaSemanal: HE.JORNADA_SEMANAL_DEFAULT, recargoPct: HE.RECARGO_PCT_DEFAULT }; }
+}
+
+/* Datos de jornada y sueldo de la ficha, para calcularle la hora extra. */
+async function baseHE(idUsuario) {
+  const [[f]] = await pool.query(
+    'SELECT sueldo_base, jornada_art22, jornada_40h, jornada_especial_hrs FROM rh_fichas WHERE id_usuario=? LIMIT 1',
+    [idUsuario]);
+  const p = await paramsHE();
+  return {
+    sueldoBase: Number(f?.sueldo_base) || 0,
+    art22: !!f?.jornada_art22,
+    // La jornada de la persona manda sobre la general: una jornada especial o
+    // las 40 h pactadas hacen la hora más cara, y pagarla con la general sería
+    // pagar de menos.
+    jornadaSemanal: Number(f?.jornada_especial_hrs) > 0 ? Number(f.jornada_especial_hrs)
+                  : (f?.jornada_40h ? 40 : p.jornadaSemanal),
+    recargoPct: p.recargoPct,
+  };
+}
+
+/* ── GET /adicionales/hora-extra?id_usuario=&horas= — lo que ve la pantalla ── */
+const getHoraExtra = async (req, res) => {
+  try {
+    const idU = Number(req.query.id_usuario);
+    if (!idU) return fail(res, 'Colaborador requerido', 400);
+    const base = await baseHE(idU);
+    const horas = Number(req.query.horas) || 0;
+    const { montoHorasExtras } = require('../../../../shared/horas-extras');
+    ok(res, { ...montoHorasExtras(horas, base), sueldo_base: base.sueldoBase });
+  } catch (e) { console.error('[rrhh hora-extra]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 // Causal → imponible (paramétrico simple; OTRO lo decide el usuario)
 const CAUSALES_ADIC = {
   'BONO DE DESEMPEÑO': 1, 'AGUINALDO': 1, 'HORAS EXTRAS': 1, 'COMISIÓN EXTRAORDINARIA': 1,
@@ -180,8 +246,24 @@ const crearAdicional = async (req, res) => {
     if (!/^\d{4}-\d{2}$/.test(mes || '')) return fail(res, 'Mes inválido', 400);
     if (await mesEmitido(mes)) return fail(res, `Las remuneraciones de ${mes} ya fueron EMITIDAS: el mes está bloqueado para nuevos adicionales.`, 423);
     const idU = Number(b.id_usuario);
-    const monto = Math.round(Number(b.monto) || 0);
     const causal = String(b.causal || '').toUpperCase().trim();
+
+    /* HORAS EXTRAS: el monto SIEMPRE lo recalcula el servidor a partir de las
+       horas. Tomar el monto que manda la pantalla dejaría el pago a merced de
+       lo que llegue en el request — acá se paga lo que dice el motor con el
+       sueldo base de la ficha, y nada más. */
+    let monto = Math.round(Number(b.monto) || 0);
+    let cantidad = null, valorUnitario = null;
+    if (causal === 'HORAS EXTRAS') {
+      const horas = Number(b.horas ?? b.cantidad);
+      if (!(horas > 0)) return fail(res, 'Indica cuántas horas extras se pagan', 400);
+      if (horas > 60) return fail(res, `${horas} horas es demasiado para un mes: el tope legal son 2 horas diarias (art. 31). Revisa el dato.`, 400);
+      const { montoHorasExtras } = require('../../../../shared/horas-extras');
+      const calc = montoHorasExtras(horas, await baseHE(idU));
+      if (!calc.aplica) return fail(res, calc.motivo, 400);
+      monto = calc.monto; cantidad = horas; valorUnitario = calc.valor_hora_extra;
+    }
+
     if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
     if (!(causal in CAUSALES_ADIC)) return fail(res, 'Causal no válida', 400);
     if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail(res, 'Describe la causal en "Otro"', 400);
@@ -190,10 +272,13 @@ const crearAdicional = async (req, res) => {
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
     if (!colab) return fail(res, 'Colaborador no encontrado', 404);
     const [r] = await pool.query(
-      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, monto, creado_por) VALUES (?,?,?,?,?,?,?,?)',
-      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, nombreDe(u)]);
+      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, cantidad, valorUnitario, nombreDe(u)]);
+    // El detalle deja el cálculo a la vista: sin el "10 h × $10.341" hay que
+    // reconstruir a mano de dónde salió el monto cuando alguien lo pregunta.
+    const glosaHE = cantidad ? ` (${cantidad} h × $${Math.round(valorUnitario).toLocaleString('es-CL')})` : '';
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
-      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}` });
+      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}` });
     ok(res, { id: r.insertId, imponible, es_liquido: esLiquido });
   } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
@@ -1262,5 +1347,5 @@ async function getNominaBanco(req, res) {
 }
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
-  revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional,
+  revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
   getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };
