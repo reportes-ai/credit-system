@@ -601,8 +601,13 @@ exports.importar = async (req, res) => {
     /* Las columnas que se traen son las que se contrastan contra el archivo
        (shared/campos-carga-dif.js). `fecha_otorgado` va con DATE_FORMAT: como
        Date se compararía contra el string del Excel y toda fila saldría distinta. */
+    /* `mes_txt`: la columna `mes` es DATE, así que mysql2 la entrega como objeto
+       Date y `String(mes).slice(0,7)` daba "Sat Aug" — que no calza con ningún
+       'YYYY-MM'. Por eso el período se compara SIEMPRE contra este campo, ya
+       formateado por SQL, y nunca contra `mes` directo. */
     const COLS_ACT = `valor_vehiculo, pie, saldo_precio, monto_financiado,
               marca, modelo, automotora, vendedor, producto,
+              DATE_FORMAT(mes,'%Y-%m') AS mes_txt,
               DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') AS fecha_otorgado`;
     // Traer registros actuales (por num_op propio)
     const [existing] = await pool.query(
@@ -645,7 +650,8 @@ exports.importar = async (req, res) => {
     const VENTANA = await ventanaMeses();
     let fueraVentana = 0;
     const enVentana = (actual, f) => {
-      const mesOp = String(actual?.mes || f?.mes || '').slice(0, 7);
+      // mes_txt viene de DATE_FORMAT (ver COLS_ACT); el del archivo es 'YYYY-MM-01'.
+      const mesOp = actual?.mes_txt || String(f?.mes || '').slice(0, 7);
       // Sin mes no se puede ubicar la operación en el tiempo: no se contrasta.
       if (!mesOp || !VENTANA.has(mesOp)) { fueraVentana++; return false; }
       return true;
@@ -705,7 +711,7 @@ exports.importar = async (req, res) => {
           // Diferencias de montos contra el archivo → cola para resolver a mano
           try {
             const act = existAfMap[String(f.num_op)];
-            if (act && enVentana(act, f) && !(await isMesCerrado(String(act.mes || '').slice(0, 7))))
+            if (act && enVentana(act, f) && !(await isMesCerrado(act.mes_txt || '')))
               difsCorrida.push(...await anotarDiferencias(act.id, act, f, nombreArchivo));
           } catch (e) { console.error('[dif AF]', e.message); }
           log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -744,7 +750,7 @@ exports.importar = async (req, res) => {
           );
           actualizados++;
           try {
-            if (actual.id && enVentana(actual, f) && !(await isMesCerrado(String(actual.mes || '').slice(0, 7))))
+            if (actual.id && enVentana(actual, f) && !(await isMesCerrado(actual.mes_txt || '')))
               difsCorrida.push(...await anotarDiferencias(actual.id, actual, f, nombreArchivo));
           } catch (e) { console.error('[dif]', e.message); }
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
