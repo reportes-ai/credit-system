@@ -2854,7 +2854,13 @@ exports.rcvPendientes = async (req, res) => {
         nota_credito: Number(d.tipo_dte) === 61,
       });
     }
-    ok(res, { mes, docs, ya_en_auxiliar: ya, config: await getConfigDig() });
+    /* TRAMPA: los documentos importados de AVSOFT antes de la corrección del parser
+       quedaron con el FOLIO igual al TIPO ('33'-'33'). Contra esos, el chequeo de
+       duplicados de arriba es ciego —ningún folio real va a calzar— y traer el RCV
+       de un mes ya importado lo DUPLICARÍA entero. Se avisa y no se decide solo. */
+    const [[fol]] = await pool.query(
+      "SELECT COUNT(*) n FROM ctb_compras_aux WHERE mes=? AND num_doc=tipo_doc", [mes]);
+    ok(res, { mes, docs, ya_en_auxiliar: ya, folios_invalidos: fol.n, config: await getConfigDig() });
   } catch (e) { fail(res, e.message); }
 };
 

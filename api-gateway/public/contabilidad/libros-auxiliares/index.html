@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -403,6 +403,11 @@ async function abrirRcvImportar(){
     </tr>`).join('');
   d.innerHTML = `
     <h5 class="fw-bold mb-1"><i class="bi bi-box-arrow-in-down me-2"></i>Traer documentos del SII al auxiliar — ${esc(j.data.mes)}</h5>
+    ${j.data.folios_invalidos ? `<div class="alert alert-danger py-2 small">
+      <b><i class="bi bi-exclamation-octagon me-1"></i>Cuidado: este mes ya tiene ${fmt(j.data.folios_invalidos)} documentos con el folio mal importado</b>
+      (quedaron con el folio igual al tipo, "33-33", de una importación de AVSOFT anterior a la corrección del parser).
+      Contra esos documentos <b>no se puede detectar duplicados</b>: si traes el RCV ahora, el mes te queda duplicado.
+      Primero <b>re-importa el export de AVSOFT de este mes</b> (reemplaza el mes completo y trae los folios buenos) y recién después usa este botón.</div>` : ''}
     <div class="small text-muted mb-3">Pendientes: <b>${RCVDOCS.length}</b> · ya en el auxiliar: <b>${fmt(j.data.ya_en_auxiliar)}</b>.
       Los montos y folios vienen del SII y no se editan; lo único que defines es la <b>cuenta de gasto</b>.
       Las notas de crédito (61) quedan marcadas y no se importan: van con signo negativo y se digitan aparte.</div>
