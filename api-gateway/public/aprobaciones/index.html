@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -857,7 +857,19 @@ const rawMoney = id => parseInt(document.getElementById(id).dataset.raw||'0',10)
 function setMoney(id, v){ const el=document.getElementById(id); el.dataset.raw=v||0; el.value=v?'$'+parseInt(v).toLocaleString('es-CL'):''; }
 // Fechas: normalizar para round-trip BD (mysql no acepta ISO con T/Z en strict)
 const dDate = v => v ? String(v).slice(0,10) : null;
-const dDT   = v => { if(!v) return null; const d=new Date(v); if(isNaN(d)) return null; return d.toISOString().slice(0,19).replace('T',' '); };
+/* dDT arma el 'YYYY-MM-DD HH:mm:ss' que viaja a la BD. Debe ser hora de CHILE:
+   con toISOString() salía en UTC y MySQL lo guardaba tal cual en una columna que
+   se lee en hora local — la carta nacía 4 horas en el futuro, y como sanitizarCarta
+   pasa por acá TODAS las fechas, cada re-guardado corría otra vez las marcas.
+   Es el mismo episodio de las 4 horas: no usar toISOString para hora de pared. */
+const dDT = v => {
+  if (!v) return null;
+  const d = new Date(v); if (isNaN(d)) return null;
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Santiago', hourCycle:'h23',
+    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' })
+    .formatToParts(d).reduce((a,x)=>(a[x.type]=x.value,a),{});
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+};
 
 /* ── Init ─────────────────────────────────────────── */
 (async function init(){

@@ -1165,7 +1165,11 @@ const upsert = async (req, res) => {
       c.plazo || null, c.acreedor, c.parque,
       c.concesionario, c.rutConc, c.vendedor,
       c.partNeto || null, c.partIVA || null, c.partBruto || null,
-      c.fecha || null, dt(c.fechaCreacion) || new Date(),
+      /* fecha_creacion la sella el SERVIDOR, siempre: es la fecha de nacimiento de
+         la fila y no hay razón para que la ponga el navegador. Antes se aceptaba
+         c.fechaCreacion y bastó que un módulo la mandara en UTC para que la carta
+         naciera 4 horas en el futuro. Regla: las marcas de tiempo las pone acá. */
+      c.fecha || null, new Date(),
       c.creadoPor, c.creadoPorNombre, c.creadoPorInitials,
       c.status || 'PENDIENTE',
       c.aprobadoPor || null, c.aprobadoPorNombre || null, c.aprobadoPorInitials || null,

@@ -96,15 +96,38 @@ async function revisar() {
   return hallazgos;
 }
 
+/* La marca de "ya revisé hoy" vive en la BASE, no en memoria. Con una variable de
+   proceso, CADA deploy y cada reinicio la reseteaba y el vigía volvía a mandar el
+   mismo correo: el 17-08-2026 salieron 11 avisos idénticos en una hora, uno por
+   arranque, y de a dos cuando se solapaban dos instancias. Un aviso que se repite
+   así deja de leerse, que es exactamente lo contrario de para lo que existe.
+   El INSERT ... ON DUPLICATE KEY es la reserva ATÓMICA del día: si otro proceso ya
+   lo tomó, no afecta filas y este se calla. */
+require('./migrate').enFila('vigia-relojes-estado', async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tareas_dia (
+      tarea VARCHAR(60) NOT NULL PRIMARY KEY,
+      dia CHAR(10) NOT NULL,
+      actualizado DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+});
+
+async function reservarDia(tarea, dia) {
+  const [r] = await pool.query(
+    'INSERT INTO tareas_dia (tarea, dia) VALUES (?,?) ON DUPLICATE KEY UPDATE dia=IF(dia<>VALUES(dia), VALUES(dia), dia)',
+    [tarea, dia]);
+  return r.affectedRows !== 0;   // 0 = la fila ya decía hoy: otro proceso se adelantó
+}
+
 /* Corre cada 30 min pero actúa UNA vez al día, pasadas las 08:00 de Chile.
    (No a las 08:00 exactas: si el proceso partió a las 09:00, revisa igual.) */
-let ultimoDia = null;
 async function tick() {
   const ahora = ahoraChileNode();               // 'YYYY-MM-DD HH:mm:ss'
   const dia = ahora.slice(0, 10);
   const hora = Number(ahora.slice(11, 13));
-  if (hora < 8 || ultimoDia === dia) return;
-  ultimoDia = dia;
+  if (hora < 8) return;
+  try { if (!await reservarDia('vigia-relojes', dia)) return; }
+  catch (e) { console.error('[vigia-relojes] no se pudo reservar el día:', e.message); return; }
   await revisar();
 }
 
