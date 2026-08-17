@@ -104,4 +104,26 @@ function aTexto(campo, valor) {
   return String(valor).slice(0, 60);
 }
 
-module.exports = { CAMPOS_DIF, ORDEN_GRUPOS, POR_COL, TOL_PESO, difieren, aTexto, normTexto, normFecha };
+/**
+ * Qué meses entran en el contraste: el mes que se está cargando y `atras` meses
+ * antes. Se contrasta solo el período que se carga (mes en curso, y a comienzos
+ * de mes también el anterior para cerrarlo) — mirar más atrás son meses ya
+ * cerrados y cuadrados, y llenar la pantalla de casos viejos hace que se dejen
+ * de mirar los nuevos.
+ * @param {string} mesActual 'YYYY-MM'
+ * @param {number} atras     cuántos meses hacia atrás además del actual
+ * @returns {Set<string>} meses 'YYYY-MM'
+ */
+function ventanaDesde(mesActual, atras = 1) {
+  const [y, m] = String(mesActual).split('-').map(Number);
+  const n = Number.isFinite(atras) && atras >= 0 ? Math.floor(atras) : 1;
+  const meses = new Set();
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return meses;
+  for (let i = 0; i <= n; i++) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));   // Date.UTC normaliza el cambio de año solo
+    meses.add(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  }
+  return meses;
+}
+
+module.exports = { CAMPOS_DIF, ORDEN_GRUPOS, POR_COL, TOL_PESO, difieren, aTexto, normTexto, normFecha, ventanaDesde };

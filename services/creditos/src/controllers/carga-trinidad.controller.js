@@ -101,7 +101,31 @@ require('../../../../shared/migrate').enFila('carga-trinidad', async () => {
 
 /* Qué campos se contrastan: catálogo ÚNICO en shared/campos-carga-dif.js (lo
    comparte con el módulo que las resuelve). Para sumar un campo, se agrega allá. */
-const { CAMPOS_DIF, ORDEN_GRUPOS, difieren, aTexto } = require('../../../../shared/campos-carga-dif');
+const { CAMPOS_DIF, ORDEN_GRUPOS, difieren, aTexto, ventanaDesde } = require('../../../../shared/campos-carga-dif');
+const { mesChile } = require('../../../../shared/utils/fecha-futura');
+
+/* ── HASTA DÓNDE ATRÁS SE CONTRASTA ─────────────────────────────────────────
+   El contraste mira SOLO las operaciones del período que se está cargando, no
+   la base entera. Así trabaja Pato: siempre carga el mes en curso, y los
+   primeros días del mes carga el anterior para cerrarlo tranquilo. Revisar más
+   atrás no aporta nada — esos meses ya se cerraron y se cuadraron — y llenaría
+   la pantalla de diferencias viejas que nadie va a resolver, que es la forma
+   más segura de que se dejen de mirar también las nuevas.
+
+   Ventana = mes en curso + los anteriores que diga `carga_dif_meses_atras`
+   (default 1, o sea mes actual y el pasado). Es un parámetro y no un número
+   fijo porque el día que haya que revisar tres meses hacia atrás, eso lo
+   cambia el Administrador y no un programador. */
+const MESES_ATRAS_DEFAULT = 1;
+async function ventanaMeses() {
+  let atras = MESES_ATRAS_DEFAULT;
+  try {
+    const [[p]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='carga_dif_meses_atras' LIMIT 1");
+    const n = parseInt(p?.valor, 10);
+    if (Number.isFinite(n) && n >= 0 && n <= 24) atras = n;
+  } catch (e) { /* sin parámetro, la ventana por defecto */ }
+  return ventanaDesde(mesChile(), atras);   // el cálculo, en el motor puro
+}
 
 /* Anota (o actualiza) las diferencias pendientes de una operación. Nunca toca el
    crédito: solo deja el caso para que una persona resuelva.
@@ -614,6 +638,18 @@ exports.importar = async (req, res) => {
     const detallesIns  = [];   // para historial inserts
     const cambiosLog   = [];   // para historial cambios
     const difsCorrida  = [];   // diferencias detectadas en ESTA carga (informe final)
+    /* El contraste solo mira el período que se está cargando (ver ventanaMeses).
+       `fueraVentana` cuenta lo que quedó afuera para poder decirlo en pantalla:
+       si no, "0 diferencias" se leería como "todo cuadra" cuando en realidad son
+       meses que ni se miraron. */
+    const VENTANA = await ventanaMeses();
+    let fueraVentana = 0;
+    const enVentana = (actual, f) => {
+      const mesOp = String(actual?.mes || f?.mes || '').slice(0, 7);
+      // Sin mes no se puede ubicar la operación en el tiempo: no se contrasta.
+      if (!mesOp || !VENTANA.has(mesOp)) { fueraVentana++; return false; }
+      return true;
+    };
     const cursadosIds        = [];   // num_ops (campo num_op en BD)
     const cursadosIdFinanciera = []; // num_ops Trinidad que están como id_financiera en BD
 
@@ -669,7 +705,7 @@ exports.importar = async (req, res) => {
           // Diferencias de montos contra el archivo → cola para resolver a mano
           try {
             const act = existAfMap[String(f.num_op)];
-            if (act && !(await isMesCerrado(String(act.mes || '').slice(0, 7))))
+            if (act && enVentana(act, f) && !(await isMesCerrado(String(act.mes || '').slice(0, 7))))
               difsCorrida.push(...await anotarDiferencias(act.id, act, f, nombreArchivo));
           } catch (e) { console.error('[dif AF]', e.message); }
           log.push(`↔ Sincronizado en AF ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -708,7 +744,7 @@ exports.importar = async (req, res) => {
           );
           actualizados++;
           try {
-            if (actual.id && !(await isMesCerrado(String(actual.mes || '').slice(0, 7))))
+            if (actual.id && enVentana(actual, f) && !(await isMesCerrado(String(actual.mes || '').slice(0, 7))))
               difsCorrida.push(...await anotarDiferencias(actual.id, actual, f, nombreArchivo));
           } catch (e) { console.error('[dif]', e.message); }
           log.push(`✓ Actualizado ${f.num_op} → ${f.estado_autofin} / ${f.estado_credito}`);
@@ -824,14 +860,21 @@ exports.importar = async (req, res) => {
       if (filasG.length) grupos.push({ grupo: g, total: filasG.length, filas: filasG.slice(0, TOPE_DIF) });
     }
     const mostradas = grupos.reduce((a, g) => a + g.filas.length, 0);
+    const meses = [...VENTANA].sort();
     const diferencias = {
       total: difsCorrida.length,
       mostradas,
       ocultas: difsCorrida.length - mostradas,
       operaciones: new Set(difsCorrida.map(d => d.id_credito)).size,
       grupos,
+      // Qué se miró y qué no: "0 diferencias" sin esto se leería como
+      // "todo cuadra", cuando puede ser que esos meses ni se revisaron.
+      ventana: meses,
+      ventana_txt: meses.length > 1 ? `${meses[0]} a ${meses[meses.length - 1]}` : meses[0],
+      fuera_ventana: fueraVentana,
     };
     if (difsCorrida.length) log.push(`⚖ ${difsCorrida.length} diferencia(s) con el archivo en ${diferencias.operaciones} operación(es) — nada se pisó, hay que elegir`);
+    if (fueraVentana) log.push(`⏭ ${fueraVentana} operación(es) fuera del período contrastado (${diferencias.ventana_txt}) — no se compararon`);
 
     return res.json({
       success: true,

@@ -8,7 +8,7 @@
    op 6251839, mala desde el alta y veinte cargas sin que nadie se enterara. */
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { difieren, aTexto, CAMPOS_DIF, POR_COL, ORDEN_GRUPOS } = require('../shared/campos-carga-dif');
+const { difieren, aTexto, CAMPOS_DIF, POR_COL, ORDEN_GRUPOS, ventanaDesde } = require('../shared/campos-carga-dif');
 
 test('un monto distinto es diferencia; $1 de redondeo no', () => {
   assert.equal(difieren('valor_vehiculo', 8990000, 9500000), true);
@@ -61,6 +61,29 @@ test('cada campo tiene etiqueta, tipo conocido y un grupo que se muestra', () =>
     assert.ok(ORDEN_GRUPOS.includes(c.grupo), `${c.col} en un grupo que la pantalla no dibuja: ${c.grupo}`);
     assert.equal(POR_COL[c.col], c);
   }
+});
+
+/* La ventana del contraste: solo el período que se carga. Se revisa el mes en
+   curso y, a comienzos de mes, también el anterior para cerrarlo — nunca la base
+   entera, porque los meses viejos ya están cuadrados y su ruido tapa lo nuevo. */
+test('la ventana por defecto son el mes en curso y el anterior', () => {
+  assert.deepEqual([...ventanaDesde('2026-08', 1)].sort(), ['2026-07', '2026-08']);
+});
+
+test('la ventana cruza el cambio de año sin quedar en mes 0', () => {
+  assert.deepEqual([...ventanaDesde('2026-01', 1)].sort(), ['2025-12', '2026-01']);
+  assert.deepEqual([...ventanaDesde('2026-02', 3)].sort(), ['2025-11', '2025-12', '2026-01', '2026-02']);
+});
+
+test('con 0 meses atrás se contrasta solo el mes en curso', () => {
+  assert.deepEqual([...ventanaDesde('2026-08', 0)], ['2026-08']);
+});
+
+test('un parámetro con basura no deja la ventana vacía: cae al default', () => {
+  // Si esto devolviera un Set vacío, la carga dejaría de contrastar TODO en
+  // silencio y "0 diferencias" pasaría a significar "no miré nada".
+  assert.deepEqual([...ventanaDesde('2026-08', NaN)].sort(), ['2026-07', '2026-08']);
+  assert.deepEqual([...ventanaDesde('2026-08', -5)].sort(), ['2026-07', '2026-08']);
 });
 
 test('aTexto deja el valor listo para guardar y mostrar', () => {

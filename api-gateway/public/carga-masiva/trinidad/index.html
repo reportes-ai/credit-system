@@ -312,7 +312,15 @@ function difFmt(valor, tipo) {
 
 function triPintarDiferencias(dif) {
   const cont = document.getElementById('triDiferencias');
-  if (!dif || !dif.total) { cont.innerHTML = ''; return; }
+  if (!dif) { cont.innerHTML = ''; return; }
+  // Sin diferencias tampoco se calla: hay que decir QUÉ período se comparó, o
+  // "todo cuadra" podría estar hablando de meses que ni se miraron.
+  if (!dif.total) {
+    cont.innerHTML = `<div style="margin-top:16px;background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px 20px;font-size:.85rem;color:#166534">
+      <i class="bi bi-check2-circle me-2"></i><b>Sin diferencias</b> en el período contrastado (${esc(dif.ventana_txt || '—')}).
+      ${dif.fuera_ventana ? `<span style="color:#6b7280"> ${dif.fuera_ventana} operación(es) de otros meses no se compararon.</span>` : ''}</div>`;
+    return;
+  }
 
   const gruposHtml = dif.grupos.map(g => `
     <div class="dif-grupo">
@@ -350,6 +358,9 @@ function triPintarDiferencias(dif) {
       <div style="font-size:.82rem;color:#78350f">
         No se pisó ningún dato: marca cuál valor queda. Lo que no elijas sigue pendiente en
         <a href="/carga-masiva/diferencias/" style="color:#92400e;font-weight:700">Diferencias con la Carga</a>.
+      </div>
+      <div style="font-size:.76rem;color:#a16207;margin-top:6px">
+        <i class="bi bi-calendar3 me-1"></i>Período contrastado: <b>${esc(dif.ventana_txt || '—')}</b>${dif.fuera_ventana ? ` · ${dif.fuera_ventana} operación(es) de otros meses no se compararon` : ''}
       </div>
       ${dif.ocultas ? `<div style="font-size:.8rem;color:#92400e;margin-top:8px;background:#fef3c7;border-radius:8px;padding:6px 10px">
         <i class="bi bi-info-circle me-1"></i>Se muestran ${dif.mostradas} de ${dif.total}; las otras ${dif.ocultas} están completas en

@@ -141,6 +141,8 @@ const ensureTable = async () => {
     ['pref_rent_minima', 100000, '¿Dónde curso? — rentabilidad mínima por operación ($); bajo esto se avisa que no conviene cursar'],
     // ── Validación de datos: piso de una prima de seguro ──────────────────
     ['prima_minima_valida', 10000, 'Piso de validez de una prima de seguro ($): sobre $0 pero bajo este monto se considera dato corrupto y el crédito vuelve a la cola de Digitación'],
+    // ── Contraste de la carga masiva contra nuestros datos ────────────────
+    ['carga_dif_meses_atras', 1, 'Carga Trinidad — cuántos meses hacia atrás, además del mes en curso, se contrastan contra el archivo (1 = mes actual y el pasado). Los meses viejos ya están cuadrados: revisarlos llena la pantalla de casos que nadie resuelve'],
   ];
   for (const [clave, valor, descripcion] of defaults) {
     await pool.query(
