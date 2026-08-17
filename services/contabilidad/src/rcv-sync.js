@@ -206,12 +206,41 @@ async function sincronizar() {
   return { ok: out.every(r => r.ok), meses: out };
 }
 
-/* Cron: cada 12h revisa si el último OK tiene 2+ días (presupuesto: 30 consultas/mes gratis). */
+/* Cron: cada 12h revisa si el último OK tiene 2+ días (presupuesto: 30 consultas/mes gratis).
+
+   FRENO ANTE FALLAS (agosto 2026): el plan gratis da 30 consultas al mes y en agosto
+   se hicieron 812. No fueron sincronizaciones: fue este mismo tick reintentando con
+   una configuración que no podía funcionar (la clave del certificado estaba mala),
+   una vez a los 45 s de CADA arranque — y con varios deploys al día eso son decenas
+   de llamadas diarias que nadie pidió. Una integración rota no debe consumir la
+   cuota que necesita cuando la arreglen.
+   Por eso: si el último intento falló, se espera cada vez más (30 min, 1 h, 2 h… hasta
+   12 h) según cuántas fallas seguidas van. Un arranque no reintenta si la falla es
+   reciente. Cuando la configuración se arregla, el primer OK borra el castigo. */
+const ESPERA_MIN = [30, 60, 120, 240, 480, 720];   // minutos, según fallas consecutivas
+
+async function frenado() {
+  const [[u]] = await pool.query("SELECT MAX(created_at) t FROM ctb_rcv_sync_log WHERE resultado='OK'");
+  const [fallas] = await pool.query(
+    `SELECT created_at FROM ctb_rcv_sync_log
+      WHERE resultado='ERROR' AND created_at > COALESCE(?, '2000-01-01')
+      ORDER BY id DESC LIMIT 6`, [u?.t || null]);
+  if (!fallas.length) return false;
+  const espera = ESPERA_MIN[Math.min(fallas.length, ESPERA_MIN.length) - 1] * 60000;
+  const desde = Date.now() - new Date(fallas[0].created_at).getTime();
+  if (desde < espera) {
+    console.log(`[rcv] en pausa: ${fallas.length} fallas seguidas, próximo intento en ${Math.ceil((espera - desde) / 60000)} min`);
+    return true;
+  }
+  return false;
+}
+
 async function tick() {
   try {
     if (!configurado()) return;
     const [[u]] = await pool.query("SELECT MAX(created_at) t FROM ctb_rcv_sync_log WHERE resultado='OK'");
     if (u?.t && Date.now() - new Date(u.t).getTime() < 2 * 86400000 - 3600000) return;
+    if (await frenado()) return;
     await sincronizar();
   } catch (e) { console.error('[rcv tick]', e.message); }
 }
