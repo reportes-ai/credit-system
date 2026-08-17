@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.1 — auxiliares de compras y honorarios (import AVSOFT): filtros, totales por mes, export Excel -->
+  <!-- v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -55,6 +55,7 @@
     <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
       <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
     <button class="btn btn-sm btn-outline-primary" id="btnRcv" onclick="rcvSync()"><i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)</button>
+    <button class="btn btn-sm btn-primary" id="btnRcvImp" onclick="abrirRcvImportar()"><i class="bi bi-box-arrow-in-down me-1"></i>Traer del SII al auxiliar</button>
   </div>
   <div id="rcvEstado" class="small text-muted mb-2" style="display:none"></div>
 
@@ -77,11 +78,12 @@
 
   <div class="mt-4 p-3" style="background:#f8fafc;border-left:4px solid var(--navy);border-radius:8px;font-size:.82rem">
     <div class="fw-bold mb-1"><i class="bi bi-info-circle me-1"></i>De dónde salen estos datos</div>
-    Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)", <b>Ventas</b> → "Exportar Documentos de Ventas" (un archivo por mes; las notas de crédito tipo 61 entran con signo negativo) y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
+    Se importan desde AVSOFT: <b>Compras</b> → Importador/Exportador → "Exportar Documentos de Compras (1 Línea)", <b>Ventas</b> → "Exportar Documentos de Ventas" (un archivo por mes; las notas de crédito tipo 61 entran con signo negativo) y <b>Honorarios</b> → "Movimiento Honorarios". La importación (botón arriba, también disponible en <a href="/contabilidad/directorio/">Presentación Directorio</a>) reemplaza completos los meses que trae el archivo, así que re-importar es seguro. Desde el <b>SII</b>: "Sincronizar SII (RCV)" trae el libro de compras oficial (espejo read-only) y <b>"Traer del SII al auxiliar"</b> ingresa esos documentos al libro operativo proponiendo la cuenta de gasto que cada proveedor usó antes — sin digitar folio ni montos a mano. El export de compras no trae marca de pago: esto es el <b>detalle de compras del período</b>, no el saldo por pagar (ese está en el Balance, cuentas 21xx).
   </div>
 </div>
 
 <dialog id="dlgDig" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:26px;width:620px;max-width:94vw"></dialog>
+<dialog id="dlgRcv" style="border:none;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:24px;width:1150px;max-width:96vw"></dialog>
 
 <script src="/js/auth-guard.js"></script>
 <script>
@@ -369,6 +371,83 @@ async function rcvSync(){
   } catch (e) { alert('RCV: ' + e.message); }
   btn.disabled = false; btn.innerHTML = '<i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)';
 }
+/* ── RCV → auxiliar: revisión documento a documento antes de confirmar ──
+   El SII trae todo menos la CUENTA DE GASTO: se propone la que ese proveedor
+   usó históricamente y el contador la confirma o la cambia antes de ingresar. */
+let RCVDOCS = [];
+async function abrirRcvImportar(){
+  await cargarBase();
+  const mes = fHasta.value || new Date().toISOString().slice(0,7);
+  const d = document.getElementById('dlgRcv');
+  d.innerHTML = '<div class="p-4 text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Buscando documentos del SII pendientes…</div>';
+  d.showModal();
+  const j = await (await fetch('/api/contabilidad/rcv/pendientes?mes='+mes,{headers:H})).json();
+  if (!j.success){ d.innerHTML = `<div class="p-3 text-danger">${esc(j.error)}</div><div class="text-end"><button class="btn btn-sm btn-outline-secondary" onclick="dlgRcv.close()">Cerrar</button></div>`; return; }
+  RCVDOCS = j.data.docs || [];
+  const cfg = j.data.config || {};
+  const filas = RCVDOCS.map((x,i)=>`
+    <tr class="${x.nota_credito?'table-warning':''}">
+      <td><input type="checkbox" class="rcvChk" data-i="${i}" ${x.nota_credito?'disabled':'checked'}></td>
+      <td>${esc(x.tipo_doc)}</td><td class="num">${esc(x.num_doc)}</td>
+      <td>${esc(x.fecha_doc||'')}</td>
+      <td>${esc(x.rut)}<br><span class="text-muted" style="font-size:.72rem">${esc(x.razon_social||'')}</span></td>
+      <td class="text-right num">${fmt(x.neto)}</td><td class="text-right num">${fmt(x.iva)}</td><td class="text-right num">${fmt(x.total)}</td>
+      <td style="min-width:250px">${selCta('rcvCta'+i, x.cuenta_sugerida||'')}
+        ${x.cuenta_sugerida?`<div class="text-success" style="font-size:.7rem"><i class="bi bi-magic"></i> propuesta: usada ${x.veces_cuenta} ${x.veces_cuenta===1?'vez':'veces'} con este proveedor</div>`
+          :`<div class="text-danger" style="font-size:.7rem"><i class="bi bi-exclamation-triangle"></i> proveedor sin historial: elige la cuenta</div>`}</td>
+    </tr>`).join('');
+  d.innerHTML = `
+    <h5 class="fw-bold mb-1"><i class="bi bi-box-arrow-in-down me-2"></i>Traer documentos del SII al auxiliar — ${esc(j.data.mes)}</h5>
+    <div class="small text-muted mb-3">Pendientes: <b>${RCVDOCS.length}</b> · ya en el auxiliar: <b>${fmt(j.data.ya_en_auxiliar)}</b>.
+      Los montos y folios vienen del SII y no se editan; lo único que defines es la <b>cuenta de gasto</b>.
+      Las notas de crédito (61) quedan marcadas y no se importan: van con signo negativo y se digitan aparte.</div>
+    ${RCVDOCS.length ? `
+    <div class="d-flex gap-2 align-items-end mb-2 flex-wrap">
+      <button class="btn btn-sm btn-outline-secondary" onclick="rcvTodos(true)">Marcar todos</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="rcvTodos(false)">Desmarcar</button>
+      <div><label class="form-label small mb-1">Aplicar esta cuenta a los marcados</label>${selCta('rcvCtaMasiva','')}</div>
+      <button class="btn btn-sm btn-outline-primary" onclick="rcvAplicarMasiva()">Aplicar</button>
+    </div>
+    <div class="panel" style="max-height:46vh"><table>
+      <thead><tr><th></th><th>DTE</th><th>Folio</th><th>Emisión</th><th>Proveedor</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th><th>Cuenta de gasto</th></tr></thead>
+      <tbody>${filas}</tbody></table></div>
+    <div class="form-check mt-3"><input type="checkbox" class="form-check-input" id="rcvAsiento" checked onchange="rcvAsientoUI()">
+      <label class="form-check-label small fw-semibold" for="rcvAsiento">Generar el asiento contable de cada documento</label></div>
+    <div id="rcvCtasAsiento" class="row g-2 mt-1">
+      <div class="col-6"><label class="form-label small mb-1">Cuenta IVA crédito fiscal</label>${selCta('rcvCtaIva', cfg.cta_iva_credito)}</div>
+      <div class="col-6"><label class="form-label small mb-1">Cuenta por pagar (proveedores)</label>${selCta('rcvCtaCxp', cfg.cta_cxp, /^2/)}</div>
+    </div>` : '<div class="alert alert-success py-2 small mb-0"><i class="bi bi-check-circle me-1"></i>No hay documentos del SII pendientes de ingresar en este mes.</div>'}
+    <div class="d-flex justify-content-end gap-2 mt-3">
+      <button class="btn btn-sm btn-outline-secondary" onclick="dlgRcv.close()">Cerrar</button>
+      ${RCVDOCS.length ? '<button class="btn btn-sm btn-primary" onclick="rcvConfirmar(this)"><i class="bi bi-check-lg me-1"></i>Ingresar al auxiliar</button>' : ''}
+    </div>`;
+}
+function rcvAsientoUI(){ document.getElementById('rcvCtasAsiento').style.display = document.getElementById('rcvAsiento').checked ? '' : 'none'; }
+function rcvTodos(v){ document.querySelectorAll('.rcvChk:not(:disabled)').forEach(c=>c.checked=v); }
+function rcvAplicarMasiva(){
+  const v = document.getElementById('rcvCtaMasiva').value; if (!v) return alert('Elige una cuenta primero.');
+  document.querySelectorAll('.rcvChk:checked').forEach(c=>{ document.getElementById('rcvCta'+c.dataset.i).value = v; });
+}
+async function rcvConfirmar(btn){
+  const sel = [...document.querySelectorAll('.rcvChk:checked')].map(c=>Number(c.dataset.i));
+  if (!sel.length) return alert('No hay documentos marcados.');
+  const docs = sel.map(i=>({ ...RCVDOCS[i], cuenta_gasto: document.getElementById('rcvCta'+i).value }));
+  const sinCta = docs.filter(d=>!d.cuenta_gasto);
+  if (sinCta.length) return alert(`Faltan cuentas de gasto en ${sinCta.length} documento(s): ${sinCta.slice(0,5).map(d=>d.num_doc).join(', ')}…`);
+  const asiento = document.getElementById('rcvAsiento').checked;
+  if (asiento && (!rcvCtaIva.value || !rcvCtaCxp.value)) return alert('Para generar los asientos hay que definir la cuenta de IVA crédito y la cuenta por pagar.');
+  if (!confirm(`Se ingresarán ${docs.length} documentos al auxiliar${asiento?' con su asiento contable':''}. ¿Continuar?`)) return;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Ingresando…';
+  const r = await fetch('/api/contabilidad/rcv/importar',{method:'POST',headers:H,body:JSON.stringify({
+    mes: fHasta.value, docs, generar_asiento: asiento, cuenta_iva: asiento?rcvCtaIva.value:null, cuenta_cxp: asiento?rcvCtaCxp.value:null })});
+  const j = await r.json(); btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Ingresar al auxiliar';
+  if (!j.success) return alert(j.error);
+  const e = j.data.errores || [];
+  alert(`Ingresados ${j.data.ingresados} documentos por $${fmt(j.data.total)}.` +
+    (e.length ? `\n\nNo entraron ${e.length}:\n` + e.slice(0,10).map(x=>`· ${x.num_doc} ${x.razon_social||''}: ${x.motivo}`).join('\n') : ''));
+  dlgRcv.close(); rcvEstadoCargar(); consultar();
+}
+
 async function rcvEstadoCargar(){
   try {
     const j = await (await fetch('/api/contabilidad/rcv/estado', { headers:H })).json();

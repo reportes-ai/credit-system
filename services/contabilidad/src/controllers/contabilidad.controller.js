@@ -13,6 +13,7 @@
 const { programar } = require('../../../../shared/scheduler.js');
 const pool = require('../../../../shared/config/database');
 const { auditar } = require('../../../../shared/audit');
+const { hoyISO, isoDe } = require('../../../../shared/fecha-chile');
 require('../motor-asientos'); // Fase 2: carga el motor (migra reglas + log al boot)
 
 const ok   = (res, data) => res.json({ success: true, data, error: null });
@@ -1488,42 +1489,53 @@ const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_r
   finally { conn.release(); }
 };
 
+/* MOTOR ÚNICO de ingreso de una factura de compra al auxiliar (+ su asiento).
+   Lo usan la digitación manual y el importador del RCV: la única diferencia entre
+   ambos es de dónde vienen los datos y qué marca queda en `origen`. Lanza Error
+   con .http cuando el dato no sirve — el llamador decide si corta o acumula. */
+async function ingresarCompraAux(b, { origen = 'DIGITADO', req } = {}) {
+  const { tipo_doc, num_doc, rut, razon_social, fecha_doc, fecha_vcto, cuenta_gasto, cuenta_iva, cuenta_cxp } = b;
+  const neto = Math.round(Number(b.neto) || 0), exento = Math.round(Number(b.exento) || 0), iva = Math.round(Number(b.iva) || 0);
+  const total = neto + exento + iva;
+  const err = (m, http) => { throw Object.assign(new Error(m), { http: http || 400 }); };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_doc || '')) err('Fecha del documento inválida');
+  if (!num_doc || !rut || !razon_social) err('Folio, RUT y razón social son obligatorios');
+  if (total <= 0) err('Montos en cero');
+  if (!cuenta_gasto) err('Cuenta de gasto obligatoria');
+  const mes = fecha_doc.slice(0, 7);
+  const [[dup]] = await pool.query('SELECT id FROM ctb_compras_aux WHERE rut=? AND tipo_doc=? AND num_doc=? LIMIT 1', [rut, tipo_doc || '33', String(num_doc)]);
+  if (dup) err(`Ya existe la factura ${num_doc} de ${rut} en el auxiliar (id ${dup.id})`, 409);
+
+  let comp = null;
+  if (b.generar_asiento) {
+    if (iva > 0 && !cuenta_iva) err('Cuenta IVA crédito obligatoria para el asiento');
+    if (!cuenta_cxp) err('Cuenta por pagar obligatoria para el asiento');
+    const movimientos = [
+      { cuenta: cuenta_gasto, debe: neto + exento, haber: 0, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
+      ...(iva > 0 ? [{ cuenta: cuenta_iva, debe: iva, haber: 0, glosa: `IVA FC ${num_doc}`, rut }] : []),
+      { cuenta: cuenta_cxp, debe: 0, haber: total, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
+    ];
+    comp = await crearComprobanteDoc({
+      fecha: fecha_doc, glosa: `Compra ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
+      movimientos, origen: origen === 'RCV' ? 'COMPRA_RCV' : 'COMPRA_DIG',
+      origen_ref: `${rut}|${tipo_doc || '33'}|${num_doc}`, usuario: nombreDe(req?.user),
+    });
+  }
+  const [r] = await pool.query(
+    `INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total, origen, id_comprobante)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [mes, tipo_doc || '33', String(num_doc), fecha_doc, fecha_vcto || null, 'Vigente', rut, String(razon_social).slice(0, 200),
+     cuenta_cxp || null, cuenta_gasto, neto, exento, iva, total, origen, comp?.id || null]);
+  if (req) auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: origen === 'RCV' ? 'compra_rcv' : 'compra_digitada', entidad_id: r.insertId, detalle: `FC ${num_doc} ${razon_social} $${total.toLocaleString('es-CL')}${comp ? ' → ' + comp.numero : ''}` });
+  return { id: r.insertId, total, comprobante: comp };
+}
+
 exports.digitarCompraAux = async (req, res) => {
   try {
     const b = req.body || {};
-    const { tipo_doc, num_doc, rut, razon_social, fecha_doc, fecha_vcto, cuenta_gasto, cuenta_iva, cuenta_cxp } = b;
-    const neto = Math.round(Number(b.neto) || 0), exento = Math.round(Number(b.exento) || 0), iva = Math.round(Number(b.iva) || 0);
-    const total = neto + exento + iva;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha_doc || '')) return fail(res, 'Fecha del documento inválida', 400);
-    if (!num_doc || !rut || !razon_social) return fail(res, 'Folio, RUT y razón social son obligatorios', 400);
-    if (total <= 0) return fail(res, 'Montos en cero', 400);
-    if (!cuenta_gasto) return fail(res, 'Cuenta de gasto obligatoria', 400);
-    const mes = fecha_doc.slice(0, 7);
-    const [[dup]] = await pool.query('SELECT id FROM ctb_compras_aux WHERE rut=? AND tipo_doc=? AND num_doc=? LIMIT 1', [rut, tipo_doc || '33', String(num_doc)]);
-    if (dup) return fail(res, `Ya existe la factura ${num_doc} de ${rut} en el auxiliar (id ${dup.id})`, 409);
-
-    let comp = null;
-    if (b.generar_asiento) {
-      if (iva > 0 && !cuenta_iva) return fail(res, 'Cuenta IVA crédito obligatoria para el asiento', 400);
-      if (!cuenta_cxp) return fail(res, 'Cuenta por pagar obligatoria para el asiento', 400);
-      const movimientos = [
-        { cuenta: cuenta_gasto, debe: neto + exento, haber: 0, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
-        ...(iva > 0 ? [{ cuenta: cuenta_iva, debe: iva, haber: 0, glosa: `IVA FC ${num_doc}`, rut }] : []),
-        { cuenta: cuenta_cxp, debe: 0, haber: total, glosa: `FC ${num_doc} ${razon_social}`.slice(0, 200), rut },
-      ];
-      comp = await crearComprobanteDoc({
-        fecha: fecha_doc, glosa: `Compra ${tipo_doc || '33'}-${num_doc} ${razon_social}`.slice(0, 250),
-        movimientos, origen: 'COMPRA_DIG', origen_ref: `${rut}|${tipo_doc || '33'}|${num_doc}`, usuario: nombreDe(req.user),
-      });
-    }
-    const [r] = await pool.query(
-      `INSERT INTO ctb_compras_aux (mes, tipo_doc, num_doc, fecha_doc, fecha_vcto, estado, rut, razon_social, cuenta_cxp, cuenta_gasto, neto, exento, iva, total, origen, id_comprobante)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DIGITADO',?)`,
-      [mes, tipo_doc || '33', String(num_doc), fecha_doc, fecha_vcto || null, 'Vigente', rut, String(razon_social).slice(0, 200),
-       cuenta_cxp || null, cuenta_gasto, neto, exento, iva, total, comp?.id || null]);
-    await setConfigDig({ cta_iva_credito: cuenta_iva, cta_cxp: cuenta_cxp });
-    auditar({ req, accion: 'CREAR', modulo: 'contabilidad', entidad: 'compra_digitada', entidad_id: r.insertId, detalle: `FC ${num_doc} ${razon_social} $${total.toLocaleString('es-CL')}${comp ? ' → ' + comp.numero : ''}` });
-    ok(res, { id: r.insertId, comprobante: comp });
+    const out = await ingresarCompraAux(b, { origen: 'DIGITADO', req });
+    await setConfigDig({ cta_iva_credito: b.cuenta_iva, cta_cxp: b.cuenta_cxp });
+    ok(res, { id: out.id, comprobante: out.comprobante });
   } catch (e) { fail(res, e.message, e.http || 500); }
 };
 
@@ -2789,5 +2801,92 @@ exports.rcvSincronizar = async (req, res) => {
     auditar({ req, accion: 'SINCRONIZAR', modulo: 'contabilidad', entidad: 'rcv_sii',
       detalle: `RCV SII manual ${m || '(rutina)'}: ${JSON.stringify(r).slice(0, 300)}` });
     ok(res, r);
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ── RCV → auxiliar de compras ────────────────────────────────────────────────
+   El SII es la fuente oficial del libro de compras, pero el libro OPERATIVO (el
+   que alimenta los asientos y el F29) es ctb_compras_aux. Esto cierra la brecha
+   que muestra el panel ("88 docs del SII vs 0 en el auxiliar") sin digitar a mano:
+   el RCV trae RUT, folio, fechas y montos; lo único que el SII no sabe es la
+   CUENTA DE GASTO, que se propone desde el historial del propio proveedor y
+   siempre pasa por revisión humana antes de confirmar.
+   Las notas de crédito (61) quedan fuera: en el auxiliar entran con signo
+   negativo y el motor de ingreso exige total > 0 — se digitan aparte. */
+const rutNorm = r => String(r || '').replace(/\./g, '').replace(/\s/g, '').toUpperCase();
+
+exports.rcvPendientes = async (req, res) => {
+  try {
+    const mes = /^\d{4}-\d{2}$/.test(String(req.query.mes || '')) ? req.query.mes : hoyISO().slice(0, 7);
+    const [sii] = await pool.query('SELECT * FROM ctb_rcv_compras WHERE mes=? ORDER BY monto_total DESC', [mes]);
+    if (!sii.length) return ok(res, { mes, docs: [], ya_en_auxiliar: 0, config: await getConfigDig() });
+
+    // Ya ingresados: se busca por folio (el documento puede haber quedado en otro mes)
+    const folios = [...new Set(sii.map(d => String(d.folio)))];
+    const [aux] = await pool.query('SELECT rut, tipo_doc, num_doc FROM ctb_compras_aux WHERE num_doc IN (?)', [folios]);
+    const yaEsta = new Set(aux.map(a => `${rutNorm(a.rut)}|${a.tipo_doc}|${a.num_doc}`));
+
+    // Cuenta propuesta: la más usada históricamente por ese proveedor (desempate: la más reciente)
+    const ruts = [...new Set(sii.map(d => d.rut_proveedor))];
+    const [hist] = await pool.query(
+      `SELECT rut, cuenta_gasto, COUNT(*) n, MAX(fecha_doc) ult
+         FROM ctb_compras_aux WHERE cuenta_gasto IS NOT NULL AND cuenta_gasto<>'' AND rut IN (?)
+        GROUP BY rut, cuenta_gasto`, [ruts]);
+    const porRut = {};
+    for (const h of hist) {
+      const k = rutNorm(h.rut), a = porRut[k];
+      if (!a || h.n > a.n || (h.n === a.n && String(h.ult) > String(a.ult))) porRut[k] = h;
+    }
+
+    let ya = 0;
+    const docs = [];
+    for (const d of sii) {
+      const clave = `${rutNorm(d.rut_proveedor)}|${d.tipo_dte}|${d.folio}`;
+      if (yaEsta.has(clave)) { ya++; continue; }
+      const sug = porRut[rutNorm(d.rut_proveedor)];
+      docs.push({
+        tipo_doc: String(d.tipo_dte), tipo_nombre: d.tipo_dte_nombre, num_doc: String(d.folio),
+        rut: d.rut_proveedor, razon_social: d.razon_social,
+        fecha_doc: isoDe(d.fecha_emision), fecha_recepcion: isoDe(d.fecha_recepcion),
+        neto: Number(d.monto_neto || 0), exento: Number(d.monto_exento || 0),
+        iva: Number(d.iva_recuperable || 0), total: Number(d.monto_total || 0),
+        cuenta_sugerida: sug?.cuenta_gasto || null, veces_cuenta: sug?.n || 0,
+        nota_credito: Number(d.tipo_dte) === 61,
+      });
+    }
+    ok(res, { mes, docs, ya_en_auxiliar: ya, config: await getConfigDig() });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* POST {mes, generar_asiento, cuenta_iva, cuenta_cxp, docs:[{...,cuenta_gasto}]}
+   Documento a documento: uno que falla no bota a los demás — el resultado dice
+   exactamente cuáles entraron y por qué se saltó cada otro. */
+exports.rcvImportar = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const lista = Array.isArray(b.docs) ? b.docs : [];
+    if (!lista.length) return fail(res, 'No se recibió ningún documento para importar', 400);
+    if (lista.length > 300) return fail(res, 'Máximo 300 documentos por importación', 400);
+
+    const okDocs = [], errores = [];
+    for (const d of lista) {
+      try {
+        if (Number(d.tipo_doc) === 61) throw new Error('Las notas de crédito se digitan aparte (van con signo negativo)');
+        const r = await ingresarCompraAux({
+          tipo_doc: String(d.tipo_doc || '33'), num_doc: String(d.num_doc), rut: d.rut, razon_social: d.razon_social,
+          fecha_doc: d.fecha_doc, fecha_vcto: d.fecha_vcto || null,
+          neto: d.neto, exento: d.exento, iva: d.iva,
+          cuenta_gasto: d.cuenta_gasto, generar_asiento: !!b.generar_asiento,
+          cuenta_iva: b.cuenta_iva, cuenta_cxp: b.cuenta_cxp,
+        }, { origen: 'RCV', req });
+        okDocs.push({ num_doc: d.num_doc, rut: d.rut, total: r.total, comprobante: r.comprobante?.numero || null });
+      } catch (e) {
+        errores.push({ num_doc: d.num_doc, rut: d.rut, razon_social: d.razon_social, motivo: e.message });
+      }
+    }
+    if (b.generar_asiento) await setConfigDig({ cta_iva_credito: b.cuenta_iva, cta_cxp: b.cuenta_cxp });
+    auditar({ req, accion: 'IMPORTAR', modulo: 'contabilidad', entidad: 'rcv_a_auxiliar',
+      detalle: `RCV ${b.mes || ''} → auxiliar: ${okDocs.length} ingresados, ${errores.length} con problema${b.generar_asiento ? ' (con asiento)' : ''}` });
+    ok(res, { ingresados: okDocs.length, total: okDocs.reduce((s, d) => s + d.total, 0), errores, docs: okDocs });
   } catch (e) { fail(res, e.message); }
 };

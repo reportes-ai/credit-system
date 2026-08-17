@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.28 — cap. 3: la cartola del parque sale del servidor con PDF adjunto. v4.27 — cap. 3: avisos por correo del pago a parques (mantenedor Correos del Sistema). v4.26 — cap. 3: migracion de comisiones de parque ya pagadas (908 comisiones, 98 cartolas). v4.25 — cap. 3: regla del universo de cartolas parque (arrastre + liberado a pago + foto por operacion). v4.24 — cap. 1: fecha 1a cuota desde el CUADRO DE PAGO de la carta + sello SIN INFORMACION DealerNet; cap. 4: pipeline del portal del dealer y correo al dealer. v4.23 — cap. 1: Correccion de Cartas de Aprobacion (carta nueva -C1, la anterior REEMPLAZADA, QR y FES no vigentes). v4.22 — cap. 36: el revisor compara la comision dealer bruta contra bruta. v4.21 — cap. 38 Excepcion por rechazo de la financiera (regla del 60%). v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.29 — cap. 39: del RCV del SII al auxiliar de compras (cuenta propuesta por proveedor). v4.28 — cap. 3: la cartola del parque sale del servidor con PDF adjunto. v4.27 — cap. 3: avisos por correo del pago a parques (mantenedor Correos del Sistema). v4.26 — cap. 3: migracion de comisiones de parque ya pagadas (908 comisiones, 98 cartolas). v4.25 — cap. 3: regla del universo de cartolas parque (arrastre + liberado a pago + foto por operacion). v4.24 — cap. 1: fecha 1a cuota desde el CUADRO DE PAGO de la carta + sello SIN INFORMACION DealerNet; cap. 4: pipeline del portal del dealer y correo al dealer. v4.23 — cap. 1: Correccion de Cartas de Aprobacion (carta nueva -C1, la anterior REEMPLAZADA, QR y FES no vigentes). v4.22 — cap. 36: el revisor compara la comision dealer bruta contra bruta. v4.21 — cap. 38 Excepcion por rechazo de la financiera (regla del 60%). v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -77,6 +77,7 @@
     <a href="#p36">36. Revisor Automático de Cartas (Unidad y Autofin)</a>
     <a href="#p37">37. Bono del Jefe Comercial (Balanced Scorecard)</a>
     <a href="#p38">38. Excepción por rechazo de la financiera (regla del 60%)</a>
+    <a href="#p39">39. Libro de compras: del SII al auxiliar (RCV)</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -882,6 +883,30 @@
   </ul>
   <div class="flujo"><span class="st mal">RECHAZADA EN UNA FINANCIERA</span><span class="ar">→</span><span class="st">SIMULAR EN LA OTRA</span><span class="ar">→</span><span class="st">¿AutoFácil ≥ 60%?</span><span class="ar">→</span><span class="st fin">EXCEPCIÓN APROBADA</span><span class="ar">/</span><span class="st mal">NO SE APRUEBA</span></div>
   <div class="afecta"><b>Afecta:</b> elección de financiera (§26 ¿Dónde curso?), comisión del dealer de esa operación (§1), rentabilidad del crédito. <b>Depende de:</b> rechazo previo de una financiera, Simulador de Rentabilidad, Excepciones Comerciales (§35) para dejar el registro.</div>
+
+  <h2 id="p39">39. Libro de compras: del SII al auxiliar (RCV)</h2>
+  <p><b>Qué y para qué:</b> dejar de digitar facturas de proveedores una por una. El <b>SII ya tiene el detalle</b> de todo lo que nos facturaron (RUT, folio, fechas, neto, IVA, total); el sistema lo trae y lo convierte en documentos del auxiliar con su asiento contable. Es una pieza del reemplazo de AVSOFT: el <b>F29 sale del sistema</b> porque el libro de compras se construye solo.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>El <b>Contador</b> (permiso <code>ctb_libros_aux</code>) revisa y confirma. La sincronización con el SII la hace el sistema solo.</div>
+    <div><b class="lbl">Prerequisitos</b>Certificado digital y Clave Tributaria cargados en el entorno (ver <code>docs/SII-certificado-rescate.md</code>). El mes no puede estar <b>cerrado con candado</b>.</div>
+  </div>
+  <h3>Cómo se hace</h3>
+  <ol>
+    <li><b>Sincronizar</b> — <a href="/contabilidad/libros-auxiliares/">Libros Auxiliares</a> → "Sincronizar SII (RCV)". Corre solo cada 2 días (el plan gratuito da 30 consultas al mes). Deja un <b>espejo read-only</b> del SII: reemplaza el mes completo, así que re-sincronizar siempre es seguro.</li>
+    <li><b>Ver la brecha</b> — el banner muestra <b>docs del SII vs docs del auxiliar</b>. Esa diferencia es exactamente lo que falta por ingresar.</li>
+    <li><b>Traer del SII al auxiliar</b> — lista los documentos del mes que todavía no están en el auxiliar. Folios y montos <b>vienen del SII y no se editan</b>; lo único que define el contador es la <b>cuenta de gasto</b>.</li>
+    <li><b>La cuenta se propone sola</b>: la que ese mismo proveedor usó más veces en el histórico del auxiliar, indicando cuántas veces. Un proveedor nuevo aparece marcado en rojo, sin propuesta.</li>
+    <li><b>Confirmar</b> — cada documento entra con <code>origen='RCV'</code> y, si se marcó la opción, su asiento: Debe gasto (neto+exento) + Debe IVA crédito · Haber proveedores (total). Un documento que falla no bota a los demás: el resultado dice cuáles entraron y por qué se saltó cada otro.</li>
+  </ol>
+  <h3>Reglas</h3>
+  <ul>
+    <li>El <b>SII es la fuente oficial</b>; el auxiliar es el <b>libro operativo</b>. Son dos tablas distintas a propósito — el panel las compara y esa comparación es el control.</li>
+    <li><b>No se duplica</b>: se busca por RUT + tipo de DTE + folio en TODO el auxiliar, no solo en el mes, para que un documento contabilizado en otro período no vuelva a entrar.</li>
+    <li>Las <b>notas de crédito (61) no se importan</b>: en el auxiliar van con signo negativo. Se digitan aparte.</li>
+    <li>Ingresar es el <b>mismo motor</b> que la digitación manual (documento + asiento), así que las validaciones — cuenta imputable, asiento cuadrado, candado del mes — son idénticas por los dos caminos.</li>
+  </ul>
+  <div class="flujo"><span class="st">SII (RCV)</span><span class="ar">→</span><span class="st">ESPEJO ctb_rcv_compras</span><span class="ar">→</span><span class="st">REVISIÓN DE CUENTAS</span><span class="ar">→</span><span class="st">AUXILIAR + ASIENTO</span><span class="ar">→</span><span class="st fin">F29</span></div>
+  <div class="afecta"><b>Afecta:</b> auxiliar de compras, <a href="/contabilidad/comprobantes/">Comprobantes</a> (un asiento por documento), IVA crédito fiscal y F29, Cierre de Mes. <b>Depende de:</b> certificado digital del SII vigente, plan de cuentas, historial del auxiliar (de ahí sale la cuenta propuesta).</div>
 
 </body>
 </html>

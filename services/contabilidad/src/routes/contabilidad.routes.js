@@ -112,6 +112,8 @@ router.get('/cluster-pg', verifyToken, requireFunc('ctb_cluster', 'ctb_directori
 // RCV SII (SimpleAPI) — libro de compras oficial
 router.get('/rcv/estado',       verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux', 'ctb_cierre_mes'), ctrl.rcvEstado);
 router.post('/rcv/sincronizar', verifyToken, requireFunc('ctb_f29', 'ctb_libros_aux'), ctrl.rcvSincronizar);
+router.get('/rcv/pendientes',   verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvPendientes);
+router.post('/rcv/importar',    verifyToken, requireFunc('ctb_libros_aux'), ctrl.rcvImportar);
 
 // Bitácora de Cierres
 router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);
