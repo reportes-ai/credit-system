@@ -84,7 +84,7 @@
 <body>
 <nav class="topnav">
   <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v7.1</span></a>
+    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge">v7.2</span></a>
     <div class="breadcrumb-nav">
       <a href="/">Inicio</a><span class="sep">›</span>
       <a href="/carga-masiva/">Carga Masiva</a><span class="sep">›</span>
@@ -108,7 +108,11 @@
     <i class="bi bi-diagram-3-fill"></i>
     <div>
       <h2>Carga Trinidad</h2>
-      <p>Importa los Excel exportados desde Trinidad. <strong>Solicitudes</strong>: nuevos se insertan, existentes se actualizan (estado). <strong>Informe Canal AFA</strong>: complementa seguros, GPS, tipo vehículo y RUT (solo rellena lo vacío). Llave: ID Trinidad = N° Operación AutoFácil.</p>
+      <!-- La llave dejó de ser "ID Trinidad = N° Operación": desde agosto 2026 toda
+           operación nace con NUESTRO correlativo y el ID de Trinidad queda en ID
+           Financiera. El texto viejo hacía buscar por un número que no es el que
+           se guarda. -->
+      <p>Importa los Excel exportados desde Trinidad. <strong>Solicitudes</strong>: nuevos se insertan, existentes se actualizan (estado). <strong>Informe Canal AFA</strong>: complementa seguros, GPS, tipo vehículo y RUT (solo rellena lo vacío). Llave: <strong>ID Trinidad = ID Financiera</strong> del crédito; el N° de Operación es siempre nuestro correlativo AutoFácil.</p>
     </div>
   </div>
 
