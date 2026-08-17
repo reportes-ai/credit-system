@@ -138,17 +138,31 @@ async function consultarComprasSII(mes, anio) {
     signal: AbortSignal.timeout(180000),
   });
   const texto = await res.text();
-  if (!res.ok) throw new Error(`SimpleAPI ${res.status}: ${texto.slice(0, 300)}`);
+  if (!res.ok) { const err = new Error(`SimpleAPI ${res.status}: ${texto.slice(0, 300)}`); err.status = res.status; throw err; }
   const j = JSON.parse(texto);
   const compras = g(j, 'compras') || j;
   return g(compras, 'detalleCompras') || [];
+}
+
+/* SimpleAPI admite 1 llamada por segundo: si dos consultas coinciden (el motor
+   automático + el botón manual), responde 429. Se reintenta con espera — el 429
+   no consume cuota del plan, solo pide calma. */
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+async function consultarConCalma(mes, anio) {
+  for (let intento = 1; ; intento++) {
+    try { return await consultarComprasSII(mes, anio); }
+    catch (e) {
+      if (e.status !== 429 || intento >= 4) throw e;
+      await pausa(1500 * intento);
+    }
+  }
 }
 
 /* Sincroniza UN período (reemplaza el mes completo: el SII es la fuente). */
 async function sincronizarMes(anio, mes) {
   const per = `${anio}-${String(mes).padStart(2, '0')}`;
   try {
-    const det = await consultarComprasSII(mes, anio);
+    const det = await consultarConCalma(mes, anio);
     await pool.query('DELETE FROM ctb_rcv_compras WHERE mes=?', [per]);
     let iva = 0;
     for (const d of det) {
@@ -185,6 +199,7 @@ async function sincronizar() {
   const hoy = new Date();
   const out = [await sincronizarMes(hoy.getFullYear(), hoy.getMonth() + 1)];
   if (hoy.getDate() <= 8) {
+    await pausa(1200);   // 1 llamada por segundo (límite SimpleAPI)
     const prev = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 15);
     out.push(await sincronizarMes(prev.getFullYear(), prev.getMonth() + 1));
   }
