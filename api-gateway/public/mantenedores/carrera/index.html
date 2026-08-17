@@ -4,7 +4,7 @@
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carrera de Colocaciones — Mantenedores</title>
-  <!-- v1.0 -->
+  <!-- v1.1 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -49,13 +49,16 @@
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <button class="btn-test" onclick="probar()"><i class="bi bi-play-circle me-1"></i>Probar pista (con el avance real del mes)</button>
       <button class="btn-navy" onclick="guardar()"><i class="bi bi-floppy me-1"></i>Guardar cambios</button>
+      <button class="btn-navy" style="background:#b45309" onclick="lanzar()"><i class="bi bi-megaphone me-1"></i>Lanzar ahora a todos</button>
     </div>
+    <div class="hint" style="margin-top:6px">Lanzar ahora: el popup aparece de inmediato a todos los usuarios (aunque ya lo hayan visto hoy), sin importar el check de activo ni la hora. Vale por el resto del día.</div>
   </div>
 
   <div class="afecta">
     <b><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</b>
     <ul>
       <li><b>Popup de la pista</b> → aparece en <b>todas las páginas</b> a todos los usuarios, 1 vez al día desde la hora configurada.</li>
+      <li><b>Lanzar ahora a todos</b> → gatillador manual: fuerza el popup de inmediato en todos los navegadores (queda auditado en <a href="/auditoria/">Auditoría</a>).</li>
       <li><b>Carriles</b> → Ejecutivos Comerciales <b>activos</b> (perfil en <a href="/usuarios/">Usuarios</a>); avance = créditos <b>OTORGADOS</b> del mes (tabla <code>creditos</code>, mismos datos del <a href="/dashboard/">Dashboard</a>).</li>
       <li><b>Meta mensual</b> → posición de la línea de llegada para TODOS los ejecutivos.</li>
     </ul>
@@ -82,6 +85,12 @@
     const j=await(await fetch('/api/carrera/config',{method:'PUT',headers:HJ,body:JSON.stringify(b)})).json();
     if(!j.success)return alert(j.error||'Error al guardar');
     const t=document.getElementById('toast'); t.style.display='block'; setTimeout(()=>t.style.display='none',2200);
+  }
+  async function lanzar(){
+    if(!confirm('¿Lanzar la carrera AHORA a todos los usuarios? El popup les aparecerá en la próxima página que abran, aunque ya lo hayan visto hoy.'))return;
+    const j=await(await fetch('/api/carrera/lanzar',{method:'POST',headers:HJ})).json();
+    if(!j.success)return alert(j.error||'Error al lanzar');
+    const t=document.getElementById('toast'); t.textContent='🚀 Lanzada a todos'; t.style.display='block'; setTimeout(()=>{t.style.display='none';t.textContent='✓ Guardado';},2600);
   }
   async function probar(){
     const j=await(await fetch('/api/carrera/popup?test=1',{headers:H})).json(); const d=j.data||{};

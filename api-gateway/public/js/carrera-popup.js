@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Carrera de Colocaciones 🏃 (v1.0) — popup diario con la pista de atletismo
+   Carrera de Colocaciones 🏃 (v1.1) — popup diario con la pista de atletismo
    vista desde arriba: un carril por ejecutivo, el corredor avanza según sus
    créditos otorgados del mes vs la meta (línea de llegada a cuadros).
    Cargado global vía app-version.js; 1 vez al día por navegador desde la hora
@@ -67,16 +67,18 @@
     }, 350);
   }
 
-  function hoyKey() { const d = new Date(); return 'afCarrera_' + d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
   async function check() {
     try {
       const token = sessionStorage.getItem('token'); if (!token) return;
-      if (localStorage.getItem(hoyKey())) return; // 1 vez al día
-      const r = await fetch('/api/carrera/popup', { headers: { Authorization: 'Bearer ' + token } });
+      // Sello de vista: identifica el día + el último lanzamiento manual. Se manda al
+      // servidor; si coincide, responde mostrar:false sin hacer las queries pesadas.
+      // Si el mantenedor "lanza a todos", el sello cambia y el popup vuelve a salir.
+      const vista = localStorage.getItem('afCarreraVista') || '';
+      const r = await fetch('/api/carrera/popup?vista=' + encodeURIComponent(vista), { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) return;
       const j = await r.json(); const d = (j && j.data) || {};
       if (!d.mostrar) return;
-      localStorage.setItem(hoyKey(), '1');
+      if (d.sello) localStorage.setItem('afCarreraVista', d.sello);
       mostrar(d);
     } catch (e) { /* silencioso */ }
   }

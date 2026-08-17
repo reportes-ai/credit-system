@@ -42,11 +42,17 @@ require('../../../../shared/migrate').enFila('carrera', async () => {
   } catch (e) { console.error('[carrera permisos]', e.message); }
 });
 
+/* La config se consulta en CADA carga de página (el sello decide si se muestra),
+   así que se cachea 60 s para no golpear la BD; guardar/lanzar la invalida. */
+let _cfgCache = null, _cfgCacheAt = 0;
 async function getConfig() {
+  if (_cfgCache && Date.now() - _cfgCacheAt < 60 * 1000) return _cfgCache;
   const [rows] = await pool.query('SELECT clave, valor FROM carrera_config LIMIT 100');
   const cfg = {}; rows.forEach(r => cfg[r.clave] = r.valor);
+  _cfgCache = cfg; _cfgCacheAt = Date.now();
   return cfg;
 }
+const olvidarConfig = () => { _cfgCache = null; };
 const tpl = (t, vars) => String(t || '').replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? vars[k] : ''));
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 const keyEj = s => norm(s).split(' ').filter(Boolean).sort().join(' ');
@@ -61,7 +67,16 @@ const popup = async (req, res) => {
     const cfg = await getConfig();
     const ch = chileNow();
     const esTest = String(req.query.test || '') === '1';
-    if (!esTest) {
+    // Lanzamiento manual del día (botón del mantenedor): fuerza el popup para todos
+    // aunque ya lo hayan visto, saltándose activo/hora. El "sello" identifica la
+    // vista vigente (día + lanzamiento); el cliente lo manda en ?vista y si coincide
+    // se corta aquí, ANTES de las queries pesadas.
+    const lanzHoy = String(cfg.lanzada_at || '').slice(0, 10) === ch.fecha;
+    const sello = ch.fecha + '|' + (lanzHoy ? cfg.lanzada_at : '');
+    if (!esTest && String(req.query.vista || '') === sello) {
+      return res.json({ success: true, data: { mostrar: false }, error: null });
+    }
+    if (!esTest && !lanzHoy) {
       if (cfg.activo !== '1') return res.json({ success: true, data: { mostrar: false }, error: null });
       const desde = /^\d{2}:\d{2}$/.test(cfg.hora_desde || '') ? cfg.hora_desde : '08:00';
       if (ch.hhmm < desde) return res.json({ success: true, data: { mostrar: false }, error: null });
@@ -84,7 +99,7 @@ const popup = async (req, res) => {
     const mesLabel = MESES[ch.month - 1] + ' ' + ch.year;
     const fechaLarga = new Intl.DateTimeFormat('es-CL', { timeZone: 'America/Santiago', day: 'numeric', month: 'long' }).format(new Date());
     res.json({ success: true, data: {
-      mostrar: true, fecha: ch.fecha, meta,
+      mostrar: true, fecha: ch.fecha, meta, sello,
       titulo: tpl(cfg.titulo, { mes: mesLabel, meta, fecha: fechaLarga }),
       subtitulo: tpl(cfg.subtitulo, { mes: mesLabel, meta, fecha: fechaLarga }),
       corredores,
@@ -104,9 +119,23 @@ const setConfigApi = async (req, res) => {
       if (!PERMITIDAS.includes(k)) continue;
       await pool.query('INSERT INTO carrera_config (clave, valor) VALUES (?,?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)', [k, String(v == null ? '' : v)]);
     }
+    olvidarConfig();
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'carrera', detalle: 'Actualizó carrera de colocaciones: ' + Object.keys(b).join(', ') });
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { popup, getConfigApi, setConfigApi };
+/* POST /api/carrera/lanzar — gatillador manual: el popup aparece de inmediato a
+   TODOS (aunque ya lo hayan visto hoy), sin importar activo/hora. Vale por el día. */
+const lanzar = async (req, res) => {
+  try {
+    const ch = chileNow();
+    const marca = ch.fecha + ' ' + ch.hhmm + ':' + String(new Date().getSeconds()).padStart(2, '0');
+    await pool.query("INSERT INTO carrera_config (clave, valor) VALUES ('lanzada_at', ?) ON DUPLICATE KEY UPDATE valor=VALUES(valor)", [marca]);
+    olvidarConfig();
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'carrera', detalle: 'Lanzó la carrera manualmente a todos (' + marca + ')' });
+    res.json({ success: true, data: { ok: true, lanzada_at: marca }, error: null });
+  } catch (e) { res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+module.exports = { popup, getConfigApi, setConfigApi, lanzar };

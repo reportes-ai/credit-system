@@ -8,5 +8,6 @@ const ctrl = require('../controllers/carrera.controller');
 router.get('/popup', verifyToken, ctrl.popup);
 router.get('/config', verifyToken, requireFunc('mant_carrera'), ctrl.getConfigApi);
 router.put('/config', verifyToken, requireFunc('mant_carrera'), ctrl.setConfigApi);
+router.post('/lanzar', verifyToken, requireFunc('mant_carrera'), ctrl.lanzar);
 
 module.exports = router;
