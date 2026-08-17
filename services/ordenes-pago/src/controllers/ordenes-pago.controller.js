@@ -620,14 +620,22 @@ const cambiarEstadoOrden = async (req, res) => {
     // Solo el Administrador puede ANULAR órdenes de pago.
     if (estado === 'ANULADA' && (req.usuario || {}).perfil_nombre !== 'Administrador')
       return res.status(403).json({ success: false, data: null, error: 'Solo el Administrador puede anular órdenes de pago' });
+    /* EL PAGO NO SE REGISTRA POR ACÁ. Esta ruta escribe solo en `ordenes_pago`,
+       así que marcar PAGADA desde aquí dejaba el pago fuera del libro central
+       (`op_correlativos`): sin egreso de caja, sin snapshot en duro, y el
+       historial —que se arma desde el correlativo— seguiría mostrando la orden
+       como impaga. De paso se saltaba lo que sí valida `/pagar`: la segregación
+       de funciones (quien emite no paga) y la ventana horaria de la caja.
+       Ninguna pantalla lo usaba así, pero la puerta estaba abierta. */
+    if (estado === 'PAGADA')
+      return res.status(400).json({ success: false, data: null,
+        error: 'El pago se registra desde la caja (Órdenes de Pago → Pagar), no cambiando el estado: así queda el egreso en el libro central y se respeta la segregación de funciones.' });
+
     const [[o]] = await pool.query('SELECT numero, estado FROM ordenes_pago WHERE id=?', [id]);
     if (!o) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     // Orden ya pagada = EN DURO: no se puede modificar ni anular.
     if (o.estado === 'PAGADA')
       return res.status(409).json({ success: false, data: null, error: 'La orden ya está pagada y queda en duro: no puede modificarse ni anularse' });
-
-    const fechaPago = estado === 'PAGADA' ? (fdate((req.body || {}).fecha_pago) || require('../../../../shared/fecha-chile').hoyISO()) : null; // día de Chile
-    const metodo = estado === 'PAGADA' ? (norm((req.body || {}).metodo_pago) || null) : null;
 
     if (estado === 'ANULADA') {
       // El correlativo NO se libera: queda reservado y marcado como anulado, con quién y cuándo.
@@ -637,31 +645,17 @@ const cambiarEstadoOrden = async (req, res) => {
         [idU, quien, id]);
       await anularCorrelativo({ numero: o.numero, origen: 'GENERAL', origen_id: id, id_usuario: idU, usuario_nombre: quien });
     } else {
+      // Volver a EMITIDA: se limpia la fecha de pago porque la orden deja de estarlo.
       await pool.query(
-        `UPDATE ordenes_pago SET estado=?, fecha_pago=?, metodo_pago=COALESCE(?, metodo_pago) WHERE id=?`,
-        [estado, fechaPago, metodo, id]);
+        `UPDATE ordenes_pago SET estado=?, fecha_pago=NULL WHERE id=?`, [estado, id]);
     }
-    auditar({ req, accion: estado === 'PAGADA' ? 'PAGAR' : (estado === 'ANULADA' ? 'ANULAR' : 'EDITAR'), modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `${o.numero || id}: ${o.estado} → ${estado}` });
-    // Centralización contable: asiento automático al pagar la ODP (nunca bloquea)
-    if (estado === 'PAGADA') {
-      pool.query('SELECT numero, concepto, proveedor_nombre, proveedor_rut, monto, categoria FROM ordenes_pago WHERE id=?', [id]).then(([[od]]) => {
-        if (!od) return;
-        // Anticipos/préstamos al personal (Solicitudes RRHH) NO son gasto a proveedor:
-        // van a cuenta por cobrar al personal (1105010 / 1105020) con su evento propio.
-        let evento = 'ODP_PAGADA';
-        if (od.categoria === 'REMUNERACIONES') {
-          if (/^anticipo/i.test(od.concepto || '')) evento = 'ANTICIPO_PERSONAL';
-          else if (/^pr[eé]stamo/i.test(od.concepto || '')) evento = 'PRESTAMO_PERSONAL';
-          else if (/^finiquito/i.test(od.concepto || '')) evento = 'FINIQUITO_PAGADO'; // rebaja 2106070 (el gasto ya se reconoció al emitir)
-        }
-        return require('../../../contabilidad/src/motor-asientos').contabilizar({
-          evento, fecha: fechaPago,
-          glosa: `Pago ODP ${od.numero || id} — ${od.proveedor_nombre || od.concepto}`.slice(0, 300),
-          ref: `ODP-${od.numero || id}`, montos: { monto: Math.round(Number(od.monto) || 0) }, rut: od.proveedor_rut || null,
-        });
-      }).catch(() => {});
-    }
-    res.json({ success: true, data: { id, estado, fecha_pago: fechaPago }, error: null });
+    auditar({ req, accion: estado === 'ANULADA' ? 'ANULAR' : 'EDITAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `${o.numero || id}: ${o.estado} → ${estado}` });
+    /* El asiento del pago NO se genera acá: por esta ruta ya no se paga. Lo hace
+       `registrarPagoOrden` (la ruta /pagar), que es donde el pago existe de
+       verdad — con su egreso de caja y su snapshot en duro. Mantener acá una
+       segunda copia de esa contabilización sería un segundo motor del mismo
+       hecho, y el día que cambien las cuentas cambiaría solo uno de los dos. */
+    res.json({ success: true, data: { id, estado }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });
   }
