@@ -1,5 +1,9 @@
 'use strict';
 const pool = require('../config/database');
+/* El mes, venga como venga (Date de la base o texto), lo normaliza el motor de
+   fechas — que es puro y no arrastra la conexión. Acá se reexporta como `aMes`
+   porque es donde lo buscan los controladores que ya cuidaban meses cerrados. */
+const { mesDe: aMes } = require('../fecha-chile');
 
 /**
  * Verifica si un mes está cerrado.
@@ -8,8 +12,8 @@ const pool = require('../config/database');
  */
 async function isMesCerrado(mesOrFecha) {
   if (!mesOrFecha) return false;
-  const mes = String(mesOrFecha).slice(0, 7); // YYYY-MM
-  if (!/^\d{4}-\d{2}$/.test(mes)) return false;
+  const mes = aMes(mesOrFecha);
+  if (!mes) return false;
   const [rows] = await pool.query(
     'SELECT cerrado FROM meses_cerrados WHERE mes = ? LIMIT 1', [mes]
   );
@@ -21,18 +25,18 @@ async function isMesCerrado(mesOrFecha) {
  * Retorna null si no existe.
  */
 async function getMesDeOp(id) {
-  const [rows] = await pool.query('SELECT mes FROM creditos WHERE id = ? LIMIT 1', [id]);
+  const [rows] = await pool.query("SELECT DATE_FORMAT(mes,'%Y-%m') AS mes FROM creditos WHERE id = ? LIMIT 1", [id]);
   if (!rows.length || !rows[0].mes) return null;
-  return String(rows[0].mes).slice(0, 7);
+  return aMes(rows[0].mes);
 }
 
 /**
  * Obtiene el mes YYYY-MM de una operación por su num_op.
  */
 async function getMesDeNumOp(numOp) {
-  const [rows] = await pool.query('SELECT mes FROM creditos WHERE num_op = ? LIMIT 1', [numOp]);
+  const [rows] = await pool.query("SELECT DATE_FORMAT(mes,'%Y-%m') AS mes FROM creditos WHERE num_op = ? LIMIT 1", [numOp]);
   if (!rows.length || !rows[0].mes) return null;
-  return String(rows[0].mes).slice(0, 7);
+  return aMes(rows[0].mes);
 }
 
-module.exports = { isMesCerrado, getMesDeOp, getMesDeNumOp };
+module.exports = { isMesCerrado, getMesDeOp, getMesDeNumOp, aMes };

@@ -433,7 +433,11 @@ async function aplicarCanal(mapaCanal, log) {
   for (let i = 0; i < ids.length; i += 500) {
     const chunk = ids.slice(i, i + 500);
     const [rows] = await pool.query(
-      `SELECT id, num_op, id_financiera, mes, seguro_cesantia, seguro_rdh, seguro_rep_menor,
+      // `mes` va con DATE_FORMAT igual que `fecha_otorgado`: la columna es DATE y
+      // mysql2 la entrega como Date, así que String(mes).slice(0,7) daba "Sat Aug"
+      // y NINGÚN mes resultaba cerrado (ver más abajo).
+      `SELECT id, num_op, id_financiera, DATE_FORMAT(mes,'%Y-%m') AS mes_txt,
+              seguro_cesantia, seguro_rdh, seguro_rep_menor,
               gps, tipo_vehiculo, marca, modelo, tascli_real, plazo, cuota, monto_financiado,
               estado_credito, fecha_primera_cuota, DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') AS fo
        FROM creditos WHERE num_op IN (?) OR id_financiera IN (?)`,
@@ -447,7 +451,7 @@ async function aplicarCanal(mapaCanal, log) {
       // Mes cerrado → no tocar MONTOS (afectan comisiones liquidadas). Los TEXTOS
       // (vehículo/RUT) no son financieros: se rellenan igual aunque el mes esté cerrado.
       let cerrado = false;
-      const mesStr = r.mes ? String(r.mes).slice(0, 7) : null;
+      const mesStr = r.mes_txt || null;
       if (mesStr) {
         if (cerradoCache[mesStr] === undefined) cerradoCache[mesStr] = await isMesCerrado(mesStr);
         cerrado = cerradoCache[mesStr];
@@ -661,14 +665,16 @@ exports.importar = async (req, res) => {
 
     for (const f of filas) {
       try {
-        // Verificar mes cerrado (aplica a updates, no a inserts nuevos)
-        const _mesTriCheck = existMap[f.num_op]?.mes || null;
-        if (_mesTriCheck) {
-          const _mesTriStr = String(_mesTriCheck).slice(0, 7);
-          if (await isMesCerrado(_mesTriStr)) {
-            log.push(`⏭ Omitido ${f.num_op}: mes ${_mesTriStr} cerrado`);
-            continue;
-          }
+        /* Mes cerrado → no se toca (aplica a updates, no a inserts nuevos).
+           El mes sale de `mes_txt` (DATE_FORMAT): la columna es DATE y mysql2 la
+           entrega como Date, así que el String(mes).slice(0,7) que había acá daba
+           "Sat Aug" y isMesCerrado devolvía false SIEMPRE — o sea que este
+           candado llevaba tiempo abierto y la carga escribía sobre meses ya
+           liquidados sin que se notara. */
+        const _mesTriStr = existMap[f.num_op]?.mes_txt || null;
+        if (_mesTriStr && await isMesCerrado(_mesTriStr)) {
+          log.push(`⏭ Omitido ${f.num_op}: mes ${_mesTriStr} cerrado`);
+          continue;
         }
 
         // Resolver id_cliente desde rut/nombre del Excel (viven en la tabla

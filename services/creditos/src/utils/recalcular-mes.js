@@ -22,6 +22,7 @@ const { cargarPenTramos, calcularPenetracionMes, comisionesSeguro } = require('.
 const { comisionDealer } = require('../../../../api-gateway/public/js/comision-dealer');
 const core = require('../../../../api-gateway/public/js/rentabilidad-core');
 const { getUF } = require('../../../../shared/uf');
+const { aMes } = require('../../../../shared/utils/mes-cerrado');   // normaliza el mes venga como venga
 
 // Campos calculados que el usuario puede dejar "forzados" (negociación puntual).
 // El recálculo los respeta: conserva el valor guardado y solo recalcula los demás.
@@ -473,7 +474,12 @@ function extraerMeses(ops) {
   const set = new Set();
   for (const op of ops) {
     const mes = op.mes || op.fecha_otorgado;
-    if (mes) set.add(String(mes).slice(0, 7));
+    /* Por `aMes` y no por String().slice(): hoy las ops llegan del Excel (donde
+       el mes es texto), pero esta función está exportada y el día que reciba
+       filas de la base traería un objeto Date — y "Sat Aug" pasaría al Set como
+       si fuera un mes, dejando sin recalcular el mes de verdad, sin un error. */
+    const m = aMes(mes);
+    if (m) set.add(m);
   }
   return [...set];
 }

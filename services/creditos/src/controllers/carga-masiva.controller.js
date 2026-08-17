@@ -2,7 +2,7 @@
 const pool = require('../../../../shared/config/database');
 const XLSX = require('xlsx');
 const { recalcularMeses, extraerMeses } = require('../utils/recalcular-mes');
-const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+const { isMesCerrado, aMes } = require('../../../../shared/utils/mes-cerrado');
 const { esFechaFutura } = require('../../../../shared/utils/fecha-futura');
 const historial = require('./carga-historial.controller');
 const { auditar } = require('../../../../shared/audit');
@@ -816,10 +816,14 @@ const actualizar = async (req, res) => {
 
         if (setCols.length === 0) { sinCambios++; continue; }
 
-        // Verificar si el mes de la operación está cerrado
+        /* Verificar si el mes de la operación está cerrado.
+           El mes se normaliza con `aMes`: viene de un `SELECT *`, o sea que la
+           columna DATE llega como objeto Date y el String(mes).slice(0,7) que
+           había acá daba "Sat Aug" — ningún mes resultaba cerrado y la carga
+           escribía sobre meses ya liquidados sin decir nada. */
         if (existente.mes) {
-          const mesOp = String(existente.mes).slice(0, 7);
-          if (await isMesCerrado(mesOp)) {
+          const mesOp = aMes(existente.mes);
+          if (mesOp && await isMesCerrado(mesOp)) {
             errores.push({ num_op: numOp, error: `🔒 Mes ${mesOp} cerrado — omitido` });
             continue;
           }

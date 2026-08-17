@@ -12,6 +12,7 @@
  * con atraso > X días o impaga vencida hace > X días (X configurable).
  * ─────────────────────────────────────────────────────────────────────────── */
 const pool = require('../../../../shared/config/database');
+const { isoDe } = require('../../../../shared/fecha-chile');   // Date de la BD → 'YYYY-MM-DD'
 
 require('../../../../shared/migrate').enFila('score-mora', async () => {
   try {
@@ -40,7 +41,12 @@ async function getConfig() {
   const [[c]] = await pool.query('SELECT carteras, desde, dias_mora FROM score_mora_config WHERE id=1');
   let carteras = c && c.carteras; if (typeof carteras === 'string') { try { carteras = JSON.parse(carteras); } catch { carteras = null; } }
   return { carteras: Array.isArray(carteras) && carteras.length ? carteras : null,
-           desde: c && c.desde ? String(c.desde).slice(0, 10) : null,
+           /* `desde` es DATE: mysql2 lo entrega como Date y String(...).slice(0,10)
+              daba "Fri May 0", que después se usa como parámetro de
+              `fecha_vencimiento >= ?` y no filtraría nada de lo que se pide.
+              Hoy está en NULL, así que el problema aparecería recién el día que
+              alguien configure la fecha en el mantenedor. */
+           desde: c && c.desde ? isoDe(c.desde) : null,
            dias_mora: (c && +c.dias_mora) || 30 };
 }
 

@@ -35,6 +35,27 @@ function isoDe(d) {
   return f.toLocaleDateString('en-CA', { timeZone: TZ });
 }
 
+/* ── EL MES, VENGA COMO VENGA ────────────────────────────────────────────────
+   'YYYY-MM' de un mes que puede llegar como Date (columna DATE leída por mysql2)
+   o como texto. Nace de un fallo mudo: las columnas de mes son DATE, así que
+   `String(mes).slice(0,7)` daba **"Sat Aug"**, isMesCerrado no reconocía el
+   formato y NINGÚN mes resultaba cerrado — el candado que protege los meses
+   liquidados llevaba tiempo abierto sin que nada lo acusara.
+
+   Un Date se convierte con isoDe (zona de Chile) y no con toISOString(): la
+   marca de un mes es su día 1 a las 00:00 de Chile, que en UTC ya es otro día y,
+   en el borde, otro mes. Un texto que ya viene bien se recorta y punto: pasar
+   '2026-08' por `new Date()` lo leería como UTC y en Chile daría julio. */
+function mesDe(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) {
+    const iso = isoDe(v);
+    return iso ? iso.slice(0, 7) : null;
+  }
+  const m = String(v).match(/^(\d{4}-\d{2})/);
+  return m ? m[1] : null;
+}
+
 // Hoy en Chile.
 const hoyISO = () => isoDe(new Date());
 
@@ -74,4 +95,4 @@ function primerDiaMes(iso) {
    medianoche. */
 const finDelDia = iso => `${String(iso).slice(0, 10)} 23:59:59.999999`;
 
-module.exports = { TZ, isoDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
+module.exports = { TZ, isoDe, mesDe, hoyISO, mesActualISO, desdeISO, sumarDias, sumarMeses, primerDiaMes, finDelDia };
