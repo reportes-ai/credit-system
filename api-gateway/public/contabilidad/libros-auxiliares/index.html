@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -25,6 +25,11 @@
     .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.15rem; color:var(--navy); }
     .card-kpi .l { font-size:.72rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
     .mes-click { cursor:pointer; } .mes-click:hover td { background:#f0f9ff; }
+    /* Resumen por mes: son 4 números cortos, no necesita el ancho de una tabla de
+       detalle. Se aprieta para que el espacio se lo lleve el detalle documento a
+       documento, que es donde el usuario realmente lee. */
+    .tabla-mes { font-size:.75rem; }
+    .tabla-mes thead th, .tabla-mes tbody td { padding:5px 7px; }
   </style>
 </head>
 <body>
@@ -62,13 +67,13 @@
   <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis" style="display:none"></div>
 
   <div class="row g-3">
-    <div class="col-lg-4">
-      <div class="panel"><table>
+    <div class="col-lg-3">
+      <div class="panel"><table class="tabla-mes">
         <thead id="theadMes"></thead><tbody id="tbodyMes"></tbody>
       </table></div>
       <div class="small text-muted"><i class="bi bi-hand-index me-1"></i>Clic en un mes para filtrar el detalle a ese mes.</div>
     </div>
-    <div class="col-lg-8">
+    <div class="col-lg-9">
       <div class="panel"><table id="tablaDet">
         <thead id="theadDet"></thead><tbody id="tbodyDet"><tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr></tbody>
       </table></div>
