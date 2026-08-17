@@ -150,6 +150,7 @@ const SELECT_GESTION = `
     CONCAT(DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.fecha_estado, ob.mes, ob.created_at),'%Y-%m-%d'),'T12:00:00') AS fecha_otorgamiento,
     ob.valor_vehiculo,
     ob.pie,
+    ob.saldo_precio,
     ob.monto_financiado,
     ob.plazo,
     ob.tascli_real                                             AS tasa_mensual,

@@ -457,6 +457,7 @@ async function exportarCreditosExcel() {
       'N° OP': c.num_op || c.numero_credito || '', 'RUT': c.rut_cliente || '', 'Cliente': c.nombre_cliente || '',
       'Financiera': c.financiera || '', 'ID Financiera': c.id_financiera || '',
       'Fecha': fmtF(c.fecha_otorgamiento || c.created_at), 'Monto Financiado': +c.monto_financiado || 0,
+      'Saldo Precio': +c.saldo_precio || 0,
       'Marca': c.marca || '', 'Modelo': c.modelo || '', 'Año': c.anio || '', 'Patente': c.patente || '',
       'Cuota': +c.cuota || 0, 'Plazo': c.plazo || '', 'Etapa': c.estado || '',
       'Estado Cartera': c.estado_cartera || '', 'Días Atraso': c.dias_atraso || '',
