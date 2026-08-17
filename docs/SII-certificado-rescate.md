@@ -44,8 +44,22 @@ one-liner de PowerShell del punto anterior hace lo mismo.
 2. **Certificado nuevo**: se compra en el día (~$10-20 mil/año). No rescata el actual, pero
    elimina el problema de raíz con una clave conocida desde el día uno.
 
+## GOTCHA: el cifrado del export (aprendido el 17-08-2026)
+
+**SimpleAPI no abre un PFX cifrado con AES256-SHA256** — responde "The specified network
+password is not correct" AUNQUE la clave sea correcta. La pista: el diagnóstico local del
+sistema (Node) SÍ lo abre. Al exportar desde certmgr elegir **TripleDES-SHA1**, o convertir:
+
+```bash
+openssl pkcs12 -in cert.pfx -nodes -out temp-cert.pem
+openssl pkcs12 -export -in temp-cert.pem -out cert-3des.pfx -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1
+rm temp-cert.pem   # OBLIGATORIO: contiene la clave privada SIN cifrar
+```
+
 ## Historia (para contexto)
 
-- 12-08-2026: el RCV quedó cableado pero `SII_CERT_PASS` no correspondía a la clave real del
-  .pfx cargado — nadie la conocía. El certificado funciona instalado en otro PC; el plan es
-  exportarlo desde ahí con clave nueva (procedimiento de arriba).
+- 12-08-2026: el RCV quedó cableado pero nadie conocía la clave del .pfx cargado.
+- 17-08-2026: **resuelto** — el certificado estaba en el certmgr de OTRO usuario de Windows
+  del PC donde el SII funcionaba, exportable. Se exportó con clave nueva, se convirtió a
+  TripleDES (gotcha de arriba) y la primera sync trajo 88 docs de agosto (IVA $5,86M).
+  Titular del certificado = usuario SII (23673582-6).
