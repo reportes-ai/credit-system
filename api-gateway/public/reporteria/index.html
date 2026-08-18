@@ -90,7 +90,7 @@
     </div>
   </div>
   <div class="topnav-right">
-    <a href="/dashboard" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='transparent'">
+    <a href="/dashboard" id="linkDash" style="display:none;align-items:center;gap:5px;color:rgba(255,255,255,.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='transparent'">
       <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
     </a>
     <div class="user-chip">
@@ -439,6 +439,10 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     const perms = new Set();
     const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { cache:'no-store', headers: apiHdrs() });
     const j = await r.json(); (j.funcionalidades||[]).forEach(c=>perms.add(c));
+    // Acceso a Dashboard solo con permiso (el backend igual bloquea /api/dashboard/datos)
+    if (esAdmin || perms.has('ver_dashboard') || perms.has('dashboard_resumen')) {
+      const d = document.getElementById('linkDash'); if (d) d.style.display = 'flex';
+    }
     // Cards generales — cada una con su funcionalidad en la matriz de Perfiles
     const CARDS_PERM = { cardTailor:'rep_tailor_made', cardPivot:'rep_tablas_dinamicas',
                          cardMando:'rep_mando_tv', cardCartera:'rep_cartera_creditos', cardMora:'rep_cobranza_mora' };

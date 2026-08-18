@@ -155,8 +155,10 @@
     try { yo = JSON.parse(sessionStorage.getItem('usuario') || 'null'); } catch (_) {}
     const nombre = yo ? ((yo.nombre || '') + ' ' + (yo.apellido || '')).trim() : '';
     const inicial = (nombre || '?').trim().charAt(0).toUpperCase() || '?';
+    // El acceso a Dashboard se muestra solo si el perfil tiene 'ver_dashboard'
+    // en la matriz de Perfiles (Admin siempre). Nace oculto y se revela al confirmar.
     const dash = cfg.dashboard === false ? ''
-      : '<a class="af-dash" href="/dashboard" title="Dashboard Analytics"><i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard</a>';
+      : '<a class="af-dash" id="afDashLink" style="display:none" href="/dashboard" title="Dashboard Analytics"><i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard</a>';
     const actions = (cfg.actions || []).map(actionHTML).join('');
 
     // Breadcrumb: estático si la página lo define; si declara self, se arma desde el placement
@@ -186,6 +188,9 @@
         '</div>' +
       '</nav>';
 
+    // Muestra el acceso a Dashboard solo con permiso (caché de sesión, 5 min)
+    mostrarDashSiPuede(yo);
+
     // Refina el breadcrumb con la sección real del placement (cuando la página declara self).
     if (!cfg.breadcrumb && cfg.self) {
       resolveSection(cfg.self, function (sec) {
@@ -195,6 +200,30 @@
         else { const left = document.querySelector('.topnav .topnav-left'); if (left) left.insertAdjacentHTML('beforeend', html); }
       });
     }
+  }
+
+  /* Revela el link a Dashboard solo si el usuario puede verlo (permiso
+     'ver_dashboard' o 'dashboard_resumen'; Admin siempre). El backend igual
+     bloquea /api/dashboard/datos sin permiso — esto es solo no mostrar la puerta. */
+  function mostrarDashSiPuede(yo) {
+    var link = document.getElementById('afDashLink');
+    if (!link) return;
+    if (yo && yo.perfil === 'Administrador') { link.style.display = ''; return; }
+    try {
+      var c = JSON.parse(sessionStorage.getItem('af_dash_ok') || 'null');
+      if (c && (Date.now() - c.t) < 300000) { if (c.ok) link.style.display = ''; return; }
+    } catch (_) {}
+    var token = null; try { token = sessionStorage.getItem('token'); } catch (_) {}
+    if (!token) return;
+    fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var fs = (j && j.funcionalidades) || (j && j.data && j.data.funcionalidades) || [];
+        var ok = fs.indexOf('ver_dashboard') >= 0 || fs.indexOf('dashboard_resumen') >= 0;
+        try { sessionStorage.setItem('af_dash_ok', JSON.stringify({ ok: ok, t: Date.now() })); } catch (_) {}
+        if (ok) link.style.display = '';
+      })
+      .catch(function () { /* sin dato → el link queda oculto; el backend protege igual */ });
   }
 
   /* ── Miga dinámica para páginas con vistas/pestañas internas (SPA) ──────────

@@ -7,12 +7,16 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 // nombre de perfil. Admin pasa por bypass; el resto requiere 'dashboard_config'.
 const configurar = requireFunc('dashboard_config');
 
-router.get('/datos',        verifyToken, ctrl.getDatos);
+// Los datos del dashboard son toda la venta: solo quien VE el dashboard (o su
+// Resumen Ejecutivo) puede pedirlos — un token de un perfil restringido no basta.
+const verDash = requireFunc('ver_dashboard', 'dashboard_resumen');
+
+router.get('/datos',        verifyToken, verDash, ctrl.getDatos);
 router.get('/permisos',     verifyToken, ctrl.getPermisos);
 router.post('/permisos',    verifyToken, configurar, ctrl.savePermisos);
 router.get('/presupuesto',  verifyToken, ctrl.getPresupuesto);
-router.get('/seguros-historico', verifyToken, ctrl.getSegurosHistorico);
-router.get('/clima-correlacion', verifyToken, ctrl.getClimaCorrelacion);
+router.get('/seguros-historico', verifyToken, verDash, ctrl.getSegurosHistorico);
+router.get('/clima-correlacion', verifyToken, verDash, ctrl.getClimaCorrelacion);
 router.post('/presupuesto', verifyToken, configurar, ctrl.savePresupuesto);
 router.get('/parametros',   verifyToken, ctrl.getParametros);                  // los lee todo usuario del dashboard
 router.post('/parametros',  verifyToken, requireFunc('mant_dashboard_param'), ctrl.saveParametros);
