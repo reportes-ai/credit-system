@@ -40,7 +40,7 @@
 const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login.html';
 const H = { Authorization:'Bearer '+token };
-function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
 
 const CARDS = [
   { perm:'mant_dealernet_productos', href:'/mantenedores/dealernet-productos/', icon:'bi-cloud-arrow-down', titulo:'Productos DealerNet', desc:'Catálogo de informes (códigos), activos/inactivos, orden y umbrales de reutilización del repositorio.' },

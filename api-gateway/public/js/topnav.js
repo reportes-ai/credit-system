@@ -270,7 +270,10 @@
 
   // Logout estándar (si la página no define el suyo).
   window.afLogout = function () {
-    try { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); } catch (_) {}
+    // clear() completo: además del token/usuario borra las cachés de sesión
+    // (af_permisos, af_fund_skip, borradores) — importante si otra persona
+    // inicia sesión en el mismo navegador después.
+    try { sessionStorage.clear(); } catch (_) {}
     location.href = '/login.html';
   };
 

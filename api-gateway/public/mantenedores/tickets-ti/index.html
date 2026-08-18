@@ -5,21 +5,13 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor Tickets TI — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; color:#fff; font-size:.85rem; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .main { padding:28px 34px; max-width:980px; margin:0 auto; }
     .page-banner { background:linear-gradient(135deg,#0141A2,#0255c5 60%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { margin:0; font-size:1.25rem; font-weight:700; } .page-banner p { margin:2px 0 0; opacity:.85; font-size:.84rem; }
@@ -73,7 +65,7 @@
 <script>
   const token = sessionStorage.getItem('token'); const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
   if (!token||!yo) location.href='/login.html';
-  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
   const H={Authorization:'Bearer '+token}, HJ={...H,'Content-Type':'application/json'};
   const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   function tab(n){ document.getElementById('tab1').classList.toggle('active',n===1); document.getElementById('tab2').classList.toggle('active',n===2); document.getElementById('sec1').style.display=n===1?'':'none'; document.getElementById('sec2').style.display=n===2?'':'none'; }

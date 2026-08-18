@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.57 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -16,19 +16,9 @@
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
     /* ── topnav corporativo ── */
     .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:300; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-    .topnav-right { display:flex; align-items:center; gap:10px; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     /* ── tabs ── */
     .tabs-bar { background:#fff; border-bottom:1px solid #e5e7eb; padding:0 24px; display:flex; gap:4px; }
     .tab-btn { border:none; background:none; padding:13px 18px; font-size:.88rem; font-weight:600; color:#64748b; cursor:pointer; border-bottom:3px solid transparent; display:flex; align-items:center; gap:7px; }
@@ -70,19 +60,10 @@
     .tab-pane.active { display:block; }
     /* Vista standalone (?tab=params desde Mantenedores): sin flash del menú */
     .bc-normal, .bc-params { align-items:center; gap:6px; }
-    .bc-normal { display:inline-flex; }
-    .bc-params { display:none; }
     html.standalone-params .tabs-bar { display:none !important; }
-    html.standalone-params #pane-home { display:none !important; }
-    html.standalone-params #pane-params { display:block !important; }
-    html.standalone-params .bc-normal { display:none !important; }
-    html.standalone-params .bc-params { display:inline-flex !important; }
     /* Vista standalone (?tab=cartolas|enviadas desde Post Venta): cartolas viven en Post Venta */
     .bc-pv { display:none; align-items:center; gap:6px; }
     html.standalone-cv .tabs-bar { display:none !important; }
-    html.standalone-cv #pane-home { display:none !important; }
-    html.standalone-cv .bc-normal { display:none !important; }
-    html.standalone-cv .bc-pv { display:inline-flex !important; }
     /* ── cards / tabla ── */
     .card-af { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
     table.tbl { width:100%; border-collapse:collapse; font-size:.82rem; }
@@ -756,7 +737,7 @@ const hdr = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer 
 /* ── Sesión ───────────────────────────────────────── */
 const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!YO) window.location.href = '/login.html';
-function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
+
 
 const MIS_INICIALES = ((YO.nombre||' ')[0] + (YO.apellido||' ')[0]).toUpperCase().trim() || 'XX';
 const MI_LOGIN = YO.email || String(YO.id_usuario);

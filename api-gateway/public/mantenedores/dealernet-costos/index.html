@@ -91,7 +91,7 @@ const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
 function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.className='toast-af'+(e?' err':''); t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2600); }
 
 let PRODS = [];

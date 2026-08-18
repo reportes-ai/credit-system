@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.1 — breadcrumb Inicio › Cobranza › Migración Cartera INDEXA -->
+<!-- v2.2 — breadcrumb Inicio › Cobranza › Migración Cartera INDEXA -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Migración Cartera INDEXA — AutoFácil</title>
@@ -11,12 +11,7 @@
   :root { --navy:#0f2d6b; --blue:#1565c0; --bg:#f0f4f8; --card:#fff; --border:#e2e8f0; --text:#1e293b; --muted:#64748b; }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{ font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  .topnav{ background:linear-gradient(135deg,var(--navy),var(--blue)); padding:0 24px; height:52px; display:flex; align-items:center; justify-content:space-between; }
-  .topnav-brand{ display:flex; align-items:center; gap:10px; color:#fff; font-weight:800; font-size:1rem; text-decoration:none; }
-  .topnav-brand img{ height:28px; filter:brightness(0) invert(1); }
-  .version-badge{ background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
   .btn-nav{ background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; text-decoration:none; display:flex; align-items:center; gap:6px; }
-  .topnav-right{ display:flex; align-items:center; gap:12px; }
   .page{ max-width:1080px; margin:0 auto; padding:24px 16px 80px; }
   h1{ font-size:1.3rem; color:var(--navy); margin-bottom:4px; }
   .sub{ color:var(--muted); font-size:.9rem; margin-bottom:20px; }
@@ -124,7 +119,7 @@ const TOKEN = () => sessionStorage.getItem('token');
 (function(){
   if(!TOKEN()){ location.href='/login.html'; return; }
 })();
-function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
 const $ = id => document.getElementById(id);
 const nfmt = n => (n==null?'—':Number(n).toLocaleString('es-CL'));
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

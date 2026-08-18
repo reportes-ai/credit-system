@@ -5,22 +5,15 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Órdenes de Pago — AutoFácil</title>
-  <!-- v1.1 — navbar migrada al componente topnav -->
+  <!-- v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#001345; --blue:#0141A2; --accent:#0255c5; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
-    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--blue); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .cards-grid { display:grid; grid-template-columns:repeat(4,minmax(220px,1fr)); gap:20px; justify-content:center; max-width:1300px; margin:0 auto; padding:40px 24px; }
     @media (max-width:1100px){ .cards-grid { grid-template-columns:repeat(2,minmax(220px,1fr)); } }
     @media (max-width:620px){ .cards-grid { grid-template-columns:1fr; } }
@@ -77,7 +70,7 @@
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
 if (!token || !yo) location.href='/login.html';
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 (async () => {
   let funcs = new Set();
   try {

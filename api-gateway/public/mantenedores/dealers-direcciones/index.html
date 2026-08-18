@@ -5,19 +5,13 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Revisión de Direcciones — AutoFácil</title>
-  <!-- v1.1 — navbar migrada al componente topnav -->
+  <!-- v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:1100; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:0.85rem; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,0.5); margin:0 7px; }
     .btn-back { color:rgba(255,255,255,0.9); text-decoration:none; font-size:13px; font-weight:600; padding:6px 14px; border:1px solid rgba(255,255,255,0.3); border-radius:7px; }
     .wrap { max-width:980px; margin:0 auto; padding:18px 18px 40px; }
     .bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:#fff; border:1px solid #e3e8ef; border-radius:12px; padding:12px 14px; box-shadow:0 2px 8px rgba(1,65,162,.05); margin-bottom:14px; }
@@ -81,7 +75,7 @@
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

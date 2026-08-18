@@ -71,7 +71,7 @@
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
-function logout(){ sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
 function setBadge(id, n){ const b=document.getElementById(id); b.textContent=n; b.classList.toggle('zero', !n); }
 if (['Administrador','Supervisor de Crédito','Supervisor de Credito'].includes(yo?.perfil))
   document.getElementById('statsLink').style.display = 'block';

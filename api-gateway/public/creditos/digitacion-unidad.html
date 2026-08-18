@@ -10,20 +10,9 @@
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --unidad:#005a9e; --unidad-dark:#003d6e; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-    .topnav-right { display:flex; align-items:center; gap:10px; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; }
     .page-content { padding:28px 40px; max-width:1050px; margin:0 auto; }
     /* Banner financiera — tono más oscuro para Unidad */
     .fin-banner { border-radius:14px; padding:18px 24px; margin-bottom:24px; display:flex; align-items:center; gap:16px; color:#fff; background:linear-gradient(135deg,var(--unidad-dark),var(--unidad) 55%,#1a73c2); }
@@ -384,7 +373,7 @@
   const token = sessionStorage.getItem('token');
   const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
   if (!token || !yo) window.location.href = '/login.html';
-  function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
+
 
   // Cargar productos dinámicos desde mantenedor
   (async () => {

@@ -5,20 +5,12 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.34 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.35 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; margin-left:16px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
-    .topnav-right { display:flex; align-items:center; gap:10px; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--navy); font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
@@ -138,7 +130,7 @@
       tr.insertAdjacentHTML('afterbegin','<span class="estado-pill e-'+est+'" id="estadoPill">'+est.replace('_',' ')+'</span>');
     }
   });
-  function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 </script>
 
 <div class="main">

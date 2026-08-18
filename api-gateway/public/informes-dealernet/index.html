@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Informes Comerciales Dealernet — AutoFácil</title>
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <link rel="stylesheet" href="/css/bootstrap.min.css">
   <link rel="stylesheet" href="/css/bootstrap-icons.css">
   <style>
@@ -240,10 +240,7 @@ try {
   const ub = document.getElementById('userBadge'); if (ub) ub.textContent = pl.nombre || '';
 } catch(_) {}
 
-function logout() {
-  sessionStorage.clear();
-  location.href = '/login.html';
-}
+
 
 const headers = () => ({ 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' });
 

@@ -5,22 +5,12 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Permisos de Edición de Dealers — AutoFácil</title>
-  <!-- v1.3 — navbar migrada al componente topnav · v1.2 — topnav con el chip de usuario (faltaba nombre y perfil) · v1.1 — botones Marcar/Desmarcar todo por bloque + los perfiles nacen SIN permisos (la tabla guarda lo habilitado) · v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
+  <!-- v1.4 — navbar migrada al componente topnav · v1.2 — topnav con el chip de usuario (faltaba nombre y perfil) · v1.1 — botones Marcar/Desmarcar todo por bloque + los perfiles nacen SIN permisos (la tabla guarda lo habilitado) · v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; min-height:100vh; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-    .topnav-right { display:flex; align-items:center; gap:10px; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; text-decoration:none; }
     .main-content { padding:32px 40px; max-width:1000px; margin:0 auto; }
     .page-banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:28px; display:flex; align-items:center; gap:20px; }
     .page-banner i { font-size:2.6rem; opacity:.85; }
@@ -118,7 +108,7 @@ const token = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 
 
 /* ── Permisos de edición por perfil y por campo ───────────────────────────

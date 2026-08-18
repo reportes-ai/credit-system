@@ -5,27 +5,15 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rentabilidad Créditos — AutoFácil</title>
-  <!-- v1.21 -->
+  <!-- v1.22 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
-    .topnav { background:linear-gradient(90deg,#012d70,#0255c5); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; box-shadow:0 2px 8px rgba(0,0,0,.3); }
-    .topnav-left { display:flex; align-items:center; gap:16px; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:32px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }
-    .topnav-right { display:flex; align-items:center; gap:10px; }
     .user-chip { background:rgba(255,255,255,.12); border-radius:24px; padding:5px 12px; display:flex; align-items:center; gap:8px; font-size:.85rem; }
     .avatar { width:28px; height:28px; background:#90caf9; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0141A2; font-weight:700; font-size:.75rem; }
     .perfil-badge { background:rgba(144,202,249,.2); border:1px solid rgba(144,202,249,.4); color:#90caf9; border-radius:12px; padding:2px 10px; font-size:.73rem; font-weight:600; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.82rem; cursor:pointer; transition:background .2s; }
-    .btn-logout:hover { background:rgba(255,255,255,.22); }
     .page-wrap { max-width:none; margin:24px 0; padding:0 28px 60px; }
     .page-banner { background:linear-gradient(135deg,#0f2a5c,#1e3a8a 60%,#2563eb); border-radius:16px; color:#fff; padding:24px 32px; margin-bottom:22px; display:flex; align-items:center; gap:18px; }
     .page-banner > i { font-size:2.6rem; opacity:.85; }
@@ -179,7 +167,7 @@ const YO = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!YO) location.href = '/login.html';
 function getToken(){ return sessionStorage.getItem('token'); }
 function hdr(){ return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 const ES_ADMIN = (YO && YO.perfil === 'Administrador');
 const PERMISOS = new Set();
 const puede = c => ES_ADMIN || PERMISOS.has(c);

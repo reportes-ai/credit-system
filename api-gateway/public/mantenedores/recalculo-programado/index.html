@@ -5,19 +5,14 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recálculo Programado — AutoFácil</title>
-  <!-- v77.70 -->
+  <!-- v77.71 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),#0255c5); color:#fff; height:56px; padding:0 22px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:30px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.62rem; font-weight:700; border-radius:6px; padding:2px 7px; }
     .crumb { color:rgba(255,255,255,.65); font-size:.82rem; }
     .crumb a { color:rgba(255,255,255,.8); text-decoration:none; }
-    .btn-logout { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:.8rem; cursor:pointer; }
     .wrap { max-width:1100px; margin:26px auto; padding:0 20px 60px; }
     .banner { background:linear-gradient(135deg,var(--navy-dark),var(--navy) 55%,var(--accent)); border-radius:14px; color:#fff; padding:18px 26px; display:flex; align-items:center; gap:16px; margin-bottom:22px; }
     .banner i { font-size:2.1rem; opacity:.9; }
@@ -120,7 +115,7 @@
 <script>
 const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login.html';
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
 const $ = s => document.querySelector(s);

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor de Cartas de Aprobación — AutoFácil</title>
-  <!-- v1.4 — card Portal del Dealer: plazos + límite IA -->
+  <!-- v1.5 — card Portal del Dealer: plazos + límite IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -147,7 +147,7 @@
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
 if (!token || !yo) location.href='/login.html';
-function logout(){ sessionStorage.clear(); location.href='/login.html'; }
+
 const hdr = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+token });
 function toast(m){ /* simple */ alert(m); }
 

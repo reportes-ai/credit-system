@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <!-- v1.3 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
+  <!-- v1.4 — workflow de aprobacion: firmas por nivel, hoja por sucursal con nro de pedido -->
   <meta charset="UTF-8">
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,14 +11,6 @@
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI', system-ui, sans-serif; margin:0; }
-    .topnav { background:linear-gradient(90deg,var(--navy-dark),var(--navy-light)); color:#fff; height:60px; padding:0 24px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:200; }
-    .topnav-brand { display:flex; align-items:center; gap:8px; text-decoration:none; }
-    .topnav-brand img { height:34px; filter:brightness(0) invert(1); }
-    .version-badge { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.75); font-size:0.65rem; font-weight:700; border-radius:6px; padding:2px 8px; }
-    .breadcrumb-nav { color:rgba(255,255,255,0.6); font-size:0.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,0.75); text-decoration:none; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,0.35); }
-    .btn-logout { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:5px 12px; font-size:0.82rem; cursor:pointer; }
     .main-content { padding:24px 32px; max-width:1400px; margin:0 auto; }
     .page-banner { background:linear-gradient(135deg,#1e3a8a,#0141A2 50%,#009AFE); border-radius:14px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:16px; }
     .page-banner i { font-size:2.4rem; opacity:.85; }

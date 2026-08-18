@@ -10,17 +10,9 @@
   <style>
     :root { --navy:#001345; --blue:#0141A2; --sky:#009AFE; }
     body { background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; }
-
-    .topnav { background: linear-gradient(90deg, #012d70, #0255c5); color: #fff; height: 60px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-    .topnav-left { display: flex; align-items: center; gap: 16px; }
-    .topnav-brand img { height: 34px; filter: brightness(0) invert(1); }
-    .version-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.75); font-size: 0.65rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; letter-spacing: 0.5px; margin-left: 2px; }
-    .topnav-right { display: flex; align-items: center; gap: 12px; }
     .user-chip { background: rgba(255,255,255,0.12); border-radius: 24px; padding: 5px 12px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
     .avatar { width: 28px; height: 28px; background: #90caf9; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0141A2; font-weight: 700; font-size: 0.75rem; }
     .perfil-badge { background: rgba(144,202,249,0.2); border: 1px solid rgba(144,202,249,0.4); color: #90caf9; border-radius: 12px; padding: 2px 10px; font-size: 0.73rem; font-weight: 600; }
-    .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; transition: background 0.2s; }
-    .btn-logout:hover { background: rgba(255,255,255,0.22); }
 
     .page-wrap { max-width:1100px; margin:20px auto; padding:0 24px 60px; }
 
@@ -142,11 +134,7 @@
     }
     @keyframes slideIn { from { transform:translateX(60px); opacity:0; } to { transform:translateX(0); opacity:1; } }
     .toast-ok  { background:#059669; }
-    .toast-err { background:#dc2626; }
-    .breadcrumb-nav { color:rgba(255,255,255,.6); font-size:.85rem; display:flex; align-items:center; gap:6px; }
-    .breadcrumb-nav a { color:rgba(255,255,255,.75); text-decoration:none; }
-    .breadcrumb-nav a:hover { color:#fff; }
-    .breadcrumb-nav .sep { color:rgba(255,255,255,.35); }  </style>
+    .toast-err { background:#dc2626; }  </style>
 </head>
 <body>
 
@@ -347,7 +335,7 @@
 /* ─── Auth ─────────────────────────────────────────────────────────── */
 function getToken() { return sessionStorage.getItem('token'); }
 function apiHeaders() { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
-function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); location.href='/login.html'; }
+
 
 
 
