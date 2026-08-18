@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — pestaña Invitar al Portal (correo masivo self-service) -->
+<!-- v2.1 — plantilla de invitación sin despedida duplicada (el marco ya firma) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -885,7 +885,8 @@ const INV_HTML_DEF = `<p>Hola <b>{{nombre}}</b>,</p>
 </ol>
 <p style="margin:22px 0"><a href="https://dealers.autofacilchile.cl" style="display:inline-block;background:#0141A2;color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:700;font-size:16px">Quiero entrar a mi portal →</a></p>
 <p>Este es el nuevo AutoFácil: <b>tecnología al servicio de tu negocio</b>. Y esto recién comienza.</p>
-<p>Un abrazo,<br><b>Equipo AutoFácil</b><br><span style="color:#64748b;font-size:13px">Crédito automotriz que sí funciona</span></p>`;
+<p><b>Equipo AutoFácil</b><br><span style="color:#64748b;font-size:13px">Crédito automotriz que sí funciona</span></p>`;
+// (sin despedida: el marco del correo del sistema ya agrega "Saludos," + logo)
 
 let INV_DEALERS = [];
 const invSel = new Set();
