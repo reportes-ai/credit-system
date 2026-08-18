@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v212.1';
+const APP_VERSION = 'v212.2';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -208,20 +208,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const mostrar = () => links.forEach(a => { a.style.display = a.dataset.afDisplay || 'flex'; });
     let yo = null; try { yo = JSON.parse(sessionStorage.getItem('usuario') || 'null'); } catch (_) {}
     if (yo && yo.perfil === 'Administrador') return mostrar();
-    try {
-      const c = JSON.parse(sessionStorage.getItem('af_dash_ok') || 'null');
-      if (c && (Date.now() - c.t) < 300000) { if (c.ok) mostrar(); return; }
-    } catch (_) {}
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-    fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.json())
-      .then(j => {
-        const fs = (j && j.funcionalidades) || [];
-        const ok = fs.includes('ver_dashboard') || fs.includes('dashboard_resumen');
-        try { sessionStorage.setItem('af_dash_ok', JSON.stringify({ ok, t: Date.now() })); } catch (_) {}
-        if (ok) mostrar();
-      }).catch(() => {}); // sin dato → oculto; el backend protege igual
+    // Motor único de permisos del cliente (definido en topnav.js): una promesa
+    // por carga + caché de 5 min. Fallback directo solo si topnav.js no está.
+    const permisos = window.AF_PERMISOS ? window.AF_PERMISOS() : (() => {
+      const token = sessionStorage.getItem('token');
+      if (!token) return Promise.resolve([]);
+      return fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } })
+        .then(r => r.json()).then(j => (j && j.funcionalidades) || []).catch(() => []);
+    })();
+    permisos.then(fs => {
+      if (fs.includes('ver_dashboard') || fs.includes('dashboard_resumen')) mostrar();
+    }); // sin permiso → oculto; el backend protege igual
   })();
 
   /* 4 ── Menú de usuario: cambiar contraseña al hacer click en el chip ──── */

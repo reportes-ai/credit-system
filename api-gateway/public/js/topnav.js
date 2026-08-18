@@ -210,6 +210,29 @@
     }
   }
 
+  /* MOTOR ÚNICO de mis-permisos en el cliente: una sola promesa por carga de
+     página + caché de sesión 5 min con el array COMPLETO de funcionalidades.
+     Lo usan el link a Dashboard de esta barra, el barrido de app-version.js y
+     cualquier página que quiera gatear cards sin repetir el fetch. */
+  window.AF_PERMISOS = window.AF_PERMISOS || function () {
+    if (window.__afPermisosP) return window.__afPermisosP;
+    try {
+      var c = JSON.parse(sessionStorage.getItem('af_permisos') || 'null');
+      if (c && (Date.now() - c.t) < 300000) return (window.__afPermisosP = Promise.resolve(c.fs || []));
+    } catch (_) {}
+    var token = null; try { token = sessionStorage.getItem('token'); } catch (_) {}
+    if (!token) return Promise.resolve([]);
+    window.__afPermisosP = fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var fs = (j && j.funcionalidades) || (j && j.data && j.data.funcionalidades) || [];
+        try { sessionStorage.setItem('af_permisos', JSON.stringify({ t: Date.now(), fs: fs })); } catch (_) {}
+        return fs;
+      })
+      .catch(function () { window.__afPermisosP = null; return []; });
+    return window.__afPermisosP;
+  };
+
   /* Revela el link a Dashboard solo si el usuario puede verlo (permiso
      'ver_dashboard' o 'dashboard_resumen'; Admin siempre). El backend igual
      bloquea /api/dashboard/datos sin permiso — esto es solo no mostrar la puerta. */
@@ -217,21 +240,9 @@
     var link = document.getElementById('afDashLink');
     if (!link) return;
     if (yo && yo.perfil === 'Administrador') { link.style.display = ''; return; }
-    try {
-      var c = JSON.parse(sessionStorage.getItem('af_dash_ok') || 'null');
-      if (c && (Date.now() - c.t) < 300000) { if (c.ok) link.style.display = ''; return; }
-    } catch (_) {}
-    var token = null; try { token = sessionStorage.getItem('token'); } catch (_) {}
-    if (!token) return;
-    fetch('/api/auth/mis-permisos', { headers: { Authorization: 'Bearer ' + token } })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        var fs = (j && j.funcionalidades) || (j && j.data && j.data.funcionalidades) || [];
-        var ok = fs.indexOf('ver_dashboard') >= 0 || fs.indexOf('dashboard_resumen') >= 0;
-        try { sessionStorage.setItem('af_dash_ok', JSON.stringify({ ok: ok, t: Date.now() })); } catch (_) {}
-        if (ok) link.style.display = '';
-      })
-      .catch(function () { /* sin dato → el link queda oculto; el backend protege igual */ });
+    window.AF_PERMISOS().then(function (fs) {
+      if (fs.indexOf('ver_dashboard') >= 0 || fs.indexOf('dashboard_resumen') >= 0) link.style.display = '';
+    });
   }
 
   /* ── Miga dinámica para páginas con vistas/pestañas internas (SPA) ──────────
@@ -271,10 +282,17 @@
   function popupFundantes() {
     var tk = null; try { tk = sessionStorage.getItem('token'); } catch (_) {}
     if (!tk) return;
+    // Caché negativa 30 min: el sondeo corre en TODAS las páginas y TiDB cobra
+    // por consulta; si la última respuesta fue "nada que rendir", no volver a
+    // preguntar en cada navegación (las reglas del popup toleran horas de espera).
+    try {
+      var sk = Number(sessionStorage.getItem('af_fund_skip') || 0);
+      if (sk && Date.now() - sk < 1800000) return;
+    } catch (_) {}
     fetch('/api/fundantes-seguimiento/popup', { headers: { Authorization: 'Bearer ' + tk } })
       .then(function (r) { return r.json(); }).then(function (j) {
         var op = j && j.success && j.data;
-        if (!op) return;
+        if (!op) { try { sessionStorage.setItem('af_fund_skip', String(Date.now())); } catch (_) {} return; }
         var dlg = document.createElement('dialog');
         dlg.style.cssText = 'border:none;border-radius:16px;padding:0;width:min(560px,94vw);box-shadow:0 20px 60px rgba(0,0,0,.35)';
         dlg.innerHTML =
