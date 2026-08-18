@@ -69,6 +69,45 @@ require('../../../../shared/migrate').enFila('reportes-cluster', async () => {
   }
 });
 
+/* Cards de Reportería gateadas por permiso: cada card del landing tiene su
+   funcionalidad en la matriz de Perfiles (antes 5 cards se mostraban siempre).
+   Se otorgan a TODOS los perfiles que hoy ven el módulo (statu quo intacto),
+   EXCEPTO los perfiles restringidos tipo "BDI Cluster Ecuador", que solo debe
+   ver su card. Corre UNA vez: después manda el mantenedor de Perfiles. */
+require('../../../../shared/migrate').migrar('reporteria_cards_permisos_v1', async () => {
+  const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/reporteria/' LIMIT 1");
+  if (!mod) return;
+  const CARDS = [
+    { codigo: 'rep_tailor_made',      nombre: 'Tailor Made (card)' },
+    { codigo: 'rep_tablas_dinamicas', nombre: 'Tablas Dinámicas (card)' },
+    { codigo: 'rep_mando_tv',         nombre: 'Cuadro de Mando TV (card)' },
+    { codigo: 'rep_cartera_creditos', nombre: 'Cartera de Créditos (card)' },
+    { codigo: 'rep_cobranza_mora',    nombre: 'Cobranza y Mora (card)' }
+  ];
+  // Perfiles que hoy ven el módulo (tienen la funcionalidad "Ver módulo Reportería")
+  const [[fVer]] = await pool.query(
+    "SELECT id_funcionalidad FROM funcionalidades WHERE id_modulo=? AND nombre LIKE 'Ver módulo%' LIMIT 1", [mod.id_modulo]);
+  const [perfiles] = fVer
+    ? await pool.query(`SELECT pp.id_perfil FROM permisos_perfil pp
+                        JOIN perfiles p ON p.id_perfil = pp.id_perfil
+                        WHERE pp.id_funcionalidad=? AND pp.habilitado=1
+                          AND p.nombre <> 'BDI Cluster Ecuador'`, [fVer.id_funcionalidad])
+    : [[]];
+  const idsPerfil = new Set(perfiles.map(p => p.id_perfil)); idsPerfil.add(1); // Admin siempre
+  for (const c of CARDS) {
+    const [[ex]] = await pool.query('SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1', [c.codigo]);
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [r] = await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo) VALUES (?,?,?)',
+        [mod.id_modulo, c.nombre, c.codigo]);
+      idF = r.insertId;
+    }
+    for (const idP of idsPerfil)
+      await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (?,?,1)', [idP, idF]);
+  }
+  console.log(`[reporteria] cards gateadas: ${CARDS.length} funcionalidades × ${idsPerfil.size} perfiles`);
+});
+
 /* GET /cluster-comercial — filas PPSTO vs REAL por AÑO|MES|SEMANA.
    Universo REAL = el mismo del Dashboard de ventas: dedup por operación,
    cartera desde 2025-01, sin CARTERA_AFA, OTORGADOS por fecha_otorgado. */

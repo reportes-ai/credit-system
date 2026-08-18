@@ -114,7 +114,7 @@
   </div>
   <div class="section-title"><i class="bi bi-grid-3x3-gap"></i>Reportes disponibles</div>
   <div class="reports-grid">
-    <div class="report-card tailor" onclick="abrirTailorMade()">
+    <div class="report-card tailor" id="cardTailor" style="display:none" onclick="abrirTailorMade()">
       <div class="card-icon-wrap"><i class="bi bi-sliders2"></i></div>
       <h6>Tailor Made</h6>
       <p>Construye tu propio reporte: elige campos, aplica filtros específicos por tipo y exporta exactamente lo que necesitas.</p>
@@ -125,7 +125,7 @@
         </button>
       </div>
     </div>
-    <div class="report-card pivot" onclick="window.location='/reporteria/tablas-dinamicas/'">
+    <div class="report-card pivot" id="cardPivot" style="display:none" onclick="window.location='/reporteria/tablas-dinamicas/'">
       <div class="card-icon-wrap"><i class="bi bi-table"></i></div>
       <h6>Tablas Dinámicas</h6>
       <p>Crea informes personalizados agrupando campos, calculando sumas, conteos y promedios. Guarda y comparte tus tablas.</p>
@@ -213,7 +213,7 @@
         </button>
       </div>
     </div>
-    <div class="report-card mando" onclick="window.location='/mando/'" style="background:linear-gradient(160deg,#040d20,#0a1e3f);border:1px solid #123a6b">
+    <div class="report-card mando" id="cardMando" onclick="window.location='/mando/'" style="display:none;background:linear-gradient(160deg,#040d20,#0a1e3f);border:1px solid #123a6b">
       <div class="card-icon-wrap" style="background:linear-gradient(135deg,#031024,#0a2748);color:#00e5ff;border:1px solid #0a2748"><i class="bi bi-broadcast"></i></div>
       <h6 style="color:#c9e6ff">Cuadro de Mando <span style="font-size:.62rem;background:#00e5ff;color:#04121f;border-radius:6px;padding:2px 7px;vertical-align:middle;font-weight:800">TV</span></h6>
       <p style="color:#7ba2cc">Centro de control en vivo para proyectar en el TV: reloj, UF/TMC, ejecutivos conectados, cartas y otorgados de hoy, carrera del mes y cumplimiento del presupuesto. Se actualiza solo.</p>
@@ -224,7 +224,7 @@
         </button>
       </div>
     </div>
-    <div class="report-card cartera" onclick="window.location='/reporteria/cartera-creditos/'">
+    <div class="report-card cartera" id="cardCartera" style="display:none" onclick="window.location='/reporteria/cartera-creditos/'">
       <div class="card-icon-wrap"><i class="bi bi-file-earmark-bar-graph"></i></div>
       <h6>Cartera de Créditos</h6>
       <p>Resumen de la cartera con gráficos 3D: etapas, montos financiados, colocaciones por mes y distribución por financiera y ejecutivo.</p>
@@ -235,7 +235,7 @@
         </button>
       </div>
     </div>
-    <div class="report-card mora" onclick="window.location='/reporteria/cobranza-mora/'">
+    <div class="report-card mora" id="cardMora" style="display:none" onclick="window.location='/reporteria/cobranza-mora/'">
       <div class="card-icon-wrap"><i class="bi bi-cash-coin"></i></div>
       <h6>Cobranza y Mora</h6>
       <p>Cuotas vencidas por tramo, tasa de mora, recuperación mensual y top de deudores con acceso directo a gestionar. Con gráficos 3D.</p>
@@ -439,6 +439,12 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     const perms = new Set();
     const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { cache:'no-store', headers: apiHdrs() });
     const j = await r.json(); (j.funcionalidades||[]).forEach(c=>perms.add(c));
+    // Cards generales — cada una con su funcionalidad en la matriz de Perfiles
+    const CARDS_PERM = { cardTailor:'rep_tailor_made', cardPivot:'rep_tablas_dinamicas',
+                         cardMando:'rep_mando_tv', cardCartera:'rep_cartera_creditos', cardMora:'rep_cobranza_mora' };
+    for (const [id, cod] of Object.entries(CARDS_PERM)) {
+      if (esAdmin || perms.has(cod)) { const el = document.getElementById(id); if (el) el.style.display = ''; }
+    }
     if (esAdmin || perms.has('aprob_rentabilidad')) {
       const el = document.getElementById('cardRentab'); if (el) el.style.display = '';
     }
