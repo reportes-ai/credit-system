@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!-- v1.0 -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BDD Cluster Comercial — Reportería AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<script src="/js/xlsx.full.min.js"></script>
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --sky:#009AFE; }
+  * { box-sizing:border-box; } body { margin:0; background:#f0f4f8; font-family:'Segoe UI',system-ui,sans-serif; color:#1e293b; }
+  .wrap { max-width:1000px; margin:24px auto; padding:0 20px 60px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:20px; display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+  .banner > i { font-size:2.4rem; opacity:.85; }
+  .banner h2 { margin:0 0 3px; font-size:1.25rem; font-weight:700; }
+  .banner p { margin:0; opacity:.8; font-size:.85rem; }
+  .banner .der { margin-left:auto; text-align:right; }
+  .banner .fecha { font-size:.78rem; opacity:.85; font-style:italic; margin-bottom:8px; }
+  .btn-dl { background:#fff; color:var(--accent); border:none; border-radius:10px; padding:11px 22px; font-size:.9rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  .btn-dl:hover { opacity:.88; }
+  .btn-dl:disabled { opacity:.5; cursor:wait; }
+  .panel { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
+  .panel h5 { margin:0 0 12px; font-size:.92rem; font-weight:700; color:var(--navy); display:flex; align-items:center; gap:8px; }
+  .panel h5 .badge3d { margin-left:auto; background:#eff6ff; color:var(--accent); border-radius:8px; padding:2px 9px; font-size:.65rem; font-weight:800; letter-spacing:.06em; }
+  table { border-collapse:collapse; font-size:.78rem; width:100%; }
+  th { background:#f0f4f8; color:#6b7280; padding:7px 10px; text-align:right; font-size:.68rem; text-transform:uppercase; position:sticky; top:0; white-space:nowrap; }
+  th:nth-child(-n+2) { text-align:left; }
+  td { padding:5px 10px; border-bottom:1px solid #f1f5f9; text-align:right; white-space:nowrap; }
+  td:nth-child(-n+2) { text-align:left; }
+  tr.sem-actual td { background:#fffbeb; font-weight:600; }
+  .scroll { max-height:62vh; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; }
+  .cargando { text-align:center; color:#6b7280; padding:60px 0; font-size:.9rem; }
+  .nota { font-size:.75rem; color:#94a3b8; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Reportería',href:'/reporteria'},{label:'BDD Cluster Comercial',icon:'bi-globe-americas',current:true}]};</script>
+
+<div class="wrap">
+  <div class="banner">
+    <i class="bi bi-globe-americas"></i>
+    <div>
+      <h2>BDD Cluster Comercial</h2>
+      <p>Créditos <b>OTORGADOS</b> por semana: presupuesto vs real, en unidades y monto financiado.<br>Formato listo para el análisis cluster de Casa Matriz.</p>
+    </div>
+    <div class="der">
+      <div class="fecha" id="fecha-corte"></div>
+      <button class="btn-dl" id="btn-dl" onclick="descargar()" disabled><i class="bi bi-file-earmark-excel"></i> Descargar .xlsx</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h5><i class="bi bi-table"></i> Vista previa <span class="badge3d" id="badge-filas"></span></h5>
+    <div class="scroll"><table id="preview"><tbody><tr><td class="cargando">Cargando datos…</td></tr></tbody></table></div>
+    <div class="nota">Semanas del mes por bloques fijos de días: 1-7 · 8-14 · 15-21 · 22-fin de mes (no semanas ISO).
+      El presupuesto vive en la tabla <code>ppsto_cluster</code>; el real sale de la base con el mismo universo del Dashboard de ventas (desde enero 2025, sin cartera migrada).</div>
+  </div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+var FILAS = [];
+
+/* Fecha de corte = AYER (día cerrado) */
+function fechaCorte() {
+  var ayer = new Date();
+  ayer.setDate(ayer.getDate() - 1);
+  return String(ayer.getDate()).padStart(2,'0') + '-' +
+         String(ayer.getMonth()+1).padStart(2,'0') + '-' + ayer.getFullYear();
+}
+document.getElementById('fecha-corte').textContent = '🕐 Actualizado al ' + fechaCorte() + ' (día cerrado)';
+
+/* Filas en el formato del Excel (mismas columnas que siempre recibió Ecuador) */
+function filasExport() {
+  return FILAS.map(function(f, i) {
+    return {
+      'ID':      i + 1,
+      'EMPRESA': 'AUTOFACIL',
+      'AÑO':     f.anio,
+      'MES':     f.mes,
+      'SEMANA':  f.semana,
+      'PPSTO #': f.ppsto_n,
+      'PPSTO $': f.ppsto_m,
+      'REAL #':  f.real_n,
+      'REAL $':  f.real_m
+    };
+  });
+}
+
+function descargar() {
+  var filas = filasExport();
+  if (!filas.length) return;
+  var wb = XLSX.utils.book_new();
+  var ws = XLSX.utils.json_to_sheet(filas);
+  ws['!cols'] = [{wch:5},{wch:12},{wch:6},{wch:5},{wch:8},{wch:9},{wch:14},{wch:9},{wch:16}];
+  // Formato miles en montos: G = PPSTO $, I = REAL $
+  var range = XLSX.utils.decode_range(ws['!ref']);
+  for (var R = range.s.r + 1; R <= range.e.r; R++) {
+    ['G','I'].forEach(function(col) {
+      var addr = col + (R + 1);
+      if (ws[addr] && ws[addr].t === 'n') ws[addr].z = '#,##0';
+    });
+  }
+  XLSX.utils.book_append_sheet(wb, ws, 'BDD');
+  XLSX.writeFile(wb, 'BDD_CLUSTER COMERCIAL - AUTOFACIL - actualizado al ' + fechaCorte() + '.xlsx');
+}
+
+function pintar() {
+  var filas = filasExport();
+  if (!filas.length) {
+    document.getElementById('preview').innerHTML = '<tbody><tr><td class="cargando">Sin datos.</td></tr></tbody>';
+    return;
+  }
+  var hoy = new Date();
+  var semAhora = Math.min(4, Math.floor((hoy.getDate()-1)/7)+1);
+  var cols = Object.keys(filas[0]);
+  var nf = function(v){ return v == null ? '' : v.toLocaleString('es-CL'); };
+  document.getElementById('preview').innerHTML =
+    '<thead><tr>' + cols.map(function(c){ return '<th>'+c+'</th>'; }).join('') + '</tr></thead>' +
+    '<tbody>' + filas.map(function(f){
+      var actual = f['AÑO']===hoy.getFullYear() && f['MES']===hoy.getMonth()+1 && f['SEMANA']===semAhora;
+      return '<tr'+(actual?' class="sem-actual"':'')+'>' + cols.map(function(c){
+        return '<td>' + (typeof f[c] === 'number' ? nf(f[c]) : (f[c] == null ? '' : f[c])) + '</td>';
+      }).join('') + '</tr>';
+    }).join('') + '</tbody>';
+  document.getElementById('badge-filas').textContent = filas.length + ' FILAS';
+}
+
+(async function cargar(){
+  try {
+    const r = await fetch('/api/reporteria/cluster-comercial', {
+      headers: { 'Authorization': 'Bearer ' + sessionStorage.getItem('token') }
+    });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'Error al cargar');
+    FILAS = j.data.filas || [];
+    pintar();
+    document.getElementById('btn-dl').disabled = !FILAS.length;
+  } catch(e) {
+    document.getElementById('preview').innerHTML =
+      '<tbody><tr><td class="cargando">⚠️ ' + e.message + '</td></tr></tbody>';
+  }
+})();
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

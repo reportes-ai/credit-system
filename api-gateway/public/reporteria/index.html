@@ -180,6 +180,17 @@
         </button>
       </div>
     </div>
+    <div class="report-card cluster" id="cardCluster" style="display:none" onclick="window.location='/reporteria/cluster-comercial/'">
+      <div class="card-icon-wrap" style="background:linear-gradient(135deg,#065f46,#10b981);color:#fff"><i class="bi bi-globe-americas"></i></div>
+      <h6>BDD Cluster Comercial</h6>
+      <p>Informe para Casa Matriz Ecuador: créditos OTORGADOS por semana, presupuesto vs real en unidades y monto financiado. Descarga directa en Excel con datos vivos de la base.</p>
+      <div class="card-footer-row">
+        <span class="badge-status activo"><i class="bi bi-check-circle-fill"></i>Disponible</span>
+        <button class="btn-abrir" style="background:linear-gradient(135deg,#065f46,#10b981)">
+          <i class="bi bi-arrow-right-circle"></i>Abrir
+        </button>
+      </div>
+    </div>
     <div class="report-card bitacora" id="cardBitacora" style="display:none" onclick="window.location='/reporteria/bitacora-credito/'">
       <div class="card-icon-wrap"><i class="bi bi-clock-history"></i></div>
       <h6>Bitácora de un Crédito</h6>
@@ -433,6 +444,9 @@ function logout()     { sessionStorage.removeItem('token'); sessionStorage.remov
     }
     if (esAdmin || perms.has('old_base_unica_ver')) {
       const el = document.getElementById('cardOldBase'); if (el) el.style.display = '';
+    }
+    if (esAdmin || perms.has('reporteria_cluster')) {
+      const el = document.getElementById('cardCluster'); if (el) el.style.display = '';
     }
     if (esAdmin || perms.has('rep_bitacora')) {
       const el = document.getElementById('cardBitacora'); if (el) el.style.display = '';
