@@ -2103,8 +2103,15 @@ const desmarcarComisiones = async (req, res) => {
 /* ── POST /api/postventa/marcar-historico — marca pre-2026 como totalmente pagado ── */
 const marcarHistorico = async (req, res) => {
   try {
+    /* Excluye lo REVERSADO a propósito: este barrido corre en cada carga de
+       Seguimiento, y sin esta exclusión volvía a marcar "pagada" una comisión
+       que un Administrador acababa de reversar (ops 82933/83753, 18-08-2026:
+       el cierre histórico las dio por pagadas y era falso). Una reversa
+       registrada en postventa_reversas manda sobre el marcado histórico. */
     const [segs] = await pool.query(
-      `SELECT id FROM postventa_seguimiento WHERE fecha_otorgado < '2026-01-01'`
+      `SELECT id FROM postventa_seguimiento
+        WHERE fecha_otorgado < '2026-01-01'
+          AND id NOT IN (SELECT DISTINCT id_seguimiento FROM postventa_reversas)`
     );
     if (!segs.length) return res.json({ success: true, data: { marcados: 0 }, error: null });
 
