@@ -547,6 +547,14 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
   } catch (e) { console.error('[notificarReversaPagoDealer]', e.message); }
 }
 
+/* Disparo ÚNICO (pedido de Pato 18-08-2026): la reversa del pago de la
+   ODP2610744 (OP 26080033, HIDALGO AUTOMOTRIZ) ocurrió ANTES de que existiera
+   el aviso automático — se le manda la corrección una sola vez desde producción
+   (acá viven las credenciales de correo; local no las tiene, a propósito). */
+require('../../../../shared/migrate').migrar('aviso-reversa-hidalgo-26080033', async () => {
+  await notificarReversaPagoDealer('SALDO', 900002, 'Transferencia rechazada por el banco');
+});
+
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
    Cada transición del workflow genera una alerta (campana) a destinatarios
    configurables por evento: perfiles + el ejecutivo de la operación + usuarios extra. */
