@@ -508,6 +508,14 @@ const reordenarProductos = async (req, res) => {
 };
 
 /* ── REST: consulta a la Central ─────────────────────────────────────────── */
+/* El Registro Nacional de Deudores de Pensiones de Alimentos (2101) es SOLO de
+   personas naturales: a una persona jurídica (RUT >= 50 millones, convención SII)
+   ni se le ofrece ni se le consulta — era saldo gastado en un informe sin sentido. */
+const PRODUCTOS_SOLO_PERSONA = new Set(['2101']);
+const esRutEmpresa = (num) => Number(num) >= 50000000;
+const soloProductosDelTipo = (num, productos) =>
+  esRutEmpresa(num) ? productos.filter(c => !PRODUCTOS_SOLO_PERSONA.has(String(c))) : productos;
+
 const consultar = async (req, res) => {
   try {
     const rut = req.body?.rut;
@@ -521,7 +529,9 @@ const consultar = async (req, res) => {
       const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
       productos = act.map(r => r.codigo);
     }
-    if (!productos.length) return res.status(400).json({ success: false, data: null, error: 'No hay productos activos para consultar' });
+    productos = soloProductosDelTipo(num, productos);
+    if (!productos.length) return res.status(400).json({ success: false, data: null,
+      error: esRutEmpresa(num) ? 'El Boletín de Deudores de Pensión de Alimentos no aplica a personas jurídicas' : 'No hay productos activos para consultar' });
 
     let r;
     try {
@@ -727,6 +737,7 @@ const verificarRepositorio = async (req, res) => {
       const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
       productos = act.map(r => r.codigo);
     }
+    productos = soloProductosDelTipo(num, productos);   // empresa: sin Deudores de Alimentos
     const cfg = await getConfig();
     const [prods] = await pool.query('SELECT codigo, nombre FROM dealernet_productos');
     const nombreDe = c => (prods.find(p => String(p.codigo) === String(c)) || {}).nombre || c;
@@ -758,7 +769,9 @@ const solicitarInformes = async (req, res) => {
       const [act] = await pool.query("SELECT codigo FROM dealernet_productos WHERE activo=1 ORDER BY orden");
       productos = act.map(r => r.codigo);
     }
-    if (!productos.length) return res.status(400).json({ success: false, data: null, error: 'No hay productos activos para solicitar' });
+    productos = soloProductosDelTipo(num, productos);   // empresa: sin Deudores de Alimentos
+    if (!productos.length) return res.status(400).json({ success: false, data: null,
+      error: esRutEmpresa(num) ? 'El Boletín de Deudores de Pensión de Alimentos no aplica a personas jurídicas' : 'No hay productos activos para solicitar' });
 
     const cfg = await getConfig();
     const bloqueados = [], aPedir = [];
