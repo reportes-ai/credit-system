@@ -239,6 +239,11 @@ require('../../../../shared/migrate').enFila('atencion', async () => {
     // Scrub: borra el token en claro de la BD (ya solo se usa el hash).
     await pool.query("UPDATE ar_dealer_cuentas SET acceso_token=NULL WHERE acceso_token IS NOT NULL");
 
+    // Invitación al portal por correo: fecha del último envío por dealer.
+    // Marca informativa (la invitación NO toca claves ni cuentas): permite ver
+    // a quién ya se invitó y evitar reenvíos que confundan al dealer.
+    await pool.query('ALTER TABLE dealers ADD COLUMN IF NOT EXISTS portal_invitado_en DATETIME NULL');
+
     // Bitácora de accesos de dealers: detección de fuerza bruta / accesos anómalos.
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_auth_logs (
       id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -604,6 +609,60 @@ const listarCuentas = async (req, res) => {
   } catch (e) { errSrv(res, e, 'listarCuentas'); }
 };
 
+/* ── Invitaciones al portal (correo masivo, camino self-service) ──────────
+   GET  /invitaciones/dealers  → todos los dealers con su correo, si ya tienen
+        cuenta de portal y la fecha del último envío de invitación.
+   POST /invitaciones/enviar   → manda el correo (asunto/HTML editables desde
+        la UI) a los dealers marcados y estampa dealers.portal_invitado_en.
+   La invitación solo INVITA: no crea cuentas ni toca claves — el dealer se
+   auto-registra en el portal con su RUT + correo registrado (onboarding). */
+const listarInvitables = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT d.id_dealer, d.rut, COALESCE(NULLIF(d.nombre_razon,''), d.nombre_indexa) AS nombre,
+              d.correo, d.activo, d.portal_invitado_en,
+              EXISTS(SELECT 1 FROM ar_dealer_cuentas c WHERE c.id_dealer=d.id_dealer AND c.activo=1) AS tiene_cuenta
+       FROM dealers d
+       ORDER BY nombre`);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { errSrv(res, e, 'listarInvitables'); }
+};
+
+const enviarInvitaciones = async (req, res) => {
+  try {
+    const { ids, asunto, html } = req.body || {};
+    if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ success: false, data: null, error: 'Selecciona al menos un dealer' });
+    if (ids.length > 1000) return res.status(400).json({ success: false, data: null, error: 'Máximo 1000 dealers por envío' });
+    if (!String(asunto || '').trim() || !String(html || '').trim())
+      return res.status(400).json({ success: false, data: null, error: 'Asunto y contenido del correo son obligatorios' });
+
+    const [dealers] = await pool.query(
+      `SELECT id_dealer, COALESCE(NULLIF(nombre_razon,''), nombre_indexa) AS nombre, correo
+       FROM dealers WHERE id_dealer IN (?)`, [ids.map(Number).filter(Boolean)]);
+
+    let enviados = 0; const fallidos = [];
+    for (const d of dealers) {
+      const correo = String(d.correo || '').trim();
+      if (!correo || !correo.includes('@')) { fallidos.push({ id_dealer: d.id_dealer, nombre: d.nombre, motivo: 'Sin correo registrado' }); continue; }
+      // Personalización: {{nombre}} → razón social del dealer (escapada)
+      const nombreSafe = String(d.nombre || 'Estimado dealer').replace(/[<>&]/g, ' ').trim();
+      const cuerpo = String(html).replace(/\{\{\s*nombre\s*\}\}/gi, nombreSafe);
+      try {
+        await enviarCorreo({ to: correo, subject: String(asunto).trim(), html: envolverHTML(cuerpo),
+          text: `Te invitamos al nuevo Portal Dealer de AutoFácil: ${APP_URL}/portal-dealer — Regístrate con tu RUT y el correo de tu ficha.` });
+        await pool.query('UPDATE dealers SET portal_invitado_en=NOW() WHERE id_dealer=?', [d.id_dealer]);
+        enviados++;
+      } catch (e) {
+        fallidos.push({ id_dealer: d.id_dealer, nombre: d.nombre, motivo: 'Fallo el envío del correo' });
+      }
+    }
+    auditar({ req, accion: 'ENVIAR', modulo: 'atencion-remota', entidad: 'invitacion_portal',
+      detalle: `Invitación al portal enviada a ${enviados} dealer(s)${fallidos.length ? `, ${fallidos.length} fallido(s)` : ''}`,
+      meta: { ids, enviados, fallidos } });
+    res.json({ success: true, data: { enviados, fallidos }, error: null });
+  } catch (e) { errSrv(res, e, 'enviarInvitaciones'); }
+};
+
 const crearCuenta = async (req, res) => {
   try {
     let { id_dealer, email, password, nombre, rut } = req.body || {};
@@ -918,6 +977,7 @@ module.exports = {
   verifyDealer, verifyAny, cuentaVigente,
   // dealer
   dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink, verComoDealer,
+  listarInvitables, enviarInvitaciones,
   // ejecutivo
   getCola, getMensajes,
   // comunes

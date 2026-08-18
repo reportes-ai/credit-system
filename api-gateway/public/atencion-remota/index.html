@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- v2.0 — pestaña Invitar al Portal (correo masivo self-service) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -169,6 +170,7 @@
     <div class="tab active" data-tab="atencion"><i class="bi bi-headset me-1"></i>Atención</div>
     <div class="tab" data-tab="cuentas"><i class="bi bi-person-badge me-1"></i>Cuentas de Dealers</div>
     <div class="tab" data-tab="solicitudes"><i class="bi bi-person-plus me-1"></i>Solicitudes<span class="tab-badge" id="solBadge" style="display:none">0</span></div>
+    <div class="tab" data-tab="invitar"><i class="bi bi-envelope-paper-heart me-1"></i>Invitar al Portal</div>
     <div class="tab hidden" id="tabConfigBtn" data-tab="config"><i class="bi bi-sliders me-1"></i>Configuración</div>
   </div>
 
@@ -251,6 +253,40 @@
       <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-person-plus me-1"></i>Solicitudes de cuenta pendientes</h3>
       <p style="font-size:.83rem;color:#64748b;margin:0 0 14px">Dealers que pidieron acceso desde el portal. Al aprobar defines su contraseña y se crea la cuenta.</p>
       <div id="solList"></div>
+    </div>
+  </div>
+
+  <!-- ── INVITAR AL PORTAL ── -->
+  <div class="paneview" id="view-invitar">
+    <div class="grid2" style="grid-template-columns:minmax(340px,1fr) minmax(420px,1.2fr);align-items:start">
+      <div class="card">
+        <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-people me-1"></i>¿A quién invitamos?</h3>
+        <p style="font-size:.8rem;color:#64748b;margin:0 0 10px">Marca los dealers y presiona Enviar. La invitación <b>no crea cuentas ni toca claves</b>: el dealer se registra solo, con su RUT y el correo de su ficha.</p>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+          <input type="text" id="invBuscar" placeholder="Buscar por nombre o RUT…" autocomplete="off" style="flex:1;min-width:180px;border:1.5px solid #d1d5db;border-radius:8px;padding:8px 10px;font-size:.86rem">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:#334155"><input type="checkbox" id="invSoloSinInv" checked> Solo no invitados</label>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px;font-size:.8rem">
+          <label style="display:flex;align-items:center;gap:6px;font-weight:700;color:#012d70"><input type="checkbox" id="invTodos"> Marcar todos los visibles</label>
+          <span style="margin-left:auto;color:#64748b"><b id="invSelN">0</b> seleccionados</span>
+        </div>
+        <div style="max-height:52vh;overflow:auto;border:1px solid #eef2f7;border-radius:10px">
+          <table class="tb"><thead><tr><th style="width:34px"></th><th>Dealer</th><th>Correo</th><th>Estado</th></tr></thead>
+            <tbody id="invBody"></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;font-size:1rem;color:var(--navy-dark)"><i class="bi bi-envelope-paper me-1"></i>El correo (editable)</h3>
+        <div class="fld"><label>Asunto</label><input type="text" id="invAsunto"></div>
+        <div class="fld"><label>Contenido (HTML — <code>{{nombre}}</code> se reemplaza por la razón social de cada dealer)</label>
+          <textarea id="invHtml" rows="16" style="font-family:monospace;font-size:.78rem"></textarea></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-ghost" onclick="previewInvitacion()"><i class="bi bi-eye me-1"></i>Vista previa</button>
+          <button class="btn-ghost" onclick="restaurarPlantillaInv()"><i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar texto original</button>
+          <button class="btn-primary2" style="margin-left:auto" id="invEnviarBtn" onclick="enviarInvitaciones()"><i class="bi bi-send me-1"></i>Enviar invitación</button>
+        </div>
+        <div id="invResultado" style="margin-top:10px;font-size:.82rem"></div>
+      </div>
     </div>
   </div>
 
@@ -374,11 +410,12 @@ document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () =>
   t.classList.add('active');
   document.getElementById('view-'+t.dataset.tab).classList.add('active');
   // Miga sigue a la pestaña (regla SPA): Atención = home interno
-  const HOJAS = { cuentas:'Cuentas de Dealers', solicitudes:'Solicitudes', config:'Configuración' };
+  const HOJAS = { cuentas:'Cuentas de Dealers', solicitudes:'Solicitudes', invitar:'Invitar al Portal', config:'Configuración' };
   if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(HOJAS[t.dataset.tab] || null,
     () => { const h=document.querySelector('.tab[data-tab="atencion"]'); if (h) h.click(); });
   if (t.dataset.tab==='cuentas') cargarCuentas();
   if (t.dataset.tab==='solicitudes') cargarSolicitudes();
+  if (t.dataset.tab==='invitar') cargarInvitables();
   if (t.dataset.tab==='config')  cargarConfig();
 }));
 
@@ -826,6 +863,99 @@ async function guardarInterloc(){
   } catch(_){ toast('Error al guardar', true); }
 }
 document.getElementById('ilModal').addEventListener('click', function(e){ if(e.target===this) cerrarInterloc(); });
+
+/* ── Invitar al Portal (correo masivo, camino self-service) ── */
+const INV_ASUNTO_DEF = '🚀 Llegó tu Portal Dealer AutoFácil: tu negocio con nosotros, en línea y en tiempo real';
+const INV_HTML_DEF = `<p>Hola <b>{{nombre}}</b>,</p>
+<p>En AutoFácil invertimos en tecnología para que trabajar con nosotros sea <b>más rápido, más transparente y más rentable</b> para ti. Hoy queremos presentarte el nuevo <b>Portal Dealer AutoFácil</b>: tu oficina virtual, abierta 24/7, donde tienes el control total de tu negocio con nosotros.</p>
+<p><b>¿Qué puedes hacer desde hoy en tu portal?</b></p>
+<ul style="line-height:1.9">
+  <li>💰 <b>Saldos de Precio</b> — mira en línea tus operaciones pendientes de pago y en qué etapa exacta va cada una. Se acabó el llamar para preguntar.</li>
+  <li>📄 <b>Tus Cartolas</b> — revisa y descarga tus cartolas cuando quieras.</li>
+  <li>🧾 <b>Comisiones pendientes</b> — total claridad de lo que tienes por cobrar, al día.</li>
+  <li>⚡ <b>Simulador de créditos</b> — cotiza un crédito para tu cliente en segundos, con la tasa y cuota al instante, sin esperar a nadie.</li>
+  <li>✅ <b>Pre-aprobación en línea</b> — evalúa a tu cliente al tiro y ciérralo en la primera visita: el que cotiza contigo, compra contigo.</li>
+  <li>🤖 <b>Asistente virtual</b> — pregúntale por tus operaciones a cualquier hora y te responde en el momento; y si necesitas a una persona, nuestro equipo te atiende por chat en horario hábil.</li>
+</ul>
+<p><b>Ingresar es así de simple</b> (2 minutos, una sola vez):</p>
+<ol style="line-height:1.9">
+  <li>Entra a <a href="https://dealers.autofacilchile.cl">dealers.autofacilchile.cl</a></li>
+  <li>Escribe <b>este mismo correo</b> y el <b>RUT de tu empresa</b></li>
+  <li>Recibirás tu clave de acceso al instante en este correo, ¡y listo!</li>
+</ol>
+<p style="margin:22px 0"><a href="https://dealers.autofacilchile.cl" style="display:inline-block;background:#0141A2;color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:700;font-size:16px">Quiero entrar a mi portal →</a></p>
+<p>Este es el nuevo AutoFácil: <b>tecnología al servicio de tu negocio</b>. Y esto recién comienza.</p>
+<p>Un abrazo,<br><b>Equipo AutoFácil</b><br><span style="color:#64748b;font-size:13px">Crédito automotriz que sí funciona</span></p>`;
+
+let INV_DEALERS = [];
+const invSel = new Set();
+function cargarInvitables(){
+  // Plantilla: solo se setea si el usuario no la ha editado en esta sesión
+  const a=document.getElementById('invAsunto'), h=document.getElementById('invHtml');
+  if(!a.value) a.value = INV_ASUNTO_DEF;
+  if(!h.value) h.value = INV_HTML_DEF;
+  fetch('/api/atencion-remota/invitaciones/dealers',{headers:H}).then(r=>r.json()).then(j=>{
+    if(!j.success) return toast(j.error||'Error al cargar dealers', true);
+    INV_DEALERS = j.data||[];
+    pintarInvitables();
+  }).catch(()=>toast('Error al cargar dealers', true));
+}
+function invFiltrados(){
+  const q=(document.getElementById('invBuscar').value||'').toLowerCase().trim();
+  const soloSin=document.getElementById('invSoloSinInv').checked;
+  return INV_DEALERS.filter(d=>{
+    if(soloSin && d.portal_invitado_en) return false;
+    if(!q) return true;
+    return String(d.nombre||'').toLowerCase().includes(q) || String(d.rut||'').toLowerCase().includes(q);
+  });
+}
+function pintarInvitables(){
+  const filas=invFiltrados();
+  document.getElementById('invBody').innerHTML = filas.map(d=>{
+    const sinCorreo=!d.correo||!String(d.correo).includes('@');
+    const est = sinCorreo ? '<span style="color:#dc2626;font-weight:700">Sin correo</span>'
+      : d.portal_invitado_en ? '<span style="color:#16a34a">Invitado '+new Date(d.portal_invitado_en).toLocaleDateString('es-CL')+'</span>'
+      : (+d.tiene_cuenta ? '<span style="color:#0141A2">Ya tiene cuenta</span>' : '<span style="color:#94a3b8">Sin invitar</span>');
+    return '<tr><td><input type="checkbox" '+(sinCorreo?'disabled':'')+(invSel.has(d.id_dealer)?' checked':'')+' onchange="invToggle('+d.id_dealer+',this.checked)"></td>'+
+      '<td><b>'+esc(d.nombre||'—')+'</b><br><span style="font-size:.74rem;color:#94a3b8">'+esc(d.rut||'')+'</span></td>'+
+      '<td style="font-size:.8rem">'+esc(d.correo||'—')+'</td><td style="font-size:.78rem">'+est+'</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:18px">Sin dealers que mostrar</td></tr>';
+  document.getElementById('invSelN').textContent = invSel.size;
+}
+function invToggle(id, on){ if(on) invSel.add(id); else invSel.delete(id); document.getElementById('invSelN').textContent=invSel.size; }
+document.getElementById('invTodos').addEventListener('change', function(){
+  invFiltrados().forEach(d=>{ if(d.correo&&String(d.correo).includes('@')){ if(this.checked) invSel.add(d.id_dealer); else invSel.delete(d.id_dealer); } });
+  pintarInvitables();
+});
+document.getElementById('invBuscar').addEventListener('input', pintarInvitables);
+document.getElementById('invSoloSinInv').addEventListener('change', pintarInvitables);
+function restaurarPlantillaInv(){ document.getElementById('invAsunto').value=INV_ASUNTO_DEF; document.getElementById('invHtml').value=INV_HTML_DEF; toast('Plantilla restaurada'); }
+function previewInvitacion(){
+  const w=window.open('','_blank','width=680,height=760,scrollbars=yes');
+  if(!w) return toast('Permite las ventanas emergentes para ver la vista previa', true);
+  w.document.write('<div style="max-width:600px;margin:20px auto;font-family:Arial,sans-serif;color:#1e293b">'+
+    document.getElementById('invHtml').value.replace(/\{\{\s*nombre\s*\}\}/gi,'AUTOMOTORA EJEMPLO SPA')+'</div>');
+  w.document.close();
+}
+async function enviarInvitaciones(){
+  if(!invSel.size) return toast('Marca al menos un dealer', true);
+  if(!confirm('¿Enviar la invitación al portal a '+invSel.size+' dealer(s)?')) return;
+  const btn=document.getElementById('invEnviarBtn'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Enviando…';
+  try{
+    const r=await fetch('/api/atencion-remota/invitaciones/enviar',{method:'POST',headers:H,
+      body:JSON.stringify({ids:[...invSel],asunto:document.getElementById('invAsunto').value,html:document.getElementById('invHtml').value})});
+    const j=await r.json();
+    if(j.success){
+      const f=j.data.fallidos||[];
+      document.getElementById('invResultado').innerHTML =
+        '<span style="color:#16a34a;font-weight:700"><i class="bi bi-check-circle me-1"></i>'+j.data.enviados+' invitación(es) enviada(s)</span>'+
+        (f.length ? '<br><span style="color:#dc2626">No se pudo enviar a: '+f.map(x=>esc(x.nombre)+' ('+esc(x.motivo)+')').join(', ')+'</span>' : '');
+      invSel.clear(); cargarInvitables();
+      toast(j.data.enviados+' invitación(es) enviada(s)');
+    } else toast(j.error||'Error al enviar', true);
+  }catch(_){ toast('Error al enviar', true); }
+  btn.disabled=false; btn.innerHTML='<i class="bi bi-send me-1"></i>Enviar invitación';
+}
 
 connect();
 cargarRespuestas();

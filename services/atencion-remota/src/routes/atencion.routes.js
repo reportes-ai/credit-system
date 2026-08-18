@@ -38,6 +38,10 @@ router.post('/cuentas/:id/regenerar-link', verifyToken, requireFunc('atencion_re
 // "Ver como dealer": token de mirada de solo lectura sobre el portal (auditado, 30 min)
 router.post('/dealer/ver-como', verifyToken, requireFunc('atencion_remota'), C.verComoDealer);
 
+// Invitaciones al portal (correo masivo self-service; no crea cuentas ni toca claves)
+router.get('/invitaciones/dealers', verifyToken, requireFunc('atencion_remota'), C.listarInvitables);
+router.post('/invitaciones/enviar', verifyToken, requireFunc('atencion_remota'), C.enviarInvitaciones);
+
 router.get('/solicitudes',              verifyToken, requireFunc('atencion_remota'), C.listarSolicitudes);
 router.post('/solicitudes/:id/aprobar', verifyToken, requireFunc('atencion_remota'), C.aprobarSolicitud);
 router.post('/solicitudes/:id/rechazar',verifyToken, requireFunc('atencion_remota'), C.rechazarSolicitud);
