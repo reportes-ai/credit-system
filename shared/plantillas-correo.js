@@ -92,6 +92,24 @@ AutoFácil Crédito Automotriz`,
     variables: '{dealer} {doc} {numero_factura} {tipo_cuenta} {num_cuenta} {banco} {ops}',
   },
   {
+    codigo: 'dealer_pago_reversado',
+    ambito: 'Post Venta — Dealers',
+    nombre: 'Pago reversado (aviso sin efecto) → al DEALER',
+    descripcion: 'Se manda al REVERSAR un pago de saldo precio o comisión cuyo aviso de pago ya había salido (ej.: transferencia rechazada por el banco). Corrige el aviso anterior. Solo se envía si el aviso de pago correspondiente está activo.',
+    asunto: 'Importante — aviso de pago sin efecto · Operación {num_op}',
+    cuerpo: `Estimado {dealer}:
+
+Te informamos que el aviso de pago del {que_pago} de la operación {num_op} queda SIN EFECTO: la transferencia no se concretó y el pago fue reversado en nuestro sistema.
+
+Nuestro equipo de Tesorería está gestionando la regularización y recibirás un nuevo aviso cuando el pago se realice. Lamentamos el inconveniente.
+
+Equipo AutoFácil`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El correo del DEALER (de su ficha), con la misma copia del aviso de pago original',
+    variables: '{dealer} {num_op} {que_pago}',
+  },
+  {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',

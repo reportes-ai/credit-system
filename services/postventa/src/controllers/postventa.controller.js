@@ -529,15 +529,17 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
       LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
       WHERE s.id = ?`, [idSeguimiento]);
     if (!d || !d.correo) return;
-    const quePago = track === 'SALDO' ? 'saldo de precio' : 'comisión';
-    const cuerpo = `Estimado ${d.dealer || 'dealer'}:\n\n`
-      + `Te informamos que el aviso de pago del ${quePago} de la operación ${d.num_op} queda SIN EFECTO: `
-      + `la transferencia no se concretó y el pago fue reversado en nuestro sistema.\n\n`
-      + `Nuestro equipo de Tesorería está gestionando la regularización y recibirás un nuevo aviso cuando el pago se realice. `
-      + `Lamentamos el inconveniente.\n\nEquipo AutoFácil`;
+    // Texto paramétrico: plantilla dealer_pago_reversado del mantenedor Correos
+    // del Sistema (junto a los avisos de pago). Su interruptor también manda.
+    const tplR = await require('../../../../shared/plantillas-correo').comoTpl('dealer_pago_reversado');
+    if (tplR.activo === false) return;
+    const datos = { dealer: d.dealer || 'dealer', num_op: d.num_op || '', que_pago: track === 'SALDO' ? 'saldo de precio' : 'comisión' };
+    const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
+    const cuerpo = rell(tplR.cuerpo) + (tplR.firma ? '\n\n' + rell(tplR.firma) : '');
+    const cc = [ccFijo, String(tplR.cc || '').trim()].filter(Boolean).join(',');
     await enviarCorreo({
-      from, to: d.correo, cc: ccFijo || undefined,
-      subject: `Importante — aviso de pago sin efecto · Operación ${d.num_op}`,
+      from, to: d.correo, cc: cc || undefined,
+      subject: rell(tplR.asunto) || `Importante — aviso de pago sin efecto · Operación ${d.num_op}`,
       html: envolverHTML(cuerpo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')),
       text: cuerpo,
     });
