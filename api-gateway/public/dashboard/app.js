@@ -5446,6 +5446,10 @@ async function vsegOverride(mes, actual) {
 /* ═══ VISTAS DEALERS / PARQUES: colocaciones mensuales (cantidad + monto) ═══
    Filas = dealer (automotora) o parque; columnas = meses descendentes desde el
    más reciente. Orden: mayor cantidad de ventas del último mes, luego total. */
+// Filtro de período de las tablas de colocaciones (por vista): todo | u6 | u12 | 2026 | 2025
+window.__colocFiltro = window.__colocFiltro || {};
+function setColocFiltro(vista, f) { window.__colocFiltro[vista] = f; buildColocMensual(vista); }
+
 function buildColocMensual(vista) {
   const esDealers = vista === 'vdealers';
   const cont = document.getElementById(esDealers ? 'tbl-dealers-mes' : 'tbl-parques-mes');
@@ -5454,9 +5458,17 @@ function buildColocMensual(vista) {
   // Parques: lo que no está en un parque es venta de CALLE
   const key = r => esDealers ? (r.automotora || '(sin dealer)')
     : (!r.parque || /^NO APLICA$/i.test(r.parque) ? 'CALLE' : r.parque);
-  const meses = [...new Set(rows.map(r => r.mes))].filter(Boolean).sort().reverse();
+  const mesesAll = [...new Set(rows.map(r => r.mes))].filter(Boolean).sort().reverse();
+  // ── Filtro de período: recorta los MESES; totales y orden respetan el filtro ──
+  const filtro = window.__colocFiltro[vista] || 'todo';
+  const meses = filtro === 'u6'  ? mesesAll.slice(0, 6)
+              : filtro === 'u12' ? mesesAll.slice(0, 12)
+              : /^\d{4}$/.test(filtro) ? mesesAll.filter(m => m.startsWith(filtro + '-'))
+              : mesesAll;
+  const mesesSet = new Set(meses);
   const M = {};   // nombre → { mes: {n, monto} }
   for (const r of rows) {
+    if (!mesesSet.has(r.mes)) continue;     // fuera del período elegido
     const k = key(r);
     if (!k) continue;                       // parques: solo ops con parque
     (M[k] = M[k] || {});
@@ -5474,7 +5486,13 @@ function buildColocMensual(vista) {
   meses.forEach(m => { totMes[m] = { n: 0, monto: 0 }; });
   lista.forEach(([, mm]) => meses.forEach(m => { if (mm[m]) { totMes[m].n += mm[m].n; totMes[m].monto += mm[m].monto; } }));
 
-  cont.innerHTML = `<table id="t-coloc-${vista}" style="width:max-content;min-width:100%;border-collapse:collapse;font-size:11.5px">
+  const FILTROS = [['todo','Todo'],['u6','Últimos 6 meses'],['u12','Últimos 12 meses'],['2026','2026'],['2025','2025']];
+  const botones = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px">
+    ${FILTROS.map(([f, lbl]) => `<button onclick="setColocFiltro('${vista}','${f}')"
+      style="border:1px solid ${f === filtro ? '#0d2f6b' : '#c6d3e8'};background:${f === filtro ? '#0d2f6b' : '#fff'};color:${f === filtro ? '#fff' : '#33507e'};border-radius:16px;padding:4px 14px;font-size:11.5px;font-weight:700;cursor:pointer">${lbl}</button>`).join('')}
+  </div>`;
+
+  cont.innerHTML = botones + `<table id="t-coloc-${vista}" style="width:max-content;min-width:100%;border-collapse:collapse;font-size:11.5px">
     <thead>
       <tr>
         <th rowspan="2" style="position:sticky;left:0;background:#12213f;color:#fff;padding:6px 10px;text-align:left;z-index:2">${esDealers ? 'Dealer' : 'Parque'}</th>
