@@ -533,7 +533,8 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
     // del Sistema (junto a los avisos de pago). Su interruptor también manda.
     const tplR = await require('../../../../shared/plantillas-correo').comoTpl('dealer_pago_reversado');
     if (tplR.activo === false) return;
-    const datos = { dealer: d.dealer || 'dealer', num_op: d.num_op || '', que_pago: track === 'SALDO' ? 'saldo de precio' : 'comisión' };
+    const datos = { dealer: d.dealer || 'dealer', num_op: d.num_op || '', que_pago: track === 'SALDO' ? 'saldo de precio' : 'comisión',
+      motivo: String(motivo || '').trim() || 'Reversa del pago registrada por Tesorería' };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
     const cuerpo = rell(tplR.cuerpo) + (tplR.firma ? '\n\n' + rell(tplR.firma) : '');
     const cc = [ccFijo, String(tplR.cc || '').trim()].filter(Boolean).join(',');

@@ -99,7 +99,9 @@ AutoFácil Crédito Automotriz`,
     asunto: 'Importante — aviso de pago sin efecto · Operación {num_op}',
     cuerpo: `Estimado {dealer}:
 
-Te informamos que el aviso de pago del {que_pago} de la operación {num_op} queda SIN EFECTO: la transferencia no se concretó y el pago fue reversado en nuestro sistema.
+Te informamos que el aviso de pago del {que_pago} de la operación {num_op} queda SIN EFECTO: el pago fue reversado en nuestro sistema.
+
+Motivo: {motivo}
 
 Nuestro equipo de Tesorería está gestionando la regularización y recibirás un nuevo aviso cuando el pago se realice. Lamentamos el inconveniente.
 
@@ -107,7 +109,7 @@ Equipo AutoFácil`,
     para_perfiles: '',
     cc: '',
     destinatario: 'El correo del DEALER (de su ficha), con la misma copia del aviso de pago original',
-    variables: '{dealer} {num_op} {que_pago}',
+    variables: '{dealer} {num_op} {que_pago} {motivo}',
   },
   {
     codigo: 'parque_cartola_envio',
@@ -226,6 +228,15 @@ require('./migrate').enFila('correos-plantillas', async () => {
     await pool.query('UPDATE correos_plantillas SET descripcion=?, variables=?, ambito=?, nombre=?, destinatario=? WHERE codigo=?',
       [p.descripcion, p.variables, p.ambito, p.nombre, p.destinatario || null, p.codigo]);
   }
+});
+
+/* dealer_pago_reversado se sembró unas horas sin {motivo}: si nadie lo editó
+   (sigue igual al default viejo), se actualiza al texto con el motivo. */
+require('./migrate').migrar('correo-reversa-con-motivo', async () => {
+  const p = SEMILLAS.find(x => x.codigo === 'dealer_pago_reversado');
+  if (p) await pool.query(
+    "UPDATE correos_plantillas SET cuerpo=? WHERE codigo=? AND cuerpo NOT LIKE '%{motivo}%'",
+    [p.cuerpo, p.codigo]);
 });
 
 /* Los 4 correos de parques nacieron con el cuerpo en HTML crudo: en el
