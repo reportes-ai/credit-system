@@ -1,6 +1,6 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
-const { emitirCorrelativo, pagarCorrelativo } = require('../../../../shared/ordenes-pago');
+const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
 
 /* ── Migración ───────────────────────────────────────────────────── */
@@ -458,6 +458,44 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
       rut: s.rut_dealer || null, detalle,
     });
   } catch (e) { console.error('[contabilizarSaldoPrecio]', e.message); }
+}
+
+/* ── Reversa COMPLETA del pago (Máximas 2 y 4) ────────────────────────────────
+   Deshacer la etapa PAGADO debe deshacer TAMBIÉN el timbre del correlativo y el
+   asiento del egreso. Antes la reversa solo borraba la etapa y quedaba un
+   híbrido: la ODP "pagada en duro" (imposible de anular) y la plata rebajada en
+   contabilidad sin haber salido del banco (caso ODP2610744, transferencia
+   rechazada, 18-08-2026). Nunca lanza: cada pieza se reversa en lo posible. */
+async function reversarPagoCentral(track, ids, usuario, motivo) {
+  const out = { correlativos: 0, asientos: 0, mesCerrado: [] };
+  for (const id of ids) {
+    try {
+      const [[s]] = await pool.query('SELECT num_op FROM postventa_seguimiento WHERE id=?', [id]);
+      const tabla = track === 'SALDO' ? 'postventa_ordenes' : 'postventa_ordenes_comision';
+      const [[po]] = await pool.query(`SELECT id FROM \`${tabla}\` WHERE id_seguimiento=?`, [id]);
+      if (po && await despagarCorrelativo({ origen: track, origen_id: po.id })) out.correlativos++;
+      if (!s || !s.num_op) continue;
+      // Asiento del egreso → ANULADO (el pago no se concretó). Mes cerrado: no se toca, se reporta.
+      const ref = track === 'SALDO' ? `SP-${s.num_op}-OUT` : `COM-${s.num_op}-PAGO`;
+      const [[ev]] = await pool.query(
+        `SELECT e.id_comprobante, c.fecha FROM ctb_eventos_log e
+           JOIN ctb_comprobantes c ON c.id = e.id_comprobante
+          WHERE e.ref=? AND c.estado='CONTABILIZADO' ORDER BY e.id DESC LIMIT 1`, [ref]);
+      if (!ev) continue;
+      const mes = String(ev.fecha instanceof Date ? ev.fecha.toISOString() : ev.fecha).slice(0, 7);
+      const [[cerrado]] = await pool.query('SELECT mes FROM ctb_meses_cerrados WHERE mes=?', [mes]);
+      if (cerrado) {
+        out.mesCerrado.push({ id_seguimiento: id, num_op: s.num_op, id_comprobante: ev.id_comprobante, mes });
+        console.warn(`[reversarPagoCentral] comprobante ${ev.id_comprobante} (OP ${s.num_op}) es del mes CERRADO ${mes}: reversar a mano en Contabilidad`);
+        continue;
+      }
+      const [r] = await pool.query(
+        "UPDATE ctb_comprobantes SET estado='ANULADO', anulado_por=?, anulado_motivo=? WHERE id=? AND estado='CONTABILIZADO'",
+        [usuario, `Reversa del pago en Post Venta (${String(motivo || 'reversa del mismo día').trim()})`.slice(0, 400), ev.id_comprobante]);
+      if (r.affectedRows) out.asientos++;
+    } catch (e) { console.error('[reversarPagoCentral]', e.message); }
+  }
+  return out;
 }
 
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
@@ -1670,7 +1708,8 @@ const desmarcarSaldos = async (req, res) => {
       const [r] = await pool.query(
         `DELETE FROM postventa_etapas
          WHERE track='SALDO' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
-      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true }, error: null });
+      const rev = etapa === 'SALDO PRECIO PAGADO' ? await reversarPagoCentral('SALDO', ids, usuario, motivo) : null;
+      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true, central: rev }, error: null });
     }
 
     // Mismo día: cualquiera con permiso
@@ -1679,7 +1718,8 @@ const desmarcarSaldos = async (req, res) => {
        WHERE track='SALDO' AND etapa=?
          AND DATE(fecha) = CURDATE()
          AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
-    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false }, error: null });
+    const rev = (etapa === 'SALDO PRECIO PAGADO' && r.affectedRows) ? await reversarPagoCentral('SALDO', ids, usuario, motivo) : null;
+    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false, central: rev }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarSaldos]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
@@ -1980,13 +2020,15 @@ const desmarcarComisiones = async (req, res) => {
       await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES ?', [logs]);
       const [r] = await pool.query(
         `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
-      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true }, error: null });
+      const rev = etapa === 'COMISION PAGADA' ? await reversarPagoCentral('COMISION', ids, usuario, motivo) : null;
+      return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true, central: rev }, error: null });
     }
 
     const [r] = await pool.query(
       `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=?
          AND DATE(fecha) = CURDATE() AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
-    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false }, error: null });
+    const rev = (etapa === 'COMISION PAGADA' && r.affectedRows) ? await reversarPagoCentral('COMISION', ids, usuario, motivo) : null;
+    res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false, central: rev }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarComisiones]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
