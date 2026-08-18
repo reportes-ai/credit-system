@@ -222,6 +222,11 @@ function bodyComportamientoExt(prd, d, cod){
 function bodyPerfilComercial(prd){
   const colect = gp(prd,'DLNTPERCOMDLNTWS','ROOT','D','result','colect');
   if(!colect) return noinfo();
+  // PERSONA JURÍDICA (tipoper 'E'): los datos vienen en colect.empresa (+
+  // accionistas/directores/ejecutivos), NO en colect.titular. Sin esta rama
+  // el Perfil Comercial de una empresa salía vacío (bug detectado 18-08-2026).
+  if (colect.empresa || String(colect.tipoper||'').toLowerCase()==='e')
+    return bodyPerfilComercialEmpresa(colect);
   const titular = colect.titular || {};
   const civ = gp(titular,'det','detalle_rut','datos_civiles','d') || {};
   const trib = gp(titular,'det','detalle_rut','detalle_rut','xmldatos','xmldata','d');
@@ -248,6 +253,56 @@ function bodyPerfilComercial(prd){
   h += sec('Participaciones en sociedades', tblSociedades(gp(titular,'sociedades','empresa')));
   h += sec('Relacionados', tblRelacionados(titular.relacionados));
   h += sec('Fuentes', (arr(gp(titular,'fuentes','fuente')).map(esc).join(', ')||secEmpty()));
+  return h;
+}
+/* Perfil Comercial de EMPRESA — réplica de las secciones del PDF DealerNet:
+   identificación, direcciones, accionistas, directores, ejecutivos, actuaciones
+   societarias, ventas/trabajadores por período, teléfonos, vehículos y tributaria. */
+function bodyPerfilComercialEmpresa(colect){
+  const emp = colect.empresa || {};
+  const sec = (t,h) => '<div class="rep-h">'+t+'</div>'+h;
+  const kv = [
+    ['RAZÓN SOCIAL', emp.razon_social],['DIRECCIÓN', emp.direccion],
+    ['TRAMO DE VENTAS', emp.tramo_venta],['AÑO FUNDACIÓN', emp.agno],
+    ['GIRO O RUBRO', emp.giro],['ACT. ECONÓMICA', emp.actividad_economica],
+    ['N° DE TRABAJADORES', emp.num_trabajadores],['TIPO EMPRESA', emp.tipo_empresa],
+    ['SUBTIPO EMPRESA', emp.subtipo_empresa],
+  ];
+  let h = sec('Identificación (Persona Jurídica)',
+    '<table class="rep-tb"><tbody>'+kv.map(([k,v])=>'<tr><th style="width:42%">'+k+'</th><td>'+esc(v!=null&&v!==''?v:'—')+'</td></tr>').join('')+'</tbody></table>');
+
+  const dsCM = arr(gp(colect,'direcciones','casa_matriz','d'));
+  h += sec('Direcciones Casa Matriz', dsCM.length
+    ? '<table class="rep-tb"><thead><tr><th>Dirección</th><th>Ubicación</th></tr></thead><tbody>'+dsCM.map(x=>'<tr><td>'+esc(x.dspdireccion)+'</td><td>'+esc(x.dspubicacion)+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  const acc = arr(gp(colect,'accionistas','vigentes','d'));
+  h += sec('Principales Accionistas Vigentes', acc.length
+    ? '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>% Participación</th></tr></thead><tbody>'+acc.map(a=>'<tr><td>'+esc(rutFmt(a.rut,a.dv))+'</td><td>'+esc(a.nombre)+'</td><td>'+(a.participacion!=null&&a.participacion!==''?esc(a.participacion)+'%':'--')+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  const dirs = arr(gp(colect,'directores','d'));
+  h += sec('Directores', dirs.length
+    ? '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>Teléfono</th></tr></thead><tbody>'+dirs.map(x=>{ const tel=arr(gp(x,'telefonos','d'))[0]||{}; return '<tr><td>'+esc(rutFmt(x.rut,x.dv))+'</td><td>'+esc(x.nombre)+'</td><td>'+esc(tel.telefono||'--')+'</td></tr>'; }).join('')+'</tbody></table>' : secEmpty());
+
+  const ejs = arr(gp(colect,'ejecutivos','d'));
+  h += sec('Ejecutivos', ejs.length
+    ? '<table class="rep-tb"><thead><tr><th>Cargo</th><th>RUT</th><th>Nombre</th></tr></thead><tbody>'+ejs.map(x=>'<tr><td>'+esc(x.cargo||'--')+'</td><td>'+esc(rutFmt(x.rut,x.dv))+'</td><td>'+esc(x.nombre)+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  const hist = arr(gp(colect,'emp1dia','d'));
+  h += sec('Actuaciones societarias', hist.length
+    ? '<table class="rep-tb"><thead><tr><th>Fecha</th><th>Actuación</th></tr></thead><tbody>'+hist.map(x=>'<tr><td>'+esc(x.fecact)+'</td><td>'+esc(x.tipact)+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  const ven = arr(gp(emp,'ventas','d'));
+  h += sec('Tramo de ventas por período (UF)', ven.length
+    ? '<table class="rep-tb"><thead><tr><th>Período</th><th>Tramo UF</th></tr></thead><tbody>'+ven.map(v=>'<tr><td>'+esc(v.periodo)+'</td><td>'+esc(v.gls)+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  const trb = arr(gp(emp,'trabajadores','d'));
+  h += sec('N° de trabajadores por período', trb.length
+    ? '<table class="rep-tb"><thead><tr><th>Período</th><th>Trabajadores</th></tr></thead><tbody>'+trb.map(v=>'<tr><td>'+esc(v.periodo)+'</td><td>'+esc(v.valor)+'</td></tr>').join('')+'</tbody></table>' : secEmpty());
+
+  h += sec('Teléfonos de contacto', tblContactos(gp(colect,'telefonos','telefono')));
+  h += sec('Vehículos Motorizados', tblVehiculos(gp(emp,'activos','activo_detalle_vehiculo')));
+  h += sec('Vehículos Motorizados Históricos', tblVehiculos(gp(emp,'activos','activo_detalle_vehiculo_historico')));
+  h += sec('Situación tributaria', bodyTributaria(gp(emp,'detalle_rut','xmldatos','xmldata','d') || gp(emp,'detalle_rut','xmldatos','xmldata')));
   return h;
 }
 function bodyBoletinSimple(prd){
