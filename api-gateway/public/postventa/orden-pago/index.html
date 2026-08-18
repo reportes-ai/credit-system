@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -91,7 +91,6 @@
     <div class="op-modal-body"><div id="docWrap"></div></div>
     <div class="op-modal-foot">
       <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
-      <button class="btn-copiar" id="btnEnviar" onclick="enviarOrdenCorreo()"><i class="bi bi-envelope-paper me-1"></i>Enviar Correo</button>
       <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
     </div>
   </div>
@@ -114,7 +113,7 @@ let DATA = [], FIJOS = {}, actual = null;
 // Plantilla editable del correo (mantenedor Post Venta → config correo_orden_saldo)
 let CORREO = {
   asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
-  cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+  cuerpo: 'Estimado Equipo de Contabilidad:\n\nA continuación encontrarán la Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
   firma: 'Saludos cordiales,\nÁrea de Operaciones',
 };
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -269,22 +268,8 @@ async function verOrden(id){
 }
 function cerrar(){ document.getElementById('ov').classList.remove('open'); actual=null; }
 
-async function enviarOrdenCorreo(){
-  if (!actual) return;
-  const btn = document.getElementById('btnEnviar');
-  if (!confirm('¿Enviar la Orden de Pago de la OP '+(actual.num_op||'')+' por correo a Contabilidad? Quedarás en copia.')) return;
-  btn.disabled = true; const txt = btn.innerHTML; btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Enviando…';
-  try {
-    const html = document.getElementById('docWrap').innerHTML;
-    const r = await fetch('/api/postventa/enviar-correo-orden', { method:'POST', headers:hdr(),
-      body: JSON.stringify({ asunto: asuntoDe(actual), html, num_op: actual.num_op, tipo:'saldo' }) });
-    const j = await r.json();
-    if (!j.success) throw new Error(j.error || 'No se pudo enviar');
-    toast('Correo enviado a ' + (j.data?.to||'Contabilidad') + (j.data?.cc?(' (CC '+j.data.cc+')'):''));
-  } catch(e){ toast('No se pudo enviar: '+e.message); }
-  btn.disabled = false; btn.innerHTML = txt;
-}
-
+/* El botón "Enviar Correo" se eliminó: emitir() ya manda el correo automático
+   a Contabilidad — dos botones confundían y duplicaban envíos. */
 async function emitir(){
   if (!actual) return;
   if (!confirm('¿Emitir la orden de pago de la OP '+(actual.num_op||'')+'? Pasará a Saldos Precios a Pagar y el correo saldrá a Contabilidad.')) return;

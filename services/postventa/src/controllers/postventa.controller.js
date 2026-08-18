@@ -86,12 +86,12 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     // Plantillas editables del correo a Contabilidad al emitir la Orden de Pago (saldo y comisión).
     const CORREO_SALDO = {
       asunto: 'Orden de Pago Saldo Precio N° {nOrden} — {dealer} (OP {num_op})',
-      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+      cuerpo: 'Estimado Equipo de Contabilidad:\n\nA continuación encontrarán la Orden de Pago N° {nOrden} para el pago del Saldo Precio a {dealer} del Crédito N° {num_op} otorgado por {financiera} con fecha {fecha_otorgado}, Saldo Precio recepcionado por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Saldo Precio Pagado, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
       firma: 'Saludos cordiales,\nÁrea de Operaciones',
     };
     const CORREO_COMISION = {
       asunto: 'Orden de Pago de Comisión N° {nOrden} — {dealer} (OP {num_op})',
-      cuerpo: 'Estimado Equipo de Contabilidad:\n\nAdjunto encontrarán Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
+      cuerpo: 'Estimado Equipo de Contabilidad:\n\nA continuación encontrarán la Orden de Pago de Comisión N° {nOrden} para el pago de la Comisión a {dealer} del Crédito N° {num_op} otorgado por {financiera}, {doc} N° {numero_factura} recepcionada por AutoFácil el día {fecha_recepcion}.\n\nLes recordamos que deben marcar en el módulo de Comisión Pagada, de manera de informar al Ejecutivo y cerrar el flujo operativo de esta transacción.',
       firma: 'Saludos cordiales,\nÁrea de Operaciones',
     };
     await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?),(?,?),(?,?)',
