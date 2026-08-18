@@ -551,9 +551,17 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
    ODP2610744 (OP 26080033, HIDALGO AUTOMOTRIZ) ocurrió ANTES de que existiera
    el aviso automático — se le manda la corrección una sola vez desde producción
    (acá viven las credenciales de correo; local no las tiene, a propósito). */
-require('../../../../shared/migrate').migrar('aviso-reversa-hidalgo-26080033', async () => {
-  await notificarReversaPagoDealer('SALDO', 900002, 'Transferencia rechazada por el banco');
-});
+/* Fuera de la fila del capataz (la cadena de boot puede demorar/atascarse):
+   claim atómico directo en _migraciones — corre UNA vez, sin DDL, al cargar. */
+(async () => {
+  try {
+    const [r] = await pool.query("INSERT IGNORE INTO _migraciones (nombre, estado) VALUES ('aviso-reversa-hidalgo-26080033','EN_CURSO')");
+    if (!r.affectedRows) return;                     // ya corrió (o corre en otra instancia)
+    await notificarReversaPagoDealer('SALDO', 900002, 'Transferencia rechazada por el banco');
+    await pool.query("UPDATE _migraciones SET estado='OK', aplicada_en=NOW() WHERE nombre='aviso-reversa-hidalgo-26080033'");
+    console.log('[postventa] corrección de reversa enviada a Hidalgo (ODP2610744)');
+  } catch (e) { console.error('[postventa aviso-reversa-hidalgo]', e.message); }
+})();
 
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
    Cada transición del workflow genera una alerta (campana) a destinatarios
