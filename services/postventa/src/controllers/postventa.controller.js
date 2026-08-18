@@ -494,8 +494,54 @@ async function reversarPagoCentral(track, ids, usuario, motivo) {
         [usuario, `Reversa del pago en Post Venta (${String(motivo || 'reversa del mismo día').trim()})`.slice(0, 400), ev.id_comprobante]);
       if (r.affectedRows) out.asientos++;
     } catch (e) { console.error('[reversarPagoCentral]', e.message); }
+    // Si el aviso de "pago realizado" está encendido, el dealer YA recibió ese
+    // correo → hay que mandarle la corrección. Fire-and-forget: nunca frena la reversa.
+    notificarReversaPagoDealer(track, id, motivo).catch(e => console.error('[postventa aviso reversa]', e.message));
   }
   return out;
+}
+
+/* Corrección al dealer cuando se reversa un pago YA AVISADO: solo se manda si el
+   aviso de pago correspondiente está activo (si nunca se le avisó el pago, no hay
+   nada que corregir). Mismo remitente y misma copia que el aviso original. */
+async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
+  try {
+    const { enviarCorreo, remitentePorClave, remitenteComisiones, envolverHTML } = require('../../../../shared/mailer');
+    let activo = false, from, ccFijo = '';
+    if (track === 'SALDO') {
+      const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_pago_saldo'");
+      const tpl = tRow ? JSON.parse(tRow.valor) : {};
+      activo = tpl.activo === true; from = remitentePorClave(tpl.remitente); ccFijo = String(tpl.cc_operaciones || '').trim();
+    } else {
+      const tpl = await require('../../../../shared/plantillas-correo').comoTpl('dealer_comision_pagada', 'correo_comision_pagada');
+      activo = tpl.activo !== false; from = remitenteComisiones(); ccFijo = String(tpl.cc || '').trim();
+    }
+    if (!activo) return;                             // el pago nunca se avisó → nada que corregir
+    if (track === 'COMISION') {                      // una factura = un correo: la corrección la manda solo la titular
+      const [[fc]] = await pool.query('SELECT es_replica FROM postventa_facturas_comision WHERE id_seguimiento=?', [idSeguimiento]);
+      if (fc && fc.es_replica) return;
+    }
+    const [[d]] = await pool.query(`
+      SELECT s.num_op, COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
+             COALESCE(dl.correo, dl.cf_email) AS correo
+      FROM postventa_seguimiento s
+      LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+      WHERE s.id = ?`, [idSeguimiento]);
+    if (!d || !d.correo) return;
+    const quePago = track === 'SALDO' ? 'saldo de precio' : 'comisión';
+    const cuerpo = `Estimado ${d.dealer || 'dealer'}:\n\n`
+      + `Te informamos que el aviso de pago del ${quePago} de la operación ${d.num_op} queda SIN EFECTO: `
+      + `la transferencia no se concretó y el pago fue reversado en nuestro sistema.\n\n`
+      + `Nuestro equipo de Tesorería está gestionando la regularización y recibirás un nuevo aviso cuando el pago se realice. `
+      + `Lamentamos el inconveniente.\n\nEquipo AutoFácil`;
+    await enviarCorreo({
+      from, to: d.correo, cc: ccFijo || undefined,
+      subject: `Importante — aviso de pago sin efecto · Operación ${d.num_op}`,
+      html: envolverHTML(cuerpo.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')),
+      text: cuerpo,
+    });
+  } catch (e) { console.error('[notificarReversaPagoDealer]', e.message); }
 }
 
 /* ── Alertas de proceso Saldo Precio (paramétricas, event-driven) ──────────────
