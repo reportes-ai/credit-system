@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.9 — detalle de op: Valor cuota en vez de Monto financiado (al dealer le interesa la cuota) · v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -894,7 +894,7 @@ function renderDetalle(d,f,p){
         <div><div class="k">RUT</div><div class="v">${esc(d.cliente_rut||'—')}</div></div>
         <div><div class="k">Vehículo</div><div class="v">${esc(veh||'—')}</div></div>
         <div><div class="k">Ejecutivo</div><div class="v">${esc(d.ejecutivo||'—')}</div></div>
-        <div><div class="k">Monto financiado</div><div class="v">${fmtMonto(d.monto_financiado)}</div></div>
+        <div><div class="k">Valor cuota</div><div class="v">${fmtMonto(d.cuota)}</div></div>
         <div><div class="k">Plazo</div><div class="v">${d.plazo?(d.plazo+' meses'):'—'}</div></div>
       </div>
     </div>
