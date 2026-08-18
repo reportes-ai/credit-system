@@ -203,6 +203,7 @@ function cambiarTab(tab) {
   document.querySelectorAll('.tab-card[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('active');
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(tab === 'ingreso' ? 'Ingreso de Créditos' : null);
   // En ingreso: si hay alguna fin-card activa la usamos como empresa seleccionada,
   // sino auto-seleccionamos la primera
   if (tab === 'ingreso') {

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedores — AutoFácil</title>
-  <!-- v1.3 dedup de cards por href (Estado Cartera duplicaba Etapas y Estados) -->
+  <!-- v1.4 navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/Sortable.min.js"></script>
@@ -49,12 +49,12 @@
     .btn-acceder { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 0.82rem; font-weight: 600; align-self: flex-start; margin-top: auto; }
     .module-card:hover .btn-acceder { background: var(--accent); }
 
-    /* Reordenar */
-    .btn-reordenar { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px; padding: 5px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px; }
-    .btn-reordenar:hover { background: rgba(255,255,255,0.22); }
-    .btn-reordenar.activo { background: #f59e0b; border-color: #f59e0b; }
-    .btn-guardar-orden { background: #16a34a; border: none; color: #fff; border-radius: 8px; padding: 5px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px; }
-    .btn-guardar-orden:hover { background: #15803d; }
+    /* Reordenar (los botones los pinta el componente topnav via actions; aquí solo su estado) */
+    #btnReordenar { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px; padding: 5px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px; }
+    #btnReordenar:hover { background: rgba(255,255,255,0.22); }
+    #btnReordenar.activo { background: #f59e0b; border-color: #f59e0b; }
+    #btnGuardarOrden { background: #16a34a; border: none; color: #fff; border-radius: 8px; padding: 5px 13px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 6px; }
+    #btnGuardarOrden:hover { background: #15803d; }
     .drag-handle { position: absolute; top: 10px; right: 10px; color: #9ca3af; font-size: 1.1rem; display: none; }
     .modules-grid.sortable-mode .module-card { cursor: grab; border: 2px dashed #d1d5db; }
     .modules-grid.sortable-mode .module-card:hover { transform: none; box-shadow: 0 4px 16px rgba(1,65,162,0.1); border-color: var(--navy); }
@@ -73,34 +73,8 @@
   </style>
 </head>
 <body>
-  <nav class="topnav">
-    <div class="topnav-left">
-      <a href="/" class="topnav-brand">
-        <img src="/img/logo.png" alt="AutoFácil" style="display:block">
-        <span class="version-badge" id="versionBadge">v5.9</span>
-      </a>
-        <div class="breadcrumb-nav"><a href="/">Inicio</a><span class="sep">›</span><span style="color:#fff;font-weight:600"><i class="bi bi-gear me-1"></i>Mantenedores</span></div></div>
-    <div class="topnav-right">
-      
-    <a href="/dashboard" title="Dashboard Analytics" style="display:flex;align-items:center;gap:5px;color:rgba(255,255,255,0.85);text-decoration:none;font-size:12px;font-weight:500;padding:5px 10px;border:1px solid rgba(255,255,255,0.25);border-radius:6px;transition:.15s" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">
-      <i class="bi bi-bar-chart-line" style="font-size:15px"></i> Dashboard
-    </a>
-    <div class="user-chip">
-        <div class="avatar" id="avatarInicial">?</div>
-        <div>
-          <div style="font-weight:600; line-height:1.3; color:#fff" id="navNombre">—</div>
-          <div class="perfil-badge" id="navPerfil">—</div>
-        </div>
-      </div>
-      <button class="btn-reordenar" id="btnReordenar" onclick="toggleReordenar()">
-        <i class="bi bi-arrows-move"></i>Reordenar
-      </button>
-      <button class="btn-guardar-orden" id="btnGuardarOrden" onclick="guardarOrden()">
-        <i class="bi bi-floppy"></i>Guardar orden
-      </button>
-      <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
-    </div>
-  </nav>
+  <div id="af-topnav"></div>
+  <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',icon:'bi-gear',current:true}],actions:[{id:'btnReordenar',label:'Reordenar',icon:'bi-arrows-move',onclick:'toggleReordenar()'},{id:'btnGuardarOrden',label:'Guardar orden',icon:'bi-floppy',onclick:'guardarOrden()'}]};</script>
 
   <div class="main-content">
     <div class="page-banner">
@@ -128,10 +102,7 @@
     const esAdmin = yo?.perfil === 'Administrador';
     const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
 
-    document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim();
-    document.getElementById('navPerfil').textContent  = yo?.perfil || '';
-    document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
-    if (esAdmin) document.getElementById('btnReordenar').style.display = 'flex';
+    // nombre/perfil/inicial los pinta el componente topnav (sessionStorage)
 
     function logout() { sessionStorage.removeItem('token'); sessionStorage.removeItem('usuario'); window.location.href = '/login.html'; }
 
@@ -369,6 +340,10 @@
             <div class="section-title"><i class="bi ${g.icon}"></i> ${g.titulo} <span class="grupo-count">${porGrupo.get(g.key).length}</span></div>
             <div class="modules-grid">${porGrupo.get(g.key).map(cardHTML).join('')}</div>
           </div>`).join('');
+
+      // El botón lo pinta el componente topnav (actions) — revelar aquí, con la barra ya montada
+      const btnR = document.getElementById('btnReordenar');
+      if (esAdmin && btnR) btnR.style.display = 'flex';
     }
 
     function toggleReordenar() {
@@ -471,6 +446,7 @@
 
     cargar();
   </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
