@@ -244,6 +244,17 @@ require('../../../../shared/migrate').enFila('atencion', async () => {
     // a quién ya se invitó y evitar reenvíos que confundan al dealer.
     await pool.query('ALTER TABLE dealers ADD COLUMN IF NOT EXISTS portal_invitado_en DATETIME NULL');
 
+    // Actividad del dealer DENTRO del portal (pestañas visitadas, qué abrió):
+    // alimenta la bitácora por cuenta en Atención Remota → Cuentas de Dealers.
+    await pool.query(`CREATE TABLE IF NOT EXISTS ar_dealer_actividad (
+      id         INT AUTO_INCREMENT PRIMARY KEY,
+      id_cuenta  INT NOT NULL,
+      vista      VARCHAR(60)  NOT NULL,
+      detalle    VARCHAR(300) NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_cuenta_fecha (id_cuenta, created_at)
+    )`);
+
     // Bitácora de accesos de dealers: detección de fuerza bruta / accesos anómalos.
     await pool.query(`CREATE TABLE IF NOT EXISTS ar_auth_logs (
       id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -607,6 +618,35 @@ const listarCuentas = async (req, res) => {
        ORDER BY c.created_at DESC`);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { errSrv(res, e, 'listarCuentas'); }
+};
+
+/* ── Bitácora del dealer en el portal ─────────────────────────────────────
+   POST /dealer/actividad (verifyDealer) — el portal registra qué pestaña o qué
+   cosa abrió el dealer. "Ver como dealer" NO se registra (es mirada interna).
+   GET  /cuentas/:id/bitacora (staff) — accesos (ar_auth_logs) + actividad. */
+const registrarActividad = async (req, res) => {
+  try {
+    if (req.dealer && req.dealer.ver_como) return res.json({ success: true, data: null, error: null });
+    const vista = String((req.body || {}).vista || '').slice(0, 60).trim();
+    if (!vista) return res.status(400).json({ success: false, data: null, error: 'vista requerida' });
+    const detalle = String((req.body || {}).detalle || '').slice(0, 300).trim() || null;
+    await pool.query('INSERT INTO ar_dealer_actividad (id_cuenta, vista, detalle) VALUES (?,?,?)',
+      [req.dealer.id_cuenta, vista, detalle]);
+    res.json({ success: true, data: null, error: null });
+  } catch (e) { errSrv(res, e, 'registrarActividad'); }
+};
+
+const bitacoraCuenta = async (req, res) => {
+  try {
+    const [[c]] = await pool.query('SELECT id, email, nombre FROM ar_dealer_cuentas WHERE id=?', [req.params.id]);
+    if (!c) return res.status(404).json({ success: false, data: null, error: 'Cuenta no encontrada' });
+    const [accesos] = await pool.query(
+      `SELECT tipo, resultado, ip, created_at FROM ar_auth_logs
+        WHERE id_cuenta=? OR email=? ORDER BY id DESC LIMIT 120`, [c.id, c.email]);
+    const [actividad] = await pool.query(
+      'SELECT vista, detalle, created_at FROM ar_dealer_actividad WHERE id_cuenta=? ORDER BY id DESC LIMIT 400', [c.id]);
+    res.json({ success: true, data: { cuenta: { id: c.id, email: c.email, nombre: c.nombre }, accesos, actividad }, error: null });
+  } catch (e) { errSrv(res, e, 'bitacoraCuenta'); }
 };
 
 /* ── Invitaciones al portal (correo masivo, camino self-service) ──────────
@@ -977,7 +1017,7 @@ module.exports = {
   verifyDealer, verifyAny, cuentaVigente,
   // dealer
   dealerLogin, dealerAcceso, iniciarAcceso, onboarding, tourVisto, recuperarClave, resetClave, listarCuentas, crearCuenta, actualizarCuenta, regenerarLink, verComoDealer,
-  listarInvitables, enviarInvitaciones,
+  listarInvitables, enviarInvitaciones, registrarActividad, bitacoraCuenta,
   // ejecutivo
   getCola, getMensajes,
   // comunes

@@ -21,6 +21,7 @@ const rlOnboarding = rateLimit({ key: 'dealer_onboarding', windowMs: 60 * 60 * 1
 router.post('/dealer/iniciar',    rlIniciar,    C.iniciarAcceso);   // ¿el email ya tiene cuenta? (público)
 router.post('/dealer/onboarding', rlOnboarding, C.onboarding);      // auto-alta self-service (público)
 router.post('/dealer/tour-visto', C.verifyDealer, C.tourVisto);    // marca tour de bienvenida visto
+router.post('/dealer/actividad',  C.verifyDealer, C.registrarActividad); // bitácora: pestaña/acción del dealer en el portal
 
 /* ── Compartido (ejecutivo o dealer) ─────────────────────────────────────── */
 router.get('/ice', C.verifyAny, C.getIce);
@@ -35,6 +36,7 @@ router.get('/cuentas',     verifyToken, requireFunc('atencion_remota'), C.listar
 router.post('/cuentas',    verifyToken, requireFunc('atencion_remota'), C.crearCuenta);
 router.put('/cuentas/:id', verifyToken, requireFunc('atencion_remota'), C.actualizarCuenta);
 router.post('/cuentas/:id/regenerar-link', verifyToken, requireFunc('atencion_remota'), C.regenerarLink);
+router.get('/cuentas/:id/bitacora',        verifyToken, requireFunc('atencion_remota'), C.bitacoraCuenta);
 // "Ver como dealer": token de mirada de solo lectura sobre el portal (auditado, 30 min)
 router.post('/dealer/ver-como', verifyToken, requireFunc('atencion_remota'), C.verComoDealer);
 

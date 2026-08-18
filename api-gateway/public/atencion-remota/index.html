@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.1 — plantilla de invitación sin despedida duplicada (el marco ya firma) -->
+<!-- v2.2 — bitácora por cuenta (accesos + actividad del portal) · v2.1 — plantilla de invitación sin despedida duplicada -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -659,6 +659,7 @@ async function cargarCuentas(){
         <td>${esc(c.email)}</td>
         <td><span class="pill ${c.activo?'ok':'no'}">${c.activo?'Activa':'Inactiva'}</span></td>
         <td style="white-space:nowrap">
+          <button class="btn-ghost" onclick="verBitacora(${c.id})" title="Bitácora: accesos y qué hizo en el portal"><i class="bi bi-clock-history"></i></button>
           <button class="btn-ghost" onclick="regenLink(${c.id})" title="Generar y copiar link de acceso (el anterior deja de funcionar)"><i class="bi bi-link-45deg"></i></button>
           <button class="btn-ghost" onclick="resetClave(${c.id})" title="Resetear clave"><i class="bi bi-key"></i></button>
           <button class="btn-ghost" onclick="toggleCuenta(${c.id},${c.activo?0:1})" title="${c.activo?'Desactivar':'Activar'}"><i class="bi bi-${c.activo?'pause':'play'}-circle"></i></button>
@@ -863,6 +864,47 @@ async function guardarInterloc(){
   } catch(_){ toast('Error al guardar', true); }
 }
 document.getElementById('ilModal').addEventListener('click', function(e){ if(e.target===this) cerrarInterloc(); });
+
+/* ── Bitácora de una cuenta de dealer: accesos + qué hizo en el portal ── */
+async function verBitacora(id){
+  let dlg=document.getElementById('dlgBitacora');
+  if(!dlg){
+    dlg=document.createElement('dialog'); dlg.id='dlgBitacora';
+    dlg.style.cssText='border:none;border-radius:16px;padding:0;max-width:640px;width:94vw;box-shadow:0 24px 64px rgba(0,0,0,.3)';
+    dlg.addEventListener('click',e=>{ if(e.target===dlg) dlg.close(); });
+    document.body.appendChild(dlg);
+  }
+  dlg.innerHTML='<div style="padding:30px;color:#64748b">Cargando bitácora…</div>'; dlg.showModal();
+  try{
+    const r=await fetch('/api/atencion-remota/cuentas/'+id+'/bitacora',{headers:H});
+    const j=await r.json(); if(!j.success) throw new Error(j.error||'');
+    const { cuenta, accesos, actividad } = j.data;
+    // Línea de tiempo unificada, más reciente arriba
+    const eventos=[
+      ...accesos.map(a=>({ f:a.created_at, ic:a.resultado==='OK'?'bi-box-arrow-in-right':'bi-x-octagon',
+        col:a.resultado==='OK'?'#16a34a':'#dc2626',
+        txt:(a.tipo==='login'?'Inicio de sesión':a.tipo==='acceso'?'Entró por link de acceso':a.tipo==='onboarding'?'Auto-registro':a.tipo==='reset'?'Reset de clave':a.tipo)+(a.resultado==='OK'?'':' (FALLIDO)'),
+        sub:a.ip||'' })),
+      ...actividad.map(x=>({ f:x.created_at, ic:'bi-cursor', col:'#0141A2', txt:x.vista+(x.detalle?' — '+x.detalle:''), sub:'' }))
+    ].sort((a,b)=>new Date(b.f)-new Date(a.f)).slice(0,300);
+    const fFmt=f=>new Date(f).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+    dlg.innerHTML=`
+      <div style="background:linear-gradient(135deg,#012d70,#0141A2 60%,#0255c5);color:#fff;padding:16px 22px;display:flex;align-items:center;gap:12px">
+        <i class="bi bi-clock-history" style="font-size:1.4rem"></i>
+        <div><h4 style="margin:0;font-size:1rem">Bitácora del portal</h4>
+        <span style="font-size:.8rem;opacity:.85">${esc(cuenta.nombre||'')} · ${esc(cuenta.email)}</span></div>
+        <button onclick="document.getElementById('dlgBitacora').close()" style="margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer"><i class="bi bi-x-lg"></i></button>
+      </div>
+      <div style="padding:14px 22px;max-height:60vh;overflow:auto">
+        ${eventos.length?eventos.map(e=>`
+          <div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;align-items:baseline">
+            <span style="font-size:.72rem;color:#94a3b8;white-space:nowrap;min-width:96px">${fFmt(e.f)}</span>
+            <i class="bi ${e.ic}" style="color:${e.col}"></i>
+            <span style="font-size:.84rem;color:#334155">${esc(e.txt)}${e.sub?' <span style="color:#94a3b8;font-size:.72rem">· '+esc(e.sub)+'</span>':''}</span>
+          </div>`).join(''):'<div style="color:#94a3b8;padding:20px;text-align:center">Sin registros todavía: la actividad dentro del portal se registra desde hoy.</div>'}
+      </div>`;
+  }catch(e){ dlg.innerHTML='<div style="padding:30px;color:#b91c1c">'+esc(e.message||'Error al cargar')+'</div>'; }
+}
 
 /* ── Invitar al Portal (correo masivo, camino self-service) ── */
 const INV_ASUNTO_DEF = '🚀 Llegó tu Portal Dealer AutoFácil: tu negocio con nosotros, en línea y en tiempo real';
