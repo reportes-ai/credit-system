@@ -6,9 +6,6 @@ if (!token || !yo) location.href = '/login.html';
 const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
 const TIPO = window.EDICION_TIPO || 'otorgados';
 
-document.getElementById('navNombre').textContent = yo.nombre + ' ' + (yo.apellido || '');
-document.getElementById('navPerfil').textContent = yo.perfil || '';
-document.getElementById('avatarInicial').textContent = (yo.nombre || '?')[0].toUpperCase();
 function logout() { sessionStorage.clear(); location.href = '/login.html'; }
 
 let CAMPOS = [], page = 1, sortCol = 'id', sortDir = 'desc', filters = {};

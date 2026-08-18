@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recálculo Programado — AutoFácil</title>
+  <!-- v77.70 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -54,13 +55,8 @@
   </style>
 </head>
 <body>
-<nav class="topnav">
-  <div style="display:flex;align-items:center;gap:14px">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="verBadge">v77.69</span></a>
-    <span class="crumb"><a href="/">Inicio</a> › <a href="/mantenedores/">Mantenedores</a> › Recálculo Programado</span>
-  </div>
-  <button class="btn-logout" onclick="sessionStorage.clear();location.href='/login.html'"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Recálculo Programado',current:true}]};</script>
 
 <div class="wrap">
   <div class="banner">
@@ -119,10 +115,12 @@
 <div id="toast"></div>
 
 <script src="/js/auth-guard.js"></script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 if (!token) location.href = '/login.html';
+function logout(){ sessionStorage.clear(); location.href='/login.html'; }
 const H = { 'Content-Type':'application/json', 'Authorization':'Bearer '+token };
 const DIAS = [['1','L'],['2','M'],['3','X'],['4','J'],['5','V'],['6','S'],['7','D']];
 const $ = s => document.querySelector(s);

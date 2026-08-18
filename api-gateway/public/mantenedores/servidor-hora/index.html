@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hora del Servidor — AutoFácil</title>
+  <!-- v1.2 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,26 +68,8 @@
 </head>
 <body>
 
-<!-- TOPNAV -->
-<nav class="topnav">
-  <div class="topnav-left">
-    <a class="topnav-brand" href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
-    <span class="version-badge">v1.1</span>
-    <nav class="breadcrumb-nav">
-      <a href="/">Inicio</a><span class="sep">›</span>
-      <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
-      <span>Hora del Servidor</span>
-    </nav>
-  </div>
-  <div class="topnav-right">
-    <div class="user-chip">
-      <div class="avatar" id="navInitial">?</div>
-      <span id="navNombre">—</span>
-      <span class="perfil-badge" id="navPerfil">—</span>
-    </div>
-    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Hora del Servidor',current:true}]};</script>
 
 <div class="page-content">
 
@@ -187,12 +170,6 @@ const TOKEN = sessionStorage.getItem('token');
 const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if(!TOKEN){ window.location.href = '/login.html'; }
 
-/* ── Nav ── */
-try {
-  document.getElementById('navNombre').textContent  = yo?.nombre || yo?.username || '—';
-  document.getElementById('navPerfil').textContent  = yo?.perfil || '—';
-  document.getElementById('navInitial').textContent = (yo?.nombre || yo?.username || '?')[0].toUpperCase();
-} catch(e){}
 function logout(){ sessionStorage.clear(); window.location.href='/login.html'; }
 
 /* ── Reloj live ── */
@@ -327,6 +304,7 @@ function restablecerTZ(){
   guardarTZ();
 }
 </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

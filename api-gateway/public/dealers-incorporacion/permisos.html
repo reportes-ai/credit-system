@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Permisos de Edición de Dealers — AutoFácil</title>
-  <!-- v1.2 — topnav con el chip de usuario (faltaba nombre y perfil) · v1.1 — botones Marcar/Desmarcar todo por bloque + los perfiles nacen SIN permisos (la tabla guarda lo habilitado) · v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
+  <!-- v1.3 — navbar migrada al componente topnav · v1.2 — topnav con el chip de usuario (faltaba nombre y perfil) · v1.1 — botones Marcar/Desmarcar todo por bloque + los perfiles nacen SIN permisos (la tabla guarda lo habilitado) · v1.0 — que perfil edita que campo, en la ficha y en Dealers vigentes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,23 +62,8 @@
   </style>
 </head>
 <body>
-<nav class="topnav">
-  <div class="topnav-left">
-    <a href="/" class="topnav-brand"><img src="/img/logo.png" alt="AutoFácil"><span class="version-badge" id="versionBadge"></span></a>
-    <div class="breadcrumb-nav">
-      <a href="/">Inicio</a><span class="sep">›</span>
-      <a href="/dealers-incorporacion/">Creación/Mantenedor de Dealer</a><span class="sep">›</span>
-      <span style="color:#fff;font-weight:600">Permisos de Edición</span>
-    </div>
-  </div>
-  <div class="topnav-right">
-    <span class="user-chip"><div class="avatar" id="avatarInicial">?</div>
-      <div><div style="font-weight:600;line-height:1.3;color:#fff" id="navNombre">—</div>
-      <div class="perfil-badge" id="navPerfil">—</div></div></span>
-    <a class="btn-logout" href="/dealers-incorporacion/"><i class="bi bi-arrow-left me-1"></i>Volver</a>
-    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Creación/Mantenedor de Dealer',href:'/dealers-incorporacion/'},{label:'Permisos de Edición',current:true}],actions:[{label:'Volver',icon:'bi-arrow-left',href:'/dealers-incorporacion/'}]};</script>
 
 <div class="main-content" style="max-width:1200px">
   <div class="page-banner">
@@ -134,9 +119,6 @@ const yo    = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!token || !yo) location.href = '/login.html';
 const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
 function logout(){ sessionStorage.clear(); location.href='/login.html'; }
-document.getElementById('navNombre').textContent = `${yo?.nombre||''} ${yo?.apellido||''}`.trim() || '—';
-document.getElementById('navPerfil').textContent = yo?.perfil || '—';
-document.getElementById('avatarInicial').textContent = (yo?.nombre||'?').charAt(0).toUpperCase();
 
 
 /* ── Permisos de edición por perfil y por campo ───────────────────────────
@@ -224,6 +206,7 @@ async function permGuardar(){
 
 permCargar();
 </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>

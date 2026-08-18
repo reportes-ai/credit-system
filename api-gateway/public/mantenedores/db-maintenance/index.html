@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.5 -->
+<!-- v1.6 — navbar migrada al componente topnav -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -279,25 +279,8 @@
 </head>
 <body>
 
-<nav class="topnav">
-  <div class="topnav-left">
-    <a class="topnav-brand" href="/"><img src="/img/logo.png" alt="AutoFácil"></a>
-    <span class="version-badge">v1.5</span>
-    <nav class="breadcrumb-nav">
-      <a href="/">Inicio</a><span class="sep">›</span>
-      <a href="/mantenedores/">Mantenedores</a><span class="sep">›</span>
-      <span>Mantenimiento BD</span>
-    </nav>
-  </div>
-  <div class="topnav-right">
-    <div class="user-chip">
-      <div class="avatar" id="navInitial">?</div>
-      <span id="navNombre">—</span>
-      <span class="perfil-badge" id="navPerfil">—</span>
-    </div>
-    <button class="btn-logout" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Salir</button>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'},{label:'Mantenimiento BD',current:true}]};</script>
 
 <!-- Overlay de ejecución -->
 <div id="overlay-run">
@@ -1216,6 +1199,12 @@ function activarTab(tab) {
     _cargado.add(tab);
     TABS[tab].carga();
   }
+  // Miga: cada tab es una vista con identidad propia
+  if (window.AF_TOPNAV_HOJA) {
+    const HOJAS = { indices:'Índices', integridad:'Integridad', crecimiento:'Crecimiento',
+                    conexiones:'Conexiones', slowq:'Slow Queries', historial:'Historial' };
+    AF_TOPNAV_HOJA(tab === 'diag' ? null : (HOJAS[tab] || null));
+  }
 }
 
 function setDot(tab, nivel) {
@@ -1452,18 +1441,6 @@ function renderSlowQueries(data) {
 
 // ── Nav: usuario ──────────────────────────────────────────────────────
 function logout() { sessionStorage.clear(); window.location.href = '/login.html'; }
-(function initNav() {
-  const token = sessionStorage.getItem('token');
-  if (!token) return;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const nombre  = payload.nombre || payload.email || '?';
-    const perfil  = payload.perfil || payload.rol || '';
-    document.getElementById('navNombre').textContent  = nombre;
-    document.getElementById('navPerfil').textContent  = perfil;
-    document.getElementById('navInitial').textContent = nombre.charAt(0).toUpperCase();
-  } catch (_) {}
-})();
 
 // ── Inicialización ────────────────────────────────────────────────────
 // Ocultar todos los bloques de tab excepto el inicial (diag)
@@ -1479,6 +1456,7 @@ setTimeout(() => { cargarIndices(); }, 300);
 setTimeout(() => { cargarIntegridad(); _cargado.add('integridad'); }, 600);
 setTimeout(() => { cargarCrecimiento(); _cargado.add('crecimiento'); }, 900);
 </script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
