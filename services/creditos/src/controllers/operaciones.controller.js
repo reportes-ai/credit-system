@@ -298,7 +298,10 @@ const create = async (req, res) => {
     const _estC = (b.estado_credito||'').toUpperCase(), _estE = (b.estado_eval||'').toUpperCase();
     if (['OTORGADO','APROBADO','DIGITADO'].includes(_estC) || ['OTORGADO','APROBADO'].includes(_estE)) {
       try {
-        const calc = await calcularOperacion({ ...b, saldo_precio, id: r.insertId });
+        // El form manda el RUT del dealer como rut_concesionario (la columna es
+        // rut_dealer): sin este alias el motor no encuentra la tabla pactada
+        // del dealer y cae a la pizarra — fue el bug de la op 26080722.
+        const calc = await calcularOperacion({ ...b, rut_dealer: b.rut_dealer || b.rut_concesionario || null, saldo_precio, id: r.insertId });
         await pool.query(`
           UPDATE creditos SET
             monto_comision_fin = ?, com_rdh = ?, com_cesantia = ?,
@@ -402,7 +405,8 @@ const update = async (req, res) => {
     // Auto-calcular ingresos y comisiones al actualizar
     if (['OTORGADO','APROBADO'].includes((b.estado_credito||'').toUpperCase())) {
       try {
-        const calc = await calcularOperacion({ ...b, saldo_precio, id });
+        // Mismo alias que en la creación: el form trae rut_concesionario, el motor espera rut_dealer.
+        const calc = await calcularOperacion({ ...b, rut_dealer: b.rut_dealer || b.rut_concesionario || null, saldo_precio, id });
         // Respetar campos forzados (negociaciones manuales / part_bruto pactado de la carta):
         // si monto_comision_fin / comdea_real / com_parque están forzados, se conserva el valor
         // guardado y NO se pisa con el cálculo (mismo criterio que recalcular-mes.js:290-297).
