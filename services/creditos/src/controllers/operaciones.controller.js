@@ -395,7 +395,9 @@ const update = async (req, res) => {
       b.comdea_real||null, b.monto_comision_fin||null, b.id_financiera||null, b.fecha_primera_cuota||null,
       b.parque||'NO APLICA', b.mayor_menor||null, b.monto_capitalizado||0,
       b.boleta_factura||null, b.cantidad_docs||0, b.docs_autorizados||0, b.fecha_recep_doc||null,
-      b.rut_concesionario||null, b.vendedor||null,
+      // Homologación: los forms nuevos mandan rut_dealer; cartas-aprobacion y
+      // revisar.html aún mandan rut_concesionario (legacy) — se aceptan ambos.
+      b.rut_dealer||b.rut_concesionario||null, b.vendedor||null,
       b.id_cliente||null,
       id
     ];
