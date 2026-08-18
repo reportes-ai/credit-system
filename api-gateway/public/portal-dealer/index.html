@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.13 — límites de reparos/factura caen SIEMPRE en día hábil + cada cartola muestra su pago estimado (ventana que le corresponde) · v3.12 — fechas de las ventanas de pago sin corrimiento de zona horaria (24 mostraba 23) · v3.11 — Seguimiento con los hitos del pago: Liberado a pago, Orden de pago emitida, Pagado (track SALDO) · v3.10 — detalle de op sin Valor cuota · v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.14 — sin "Enviar factura hasta" en la card (queda reparos + ventana de pago) · v3.13 — límites de reparos/factura caen SIEMPRE en día hábil + cada cartola muestra su pago estimado (ventana que le corresponde) · v3.12 — fechas de las ventanas de pago sin corrimiento de zona horaria (24 mostraba 23) · v3.11 — Seguimiento con los hitos del pago: Liberado a pago, Orden de pago emitida, Pagado (track SALDO) · v3.10 — detalle de op sin Valor cuota · v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -302,7 +302,7 @@
       <div class="port-scroll">
         <div id="dashWrap">
           <div class="port-hello" style="margin-bottom:4px"><b>Mis cartolas</b></div>
-          <p style="font-size:.84rem;color:#64748b;margin:0 0 16px">Cartolas enviadas, con el plazo para reparar y para enviar la factura.</p>
+          <p style="font-size:.84rem;color:#64748b;margin:0 0 16px">Cartolas enviadas, con el plazo para reparar y la fecha de pago de tu factura.</p>
           <div id="cartList"><div class="empty">Cargando…</div></div>
         </div>
       </div>
@@ -775,7 +775,6 @@ async function cargarCartolas(){
       <div style="font-size:.82rem;color:#64748b;margin-top:3px">Enviada: ${fmtFecha(c.fecha_envio)} · <span style="color:#0141A2;font-weight:600"><i class="bi bi-zoom-in"></i> Ver detalle</span></div>
       <div class="cart-plazos">
         <span>Reparar hasta: <b class="${vc(c.limite_reparos)}">${fdia(c.limite_reparos)}</b></span>
-        <span>Enviar factura hasta: <b class="${vc(c.limite_factura)}">${fdia(c.limite_factura)}</b></span>
         ${c.pago_estimado?`<span>Recibida hasta el <b>${fdia(c.pago_estimado.corte)}</b> a las ${pf?pf.corte_hora:12}:00 → se paga el <b style="color:#16a34a">${fdia(c.pago_estimado.pago)}</b></span>`:''}
       </div>
     </div>`).join('');
@@ -1044,7 +1043,7 @@ document.getElementById('fileInput').addEventListener('change', async function()
 const TOUR=[
   {tab:'inicio',  sel:'#kpis',                  t:'Tu resumen',            d:'Un vistazo rápido a tus operaciones: cuántas llevas, otorgadas y en proceso.'},
   {tab:'inicio',  sel:'#opsList',               t:'Mis operaciones',       d:'El listado de tus operaciones. Haz clic en una para ver el detalle: qué falta, fechas y el estado del pago.'},
-  {tab:'cartolas',sel:'[data-tab="cartolas"]',  t:'Cartolas',              d:'Tus cartolas enviadas, con el plazo para reparar y para enviar la factura.'},
+  {tab:'cartolas',sel:'[data-tab="cartolas"]',  t:'Cartolas',              d:'Tus cartolas enviadas, con el plazo para reparar y la fecha de pago de tu factura.'},
   {tab:'ia',      sel:'[data-tab="ia"]',        t:'Asistente',             d:'Pregúntale en lenguaje natural por tus operaciones, pagos o cartolas.'},
   {tab:'chat',    sel:'[data-tab="chat"]',      t:'Chat con tu ejecutivo', d:'Habla en vivo (chat y videollamada) con tu ejecutivo de AutoFácil.'},
 ];
