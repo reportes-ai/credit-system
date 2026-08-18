@@ -200,13 +200,15 @@ async function aplicar(f, usuario) {
                     plazo = ?, comdea_real = ?, updated_at = NOW() WHERE id = ?`,
     [f.nombre_dealer || null, f.rut_dealer || null, f.es_parque ? 'PARQUE' : 'CALLE',
      Number(f.saldo_precio) || 0, Number(f.plazo) || 0, Number(f.comision) || 0, c.id]);
-  // Si la comisión confirmada difiere del motor, dejarla FORZADA: sin esta marca
-  // el próximo recálculo la pisaría de vuelta al valor de pizarra (el recálculo
-  // solo respeta campos_forzados o carta, y estas ops no tienen carta).
-  try {
-    const { marcarForzadosCalculo } = require('../../../creditos/src/utils/recalcular-mes');
-    await marcarForzadosCalculo([c.id], { campos: ['comdea_real'] });
-  } catch (e) { console.error('[incorporaciones forzado]', e.message); }
+  // La comisión CONFIRMADA queda FORZADA SIEMPRE (es lo pactado, como la carta):
+  // sin la marca el próximo recálculo la pisa con la pizarra. Marca directa e
+  // incondicional en el MISMO flujo — antes dependía del helper comparativo
+  // marcarForzadosCalculo y si este fallaba en silencio, la protección no quedaba
+  // (OP 89047: la ODP salió por $564.000 en vez de los $423.000 aprobados).
+  await pool.query(
+    `UPDATE creditos
+        SET campos_forzados = JSON_ARRAY_APPEND(COALESCE(campos_forzados, JSON_ARRAY()), '$', 'comdea_real')
+      WHERE id = ? AND NOT JSON_CONTAINS(COALESCE(campos_forzados, '[]'), '"comdea_real"')`, [c.id]);
   // 2) Movimiento de cartola (id_carta NULL = incorporada sin carta)
   // nombre_completo es la columna poblada en `clientes`; los campos separados
   // (nombres/apellido_paterno) están vacíos en buena parte de la base.
