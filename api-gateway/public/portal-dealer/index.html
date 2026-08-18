@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.10 — detalle de op sin Valor cuota (queda cliente, RUT, vehículo, ejecutivo y plazo) · v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.11 — Seguimiento con los hitos del pago: Liberado a pago, Orden de pago emitida, Pagado (track SALDO) · v3.10 — detalle de op sin Valor cuota · v3.8 — Seguimiento de la op en orden cronológico real (por fecha; pendientes al final) · v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -860,6 +860,8 @@ function renderDetalle(d,f,p){
   const tl=[['Ingreso de la operación', d.fecha_ingreso, true]];
   if(f){ tl.push(['Antecedentes enviados', f.fecha_envio, !!f.fecha_envio]); tl.push(['Antecedentes validados', f.fecha_validacion, !!f.fecha_validacion]); }
   tl.push(['Crédito otorgado', d.fecha_otorgado, !!d.fecha_otorgado]);
+  // Hitos del pago del saldo precio (track SALDO de Post Venta)
+  if(p&&p.tiene&&Array.isArray(p.hitos_saldo)) for(const h of p.hitos_saldo) tl.push([h.etiqueta, h.fecha, !!h.fecha]);
   // Orden cronológico real: los hitos con fecha se ordenan por fecha (los antecedentes
   // pueden llegar DESPUÉS del otorgamiento); los pendientes quedan al final.
   tl.sort((a,b)=>{ if(!a[2]&&!b[2]) return 0; if(!a[2]) return 1; if(!b[2]) return -1;

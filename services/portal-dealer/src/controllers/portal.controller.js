@@ -443,6 +443,13 @@ exports.pago = async (req, res) => {
     const ult = {};
     for (const e of et) { if (!ult[e.track]) ult[e.track] = { etapa: e.etapa, fecha: e.fecha }; }
 
+    /* Hitos del pago para el timeline del portal: fecha del PRIMER paso por cada
+       etapa clave del track SALDO (et viene DESC → la última vista es la primera). */
+    const HITOS = { 'LIBERADO A PAGO': 'Liberado a pago', 'ORDEN DE PAGO EMITIDA': 'Orden de pago emitida', 'SALDO PRECIO PAGADO': 'Pagado' };
+    const hs = {};
+    for (const e of et) if (e.track === 'SALDO' && HITOS[String(e.etapa || '').toUpperCase()]) hs[String(e.etapa).toUpperCase()] = e.fecha;
+    const hitos_saldo = Object.keys(HITOS).map(k => ({ etiqueta: HITOS[k], fecha: hs[k] || null }));
+
     return res.json({
       success: true,
       data: {
@@ -451,6 +458,7 @@ exports.pago = async (req, res) => {
         comision: seg.comision,
         saldo: ult['SALDO'] || null,
         comision_pago: ult['COMISION'] || null,
+        hitos_saldo,
       },
       error: null,
     });
