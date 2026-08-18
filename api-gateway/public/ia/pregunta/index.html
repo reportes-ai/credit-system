@@ -339,8 +339,10 @@
     }
 
     (function init() {
-      // El botón Límites lo renderiza el componente topnav en DOMContentLoaded; tocarlo antes = TypeError
-      document.addEventListener('DOMContentLoaded', () => {
+      // El botón Límites lo renderiza el componente topnav en DOMContentLoaded; este
+      // listener se registra ANTES que el del componente, así que hay que esperar
+      // 'load' (siempre posterior al render) — con DOMContentLoaded quedaba oculto.
+      window.addEventListener('load', () => {
         const b = document.getElementById('btnLimites');
         if (b && yo && yo.perfil === 'Administrador') b.style.display = 'inline-flex';
       });

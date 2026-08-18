@@ -191,6 +191,14 @@
     // Muestra el acceso a Dashboard solo con permiso (caché de sesión, 5 min)
     mostrarDashSiPuede(yo);
 
+    // Hoja de miga encolada antes del render (deep-links) → aplicarla ahora
+    if (window.__afHojaPend) {
+      var hp = window.__afHojaPend; window.__afHojaPend = null;
+      window.AF_TOPNAV_HOJA(hp[0], hp[1]);
+    }
+    // Señal para páginas que necesitan tocar elementos del componente
+    try { document.dispatchEvent(new CustomEvent('af-topnav-ready')); } catch (_) {}
+
     // Refina el breadcrumb con la sección real del placement (cuando la página declara self).
     if (!cfg.breadcrumb && cfg.self) {
       resolveSection(cfg.self, function (sec) {
@@ -233,7 +241,9 @@
      Así ninguna pantalla interna queda con el breadcrumb de la landing. */
   window.AF_TOPNAV_HOJA = function (label, onVolver) {
     var bc = document.querySelector('.topnav .breadcrumb-nav');
-    if (!bc) return;
+    // Antes del render (deep-links ?tab= que corren en un DOMContentLoaded
+    // registrado antes que el del componente): encolar y aplicar al renderizar.
+    if (!bc) { window.__afHojaPend = [label, onVolver]; return; }
     if (!bc.dataset.original) bc.dataset.original = bc.innerHTML;   // respaldo de la miga base
     if (!label) { bc.innerHTML = bc.dataset.original; return; }
     bc.innerHTML = bc.dataset.original;
