@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mantenedor de Cartas de Aprobación — AutoFácil</title>
-  <!-- v1.5 — card Portal del Dealer: plazos + límite IA -->
+  <!-- v1.6 — ventanas de pago de facturas (corte/pago × 2 + hora) editables en el panel Portal del Dealer · v1.5 — card Portal del Dealer: plazos + límite IA -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -126,6 +126,16 @@
     <input type="number" id="plzFactura" min="0" max="120" step="1" style="width:120px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700">
     <div class="lbl">Preguntas IA por día (por dealer) — 0 = sin límite</div>
     <input type="number" id="plzIaDia" min="0" max="200" step="1" style="width:120px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700">
+    <hr style="margin:18px 0 10px;border:none;border-top:1px solid #e5e7eb">
+    <h5 style="margin:0 0 4px">Ventanas de pago de facturas</h5>
+    <p class="hint">Regla de Tesorería que ve el dealer en su portal: factura recibida hasta el día de <b>corte</b> (o hábil siguiente) antes de la hora indicada → se paga el día de <b>pago</b> (o hábil siguiente). Las fechas concretas se calculan solas saltando fines de semana y feriados.</p>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:end">
+      <div><div class="lbl">Corte 1 (día del mes)</div><input type="number" id="plzCorte1" min="1" max="28" step="1" style="width:100px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700"></div>
+      <div><div class="lbl">Pago 1 (día del mes)</div><input type="number" id="plzPago1" min="1" max="28" step="1" style="width:100px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700"></div>
+      <div><div class="lbl">Corte 2 (día del mes)</div><input type="number" id="plzCorte2" min="1" max="28" step="1" style="width:100px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700"></div>
+      <div><div class="lbl">Pago 2 (día del mes)</div><input type="number" id="plzPago2" min="1" max="28" step="1" style="width:100px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700"></div>
+      <div><div class="lbl">Hora de corte</div><input type="number" id="plzCorteHora" min="0" max="23" step="1" style="width:100px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 14px;font-size:1rem;font-weight:700"></div>
+    </div>
     <div style="margin-top:16px;text-align:right">
       <button class="btn btn-primary" onclick="guardarPlazos()"><i class="bi bi-floppy me-1"></i>Guardar</button>
     </div>
@@ -204,6 +214,8 @@ async function cargarPlazos(){
   document.getElementById('plzReparos').value = (rep!=null && rep!=='') ? rep : 5;
   document.getElementById('plzFactura').value = (fac!=null && fac!=='') ? fac : 10;
   document.getElementById('plzIaDia').value   = (iad!=null && iad!=='') ? iad : 15;
+  const defs={fact_corte1_dia:[16,'plzCorte1'],fact_pago1_dia:[17,'plzPago1'],fact_corte2_dia:[24,'plzCorte2'],fact_pago2_dia:[25,'plzPago2'],fact_corte_hora:[12,'plzCorteHora']};
+  for(const k in defs){ const v=await getParam(k); document.getElementById(defs[k][1]).value=(v!=null&&v!=='')?v:defs[k][0]; }
 }
 async function guardarPlazos(){
   const rep=parseInt(document.getElementById('plzReparos').value,10);
@@ -211,7 +223,13 @@ async function guardarPlazos(){
   const iad=parseInt(document.getElementById('plzIaDia').value,10);
   if(!(rep>=0&&rep<=120)||!(fac>=0&&fac<=120)){ toast('Ingresa días entre 0 y 120.'); return; }
   if(!(iad>=0&&iad<=200)){ toast('El límite IA debe estar entre 0 y 200.'); return; }
-  try { await setParam('plazo_reparos_dias', rep); await setParam('plazo_factura_dias', fac); await setParam('dealer_ia_limite_dia', iad); toast('Configuración del portal guardada.'); }
+  const c1=parseInt(document.getElementById('plzCorte1').value,10), p1=parseInt(document.getElementById('plzPago1').value,10);
+  const c2=parseInt(document.getElementById('plzCorte2').value,10), p2=parseInt(document.getElementById('plzPago2').value,10);
+  const ch=parseInt(document.getElementById('plzCorteHora').value,10);
+  if(![c1,p1,c2,p2].every(n=>n>=1&&n<=28)||!(ch>=0&&ch<=23)){ toast('Días de corte/pago entre 1 y 28; hora entre 0 y 23.'); return; }
+  try { await setParam('plazo_reparos_dias', rep); await setParam('plazo_factura_dias', fac); await setParam('dealer_ia_limite_dia', iad);
+    await setParam('fact_corte1_dia', c1); await setParam('fact_pago1_dia', p1); await setParam('fact_corte2_dia', c2); await setParam('fact_pago2_dia', p2); await setParam('fact_corte_hora', ch);
+    toast('Configuración del portal guardada.'); }
   catch(e){ toast('Error: '+e.message); }
 }
 

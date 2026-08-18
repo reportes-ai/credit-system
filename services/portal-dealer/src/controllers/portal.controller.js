@@ -477,12 +477,41 @@ exports.cartolas = async (req, res) => {
 
     const plazoRep = await paramNum('plazo_reparos_dias', 5);
     const plazoFac = await paramNum('plazo_factura_dias', 10);
+
+    /* Ventanas de pago de facturas (regla de Tesorería, paramétrica):
+       recibida hasta el día C (o hábil siguiente) antes de la hora de corte
+       → se paga el día P del mismo mes (o hábil siguiente al corte).
+       Ventana 1: 16 → 17 · Ventana 2: 24 → 25 · corte 12:00. */
+    const corte1 = await paramNum('fact_corte1_dia', 16), pago1 = await paramNum('fact_pago1_dia', 17);
+    const corte2 = await paramNum('fact_corte2_dia', 24), pago2 = await paramNum('fact_pago2_dia', 25);
+    const corteHora = await paramNum('fact_corte_hora', 12);
+    const { siguienteHabil } = require('../../../../shared/feriados');
+    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const ventana = (y, m, dC, dP) => {
+      const corte = siguienteHabil(new Date(y, m, dC));
+      let pago = siguienteHabil(new Date(y, m, dP));
+      if (pago <= corte) pago = siguienteHabil(new Date(corte.getFullYear(), corte.getMonth(), corte.getDate() + 1));
+      return { corte: iso(corte), pago: iso(pago) };
+    };
+    // Próximas 2 ventanas cuyo corte no haya pasado todavía
+    const hoyISO = iso(new Date());
+    const ventanas = [];
+    for (let k = 0; ventanas.length < 2 && k < 3; k++) {
+      const base = new Date(); base.setDate(1); base.setMonth(base.getMonth() + k);
+      for (const [dC, dP] of [[corte1, pago1], [corte2, pago2]]) {
+        const v = ventana(base.getFullYear(), base.getMonth(), dC, dP);
+        if (v.corte >= hoyISO && ventanas.length < 2) ventanas.push(v);
+      }
+    }
+
     const out = rows.map(r => ({
       id: r.id, mes: r.mes, total_bruto: r.total_bruto, fecha_envio: r.fecha_envio, nombre_dealer: r.nombre_dealer,
       limite_reparos: addDiasISO(r.fecha_envio, plazoRep),
       limite_factura: addDiasISO(r.fecha_envio, plazoFac),
     }));
-    return res.json({ success: true, data: { vinculado: true, rows: out, plazos: { reparos: plazoRep, factura: plazoFac } }, error: null });
+    return res.json({ success: true, data: { vinculado: true, rows: out,
+      plazos: { reparos: plazoRep, factura: plazoFac },
+      pago_facturas: { corte_hora: corteHora, dias: { corte1, pago1, corte2, pago2 }, ventanas } }, error: null });
   } catch (err) {
     console.error('[portal-dealer] cartolas:', err.message);
     return res.status(500).json({ success: false, data: null, error: 'No se pudieron cargar las cartolas.' });

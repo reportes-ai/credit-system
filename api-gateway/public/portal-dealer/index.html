@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portal Dealer — AutoFácil</title>
-  <!-- v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
+  <!-- v3.7 — Cartolas: aviso con las ventanas de pago de facturas (corte 16→pago 17, corte 24→pago 25, hora 12:00; paramétrico y con fechas hábiles calculadas) · v3.6 — bitácora: el portal registra pestañas, cartolas abiertas, preguntas al asistente y pre-aprobaciones · v3.5 — la comision en negrita y del mismo tamano que el saldo precio · v3.4 — tarjetas del pipeline del saldo precio (pinchables, filtran el listado); card con Saldo Precio y Comision rotulados con su estado · v3.3 — la card muestra el SALDO PRECIO y su estado en 4 pasos (pendientes/recibidos/liberado/pagado) · v3.2 — cartola pinchable con popup de detalle (mov_ids); Mis operaciones parte en otorgadas de los ultimos 3 meses · v3.1 — modo Ver como dealer (interno): token en el hash, cinta morada, solo lectura, sin chat · v3.0 — el chat "Iniciar atención" funciona en la vista demo (simula conversación con ejecutivo, sin token/WS) -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; }
@@ -761,7 +761,14 @@ async function cargarCartolas(){
     if(!rows.length){ cont.innerHTML='<div class="empty">Aún no tienes cartolas enviadas.</div>'; return; }
     const hoy=new Date();
     const vc = d => (d && new Date(d) < hoy) ? ' venc' : '';
-    cont.innerHTML=rows.map(c=>`<div class="cart-card clickable" onclick="verCartola(${c.id})" title="Ver el detalle de esta cartola" style="cursor:pointer">
+    /* Regla de pago de facturas (paramétrica, viene del servidor con las próximas fechas hábiles) */
+    const pf=j.data.pago_facturas;
+    const pagoInfo = pf ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:11px;padding:11px 14px;margin-bottom:13px;font-size:.82rem;color:#1e3a8a">
+      <b><i class="bi bi-cash-coin me-1"></i>¿Cuándo se paga tu factura?</b><br>
+      Facturas recibidas hasta el día <b>${pf.dias.corte1}</b> antes de las <b>${pf.corte_hora}:00 hrs</b> se pagan el día <b>${pf.dias.pago1}</b>; recibidas hasta el día <b>${pf.dias.corte2}</b> antes de las <b>${pf.corte_hora}:00 hrs</b> se pagan el día <b>${pf.dias.pago2}</b> (o el día hábil siguiente).<br>
+      ${(pf.ventanas||[]).map(v=>`<span style="display:inline-block;margin-top:5px;margin-right:14px">📅 Recibida hasta el <b>${fmtFecha(v.corte)}</b> a las ${pf.corte_hora}:00 → se paga el <b>${fmtFecha(v.pago)}</b></span>`).join('')}
+    </div>` : '';
+    cont.innerHTML=pagoInfo+rows.map(c=>`<div class="cart-card clickable" onclick="verCartola(${c.id})" title="Ver el detalle de esta cartola" style="cursor:pointer">
       <div class="cart-top"><span class="cart-mes">Cartola ${esc(c.mes||'')}</span><span class="op-monto">${fmtMonto(c.total_bruto)}</span></div>
       <div style="font-size:.82rem;color:#64748b;margin-top:3px">Enviada: ${fmtFecha(c.fecha_envio)} · <span style="color:#0141A2;font-weight:600"><i class="bi bi-zoom-in"></i> Ver detalle</span></div>
       <div class="cart-plazos">

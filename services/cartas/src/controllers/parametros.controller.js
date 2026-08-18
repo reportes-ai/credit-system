@@ -24,6 +24,11 @@ const KEY_PERMISOS = {
   plazo_reparos_dias:     ['cartas_mantenedores'],
   plazo_factura_dias:     ['cartas_mantenedores'],
   dealer_ia_limite_dia:   ['cartas_mantenedores'],
+  fact_corte1_dia:        ['cartas_mantenedores'],
+  fact_pago1_dia:         ['cartas_mantenedores'],
+  fact_corte2_dia:        ['cartas_mantenedores'],
+  fact_pago2_dia:         ['cartas_mantenedores'],
+  fact_corte_hora:        ['cartas_mantenedores'],
 };
 
 const getParam = async (req, res) => {
