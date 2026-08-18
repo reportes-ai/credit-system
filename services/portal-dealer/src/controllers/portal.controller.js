@@ -512,11 +512,32 @@ exports.cartolas = async (req, res) => {
       }
     }
 
-    const out = rows.map(r => ({
-      id: r.id, mes: r.mes, total_bruto: r.total_bruto, fecha_envio: r.fecha_envio, nombre_dealer: r.nombre_dealer,
-      limite_reparos: addDiasISO(r.fecha_envio, plazoRep),
-      limite_factura: addDiasISO(r.fecha_envio, plazoFac),
-    }));
+    /* Los límites caen SIEMPRE en día hábil (un "hasta el domingo 16" no sirve
+       de nada) y cada cartola trae su pago estimado: la ventana cuyo corte es
+       el primero >= al límite de factura. Así la card cuadra con la leyenda. */
+    const habilISO = f => { if (!f) return null; const d = new Date(f); return isNaN(d) ? null : iso(siguienteHabil(d)); };
+    const pagoEstimado = limFacISO => {
+      if (!limFacISO) return null;
+      const base = new Date(limFacISO.slice(0, 10) + 'T12:00:00');
+      for (let k = 0; k < 3; k++) {
+        const y = base.getFullYear(), m = base.getMonth() + k;
+        for (const [dC, dP] of [[corte1, pago1], [corte2, pago2]]) {
+          const v = ventana(y, m, dC, dP);
+          if (v.corte >= limFacISO.slice(0, 10)) return v;
+        }
+      }
+      return null;
+    };
+    const out = rows.map(r => {
+      const limRep = habilISO(addDiasISO(r.fecha_envio, plazoRep));
+      const limFac = habilISO(addDiasISO(r.fecha_envio, plazoFac));
+      return {
+        id: r.id, mes: r.mes, total_bruto: r.total_bruto, fecha_envio: r.fecha_envio, nombre_dealer: r.nombre_dealer,
+        limite_reparos: limRep,
+        limite_factura: limFac,
+        pago_estimado: pagoEstimado(limFac),
+      };
+    });
     return res.json({ success: true, data: { vinculado: true, rows: out,
       plazos: { reparos: plazoRep, factura: plazoFac },
       pago_facturas: { corte_hora: corteHora, dias: { corte1, pago1, corte2, pago2 }, ventanas } }, error: null });
