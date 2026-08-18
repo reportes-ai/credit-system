@@ -34,6 +34,17 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // Reservar la altura de la barra desde el PARSE del script (antes del render
+  // en DOMContentLoaded): sin esto el contenido pinta arriba y salta 60px al
+  // insertarse la barra (layout shift en cada navegación).
+  (function reservarAltura() {
+    try {
+      const st = document.createElement('style');
+      st.textContent = '#af-topnav{display:block;height:60px}';
+      (document.head || document.documentElement).appendChild(st);
+    } catch (_) {}
+  })();
+
   function injectCSS() {
     if (document.getElementById('af-topnav-css')) return;
     const st = document.createElement('style');
@@ -164,6 +175,14 @@
     // Breadcrumb: estático si la página lo define; si declara self, se arma desde el placement
     // (provisional con defaultSection y se refina al resolver placement_v2 — sigue al card si se mueve).
     let bcItems = cfg.breadcrumb;
+    // Miga de los editores BD Solo Dios (regla en UN solo lugar): con
+    // AF_TOPNAV={migaBD:{titulo,icon}} se arma Inicio › Mantenedores › ⚡ Solo
+    // Dios › Título, omitiendo Solo Dios en la ruta alias -edicion (Analista).
+    if (!bcItems && cfg.migaBD) {
+      bcItems = [{ label: 'Inicio', href: '/' }, { label: 'Mantenedores', href: '/mantenedores/' }];
+      if (!/-edicion/.test(location.pathname)) bcItems.push({ label: '⚡ Solo Dios', href: '/mantenedores/solo-dios/' });
+      bcItems.push({ label: cfg.migaBD.titulo, icon: cfg.migaBD.icon, current: true });
+    }
     if (!bcItems && cfg.self) bcItems = selfCrumbs(cfg.self, cfg.self.defaultSection || 'home');
 
     mount.outerHTML =
@@ -176,6 +195,9 @@
           breadcrumbHTML(bcItems) +
         '</div>' +
         '<div class="topnav-right">' +
+          // Slot ESTABLE para contenido de página (píldoras de estado, badges):
+          // las páginas escriben en #afNavExtra, nunca en el DOM interno de la barra.
+          '<span class="af-nav-extra" id="afNavExtra"></span>' +
           actions + dash +
           '<div class="user-chip">' +
             '<div class="avatar" id="avatarInicial">' + esc(inicial) + '</div>' +
@@ -191,6 +213,11 @@
     // Muestra el acceso a Dashboard solo con permiso (caché de sesión, 5 min)
     mostrarDashSiPuede(yo);
 
+    // Título encolado antes del render → aplicarlo ahora
+    if (window.__afTituloPend) {
+      var tp = window.__afTituloPend; window.__afTituloPend = null;
+      window.AF_TOPNAV_TITULO(tp[0], tp[1]);
+    }
     // Hoja de miga encolada antes del render (deep-links) → aplicarla ahora
     if (window.__afHojaPend) {
       var hp = window.__afHojaPend; window.__afHojaPend = null;
@@ -244,6 +271,18 @@
       if (fs.indexOf('ver_dashboard') >= 0 || fs.indexOf('dashboard_resumen') >= 0) link.style.display = '';
     });
   }
+
+  /* Renombra el ÚLTIMO nivel de la miga (título dinámico de la página, p. ej.
+     la tabla real en BD Tabla). A diferencia de AF_TOPNAV_HOJA no agrega un
+     nivel: reemplaza el actual, escapado, y pasa a ser la miga base. */
+  window.AF_TOPNAV_TITULO = function (label, icon) {
+    var bc = document.querySelector('.topnav .breadcrumb-nav');
+    if (!bc) { window.__afTituloPend = [label, icon]; return; }
+    var cur = bc.querySelector('.cur');
+    if (!cur) return;
+    cur.innerHTML = (icon ? '<i class="bi ' + esc(icon) + ' me-1"></i>' : '') + esc(label);
+    bc.dataset.original = bc.innerHTML;
+  };
 
   /* ── Miga dinámica para páginas con vistas/pestañas internas (SPA) ──────────
      REGLA: si la página cambia de vista sin navegar, DEBE llamar esto al cambiar:

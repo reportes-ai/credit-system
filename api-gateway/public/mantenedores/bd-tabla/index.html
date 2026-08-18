@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BD Tabla Nivel Dios — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -80,12 +80,7 @@
 <body>
 <div id="af-topnav"></div>
 <script>
-(function(){
-  const bc = [{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'}];
-  if (!/-edicion/.test(location.pathname)) bc.push({label:'⚡ Solo Dios',href:'/mantenedores/solo-dios/'});
-  bc.push({label:'BD Tabla',icon:'bi-database-fill',current:true});
-  window.AF_TOPNAV = { breadcrumb: bc };
-})();
+window.AF_TOPNAV = { migaBD: { titulo:'BD Tabla', icon:'bi-database-fill' } };  // regla Solo Dios/-edicion vive en topnav.js
 </script>
 
 <div class="main-content">
@@ -186,8 +181,9 @@ async function init() {
   document.getElementById('bannerTitulo').textContent = `⚡ BD ${t.label.toUpperCase()} NIVEL DIOS`;
   document.getElementById('bannerSub').innerHTML = `Vista y edición directa de la tabla <strong>${TABLA}</strong> — todos los campos, filtros por columna, edición inline.`;
   document.getElementById('bannerIcon').className = 'bi ' + (t.icono||'bi-database-fill');
-  const bcCur = document.querySelector('.topnav .breadcrumb-nav .cur');
-  if (bcCur) bcCur.innerHTML = `<i class="bi ${t.icono||'bi-database-fill'} me-1"></i>BD ${t.label}`;
+  // Título dinámico de la miga por la API del componente (escapa y sobrevive
+  // a la carrera con el render; antes se parchaba el DOM interno a mano)
+  if (window.AF_TOPNAV_TITULO) AF_TOPNAV_TITULO('BD ' + t.label, t.icono || 'bi-database-fill');
   const hermanas = cat.filter(x=>x.grupo===t.grupo);
   document.getElementById('tablaChips').innerHTML = hermanas.length>1 ? hermanas.map(x=>
     `<a href="?t=${x.nombre}" style="text-decoration:none;border-radius:8px;padding:3px 12px;font-size:.72rem;font-weight:700;

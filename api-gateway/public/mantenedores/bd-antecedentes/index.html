@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BD Antecedentes Laborales Nivel Dios — AutoFácil</title>
-  <!-- v1.2 -->
+  <!-- v1.3 -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -65,12 +65,7 @@
 <body>
 <div id="af-topnav"></div>
 <script>
-(function(){
-  const bc = [{label:'Inicio',href:'/'},{label:'Mantenedores',href:'/mantenedores/'}];
-  if (!/-edicion/.test(location.pathname)) bc.push({label:'⚡ Solo Dios',href:'/mantenedores/solo-dios/'});
-  bc.push({label:'BD Antecedentes Laborales',icon:'bi-briefcase-fill',current:true});
-  window.AF_TOPNAV = { breadcrumb: bc };
-})();
+window.AF_TOPNAV = { migaBD: { titulo:'BD Antecedentes Laborales', icon:'bi-briefcase-fill' } };  // regla Solo Dios/-edicion vive en topnav.js
 </script>
 
 <div class="main-content">

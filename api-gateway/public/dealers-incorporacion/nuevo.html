@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nueva Ficha de Dealer — AutoFácil</title>
-  <!-- v1.35 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
+  <!-- v1.36 — navbar migrada al componente topnav (píldora de estado reinyectada en el topnav) · v1.33 — campos en gris segun los permisos por perfil del mantenedor (Mantenedores > Dealers > Permisos de edicion) · v1.32 — el banco DEBE ser de la lista: lo escrito se normaliza al nombre oficial (chile→Banco de Chile) y si no calza se rechaza al enviar · v1.30 — fix: banco fuera de la lista (CHILE) se imprimia vacio aunque estaba en el sistema · v1.29 — fix: el input de cédulas quedaba deshabilitado en AUTORIZADA/PEND_CIERRE -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -121,13 +121,13 @@
       {label:'Volver',icon:'bi-arrow-left',href:'/dealers-incorporacion/'}
     ]
   };
-  // La píldora de estado vivía dentro del nav viejo: se reinyecta en el topnav
-  // ya renderizado (el componente pinta en DOMContentLoaded; 'load' corre después).
-  window.addEventListener('load', function(){
-    var tr=document.querySelector('.topnav .topnav-right');
-    if (tr && !document.getElementById('estadoPill')){
+  // La píldora de estado va en el slot #afNavExtra del componente (contrato
+  // estable; 'af-topnav-ready' se emite justo después del render).
+  document.addEventListener('af-topnav-ready', function(){
+    var slot=document.getElementById('afNavExtra');
+    if (slot && !document.getElementById('estadoPill')){
       var est=window._pillEstado||'BORRADOR';
-      tr.insertAdjacentHTML('afterbegin','<span class="estado-pill e-'+est+'" id="estadoPill">'+est.replace('_',' ')+'</span>');
+      slot.innerHTML='<span class="estado-pill e-'+est+'" id="estadoPill">'+est.replace('_',' ')+'</span>';
     }
   });
 

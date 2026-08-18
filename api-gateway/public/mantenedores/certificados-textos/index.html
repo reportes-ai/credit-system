@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.4 — navbar migrada al componente topnav -->
+<!-- v1.5 — navbar migrada al componente topnav -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Textos de Certificados — AutoFácil</title>
@@ -63,7 +63,7 @@
 <script src="/js/auth-guard.js"></script>
 <script>
 const TOKEN=()=>sessionStorage.getItem('token');
-(function(){ if(!TOKEN()){ location.href='/login.html'; return; } })();
+// (el guard de sesión lo hace auth-guard.js, cargado arriba: chequea token Y expiración)
 const $=id=>document.getElementById(id);
 const HJ=()=>({ 'Content-Type':'application/json', Authorization:'Bearer '+TOKEN() });
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
