@@ -537,7 +537,7 @@ async function notificarReversaPagoDealer(track, idSeguimiento, motivo) {
       motivo: String(motivo || '').trim() || 'Reversa del pago registrada por Tesorería' };
     const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
     const cuerpo = rell(tplR.cuerpo) + (tplR.firma ? '\n\n' + rell(tplR.firma) : '');
-    const cc = [ccFijo, String(tplR.cc || '').trim()].filter(Boolean).join(',');
+    const cc = [...new Set([ccFijo, String(tplR.cc || '').trim()].join(',').split(',').map(s => s.trim().toLowerCase()).filter(Boolean))].join(',');
     await enviarCorreo({
       from, to: d.correo, cc: cc || undefined,
       subject: rell(tplR.asunto) || `Importante — aviso de pago sin efecto · Operación ${d.num_op}`,
