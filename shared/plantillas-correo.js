@@ -112,6 +112,37 @@ Equipo AutoFácil`,
     variables: '{dealer} {num_op} {que_pago} {motivo}',
   },
   {
+    codigo: 'dealer_invitacion_portal',
+    ambito: 'Post Venta — Dealers',
+    nombre: 'Invitación al Portal Dealer (envío masivo)',
+    descripcion: 'La invitación comercial al Portal Dealer que se manda desde Atención Remota → Invitar al Portal. Al enviar desde esa pantalla, el texto editado queda GUARDADO acá (es la misma plantilla). {{nombre}} se reemplaza por la razón social de cada dealer.',
+    asunto: '🚀 Llegó tu Portal Dealer AutoFácil: tu negocio con nosotros, en línea y en tiempo real',
+    cuerpo: `<p>Hola <b>{{nombre}}</b>,</p>
+<p>En AutoFácil invertimos en tecnología para que trabajar con nosotros sea <b>más rápido, más transparente y más rentable</b> para ti. Hoy queremos presentarte el nuevo <b>Portal Dealer AutoFácil</b>: tu oficina virtual, abierta 24/7, donde tienes el control total de tu negocio con nosotros.</p>
+<p><b>¿Qué puedes hacer desde hoy en tu portal?</b></p>
+<ul style="line-height:1.9">
+  <li>💰 <b>Saldos de Precio</b> — mira en línea tus operaciones pendientes de pago y en qué etapa exacta va cada una. Se acabó el llamar para preguntar.</li>
+  <li>📄 <b>Tus Cartolas</b> — revisa y descarga tus cartolas cuando quieras.</li>
+  <li>🧾 <b>Comisiones pendientes</b> — total claridad de lo que tienes por cobrar, al día.</li>
+  <li>⚡ <b>Simulador de créditos</b> — cotiza un crédito para tu cliente en segundos, con la tasa y cuota al instante, sin esperar a nadie.</li>
+  <li>✅ <b>Pre-aprobación en línea</b> — evalúa a tu cliente al tiro y ciérralo en la primera visita: el que cotiza contigo, compra contigo.</li>
+  <li>🤖 <b>Asistente virtual</b> — pregúntale por tus operaciones a cualquier hora y te responde en el momento; y si necesitas a una persona, nuestro equipo te atiende por chat en horario hábil.</li>
+</ul>
+<p><b>Ingresar es así de simple</b> (2 minutos, una sola vez):</p>
+<ol style="line-height:1.9">
+  <li>Entra a <a href="https://dealers.autofacilchile.cl">dealers.autofacilchile.cl</a></li>
+  <li>Escribe <b>este mismo correo</b> y el <b>RUT de tu empresa</b></li>
+  <li>Recibirás tu clave de acceso al instante en este correo, ¡y listo!</li>
+</ol>
+<p style="margin:22px 0"><a href="https://dealers.autofacilchile.cl" style="display:inline-block;background:#0141A2;color:#ffffff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:700;font-size:16px">Quiero entrar a mi portal →</a></p>
+<p>Este es el nuevo AutoFácil: <b>tecnología al servicio de tu negocio</b>. Y esto recién comienza.</p>
+<p><b>Equipo AutoFácil</b><br><span style="color:#64748b;font-size:13px">Crédito automotriz que sí funciona</span></p>`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'Los dealers marcados en la pantalla Invitar al Portal (correo de su ficha)',
+    variables: '{{nombre}}',
+  },
+  {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',

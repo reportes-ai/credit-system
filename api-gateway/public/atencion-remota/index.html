@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.2 — bitácora por cuenta (accesos + actividad del portal) · v2.1 — plantilla de invitación sin despedida duplicada -->
+<!-- v2.3 — la plantilla de invitación queda GUARDADA al enviar (correos_plantillas: lo editado persiste entre sesiones) · v2.2 — bitácora por cuenta (accesos + actividad del portal) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -933,12 +933,13 @@ const INV_HTML_DEF = `<p>Hola <b>{{nombre}}</b>,</p>
 let INV_DEALERS = [];
 const invSel = new Set();
 function cargarInvitables(){
-  // Plantilla: solo se setea si el usuario no la ha editado en esta sesión
   const a=document.getElementById('invAsunto'), h=document.getElementById('invHtml');
-  if(!a.value) a.value = INV_ASUNTO_DEF;
-  if(!h.value) h.value = INV_HTML_DEF;
   fetch('/api/atencion-remota/invitaciones/dealers',{headers:H}).then(r=>r.json()).then(j=>{
     if(!j.success) return toast(j.error||'Error al cargar dealers', true);
+    // La plantilla guardada (correos_plantillas) manda; el default JS es solo respaldo.
+    // No pisa lo que el usuario esté editando en esta sesión.
+    if(!a.value) a.value = (j.plantilla&&j.plantilla.asunto) || INV_ASUNTO_DEF;
+    if(!h.value) h.value = (j.plantilla&&j.plantilla.cuerpo) || INV_HTML_DEF;
     INV_DEALERS = j.data||[];
     pintarInvitables();
   }).catch(()=>toast('Error al cargar dealers', true));

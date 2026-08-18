@@ -664,7 +664,10 @@ const listarInvitables = async (req, res) => {
               EXISTS(SELECT 1 FROM ar_dealer_cuentas c WHERE c.id_dealer=d.id_dealer AND c.activo=1) AS tiene_cuenta
        FROM dealers d
        ORDER BY nombre`);
-    res.json({ success: true, data: rows, error: null });
+    /* La plantilla es paramétrica (correos_plantillas): lo que se edite y envíe
+       desde la pantalla queda guardado ahí — al recargar se ve el último texto. */
+    const tpl = await require('../../../../shared/plantillas-correo').obtener('dealer_invitacion_portal').catch(() => null);
+    res.json({ success: true, data: rows, plantilla: tpl ? { asunto: tpl.asunto, cuerpo: tpl.cuerpo } : null, error: null });
   } catch (e) { errSrv(res, e, 'listarInvitables'); }
 };
 
@@ -675,6 +678,11 @@ const enviarInvitaciones = async (req, res) => {
     if (ids.length > 1000) return res.status(400).json({ success: false, data: null, error: 'Máximo 1000 dealers por envío' });
     if (!String(asunto || '').trim() || !String(html || '').trim())
       return res.status(400).json({ success: false, data: null, error: 'Asunto y contenido del correo son obligatorios' });
+
+    // El texto enviado ES la plantilla: se persiste para que el próximo que abra
+    // la pantalla vea la última versión editada (una sola fuente de datos).
+    await pool.query('UPDATE correos_plantillas SET asunto=?, cuerpo=? WHERE codigo=?',
+      [String(asunto).trim(), String(html), 'dealer_invitacion_portal']).catch(e => console.error('[invitaciones guardar plantilla]', e.message));
 
     const [dealers] = await pool.query(
       `SELECT id_dealer, COALESCE(NULLIF(nombre_razon,''), nombre_indexa) AS nombre, correo
