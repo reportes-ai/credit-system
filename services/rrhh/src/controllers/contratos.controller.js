@@ -737,6 +737,7 @@ exports.anexosDatos = async (_req, res) => {
     vars.forEach(v => { comision[v.clave] = parseFloat(v.valor); });
     const [modelos] = await pool.query(
       `SELECT m.id, m.nombre, m.nombre_archivo, m.mime, m.doc_bytes, m.created_at,
+              m.marcadores, m.ia_estado, m.ia_aviso,
               CONCAT_WS(' ', u.nombre, u.apellido) subido_por
          FROM rh_anexo_modelos m LEFT JOIN usuarios u ON u.id_usuario = m.subido_por
         ORDER BY m.created_at DESC`).catch(() => [[]]);
@@ -759,9 +760,47 @@ require('../../../../shared/migrate').enFila('rrhh-anexo-modelos', async () => {
     subido_por INT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  // marcadores {{...}} detectados + veredicto del revisor IA (v213.35)
+  for (const col of ['marcadores TEXT NULL', 'ia_aviso TEXT NULL', 'ia_estado VARCHAR(14) NULL'])
+    await pool.query(`ALTER TABLE rh_anexo_modelos ADD COLUMN ${col}`).catch(e => { if (e.code !== 'ER_DUP_FIELDNAME') throw e; });
+  require('../../../../shared/ia').registrarFuncionalidad({
+    codigo: 'rrhh_anexo_revisor', nombre: 'Revisor de modelos de anexo',
+    descripcion: 'Al subir un modelo de anexo (Word/PDF), compara sus montos, tasas y umbrales contra los valores vigentes del Mantenedor Variables de Comisiones y avisa las inconsistencias. No modifica el documento.',
+  });
 });
 const ALMACEN = require('../../../../shared/almacen-docs');
+const DOCXP = require('../../../../shared/docx-plantilla');
 const ANEXO_MAX = 7 * 1024 * 1024;   // el body de express es 10mb y el base64 infla ~37%
+const ES_DOCX = (nombre, mime) => /\.docx$/i.test(nombre || '') || /officedocument\.wordprocessingml/.test(mime || '');
+
+/* Revisor IA (no bloqueante): compara el texto del modelo contra los valores
+   vigentes de comisiones_variables. Solo AVISA — jamás modifica el documento. */
+async function anexoRevisarIA(id, { buffer, mime, nombre_archivo }, id_usuario) {
+  try {
+    const AI = require('../../../../shared/anthropic');
+    if (!AI.disponible() || !(await require('../../../../shared/ia').iaActiva('rrhh_anexo_revisor'))) {
+      await pool.query('UPDATE rh_anexo_modelos SET ia_estado=? WHERE id=?', ['NO_REVISADO', id]);
+      return;
+    }
+    const [vars] = await pool.query('SELECT clave, valor FROM comisiones_variables');
+    const vigentes = vars.map(v => `${v.clave} = ${v.valor}`).join('\n');
+    const esDocx = ES_DOCX(nombre_archivo, mime);
+    const texto = esDocx ? DOCXP.extraerTexto(buffer) : null;
+    const { datos } = await AI.analizar({
+      codigo: 'rrhh_anexo_revisor', id_usuario, json: true, max_tokens: 1024,
+      system: 'Eres revisor de anexos de remuneración variable de AutoFácil (crédito automotriz, Chile). Comparas un modelo de anexo contra los parámetros vigentes del sistema. Las claves pct_/peso_/umbral_/factor_ son fracciones (0.0075 = 0,75%); minimo_monto es CLP. Un marcador {{CLAVE}} en el texto NO es inconsistencia: se rellena solo. Responde JSON: {"consistente": true|false, "avisos": ["..."]} — avisos SOLO por números escritos que contradicen los vigentes, en español chileno, breves.',
+      prompt: `PARÁMETROS VIGENTES DEL MANTENEDOR:\n${vigentes}\n\nMODELO SUBIDO${texto ? ':\n' + texto.slice(0, 20000) : ' (PDF adjunto).'}`,
+      documentos: texto ? [] : [{ tipo: 'pdf', data: buffer.toString('base64') }],
+    });
+    const avisos = (datos && Array.isArray(datos.avisos)) ? datos.avisos.filter(Boolean) : [];
+    const okDoc = datos && datos.consistente !== false && !avisos.length;
+    await pool.query('UPDATE rh_anexo_modelos SET ia_estado=?, ia_aviso=? WHERE id=?',
+      [okDoc ? 'OK' : 'INCONSISTENTE', avisos.length ? avisos.join(' · ') : null, id]);
+  } catch (e) {
+    console.error('[rrhh anexo revisor IA]', e.message);
+    await pool.query('UPDATE rh_anexo_modelos SET ia_estado=? WHERE id=?', ['NO_REVISADO', id]).catch(() => {});
+  }
+}
 
 exports.anexoModeloSubir = async (req, res) => {
   try {
@@ -772,13 +811,18 @@ exports.anexoModeloSubir = async (req, res) => {
     if (!buffer.length) return fail(res, 'El archivo llegó vacío', 400);
     if (buffer.length > ANEXO_MAX) return fail(res, 'El archivo supera el máximo de 7 MB', 400);
     const col = await ALMACEN.colocar({ ambito: 'rrhh-anexos', clave: Date.now(), buffer, mime, nombre: nombre_archivo });
+    let marcadores = [];
+    if (ES_DOCX(nombre_archivo, mime)) { try { marcadores = DOCXP.marcadoresDe(buffer); } catch (_) {} }
     const [r] = await pool.query(
-      `INSERT INTO rh_anexo_modelos (nombre, nombre_archivo, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [String(nombre).trim(), nombre_archivo || 'modelo', mime || null, col.blob, col.storage, col.ruta, col.bytes, req.user?.id_usuario || null]);
+      `INSERT INTO rh_anexo_modelos (nombre, nombre_archivo, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por, marcadores, ia_estado)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [String(nombre).trim(), nombre_archivo || 'modelo', mime || null, col.blob, col.storage, col.ruta, col.bytes,
+       req.user?.id_usuario || null, marcadores.length ? JSON.stringify(marcadores) : null, 'REVISANDO']);
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: r.insertId,
       detalle: `Subió el modelo de anexo "${String(nombre).trim()}" (${nombre_archivo || 'archivo'})` });
-    ok(res, { id: r.insertId });
+    // revisor IA en segundo plano: la subida no espera a Claude
+    anexoRevisarIA(r.insertId, { buffer, mime, nombre_archivo }, req.user?.id_usuario || null);
+    ok(res, { id: r.insertId, marcadores });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -799,6 +843,52 @@ exports.anexoModeloVer = async (req, res) => {
     const [[m]] = await pool.query('SELECT * FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
     if (!m) return fail(res, 'Modelo no encontrado', 404);
     await ALMACEN.servir(res, { ruta: m.doc_ruta, blob: m.archivo, nombre: m.nombre_archivo, mime: m.mime });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* Genera el anexo de un modelo subido (.docx) para UN trabajador: reemplaza los
+   {{MARCADORES}} con los datos de la persona y los valores VIVOS del mantenedor
+   (Máxima: el mantenedor debe LEERSE — nunca números copiados). */
+const fmtCLP = n => '$' + Number(n || 0).toLocaleString('es-CL');
+const fmtPct = n => { const s = (Number(n || 0) * 100).toLocaleString('es-CL', { maximumFractionDigits: 2 }); return s + '%'; };
+const fechaLargaCL = v => v ? new Date(v + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+
+exports.anexoModeloGenerar = async (req, res) => {
+  try {
+    const { id_trabajador, id_firmante, fecha, vigencia } = req.body || {};
+    const [[m]] = await pool.query('SELECT * FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (!m) return fail(res, 'Modelo no encontrado', 404);
+    if (!ES_DOCX(m.nombre_archivo, m.mime)) return fail(res, 'Solo los modelos Word (.docx) se pueden rellenar; los PDF se imprimen tal cual', 400);
+    const buffer = await ALMACEN.obtener({ ruta: m.doc_ruta, blob: m.archivo });
+    if (!buffer) return fail(res, 'El archivo del modelo no está disponible', 500);
+    const persona = async id => {
+      if (!id) return null;
+      const [[p]] = await pool.query(
+        `SELECT CONCAT_WS(' ', nombre, apellido, apellido_materno) nombre, rut, cargo, sexo
+           FROM usuarios WHERE id_usuario=?`, [id]);
+      return p || null;
+    };
+    const trab = await persona(id_trabajador);
+    if (!trab) return fail(res, 'Trabajador no encontrado', 400);
+    const firm = await persona(id_firmante);
+    const [vars] = await pool.query('SELECT clave, valor FROM comisiones_variables');
+    const valores = {
+      TRABAJADOR: trab.nombre, RUT: trab.rut || '', CARGO: trab.cargo || '',
+      TRATO: String(trab.sexo || '').toUpperCase().startsWith('F') ? 'doña' : 'don',
+      FIRMANTE: firm ? firm.nombre : '', FIRMANTE_RUT: firm ? (firm.rut || '') : '', FIRMANTE_CARGO: firm ? (firm.cargo || '') : '',
+      FECHA_FIRMA: fechaLargaCL(fecha), VIGENCIA: fechaLargaCL(vigencia),
+    };
+    for (const v of vars) {
+      const k = String(v.clave).toUpperCase(), n = parseFloat(v.valor);
+      valores[k] = /^(PCT|PESO|UMBRAL|FACTOR|DCTO_PCT)/.test(k) ? fmtPct(n)
+                 : /MONTO/.test(k) ? fmtCLP(n) : String(v.valor);
+    }
+    const r = DOCXP.reemplazar(buffer, valores);
+    auditar({ req, accion: 'GENERAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: m.id,
+      detalle: `Generó "${m.nombre}" para ${trab.nombre}` });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment');
+    res.send(r.buffer);
   } catch (e) { fail(res, e.message); }
 };
 

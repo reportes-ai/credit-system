@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -638,19 +638,46 @@ async function anexInit(){
 }
 
 /* ── Modelos subidos por RRHH (Word/PDF con nombre propio) ── */
+let ANEX_SUBIDOS=[];
+const ANEX_MARC_FIJOS=['TRABAJADOR','RUT','CARGO','TRATO','FIRMANTE','FIRMANTE_RUT','FIRMANTE_CARGO','FECHA_FIRMA','VIGENCIA'];
+function anexPillIA(m){
+  if (m.ia_estado==='INCONSISTENTE') return `<div style="font-size:.74rem;background:#fef3c7;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:6px 10px;margin-top:6px"><i class="bi bi-robot me-1"></i><b>Revisor IA:</b> ${esc(m.ia_aviso||'los valores del documento no calzan con el mantenedor vigente')}</div>`;
+  if (m.ia_estado==='OK') return `<div style="font-size:.72rem;color:#15803d;margin-top:5px"><i class="bi bi-robot me-1"></i>Revisor IA: consistente con el mantenedor vigente</div>`;
+  if (m.ia_estado==='REVISANDO') return `<div style="font-size:.72rem;color:#94a3b8;margin-top:5px"><i class="bi bi-robot me-1"></i>Revisor IA analizando…</div>`;
+  return '';
+}
 function anexPintarSubidos(modelos){
-  $('anexSubidos').innerHTML = modelos.length ? '<b style="font-size:.85rem">Modelos subidos</b>' + modelos.map(m=>`
+  ANEX_SUBIDOS = modelos;
+  const esDocx = m => /\.docx$/i.test(m.nombre_archivo||'');
+  $('anexSubidos').innerHTML = (modelos.length ? '<b style="font-size:.85rem">Modelos subidos</b>' + modelos.map(m=>{
+    const marc = m.marcadores ? (typeof m.marcadores==='string'?JSON.parse(m.marcadores):m.marcadores) : [];
+    return `
     <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:#fbfdff">
       <div style="flex:1;min-width:260px">
         <div style="font-weight:700;color:#0f172a"><i class="bi bi-file-earmark-arrow-up me-1" style="color:var(--navy)"></i>${esc(m.nombre)}</div>
         <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">${esc(m.nombre_archivo)} · subido el ${fmtF(m.created_at)}${m.subido_por?' por '+esc(m.subido_por):''}</div>
+        ${esDocx(m) ? `<div style="font-size:.72rem;color:#64748b;margin-top:4px">${marc.length?'Marcadores detectados: '+marc.map(x=>'<code>{{'+esc(x)+'}}</code>').join(' '):'Sin marcadores {{…}} — se imprime tal cual'}</div>` : ''}
+        ${anexPillIA(m)}
       </div>
       <div style="display:flex;gap:6px">
-        <button class="btn" onclick="anexVerModelo(${m.id})"><i class="bi bi-eye me-1"></i>Ver / Imprimir</button>
+        ${esDocx(m)&&marc.length ? `<button class="btn" onclick="anexAbrirSubido(${m.id})"><i class="bi bi-people me-1"></i>Generar</button>` : ''}
+        <button class="${esDocx(m)&&marc.length?'btn-g':'btn'}" onclick="anexVerModelo(${m.id})"><i class="bi bi-eye me-1"></i>Ver</button>
         <button class="btn-g" onclick="anexRenombrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-pencil"></i></button>
         <button class="btn-g" style="color:#b91c1c" onclick="anexBorrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-trash"></i></button>
       </div>
-    </div>`).join('') : '';
+    </div>`;}).join('') : '') + `
+    <div style="font-size:.74rem;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:10px 14px;margin-top:10px;color:#475569">
+      <b><i class="bi bi-braces me-1"></i>Marcadores para modelos Word:</b> escribe en el documento <code>{{MARCADOR}}</code> y el sistema lo rellena al generar —
+      del trabajador: <code>{{TRABAJADOR}}</code> <code>{{RUT}}</code> <code>{{CARGO}}</code> <code>{{TRATO}}</code> ·
+      firma: <code>{{FIRMANTE}}</code> <code>{{FIRMANTE_RUT}}</code> <code>{{FIRMANTE_CARGO}}</code> <code>{{FECHA_FIRMA}}</code> <code>{{VIGENCIA}}</code> ·
+      valores VIVOS del <a href="/comisiones/variables/">Mantenedor Variables</a>: <code>{{MINIMO_MONTO}}</code> <code>{{PCT_24}}</code> <code>{{PCT_MAS24}}</code> <code>{{FACTOR_MAX}}</code> <code>{{PESO_RDH}}</code> <code>{{PESO_CESANTIA}}</code> <code>{{PESO_REP}}</code> <code>{{UMBRAL_RDH}}</code> <code>{{UMBRAL_CESANTIA}}</code> <code>{{UMBRAL_REP}}</code> <code>{{META_UNIDAD}}</code>.
+      Al subir, el <b>revisor IA</b> compara los números escritos contra el mantenedor y avisa si no calzan (no modifica el documento).
+    </div>`;
+}
+function anexAbrirSubido(id){
+  const m = ANEX_SUBIDOS.find(x=>x.id===id); if(!m) return;
+  ANEX_MODELO = { codigo:'SUBIDO', id:m.id, titulo:m.nombre, cargos:[''] };  // cargos[''] = todos elegibles
+  anexAbrirComun(m);
 }
 async function anexSubirModelo(inp){
   const f = inp.files[0]; if(!f) return; inp.value='';
@@ -684,24 +711,35 @@ async function anexVerModelo(id){
   } catch(_) { alert('No se pudo abrir el modelo.'); }
 }
 
-function anexAbrir(cod){
-  ANEX_MODELO = ANEXOS_MODELOS.find(m=>m.codigo===cod); if(!ANEX_MODELO) return;
+/* Form común para el modelo paramétrico y los subidos: trabajadores (multi),
+   firmante gerente (default GG), fechas y aviso. */
+function anexAbrirComun(mSubido){
   const elegibles = ANEX_PERSONAS.filter(p => ANEX_MODELO.cargos.some(c => String(p.cargo||'').toUpperCase().includes(c)));
   $('anexTitulo').textContent = ANEX_MODELO.titulo;
   $('anexTrabList').innerHTML = elegibles.length
     ? elegibles.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:3px 0;margin:0"><input type="checkbox" class="anexTrabChk" value="${p.id_usuario}" style="width:auto">${esc(p.nombre)}${p.rut?' · '+esc(rutFmt(p.rut)):''}</label>`).join('')
     : '<span style="color:#94a3b8;font-size:.8rem">— sin colaboradores con ese cargo —</span>';
-  // El documento por la empresa lo firma siempre un GERENTE; por defecto, el Gerente General.
   const gerentes = ANEX_PERSONAS.filter(p => /GERENTE/i.test(String(p.cargo||'')));
   const listaF = gerentes.length ? gerentes : ANEX_PERSONAS;
   $('anexFirmante').innerHTML = listaF.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.cargo?' — '+esc(p.cargo):''}</option>`).join('');
   const gg = listaF.find(p => /GERENTE\s+GENERAL/i.test(String(p.cargo||'')));
   if (gg) $('anexFirmante').value = String(gg.id_usuario);
-  $('anexCola').innerHTML='';
   const hoy = new Date().toISOString().slice(0,10);
   $('anexFecha').value = hoy;
-  const d = new Date(); d.setMonth(d.getMonth()+1, 1);
-  $('anexVigencia').value = d.toISOString().slice(0,10);
+  const dv = new Date(); dv.setMonth(dv.getMonth()+1, 1);
+  $('anexVigencia').value = dv.toISOString().slice(0,10);
+  if (mSubido) {
+    const marc = mSubido.marcadores ? (typeof mSubido.marcadores==='string'?JSON.parse(mSubido.marcadores):mSubido.marcadores) : [];
+    $('anexAviso').innerHTML = `Modelo Word subido: se rellenan sus marcadores ${marc.map(x=>'<code>{{'+esc(x)+'}}</code>').join(' ')} con los datos de cada trabajador y los <b>valores vivos</b> del <a href="/comisiones/variables/">Mantenedor Variables</a>. Se descarga un <b>.docx por trabajador</b> (ANEXO Nombre fecha).`;
+  }
+  $('anexCola').innerHTML='';
+  $('anexForm').style.display='block';
+  $('anexForm').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function anexAbrir(cod){
+  ANEX_MODELO = ANEXOS_MODELOS.find(m=>m.codigo===cod); if(!ANEX_MODELO) return;
+  anexAbrirComun(null);
   const c = ANEX_COM;
   $('anexAviso').innerHTML = `<b>Valores vigentes que se imprimirán:</b> mínimo mensual <b>${CLP(c.minimo_monto)}</b> · `
     + `base <b>${anexPct(c.pct_24)}</b> (&lt;24 meses) y <b>${anexPct(c.pct_mas24)}</b> (≥24) · factor máximo <b>${anexPct(c.factor_max,0)}</b> · `
@@ -732,8 +770,23 @@ function anexImprimir(){
         <i class="bi bi-printer me-1"></i>ANEXO ${esc(nombreCorto(t.nombre))} ${fechaArchivo($('anexFecha').value)}</button></div>`).join('');
   $('anexCola').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
-function anexGenerarUno(trab, firm){
-  if (ANEX_MODELO.codigo === 'VAR_EJECUTIVOS') anexVarEjecutivos(trab, firm);
+async function anexGenerarUno(trab, firm){
+  if (ANEX_MODELO.codigo === 'VAR_EJECUTIVOS') return anexVarEjecutivos(trab, firm);
+  if (ANEX_MODELO.codigo === 'SUBIDO') {
+    // Modelo Word subido: el servidor rellena los marcadores y baja UN .docx por trabajador
+    try {
+      const r = await fetch('/api/rrhh/contratos/anexos/modelos/'+ANEX_MODELO.id+'/generar', {
+        method:'POST', headers:{...H,'Content-Type':'application/json'},
+        body: JSON.stringify({ id_trabajador: trab.id_usuario, id_firmante: firm?.id_usuario,
+          fecha: $('anexFecha').value, vigencia: $('anexVigencia').value })});
+      if (!r.ok) { const j = await r.json().catch(()=>({})); return alert(j.error||'No se pudo generar'); }
+      const blob = await r.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ANEXO ${nombreCorto(trab.nombre)} ${fechaArchivo($('anexFecha').value)}.docx`;
+      a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
+    } catch(_) { alert('No se pudo generar el anexo.'); }
+  }
 }
 
 function anexVarEjecutivos(trab, firm){
