@@ -58,15 +58,21 @@ function calcularComision(creditos, vars, mes) {
   const baseMas24 = montoMas24 * pct_mas24;
   const incentivo_base = base24 + baseMas24;
 
-  // NCNU: AUTOFIN, no CORFO (base de medición de seguros)
+  // NCNU: AUTOFIN, no CORFO, no UNIDAD — los créditos susceptibles de llevar
+  // estos seguros. Es la base de medición del cumplimiento Y la única base
+  // sobre la que se pagan los bonos (corrección 19-08-2026).
   const ncnu = otorgados.filter(c =>
     (c.financiera || '').toUpperCase() === 'AUTOFIN' &&
-    !(c.producto || '').toUpperCase().includes('CORFO')
+    !(c.producto || '').toUpperCase().includes('CORFO') &&
+    !(c.producto || '').toUpperCase().includes('UNIDAD')
   );
+  const conRdh = ncnu.filter(c => (parseFloat(c.seguro_rdh)       || 0) > 0);
+  const conCes = ncnu.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0);
+  const conRep = ncnu.filter(c => (parseFloat(c.seguro_rep_menor) || 0) > 0);
   const ncnu_total    = ncnu.length;
-  const ncnu_rdh      = ncnu.filter(c => (parseFloat(c.seguro_rdh)       || 0) > 0).length;
-  const ncnu_cesantia = ncnu.filter(c => (parseFloat(c.seguro_cesantia)  || 0) > 0).length;
-  const ncnu_rep      = ncnu.filter(c => (parseFloat(c.seguro_rep_menor) || 0) > 0).length;
+  const ncnu_rdh      = conRdh.length;
+  const ncnu_cesantia = conCes.length;
+  const ncnu_rep      = conRep.length;
 
   const cruce_rdh          = ncnu_total > 0 ? ncnu_rdh      / ncnu_total : 0;
   const cruce_cesantia     = ncnu_total > 0 ? ncnu_cesantia / ncnu_total : 0;
@@ -96,10 +102,18 @@ function calcularComision(creditos, vars, mes) {
   const ajuste_calidad = calidad * (peso_calidad || 0) * factor_max;
   const factor_ajuste  = ajuste_rdh + ajuste_ces + ajuste_rep + ajuste_calidad;
 
-  // Cada bono aplica su propio ajuste sobre el incentivo_base total
-  const bono_rdh     = incentivo_base * ajuste_rdh;
-  const bono_ces     = incentivo_base * ajuste_ces;
-  const bono_rep     = incentivo_base * ajuste_rep;
+  // Cada bono aplica su ajuste SOLO sobre la base de las operaciones que llevan
+  // ese seguro (las mismas con que se midió el cumplimiento), no sobre el
+  // incentivo_base total (corrección 19-08-2026). La base de cada operación es
+  // su monto financiado por la tasa de su tramo de plazo.
+  const baseDe = ops => ops.reduce((s, c) =>
+    s + (parseFloat(c.monto_financiado) || 0) * (parseInt(c.plazo) >= 24 ? pct_mas24 : pct_24), 0);
+  const base_rdh = baseDe(conRdh);
+  const base_ces = baseDe(conCes);
+  const base_rep = baseDe(conRep);
+  const bono_rdh     = base_rdh * ajuste_rdh;
+  const bono_ces     = base_ces * ajuste_ces;
+  const bono_rep     = base_rep * ajuste_rep;
   const bono_calidad = incentivo_base * ajuste_calidad;
 
   const incentivo_final = incentivo_base + bono_rdh + bono_ces + bono_rep + bono_calidad;
@@ -121,6 +135,7 @@ function calcularComision(creditos, vars, mes) {
     cumple_rdh, cumple_cesantia: cumple_ces, cumple_reparaciones: cumple_rep,
     ajuste_rdh, ajuste_cesantia: ajuste_ces, ajuste_reparaciones: ajuste_rep,
     ajuste_calidad, factor_ajuste,
+    base_rdh, base_cesantia: base_ces, base_reparaciones: base_rep,
     bono_rdh, bono_cesantia: bono_ces, bono_reparaciones: bono_rep, bono_calidad,
     incentivo_final,
     factor_semana_corrida: factor_sc,

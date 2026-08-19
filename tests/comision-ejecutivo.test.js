@@ -108,10 +108,36 @@ test('superado el umbral, el bono es el cruce por su peso sobre la base', () => 
   const r = calcularComision(creditos, VARS, '2026-08');
   assert.strictEqual(r.cumple_rdh, true);
   assert.ok(Math.abs(r.ajuste_rdh - 0.30) < 1e-9);
-  // Tolerancia de un peso: 0,75 × 0,4 no es exacto en punto flotante y el motor
-  // no redondea acá a propósito (redondea el consumidor, al liquidar).
-  assert.ok(Math.abs(r.bono_rdh - r.incentivo_base * 0.30) < 1);
-  assert.ok(Math.abs(r.incentivo_final - r.incentivo_base * 1.30) < 1);
+  // El bono aplica SOLO sobre la base de las operaciones que llevan el seguro
+  // (corrección 19-08-2026): 3 ops × 10M × 1% = 300.000 de base, no los 400.000
+  // del incentivo base total. Tolerancia de un peso por punto flotante.
+  assert.ok(Math.abs(r.base_rdh - 300000) < 1);
+  assert.ok(Math.abs(r.bono_rdh - 300000 * 0.30) < 1);
+  assert.ok(Math.abs(r.incentivo_final - (r.incentivo_base + r.bono_rdh)) < 1);
+});
+
+test('el bono NO se paga por las operaciones que no llevan el seguro', () => {
+  // Aunque el cumplimiento se supere, la op sin RDH no genera bono RDH.
+  const creditos = [
+    op({ monto_financiado: 10000000, seguro_rdh: 50000 }),
+    op({ monto_financiado: 90000000 }),                       // grande y sin seguro
+    op({ monto_financiado: 10000000, seguro_rdh: 50000 }),
+    op({ monto_financiado: 10000000, seguro_rdh: 50000 }),
+  ];
+  const r = calcularComision(creditos, VARS, '2026-08');
+  assert.strictEqual(r.cumple_rdh, true);                     // 3 de 4 = 75%
+  assert.ok(Math.abs(r.base_rdh - 300000) < 1);               // los 90M no entran a la base del bono
+  assert.ok(Math.abs(r.bono_rdh - 300000 * r.ajuste_rdh) < 1);
+});
+
+test('NCNU excluye también el producto UNIDAD: no mide cumplimiento ni paga bono', () => {
+  const creditos = [
+    op({ monto_financiado: 20000000, seguro_rdh: 50000 }),
+    op({ monto_financiado: 20000000, producto: 'UNIDAD DE CREDITO', seguro_rdh: 50000 }),
+  ];
+  const r = calcularComision(creditos, VARS, '2026-08');
+  assert.strictEqual(r.ncnu_total, 1);
+  assert.ok(Math.abs(r.base_rdh - 200000) < 1);               // solo la op NCNU
 });
 
 test('la base de medición de seguros (NCNU) excluye CORFO y lo que no es AUTOFIN', () => {
