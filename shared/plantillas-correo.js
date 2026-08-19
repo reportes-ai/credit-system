@@ -143,6 +143,30 @@ Equipo AutoFácil`,
     variables: '{{nombre}}',
   },
   {
+    codigo: 'odp_proveedor_contabilidad',
+    ambito: 'Órdenes de Pago',
+    nombre: 'ODP de proveedor emitida → Contabilidad',
+    descripcion: 'Se manda automáticamente al EMITIR una Orden de Pago de proveedores (Órdenes de Pago → Emisión). Va al correo de Contabilidad (config correo_contabilidad de Post Venta) con la factura/boleta adjunta si se subió al emitir.',
+    asunto: 'Orden de Pago {ODP} — {PROVEEDOR} ({TOTAL})',
+    cuerpo: `Estimado Equipo de Contabilidad:
+
+Se emitió la Orden de Pago {ODP} a {PROVEEDOR} (RUT {RUT}).
+
+Concepto: {CONCEPTO}
+Documento: {DOC}
+Total a pagar: {TOTAL}
+Método de pago: {METODO}
+
+Emitida por {QUIEN}. La orden queda por pagar en el módulo Órdenes de Pago.
+
+Saludos cordiales,
+Área de Operaciones`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El correo de Contabilidad (config correo_contabilidad, compartida con Post Venta)',
+    variables: '{ODP} {PROVEEDOR} {RUT} {CONCEPTO} {DOC} {TOTAL} {METODO} {QUIEN}',
+  },
+  {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',

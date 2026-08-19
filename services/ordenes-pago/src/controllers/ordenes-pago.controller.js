@@ -605,6 +605,48 @@ const crearOrden = async (req, res) => {
     await pool.query('UPDATE ordenes_pago SET numero=? WHERE id=?', [numero, r.insertId]);
 
     auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: r.insertId, detalle: `Emitió ${numero} a ${provNombre} por $${m.aPagar.toLocaleString('es-CL')}` });
+
+    /* Adjunto (factura/boleta) en el MISMO request de la emisión: así el correo
+       automático de abajo ya sale con el documento. */
+    if (b.adjunto && b.adjunto.base64) {
+      try {
+        const pv = require('../../../postventa/src/controllers/postventa.controller');
+        const out = await pv.guardarFacturaDoc({ origen: 'ODP', ref_id: r.insertId,
+          nombre: b.adjunto.nombre || 'documento', mime: b.adjunto.mime || null,
+          buffer: Buffer.from(String(b.adjunto.base64), 'base64'), usuario: nombreUsuario(req) });
+        auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: out.id,
+          detalle: `Subió factura "${b.adjunto.nombre}" (ODP #${r.insertId}, ${Math.round(out.bytes / 1024)} KB)` });
+      } catch (e) { console.error('[ordenes-pago adjunto]', e.message); }
+    }
+
+    /* Correo AUTOMÁTICO a Contabilidad al emitir (igual que las ODP de Post
+       Venta — antes solo salía si alguien lo mandaba a mano desde el Historial,
+       y las órdenes "no le llegaban a nadie"). Plantilla paramétrica
+       odp_proveedor_contabilidad; adjunta la factura si se subió. Nunca frena
+       la emisión. */
+    (async () => {
+      try {
+        let to = 'contabilidad@autofacilchile.cl';
+        try {
+          const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
+          if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
+        } catch (_) {}
+        const adjuntos = await require('../../../postventa/src/controllers/postventa.controller')
+          .adjuntosFactura('ODP', [r.insertId]).catch(() => []);
+        const env = await require('../../../../shared/plantillas-correo').enviar({
+          codigo: 'odp_proveedor_contabilidad', to: [to],
+          adjuntos: adjuntos.length ? adjuntos : undefined,
+          datos: {
+            ODP: numero, PROVEEDOR: provNombre, RUT: provRut || '—', CONCEPTO: concepto,
+            DOC: `${tipoDoc}${norm(b.numero_documento) ? ' N° ' + norm(b.numero_documento) : ''}`,
+            TOTAL: '$' + Math.round(m.aPagar).toLocaleString('es-CL'),
+            METODO: norm(b.metodo_pago) || '—', QUIEN: nombreUsuario(req),
+          },
+        });
+        if (!env.enviado) console.warn('[ordenes-pago correo emisión]', numero, env.motivo);
+      } catch (e) { console.error('[ordenes-pago correo emisión]', e.message); }
+    })();
+
     res.json({ success: true, data: { id: r.insertId, numero }, error: null });
   } catch (e) {
     res.status(500).json({ success: false, data: null, error: e.message });

@@ -53,26 +53,32 @@ require('../../../../shared/migrate').enFila('postventa-factura-docs', async () 
 });
 
 const ORIGENES_FDOC = ['COMISION', 'PARQUE', 'ODP'];   // ODP → ref_id = ordenes_pago.id (proveedores)
+/* Núcleo reutilizable (también lo llama ordenes-pago al emitir con adjunto). */
+async function guardarFacturaDoc({ origen, ref_id, nombre, mime, buffer, usuario }) {
+  const ref = parseInt(ref_id, 10);
+  if (!ORIGENES_FDOC.includes(origen) || !ref) throw new Error('origen y ref_id requeridos');
+  if (!nombre || !Buffer.isBuffer(buffer) || !buffer.length) throw new Error('Falta el archivo');
+  if (buffer.length > 10 * 1024 * 1024) throw new Error('El archivo debe pesar máximo 10 MB');
+  const alm = require('../../../../shared/almacen-docs');
+  const d = await alm.colocar({ ambito: 'facturas-odp', clave: origen.toLowerCase() + '-' + ref, buffer, mime, nombre });
+  const [r] = await pool.query(
+    `INSERT INTO postventa_factura_docs (origen, ref_id, nombre, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    [origen, ref, String(nombre).slice(0, 200), mime || null, d.blob, d.storage, d.ruta, d.bytes, usuario || null]);
+  return { id: r.insertId, bytes: buffer.length };
+}
 const subirFacturaDoc = async (req, res) => {
   try {
     const { origen, ref_id, nombre, mime, base64 } = req.body || {};
-    const ref = parseInt(ref_id, 10);
-    if (!ORIGENES_FDOC.includes(origen) || !ref)
-      return res.status(400).json({ success: false, data: null, error: 'origen y ref_id requeridos' });
-    if (!nombre || !base64) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
-    const buffer = Buffer.from(String(base64), 'base64');
-    if (!buffer.length || buffer.length > 10 * 1024 * 1024)
-      return res.status(400).json({ success: false, data: null, error: 'El archivo debe pesar entre 1 byte y 10 MB' });
-    const alm = require('../../../../shared/almacen-docs');
-    const d = await alm.colocar({ ambito: 'facturas-odp', clave: origen.toLowerCase() + '-' + ref, buffer, mime, nombre });
-    const [r] = await pool.query(
-      `INSERT INTO postventa_factura_docs (origen, ref_id, nombre, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [origen, ref, String(nombre).slice(0, 200), mime || null, d.blob, d.storage, d.ruta, d.bytes, loginDe(req.usuario)]);
-    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: r.insertId,
-      detalle: `Subió factura "${nombre}" (${origen} #${ref}, ${Math.round(buffer.length / 1024)} KB)` });
-    res.json({ success: true, data: { id: r.insertId, nombre, bytes: buffer.length }, error: null });
-  } catch (e) { console.error('[postventa subirFacturaDoc]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+    const buffer = Buffer.from(String(base64 || ''), 'base64');
+    const out = await guardarFacturaDoc({ origen, ref_id, nombre, mime, buffer, usuario: loginDe(req.usuario) });
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: out.id,
+      detalle: `Subió factura "${nombre}" (${origen} #${parseInt(ref_id, 10)}, ${Math.round(out.bytes / 1024)} KB)` });
+    res.json({ success: true, data: { id: out.id, nombre, bytes: out.bytes }, error: null });
+  } catch (e) {
+    console.error('[postventa subirFacturaDoc]', e.message);
+    res.status(400).json({ success: false, data: null, error: e.message || 'Error al subir' });
+  }
 };
 const listarFacturaDocs = async (req, res) => {
   try {
@@ -2678,7 +2684,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden, marcarFundantesDevueltos,
-  subirFacturaDoc, listarFacturaDocs, verFacturaDoc, borrarFacturaDoc, adjuntosFactura,
+  subirFacturaDoc, listarFacturaDocs, verFacturaDoc, borrarFacturaDoc, adjuntosFactura, guardarFacturaDoc,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
