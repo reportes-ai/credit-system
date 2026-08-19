@@ -330,7 +330,7 @@ const listar = async (req, res) => {
     if (!mes) return res.status(400).json({ success: false, data: null, error: 'Parámetro mes (YYYY-MM) requerido' });
     const calc = await calcularMes(mes);
     const [estados] = await pool.query(
-      "SELECT parque, etapa, odp_numero, arriendo, comision_creditos, ops, aprobada_por, fecha_aprobada, emitida_por, fecha_emitida, pagada_por, fecha_pagada FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
+      "SELECT id, parque, etapa, odp_numero, arriendo, comision_creditos, ops, aprobada_por, fecha_aprobada, emitida_por, fecha_emitida, pagada_por, fecha_pagada FROM parques_pagos_mes WHERE DATE_FORMAT(mes,'%Y-%m')=?", [mes]);
     const estByParque = new Map(estados.map(e => [e.parque, e]));
     const rows = calc.map(r => {
       const e = estByParque.get(r.parque);
@@ -345,6 +345,7 @@ const listar = async (req, res) => {
         total: frozen ? Math.round(Number(e.arriendo)) + Math.round(Number(e.comision_creditos)) : r.total,
         etapa: e?.etapa || 'EN_APROBACION',
         odp_numero: e?.odp_numero || null,
+        pago_id: e?.id || null,   // ref para las facturas adjuntas (postventa_factura_docs PARQUE)
         hitos: e ? {
           aprobada: e.fecha_aprobada ? { por: e.aprobada_por, fecha: e.fecha_aprobada } : null,
           emitida:  e.fecha_emitida  ? { por: e.emitida_por,  fecha: e.fecha_emitida }  : null,
@@ -503,8 +504,11 @@ const emitir = async (req, res) => {
 
     // Correo a Contabilidad con el desglose — texto, destinatarios y CC salen del
     // mantenedor Correos del Sistema (plantilla parque_odp_contabilidad).
+    // Factura(s) del parque subidas a este pago: viajan adjuntas a Contabilidad
+    const adjuntos = await require('./postventa.controller').adjuntosFactura('PARQUE', [e.id]).catch(() => []);
     await require('../../../../shared/plantillas-correo').enviar({
       codigo: 'parque_odp_contabilidad',
+      adjuntos: adjuntos.length ? adjuntos : undefined,
       to: destinatarios.map(u => u.email).filter(Boolean),
       datos: { ODP: odp.numero, PARQUE: parque, PERIODO: mes, ARRIENDO: CLP(arriendo),
                COMISION: CLP(comision), OPS: e.ops, TOTAL: CLP(total), QUIEN: quien },

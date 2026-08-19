@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -157,6 +157,9 @@ function pintar(){
       btn = `<button class="btn-a b-emitir" onclick="accion(event,'emitir','${esc(r.parque)}')"><i class="bi bi-receipt me-1"></i>Emitir Orden de Pago</button>`;
     else if(r.etapa==='OP_EMITIDA' && puede('pv_parques_pagar'))
       btn = `<button class="btn-a b-pagar" onclick="accion(event,'pagar','${esc(r.parque)}')"><i class="bi bi-cash-coin me-1"></i>Confirmar Pago</button>`;
+    // Factura del parque: se sube ANTES de emitir para que viaje adjunta a Contabilidad (y queda de respaldo)
+    if (r.pago_id && puede('pv_parques_emitir'))
+      btn += ` <button class="btn-a" style="background:#fff;color:#0141A2;border:1px solid #bfdbfe" onclick="subirFacturaParque(event,${r.pago_id},'${esc(r.parque)}')" title="Adjuntar la factura del parque: viaja en el correo de la ODP a Contabilidad y queda de respaldo"><i class="bi bi-paperclip"></i> Factura<span id="facN${r.pago_id}"></span></button>`;
     return `<tr class="rowp" onclick="toggleDet(${i})">
       <td><i class="bi bi-chevron-right" id="chev${i}"></i></td>
       <td style="font-weight:700;color:var(--navy)">${esc(r.parque)}</td>
@@ -202,6 +205,34 @@ async function toggleDet(i){
       <tfoot><tr><td colspan="4">TOTAL COMISIÓN (${ops.length} ops)</td><td class="num">${CLP(j.data.comision_creditos)}</td></tr></tfoot>
     </table>` : '<div class="vacio">Sin operaciones otorgadas este mes</div>';
   } catch(e){ box.innerHTML = '<div class="vacio">'+esc(e.message)+'</div>'; }
+}
+
+/* ── Factura del parque: subir/listar (respaldo + adjunto del correo de la ODP) ── */
+async function subirFacturaParque(ev, pagoId, parque){
+  ev.stopPropagation();
+  // Mostrar lo ya subido y ofrecer agregar
+  try {
+    const r = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+pagoId, { headers:H });
+    const j = await r.json();
+    const ya = (j.success && j.data && j.data.length) ? '\n\nYa adjuntas:\n' + j.data.map(d=>'· '+d.nombre).join('\n') : '';
+    if (!confirm('Adjuntar factura del parque '+parque+'.'+ya+'\n\n¿Elegir archivo?')) return;
+  } catch(_){}
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='.pdf,.jpg,.jpeg,.png,.xml';
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    if (f.size > 7*1024*1024) return alert("Máximo 7 MB");
+    const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(f); });
+    try {
+      const r = await fetch('/api/postventa/factura-doc', { method:'POST', headers:H,
+        body: JSON.stringify({ origen:'PARQUE', ref_id:pagoId, nombre:f.name, mime:f.type, base64:b64 }) });
+      const j = await r.json();
+      if (!j.success) return alert(j.error||'Error al subir');
+      const n = document.getElementById('facN'+pagoId); if (n) n.textContent=' ✓';
+      alert('Factura "'+f.name+'" adjuntada: viajará en el correo de la ODP a Contabilidad y queda de respaldo.');
+    } catch(_){ alert('Error de conexión'); }
+  };
+  inp.click();
 }
 
 const CONFIRM = {

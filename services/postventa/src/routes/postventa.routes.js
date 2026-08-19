@@ -43,6 +43,11 @@ router.get('/consulta-facturas',  verifyToken, c.consultaFacturas);
 router.get('/consulta-fundantes', verifyToken, c.consultaFundantes);
 router.post('/enviar-correo-orden', verifyToken, requireFunc('pv_orden_emitir', 'pv_com_orden_emitir'), c.enviarCorreoOrden);
 router.get('/',               verifyToken, c.getAll);
+// Facturas adjuntas a la ODP (respaldo + adjunto al correo de Finanzas)
+router.post('/factura-doc',       verifyToken, requireFunc('postventa_seguimiento', 'pv_com_orden_emitir', 'pv_parques_emitir'), c.subirFacturaDoc);
+router.get('/factura-doc',        verifyToken, c.listarFacturaDocs);
+router.get('/factura-doc/:id',    verifyToken, c.verFacturaDoc);
+router.delete('/factura-doc/:id', verifyToken, requireFunc('postventa_seguimiento', 'pv_com_orden_emitir', 'pv_parques_emitir'), c.borrarFacturaDoc);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
 router.get('/:id/factura-comision', verifyToken, c.getFacturaComision);
 router.put('/:id/factura-comision', verifyToken, requireFunc('postventa_seguimiento'), c.updateFacturaComision);

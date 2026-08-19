@@ -30,6 +30,101 @@ require('../../../../shared/migrate').migrar('fundantes-devueltos-backfill-v1', 
   console.log('[postventa] backfill fundantes devueltos:', devs.length, 'operación(es)');
 });
 
+/* ═══ FACTURAS ADJUNTAS A LA ODP (dealers y parques) ═══════════════════════
+   El usuario sube el PDF de la factura; queda como RESPALDO (bucket vía
+   shared/almacen-docs — nunca un LONGBLOB nuevo con GCS activo) y viaja
+   ADJUNTA en el correo de la ODP a Finanzas.
+   origen COMISION → ref_id = id_seguimiento (titular de la factura)
+   origen PARQUE   → ref_id = parques_pagos_mes.id                     */
+require('../../../../shared/migrate').enFila('postventa-factura-docs', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS postventa_factura_docs (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    origen      VARCHAR(10)  NOT NULL,
+    ref_id      INT          NOT NULL,
+    nombre      VARCHAR(200) NOT NULL,
+    mime        VARCHAR(100) NULL,
+    archivo     LONGBLOB     NULL,
+    doc_storage VARCHAR(10)  NOT NULL DEFAULT 'db',
+    doc_ruta    VARCHAR(500) NULL,
+    doc_bytes   BIGINT       NULL,
+    subido_por  VARCHAR(150) NULL,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ref (origen, ref_id))`);
+});
+
+const ORIGENES_FDOC = ['COMISION', 'PARQUE'];
+const subirFacturaDoc = async (req, res) => {
+  try {
+    const { origen, ref_id, nombre, mime, base64 } = req.body || {};
+    const ref = parseInt(ref_id, 10);
+    if (!ORIGENES_FDOC.includes(origen) || !ref)
+      return res.status(400).json({ success: false, data: null, error: 'origen y ref_id requeridos' });
+    if (!nombre || !base64) return res.status(400).json({ success: false, data: null, error: 'Falta el archivo' });
+    const buffer = Buffer.from(String(base64), 'base64');
+    if (!buffer.length || buffer.length > 10 * 1024 * 1024)
+      return res.status(400).json({ success: false, data: null, error: 'El archivo debe pesar entre 1 byte y 10 MB' });
+    const alm = require('../../../../shared/almacen-docs');
+    const d = await alm.colocar({ ambito: 'facturas-odp', clave: origen.toLowerCase() + '-' + ref, buffer, mime, nombre });
+    const [r] = await pool.query(
+      `INSERT INTO postventa_factura_docs (origen, ref_id, nombre, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [origen, ref, String(nombre).slice(0, 200), mime || null, d.blob, d.storage, d.ruta, d.bytes, loginDe(req.usuario)]);
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: r.insertId,
+      detalle: `Subió factura "${nombre}" (${origen} #${ref}, ${Math.round(buffer.length / 1024)} KB)` });
+    res.json({ success: true, data: { id: r.insertId, nombre, bytes: buffer.length }, error: null });
+  } catch (e) { console.error('[postventa subirFacturaDoc]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const listarFacturaDocs = async (req, res) => {
+  try {
+    const { origen } = req.query; const ref = parseInt(req.query.ref_id, 10);
+    if (!ORIGENES_FDOC.includes(origen) || !ref)
+      return res.status(400).json({ success: false, data: null, error: 'origen y ref_id requeridos' });
+    const [rows] = await pool.query(
+      'SELECT id, nombre, mime, doc_bytes, subido_por, created_at FROM postventa_factura_docs WHERE origen=? AND ref_id=? ORDER BY id', [origen, ref]);
+    res.json({ success: true, data: rows, error: null });
+  } catch (e) { console.error('[postventa listarFacturaDocs]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const verFacturaDoc = async (req, res) => {
+  try {
+    const [[f]] = await pool.query('SELECT nombre, mime, archivo, doc_ruta FROM postventa_factura_docs WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    await require('../../../../shared/almacen-docs').servir(res, { ruta: f.doc_ruta, blob: f.archivo, nombre: f.nombre, mime: f.mime });
+  } catch (e) { console.error('[postventa verFacturaDoc]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+const borrarFacturaDoc = async (req, res) => {
+  try {
+    // Capturar doc_ruta ANTES del DELETE (regla del almacén) y borrar el objeto DESPUÉS.
+    const [[f]] = await pool.query('SELECT doc_ruta, nombre FROM postventa_factura_docs WHERE id=?', [req.params.id]);
+    if (!f) return res.status(404).json({ success: false, data: null, error: 'Archivo no encontrado' });
+    await pool.query('DELETE FROM postventa_factura_docs WHERE id=?', [req.params.id]);
+    await require('../../../../shared/almacen-docs').borrar(f.doc_ruta);
+    auditar({ req, accion: 'ELIMINAR', modulo: 'postventa', entidad: 'factura_doc', entidad_id: req.params.id,
+      detalle: `Eliminó la factura adjunta "${f.nombre}"` });
+    res.json({ success: true, data: { id: Number(req.params.id) }, error: null });
+  } catch (e) { console.error('[postventa borrarFacturaDoc]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+/* Adjuntos nodemailer de las facturas de un grupo (para el correo de la ODP). */
+async function adjuntosFactura(origen, refIds) {
+  try {
+    if (!Array.isArray(refIds)) refIds = [refIds];
+    refIds = refIds.map(Number).filter(Boolean);
+    if (!refIds.length) return [];
+    const [rows] = await pool.query(
+      'SELECT nombre, mime, archivo, doc_ruta FROM postventa_factura_docs WHERE origen=? AND ref_id IN (?) ORDER BY id', [origen, refIds]);
+    const alm = require('../../../../shared/almacen-docs');
+    const out = [];
+    let total = 0;
+    for (const f of rows) {
+      const buf = await alm.obtener({ ruta: f.doc_ruta, blob: f.archivo }).catch(() => null);
+      if (!buf) continue;
+      total += buf.length;
+      if (total > 20 * 1024 * 1024) break;   // techo del correo
+      out.push({ filename: f.nombre, content: buf, contentType: f.mime || undefined });
+    }
+    return out;
+  } catch (e) { console.error('[postventa adjuntosFactura]', e.message); return []; }
+}
+
 /* Hermanas de parque: los seguimientos del MISMO parque y mes de pago (la foto
    parques_pagos_ops manda si existe; si no, por s.parque + mes del crédito).
    Para replicar FACTURA RECIBIDA del track PARQUE: la factura es una por mes. */
@@ -2483,7 +2578,17 @@ const enviarCorreoOrden = async (req, res) => {
       const [[pl]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [clave]);
       if (pl) { const v = JSON.parse(pl.valor); if (v && v.remitente) from = remitentePorClave(v.remitente); }
     } catch (_) {}
-    const r = await enviarCorreo({ to, cc, subject: asunto || 'Orden de Pago — AutoFácil', html, from });
+    /* Factura(s) adjunta(s): para la ODP de COMISIÓN, los PDF subidos a cualquier
+       operación del grupo de la factura viajan a Finanzas y quedan de respaldo. */
+    let attachments;
+    if (tipo === 'comision' && num_op) {
+      try {
+        const [[seg]] = await pool.query('SELECT id FROM postventa_seguimiento WHERE num_op=? LIMIT 1', [num_op]);
+        if (seg) attachments = await adjuntosFactura('COMISION', await idsGrupoFactura(seg.id));
+        if (attachments && !attachments.length) attachments = undefined;
+      } catch (_) {}
+    }
+    const r = await enviarCorreo({ to, cc, subject: asunto || 'Orden de Pago — AutoFácil', html, from, attachments });
     if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.error || 'No se pudo enviar el correo' });
     try {
       const { auditar } = require('../../../../shared/audit');
@@ -2573,6 +2678,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
   getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden, marcarFundantesDevueltos,
+  subirFacturaDoc, listarFacturaDocs, verFacturaDoc, borrarFacturaDoc, adjuntosFactura,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
