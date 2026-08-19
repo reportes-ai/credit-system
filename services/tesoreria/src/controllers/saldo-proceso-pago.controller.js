@@ -55,9 +55,9 @@ require('../../../../shared/migrate').enFila('saldo-proceso-pago', async () => {
       }
       await pool.query('INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1,?,1)', [idF]);
     }
-    // SLA paramétrico (horas hábiles por clasificación del dealer)
-    for (const [k, v] of [['sla_saldo_superpartner_horas', '24'], ['sla_saldo_partner_horas', '48'], ['sla_saldo_socio_horas', '72']])
-      await pool.query('INSERT IGNORE INTO postventa_config (clave, valor) VALUES (?,?)', [k, v]).catch(() => {});
+    /* SLA: ya NO se siembra acá — la regla vive en el mantenedor Categoría y
+       Potencial Dealer (dealer_categorias.pago_horas_habiles + hora de corte)
+       y se lee por el motor único shared/sla-saldo.js. */
     console.log('[saldo-proceso-pago] módulo listo');
   } catch (e) { console.error('[saldo-proceso-pago migration]', e.message); }
 });
@@ -67,31 +67,9 @@ const FLUJO = ['FUNDANTES PENDIENTES', 'FUNDANTES RECIBIDOS', 'FUNDANTES ENVIADO
                'LIBERADO A PAGO', 'FONDOS RECIBIDOS', 'ORDEN DE PAGO EMITIDA',
                'ENVIADO A PAGO', 'SALDO PRECIO PAGADO'];
 
-async function slaHoras() {
-  const out = { SUPERPARTNER: 24, PARTNER: 48, SOCIO: 72 };
-  try {
-    const [rows] = await pool.query("SELECT clave, valor FROM postventa_config WHERE clave LIKE 'sla_saldo_%_horas'");
-    for (const r of rows) {
-      const m = /sla_saldo_(\w+)_horas/.exec(r.clave);
-      const n = parseInt(r.valor, 10);
-      if (m && Number.isFinite(n) && n > 0) out[m[1].toUpperCase()] = n;
-    }
-  } catch (_) {}
-  return out;
-}
-
-/* Suma N días HÁBILES (lun-vie) a una fecha. La planilla no considera feriados
-   y acá tampoco: mismo criterio para que cuadre contra lo histórico. */
-function sumarHabiles(fecha, dias) {
-  const d = new Date(fecha);
-  let n = 0;
-  while (n < dias) {
-    d.setDate(d.getDate() + 1);
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) n++;
-  }
-  return d;
-}
+/* SLA por categoría del dealer: motor único (mantenedor Categoría y Potencial
+   Dealer + hora de corte). Salta fines de semana Y feriados chilenos. */
+const SLA = require('../../../../shared/sla-saldo');
 const ymd = d => d ? new Date(d).toLocaleDateString('sv-SE', { timeZone: 'America/Santiago' }) : null;
 
 /* GET /api/saldo-proceso-pago?estado=&q=&desde=&hasta=&todo=1
@@ -139,7 +117,7 @@ exports.listar = async (req, res) => {
       });
     }
 
-    const sla = await slaHoras();
+    const slaCfg = await SLA.config();
     const hoy = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
     const diasEntre = (a, b) => Math.round((new Date(ymd(b)) - new Date(ymd(a))) / 86400000);
 
@@ -155,11 +133,11 @@ exports.listar = async (req, res) => {
       for (let i = FLUJO.length - 1; i >= 0; i--) if (et[FLUJO[i]]) { estadoActual = FLUJO[i]; break; }
 
       const recep = et['FUNDANTES RECIBIDOS'] || null;
-      const ampm  = recep ? (new Date(recep).getHours() < 13 ? 'AM' : 'PM') : null;
-      const clasif = String(s.categoria_asignada || 'SOCIO').toUpperCase();
-      const horas  = sla[clasif] || sla.SOCIO || 72;
-      // PM cuenta desde el día hábil siguiente (regla de la planilla)
-      const venc = recep ? ymd(sumarHabiles(ampm === 'PM' ? sumarHabiles(recep, 1) : recep, Math.ceil(horas / 24))) : null;
+      // AM/PM según la hora de corte paramétrica (después del corte, el plazo corre desde el día hábil siguiente)
+      const ampm  = recep ? (new Date(recep).getHours() < slaCfg.corte ? 'AM' : 'PM') : null;
+      const v     = SLA.vencimiento(recep, s.categoria_asignada, slaCfg);
+      const venc  = v ? ymd(v.fecha) : null;
+      const horas = v ? v.horas : null;
 
       const pagado = et['SALDO PRECIO PAGADO'] || null;
       const dRec = recep ? new Date(recep) : null;

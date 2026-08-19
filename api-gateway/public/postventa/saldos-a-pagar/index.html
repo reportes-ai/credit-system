@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Saldos Precios a Pagar — AutoFácil</title>
-  <!-- v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
+  <!-- v4.7 — columna Fecha de Pago (SLA por categoría del dealer, motor shared/sla-saldo) + Días respecto del SLA: amarillo falta / verde vence hoy / rojo vencido · v4.6 — navbar migrada al componente topnav · v4.4 — la Orden de Pago se abre en un POPUP sobre esta misma pantalla (motor unico /js/odp-documento.js), ya no en otra pestana · v4.3 — columna Orden de Pago: abre el documento con los datos de transferencia antes de pagar · v4.2 — columnas Financiera y Categoria del dealer + full width · v4.1 — Seleccionadas en ROJO cuando superan el disponible para asignar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -179,6 +179,7 @@
             <th>Cuenta Corriente</th>
             <th>Banco</th>
             <th>Fondos Recibidos</th>
+            <th>Fecha de Pago</th>
             <th style="text-align:center">Días</th>
             <th class="num">Saldo Precio</th>
             <th style="text-align:center">Pagar</th>
@@ -187,7 +188,7 @@
         <tbody id="body"></tbody>
         <tfoot>
           <tr>
-            <td colspan="11" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
+            <td colspan="12" style="text-align:right">TOTAL SALDO PRECIO (visible)</td>
             <td class="num" id="totSaldo">$0</td>
             <td></td>
           </tr>
@@ -249,7 +250,7 @@ function quienTxt(accion){
     DATA = (j.data || []).map(x => ({ ...x, pagado: !!Number(x.pagado_hoy), enviado: !!Number(x.enviado) }));
     colorearDias();
     render();
-  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="13" class="vacio">Error: ${e.message}</td></tr>`; }
+  } catch(e){ document.getElementById('body').innerHTML = `<tr><td colspan="14" class="vacio">Error: ${e.message}</td></tr>`; }
 })();
 
 // Cada minuto: borrar al cambiar de día (00:00 Chile) y sincronizar el monto
@@ -269,18 +270,14 @@ setInterval(async () => {
   }
 }, 60000);
 
-// El backend ya ordena por antigüedad (FONDOS RECIBIDOS) y entrega r.dias.
-// Coloreamos por cuartiles sobre los pendientes con > 2 días.
+/* Días respecto del SLA de la categoría (r.dias_sla del backend):
+   negativo = aún falta (amarillo) · 0 = vence HOY (verde) · positivo = vencido (rojo). */
 function colorearDias(){
-  const vals = DATA.filter(r => r.dias > 2).map(r => r.dias).sort((a,b)=>a-b);
-  const q = p => { if (!vals.length) return Infinity; const i=(vals.length-1)*p, lo=Math.floor(i), hi=Math.ceil(i); return vals[lo]+(vals[hi]-vals[lo])*(i-lo); };
-  const Q1=q(.25), Q2=q(.5), Q3=q(.75);
   DATA.forEach(r => {
-    if (r.dias == null || r.dias <= 2) r.dcls = 'd-wht';
-    else if (r.dias > Q3) r.dcls = 'd-red';
-    else if (r.dias > Q2) r.dcls = 'd-yel';
-    else if (r.dias > Q1) r.dcls = 'd-grn';
-    else r.dcls = 'd-wht';
+    if (r.dias_sla == null) r.dcls = 'd-wht';
+    else if (r.dias_sla < 0) r.dcls = 'd-yel';
+    else if (r.dias_sla === 0) r.dcls = 'd-grn';
+    else r.dcls = 'd-red';
   });
 }
 
@@ -324,7 +321,8 @@ function render(){
       <td>${escH(r.num_cuenta||'—')}</td>
       <td>${escH(r.banco||'—')}</td>
       <td>${fechaCL(r.fecha_fondos)}</td>
-      <td style="text-align:center"><span class="dias-pill ${r.dcls}">${r.dias==null?'—':r.dias+' d'}</span></td>
+      <td>${r.fecha_pago_sla ? r.fecha_pago_sla.split('-').reverse().join('-') : '—'}</td>
+      <td style="text-align:center"><span class="dias-pill ${r.dcls}" title="Respecto de la fecha de pago SLA (categoría ${escH(r.categoria||'SOCIO')})">${r.dias_sla==null?'—':(r.dias_sla>0?'+':'')+r.dias_sla+' d'}</span></td>
       <td class="num">${fmt(montoP(r))}${esAutoFinRow(r)?` <span title="Saldo ${fmt(r.saldo_precio)} + Transferencia + Limitación" style="color:#0141A2;cursor:help">ⓘ</span>`:''}</td>
       <td style="text-align:center">${celdaAccion(r)}</td>
     </tr>`).join('');

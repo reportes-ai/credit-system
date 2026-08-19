@@ -1458,6 +1458,7 @@ const getSaldosAPagar = async (req, res) => {
              oc.id AS orden_id, oc.numero AS num_orden,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
+             efu.fecha AS fecha_fundantes,
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
              (esp.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
@@ -1469,6 +1470,8 @@ const getSaldosAPagar = async (req, res) => {
         ON eev.id_seguimiento = s.id AND eev.track='SALDO' AND eev.etapa='ENVIADO A PAGO'
       LEFT JOIN postventa_etapas efr
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
+      LEFT JOIN postventa_etapas efu
+        ON efu.id_seguimiento = s.id AND efu.track='SALDO' AND efu.etapa='FUNDANTES RECIBIDOS'
       LEFT JOIN postventa_etapas esp
         ON esp.id_seguimiento = s.id AND esp.track='SALDO' AND esp.etapa='SALDO PRECIO PAGADO'
            AND DATE(esp.fecha) = CURDATE()
@@ -1505,7 +1508,20 @@ const getSaldosAPagar = async (req, res) => {
     }
     // AUTOFIN: el monto a pagar/disponer = saldo + Transferencia + Limitación (la orden ya lo registra así).
     const fijos = await getFijosAutoFin();
-    rows.forEach(r => { r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos); });
+    /* Fecha comprometida de pago según el SLA de la categoría del dealer
+       (motor único shared/sla-saldo: horas hábiles + hora de corte del
+       mantenedor Categoría y Potencial Dealer, desde FUNDANTES RECIBIDOS). */
+    const SLAM = require('../../../../shared/sla-saldo');
+    const slaCfg = await SLAM.config();
+    const isoD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const hoyCL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
+    rows.forEach(r => {
+      r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos);
+      const v = SLAM.vencimiento(r.fecha_fundantes, r.categoria, slaCfg);
+      r.fecha_pago_sla = v ? isoD(v.fecha) : null;
+      // Días respecto del SLA: negativo = falta, 0 = vence hoy, positivo = vencido
+      r.dias_sla = v ? Math.round((new Date(isoD(hoyCL)) - new Date(isoD(v.fecha))) / 86400000) : null;
+    });
     res.json({ success: true, data: rows, fijos, error: null });
   } catch (e) {
     console.error('[postventa saldosAPagar]', e.message);
