@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.4 — el botón de devolución ya no parece estado ("¿Te los devolvieron? Registrar devolución…", con confirmación) · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -391,7 +391,6 @@ function trackHTML(r, track, lista){
               ? `<span title="${escA('Fundantes rechazados y devueltos por '+(r.fundantes_devueltos_por||'')+(r.fundantes_devueltos_motivo?': '+r.fundantes_devueltos_motivo:''))}" style="display:block;margin-top:2px;background:#fee2e2;color:#b91c1c;border-radius:6px;padding:1px 7px;font-size:.66rem;font-weight:800;cursor:help">DEVUELTOS<br>${fmtF(r.fundantes_devueltos_en)}</span>`
               : (!m?`<span class="pend">${canMark?'Pendiente':'🔒'}</span>`:'')}
             ${disabled && title ? '</span>' : ''}`}
-        ${(track==='SALDO' && x.etapa==='FUNDANTES ENVIADOS' && m)?`<button onclick="devolverFundantes(${r.id})" title="Usar SOLO si la financiera rechazó y devolvió los fundantes: desmarca Recibidos y Enviados y registra la fecha de devolución" style="display:block;margin:3px auto 0;background:#fff;color:#9a3412;border:1px dashed #fdba74;border-radius:6px;padding:1px 7px;font-size:.64rem;font-weight:600;cursor:pointer;opacity:.75">¿Te los devolvieron? Registrar devolución…</button>`:''}
         ${(esAuto && x.etapa==='SALDO PRECIO PAGADO' && m && esAdmin)?`<button onclick="revertirPago(${r.id})" title="Revertir pago (con motivo, Administrador)" style="display:block;margin:3px auto 0;background:#fff1f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">↶ Revertir</button>`:''}
         ${(track==='COMISION' && x.etapa==='FACTURA RECIBIDA' && m)?`<button onclick="editarFactura(${r.id})" title="Ver / editar datos de la factura" style="display:block;margin:3px auto 0;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px;font-size:.68rem;font-weight:700;cursor:pointer">✎ Factura</button>`:''}
       </div>
@@ -399,26 +398,6 @@ function trackHTML(r, track, lista){
       ${dias}
     </div>`;
   }).join('');
-}
-
-async function devolverFundantes(id){
-  if (!confirm('¿Confirmas que la financiera RECHAZÓ y devolvió los fundantes de esta operación?\n\nSe desmarcarán "Fundantes Recibidos" y "Fundantes Enviados" y quedará registrada la devolución.')) return;
-  const motivo = prompt('Motivo de la devolución (opcional, queda en auditoría):');
-  if (motivo === null) return;
-  try {
-    const r = await fetch('/api/postventa/'+id+'/fundantes-devueltos', { method:'POST', headers:H,
-      body: JSON.stringify({ motivo: motivo.trim() }) });
-    const j = await r.json();
-    if (!j.success) { alert(j.error||'Error'); return; }
-    const row = DATA.find(x=>x.id===id);
-    if (row) {
-      row.etapas = row.etapas.filter(e=>!(e.track==='SALDO' && ['FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS'].includes(e.etapa)));
-      row.fundantes_devueltos_en = new Date().toISOString();
-      row.fundantes_devueltos_por = (yo&&(yo.nombre+' '+(yo.apellido||'')).trim())||'';
-      row.fundantes_devueltos_motivo = motivo.trim()||null;
-    }
-    render();
-  } catch(e) { alert('Error de conexión'); }
 }
 
 async function revertirPago(id){

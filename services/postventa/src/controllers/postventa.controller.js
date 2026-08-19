@@ -1274,43 +1274,24 @@ const setEtapa = async (req, res) => {
   }
 };
 
-/* ── POST /api/postventa/:id/fundantes-devueltos { motivo } ──────────────────
-   La financiera RECHAZÓ y devolvió los fundantes: se desmarcan FUNDANTES
-   RECIBIDOS y ENVIADOS y queda registrada la fecha de devolución. Solo procede
-   si el flujo no avanzó más allá (con fondos recibidos o pagado ya no aplica). */
-const fundantesDevueltos = async (req, res) => {
+/* ── Fundantes DEVUELTOS por la financiera (hook interno) ────────────────────
+   Lo dispara Seguimiento Fundantes (POST /api/fundantes-seguimiento/:id/devolver):
+   acá SOLO se refleja — se desmarcan FUNDANTES RECIBIDOS y ENVIADOS del track
+   SALDO y queda la fecha/motivo de la devolución para mostrar "DEVUELTOS". */
+async function marcarFundantesDevueltos(idCredito, usuario, motivo) {
   try {
-    const id = parseInt(req.params.id, 10);
-    const motivo = String(req.body?.motivo || '').trim().slice(0, 300) || null;
-    const usuario = loginDe(req.usuario);
-    const [[seg]] = await pool.query('SELECT id, num_op FROM postventa_seguimiento WHERE id=?', [id]);
-    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Seguimiento no encontrado' });
-    const [[{ avanzadas }]] = await pool.query(
-      `SELECT COUNT(*) avanzadas FROM postventa_etapas
-        WHERE id_seguimiento=? AND track='SALDO'
-          AND etapa IN ('LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO')`, [id]);
-    if (avanzadas > 0)
-      return res.status(400).json({ success: false, data: null,
-        error: 'El flujo ya avanzó más allá de los fundantes (liberado/fondos/orden/pago): desmarca primero esas etapas.' });
-    const [r] = await pool.query(
+    const [[seg]] = await pool.query('SELECT id, num_op FROM postventa_seguimiento WHERE id_credito=?', [idCredito]);
+    if (!seg) return;
+    await pool.query(
       `DELETE FROM postventa_etapas WHERE id_seguimiento=? AND track='SALDO'
-        AND etapa IN ('FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS')`, [id]);
-    if (!r.affectedRows)
-      return res.status(400).json({ success: false, data: null, error: 'No hay fundantes recibidos/enviados que devolver.' });
+        AND etapa IN ('FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS')`, [seg.id]);
     await pool.query(
       'UPDATE postventa_seguimiento SET fundantes_devueltos_en=NOW(), fundantes_devueltos_por=?, fundantes_devueltos_motivo=? WHERE id=?',
-      [usuario, motivo, id]);
-    // Auditoría (misma tabla que las reversas de etapas)
+      [usuario || 'Sistema', String(motivo || '').slice(0, 300) || null, seg.id]);
     await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES (?,?,?,?)',
-      [id, 'FUNDANTES DEVUELTOS', usuario, motivo || 'Fundantes rechazados y devueltos']).catch(() => {});
-    auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'fundantes', entidad_id: id,
-      detalle: `Fundantes DEVUELTOS — op ${seg.num_op}${motivo ? '. Motivo: ' + motivo : ''}` });
-    res.json({ success: true, data: { id, desmarcadas: r.affectedRows }, error: null });
-  } catch (e) {
-    console.error('[postventa fundantesDevueltos]', e.message);
-    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
-  }
-};
+      [seg.id, 'FUNDANTES DEVUELTOS', usuario || 'Sistema', String(motivo || 'Fundantes devueltos por la financiera').slice(0, 400)]).catch(() => {});
+  } catch (e) { console.error('[postventa marcarFundantesDevueltos]', e.message); }
+}
 
 /* ── GET /api/postventa/perfiles-lista ─── */
 const getPerfiles = async (req, res) => {
@@ -2523,7 +2504,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden, fundantesDevueltos,
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden, marcarFundantesDevueltos,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento

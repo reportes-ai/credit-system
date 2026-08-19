@@ -44,7 +44,6 @@ router.get('/consulta-fundantes', verifyToken, c.consultaFundantes);
 router.post('/enviar-correo-orden', verifyToken, requireFunc('pv_orden_emitir', 'pv_com_orden_emitir'), c.enviarCorreoOrden);
 router.get('/',               verifyToken, c.getAll);
 router.put('/:id/etapa',    verifyToken, requireFunc('postventa_seguimiento'), c.setEtapa);
-router.post('/:id/fundantes-devueltos', verifyToken, requireFunc('postventa_seguimiento'), c.fundantesDevueltos);
 router.get('/:id/factura-comision', verifyToken, c.getFacturaComision);
 router.put('/:id/factura-comision', verifyToken, requireFunc('postventa_seguimiento'), c.updateFacturaComision);
 

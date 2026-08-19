@@ -502,6 +502,11 @@ const devolver = async (req, res) => {
       [id, motivo, nombreUsuario(req)]);
 
     AVISOS.retirar('fund_env_' + id).catch(() => {});
+    /* Reflejo en Post Venta → Seguimiento: se desmarcan FUNDANTES RECIBIDOS y
+       ENVIADOS del track SALDO y las celdas quedan con "DEVUELTOS" + fecha. */
+    require('../../../postventa/src/controllers/postventa.controller')
+      .marcarFundantesDevueltos(id, nombreUsuario(req), motivo)
+      .catch(e => console.error('[fundantes devolver→postventa]', e.message));
     auditar({ req, accion: 'DEVOLVER_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
       detalle: `La financiera devolvió los fundantes de la OP ${op.num_op} (estaba en ${estadoActual}) — ${motivo}`,
       meta: { estado_anterior: estadoActual, motivo } });
