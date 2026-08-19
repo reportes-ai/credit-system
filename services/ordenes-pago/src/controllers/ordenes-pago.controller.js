@@ -599,6 +599,25 @@ const crearOrden = async (req, res) => {
     }
     if (!provNombre) return res.status(400).json({ success: false, data: null, error: 'Debe indicar el proveedor' });
 
+    /* Proveedor "no registrado": se CREA en la base de proveedores (o se reusa
+       si su RUT/nombre ya existe) y la orden queda enlazada por id. Antes el
+       nombre libre no se anexaba a la base y el proveedor había que digitarlo
+       de nuevo en cada orden. */
+    if (!idProv) {
+      try {
+        const [[dup]] = provRut
+          ? await pool.query('SELECT id FROM proveedores WHERE rut=? LIMIT 1', [provRut])
+          : await pool.query('SELECT id FROM proveedores WHERE UPPER(nombre)=UPPER(?) LIMIT 1', [provNombre]);
+        if (dup) idProv = dup.id;
+        else {
+          const [np] = await pool.query('INSERT INTO proveedores (rut, nombre, activo) VALUES (?,?,1)', [provRut || null, provNombre]);
+          idProv = np.insertId;
+          auditar({ req, accion: 'CREAR', modulo: 'ordenes-pago', entidad: 'proveedor', entidad_id: idProv,
+            detalle: `Creó proveedor ${provNombre} (desde la emisión de una orden — completar banco y cuenta en la ficha)` });
+        }
+      } catch (e) { console.error('[ordenes-pago crear proveedor desde emision]', e.message); }
+    }
+
     // El sistema calcula bruto/neto/impuesto y A pagar a partir del tipo de documento.
     const m = await calcularDoc(tipoDoc, base, valor);
 
