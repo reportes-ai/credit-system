@@ -126,6 +126,8 @@ function calcularComision(creditos, vars, mes) {
     minimo_monto,
     monto_24: monto24, monto_mas24: montoMas24,
     base_24: base24, base_mas24: baseMas24,
+    pct_24, pct_mas24,
+    n_24: ot24.length, n_mas24: otMas24.length,
     incentivo_base,
     ncnu_total, ncnu_rdh, ncnu_cesantia, ncnu_rep,
     cruce_rdh, cruce_cesantia, cruce_reparaciones,
