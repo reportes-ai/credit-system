@@ -454,35 +454,16 @@ const emitir = async (req, res) => {
     if (!e || e.etapa !== 'APROBADA')
       return res.status(400).json({ success: false, data: null, error: 'La comisión debe estar APROBADA antes de emitir la Orden de Pago' });
 
-    /* Mismas condiciones que el dealer: la ODP nace de la FACTURA, nunca antes.
-       Todas las operaciones del parque en el mes deben tener FACTURA RECIBIDA en
-       su track (la marca el módulo de Cartolas Parque, o a mano en Seguimiento
-       Comisión Parques). Un parque solo-arriendo (0 ops) pasa sin exigencia. */
-    /* Con FOTO (la comisión ya está APROBADA acá, así que existe) la exigencia
-       es sobre las operaciones de la cartola; sin foto, flujo antiguo por mes. */
-    const [[foto]] = await pool.query(
-      "SELECT COUNT(*) n FROM parques_pagos_ops WHERE parque=? AND DATE_FORMAT(mes,'%Y-%m')=?", [parque, mes]);
-    const [[sinFactura]] = foto.n > 0
-      ? await pool.query(`
-          SELECT COUNT(*) n
-          FROM parques_pagos_ops po
-          JOIN creditos c ON c.num_op = po.num_op
-          JOIN postventa_seguimiento s ON s.id_credito = c.id
-          WHERE po.parque = ? AND DATE_FORMAT(po.mes,'%Y-%m') = ?
-            AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
-              WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
-          [parque, mes])
-      : await pool.query(`
-          SELECT COUNT(*) n
-          FROM postventa_seguimiento s
-          JOIN creditos c ON c.id = s.id_credito
-          WHERE UPPER(s.parque) = UPPER(?) AND DATE_FORMAT(c.mes,'%Y-%m') = ?
-            AND NOT EXISTS (SELECT 1 FROM postventa_etapas pe
-              WHERE pe.id_seguimiento = s.id AND pe.track='PARQUE' AND pe.etapa='FACTURA RECIBIDA')`,
-          [parque, mes]);
-    if (sinFactura.n > 0)
+    /* La ODP nace de la FACTURA DEL PARQUE: UNA por cartola/mes (regla de Pato,
+       19-08-2026). Las operaciones son de los DEALERS — sus facturas no pueden
+       condicionar el pago al parque, así que la exigencia por-operación anterior
+       se elimina. Lo exigido: la factura del parque adjunta a este pago
+       (botón 📎 Factura), que además viaja en el correo de la ODP a Contabilidad. */
+    const [[fdoc]] = await pool.query(
+      "SELECT COUNT(*) n FROM postventa_factura_docs WHERE origen='PARQUE' AND ref_id=?", [e.id]);
+    if (!fdoc.n)
       return res.status(400).json({ success: false, data: null,
-        error: `No se puede emitir la Orden de Pago: ${sinFactura.n} operación(es) del parque aún sin FACTURA RECIBIDA en el Seguimiento Comisión Parques. La ODP nace de la factura, igual que en dealers.` });
+        error: 'No se puede emitir la Orden de Pago: falta la FACTURA DEL PARQUE del mes. Adjúntala con el botón 📎 Factura (una por cartola) — viajará en el correo a Contabilidad y queda de respaldo.' });
 
     const arriendo = Math.round(Number(e.arriendo)), comision = Math.round(Number(e.comision_creditos));
     const total = arriendo + comision;
