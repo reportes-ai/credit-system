@@ -375,6 +375,19 @@ function anotarBitacora(carta, resultado, r, checklist) {
    _enCurso: candado por carta — dos documentos subiendo a la vez disparaban
    dos revisiones simultáneas (doble checklist y doble fila de bitácora). */
 const _enCurso = new Set();
+/* One-shot: limpiar las derivaciones repetidas que dejó el bug (misma carta,
+   mismo resultado y motivo → se conserva la PRIMERA anotación de cada racha). */
+require('../../../shared/migrate').migrar('revisor-bitacora-dedup-v1', async () => {
+  const [dups] = await pool.query(`
+    SELECT b.id FROM revisor_bitacora b
+    JOIN revisor_bitacora a
+      ON a.id_carta = b.id_carta AND a.resultado = b.resultado
+     AND COALESCE(a.motivo,'') = COALESCE(b.motivo,'') AND a.id < b.id
+    GROUP BY b.id`);
+  if (dups.length) await pool.query('DELETE FROM revisor_bitacora WHERE id IN (?)', [dups.map(d => d.id)]);
+  console.log('[revisor-bitacora] duplicados eliminados:', dups.length);
+});
+
 async function procesarCarta(idCarta) {
   if (_enCurso.has(idCarta)) return;
   _enCurso.add(idCarta);
@@ -404,7 +417,16 @@ async function _procesarCarta(idCarta) {
 
     if (!r.ok) {
       // Sin ambos documentos aún no hay revisión completa: no ensuciar la bitácora
-      if (!/Faltan documentos/.test(r.motivo || '')) await anotarBitacora(carta, 'DERIVADA', r, null);
+      if (!/Faltan documentos/.test(r.motivo || '')) {
+        /* Un veredicto por HECHO, no por pasada: el revisor corre con cada evento
+           de la carta (documento subido, edición) y re-anotaba la MISMA derivación
+           una y otra vez (26647174SV: 3 filas en 3 segundos). Solo se anota si el
+           veredicto cambió respecto de la revisión anterior. */
+        let prev = null;
+        try { prev = carta.revision_auto ? (typeof carta.revision_auto === 'string' ? JSON.parse(carta.revision_auto) : carta.revision_auto) : null; } catch (_) {}
+        if (!(prev && prev.ok === false && prev.motivo === r.motivo))
+          await anotarBitacora(carta, 'DERIVADA', r, null);
+      }
       console.log(`[revisor-unidad] carta ${carta.op_carta}: al analista — ${r.motivo}`);
       return;   // queda PENDIENTE en la cola humana con el detalle en revision_auto
     }
