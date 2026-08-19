@@ -152,9 +152,13 @@ function marcadoresDe(buffer) {
    el formato del primero (rPr) y las propiedades del párrafo (pPr). */
 const RE_P = /<w:p\b[^>]*?(?:\/>|>[\s\S]*?<\/w:p>)/g;
 const desXml = s => String(s).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+/* El texto del párrafo INCLUYE las tabulaciones como \t (las firmas lado a lado
+   van separadas por tabs; si se pierden al editar, los nombres quedan pegados). */
 function textoDeP(pXml) {
-  return (pXml.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g) || [])
-    .map(t => desXml(t.replace(/<[^>]+>/g, ''))).join('');
+  // fuera el pPr: sus <w:tabs> (definiciones de tab stops) no son tabulaciones reales
+  const cuerpo = pXml.replace(/<w:pPr\b[\s\S]*?<\/w:pPr>/g, '');
+  return (cuerpo.match(/<w:tab\/>|<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g) || [])
+    .map(t => t === '<w:tab/>' ? '\t' : desXml(t.replace(/<[^>]+>/g, ''))).join('');
 }
 
 /** Lista los párrafos del documento: [{ i, texto }]. */
@@ -173,14 +177,18 @@ function editarParrafos(buffer, cambios) {
   const xml = doc.contenido.toString('utf8').replace(RE_P, p => {
     i++;
     if (!(i in cambios)) return p;
-    const nuevo = String(cambios[i]).replace(/\s*\n\s*/g, ' ').trim();
+    // Los \n colapsan a espacio; los \t se CONSERVAN (vuelven como <w:tab/>)
+    const nuevo = String(cambios[i]).replace(/[ ]*\n[ ]*/g, ' ').replace(/^[ ]+|[ ]+$/g, '');
     if (nuevo === textoDeP(p)) return p;
     tocados++;
     if (p.endsWith('/>')) p = p.replace(/\/>$/, '></w:p>').replace('<w:p', '<w:p').replace('></w:p>', '></w:p>'); // párrafo vacío autocerrado → expandir
     const pPr = (p.match(/<w:pPr\b[^>]*(?:\/>|>[\s\S]*?<\/w:pPr>)/) || [''])[0];
     const rPr = (p.match(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/) || [''])[0].match(/<w:rPr\b[^>]*(?:\/>|>[\s\S]*?<\/w:rPr>)/) || [''];
     const abre = (p.match(/^<w:p\b[^>]*>/) || ['<w:p>'])[0].replace(/\/>$/, '>');
-    const run = nuevo ? `<w:r>${rPr[0]}<w:t xml:space="preserve">${escXml(nuevo)}</w:t></w:r>` : '';
+    const cuerpo = nuevo.split('\t')
+      .map(seg => seg ? `<w:t xml:space="preserve">${escXml(seg)}</w:t>` : '')
+      .join('<w:tab/>');
+    const run = cuerpo ? `<w:r>${rPr[0]}${cuerpo}</w:r>` : '';
     return `${abre}${pPr}${run}</w:p>`;
   });
   doc.contenido = Buffer.from(xml, 'utf8');
