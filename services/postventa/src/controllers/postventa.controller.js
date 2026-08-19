@@ -30,6 +30,36 @@ require('../../../../shared/migrate').migrar('fundantes-devueltos-backfill-v1', 
   console.log('[postventa] backfill fundantes devueltos:', devs.length, 'operación(es)');
 });
 
+/* Hermanas de parque: los seguimientos del MISMO parque y mes de pago (la foto
+   parques_pagos_ops manda si existe; si no, por s.parque + mes del crédito).
+   Para replicar FACTURA RECIBIDA del track PARQUE: la factura es una por mes. */
+async function hermanosParque(idSeg) {
+  try {
+    const [[base]] = await pool.query(
+      `SELECT s.id, s.parque, s.num_op, DATE_FORMAT(c.mes,'%Y-%m') AS mes
+         FROM postventa_seguimiento s LEFT JOIN creditos c ON c.id = s.id_credito WHERE s.id=?`, [idSeg]);
+    if (!base || !base.parque || String(base.parque).toUpperCase() === 'NO APLICA') return [];
+    // ¿La op está en la foto de un pago de parque? → el grupo es esa foto
+    const [[fo]] = await pool.query(
+      `SELECT parque, DATE_FORMAT(mes,'%Y-%m') m FROM parques_pagos_ops
+        WHERE CAST(num_op AS CHAR) = CAST(? AS CHAR) ORDER BY mes DESC LIMIT 1`, [base.num_op]);
+    if (fo) {
+      const [rows] = await pool.query(
+        `SELECT s2.id FROM parques_pagos_ops po
+           JOIN creditos c2 ON CAST(c2.num_op AS CHAR) = CAST(po.num_op AS CHAR)
+           JOIN postventa_seguimiento s2 ON s2.id_credito = c2.id
+          WHERE UPPER(po.parque)=UPPER(?) AND DATE_FORMAT(po.mes,'%Y-%m')=? AND s2.id<>?`,
+        [fo.parque, fo.m, idSeg]);
+      return rows.map(r => r.id);
+    }
+    const [rows] = await pool.query(
+      `SELECT s2.id FROM postventa_seguimiento s2 JOIN creditos c2 ON c2.id = s2.id_credito
+        WHERE UPPER(s2.parque)=UPPER(?) AND DATE_FORMAT(c2.mes,'%Y-%m')=? AND s2.id<>?`,
+      [base.parque, base.mes, idSeg]);
+    return rows.map(r => r.id);
+  } catch (e) { console.error('[postventa hermanosParque]', e.message); return []; }
+}
+
 /* num_op de un lote de seguimientos, para el detalle de auditoría */
 async function opsTxt(ids) {
   try {
@@ -1213,6 +1243,18 @@ const setEtapa = async (req, res) => {
           .catch(e => { console.error('[postventa replicar factura]', e.message); return 0; });
         if (n) console.log(`[postventa] factura replicada a ${n} operación(es) de la cartola`);
       }
+      // FACTURA RECIBIDA de PARQUE: la factura del parque es UNA por mes → se
+      // replica a todas las operaciones del mismo parque y mes (igual que la
+      // cartola en dealers). Sin esto había que marcar op por op para poder
+      // emitir la ODP del parque.
+      if (track === 'PARQUE' && etapa === 'FACTURA RECIBIDA') {
+        const ids = await hermanosParque(Number(req.params.id));
+        if (ids.length) {
+          await pool.query('INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario) VALUES ?',
+            [ids.map(i => [i, 'PARQUE', 'FACTURA RECIBIDA', usuario])]);
+          console.log(`[postventa] factura de parque replicada a ${ids.length} operación(es)`);
+        }
+      }
     } else {
       // Validación desmarcar: debe ser la última marcada
       let lastIdx = -1;
@@ -1243,6 +1285,12 @@ const setEtapa = async (req, res) => {
           await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento=?', [r.id_seguimiento]);
         }
         await pool.query('DELETE FROM postventa_facturas_comision WHERE id_seguimiento = ?', [req.params.id]);
+      }
+      // Desmarcar FACTURA RECIBIDA de PARQUE: simétrico — se quita en todo el grupo
+      if (track === 'PARQUE' && etapa === 'FACTURA RECIBIDA') {
+        const ids = await hermanosParque(Number(req.params.id));
+        if (ids.length) await pool.query(
+          `DELETE FROM postventa_etapas WHERE track='PARQUE' AND etapa='FACTURA RECIBIDA' AND id_seguimiento IN (?)`, [ids]);
       }
       // Al desmarcar FONDOS RECIBIDOS del saldo, revertir la COMISION A PAGAR
       // automática (solo si la comisión no avanzó más allá) — y el movimiento de
