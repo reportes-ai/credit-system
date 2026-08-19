@@ -280,11 +280,10 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
          cierre de mes (auditoría 05-08-2026, C-5).
          Mismo remedio que `shared/num-op.js` para el correlativo de operación:
          insistir con el siguiente número hasta encontrar el libre. */
+      const { siguienteNumero } = require('./numeracion');
       let sig = null, r = null, ultimo = null;
       for (let intento = 0; intento < 8 && !r; intento++) {
-        const [[mx]] = await conn.query(
-          'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', [regla.tipo, anio]);
-        sig = Number(mx.sig) + intento;
+        sig = await siguienteNumero(conn, regla.tipo, anio, Number(String(f).slice(5, 7)), intento);
         try {
           [r] = await conn.query(
             `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, origen, origen_ref, total, creado_por)
@@ -301,7 +300,7 @@ async function contabilizar({ evento, fecha, glosa, ref, montos = {}, num_op = n
         await conn.query('INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber, num_op, rut) VALUES (?,?,?,?,?,?,?)',
           [r.insertId, m.cuenta, m.glosa, m.debe, m.haber, num_op, rut]);
       await conn.commit();
-      await log(evento, ref, 'CONTABILIZADO', `${regla.tipo[0]}-${anio}-${String(sig).padStart(5, '0')} por $${debe.toLocaleString('es-CL')}`, r.insertId);
+      await log(evento, ref, 'CONTABILIZADO', `${require('./numeracion').fmtComprobante(regla.tipo, anio, sig)} por $${debe.toLocaleString('es-CL')}`, r.insertId);
       return r.insertId;
     } catch (e) {
       await conn.rollback().catch(() => {});

@@ -187,7 +187,8 @@ exports.eliminarCuenta = async (req, res) => {
 };
 
 /* ── Comprobantes ──────────────────────────────────────────────────────────── */
-const fmtNum = c => `${c.tipo[0]}-${c.anio}-${String(c.numero).padStart(5, '0')}`;
+const { siguienteNumero, fmtComprobante } = require('../numeracion');
+const fmtNum = c => fmtComprobante(c.tipo, c.anio, c.numero);
 
 exports.crearComprobante = async (req, res) => {
   const conn = await pool.getConnection();
@@ -235,8 +236,7 @@ exports.crearComprobante = async (req, res) => {
 
     const anio = Number(fecha.slice(0, 4));
     await conn.beginTransaction();
-    const [[{ sig }]] = await conn.query(
-      'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', [tipo, anio]);
+    const sig = await siguienteNumero(conn, tipo, anio, Number(fecha.slice(5, 7)));
     const [r] = await conn.query(
       `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, total, creado_por) VALUES (?,?,?,?,?,?,?)`,
       [tipo, anio, sig, fecha, String(glosa).trim(), debe, nombreDe(req.user)]);
@@ -1475,8 +1475,7 @@ const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_r
   try {
     const anio = Number(fecha.slice(0, 4));
     await conn.beginTransaction();
-    const [[{ sig }]] = await conn.query(
-      'SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo=? AND anio=? FOR UPDATE', ['TRASPASO', anio]);
+    const sig = await siguienteNumero(conn, 'TRASPASO', anio, Number(fecha.slice(5, 7)));
     const [r] = await conn.query(
       `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, total, origen, origen_ref, creado_por) VALUES ('TRASPASO',?,?,?,?,?,?,?,?)`,
       [anio, sig, fecha, glosa, debe, origen, origen_ref, usuario]);
@@ -1484,7 +1483,7 @@ const crearComprobanteDoc = async ({ fecha, glosa, movimientos, origen, origen_r
       await conn.query('INSERT INTO ctb_movimientos (id_comprobante, cuenta, glosa, debe, haber, rut) VALUES (?,?,?,?,?,?)',
         [r.insertId, m.cuenta, m.glosa || null, m.debe || 0, m.haber || 0, m.rut || null]);
     await conn.commit();
-    return { id: r.insertId, numero: `T-${anio}-${String(sig).padStart(5, '0')}` };
+    return { id: r.insertId, numero: fmtComprobante('TRASPASO', anio, sig) };
   } catch (e) { await conn.rollback().catch(() => {}); throw e; }
   finally { conn.release(); }
 };
@@ -2337,8 +2336,7 @@ exports.cerrarEjercicio = async (req, res) => {
     const total = Math.max(debe, haber);
 
     await conn.beginTransaction();
-    const [[{ sig }]] = await conn.query(
-      "SELECT COALESCE(MAX(numero),0)+1 sig FROM ctb_comprobantes WHERE tipo='TRASPASO' AND anio=? FOR UPDATE", [anio]);
+    const sig = await siguienteNumero(conn, 'TRASPASO', anio, 12);   // cierre = diciembre
     const [r] = await conn.query(
       `INSERT INTO ctb_comprobantes (tipo, anio, numero, fecha, glosa, origen, origen_ref, total, creado_por)
        VALUES ('TRASPASO',?,?,?,?,'CIERRE_EJERCICIO',?,?,?)`,
@@ -2349,7 +2347,7 @@ exports.cerrarEjercicio = async (req, res) => {
     await conn.commit();
     auditar({ req, accion: 'EDITAR', modulo: 'contabilidad', entidad: 'cierre_ejercicio', entidad_id: anio,
       detalle: `Cierre ${anio}: ${rows.length} cuentas de resultado → ${resultado >= 0 ? 'utilidad' : 'pérdida'} $${Math.abs(resultado).toLocaleString('es-CL')} a ${ctaResult}` });
-    ok(res, { id: r.insertId, numero: `T-${anio}-${String(sig).padStart(5, '0')}`, resultado, cuentas_cerradas: rows.length });
+    ok(res, { id: r.insertId, numero: fmtComprobante('TRASPASO', anio, sig), resultado, cuentas_cerradas: rows.length });
   } catch (e) {
     await conn.rollback().catch(() => {});
     fail(res, e.message);
