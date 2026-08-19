@@ -29,6 +29,27 @@ const pool = require('./config/database');
 let cadena = Promise.resolve();
 let tablaLista = null;
 
+/* Estado observable del capataz (diagnóstico 19-08-2026: la fila se cuelga en
+   algún bloque intermedio en Render y los one-shots posteriores nunca corren).
+   Se expone en /api/health → capataz, y el watchdog acusa al bloque colgado. */
+const _estado = { actual: null, iniciado: 0, completados: 0, fallados: 0, encolados: 0, ultimo_ok: null };
+function estadoCapataz() {
+  return {
+    corriendo: _estado.actual,
+    hace_seg: _estado.actual ? Math.round((Date.now() - _estado.iniciado) / 1000) : null,
+    completados: _estado.completados,
+    fallados: _estado.fallados,
+    encolados: _estado.encolados,
+    pendientes: _estado.encolados - _estado.completados - _estado.fallados - (_estado.actual ? 1 : 0),
+    ultimo_ok: _estado.ultimo_ok,
+  };
+}
+// Watchdog: si un bloque lleva >2 min corriendo, acusarlo por nombre cada minuto.
+setInterval(() => {
+  if (_estado.actual && Date.now() - _estado.iniciado > 2 * 60 * 1000)
+    console.error(`[migrate] ⚠ BLOQUE COLGADO: "${_estado.actual}" lleva ${Math.round((Date.now() - _estado.iniciado) / 60000)} min — la fila de migraciones está detenida aquí`);
+}, 60 * 1000).unref();
+
 const dormir = (ms) => new Promise(r => setTimeout(r, ms));
 
 // Errores DDL/lock transitorios de TiDB que ameritan reintento
@@ -51,14 +72,20 @@ async function conReintento(fn, intentos = 4) {
    (el error se loguea y la fila sigue) para no tumbar el arranque. */
 function enFila(nombre, fn) {
   if (typeof nombre === 'function') { fn = nombre; nombre = 'anonimo'; }
+  _estado.encolados++;
   cadena = cadena.then(async () => {
     const t0 = Date.now();
+    _estado.actual = nombre; _estado.iniciado = t0;
     try {
       await conReintento(fn);
       const ms = Date.now() - t0;
       if (ms > 3000) console.log(`[migrate] ${nombre} tardó ${(ms / 1000).toFixed(1)}s`);
+      _estado.completados++; _estado.ultimo_ok = nombre;
     } catch (e) {
+      _estado.fallados++;
       console.error(`[migrate] ${nombre} FALLÓ:`, e.message);
+    } finally {
+      _estado.actual = null;
     }
   });
   return cadena;
@@ -110,4 +137,4 @@ function migrarAuto(nombre, fn) {
   return migrar(`${nombre}@${(h >>> 0).toString(36)}`, fn);
 }
 
-module.exports = { enFila, migrar, migrarAuto };
+module.exports = { enFila, migrar, migrarAuto, estadoCapataz };

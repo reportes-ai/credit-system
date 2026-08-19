@@ -138,6 +138,11 @@ app.get('/api/health', async (req, res) => {
        acepta lo que le manden desde internet. Se expone acá para que la falta se
        vea y no quede solo en una advertencia del log. */
     whatsapp_webhook_firmado: !!process.env.WSP_APP_SECRET,
+    /* Estado de la fila de migraciones de boot (diagnóstico 19-08-2026: en Render
+       la fila se detiene en un bloque intermedio y los one-shots nunca corren).
+       `corriendo` + `hace_seg` delatan al bloque colgado; `pendientes` cuántos
+       esperan detrás. Sano: corriendo=null y pendientes=0 a los minutos del boot. */
+    capataz: require('../../shared/migrate').estadoCapataz(),
   });
 });
 
