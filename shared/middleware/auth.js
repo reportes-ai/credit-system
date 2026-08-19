@@ -125,6 +125,14 @@ const verifyToken = async (req, res, next) => {
       error: 'Modo "Ver como": solo lectura. Para operar, ingresa con tu propia cuenta.' });
   }
 
+  /* PERFIL DE SOLO LECTURA (perfiles.solo_lectura=1, ej. "Demo"): mismo candado
+     que "Ver como" — datos reales a la vista, cero escrituras. Se hace valer acá
+     en el middleware para que ninguna ruta dependa de acordarse. */
+  if (payload && payload.sl && !['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+    return res.status(403).json({ success: false, data: null,
+      error: 'Perfil de demostración: solo lectura. Puedes navegar y ver, no operar.' });
+  }
+
   req.usuario = payload;
   req.user    = req.usuario;   // alias para controllers que usan req.user
   alsUsuario.run({

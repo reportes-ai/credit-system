@@ -13,13 +13,24 @@ const login = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Email y contraseña son requeridos' });
     }
 
-    const [rows] = await pool.query(
-      `SELECT u.*, p.nombre AS perfil_nombre
-       FROM usuarios u
-       JOIN perfiles p ON u.id_perfil = p.id_perfil
-       WHERE u.email = ? AND u.estado = 'activo'`,
-      [email]
-    );
+    let rows;
+    try {
+      [rows] = await pool.query(
+        `SELECT u.*, p.nombre AS perfil_nombre, p.solo_lectura AS perfil_solo_lectura
+         FROM usuarios u
+         JOIN perfiles p ON u.id_perfil = p.id_perfil
+         WHERE u.email = ? AND u.estado = 'activo'`,
+        [email]
+      );
+    } catch (_) {   // por si la columna solo_lectura aún no existe en este arranque
+      [rows] = await pool.query(
+        `SELECT u.*, p.nombre AS perfil_nombre
+         FROM usuarios u
+         JOIN perfiles p ON u.id_perfil = p.id_perfil
+         WHERE u.email = ? AND u.estado = 'activo'`,
+        [email]
+      );
+    }
 
     if (rows.length === 0) {
       return res.status(401).json({ success: false, data: null, error: 'Credenciales inválidas' });
@@ -98,7 +109,10 @@ const login = async (req, res) => {
          nunca la clave — y eso dejaba sin efecto el primer ingreso, el reseteo
          por sospecha y el vencimiento por política. Ahora viaja en el token y
          `verifyToken` solo deja pasar el cambio de clave. */
-      cc: debeForzar ? 1 : 0
+      cc: debeForzar ? 1 : 0,
+      /* Perfil de SOLO LECTURA (perfiles.solo_lectura, ej. "Demo"): el flag viaja
+         en el token y verifyToken bloquea toda escritura — datos reales, no transaccional. */
+      sl: Number(usuario.perfil_solo_lectura || 0) ? 1 : 0,
     };
 
     // Cuentas de propósito fijo (ej. TV) pueden tener sesión más larga (usuarios.sesion_horas).

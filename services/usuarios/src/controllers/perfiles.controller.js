@@ -841,10 +841,11 @@ const createPerfil = async (req, res) => {
     const [[ex]] = await pool.query('SELECT id_perfil FROM perfiles WHERE nombre = ?', [nombre.trim()]);
     if (ex) return res.status(400).json({ success: false, data: null, error: 'Ya existe un perfil con ese nombre' });
 
+    const sl = req.body.solo_lectura ? 1 : 0;
     let r;
     try {
-      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion, ambito_ejecutivos) VALUES (?, ?, ?)', [nombre.trim(), descripcion || null, amb]);
-    } catch (_) {   // por si la columna aún no existe en este arranque
+      [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion, ambito_ejecutivos, solo_lectura) VALUES (?, ?, ?, ?)', [nombre.trim(), descripcion || null, amb, sl]);
+    } catch (_) {   // por si alguna columna aún no existe en este arranque
       [r] = await pool.query('INSERT INTO perfiles (nombre, descripcion) VALUES (?, ?)', [nombre.trim(), descripcion || null]);
     }
     const id_perfil = r.insertId;
@@ -887,6 +888,11 @@ const updatePerfil = async (req, res) => {
       try { require('../../../../shared/visibilidad-ejecutivos').invalidarCache(); } catch (_) {}
     } else {
       await pool.query('UPDATE perfiles SET nombre = ?, descripcion = ? WHERE id_perfil = ?', [nombre.trim(), descripcion || null, id]);
+    }
+    // Flag solo lectura (demo). Administrador nunca puede quedar en solo lectura.
+    if (req.body.solo_lectura !== undefined && perfil.nombre !== 'Administrador') {
+      await pool.query('UPDATE perfiles SET solo_lectura=? WHERE id_perfil=?', [req.body.solo_lectura ? 1 : 0, id])
+        .catch(e => console.error('[perfiles solo_lectura]', e.message));
     }
     const [[updated]] = await pool.query('SELECT * FROM perfiles WHERE id_perfil = ?', [id]);
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'perfil', entidad_id: id, detalle: `Editó el perfil/rol #${id} → "${nombre.trim()}"` });
@@ -2329,6 +2335,19 @@ require('../../../../shared/migrate').migrarAuto('perfiles_b41', async () => {
    filas con el mismo código en cada arranque. Se consolida a UNA fila por código
    (la de menor id), re-apuntando sus permisos, y se agrega UNIQUE(codigo) para
    que no vuelva a ocurrir. Idempotente y seguro de correr en cada boot. */
+/* ─── Perfil de SOLO LECTURA (demo con datos reales, no transaccional) ─────────
+   perfiles.solo_lectura=1 → el middleware verifyToken bloquea toda escritura
+   (POST/PUT/DELETE) de cualquier usuario con ese perfil, igual que "Ver como".
+   Qué VE el perfil se controla como siempre por la matriz de permisos.
+   Se siembra el perfil "Demo" con el flag prendido (nace sin permisos: marcar
+   en la matriz qué módulos mostrar). */
+require('../../../../shared/migrate').enFila('perfil-solo-lectura', async () => {
+  await pool.query('ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS solo_lectura TINYINT(1) NOT NULL DEFAULT 0');
+  await pool.query(`INSERT IGNORE INTO perfiles (nombre, descripcion, solo_lectura)
+                    VALUES ('Demo', 'Demostración con datos reales: puede navegar y ver, no puede operar (solo lectura)', 1)`);
+  await pool.query("UPDATE perfiles SET solo_lectura=1 WHERE nombre='Demo'");
+});
+
 // Red de seguridad: corre en CADA boot (enFila, no migrar) — consolida duplicados por código.
 require('../../../../shared/migrate').enFila('perfiles_dedup', async () => {
   try {
