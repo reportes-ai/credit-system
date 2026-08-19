@@ -53,6 +53,14 @@ require('../../../../shared/migrate').enFila('dealer-categorias', async () => {
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_propuesta VARCHAR(20) NULL`);
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS categoria_asignada VARCHAR(20) NULL`);
     await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS unidades_mes_pasado INT NULL`);
+    /* Regla de negocio (Pato 19-08-2026): TODO dealer nace SOCIO — nadie sin
+       categoría. Default en la columna para los INSERT nuevos + autocuración en
+       cada boot para los que hayan quedado NULL por cualquier camino. */
+    await pool.query(`ALTER TABLE dealers MODIFY categoria_asignada VARCHAR(20) NULL DEFAULT 'SOCIO'`).catch(() => {});
+    await pool.query(`UPDATE dealers SET categoria_asignada='SOCIO' WHERE categoria_asignada IS NULL OR categoria_asignada=''`);
+    /* SLA de pago del Saldo Precio por categoría (horas hábiles desde la
+       recepción de fundantes, con hora de corte paramétrica — ver abajo). */
+    await pool.query(`ALTER TABLE dealer_categorias ADD COLUMN IF NOT EXISTS pago_horas_habiles INT NOT NULL DEFAULT 72`);
     // Renombrar tipo "PARTICULAR" → "CALLE" (idempotente).
     await pool.query("UPDATE dealers SET ccs_parque='CALLE' WHERE UPPER(ccs_parque)='PARTICULAR'");
 
@@ -74,6 +82,16 @@ require('../../../../shared/migrate').enFila('dealer-categorias', async () => {
   } catch (e) { console.error('[dealer-categorias migration]', e.message); }
 });
 
+/* Semilla del SLA de pago (una vez): Socio 72 h · Partner 48 h · Super Partner 24 h.
+   A nivel de módulo — NUNCA adentro del enFila (congela la fila). */
+require('../../../../shared/migrate').migrar('dealer-cat-sla-pago-v1', async () => {
+  await pool.query("UPDATE dealer_categorias SET pago_horas_habiles=48 WHERE codigo='PARTNER'");
+  await pool.query("UPDATE dealer_categorias SET pago_horas_habiles=24 WHERE codigo='SUPER_PARTNER'");
+  await pool.query(`INSERT INTO parametros_credito (clave, valor, descripcion)
+    VALUES ('sp_fundantes_corte_hora','14','Hora de corte de recepción de fundantes: recibidos e ingresados ANTES de esta hora, el plazo de pago del Saldo Precio corre desde ese día; después, desde el día hábil siguiente')
+    ON DUPLICATE KEY UPDATE clave=clave`);
+});
+
 /* Determina el código de categoría según unidades vendidas y las metas. */
 function categoriaPara(unidades, cats) {
   // cats ordenadas por meta_min_unidades desc → la primera que cumple
@@ -85,19 +103,36 @@ function categoriaPara(unidades, cats) {
 const listar = async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM dealer_categorias ORDER BY nivel');
-    res.json({ success: true, data: rows, error: null });
+    const [[ch]] = await pool.query("SELECT valor FROM parametros_credito WHERE clave='sp_fundantes_corte_hora'").catch(() => [[null]]);
+    res.json({ success: true, data: rows, corte_hora: ch ? parseInt(ch.valor, 10) : 14, error: null });
   } catch (e) { console.error('[dealer-cat listar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
+/* ── PUT /api/dealer-categorias/corte-hora — hora de corte de recepción de fundantes ── */
+const setCorteHora = async (req, res) => {
+  try {
+    const h = parseInt(req.body?.hora, 10);
+    if (!(h >= 0 && h <= 23)) return res.status(400).json({ success: false, data: null, error: 'Hora inválida (0 a 23)' });
+    await pool.query(`INSERT INTO parametros_credito (clave, valor, descripcion)
+      VALUES ('sp_fundantes_corte_hora', ?, 'Hora de corte de recepción de fundantes para el plazo de pago del Saldo Precio')
+      ON DUPLICATE KEY UPDATE valor=VALUES(valor)`, [h]);
+    auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer_categoria', entidad_id: 'corte_hora',
+      detalle: `Hora de corte de recepción de fundantes = ${h}:00` });
+    res.json({ success: true, data: { hora: h }, error: null });
+  } catch (e) { console.error('[dealer-cat corteHora]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
 /* ── PUT /api/dealer-categorias/:id ───────────────────────────────────────── */
 const actualizar = async (req, res) => {
   try {
-    const { nombre, meta_min_unidades, meta_texto, descripcion, color, beneficios } = req.body || {};
+    const { nombre, meta_min_unidades, meta_texto, descripcion, color, beneficios, pago_horas_habiles } = req.body || {};
     const benef = Array.isArray(beneficios) ? beneficios.map(b => String(b).trim()).filter(Boolean) : null;
     await pool.query(
-      `UPDATE dealer_categorias SET nombre=?, meta_min_unidades=?, meta_texto=?, descripcion=?, color=?, beneficios=? WHERE id=?`,
+      `UPDATE dealer_categorias SET nombre=?, meta_min_unidades=?, meta_texto=?, descripcion=?, color=?, beneficios=?,
+              pago_horas_habiles=COALESCE(?, pago_horas_habiles) WHERE id=?`,
       [nombre, parseInt(meta_min_unidades) || 0, meta_texto || null, descripcion || null, color || null,
-       benef ? JSON.stringify(benef) : null, req.params.id]);
+       benef ? JSON.stringify(benef) : null,
+       (Number(pago_horas_habiles) > 0 ? parseInt(pago_horas_habiles, 10) : null), req.params.id]);
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer_categoria', entidad_id: req.params.id,
       detalle: `Editó categoría de dealer "${nombre}" (meta ${meta_min_unidades} u/mes)` });
     res.json({ success: true, data: { id: req.params.id }, error: null });
@@ -108,7 +143,9 @@ const actualizar = async (req, res) => {
 const asignar = async (req, res) => {
   try {
     const cat = String(req.body.categoria_asignada || '').toUpperCase() || null;
-    if (cat) { const [[ok]] = await pool.query('SELECT 1 v FROM dealer_categorias WHERE codigo=?', [cat]); if (!ok) return res.status(400).json({ success: false, data: null, error: 'Categoría inválida' }); }
+    // Nadie sin categoría: no se puede dejar un dealer sin categoría asignada.
+    if (!cat) return res.status(400).json({ success: false, data: null, error: 'Todo dealer debe tener categoría (nacen como Socio); no se puede dejar sin categoría.' });
+    { const [[ok]] = await pool.query('SELECT 1 v FROM dealer_categorias WHERE codigo=?', [cat]); if (!ok) return res.status(400).json({ success: false, data: null, error: 'Categoría inválida' }); }
     await pool.query('UPDATE dealers SET categoria_asignada=? WHERE id_dealer=?', [cat, req.params.idDealer]);
     auditar({ req, accion: 'EDITAR', modulo: 'mantenedores', entidad: 'dealer', entidad_id: req.params.idDealer,
       detalle: `Asignó categoría ${cat || '—'} al dealer #${req.params.idDealer}` });
@@ -204,4 +241,4 @@ const setActivo = async (req, res) => {
   } catch (e) { console.error('[dealer-cat setActivo]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
-module.exports = { listar, actualizar, asignar, recalcular, movimientos, porInactivar, setActivo };
+module.exports = { listar, actualizar, asignar, recalcular, movimientos, porInactivar, setActivo, setCorteHora };

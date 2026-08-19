@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Categoría y Potencial Dealer — AutoFácil</title>
-  <!-- v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.3 — SLA de pago del Saldo Precio por categoría (horas hábiles + hora de corte, paramétrico); todo dealer nace Socio · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -64,12 +64,27 @@
 
   <div class="cards" id="cards"></div>
 
+  <!-- Regla de pago del Saldo Precio (paramétrica) -->
+  <div class="footer-box" style="background:#f0fdf4;border-left-color:#16a34a">
+    <h4 style="color:#166534"><i class="bi bi-cash-coin"></i> Regla de pago del Saldo Precio</h4>
+    <ul>
+      <li>El plazo de cada categoría (tarjetas de arriba) corre en <b>horas hábiles</b> desde que los fundantes se <b>reciben e ingresan al sistema antes de la hora de corte</b>.</li>
+      <li>Si llegan <b>después de la hora de corte</b>, el plazo se cuenta desde el día hábil siguiente (equivale a 1 día más).</li>
+      <li style="list-style:none;margin-top:8px">
+        <b>Hora de corte:</b>
+        <input id="corteHora" type="number" min="0" max="23" style="width:70px;border:1.5px solid #d1d5db;border-radius:8px;padding:5px 8px;font-weight:700"> :00 hrs
+        <button onclick="guardarCorte()" style="margin-left:8px;background:#16a34a;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-weight:700;font-size:.82rem;cursor:pointer"><i class="bi bi-save me-1"></i>Guardar hora de corte</button>
+      </li>
+    </ul>
+  </div>
+
   <div class="footer-box">
     <h4><i class="bi bi-diagram-3"></i> Qué afecta este mantenedor</h4>
     <ul>
       <li><b>Meta (unidades/mes)</b> → define la <b>Categoría Propuesta</b> de cada dealer al pulsar "Recalcular categorías" en <a href="/mantenedores/dealers/">Dealers</a> (cuenta créditos otorgados el mes pasado).</li>
       <li><b>Beneficios</b> → se muestran en el tooltip <b>(i)</b> junto a la Categoría Asignada en <a href="/mantenedores/dealers/">Dealers</a>.</li>
       <li><b>Nombre / Meta texto / Color</b> → etiquetas y badges que se ven en la base de Dealers.</li>
+      <li><b>Pago Saldo Precio (horas hábiles) + hora de corte</b> → plazo comprometido de pago del Saldo Precio por categoría (Socio 72 · Partner 48 · Super Partner 24). Todo dealer nace <b>Socio</b>: nadie queda sin categoría.</li>
     </ul>
   </div>
 </div>
@@ -89,6 +104,7 @@ function toast(m,err){ const t=document.getElementById('toast'); t.textContent=m
 async function cargar(){
   const r = await fetch('/api/dealer-categorias', { headers:H }); const j = await r.json();
   if (!j.success) { toast('Error al cargar', true); return; }
+  document.getElementById('corteHora').value = (j.corte_hora!=null ? j.corte_hora : 14);
   const cats = j.data.map(c => ({ ...c, beneficios: Array.isArray(c.beneficios)?c.beneficios:(()=>{try{return JSON.parse(c.beneficios||'[]')}catch(e){return[]}})() }));
   document.getElementById('cards').innerHTML = cats.map(c => `
     <div class="cat-card" style="--c:${esc(c.color||'#0141A2')}">
@@ -103,6 +119,12 @@ async function cargar(){
         </div>
         <div class="fld"><label>Descripción</label><input id="desc_${c.id}" value="${esc(c.descripcion||'')}"></div>
         <div class="fld"><label>Color</label><input id="col_${c.id}" type="color" value="${esc(c.color||'#0141A2')}" style="height:38px;padding:3px"></div>
+        <div class="meta-box" style="background:#f0fdf4;border-color:#86efac">
+          <div class="fld" style="margin:0"><label>💵 Pago Saldo Precio (horas hábiles)</label>
+            <input id="sla_${c.id}" type="number" min="1" max="240" value="${c.pago_horas_habiles||72}">
+            <div class="benef-hint">Desde la recepción e ingreso de los fundantes, antes de la hora de corte.</div>
+          </div>
+        </div>
         <div class="fld"><label>Beneficios incluidos</label>
           <textarea id="ben_${c.id}" rows="${Math.max(5,(c.beneficios||[]).length+1)}">${esc((c.beneficios||[]).join('\n'))}</textarea>
           <div class="benef-hint">Un beneficio por línea.</div>
@@ -120,11 +142,22 @@ async function guardar(id){
     descripcion: document.getElementById('desc_'+id).value.trim(),
     color: document.getElementById('col_'+id).value,
     beneficios: document.getElementById('ben_'+id).value.split('\n').map(s=>s.trim()).filter(Boolean),
+    pago_horas_habiles: parseInt(document.getElementById('sla_'+id).value)||null,
   };
   try {
     const r = await fetch('/api/dealer-categorias/'+id, { method:'PUT', headers:H, body:JSON.stringify(body) });
     const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
     toast('Categoría guardada ✓'); cargar();
+  } catch(e){ toast(e.message, true); }
+}
+
+async function guardarCorte(){
+  const h = parseInt(document.getElementById('corteHora').value, 10);
+  if (!(h>=0 && h<=23)) return toast('Hora inválida (0 a 23)', true);
+  try {
+    const r = await fetch('/api/dealer-categorias/corte-hora', { method:'PUT', headers:H, body:JSON.stringify({ hora:h }) });
+    const j = await r.json(); if (!j.success) throw new Error(j.error||'Error');
+    toast('Hora de corte guardada ✓');
   } catch(e){ toast(e.message, true); }
 }
 

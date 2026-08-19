@@ -10,6 +10,7 @@ router.get('/por-inactivar',   verifyToken, ctrl.porInactivar);
 router.put('/asignar/:idDealer', verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.asignar);
 router.put('/activo/:idDealer',  verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.setActivo);
 router.post('/recalcular',     verifyToken, requireFunc('mantenedores_dealers', 'dealer_mantener'), ctrl.recalcular);
+router.put('/corte-hora',      verifyToken, requireFunc('mant_dealer_categorias'), ctrl.setCorteHora);
 router.put('/:id',             verifyToken, requireFunc('mant_dealer_categorias'), ctrl.actualizar);
 
 module.exports = router;
