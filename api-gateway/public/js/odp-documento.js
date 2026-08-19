@@ -92,6 +92,7 @@ function docHTML(o){
       <tr><td style="${SresL}">Concepto</td><td style="${SresV}">${escH(o.concepto||'')}</td></tr>
       <tr><td style="${SresL}">Período</td><td style="${SresV}">${periodo}</td></tr>
       <tr><td style="${SresL}">Documento</td><td style="${SresV}">${escH(o.tipo_documento||'—')}${docNum&&o.numero_documento?' N° '+escH(o.numero_documento):''}${o.fecha_documento?' · '+fdate(o.fecha_documento):''}</td></tr>
+      ${Array.isArray(o.facturas)&&o.facturas.length?`<tr><td style="${SresL}">Factura adjunta</td><td style="${SresV}">${o.facturas.map(f=>`<a href="#" onclick="AF_ODP_DOC.verFactura(${f.id});return false" style="color:#0141A2;font-weight:700;text-decoration:none">📎 ${escH(f.nombre)}</a>`).join(' · ')}</td></tr>`:''}
       ${o.deposito ? `
       <tr><td style="${SresL}">Depositar en</td><td style="${SresV}"><b>${escH(o.deposito.banco||'—')}</b> · ${
         o.deposito.tipo_cuenta ? escH(o.deposito.tipo_cuenta)
@@ -107,5 +108,17 @@ function docHTML(o){
     </tbody></table>
   </div>`;
 }
-window.AF_ODP_DOC = { html: docHTML, impInfo };
+/* Abre la factura adjunta en otra pestaña (fetch con token → blob: un link
+   directo no sirve porque el endpoint exige Authorization). */
+async function verFactura(id){
+  try {
+    const t = sessionStorage.getItem('token');
+    const r = await fetch('/api/postventa/factura-doc/' + id, { headers: { Authorization: 'Bearer ' + t } });
+    if (!r.ok) throw new Error();
+    const u = URL.createObjectURL(await r.blob());
+    window.open(u, '_blank');
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  } catch (_) { alert('No se pudo abrir la factura adjunta.'); }
+}
+window.AF_ODP_DOC = { html: docHTML, impInfo, verFactura };
 })();

@@ -532,6 +532,20 @@ const getDocumento = async (req, res) => {
     if (!data) data = await construirDocumento(oc);
     if (!data) return res.status(404).json({ success: false, data: null, error: 'Orden no encontrada' });
     if (congelada) data.congelada = true;
+    /* Facturas ADJUNTAS a la orden (respaldo del almacén): EN VIVO siempre —
+       aunque el documento esté congelado, un adjunto subido después debe verse. */
+    try {
+      let facturas = [];
+      if (oc.origen === 'GENERAL') {
+        [facturas] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='ODP' AND ref_id=? ORDER BY id", [oc.origen_id]);
+      } else if (oc.origen === 'COMISION') {
+        const [[po]] = await pool.query('SELECT id_seguimiento FROM postventa_ordenes_comision WHERE id=?', [oc.origen_id]);
+        if (po) [facturas] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='COMISION' AND ref_id=? ORDER BY id", [po.id_seguimiento]);
+      } else if (oc.origen === 'PARQUE') {
+        [facturas] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='PARQUE' AND ref_id=? ORDER BY id", [oc.origen_id]);
+      }
+      data.facturas = facturas;
+    } catch (_) { data.facturas = []; }
     // Datos del timbre "PAGADO" (caja, fecha y hora del pago), formateados en hora de Chile.
     if (oc.pagada) {
       try {
