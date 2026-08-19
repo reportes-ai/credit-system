@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comisiones Parques a Pagar — AutoFácil</title>
-  <!-- v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
+  <!-- v1.4 — popup de revisión pre-emisión (factura adjunta + totales) · v1.3 — botón 📎 Factura por parque: sube la factura del mes (respaldo) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v1.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -242,7 +242,45 @@ const CONFIRM = {
 };
 async function accion(ev, acc, parque){
   ev.stopPropagation();
+  // PRE-EMISIÓN: popup con la orden y los datos que faltan (motor AF_ODP_PRE)
+  if (acc === 'emitir') {
+    const r0 = ROWS.find(x => x.parque === parque) || {};
+    let facturaAdj = '';
+    if (r0.pago_id) {
+      try {
+        const rd = await fetch('/api/postventa/factura-doc?origen=PARQUE&ref_id='+r0.pago_id, { headers:H });
+        const jd = await rd.json();
+        if (jd.success && jd.data && jd.data.length) facturaAdj = jd.data.map(d=>d.nombre).join(', ');
+      } catch(_){}
+    }
+    const faltas = AF_ODP_PRE.check([
+      { etiqueta:'Factura del parque adjunta (obligatoria: la ODP nace de la factura)', valor: facturaAdj, critico:true },
+      { etiqueta:'Total a pagar mayor a $0', valor: (Number(r0.total)>0 ? r0.total : null), critico:true },
+    ]);
+    const F=(k,v)=>`<tr><td style="padding:3px 12px 3px 0;color:#64748b;white-space:nowrap">${k}</td><td style="font-weight:600">${esc(v==null?'—':v)}</td></tr>`;
+    let dlg = document.getElementById('dlgPreParque');
+    if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgPreParque'; dlg.style.cssText='border:none;border-radius:14px;max-width:520px;width:94%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
+    dlg.innerHTML = `
+      <div style="background:linear-gradient(135deg,#001345,#0141A2);color:#fff;padding:13px 20px;font-weight:800">Revisión antes de emitir — ${esc(parque)}</div>
+      <div style="padding:16px 20px;font-size:.88rem">
+        ${AF_ODP_PRE.render(faltas)}
+        <table style="width:100%;border-collapse:collapse">
+          ${F('Período', elMes.value)}${F('Operaciones', r0.ops)}
+          ${F('Arriendo', CLP(r0.arriendo))}${F('Comisión por créditos', CLP(r0.comision_creditos))}
+          ${F('TOTAL A PAGAR', CLP(r0.total))}${F('Factura adjunta', facturaAdj||null)}
+        </table>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('dlgPreParque').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Volver</button>
+        <button onclick="document.getElementById('dlgPreParque').close();ejecutarAccion('emitir','${esc(parque)}')" style="background:#c2410c;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-receipt me-1"></i>Emitir definitivo</button>
+      </div>`;
+    dlg.showModal();
+    return;
+  }
   if(!confirm(CONFIRM[acc](parque))) return;
+  return ejecutarAccion(acc, parque);
+}
+async function ejecutarAccion(acc, parque){
   try {
     const r = await fetch('/api/comisiones-parques/'+acc, { method:'POST', headers:H, body: JSON.stringify({ mes: elMes.value, parque }) });
     const j = await r.json();
@@ -251,7 +289,6 @@ async function accion(ev, acc, parque){
     cargar();
   } catch(e){ toast(e.message, true); }
 }
-
 (async () => {
   try {
     const r = await fetch('/api/auth/mis-permisos?_='+Date.now(), { headers:{ Authorization:'Bearer '+token } });
@@ -261,6 +298,7 @@ async function accion(ev, acc, parque){
   cargar();
 })();
 </script>
+<script src="/js/odp-preemision.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

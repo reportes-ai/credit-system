@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -755,7 +755,13 @@ function abrirEmitirODP(id, track){
       <div class="em-row"><span>IVA (${pct}%)</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
   }
   document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
-  document.getElementById('emBody').innerHTML = `
+  // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
+  const preAvisos = (window.AF_ODP_PRE ? AF_ODP_PRE.render(AF_ODP_PRE.check([
+    { etiqueta:'RUT del dealer', valor: r.rut_dealer, critico:true },
+    { etiqueta:'Monto a pagar mayor a $0', valor: (monto>0 ? monto : null), critico:true },
+    ...(esComision ? [{ etiqueta:'Documento (factura/boleta) registrado', valor: r.fac_numero }] : []),
+  ])) : '');
+  document.getElementById('emBody').innerHTML = preAvisos + `
     <div class="em-row"><span>N° Operación</span><b>${escH(r.num_op||'')}</b></div>
     <div class="em-row"><span>Dealer</span><b>${escH(r.nombre_dealer||'—')}</b></div>
     ${r.rut_dealer?`<div class="em-row"><span>RUT</span><b>${escH(r.rut_dealer)}</b></div>`:''}
@@ -844,6 +850,7 @@ async function confirmarEmitirODP(){
     <button type="button" onclick="fcGuardar()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:7px 18px;font-weight:700;cursor:pointer">Guardar</button>
   </div>
 </dialog>
+<script src="/js/odp-preemision.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

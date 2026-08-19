@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
+  <!-- v1.8 — popup de revisión pre-emisión (datos faltantes) antes de emitir · v1.7 — al EMITIR sale el correo automático a Contabilidad (plantilla odp_proveedor_contabilidad) con la factura adjunta; el adjunto viaja en el mismo request · v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -170,10 +170,12 @@ function onTipo(){
   pintarMontos(calcDoc(tipo, base, numEl(base==='BRUTO'?'fBruto':'fNeto')));
 }
 
+let PROVS = [];
 async function cargarProv(){
   try {
     const r = await fetch('/api/ordenes-pago/proveedores', { headers:H });
     const j = await r.json();
+    PROVS = j.data||[];
     const opts = (j.data||[]).map(p=>`<option value="${p.id}">${escH(p.nombre)}${p.rut?' — '+escH(formatRUT(p.rut)):''}</option>`).join('');
     document.getElementById('fProv').innerHTML =
       '<option value="">— Seleccionar proveedor —</option>' + opts + '<option value="__otro">+ Proveedor no registrado…</option>';
@@ -188,12 +190,60 @@ function onProvChange(){
   document.getElementById('boxProvRut').style.display = otro?'':'none';
 }
 
-async function emitir(){
+/* PRE-EMISIÓN: popup con la orden y los datos que faltan, ANTES de emitir. */
+function emitir(){
   const err = document.getElementById('errMsg'); err.style.display='none';
   const provSel = document.getElementById('fProv').value;
   const concepto = document.getElementById('fConcepto').value.trim();
   const monto = lastBase==='BRUTO' ? numEl('fBruto') : numEl('fNeto');
   if (!provSel) { return fail('Selecciona un proveedor.'); }
+  if (!concepto) return fail('El concepto es obligatorio.');
+  if (monto<=0) return fail('Ingresa el monto (bruto o neto).');
+
+  const otro = provSel==='__otro';
+  const prov = otro ? { nombre: document.getElementById('fProvNombre').value.trim(), rut: document.getElementById('fProvRut').value.trim() }
+                    : (PROVS.find(p=>String(p.id)===String(provSel)) || {});
+  if (otro && !prov.nombre) return fail('Indica el nombre del proveedor.');
+  const fDoc = document.getElementById('fDoc').files && document.getElementById('fDoc').files[0];
+  const tipoDoc = document.getElementById('fTipoDoc').value;
+  const m = calcDoc(tipoDoc, lastBase, monto);
+  const faltas = AF_ODP_PRE.check([
+    { etiqueta:'RUT del proveedor', valor: prov.rut },
+    { etiqueta:'Banco del proveedor (dato de transferencia)', valor: prov.banco, critico:true },
+    { etiqueta:'N° de cuenta del proveedor (dato de transferencia)', valor: prov.numero_cuenta, critico:true },
+    { etiqueta:'Categoría', valor: document.getElementById('fCategoria').value.trim() },
+    { etiqueta:'N° de documento', valor: document.getElementById('fNumDoc').value.trim() },
+    { etiqueta:'Fecha del documento', valor: document.getElementById('fFechaDoc').value },
+    { etiqueta:'Método de pago', valor: document.getElementById('fMetodo').value },
+    { etiqueta:'Documento adjunto (factura/boleta)', valor: fDoc ? fDoc.name : '' },
+  ]);
+  const F = (k,v)=>`<tr><td style="padding:3px 12px 3px 0;color:#64748b;white-space:nowrap">${k}</td><td style="font-weight:600">${escH(v||'—')}</td></tr>`;
+  let dlg = document.getElementById('dlgPre');
+  if(!dlg){ dlg=document.createElement('dialog'); dlg.id='dlgPre'; dlg.style.cssText='border:none;border-radius:14px;max-width:560px;width:94%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,.3)'; document.body.appendChild(dlg); }
+  dlg.innerHTML = `
+    <div style="background:linear-gradient(135deg,#012d70,#0141A2);color:#fff;padding:14px 20px;font-weight:800">Revisión antes de emitir</div>
+    <div style="padding:16px 20px;font-size:.88rem">
+      ${AF_ODP_PRE.render(faltas)}
+      <table style="width:100%;border-collapse:collapse">
+        ${F('Proveedor', prov.nombre)}${F('RUT', prov.rut)}
+        ${F('Concepto', concepto)}${F('Documento', tipoDoc + (document.getElementById('fNumDoc').value.trim()? ' N° '+document.getElementById('fNumDoc').value.trim():''))}
+        ${F('Neto', money(m.neto))}${F(m.clase==='RET'?'Retención':'IVA', money(m.imp))}
+        ${F('A PAGAR', money(m.pagar))}
+        ${F('Transferir a', [prov.banco, prov.numero_cuenta].filter(Boolean).join(' · '))}
+        ${F('Método de pago', document.getElementById('fMetodo').value)}
+        ${F('Adjunto', fDoc ? fDoc.name : null)}
+      </table>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="document.getElementById('dlgPre').close()" style="background:#f1f5f9;border:none;border-radius:8px;padding:9px 16px;font-weight:600;cursor:pointer">Volver a corregir</button>
+      <button onclick="document.getElementById('dlgPre').close();emitirDefinitivo()" style="background:#0141A2;color:#fff;border:none;border-radius:8px;padding:9px 18px;font-weight:700;cursor:pointer"><i class="bi bi-send-check me-1"></i>Emitir definitivo</button>
+    </div>`;
+  dlg.showModal();
+}
+
+async function emitirDefinitivo(){
+  const provSel = document.getElementById('fProv').value;
+  const concepto = document.getElementById('fConcepto').value.trim();
   let body = { concepto,
     tipo_documento: document.getElementById('fTipoDoc').value,
     monto_base: lastBase,
@@ -205,13 +255,9 @@ async function emitir(){
     metodo_pago: document.getElementById('fMetodo').value,
     observaciones: document.getElementById('fObs').value.trim() };
   if (provSel==='__otro') {
-    const pn = document.getElementById('fProvNombre').value.trim();
-    if (!pn) return fail('Indica el nombre del proveedor.');
-    body.proveedor_nombre = pn;
+    body.proveedor_nombre = document.getElementById('fProvNombre').value.trim();
     body.proveedor_rut = document.getElementById('fProvRut').value.trim();
   } else { body.id_proveedor = parseInt(provSel); }
-  if (!concepto) return fail('El concepto es obligatorio.');
-  if (monto<=0) return fail('Ingresa el monto (bruto o neto).');
 
   const btn = document.getElementById('btnEmitir'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
   try {
@@ -240,6 +286,7 @@ function nueva(){ location.reload(); }
 cargarProv();
 cargarImpuestos();
 </script>
+<script src="/js/odp-preemision.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>

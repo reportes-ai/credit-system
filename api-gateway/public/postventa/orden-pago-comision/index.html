@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -72,7 +72,7 @@
 <div class="ov" id="ov">
   <div class="op-modal">
     <div class="op-modal-head"><h5>Orden de Pago de Comisión</h5><button class="btn-cerrar" onclick="cerrar()"><i class="bi bi-x-lg"></i></button></div>
-    <div class="op-modal-body"><div id="docWrap"></div></div>
+    <div class="op-modal-body"><div id="preAvisos"></div><div id="docWrap"></div></div>
     <div class="op-modal-foot">
       <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
       <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
@@ -82,6 +82,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="/js/desglose-impuesto.js"></script>
+<script src="/js/odp-preemision.js"></script>
 <script>
 const token = sessionStorage.getItem('token');
 const yo = JSON.parse(sessionStorage.getItem('usuario')||'null');
@@ -324,6 +325,23 @@ async function verOrden(gi){
       if (j.success) actual.forEach(o => o.num_orden = j.data.num_orden);
     } catch(e){}
   }
+  // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
+  let facturaAdj = '';
+  try {
+    const rd = await fetch('/api/postventa/factura-doc?origen=COMISION&ref_id='+f0.id, { headers: hdr() });
+    const jd = await rd.json();
+    if (jd.success && jd.data && jd.data.length) facturaAdj = jd.data.map(d=>d.nombre).join(', ');
+  } catch(_){}
+  const faltas = AF_ODP_PRE.check([
+    { etiqueta:'RUT del dealer', valor: f0.rut_dealer, critico:true },
+    { etiqueta:'N° de cuenta del dealer (dato de transferencia)', valor: f0.num_cuenta, critico:true },
+    { etiqueta:'Banco del dealer (dato de transferencia)', valor: f0.banco, critico:true },
+    { etiqueta:'N° de factura/boleta', valor: f0.numero_factura },
+    { etiqueta:'Factura adjunta (PDF, viaja a Contabilidad)', valor: facturaAdj },
+  ]);
+  /* Los avisos van en su propio contenedor: docWrap es el CUERPO del correo
+     a Contabilidad y no debe llevar el recuadro de faltas. */
+  document.getElementById('preAvisos').innerHTML = AF_ODP_PRE.render(faltas);
   document.getElementById('docWrap').innerHTML = emailHTML(actual);
   document.getElementById('ov').classList.add('open');
 }

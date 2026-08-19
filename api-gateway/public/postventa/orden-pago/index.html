@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.12 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -88,7 +88,7 @@
 <div class="ov" id="ov">
   <div class="op-modal">
     <div class="op-modal-head"><h5>Orden de Pago</h5><button class="btn-cerrar" onclick="cerrar()"><i class="bi bi-x-lg"></i></button></div>
-    <div class="op-modal-body"><div id="docWrap"></div></div>
+    <div class="op-modal-body"><div id="preAvisos"></div><div id="docWrap"></div></div>
     <div class="op-modal-foot">
       <button class="btn-cerrar" onclick="cerrar()">Cancelar</button>
       <button class="btn-emitir" onclick="emitir()"><i class="bi bi-send-check me-1"></i>Emitir orden</button>
@@ -263,6 +263,13 @@ async function verOrden(id){
       if (j.success) actual.num_orden = j.data.num_orden;
     } catch(e){}
   }
+  // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
+  document.getElementById('preAvisos').innerHTML = AF_ODP_PRE.render(AF_ODP_PRE.check([
+    { etiqueta:'RUT del dealer', valor: actual.rut_dealer, critico:true },
+    { etiqueta:'N° de cuenta del dealer (dato de transferencia)', valor: actual.num_cuenta, critico:true },
+    { etiqueta:'Banco del dealer (dato de transferencia)', valor: actual.banco, critico:true },
+    { etiqueta:'Saldo precio (monto a pagar)', valor: (Number(actual.saldo_precio)>0 ? actual.saldo_precio : null), critico:true },
+  ]));
   document.getElementById('docWrap').innerHTML = emailHTML(actual);
   document.getElementById('ov').classList.add('open');
 }
@@ -323,6 +330,7 @@ let CAN_EMITIR = false;
 
 cargar();
 </script>
+<script src="/js/odp-preemision.js"></script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
