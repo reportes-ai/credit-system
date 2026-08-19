@@ -199,7 +199,8 @@ const listarProveedores = async (req, res) => {
     const where = [];
     const args = [];
     if (!incluirInactivos) where.push('activo = 1');
-    if (q) { where.push('(nombre LIKE ? OR rut LIKE ? OR giro LIKE ? OR codigo_actividad LIKE ? OR comentario LIKE ?)'); args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
+    // UPPER en ambos lados: la BD es case-sensitive (utf8mb4_bin) y "gestio" no encontraba a GESTION
+    if (q) { const qq = `%${q.toUpperCase()}%`; where.push('(UPPER(nombre) LIKE ? OR UPPER(rut) LIKE ? OR UPPER(giro) LIKE ? OR UPPER(codigo_actividad) LIKE ? OR UPPER(comentario) LIKE ?)'); args.push(qq, qq, qq, qq, qq); }
     const [rows] = await pool.query(
       `SELECT * FROM proveedores ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY nombre LIMIT 500`, args);
     res.json({ success: true, data: rows, error: null });
