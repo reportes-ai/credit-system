@@ -118,6 +118,49 @@ function tblVehiculos(nodo){
   return '<table class="rep-tb"><thead><tr><th>Patente</th><th>Marca / Modelo</th><th>Año</th></tr></thead><tbody>'+
     ds.map(v=>'<tr><td>'+esc(v.patente)+'</td><td>'+esc((v.marca||'')+' / '+(v.modelo||''))+'</td><td>'+esc(v.agno)+'</td></tr>').join('')+'</tbody></table>';
 }
+const fmtPlata = v => { const n=Number(v); return isNaN(n)?esc(String(v??'—')):'$ '+n.toLocaleString('es-CL'); };
+function tblVehiculosVig(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const tot = ds.reduce((s,v)=>s+(Number(v.avaluo)||0),0);
+  return '<table class="rep-tb"><thead><tr><th>Patente</th><th>Marca / Modelo</th><th>Año</th><th style="text-align:right">Avalúo Fiscal</th></tr></thead><tbody>'+
+    ds.map(v=>'<tr><td>'+esc(v.patente)+'</td><td>'+esc((v.marca||'')+' / '+(v.modelo||''))+'</td><td>'+esc(v.agno)+'</td><td style="text-align:right">'+fmtPlata(v.avaluo)+'</td></tr>').join('')+
+    '<tr style="font-weight:700"><td colspan="3">Total Avalúo</td><td style="text-align:right">'+fmtPlata(tot)+'</td></tr></tbody></table>';
+}
+function tblPropiedades(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const tot = ds.reduce((s,x)=>s+(Number(x.avaluo_fiscal)||0),0);
+  return '<table class="rep-tb"><thead><tr><th>Dirección</th><th>Rol</th><th>Relación</th><th style="text-align:right">Avalúo Fiscal</th></tr></thead><tbody>'+
+    ds.map(x=>'<tr><td>'+esc(x.direccion)+'<div class="muted" style="font-size:.7rem">'+esc(x.ubicacion||'')+'</div></td><td>'+esc(x.rol||'—')+'</td><td>'+relList(x.relacionados)+'</td><td style="text-align:right">'+fmtPlata(x.avaluo_fiscal)+'</td></tr>').join('')+
+    '<tr style="font-weight:700"><td colspan="3">Total</td><td style="text-align:right">'+fmtPlata(tot)+'</td></tr></tbody></table>';
+}
+function tblResumenActivos(nodo){
+  const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
+  const NOM = { AUTO:'Vehículos Motorizados', DIRECCION:'Propiedades' };
+  const totC = ds.reduce((s,x)=>s+(Number(x.cantidad)||0),0), totM = ds.reduce((s,x)=>s+(Number(x.monto)||0),0);
+  return '<table class="rep-tb"><thead><tr><th></th><th style="text-align:right">Cantidad</th><th style="text-align:right">Avalúo Fiscal</th></tr></thead><tbody>'+
+    ds.map(x=>'<tr><td>'+esc(NOM[x.tipo]||x.tipo)+'</td><td style="text-align:right">'+esc(x.cantidad)+'</td><td style="text-align:right">'+fmtPlata(x.monto)+'</td></tr>').join('')+
+    '<tr style="font-weight:700"><td>Total Activos</td><td style="text-align:right">'+totC+'</td><td style="text-align:right">'+fmtPlata(totM)+'</td></tr></tbody></table>';
+}
+/* Boletines del nodo titular.causas — se listan SIEMPRE (como el PDF DealerNet),
+   con "No se registra información" cuando vienen vacíos y el detalle crudo cuando
+   traen datos. Antes se omitían por completo: un proceso penal o una quiebra
+   presentes en la respuesta no se mostraban en el informe (detectado 19-08-2026). */
+function tieneDato(o){
+  if(o==null || o==='') return false;
+  if(typeof o!=='object') return String(o).trim()!=='';
+  if(/sin registro/i.test(String(gp(o,'enc','glscod')||''))) return false;
+  return Object.keys(o).some(k=>tieneDato(o[k]));
+}
+function secBoletines(causas){
+  const B = [
+    ['Boletín de Alertas','alert'],['Boletín de Impagos Vigente','bolvig'],
+    ['Boletín de Impagos Histórico','bolhst'],['Boletín Laboral y Previsional Vigente','labvig'],
+    ['Boletín Laboral y Previsional Histórico','labhst'],['Boletín de Procesos Penales','penal'],
+    ['Boletín Concursal','bolconc'],['Boletín de Arriendos','bolarrien'],
+  ];
+  return B.map(([t,k])=>'<div class="rep-h">'+t+'</div>'+
+    (tieneDato(gp(causas,k)) ? '<div class="rep-tree">'+renderTree(gp(causas,k))+'</div>' : noinfo())).join('');
+}
 function tblRelacionados(nodo){
   const ds = arr(gp(nodo,'d')); if(!ds.length) return secEmpty();
   return '<table class="rep-tb"><thead><tr><th>RUT</th><th>Nombre</th><th>Relación</th></tr></thead><tbody>'+
@@ -237,9 +280,13 @@ function bodyPerfilComercial(prd){
     ['EDAD', civ.edad!=null?civ.edad+' Años':''],['OCUPACIÓN', gp(civ,'ocupacion','profesion')],
     ['PERFIL SOCIO ECONÓMICO', civ.perfil_socioeconomico],['ESTADO CIVIL', civ.matrimonio_estado_civil],
     ['HIJOS', gp(civ,'asignacion_familiar','hijos')],['CÓNYUGE', gp(civ,'asignacion_familiar','conyuge')],
+    ['EX-CÓNYUGE', gp(civ,'asignacion_familiar','exconyuge')],
   ];
   const idHtml = '<table class="rep-tb"><tbody>'+idRows.map(([k,v])=>'<tr><th style="width:42%">'+k+'</th><td>'+esc(v!=null&&v!==''?v:'—')+'</td></tr>').join('')+'</tbody></table>';
   let h = sec('Identificación', idHtml);
+  h += sec('Resumen de Activos', tblResumenActivos(gp(titular,'activos','activos_resumen')));
+  h += sec('Propiedades Vigentes', tblPropiedades(gp(titular,'activos','activo_detalle_direccion')));
+  h += sec('Vehículos Motorizados Vigentes', tblVehiculosVig(gp(titular,'activos','activo_detalle_vehiculo')));
   h += sec('Vehículos Motorizados Históricos', tblVehiculos(gp(titular,'activos','activo_detalle_vehiculo_historico')));
   h += sec('Teléfonos más probables de contacto', tblContactos(gp(colect,'telefonos','telefono_contacto_probable')));
   h += sec('Teléfonos alternativos', tblContactos(gp(colect,'telefonos','telefono_contacto_alternativo')));
@@ -249,7 +296,9 @@ function bodyPerfilComercial(prd){
   h += sec('Dirección laboral', tblContactos(gp(colect,'direcciones','direccion_laboral')));
   h += sec('Correos electrónicos más probables', tblContactos(gp(colect,'correos','correo_contacto_probable')));
   h += sec('Correos electrónicos alternativos', tblContactos(gp(colect,'correos','correo_contacto_alternativo')));
+  h += sec('Correos electrónicos laborales', tblContactos(gp(colect,'correos','correo_contacto_laboral')));
   h += sec('Situación tributaria', bodyTributaria(trib));
+  h += secBoletines(titular.causas || {});
   h += sec('Participaciones en sociedades', tblSociedades(gp(titular,'sociedades','empresa')));
   h += sec('Relacionados', tblRelacionados(titular.relacionados));
   h += sec('Fuentes', (arr(gp(titular,'fuentes','fuente')).map(esc).join(', ')||secEmpty()));
