@@ -129,6 +129,26 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
        ingresar y operar según su perfil. */
     await pool.query(`ALTER TABLE usuarios ADD COLUMN externo TINYINT(1) NOT NULL DEFAULT 0`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration externo]', e.message); }
+  try {
+    // Trazabilidad de la suspensión: cuándo y quién (se muestran en Usuarios Suspendidos)
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN suspendido_en DATETIME NULL DEFAULT NULL`);
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN suspendido_por VARCHAR(150) NULL DEFAULT NULL`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration suspendido]', e.message); }
+});
+
+/* Backfill: fecha y autor de las suspensiones YA hechas, desde la auditoría
+   (accion ELIMINAR, detalle 'Usuario suspendido'). Sin rastro en auditoría,
+   queda al menos la fecha_baja. */
+require('../../../../shared/migrate').migrar('usuarios-suspendido-backfill-v1', async () => {
+  await pool.query(`
+    UPDATE usuarios u
+    JOIN (SELECT entidad_id, MAX(id) mx FROM auditoria_movimientos
+           WHERE modulo='usuarios' AND entidad='usuario' AND accion='ELIMINAR' AND detalle LIKE '%suspendido%'
+           GROUP BY entidad_id) x ON x.entidad_id = CAST(u.id_usuario AS CHAR)
+    JOIN auditoria_movimientos a ON a.id = x.mx
+     SET u.suspendido_en = a.fecha, u.suspendido_por = a.usuario
+   WHERE u.estado <> 'activo' AND u.suspendido_en IS NULL`).catch(e => console.error('[backfill suspendido]', e.message));
+  await pool.query(`UPDATE usuarios SET suspendido_en = fecha_baja WHERE estado <> 'activo' AND suspendido_en IS NULL AND fecha_baja IS NOT NULL`);
 });
 
 /* One-shot (Pato, 19-08-2026): reenviar el correo de BIENVENIDA (URL + usuario +
@@ -293,7 +313,7 @@ const getAllUsuarios = async (req, res) => {
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion, u.bloqueado, u.intentos_fallidos,
-              COALESCE(u.externo, 0) AS externo,
+              COALESCE(u.externo, 0) AS externo, u.suspendido_en, u.suspendido_por,
               cj.id_caja, cj.nombre AS nombre_caja
        FROM usuarios u
        JOIN perfiles p ON u.id_perfil = p.id_perfil
@@ -390,7 +410,7 @@ const updateUsuario = async (req, res) => {
 
     // "Solo otorgas lo que tienes": si el editor no-Admin CAMBIA el perfil, el nuevo
     // perfil debe estar contenido en sus propios permisos (mantener el actual sí se permite).
-    const [[act]] = await pool.query('SELECT id_perfil FROM usuarios WHERE id_usuario=?', [id]);
+    const [[act]] = await pool.query('SELECT id_perfil, estado FROM usuarios WHERE id_usuario=?', [id]);
     if (act && Number(act.id_perfil) !== Number(id_perfil) &&
         !(await require('../otorgables').perfilOtorgable(req.usuario.id_usuario, id_perfil))) {
       return res.status(403).json({ success: false, data: null, error: 'No puedes asignar ese perfil: tiene permisos que tú no tienes' });
@@ -410,6 +430,14 @@ const updateUsuario = async (req, res) => {
       'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo), sexo = COALESCE(?, sexo), externo = COALESCE(?, externo) WHERE id_usuario = ?',
       [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo === undefined ? null : (req.body.externo ? 1 : 0), id]
     );
+
+    // Trazabilidad de la suspensión también cuando el cambio de estado viene del form de edición
+    if (act && act.estado === 'activo' && estadoFinal !== 'activo') {
+      const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || req.usuario?.email || null;
+      await pool.query('UPDATE usuarios SET suspendido_en = NOW(), suspendido_por = ? WHERE id_usuario = ?', [quien, id]).catch(() => {});
+    } else if (act && act.estado !== 'activo' && estadoFinal === 'activo') {
+      await pool.query('UPDATE usuarios SET suspendido_en = NULL, suspendido_por = NULL WHERE id_usuario = ?', [id]).catch(() => {});
+    }
 
     // A-7: al suspender, sus sesiones abiertas mueren ya — no al vencer el token.
     // También al cambiarle el perfil: el token viejo lleva el perfil anterior y
@@ -436,7 +464,8 @@ const deleteUsuario = async (req, res) => {
       return res.status(403).json({ success: false, data: null, error: 'Cuenta protegida: no puede suspenderse ni eliminarse.' });
     }
     // fecha_baja = fuente única del evento "egresó" (la leen rotación/egresos de Indicadores RRHH)
-    await pool.query("UPDATE usuarios SET estado = ?, fecha_baja = COALESCE(fecha_baja, CURDATE()) WHERE id_usuario = ?", ['inactivo', id]);
+    const quien = `${req.usuario?.nombre || ''} ${req.usuario?.apellido || ''}`.trim() || req.usuario?.email || null;
+    await pool.query("UPDATE usuarios SET estado = ?, fecha_baja = COALESCE(fecha_baja, CURDATE()), suspendido_en = NOW(), suspendido_por = ? WHERE id_usuario = ?", ['inactivo', quien, id]);
     auditar({ req, accion: 'ELIMINAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario suspendido (baja lógica)' });
     res.json({ success: true, data: { mensaje: 'Usuario suspendido correctamente' }, error: null });
   } catch (error) {
@@ -482,7 +511,7 @@ const eliminarDefinitivo = async (req, res) => {
 const reactivarUsuario = async (req, res) => {
   try {
     const { id } = req.params;
-    const [r] = await pool.query('UPDATE usuarios SET estado = ?, fecha_baja = NULL WHERE id_usuario = ?', ['activo', id]);
+    const [r] = await pool.query('UPDATE usuarios SET estado = ?, fecha_baja = NULL, suspendido_en = NULL, suspendido_por = NULL WHERE id_usuario = ?', ['activo', id]);
     if (!r.affectedRows) return res.status(404).json({ success: false, data: null, error: 'Usuario no encontrado' });
     auditar({ req, accion: 'EDITAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: id, detalle: 'Usuario reactivado' });
     res.json({ success: true, data: { mensaje: 'Usuario reactivado correctamente' }, error: null });

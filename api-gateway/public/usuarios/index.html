@@ -260,12 +260,14 @@
                   <th>Teléfono</th>
                   <th>Perfil</th>
                   <th>Estado</th>
+                  <th>Suspendido el</th>
+                  <th>Suspendido por</th>
                   <th>Último acceso</th>
                   <th style="width:130px">Acciones</th>
                 </tr>
               </thead>
               <tbody id="tbodySuspendidos">
-                <tr><td colspan="8" class="text-center py-4 text-muted">Cargando...</td></tr>
+                <tr><td colspan="10" class="text-center py-4 text-muted">Cargando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1082,7 +1084,7 @@
     function renderSuspendidos(lista) {
       const tbody = document.getElementById('tbodySuspendidos');
       if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">Sin usuarios suspendidos.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">Sin usuarios suspendidos.</td></tr>';
         return;
       }
       tbody.innerHTML = lista.map(u => `
@@ -1093,6 +1095,8 @@
           <td class="text-muted">${u.telefono || '—'}</td>
           <td><span class="badge-perfil">${u.perfil}</span></td>
           <td><span class="badge-estado badge-${u.estado}">${u.estado}</span></td>
+          <td class="text-muted" style="font-size:0.8rem">${u.suspendido_en ? new Date(u.suspendido_en).toLocaleDateString('es-CL') : '—'}</td>
+          <td class="text-muted" style="font-size:0.8rem">${u.suspendido_por || '—'}</td>
           <td class="text-muted" style="font-size:0.8rem">${u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-CL') : 'Nunca'}</td>
           <td>
             ${puedeGestionarUsuarios ? `
