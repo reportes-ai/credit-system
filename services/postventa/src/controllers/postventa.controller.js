@@ -2,6 +2,14 @@
 const pool = require('../../../../shared/config/database');
 const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
 const { auditar } = require('../../../../shared/audit');
+/* Fundantes DEVUELTOS (rechazados por la financiera): al registrarlo se
+   desmarcan FUNDANTES RECIBIDOS/ENVIADOS y queda la fecha y el motivo. */
+require('../../../../shared/migrate').enFila('postventa-fundantes-devueltos', async () => {
+  await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS fundantes_devueltos_en DATETIME NULL');
+  await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS fundantes_devueltos_por VARCHAR(120) NULL');
+  await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS fundantes_devueltos_motivo VARCHAR(300) NULL');
+});
+
 /* num_op de un lote de seguimientos, para el detalle de auditoría */
 async function opsTxt(ids) {
   try {
@@ -824,7 +832,8 @@ const getAll = async (req, res) => {
              fc.fecha_factura AS fac_fecha, fc.numero_factura AS fac_numero, fc.monto_bruto AS fac_monto,
              fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta,
              fc.impuesto_pct AS fac_imp_pct, fc.impuesto_monto AS fac_imp_monto,
-             fc.monto_liquido AS fac_liquido   -- lo que EFECTIVAMENTE se deposita
+             fc.monto_liquido AS fac_liquido,   -- lo que EFECTIVAMENTE se deposita
+             s.fundantes_devueltos_en, s.fundantes_devueltos_por, s.fundantes_devueltos_motivo
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
@@ -1261,6 +1270,44 @@ const setEtapa = async (req, res) => {
     res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
+/* ── POST /api/postventa/:id/fundantes-devueltos { motivo } ──────────────────
+   La financiera RECHAZÓ y devolvió los fundantes: se desmarcan FUNDANTES
+   RECIBIDOS y ENVIADOS y queda registrada la fecha de devolución. Solo procede
+   si el flujo no avanzó más allá (con fondos recibidos o pagado ya no aplica). */
+const fundantesDevueltos = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const motivo = String(req.body?.motivo || '').trim().slice(0, 300) || null;
+    const usuario = loginDe(req.usuario);
+    const [[seg]] = await pool.query('SELECT id, num_op FROM postventa_seguimiento WHERE id=?', [id]);
+    if (!seg) return res.status(404).json({ success: false, data: null, error: 'Seguimiento no encontrado' });
+    const [[{ avanzadas }]] = await pool.query(
+      `SELECT COUNT(*) avanzadas FROM postventa_etapas
+        WHERE id_seguimiento=? AND track='SALDO'
+          AND etapa IN ('LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO')`, [id]);
+    if (avanzadas > 0)
+      return res.status(400).json({ success: false, data: null,
+        error: 'El flujo ya avanzó más allá de los fundantes (liberado/fondos/orden/pago): desmarca primero esas etapas.' });
+    const [r] = await pool.query(
+      `DELETE FROM postventa_etapas WHERE id_seguimiento=? AND track='SALDO'
+        AND etapa IN ('FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS')`, [id]);
+    if (!r.affectedRows)
+      return res.status(400).json({ success: false, data: null, error: 'No hay fundantes recibidos/enviados que devolver.' });
+    await pool.query(
+      'UPDATE postventa_seguimiento SET fundantes_devueltos_en=NOW(), fundantes_devueltos_por=?, fundantes_devueltos_motivo=? WHERE id=?',
+      [usuario, motivo, id]);
+    // Auditoría (misma tabla que las reversas de etapas)
+    await pool.query('INSERT INTO postventa_reversas (id_seguimiento, etapa, usuario, motivo) VALUES (?,?,?,?)',
+      [id, 'FUNDANTES DEVUELTOS', usuario, motivo || 'Fundantes rechazados y devueltos']).catch(() => {});
+    auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'fundantes', entidad_id: id,
+      detalle: `Fundantes DEVUELTOS — op ${seg.num_op}${motivo ? '. Motivo: ' + motivo : ''}` });
+    res.json({ success: true, data: { id, desmarcadas: r.affectedRows }, error: null });
+  } catch (e) {
+    console.error('[postventa fundantesDevueltos]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
   }
 };
@@ -2476,7 +2523,7 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
 
 module.exports = { sync, getAll, setEtapa, getConfig, setConfig, marcarHistorico, getPerfiles, getSaldosAPagar, enviarAPago, pagarSaldos, getOrdenPago, correlativoOrden, emitirOrdenPago, desmarcarSaldos, getAtribuciones, getFondos, setFondos, getAlertasConfig, setAlertasConfig,
   getComisionesAPagar, getOrdenPagoComision, correlativoOrdenComision, emitirOrdenPagoComision, enviarAPagoComision, pagarComisiones, desmarcarComisiones, getAtribucionesComision, getFondosComision, setFondosComision,
-  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden,
+  getFacturaComision, updateFacturaComision, consultaSaldos, consultaFacturas, consultaFundantes, enviarCorreoOrden, fundantesDevueltos,
   // hooks para otros módulos (ordenes-pago paga la ODP de comisión; anulación/prepago desactivan la comisión)
   notificarPagoComisionDealer, notificarPagoSaldoDealer, idsGrupoFactura, marcarComisionAPagar, probarCorreos,
   contabilizarSaldoPrecio, contabilizarComision,   // el pago desde la ODP también debe generar su asiento
