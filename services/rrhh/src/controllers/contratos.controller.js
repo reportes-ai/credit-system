@@ -735,6 +735,81 @@ exports.anexosDatos = async (_req, res) => {
     const [vars] = await pool.query('SELECT clave, valor FROM comisiones_variables');
     const comision = {};
     vars.forEach(v => { comision[v.clave] = parseFloat(v.valor); });
-    ok(res, { personas, comision });
+    const [modelos] = await pool.query(
+      `SELECT m.id, m.nombre, m.nombre_archivo, m.mime, m.doc_bytes, m.created_at,
+              CONCAT_WS(' ', u.nombre, u.apellido) subido_por
+         FROM rh_anexo_modelos m LEFT JOIN usuarios u ON u.id_usuario = m.subido_por
+        ORDER BY m.created_at DESC`).catch(() => [[]]);
+    ok(res, { personas, comision, modelos });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* ─── MODELOS DE ANEXO SUBIDOS ──────────────────────────────────────────────
+   Además del anexo paramétrico, RRHH puede subir sus propios modelos (Word/PDF)
+   con un nombre propio para distinguirlos. El archivo va al bucket por el motor
+   único shared/almacen-docs (la fila guarda solo la referencia).               */
+require('../../../../shared/migrate').enFila('rrhh-anexo-modelos', async () => {
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_anexo_modelos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(160) NOT NULL,
+    nombre_archivo VARCHAR(255) NOT NULL,
+    mime VARCHAR(120) NULL,
+    archivo LONGBLOB NULL,
+    doc_storage VARCHAR(20) NULL, doc_ruta VARCHAR(300) NULL, doc_bytes INT NULL,
+    subido_por INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+});
+const ALMACEN = require('../../../../shared/almacen-docs');
+const ANEXO_MAX = 7 * 1024 * 1024;   // el body de express es 10mb y el base64 infla ~37%
+
+exports.anexoModeloSubir = async (req, res) => {
+  try {
+    const { nombre, nombre_archivo, mime, base64 } = req.body || {};
+    if (!nombre || !String(nombre).trim()) return fail(res, 'Ponle un nombre al modelo', 400);
+    if (!base64) return fail(res, 'Falta el archivo', 400);
+    const buffer = Buffer.from(base64, 'base64');
+    if (!buffer.length) return fail(res, 'El archivo llegó vacío', 400);
+    if (buffer.length > ANEXO_MAX) return fail(res, 'El archivo supera el máximo de 7 MB', 400);
+    const col = await ALMACEN.colocar({ ambito: 'rrhh-anexos', clave: Date.now(), buffer, mime, nombre: nombre_archivo });
+    const [r] = await pool.query(
+      `INSERT INTO rh_anexo_modelos (nombre, nombre_archivo, mime, archivo, doc_storage, doc_ruta, doc_bytes, subido_por)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [String(nombre).trim(), nombre_archivo || 'modelo', mime || null, col.blob, col.storage, col.ruta, col.bytes, req.user?.id_usuario || null]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: r.insertId,
+      detalle: `Subió el modelo de anexo "${String(nombre).trim()}" (${nombre_archivo || 'archivo'})` });
+    ok(res, { id: r.insertId });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.anexoModeloRenombrar = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').trim();
+    if (!nombre) return fail(res, 'El nombre no puede quedar vacío', 400);
+    const [r] = await pool.query('UPDATE rh_anexo_modelos SET nombre=? WHERE id=?', [nombre, req.params.id]);
+    if (!r.affectedRows) return fail(res, 'Modelo no encontrado', 404);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: req.params.id,
+      detalle: `Renombró el modelo de anexo a "${nombre}"` });
+    ok(res, { id: Number(req.params.id) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.anexoModeloVer = async (req, res) => {
+  try {
+    const [[m]] = await pool.query('SELECT * FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (!m) return fail(res, 'Modelo no encontrado', 404);
+    await ALMACEN.servir(res, { ruta: m.doc_ruta, blob: m.archivo, nombre: m.nombre_archivo, mime: m.mime });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.anexoModeloBorrar = async (req, res) => {
+  try {
+    const [[m]] = await pool.query('SELECT nombre, doc_ruta FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (!m) return fail(res, 'Modelo no encontrado', 404);
+    await pool.query('DELETE FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (m.doc_ruta) ALMACEN.borrar(m.doc_ruta).catch(() => {});
+    auditar({ req, accion: 'ELIMINAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: req.params.id,
+      detalle: `Eliminó el modelo de anexo "${m.nombre}"` });
+    ok(res, { id: Number(req.params.id) });
   } catch (e) { fail(res, e.message); }
 };

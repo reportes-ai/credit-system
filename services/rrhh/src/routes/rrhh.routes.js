@@ -45,6 +45,10 @@ router.put('/contratos/cartas/:id/estado', verifyToken, requireFunc('rh_contrato
 router.post('/contratos/cartas/:id/contratar', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.contratarDesdeCarta);
 router.get('/contratos',               verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.getContratos);
 router.get('/contratos/anexos/datos',  verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexosDatos);
+router.post('/contratos/anexos/modelos',        verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloSubir);
+router.put('/contratos/anexos/modelos/:id',     verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloRenombrar);
+router.get('/contratos/anexos/modelos/:id',     verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloVer);
+router.delete('/contratos/anexos/modelos/:id',  verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloBorrar);
 router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoColaboradores);
 router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);
 router.post('/finiquitos',              verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoGuardar);

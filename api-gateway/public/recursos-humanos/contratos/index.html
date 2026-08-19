@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -106,21 +106,29 @@
   </div>
 
   <div class="panel" id="pAnexos" style="display:none">
-    <b>Modelos de anexo vigentes</b>
-    <p style="font-size:.78rem;color:#64748b;margin:4px 0 12px">Cada modelo se arma con los <b>valores vigentes del sistema</b> — no con números copiados. Elige el modelo, quién firma por la empresa y la fecha, y se genera listo para imprimir o guardar como PDF (tamaño carta, con logo).</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <b>Modelos de anexo vigentes</b>
+      <button class="btn-g" onclick="$('anexUpFile').click()"><i class="bi bi-upload me-1"></i>Subir modelo de anexo</button>
+      <input type="file" id="anexUpFile" accept=".pdf,.doc,.docx" style="display:none" onchange="anexSubirModelo(this)">
+    </div>
+    <p style="font-size:.78rem;color:#64748b;margin:4px 0 12px">Cada modelo se arma con los <b>valores vigentes del sistema</b> — no con números copiados. Elige el modelo, quién firma por la empresa y la fecha, y se genera listo para imprimir o guardar como PDF (tamaño carta, con logo). También puedes <b>subir tus propios modelos</b> (Word/PDF) y ponerles nombre para distinguirlos.</p>
     <div id="anexModelos"></div>
+    <div id="anexSubidos"></div>
 
     <div id="anexForm" style="display:none;margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px">
       <b id="anexTitulo"></b>
       <div class="grid3" style="margin-top:10px">
-        <div class="fld"><label>Trabajador que firma *</label><select id="anexTrab"></select></div>
-        <div class="fld"><label>Firma por la empresa *</label><select id="anexFirmante"></select></div>
+        <div class="fld"><label>Trabajadores que firman * <span style="color:#94a3b8;font-weight:400">(uno o varios)</span></label>
+          <div id="anexTrabList" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;max-height:180px;overflow:auto;background:#fff"></div>
+        </div>
+        <div class="fld"><label>Firma por la empresa * <span style="color:#94a3b8;font-weight:400">(gerentes)</span></label><select id="anexFirmante"></select></div>
         <div class="fld"><label>Fecha de firma *</label><input id="anexFecha" type="date"></div>
       </div>
       <div class="fld" style="max-width:320px"><label>Vigencia del anexo (rige a contar de) *</label><input id="anexVigencia" type="date"></div>
       <div id="anexAviso" style="font-size:.79rem;background:#f8fafc;border-left:3px solid var(--navy);border-radius:6px;padding:9px 12px;margin:10px 0;color:#475569"></div>
       <button class="btn" onclick="anexImprimir()"><i class="bi bi-printer me-1"></i>Imprimir / Guardar PDF</button>
       <button class="btn-g" onclick="$('anexForm').style.display='none'">Cancelar</button>
+      <div id="anexCola" style="margin-top:12px"></div>
     </div>
   </div>
 
@@ -142,7 +150,7 @@
       <li><b>Cargos y descripciones</b> → cartas oferta y contratos de esta página; un cargo sin descripción genera un recordatorio diario (campana) hasta que se cargue.</li>
       <li><b>Catálogo de beneficios</b> → los checkbox disponibles al armar cada <b>carta oferta</b>, y las cláusulas que hereda el <b>contrato</b>.</li>
       <li><b>Carta ACEPTADA → Contratar</b> → crea el contrato con lo ofertado (fuente única) y deja el documento imprimible para firma.</li>
-      <li><b>Anexos</b> → documentos imprimibles en tamaño carta con los <b>valores vigentes del sistema</b>, no copiados. El <b>Anexo Variable Ejecutivos</b> toma sus montos, tramos, pesos y umbrales de <a href="/comisiones/variables/">Comisiones → Mantenedor Variables</a>: si ahí se cambia un valor, el próximo anexo sale con el valor nuevo — y lo que se paga en <a href="/comisiones/revision/">Revisión de Comisiones</a> es exactamente lo que dice el papel firmado.</li>
+      <li><b>Anexos</b> → documentos imprimibles en tamaño carta con los <b>valores vigentes del sistema</b>, no copiados. El <b>Anexo Variable Ejecutivos</b> toma sus montos, tramos, pesos y umbrales de <a href="/comisiones/variables/">Comisiones → Mantenedor Variables</a>: si ahí se cambia un valor, el próximo anexo sale con el valor nuevo — y lo que se paga en <a href="/comisiones/revision/">Revisión de Comisiones</a> es exactamente lo que dice el papel firmado. Por la empresa firma siempre un <b>gerente</b> (por defecto el Gerente General); se puede generar para <b>varios trabajadores a la vez</b> (un PDF por cada uno, con su nombre y fecha en el archivo). Los <b>modelos subidos</b> (Word/PDF) se guardan en el almacén de documentos con su fecha de subida.</li>
     </ul>
   </div>
 </div>
@@ -626,16 +634,70 @@ async function anexInit(){
       </div>
       <button class="btn" onclick="anexAbrir('${m.codigo}')">Generar</button>
     </div>`).join('');
+  anexPintarSubidos(j.data.modelos||[]);
+}
+
+/* ── Modelos subidos por RRHH (Word/PDF con nombre propio) ── */
+function anexPintarSubidos(modelos){
+  $('anexSubidos').innerHTML = modelos.length ? '<b style="font-size:.85rem">Modelos subidos</b>' + modelos.map(m=>`
+    <div style="border:1.5px solid #e2e8f0;border-radius:12px;padding:12px 16px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:#fbfdff">
+      <div style="flex:1;min-width:260px">
+        <div style="font-weight:700;color:#0f172a"><i class="bi bi-file-earmark-arrow-up me-1" style="color:var(--navy)"></i>${esc(m.nombre)}</div>
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:4px">${esc(m.nombre_archivo)} · subido el ${fmtF(m.created_at)}${m.subido_por?' por '+esc(m.subido_por):''}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" onclick="anexVerModelo(${m.id})"><i class="bi bi-eye me-1"></i>Ver / Imprimir</button>
+        <button class="btn-g" onclick="anexRenombrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-pencil"></i></button>
+        <button class="btn-g" style="color:#b91c1c" onclick="anexBorrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-trash"></i></button>
+      </div>
+    </div>`).join('') : '';
+}
+async function anexSubirModelo(inp){
+  const f = inp.files[0]; if(!f) return; inp.value='';
+  if (f.size > 7*1024*1024) return alert('El archivo supera el máximo de 7 MB');
+  const nombre = prompt('Nombre del modelo (para distinguirlo en la lista):', f.name.replace(/\.[^.]+$/,''));
+  if (!nombre || !nombre.trim()) return;
+  const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
+  const j = await (await fetch('/api/rrhh/contratos/anexos/modelos',{method:'POST',headers:{...H,'Content-Type':'application/json'},
+    body:JSON.stringify({nombre:nombre.trim(), nombre_archivo:f.name, mime:f.type, base64})})).json();
+  if (!j.success) return alert(j.error||'No se pudo subir');
+  ANEX_INIT=false; anexInit();
+}
+async function anexRenombrarModelo(id, actual){
+  const nombre = prompt('Nuevo nombre del modelo:', actual); if(!nombre||!nombre.trim()) return;
+  const j = await (await fetch('/api/rrhh/contratos/anexos/modelos/'+id,{method:'PUT',headers:{...H,'Content-Type':'application/json'},body:JSON.stringify({nombre:nombre.trim()})})).json();
+  if (!j.success) return alert(j.error||'No se pudo renombrar');
+  ANEX_INIT=false; anexInit();
+}
+async function anexBorrarModelo(id, nombre){
+  if (!confirm('¿Eliminar el modelo "'+nombre+'"? Esta acción no se puede deshacer.')) return;
+  const j = await (await fetch('/api/rrhh/contratos/anexos/modelos/'+id,{method:'DELETE',headers:H})).json();
+  if (!j.success) return alert(j.error||'No se pudo eliminar');
+  ANEX_INIT=false; anexInit();
+}
+async function anexVerModelo(id){
+  try {
+    const r = await fetch('/api/rrhh/contratos/anexos/modelos/'+id,{headers:H});
+    if (!r.ok) throw new Error();
+    const u = URL.createObjectURL(await r.blob());
+    window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000);
+  } catch(_) { alert('No se pudo abrir el modelo.'); }
 }
 
 function anexAbrir(cod){
   ANEX_MODELO = ANEXOS_MODELOS.find(m=>m.codigo===cod); if(!ANEX_MODELO) return;
   const elegibles = ANEX_PERSONAS.filter(p => ANEX_MODELO.cargos.some(c => String(p.cargo||'').toUpperCase().includes(c)));
   $('anexTitulo').textContent = ANEX_MODELO.titulo;
-  $('anexTrab').innerHTML = elegibles.length
-    ? elegibles.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.rut?' · '+esc(rutFmt(p.rut)):''}</option>`).join('')
-    : '<option value="">— sin colaboradores con ese cargo —</option>';
-  $('anexFirmante').innerHTML = ANEX_PERSONAS.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.cargo?' — '+esc(p.cargo):''}</option>`).join('');
+  $('anexTrabList').innerHTML = elegibles.length
+    ? elegibles.map(p=>`<label style="display:flex;align-items:center;gap:8px;font-size:.82rem;padding:3px 0;margin:0"><input type="checkbox" class="anexTrabChk" value="${p.id_usuario}" style="width:auto">${esc(p.nombre)}${p.rut?' · '+esc(rutFmt(p.rut)):''}</label>`).join('')
+    : '<span style="color:#94a3b8;font-size:.8rem">— sin colaboradores con ese cargo —</span>';
+  // El documento por la empresa lo firma siempre un GERENTE; por defecto, el Gerente General.
+  const gerentes = ANEX_PERSONAS.filter(p => /GERENTE/i.test(String(p.cargo||'')));
+  const listaF = gerentes.length ? gerentes : ANEX_PERSONAS;
+  $('anexFirmante').innerHTML = listaF.map(p=>`<option value="${p.id_usuario}">${esc(p.nombre)}${p.cargo?' — '+esc(p.cargo):''}</option>`).join('');
+  const gg = listaF.find(p => /GERENTE\s+GENERAL/i.test(String(p.cargo||'')));
+  if (gg) $('anexFirmante').value = String(gg.id_usuario);
+  $('anexCola').innerHTML='';
   const hoy = new Date().toISOString().slice(0,10);
   $('anexFecha').value = hoy;
   const d = new Date(); d.setMonth(d.getMonth()+1, 1);
@@ -653,12 +715,24 @@ const anexPct = (x,dec=2) => { const s=((x||0)*100).toFixed(dec).replace('.',','
 const anexFechaLarga = v => v ? new Date(v+'T12:00:00').toLocaleDateString('es-CL',{day:'numeric',month:'long',year:'numeric'}) : '';
 
 function anexImprimir(){
-  const trab = ANEX_PERSONAS.find(p=>String(p.id_usuario)===$('anexTrab').value);
+  const ids = [...document.querySelectorAll('.anexTrabChk:checked')].map(c=>c.value);
   const firm = ANEX_PERSONAS.find(p=>String(p.id_usuario)===$('anexFirmante').value);
-  if (!trab) return alert('Selecciona el trabajador que firma');
+  if (!ids.length) return alert('Selecciona al menos un trabajador');
   if (!firm) return alert('Selecciona quién firma por la empresa');
   if (!$('anexFecha').value)    return alert('Indica la fecha de firma');
   if (!$('anexVigencia').value) return alert('Indica desde cuándo rige el anexo');
+  const trabajadores = ids.map(id=>ANEX_PERSONAS.find(p=>String(p.id_usuario)===id)).filter(Boolean);
+  if (trabajadores.length === 1) return anexGenerarUno(trabajadores[0], firm);
+  /* Varios seleccionados: el navegador solo permite UN diálogo de impresión por clic,
+     así que se deja la cola con un botón por trabajador — cada uno sale con su nombre
+     de archivo propio (ANEXO Nombre Apellido dd-mm-aaaa). */
+  $('anexCola').innerHTML = '<b style="font-size:.85rem">Cola de impresión — un PDF por trabajador:</b>'+
+    trabajadores.map(t=>`<div style="display:flex;align-items:center;gap:10px;margin-top:6px" id="anexQ${t.id_usuario}">
+      <button class="btn" onclick="anexGenerarUno(ANEX_PERSONAS.find(p=>p.id_usuario==${t.id_usuario}), ANEX_PERSONAS.find(p=>String(p.id_usuario)===$('anexFirmante').value)); this.classList.add('btn-g'); this.innerHTML='<i class=&quot;bi bi-check2&quot;></i> ${esc('ANEXO '+nombreCorto(t.nombre))} — impreso'">
+        <i class="bi bi-printer me-1"></i>ANEXO ${esc(nombreCorto(t.nombre))} ${fechaArchivo($('anexFecha').value)}</button></div>`).join('');
+  $('anexCola').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function anexGenerarUno(trab, firm){
   if (ANEX_MODELO.codigo === 'VAR_EJECUTIVOS') anexVarEjecutivos(trab, firm);
 }
 
@@ -734,7 +808,7 @@ function anexVarEjecutivos(trab, firm){
     <div style="display:flex;justify-content:space-between;margin-top:70px;text-align:center;font-size:12.5px">
       <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(firm.nombre)}</b><br>p.p. AUTOFÁCIL SpA<br>RUT N° 76.545.638-K</div>
       <div style="border-top:1px solid #333;padding-top:6px;width:44%"><b>${esc(trab.nombre)}</b><br>Trabajador${trab.rut?`<br>RUT N° ${esc(rutFmt(trab.rut))}`:''}</div>
-    </div>`, `Anexo Variable ${nombreCorto(trab.nombre)} ${fechaArchivo($('anexFecha').value)}`);
+    </div>`, `ANEXO ${nombreCorto(trab.nombre)} ${fechaArchivo($('anexFecha').value)}`);
 }
 
 cargarTodo();
