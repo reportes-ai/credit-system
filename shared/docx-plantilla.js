@@ -146,4 +146,45 @@ function marcadoresDe(buffer) {
   return [...out];
 }
 
-module.exports = { reemplazar, extraerTexto, marcadoresDe };
+/* ── Edición de párrafos (para el editor in-app) ──────────────────────────
+   Un párrafo Word = <w:p>…</w:p> (incluye los de las celdas de tabla, en orden
+   de documento). Editar reemplaza los runs del párrafo por UN run que conserva
+   el formato del primero (rPr) y las propiedades del párrafo (pPr). */
+const RE_P = /<w:p\b[^>]*?(?:\/>|>[\s\S]*?<\/w:p>)/g;
+const desXml = s => String(s).replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+function textoDeP(pXml) {
+  return (pXml.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g) || [])
+    .map(t => desXml(t.replace(/<[^>]+>/g, ''))).join('');
+}
+
+/** Lista los párrafos del documento: [{ i, texto }]. */
+function parrafos(buffer) {
+  const doc = leerZip(buffer).find(e => e.nombre === 'word/document.xml');
+  if (!doc) return [];
+  return (doc.contenido.toString('utf8').match(RE_P) || []).map((p, i) => ({ i, texto: textoDeP(p) }));
+}
+
+/** Nuevo .docx con los párrafos indicados reemplazados. `cambios` = { indice: 'texto nuevo' }. */
+function editarParrafos(buffer, cambios) {
+  const entradas = leerZip(buffer);
+  const doc = entradas.find(e => e.nombre === 'word/document.xml');
+  if (!doc) throw new Error('document.xml no encontrado');
+  let i = -1, tocados = 0;
+  const xml = doc.contenido.toString('utf8').replace(RE_P, p => {
+    i++;
+    if (!(i in cambios)) return p;
+    const nuevo = String(cambios[i]).replace(/\s*\n\s*/g, ' ').trim();
+    if (nuevo === textoDeP(p)) return p;
+    tocados++;
+    if (p.endsWith('/>')) p = p.replace(/\/>$/, '></w:p>').replace('<w:p', '<w:p').replace('></w:p>', '></w:p>'); // párrafo vacío autocerrado → expandir
+    const pPr = (p.match(/<w:pPr\b[^>]*(?:\/>|>[\s\S]*?<\/w:pPr>)/) || [''])[0];
+    const rPr = (p.match(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/) || [''])[0].match(/<w:rPr\b[^>]*(?:\/>|>[\s\S]*?<\/w:rPr>)/) || [''];
+    const abre = (p.match(/^<w:p\b[^>]*>/) || ['<w:p>'])[0].replace(/\/>$/, '>');
+    const run = nuevo ? `<w:r>${rPr[0]}<w:t xml:space="preserve">${escXml(nuevo)}</w:t></w:r>` : '';
+    return `${abre}${pPr}${run}</w:p>`;
+  });
+  doc.contenido = Buffer.from(xml, 'utf8');
+  return { buffer: escribirZip(entradas), tocados };
+}
+
+module.exports = { reemplazar, extraerTexto, marcadoresDe, parrafos, editarParrafos };

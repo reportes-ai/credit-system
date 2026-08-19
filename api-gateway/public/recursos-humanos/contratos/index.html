@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -156,6 +156,15 @@
 </div>
 
 <dialog id="dlgCarta"><div class="dlg" id="dlgCartaBody"></div></dialog>
+<dialog id="dlgAnexTexto"><div class="dlg" style="max-width:860px;width:92vw">
+  <h5 style="color:var(--navy);margin:0 0 4px" id="anexTxtTit">Editar texto del modelo</h5>
+  <p style="font-size:.76rem;color:#64748b;margin:0 0 10px">Edita el texto y los <code>{{MARCADORES}}</code> directamente — el formato de cada párrafo se conserva. Al guardar se re-detectan los marcadores y el revisor IA vuelve a pasar.</p>
+  <div id="anexTxtBody" style="max-height:60vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px"></div>
+  <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn-g" onclick="$('dlgAnexTexto').close()">Cancelar</button>
+    <button class="btn" onclick="anexGuardarTexto()"><i class="bi bi-check2 me-1"></i>Guardar cambios</button>
+  </div>
+</div></dialog>
 <dialog id="dlgCargo"><div class="dlg">
   <h5 style="color:var(--navy);margin:0 0 12px" id="dlgCargoTit">Cargo</h5>
   <div class="fld"><label>Nombre del cargo *</label><input id="cgNombre" maxlength="120"></div>
@@ -661,6 +670,7 @@ function anexPintarSubidos(modelos){
       </div>
       <div style="display:flex;gap:6px">
         ${esDocx(m)&&marc.length ? `<button class="btn" onclick="anexAbrirSubido(${m.id})"><i class="bi bi-people me-1"></i>Generar</button>` : ''}
+        ${esDocx(m) ? `<button class="btn-g" onclick="anexEditarTexto(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-input-cursor-text me-1"></i>Texto</button>` : ''}
         <button class="${esDocx(m)&&marc.length?'btn-g':'btn'}" onclick="anexVerModelo(${m.id})"><i class="bi bi-eye me-1"></i>Ver</button>
         <button class="btn-g" onclick="anexRenombrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-pencil"></i></button>
         <button class="btn-g" style="color:#b91c1c" onclick="anexBorrarModelo(${m.id},'${esc(m.nombre).replace(/'/g,'&#39;')}')"><i class="bi bi-trash"></i></button>
@@ -700,6 +710,34 @@ async function anexBorrarModelo(id, nombre){
   if (!confirm('¿Eliminar el modelo "'+nombre+'"? Esta acción no se puede deshacer.')) return;
   const j = await (await fetch('/api/rrhh/contratos/anexos/modelos/'+id,{method:'DELETE',headers:H})).json();
   if (!j.success) return alert(j.error||'No se pudo eliminar');
+  ANEX_INIT=false; anexInit();
+}
+/* ── Editor in-app del texto del modelo ── */
+let ANEX_TXT = { id:null, originales:{} };
+async function anexEditarTexto(id, nombre){
+  const j = await (await fetch('/api/rrhh/contratos/anexos/modelos/'+id+'/texto',{headers:H})).json();
+  if (!j.success) return alert(j.error||'No se pudo abrir el texto');
+  ANEX_TXT = { id, originales:{} };
+  $('anexTxtTit').textContent = 'Editar texto — '+nombre;
+  $('anexTxtBody').innerHTML = j.data.parrafos.map(p=>{
+    ANEX_TXT.originales[p.i] = p.texto;
+    if (!p.texto.trim()) return `<div style="height:8px" data-i="${p.i}"></div>`;
+    return `<textarea class="anexTxtP" data-i="${p.i}" rows="1" style="width:100%;border:1px solid transparent;border-radius:6px;padding:4px 6px;font-size:.82rem;line-height:1.5;resize:none;overflow:hidden;font-family:inherit;background:transparent"
+      onfocus="this.style.borderColor='#94a3b8';this.style.background='#fff'"
+      onblur="this.style.borderColor=this.value!==ANEX_TXT.originales[this.dataset.i]?'#f59e0b':'transparent';this.style.background='transparent'"
+      oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(p.texto)}</textarea>`;
+  }).join('');
+  $('dlgAnexTexto').showModal();
+  document.querySelectorAll('.anexTxtP').forEach(t=>{ t.style.height='auto'; t.style.height=t.scrollHeight+'px'; });
+}
+async function anexGuardarTexto(){
+  const cambios = {};
+  document.querySelectorAll('.anexTxtP').forEach(t=>{ if (t.value !== ANEX_TXT.originales[t.dataset.i]) cambios[t.dataset.i] = t.value; });
+  if (!Object.keys(cambios).length) return $('dlgAnexTexto').close();
+  const j = await (await fetch('/api/rrhh/contratos/anexos/modelos/'+ANEX_TXT.id+'/texto',{method:'PUT',
+    headers:{...H,'Content-Type':'application/json'}, body:JSON.stringify({cambios})})).json();
+  if (!j.success) return alert(j.error||'No se pudo guardar');
+  $('dlgAnexTexto').close();
   ANEX_INIT=false; anexInit();
 }
 async function anexVerModelo(id){

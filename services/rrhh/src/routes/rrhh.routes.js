@@ -49,6 +49,8 @@ router.post('/contratos/anexos/modelos',        verifyToken, requireFunc('rh_con
 router.put('/contratos/anexos/modelos/:id',     verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloRenombrar);
 router.get('/contratos/anexos/modelos/:id',     verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloVer);
 router.post('/contratos/anexos/modelos/:id/generar', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloGenerar);
+router.get('/contratos/anexos/modelos/:id/texto',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloTexto);
+router.put('/contratos/anexos/modelos/:id/texto',    verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloTextoGuardar);
 router.delete('/contratos/anexos/modelos/:id',  verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.anexoModeloBorrar);
 router.get('/finiquitos/colaboradores', verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoColaboradores);
 router.get('/finiquitos/calcular',      verifyToken, requireFunc('rh_contratos', 'rh_colaboradores'), con.finiquitoCalcular);

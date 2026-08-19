@@ -892,6 +892,47 @@ exports.anexoModeloGenerar = async (req, res) => {
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── Editor in-app del texto del modelo (.docx) ──
+   GET  → lista de párrafos {i, texto} para editar (incluye la tabla de firmas).
+   PUT  → aplica {cambios: {i: 'texto'}} conservando el formato del párrafo,
+          re-detecta marcadores, vuelve a pasar el revisor IA y reemplaza el
+          archivo en el almacén (el objeto viejo se borra DESPUÉS de apuntar al nuevo). */
+exports.anexoModeloTexto = async (req, res) => {
+  try {
+    const [[m]] = await pool.query('SELECT * FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (!m) return fail(res, 'Modelo no encontrado', 404);
+    if (!ES_DOCX(m.nombre_archivo, m.mime)) return fail(res, 'Solo los modelos Word (.docx) se pueden editar acá', 400);
+    const buffer = await ALMACEN.obtener({ ruta: m.doc_ruta, blob: m.archivo });
+    if (!buffer) return fail(res, 'El archivo del modelo no está disponible', 500);
+    ok(res, { parrafos: DOCXP.parrafos(buffer) });
+  } catch (e) { fail(res, e.message); }
+};
+
+exports.anexoModeloTextoGuardar = async (req, res) => {
+  try {
+    const cambios = req.body?.cambios || {};
+    if (!Object.keys(cambios).length) return fail(res, 'No hay cambios', 400);
+    const [[m]] = await pool.query('SELECT * FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
+    if (!m) return fail(res, 'Modelo no encontrado', 404);
+    if (!ES_DOCX(m.nombre_archivo, m.mime)) return fail(res, 'Solo los modelos Word (.docx) se pueden editar acá', 400);
+    const buffer = await ALMACEN.obtener({ ruta: m.doc_ruta, blob: m.archivo });
+    if (!buffer) return fail(res, 'El archivo del modelo no está disponible', 500);
+    const r = DOCXP.editarParrafos(buffer, cambios);
+    if (!r.tocados) return ok(res, { tocados: 0 });
+    let marcadores = []; try { marcadores = DOCXP.marcadoresDe(r.buffer); } catch (_) {}
+    const rutaVieja = m.doc_ruta;   // capturar ANTES: después del UPDATE ya no hay cómo saber qué objeto quedó huérfano
+    const col = await ALMACEN.colocar({ ambito: 'rrhh-anexos', clave: Date.now(), buffer: r.buffer, mime: m.mime, nombre: m.nombre_archivo });
+    await pool.query(
+      `UPDATE rh_anexo_modelos SET archivo=?, doc_storage=?, doc_ruta=?, doc_bytes=?, marcadores=?, ia_estado='REVISANDO', ia_aviso=NULL WHERE id=?`,
+      [col.blob, col.storage, col.ruta, col.bytes, marcadores.length ? JSON.stringify(marcadores) : null, m.id]);
+    if (rutaVieja && rutaVieja !== col.ruta) ALMACEN.borrar(rutaVieja).catch(() => {});
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'anexo_modelo', entidad_id: m.id,
+      detalle: `Editó el texto del modelo "${m.nombre}" (${r.tocados} párrafo${r.tocados !== 1 ? 's' : ''})` });
+    anexoRevisarIA(m.id, { buffer: r.buffer, mime: m.mime, nombre_archivo: m.nombre_archivo }, req.user?.id_usuario || null);
+    ok(res, { tocados: r.tocados, marcadores });
+  } catch (e) { fail(res, e.message); }
+};
+
 exports.anexoModeloBorrar = async (req, res) => {
   try {
     const [[m]] = await pool.query('SELECT nombre, doc_ruta FROM rh_anexo_modelos WHERE id=?', [req.params.id]);
