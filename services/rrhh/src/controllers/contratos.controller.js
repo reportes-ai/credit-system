@@ -851,6 +851,8 @@ exports.anexoModeloVer = async (req, res) => {
    (Máxima: el mantenedor debe LEERSE — nunca números copiados). */
 const fmtCLP = n => '$' + Number(n || 0).toLocaleString('es-CL');
 const fmtPct = n => { const s = (Number(n || 0) * 100).toLocaleString('es-CL', { maximumFractionDigits: 2 }); return s + '%'; };
+// RUT con puntos y guión (15820531-9 → 15.820.531-9); si no calza el formato, se deja tal cual
+const fmtRut = r => { const m = String(r || '').replace(/\./g, '').match(/^(\d{1,9})-?([\dkK])$/); return m ? Number(m[1]).toLocaleString('es-CL') + '-' + m[2].toUpperCase() : String(r || ''); };
 const fechaLargaCL = v => v ? new Date(v + 'T12:00:00').toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 
 exports.anexoModeloGenerar = async (req, res) => {
@@ -873,9 +875,9 @@ exports.anexoModeloGenerar = async (req, res) => {
     const firm = await persona(id_firmante);
     const [vars] = await pool.query('SELECT clave, valor FROM comisiones_variables');
     const valores = {
-      TRABAJADOR: trab.nombre, RUT: trab.rut || '', CARGO: trab.cargo || '',
+      TRABAJADOR: trab.nombre, RUT: fmtRut(trab.rut), CARGO: trab.cargo || '',
       TRATO: String(trab.sexo || '').toUpperCase().startsWith('F') ? 'doña' : 'don',
-      FIRMANTE: firm ? firm.nombre : '', FIRMANTE_RUT: firm ? (firm.rut || '') : '', FIRMANTE_CARGO: firm ? (firm.cargo || '') : '',
+      FIRMANTE: firm ? firm.nombre : '', FIRMANTE_RUT: firm ? fmtRut(firm.rut) : '', FIRMANTE_CARGO: firm ? (firm.cargo || '') : '',
       FECHA_FIRMA: fechaLargaCL(fecha), VIGENCIA: fechaLargaCL(vigencia),
     };
     for (const v of vars) {
