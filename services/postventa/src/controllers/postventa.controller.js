@@ -10,6 +10,26 @@ require('../../../../shared/migrate').enFila('postventa-fundantes-devueltos', as
   await pool.query('ALTER TABLE postventa_seguimiento ADD COLUMN IF NOT EXISTS fundantes_devueltos_motivo VARCHAR(300) NULL');
 });
 
+/* Backfill: devoluciones registradas en Seguimiento Fundantes ANTES de que
+   existiera el reflejo hacia acá (ej. op 85307, devuelta el 17-08). Solo las
+   que siguen devueltas (estado PENDIENTE con devuelto_fin=1, aún no re-enviadas):
+   se desmarcan RECIBIDOS/ENVIADOS y se estampa la fecha REAL de la devolución. */
+require('../../../../shared/migrate').migrar('fundantes-devueltos-backfill-v1', async () => {
+  const [devs] = await pool.query(`
+    SELECT fs.id_credito, fs.devuelto_at, fs.devuelto_por, fs.devuelto_motivo, s.id AS id_seg
+      FROM fundantes_seg fs
+      JOIN postventa_seguimiento s ON s.id_credito = fs.id_credito
+     WHERE fs.devuelto_fin=1 AND fs.estado='PENDIENTE' AND s.fundantes_devueltos_en IS NULL`);
+  for (const d of devs) {
+    await pool.query(`DELETE FROM postventa_etapas WHERE id_seguimiento=? AND track='SALDO'
+      AND etapa IN ('FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS')`, [d.id_seg]);
+    await pool.query(
+      'UPDATE postventa_seguimiento SET fundantes_devueltos_en=?, fundantes_devueltos_por=?, fundantes_devueltos_motivo=? WHERE id=?',
+      [d.devuelto_at, d.devuelto_por || 'Sistema', String(d.devuelto_motivo || '').slice(0, 300) || null, d.id_seg]);
+  }
+  console.log('[postventa] backfill fundantes devueltos:', devs.length, 'operación(es)');
+});
+
 /* num_op de un lote de seguimientos, para el detalle de auditoría */
 async function opsTxt(ids) {
   try {
