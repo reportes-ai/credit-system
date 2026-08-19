@@ -46,6 +46,7 @@ exports.listar = async (_req, res) => {
              c.expira, (c.foto IS NOT NULL) tiene_foto
       FROM usuarios u LEFT JOIN credenciales_usuario c ON c.id_usuario = u.id_usuario
       WHERE u.estado='activo'
+        AND COALESCE(u.protegido, 0) = 0   -- las cuentas de sistema no llevan credencial
       ORDER BY u.nombre, u.apellido`);
     res.json({ success: true, data: rows, error: null });
   } catch (e) { errSrv(res, e, 'credenciales listar'); }
