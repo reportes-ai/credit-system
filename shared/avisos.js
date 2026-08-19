@@ -154,7 +154,8 @@ async function porFuncionalidad(codigos) {
       `SELECT DISTINCT u.id_usuario FROM usuarios u
          JOIN permisos_perfil pp ON pp.id_perfil = u.id_perfil
          JOIN funcionalidades f  ON f.id_funcionalidad = pp.id_funcionalidad
-        WHERE f.codigo IN (?) AND pp.habilitado = 1 AND u.estado = 'activo'`, [cods]);
+        WHERE f.codigo IN (?) AND pp.habilitado = 1 AND u.estado = 'activo'
+          AND COALESCE(u.externo, 0) = 0`, [cods]);
     return rows.map(r => r.id_usuario);
   } catch (e) { return []; }
 }
@@ -164,7 +165,8 @@ async function porPerfiles(nombres) {
   try {
     const [rows] = await pool.query(
       `SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
-        WHERE p.nombre IN (?) AND u.estado = 'activo'`, [nombres]);
+        WHERE p.nombre IN (?) AND u.estado = 'activo'
+          AND COALESCE(u.externo, 0) = 0`, [nombres]);
     return rows.map(r => r.id_usuario);
   } catch (e) { return []; }
 }

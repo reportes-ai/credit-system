@@ -780,6 +780,13 @@
                 <option value="inactivo">Inactivo</option>
               </select>
             </div>
+            <div class="col-md-6">
+              <div class="form-check" style="margin-top:30px">
+                <input class="form-check-input" type="checkbox" id="uExterno">
+                <label class="form-check-label" for="uExterno"><b>EXTERNO</b></label>
+                <div class="form-text" style="font-size:.76rem">Persona de fuera de la organización (director, asesor). NO se incluye en envíos masivos de correo, escalamientos, suplencias, directorio ni organigrama. Sí puede ingresar según su perfil.</div>
+              </div>
+            </div>
           </div>
           <div id="modalError" class="alert alert-danger mt-3 d-none"></div>
         </div>
@@ -1054,7 +1061,7 @@
           <td class="text-muted">${u.rut}</td>
           <td>${u.email}</td>
           <td class="text-muted">${u.telefono || '—'}</td>
-          <td><span class="badge-perfil">${u.perfil}</span></td>
+          <td><span class="badge-perfil">${u.perfil}</span>${Number(u.externo)?' <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 7px;font-weight:700" title="Usuario externo: fuera de envíos masivos, escalamientos, suplencias, directorio y organigrama">EXTERNO</span>':''}</td>
           <td>${u.nombre_caja ? `<span style="font-size:.75rem;background:#e0f2fe;color:#0369a1;border-radius:8px;padding:2px 9px;font-weight:600"><i class="bi bi-cash-stack me-1"></i>${u.nombre_caja}</span>` : '<span class="text-muted" style="font-size:.8rem">—</span>'}</td>
           <td class="text-muted">${u.supervisor_nombre || '—'}</td>
           <td><span class="badge-estado badge-${u.estado}">${u.estado}</span>${u.bloqueado ? ' <span class="badge-estado" style="background:#fef3c7;color:#92400e" title="Bloqueada por intentos fallidos"><i class="bi bi-lock-fill"></i> bloqueada</span>' : ''}</td>
@@ -1173,6 +1180,7 @@
           document.getElementById('uTelefono').value = u.telefono || '';
           document.getElementById('uCargo').value = u.cargo || '';
           document.getElementById('uSexo').value = u.sexo || '';
+          document.getElementById('uExterno').checked = !!Number(u.externo || 0);
           document.getElementById('uFechaIngreso').value = u.fecha_ingreso ? String(u.fecha_ingreso).slice(0,10) : '';
           document.getElementById('uFechaNacimiento').value = u.fecha_nacimiento ? String(u.fecha_nacimiento).slice(0,10) : '';
           document.getElementById('uPerfil').value = u.id_perfil;
@@ -1193,6 +1201,7 @@
         document.getElementById('uSexo').value = '';
         document.getElementById('uFechaIngreso').value = '';
         document.getElementById('uFechaNacimiento').value = '';
+        document.getElementById('uExterno').checked = false;
         document.getElementById('uPerfil').value = '';
         document.getElementById('uSupervisor').value = '';
         actualizarSupervisorVisibilidad();
@@ -1222,6 +1231,7 @@
         sexo: document.getElementById('uSexo').value || null,
         fecha_ingreso: document.getElementById('uFechaIngreso').value || null,
         fecha_nacimiento: document.getElementById('uFechaNacimiento').value || null,
+        externo: document.getElementById('uExterno').checked ? 1 : 0,
         id_perfil: document.getElementById('uPerfil').value,
         id_supervisor: document.getElementById('uSupervisor').value || null,
         estado: document.getElementById('uEstado').value || 'activo'

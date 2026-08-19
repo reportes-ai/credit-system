@@ -280,6 +280,7 @@ const directorio = async (req, res) => {
          LEFT JOIN usuarios s ON s.id_usuario = u.id_supervisor
          LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
         WHERE u.estado = 'activo' AND COALESCE(c.en_directorio, 1) = 1
+          AND COALESCE(u.externo, 0) = 0
         ORDER BY nombre LIMIT 800`);
     ok(res, rows);
   } catch (e) { console.error('[rrhh directorio]', e.message); fail(res, 'Error interno del servidor'); }
@@ -294,6 +295,7 @@ const organigrama = async (req, res) => {
          FROM usuarios u
          LEFT JOIN rh_directorio_config c ON c.id_usuario = u.id_usuario
         WHERE u.estado = 'activo' AND COALESCE(c.en_organigrama, 1) = 1
+          AND COALESCE(u.externo, 0) = 0
         ORDER BY nombre LIMIT 800`);
     ok(res, rows);
   } catch (e) { console.error('[rrhh organigrama]', e.message); fail(res, 'Error interno del servidor'); }

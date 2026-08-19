@@ -122,6 +122,13 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
     // M/F: para don/doña en el certificado de antigüedad y saludos
     await pool.query(`ALTER TABLE usuarios ADD COLUMN sexo CHAR(1) NULL DEFAULT NULL`);
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
+  try {
+    /* EXTERNO (Pato, 19-08-2026): usuario de fuera de la organización (directores,
+       asesores). NO se considera en: avisos/correos por perfil o funcionalidad,
+       escalamientos de workflows, suplencias, directorio ni organigrama. Sí puede
+       ingresar y operar según su perfil. */
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN externo TINYINT(1) NOT NULL DEFAULT 0`);
+  } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration externo]', e.message); }
 });
 
 /* One-shot (Pato, 19-08-2026): reenviar el correo de BIENVENIDA (URL + usuario +
@@ -286,6 +293,7 @@ const getAllUsuarios = async (req, res) => {
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
               u.estado, u.ultimo_acceso, u.fecha_creacion, u.bloqueado, u.intentos_fallidos,
+              COALESCE(u.externo, 0) AS externo,
               cj.id_caja, cj.nombre AS nombre_caja
        FROM usuarios u
        JOIN perfiles p ON u.id_perfil = p.id_perfil
@@ -309,7 +317,7 @@ const getUsuarioById = async (req, res) => {
               u.cargo, u.fecha_ingreso, u.fecha_nacimiento, u.sexo,
               u.id_perfil, p.nombre AS perfil, u.id_supervisor,
               CONCAT(s.nombre, ' ', s.apellido) AS supervisor_nombre,
-              u.estado, u.ultimo_acceso, u.fecha_creacion
+              u.estado, u.ultimo_acceso, u.fecha_creacion, COALESCE(u.externo, 0) AS externo
        FROM usuarios u
        JOIN perfiles p ON u.id_perfil = p.id_perfil
        LEFT JOIN usuarios s ON u.id_supervisor = s.id_usuario
@@ -342,8 +350,8 @@ const createUsuario = async (req, res) => {
     const claveTemporal = generarClaveTemporal();
     const passwordHash = await bcrypt.hash(claveTemporal, 10);
     const [result] = await pool.query(
-      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
-      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null]
+      'INSERT INTO usuarios (rut, nombre, apellido, apellido_materno, centro_costo, email, password_hash, id_perfil, id_supervisor, telefono, fecha_ingreso, fecha_nacimiento, cargo, sexo, externo, debe_cambiar_clave, password_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())',
+      [RUT.normalizar(rut) || rut, nombre, apellido, apellido_materno || null, centro_costo || null, email, passwordHash, id_perfil, id_supervisor || null, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo ? 1 : 0]
     );
 
     auditar({ req, accion: 'CREAR', modulo: 'usuarios', entidad: 'usuario', entidad_id: result.insertId,
@@ -399,8 +407,8 @@ const updateUsuario = async (req, res) => {
 
     await pool.query(
       // COALESCE: si el form no envía los campos RRHH (undefined), se preservan los existentes
-      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo), sexo = COALESCE(?, sexo) WHERE id_usuario = ?',
-      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, id]
+      'UPDATE usuarios SET nombre = ?, apellido = ?, apellido_materno = ?, centro_costo = ?, email = ?, id_perfil = ?, id_supervisor = ?, estado = ?, telefono = ?, fecha_ingreso = COALESCE(?, fecha_ingreso), fecha_nacimiento = COALESCE(?, fecha_nacimiento), cargo = COALESCE(?, cargo), sexo = COALESCE(?, sexo), externo = COALESCE(?, externo) WHERE id_usuario = ?',
+      [nombre, apellido, apellido_materno || null, centro_costo || null, email, perfilFinal, id_supervisor || null, estadoFinal, telefono || null, fecha_ingreso || null, fecha_nacimiento || null, cargo || null, ['M','F'].includes(sexo) ? sexo : null, req.body.externo === undefined ? null : (req.body.externo ? 1 : 0), id]
     );
 
     // A-7: al suspender, sus sesiones abiertas mueren ya — no al vencer el token.

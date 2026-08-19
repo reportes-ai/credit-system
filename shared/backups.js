@@ -16,8 +16,9 @@ async function expandirAlerta(ids) {
   if (!base.length) return base;
   try {
     const [rows] = await pool.query(
-      `SELECT DISTINCT id_suplente FROM usuario_backups
-        WHERE b_alertas = 1 AND id_suplente IS NOT NULL AND id_titular IN (?)`, [base]);
+      `SELECT DISTINCT b.id_suplente FROM usuario_backups b
+         JOIN usuarios s ON s.id_usuario = b.id_suplente AND COALESCE(s.externo, 0) = 0
+        WHERE b.b_alertas = 1 AND b.id_suplente IS NOT NULL AND b.id_titular IN (?)`, [base]);
     const out = new Set(base);
     rows.forEach(r => out.add(r.id_suplente));
     return [...out];
@@ -46,6 +47,7 @@ async function ccCorreos(emails) {
          JOIN usuarios t ON t.id_usuario = b.id_titular
          JOIN usuarios s ON s.id_usuario = b.id_suplente
         WHERE b.b_correos = 1 AND s.email IS NOT NULL AND s.email <> ''
+          AND COALESCE(s.externo, 0) = 0
           AND LOWER(t.email) IN (?)`, [list]);
     return rows.map(r => r.email);
   } catch (_) { return []; }

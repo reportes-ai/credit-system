@@ -297,7 +297,8 @@ async function correosDePerfiles(csv) {
   if (!perfiles.length) return [];
   const [us] = await pool.query(
     `SELECT u.email FROM usuarios u JOIN perfiles p ON p.id_perfil = u.id_perfil
-      WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado <> 'inactivo') AND u.email IS NOT NULL`,
+      WHERE p.nombre IN (?) AND (u.estado IS NULL OR u.estado <> 'inactivo') AND u.email IS NOT NULL
+        AND COALESCE(u.externo, 0) = 0`,
     [perfiles]);
   return us.map(u => u.email).filter(Boolean);
 }

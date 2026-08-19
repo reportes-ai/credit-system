@@ -318,6 +318,7 @@ async function jefesDe(func) {
     const [rows] = await pool.query(
       `SELECT DISTINCT s.id_usuario FROM usuarios u
          JOIN usuarios s ON s.id_usuario = u.id_supervisor AND s.estado = 'activo'
+          AND COALESCE(s.externo, 0) = 0
         WHERE u.id_usuario IN (?)`, [responsables]);
     return rows.map(r => r.id_usuario);
   } catch (e) { return []; }
