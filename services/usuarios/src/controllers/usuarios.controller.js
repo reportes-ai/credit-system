@@ -124,6 +124,28 @@ require('../../../../shared/migrate').enFila('usuarios', async () => {
   } catch (e) { if (e.errno !== 1060) console.error('[usuarios migration sexo]', e.message); }
 });
 
+/* One-shot (Pato, 19-08-2026): reenviar el correo de BIENVENIDA (URL + usuario +
+   clave temporal, el mismo del alta) a Mauricio Torres, Director. Nunca ha
+   ingresado (ultimo_acceso NULL — condición de seguridad: si ya entró, no se
+   toca su clave). Genera clave temporal nueva + debe_cambiar_clave, igual que
+   el alta. Si el correo no sale (host sin MAIL_*), lanza y el claim se libera
+   para reintentar en el próximo arranque. */
+require('../../../../shared/migrate').migrar('bienvenida-mauricio-torres-v1', async () => {
+  const email = 'mauricio.torres@cfccorporacion.com';
+  const [[u]] = await pool.query(
+    "SELECT id_usuario, nombre, apellido FROM usuarios WHERE email=? AND estado='activo' AND ultimo_acceso IS NULL", [email]);
+  if (!u) { console.log('[usuarios] bienvenida M.Torres: no aplica (ya ingresó o no existe)'); return; }
+  const clave = generarClaveTemporal();
+  const hash = await bcrypt.hash(clave, 10);
+  await pool.query(
+    'UPDATE usuarios SET password_hash=?, debe_cambiar_clave=1, password_updated_at=NOW(), intentos_fallidos=0, bloqueado=0 WHERE id_usuario=?',
+    [hash, u.id_usuario]);
+  const c = correoClave(u.nombre, email, clave, false);   // false = correo de ALTA (bienvenida)
+  const envio = await enviarCorreo({ to: email, subject: c.subject, html: c.html, text: c.text });
+  if (!envio.ok) throw new Error('correo no enviado: ' + (envio.error || 'sin detalle'));
+  console.log('[usuarios] bienvenida reenviada a', email);
+});
+
 // Tabla de permisos individuales por usuario (excepciones al perfil base)
 require('../../../../shared/migrate').enFila('usuarios', async () => {
   try {
