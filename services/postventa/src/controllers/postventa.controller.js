@@ -1,6 +1,14 @@
 'use strict';
 const pool = require('../../../../shared/config/database');
 const { emitirCorrelativo, pagarCorrelativo, despagarCorrelativo } = require('../../../../shared/ordenes-pago');
+const { auditar } = require('../../../../shared/audit');
+/* num_op de un lote de seguimientos, para el detalle de auditoría */
+async function opsTxt(ids) {
+  try {
+    const [rows] = await pool.query('SELECT num_op FROM postventa_seguimiento WHERE id IN (?)', [ids]);
+    return rows.map(r => r.num_op).filter(Boolean).join(', ') || ids.join(', ');
+  } catch (_) { return ids.join(', '); }
+}
 const { ejecutivosVisibles: _visEjec } = require('../../../../shared/visibilidad-ejecutivos');
 
 /* ── Migración ───────────────────────────────────────────────────── */
@@ -1248,6 +1256,8 @@ const setEtapa = async (req, res) => {
     // Saldo precio = CUENTA DE PASO: entra de la financiera y sale íntegro al dealer
     if (marcar && track === 'SALDO' && ['FONDOS RECIBIDOS', 'SALDO PRECIO PAGADO'].includes(etapa))
       await contabilizarSaldoPrecio(Number(req.params.id), etapa);
+    auditar({ req, accion: 'EDITAR', modulo: 'postventa', entidad: 'etapa', entidad_id: req.params.id,
+      detalle: `${marcar ? 'Marcó' : 'Desmarcó'} "${etapa}" (${track}) — op ${await opsTxt([req.params.id])}` });
     res.json({ success: true, data: { id: Number(req.params.id), etapa, marcado: !!marcar, usuario }, error: null });
   } catch (e) {
     console.error('[postventa etapa]', e.message);
@@ -1625,6 +1635,8 @@ const emitirOrdenPago = async (req, res) => {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('orden_emitida', { op: c.num_op, id_seguimiento: id });
     }
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_saldo', entidad_id: ids[0],
+      detalle: `Emitió Orden de Pago de saldo precio — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { emitidas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPago]', e.message);
@@ -1655,6 +1667,8 @@ const enviarAPago = async (req, res) => {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('enviado_pago', { op: c.num_op, id_seguimiento: id });
     }
+    auditar({ req, accion: 'ENVIAR', modulo: 'postventa', entidad: 'saldo_a_pago', entidad_id: ids[0],
+      detalle: `Envió a pago saldo precio — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { enviadas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa enviarAPago]', e.message);
@@ -1727,6 +1741,8 @@ const pagarSaldos = async (req, res) => {
       // que cuando el pago entra por la ODP de Tesorería (pagarOrden origen SALDO).
       notificarPagoSaldoDealer(id).catch(e => console.error('[postventa aviso pago saldo]', e.message));
     }
+    auditar({ req, accion: 'PAGAR', modulo: 'postventa', entidad: 'saldo_precio', entidad_id: ids[0],
+      detalle: `Confirmó el PAGO de saldo precio — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa pagarSaldos]', e.message);
@@ -1774,6 +1790,8 @@ const desmarcarSaldos = async (req, res) => {
         `DELETE FROM postventa_etapas
          WHERE track='SALDO' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
       const rev = etapa === 'SALDO PRECIO PAGADO' ? await reversarPagoCentral('SALDO', ids, usuario, motivo) : null;
+      auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'saldo_precio', entidad_id: ids[0],
+        detalle: `REVERSÓ "${etapa}" (día anterior) — op ${await opsTxt(ids)}. Motivo: ${String(motivo).trim().slice(0, 200)}` });
       return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true, central: rev }, error: null });
     }
 
@@ -1784,6 +1802,8 @@ const desmarcarSaldos = async (req, res) => {
          AND DATE(fecha) = CURDATE()
          AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
     const rev = (etapa === 'SALDO PRECIO PAGADO' && r.affectedRows) ? await reversarPagoCentral('SALDO', ids, usuario, motivo) : null;
+    if (r.affectedRows) auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'saldo_precio', entidad_id: ids[0],
+      detalle: `Desmarcó "${etapa}" (mismo día) — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false, central: rev }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarSaldos]', e.message);
@@ -1978,6 +1998,8 @@ const emitirOrdenPagoComision = async (req, res) => {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_orden_emitida', { op: c.num_op, id_seguimiento: id });
     }
+    auditar({ req, accion: 'CREAR', modulo: 'postventa', entidad: 'orden_pago_comision', entidad_id: ids[0],
+      detalle: `Emitió Orden de Pago de comisión — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { emitidas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa emitirOrdenPagoComision]', e.message);
@@ -2004,6 +2026,8 @@ const enviarAPagoComision = async (req, res) => {
       const c = await ctxSeguimiento(id);
       await notificarEventoSaldo('com_enviado_pago', { op: c.num_op, id_seguimiento: id });
     }
+    auditar({ req, accion: 'ENVIAR', modulo: 'postventa', entidad: 'comision_a_pago', entidad_id: ids[0],
+      detalle: `Envió a pago comisión — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { enviadas: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa enviarAPagoComision]', e.message);
@@ -2045,6 +2069,8 @@ const pagarComisiones = async (req, res) => {
       await contabilizarComision(id, 'PAGO');   // rebaja el pasivo contra banco (líquido)
       await notificarPagoComisionDealer(id);    // aviso al dealer desde comisiones@
     }
+    auditar({ req, accion: 'PAGAR', modulo: 'postventa', entidad: 'comision', entidad_id: ids[0],
+      detalle: `Confirmó el PAGO de comisión — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { pagados: ids.length }, error: null });
   } catch (e) {
     console.error('[postventa pagarComisiones]', e.message);
@@ -2086,6 +2112,8 @@ const desmarcarComisiones = async (req, res) => {
       const [r] = await pool.query(
         `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=? AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
       const rev = etapa === 'COMISION PAGADA' ? await reversarPagoCentral('COMISION', ids, usuario, motivo) : null;
+      auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'comision', entidad_id: ids[0],
+        detalle: `REVERSÓ "${etapa}" (día anterior) — op ${await opsTxt(ids)}. Motivo: ${String(motivo).trim().slice(0, 200)}` });
       return res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: true, central: rev }, error: null });
     }
 
@@ -2093,6 +2121,8 @@ const desmarcarComisiones = async (req, res) => {
       `DELETE FROM postventa_etapas WHERE track='COMISION' AND etapa=?
          AND DATE(fecha) = CURDATE() AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
     const rev = (etapa === 'COMISION PAGADA' && r.affectedRows) ? await reversarPagoCentral('COMISION', ids, usuario, motivo) : null;
+    if (r.affectedRows) auditar({ req, accion: 'ANULAR', modulo: 'postventa', entidad: 'comision', entidad_id: ids[0],
+      detalle: `Desmarcó "${etapa}" (mismo día) — op ${await opsTxt(ids)}` });
     res.json({ success: true, data: { desmarcados: r.affectedRows, reversa: false, central: rev }, error: null });
   } catch (e) {
     console.error('[postventa desmarcarComisiones]', e.message);
