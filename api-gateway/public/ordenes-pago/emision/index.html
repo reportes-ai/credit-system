@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión de Orden de Pago — AutoFácil</title>
-  <!-- v1.5 — navbar migrada al componente topnav -->
+  <!-- v1.6 — adjuntar factura/boleta al emitir: respaldo en la orden + adjunto del correo a Contabilidad · v1.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -89,6 +89,11 @@
         <select id="fMetodo"><option value="">—</option><option>Transferencia</option><option>Cheque</option><option>Efectivo</option><option>Tarjeta</option></select>
       </div>
       <div class="fld"><!-- spacer --></div>
+
+      <div class="fld full"><label>Documento (factura / boleta)</label>
+        <input type="file" id="fDoc" accept=".pdf,.jpg,.jpeg,.png,.xml" style="font-size:.84rem">
+        <div style="font-size:.74rem;color:#94a3b8;margin-top:3px">Queda de respaldo en la orden y viaja adjunto en el correo a Contabilidad. Máx. 7 MB.</div>
+      </div>
 
       <div class="fld full"><label>Observaciones</label><textarea id="fObs" maxlength="500"></textarea></div>
     </div>
@@ -210,9 +215,22 @@ async function emitir(){
 
   const btn = document.getElementById('btnEmitir'); btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Emitiendo…';
   try {
+    // Validar el adjunto ANTES de emitir (para no emitir y fallar después)
+    const fDoc = document.getElementById('fDoc').files && document.getElementById('fDoc').files[0];
+    if (fDoc && fDoc.size > 7*1024*1024) return fail('El documento adjunto debe pesar máximo 7 MB.');
     const r = await fetch('/api/ordenes-pago/ordenes', { method:'POST', headers:H, body: JSON.stringify(body) });
     const j = await r.json();
     if (j.success) {
+      // Subir el documento de respaldo a la orden recién emitida (origen ODP)
+      if (fDoc) {
+        try {
+          const b64 = await new Promise((ok,ko)=>{ const fr=new FileReader(); fr.onload=()=>ok(String(fr.result).split(',')[1]); fr.onerror=ko; fr.readAsDataURL(fDoc); });
+          const ru = await fetch('/api/postventa/factura-doc', { method:'POST', headers:H,
+            body: JSON.stringify({ origen:'ODP', ref_id:j.data.id, nombre:fDoc.name, mime:fDoc.type, base64:b64 }) });
+          const ju = await ru.json();
+          if (!ju.success) alert('La orden se emitió, pero el documento no se pudo adjuntar: '+(ju.error||'error')+'. Puedes reintentarlo desde el historial.');
+        } catch(_) { alert('La orden se emitió, pero el documento no se pudo adjuntar. Puedes reintentarlo desde el historial.'); }
+      }
       document.getElementById('formCard').style.display='none';
       document.getElementById('okNum').textContent = j.data.numero;
       document.getElementById('okBox').style.display='block';

@@ -709,7 +709,13 @@ const enviarCorreoOrden = async (req, res) => {
     } catch (_) {}
     const cc = (req.usuario && req.usuario.email) || undefined;
     const { enviarCorreo } = require('../../../../shared/mailer');
-    const r = await enviarCorreo({ to, cc, subject: asunto || `Orden de Pago ${o.numero || ''} — AutoFácil`, html });
+    // Documento de respaldo (factura/boleta subida a la orden): viaja adjunto
+    let attachments;
+    try {
+      attachments = await require('../../../postventa/src/controllers/postventa.controller').adjuntosFactura('ODP', [id]);
+      if (!attachments.length) attachments = undefined;
+    } catch (_) {}
+    const r = await enviarCorreo({ to, cc, subject: asunto || `Orden de Pago ${o.numero || ''} — AutoFácil`, html, attachments });
     if (!r.ok) return res.status(422).json({ success: false, data: null, error: r.error || 'No se pudo enviar el correo' });
     auditar({ req, accion: 'ENVIAR', modulo: 'ordenes-pago', entidad: 'orden_pago', entidad_id: id, detalle: `Envió por correo la Orden de Pago ${o.numero || id} a ${to}, CC ${cc || '—'}` });
     res.json({ success: true, data: { to, cc }, error: null });

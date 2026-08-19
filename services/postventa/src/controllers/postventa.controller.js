@@ -52,7 +52,7 @@ require('../../../../shared/migrate').enFila('postventa-factura-docs', async () 
     INDEX idx_ref (origen, ref_id))`);
 });
 
-const ORIGENES_FDOC = ['COMISION', 'PARQUE'];
+const ORIGENES_FDOC = ['COMISION', 'PARQUE', 'ODP'];   // ODP → ref_id = ordenes_pago.id (proveedores)
 const subirFacturaDoc = async (req, res) => {
   try {
     const { origen, ref_id, nombre, mime, base64 } = req.body || {};
