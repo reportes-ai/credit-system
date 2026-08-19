@@ -450,6 +450,26 @@ exports.pago = async (req, res) => {
     for (const e of et) if (e.track === 'SALDO' && HITOS[String(e.etapa || '').toUpperCase()]) hs[String(e.etapa).toUpperCase()] = e.fecha;
     const hitos_saldo = Object.keys(HITOS).map(k => ({ etiqueta: HITOS[k], fecha: hs[k] || null }));
 
+    /* Fecha COMPROMETIDA de pago del saldo precio: SLA de la categoría del dealer
+       desde la recepción de fundantes (motor único shared/sla-saldo — el mismo de
+       Tesorería y Saldos a Pagar). Solo mientras no esté pagado. */
+    let pago_comprometido = null, pago_sla_horas = null;
+    try {
+      const fr = et.find(e => e.track === 'SALDO' && String(e.etapa).toUpperCase() === 'FUNDANTES RECIBIDOS');
+      const yaPagado = et.some(e => e.track === 'SALDO' && String(e.etapa).toUpperCase() === 'SALDO PRECIO PAGADO');
+      if (fr && !yaPagado) {
+        const [[dc]] = await pool.query(
+          `SELECT COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), 'SOCIO') AS cat
+             FROM creditos c LEFT JOIN dealers d ON d.id_dealer = c.id_dealer WHERE c.id=?`, [id]);
+        const SLAM = require('../../../../shared/sla-saldo');
+        const v = SLAM.vencimiento(fr.fecha, dc && dc.cat, await SLAM.config());
+        if (v) {
+          pago_comprometido = v.fecha.getFullYear() + '-' + String(v.fecha.getMonth() + 1).padStart(2, '0') + '-' + String(v.fecha.getDate()).padStart(2, '0');
+          pago_sla_horas = v.horas;
+        }
+      }
+    } catch (e) { console.error('[portal-dealer] sla pago:', e.message); }
+
     return res.json({
       success: true,
       data: {
@@ -459,6 +479,7 @@ exports.pago = async (req, res) => {
         saldo: ult['SALDO'] || null,
         comision_pago: ult['COMISION'] || null,
         hitos_saldo,
+        pago_comprometido, pago_sla_horas,
       },
       error: null,
     });
