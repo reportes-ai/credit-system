@@ -105,7 +105,7 @@ async function asegurarTabla() {
    Claim atómico por PK: en multi-instancia solo una gana. Si fn falla, se
    libera el claim para que el próximo arranque reintente. */
 function migrar(nombre, fn) {
-  return enFila(`migracion:${nombre}`, async () => {
+  const cuerpo = async () => {
     await asegurarTabla();
     let [r] = await pool.query('INSERT IGNORE INTO _migraciones (nombre) VALUES (?)', [nombre]);
     if (!r.affectedRows) {
@@ -123,7 +123,17 @@ function migrar(nombre, fn) {
       await pool.query('DELETE FROM _migraciones WHERE nombre=?', [nombre]).catch(() => {});
       throw e;
     }
-  });
+  };
+  /* GUARDIA ANTI-ABRAZO-MORTAL: un `await migrar()` DENTRO de un bloque enFila
+     se encolaría detrás del bloque que lo espera → la fila entera se congela
+     (pasó con dealernet-sin-datos-v1, 12→19-08-2026: dejó todos los one-shots
+     sin correr en Render). Si ya estamos dentro de un bloque, se ejecuta
+     directo — el claim atómico en _migraciones lo mantiene seguro igual. */
+  if (_estado.actual) {
+    console.error(`[migrate] ⚠ migrar("${nombre}") llamado DENTRO del bloque "${_estado.actual}" — se ejecuta directo para no congelar la fila. Muévelo a nivel de módulo.`);
+    return cuerpo().catch(e => console.error(`[migrate] migración ${nombre} FALLÓ:`, e.message));
+  }
+  return enFila(`migracion:${nombre}`, cuerpo);
 }
 
 /* Como migrar(), pero el registro incluye un hash del CÓDIGO del bloque:

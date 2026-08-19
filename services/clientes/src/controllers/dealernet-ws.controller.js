@@ -166,16 +166,6 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
        repositorio: se marcan para poder reintentarlos. Backfill de una vez para
        los que ya estaban guardados — si no, quedarían bloqueando 15 días. */
     await pool.query(`ALTER TABLE dealernet_informes ADD COLUMN sin_datos TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
-    await require('../../../../shared/migrate').migrar('dealernet-sin-datos-v1', async () => {
-      const [rows] = await pool.query('SELECT id, contenido FROM dealernet_informes');
-      const vacios = rows.filter(r => {
-        let c = r.contenido;
-        if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return false; } }
-        return !informeConDatos(c);
-      }).map(r => r.id);
-      if (vacios.length) await pool.query('UPDATE dealernet_informes SET sin_datos=1 WHERE id IN (?)', [vacios]);
-      console.log('[dealernet] informes sin datos marcados:', vacios.length);
-    });
 
     // Módulo/card propio "Informes DealerNet" (anti-hardcode: vive en BD).
     await pool.query(
@@ -208,6 +198,22 @@ require('../../../../shared/migrate').enFila('dealernet-ws', async () => {
     }
     console.log('[dealernet-ws] repositorio de informes y card listos');
   } catch (e) { console.error('[dealernet-informes migration]', e.message); }
+});
+
+/* Backfill "informes sin datos" — A NIVEL DE MÓDULO, nunca adentro de un enFila:
+   un `await migrar()` DENTRO de un bloque enFila se encola detrás del bloque que
+   lo espera y CONGELA la fila entera de migraciones (fue exactamente lo que dejó
+   los one-shots sin correr en Render del 12-08 al 19-08-2026). Acá queda en la
+   fila DESPUÉS del bloque del ALTER, que es el orden que necesita. */
+require('../../../../shared/migrate').migrar('dealernet-sin-datos-v1', async () => {
+  const [rows] = await pool.query('SELECT id, contenido FROM dealernet_informes');
+  const vacios = rows.filter(r => {
+    let c = r.contenido;
+    if (typeof c === 'string') { try { c = JSON.parse(c); } catch { return false; } }
+    return !informeConDatos(c);
+  }).map(r => r.id);
+  if (vacios.length) await pool.query('UPDATE dealernet_informes SET sin_datos=1 WHERE id IN (?)', [vacios]);
+  console.log('[dealernet] informes sin datos marcados:', vacios.length);
 });
 
 /* ── Migración: auditoría de uso + aviso a supervisor/RRHH ────────────────── */
