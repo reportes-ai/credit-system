@@ -42,6 +42,30 @@ require('../../../../shared/migrate').enFila('rrhh-vac-cuenta', async () => {
   const [[dt]] = await pool.query("SELECT valor FROM rh_config WHERE clave='doc_tipos'");
   if (dt && !dt.valor.includes('CERTIFICADO AFP'))
     await pool.query("UPDATE rh_config SET valor=CONCAT(valor, ',CERTIFICADO AFP (AÑOS COTIZADOS)') WHERE clave='doc_tipos'");
+  /* Ajustes de saldo: los propone RRHH y NO tocan la cuenta hasta que los
+     firman la jefatura del colaborador y la gerencia (mismo espíritu que las
+     Solicitudes). Recién ahí nace el movimiento AJUSTE. */
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_vac_ajustes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario INT NOT NULL,
+    dias DECIMAL(6,1) NOT NULL,
+    glosa VARCHAR(300) NOT NULL,
+    estado VARCHAR(12) DEFAULT 'PENDIENTE',   -- PENDIENTE | APROBADO | RECHAZADO
+    paso INT DEFAULT 0,                        -- 0 = JEFATURA · 1 = GERENCIA
+    creado_por INT NULL,
+    resuelto_motivo VARCHAR(300) NULL,
+    id_movimiento INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_u (id_usuario), INDEX idx_e (estado)
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_vac_ajuste_firmas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    id_ajuste INT NOT NULL, paso INT NOT NULL, rol VARCHAR(12) NOT NULL,
+    id_usuario INT NOT NULL, nombre VARCHAR(160), cargo VARCHAR(120),
+    decision VARCHAR(10) NOT NULL, comentario VARCHAR(300) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_aj_paso (id_ajuste, paso)
+  )`);
   console.log('[rrhh-vac-cuenta] listo');
 });
 
@@ -205,9 +229,17 @@ exports.getCuenta = async (req, res) => {
     const u = req.usuario || {};
     let objetivo = u.id_usuario;
     if (req.query.id_usuario && String(req.query.id_usuario) !== String(u.id_usuario)) objetivo = parseInt(req.query.id_usuario);
+    // el TOMADO trae las fechas reales de la solicitud (desde → hasta y hábiles)
     const [movs] = await pool.query(
-      `SELECT id, tipo, dias, DATE_FORMAT(periodo_desde,'%Y-%m-%d') periodo_desde, DATE_FORMAT(periodo_hasta,'%Y-%m-%d') periodo_hasta,
-              glosa, DATE_FORMAT(created_at,'%Y-%m-%d') fecha FROM rh_vac_movimientos WHERE id_usuario=? ORDER BY COALESCE(periodo_desde, created_at), id`, [objetivo]);
+      `SELECT m.id, m.tipo, m.dias, DATE_FORMAT(m.periodo_desde,'%Y-%m-%d') periodo_desde,
+              DATE_FORMAT(m.periodo_hasta,'%Y-%m-%d') periodo_hasta, m.glosa,
+              DATE_FORMAT(m.created_at,'%Y-%m-%d') fecha,
+              DATE_FORMAT(v.fecha_desde,'%Y-%m-%d') uso_desde, DATE_FORMAT(v.fecha_hasta,'%Y-%m-%d') uso_hasta,
+              TRIM(CONCAT_WS(' ', a.nombre, a.apellido)) autor
+         FROM rh_vac_movimientos m
+         LEFT JOIN rh_vacaciones v ON v.id = m.id_ref AND m.tipo='TOMADO'
+         LEFT JOIN usuarios a ON a.id_usuario = m.creado_por
+        WHERE m.id_usuario=? ORDER BY COALESCE(m.periodo_desde, m.created_at), m.id`, [objetivo]);
     const saldo = await saldoCuenta(objetivo);
 
     // Vista cuenta corriente: los CARGOS se consumen FIFO desde el período más
@@ -221,8 +253,9 @@ exports.getCuenta = async (req, res) => {
     }
     periodos.sort((a, b) => a.desde < b.desde ? -1 : 1);
     const sueltosAbono = movs.filter(x => x.dias > 0 && !x.periodo_desde)
-      .map(m => ({ tipo: m.tipo, dias: Number(m.dias), glosa: m.glosa, fecha: m.fecha }));
-    const cargos = movs.filter(x => x.dias < 0).map(m => ({ tipo: m.tipo, dias: -Number(m.dias), glosa: m.glosa, fecha: m.fecha }));
+      .map(m => ({ tipo: m.tipo, dias: Number(m.dias), glosa: m.glosa, fecha: m.fecha, autor: m.autor }));
+    const cargos = movs.filter(x => x.dias < 0).map(m => ({ tipo: m.tipo, dias: -Number(m.dias), glosa: m.glosa,
+      fecha: m.fecha, desde: m.uso_desde, hasta: m.uso_hasta, autor: m.autor }));
     const sinPeriodo = [];
     for (const c of cargos) {
       let resto = c.dias;
@@ -249,7 +282,15 @@ exports.getCuenta = async (req, res) => {
       const ph = new Date(fi); ph.setFullYear(fi.getFullYear() + anios + 1); ph.setDate(ph.getDate() - 1);
       enCurso = { desde: isoF(pd), hasta: isoF(ph), proporcional: saldo.proporcional };
     }
-    ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo, periodo_en_curso: enCurso, ...saldo });
+    // Ajustes propuestos por RRHH que aún no firman jefatura/gerencia: se
+    // muestran en la cartola como "pendientes" (no suman al saldo todavía).
+    const [ajPend] = await pool.query(
+      `SELECT a.id, a.dias, a.glosa, a.paso, DATE_FORMAT(a.created_at,'%Y-%m-%d') fecha,
+              TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) autor
+         FROM rh_vac_ajustes a LEFT JOIN usuarios u ON u.id_usuario=a.creado_por
+        WHERE a.id_usuario=? AND a.estado='PENDIENTE' ORDER BY a.id`, [objetivo]);
+    ok(res, { movimientos: movs, periodos, abonos_sueltos: sueltosAbono, cargos_sin_periodo: sinPeriodo,
+      periodo_en_curso: enCurso, ajustes_pendientes: ajPend, ...saldo });
   } catch (e) { fail(res, e.message); }
 };
 
@@ -266,6 +307,10 @@ async function calcularSaldosEquipo() {
     // (los mismos que usa el finiquito para el feriado proporcional).
     const baseDe = await require('../base-remuneracion').remuneracionBaseMapa();
     const { provisionVacaciones } = require('../../../../api-gateway/public/js/rrhh-core');
+    // días de feriado progresivo (art. 68) ya abonados, por colaborador
+    const [progs] = await pool.query(
+      `SELECT id_usuario, COALESCE(SUM(dias),0) d FROM rh_vac_movimientos WHERE tipo='PROGRESIVO' GROUP BY id_usuario`);
+    const progDe = new Map(progs.map(p => [p.id_usuario, Number(p.d)]));
     const filas = [];
     let totDias = 0, totProv = 0;
     for (const u of users) {
@@ -273,28 +318,165 @@ async function calcularSaldosEquipo() {
       const base = baseDe(u.id_usuario);
       const provision = provisionVacaciones(s.disponibles, base);
       totDias += s.disponibles; totProv += provision;
-      filas.push({ ...u, ...s, base, provision });
+      filas.push({ ...u, ...s, base, provision, progresivos: progDe.get(u.id_usuario) || 0 });
     }
     return { saldos: filas, total_dias: Math.round(totDias * 10) / 10, total_provision: totProv };
 }
 exports.calcularSaldosEquipo = calcularSaldosEquipo;
 
-/* GET /api/rrhh/vacaciones/saldos — saldos de TODO el equipo (RRHH) */
+/* ── Alcance jerárquico: yo + TODA mi línea directa hacia abajo ─────────────── */
+async function miLinea(idUsuario) {
+  const [rows] = await pool.query(
+    `WITH RECURSIVE linea (id_usuario) AS (
+        SELECT ? UNION ALL
+        SELECT u.id_usuario FROM usuarios u JOIN linea l ON u.id_supervisor = l.id_usuario)
+     SELECT id_usuario FROM linea`, [idUsuario]).catch(async () => {
+    // sin CTE recursiva: se recorre por niveles (mismo resultado)
+    const vistos = new Set([idUsuario]); let frente = [idUsuario];
+    while (frente.length) {
+      const [hijos] = await pool.query(`SELECT id_usuario FROM usuarios WHERE id_supervisor IN (?)`, [frente]);
+      frente = hijos.map(h => h.id_usuario).filter(id => !vistos.has(id));
+      frente.forEach(id => vistos.add(id));
+    }
+    return [[...vistos].map(id => ({ id_usuario: id }))];
+  });
+  return new Set(rows.map(r => r.id_usuario));
+}
+const esRRHH = id => require('../../../../shared/middleware/permisos').tieneFunc(id, 'rh_colaboradores').catch(() => false);
+
+/* Gerencia = perfil gerencial (los que además firman el 2º paso del ajuste) */
+async function esGerente(idUsuario) {
+  const [[r]] = await pool.query(
+    `SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?`, [idUsuario]);
+  return /gerente|director|administrador/i.test(r?.nombre || '');
+}
+
+/* GET /api/rrhh/vacaciones/saldos — mi línea directa (RRHH y gerencia ven todo) */
 exports.getSaldos = async (req, res) => {
   try {
-    ok(res, await calcularSaldosEquipo());
+    const yo = req.usuario.id_usuario;
+    const [rrhh, gerente] = await Promise.all([esRRHH(yo), esGerente(yo)]);
+    const data = await calcularSaldosEquipo();
+    let saldos = data.saldos;
+    if (!rrhh) {                                   // jefaturas: solo su línea
+      const linea = await miLinea(yo);
+      saldos = saldos.filter(s => linea.has(s.id_usuario));
+    }
+    if (!gerente) saldos = saldos.map(({ provision, base, ...s }) => s);   // provisión: solo gerencia
+    ok(res, {
+      saldos, es_rrhh: rrhh, ver_provision: gerente,
+      total_dias: Math.round(saldos.reduce((a, s) => a + s.disponibles, 0) * 10) / 10,
+      total_provision: gerente ? saldos.reduce((a, s) => a + (s.provision || 0), 0) : null,
+    });
   } catch (e) { fail(res, e.message); }
 };
 
+/* ── AJUSTES DE SALDO (los propone RRHH · firman jefatura y gerencia) ───────── */
+const ROLES_AJUSTE = ['JEFATURA', 'GERENCIA'];
+
+async function firmantesDe(aj) {
+  if (aj.paso === 0) {
+    const [[u]] = await pool.query(`SELECT id_supervisor FROM usuarios WHERE id_usuario=?`, [aj.id_usuario]);
+    if (u?.id_supervisor) return [u.id_supervisor];
+  }
+  const [rows] = await pool.query(
+    `SELECT DISTINCT u.id_usuario FROM usuarios u
+       JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+       JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+      WHERE f.codigo='rh_aprobar' AND u.estado='activo'`);
+  return rows.map(r => r.id_usuario);
+}
+
+async function avisarAjuste(aj, nombre) {
+  const ids = await firmantesDe(aj);
+  if (!ids.length) return;
+  require('../../../notificaciones/src/controllers/notificaciones.controller').notificar(ids, {
+    tipo: 'RRHH', prioridad: 'alta', sonar: true,
+    titulo: `Ajuste de vacaciones por aprobar: ${nombre}`,
+    mensaje: `${aj.dias > 0 ? '+' : ''}${aj.dias} día(s) — ${aj.glosa}. Paso ${aj.paso + 1} de 2 (${ROLES_AJUSTE[aj.paso]}).`,
+    href: '/recursos-humanos/vacaciones/', clave: `vaj_${aj.id}_p${aj.paso}`,
+  });
+}
+
+/* POST /vacaciones/cuenta/ajuste — RRHH propone (no aplica hasta las 2 firmas) */
 exports.ajuste = async (req, res) => {
   try {
     const { id_usuario, dias, glosa } = req.body || {};
-    const d = parseFloat(dias);
-    if (!parseInt(id_usuario) || !d || !String(glosa || '').trim()) return fail(res, 'Faltan colaborador, días (±) o glosa', 400);
-    await pool.query(`INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, glosa, creado_por) VALUES (?,?,?,?,?)`,
-      [parseInt(id_usuario), 'AJUSTE', Math.round(d * 10) / 10, String(glosa).slice(0, 300), req.usuario.id_usuario]);
-    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vac_ajuste', entidad_id: parseInt(id_usuario),
-      detalle: `Ajuste vacaciones ${d > 0 ? '+' : ''}${d} días: ${glosa}` });
+    const d = Math.round(parseFloat(dias) * 10) / 10;
+    if (!parseInt(id_usuario) || !d || !String(glosa || '').trim())
+      return fail(res, 'Faltan colaborador, días (±) o comentario', 400);
+    if (!(await esRRHH(req.usuario.id_usuario)))
+      return fail(res, 'Solo Recursos Humanos puede proponer ajustes de saldo', 403);
+    const [r] = await pool.query(
+      `INSERT INTO rh_vac_ajustes (id_usuario, dias, glosa, creado_por) VALUES (?,?,?,?)`,
+      [parseInt(id_usuario), d, String(glosa).slice(0, 300), req.usuario.id_usuario]);
+    const [[u]] = await pool.query(`SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) n FROM usuarios WHERE id_usuario=?`, [id_usuario]);
+    await avisarAjuste({ id: r.insertId, id_usuario: parseInt(id_usuario), dias: d, glosa, paso: 0 }, u?.n || '');
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'vac_ajuste', entidad_id: r.insertId,
+      detalle: `Propone ajuste vacaciones ${d > 0 ? '+' : ''}${d} días a ${u?.n}: ${glosa}` });
+    ok(res, { id: r.insertId, estado: 'PENDIENTE' });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* GET /vacaciones/ajustes — los que me toca firmar + los que propuse */
+exports.ajustesListar = async (req, res) => {
+  try {
+    const yo = req.usuario.id_usuario;
+    const [pend] = await pool.query(
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.id_supervisor,
+              TRIM(CONCAT_WS(' ', c.nombre, c.apellido)) autor
+         FROM rh_vac_ajustes a
+         JOIN usuarios u ON u.id_usuario=a.id_usuario
+         LEFT JOIN usuarios c ON c.id_usuario=a.creado_por
+        WHERE a.estado='PENDIENTE' ORDER BY a.id`);
+    const gerente = await esGerente(yo);
+    const mios = [];
+    for (const a of pend) {
+      const puedo = a.paso === 0
+        ? (a.id_supervisor === yo || (!a.id_supervisor && gerente))
+        : gerente;
+      if (puedo && a.creado_por !== yo) mios.push({ ...a, rol_paso: ROLES_AJUSTE[a.paso] });
+    }
+    ok(res, { ajustes: mios });
+  } catch (e) { fail(res, e.message); }
+};
+
+/* POST /vacaciones/ajustes/:id/resolver — APROBAR | RECHAZAR (comentario) */
+exports.ajusteResolver = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { decision, comentario } = req.body || {};
+    const [[aj]] = await pool.query(`SELECT * FROM rh_vac_ajustes WHERE id=?`, [id]);
+    if (!aj || aj.estado !== 'PENDIENTE') return fail(res, 'El ajuste ya fue resuelto', 400);
+    const yo = req.usuario.id_usuario;
+    if (aj.creado_por === yo) return fail(res, 'Quien propone el ajuste no puede firmarlo', 403);
+    const habilitados = await firmantesDe(aj);
+    if (!habilitados.includes(yo)) return fail(res, 'No te corresponde firmar este paso', 403);
+    if (decision === 'RECHAZAR' && !String(comentario || '').trim())
+      return fail(res, 'El rechazo exige un comentario', 400);
+
+    const [[u]] = await pool.query(
+      `SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) n, cargo FROM usuarios WHERE id_usuario=?`, [yo]);
+    await pool.query(`INSERT IGNORE INTO rh_vac_ajuste_firmas (id_ajuste, paso, rol, id_usuario, nombre, cargo, decision, comentario)
+      VALUES (?,?,?,?,?,?,?,?)`, [id, aj.paso, ROLES_AJUSTE[aj.paso], yo, u?.n, u?.cargo,
+      decision === 'RECHAZAR' ? 'RECHAZA' : 'APRUEBA', String(comentario || '').slice(0, 300) || null]);
+
+    if (decision === 'RECHAZAR') {
+      await pool.query(`UPDATE rh_vac_ajustes SET estado='RECHAZADO', resuelto_motivo=? WHERE id=?`, [String(comentario).slice(0, 300), id]);
+    } else if (aj.paso + 1 >= ROLES_AJUSTE.length) {
+      // última firma → recién ahora nace el movimiento en la cuenta corriente
+      const [mv] = await pool.query(
+        `INSERT INTO rh_vac_movimientos (id_usuario, tipo, dias, glosa, creado_por) VALUES (?,?,?,?,?)`,
+        [aj.id_usuario, 'AJUSTE', aj.dias, `${aj.glosa} — aprobado por jefatura y gerencia`, aj.creado_por]);
+      await pool.query(`UPDATE rh_vac_ajustes SET estado='APROBADO', paso=?, id_movimiento=? WHERE id=?`,
+        [aj.paso + 1, mv.insertId, id]);
+    } else {
+      await pool.query(`UPDATE rh_vac_ajustes SET paso=? WHERE id=?`, [aj.paso + 1, id]);
+      const [[c]] = await pool.query(`SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) n FROM usuarios WHERE id_usuario=?`, [aj.id_usuario]);
+      await avisarAjuste({ ...aj, paso: aj.paso + 1 }, c?.n || '');
+    }
+    auditar({ req, accion: decision === 'RECHAZAR' ? 'RECHAZAR' : 'APROBAR', modulo: 'rrhh',
+      entidad: 'vac_ajuste', entidad_id: id, detalle: `${ROLES_AJUSTE[aj.paso]} ${decision} ajuste de ${aj.dias} días` });
     ok(res, { ok: true });
   } catch (e) { fail(res, e.message); }
 };

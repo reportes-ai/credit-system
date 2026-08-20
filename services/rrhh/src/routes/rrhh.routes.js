@@ -164,8 +164,10 @@ router.put('/cursos/asistentes/:id',  verifyToken, requireFunc('rh_cursos', 'rh_
 router.delete('/cursos/:id',          verifyToken, requireFunc('rh_cursos', 'rh_colaboradores', 'rh_aprobar'), cur.eliminar);
 const vc = require('../controllers/vac-cuenta.controller');
 router.get('/vacaciones/cuenta',        verifyToken, vc.getCuenta);
-router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.ajuste);
-router.get('/vacaciones/saldos',         verifyToken, requireFunc('rh_aprobar', 'rh_colaboradores'), vc.getSaldos);
+router.post('/vacaciones/cuenta/ajuste', verifyToken, requireFunc('rh_colaboradores'), vc.ajuste);
+router.get('/vacaciones/saldos',         verifyToken, requireFunc('rh_vacaciones', 'rh_aprobar', 'rh_colaboradores'), vc.getSaldos);
+router.get('/vacaciones/ajustes',        verifyToken, vc.ajustesListar);
+router.post('/vacaciones/ajustes/:id/resolver', verifyToken, vc.ajusteResolver);
 router.get('/remuneraciones/nomina-banco',    verifyToken, requireFunc('rh_remuneraciones'), rem.getNominaBanco);
 router.get('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.getPreviredConfig);
 router.put('/remuneraciones/previred-config', verifyToken, requireFunc('rh_remuneraciones'), rem.putPreviredConfig);
