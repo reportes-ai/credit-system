@@ -200,7 +200,7 @@ const resolver = async (req, res) => {
     if (accion === 'rechazar' && !motivoRech)
       return res.status(400).json({ success: false, data: null, error: 'Indica por qué se rechaza la anulación.' });
 
-    const [[op]] = await pool.query('SELECT id, num_op, id_financiera, estado_credito, financiera FROM creditos WHERE id=?', [a.id_credito]);
+    const [[op]] = await pool.query('SELECT id, num_op, id_financiera, estado_credito, financiera, ejecutivo FROM creditos WHERE id=?', [a.id_credito]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
 
     if (accion === 'rechazar') {
@@ -277,7 +277,11 @@ const resolver = async (req, res) => {
     // Anuncio push a TODA la app (paramétrico en el mantenedor de Alertas →
     // Anuncios, igual que el del crédito otorgado).
     require('../../../../shared/anuncios')
-      .publicarAnuncio('operacion_anulada', { op: op.num_op, usuario: nombreUsuario(req) })
+      .publicarAnuncio('operacion_anulada', {
+        op: op.num_op, usuario: nombreUsuario(req),
+        // mismo formato que el anuncio de otorgamiento (el ejecutivo va en Capital Case)
+        ejecutivo: String(op.ejecutivo || '').trim().toLowerCase().replace(/\b\p{L}/gu, m => m.toUpperCase()),
+      })
       .catch(() => {});
 
     res.json({ success: true, data: { estado: 'APROBADA', cartola: nota.trim() }, error: null });

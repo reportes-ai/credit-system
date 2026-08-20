@@ -30,9 +30,10 @@ const EVENTOS = [
     },
   },
   {
-    evento: 'operacion_anulada', label: 'Operación anulada', tokens: ['{op}', '{usuario}'],
+    evento: 'operacion_anulada', label: 'Operación anulada',
+    tokens: ['{op}', '{ejecutivo}', '{usuario}'],
     default: {
-      activo: 1, mensaje: 'Se anuló la operación {op}',
+      activo: 1, mensaje: 'Se anuló la operación {op} de {ejecutivo}',
       color_fondo: '#7f1d1d', color_texto: '#ffffff', ancho_pct: 33,
       sonido: 'trompeta', segundos_antes: 2, duracion_seg: 6,
     },

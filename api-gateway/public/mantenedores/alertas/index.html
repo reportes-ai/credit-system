@@ -500,7 +500,8 @@ function anLeer(card){
 function anProbarSon(btn){ const t=btn.closest('[data-ev]').querySelector('.an-sonido').value; if(t&&t!=='none'&&window.afPlaySound) window.afPlaySound(t); }
 function anProbar(btn){
   const c=anLeer(btn.closest('[data-ev]'));
-  const texto=(c.mensaje||'').replace(/\{(\w+)\}/g,(_,k)=> k==='ejecutivo'?'Juan Pérez':('{'+k+'}'));
+  const DEMO={ ejecutivo:'Juan Pérez', usuario:'Ana Soto', op:'88973' };
+  const texto=(c.mensaje||'').replace(/\{(\w+)\}/g,(_,k)=> DEMO[k]!==undefined?DEMO[k]:('{'+k+'}'));
   if(c.sonido&&c.sonido!=='none'&&window.afPlaySound) window.afPlaySound(c.sonido);
   const antes=(parseInt(c.segundos_antes)||0)*1000;
   setTimeout(()=>{ if(window.afMostrarAnuncio) window.afMostrarAnuncio(texto,{ bg:c.color_fondo, fg:c.color_texto, ancho:c.ancho_pct, dur:c.duracion_seg }); }, antes);
