@@ -20,6 +20,7 @@ router.post('/antiguedad/:id/resolver', verifyToken, requireFunc('rh_aprobar'), 
 // Certificado de antigüedad self-service (QR verificable)
 router.get('/antiguedad/cert/estado',  verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.certEstado);
 router.post('/antiguedad/cert/emitir', verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.certEmitir);
+router.get('/antiguedad/cert/historial', verifyToken, requireFunc('rh_antiguedad', 'rh_aprobar'), ctrl.certHistorial);
 router.get('/empleados',               verifyToken, requireFunc('rh_aprobar'), ctrl.listarEmpleados);
 
 // Cumpleaños (popup del cumpleañero + banner a compañeros; cualquier usuario logueado)

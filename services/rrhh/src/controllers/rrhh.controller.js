@@ -433,6 +433,37 @@ const certEmitir = async (req, res) => {
   } catch (e) { console.error('[rrhh certEmitir]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* Historial de certificados emitidos (los míos; RRHH/Admin ve todos) con los
+   datos para reimprimir una COPIA fiel: la antigüedad se calcula a la fecha de
+   EMISIÓN original y el folio/QR es el mismo (sigue verificable). */
+const certHistorial = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const rrhh = await esRRHH(u.id_usuario);
+    const todos = rrhh && req.query.vista === 'todos';
+    const [rows] = await pool.query(
+      `SELECT id, id_usuario, nombre, rut, cargo, fecha_ingreso, codigo, emitido_nombre, created_at
+         FROM rh_certificados ${todos ? '' : 'WHERE id_usuario=?'} ORDER BY created_at DESC LIMIT 300`,
+      todos ? [] : [u.id_usuario]);
+    const cfg = await getConfig();
+    const RUT = require('../../../../api-gateway/public/js/rut-core');
+    const certificados = rows.map(c => {
+      const meses = c.fecha_ingreso ? mesesAntiguedad(c.fecha_ingreso, isoFecha(c.created_at)) : 0;
+      const vars = {
+        nombre: c.nombre, rut: c.rut ? RUT.formatear(c.rut) : '—', cargo: c.cargo || 'Colaborador',
+        don: 'don/doña', interesado: 'del interesado',
+        fecha_ingreso: c.fecha_ingreso ? fechaLargaCL(c.fecha_ingreso) : '—',
+        antiguedad: antiguedadTexto(meses), fecha_emision: fechaLargaCL(c.created_at),
+      };
+      return { id: c.id, id_usuario: c.id_usuario, codigo: c.codigo, nombre: c.nombre, rut: c.rut,
+        cargo: vars.cargo, fecha_ingreso: isoFecha(c.fecha_ingreso), antiguedad: vars.antiguedad,
+        fecha_emision: isoFecha(c.created_at), emitido_por: c.emitido_nombre,
+        cuerpo_html: tpl(cfg.cert_cuerpo, vars), cierre_html: tpl(cfg.cert_cierre, vars),
+        firmante: c.emitido_nombre, firmante_cargo: null };
+    });
+    res.json({ success: true, data: { certificados, es_rrhh: rrhh }, error: null });
+  } catch (e) { console.error('[rrhh certHistorial]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
+};
+
 // Lista mínima de empleados para el selector de RRHH/Admin
 const listarEmpleados = async (req, res) => {
   try {
@@ -561,5 +592,5 @@ const pendientes = async (req, res) => {
 };
 
 module.exports = { crearVacaciones, listarVacaciones, resolverVacaciones, crearAntiguedad, listarAntiguedad, resolverAntiguedad, pendientes,
-  certEstado, certEmitir, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi,
+  certEstado, certEmitir, certHistorial, listarEmpleados, cumpleEstado, cumpleHoy, getConfigApi, setConfigApi,
   cumplesProximos, getConfig };

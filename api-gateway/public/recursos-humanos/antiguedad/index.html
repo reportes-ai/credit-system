@@ -28,7 +28,7 @@
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Certificado de Antigüedad',icon:'bi-award',current:true}]};</script>
 <div class="main">
   <div class="page-banner"><i class="bi bi-award"></i><div><h2>Certificado de Antigüedad</h2><p>Emite tu certificado de antigüedad laboral al instante, o solicítalo a RRHH.</p></div></div>
-  <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div></div>
+  <div class="tabs"><div class="tab active" id="t1" onclick="tab('crear')"><i class="bi bi-plus-circle me-1"></i>Nueva solicitud</div><div class="tab" id="t2" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis solicitudes</div><div class="tab" id="t3" onclick="tab('bandeja')" style="display:none"><i class="bi bi-inbox me-1"></i>Bandeja RRHH<span class="badge-count" id="bandejaCount">0</span></div><div class="tab" id="t4" onclick="tab('historicas')" style="display:none"><i class="bi bi-clock-history me-1"></i>Solicitudes Históricas</div><div class="tab" id="t5" onclick="tab('certificados')"><i class="bi bi-file-earmark-check me-1"></i>Certificados emitidos</div></div>
   <div id="secCrear">
     <div class="card-box" id="boxInstant" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><i class="bi bi-lightning-charge-fill" style="color:#f59e0b;font-size:1.3rem"></i><b>Certificado inmediato</b></div>
@@ -45,6 +45,11 @@
   <div id="secLista" class="card-box" style="display:none">
     <table><thead><tr><th>Solicitante</th><th>Motivo</th><th>Estado</th><th>Antigüedad</th><th id="thAcc"></th></tr></thead><tbody id="tb"><tr><td colspan="5" class="empty">Cargando…</td></tr></tbody></table>
   </div>
+  <div id="secCerts" class="card-box" style="display:none">
+    <div style="font-size:.8rem;color:#64748b;margin-bottom:10px"><i class="bi bi-info-circle me-1"></i>Copia fiel del certificado original: mismo folio y mismo QR (sigue verificable), con la antigüedad a la fecha de emisión.</div>
+    <table><thead><tr><th>Fecha emisión</th><th id="thCertNom" style="display:none">Colaborador</th><th>Folio</th><th>Antigüedad</th><th>Emitido por</th><th></th></tr></thead>
+      <tbody id="tbCerts"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody></table>
+  </div>
 </div>
 <script src="/js/auth-guard.js"></script>
 <script src="/js/qrcode-generator.js"></script>
@@ -60,8 +65,32 @@
   let FIRMA_EMPRESA=null;
   fetch('/api/cartas-params/firma_empresa',{headers:H}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.data) FIRMA_EMPRESA=j.data; }).catch(()=>{});
   function antiguedadStr(fi){ if(!fi)return''; const a=new Date(fi+'T00:00:00'), b=new Date(); let m=(b.getFullYear()-a.getFullYear())*12+(b.getMonth()-a.getMonth()); if(b.getDate()<a.getDate())m--; m=Math.max(0,m); return `${Math.floor(m/12)} año(s) ${m%12} mes(es)`; }
-  const TABMAP={crear:'t1',mias:'t2',bandeja:'t3',historicas:'t4'};
-  function tab(t){ ['t1','t2','t3','t4'].forEach(id=>document.getElementById(id).classList.remove('active')); document.getElementById(TABMAP[t]).classList.add('active'); document.getElementById('secCrear').style.display=t==='crear'?'':'none'; document.getElementById('secLista').style.display=t==='crear'?'none':''; if(t!=='crear'){VISTA=t; cargar();} }
+  const TABMAP={crear:'t1',mias:'t2',bandeja:'t3',historicas:'t4',certificados:'t5'};
+  function tab(t){ ['t1','t2','t3','t4','t5'].forEach(id=>document.getElementById(id).classList.remove('active')); document.getElementById(TABMAP[t]).classList.add('active');
+    document.getElementById('secCrear').style.display=t==='crear'?'':'none';
+    document.getElementById('secCerts').style.display=t==='certificados'?'':'none';
+    document.getElementById('secLista').style.display=(t==='crear'||t==='certificados')?'none':'';
+    if(t==='certificados') return cargarCerts();
+    if(t!=='crear'){VISTA=t; cargar();} }
+
+  /* ── Historial de certificados emitidos, con descarga de copia ── */
+  let CERTS=[];
+  async function cargarCerts(){
+    const tb=document.getElementById('tbCerts'); tb.innerHTML='<tr><td colspan="6" class="empty">Cargando…</td></tr>';
+    const j=await(await fetch('/api/rrhh/antiguedad/cert/historial?vista=todos',{headers:H})).json();  // el backend ignora 'todos' si no es RRHH
+    if(!j.success){tb.innerHTML='<tr><td colspan="6" class="empty">'+esc(j.error)+'</td></tr>';return;}
+    CERTS=j.data.certificados||[];
+    document.getElementById('thCertNom').style.display=j.data.es_rrhh?'':'none';
+    if(!CERTS.length){tb.innerHTML='<tr><td colspan="6" class="empty">Sin certificados emitidos.</td></tr>';return;}
+    tb.innerHTML=CERTS.map((c,i)=>`<tr>
+      <td>${fd(c.fecha_emision)}</td>
+      <td style="display:${j.data.es_rrhh?'':'none'}">${esc(c.nombre||'')}</td>
+      <td style="font-family:Consolas,monospace">${esc(c.codigo||'—')}</td>
+      <td>${esc(c.antiguedad||'—')}</td>
+      <td>${esc(c.emitido_por||'—')}</td>
+      <td><button class="btn-mini ok" onclick="descargarCopia(${i})"><i class="bi bi-download me-1"></i>Descargar copia</button></td></tr>`).join('');
+  }
+  function descargarCopia(i){ const c=CERTS[i]; if(c) imprimirCertificado(c); }
   async function cargarPendientes(){ try{ const j=await(await fetch('/api/rrhh/pendientes',{headers:H})).json(); if(j.data?.es_rrhh){ document.getElementById('t3').style.display=''; document.getElementById('t4').style.display=''; const b=document.getElementById('bandejaCount'); const c=j.data.antiguedad||0; if(c>0){b.textContent=c;b.style.display='';}else b.style.display='none'; } }catch(e){} }
   async function crear(){ const j=await(await fetch('/api/rrhh/antiguedad',{method:'POST',headers:HJ,body:JSON.stringify({motivo:document.getElementById('fM').value})})).json();
     if(!j.success)return alert(j.error); alert('Solicitud enviada a RRHH'); document.getElementById('fM').value=''; tab('mias'); }
