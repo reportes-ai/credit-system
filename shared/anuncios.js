@@ -22,7 +22,7 @@ const RETENCION_DIAS  = 7;    // la cola se poda sola
 // Eventos que pueden disparar un anuncio (extensible). tokens = variables del mensaje.
 const EVENTOS = [
   {
-    evento: 'credito_otorgado', label: 'Crédito otorgado', tokens: ['{ejecutivo}'],
+    evento: 'credito_otorgado', label: 'Crédito otorgado', tokens: ['{ejecutivo}'], icono: '🎉',
     default: {
       activo: 1, mensaje: '{ejecutivo} acaba de colocar un nuevo crédito',
       color_fondo: '#0a0a0a', color_texto: '#ffffff', ancho_pct: 33,
@@ -30,7 +30,7 @@ const EVENTOS = [
     },
   },
   {
-    evento: 'operacion_anulada', label: 'Operación anulada',
+    evento: 'operacion_anulada', label: 'Operación anulada', icono: '😭',
     tokens: ['{op}', '{ejecutivo}', '{usuario}'],
     default: {
       activo: 1, mensaje: 'Se anuló la operación {op} de {ejecutivo}',
@@ -96,7 +96,9 @@ async function publicarAnuncio(evento, vars) {
     if (!cfg || !cfg.activo) return;                 // desactivado en el mantenedor → no molesta
     const texto = aplicarVars(cfg.mensaje, vars).trim().slice(0, 200);
     if (!texto) return;
-    const opts = { bg: cfg.color_fondo, fg: cfg.color_texto, ancho: cfg.ancho_pct,
+    // El ícono es propio del evento (celebrar un crédito ≠ anunciar una anulación)
+    const icono = (EVENTOS.find(e => e.evento === evento) || {}).icono || '🎉';
+    const opts = { bg: cfg.color_fondo, fg: cfg.color_texto, ancho: cfg.ancho_pct, icon: icono,
                    sonido: cfg.sonido, antes: cfg.segundos_antes, dur: cfg.duracion_seg };
     await pool.query('INSERT INTO anuncios_cola (evento, texto, opts) VALUES (?,?,?)',
       [evento, texto, JSON.stringify(opts).slice(0, 500)]);
