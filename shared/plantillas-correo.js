@@ -167,6 +167,30 @@ Saludos cordiales,
     variables: '{ODP} {PROVEEDOR} {RUT} {CONCEPTO} {DOC} {TOTAL} {METODO} {QUIEN}',
   },
   {
+    codigo: 'odc_finanzas',
+    ambito: 'Otras Compras',
+    nombre: 'ODC con firma del supervisor → Finanzas',
+    descripcion: 'Se manda automáticamente cuando una Orden de Compra (Soporte → Otras Compras) recibe la firma del supervisor (o pasa directo a Finanzas por no tener supervisor asignado). Va al correo de Contabilidad/Finanzas (config correo_contabilidad de Post Venta) con las cotizaciones adjuntas.',
+    asunto: 'Orden de Compra {ODC} por aprobar — {PROVEEDOR} ({TOTAL})',
+    cuerpo: `Estimado Equipo de Administración y Finanzas:
+
+La Orden de Compra {ODC} a {PROVEEDOR} (RUT {RUT}) tiene la firma del supervisor y espera su aprobación.
+
+Detalle: {DETALLE}
+Total: {TOTAL}
+Generada por: {QUIEN}
+Firma del supervisor: {SUPERVISOR}
+
+Pueden aprobarla o devolverla desde Soporte → Otras Compras (pestaña Por aprobar).
+
+Saludos cordiales,
+Área de Operaciones`,
+    para_perfiles: '',
+    cc: '',
+    destinatario: 'El correo de Contabilidad/Finanzas (config correo_contabilidad, compartida con Post Venta)',
+    variables: '{ODC} {PROVEEDOR} {RUT} {DETALLE} {TOTAL} {QUIEN} {SUPERVISOR}',
+  },
+  {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',

@@ -88,6 +88,33 @@ async function esFinanzas(idUsuario) {
 }
 const esAdminPerfil = n => String(n || '') === 'Administrador';
 
+/* Correo AUTOMÁTICO a Finanzas cuando la ODC queda esperando su firma —
+   idéntico al de las ODP de proveedores: plantilla paramétrica (odc_finanzas),
+   destino config correo_contabilidad, cotizaciones adjuntas. Nunca frena el flujo. */
+function correoFinanzasODC(o, supervisorNombre) {
+  (async () => {
+    try {
+      let to = 'contabilidad@autofacilchile.cl';
+      try {
+        const [[row]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_contabilidad'");
+        if (row) { const v = JSON.parse(row.valor); if (v && String(v).trim()) to = String(v).trim(); }
+      } catch (_) {}
+      const adjuntos = await require('../../../postventa/src/controllers/postventa.controller')
+        .adjuntosFactura('ODC', [o.id]).catch(() => []);
+      const env = await require('../../../../shared/plantillas-correo').enviar({
+        codigo: 'odc_finanzas', to: [to],
+        adjuntos: adjuntos.length ? adjuntos : undefined,
+        datos: {
+          ODC: o.numero, PROVEEDOR: o.proveedor_nombre, RUT: o.proveedor_rut || '—',
+          DETALLE: String(o.detalle || '').slice(0, 500), TOTAL: CLP(o.monto),
+          QUIEN: o.creado_por || '—', SUPERVISOR: supervisorNombre || 'sin supervisor asignado (pasa directo a Finanzas)',
+        },
+      });
+      if (!env.enviado) console.warn('[odc correo finanzas]', o.numero, env.motivo);
+    } catch (e) { console.error('[odc correo finanzas]', e.message); }
+  })();
+}
+
 /* ── GET /datos — proveedores activos + contadores ── */
 const getDatos = async (req, res) => {
   try {
@@ -169,6 +196,7 @@ const crear = async (req, res) => {
         WHERE u.estado='activo' AND (p.nombre LIKE '%Finanzas%' OR p.nombre LIKE '%Financiero%')`);
       if (fin.length) await notificar(fin.map(x => x.id_usuario), { tipo: 'ODC', titulo: '🛒 Orden de Compra por aprobar',
         mensaje: `${nombreDe(u)} generó la ${numero} (${provNombre}, ${CLP(monto)}) — sin supervisor asignado, pasa directo a Finanzas.`, href: '/soporte/otras-compras/' }).catch(() => {});
+      correoFinanzasODC({ id: r.insertId, numero, proveedor_nombre: provNombre, proveedor_rut: provRut, detalle: b.detalle, monto, creado_por: nombreDe(u) }, null);
     }
     auditar({ req, accion: 'CREAR', modulo: 'otras-compras', entidad: 'odc', entidad_id: r.insertId,
       detalle: `Generó ${numero}: ${provNombre} ${CLP(monto)} — ${String(b.detalle).trim().slice(0, 120)}${adjuntos ? ` (${adjuntos} adjunto/s)` : ''}` });
@@ -244,6 +272,7 @@ const resolver = async (req, res) => {
           WHERE u.estado='activo' AND (p.nombre LIKE '%Finanzas%' OR p.nombre LIKE '%Financiero%')`);
         if (fin.length) await notificar(fin.map(x => x.id_usuario), { tipo: 'ODC', titulo: '🛒 Orden de Compra por aprobar',
           mensaje: `La ${o.numero} (${o.proveedor_nombre}, ${CLP(o.monto)}) tiene firma del supervisor. Falta Administración y Finanzas.`, href: '/soporte/otras-compras/' }).catch(() => {});
+        correoFinanzasODC(o, nombreDe(u));   // mail a Finanzas con las cotizaciones adjuntas
       }
     } else { // PENDIENTE_FINANZAS
       if (!admin && !(await esFinanzas(u.id_usuario)))
