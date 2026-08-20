@@ -163,8 +163,8 @@ function render(d){
     </div>
     ${sug ? `<div class="card" style="border-left:4px solid #0141A2">
       <div style="font-size:.85rem;color:#1e293b"><i class="bi bi-envelope-paper" style="color:#0141A2"></i>
-        <b>${Object.keys(sug.campos||{}).length} dato(s) pre-llenados desde la carta ${esc(sug.carta||'')}</b>
-        <span style="color:#64748b">(${esc(sug.status||'')})</span> — revísalos: si el vehículo cambió entre la carta y el curse, corrígelos antes de guardar.</div>
+        <b>${Object.keys(sug.campos||{}).length} dato(s) pre-llenados ${sug.carta?`desde la carta ${esc(sug.carta)}`:'desde los datos de la operación'}</b>
+        ${sug.status?`<span style="color:#64748b">(${esc(sug.status)})</span>`:''} — revísalos${sug.carta?': si el vehículo cambió entre la carta y el curse, corrígelos':' y corrígelos si no corresponden'} antes de guardar.</div>
     </div>` : ''}
     ${d.aviso_parque ? `<div class="card" style="border-left:4px solid #b45309;background:#fffbeb">
       <div style="font-size:.85rem;color:#92400e"><i class="bi bi-exclamation-triangle-fill"></i> <b>Parque / Calle no calza:</b> ${esc(d.aviso_parque)}</div>

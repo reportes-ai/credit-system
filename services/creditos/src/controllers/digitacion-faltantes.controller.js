@@ -329,6 +329,17 @@ exports.siguiente = async (req, res) => {
             sugerencias = { carta: ca.op_carta, status: ca.status, campos: s };
         }
       }
+      /* Si la carta no trae el parque, el PROPIO crédito ya lo dice: la columna
+         `parque` viene del Excel de carga ("NO APLICA" o el nombre del parque).
+         Deducir PARQUE/CALLE de ahí en vez de pedirlo al digitador (20-08-2026). */
+      if (esVacio('tipo_ubicacion', cr.tipo_ubicacion, cr)) {
+        const p = String(cr.parque || '').trim().toUpperCase();
+        if (p) {
+          cr.tipo_ubicacion = (p !== 'NO APLICA' && p !== 'CALLE' && p !== 'S/I') ? 'PARQUE' : 'CALLE';
+          if (!sugerencias) sugerencias = { carta: null, status: null, campos: {} };
+          sugerencias.campos.tipo_ubicacion = cr.tipo_ubicacion;
+        }
+      }
     } catch (e) { console.error('[digit sugerencias carta]', e.message); }
 
     // Lo pre-llenado ya no cuenta como faltante (sigue siendo editable y obligatorio al guardar).
