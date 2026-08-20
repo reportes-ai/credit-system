@@ -1359,6 +1359,7 @@
     function _modSec(mod) {                     // sección "natural" de un módulo (por su ruta)
       return (typeof sectionFromHref === 'function') ? sectionFromHref(mod.ruta || '') : 'home';
     }
+    const GRUPO_ICONO = { 'Dealers': 'bi-building' };   // ícono por grupo explícito
     function agruparPorPlacement(raw) {
       if (!Array.isArray(raw) || !raw.length) return raw;
       // índice sección → módulo (destino al relocalizar una card movida)
@@ -1375,6 +1376,14 @@
         for (const f of (mod.funcionalidades || [])) {
           f._ruta = mod.ruta;                  // preserva link de fallback de las acciones
           let g;
+          /* GRUPO explícito (funcionalidades.grupo): manda sobre módulo y placement.
+             Junta en un solo bloque permisos que viven en módulos distintos —p.ej.
+             todo lo de dealers— sin mover ninguna card de pantalla. */
+          if (f.grupo) {
+            g = ensure('_grp_' + f.grupo, f.grupo, GRUPO_ICONO[f.grupo] || 'bi-collection', '');
+            g.funcionalidades.push(f);
+            continue;
+          }
           const key = f.href ? _plKey(f.href) : null;
           const ov  = key ? _plOverride(key) : null;
           if (f.href && ov && ov !== _modSec(mod)) {

@@ -6,7 +6,7 @@ const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/visitas-terreno.controller');
 
 // Mismos permisos que el módulo de visitas (el ejecutivo opera SUS visitas)
-const puede = requireFunc('visitas_dealers', 'visitas_supervisar');
+const puede = requireFunc('visitas_dealers', 'visitas_supervisar');   // escribe en terreno: NO incluye visitas_ver (solo lectura)
 const upFoto = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.get('/mi-dia',                    verifyToken, puede, c.miDia);

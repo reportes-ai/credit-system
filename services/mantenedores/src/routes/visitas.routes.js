@@ -5,7 +5,7 @@ const { verifyToken } = require('../../../../shared/middleware/auth');
 const { requireFunc } = require('../../../../shared/middleware/permisos');
 const c = require('../controllers/visitas.controller');
 
-const verVisitas = requireFunc('visitas_dealers', 'visitas_supervisar');
+const verVisitas = requireFunc('visitas_ver', 'visitas_dealers', 'visitas_supervisar');
 const gestionar  = requireFunc('visitas_dealers', 'visitas_supervisar');
 
 const supervisar = requireFunc('visitas_supervisar');

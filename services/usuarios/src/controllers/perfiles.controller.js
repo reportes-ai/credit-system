@@ -624,7 +624,7 @@ const getModulosConFuncionalidades = async (req, res) => {
   try {
     const [modulos] = await pool.query(
       `SELECT m.id_modulo, m.nombre AS modulo, m.icono, m.ruta,
-              f.id_funcionalidad, f.nombre AS funcionalidad, f.codigo, f.href
+              f.id_funcionalidad, f.nombre AS funcionalidad, f.codigo, f.href, f.grupo
        FROM modulos m
        JOIN funcionalidades f ON f.id_modulo = m.id_modulo
        WHERE m.estado = 'activo'
@@ -643,7 +643,8 @@ const getModulosConFuncionalidades = async (req, res) => {
         id_funcionalidad: row.id_funcionalidad,
         nombre: row.funcionalidad,
         codigo: row.codigo,
-        href: row.href   // sub-item/página (NULL = permiso de acción)
+        href: row.href,  // sub-item/página (NULL = permiso de acción)
+        grupo: row.grupo // agrupación en la matriz de permisos (no afecta Home ni menús)
       });
     }
 
@@ -2346,6 +2347,41 @@ require('../../../../shared/migrate').enFila('perfil-solo-lectura', async () => 
   await pool.query(`INSERT IGNORE INTO perfiles (nombre, descripcion, solo_lectura)
                     VALUES ('Demo', 'Demostración con datos reales: puede navegar y ver, no puede operar (solo lectura)', 1)`);
   await pool.query("UPDATE perfiles SET solo_lectura=1 WHERE nombre='Demo'");
+});
+
+/* GRUPO de la matriz de permisos (v213.45).
+   `funcionalidades.grupo` SOLO afecta cómo se agrupan los checkbox en Perfiles y
+   Permisos. No lo lee el Home ni los menús —esos siguen saliendo de `modulos` y
+   del `href`—, así que agrupar no mueve ninguna card de pantalla.
+   Motivo: los permisos de dealer vivían repartidos en 4 secciones distintas
+   ("Dealers" con un solo checkbox, "Creación/Mantenedor de Dealer", "Informes
+   DealerNet" y sueltos dentro de "Mantenedores"): para habilitar un perfil había
+   que recorrer toda la matriz. */
+require('../../../../shared/migrate').enFila('func-grupo-permisos', async () => {
+  await pool.query('ALTER TABLE funcionalidades ADD COLUMN IF NOT EXISTS grupo VARCHAR(60) NULL');
+  // Módulos que son 100% de dealers → todas sus funcionalidades al grupo
+  await pool.query(`UPDATE funcionalidades f JOIN modulos m ON m.id_modulo=f.id_modulo
+                       SET f.grupo='Dealers'
+                     WHERE m.ruta IN ('/dealers-incorporacion/','/dealernet-informes/')`);
+  // Funcionalidades de dealer que viven dentro de otros módulos (Mantenedores)
+  const SUELTAS = ['mantenedores_dealers', 'mantenedores_parques', 'mant_dealer_categorias',
+    'mant_dealernet', 'mant_dealernet_productos', 'mant_dealernet_costos',
+    'visitas_ver', 'visitas_dealers', 'visitas_supervisar', 'visitas_informes'];
+  await pool.query(`UPDATE funcionalidades SET grupo='Dealers' WHERE codigo IN (?)`, [SUELTAS]);
+
+  /* Ruta AutoFácil: faltaba el permiso de SOLO LECTURA. Hasta ahora ver la ruta
+     exigía `visitas_dealers` (que además deja crear/editar/borrar visitas) o
+     `visitas_supervisar`: no había forma de dar mirada sin dar gestión.
+     Sin href a propósito — la ruta se entra por la pestaña de Dealers, y darle
+     href la convertiría en una card nueva del Home. */
+  const [[modMant]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/mantenedores/' LIMIT 1");
+  if (modMant) await pool.query(
+    `INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono, grupo)
+     VALUES (?, 'Ruta AutoFácil — ver (solo lectura)', 'visitas_ver', NULL, NULL, 'Dealers')`,
+    [modMant.id_modulo]);
+  // Nombres explícitos: en la matriz se leen los cuatro seguidos
+  await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — gestionar visitas' WHERE codigo='visitas_dealers'");
+  await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — supervisar (asignar, zonas, config)' WHERE codigo='visitas_supervisar'");
 });
 
 // Red de seguridad: corre en CADA boot (enFila, no migrar) — consolida duplicados por código.

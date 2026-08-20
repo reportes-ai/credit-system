@@ -453,7 +453,7 @@ async function cargarPermisos(){
   try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
     const fs = j.funcionalidades||[];
     if (esAdmin || fs.includes('dealer_ficha_revisar')) puedeEditarDealer = true;
-    if (esAdmin || fs.includes('visitas_dealers') || fs.includes('visitas_supervisar')) {
+    if (esAdmin || fs.includes('visitas_ver') || fs.includes('visitas_dealers') || fs.includes('visitas_supervisar')) {
       const t=document.getElementById('tabVisitas'); if(t) t.style.display='';
     }
   } catch(e){}
