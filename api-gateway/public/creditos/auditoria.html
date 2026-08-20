@@ -383,7 +383,7 @@ async function ejecutarBackfill() {
     const j = await r.json();
     if (!j.success) throw new Error(j.error);
     const d = j.data;
-    alert(`✅ Backfill completado\n\nEventos insertados: ${d.insertados}\n• Créditos: ${d.creditos}\n• Documentos respaldo: ${d.documentos}\n• Documentos AF: ${d.docs_af}\n• Pagos: ${d.pagos}`);
+    alert(`✅ Historial reconstruido\n\nEventos insertados: ${d.insertados}\n• Operaciones: ${d.creditos}\n• Anulaciones: ${d.anulaciones||0}\n• Documentos respaldo: ${d.documentos}\n• Documentos AF: ${d.docs_af}\n• Pagos: ${d.pagos}`);
     cargarPagina(); // recargar
   } catch(e) {
     alert('Error en backfill: ' + e.message);

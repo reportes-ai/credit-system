@@ -31,18 +31,30 @@ const getByCredito = async (req, res) => {
    único (ETAPA_SQL), no por una columna suelta. */
 const backfill = async (req, res) => {
   let insertados = 0;
-  const ins = async (row) => {
+  /* Los eventos se acumulan y entran por LOTES de 200. Uno por INSERT eran ~1.200
+     consultas para las otorgadas de un año, y TiDB cobra por consulta. */
+  let buffer = [];
+  const flush = async () => {
+    if (!buffer.length) return;
+    const lote = buffer; buffer = [];
     try {
       const [r] = await pool.query(
         `INSERT IGNORE INTO auditoria_credito
            (id_credito, fecha, usuario, id_usuario, perfil, accion, detalle, meta, ref_origen)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        [row.id_credito, row.fecha, row.usuario, row.id_usuario || null,
-         row.perfil || null, row.accion, row.detalle || null,
-         row.meta ? JSON.stringify(row.meta) : null, row.ref_origen]
+         VALUES ?`,
+        [lote.map(row => [
+          row.id_credito, row.fecha, row.usuario, row.id_usuario || null,
+          row.perfil || null, row.accion, row.detalle || null,
+          row.meta ? JSON.stringify(row.meta) : null, row.ref_origen,
+        ])]
       );
-      if (r.affectedRows) insertados++;
-    } catch(e) { console.error('[backfill ins]', e.message, row.ref_origen); }
+      insertados += r.affectedRows || 0;
+    } catch(e) { console.error('[backfill lote]', e.message, lote.length + ' filas'); }
+  };
+  const ins = async (row) => {
+    if (!row.id_credito || !row.fecha) return;   // sin fecha no hay hito que contar
+    buffer.push(row);
+    if (buffer.length >= 200) await flush();
   };
 
   try {
@@ -52,8 +64,10 @@ const backfill = async (req, res) => {
        con "Unknown column" cada vez que alguien apretaba el botón. */
     const [creditos] = await pool.query(
       `SELECT c.id, c.num_op, c.numero_credito, c.ejecutivo,
-              COALESCE(c.nombre_cliente, cl.nombre_completo, '') AS nombre_cliente,
-              COALESCE(c.rut_cliente,    cl.rut,             '') AS rut_cliente,
+              /* El cliente NO vive en la tabla creditos (Máxima 2: una sola
+                 fuente de datos) — se lee de clientes por id_cliente. */
+              COALESCE(cl.nombre_completo, '') AS nombre_cliente,
+              COALESCE(cl.rut,             '') AS rut_cliente,
               c.financiera, c.monto_financiado, c.created_at, c.fecha_otorgado,
               COALESCE(c.id_usuario, c.created_by) AS uid,
               TRIM(CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido,''))) AS usr_nombre,
@@ -62,15 +76,22 @@ const backfill = async (req, res) => {
        LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
        LEFT JOIN usuarios u  ON u.id_usuario  = COALESCE(c.id_usuario, c.created_by)
        LEFT JOIN perfiles p  ON u.id_perfil   = p.id_perfil
-       WHERE ${ES_ETAPA('OTORGADO', 'c')}
-         AND c.fecha_otorgado >= MAKEDATE(YEAR(CURDATE()), 1)`
+       /* fecha_otorgado solo se puebla al otorgar, así que es el filtro real del
+          universo. NO se exige que la etapa siga siendo OTORGADO: una operación
+          ANULADA también se otorgó, y es justamente la que más historia necesita. */
+       WHERE c.fecha_otorgado >= MAKEDATE(YEAR(CURDATE()), 1)`
     );
     const ids = creditos.map(c => c.id);
     for (const c of creditos) {
       const nOp = c.num_op || c.numero_credito || c.id;
+      /* Las operaciones migradas traen created_at con la fecha de la migración,
+         posterior a su propio otorgamiento. Usar esa fecha dejaba el ingreso
+         DESPUÉS del curse en la línea de tiempo; se toma la menor de las dos. */
+      const nace = (c.created_at && c.fecha_otorgado && c.created_at > c.fecha_otorgado)
+        ? c.fecha_otorgado : c.created_at;
       await ins({
         id_credito: c.id,
-        fecha:      c.created_at || new Date(),
+        fecha:      nace || c.fecha_otorgado,
         usuario:    c.usr_nombre?.trim() || 'Sistema',
         id_usuario: c.uid,
         perfil:     c.usr_perfil || null,
@@ -98,6 +119,26 @@ const backfill = async (req, res) => {
       return res.json({ success: true, error: null, data: {
         insertados: 0, creditos: 0, documentos: 0, docs_af: 0, pagos: 0,
         mensaje: 'No hay operaciones otorgadas este año para reconstruir.' } });
+    }
+
+    /* ── 1-bis. Anulaciones ya aprobadas ─────────────────────────────────── */
+    const [anuls] = await pool.query(
+      `SELECT id, id_credito, num_op, motivo, cartola_nota, estado_anterior,
+              solicitado_nombre, resuelto_nombre, resuelto_por, resuelto_at
+         FROM anulaciones_operacion
+        WHERE estado = 'APROBADA' AND id_credito IN (?)`, [ids]);
+    for (const an of anuls) {
+      await ins({
+        id_credito: an.id_credito,
+        fecha:      an.resuelto_at,
+        usuario:    an.resuelto_nombre || 'Sistema',
+        id_usuario: an.resuelto_por,
+        perfil:     null,
+        accion:     'CREDITO_ANULADO',
+        detalle:    `Operación N°${an.num_op || an.id_credito} anulada — ${an.motivo}. Solicitada por ${an.solicitado_nombre || '—'}. ${an.cartola_nota || ''}`.trim(),
+        meta:       { motivo: an.motivo, solicitada_por: an.solicitado_nombre, estado_anterior: an.estado_anterior, cartola: an.cartola_nota },
+        ref_origen: `anu_${an.id}`,
+      });
     }
 
     /* ── 2. Documentos de respaldo cargados (credito_documentos) ─────────── */
@@ -200,6 +241,8 @@ const backfill = async (req, res) => {
       });
     }
 
+    await flush();   // lo que quedó bajo el corte del lote
+
     res.json({
       success: true,
       data: {
@@ -208,6 +251,7 @@ const backfill = async (req, res) => {
         documentos: cdocs.length,
         docs_af:   afdocs.length,
         pagos:     pagos.length,
+        anulaciones: anuls.length,
         mensaje:   `Backfill completado: ${insertados} eventos históricos insertados sobre ${creditos.length} operaciones otorgadas este año.`,
       },
       error: null,

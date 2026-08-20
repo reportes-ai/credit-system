@@ -961,10 +961,16 @@ const otorgar = async (req, res) => {
     try {
       const audCred = require('../../../../shared/auditoria');
       const [[crAud]] = await pool.query(
-        `SELECT id, num_op, numero_credito, nombre_cliente, rut_cliente, financiera,
-                monto_financiado, created_at
-           FROM creditos WHERE id = ? OR num_op = ? LIMIT 1`,
-        [ca.id_credito_creado || 0, ca.id_financiera || 0]);
+        // El nombre/RUT del cliente se leen de clientes: en creditos no viven.
+        `SELECT cr.id, cr.num_op, cr.numero_credito, cr.financiera,
+                cr.monto_financiado, cr.created_at,
+                COALESCE(cl.nombre_completo, ca2.cliente, '') AS nombre_cliente,
+                COALESCE(cl.rut, ca2.rut_cliente, '')         AS rut_cliente
+           FROM creditos cr
+           LEFT JOIN clientes cl ON cl.id_cliente = cr.id_cliente
+           LEFT JOIN cartas_aprobacion ca2 ON ca2.id = ?
+          WHERE cr.id = ? OR cr.num_op = ? LIMIT 1`,
+        [id, ca.id_credito_creado || 0, ca.id_financiera || 0]);
       if (crAud) {
         const nOp = crAud.num_op || crAud.numero_credito || crAud.id;
         audCred.registrarUnico({
