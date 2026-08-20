@@ -144,7 +144,11 @@ async function cargarMias(){
 async function vpCargarMias(){
   try{
     const j=await (await fetch('/api/rrhh/vac-progresivas',{headers:H})).json();
-    const mias=(j.data||{}).mias||[]; if(!mias.length) return;
+    let mias=(j.data||{}).mias||[];
+    // El "AÚN NO CORRESPONDE" es la respuesta del análisis, no un trámite: solo
+    // se muestra mientras no haya una solicitud viva (en revisión o aprobada).
+    if(mias.some(m=>m.resultado==='CORRESPONDE')) mias=mias.filter(m=>m.resultado==='CORRESPONDE');
+    if(!mias.length) return;
     const box=document.getElementById('vpMias'); if(!box) return;
     const fdd=v=>v?String(v).slice(0,10).split('-').reverse().join('-'):'';
     box.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)"><i class="bi bi-umbrella me-1"></i>Mis vacaciones progresivas</h6>
