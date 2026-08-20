@@ -209,9 +209,9 @@ Al aprobar, los años previos quedan en la ficha del colaborador y los días pro
 
 Saludos cordiales,
 Auto Fácil Business Suite`,
-    para_perfiles: 'Jefe Recursos Humanos',
+    para_perfiles: 'Consultora Recursos Humanos',
     cc: '',
-    destinatario: 'Los usuarios del perfil Jefe Recursos Humanos (editable acá)',
+    destinatario: 'Los usuarios del perfil Consultora Recursos Humanos (editable acá)',
     variables: '{NOMBRE} {DIAS} {ANOS_PREVIOS} {LINK}',
   },
   {

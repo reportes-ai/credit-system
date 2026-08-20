@@ -87,7 +87,7 @@ require('../../../../shared/migrate').migrar('rrhh-sol-permisos-v1', async () =>
   if (!mod) return;
   const NO_EMPLEADOS = ['Pantalla TV', 'BDI Cluster Ecuador','Demo'];
   const APROBADORES = ['Administrador', 'Gerente General', 'Gerente de Finanzas',
-    'Gerente de Operaciones y Crédito', 'Jefe Comercial', 'Jefe Recursos Humanos',
+    'Gerente de Operaciones y Crédito', 'Jefe Comercial', 'Consultora Recursos Humanos', 'Jefe Recursos Humanos',
     'Supervisor Comercial', 'Supervisor de Crédito', 'Supervisor de Operaciones'];
 
   const func = async (codigo, nombre, icono) => {
