@@ -139,6 +139,8 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS cotizacion JSON NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Correlativo del repositorio de preaprobaciones (PREaammxxx) de esta conversación
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS preaprob_codigo VARCHAR(12) NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // cuándo la tomó el ejecutivo (para el seguimiento de ventas del bot)
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS asignada_at DATETIME NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Contador de preevaluaciones DealerNet de la conversación (límite anti-abuso)
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS preevals INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
   } catch (e) { console.error('[wsp_conversaciones migration]', e.message); }
@@ -1141,7 +1143,7 @@ exports.responderConv = async (req, res) => {
       if (!v.abierta) return res.status(400).json({ success: false, error: `Ventana de ${v.horas} h cerrada: el cliente debe escribir primero (o contactarlo vía campaña con plantilla).` });
     }
     // Al responder un agente, la conversación queda tomada por él
-    if (conv.estado !== 'CERRADA') await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=? WHERE id=? AND asignada_a IS NULL", [req.user.id_usuario, nombreDe(req.user), req.params.id]);
+    if (conv.estado !== 'CERRADA') await pool.query("UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=?, asignada_at=NOW() WHERE id=? AND asignada_a IS NULL", [req.user.id_usuario, nombreDe(req.user), req.params.id]);
     const estado = await responder(conv, texto, 'AGENTE', req.user);
     res.json({ success: true, data: { estado_envio: estado }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -1162,7 +1164,7 @@ exports.accionConv = async (req, res) => {
     if (accion === 'TOMAR') {
       // Carrera justa: el PRIMERO que toca "Tomar" se queda con el cliente (update atómico)
       const [r] = await pool.query(
-        "UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=? WHERE id=? AND (asignada_a IS NULL OR asignada_a=?)",
+        "UPDATE wsp_conversaciones SET estado='DERIVADA', asignada_a=?, asignada_nombre=?, asignada_at=COALESCE(asignada_at, NOW()) WHERE id=? AND (asignada_a IS NULL OR asignada_a=?)",
         [req.user.id_usuario, nombreDe(req.user), req.params.id, req.user.id_usuario]);
       if (!r.affectedRows) {
         const [[c2]] = await pool.query('SELECT asignada_nombre FROM wsp_conversaciones WHERE id=?', [req.params.id]);
@@ -1178,6 +1180,76 @@ exports.accionConv = async (req, res) => {
     } else return res.status(400).json({ success: false, error: 'Acción inválida' });
     auditar({ req, accion: 'EDITAR', modulo: 'whatsapp', entidad: 'wsp_conversaciones', entidad_id: String(req.params.id), detalle: `Conversación ${req.params.id}: ${accion}` });
     res.json({ success: true, data: null, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+/* ── Seguimiento de ventas del bot ─────────────────────────────────────────────
+   Toda conversación TOMADA por un ejecutivo se sigue hasta su resultado:
+   VENDIDO (carta otorgada) · CARTA (emitida, sin otorgar) · EN GESTIÓN ·
+   SIN CIERRE (cerrada o inactiva sin venta). El cruce es por RUT del cliente
+   contra cartas_aprobacion creadas DESPUÉS de iniciada la conversación. */
+exports.seguimientoVentas = async (req, res) => {
+  try {
+    const dias = Math.min(365, Math.max(7, parseInt(req.query.dias) || 60));
+    const [convs] = await pool.query(
+      `SELECT id, telefono, nombre, rut_cliente, estado, asignada_a, asignada_nombre,
+              es_simulada, preaprob_codigo,
+              DATE_FORMAT(created_at,'%Y-%m-%d %H:%i') inicio,
+              DATE_FORMAT(asignada_at,'%Y-%m-%d %H:%i') tomada,
+              created_at creada_raw,
+              TIMESTAMPDIFF(HOUR, ultima_actividad, NOW()) horas_inactiva
+         FROM wsp_conversaciones
+        WHERE asignada_a IS NOT NULL AND created_at >= NOW() - INTERVAL ? DAY
+        ORDER BY created_at DESC LIMIT 500`, [dias]);
+
+    // Cartas por RUT. El rut de la conversación puede venir con o sin DV, con o
+    // sin puntos: se busca el cuerpo por ambas lecturas (tal cual y sin el
+    // último carácter) y el JOIN decide.
+    const limpio = r => String(r || '').replace(/[.\-\s]/g, '').toUpperCase();
+    const variantes = r => { const l = limpio(r); return l ? [l, l.slice(0, -1)] : []; };
+    const norm = r => variantes(r)[0] || '';
+    const ruts = [...new Set(convs.flatMap(c => variantes(c.rut_cliente)))];
+    let cartasPorRut = new Map();
+    if (ruts.length) {
+      const [cartas] = await pool.query(
+        `SELECT op_carta, rut_cliente_cuerpo, status, otorgado, fecha_creacion,
+                DATE_FORMAT(fecha_otorgado,'%Y-%m-%d') f_otorgado
+           FROM cartas_aprobacion
+          WHERE rut_cliente_cuerpo IN (?)`, [ruts]);
+      for (const ca of cartas) {
+        const k = String(ca.rut_cliente_cuerpo);
+        if (!cartasPorRut.has(k)) cartasPorRut.set(k, []);
+        cartasPorRut.get(k).push(ca);
+      }
+    }
+
+    const cfgInactividad = 72;   // horas sin actividad para dar la gestión por caída
+    const filas = convs.map(c => {
+      const cartas = variantes(c.rut_cliente).flatMap(v => cartasPorRut.get(v) || [])
+        .filter(ca => new Date(ca.fecha_creacion) >= new Date(c.creada_raw));
+      let resultado = 'EN GESTION', carta = null;
+      const otorgada = cartas.find(ca => ca.otorgado);
+      const vigente = cartas.find(ca => !ca.otorgado && !/RECHAZ|ANULAD|DESIST|ELIMIN|REEMPLAZ/i.test(ca.status || ''));
+      if (otorgada) { resultado = 'VENDIDO'; carta = otorgada.op_carta; }
+      else if (vigente) { resultado = 'CARTA'; carta = vigente.op_carta; }
+      else if (c.estado === 'CERRADA' || c.horas_inactiva > cfgInactividad) resultado = 'SIN CIERRE';
+      const { creada_raw, ...resto } = c;
+      return { ...resto, resultado, carta };
+    });
+
+    // Resumen por ejecutivo
+    const porEjec = {};
+    for (const f of filas) {
+      const k = f.asignada_nombre || '—';
+      porEjec[k] = porEjec[k] || { ejecutivo: k, tomadas: 0, vendidas: 0, cartas: 0, en_gestion: 0, sin_cierre: 0 };
+      porEjec[k].tomadas++;
+      if (f.resultado === 'VENDIDO') porEjec[k].vendidas++;
+      else if (f.resultado === 'CARTA') porEjec[k].cartas++;
+      else if (f.resultado === 'EN GESTION') porEjec[k].en_gestion++;
+      else porEjec[k].sin_cierre++;
+    }
+    const resumen = Object.values(porEjec).sort((a, b) => b.vendidas - a.vendidas || b.tomadas - a.tomadas);
+    res.json({ success: true, data: { dias, filas, resumen }, error: null });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 

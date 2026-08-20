@@ -176,6 +176,32 @@
     <div class="tab" id="tTriggers" onclick="tab('triggers')"><i class="bi bi-exclamation-diamond me-1"></i>Triggers</div>
     <div class="tab" id="tConfig" onclick="tab('config')"><i class="bi bi-gear me-1"></i>Configuración</div>
     <div class="tab" onclick="location.href='/whatsapp/seguimiento-cartas.html'"><i class="bi bi-envelope-heart me-1"></i>Seguimiento Cartas</div>
+    <div class="tab" id="tSegbot" onclick="tab('segbot')" style="display:none"><i class="bi bi-bullseye me-1"></i>Seguimiento Bot</div>
+  </div>
+
+  <!-- ═══ SEGUIMIENTO BOT (ventas de conversaciones tomadas) ═══ -->
+  <div id="secSegbot" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <b style="color:#065f46"><i class="bi bi-bullseye me-1"></i>Conversaciones tomadas y su resultado</b>
+      <select id="sbDias" onchange="cargarSegBot()" style="border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:.83rem">
+        <option value="30">Últimos 30 días</option><option value="60" selected>Últimos 60 días</option>
+        <option value="90">Últimos 90 días</option><option value="180">Últimos 180 días</option>
+      </select>
+      <span id="sbTot" style="color:#64748b;font-size:.82rem"></span>
+    </div>
+    <div id="sbResumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div class="card-box" style="background:#fff;border-radius:14px;box-shadow:0 1px 6px rgba(0,0,0,.07);padding:16px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+        <thead><tr style="text-transform:uppercase;font-size:.68rem;color:#64748b;text-align:left">
+          <th style="padding:8px">Cliente</th><th style="padding:8px">Ejecutivo</th>
+          <th style="padding:8px">Inicio</th><th style="padding:8px">Tomada</th>
+          <th style="padding:8px">Preaprobación</th><th style="padding:8px">Carta</th>
+          <th style="padding:8px">Resultado</th><th style="padding:8px"></th></tr></thead>
+        <tbody id="sbTabla"><tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8">Cargando…</td></tr></tbody>
+      </table>
+      <p style="font-size:.74rem;color:#94a3b8;margin:10px 0 0">VENDIDO = carta otorgada después de iniciada la conversación · CARTA = carta emitida vigente sin otorgar ·
+      EN GESTIÓN = conversación viva · SIN CIERRE = cerrada o más de 72 h sin actividad y sin venta — <b>estos son los casos a revisar con el ejecutivo</b>.</p>
+    </div>
   </div>
 
   <!-- ═══ BANDEJA ═══ -->
@@ -435,7 +461,7 @@
   const fdt = s => s ? new Date(s).toLocaleString('es-CL',{timeZone:'America/Santiago',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
 
   function tab(t){
-    ['Bandeja','Campanas','Plantillas','Respuestas','Triggers','Config'].forEach(x=>{
+    ['Bandeja','Campanas','Plantillas','Respuestas','Triggers','Config','Segbot'].forEach(x=>{
       document.getElementById('sec'+x).style.display='none';
       document.getElementById('t'+x).classList.remove('active');
     });
@@ -448,6 +474,7 @@
     if (t==='respuestas') cargarResp();
     if (t==='triggers') cargarTrg();
     if (t==='config') cargarConfig(); cargarAvisoVenc();
+    if (t==='segbot') cargarSegBot();
   }
 
   /* ═══ PLANTILLAS HSM ═══ */
@@ -1136,6 +1163,38 @@ async function cargarConfig(){
   simReset();
   cargarConvs();
   cargarQuick();
+  /* ── Seguimiento Bot (visible solo con wsp_config; el 403 oculta la pestaña) ── */
+  async function cargarSegBot(){
+    const dias=document.getElementById('sbDias').value;
+    const j=await (await fetch('/api/whatsapp/seguimiento-ventas?dias='+dias,{headers:H})).json();
+    if(!j.success){ document.getElementById('sbTabla').innerHTML=`<tr><td colspan="8" style="padding:16px;color:#b91c1c">${j.error||'Sin acceso'}</td></tr>`; return; }
+    const { filas, resumen }=j.data;
+    document.getElementById('sbTot').textContent=`${filas.length} conversación(es) tomadas`;
+    const PC={VENDIDO:'#15803d',CARTA:'#0141A2','EN GESTION':'#92400e','SIN CIERRE':'#b91c1c'};
+    document.getElementById('sbResumen').innerHTML=resumen.map(r=>{
+      const pct=r.tomadas?Math.round(r.vendidas/r.tomadas*100):0;
+      return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 16px;min-width:180px">
+        <b style="color:#0f172a">${esc(r.ejecutivo)}</b>
+        <div style="font-size:.78rem;color:#64748b;margin-top:3px">
+          ${r.tomadas} tomadas · <b style="color:#15803d">${r.vendidas} vendidas (${pct}%)</b>
+          ${r.cartas?` · ${r.cartas} con carta`:''}${r.en_gestion?` · ${r.en_gestion} en gestión`:''}
+          ${r.sin_cierre?` · <b style="color:#b91c1c">${r.sin_cierre} sin cierre</b>`:''}</div></div>`;
+    }).join('')||'<span style="color:#94a3b8;font-size:.85rem">Aún no hay conversaciones tomadas en el período.</span>';
+    document.getElementById('sbTabla').innerHTML=filas.map(f=>`<tr style="border-top:1px solid #f1f5f9">
+      <td style="padding:8px"><b>${esc(f.nombre||('+'+f.telefono))}</b>${f.rut_cliente?`<br><span style="font-size:.72rem;color:#94a3b8">${esc(f.rut_cliente)}</span>`:''}${f.es_simulada?' <span style="font-size:.65rem;background:#ede9fe;color:#6d28d9;border-radius:5px;padding:1px 5px">SIM</span>':''}</td>
+      <td style="padding:8px">${esc(f.asignada_nombre||'')}</td>
+      <td style="padding:8px;white-space:nowrap">${f.inicio||''}</td>
+      <td style="padding:8px;white-space:nowrap">${f.tomada||'—'}</td>
+      <td style="padding:8px">${f.preaprob_codigo?`<b>${esc(f.preaprob_codigo)}</b>`:'—'}</td>
+      <td style="padding:8px">${f.carta?`<b>${esc(String(f.carta))}</b>`:'—'}</td>
+      <td style="padding:8px"><span style="font-weight:800;font-size:.72rem;color:${PC[f.resultado]||'#64748b'}">${f.resultado}</span></td>
+      <td style="padding:8px"><button onclick="tab('bandeja');abrirConv(${f.id})" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:3px 9px;font-size:.74rem;cursor:pointer">Ver chat</button></td></tr>`).join('')
+      ||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8">Sin conversaciones tomadas en el período.</td></tr>';
+  }
+  // La pestaña aparece solo si el endpoint responde (permiso wsp_config)
+  (async()=>{ try{ const r=await fetch('/api/whatsapp/seguimiento-ventas?dias=30',{headers:H});
+    if(r.ok) document.getElementById('tSegbot').style.display=''; }catch(e){} })();
+
   // Estado REAL de la conexión Meta (antes el pill decía "simulado" fijo)
   (async()=>{ try{
     const j=await (await fetch('/api/whatsapp/config',{headers:H})).json();
