@@ -191,6 +191,30 @@ Saludos cordiales,
     variables: '{ODC} {PROVEEDOR} {RUT} {DETALLE} {TOTAL} {QUIEN} {SUPERVISOR}',
   },
   {
+    codigo: 'vac_progresivas_rrhh',
+    ambito: 'Recursos Humanos',
+    nombre: 'Vacaciones progresivas validadas → RRHH',
+    descripcion: 'Se manda automáticamente cuando un colaborador sube su certificado AFP en Solicitudes → Vacaciones Progresivas y el sistema valida que el beneficio corresponde. Va a RRHH con el informe y el certificado adjuntos; la solicitud queda en Por Aprobar con plazo de 48 horas hábiles.',
+    asunto: 'Vacaciones progresivas por aprobar — {NOMBRE} ({DIAS} día/s)',
+    cuerpo: `Estimado Equipo de Recursos Humanos:
+
+{NOMBRE} solicitó el reconocimiento de sus vacaciones progresivas (art. 68 del Código del Trabajo).
+
+El certificado de cotizaciones AFP fue validado por el sistema: acredita {ANOS_PREVIOS} años previos y le corresponden {DIAS} día(s) adicional(es) de feriado. Se adjuntan el informe de validación y el certificado.
+
+Tienen 48 horas hábiles para aprobar o rechazar la solicitud en el sistema:
+{LINK}
+
+Al aprobar, los años previos quedan en la ficha del colaborador y los días progresivos se depositan automáticamente en su cuenta de vacaciones.
+
+Saludos cordiales,
+Auto Fácil Business Suite`,
+    para_perfiles: 'Jefe Recursos Humanos',
+    cc: '',
+    destinatario: 'Los usuarios del perfil Jefe Recursos Humanos (editable acá)',
+    variables: '{NOMBRE} {DIAS} {ANOS_PREVIOS} {LINK}',
+  },
+  {
     codigo: 'parque_cartola_envio',
     ambito: 'Post Venta — Parques',
     nombre: 'Cartola mensual → al PARQUE (con PDF adjunto)',

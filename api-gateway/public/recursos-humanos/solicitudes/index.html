@@ -130,10 +130,70 @@ async function cargarMias(){
   const j=await (await fetch('/api/rrhh/solicitudes/mias',{headers:H})).json();
   const ss=(j.data||{}).solicitudes||[];
   sec.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)">Nueva solicitud</h6>
-    <div class="tipos">${TIPOS.map(t=>`<button class="tipo-btn" onclick="nuevaSol('${t.codigo}')"><i class="bi ${t.icono}"></i><b>${esc(t.nombre)}</b><small>${t.cadena.join(' → ')}</small></button>`).join('')}</div></div>
+    <div class="tipos">${TIPOS.map(t=>`<button class="tipo-btn" onclick="nuevaSol('${t.codigo}')"><i class="bi ${t.icono}"></i><b>${esc(t.nombre)}</b><small>${t.cadena.join(' → ')}</small></button>`).join('')}
+    <button class="tipo-btn" onclick="vpAbrir()"><i class="bi bi-umbrella"></i><b>Vacaciones Progresivas</b><small>CERTIFICADO AFP → IA → RRHH</small></button></div></div>
+    <div id="vpForm" style="display:none"></div>
+    <div id="vpMias"></div>
     <div class="card-box"><h6 style="color:var(--navy)">Historial</h6>
     ${ss.map(s=>solHTML(s,'')).join('')||'<div class="empty">Aún no has enviado solicitudes.</div>'}</div>`;
+  vpCargarMias();
 }
+
+/* ═══ VACACIONES PROGRESIVAS (art. 68) ═══ */
+async function vpCargarMias(){
+  try{
+    const j=await (await fetch('/api/rrhh/vac-progresivas',{headers:H})).json();
+    const mias=(j.data||{}).mias||[]; if(!mias.length) return;
+    const box=document.getElementById('vpMias'); if(!box) return;
+    const fdd=v=>v?String(v).slice(0,10).split('-').reverse().join('-'):'';
+    box.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)"><i class="bi bi-umbrella me-1"></i>Mis vacaciones progresivas</h6>
+      ${mias.map(m=>`<div class="sol"><b>Solicitud #${m.id}</b> · ${fdd(m.created_at)} —
+        ${m.resultado==='CORRESPONDE'
+          ? `${m.dias_actuales} día(s) · <span class="pill ${m.estado==='APROBADA'?'APROBADA':m.estado==='RECHAZADA'?'RECHAZADA':'PENDIENTE'}">${m.estado==='PENDIENTE'?'EN REVISIÓN RRHH':m.estado}</span>${m.resuelto_motivo?`<div style="color:#b91c1c;font-size:.8rem">${esc(m.resuelto_motivo)}</div>`:''}`
+          : `<span class="pill RECHAZADA">AÚN NO CORRESPONDE</span> — desde el <b>${fdd(m.fecha_desde)}</b>: vuelve a cargar un certificado AFP emitido después de esa fecha.`}
+      </div>`).join('')}</div>`;
+  }catch(_){}
+}
+window.vpAbrir=function(){
+  const f=document.getElementById('vpForm');
+  f.style.display='';
+  f.innerHTML=`<div class="card-box" style="border-left:4px solid var(--navy)">
+    <h6 style="color:var(--navy)"><i class="bi bi-umbrella me-1"></i>Vacaciones Progresivas (art. 68 del Código del Trabajo)</h6>
+    <div style="font-size:.85rem;color:#475569;line-height:1.6">
+      <p><b>El beneficio:</b> además de tus 15 días hábiles de vacaciones, ganas <b>1 día adicional por cada 3 nuevos años trabajados con AutoFácil</b>, una vez que acreditas <b>10 años de trabajo</b> en total (se pueden hacer valer hasta 10 años con empleadores anteriores). Los días se depositan período a período en tu cuenta de vacaciones, igual que los 15 legales.</p>
+      <p><b>Cómo se hace:</b></p>
+      <ol style="margin:0 0 10px 18px">
+        <li>Descarga tu <b>certificado de cotizaciones</b> desde el sitio de tu AFP con ClaveÚnica (opción "certificados" → cotizaciones o feriado progresivo). Ojo: vence a los 30 días.</li>
+        <li>Súbelo aquí. El sistema lo lee con IA, valida la regla y te dice al instante si te corresponde.</li>
+        <li>Si corresponde, la solicitud pasa a <b>Recursos Humanos</b> (48 horas hábiles para resolver). Aprobada, los años quedan en tu ficha y los días extra aparecen solos en tu cuenta de vacaciones.</li>
+      </ol>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn-navy" onclick="document.getElementById('vpFile').click()"><i class="bi bi-upload me-1"></i>Subir Certificado Vacaciones Progresivas AFP</button>
+      <input type="file" id="vpFile" accept=".pdf" style="display:none" onchange="vpAnalizar(this)">
+      <span id="vpEstado" style="font-size:.85rem;color:#64748b"></span>
+      <button class="btn-mini" style="margin-left:auto" onclick="document.getElementById('vpForm').style.display='none'">Cerrar</button>
+    </div>
+    <div id="vpInforme" style="margin-top:14px"></div>
+  </div>`;
+  f.scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+window.vpAnalizar=async function(inp){
+  const file=inp.files[0]; if(!file) return; inp.value='';
+  if(file.size>7*1024*1024) return alert('El archivo supera el máximo de 7 MB');
+  const est=document.getElementById('vpEstado');
+  est.innerHTML='<i class="bi bi-robot me-1"></i>Analizando el certificado con IA…';
+  const base64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+  try{
+    const j=await (await fetch('/api/rrhh/vac-progresivas/analizar',{method:'POST',headers:HJ,body:JSON.stringify({nombre:file.name,mime:file.type,base64})})).json();
+    if(!j.success){ est.innerHTML='<span style="color:#b91c1c">'+esc(j.error)+'</span>'; return; }
+    est.innerHTML = j.data.corresponde
+      ? '<span style="color:#15803d;font-weight:700"><i class="bi bi-check2-circle"></i> Te corresponde — derivado a RRHH para revisión y aprobación.</span>'
+      : '<span style="color:#b45309;font-weight:700">Aún no te corresponde.</span>';
+    document.getElementById('vpInforme').innerHTML=j.data.informe;
+    vpCargarMias();
+  }catch(e){ est.innerHTML='<span style="color:#b91c1c">No se pudo analizar: '+esc(e.message)+'</span>'; }
+};
 
 /* ── Por aprobar ── */
 async function cargarAprobar(){
@@ -151,8 +211,43 @@ async function cargarAprobar(){
       return solHTML(s,`${ajuste}<div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn-navy" onclick="resolver(${s.id},'APROBAR','${s.tipo}',this)"><i class="bi bi-check2 me-1"></i>Aprobar y firmar</button>
         <button class="btn-mini" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca" onclick="resolver(${s.id},'RECHAZAR','${s.tipo}',this)"><i class="bi bi-x me-1"></i>Rechazar</button></div>`);
-    }).join('')||'<div class="empty">Nada pendiente de tu firma. 🎉</div>'}</div>`;
+    }).join('')||'<div class="empty">Nada pendiente de tu firma. 🎉</div>'}</div>
+    <div id="vpPend"></div>`;
+  vpCargarPendientes();
 }
+/* Vacaciones progresivas esperando a RRHH */
+async function vpCargarPendientes(){
+  try{
+    const j=await (await fetch('/api/rrhh/vac-progresivas',{headers:H})).json();
+    const ps=(j.data||{}).pendientes||[]; const box=document.getElementById('vpPend');
+    if(!box||!j.data?.es_rrhh||!ps.length){ if(box) box.innerHTML=''; return; }
+    const fdd=v=>v?String(v).slice(0,10).split('-').reverse().join('-'):'';
+    box.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)"><i class="bi bi-umbrella me-1"></i>Vacaciones progresivas por aprobar (${ps.length}) <span style="font-size:.72rem;color:#b45309;font-weight:600">plazo 48 horas hábiles</span></h6>
+      ${ps.map(p=>`<div class="sol"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+        <b>${esc(p.nombre)}</b><span style="font-size:.78rem;color:#94a3b8">solicitado el ${fdd(p.created_at)}</span></div>
+        <div style="font-size:.85rem;color:#475569;margin:4px 0">${p.anos_previos} años previos acreditados → <b>${p.dias_actuales} día(s) progresivo(s)</b>
+          · <a href="#" onclick="vpVerCert(${p.id});return false">📎 ${esc(p.cert_nombre||'certificado AFP')}</a></div>
+        <details style="font-size:.85rem"><summary style="cursor:pointer;color:var(--navy);font-weight:600">Ver informe de validación</summary>${p.informe||''}</details>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn-navy" onclick="vpResolver(${p.id},'APROBAR',this)"><i class="bi bi-check2 me-1"></i>Aprobar (a la ficha + cuenta de vacaciones)</button>
+          <button class="btn-mini" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca" onclick="vpResolver(${p.id},'RECHAZAR',this)"><i class="bi bi-x me-1"></i>Rechazar</button>
+        </div></div>`).join('')}</div>`;
+  }catch(_){}
+}
+window.vpVerCert=async function(id){
+  try{ const r=await fetch('/api/rrhh/vac-progresivas/'+id+'/certificado',{headers:H});
+    if(!r.ok) throw 0; const u=URL.createObjectURL(await r.blob()); window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000);
+  }catch(_){ alert('No se pudo abrir el certificado.'); }
+};
+window.vpResolver=async function(id,decision,btn){
+  let motivo='';
+  if(decision==='RECHAZAR'){ motivo=prompt('Motivo del rechazo (lo verá el colaborador):')||''; if(!motivo.trim()) return; }
+  else if(!confirm('¿Aprobar? Los años previos quedan en la ficha y los días progresivos se depositan en su cuenta de vacaciones.')) return;
+  btn.disabled=true;
+  const j=await (await fetch('/api/rrhh/vac-progresivas/'+id+'/resolver',{method:'POST',headers:HJ,body:JSON.stringify({decision,motivo})})).json();
+  if(!j.success){ alert(j.error); btn.disabled=false; return; }
+  vpCargarPendientes();
+};
 window.resolver=async(id,decision,tipo,btn)=>{
   let comentario='';
   if(decision==='RECHAZAR'){ comentario=prompt('Motivo del rechazo (lo verá el solicitante):')||''; if(!comentario.trim()) return; }

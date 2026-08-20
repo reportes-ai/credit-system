@@ -220,4 +220,11 @@ router.delete('/docs/:docId',      verifyToken, requireFunc('rh_aprobar'), ficha
 router.get('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.getConfigApi);
 router.put('/config', verifyToken, requireFunc('mant_rrhh_saludos', 'rh_aprobar'), ctrl.setConfigApi);
 
+// Vacaciones progresivas (art. 68) — certificado AFP + revisor IA + aprobación RRHH
+const vpr = require('../controllers/vac-progresivas.controller');
+router.post('/vac-progresivas/analizar',     verifyToken, vpr.analizar);
+router.get('/vac-progresivas',               verifyToken, vpr.listar);
+router.post('/vac-progresivas/:id/resolver', verifyToken, vpr.resolver);
+router.get('/vac-progresivas/:id/certificado', verifyToken, vpr.verCertificado);
+
 module.exports = router;
