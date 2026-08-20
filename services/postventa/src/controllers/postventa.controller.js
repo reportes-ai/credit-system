@@ -30,6 +30,15 @@ require('../../../../shared/migrate').migrar('fundantes-devueltos-backfill-v1', 
   console.log('[postventa] backfill fundantes devueltos:', devs.length, 'operación(es)');
 });
 
+/* One-shot: reenviar el aviso de Saldo Precio pagado a AUTEN (op 26080532,
+   pagada el 20-08). No salió porque el crédito venía sin id_dealer (cursado
+   vía carta); los datos ya se repararon y el JOIN ahora tiene fallback por
+   RUT — esto solo despacha el correo que quedó pendiente. */
+require('../../../../shared/migrate').migrar('aviso-pago-saldo-auten-v1', async () => {
+  await notificarPagoSaldoDealer(1230001);
+  console.log('[postventa] aviso de pago reenviado a AUTEN (seg 1230001)');
+});
+
 /* ═══ FACTURAS ADJUNTAS A LA ODP (dealers y parques) ═══════════════════════
    El usuario sube el PDF de la factura; queda como RESPALDO (bucket vía
    shared/almacen-docs — nunca un LONGBLOB nuevo con GCS activo) y viaja
@@ -1111,12 +1120,16 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
     const [[d]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera,
              po.monto AS odp_monto, po.num_orden,
-             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
-             COALESCE(dl.correo, dl.cf_email) AS correo,
-             COALESCE(dl.tipo_cuenta, dl.cuenta_tipo) AS tipo_cuenta, dl.num_cuenta, dl.banco
+             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, NULLIF(dr.nombre_indexa,''), dr.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
+             COALESCE(dl.correo, dl.cf_email, dr.correo, dr.cf_email) AS correo,
+             COALESCE(dl.tipo_cuenta, dl.cuenta_tipo, dr.tipo_cuenta, dr.cuenta_tipo) AS tipo_cuenta,
+             COALESCE(dl.num_cuenta, dr.num_cuenta) AS num_cuenta, COALESCE(dl.banco, dr.banco) AS banco
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
+      -- Fallback por RUT: las ops cursadas vía carta pueden venir sin id_dealer
+      -- (pasó con AUTEN op 26080532, 20-08-2026: dealer con correo y sin aviso)
+      LEFT JOIN dealers  dr ON dl.id_dealer IS NULL AND dr.rut = COALESCE(c.rut_dealer, s.rut_dealer)
       LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
       WHERE s.id = ?`, [idSeguimiento]);
     if (!d) return;
