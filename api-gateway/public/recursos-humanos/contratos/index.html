@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
+<!-- v2.9 — onboarding: dialog dlgVer que faltaba (Plantilla de tareas no abría), botones + Onboarding / + Offboarding separados · v2.8 — anexos: editor in-app del texto y los marcadores del modelo Word (párrafo a párrafo, conserva formato; re-detecta marcadores y re-pasa el revisor IA) · v2.7 — anexos: marcadores {{...}} en modelos Word (rellenados con datos del trabajador + valores vivos del mantenedor, un .docx por trabajador) y revisor IA al subir (avisa inconsistencias vs mantenedor, no modifica) · v2.6 — anexos: subir modelos propios (renombrar/ver/eliminar), firmante solo gerentes (default GG), multiselección de trabajadores con un PDF por cada uno (ANEXO Nombre dd-mm-aaaa) · v2.5 — anexo: cláusulas 9 (prepago 100%/50% desde el vencimiento de la 1ª cuota) y 10 (48 horas hábiles) nuevas; ejemplo dice Incentivo Mensual -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -136,7 +136,8 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <b>Onboarding / Offboarding</b>
       <div style="display:flex;gap:8px">
-        <button class="btn-g" onclick="onbNuevoManual()">+ Proceso manual</button>
+        <button class="btn-g" onclick="onbNuevoManual('ONBOARDING')" style="color:#1d4ed8"><i class="bi bi-person-plus me-1"></i>+ Onboarding</button>
+        <button class="btn-g" onclick="onbNuevoManual('OFFBOARDING')" style="color:#b91c1c"><i class="bi bi-person-dash me-1"></i>+ Offboarding</button>
         <button class="btn-g" onclick="onbVerPlantilla()"><i class="bi bi-list-check"></i> Plantilla de tareas</button>
       </div>
     </div>
@@ -156,6 +157,7 @@
 </div>
 
 <dialog id="dlgCarta"><div class="dlg" id="dlgCartaBody"></div></dialog>
+<dialog id="dlgVer"><div class="dlg" id="dlgVerBody"></div></dialog>
 <dialog id="dlgAnexTexto"><div class="dlg" style="max-width:860px;width:92vw">
   <h5 style="color:var(--navy);margin:0 0 4px" id="anexTxtTit">Editar texto del modelo</h5>
   <p style="font-size:.76rem;color:#64748b;margin:0 0 10px">Edita el texto y los <code>{{MARCADORES}}</code> directamente — el formato de cada párrafo se conserva. Al guardar se re-detectan los marcadores y el revisor IA vuelve a pasar.</p>
@@ -252,10 +254,10 @@ async function onbMarcar(id, ok){
   if (j.data.cerrado) alert('🎉 ¡Proceso completado!');
   onbCargar();
 }
-async function onbNuevoManual(){
-  const persona = prompt('Nombre de la persona:'); if (!persona) return;
-  const tipo = confirm('¿Es ONBOARDING (ingreso)?\nAceptar = Onboarding · Cancelar = Offboarding') ? 'ONBOARDING' : 'OFFBOARDING';
-  const fecha = prompt('Fecha base (YYYY-MM-DD):', new Date().toISOString().slice(0,10)); if (!fecha) return;
+async function onbNuevoManual(tipo){
+  const persona = prompt(`Nombre de la persona (${tipo==='ONBOARDING'?'ingreso':'salida'}):`); if (!persona) return;
+  if (!tipo) tipo = confirm('¿Es ONBOARDING (ingreso)?\nAceptar = Onboarding · Cancelar = Offboarding') ? 'ONBOARDING' : 'OFFBOARDING';
+  const fecha = prompt(`Fecha base (${tipo==='ONBOARDING'?'fecha de ingreso':'fecha de término'}, YYYY-MM-DD):`, new Date().toISOString().slice(0,10)); if (!fecha) return;
   const j = await (await fetch('/api/rrhh/onboarding',{method:'POST',headers:HJ,body:JSON.stringify({persona,tipo,fecha_base:fecha})})).json();
   if (!j.success) return alert(j.error);
   onbCargar();
