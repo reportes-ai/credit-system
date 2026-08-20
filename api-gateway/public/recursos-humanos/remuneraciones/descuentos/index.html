@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.4 — filtro de mes global (historia por mes en Cuotas del mes), checkbox Permanente sincronizado con el tipo, lista bajo Ingresar con los descuentos YA considerados en el mes · v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -43,6 +43,11 @@
     <li class="nav-item"><a class="nav-link" href="#" id="tabT" onclick="tab('T');return false"><i class="bi bi-list-ul me-1"></i>Todos los descuentos</a></li>
   </ul>
 
+  <div class="d-flex gap-2 align-items-end mb-3">
+    <div><label class="form-label small fw-semibold mb-1">Mes de remuneración</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
+    <span id="lblBloq"></span>
+  </div>
+
   <div id="secI" class="panel">
     <div class="row g-2">
       <div class="col-md-4"><label class="form-label small fw-semibold mb-1">Colaborador</label>
@@ -68,6 +73,10 @@
         </select></div>
       <div class="col-md-4" id="wOtro" style="display:none"><label class="form-label small fw-semibold mb-1">Describe el descuento</label>
         <input id="fOtro" class="form-control form-control-sm" maxlength="200" placeholder="ej. Seguro complementario dental"></div>
+      <div class="col-md-2 d-flex align-items-end pb-1">
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="fPermD" onchange="permUI()">
+          <label class="form-check-label small fw-semibold" for="fPermD" title="Monto mensual todos los meses hasta desmarcarlo">Permanente</label></div>
+      </div>
       <div class="col-md-2 d-flex align-items-end">
         <button class="btn btn-sm btn-primary w-100" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
       </div>
@@ -79,10 +88,7 @@
   </div>
 
   <div id="secM" style="display:none">
-    <div class="d-flex gap-2 align-items-end mb-3">
-      <div><label class="form-label small fw-semibold mb-1">Mes</label><input type="month" id="fMes" class="form-control form-control-sm" onchange="cargar()"></div>
-      <span id="lblBloq"></span>
-      <span class="flex-grow-1"></span>
+    <div class="d-flex justify-content-end mb-2">
       <button class="btn btn-sm btn-outline-success" onclick="exportar('M')"><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
     </div>
     <div class="d-flex gap-3 mb-3 flex-wrap" id="kpis"></div>
@@ -125,8 +131,17 @@ function tab(m){
   secI.style.display=m==='I'?'':'none'; secM.style.display=m==='M'?'':'none'; secT.style.display=m==='T'?'':'none';
 }
 
+/* Checkbox Permanente ↔ tipo PERMANENTE: son la misma cosa, sincronizados
+   en los dos sentidos (marcarlo cambia el tipo; elegir el tipo lo marca). */
+function permUI(){
+  const chk = document.getElementById('fPermD');
+  if (chk.checked && fTipo.value !== 'PERMANENTE') { fTipo.value = 'PERMANENTE'; }
+  else if (!chk.checked && fTipo.value === 'PERMANENTE') { fTipo.value = 'ANTICIPO'; }
+  tipoUI();
+}
 function tipoUI(){
   const t = fTipo.value, sub = fSubtipo.value;
+  document.getElementById('fPermD').checked = t === 'PERMANENTE';
   wCuotas.style.display = t==='PERMANENTE' ? 'none' : '';
   wTasa.style.display = t==='PRESTAMO' ? '' : 'none';
   wMesRef.style.display = t==='PAGO_EXCESO' ? '' : 'none';
@@ -171,22 +186,27 @@ async function cargar(){
 const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
 const MESES_TX=['','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
 const mesTxt = m => (MESES_TX[Number(String(m).slice(5,7))]||m);
+/* Bajo el formulario: los descuentos YA CONSIDERADOS en el mes elegido —
+   para verlos antes de ingresar uno nuevo y no duplicar. */
 function renderListaIng(){
-  const vig = D.descuentos.filter(d=>d.estado==='VIGENTE').slice(0,20);
-  document.getElementById('listaIng').innerHTML = vig.length ? '<div class="fw-bold small mb-1">Descuentos ingresados (vigentes)</div>'+vig.map(d=>`
+  const tot = D.del_mes.reduce((s,d)=>s+d.cuota_mes,0);
+  document.getElementById('listaIng').innerHTML = D.del_mes.length
+    ? `<div class="fw-bold small mb-1">Descuentos ya considerados en ${mesTxt(D.mes)} ${String(D.mes).slice(0,4)} — total $${fmt(tot)} <span class="text-muted fw-normal">(revisa antes de ingresar, para no duplicar)</span></div>`
+      + D.del_mes.map(d=>`
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:9px;padding:7px 12px;margin-bottom:6px;background:${d.tipo==='PERMANENTE'?'#fbfdff':'#fff'}">
       <b style="font-size:.82rem">${esc(d.nombre_actual||d.nombre)}</b>
       <span class="small text-muted">${esc(tipoTxt(d))}${d.detalle_texto?' — '+esc(d.detalle_texto):''}</span>
-      <span class="num" style="font-size:.85rem">$${fmt(d.valor_cuota)}${d.tipo==='PERMANENTE'?'/mes':''}</span>
+      <span class="num" style="font-size:.85rem">$${fmt(d.cuota_mes)}</span>
       ${d.tipo==='PERMANENTE'
         ? '<span class="pill" style="background:#e0e7ff;color:#3730a3">PERMANENTE</span>'
         : d.cuotas>1
-        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">${d.cuotas} CUOTAS desde ${d.mes_inicio}</span>`
+        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">CUOTA ${d.cuota_num} de ${d.cuotas}</span>`
         : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(d.mes_inicio)}</span>`}
       <span style="margin-left:auto">
         <button class="btn btn-sm btn-outline-danger py-0" onclick="anular(${d.id})" title="${d.tipo==='PERMANENTE'?'Desmarcar: deja de descontarse desde ahora':'Detiene las cuotas futuras'}">${d.tipo==='PERMANENTE'?'Desmarcar':'Anular'}</button>
       </span>
-    </div>`).join('') : '';
+    </div>`).join('')
+    : `<div class="small text-muted">Sin descuentos considerados en ${mesTxt(D.mes)} ${String(D.mes).slice(0,4)}.</div>`;
 }
 function render(){
   renderListaIng();
