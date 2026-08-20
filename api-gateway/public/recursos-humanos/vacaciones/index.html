@@ -113,7 +113,7 @@
       +(PROV?'<th style="text-align:right">Provisión $</th>':'')+'<th></th>';
     const nCols=8+(PROV?1:0);
     tb.innerHTML=((j.data.saldos||[]).map(s=>`<tr>
-      <td><b>${esc(s.nombre)}</b>${s.previos?` <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px" title="años previos (progresivo art. 68)">+${s.previos}a prev</span>`:''}<br><span style="font-size:.72rem;color:#94a3b8">${esc(s.rut||'')}</span></td>
+      <td style="padding-left:${12+(s.nivel||0)*22}px">${s.nivel?'<span style="color:#cbd5e1;margin-right:5px">└</span>':''}<b>${esc(s.nombre)}</b>${s.previos?` <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:6px;padding:1px 6px" title="años previos (progresivo art. 68)">+${s.previos}a prev</span>`:''}<br><span style="font-size:.72rem;color:#94a3b8">${esc(s.rut||'')}</span></td>
       <td style="${C}">${s.fecha_ingreso?fd(s.fecha_ingreso):'<span style="color:#dc2626;font-weight:700">S/I</span>'}</td>
       <td style="${C}">${co(s.abonos)}</td>
       <td style="${C};color:#b91c1c">${co(s.cargos)}</td>

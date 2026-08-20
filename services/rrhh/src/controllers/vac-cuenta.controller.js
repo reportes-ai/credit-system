@@ -298,7 +298,7 @@ exports.getCuenta = async (req, res) => {
    "Saldos del equipo" y la contabilización al cierre de mes. */
 async function calcularSaldosEquipo() {
   const [users] = await pool.query(
-      `SELECT u.id_usuario, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
+      `SELECT u.id_usuario, u.id_supervisor, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre, u.rut,
               DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fecha_ingreso, COALESCE(f.anos_trabajados_previos,0) previos
          FROM usuarios u LEFT JOIN rh_fichas f ON f.id_usuario=u.id_usuario
         WHERE u.estado='activo' AND COALESCE(f.no_mostrar,0)=0 ORDER BY u.apellido, u.nombre`);
@@ -342,7 +342,39 @@ async function miLinea(idUsuario) {
   });
   return new Set(rows.map(r => r.id_usuario));
 }
-const esRRHH = id => require('../../../../shared/middleware/permisos').tieneFunc(id, 'rh_colaboradores').catch(() => false);
+/* RRHH "puro" (ve a TODOS y propone ajustes): el perfil de Recursos Humanos y
+   el Administrador. Ojo: NO sirve `rh_colaboradores`, que también la tienen
+   las gerencias — con esa regla un gerente veía la nómina completa. */
+async function esRRHH(idUsuario) {
+  const [[r]] = await pool.query(
+    `SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?`, [idUsuario]);
+  return /recursos humanos|administrador/i.test(r?.nombre || '');
+}
+
+/* Orden jerárquico: yo primero, después mis reportes directos, después la
+   segunda línea de cada uno, y así (recorrido en profundidad por rama). */
+function ordenarPorLinea(filas, raizId) {
+  const hijos = new Map();
+  for (const f of filas) {
+    const k = f.id_supervisor || 0;
+    if (!hijos.has(k)) hijos.set(k, []);
+    hijos.get(k).push(f);
+  }
+  for (const arr of hijos.values()) arr.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+  const salida = [], visto = new Set();
+  const bajar = (f, nivel) => {
+    if (visto.has(f.id_usuario)) return;
+    visto.add(f.id_usuario);
+    salida.push({ ...f, nivel });
+    for (const h of (hijos.get(f.id_usuario) || [])) bajar(h, nivel + 1);
+  };
+  if (raizId) { const yo = filas.find(f => f.id_usuario === raizId); if (yo) bajar(yo, 0); }
+  // raíces (sin jefe o con jefe fuera del universo) y cualquier huérfano
+  const ids = new Set(filas.map(f => f.id_usuario));
+  for (const f of filas) if (!f.id_supervisor || !ids.has(f.id_supervisor)) bajar(f, 0);
+  for (const f of filas) bajar(f, 0);
+  return salida;
+}
 
 /* Gerencia = perfil gerencial (los que además firman el 2º paso del ajuste) */
 async function esGerente(idUsuario) {
@@ -362,6 +394,7 @@ exports.getSaldos = async (req, res) => {
       const linea = await miLinea(yo);
       saldos = saldos.filter(s => linea.has(s.id_usuario));
     }
+    saldos = ordenarPorLinea(saldos, rrhh ? null : yo);
     if (!gerente) saldos = saldos.map(({ provision, base, ...s }) => s);   // provisión: solo gerencia
     ok(res, {
       saldos, es_rrhh: rrhh, ver_provision: gerente,
