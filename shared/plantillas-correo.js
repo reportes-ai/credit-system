@@ -353,7 +353,7 @@ async function correosDePerfiles(csv) {
 
 /* Envía una plantilla. Devuelve { enviado, motivo?, to, cc }.
    NUNCA lanza: un correo que falla no puede voltear la operación que lo dispara. */
-async function enviar({ codigo, to = [], datos = {}, adjuntos } = {}) {
+async function enviar({ codigo, to = [], cc: ccExtra = [], datos = {}, adjuntos } = {}) {
   try {
     const p = await obtener(codigo);
     if (!p) return { enviado: false, motivo: 'plantilla inexistente: ' + codigo };
@@ -365,7 +365,9 @@ async function enviar({ codigo, to = [], datos = {}, adjuntos } = {}) {
     const dest = [...new Set([...(Array.isArray(to) ? to : [to]), ...(await correosDePerfiles(p.para_perfiles))]
       .map(s => String(s || '').trim()).filter(Boolean))];
     if (!dest.length) return { enviado: false, motivo: 'sin destinatarios' };
-    const cc = String(p.cc || '').split(',').map(s => s.trim()).filter(Boolean);
+    // CC = lo configurado en la plantilla + lo que agregue el llamador (ej. quien generó la orden)
+    const cc = [...new Set([...String(p.cc || '').split(','), ...(Array.isArray(ccExtra) ? ccExtra : [ccExtra])]
+      .map(s => String(s || '').trim().toLowerCase()).filter(Boolean))];
 
     const cuerpo = render(p.cuerpo, datos);
     await enviarCorreo({

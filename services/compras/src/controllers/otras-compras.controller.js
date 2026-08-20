@@ -101,8 +101,14 @@ function correoFinanzasODC(o, supervisorNombre) {
       } catch (_) {}
       const adjuntos = await require('../../../postventa/src/controllers/postventa.controller')
         .adjuntosFactura('ODC', [o.id]).catch(() => []);
+      // CC a quien generó la orden: sigue el hilo de su propia compra
+      let ccGen = [];
+      if (o.id_usuario) {
+        const [[cu]] = await pool.query('SELECT email FROM usuarios WHERE id_usuario=? AND email IS NOT NULL', [o.id_usuario]);
+        if (cu?.email) ccGen = [String(cu.email)];
+      }
       const env = await require('../../../../shared/plantillas-correo').enviar({
-        codigo: 'odc_finanzas', to: [to],
+        codigo: 'odc_finanzas', to: [to], cc: ccGen,
         adjuntos: adjuntos.length ? adjuntos : undefined,
         datos: {
           ODC: o.numero, PROVEEDOR: o.proveedor_nombre, RUT: o.proveedor_rut || '—',
@@ -196,7 +202,7 @@ const crear = async (req, res) => {
         WHERE u.estado='activo' AND (p.nombre LIKE '%Finanzas%' OR p.nombre LIKE '%Financiero%')`);
       if (fin.length) await notificar(fin.map(x => x.id_usuario), { tipo: 'ODC', titulo: '🛒 Orden de Compra por aprobar',
         mensaje: `${nombreDe(u)} generó la ${numero} (${provNombre}, ${CLP(monto)}) — sin supervisor asignado, pasa directo a Finanzas.`, href: '/soporte/otras-compras/' }).catch(() => {});
-      correoFinanzasODC({ id: r.insertId, numero, proveedor_nombre: provNombre, proveedor_rut: provRut, detalle: b.detalle, monto, creado_por: nombreDe(u) }, null);
+      correoFinanzasODC({ id: r.insertId, numero, proveedor_nombre: provNombre, proveedor_rut: provRut, detalle: b.detalle, monto, creado_por: nombreDe(u), id_usuario: u.id_usuario }, null);
     }
     auditar({ req, accion: 'CREAR', modulo: 'otras-compras', entidad: 'odc', entidad_id: r.insertId,
       detalle: `Generó ${numero}: ${provNombre} ${CLP(monto)} — ${String(b.detalle).trim().slice(0, 120)}${adjuntos ? ` (${adjuntos} adjunto/s)` : ''}` });
