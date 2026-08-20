@@ -398,9 +398,17 @@ async function construirDocumento(oc) {
        antes de cargarle la cuenta al proveedor, ese string quedaba vacío para siempre.
        `destino` se conserva como respaldo para las órdenes con proveedor de nombre libre. */
     let deposito = null;
-    if (op.id_proveedor) {
-      const [[p]] = await pool.query(
-        'SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [op.id_proveedor]);
+    {
+      // Por id; si la orden quedó sin enlazar (emitidas antes del fix 19-08),
+      // fallback por RUT normalizado (con o sin puntos) y luego por nombre.
+      let p = null;
+      if (op.id_proveedor)
+        [[p]] = await pool.query('SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE id=?', [op.id_proveedor]);
+      if (!p && op.proveedor_rut)
+        [[p]] = await pool.query(
+          "SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE REPLACE(rut,'.','')=REPLACE(?,'.','') LIMIT 1", [op.proveedor_rut]);
+      if (!p && op.proveedor_nombre)
+        [[p]] = await pool.query('SELECT nombre, rut, banco, tipo_cuenta, numero_cuenta FROM proveedores WHERE UPPER(nombre)=UPPER(?) LIMIT 1', [op.proveedor_nombre]);
       if (p && p.numero_cuenta) deposito = {
         banco: p.banco || null, tipo_cuenta: p.tipo_cuenta || 'Cuenta Corriente', num_cuenta: p.numero_cuenta,
         titular: p.nombre || op.proveedor_nombre || null, rut: p.rut || op.proveedor_rut || null,
@@ -606,7 +614,7 @@ const crearOrden = async (req, res) => {
     if (!idProv) {
       try {
         const [[dup]] = provRut
-          ? await pool.query('SELECT id FROM proveedores WHERE rut=? LIMIT 1', [provRut])
+          ? await pool.query("SELECT id FROM proveedores WHERE REPLACE(rut,'.','')=REPLACE(?,'.','') LIMIT 1", [provRut])
           : await pool.query('SELECT id FROM proveedores WHERE UPPER(nombre)=UPPER(?) LIMIT 1', [provNombre]);
         if (dup) idProv = dup.id;
         else {
