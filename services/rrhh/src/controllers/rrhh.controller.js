@@ -264,6 +264,14 @@ const resolverVacaciones = async (req, res) => {
 const crearAntiguedad = async (req, res) => {
   try {
     const b = req.body || {}; const u = req.usuario || {};
+    // Si puede emitirlo al instante, NO se deriva a RRHH: se le indica el botón
+    // de autoservicio (pasó con Jorge Vargas el 20-08-2026 — RRHH recibió una
+    // solicitud que el propio sistema resolvía en un clic).
+    try {
+      const st = await estadoCertUsuario(u.id_usuario, await getConfig());
+      if (st.puede) return res.status(409).json({ success: false, data: { autoservicio: true },
+        error: 'Puedes emitir tu certificado AL INSTANTE con el botón "Emitir mi certificado ahora" de arriba — no necesitas pedirlo a RRHH.' });
+    } catch (_) {}
     const [r] = await pool.query('INSERT INTO rh_antiguedad (id_usuario, nombre, motivo) VALUES (?,?,?)', [u.id_usuario || null, nombreDe(u), norm(b.motivo) || null]);
     const ids = await poolRRHH(u.id_usuario);
     if (ids.length) notificar(ids, { tipo: 'RH_ANTIGUEDAD', titulo: '🏅 Solicitud de antigüedad', mensaje: `${nombreDe(u)} pidió un certificado de antigüedad`, href: '/recursos-humanos/antiguedad/?id=' + r.insertId });
