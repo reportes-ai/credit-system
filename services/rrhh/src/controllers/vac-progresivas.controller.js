@@ -171,7 +171,13 @@ La tabla del certificado lista año y meses cotizados por año. Si el documento 
       })();
     }
     ok(res, { id: r.insertId, corresponde, dias: diasHoy, fecha_desde: fechaDesde, informe });
-  } catch (e) { console.error('[vac-prog analizar]', e.message); fail(res, e.code === 'IA_OFF' ? 'El lector IA está desactivado — entrega el certificado directamente a RRHH' : 'Error interno del servidor'); }
+  } catch (e) {
+    console.error('[vac-prog analizar]', e.message);
+    // 503 y no 500: el gateway reescribe los 500 a un texto genérico y el
+    // usuario no vería el motivo real (IA desactivada, PDF ilegible, etc.)
+    if (e.code === 'IA_OFF') return fail(res, 'El lector IA de este trámite está desactivado en el mantenedor de IA — actívalo o entrega el certificado directamente a RRHH', 503);
+    fail(res, 'No se pudo analizar el certificado: ' + e.message, 503);
+  }
 };
 
 /* ── GET /pendientes (RRHH) + mis solicitudes ── */
