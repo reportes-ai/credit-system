@@ -1055,6 +1055,16 @@ async function veTodo(req) {
   } catch (_) { return false; }
 }
 
+/* Enforcement de propiedad (mismo criterio que el listado): un ejecutivo solo
+   puede actuar sobre SU conversación o sobre una derivada sin tomar. Devuelve
+   null si puede; el mensaje de error si no. */
+async function bloqueoPropiedad(req, conv) {
+  if (await veTodo(req)) return null;
+  if (conv.asignada_a === req.usuario.id_usuario) return null;
+  if (!conv.asignada_a) return null;                    // sin dueño → puede (la toma)
+  return `Esta conversación la tomó ${conv.asignada_nombre || 'otro ejecutivo'}`;
+}
+
 exports.conversaciones = async (req, res) => {
   try {
     const { estado, area, q, mias } = req.query;
@@ -1098,8 +1108,11 @@ exports.conversacion = async (req, res) => {
 /* Ficha del cliente identificado (fuente única: clientes + creditos por RUT) */
 exports.fichaCliente = async (req, res) => {
   try {
-    const [[conv]] = await pool.query('SELECT rut_cliente, telefono FROM wsp_conversaciones WHERE id=?', [req.params.id]);
+    const [[conv]] = await pool.query('SELECT rut_cliente, telefono, asignada_a, asignada_nombre FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    // Propiedad: la ficha del cliente de una conversación ajena tampoco se ve
+    const bloqueo = await bloqueoPropiedad(req, conv);
+    if (bloqueo) return res.status(403).json({ success: false, error: bloqueo });
     if (!conv.rut_cliente) return res.json({ success: true, data: { identificado: false }, error: null });
     const [[cli]] = await pool.query(
       `SELECT rut, nombre_completo, telefono_movil, correo, email, ciudad_id, tipo_cliente FROM clientes WHERE rut=? LIMIT 1`, [conv.rut_cliente]);
@@ -1119,6 +1132,9 @@ exports.responderConv = async (req, res) => {
     if (!texto) return res.status(400).json({ success: false, error: 'Falta el texto' });
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    // Propiedad: no se responde en la conversación de otro ejecutivo
+    const bloqueo = await bloqueoPropiedad(req, conv);
+    if (bloqueo) return res.status(403).json({ success: false, error: bloqueo });
     // Ventana Meta: fuera del plazo configurable no se puede escribir en esta conversación
     if (!conv.es_simulada) {
       const v = await ventanaRestante(conv.id, await getCfg());
@@ -1136,6 +1152,13 @@ exports.accionConv = async (req, res) => {
     const { accion, area } = req.body || {};
     const [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [req.params.id]);
     if (!conv) return res.status(404).json({ success: false, error: 'No existe' });
+    // Propiedad: cerrar, devolver al bot o re-derivar la conversación de OTRO
+    // ejecutivo solo lo puede un supervisor (wsp_config). TOMAR tiene su propia
+    // carrera atómica más abajo.
+    if (accion !== 'TOMAR') {
+      const bloqueo = await bloqueoPropiedad(req, conv);
+      if (bloqueo) return res.status(403).json({ success: false, error: bloqueo });
+    }
     if (accion === 'TOMAR') {
       // Carrera justa: el PRIMERO que toca "Tomar" se queda con el cliente (update atómico)
       const [r] = await pool.query(
