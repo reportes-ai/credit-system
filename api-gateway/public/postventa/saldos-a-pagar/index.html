@@ -552,17 +552,25 @@ async function enviarSeleccion(){
   btn.innerHTML = '<i class="bi bi-send-check me-1"></i>Enviar a Pago';
 }
 
-/* Deshacer envío (mismo día): saca la op de la cola firme */
-async function revertirEnvio(id){
+/* Deshacer envío: mismo día directo; de un día anterior (ej. el banco rechazó
+   la transferencia) el backend exige Admin + motivo → se pide acá y se reintenta. */
+async function revertirEnvio(id, motivo){
   const r = DATA.find(x => x.id===id); if (!r) return;
-  if (!confirm(`¿Deshacer el envío a pago de la OP ${r.num_op}? Volverá a quedar seleccionable.`)) return;
+  if (!motivo && !confirm(`¿Deshacer el envío a pago de la OP ${r.num_op}? Volverá a quedar seleccionable.`)) return;
   try {
-    const resp = await fetch('/api/postventa/saldos-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id], etapa:'ENVIADO A PAGO' }) });
+    const resp = await fetch('/api/postventa/saldos-a-pagar/desmarcar', { method:'POST', headers:H, body: JSON.stringify({ ids:[id], etapa:'ENVIADO A PAGO', motivo: motivo||undefined }) });
     const j = await resp.json();
-    if (!j.success) throw new Error(j.error||'Error');
+    if (!j.success) {
+      if (/motivo/i.test(j.error||'')) {
+        const m = prompt(`El envío de la OP ${r.num_op} es de un día anterior.\nIndica el MOTIVO de la reversa (queda auditado):`, 'Transferencia rechazada por el banco — dato bancario erróneo');
+        if (m && m.trim()) return revertirEnvio(id, m.trim());
+        return;
+      }
+      throw new Error(j.error||'Error');
+    }
     if (j.data && j.data.desmarcados === 0) throw new Error('No se pudo deshacer (¿no es de hoy?).');
     r.enviado = false; r.sel = false; propActiva = null;
-    render(); toast(`Envío de OP ${r.num_op} deshecho`);
+    render(); toast(`Envío de OP ${r.num_op} deshecho${motivo?' (reversa auditada)':''}`);
   } catch(e){ toast(e.message, true); }
 }
 
