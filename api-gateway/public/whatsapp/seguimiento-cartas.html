@@ -75,6 +75,13 @@
 <script>
 'use strict';
 const H = { Authorization: 'Bearer ' + sessionStorage.getItem('token'), 'Content-Type': 'application/json' };
+// Guardia de permiso: la página exige wsp_seg_cartas (o wsp_config) — antes solo
+// pedía login y el usuario sin permiso veía la pantalla vacía con un error.
+(async () => { try {
+  const j = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
+  const f = j.funcionalidades || [];
+  if (!f.includes('wsp_seg_cartas') && !f.includes('wsp_config')) location.replace('/');
+} catch (e) {} })();
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmt = n => (n==null||n==='') ? '—' : '$'+Math.round(+n).toLocaleString('es-CL');

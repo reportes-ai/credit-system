@@ -170,12 +170,12 @@
 
   <div class="tabs">
     <div class="tab active" id="tBandeja" onclick="tab('bandeja')"><i class="bi bi-inbox me-1"></i>Bandeja</div>
-    <div class="tab" id="tCampanas" onclick="tab('campanas')"><i class="bi bi-megaphone me-1"></i>Campañas</div>
-    <div class="tab" id="tPlantillas" onclick="tab('plantillas')"><i class="bi bi-file-earmark-text me-1"></i>Plantillas</div>
-    <div class="tab" id="tRespuestas" onclick="tab('respuestas')"><i class="bi bi-chat-square-text me-1"></i>Respuestas del bot</div>
-    <div class="tab" id="tTriggers" onclick="tab('triggers')"><i class="bi bi-exclamation-diamond me-1"></i>Triggers</div>
-    <div class="tab" id="tConfig" onclick="tab('config')"><i class="bi bi-gear me-1"></i>Configuración</div>
-    <div class="tab" onclick="location.href='/whatsapp/seguimiento-cartas.html'"><i class="bi bi-envelope-heart me-1"></i>Seguimiento Cartas</div>
+    <div class="tab" id="tCampanas" onclick="tab('campanas')" style="display:none"><i class="bi bi-megaphone me-1"></i>Campañas</div>
+    <div class="tab" id="tPlantillas" onclick="tab('plantillas')" style="display:none"><i class="bi bi-file-earmark-text me-1"></i>Plantillas</div>
+    <div class="tab" id="tRespuestas" onclick="tab('respuestas')" style="display:none"><i class="bi bi-chat-square-text me-1"></i>Respuestas del bot</div>
+    <div class="tab" id="tTriggers" onclick="tab('triggers')" style="display:none"><i class="bi bi-exclamation-diamond me-1"></i>Triggers</div>
+    <div class="tab" id="tConfig" onclick="tab('config')" style="display:none"><i class="bi bi-gear me-1"></i>Configuración</div>
+    <div class="tab" id="tSegCartas" onclick="location.href='/whatsapp/seguimiento-cartas.html'" style="display:none"><i class="bi bi-envelope-heart me-1"></i>Seguimiento Cartas</div>
     <div class="tab" id="tSegbot" onclick="tab('segbot')" style="display:none"><i class="bi bi-bullseye me-1"></i>Seguimiento Bot</div>
   </div>
 
@@ -1191,9 +1191,17 @@ async function cargarConfig(){
       <td style="padding:8px"><button onclick="tab('bandeja');abrirConv(${f.id})" style="border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:3px 9px;font-size:.74rem;cursor:pointer">Ver chat</button></td></tr>`).join('')
       ||'<tr><td colspan="8" style="padding:20px;text-align:center;color:#94a3b8">Sin conversaciones tomadas en el período.</td></tr>';
   }
-  // La pestaña aparece solo si el endpoint responde (permiso wsp_config)
-  (async()=>{ try{ const r=await fetch('/api/whatsapp/seguimiento-ventas?dias=30',{headers:H});
-    if(r.ok) document.getElementById('tSegbot').style.display=''; }catch(e){} })();
+  // Pestañas según permisos (server-side cada endpoint valida igual):
+  // Campañas → wsp_campanas · Plantillas/Respuestas/Triggers/Config → wsp_config
+  // Seguimiento Cartas → wsp_seg_cartas · Seguimiento Bot → wsp_seguimiento_bot
+  (async()=>{ try{
+    const j=await (await fetch('/api/auth/mis-permisos',{headers:H})).json();
+    const f=j.funcionalidades||[]; const on=id=>{ const el=document.getElementById(id); if(el) el.style.display=''; };
+    if(f.includes('wsp_campanas')||f.includes('wsp_config')) on('tCampanas');
+    if(f.includes('wsp_config')) ['tPlantillas','tRespuestas','tTriggers','tConfig'].forEach(on);
+    if(f.includes('wsp_seg_cartas')||f.includes('wsp_config')) on('tSegCartas');
+    if(f.includes('wsp_seguimiento_bot')||f.includes('wsp_config')) on('tSegbot');
+  }catch(e){} })();
 
   // Estado REAL de la conexión Meta (antes el pill decía "simulado" fijo)
   (async()=>{ try{
