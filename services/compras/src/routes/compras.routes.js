@@ -63,6 +63,7 @@ router.get('/otras/datos',            verifyToken, puedeODC, odc.getDatos);
 router.get('/otras',                  verifyToken, puedeODC, odc.listar);
 router.post('/otras',                 verifyToken, puedeODC, odc.crear);
 router.post('/otras/:id/resolver',    verifyToken, puedeODC, odc.resolver);
+router.post('/otras/:id/adjunto',     verifyToken, puedeODC, odc.adjuntar);
 router.get('/otras/:id/documento',    verifyToken, puedeODC, odc.documento);
 
 module.exports = router;

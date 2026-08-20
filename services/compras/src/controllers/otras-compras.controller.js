@@ -248,6 +248,28 @@ const resolver = async (req, res) => {
   } catch (e) { console.error('[odc resolver]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* ── POST /:id/adjunto — agregar cotización/detalle a una orden aún pendiente ── */
+const adjuntar = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const b = req.body || {};
+    const [[o]] = await pool.query('SELECT * FROM odc_ordenes WHERE id=?', [req.params.id]);
+    if (!o) return fail(res, 'Orden no encontrada', 404);
+    if (!o.estado.startsWith('PENDIENTE')) return fail(res, 'La orden ya fue resuelta: no se pueden agregar adjuntos', 409);
+    const [[perfil]] = await pool.query('SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?', [u.id_usuario]);
+    if (o.id_usuario !== u.id_usuario && !esAdminPerfil(perfil?.nombre))
+      return fail(res, 'Solo quien generó la orden puede adjuntar', 403);
+    if (!b.base64) return fail(res, 'Falta el archivo', 400);
+    const buffer = Buffer.from(b.base64, 'base64');
+    if (!buffer.length) return fail(res, 'El archivo llegó vacío', 400);
+    if (buffer.length > ADJ_MAX) return fail(res, 'El archivo supera el máximo de 7 MB', 400);
+    const { guardarFacturaDoc } = require('../../../postventa/src/controllers/postventa.controller');
+    const out = await guardarFacturaDoc({ origen: 'ODC', ref_id: o.id, nombre: String(b.nombre || 'adjunto').slice(0, 200), mime: b.mime || null, buffer, usuario: nombreDe(u) });
+    auditar({ req, accion: 'CREAR', modulo: 'otras-compras', entidad: 'odc_adjunto', entidad_id: out.id,
+      detalle: `Adjuntó "${b.nombre}" a la ${o.numero}` });
+    ok(res, out);
+  } catch (e) { console.error('[odc adjuntar]', e.message); fail(res, e.message || 'Error interno del servidor'); }
+};
+
 /* ── GET /:id/documento — la orden completa + adjuntos para el comprobante ── */
 const documento = async (req, res) => {
   try {
@@ -258,4 +280,4 @@ const documento = async (req, res) => {
   } catch (e) { console.error('[odc documento]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getDatos, crear, listar, resolver, documento };
+module.exports = { getDatos, crear, listar, resolver, documento, adjuntar };

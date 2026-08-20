@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Otras Compras — AutoFácil</title>
-  <!-- v1.0 — órdenes de compra ODC a proveedores (base compartida con ODP): formulario amarillo, adjuntos, workflow supervisor → Adm. y Finanzas, comprobante con trazabilidad -->
+  <!-- v1.1 — comprobante formato Solicitud de Pago en AMARILLO, botón 📎 para adjuntar a órdenes pendientes · v1.0 — órdenes de compra ODC a proveedores (base compartida con ODP): formulario amarillo, adjuntos, workflow supervisor → Adm. y Finanzas, comprobante con trazabilidad -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -60,7 +60,7 @@
       <div class="col-12">
         <label class="form-label small fw-semibold mb-1">Cotizaciones / detalle adjunto <span class="text-muted fw-normal">(PDF o imagen, máx 5 archivos de 7 MB)</span></label>
         <div><button class="btn btn-sm btn-outline-secondary" onclick="$('fAdj').click()"><i class="bi bi-paperclip me-1"></i>Adjuntar archivo</button>
-          <input type="file" id="fAdj" accept=".pdf,image/*" style="display:none" onchange="agregarAdj(this)">
+          <input type="file" id="fAdj" accept=".pdf,image/*,.xlsx,.xls,.docx" style="display:none" onchange="agregarAdj(this)">
           <span id="adjLista"></span></div>
       </div>
       <div class="col-12 d-flex justify-content-end">
@@ -178,10 +178,25 @@ async function cargarLista(){
     <td>${esc(o.creado_por||'')}<div class="text-muted" style="font-size:.68rem">${fdh(o.created_at)}</div></td>
     <td><span class="pill ${o.estado}">${ESTADO[o.estado]||o.estado}</span>${o.rechazo_motivo?`<div class="text-danger" style="font-size:.7rem">${esc(o.rechazo_motivo)}</div>`:''}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-sm btn-outline-secondary py-0" onclick="verDoc(${o.id})"><i class="bi bi-file-text"></i></button>
+      <button class="btn btn-sm btn-outline-secondary py-0" onclick="verDoc(${o.id})" title="Ver comprobante"><i class="bi bi-file-text"></i></button>
+      ${o.estado.startsWith('PENDIENTE')&&VISTA!=='por-aprobar'?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="adjPost(${o.id})" title="Agregar cotización/detalle"><i class="bi bi-paperclip"></i></button>`:''}
       ${VISTA==='por-aprobar'?`<button class="btn btn-sm btn-success py-0" onclick="resolver(${o.id},'APROBAR')">Aprobar</button>
       <button class="btn btn-sm btn-outline-danger py-0" onclick="resolver(${o.id},'RECHAZAR')">Rechazar</button>`:''}
     </td></tr>`).join('');
+}
+
+/* Adjuntar a una orden ya emitida (mientras esté pendiente) */
+function adjPost(id){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.pdf,image/*,.xlsx,.xls,.docx';
+  inp.onchange = async ()=>{
+    const f=inp.files[0]; if(!f) return;
+    if (f.size > 7*1024*1024) return alert('El archivo supera el máximo de 7 MB');
+    const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
+    const j = await (await fetch('/api/compras/otras/'+id+'/adjunto',{method:'POST',headers:H,body:JSON.stringify({nombre:f.name,mime:f.type,base64})})).json();
+    if (!j.success) return alert(j.error);
+    cargarLista();
+  };
+  inp.click();
 }
 
 async function resolver(id, decision){
@@ -205,21 +220,44 @@ async function verDoc(id){
     : `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)}
        &nbsp;⟶&nbsp; ${paso(o.sup_fecha, o.sup_fecha?`Supervisor: ${esc(o.sup_nombre)} el ${fdh(o.sup_fecha)}`:'Supervisor: pendiente')}
        &nbsp;⟶&nbsp; ${paso(o.fin_fecha, o.fin_fecha?`Administración y Finanzas: ${esc(o.fin_nombre)} el ${fdh(o.fin_fecha)}`:'Administración y Finanzas: pendiente')}`;
+  /* Mismo formato del documento "Solicitud de Pago" de las ODP, pero AMARILLO
+     para distinguir a simple vista una Orden de COMPRA de una de PAGO. */
+  const Slbl='color:#92400e;font-weight:700;text-transform:uppercase;font-size:9.5px;padding:1px 8px;white-space:nowrap';
+  const Smv='padding:1px 8px;font-size:12px';
+  const Sth='background:#fef3c7;color:#92400e;border:1px solid #fcd34d;padding:5px 6px;font-size:9.5px;text-transform:uppercase;text-align:left';
+  const Std='border:1px solid #e7d9a8;padding:5px 6px;font-size:12px;word-break:break-word';
+  const SresL='border:1px solid #e7d9a8;padding:5px 8px;font-size:12px;background:#fffbeb;font-weight:700;width:22%;white-space:nowrap';
+  const SresV='border:1px solid #e7d9a8;padding:5px 8px;font-size:12px';
   $('dlgDocBody').innerHTML = `
-    <div style="border:2px solid #fde68a;border-radius:10px;padding:16px 20px;background:#fffdf5;font-size:.85rem" id="docBox">
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #b45309;padding-bottom:8px;margin-bottom:12px">
-        <img src="/img/logo-autofacil.png" style="height:36px" onerror="this.src='/img/logo.png'">
-        <div style="text-align:right"><b style="color:#92400e;font-size:1rem">ORDEN DE COMPRA</b><div class="num" style="font-size:1.05rem">${esc(o.numero)}</div></div>
-      </div>
-      <table style="font-size:.84rem"><tbody>
-        <tr><td style="width:26%;color:#92400e;font-weight:700;padding:3px 0">Proveedor</td><td>${esc(o.proveedor_nombre)}${o.proveedor_rut?' · RUT '+esc(o.proveedor_rut):''}</td></tr>
-        <tr><td style="color:#92400e;font-weight:700;padding:3px 0">Monto</td><td class="num">$${fmt(o.monto)}</td></tr>
-        <tr><td style="color:#92400e;font-weight:700;padding:3px 0;vertical-align:top">Detalle</td><td>${esc(o.detalle||'')}</td></tr>
-        ${o.comentarios?`<tr><td style="color:#92400e;font-weight:700;padding:3px 0;vertical-align:top">Comentarios</td><td>${esc(o.comentarios)}</td></tr>`:''}
-        ${(o.docs||[]).length?`<tr><td style="color:#92400e;font-weight:700;padding:3px 0">Adjuntos</td><td>${o.docs.map(d=>`<a href="#" onclick="verAdj(${d.id});return false" style="color:#b45309;font-weight:700;text-decoration:none">📎 ${esc(d.nombre)}</a>`).join(' · ')}</td></tr>`:''}
-        <tr><td style="color:#92400e;font-weight:700;padding:3px 0">Estado</td><td><span class="pill ${o.estado}">${esc(o.estado.replace(/_/g,' '))}</span></td></tr>
+    <div style="border:2px solid #fcd34d;border-radius:8px;padding:14px 16px;background:#fffdf5;font-family:Arial,sans-serif;color:#1e293b" id="docBox">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
+        <td style="vertical-align:top"><table style="border-collapse:collapse"><tbody>
+          <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">ORDEN DE COMPRA</td></tr>
+          <tr><td style="${Slbl}">Compañía</td><td style="${Smv}">AUTOFÁCIL SPA</td></tr>
+          <tr><td style="${Slbl}">Tipo gasto</td><td style="${Smv}">OTRAS COMPRAS</td></tr>
+          <tr><td style="${Slbl}">N° Orden</td><td style="${Smv}"><b>${esc(o.numero)}</b></td></tr>
+          <tr><td style="${Slbl}">Solicitante</td><td style="${Smv}">${esc(o.creado_por||'—')}</td></tr>
+          <tr><td style="${Slbl}">Fecha</td><td style="${Smv}">${new Date(o.created_at).toLocaleDateString('es-CL')}</td></tr>
+        </tbody></table></td>
+        <td style="vertical-align:top;text-align:right"><img style="height:34px" src="/img/logo-autofacil.png" onerror="this.src='/img/logo.png'"></td>
+      </tr></tbody></table>
+      <table style="width:100%;border-collapse:collapse;margin:8px 0;table-layout:fixed">
+        <colgroup><col style="width:30%"><col style="width:16%"><col style="width:39%"><col style="width:15%"></colgroup>
+        <thead><tr><th style="${Sth}">Proveedor</th><th style="${Sth}">RUT</th><th style="${Sth}">Detalle</th><th style="${Sth}">Monto</th></tr></thead>
+        <tbody>
+          <tr><td style="${Std}">${esc(o.proveedor_nombre)}</td><td style="${Std}">${esc(o.proveedor_rut||'—')}</td>
+            <td style="${Std}">${esc(o.detalle||'')}</td><td style="${Std};text-align:right">$${fmt(o.monto)}</td></tr>
+          <tr><td colspan="3" style="${Std};text-align:right;font-weight:800;background:#fef9e7">A PAGAR</td>
+            <td style="${Std};text-align:right;font-weight:800;background:#fef3c7;color:#92400e">$${fmt(o.monto)}</td></tr>
+        </tbody>
+      </table>
+      <table style="border-collapse:collapse;margin-top:12px;width:100%"><tbody>
+        <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${esc(o.proveedor_nombre)}${o.proveedor_rut?' · RUT '+esc(o.proveedor_rut):''}</td></tr>
+        ${o.comentarios?`<tr><td style="${SresL}">Comentarios</td><td style="${SresV}">${esc(o.comentarios)}</td></tr>`:''}
+        ${(o.docs||[]).length?`<tr><td style="${SresL}">Adjuntos</td><td style="${SresV}">${o.docs.map(d=>`<a href="#" onclick="verAdj(${d.id});return false" style="color:#b45309;font-weight:700;text-decoration:none">📎 ${esc(d.nombre)}</a>`).join(' · ')}</td></tr>`:''}
+        <tr><td style="${SresL}">Estado</td><td style="${SresV}"><span class="pill ${o.estado}">${esc(o.estado.replace(/_/g,' '))}</span></td></tr>
       </tbody></table>
-      <div style="border-top:1px dashed #d6c58a;margin-top:14px;padding-top:10px;font-size:.76rem;color:#374151">${traza}</div>
+      <div style="border-top:1px dashed #d6c58a;margin-top:14px;padding-top:10px;font-size:11px;color:#374151">${traza}</div>
     </div>`;
   dlgDoc.showModal();
 }

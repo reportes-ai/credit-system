@@ -61,7 +61,7 @@ require('../../../../shared/migrate').enFila('postventa-factura-docs', async () 
     INDEX idx_ref (origen, ref_id))`);
 });
 
-const ORIGENES_FDOC = ['COMISION', 'PARQUE', 'ODP'];   // ODP → ref_id = ordenes_pago.id (proveedores)
+const ORIGENES_FDOC = ['COMISION', 'PARQUE', 'ODP', 'ODC'];   // ODP → ordenes_pago.id · ODC → odc_ordenes.id (Otras Compras)
 /* Núcleo reutilizable (también lo llama ordenes-pago al emitir con adjunto). */
 async function guardarFacturaDoc({ origen, ref_id, nombre, mime, buffer, usuario }) {
   const ref = parseInt(ref_id, 10);
