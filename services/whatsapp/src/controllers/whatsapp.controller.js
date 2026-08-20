@@ -208,6 +208,7 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
       ['Atender conversaciones',   'wsp_atender',  null,         null,          MOD_WSP],
       ['Configurar bot WhatsApp',  'wsp_config',   null,         null,          MOD_WSP],
       ['Campañas WhatsApp',        'wsp_campanas', null,         null,          MOD_WSP],
+      ['Seguimiento Bot (ventas)', 'wsp_seguimiento_bot', null,  null,          MOD_WSP],
     ];
     const idFunc = {};
     for (const [nombre, codigo, href, icono, idmod] of funcs) {
@@ -216,7 +217,7 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
       const [r] = await pool.query('INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,?,?,?,?)', [idmod, nombre, codigo, href, icono]);
       idFunc[codigo] = r.insertId;
     }
-    const seed = { wsp_panel: [1], wsp_atender: [1], wsp_config: [1], wsp_campanas: [1] };
+    const seed = { wsp_panel: [1], wsp_atender: [1], wsp_config: [1], wsp_campanas: [1], wsp_seguimiento_bot: [1] };
     for (const [codigo, perfiles] of Object.entries(seed)) {
       const idf = idFunc[codigo]; if (!idf) continue;
       for (const idp of perfiles) {
