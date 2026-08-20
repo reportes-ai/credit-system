@@ -39,9 +39,11 @@ require('../../../../shared/migrate').enFila('rrhh-vac-progresivas', async () =>
     resuelto_por VARCHAR(160) NULL, resuelto_fecha DATETIME NULL, resuelto_motivo VARCHAR(400) NULL,
     cert_nombre VARCHAR(200) NULL, cert_mime VARCHAR(100) NULL,
     archivo LONGBLOB NULL, doc_storage VARCHAR(10) NULL, doc_ruta VARCHAR(500) NULL, doc_bytes BIGINT NULL,
+    escalado_at DATETIME NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_u (id_usuario), INDEX idx_estado (estado)
   )`);
+  await pool.query('ALTER TABLE rh_vac_prog_solicitudes ADD COLUMN IF NOT EXISTS escalado_at DATETIME NULL');
   require('../../../../shared/ia').registrarFuncionalidad({
     codigo: 'rrhh_vac_progresivas', nombre: 'Vacaciones progresivas — lector de certificado AFP',
     descripcion: 'Extrae los meses cotizados del certificado de cotizaciones AFP que sube el colaborador para el feriado progresivo (art. 68). La IA solo EXTRAE; la regla la calcula el sistema.',
@@ -52,6 +54,51 @@ async function esRRHH(idUsuario) {
   try { const { tieneFunc } = require('../../../../shared/middleware/permisos'); return await tieneFunc(idUsuario, 'rh_aprobar'); }
   catch { return false; }
 }
+
+/* El equipo RRHH propiamente tal (perfil del área); fallback a rh_aprobar si
+   ningún usuario tiene perfil de Recursos Humanos. */
+async function usuariosRRHH() {
+  const [rr] = await pool.query(
+    `SELECT u.id_usuario, u.id_supervisor FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
+      WHERE u.estado='activo' AND p.nombre LIKE '%Recursos Humanos%'`);
+  if (rr.length) return rr;
+  const [fb] = await pool.query(
+    `SELECT DISTINCT u.id_usuario, u.id_supervisor FROM usuarios u
+      JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
+      JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
+     WHERE f.codigo='rh_aprobar' AND u.estado='activo'`);
+  return fb;
+}
+
+/* ── Escalamiento: 48 horas hábiles sin resolver → supervisor de RRHH ────────
+   Corre cada hora. 48 h hábiles = 2 días hábiles (feriados y findes fuera,
+   motor único shared/feriados). Escala UNA vez por solicitud (escalado_at). */
+async function escalarPendientes() {
+  try {
+    const [pend] = await pool.query(
+      `SELECT id, nombre, dias_actuales, created_at FROM rh_vac_prog_solicitudes
+        WHERE estado='PENDIENTE' AND escalado_at IS NULL`);
+    if (!pend.length) return;
+    const { sumarDiasHabiles } = require('../../../../shared/feriados');
+    const ahora = new Date();
+    for (const s of pend) {
+      const limite = await sumarDiasHabiles(new Date(s.created_at), 2);
+      if (ahora < limite) continue;
+      const rr = await usuariosRRHH();
+      const sups = [...new Set(rr.map(x => x.id_supervisor).filter(Boolean))];
+      const destino = sups.length ? sups : rr.map(x => x.id_usuario);
+      if (destino.length) await notificar(destino, {
+        tipo: 'RRHH', prioridad: 'alta', titulo: '⏰ Vacaciones progresivas SIN RESOLVER (48 h hábiles)',
+        mensaje: `La solicitud de ${s.nombre} (${s.dias_actuales} día/s progresivo/s) lleva más de 48 horas hábiles esperando a RRHH. Escalada a jefatura.`,
+        href: '/recursos-humanos/solicitudes/',
+      }).catch(() => {});
+      await pool.query('UPDATE rh_vac_prog_solicitudes SET escalado_at=NOW() WHERE id=?', [s.id]);
+      auditar({ accion: 'EDITAR', modulo: 'rrhh', entidad: 'vac_progresivas', entidad_id: s.id,
+        detalle: `Escalada al supervisor de RRHH: 48 horas hábiles sin resolver (${s.nombre})` });
+    }
+  } catch (e) { console.error('[vac-prog escalamiento]', e.message); }
+}
+require('../../../../shared/scheduler.js').programar('rrhh-vac-prog-escalamiento', escalarPendientes, 60 * 60 * 1000);
 
 /* La MISMA aritmética del motor de devengos (vac-cuenta.progresivoDelPeriodo,
    convención al CIERRE del período desde 20-08-2026):
@@ -144,12 +191,9 @@ La tabla del certificado lista año y meses cotizados por año. Si el documento 
       detalle: `Vacaciones progresivas: ${corresponde ? `CORRESPONDE (${diasHoy} día/s) — derivado a RRHH` : `aún no corresponde (desde ${fechaDesde})`}` });
 
     if (corresponde) {
-      // Campana a RRHH
-      const [rr] = await pool.query(
-        `SELECT DISTINCT u.id_usuario FROM usuarios u
-          JOIN permisos_perfil pp ON pp.id_perfil=u.id_perfil AND pp.habilitado=1
-          JOIN funcionalidades f ON f.id_funcionalidad=pp.id_funcionalidad
-         WHERE f.codigo='rh_aprobar' AND u.estado='activo'`);
+      // Campana SOLO al equipo RRHH (perfil del área) — no a todo rh_aprobar,
+      // que incluye a los gerentes: a ellos solo se escala a las 48 h hábiles.
+      const rr = await usuariosRRHH();
       if (rr.length) notificar(rr.map(x => x.id_usuario), {
         tipo: 'RRHH', prioridad: 'alta', titulo: '🏖️ Vacaciones progresivas por aprobar',
         mensaje: `${yo.nombre} acredita ${anosPrevios} años previos (certificado AFP validado): ${diasHoy} día(s) progresivo(s). Plazo: 48 horas hábiles.`,
