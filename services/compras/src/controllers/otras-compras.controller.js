@@ -198,9 +198,14 @@ const listar = async (req, res) => {
         `SELECT o.*, (SELECT COUNT(*) FROM postventa_factura_docs d WHERE d.origen='ODC' AND d.ref_id=o.id) n_docs
            FROM odc_ordenes o ORDER BY o.created_at DESC LIMIT 300`);
     } else {
+      // Historial personal: las que generé + las de mi equipo (soy el supervisor
+      // de quien las generó) + las que ya firmé en cualquier nivel
       [rows] = await pool.query(
         `SELECT o.*, (SELECT COUNT(*) FROM postventa_factura_docs d WHERE d.origen='ODC' AND d.ref_id=o.id) n_docs
-           FROM odc_ordenes o WHERE o.id_usuario=? ORDER BY o.created_at DESC LIMIT 300`, [u.id_usuario]);
+           FROM odc_ordenes o
+           LEFT JOIN usuarios cu ON cu.id_usuario = o.id_usuario
+          WHERE o.id_usuario=? OR cu.id_supervisor=? OR o.sup_id=? OR o.fin_id=?
+          ORDER BY o.created_at DESC LIMIT 300`, [u.id_usuario, u.id_usuario, u.id_usuario, u.id_usuario]);
     }
     ok(res, { ordenes: rows, es_finanzas: fin, es_admin: admin });
   } catch (e) { console.error('[odc listar]', e.message); fail(res, 'Error interno del servidor'); }
