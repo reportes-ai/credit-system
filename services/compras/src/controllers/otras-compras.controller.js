@@ -128,6 +128,15 @@ const crear = async (req, res) => {
       }
     }
 
+    /* Anti-duplicado: tras un error de pantalla el usuario reintenta y quedan dos
+       órdenes iguales (pasó con la ODC260001/2 el mismo día del estreno). Misma
+       persona + mismo proveedor + mismo monto, pendiente y de menos de 15 min → 409. */
+    const [[dupOrden]] = await pool.query(
+      `SELECT numero FROM odc_ordenes
+        WHERE id_usuario=? AND id_proveedor=? AND monto=? AND estado LIKE 'PENDIENTE%'
+          AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE) LIMIT 1`, [u.id_usuario, idProv, monto]);
+    if (dupOrden) return fail(res, `Ya emitiste la ${dupOrden.numero} con este proveedor y monto hace unos minutos — revisa el Historial antes de emitir de nuevo.`, 409);
+
     // Supervisor de quien genera; sin supervisor la orden salta directo a Finanzas
     const [[sup]] = await pool.query(
       `SELECT s.id_usuario, TRIM(CONCAT_WS(' ', s.nombre, s.apellido)) nombre
@@ -212,18 +221,22 @@ const resolver = async (req, res) => {
     const admin = esAdminPerfil(perfil?.nombre);
     const comentario = String(b.comentario || '').trim().slice(0, 400) || null;
 
+    /* RECHAZAR = DEVOLVER AL NIVEL ANTERIOR (siempre con comentario):
+       Finanzas devuelve → vuelve al supervisor (su firma se borra y debe re-firmar);
+       el supervisor devuelve → vuelve al generador (estado DEVUELTA: corrige,
+       adjunta lo que falte y la reenvía). Nada muere en silencio. */
     if (o.estado === 'PENDIENTE_SUPERVISOR') {
       const [[cu]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [o.id_usuario]);
       if (!admin && cu?.id_supervisor !== u.id_usuario)
         return fail(res, 'Esta orden espera la firma del supervisor de quien la generó', 403);
       if (decision === 'RECHAZAR') {
-        await pool.query(`UPDATE odc_ordenes SET estado='RECHAZADA', rechazo_por=?, rechazo_motivo=?, rechazo_fecha=NOW() WHERE id=?`,
+        await pool.query(`UPDATE odc_ordenes SET estado='DEVUELTA', rechazo_por=?, rechazo_motivo=?, rechazo_fecha=NOW() WHERE id=?`,
           [nombreDe(u), comentario, o.id]);
       } else {
         await pool.query(`UPDATE odc_ordenes SET estado='PENDIENTE_FINANZAS', sup_id=?, sup_nombre=?, sup_fecha=NOW(), sup_comentario=? WHERE id=?`,
           [u.id_usuario, nombreDe(u), comentario, o.id]);
         const [fin] = await pool.query(`SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-          WHERE u.estado='activo' AND p.nombre LIKE '%Finanzas%'`);
+          WHERE u.estado='activo' AND (p.nombre LIKE '%Finanzas%' OR p.nombre LIKE '%Financiero%')`);
         if (fin.length) await notificar(fin.map(x => x.id_usuario), { tipo: 'ODC', titulo: '🛒 Orden de Compra por aprobar',
           mensaje: `La ${o.numero} (${o.proveedor_nombre}, ${CLP(o.monto)}) tiene firma del supervisor. Falta Administración y Finanzas.`, href: '/soporte/otras-compras/' }).catch(() => {});
       }
@@ -231,16 +244,22 @@ const resolver = async (req, res) => {
       if (!admin && !(await esFinanzas(u.id_usuario)))
         return fail(res, 'Esta orden espera la firma de Administración y Finanzas', 403);
       if (decision === 'RECHAZAR') {
-        await pool.query(`UPDATE odc_ordenes SET estado='RECHAZADA', rechazo_por=?, rechazo_motivo=?, rechazo_fecha=NOW() WHERE id=?`,
+        // Devuelve al supervisor: su firma anterior se limpia y debe volver a firmar
+        await pool.query(`UPDATE odc_ordenes SET estado='PENDIENTE_SUPERVISOR', sup_id=NULL, sup_nombre=NULL, sup_fecha=NULL, sup_comentario=NULL,
+                                                 rechazo_por=?, rechazo_motivo=?, rechazo_fecha=NOW() WHERE id=?`,
           [nombreDe(u), comentario, o.id]);
+        const [[cu]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [o.id_usuario]);
+        if (cu?.id_supervisor) await notificar([cu.id_supervisor], { tipo: 'ODC', titulo: '↩ Orden de Compra devuelta por Finanzas',
+          mensaje: `La ${o.numero} (${o.proveedor_nombre}, ${CLP(o.monto)}) volvió a tu firma: ${comentario}`, href: '/soporte/otras-compras/' }).catch(() => {});
       } else {
         await pool.query(`UPDATE odc_ordenes SET estado='APROBADA', fin_id=?, fin_nombre=?, fin_fecha=NOW(), fin_comentario=? WHERE id=?`,
           [u.id_usuario, nombreDe(u), comentario, o.id]);
       }
     }
     if (o.id_usuario) await notificar([o.id_usuario], { tipo: 'ODC',
-      titulo: decision === 'APROBAR' ? '✅ Orden de Compra avanzó' : '❌ Orden de Compra rechazada',
-      mensaje: `${o.numero}: ${decision === 'RECHAZAR' ? 'rechazada por ' + nombreDe(u) + (comentario ? ' — ' + comentario : '')
+      titulo: decision === 'APROBAR' ? '✅ Orden de Compra avanzó' : '↩ Orden de Compra devuelta',
+      mensaje: `${o.numero}: ${decision === 'RECHAZAR'
+        ? (o.estado === 'PENDIENTE_SUPERVISOR' ? `devuelta a ti por ${nombreDe(u)} — ${comentario}. Corrígela y reenvíala.` : `Finanzas la devolvió al supervisor — ${comentario}`)
         : (o.estado === 'PENDIENTE_SUPERVISOR' ? 'aprobada por tu supervisor, falta Administración y Finanzas' : 'APROBADA por Administración y Finanzas')}`,
       href: '/soporte/otras-compras/' }).catch(() => {});
     auditar({ req, accion: decision === 'APROBAR' ? 'APROBAR' : 'RECHAZAR', modulo: 'otras-compras', entidad: 'odc', entidad_id: o.id,
@@ -249,13 +268,42 @@ const resolver = async (req, res) => {
   } catch (e) { console.error('[odc resolver]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
+/* ── POST /:id/reenviar — el generador corrige una DEVUELTA y la manda de vuelta ── */
+const reenviar = async (req, res) => {
+  try {
+    const u = req.usuario || {}; const b = req.body || {};
+    const [[o]] = await pool.query('SELECT * FROM odc_ordenes WHERE id=?', [req.params.id]);
+    if (!o) return fail(res, 'Orden no encontrada', 404);
+    if (o.estado !== 'DEVUELTA') return fail(res, 'Solo se reenvían órdenes devueltas', 409);
+    const [[perfil]] = await pool.query('SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?', [u.id_usuario]);
+    if (o.id_usuario !== u.id_usuario && !esAdminPerfil(perfil?.nombre))
+      return fail(res, 'Solo quien generó la orden puede reenviarla', 403);
+    // Puede corregir monto/detalle/comentarios antes de reenviar
+    const monto = b.monto != null ? Math.round(Number(b.monto) || 0) : Number(o.monto);
+    if (monto <= 0) return fail(res, 'Monto inválido', 400);
+    const [[sup]] = await pool.query(
+      `SELECT s.id_usuario FROM usuarios u JOIN usuarios s ON s.id_usuario=u.id_supervisor
+        WHERE u.id_usuario=? AND s.estado='activo'`, [o.id_usuario]);
+    const estado = sup ? 'PENDIENTE_SUPERVISOR' : 'PENDIENTE_FINANZAS';
+    await pool.query(
+      `UPDATE odc_ordenes SET estado=?, monto=?, detalle=COALESCE(?, detalle), comentarios=COALESCE(?, comentarios),
+              rechazo_por=NULL, rechazo_motivo=NULL, rechazo_fecha=NULL WHERE id=?`,
+      [estado, monto, String(b.detalle || '').trim() || null, String(b.comentarios || '').trim() || null, o.id]);
+    if (sup) await notificar([sup.id_usuario], { tipo: 'ODC', titulo: '🛒 Orden de Compra reenviada',
+      mensaje: `${nombreDe(u)} corrigió y reenvió la ${o.numero} (${o.proveedor_nombre}, ${CLP(monto)}). Esperando tu firma.`, href: '/soporte/otras-compras/' }).catch(() => {});
+    auditar({ req, accion: 'EDITAR', modulo: 'otras-compras', entidad: 'odc', entidad_id: o.id,
+      detalle: `Reenvió la ${o.numero} tras la devolución (${CLP(monto)})` });
+    ok(res, { id: o.id, estado });
+  } catch (e) { console.error('[odc reenviar]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
 /* ── POST /:id/adjunto — agregar cotización/detalle a una orden aún pendiente ── */
 const adjuntar = async (req, res) => {
   try {
     const u = req.usuario || {}; const b = req.body || {};
     const [[o]] = await pool.query('SELECT * FROM odc_ordenes WHERE id=?', [req.params.id]);
     if (!o) return fail(res, 'Orden no encontrada', 404);
-    if (!o.estado.startsWith('PENDIENTE')) return fail(res, 'La orden ya fue resuelta: no se pueden agregar adjuntos', 409);
+    if (!o.estado.startsWith('PENDIENTE') && o.estado !== 'DEVUELTA') return fail(res, 'La orden ya fue resuelta: no se pueden agregar adjuntos', 409);
     const [[perfil]] = await pool.query('SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?', [u.id_usuario]);
     if (o.id_usuario !== u.id_usuario && !esAdminPerfil(perfil?.nombre))
       return fail(res, 'Solo quien generó la orden puede adjuntar', 403);
@@ -292,4 +340,4 @@ const documento = async (req, res) => {
   } catch (e) { console.error('[odc documento]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-module.exports = { getDatos, crear, listar, resolver, documento, adjuntar };
+module.exports = { getDatos, crear, listar, resolver, documento, adjuntar, reenviar };

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Otras Compras — AutoFácil</title>
-  <!-- v1.1 — comprobante formato Solicitud de Pago en AMARILLO, botón 📎 para adjuntar a órdenes pendientes · v1.0 — órdenes de compra ODC a proveedores (base compartida con ODP): formulario amarillo, adjuntos, workflow supervisor → Adm. y Finanzas, comprobante con trazabilidad -->
+  <!-- v1.2 — rechazo DEVUELVE al nivel anterior (Finanzas→supervisor, supervisor→generador con Reenviar), comentarios siempre visibles en el comprobante, anti-duplicado 15 min · v1.1 — comprobante formato Solicitud de Pago en AMARILLO, botón 📎 para adjuntar a órdenes pendientes · v1.0 — órdenes de compra ODC a proveedores (base compartida con ODP): formulario amarillo, adjuntos, workflow supervisor → Adm. y Finanzas, comprobante con trazabilidad -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -23,7 +23,7 @@
     .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--amb); }
     .pill { border-radius:9px; padding:2px 9px; font-size:.68rem; font-weight:700; white-space:nowrap; }
     .pill.PENDIENTE_SUPERVISOR { background:#fef3c7; color:#92400e; } .pill.PENDIENTE_FINANZAS { background:#dbeafe; color:#1e40af; }
-    .pill.APROBADA { background:#dcfce7; color:#15803d; } .pill.RECHAZADA { background:#fee2e2; color:#991b1b; }
+    .pill.APROBADA { background:#dcfce7; color:#15803d; } .pill.RECHAZADA { background:#fee2e2; color:#991b1b; } .pill.DEVUELTA { background:#fee2e2; color:#991b1b; }
     .num { font-family:Consolas,monospace; font-weight:700; color:var(--amb); }
     .btn-amb { background:#d97706; border:none; color:#fff; border-radius:8px; padding:7px 16px; font-size:.85rem; font-weight:700; }
     .btn-amb:hover { background:#b45309; color:#fff; }
@@ -173,7 +173,7 @@ async function cargarLista(){
   if (!j.success){ tb.innerHTML='<tr><td colspan="7" class="text-center text-danger py-3">'+esc(j.error)+'</td></tr>'; return; }
   const rows=j.data.ordenes||[];
   if (!rows.length){ tb.innerHTML='<tr><td colspan="7" class="text-center text-muted py-3">'+(VISTA==='por-aprobar'?'Nada esperando tu firma. ¡Al día!':'Sin órdenes.')+'</td></tr>'; return; }
-  const ESTADO = { PENDIENTE_SUPERVISOR:'Espera al supervisor', PENDIENTE_FINANZAS:'Espera Adm. y Finanzas', APROBADA:'APROBADA', RECHAZADA:'RECHAZADA' };
+  const ESTADO = { PENDIENTE_SUPERVISOR:'Espera al supervisor', PENDIENTE_FINANZAS:'Espera Adm. y Finanzas', APROBADA:'APROBADA', DEVUELTA:'DEVUELTA — corregir y reenviar', RECHAZADA:'RECHAZADA' };
   tb.innerHTML = rows.map(o=>`<tr>
     <td class="num">${esc(o.numero)}</td>
     <td>${esc(o.proveedor_nombre)}${o.n_docs?` <i class="bi bi-paperclip text-muted" title="${o.n_docs} adjunto(s)"></i>`:''}</td>
@@ -183,7 +183,8 @@ async function cargarLista(){
     <td><span class="pill ${o.estado}">${ESTADO[o.estado]||o.estado}</span>${o.rechazo_motivo?`<div class="text-danger" style="font-size:.7rem">${esc(o.rechazo_motivo)}</div>`:''}</td>
     <td style="white-space:nowrap">
       <button class="btn btn-sm btn-outline-secondary py-0" onclick="verDoc(${o.id})" title="Ver comprobante"><i class="bi bi-file-text"></i></button>
-      ${o.estado.startsWith('PENDIENTE')&&VISTA!=='por-aprobar'?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="adjPost(${o.id})" title="Agregar cotización/detalle"><i class="bi bi-paperclip"></i></button>`:''}
+      ${(o.estado.startsWith('PENDIENTE')||o.estado==='DEVUELTA')&&VISTA!=='por-aprobar'?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="adjPost(${o.id})" title="Agregar cotización/detalle"><i class="bi bi-paperclip"></i></button>`:''}
+      ${o.estado==='DEVUELTA'&&VISTA!=='por-aprobar'?`<button class="btn btn-sm btn-warning py-0" onclick="reenviar(${o.id})" title="Corregir y reenviar al flujo de firmas">Reenviar</button>`:''}
       ${VISTA==='por-aprobar'?`<button class="btn btn-sm btn-success py-0" onclick="resolver(${o.id},'APROBAR')">Aprobar</button>
       <button class="btn btn-sm btn-outline-danger py-0" onclick="resolver(${o.id},'RECHAZAR')">Rechazar</button>`:''}
     </td></tr>`).join('');
@@ -203,6 +204,13 @@ function adjPost(id){
   inp.click();
 }
 
+async function reenviar(id){
+  if (!confirm('¿Reenviar esta orden al flujo de firmas? Vuelve a tu supervisor.')) return;
+  const j = await (await fetch('/api/compras/otras/'+id+'/reenviar',{method:'POST',headers:H,body:JSON.stringify({})})).json();
+  if (!j.success) return alert(j.error);
+  cargarLista(); badge();
+}
+
 async function resolver(id, decision){
   let comentario='';
   if (decision==='RECHAZAR'){ comentario = prompt('Motivo del rechazo (obligatorio):')||''; if (!comentario.trim()) return; }
@@ -219,11 +227,12 @@ async function verDoc(id){
   if (!j.success) return alert(j.error);
   DOC = j.data; const o = DOC;
   const paso = (hecho, txt) => `<span style="font-weight:${hecho?'700':'400'};color:${hecho?'#15803d':'#94a3b8'}">${txt}</span>`;
-  const traza = o.estado==='RECHAZADA'
-    ? `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)} &nbsp;⟶&nbsp; <span style="color:#b91c1c;font-weight:700">RECHAZADA por ${esc(o.rechazo_por)} el ${fdh(o.rechazo_fecha)}${o.rechazo_motivo?' — '+esc(o.rechazo_motivo):''}</span>`
+  const devu = o.rechazo_fecha ? ` &nbsp;⟶&nbsp; <span style="color:#b91c1c;font-weight:700">↩ Devuelta por ${esc(o.rechazo_por)} el ${fdh(o.rechazo_fecha)} — ${esc(o.rechazo_motivo||'')}</span>` : '';
+  const traza = (o.estado==='RECHAZADA'||o.estado==='DEVUELTA')
+    ? `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)}${devu||` &nbsp;⟶&nbsp; <span style="color:#b91c1c;font-weight:700">RECHAZADA</span>`}`
     : `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)}
        &nbsp;⟶&nbsp; ${paso(o.sup_fecha, o.sup_fecha?`Supervisor: ${esc(o.sup_nombre)} el ${fdh(o.sup_fecha)}`:'Supervisor: pendiente')}
-       &nbsp;⟶&nbsp; ${paso(o.fin_fecha, o.fin_fecha?`Administración y Finanzas: ${esc(o.fin_nombre)} el ${fdh(o.fin_fecha)}`:'Administración y Finanzas: pendiente')}`;
+       &nbsp;⟶&nbsp; ${paso(o.fin_fecha, o.fin_fecha?`Administración y Finanzas: ${esc(o.fin_nombre)} el ${fdh(o.fin_fecha)}`:'Administración y Finanzas: pendiente')}${devu}`;
   /* Mismo formato del documento "Solicitud de Pago" de las ODP, pero AMARILLO
      para distinguir a simple vista una Orden de COMPRA de una de PAGO. */
   const Slbl='color:#92400e;font-weight:700;text-transform:uppercase;font-size:9.5px;padding:1px 8px;white-space:nowrap';
@@ -257,7 +266,7 @@ async function verDoc(id){
       </table>
       <table style="border-collapse:collapse;margin-top:12px;width:100%"><tbody>
         <tr><td style="${SresL}">Proveedor</td><td style="${SresV}">${esc(o.proveedor_nombre)}${o.proveedor_rut?' · RUT '+esc(o.proveedor_rut):''}</td></tr>
-        ${o.comentarios?`<tr><td style="${SresL}">Comentarios</td><td style="${SresV}">${esc(o.comentarios)}</td></tr>`:''}
+        <tr><td style="${SresL}">Comentarios</td><td style="${SresV}">${esc(o.comentarios||'—')}</td></tr>
         ${(o.docs||[]).length?`<tr><td style="${SresL}">Adjuntos</td><td style="${SresV}">${o.docs.map(d=>`<a href="#" onclick="verAdj(${d.id});return false" style="color:#b45309;font-weight:700;text-decoration:none">📎 ${esc(d.nombre)}</a>`).join(' · ')}</td></tr>`:''}
         <tr><td style="${SresL}">Estado</td><td style="${SresV}"><span class="pill ${o.estado}">${esc(o.estado.replace(/_/g,' '))}</span></td></tr>
       </tbody></table>
