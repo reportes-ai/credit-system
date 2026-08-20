@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Otras Compras — AutoFácil</title>
+  <!-- v1.0 — órdenes de compra ODC a proveedores (base compartida con ODP): formulario amarillo, adjuntos, workflow supervisor → Adm. y Finanzas, comprobante con trazabilidad -->
+  <link href="/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --amb:#b45309; --bg:#f0f4f8; }
+    body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
+    .main-content { padding:28px 36px; max-width:1150px; margin:0 auto; }
+    .page-banner { background:linear-gradient(135deg,#92400e,#d97706 60%,#f59e0b); border-radius:16px; color:#fff; padding:22px 30px; margin-bottom:22px; display:flex; align-items:center; gap:16px; }
+    .page-banner i { font-size:2.2rem; opacity:.9; } .page-banner h2 { font-weight:700; margin:0 0 3px; font-size:1.25rem; } .page-banner p { opacity:.9; margin:0; font-size:.87rem; }
+    .panel { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 22px; margin-bottom:18px; }
+    /* Formulario AMARILLO SUAVE — distingue la ODC de la ODP (celeste) */
+    .panel.odc { background:#fffbeb; border:1.5px solid #fde68a; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    thead th { background:#f8fafc; color:#374151; font-weight:700; padding:9px 12px; text-align:left; border-bottom:2px solid #e5e7eb; white-space:nowrap; }
+    tbody td { padding:8px 12px; border-bottom:1px solid #f1f5f9; }
+    .nav-tabs .nav-link { font-size:.86rem; font-weight:600; } .nav-tabs .nav-link.active { color:var(--amb); }
+    .pill { border-radius:9px; padding:2px 9px; font-size:.68rem; font-weight:700; white-space:nowrap; }
+    .pill.PENDIENTE_SUPERVISOR { background:#fef3c7; color:#92400e; } .pill.PENDIENTE_FINANZAS { background:#dbeafe; color:#1e40af; }
+    .pill.APROBADA { background:#dcfce7; color:#15803d; } .pill.RECHAZADA { background:#fee2e2; color:#991b1b; }
+    .num { font-family:Consolas,monospace; font-weight:700; color:var(--amb); }
+    .btn-amb { background:#d97706; border:none; color:#fff; border-radius:8px; padding:7px 16px; font-size:.85rem; font-weight:700; }
+    .btn-amb:hover { background:#b45309; color:#fff; }
+    .adj-chip { display:inline-flex; align-items:center; gap:6px; background:#fff; border:1px solid #fde68a; border-radius:8px; padding:3px 10px; font-size:.76rem; margin:2px 4px 2px 0; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Soporte', href:'/soporte/' }, { label:'Otras Compras', icon:'bi-cart-plus', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+<div class="main-content">
+  <div class="page-banner"><i class="bi bi-cart-plus"></i><div><h2>Otras Compras</h2><p>Órdenes de compra a proveedores fuera del catálogo de oficina. Cada orden requiere la firma del supervisor de quien la genera y de Administración y Finanzas.</p></div></div>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><a class="nav-link active" href="#" id="tN" onclick="tab('N');return false"><i class="bi bi-plus-circle me-1"></i>Nueva orden</a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tA" onclick="tab('A');return false"><i class="bi bi-pen me-1"></i>Por aprobar <span class="badge bg-warning text-dark" id="badgeA" style="display:none">0</span></a></li>
+    <li class="nav-item"><a class="nav-link" href="#" id="tH" onclick="tab('H');return false"><i class="bi bi-clock-history me-1"></i>Historial</a></li>
+  </ul>
+
+  <div id="secN" class="panel odc">
+    <div class="row g-2">
+      <div class="col-md-5"><label class="form-label small fw-semibold mb-1">Proveedor *</label>
+        <select id="fProv" class="form-select form-select-sm" onchange="provUI()"><option value="">— elegir —</option></select></div>
+      <div class="col-md-4" id="wProvNom" style="display:none"><label class="form-label small fw-semibold mb-1">Nombre del proveedor nuevo *</label>
+        <input id="fProvNom" class="form-control form-control-sm" maxlength="200"></div>
+      <div class="col-md-3" id="wProvRut" style="display:none"><label class="form-label small fw-semibold mb-1">RUT proveedor</label>
+        <input id="fProvRut" class="form-control form-control-sm" maxlength="20" placeholder="76.123.456-7"></div>
+      <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Monto $ *</label>
+        <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
+      <div class="col-12"><label class="form-label small fw-semibold mb-1">Detalle de la compra *</label>
+        <textarea id="fDetalle" class="form-control form-control-sm" rows="3" maxlength="2000" placeholder="Qué se compra, cantidades, para qué área…"></textarea></div>
+      <div class="col-12"><label class="form-label small fw-semibold mb-1">Comentarios</label>
+        <textarea id="fComent" class="form-control form-control-sm" rows="2" maxlength="2000" placeholder="Observaciones para los aprobadores (opcional)"></textarea></div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold mb-1">Cotizaciones / detalle adjunto <span class="text-muted fw-normal">(PDF o imagen, máx 5 archivos de 7 MB)</span></label>
+        <div><button class="btn btn-sm btn-outline-secondary" onclick="$('fAdj').click()"><i class="bi bi-paperclip me-1"></i>Adjuntar archivo</button>
+          <input type="file" id="fAdj" accept=".pdf,image/*" style="display:none" onchange="agregarAdj(this)">
+          <span id="adjLista"></span></div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn-amb" id="btnEmitir" onclick="emitir()"><i class="bi bi-send me-1"></i>Emitir Orden de Compra</button>
+      </div>
+    </div>
+    <div class="small text-muted mt-2"><i class="bi bi-diagram-3 me-1"></i>Flujo: <b>tú generas</b> → firma tu <b>supervisor</b> → firma <b>Administración y Finanzas</b>. La trazabilidad queda impresa al pie del comprobante.</div>
+  </div>
+
+  <div id="secL" style="display:none" class="panel">
+    <table><thead><tr><th>N° Orden</th><th>Proveedor</th><th class="text-end">Monto</th><th>Detalle</th><th>Generada por</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="tbL"><tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr></tbody></table>
+  </div>
+
+  <div id="docPrint" style="display:none"></div>
+</div>
+
+<dialog id="dlgDoc" style="border:none;border-radius:14px;max-width:840px;width:92vw;padding:0"><div style="padding:18px 22px">
+  <div id="dlgDocBody"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+    <button class="btn btn-sm btn-outline-secondary" onclick="dlgDoc.close()">Cerrar</button>
+    <button class="btn btn-sm btn-primary" onclick="imprimirDoc()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
+  </div>
+</div></dialog>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { 'Content-Type':'application/json', Authorization:'Bearer '+token };
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+const fdh = d => { const x=new Date(d); return x.toLocaleDateString('es-CL')+' '+x.toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})+' hrs'; };
+let DATOS=null, VISTA='mias', ADJ=[];
+
+function fmtMonto(el){ const raw=el.value.replace(/[^\d]/g,''); el.value = raw?Number(raw).toLocaleString('es-CL'):''; }
+const montoVal = () => Number($('fMonto').value.replace(/[^\d]/g,''))||0;
+
+function tab(t){
+  ['tN','tA','tH'].forEach(id=>$(id).classList.remove('active'));
+  $({N:'tN',A:'tA',H:'tH'}[t]).classList.add('active');
+  $('secN').style.display = t==='N'?'':'none';
+  $('secL').style.display = t==='N'?'none':'';
+  if (t==='A'){ VISTA='por-aprobar'; cargarLista(); }
+  if (t==='H'){ VISTA = (DATOS&&(DATOS.es_finanzas))?'todas':'mias'; cargarLista(); }
+}
+
+async function init(){
+  const j = await (await fetch('/api/compras/otras/datos',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  DATOS = j.data;
+  $('fProv').innerHTML = '<option value="">— elegir —</option>'
+    + DATOS.proveedores.map(p=>`<option value="${p.id}">${esc(p.nombre)}${p.rut?' · '+esc(p.rut):''}</option>`).join('')
+    + '<option value="NUEVO">+ Proveedor no registrado…</option>';
+  badge();
+}
+async function badge(){
+  try { const j = await (await fetch('/api/compras/otras?vista=por-aprobar',{headers:H})).json();
+    const n = (j.data?.ordenes||[]).length;
+    $('badgeA').textContent = n; $('badgeA').style.display = n?'':'none';
+  } catch(_){}
+}
+function provUI(){
+  const nuevo = $('fProv').value==='NUEVO';
+  $('wProvNom').style.display = nuevo?'':'none';
+  $('wProvRut').style.display = nuevo?'':'none';
+}
+
+async function agregarAdj(inp){
+  const f = inp.files[0]; if (!f) return; inp.value='';
+  if (f.size > 7*1024*1024) return alert('El archivo supera el máximo de 7 MB');
+  if (ADJ.length >= 5) return alert('Máximo 5 adjuntos');
+  const base64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
+  ADJ.push({ nombre:f.name, mime:f.type, base64 });
+  pintarAdj();
+}
+function pintarAdj(){
+  $('adjLista').innerHTML = ADJ.map((a,i)=>`<span class="adj-chip"><i class="bi bi-file-earmark"></i>${esc(a.nombre)}
+    <i class="bi bi-x-circle text-danger" style="cursor:pointer" onclick="ADJ.splice(${i},1);pintarAdj()"></i></span>`).join('');
+}
+
+async function emitir(){
+  const nuevo = $('fProv').value==='NUEVO';
+  const body = {
+    id_proveedor: nuevo?null:($('fProv').value||null),
+    prov_nombre: nuevo?$('fProvNom').value:undefined,
+    prov_rut: nuevo?$('fProvRut').value:undefined,
+    monto: montoVal(), detalle: $('fDetalle').value, comentarios: $('fComent').value, adjuntos: ADJ,
+  };
+  if (!body.id_proveedor && !String(body.prov_nombre||'').trim()) return alert('Elige o crea el proveedor');
+  if (!body.monto) return alert('Indica el monto');
+  if (!String(body.detalle||'').trim()) return alert('Describe qué se está comprando');
+  const btn=$('btnEmitir'); btn.disabled=true;
+  try {
+    const j = await (await fetch('/api/compras/otras',{method:'POST',headers:H,body:JSON.stringify(body)})).json();
+    if (!j.success) return alert(j.error);
+    alert(`Orden ${j.data.numero} emitida — ${j.data.estado==='PENDIENTE_FINANZAS'?'pasó directo a Administración y Finanzas (no tienes supervisor asignado)':'esperando la firma de tu supervisor'}.`);
+    $('fProv').value=''; $('fProvNom').value=''; $('fProvRut').value=''; $('fMonto').value=''; $('fDetalle').value=''; $('fComent').value=''; ADJ=[]; pintarAdj(); provUI();
+    init();
+  } finally { btn.disabled=false; }
+}
+
+async function cargarLista(){
+  const tb=$('tbL'); tb.innerHTML='<tr><td colspan="7" class="text-center text-muted py-3">Cargando…</td></tr>';
+  const j = await (await fetch('/api/compras/otras?vista='+VISTA,{headers:H})).json();
+  if (!j.success){ tb.innerHTML='<tr><td colspan="7" class="text-center text-danger py-3">'+esc(j.error)+'</td></tr>'; return; }
+  const rows=j.data.ordenes||[];
+  if (!rows.length){ tb.innerHTML='<tr><td colspan="7" class="text-center text-muted py-3">'+(VISTA==='por-aprobar'?'Nada esperando tu firma. ¡Al día!':'Sin órdenes.')+'</td></tr>'; return; }
+  const ESTADO = { PENDIENTE_SUPERVISOR:'Espera al supervisor', PENDIENTE_FINANZAS:'Espera Adm. y Finanzas', APROBADA:'APROBADA', RECHAZADA:'RECHAZADA' };
+  tb.innerHTML = rows.map(o=>`<tr>
+    <td class="num">${esc(o.numero)}</td>
+    <td>${esc(o.proveedor_nombre)}${o.n_docs?` <i class="bi bi-paperclip text-muted" title="${o.n_docs} adjunto(s)"></i>`:''}</td>
+    <td class="text-end num">$${fmt(o.monto)}</td>
+    <td style="max-width:260px">${esc(String(o.detalle||'').slice(0,90))}</td>
+    <td>${esc(o.creado_por||'')}<div class="text-muted" style="font-size:.68rem">${fdh(o.created_at)}</div></td>
+    <td><span class="pill ${o.estado}">${ESTADO[o.estado]||o.estado}</span>${o.rechazo_motivo?`<div class="text-danger" style="font-size:.7rem">${esc(o.rechazo_motivo)}</div>`:''}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-sm btn-outline-secondary py-0" onclick="verDoc(${o.id})"><i class="bi bi-file-text"></i></button>
+      ${VISTA==='por-aprobar'?`<button class="btn btn-sm btn-success py-0" onclick="resolver(${o.id},'APROBAR')">Aprobar</button>
+      <button class="btn btn-sm btn-outline-danger py-0" onclick="resolver(${o.id},'RECHAZAR')">Rechazar</button>`:''}
+    </td></tr>`).join('');
+}
+
+async function resolver(id, decision){
+  let comentario='';
+  if (decision==='RECHAZAR'){ comentario = prompt('Motivo del rechazo (obligatorio):')||''; if (!comentario.trim()) return; }
+  else { comentario = prompt('Comentario (opcional):')||''; }
+  const j = await (await fetch('/api/compras/otras/'+id+'/resolver',{method:'POST',headers:H,body:JSON.stringify({decision,comentario})})).json();
+  if (!j.success) return alert(j.error);
+  cargarLista(); badge();
+}
+
+/* ── Comprobante con TRAZABILIDAD al pie ── */
+let DOC=null;
+async function verDoc(id){
+  const j = await (await fetch('/api/compras/otras/'+id+'/documento',{headers:H})).json();
+  if (!j.success) return alert(j.error);
+  DOC = j.data; const o = DOC;
+  const paso = (hecho, txt) => `<span style="font-weight:${hecho?'700':'400'};color:${hecho?'#15803d':'#94a3b8'}">${txt}</span>`;
+  const traza = o.estado==='RECHAZADA'
+    ? `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)} &nbsp;⟶&nbsp; <span style="color:#b91c1c;font-weight:700">RECHAZADA por ${esc(o.rechazo_por)} el ${fdh(o.rechazo_fecha)}${o.rechazo_motivo?' — '+esc(o.rechazo_motivo):''}</span>`
+    : `Generado por <b>${esc(o.creado_por)}</b> el ${fdh(o.created_at)}
+       &nbsp;⟶&nbsp; ${paso(o.sup_fecha, o.sup_fecha?`Supervisor: ${esc(o.sup_nombre)} el ${fdh(o.sup_fecha)}`:'Supervisor: pendiente')}
+       &nbsp;⟶&nbsp; ${paso(o.fin_fecha, o.fin_fecha?`Administración y Finanzas: ${esc(o.fin_nombre)} el ${fdh(o.fin_fecha)}`:'Administración y Finanzas: pendiente')}`;
+  $('dlgDocBody').innerHTML = `
+    <div style="border:2px solid #fde68a;border-radius:10px;padding:16px 20px;background:#fffdf5;font-size:.85rem" id="docBox">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid #b45309;padding-bottom:8px;margin-bottom:12px">
+        <img src="/img/logo-autofacil.png" style="height:36px" onerror="this.src='/img/logo.png'">
+        <div style="text-align:right"><b style="color:#92400e;font-size:1rem">ORDEN DE COMPRA</b><div class="num" style="font-size:1.05rem">${esc(o.numero)}</div></div>
+      </div>
+      <table style="font-size:.84rem"><tbody>
+        <tr><td style="width:26%;color:#92400e;font-weight:700;padding:3px 0">Proveedor</td><td>${esc(o.proveedor_nombre)}${o.proveedor_rut?' · RUT '+esc(o.proveedor_rut):''}</td></tr>
+        <tr><td style="color:#92400e;font-weight:700;padding:3px 0">Monto</td><td class="num">$${fmt(o.monto)}</td></tr>
+        <tr><td style="color:#92400e;font-weight:700;padding:3px 0;vertical-align:top">Detalle</td><td>${esc(o.detalle||'')}</td></tr>
+        ${o.comentarios?`<tr><td style="color:#92400e;font-weight:700;padding:3px 0;vertical-align:top">Comentarios</td><td>${esc(o.comentarios)}</td></tr>`:''}
+        ${(o.docs||[]).length?`<tr><td style="color:#92400e;font-weight:700;padding:3px 0">Adjuntos</td><td>${o.docs.map(d=>`<a href="#" onclick="verAdj(${d.id});return false" style="color:#b45309;font-weight:700;text-decoration:none">📎 ${esc(d.nombre)}</a>`).join(' · ')}</td></tr>`:''}
+        <tr><td style="color:#92400e;font-weight:700;padding:3px 0">Estado</td><td><span class="pill ${o.estado}">${esc(o.estado.replace(/_/g,' '))}</span></td></tr>
+      </tbody></table>
+      <div style="border-top:1px dashed #d6c58a;margin-top:14px;padding-top:10px;font-size:.76rem;color:#374151">${traza}</div>
+    </div>`;
+  dlgDoc.showModal();
+}
+async function verAdj(id){
+  try { const r = await fetch('/api/postventa/factura-doc/'+id,{headers:{Authorization:'Bearer '+token}});
+    if (!r.ok) throw 0; const u=URL.createObjectURL(await r.blob()); window.open(u,'_blank'); setTimeout(()=>URL.revokeObjectURL(u),60000);
+  } catch(_){ alert('No se pudo abrir el adjunto.'); }
+}
+function imprimirDoc(){
+  const cont=$('docPrint'); cont.innerHTML=$('dlgDocBody').innerHTML; cont.style.display='block';
+  const tit=document.title; document.title = 'Orden de Compra '+(DOC?DOC.numero:'');
+  const main=document.querySelector('.main-content');
+  [...main.children].forEach(c=>{ if(c.id!=='docPrint') c.dataset.h='1', c.style.display='none'; });
+  dlgDoc.close(); window.print();
+  setTimeout(()=>{ document.title=tit; cont.style.display='none';
+    [...main.children].forEach(c=>{ if(c.dataset.h){ delete c.dataset.h; c.style.display=''; } });
+    // las pestañas reponen su propio display
+    tab($('tN').classList.contains('active')?'N':$('tA').classList.contains('active')?'A':'H');
+  }, 600);
+}
+
+init();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

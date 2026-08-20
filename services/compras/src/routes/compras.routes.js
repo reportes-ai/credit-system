@@ -56,4 +56,14 @@ router.get('/revision',              verifyToken, c.revisionBandeja);
 router.get('/revision/:id',          verifyToken, c.revisionDetalle);
 router.post('/revision/:id/decidir', verifyToken, c.adminOrdenDecidir);
 
+// ── OTRAS COMPRAS (ODC): proveedores + workflow supervisor → Finanzas ──
+const odc = require('../controllers/otras-compras.controller');
+const puedeODC = requireFunc('otras_compras', 'compras');
+router.get('/otras/datos',            verifyToken, puedeODC, odc.getDatos);
+router.get('/otras',                  verifyToken, puedeODC, odc.listar);
+router.post('/otras',                 verifyToken, puedeODC, odc.crear);
+router.post('/otras/:id/resolver',    verifyToken, puedeODC, odc.resolver);
+router.get('/otras/:id/documento',    verifyToken, puedeODC, odc.documento);
+
 module.exports = router;
+

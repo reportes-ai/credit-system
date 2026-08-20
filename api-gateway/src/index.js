@@ -504,6 +504,7 @@ const PAGINAS = [
   ['/presentacion-grupo', 'presentacion-grupo/index.html'],
   ['/mantenedores/apis', 'mantenedores/apis/index.html'],
   ['/soporte/compras-revision', 'soporte/compras-revision/index.html'],
+  ['/soporte/otras-compras', 'soporte/otras-compras/index.html'],
   ['/mantenedores/workflows', 'mantenedores/workflows/index.html'],
   ['/mantenedores/uptime', 'mantenedores/uptime/index.html'],
   ['/mantenedores/comisiones-seguro', 'mantenedores/comisiones-seguro/index.html'],
