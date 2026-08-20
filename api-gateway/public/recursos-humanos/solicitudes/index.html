@@ -199,6 +199,7 @@ window.vpAnalizar=async function(inp){
 async function cargarAprobar(){
   const sec=document.getElementById('secAprobar');
   const j=await (await fetch('/api/rrhh/solicitudes/por-aprobar',{headers:H})).json();
+  if(!j.success){ document.getElementById('t2').style.display='none'; sec.innerHTML=''; return; }
   const ss=(j.data||{}).solicitudes||[];
   const b=document.getElementById('badgeA'); b.style.display=ss.length?'':'none'; b.textContent=ss.length;
   sec.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)">Solicitudes esperando tu decisión (${ss.length})</h6>
@@ -290,10 +291,13 @@ window.guardarCadena=async(codigo,btn)=>{
 (async()=>{
   const jt=await (await fetch('/api/rrhh/solicitudes/tipos',{headers:H})).json();
   TIPOS=(jt.data||{}).tipos||[];
-  try{ const jp=await (await fetch('/api/rrhh/solicitudes/todas',{headers:H})).json();
-    ES_RRHH=!!jp.success;
+  let puedeConfig=false;
+  try{ const jp=await (await fetch('/api/auth/mis-permisos',{headers:H})).json();
+    const cods = jp.funcionalidades || [];
+    ES_RRHH = cods.includes('rh_colaboradores');
+    puedeConfig = cods.includes('rh_sol_config');
   }catch(e){}
-  if(ES_RRHH) document.getElementById('t3').style.display='';
+  if(puedeConfig) document.getElementById('t3').style.display='';
   cargarMias(); cargarAprobar();
 })();
 </script>

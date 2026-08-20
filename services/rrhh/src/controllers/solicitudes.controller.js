@@ -78,6 +78,43 @@ require('../../../../shared/migrate').enFila('rrhh-solicitudes', async () => {
   console.log('[rrhh-solicitudes] listo');
 });
 
+/* Permisos diferenciados de Solicitudes (una sola vez):
+   · rh_solicitudes   → la página: TODOS los empleados (no perfiles externos/no-persona)
+   · rh_sol_aprobar   → pestaña "Por Aprobar": supervisores, jefes, gerentes y RRHH
+   · rh_sol_config    → pestaña "Todas y Configuración": Administrador             */
+require('../../../../shared/migrate').migrar('rrhh-sol-permisos-v1', async () => {
+  const [[mod]] = await pool.query(`SELECT id_modulo FROM modulos WHERE ruta='/recursos-humanos/' LIMIT 1`);
+  if (!mod) return;
+  const NO_EMPLEADOS = ['Pantalla TV', 'BDI Cluster Ecuador','Demo'];
+  const APROBADORES = ['Administrador', 'Gerente General', 'Gerente de Finanzas',
+    'Gerente de Operaciones y Crédito', 'Jefe Comercial', 'Jefe Recursos Humanos',
+    'Supervisor Comercial', 'Supervisor de Crédito', 'Supervisor de Operaciones'];
+
+  const func = async (codigo, nombre, icono) => {
+    const [[f]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo=? LIMIT 1`, [codigo]);
+    if (f) return f.id_funcionalidad;
+    const [r] = await pool.query(`INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono)
+      VALUES (?,?,?,NULL,?)`, [mod.id_modulo, nombre, codigo, icono]);
+    return r.insertId;
+  };
+  const dar = async (idFunc, perfiles) => {
+    await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT p.id_perfil, ?, 1 FROM perfiles p WHERE p.nombre IN (?)
+      ON DUPLICATE KEY UPDATE habilitado=1`, [idFunc, perfiles]);
+  };
+
+  const [[fPag]] = await pool.query(`SELECT id_funcionalidad FROM funcionalidades WHERE codigo='rh_solicitudes' LIMIT 1`);
+  if (fPag) await pool.query(`INSERT INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT p.id_perfil, ?, 1 FROM perfiles p WHERE p.nombre NOT IN (?)
+      ON DUPLICATE KEY UPDATE habilitado=1`, [fPag.id_funcionalidad, NO_EMPLEADOS]);
+
+  const fApr = await func('rh_sol_aprobar', 'Solicitudes: Por Aprobar', 'bi-check2-square');
+  const fCfg = await func('rh_sol_config', 'Solicitudes: Todas y Configuración', 'bi-collection');
+  await dar(fApr, APROBADORES);
+  await dar(fCfg, ['Administrador']);
+  console.log('[rrhh-sol-permisos-v1] permisos de Solicitudes diferenciados');
+});
+
 const hashSol = s => crypto.createHash('sha256')
   .update(JSON.stringify({ id: s.id, tipo: s.tipo, id_usuario: s.id_usuario, datos: s.datos, comentario: s.comentario }))
   .digest('hex');

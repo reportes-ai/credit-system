@@ -65,10 +65,10 @@ router.post('/onboarding/plantilla',   verifyToken, requireFunc('rh_contratos', 
 // Solicitudes del colaborador — permisos por rol validados adentro (jefatura/RRHH/gerencia)
 const sol = require('../controllers/solicitudes.controller');
 router.get('/solicitudes/tipos',        verifyToken, sol.tipos);
-router.post('/solicitudes/tipos',       verifyToken, requireFunc('rh_colaboradores'), sol.tipoGuardar);
+router.post('/solicitudes/tipos',       verifyToken, requireFunc('rh_sol_config'), sol.tipoGuardar);
 router.get('/solicitudes/mias',         verifyToken, sol.mias);
-router.get('/solicitudes/por-aprobar',  verifyToken, sol.porAprobar);
-router.get('/solicitudes/todas',        verifyToken, sol.todas);
+router.get('/solicitudes/por-aprobar',  verifyToken, requireFunc('rh_sol_aprobar'), sol.porAprobar);
+router.get('/solicitudes/todas',        verifyToken, requireFunc('rh_sol_config'), sol.todas);
 router.post('/solicitudes',             verifyToken, sol.crear);
 router.post('/solicitudes/resolver',    verifyToken, sol.resolver);
 // People Analytics — indicadores agregados de RRHH (solo gestión)
