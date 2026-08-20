@@ -938,12 +938,16 @@ const sync = async (req, res) => {
       WHERE COALESCE(s.saldo_precio,-1) <> COALESCE(c.saldo_precio,-1)
          OR COALESCE(s.comision,-1) <> COALESCE(c.comdea_real,-1)
     `).catch(e => console.error('[postventa espejo sp/comision]', e.message));
-    // Etapas "Sistema" automáticas para los nuevos
+    // Etapas "Sistema" automáticas para los nuevos. Una operación ANULADA no
+    // se resembra: la anulación apagó sus tracks a propósito (si no, este
+    // INSERT IGNORE los revivía en la siguiente visita a Post Venta).
     await pool.query(`
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
       SELECT s.id, 'SALDO', 'FUNDANTES PENDIENTES', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
       FROM postventa_seguimiento s
-      WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE UPPER(COALESCE(c.estado_credito,'')) <> 'ANULADO'
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas e
         WHERE e.id_seguimiento = s.id AND e.track='SALDO' AND e.etapa='FUNDANTES PENDIENTES')`);
     // COMISIÓN PENDIENTE se activa al otorgar; COMISION A PAGAR ya no (esa la
     // marca FONDOS RECIBIDOS del saldo — la comisión se paga con la plata en mano).
@@ -951,7 +955,9 @@ const sync = async (req, res) => {
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
       SELECT s.id, 'COMISION', 'COMISION PENDIENTE', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
       FROM postventa_seguimiento s
-      WHERE NOT EXISTS (SELECT 1 FROM postventa_etapas e
+      JOIN creditos c ON c.id = s.id_credito
+      WHERE UPPER(COALESCE(c.estado_credito,'')) <> 'ANULADO'
+        AND NOT EXISTS (SELECT 1 FROM postventa_etapas e
         WHERE e.id_seguimiento = s.id AND e.track='COMISION' AND e.etapa='COMISION PENDIENTE')`);
     /* Track PARQUE: atribución igual que Comisiones Parques a Pagar (dealers.ccs_parque
        vía el dealer del crédito; fallback texto creditos.parque; CALLE no es parque) y
@@ -970,7 +976,9 @@ const sync = async (req, res) => {
       INSERT IGNORE INTO postventa_etapas (id_seguimiento, track, etapa, usuario, fecha)
       SELECT s.id, 'PARQUE', 'COMISION A PAGAR', 'Sistema', COALESCE(s.fecha_otorgado, NOW())
       FROM postventa_seguimiento s
+      JOIN creditos c ON c.id = s.id_credito
       WHERE s.parque IS NOT NULL
+        AND UPPER(COALESCE(c.estado_credito,'')) <> 'ANULADO'
         AND NOT EXISTS (SELECT 1 FROM postventa_etapas e
           WHERE e.id_seguimiento = s.id AND e.track='PARQUE' AND e.etapa='COMISION A PAGAR')`);
     res.json({ success: true, data: { nuevos: r1.affectedRows }, error: null });

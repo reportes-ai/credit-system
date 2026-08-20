@@ -248,22 +248,17 @@ const resolver = async (req, res) => {
               comentarios=CONCAT(COALESCE(comentarios,''),' | ANULADA ',DATE_FORMAT(NOW(),'%d-%m-%Y'),': ',?)
         WHERE id=?`, [...valoresEtapa('ANULADO'), a.motivo, a.id_credito]);
 
-    // Post Venta: una operación anulada no tiene comisión que pagar — se desactiva
-    // COMISIÓN PENDIENTE (solo si el flujo de comisión no había avanzado más allá).
-    await pool.query(`
-      DELETE e FROM postventa_etapas e
-      JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
-      WHERE s.id_credito = ? AND e.track='COMISION' AND e.etapa IN ('COMISION PENDIENTE','COMISION A PAGAR')
-        AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa FROM postventa_etapas WHERE track='COMISION') x
-          WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
-      [a.id_credito]).catch(err => console.error('[anulacion comision pendiente]', err.message));
-
-    /* Los otros dos tracks de Post Venta también quedaban vivos: la operación
-       seguía pidiendo fundantes (SALDO) y con la comisión del parque por pagar
-       (PARQUE). Se limpian con el MISMO criterio conservador que la comisión:
-       solo si el track no avanzó más allá de su etapa inicial — si ya se pagó
-       algo, la etapa se respeta y queda para regularizar a mano. */
-    const INICIALES = { SALDO: ['FUNDANTES PENDIENTES'], PARQUE: ['COMISION A PAGAR'] };
+    /* Post Venta: una operación anulada no pide fundantes (SALDO) ni tiene
+       comisión al dealer (COMISION) ni al parque (PARQUE) que pagar. Los TRES
+       tracks se apagan con el mismo criterio conservador: solo si el track no
+       avanzó más allá de sus etapas iniciales — si ya se movió plata, la etapa
+       se respeta y queda para regularizar a mano. El sync() de Post Venta ya
+       no resiembra las iniciales de operaciones ANULADAS. */
+    const INICIALES = {
+      SALDO:    ['FUNDANTES PENDIENTES'],
+      COMISION: ['COMISION PENDIENTE', 'COMISION A PAGAR'],
+      PARQUE:   ['COMISION A PAGAR'],
+    };
     for (const [track, iniciales] of Object.entries(INICIALES)) {
       await pool.query(`
         DELETE e FROM postventa_etapas e
