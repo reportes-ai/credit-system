@@ -1,4 +1,5 @@
-/* ─────────────────────────────────────────────────────────────────
+/* v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+   ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
    Vivía dentro de /ordenes-pago/historial/. Se extrajo para que Saldos
@@ -27,6 +28,28 @@ function impInfo(o){
   const pct   = Number(o.impuesto_pct != null ? o.impuesto_pct : (esRet?15.25:esEx?0:19));
   const lbl   = esRet ? `Retención ${pct}%` : esEx ? 'Exento' : `IVA ${pct}%`;
   return { neto, bruto, imp, pagar, pct, lbl, esRet, esEx };
+}
+/* Fecha y hora larga para la trazabilidad: "20-08-2026 01:20 p. m. hrs" */
+const fdh = d => {
+  if (!d) return '';
+  const x = new Date(String(d).replace(' ', 'T'));
+  if (isNaN(x)) return String(d).slice(0, 16).replace('T', ' ');
+  return x.toLocaleDateString('es-CL') + ' ' +
+         x.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
+};
+/* Pie de TRAZABILIDAD — la vida del negocio que se está pagando, desde la carta
+   de aprobación hasta la orden. Mismo formato que las Órdenes de Compra. */
+function trazaHTML(traza){
+  if (!Array.isArray(traza) || !traza.length) return '';
+  const pasos = traza.map(p => {
+    const col = p.mal ? '#b91c1c' : '#15803d';
+    const quien = p.nombre ? ` <b>${escH(p.nombre)}</b>` : '';
+    const cuando = p.fecha ? ` el ${fdh(p.fecha)}` : '';
+    return `<span style="color:${col};font-weight:600">${escH(p.label)}</span>${quien}${cuando}`;
+  }).join(' &nbsp;⟶&nbsp; ');
+  return `<div style="margin-top:14px;padding-top:9px;border-top:1px dashed #cbd5e1;font-size:9.5px;color:#475569;line-height:1.7">
+    <b style="color:#1e3a8a;text-transform:uppercase;font-size:9px">Trazabilidad</b><br>${pasos}
+  </div>`;
 }
 function docHTML(o){
   const i = impInfo(o);
@@ -106,6 +129,7 @@ function docHTML(o){
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
     </tbody></table>
+    ${trazaHTML(o.traza)}
   </div>`;
 }
 /* Abre la factura adjunta en otra pestaña (fetch con token → blob: un link

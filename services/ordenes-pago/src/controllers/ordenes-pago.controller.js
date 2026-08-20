@@ -526,6 +526,69 @@ async function construirDocumento(oc) {
   };
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   TRAZABILIDAD de la orden — la vida completa del negocio que se está pagando.
+   Igual que el pie de las Órdenes de Compra, pero acá la cadena empieza mucho
+   antes: la carta de aprobación, quién la aprobó, el otorgamiento, los
+   fundantes, la factura del dealer y recién ahí la orden de pago.
+
+   Se arma SIEMPRE en vivo (aunque el documento esté congelado): son hechos
+   históricos con fecha y autor, no montos — no pueden "cambiar" el documento.
+   Cada paso: { label, nombre, fecha, mal? }.
+   ───────────────────────────────────────────────────────────────────────────── */
+async function construirTraza(oc) {
+  const pasos = [];
+  const push = (label, nombre, fecha, mal) => { if (fecha || nombre) pasos.push({ label, nombre: nombre || null, fecha: fecha || null, mal: !!mal }); };
+  try {
+    if (oc.origen === 'SALDO' || oc.origen === 'COMISION') {
+      const esCom = oc.origen === 'COMISION';
+      const [[seg]] = await pool.query(
+        esCom
+          ? `SELECT s.id, s.id_credito, s.num_op FROM postventa_ordenes_comision o
+               JOIN postventa_seguimiento s ON s.id = o.id_seguimiento WHERE o.id=?`
+          : `SELECT s.id, s.id_credito, s.num_op FROM postventa_ordenes o
+               JOIN postventa_seguimiento s ON s.id = o.id_seguimiento WHERE o.id=?`,
+        [oc.origen_id]);
+      if (seg) {
+        const [[cr]] = await pool.query(
+          'SELECT id, num_op, id_financiera, ejecutivo, fecha_otorgado FROM creditos WHERE id=?', [seg.id_credito]);
+        // La carta se enlaza por el crédito que creó o por el ID de la financiera.
+        const [[ca]] = await pool.query(
+          `SELECT op_carta, creado_por_nombre, creado_por, fecha_creacion,
+                  aprobado_por_nombre, aprobado_por, fecha_aprobacion,
+                  rechazado_por_nombre, fecha_rechazo, fecha_otorgado
+             FROM cartas_aprobacion
+            WHERE id_credito_creado = ?
+               OR (id_financiera IS NOT NULL AND id_financiera <> '' AND id_financiera = ?)
+            ORDER BY id DESC LIMIT 1`,
+          [seg.id_credito || 0, (cr && cr.id_financiera) || '']);
+        if (ca) {
+          push(`Carta ${ca.op_carta || ''}`.trim() + ' emitida', ca.creado_por_nombre || ca.creado_por, ca.fecha_creacion);
+          if (ca.fecha_aprobacion) push('Carta aprobada', ca.aprobado_por_nombre || ca.aprobado_por, ca.fecha_aprobacion);
+          if (ca.fecha_rechazo)    push('Carta rechazada', ca.rechazado_por_nombre, ca.fecha_rechazo, true);
+        }
+        if (cr && cr.fecha_otorgado)
+          push('Operación otorgada', cr.ejecutivo || null, ca && ca.fecha_otorgado ? ca.fecha_otorgado : cr.fecha_otorgado);
+        // Etapas de Post Venta del track que corresponde (fundantes, factura, etc.)
+        const [ets] = await pool.query(
+          `SELECT etapa, usuario, fecha FROM postventa_etapas
+            WHERE id_seguimiento=? AND track=? ORDER BY fecha, id`,
+          [seg.id, esCom ? 'COMISION' : 'SALDO']);
+        ets.forEach(e => push(e.etapa, e.usuario, e.fecha));
+      }
+    }
+    // La orden de pago misma — el final de la cadena, en cualquier origen.
+    push('Orden ' + (oc.numero || '') + ' emitida', oc.usuario_nombre, oc.created_at);
+    if (oc.anulada)     push('Orden anulada', oc.anulada_nombre, oc.fecha_anulada, true);
+    else if (oc.pagada) push('Pagada', oc.pagada_nombre || null, oc.fecha_pagada);
+  } catch (e) { console.error('[ordenes-pago traza]', e.message); }
+  /* Ordenado por FECHA, no por el orden en que se consultó: hay operaciones
+     cursadas antes de que existiera su carta (incorporación de otorgadas sin
+     carta), y ahí el otorgamiento es anterior a la emisión de la carta. La
+     línea de tiempo muestra lo que pasó, no lo que "debería" haber pasado. */
+  return pasos.sort((a, b) => new Date(a.fecha || 0) - new Date(b.fecha || 0));
+}
+
 /* GET /api/ordenes-pago/ordenes/:id/documento  (:id = op_correlativos.id)
    Documento "Solicitud de Pago" UNIFICADO (GENERAL/SALDO/COMISION).
    Si la orden está congelada (snapshot_json), devuelve el documento EN DURO sin
@@ -554,6 +617,8 @@ const getDocumento = async (req, res) => {
       }
       data.facturas = facturas;
     } catch (_) { data.facturas = []; }
+    // Trazabilidad al pie: SIEMPRE en vivo, igual que los adjuntos.
+    data.traza = await construirTraza(oc);
     // Datos del timbre "PAGADO" (caja, fecha y hora del pago), formateados en hora de Chile.
     if (oc.pagada) {
       try {
