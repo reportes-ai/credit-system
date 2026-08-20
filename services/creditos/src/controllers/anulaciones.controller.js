@@ -274,6 +274,12 @@ const resolver = async (req, res) => {
       href: '/creditos/anulaciones.html',
     }, { excluir: [req.usuario.id_usuario], extra: a.solicitado_por ? [a.solicitado_por] : [] }).catch(() => {});
 
+    // Anuncio push a TODA la app (paramétrico en el mantenedor de Alertas →
+    // Anuncios, igual que el del crédito otorgado).
+    require('../../../../shared/anuncios')
+      .publicarAnuncio('operacion_anulada', { op: op.num_op, usuario: nombreUsuario(req) })
+      .catch(() => {});
+
     res.json({ success: true, data: { estado: 'APROBADA', cartola: nota.trim() }, error: null });
   } catch (e) { console.error('[anulaciones resolver]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };

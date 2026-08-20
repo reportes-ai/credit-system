@@ -29,6 +29,14 @@ const EVENTOS = [
       sonido: 'anuncio', segundos_antes: 2, duracion_seg: 6,
     },
   },
+  {
+    evento: 'operacion_anulada', label: 'Operación anulada', tokens: ['{op}', '{usuario}'],
+    default: {
+      activo: 1, mensaje: 'Se anuló la operación {op}',
+      color_fondo: '#7f1d1d', color_texto: '#ffffff', ancho_pct: 33,
+      sonido: 'trompeta', segundos_antes: 2, duracion_seg: 6,
+    },
+  },
 ];
 
 // Sonidos disponibles (sintetizados en app-version.js / reproducir()).
@@ -39,6 +47,7 @@ const SONIDOS = [
   { id: 'aplausos', label: '👏 Aplausos' },
   { id: 'alarma',   label: '🚨 Alarma' },
   { id: 'redoble',  label: '🥁 Redoble de tambores' },
+  { id: 'trompeta', label: '🎺 Trompeta' },
   { id: 'none',     label: '🔇 Sin sonido' },
 ];
 

@@ -341,6 +341,7 @@ const SONIDOS = [
   { id: 'alarma',   label: '🚨 Alarma (sirena)' },
   { id: 'aplausos', label: '👏 Aplausos' },
   { id: 'redoble',  label: '🥁 Redoble de tambores' },
+  { id: 'trompeta', label: '🎺 Trompeta' },
 ];
 
 function cumple(val, op, v1, v2) {

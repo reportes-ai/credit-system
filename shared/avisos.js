@@ -29,7 +29,7 @@
    ──────────────────────────────────────────────────────────────────────────── */
 const pool = require('./config/database');
 
-const SONIDOS = ['campana', 'dingdong', 'alarma', 'aplausos', 'redoble'];
+const SONIDOS = ['campana', 'dingdong', 'alarma', 'aplausos', 'redoble', 'trompeta'];
 const lista = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
 const ids   = s => lista(s).map(x => parseInt(x)).filter(Boolean);
 
