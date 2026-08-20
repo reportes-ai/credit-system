@@ -83,7 +83,8 @@ async function esFinanzas(idUsuario) {
   const [[r]] = await pool.query(
     `SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?`, [idUsuario]);
   const n = String(r?.nombre || '');
-  return n === 'Administrador' || /Finanzas/i.test(n);
+  // 'Gerente de Finanzas', 'Analista Financiero', etc. — toda el área firma/recibe
+  return n === 'Administrador' || /finan/i.test(n);
 }
 const esAdminPerfil = n => String(n || '') === 'Administrador';
 
@@ -156,7 +157,7 @@ const crear = async (req, res) => {
       mensaje: `${nombreDe(u)} generó la ${numero} (${provNombre}, ${CLP(monto)}). Esperando tu firma.`, href: '/soporte/otras-compras/' }).catch(() => {});
     else {
       const [fin] = await pool.query(`SELECT u.id_usuario FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil
-        WHERE u.estado='activo' AND p.nombre LIKE '%Finanzas%'`);
+        WHERE u.estado='activo' AND (p.nombre LIKE '%Finanzas%' OR p.nombre LIKE '%Financiero%')`);
       if (fin.length) await notificar(fin.map(x => x.id_usuario), { tipo: 'ODC', titulo: '🛒 Orden de Compra por aprobar',
         mensaje: `${nombreDe(u)} generó la ${numero} (${provNombre}, ${CLP(monto)}) — sin supervisor asignado, pasa directo a Finanzas.`, href: '/soporte/otras-compras/' }).catch(() => {});
     }
@@ -273,10 +274,21 @@ const adjuntar = async (req, res) => {
 /* ── GET /:id/documento — la orden completa + adjuntos para el comprobante ── */
 const documento = async (req, res) => {
   try {
+    const u = req.usuario || {};
     const [[o]] = await pool.query('SELECT * FROM odc_ordenes WHERE id=?', [req.params.id]);
     if (!o) return fail(res, 'Orden no encontrada', 404);
     const [docs] = await pool.query("SELECT id, nombre FROM postventa_factura_docs WHERE origen='ODC' AND ref_id=? ORDER BY id", [o.id]);
-    ok(res, { ...o, docs });
+    // ¿Quien mira el voucher puede firmarlo? → botón Aprobar/Rechazar en el documento
+    let puedo_resolver = false;
+    if (['PENDIENTE_SUPERVISOR', 'PENDIENTE_FINANZAS'].includes(o.estado)) {
+      const [[perfil]] = await pool.query('SELECT p.nombre FROM usuarios u JOIN perfiles p ON p.id_perfil=u.id_perfil WHERE u.id_usuario=?', [u.id_usuario]);
+      if (esAdminPerfil(perfil?.nombre)) puedo_resolver = true;
+      else if (o.estado === 'PENDIENTE_SUPERVISOR') {
+        const [[cu]] = await pool.query('SELECT id_supervisor FROM usuarios WHERE id_usuario=?', [o.id_usuario]);
+        puedo_resolver = cu?.id_supervisor === u.id_usuario;
+      } else puedo_resolver = await esFinanzas(u.id_usuario);
+    }
+    ok(res, { ...o, docs, puedo_resolver });
   } catch (e) { console.error('[odc documento]', e.message); fail(res, 'Error interno del servidor'); }
 };
 

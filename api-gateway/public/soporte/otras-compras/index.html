@@ -81,6 +81,10 @@
 <dialog id="dlgDoc" style="border:none;border-radius:14px;max-width:840px;width:92vw;padding:0"><div style="padding:18px 22px">
   <div id="dlgDocBody"></div>
   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+    <span id="dlgDocFirma" style="display:none;margin-right:auto">
+      <button class="btn btn-sm btn-success" onclick="resolverDesdeDoc('APROBAR')"><i class="bi bi-check2-circle me-1"></i>Aprobar</button>
+      <button class="btn btn-sm btn-outline-danger" onclick="resolverDesdeDoc('RECHAZAR')"><i class="bi bi-x-circle me-1"></i>Rechazar</button>
+    </span>
     <button class="btn btn-sm btn-outline-secondary" onclick="dlgDoc.close()">Cerrar</button>
     <button class="btn btn-sm btn-primary" onclick="imprimirDoc()"><i class="bi bi-printer me-1"></i>Imprimir / PDF</button>
   </div>
@@ -259,7 +263,15 @@ async function verDoc(id){
       </tbody></table>
       <div style="border-top:1px dashed #d6c58a;margin-top:14px;padding-top:10px;font-size:11px;color:#374151">${traza}</div>
     </div>`;
+  // Botón de firma en el voucher: solo para quien puede resolver el paso actual
+  $('dlgDocFirma').style.display = o.puedo_resolver ? '' : 'none';
   dlgDoc.showModal();
+}
+async function resolverDesdeDoc(decision){
+  if (!DOC) return;
+  dlgDoc.close();
+  await resolver(DOC.id, decision);
+  badge();
 }
 async function verAdj(id){
   try { const r = await fetch('/api/postventa/factura-doc/'+id,{headers:{Authorization:'Bearer '+token}});
