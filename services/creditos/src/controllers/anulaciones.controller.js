@@ -258,6 +258,23 @@ const resolver = async (req, res) => {
           WHERE x.id_seguimiento = e.id_seguimiento AND x.etapa NOT IN ('COMISION PENDIENTE','COMISION A PAGAR'))`,
       [a.id_credito]).catch(err => console.error('[anulacion comision pendiente]', err.message));
 
+    /* Los otros dos tracks de Post Venta también quedaban vivos: la operación
+       seguía pidiendo fundantes (SALDO) y con la comisión del parque por pagar
+       (PARQUE). Se limpian con el MISMO criterio conservador que la comisión:
+       solo si el track no avanzó más allá de su etapa inicial — si ya se pagó
+       algo, la etapa se respeta y queda para regularizar a mano. */
+    const INICIALES = { SALDO: ['FUNDANTES PENDIENTES'], PARQUE: ['COMISION A PAGAR'] };
+    for (const [track, iniciales] of Object.entries(INICIALES)) {
+      await pool.query(`
+        DELETE e FROM postventa_etapas e
+        JOIN postventa_seguimiento s ON s.id = e.id_seguimiento
+        WHERE s.id_credito = ? AND e.track = ? AND e.etapa IN (?)
+          AND NOT EXISTS (SELECT 1 FROM (SELECT id_seguimiento, etapa, track FROM postventa_etapas) x
+            WHERE x.id_seguimiento = e.id_seguimiento AND x.track = ? AND x.etapa NOT IN (?))`,
+        [a.id_credito, track, iniciales, track, iniciales])
+        .catch(err => console.error('[anulacion track ' + track + ']', err.message));
+    }
+
     await pool.query(
       `UPDATE anulaciones_operacion SET estado='APROBADA', cartola_retirada=?, cartola_nota=?,
               resuelto_por=?, resuelto_nombre=?, resuelto_at=NOW() WHERE id=?`,
