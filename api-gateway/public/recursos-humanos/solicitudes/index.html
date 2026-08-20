@@ -34,7 +34,7 @@
 <div id="af-topnav"></div>
 <script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Solicitudes',icon:'bi-send-check',current:true}]};</script>
 <div class="main">
-  <div class="page-banner"><i class="bi bi-send-check"></i><div><h2>Solicitudes</h2><p>Paperless: pide tu anticipo, préstamo o vacaciones progresivas — viaja por la cadena de aprobación con firma electrónica y se ejecuta solo al aprobarse.</p></div></div>
+  <div class="page-banner"><i class="bi bi-send-check"></i><div><h2>Solicitudes</h2><p>Paperless: pide tus vacaciones, vacaciones progresivas, anticipo o préstamo — viaja por la cadena de aprobación con firma electrónica y se ejecuta solo al aprobarse.</p></div></div>
   <div class="tabs">
     <div class="tab active" id="t1" onclick="tab('mias')"><i class="bi bi-person me-1"></i>Mis Solicitudes</div>
     <div class="tab" id="t2" onclick="tab('aprobar')"><i class="bi bi-check2-square me-1"></i>Por Aprobar<span class="badge-n" id="badgeA" style="display:none">0</span></div>
@@ -131,6 +131,7 @@ async function cargarMias(){
   const ss=(j.data||{}).solicitudes||[];
   sec.innerHTML=`<div class="card-box"><h6 style="color:var(--navy)">Nueva solicitud</h6>
     <div class="tipos">${TIPOS.map(t=>`<button class="tipo-btn" onclick="nuevaSol('${t.codigo}')"><i class="bi ${t.icono}"></i><b>${esc(t.nombre)}</b><small>${t.cadena.join(' → ')}</small></button>`).join('')}
+    <button class="tipo-btn" onclick="location.href='/recursos-humanos/vacaciones/'"><i class="bi bi-calendar-check"></i><b>Vacaciones</b><small>JEFATURA → RRHH</small></button>
     <button class="tipo-btn" onclick="vpAbrir()"><i class="bi bi-umbrella"></i><b>Vacaciones Progresivas</b><small>CERTIFICADO AFP → IA → RRHH</small></button></div></div>
     <div id="vpForm" style="display:none"></div>
     <div id="vpMias"></div>

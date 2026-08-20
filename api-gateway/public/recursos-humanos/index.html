@@ -95,7 +95,7 @@
     <a href="/recursos-humanos/solicitudes/" class="module-card" id="cardSol" style="display:none">
       <div class="card-icon"><i class="bi bi-send-check"></i></div>
       <h5>Solicitudes</h5>
-      <p>Paperless: anticipo, préstamo, aumento o ascenso — viaja por la cadena de aprobación con firma electrónica y se ejecuta solo al aprobarse.</p>
+      <p>Paperless: vacaciones, vacaciones progresivas, anticipo y préstamo — viajan por la cadena de aprobación con firma electrónica y se ejecutan solo al aprobarse.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
     <a href="/recursos-humanos/encuestas/" class="module-card" id="cardEnc" style="display:none">
@@ -170,7 +170,9 @@
     if (tiene('rh_aumento_renta','rh_remuneraciones')) document.getElementById('cardAum').style.display='';
     if (tiene('rh_ausencias','rh_aprobar')) document.getElementById('cardAus').style.display='';
     if (tiene('rh_aprobar')) document.getElementById('cardLic').style.display='';
-    if (tiene('rh_vacaciones','rh_aprobar')) document.getElementById('cardVac').style.display='';
+    // Vacaciones vive DENTRO de Solicitudes: solo se muestra como card propia
+    // a quien no tiene Solicitudes (para no dejarlo sin acceso).
+    if (tiene('rh_vacaciones','rh_aprobar') && !tiene('rh_solicitudes')) document.getElementById('cardVac').style.display='';
     if (tiene('rh_antiguedad','rh_aprobar')) document.getElementById('cardAnt').style.display='';
     if (tiene('concurso')) document.getElementById('cardConc').style.display='';
     if (tiene('rh_desempeno')) document.getElementById('cardDes').style.display='';
