@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Adicionales de Remuneración — AutoFácil</title>
-  <!-- v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
+  <!-- v1.1 — PERMANENTE (se repite cada mes hasta desmarcar), No imponible manual, lista con etiquetas bajo el form, + Concepto de Pago · v1.0 — pagos adicionales del mes por colaborador: causal define imponible; bloqueo al emitir el mes -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -63,9 +63,13 @@
         <input id="fHoras" class="form-control form-control-sm text-end" inputmode="decimal" placeholder="0" step="0.5" min="0" oninput="calcHE()"></div>
       <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Monto $</label>
         <input id="fMonto" class="form-control form-control-sm text-end" inputmode="numeric" placeholder="0" oninput="fmtMonto(this)"></div>
-      <div class="col-md-2 d-flex align-items-end pb-1">
+      <div class="col-md-4 d-flex align-items-end pb-1 gap-3 flex-wrap">
         <div class="form-check"><input type="checkbox" class="form-check-input" id="fLiq">
           <label class="form-check-label small fw-semibold" for="fLiq" title="El colaborador recibe exactamente este monto: entra como haber no imponible, sin descuentos">Líquido</label></div>
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="fNoImp">
+          <label class="form-check-label small fw-semibold" for="fNoImp" title="Manda sobre el default de la causal: este monto no paga AFP, salud ni impuesto">No imponible</label></div>
+        <div class="form-check"><input type="checkbox" class="form-check-input" id="fPerm">
+          <label class="form-check-label small fw-semibold" for="fPerm" title="Se incluye TODOS los meses hasta que se desmarque">Permanente</label></div>
       </div>
       <div class="col-md-2 d-flex align-items-end">
         <button class="btn btn-sm btn-primary w-100" id="btnGuardar" onclick="guardar()"><i class="bi bi-check-lg me-1"></i>Guardar</button>
@@ -73,6 +77,9 @@
     </div>
     <div class="small mt-2" id="heDetalle" style="color:#0141A2"></div>
     <div class="small text-muted mt-1" id="hintImp"></div>
+    <div class="mt-2"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConcepto()"><i class="bi bi-plus-circle me-1"></i>Concepto de Pago</button>
+      <span class="small text-muted ms-2">agrega una causal nueva a la lista (queda disponible para siempre)</span></div>
+    <div id="listaMes" class="mt-3"></div>
   </div>
 
   <div id="secD" style="display:none">
@@ -170,20 +177,27 @@ function hintImp(){
   if (!CAUSALES) return;
   const c = fCausal.value; if (!c) return;
   const liq = document.getElementById('fLiq').checked;
-  const imp = liq ? false : (c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1);
-  document.getElementById('hintImp').innerHTML = liq
+  const noImp = document.getElementById('fNoImp').checked;
+  const perm = document.getElementById('fPerm').checked;
+  const imp = (liq||noImp) ? false : (c==='OTRO' ? fOtroImp.value==='1' : CAUSALES[c]===1);
+  document.getElementById('hintImp').innerHTML = (liq
     ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>Líquido</b>: el colaborador recibe exactamente este monto (entra como haber no imponible).'
-    : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`;
+    : noImp
+    ? '<i class="bi bi-info-circle me-1"></i>Marcado <b>No imponible</b>: este monto no paga AFP, salud ni impuesto, aunque la causal diga otra cosa.'
+    : `<i class="bi bi-info-circle me-1"></i>${esc(c)} es <b>${imp?'IMPONIBLE (paga AFP, salud e impuesto)':'NO imponible (se paga tal cual)'}</b>.`)
+    + (perm ? ' <b>PERMANENTE</b>: se incluirá todos los meses hasta que se desmarque.' : '');
 }
-document.addEventListener('change', e=>{ if (e.target.id==='fLiq'||e.target.id==='fOtroImp') hintImp(); });
+document.addEventListener('change', e=>{ if (['fLiq','fOtroImp','fNoImp','fPerm'].includes(e.target.id)) hintImp(); });
 
 async function cargar(){
   const r = await fetch('/api/rrhh/remuneraciones/adicionales?mes='+fMes.value,{headers:H});
   const j = await r.json(); if (!j.success) return alert(j.error);
   D = j.data;
-  if (!CAUSALES){
-    CAUSALES = D.causales;
-    fCausal.innerHTML = Object.keys(CAUSALES).map(c=>`<option>${esc(c)}</option>`).join('');
+  const sel = fCausal.value;
+  CAUSALES = D.causales;
+  fCausal.innerHTML = Object.keys(CAUSALES).map(c=>`<option>${esc(c)}</option>`).join('');
+  if (sel && CAUSALES[sel]!==undefined) fCausal.value = sel;
+  if (!fColab.options.length || fColab.options.length===1){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
     fColab.innerHTML = '<option value="">— elegir —</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
     causalUI();
@@ -213,12 +227,52 @@ function render(){
     <td>${String(a.created_at).slice(0,10)}</td>
     <td>${D.bloqueado?'':`<i class="bi bi-trash text-danger" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`}</td>
   </tr>`).join('') || '<tr><td colspan="7" class="text-center text-muted py-3">Sin adicionales este mes</td></tr>';
+
+  // ── Lista bajo el formulario: cada adicional con sus etiquetas a la vista ──
+  const MESES=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const mesTxt = m => (MESES[Number(String(m).slice(5,7))]||m).toUpperCase();
+  document.getElementById('listaMes').innerHTML = D.adicionales.length ? '<div class="fw-bold small mb-1">Adicionales de este mes</div>'+D.adicionales.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:9px;padding:7px 12px;margin-bottom:6px;background:${a.permanente?'#fbfdff':'#fff'}">
+      <b style="font-size:.82rem">${esc(a.nombre_actual||a.nombre)}</b>
+      <span class="small text-muted">${esc(a.causal)}${a.causal_texto?' — '+esc(a.causal_texto):''}</span>
+      <span class="num" style="font-size:.85rem">$${fmt(a.monto)}</span>
+      ${a.permanente
+        ? `<span class="pill" style="background:#e0e7ff;color:#3730a3" title="Se incluye todos los meses${a.heredado?' (viene de '+a.mes+')':''}">PERMANENTE${a.permanente_fin?' hasta '+a.permanente_fin:''}</span>`
+        : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(a.mes)}</span>`}
+      <span class="pill ${a.es_liquido?'liq':'noimp'}">${a.es_liquido?'LÍQUIDO':'BRUTO'}</span>
+      <span class="pill ${a.imponible&&!a.es_liquido?'imp':'noimp'}">${a.imponible&&!a.es_liquido?'IMPONIBLE':'NO IMPONIBLE'}</span>
+      <span style="margin-left:auto">
+        ${a.permanente&&!a.permanente_fin?`<button class="btn btn-sm btn-outline-secondary py-0" onclick="desmarcarPerm(${a.id})" title="Deja de pagarse todos los meses">Desmarcar permanente</button>`:''}
+        ${!a.heredado&&!D.bloqueado?`<i class="bi bi-trash text-danger ms-2" style="cursor:pointer" onclick="eliminar(${a.id})"></i>`:''}
+      </span>
+    </div>`).join('') : '';
+}
+
+async function desmarcarPerm(id){
+  const prox = (()=>{ const [y,m]=fMes.value.split('-').map(Number); const d=new Date(y,m,1); return d.toISOString().slice(0,7); })();
+  const desde = prompt('¿Desde qué mes deja de pagarse? (AAAA-MM)', prox);
+  if (!desde) return;
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales/'+id+'/permanente',{method:'PUT',headers:H,body:JSON.stringify({desde})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  cargar();
+}
+
+async function nuevoConcepto(){
+  const nombre = prompt('Nombre del nuevo Concepto de Pago (ej. BONO DE ANTIGÜEDAD):');
+  if (!nombre || !nombre.trim()) return;
+  const imponible = confirm('¿El concepto "'+nombre.trim().toUpperCase()+'" es IMPONIBLE (paga AFP, salud e impuesto)?\n\nAceptar = imponible · Cancelar = no imponible');
+  const r = await fetch('/api/rrhh/remuneraciones/adicionales/conceptos',{method:'POST',headers:H,body:JSON.stringify({nombre,imponible})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  await cargar();
+  fCausal.value = j.data.nombre; causalUI();
 }
 
 async function guardar(){
   const horas = parseFloat(String(document.getElementById('fHoras').value).replace(',','.')) || 0;
   const body = { mes: fMes.value, id_usuario: fColab.value, causal: fCausal.value,
     causal_texto: fOtro.value, imponible: fOtroImp.value==='1', es_liquido: document.getElementById('fLiq').checked,
+    no_imponible: document.getElementById('fNoImp').checked,
+    permanente: document.getElementById('fPerm').checked,
     monto: montoVal(), horas: esHE() ? horas : undefined };
   if (!body.id_usuario) return alert('Elige el colaborador');
   // En horas extras manda la cantidad de horas: el monto lo recalcula el servidor.
@@ -228,6 +282,7 @@ async function guardar(){
   const j = await r.json(); if (!j.success) return alert(j.error);
   // listo para el siguiente: limpia colaborador/monto/otro, mantiene mes y causal
   fColab.value=''; document.getElementById('fMonto').value=''; fOtro.value=''; document.getElementById('fLiq').checked=false;
+  document.getElementById('fNoImp').checked=false; document.getElementById('fPerm').checked=false;
   document.getElementById('fHoras').value=''; document.getElementById('heDetalle').innerHTML='';
   fColab.focus();
   cargar();

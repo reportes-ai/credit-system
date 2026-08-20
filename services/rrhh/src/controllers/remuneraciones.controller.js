@@ -213,13 +213,39 @@ const getHoraExtra = async (req, res) => {
   } catch (e) { console.error('[rrhh hora-extra]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
-// Causal → imponible (paramétrico simple; OTRO lo decide el usuario)
+// Causal → imponible (base fija; OTRO lo decide el usuario). Los conceptos
+// NUEVOS los agrega el propio usuario desde la pantalla (rh_conceptos_adic).
 const CAUSALES_ADIC = {
   'BONO DE DESEMPEÑO': 1, 'AGUINALDO': 1, 'HORAS EXTRAS': 1, 'COMISIÓN EXTRAORDINARIA': 1,
   'BONO POR META': 1, 'DIFERENCIA DE SUELDO': 1,
   'VIÁTICO': 0, 'COLACIÓN ADICIONAL': 0, 'MOVILIZACIÓN ADICIONAL': 0,
   'ASIGNACIÓN DE CELULAR': 0, 'DEVOLUCIÓN DE DESCUENTO': 0, 'OTRO': null,
 };
+
+/* v5 (v213.37): adicionales PERMANENTES (se repiten todos los meses hasta
+   desmarcar) + conceptos de pago y de descuento agregados por el usuario. */
+require('../../../../shared/migrate').enFila('rrhh-adic-permanente', async () => {
+  for (const col of ['permanente TINYINT(1) NOT NULL DEFAULT 0', 'permanente_fin CHAR(7) NULL COMMENT "primer mes en que YA NO se paga"'])
+    await pool.query(`ALTER TABLE rh_adicionales ADD COLUMN ${col}`).catch(e => { if (e.errno !== 1060) throw e; });
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_conceptos_adic (
+    id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(60) NOT NULL UNIQUE,
+    imponible TINYINT(1) NOT NULL DEFAULT 1, activo TINYINT(1) NOT NULL DEFAULT 1,
+    creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS rh_conceptos_desc (
+    id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(60) NOT NULL UNIQUE,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    creado_por VARCHAR(160) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+});
+
+// Causales vigentes = base fija + conceptos agregados por el usuario (OTRO al final)
+async function causalesAdic() {
+  const m = { ...CAUSALES_ADIC };
+  delete m.OTRO;
+  const [rows] = await pool.query('SELECT nombre, imponible FROM rh_conceptos_adic WHERE activo=1 ORDER BY nombre').catch(() => [[]]);
+  rows.forEach(r => { m[r.nombre] = r.imponible ? 1 : 0; });
+  m.OTRO = null;
+  return m;
+}
 
 const mesEmitido = async (mes) => {
   const [[e]] = await pool.query("SELECT COUNT(*) c FROM rh_liquidaciones WHERE mes=? AND estado='EMITIDA'", [mes]);
@@ -229,13 +255,18 @@ const mesEmitido = async (mes) => {
 const getAdicionales = async (req, res) => {
   try {
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
+    // Los del mes + los PERMANENTES nacidos antes que siguen vigentes este mes
     const [rows] = await pool.query(
-      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual FROM rh_adicionales a
-        LEFT JOIN usuarios u ON u.id_usuario=a.id_usuario WHERE a.mes=? ORDER BY a.created_at DESC`, [mes]);
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual,
+              (a.mes < ?) heredado
+         FROM rh_adicionales a
+        LEFT JOIN usuarios u ON u.id_usuario=a.id_usuario
+        WHERE a.mes=? OR (a.permanente=1 AND a.mes<? AND (a.permanente_fin IS NULL OR a.permanente_fin>?))
+        ORDER BY a.created_at DESC`, [mes, mes, mes, mes]);
     const tot = { imponible: 0, no_imponible: 0, liquido: 0 };
     rows.forEach(r => { const m = Number(r.monto);
       if (r.es_liquido) tot.liquido += m; else if (r.imponible) tot.imponible += m; else tot.no_imponible += m; });
-    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: CAUSALES_ADIC });
+    ok(res, { mes, adicionales: rows, totales: tot, bloqueado: await mesEmitido(mes), causales: await causalesAdic() });
   } catch (e) { console.error('[rrhh adicionales get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -265,21 +296,25 @@ const crearAdicional = async (req, res) => {
     }
 
     if (!idU || monto <= 0) return fail(res, 'Colaborador y monto son obligatorios', 400);
-    if (!(causal in CAUSALES_ADIC)) return fail(res, 'Causal no válida', 400);
+    const CAUS = await causalesAdic();
+    if (!(causal in CAUS)) return fail(res, 'Causal no válida', 400);
     if (causal === 'OTRO' && !String(b.causal_texto || '').trim()) return fail(res, 'Describe la causal en "Otro"', 400);
     const esLiquido = b.es_liquido ? 1 : 0;
-    const imponible = esLiquido ? 0 : (CAUSALES_ADIC[causal] != null ? CAUSALES_ADIC[causal] : (b.imponible ? 1 : 0));
+    // "No imponible" marcado a mano MANDA sobre el default de la causal
+    const imponible = (esLiquido || b.no_imponible) ? 0 : (CAUS[causal] != null ? CAUS[causal] : (b.imponible ? 1 : 0));
+    const permanente = b.permanente ? 1 : 0;
+    if (permanente && causal === 'HORAS EXTRAS') return fail(res, 'Las horas extras se digitan cada mes: no pueden ser permanentes', 400);
     const [[colab]] = await pool.query("SELECT TRIM(CONCAT_WS(' ', nombre, apellido)) nombre FROM usuarios WHERE id_usuario=?", [idU]);
     if (!colab) return fail(res, 'Colaborador no encontrado', 404);
     const [r] = await pool.query(
-      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, monto, cantidad, valorUnitario, nombreDe(u)]);
+      'INSERT INTO rh_adicionales (mes, id_usuario, causal, causal_texto, imponible, es_liquido, permanente, monto, cantidad, valor_unitario, creado_por) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [mes, idU, causal, causal === 'OTRO' ? String(b.causal_texto).trim().slice(0, 200) : null, imponible, esLiquido, permanente, monto, cantidad, valorUnitario, nombreDe(u)]);
     // El detalle deja el cálculo a la vista: sin el "10 h × $10.341" hay que
     // reconstruir a mano de dónde salió el monto cuando alguien lo pregunta.
     const glosaHE = cantidad ? ` (${cantidad} h × $${Math.round(valorUnitario).toLocaleString('es-CL')})` : '';
     auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: r.insertId,
-      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}` });
-    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido });
+      detalle: `Adicional ${mes} ${colab.nombre}: ${causal}${causal === 'OTRO' ? ' (' + b.causal_texto + ')' : ''} $${monto.toLocaleString('es-CL')}${glosaHE}${esLiquido ? ' LÍQUIDO' : imponible ? ' imponible' : ' no imponible'}${permanente ? ' PERMANENTE' : ''}` });
+    ok(res, { id: r.insertId, imponible, es_liquido: esLiquido, permanente });
   } catch (e) { console.error('[rrhh adicionales crear]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -298,14 +333,65 @@ const eliminarAdicional = async (req, res) => {
 
 // Suma de adicionales del mes por usuario → alimenta el libro de liquidaciones
 async function adicionalesDelMes(mes) {
+  // Del mes + los PERMANENTES vigentes nacidos en meses anteriores
   const [rows] = await pool.query(
     `SELECT id_usuario,
             SUM(CASE WHEN es_liquido=0 AND imponible=1 THEN monto ELSE 0 END) imp,
             SUM(CASE WHEN es_liquido=1 OR imponible=0 THEN monto ELSE 0 END) noimp
-       FROM rh_adicionales WHERE mes=? GROUP BY id_usuario`, [mes]);
+       FROM rh_adicionales
+      WHERE mes=? OR (permanente=1 AND mes<? AND (permanente_fin IS NULL OR permanente_fin>?))
+      GROUP BY id_usuario`, [mes, mes, mes]);
   const m = {}; rows.forEach(r => m[r.id_usuario] = { imp: Number(r.imp), noimp: Number(r.noimp) });
   return m;
 }
+
+/* Desmarcar un adicional permanente: deja de pagarse DESDE el mes indicado
+   (los meses ya emitidos no se tocan). Volver a marcarlo = permanente_fin NULL. */
+const permanenteAdicional = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const [[a]] = await pool.query(
+      `SELECT a.*, TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) nombre_actual
+       FROM rh_adicionales a LEFT JOIN usuarios u ON u.id_usuario=a.id_usuario WHERE a.id=?`, [req.params.id]);
+    if (!a) return fail(res, 'No existe', 404);
+    if (!a.permanente) return fail(res, 'Este adicional no es permanente', 400);
+    if (b.reactivar) {
+      await pool.query('UPDATE rh_adicionales SET permanente_fin=NULL WHERE id=?', [a.id]);
+      auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: a.id,
+        detalle: `Reactivó el adicional permanente ${a.causal} de ${a.nombre_actual || a.nombre}` });
+      return ok(res, { reactivado: true });
+    }
+    const desde = /^\d{4}-\d{2}$/.test(b.desde || '') ? b.desde : null;
+    if (!desde) return fail(res, 'Indica desde qué mes deja de pagarse', 400);
+    if (desde <= a.mes) return fail(res, `Debe ser posterior al mes de origen (${a.mes})`, 400);
+    await pool.query('UPDATE rh_adicionales SET permanente_fin=? WHERE id=?', [desde, a.id]);
+    auditar({ req, accion: 'EDITAR', modulo: 'rrhh', entidad: 'adicional', entidad_id: a.id,
+      detalle: `Desmarcó el adicional permanente ${a.causal} de ${a.nombre_actual || a.nombre}: deja de pagarse desde ${desde}` });
+    ok(res, { fin: desde });
+  } catch (e) { console.error('[rrhh adic permanente]', e.message); fail(res, 'Error interno del servidor'); }
+};
+
+/* Conceptos agregados por el usuario (mantenedores mínimos in-page) */
+const crearConceptoAdic = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').toUpperCase().trim().slice(0, 60);
+    if (!nombre) return fail(res, 'Ponle nombre al concepto', 400);
+    if (nombre in CAUSALES_ADIC) return fail(res, 'Ese concepto ya existe', 400);
+    const imponible = req.body?.imponible ? 1 : 0;
+    await pool.query('INSERT INTO rh_conceptos_adic (nombre, imponible, creado_por) VALUES (?,?,?) ON DUPLICATE KEY UPDATE activo=1, imponible=VALUES(imponible)', [nombre, imponible, nombreDe(req.usuario || {})]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'concepto_adicional', detalle: `Concepto de pago "${nombre}" (${imponible ? 'imponible' : 'no imponible'})` });
+    ok(res, { nombre, imponible });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
+const crearConceptoDesc = async (req, res) => {
+  try {
+    const nombre = String(req.body?.nombre || '').toUpperCase().trim().slice(0, 60);
+    if (!nombre) return fail(res, 'Ponle nombre al concepto', 400);
+    await pool.query('INSERT INTO rh_conceptos_desc (nombre, creado_por) VALUES (?,?) ON DUPLICATE KEY UPDATE activo=1', [nombre, nombreDe(req.usuario || {})]);
+    auditar({ req, accion: 'CREAR', modulo: 'rrhh', entidad: 'concepto_descuento', detalle: `Concepto de descuento "${nombre}"` });
+    ok(res, { nombre });
+  } catch (e) { fail(res, 'Error interno del servidor'); }
+};
 
 /* v4: DESCUENTOS DE REMUNERACIÓN — anticipos en N meses, préstamos al personal
    con interés (cuota francesa capital+interés, tasa tope = TMC vigente),
@@ -347,6 +433,13 @@ const tmcVigente = async () => {
   return t ? parseFloat(t.tasa_mensual_menor) : null;
 };
 
+// Subtipos de descuento PERMANENTE = base fija + conceptos agregados por el usuario
+async function subtiposDesc() {
+  const base = ['ORDEN TRIBUNAL', 'ORDEN TGR', 'APV'];
+  const [rows] = await pool.query('SELECT nombre FROM rh_conceptos_desc WHERE activo=1 ORDER BY nombre').catch(() => [[]]);
+  return [...base, ...rows.map(r => r.nombre).filter(n => !base.includes(n)), 'OTRO'];
+}
+
 // Cuota del descuento VIGENTE d en el mes m (null si ese mes no le toca)
 const cuotaEnMes = (d, m) => {
   const k = difMeses(d.mes_inicio, m);
@@ -368,7 +461,7 @@ const getDescuentos = async (req, res) => {
     const delMes = rows.filter(d => d.estado === 'VIGENTE' && cuotaEnMes(d, mes) != null)
       .map(d => ({ ...d, cuota_mes: cuotaEnMes(d, mes), cuota_num: d.tipo === 'PERMANENTE' ? null : difMeses(d.mes_inicio, mes) + 1 }));
     const total_mes = delMes.reduce((s, d) => s + d.cuota_mes, 0);
-    ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente() });
+    ok(res, { mes, descuentos: rows, del_mes: delMes, total_mes, bloqueado: await mesEmitido(mes), tmc: await tmcVigente(), subtipos: await subtiposDesc() });
   } catch (e) { console.error('[rrhh descuentos get]', e.message); fail(res, 'Error interno del servidor'); }
 };
 
@@ -402,7 +495,7 @@ const crearDescuento = async (req, res) => {
       valorCuota = Math.round(monto / cuotas);
     } else { // PERMANENTE
       subtipo = String(b.subtipo || '').toUpperCase();
-      if (!['ORDEN TRIBUNAL', 'ORDEN TGR', 'APV', 'OTRO'].includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
+      if (!(await subtiposDesc()).includes(subtipo)) return fail(res, 'Subtipo inválido', 400);
       if (subtipo === 'OTRO' && !String(b.detalle_texto || '').trim()) return fail(res, 'Describe el descuento permanente', 400);
       detalle = String(b.detalle_texto || '').trim().slice(0, 200) || null;
       cuotas = 0; valorCuota = monto; // mensual indefinido hasta anular
@@ -1348,4 +1441,5 @@ async function getNominaBanco(req, res) {
 
 module.exports = { getMes, guardar, emitir, getLiquidacion, misLiquidaciones, calcLiquidacion, getIndicadores, putIndicadores,
   revisarAhora, getPropuesta, resolverPropuesta, getAdicionales, crearAdicional, eliminarAdicional, getHoraExtra,
+  permanenteAdicional, crearConceptoAdic, crearConceptoDesc,
   getDescuentos, crearDescuento, anularDescuento, aumentoRenta, aumentoPersonas, getPrevired, getPreviredConfig, putPreviredConfig, subirConvenioDescuento, getNominaBanco };

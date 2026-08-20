@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Descuentos de Remuneración — AutoFácil</title>
-  <!-- v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
+  <!-- v1.3 — lista de ingresados con etiquetas (Permanente / N cuotas / solo mes), + Concepto Descuento paramétrico · v1.2 — preview de cuota francesa desde el motor único rrhh-core.js -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -73,6 +73,9 @@
       </div>
     </div>
     <div class="preview mt-3" id="prev"></div>
+    <div class="mt-2"><button class="btn btn-sm btn-outline-primary" onclick="nuevoConceptoDesc()"><i class="bi bi-plus-circle me-1"></i>Concepto Descuento</button>
+      <span class="small text-muted ms-2">agrega un concepto permanente nuevo a la lista (queda disponible para siempre)</span></div>
+    <div id="listaIng" class="mt-3"></div>
   </div>
 
   <div id="secM" style="display:none">
@@ -155,13 +158,38 @@ async function cargar(){
     const jd = await (await fetch('/api/rrhh/directorio',{headers:H})).json();
     fColab.innerHTML = '<option value="">— elegir —</option>' + (jd.data||[]).map(c=>`<option value="${c.id_usuario}">${esc(c.nombre)}</option>`).join('');
   }
+  if (Array.isArray(D.subtipos) && D.subtipos.length){
+    const s = fSubtipo.value;
+    fSubtipo.innerHTML = D.subtipos.map(x=>`<option>${esc(x)}</option>`).join('');
+    if (s && D.subtipos.includes(s)) fSubtipo.value = s;
+  }
   document.getElementById('lblTmc').textContent = D.tmc!=null ? `(TMC ${String(D.tmc).replace('.',',')}%)` : '';
   document.getElementById('lblBloq').innerHTML = D.bloqueado ? '<span class="pill ANULADO"><i class="bi bi-lock-fill"></i> MES EMITIDO</span>' : '';
   render(); preview();
 }
 
 const tipoTxt = d => d.tipo==='PAGO_EXCESO' ? `Pago en exceso ${d.mes_referencia||''}` : d.tipo==='PERMANENTE' ? `Permanente · ${d.subtipo||''}` : d.tipo==='ANTICIPO' ? 'Anticipo' : 'Préstamo';
+const MESES_TX=['','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+const mesTxt = m => (MESES_TX[Number(String(m).slice(5,7))]||m);
+function renderListaIng(){
+  const vig = D.descuentos.filter(d=>d.estado==='VIGENTE').slice(0,20);
+  document.getElementById('listaIng').innerHTML = vig.length ? '<div class="fw-bold small mb-1">Descuentos ingresados (vigentes)</div>'+vig.map(d=>`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #e5e7eb;border-radius:9px;padding:7px 12px;margin-bottom:6px;background:${d.tipo==='PERMANENTE'?'#fbfdff':'#fff'}">
+      <b style="font-size:.82rem">${esc(d.nombre_actual||d.nombre)}</b>
+      <span class="small text-muted">${esc(tipoTxt(d))}${d.detalle_texto?' — '+esc(d.detalle_texto):''}</span>
+      <span class="num" style="font-size:.85rem">$${fmt(d.valor_cuota)}${d.tipo==='PERMANENTE'?'/mes':''}</span>
+      ${d.tipo==='PERMANENTE'
+        ? '<span class="pill" style="background:#e0e7ff;color:#3730a3">PERMANENTE</span>'
+        : d.cuotas>1
+        ? `<span class="pill" style="background:#dbeafe;color:#1e40af">${d.cuotas} CUOTAS desde ${d.mes_inicio}</span>`
+        : `<span class="pill" style="background:#fef3c7;color:#92400e">SOLO ${mesTxt(d.mes_inicio)}</span>`}
+      <span style="margin-left:auto">
+        <button class="btn btn-sm btn-outline-danger py-0" onclick="anular(${d.id})" title="${d.tipo==='PERMANENTE'?'Desmarcar: deja de descontarse desde ahora':'Detiene las cuotas futuras'}">${d.tipo==='PERMANENTE'?'Desmarcar':'Anular'}</button>
+      </span>
+    </div>`).join('') : '';
+}
 function render(){
+  renderListaIng();
   document.getElementById('kpis').innerHTML = `
     <div class="card-kpi"><div class="v">${D.del_mes.length}</div><div class="l">Descuentos activos</div></div>
     <div class="card-kpi"><div class="v">$${fmt(D.total_mes)}</div><div class="l">Total a descontar en ${fMes.value}</div></div>`;
@@ -189,6 +217,15 @@ function render(){
         :`<i class="bi bi-upload text-primary" style="cursor:pointer" title="Subir convenio FIRMADO (va a la carpeta digital)" onclick="subirConvenio(${d.id})"></i> <span style="color:#dc2626;font-size:.68rem;font-weight:700">SIN FIRMA</span>`}`:''}</td>
     <td>${d.estado==='VIGENTE'?`<i class="bi bi-x-circle text-danger" style="cursor:pointer" title="Anular (detiene cuotas futuras)" onclick="anular(${d.id})"></i>`:''}</td></tr>`).join('')
     || '<tr><td colspan="11" class="text-center text-muted py-3">Sin descuentos registrados</td></tr>';
+}
+
+async function nuevoConceptoDesc(){
+  const nombre = prompt('Nombre del nuevo Concepto de Descuento permanente (ej. SEGURO COMPLEMENTARIO):');
+  if (!nombre || !nombre.trim()) return;
+  const r = await fetch('/api/rrhh/remuneraciones/descuentos/conceptos',{method:'POST',headers:H,body:JSON.stringify({nombre})});
+  const j = await r.json(); if (!j.success) return alert(j.error);
+  await cargar();
+  fTipo.value='PERMANENTE'; fSubtipo.value=j.data.nombre; tipoUI();
 }
 
 async function guardar(){
