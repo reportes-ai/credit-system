@@ -38,6 +38,7 @@ const SONIDOS = [
   { id: 'dingdong', label: '🔔 Timbre' },
   { id: 'aplausos', label: '👏 Aplausos' },
   { id: 'alarma',   label: '🚨 Alarma' },
+  { id: 'redoble',  label: '🥁 Redoble de tambores' },
   { id: 'none',     label: '🔇 Sin sonido' },
 ];
 

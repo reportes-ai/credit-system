@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v213.41';
+const APP_VERSION = 'v213.42';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
@@ -762,6 +762,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function reproducir(tipo) {
     try {
+      // Sonidos de ARCHIVO (mp3 en /audio/) — los demás son sintetizados con WebAudio
+      if (tipo === 'redoble') { const a = new Audio('/audio/redoble.mp3'); a.volume = 0.9; a.play().catch(() => {}); return; }
       const ctx = ctxAudio(); if (!ctx) return;
       if (tipo === 'dingdong') sDingDong(ctx);
       else if (tipo === 'alarma') sAlarma(ctx);

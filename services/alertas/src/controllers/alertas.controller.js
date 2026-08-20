@@ -340,6 +340,7 @@ const SONIDOS = [
   { id: 'dingdong', label: '🔔 Timbre (ding-dong)' },
   { id: 'alarma',   label: '🚨 Alarma (sirena)' },
   { id: 'aplausos', label: '👏 Aplausos' },
+  { id: 'redoble',  label: '🥁 Redoble de tambores' },
 ];
 
 function cumple(val, op, v1, v2) {
