@@ -75,4 +75,36 @@ function registrar({ id_credito, req, accion, detalle, meta }) {
   })();
 }
 
-module.exports = { registrar };
+/**
+ * Igual que `registrar()` pero IDEMPOTENTE: lleva `ref_origen` (clave única), así
+ * que el mismo hecho nunca queda dos veces aunque se reintente o lo escriba
+ * también el backfill. Se usa para hitos del ciclo de vida (nacimiento,
+ * otorgamiento, anulación), donde el backfill histórico y el registro en vivo
+ * pueden toparse sobre la misma operación.
+ * @param {string} opts.ref_origen clave única del hecho (ej. `otg_1234`)
+ * @param {Date|string} [opts.fecha] fecha del hecho (por defecto, ahora)
+ */
+function registrarUnico({ id_credito, req, accion, detalle, meta, ref_origen, fecha }) {
+  (async () => {
+    try {
+      const u  = req?.usuario;
+      const ip = req?.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
+               || req?.socket?.remoteAddress
+               || null;
+      await pool.query(
+        `INSERT IGNORE INTO auditoria_credito
+           (id_credito, fecha, usuario, id_usuario, perfil, accion, detalle, meta, ip, ref_origen)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [
+          id_credito, fecha || new Date(), _nombreUsuario(u),
+          u?.id_usuario || null, u?.perfil_nombre || null,
+          accion, detalle || null, meta ? JSON.stringify(meta) : null, ip, ref_origen,
+        ]
+      );
+    } catch(e) {
+      console.error('[auditoria.registrarUnico]', e.message);
+    }
+  })();
+}
+
+module.exports = { registrar, registrarUnico };

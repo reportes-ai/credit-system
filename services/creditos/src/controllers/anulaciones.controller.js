@@ -280,6 +280,16 @@ const resolver = async (req, res) => {
       detalle: `Aprobó la anulación de la OP ${op.num_op} (solicitada por ${a.solicitado_nombre}) — ${a.motivo}. ${nota.trim()}`,
       meta: { motivo: a.motivo, estado_anterior: op.estado_credito, cartola: nota.trim(), movimientos_retirados: retirables.map(m => m.id) } });
 
+    /* Bitácora del CRÉDITO: la anulación es el hito más caro de la vida de una
+       operación y no dejaba rastro en su Auditoría (solo en el log general). */
+    require('../../../../shared/auditoria').registrarUnico({
+      id_credito: a.id_credito, req, accion: 'CREDITO_ANULADO',
+      detalle: `Operación N°${op.num_op} anulada — ${a.motivo}. Solicitada por ${a.solicitado_nombre}. ${nota.trim()}`.trim(),
+      meta: { motivo: a.motivo, solicitada_por: a.solicitado_nombre, estado_anterior: op.estado_credito,
+              cartola: nota.trim(), movimientos_retirados: retirables.map(m => m.id) },
+      ref_origen: `anu_${id}`,
+    });
+
     AVISOS.avisar('operacion_anulacion_resuelta', {
       titulo: '🚫 Operación ANULADA — OP ' + op.num_op,
       mensaje: `${nombreUsuario(req)} aprobó la anulación de la OP ${op.num_op} solicitada por ${a.solicitado_nombre}. Motivo: ${a.motivo}. ${nota.trim()}`,

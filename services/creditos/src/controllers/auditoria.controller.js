@@ -1,4 +1,5 @@
 const pool = require('../../../../shared/config/database');
+const { ES_ETAPA } = require('../../../../shared/etapa-credito');
 // La tabla la crea shared/auditoria.js al arrancar
 
 /* ─── GET /api/auditoria-credito/:id_credito ─────────────────────────────── */
@@ -19,8 +20,15 @@ const getByCredito = async (req, res) => {
 };
 
 /* ─── POST /api/auditoria-credito/backfill ───────────────────────────────── */
-// Reconstruye el historial desde datos históricos existentes.
-// Idempotente: usa INSERT IGNORE + ref_origen único → se puede correr varias veces sin duplicar.
+/* Reconstruye el historial desde los datos que ya existen.
+   Idempotente: INSERT IGNORE + `ref_origen` único → se puede correr las veces
+   que sea sin duplicar, y comparte las claves con el registro en vivo
+   (`shared/auditoria.registrarUnico`), así que ninguno pisa al otro.
+
+   UNIVERSO: solo las operaciones OTORGADAS del año en curso. Barrer las 17.900
+   filas históricas cuesta caro en TiDB (cobra por consulta) y llena la tabla de
+   eventos de solicitudes que nunca se cursaron. La etapa se lee por el motor
+   único (ETAPA_SQL), no por una columna suelta. */
 const backfill = async (req, res) => {
   let insertados = 0;
   const ins = async (row) => {
@@ -38,32 +46,58 @@ const backfill = async (req, res) => {
   };
 
   try {
-    /* ── 1. Créditos creados ─────────────────────────────────────────────── */
+    /* ── 1. Nacimiento y otorgamiento de las operaciones del año ─────────── */
+    /* PK real de `creditos` es `id` — `id_credito` es solo alias en algunos
+       SELECT. La versión anterior consultaba `c.id_credito` y el backfill moría
+       con "Unknown column" cada vez que alguien apretaba el botón. */
     const [creditos] = await pool.query(
-      `SELECT c.id_credito, c.numero_credito,
-              COALESCE(cl.nombre_completo, '') AS nombre_cliente,
-              COALESCE(cl.rut,             '') AS rut_cliente,
-              c.financiera, c.monto_financiado, c.estado, c.created_at,
-              c.id_usuario,
+      `SELECT c.id, c.num_op, c.numero_credito, c.ejecutivo,
+              COALESCE(c.nombre_cliente, cl.nombre_completo, '') AS nombre_cliente,
+              COALESCE(c.rut_cliente,    cl.rut,             '') AS rut_cliente,
+              c.financiera, c.monto_financiado, c.created_at, c.fecha_otorgado,
+              COALESCE(c.id_usuario, c.created_by) AS uid,
               TRIM(CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido,''))) AS usr_nombre,
               p.nombre AS usr_perfil
        FROM creditos c
        LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
-       LEFT JOIN usuarios u  ON c.id_usuario  = u.id_usuario
-       LEFT JOIN perfiles p  ON u.id_perfil   = p.id_perfil`
+       LEFT JOIN usuarios u  ON u.id_usuario  = COALESCE(c.id_usuario, c.created_by)
+       LEFT JOIN perfiles p  ON u.id_perfil   = p.id_perfil
+       WHERE ${ES_ETAPA('OTORGADO', 'c')}
+         AND c.fecha_otorgado >= MAKEDATE(YEAR(CURDATE()), 1)`
     );
+    const ids = creditos.map(c => c.id);
     for (const c of creditos) {
+      const nOp = c.num_op || c.numero_credito || c.id;
       await ins({
-        id_credito: c.id_credito,
+        id_credito: c.id,
         fecha:      c.created_at || new Date(),
         usuario:    c.usr_nombre?.trim() || 'Sistema',
-        id_usuario: c.id_usuario,
+        id_usuario: c.uid,
         perfil:     c.usr_perfil || null,
         accion:     'CREDITO_CREADO',
-        detalle:    `Crédito N°${c.numero_credito||c.id_credito} creado para ${c.nombre_cliente}`,
-        meta:       { numero_credito: c.numero_credito, cliente: c.nombre_cliente, rut: c.rut_cliente, financiera: c.financiera, monto_financiado: c.monto_financiado },
-        ref_origen: `bc_cred_${c.id_credito}`,
+        detalle:    `Operación N°${nOp} ingresada para ${c.nombre_cliente}`,
+        meta:       { num_op: c.num_op, numero_credito: c.numero_credito, cliente: c.nombre_cliente, rut: c.rut_cliente, financiera: c.financiera, monto_financiado: c.monto_financiado },
+        ref_origen: `bc_cred_${c.id}`,
       });
+      await ins({
+        id_credito: c.id,
+        fecha:      c.fecha_otorgado,
+        usuario:    'Sistema',
+        id_usuario: null,
+        perfil:     null,
+        accion:     'CREDITO_OTORGADO',
+        detalle:    `Operación N°${nOp} otorgada${c.ejecutivo ? ' — ejecutivo ' + c.ejecutivo : ''}`,
+        meta:       { num_op: c.num_op, ejecutivo: c.ejecutivo, financiera: c.financiera, monto_financiado: c.monto_financiado, fecha_otorgado: c.fecha_otorgado },
+        ref_origen: `otg_${c.id}`,
+      });
+    }
+
+    // Sin operaciones en el universo no hay nada que reconstruir (y evita un
+    // `IN ()` vacío, que en MySQL es un error de sintaxis).
+    if (!ids.length) {
+      return res.json({ success: true, error: null, data: {
+        insertados: 0, creditos: 0, documentos: 0, docs_af: 0, pagos: 0,
+        mensaje: 'No hay operaciones otorgadas este año para reconstruir.' } });
     }
 
     /* ── 2. Documentos de respaldo cargados (credito_documentos) ─────────── */
@@ -76,7 +110,8 @@ const backfill = async (req, res) => {
        FROM credito_documentos cd
        LEFT JOIN usuarios u  ON cd.subido_por = u.id_usuario
        LEFT JOIN perfiles p  ON u.id_perfil   = p.id_perfil
-       LEFT JOIN tipos_documento td ON cd.id_tipo = td.id_tipo`
+       LEFT JOIN tipos_documento td ON cd.id_tipo = td.id_tipo
+       WHERE cd.id_credito IN (?)`, [ids]
     );
     for (const d of cdocs) {
       await ins({
@@ -97,7 +132,8 @@ const backfill = async (req, res) => {
       `SELECT id_doc_af, id_credito, codigo, nombre, created_at,
               validado, validado_por, validado_at,
               rechazado, comentario_rechazo, rechazado_por, rechazado_at
-       FROM documentos_af`
+       FROM documentos_af
+       WHERE id_credito IN (?)`, [ids]
     );
     for (const d of afdocs) {
       // Carga inicial
@@ -147,7 +183,8 @@ const backfill = async (req, res) => {
       `SELECT id_pago, id_credito, numero_cuota, total_pagado,
               monto_cuota, interes_mora, gastos_cobranza,
               fecha_pago, registrado_por, created_at
-       FROM pagos_credito`
+       FROM pagos_credito
+       WHERE id_credito IN (?)`, [ids]
     );
     for (const p of pagos) {
       await ins({
@@ -171,7 +208,7 @@ const backfill = async (req, res) => {
         documentos: cdocs.length,
         docs_af:   afdocs.length,
         pagos:     pagos.length,
-        mensaje:   `Backfill completado: ${insertados} eventos históricos insertados.`,
+        mensaje:   `Backfill completado: ${insertados} eventos históricos insertados sobre ${creditos.length} operaciones otorgadas este año.`,
       },
       error: null,
     });

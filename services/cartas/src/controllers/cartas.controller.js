@@ -953,6 +953,36 @@ const otorgar = async (req, res) => {
     recalcularTierMes(ca.fecha).catch(() => {});
     auditar({ req, accion: 'OTORGAR', modulo: 'cartas', entidad: 'carta', entidad_id: id,
       detalle: `Carta ${ca.op_carta || id} otorgada (crédito → OTORGADO + cartola de comisión)` });
+    /* Bitácora del CRÉDITO (Auditoría de Crédito). El otorgamiento nace acá, en
+       la carta, y hasta ahora no dejaba rastro en la ficha de la operación: una
+       op otorgada mostraba el historial vacío. Se graba también el nacimiento
+       con la MISMA clave que usa el backfill (`bc_cred_`), así que jamás queda
+       duplicado corran en el orden que corran. */
+    try {
+      const audCred = require('../../../../shared/auditoria');
+      const [[crAud]] = await pool.query(
+        `SELECT id, num_op, numero_credito, nombre_cliente, rut_cliente, financiera,
+                monto_financiado, created_at
+           FROM creditos WHERE id = ? OR num_op = ? LIMIT 1`,
+        [ca.id_credito_creado || 0, ca.id_financiera || 0]);
+      if (crAud) {
+        const nOp = crAud.num_op || crAud.numero_credito || crAud.id;
+        audCred.registrarUnico({
+          id_credito: crAud.id, req, accion: 'CREDITO_CREADO', fecha: crAud.created_at,
+          detalle: `Operación N°${nOp} ingresada para ${crAud.nombre_cliente || ''}`.trim(),
+          meta: { num_op: crAud.num_op, cliente: crAud.nombre_cliente, rut: crAud.rut_cliente,
+                  financiera: crAud.financiera, monto_financiado: crAud.monto_financiado },
+          ref_origen: `bc_cred_${crAud.id}`,
+        });
+        audCred.registrarUnico({
+          id_credito: crAud.id, req, accion: 'CREDITO_OTORGADO',
+          detalle: `Operación N°${nOp} otorgada desde la carta ${ca.op_carta || id}${ca.ejecutivo ? ' — ejecutivo ' + ca.ejecutivo : ''}`,
+          meta: { num_op: crAud.num_op, op_carta: ca.op_carta, ejecutivo: ca.ejecutivo,
+                  part_bruto: ca.part_bruto, saldo: ca.saldo },
+          ref_origen: `otg_${crAud.id}`,
+        });
+      }
+    } catch (e) { console.error('[carta otorgar→auditoria credito]', e.message); }
     // Anuncio push a toda la app (mensaje/colores/sonido configurables en mantenedor de Alertas)
     const ejec = String(ca.ejecutivo || '').trim().toLowerCase().replace(/\b\p{L}/gu, m => m.toUpperCase());
     if (ejec) publicarAnuncio('credito_otorgado', { ejecutivo: ejec }).catch(() => {});
