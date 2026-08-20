@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v4.29 — cap. 39: del RCV del SII al auxiliar de compras (cuenta propuesta por proveedor). v4.28 — cap. 3: la cartola del parque sale del servidor con PDF adjunto. v4.27 — cap. 3: avisos por correo del pago a parques (mantenedor Correos del Sistema). v4.26 — cap. 3: migracion de comisiones de parque ya pagadas (908 comisiones, 98 cartolas). v4.25 — cap. 3: regla del universo de cartolas parque (arrastre + liberado a pago + foto por operacion). v4.24 — cap. 1: fecha 1a cuota desde el CUADRO DE PAGO de la carta + sello SIN INFORMACION DealerNet; cap. 4: pipeline del portal del dealer y correo al dealer. v4.23 — cap. 1: Correccion de Cartas de Aprobacion (carta nueva -C1, la anterior REEMPLAZADA, QR y FES no vigentes). v4.22 — cap. 36: el revisor compara la comision dealer bruta contra bruta. v4.21 — cap. 38 Excepcion por rechazo de la financiera (regla del 60%). v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
+<!-- v4.30 — cap. 40: bitacora de auditoria de una operacion (que se registra, alcance de la reconstruccion). v4.29 — cap. 39: del RCV del SII al auxiliar de compras (cuenta propuesta por proveedor). v4.28 — cap. 3: la cartola del parque sale del servidor con PDF adjunto. v4.27 — cap. 3: avisos por correo del pago a parques (mantenedor Correos del Sistema). v4.26 — cap. 3: migracion de comisiones de parque ya pagadas (908 comisiones, 98 cartolas). v4.25 — cap. 3: regla del universo de cartolas parque (arrastre + liberado a pago + foto por operacion). v4.24 — cap. 1: fecha 1a cuota desde el CUADRO DE PAGO de la carta + sello SIN INFORMACION DealerNet; cap. 4: pipeline del portal del dealer y correo al dealer. v4.23 — cap. 1: Correccion de Cartas de Aprobacion (carta nueva -C1, la anterior REEMPLAZADA, QR y FES no vigentes). v4.22 — cap. 36: el revisor compara la comision dealer bruta contra bruta. v4.21 — cap. 38 Excepcion por rechazo de la financiera (regla del 60%). v4.20 — cap. 3: corregir dealer alcanza tambien al credito. v4.19 — cap. 3: la cartola agrupa por RUT del dealer. v4.18 — cap. 9: aviso de cuota que no cuadra con monto+tasa+plazo. v4.17 — cap. 9: cola de Diferencias con la Carga (elegir nuestro/archivo/tercero). v4.16 — cap. 9: la fecha 1a cuota NO se deriva del Canal (queda desviada); sale del PDF o se digita. v4.14 — cap. 9: el pre-llenado desde la carta tambien busca por RUT del cliente. v4.13 — cap. 12: vigencia y bitacora inmutable de las variables de comisiones de ejecutivos. v4.12 — cap. 37: vigencia desde/hasta de las variables y bitacora inmutable de cambios. v4.11 — cap. 37 Bono del Jefe Comercial (BSC): pilares OTORGADOS, dealers nuevos que cursaron y equipo vigente por ficha de Usuarios. v4.10 — cap. 35: blindaje de codigos (nivel server-side, dueño, un solo uso anti-carrera). v4.9 — cap. 36 Revisor Automatico de Cartas (Unidad y Autofin) + cap. 35 actualizado a la escalera de estrellas. v4.8 — cap. 4 card Saldo Precio en Proceso de Pago -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -78,6 +78,7 @@
     <a href="#p37">37. Bono del Jefe Comercial (Balanced Scorecard)</a>
     <a href="#p38">38. Excepción por rechazo de la financiera (regla del 60%)</a>
     <a href="#p39">39. Libro de compras: del SII al auxiliar (RCV)</a>
+    <a href="#p40">40. Auditoría de una operación: la bitácora del crédito</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -907,6 +908,38 @@
   </ul>
   <div class="flujo"><span class="st">SII (RCV)</span><span class="ar">→</span><span class="st">ESPEJO ctb_rcv_compras</span><span class="ar">→</span><span class="st">REVISIÓN DE CUENTAS</span><span class="ar">→</span><span class="st">AUXILIAR + ASIENTO</span><span class="ar">→</span><span class="st fin">F29</span></div>
   <div class="afecta"><b>Afecta:</b> auxiliar de compras, <a href="/contabilidad/comprobantes/">Comprobantes</a> (un asiento por documento), IVA crédito fiscal y F29, Cierre de Mes. <b>Depende de:</b> certificado digital del SII vigente, plan de cuentas, historial del auxiliar (de ahí sale la cuenta propuesta).</div>
+
+  <h2 id="p40">40. Auditoría de una operación: la bitácora del crédito</h2>
+  <p><b>Qué y para qué:</b> poder responder, sobre <b>una operación puntual</b>, quién hizo qué y cuándo — sin depender de la memoria de nadie. Es la línea de tiempo de la vida del crédito: nace, se le cargan documentos, se otorga, se paga, se anula. Sirve para reconstruir un reclamo, defender una decisión ante la financiera o el dealer, y encontrar dónde se cortó un proceso.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Lo consulta quien tenga <code>creditos_auditoria</code> (Administrador y Gerencia). <b>Nadie escribe a mano</b>: los eventos los graba el sistema.</div>
+    <div><b class="lbl">Prerequisitos</b>Ninguno — se entra desde <a href="/creditos/">Créditos</a> → la operación → botón <b>Auditoría</b>.</div>
+  </div>
+  <h3>Cómo se hace</h3>
+  <ol>
+    <li><b>Abrir la operación</b> (Créditos → Revisión de Crédito) y pinchar <b>Auditoría</b>. La línea de tiempo sale del más antiguo al más nuevo, con separador por día.</li>
+    <li><b>Filtrar</b> por texto, por tipo de acción o invertir el orden. Cada evento muestra <b>acción, fecha y hora, usuario, perfil e IP</b>, y "Ver datos" abre el detalle técnico que se guardó del hecho.</li>
+    <li><b>Exportar CSV</b> si hay que adjuntarlo a un informe.</li>
+    <li><b>Poblar Historial</b> (solo Administrador) reconstruye la bitácora desde los datos que ya existen, para operaciones anteriores a que el registro estuviera cableado. Es <b>idempotente</b>: se puede apretar las veces que sea sin duplicar.</li>
+  </ol>
+  <h3>Qué queda registrado hoy</h3>
+  <ul>
+    <li><b>Ingreso de la operación</b> y <b>otorgamiento</b> (este último nace en la carta, al otorgarla).</li>
+    <li><b>Anulación</b>: motivo, quién la solicitó, quién la aprobó y qué pasó con la comisión en la cartola (§32).</li>
+    <li><b>Documentos</b> de respaldo y documentos AF: carga, aprobación, rechazo y anulación de la revisión.</li>
+    <li><b>Pagos</b> de cuotas, prepagos y pagos por orden de pago.</li>
+    <li><b>Cambios de estado</b> y ediciones del crédito.</li>
+  </ul>
+  <h3>Reglas</h3>
+  <ul>
+    <li>Es un registro <b>inmutable</b>: el sistema solo agrega filas. No hay forma de editar ni borrar un evento desde la aplicación.</li>
+    <li><b>Un hecho, una fila</b>: cada hito lleva una clave única, así que el registro en vivo y la reconstrucción histórica jamás se duplican entre sí, corran en el orden que corran.</li>
+    <li><b>Alcance de la reconstrucción:</b> las operaciones con <b>fecha de otorgamiento del año en curso</b> — incluidas las que después se anularon, que son las que más historia necesitan. Las solicitudes que nunca se cursaron quedan fuera a propósito: son decenas de miles al año y llenarían la bitácora de ruido.</li>
+    <li>La <b>creación masiva</b> (carga diaria del canal) no se audita fila por fila por la misma razón; el nacimiento de una operación se registra cuando se otorga, que es cuando pasa a importar.</li>
+  </ul>
+  <div class="flujo"><span class="st ini">INGRESADA</span><span class="ar">→</span><span class="st">DOCUMENTOS</span><span class="ar">→</span><span class="st">OTORGADA</span><span class="ar">→</span><span class="st">PAGOS</span><span class="ar">/</span><span class="st mal">ANULADA</span></div>
+  <div class="afecta"><b>Afecta:</b> nada aguas abajo — solo lee. Es evidencia. <b>Depende de:</b> que cada proceso deje su marca al ejecutarse (otorgamiento, anulación, documentos, pagos). <b>No confundir con</b> <a href="/auditoria/">Auditoría</a> (bitácora central de TODO el sistema, por módulo y usuario) ni con la <b>Bitácora de un Crédito</b> de Reportería, que arma la historia por RUT cruzando varias fuentes.</div>
+  <p style="font-size:.85rem;color:#64748b"><b>Por qué se completó (20-08-2026):</b> una operación otorgada mostraba el historial vacío. El registro estaba cableado solo en la digitación individual, y el otorgamiento —que ocurre en la carta— no dejaba rastro en la ficha del crédito; la anulación tampoco. Se cablearon ambos y se reconstruyó el año: <b>3.843 eventos sobre 2.498 operaciones</b>.</p>
 
 </body>
 </html>
