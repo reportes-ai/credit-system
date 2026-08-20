@@ -1,6 +1,6 @@
 # Pendientes del Business Suite — vista consolidada
 
-> **Actualizado: 17-08-2026.** Este archivo es la **única lista completa** de lo que está
+> **Actualizado: 20-08-2026.** Este archivo es la **única lista completa** de lo que está
 > abierto. Antes vivía repartido: la sección "Pendientes de Madurez" de `CLAUDE.md`, los
 > backlogs de memoria, y lo que cada módulo dejó anotado por su cuenta. Ahora todo
 > converge acá, y las otras ubicaciones apuntan a este archivo.
@@ -86,6 +86,7 @@
 | 6.4 | **Caché de consultas frecuentes** | Solo cuando el volumen lo justifique (UF, mantenedores). TiDB cobra por consulta, así que tiene retorno directo. |
 | 6.5 | **Servir estáticos desde CDN** | Sacar HTML/CSS/JS del api-gateway a futuro. |
 | 6.6 | **Tabla de contactos múltiples para cobranza** | `cobranza_contactos` (titular + aval + familiar). **No** tocar `clientes`. |
+| 6.7 | **Consolidar las 3 copias del documento "Solicitud de Pago"** (anotado 20-08-2026, para el 21-08) | El motor único es `api-gateway/public/js/odp-documento.js` (lo usan Órdenes de Pago → Historial y Saldos Precios a Pagar), pero las pantallas de **emisión** tienen cada una su **propia copia** del HTML: `postventa/orden-pago/index.html` y `postventa/orden-pago-comision/index.html`. Consecuencia inmediata: el **pie de trazabilidad** (v213.76) no aparece en esas dos, y cualquier cambio de formato hay que hacerlo tres veces. Ojo al consolidar: esas copias se **envían por correo**, así que los estilos deben seguir siendo inline, y la de comisión trae el aviso de descuadre factura↔cartola. Máxima 1. |
 
 ## 7. Herramientas y agenda
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
+<!-- v1.1 — 6.7 consolidar las 3 copias del documento Solicitud de Pago. v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -28,7 +28,7 @@
 <script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Pendientes Abiertos",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
 <div class="doc">
   <h1><i class="bi bi-list-check me-2"></i>Pendientes Abiertos</h1>
-  <p>Todo lo que está abierto en el Business Suite, en un solo lugar. Antes vivía repartido entre la lista técnica del repositorio, los backlogs de ideas aprobadas y lo que cada módulo anotaba por su cuenta. <b>Actualizado al 17-08-2026.</b></p>
+  <p>Todo lo que está abierto en el Business Suite, en un solo lugar. Antes vivía repartido entre la lista técnica del repositorio, los backlogs de ideas aprobadas y lo que cada módulo anotaba por su cuenta. <b>Actualizado al 20-08-2026.</b></p>
 
   <div class="nota"><b>Regla de esta lista:</b> cuando algo se cierra se marca con su fecha, <b>no se borra</b> — así queda la historia de por qué se hizo. Cuando nace un pendiente nuevo, entra acá <b>en el mismo momento</b> en que se detecta, igual que la máxima de documentar el proceso junto con construirlo.</div>
 
@@ -110,6 +110,7 @@
     <tr><td>6.4</td><td>Caché de consultas frecuentes</td><td>UF y mantenedores. Tiene retorno directo: la base cobra por consulta.</td></tr>
     <tr><td>6.5</td><td>Servir los archivos estáticos desde un CDN</td><td>Sacar HTML, CSS y JS del servidor de aplicación.</td></tr>
     <tr><td>6.6</td><td>Contactos múltiples para cobranza</td><td>Titular, aval y familiar en su propia tabla. <b>No</b> tocar la ficha del cliente.</td></tr>
+    <tr><td>6.7</td><td>Un solo documento "Solicitud de Pago" <span style="color:#b45309">(21-08-2026)</span></td><td>El formato existe <b>tres veces</b>: el motor único que usan Historial y Saldos Precios a Pagar, más una copia propia en cada pantalla de emisión (Orden de Pago y Orden de Pago Comisión). Por eso el <b>pie de trazabilidad</b> no aparece en esas dos y cualquier cambio de formato hay que hacerlo tres veces. Al unificar: esas copias se envían por correo (estilos inline) y la de comisión trae el aviso de descuadre factura↔cartola.</td></tr>
   </table>
 
   <h2 id="s7">7. Herramientas y agenda</h2>
