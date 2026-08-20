@@ -45,6 +45,31 @@ require('../../../../shared/migrate').enFila('rrhh-vac-cuenta', async () => {
   console.log('[rrhh-vac-cuenta] listo');
 });
 
+/* Backfill del cambio de convención: los PROGRESIVO ya depositados se
+   recalculan con la fórmula nueva (al cierre del período). Los períodos que
+   antes daban 0 y ahora dan >0 los inserta solo generarDevengos() al correr. */
+require('../../../../shared/migrate').migrar('vac-prog-convencion-v1', async () => {
+  const [rows] = await pool.query(`
+    SELECT m.id, m.id_usuario, m.dias, DATE_FORMAT(m.periodo_desde,'%Y-%m-%d') pd,
+           DATE_FORMAT(u.fecha_ingreso,'%Y-%m-%d') fi, COALESCE(f.anos_trabajados_previos,0) previos
+      FROM rh_vac_movimientos m
+      JOIN usuarios u ON u.id_usuario = m.id_usuario
+      LEFT JOIN rh_fichas f ON f.id_usuario = m.id_usuario
+     WHERE m.tipo='PROGRESIVO'`);
+  let corregidos = 0;
+  for (const r of rows) {
+    if (!r.fi || !r.pd) continue;
+    const n = (parseInt(r.pd.slice(0, 4)) - parseInt(r.fi.slice(0, 4))) + 1;
+    const nuevo = progresivoDelPeriodo(r.previos, n);
+    if (nuevo !== Number(r.dias)) {
+      await pool.query('UPDATE rh_vac_movimientos SET dias=?, glosa=CONCAT(glosa, \' — recalculado convención al cierre del período\') WHERE id=?', [nuevo, r.id]);
+      corregidos++;
+    }
+  }
+  await generarDevengos();   // deposita los períodos que la fórmula vieja dejó en 0
+  console.log(`[vac-prog convención] ${rows.length} movimientos revisados, ${corregidos} corregidos + devengos regenerados`);
+});
+
 /* ── Alegato SEMANAL: años previos declarados SIN certificado AFP ───────────── */
 const _w = require('../../../../api-gateway/public/js/rrhh-core').semanaISO; // motor único
 async function alegarSinCertificadoAFP() {
@@ -80,8 +105,13 @@ programar('rrhh-certificado-afp', alegarSinCertificadoAFP, 24 * 60 * 60 * 1000);
 
 /* ── Generación de devengos: cada aniversario cumplido deposita su período ──── */
 function progresivoDelPeriodo(previos, periodoN) {
-  // años trabajados al inicio del período = previos + (períodoN − 1) en la empresa
-  return Math.max(0, Math.floor(((previos || 0) + (periodoN - 1) - 10) / 3));
+  /* CONVENCIÓN (cambiada 20-08-2026, decisión de Pato): el día progresivo se
+     abona con el período en que se CUMPLE el trienio — años trabajados al
+     CIERRE del período (previos + periodoN). Es la interpretación de la DT y
+     el criterio de las AFP ("debe sumar 13 años cotizados", cumplidos).
+     Antes se contaban los años al inicio del período (previos + N − 1), lo
+     que corría todo un año hacia adelante. Backfill: vac-prog-convencion-v1. */
+  return Math.max(0, Math.floor(((previos || 0) + periodoN - 10) / 3));
 }
 
 async function generarDevengos() {

@@ -53,9 +53,10 @@ async function esRRHH(idUsuario) {
   catch { return false; }
 }
 
-/* La MISMA aritmética del motor de devengos (vac-cuenta.progresivoDelPeriodo):
-   días del período N = floor((previos + (N−1) − 10) / 3). */
-const progDelPeriodo = (previos, n) => Math.max(0, Math.floor(((previos || 0) + (n - 1) - 10) / 3));
+/* La MISMA aritmética del motor de devengos (vac-cuenta.progresivoDelPeriodo,
+   convención al CIERRE del período desde 20-08-2026):
+   días del período N = floor((previos + N − 10) / 3). */
+const progDelPeriodo = (previos, n) => Math.max(0, Math.floor(((previos || 0) + n - 10) / 3));
 
 /* ── POST /analizar { nombre, mime, base64 } ── */
 const analizar = async (req, res) => {
