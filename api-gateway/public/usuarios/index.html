@@ -1359,7 +1359,10 @@
     function _modSec(mod) {                     // sección "natural" de un módulo (por su ruta)
       return (typeof sectionFromHref === 'function') ? sectionFromHref(mod.ruta || '') : 'home';
     }
-    const GRUPO_ICONO = { 'Dealers': 'bi-building' };   // ícono por grupo explícito
+    const GRUPO_ICONO = {   // ícono por grupo explícito (funcionalidades.grupo)
+      'Dealers': 'bi-building',
+      'Informes Comerciales (DealerNet)': 'bi-file-earmark-bar-graph',
+    };
     function agruparPorPlacement(raw) {
       if (!Array.isArray(raw) || !raw.length) return raw;
       // índice sección → módulo (destino al relocalizar una card movida)

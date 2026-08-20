@@ -77,6 +77,13 @@ require('../../../../shared/migrate').enFila('visitas', async () => {
              SELECT id_perfil, ?, 1 FROM perfiles WHERE ${filtroPerfiles}`, [idF]);
         return idF;
       };
+      /* Solo lectura (v213.46): hasta ahora mirar la ruta exigía `visitas_dealers`,
+         que además deja crear, editar y borrar visitas — no había forma de dar
+         mirada sin dar gestión. Nace solo para Administrador: quién más la ve se
+         decide en la matriz de Perfiles y Permisos, no acá.
+         SIN href a propósito: la ruta se entra por la pestaña de Dealers, y darle
+         href la convertiría en una card nueva del Home. */
+      await ensure('Ruta AutoFácil — ver (solo lectura)', 'visitas_ver', "nombre='Administrador'");
       await ensure('Ruta AutoFácil — gestionar', 'visitas_dealers',
         "nombre='Administrador' OR nombre LIKE 'Gerente%' OR nombre LIKE 'Supervisor%' OR nombre LIKE 'Ejecutivo%' OR nombre LIKE 'Comercial%'");
       await ensure('Ruta AutoFácil — supervisar', 'visitas_supervisar',

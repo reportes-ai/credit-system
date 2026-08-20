@@ -2359,29 +2359,23 @@ require('../../../../shared/migrate').enFila('perfil-solo-lectura', async () => 
    que recorrer toda la matriz. */
 require('../../../../shared/migrate').enFila('func-grupo-permisos', async () => {
   await pool.query('ALTER TABLE funcionalidades ADD COLUMN IF NOT EXISTS grupo VARCHAR(60) NULL');
-  // Módulos que son 100% de dealers → todas sus funcionalidades al grupo
+  // ── Dealers (concesionarios) ──
   await pool.query(`UPDATE funcionalidades f JOIN modulos m ON m.id_modulo=f.id_modulo
-                       SET f.grupo='Dealers'
-                     WHERE m.ruta IN ('/dealers-incorporacion/','/dealernet-informes/')`);
-  // Funcionalidades de dealer que viven dentro de otros módulos (Mantenedores)
-  const SUELTAS = ['mantenedores_dealers', 'mantenedores_parques', 'mant_dealer_categorias',
-    'mant_dealernet', 'mant_dealernet_productos', 'mant_dealernet_costos',
+                       SET f.grupo='Dealers' WHERE m.ruta='/dealers-incorporacion/'`);
+  const DEALERS = ['mantenedores_dealers', 'mantenedores_parques', 'mant_dealer_categorias',
     'visitas_ver', 'visitas_dealers', 'visitas_supervisar', 'visitas_informes'];
-  await pool.query(`UPDATE funcionalidades SET grupo='Dealers' WHERE codigo IN (?)`, [SUELTAS]);
+  await pool.query(`UPDATE funcionalidades SET grupo='Dealers' WHERE codigo IN (?)`, [DEALERS]);
 
-  /* Ruta AutoFácil: faltaba el permiso de SOLO LECTURA. Hasta ahora ver la ruta
-     exigía `visitas_dealers` (que además deja crear/editar/borrar visitas) o
-     `visitas_supervisar`: no había forma de dar mirada sin dar gestión.
-     Sin href a propósito — la ruta se entra por la pestaña de Dealers, y darle
-     href la convertiría en una card nueva del Home. */
-  const [[modMant]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/mantenedores/' LIMIT 1");
-  if (modMant) await pool.query(
-    `INSERT IGNORE INTO funcionalidades (id_modulo, nombre, codigo, href, icono, grupo)
-     VALUES (?, 'Ruta AutoFácil — ver (solo lectura)', 'visitas_ver', NULL, NULL, 'Dealers')`,
-    [modMant.id_modulo]);
-  // Nombres explícitos: en la matriz se leen los cuatro seguidos
-  await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — gestionar visitas' WHERE codigo='visitas_dealers'");
-  await pool.query("UPDATE funcionalidades SET nombre='Ruta AutoFácil — supervisar (asignar, zonas, config)' WHERE codigo='visitas_supervisar'");
+  /* ── DealerNet: NO es de concesionarios ──────────────────────────────────
+     Pese al nombre, DealerNet es la plataforma externa de INFORMES COMERCIALES
+     (buró: deuda, protestos, perfil del cliente). Va en su propio grupo; que
+     comparta las letras "dealer" no lo hace parte del circuito de dealers. */
+  await pool.query(`UPDATE funcionalidades f JOIN modulos m ON m.id_modulo=f.id_modulo
+                       SET f.grupo='Informes Comerciales (DealerNet)'
+                     WHERE m.ruta='/dealernet-informes/'`);
+  await pool.query(`UPDATE funcionalidades SET grupo='Informes Comerciales (DealerNet)'
+                     WHERE codigo IN ('mant_dealernet','mant_dealernet_productos','mant_dealernet_costos')`);
+
 });
 
 // Red de seguridad: corre en CADA boot (enFila, no migrar) — consolida duplicados por código.
