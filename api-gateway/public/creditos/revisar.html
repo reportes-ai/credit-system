@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -22,6 +22,7 @@
   .nav-actions { display:flex; align-items:center; gap:10px; }
   .btn-back { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:#fff; border-radius:8px; padding:6px 14px; font-size:.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px; text-decoration:none; transition:background .15s; }
   .btn-back:hover { background:rgba(255,255,255,.25); }
+  #btnAuditoria, #btnDocumentos { display:none; }
   .version-badge { background:rgba(255,255,255,.15); color:rgba(255,255,255,.75); font-size:.65rem; font-weight:700; border-radius:6px; padding:2px 8px; letter-spacing:.5px; margin-left:4px; }
 
   /* ── Page layout ── */
@@ -209,24 +210,16 @@
 </head>
 <body>
 
-<nav class="navbar">
-  <a class="nav-brand" href="/">
-    <img src="/img/logo-autofacil.png" alt="AutoFácil" style="filter:brightness(0) invert(1);height:32px;display:block" onerror="this.style.display='none'">
-    <span>Revisión de Crédito</span>
-    <span class="version-badge">v4.2</span>
-  </a>
-  <div class="breadcrumb-nav">
-  <a href="/">Inicio</a><span class="sep">›</span>
-  <a href="/creditos">Créditos</a><span class="sep">›</span>
-  <span style="color:#fff;font-weight:600"><i class="bi bi-search me-1"></i>Revisión de Crédito</span>
-  </div>
-  <div class="nav-actions">
-    <span id="navUser" class="user-chip" style="color:rgba(255,255,255,.75);font-size:.82rem"></span>
-    <a id="btnAuditoria" href="#" class="btn-back" style="background:rgba(255,255,255,.15);display:none"><i class="bi bi-journal-text"></i>Auditoría</a>
-    <a id="btnDocumentos" href="#" class="btn-back" style="background:rgba(255,255,255,.2);display:none" onclick="abrirDocumentos()"><i class="bi bi-file-earmark-text"></i>Documentos</a>
-    <a href="/creditos" class="btn-back"><i class="bi bi-arrow-left"></i>Volver</a>
-  </div>
-</nav>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = {
+  breadcrumb: [{label:'Inicio',href:'/'},{label:'Créditos',href:'/creditos'},
+               {label:'Revisión de Crédito',icon:'bi-search',current:true}],
+  actions: [
+    { id:'btnAuditoria',  label:'Auditoría',  icon:'bi-journal-text',       href:'#' },
+    { id:'btnDocumentos', label:'Documentos', icon:'bi-file-earmark-text',  onclick:'abrirDocumentos()' },
+    { id:'btnVolver',     label:'Volver',     icon:'bi-arrow-left',         href:'/creditos' },
+  ],
+};</script>
 
 <div class="page-wrap" id="pageWrap">
   <div class="spinner-wrap"><div class="spinner-border"></div></div>
@@ -348,10 +341,17 @@
 function getToken() { return sessionStorage.getItem('token'); }
 function apiHdr()   { return { 'Content-Type':'application/json', 'Authorization':'Bearer '+getToken() }; }
 
-try {
-  const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
-  document.getElementById('navUser').textContent = u.nombre || '';
-} catch(e){}
+/* Los botones Auditoría y Documentos nacen ocultos y se muestran cuando
+   corresponde. El topnav se dibuja asincrónico, así que se espera al nodo. */
+function accionTopnav(id, fn) {
+  let intentos = 0;
+  (function busca() {
+    const el = document.getElementById(id);
+    if (el) return fn(el);
+    if (++intentos < 40) setTimeout(busca, 100);
+  })();
+}
+const mostrarAccion = id => accionTopnav(id, el => { el.style.display = 'inline-flex'; });
 
 /* ── Helpers ── */
 const fmtP  = v => v != null && v !== '' ? '$'+Math.round(Number(v)).toLocaleString('es-CL') : '—';
@@ -1778,15 +1778,14 @@ async function confirmarPrepagoFicha(){
 }
 
 cargarPagina().then(() => {
-  document.getElementById('btnDocumentos').style.display = 'flex';
+  mostrarAccion('btnDocumentos');
 
   try {
     const u = JSON.parse(sessionStorage.getItem('usuario')||'{}');
 
     // Botón Auditoría: solo para Administrador y Gerente
     if (['Administrador','Gerente'].includes(u.perfil)) {
-      const btn = document.getElementById('btnAuditoria');
-      if (btn) { btn.href = '/creditos/auditoria?id=' + creditId; btn.style.display = 'flex'; }
+      accionTopnav('btnAuditoria', btn => { btn.href = '/creditos/auditoria?id=' + creditId; btn.style.display = 'inline-flex'; });
     }
 
     // Sección Estado y Observaciones: editable solo para Administrador
@@ -1805,6 +1804,7 @@ cargarPagina().then(() => {
 <script src="/js/html2canvas.min.js"></script>
 <script src="/js/timbre-pagado.js"></script>
 <script src="/js/comprobante.js"></script>
+<script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
