@@ -2140,8 +2140,11 @@ const getOrdenPagoComision = async (req, res) => {
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
       -- Fallback: créditos sin id_dealer → dealer por razón social del seguimiento
       LEFT JOIN dealers  dn ON d.id_dealer IS NULL AND (dn.nombre_razon = s.nombre_dealer OR dn.nombre_indexa = s.nombre_dealer)
-      WHERE COALESCE(fc.es_replica, 0) = 0   -- la factura replicada se paga por su titular (una ODP por cartola)
-        AND NOT EXISTS (
+      -- Las réplicas SÍ viajan: son las OTRAS operaciones de la misma factura y
+      -- el detalle de la orden tiene que sumarlas (excluyéndolas, el comprobante
+      -- mostraba una sola op y descuadraba contra la factura). El correlativo
+      -- sigue siendo uno: asegurarOrdenComision() lo emite sobre el titular.
+      WHERE NOT EXISTS (
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='ORDEN DE PAGO EMITIDA')
       ORDER BY efa.fecha ASC, s.num_op ASC
@@ -2155,7 +2158,13 @@ const getOrdenPagoComision = async (req, res) => {
 
 /* ── Asegura la Orden de Pago de COMISIÓN (postventa_ordenes_comision + correlativo).
  *    Idempotente. Devuelve num_orden o null. ── */
-async function asegurarOrdenComision(id, reqUsuario) {
+async function asegurarOrdenComision(idPedido, reqUsuario) {
+  /* Una factura = UNA orden: si el id viene de una réplica, la orden se emite
+     sobre el titular de esa factura (así dos ops de la misma factura no sacan
+     dos correlativos). */
+  const [[fr]] = await pool.query(
+    'SELECT es_replica, id_titular FROM postventa_facturas_comision WHERE id_seguimiento=?', [idPedido]);
+  const id = (fr && fr.es_replica && fr.id_titular) ? Number(fr.id_titular) : Number(idPedido);
   const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes_comision WHERE id_seguimiento=?', [id]);
   if (ya && ya.num_orden) return ya.num_orden;
   /* Monto de la ODP = LÍQUIDO A DEPOSITAR del documento recibido, no la comisión bruta.
