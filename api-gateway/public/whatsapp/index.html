@@ -1136,7 +1136,12 @@ async function cargarConfig(){
   simReset();
   cargarConvs();
   cargarQuick();
-  // ¿conectado a Meta? — si el config endpoint responde y hay envíos reales lo sabremos por los estados; el pill es informativo
+  // Estado REAL de la conexión Meta (antes el pill decía "simulado" fijo)
+  (async()=>{ try{
+    const j=await (await fetch('/api/whatsapp/config',{headers:H})).json();
+    const m=(j.data||{})._meta; const pill=document.getElementById('connPill'); if(!m||!pill) return;
+    if(m.conectado){ pill.innerHTML='<i class="bi bi-plug-fill me-1"></i>CONECTADO A META'+(m.webhook_firmado?'':' — webhook sin firmar'); pill.style.background='rgba(255,255,255,.25)'; }
+  }catch(e){} })();
   const params = new URLSearchParams(location.search);
   if (params.get('conv')) { tab('bandeja'); abrirConv(parseInt(params.get('conv'))); }
   POLL = setInterval(()=>{ if (document.getElementById('secBandeja').style.display!=='none') { cargarConvs(); if (CONV_SEL) abrirConv(CONV_SEL); } }, 20000);

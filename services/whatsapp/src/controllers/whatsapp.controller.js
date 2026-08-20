@@ -970,8 +970,17 @@ exports.simular = async (req, res) => {
 
 /* ── Configuración general ─────────────────────────────────────────────────── */
 exports.getConfig = async (_req, res) => {
-  try { res.json({ success: true, data: await getCfg(), error: null }); }
-  catch (e) { res.status(500).json({ success: false, error: e.message }); }
+  try {
+    const data = await getCfg();
+    // Estado REAL de la conexión Meta (el panel lo mostraba fijo en "simulado"):
+    // hay conexión si WSP_TOKEN y WSP_PHONE_ID están cargados. El Modo
+    // Desarrollo no la corta — redirige los envíos al número de prueba.
+    data._meta = {
+      conectado: !!(process.env.WSP_TOKEN && process.env.WSP_PHONE_ID),
+      webhook_firmado: !!process.env.WSP_APP_SECRET,
+    };
+    res.json({ success: true, data, error: null });
+  } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 };
 
 exports.setConfig = async (req, res) => {

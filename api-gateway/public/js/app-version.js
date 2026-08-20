@@ -2,7 +2,7 @@
    AutoFácil — Versión global de la aplicación
    Editar SOLO este archivo para cambiar la versión
    ───────────────────────────────────────────── */
-const APP_VERSION = 'v213.67';
+const APP_VERSION = 'v213.68';
 
 /* ── Abrir en otra pestaña SIN perder la sesión ────────────────────────
    El token vive en sessionStorage. Desde Chrome 88 un <a target="_blank">
