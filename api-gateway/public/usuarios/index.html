@@ -1329,46 +1329,27 @@
     let perfilesData = [];
     let modulosData = [];      // agrupado para la grilla: cabecera = módulo + cards movidas relocalizadas
     let modulosRaw  = [];      // crudo desde BD (agrupado por módulo)
-    let placementCfg = {};     // placement_v2 — override de secciones (mueve cards entre pantallas)
     let perfilActualId = null;
     let permisosActuales = {};
 
-    // ── Agrupar permisos: cabecera = MÓDULO (como siempre) + relocalización ──
-    // Headers = los módulos del home (igual que antes). Solo las cards que el
-    // usuario MOVIÓ explícitamente en Vista Pantallas (override en placement_v2
-    // a una sección distinta a la de su módulo) se relocalizan: si las movió al
-    // Home, quedan en su propia cabecera (ej. Dealers); si a otra sección, bajo
-    // el módulo de esa sección. Sin manifiesto → agrupado por módulo puro.
-    function _plKey(href) {
-      if (!href) return null;
-      if (typeof PLACEMENT_ITEMS !== 'undefined') {
-        if (PLACEMENT_ITEMS[href]) return href;
-        const n = href.endsWith('/') ? href : href + '/';
-        if (PLACEMENT_ITEMS[n]) return n;
-      }
-      return String(href).replace(/^\/+|\/+$/g, '').split('/').pop();
-    }
-    function _plOverride(key) {                 // sección asignada en placement_v2 (override explícito)
-      if (!key) return null;
-      for (const sec in placementCfg) {
-        if (Array.isArray(placementCfg[sec]) && placementCfg[sec].indexOf(key) >= 0) return sec;
-      }
-      if (typeof placementCfg[key] === 'string') return placementCfg[key];   // formato viejo
-      return null;
-    }
-    function _modSec(mod) {                     // sección "natural" de un módulo (por su ruta)
-      return (typeof sectionFromHref === 'function') ? sectionFromHref(mod.ruta || '') : 'home';
-    }
+    /* ── Agrupar permisos: UN BLOQUE POR MÓDULO ────────────────────────────
+       Cada módulo del Home = un menú acá, y TODAS sus funcionalidades (páginas
+       y permisos de acción) son sus submenús.
+
+       Antes esto se agrupaba por PLACEMENT y quedaba desalineado del Home: una
+       card movida a otra pantalla se llevaba su permiso al bloque de esa otra
+       sección, y una card promovida al Home formaba un bloque suelto de un solo
+       checkbox. Resultado: para habilitar un módulo había que buscar sus
+       permisos en tres o cuatro bloques distintos.
+       Placement y permisos responden preguntas distintas: el placement dice
+       DÓNDE SE VE la card, la matriz dice QUÉ SE PUEDE HACER. Acá manda el
+       módulo, y `funcionalidades.grupo` es el único override (paramétrico). */
     const GRUPO_ICONO = {   // ícono por grupo explícito (funcionalidades.grupo)
       'Dealers': 'bi-building',
       'Informes Comerciales (DealerNet)': 'bi-file-earmark-bar-graph',
     };
     function agruparPorPlacement(raw) {
       if (!Array.isArray(raw) || !raw.length) return raw;
-      // índice sección → módulo (destino al relocalizar una card movida)
-      const secToMod = {};
-      for (const m of raw) { const s = _modSec(m); if (!secToMod[s]) secToMod[s] = m; }
-
       const groups = {}; let ord = 0;
       const ensure = (key, nombre, icono, ruta) => {
         if (!groups[key]) groups[key] = { key, nombre, icono: icono || 'bi-grid', ruta: ruta || '', _ord: ord++, funcionalidades: [] };
@@ -1378,40 +1359,25 @@
       for (const mod of raw) {
         for (const f of (mod.funcionalidades || [])) {
           f._ruta = mod.ruta;                  // preserva link de fallback de las acciones
-          let g;
-          /* GRUPO explícito (funcionalidades.grupo): manda sobre módulo y placement.
-             Junta en un solo bloque permisos que viven en módulos distintos —p.ej.
-             todo lo de dealers— sin mover ninguna card de pantalla. */
-          if (f.grupo) {
-            g = ensure('_grp_' + f.grupo, f.grupo, GRUPO_ICONO[f.grupo] || 'bi-collection', '');
-            g.funcionalidades.push(f);
-            continue;
-          }
-          const key = f.href ? _plKey(f.href) : null;
-          const ov  = key ? _plOverride(key) : null;
-          if (f.href && ov && ov !== _modSec(mod)) {
-            // card movida por el usuario a una sección distinta a la de su módulo
-            if (ov === 'home') {
-              const meta = (typeof PLACEMENT_ITEMS !== 'undefined' && PLACEMENT_ITEMS[key]) || {};
-              g = ensure('_home_' + key, meta.titulo || f.nombre || key, meta.icon || 'bi-house-door-fill', f.href);
-            } else if (secToMod[ov] && secToMod[ov] !== mod) {
-              const t = secToMod[ov];
-              g = ensure('_mod_' + t.id_modulo, t.nombre, t.icono, t.ruta);
-            } else {
-              g = ensure('_mod_' + mod.id_modulo, mod.nombre, mod.icono, mod.ruta);
-            }
-          } else {
-            g = ensure('_mod_' + mod.id_modulo, mod.nombre, mod.icono, mod.ruta);
-          }
+          // Override paramétrico: junta en un bloque permisos de módulos distintos
+          // (ej. todo lo de dealers) sin mover ninguna card de pantalla.
+          const g = f.grupo
+            ? ensure('_grp_' + f.grupo, f.grupo, GRUPO_ICONO[f.grupo] || 'bi-collection', '')
+            : ensure('_mod_' + mod.id_modulo, mod.nombre, mod.icono, mod.ruta);
           g.funcionalidades.push(f);
         }
       }
-      // cards promovidas al Home primero; el resto por orden de aparición (= orden BD)
-      return Object.values(groups).sort((a, b) => {
-        const ha = a.key.indexOf('_home_') === 0 ? 0 : 1;
-        const hb = b.key.indexOf('_home_') === 0 ? 0 : 1;
-        return ha !== hb ? ha - hb : a._ord - b._ord;
-      });
+      // Alfabético: el bloque se busca por nombre, no por el orden interno de la BD.
+      // Dentro de cada bloque: primero las páginas, después los permisos de acción.
+      return Object.values(groups)
+        .map(g => {
+          g.funcionalidades.sort((a, b) => {
+            const pa = a.href ? 0 : 1, pb = b.href ? 0 : 1;
+            return pa !== pb ? pa - pb : String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es');
+          });
+          return g;
+        })
+        .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
     }
 
     // Estado para expansión de usuarios por perfil
@@ -1426,14 +1392,13 @@
     let permisosUsuarioDelta = {};     // { id_func: bool } — estado actual editado
 
     async function cargarPerfiles() {
-      const [pData, mData, plData] = await Promise.all([
+      // La matriz ya no depende del placement: se agrupa por módulo (ver agruparPorPlacement)
+      const [pData, mData] = await Promise.all([
         api('GET', '/api/perfiles'),
-        api('GET', '/api/perfiles/modulos-funcionalidades'),
-        api('GET', '/api/config/ui/placement_v2')
+        api('GET', '/api/perfiles/modulos-funcionalidades')
       ]);
       perfilesData = pData?.data || [];
       modulosRaw   = mData?.data || [];
-      placementCfg = (plData && plData.success && plData.data && typeof plData.data === 'object') ? plData.data : {};
       modulosData  = agruparPorPlacement(modulosRaw);
       renderListaPerfiles();
     }
