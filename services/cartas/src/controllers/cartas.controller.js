@@ -2269,9 +2269,22 @@ const corregirCarta = async (req, res) => {
       cartola = mv.affectedRows;
     } catch (e) { console.error('[cartas corregir cartola]', e.message); }
 
+    /* Si la corrección cambió el DEALER, se propaga completo al crédito
+       (automotora + rut + ficha id_dealer) y al seguimiento de Post Venta —
+       aunque el crédito esté OTORGADO: la vía de corrección es deliberada y
+       auditada, no una edición accidental (caso 89127: quedó `automotora`
+       nueva con la ficha del dealer viejo y la ODP salía a la cuenta errada). */
+    let propDealer = null;
+    try {
+      const dealerCambio = String(nueva.nombre_dealer || '') !== String(orig.nombre_dealer || '')
+                        || String(nueva.rut_dealer || '') !== String(orig.rut_dealer || '');
+      if (dealerCambio && nueva.rut_dealer)
+        propDealer = await propagarDealerCredito(orig.id_credito_creado, nueva.nombre_dealer, String(nueva.rut_dealer).trim().toUpperCase());
+    } catch (e) { console.error('[cartas corregir→dealer credito]', e.message); }
+
     auditar({ req, accion: 'CORREGIR', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: idNueva,
       detalle: `Corrigió la carta ${orig.op_carta} → ${opNueva} (${cambios.map(c => c.campo).join(', ')}). Motivo: ${String(motivo).trim()}`,
-      rut: nueva.rut_cliente });
+      rut: nueva.rut_cliente, meta: propDealer ? { dealer_propagado: propDealer } : undefined });
 
     res.json({ success: true, error: null, data: {
       id: idNueva, opCarta: opNueva, correccionN: n,
@@ -2312,6 +2325,34 @@ const cadenaCorrecciones = async (req, res) => {
   } catch (e) { console.error('[cartas cadena]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
+/* ── Propaga el dealer corregido a TODO lo que lo lee (Máxima 2: una sola
+   fuente). El caso 89127 (21-08-2026) mostró la falla: la corrección dejaba
+   `automotora` bien pero `rut_dealer` e `id_dealer` seguían apuntando a la
+   ficha del dealer viejo — y la Orden de Pago de comisión lee el dealer y la
+   CUENTA DE DEPÓSITO por `id_dealer`, así que la plata iba a la cuenta
+   equivocada. También el seguimiento de Post Venta quedaba con el nombre viejo.
+   Solo en meses abiertos; devuelve qué tocó para la auditoría. ── */
+async function propagarDealerCredito(idCredito, nom, rut) {
+  const out = { credito: 0, seguimiento: 0, id_dealer: null };
+  if (!idCredito) return out;
+  const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
+  const [[cr]] = await pool.query("SELECT id, DATE_FORMAT(mes,'%Y-%m') mes FROM creditos WHERE id=?", [idCredito]);
+  if (!cr || (await isMesCerrado(cr.mes))) return out;
+  // La FICHA del dealer nuevo, por RUT (con o sin puntos): id_dealer es lo que
+  // leen la ODP (cuenta de depósito) y los JOIN de Post Venta.
+  const [[d]] = await pool.query(
+    "SELECT id_dealer FROM dealers WHERE REPLACE(rut,'.','') = REPLACE(?,'.','') LIMIT 1", [rut]);
+  out.id_dealer = d ? d.id_dealer : null;
+  const [rc] = await pool.query(
+    'UPDATE creditos SET automotora=?, rut_dealer=?, id_dealer=COALESCE(?, id_dealer), updated_at=NOW() WHERE id=?',
+    [nom, rut, out.id_dealer, cr.id]);
+  out.credito = rc.affectedRows;
+  const [rs] = await pool.query(
+    'UPDATE postventa_seguimiento SET nombre_dealer=?, rut_dealer=? WHERE id_credito=?', [nom, rut, cr.id]);
+  out.seguimiento = rs.affectedRows;
+  return out;
+}
+
 /* ── PUT /api/cartas/:id/corregir-dealer — corrige el dealer de una carta ya
    APROBADA (una pendiente/rechazada se corrige por el flujo normal de edición).
    Casilla propia aprob_corregir_dealer (por defecto solo Administrador), motivo
@@ -2340,19 +2381,11 @@ const corregirDealer = async (req, res) => {
     /* El CRÉDITO también lleva el dealer (comisiones, cartola, reportería): si se
        corrige la carta y no el crédito quedan dos verdades para el mismo hecho.
        Solo en meses abiertos — uno cerrado ya está liquidado. */
-    let credito = 0;
-    if (ca.id_credito_creado) {
-      const { isMesCerrado } = require('../../../../shared/utils/mes-cerrado');
-      const [[cr]] = await pool.query("SELECT id, DATE_FORMAT(mes,'%Y-%m') mes FROM creditos WHERE id=?", [ca.id_credito_creado]);
-      if (cr && !(await isMesCerrado(cr.mes))) {
-        const [rc] = await pool.query('UPDATE creditos SET automotora=?, rut_dealer=?, updated_at=NOW() WHERE id=?', [nom, rut, cr.id]);
-        credito = rc.affectedRows;
-      }
-    }
+    const prop = await propagarDealerCredito(ca.id_credito_creado, nom, rut);
     auditar({ req, accion: 'CORREGIR_DEALER', modulo: 'cartas', entidad: 'carta_aprobacion', entidad_id: id,
       detalle: `Corrigió dealer de la carta ${ca.op_carta}: ${ca.nombre_dealer || '—'} (${ca.rut_dealer || '—'}) → ${nom} (${rut}). Motivo: ${String(motivo).trim()}`,
-      meta: { antes: { nombre: ca.nombre_dealer, rut: ca.rut_dealer }, despues: { nombre: nom, rut }, movimientos: mv.affectedRows, credito } });
-    res.json({ success: true, data: { id, movimientos_actualizados: mv.affectedRows, credito_actualizado: credito }, error: null });
+      meta: { antes: { nombre: ca.nombre_dealer, rut: ca.rut_dealer }, despues: { nombre: nom, rut }, movimientos: mv.affectedRows, ...prop } });
+    res.json({ success: true, data: { id, movimientos_actualizados: mv.affectedRows, credito_actualizado: prop.credito, seguimiento_actualizado: prop.seguimiento }, error: null });
   } catch (e) {
     console.error('[cartas corregirDealer]', e.message);
     res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
