@@ -1302,8 +1302,12 @@ const setEtapa = async (req, res) => {
       return res.status(400).json({ success: false, data: null, error: 'Etapa de sistema — no editable' });
     if (track === 'COMISION' && etapa === 'COMISION A PAGAR')
       return res.status(400).json({ success: false, data: null, error: '"COMISION A PAGAR" se marca automáticamente al marcar FONDOS RECIBIDOS en el track Saldo Precio de la operación' });
-    if (track === 'COMISION' && etapa === 'CARTOLA ENVIADA')
-      return res.status(400).json({ success: false, data: null, error: '"CARTOLA ENVIADA" se marca automáticamente al enviar la cartola al dealer (Emisión de Cartolas)' });
+    // CARTOLA ENVIADA es automática (la marca el envío desde Emisión de Cartolas),
+    // pero el Administrador puede marcarla a mano para el caso de borde real:
+    // una cartola emitida y enviada FUERA del ciclo (op que no estaba marcada al
+    // enviar) dejaba la operación atascada sin poder llegar a FACTURA RECIBIDA.
+    if (track === 'COMISION' && etapa === 'CARTOLA ENVIADA' && req.usuario?.perfil_nombre !== 'Administrador')
+      return res.status(400).json({ success: false, data: null, error: '"CARTOLA ENVIADA" se marca automáticamente al enviar la cartola al dealer (Emisión de Cartolas). Solo el Administrador puede marcarla a mano (cartola enviada fuera del ciclo).' });
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
     if (track === 'SALDO' && etapa === 'FUNDANTES RECIBIDOS')
       return res.status(400).json({ success: false, data: null, error: `"FUNDANTES RECIBIDOS" se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)` });

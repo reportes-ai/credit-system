@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -298,8 +298,13 @@ function trackHTML(r, track, lista){
     // Etapas automáticas: se marcan desde sus módulos (Emisión Orden de Pago /
     // Saldos Precios a Pagar / Emisión de Cartolas / Comisiones a Pagar).
     // No se marcan ni desmarcan a mano en Seguimiento.
+    // CARTOLA ENVIADA: automática, pero el Administrador puede marcarla a mano
+    // (caso de borde: cartola emitida y enviada fuera del ciclo — el servidor
+    // aplica el mismo permiso).
+    const autoComision = ['COMISION A PAGAR','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
+    if (!esAdmin) autoComision.push('CARTOLA ENVIADA');
     const esAuto = (track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa))
-                || (track==='COMISION' && ['COMISION A PAGAR','CARTOLA ENVIADA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'].includes(x.etapa));
+                || (track==='COMISION' && autoComision.includes(x.etapa));
 
     // ¿Puede marcar? Etapa anterior debe estar marcada
     const prevMarcado = i === 0 || !!marc[lista[i-1].etapa];
