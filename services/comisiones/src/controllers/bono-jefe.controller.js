@@ -191,16 +191,21 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
           AND (? IS NULL OR u.id_supervisor = ?)
         ORDER BY ejecutivo`, [mes, mes, idJefe || null, idJefe || null]);
 
+    /* Mes de atribución (motor único shared/mes-atribucion.js): desde el corte
+       manda la fecha de curse; antes, el mes contable ajustado. */
+    const ATRIB = require('../../../../shared/mes-atribucion');
+    const mesSqlC = ATRIB.MES_SQL(mes, await ATRIB.mesCorte(), '');
+
     // Pilar 1: créditos OTORGADOS del mes
     const [ing] = await pool.query(
       `SELECT ejecutivo, COUNT(*) n FROM creditos
-        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
+        WHERE ${mesSqlC}=? AND estado_credito='OTORGADO'
           AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
     // Pilar 2: MONTOS OTORGADOS del mes (solo operaciones cursadas — definición Pato 2026-08-11;
     // antes sumaba también las APROBADAS, lo que no calzaba con el nombre del pilar)
     const [apr] = await pool.query(
       `SELECT ejecutivo, COALESCE(SUM(monto_financiado),0) monto FROM creditos
-        WHERE DATE_FORMAT(mes,'%Y-%m')=? AND estado_credito='OTORGADO'
+        WHERE ${mesSqlC}=? AND estado_credito='OTORGADO'
           AND ejecutivo IS NOT NULL AND ejecutivo<>'' GROUP BY ejecutivo`, [mes]);
     // Pilar 3: NUEVOS DEALERS CON NEGOCIOS — dealers que CURSARON su PRIMERA operación
     // otorgada de la historia en el mes evaluado (definición Pato 2026-08-11; antes se
@@ -218,7 +223,7 @@ async function calcularBSC(mesQ, cfgOverride, idJefe) {
            ON COALESCE(NULLIF(TRIM(c.rut_dealer),''), TRIM(c.automotora)) = t.d
           AND c.mes = t.pri AND c.estado_credito='OTORGADO'
         WHERE DATE_FORMAT(t.pri,'%Y-%m')=? AND c.ejecutivo IS NOT NULL AND c.ejecutivo<>''
-        GROUP BY c.ejecutivo`, [mes]);
+        GROUP BY c.ejecutivo`, [mes]);   // pilar 3 sigue por `mes`: la "primera op" se ancla al mes contable histórico
 
     const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
     const keyEj = s => norm(s).split(' ').filter(Boolean).sort().join(' ');

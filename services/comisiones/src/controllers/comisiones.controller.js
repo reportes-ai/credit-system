@@ -532,6 +532,13 @@ async function calcularMes(mes, varsOverride) {
     // seed de boot haya alcanzado a correr.
     await SC.asegurarFeriados();
 
+    /* MES DE ATRIBUCIÓN (motor único shared/mes-atribucion.js, definición
+       21-08-2026): desde el corte (ago-2026) manda la FECHA DE CURSE; los meses
+       anteriores mantienen el mes contable AJUSTADO (INDEXA no dejaba digitar
+       con fechas distintas y esos ajustes deben seguir cuadrando tal cual). */
+    const ATRIB = require('../../../../shared/mes-atribucion');
+    const mesAtribSql = ATRIB.MES_SQL(mes, await ATRIB.mesCorte(), 'ob');
+
     // Trae todos los créditos del mes agrupados por ejecutivo
     const [creditos] = await pool.query(
       `SELECT ob.ejecutivo, ob.estado_credito, ob.financiera, ob.producto,
@@ -542,7 +549,7 @@ async function calcularMes(mes, varsOverride) {
               COALESCE(cl.rut, '')             AS rut_cliente
        FROM creditos ob
        LEFT JOIN clientes cl ON cl.id_cliente = ob.id_cliente
-       WHERE DATE_FORMAT(COALESCE(ob.fecha_otorgado, ob.mes), '%Y-%m') = ?
+       WHERE ${mesAtribSql} = ?
          AND ob.ejecutivo IS NOT NULL AND ob.ejecutivo != ''`,
       [mes]
     );

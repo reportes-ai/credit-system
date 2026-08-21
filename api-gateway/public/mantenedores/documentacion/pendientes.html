@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.1 — 6.7 consolidar las 3 copias del documento Solicitud de Pago. v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
+<!-- v1.2 — 2.7 resuelto: mes de atribucion (mes contable hasta jul-26, fecha de curse desde ago-26). v1.1 — 6.7 consolidar las 3 copias del documento Solicitud de Pago. v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -61,7 +61,7 @@
     <tr><td>2.4</td><td>Nunca se ha cerrado un mes</td><td>La tabla de meses cerrados está vacía, así que el candado <b>jamás ha actuado</b>: hoy nada impide digitar sobre un período ya informado. Decidir desde qué mes se empieza a cerrar.</td></tr>
     <tr><td>2.5</td><td>Conciliación y pagos al día</td><td>Al corte de julio: 112 movimientos bancarios sin conciliar y 4 órdenes de pago emitidas e impagas.</td></tr>
     <tr><td>2.6</td><td>Facturación electrónica (emitir DTE)</td><td>Acordado y <b>no contratado</b>. Lo que hoy tenemos con el SII solo <b>lee</b> el registro de compras; emitir es otro servicio.</td></tr>
-    <tr><td>2.7</td><td>Mes contable vs fecha de curse</td><td>8 operaciones de 2026 cursadas el 1 o 2 del mes quedaron en el cierre del mes anterior. Decidir la convención. <b>Toca meses ya cerrados y sus comisiones</b> — no se hace a la ligera.</td></tr>
+    <tr><td>2.7</td><td>✅ Mes contable vs fecha de curse <span style="color:#15803d">(definido 21-08-2026)</span></td><td>La comisión se atribuye por <b>fecha de curse</b>; los meses históricos (hasta jul-2026) mantienen el <b>mes contable ajustado</b> — INDEXA no dejaba digitar con fechas distintas y esos ajustes deben seguir cuadrando. Motor único <code>shared/mes-atribucion.js</code>, corte paramétrico <code>mes_corte_curse</code>. Aplicado en Comisión Ejecutivos y Bono Jefe.</td></tr>
     <tr><td>2.8</td><td>Costos de servicios por escenario</td><td>La vista única ya existe en Salud y Uptime. Falta lo que se pidió originalmente: cuánto cuesta cada servicio <b>en contingencia</b>, <b>si crece el volumen</b>, y <b>qué pasa si se deja de pagar</b>. Los precios que faltan se confirman en cada panel: no se inventan.</td></tr>
   </table>
 
