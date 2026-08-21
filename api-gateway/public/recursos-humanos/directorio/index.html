@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -75,8 +75,15 @@
        desplazada a la izquierda con su tirante horizontal al tronco. */
     .staff-band { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 0 0; }
     .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:-24px; width:2px; background:#dbe3ec; transform:translateX(-50%); }
-    .staff-item { position:relative; transform:translateX(calc(-50% - 30px)); }
-    .staff-item::after { content:''; position:absolute; left:100%; top:50%; width:32px; height:2px; background:#dbe3ec; }
+    /* Alternadas: una a cada lado del tronco, con su tirante hacia él.
+       Cajas del MISMO tamaño (ancho fijo, no al contenido). */
+    .staff-item { position:relative; }
+    .staff-item .org-row { width:200px; min-width:200px; max-width:200px; box-sizing:border-box; }
+    .staff-item:nth-child(odd)  { transform:translateX(calc(-50% - 30px)); }
+    .staff-item:nth-child(even) { transform:translateX(calc(50% + 30px)); }
+    .staff-item::after { content:''; position:absolute; top:50%; width:32px; height:2px; background:#dbe3ec; }
+    .staff-item:nth-child(odd)::after  { left:100%; }
+    .staff-item:nth-child(even)::after { right:100%; }
     /* con banda staff, el conector del <ul> de jefaturas lo dibuja la banda */
     .tree.clasico li > .staff-band + ul::before { display:none; }
 
