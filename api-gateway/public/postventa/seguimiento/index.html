@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -96,6 +96,9 @@ let DATA = [], CFG = { etapas_saldo:[], etapas_comision:[] };
 let FIJOS = { autofin_inscripcion:0, autofin_limitacion:0 };   // Saldo Precio AUTOFIN = saldo + estos fijos
 let IMPUESTOS = { IVA:19, RETENCION_HONORARIOS:15.25 };
 let selFin = new Set(), selSaldo = new Set(), selCom = new Set(), selMes = new Set();
+// Marcar CARTOLA ENVIADA a mano: Admin siempre; delegable con la casilla
+// pv_marcar_cartola_enviada (el servidor aplica el mismo permiso).
+let PUEDE_CARTOLA_ENV = yo?.perfil === 'Administrador';
 let filtroPagado = true; // por defecto oculta completamente pagados
 const FINANCIERAS = ['AUTOFIN','UNIDAD DE CREDITO','AUTOFACIL'];
 const MESES_N = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
@@ -108,15 +111,17 @@ async function init(){
   try {
     await fetch('/api/postventa/sync',             { method:'POST', headers:H }).catch(()=>{});
     await fetch('/api/postventa/marcar-historico', { method:'POST', headers:H }).catch(()=>{});
-    const [rD, rC, rI] = await Promise.all([
+    const [rD, rC, rI, rP] = await Promise.all([
       fetch('/api/postventa', { headers:H }),
       fetch('/api/postventa/config', { headers:H }),
       fetch('/api/impuestos/valores', { headers:H }),
+      fetch('/api/auth/mis-permisos', { headers:H }).catch(() => null),
     ]);
     if (!rD.ok) throw new Error('El servidor respondió ' + rD.status);
     const jD = await rD.json(), jC = await rC.json();
     if (jD.success === false) throw new Error(jD.error || 'No se pudo cargar el seguimiento');
     try { const jI = await rI.json(); if (jI.success && jI.data) IMPUESTOS = Object.assign(IMPUESTOS, jI.data); } catch(e){}
+    try { const jP = rP && await rP.json(); if ((jP.funcionalidades||[]).includes('pv_marcar_cartola_enviada')) PUEDE_CARTOLA_ENV = true; } catch(e){}
     DATA = jD.data || [];
     if (jD.fijos) FIJOS = jD.fijos;
     if (jC.data) CFG = { etapas_saldo: jC.data.etapas_saldo||[], etapas_comision: jC.data.etapas_comision||[] };
@@ -298,11 +303,11 @@ function trackHTML(r, track, lista){
     // Etapas automáticas: se marcan desde sus módulos (Emisión Orden de Pago /
     // Saldos Precios a Pagar / Emisión de Cartolas / Comisiones a Pagar).
     // No se marcan ni desmarcan a mano en Seguimiento.
-    // CARTOLA ENVIADA: automática, pero el Administrador puede marcarla a mano
-    // (caso de borde: cartola emitida y enviada fuera del ciclo — el servidor
-    // aplica el mismo permiso).
+    // CARTOLA ENVIADA: automática, pero quien tenga la casilla "Marcar Cartola
+    // Enviada a mano" (o el Admin) puede marcarla — caso de borde: cartola
+    // emitida y enviada fuera del ciclo. El servidor aplica el mismo permiso.
     const autoComision = ['COMISION A PAGAR','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
-    if (!esAdmin) autoComision.push('CARTOLA ENVIADA');
+    if (!PUEDE_CARTOLA_ENV) autoComision.push('CARTOLA ENVIADA');
     const esAuto = (track==='SALDO' && ['FUNDANTES RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'].includes(x.etapa))
                 || (track==='COMISION' && autoComision.includes(x.etapa));
 
@@ -326,7 +331,7 @@ function trackHTML(r, track, lista){
       if (x.etapa==='COMISION A PAGAR') {
         title = 'Se marca sola cuando el Saldo Precio de esta misma operación queda con «FONDOS RECIBIDOS»: la comisión se paga con la plata en mano.';
       } else if (x.etapa==='CARTOLA ENVIADA') {
-        title = 'Se marca sola cuando el Analista envía la cartola al dealer desde Emisión de Cartolas.';
+        title = 'Se marca sola cuando el Analista envía la cartola al dealer desde Emisión de Cartolas. Si la cartola se envió FUERA del ciclo, puede marcarla a mano quien tenga la casilla "Marcar Cartola Enviada a mano" (matriz de Perfiles) o el Administrador.';
         donde = '/cartas-aprobacion/cartolas/'; dondeTxt = 'Ir a Emisión de Cartolas';
       } else if (x.etapa==='ORDEN DE PAGO EMITIDA') {
         if (m) {

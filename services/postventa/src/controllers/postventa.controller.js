@@ -1303,11 +1303,12 @@ const setEtapa = async (req, res) => {
     if (track === 'COMISION' && etapa === 'COMISION A PAGAR')
       return res.status(400).json({ success: false, data: null, error: '"COMISION A PAGAR" se marca automáticamente al marcar FONDOS RECIBIDOS en el track Saldo Precio de la operación' });
     // CARTOLA ENVIADA es automática (la marca el envío desde Emisión de Cartolas),
-    // pero el Administrador puede marcarla a mano para el caso de borde real:
-    // una cartola emitida y enviada FUERA del ciclo (op que no estaba marcada al
-    // enviar) dejaba la operación atascada sin poder llegar a FACTURA RECIBIDA.
-    if (track === 'COMISION' && etapa === 'CARTOLA ENVIADA' && req.usuario?.perfil_nombre !== 'Administrador')
-      return res.status(400).json({ success: false, data: null, error: '"CARTOLA ENVIADA" se marca automáticamente al enviar la cartola al dealer (Emisión de Cartolas). Solo el Administrador puede marcarla a mano (cartola enviada fuera del ciclo).' });
+    // pero se puede marcar a mano para el caso de borde real: una cartola emitida
+    // y enviada FUERA del ciclo (op que no estaba marcada al enviar) dejaba la
+    // operación atascada sin poder llegar a FACTURA RECIBIDA. Admin siempre puede;
+    // delegable con la casilla pv_marcar_cartola_enviada en la matriz de Perfiles.
+    if (track === 'COMISION' && etapa === 'CARTOLA ENVIADA' && !(await puedeMarcarCartolaEnviada(req)))
+      return res.status(400).json({ success: false, data: null, error: '"CARTOLA ENVIADA" se marca automáticamente al enviar la cartola al dealer (Emisión de Cartolas). Para marcarla a mano (cartola enviada fuera del ciclo) necesitas la casilla "Marcar Cartola Enviada a mano" en la matriz de Perfiles, o ser Administrador.' });
     // Etapas automáticas: solo se marcan desde sus módulos dedicados
     if (track === 'SALDO' && etapa === 'FUNDANTES RECIBIDOS')
       return res.status(400).json({ success: false, data: null, error: `"FUNDANTES RECIBIDOS" se marca automáticamente al aprobar los fundantes en Seguimiento Fundantes (Operaciones)` });
@@ -2025,6 +2026,34 @@ require('../../../../shared/migrate').enFila('pv-revertir-anteriores', async () 
       SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [idF]);
   } catch (e) { console.error('[pv-revertir-anteriores seed]', e.message); }
 });
+
+/* ── Marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo): Admin
+   siempre; delegable con la casilla pv_marcar_cartola_enviada (matriz de
+   Perfiles) — mismo patrón que la reversa de días anteriores. ── */
+require('../../../../shared/migrate').enFila('pv-cartola-enviada-manual', async () => {
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
+    if (!mod) return;
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='pv_marcar_cartola_enviada'");
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?, 'Marcar Cartola Enviada a mano', 'pv_marcar_cartola_enviada', NULL)",
+        [mod.id_modulo]);
+      idF = ins.insertId;
+    }
+    await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [idF]);
+  } catch (e) { console.error('[pv-cartola-enviada-manual seed]', e.message); }
+});
+
+async function puedeMarcarCartolaEnviada(req) {
+  if (req.usuario?.perfil_nombre === 'Administrador') return true;
+  try {
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    return await tieneFunc(req.usuario?.id_usuario, 'pv_marcar_cartola_enviada');
+  } catch (_) { return false; }
+}
 
 async function puedeRevertirAnterior(req) {
   if (req.usuario?.perfil_nombre === 'Administrador') return true;
