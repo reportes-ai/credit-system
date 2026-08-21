@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -37,6 +37,46 @@
     .org-row .on { font-weight:700; font-size:.85rem; color:#111827; line-height:1.2; }
     .org-row .oc { font-size:.72rem; color:#0141A2; font-weight:600; line-height:1.2; }
     .org-row .cnt { margin-left:auto; font-size:.68rem; color:#64748b; background:#eef2f7; border-radius:20px; padding:2px 9px; font-weight:700; white-space:nowrap; }
+
+    /* Selector de vista del organigrama */
+    .org-views { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+    .org-view-btn { display:inline-flex; align-items:center; gap:6px; background:#fff; border:1.5px solid #e2e8f0; color:#475569; border-radius:9px; padding:6px 14px; font-size:.8rem; font-weight:700; cursor:pointer; }
+    .org-view-btn.on { background:#0141A2; border-color:#0141A2; color:#fff; }
+
+    /* ── Vista ÁRBOL (clásico hacia abajo): cajas centradas con conectores ── */
+    .tree-scroll { overflow-x:auto; padding:10px 4px 20px; }
+    .tree, .tree ul { display:flex; justify-content:center; list-style:none; margin:0; padding:0; }
+    .tree ul { padding-top:24px; position:relative; }
+    .tree li { display:flex; flex-direction:column; align-items:center; position:relative; padding:0 10px; }
+    /* conector vertical que baja del padre */
+    .tree li > ul::before { content:''; position:absolute; top:0; left:50%; width:2px; height:24px; background:#dbe3ec; transform:translateX(-50%); }
+    /* conector que sube de cada hijo + línea horizontal entre hermanos */
+    .tree ul li::before { content:''; position:absolute; top:-24px; left:50%; width:2px; height:24px; background:#dbe3ec; transform:translateX(-50%); }
+    .tree ul li:not(:only-child)::after { content:''; position:absolute; top:-24px; height:2px; background:#dbe3ec; }
+    .tree ul li:first-child:not(:only-child)::after { left:50%; right:-10px; }
+    .tree ul li:last-child:not(:only-child)::after { left:-10px; right:50%; }
+    .tree ul li:not(:first-child):not(:last-child):not(:only-child)::after { left:-10px; right:-10px; }
+    .tree .org-row { margin:0; min-width:170px; max-width:220px; }
+    .tree .org-row .cnt { display:none; }
+
+    /* ── Vista HORIZONTAL (hacia el lado): raíz a la izquierda ── */
+    .horiz-scroll { overflow-x:auto; padding:6px 4px 16px; }
+    .horiz-item { display:flex; align-items:center; }
+    .horiz-node { flex-shrink:0; }
+    .horiz-children { display:flex; flex-direction:column; margin-left:34px; position:relative; }
+    .horiz-children::before { content:''; position:absolute; left:-18px; top:0; bottom:0; width:2px; background:#dbe3ec; }
+    .horiz-children > .horiz-item { position:relative; }
+    .horiz-children > .horiz-item::before { content:''; position:absolute; left:-18px; top:50%; width:16px; border-top:2px solid #dbe3ec; }
+    .horiz-item .org-row { margin:5px 0; min-width:200px; }
+
+    /* ── Vista EQUIPOS (compacta): una card por jefatura ── */
+    .teams { display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:14px; }
+    .team-card { background:#fff; border:1.5px solid #e5e9f0; border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+    .team-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:10px 14px; display:flex; align-items:center; gap:10px; }
+    .team-head .oa { width:34px; height:34px; }
+    .team-head .on { color:#fff; } .team-head .oc { color:#bcd7ff; }
+    .team-body { padding:8px 12px; }
+    .team-body .org-row { border:none; box-shadow:none; padding:5px 4px; margin:0; }
 
     /* ── Configurar ── */
     .cfg-box { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:18px 20px; }
@@ -74,6 +114,12 @@
 
   <!-- ORGANIGRAMA -->
   <div id="pane-org" style="display:none">
+    <div class="org-views">
+      <button class="org-view-btn" id="ov-escalera" onclick="vistaOrg('escalera')"><i class="bi bi-list-nested"></i>Escalera</button>
+      <button class="org-view-btn" id="ov-arbol"    onclick="vistaOrg('arbol')"><i class="bi bi-diagram-3"></i>Árbol (hacia abajo)</button>
+      <button class="org-view-btn" id="ov-lado"     onclick="vistaOrg('lado')"><i class="bi bi-diagram-2" style="transform:rotate(-90deg)"></i>Hacia el lado</button>
+      <button class="org-view-btn" id="ov-equipos"  onclick="vistaOrg('equipos')"><i class="bi bi-people"></i>Por equipos</button>
+    </div>
     <div class="org-wrap"><div id="orgTree" class="empty">Cargando…</div></div>
   </div>
 
@@ -167,7 +213,45 @@ function ramaHTML(id, hijosDe){
   const n = MAPA[id];
   return `<div class="org-item">${nodoRow(n,hijosDe)}${hijos.length?`<div class="org-children">${hijos.map(h=>ramaHTML(h.id_usuario,hijosDe)).join('')}</div>`:''}</div>`;
 }
+/* ── Las 4 vistas del organigrama (elección recordada por navegador) ── */
 let MAPA = {};
+let VISTA_ORG = localStorage.getItem('af_org_vista') || 'escalera';
+function vistaOrg(v){ VISTA_ORG = v; localStorage.setItem('af_org_vista', v); pintarOrg(); }
+
+function arbolHTML(id, hijosDe){
+  const hijos = hijosDe[id] || [];
+  return `<li>${nodoRow(MAPA[id],hijosDe)}${hijos.length?`<ul>${hijos.map(h=>arbolHTML(h.id_usuario,hijosDe)).join('')}</ul>`:''}</li>`;
+}
+function ladoHTML(id, hijosDe){
+  const hijos = hijosDe[id] || [];
+  return `<div class="horiz-item">
+    <div class="horiz-node">${nodoRow(MAPA[id],hijosDe)}</div>
+    ${hijos.length?`<div class="horiz-children">${hijos.map(h=>ladoHTML(h.id_usuario,hijosDe)).join('')}</div>`:''}
+  </div>`;
+}
+function equiposHTML(raices, hijosDe){
+  // Una card por persona con gente a cargo, en orden jerárquico (BFS desde las raíces)
+  const jefes = [];
+  const cola = raices.map(r=>r.id_usuario);
+  while (cola.length){
+    const id = cola.shift();
+    const hijos = hijosDe[id] || [];
+    if (hijos.length) jefes.push(id);
+    hijos.forEach(h=>cola.push(h.id_usuario));
+  }
+  if (!jefes.length) return '<div class="empty">Sin jefaturas con equipo.</div>';
+  return `<div class="teams">${jefes.map(id=>{
+    const n = MAPA[id]; const foto = FOTOS[id]; const hijos = hijosDe[id];
+    return `<div class="team-card">
+      <div class="team-head">
+        <div class="oa">${foto?`<img src="${foto}" alt="" style="width:100%;height:100%;object-fit:cover">`:esc((n.nombre||'?')[0].toUpperCase())}</div>
+        <div style="min-width:0"><div class="on">${esc(n.nombre)}</div><div class="oc">${esc(n.cargo||'')}</div></div>
+        <span class="cnt" style="margin-left:auto;background:rgba(255,255,255,.18);color:#fff"><i class="bi bi-people-fill"></i> ${contarDescendientes(id,hijosDe)}</span>
+      </div>
+      <div class="team-body">${hijos.map(h=>nodoRow(h,{})).join('')}</div>
+    </div>`;
+  }).join('')}</div>`;
+}
 function pintarOrg(){
   MAPA = {}; ORG.forEach(n=>MAPA[n.id_usuario]=n);
   const hijosDe = {}; const raices = [];
@@ -179,10 +263,19 @@ function pintarOrg(){
   const orden = a => (a.nombre||'').toLowerCase();
   Object.values(hijosDe).forEach(arr=>arr.sort((a,b)=>orden(a)<orden(b)?-1:1));
   raices.sort((a,b)=>orden(a)<orden(b)?-1:1);
+  document.querySelectorAll('.org-view-btn').forEach(b=>b.classList.remove('on'));
+  document.getElementById('ov-'+VISTA_ORG)?.classList.add('on');
   const el = document.getElementById('orgTree');
   if (!ORG.length){ el.textContent='Sin colaboradores para mostrar.'; return; }
   el.className='';
-  el.innerHTML = raices.map(r=>ramaHTML(r.id_usuario,hijosDe)).join('');
+  if (VISTA_ORG === 'arbol')
+    el.innerHTML = `<div class="tree-scroll"><ul class="tree">${raices.map(r=>arbolHTML(r.id_usuario,hijosDe)).join('')}</ul></div>`;
+  else if (VISTA_ORG === 'lado')
+    el.innerHTML = `<div class="horiz-scroll">${raices.map(r=>ladoHTML(r.id_usuario,hijosDe)).join('')}</div>`;
+  else if (VISTA_ORG === 'equipos')
+    el.innerHTML = equiposHTML(raices, hijosDe);
+  else
+    el.innerHTML = raices.map(r=>ramaHTML(r.id_usuario,hijosDe)).join('');
 }
 
 /* ── Configurar ── */
