@@ -391,6 +391,7 @@ app.use('/api/cuentas-corrientes',   require('../../services/tesoreria/src/route
 app.use('/api/cierre-mes',           require('../../services/tesoreria/src/routes/cierre-mes.routes'));
 app.use('/api/facilbook',            require('../../services/facilbook/src/routes/facilbook.routes'));
 app.use('/api/concurso',             require('../../services/rrhh/src/routes/concurso.routes'));
+app.use('/api/postulaciones',        require('../../services/rrhh/src/routes/postulaciones.routes'));
 app.use('/api/trx-bitacora',         require('../../services/tesoreria/src/routes/trx-bitacora.routes'));
 
 // Cartas de Aprobación

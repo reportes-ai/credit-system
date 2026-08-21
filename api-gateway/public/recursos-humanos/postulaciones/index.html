@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<!-- v1.0 — Portal del Postulante (RRHH): avisos con preguntas/requisitos y link publico; bandeja de postulantes con filtros, ficha completa, CV, pipeline de estados y correo de descarte -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal del Postulante — AutoFácil</title>
+<link rel="icon" href="/img/favicon.png" type="image/png">
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
+  * { box-sizing:border-box; } body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; color:#1e293b; }
+  .page { padding:24px 28px 80px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE); border-radius:16px; color:#fff; padding:20px 28px; margin-bottom:16px; display:flex; align-items:center; gap:18px; }
+  .banner i { font-size:2.2rem; opacity:.85; } .banner h2 { margin:0 0 3px; font-size:1.25rem; } .banner p { margin:0; opacity:.85; font-size:.86rem; }
+  .tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tab { background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:8px 18px; font-weight:700; font-size:.86rem; color:#475569; cursor:pointer; }
+  .tab.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+  .card { background:#fff; border-radius:14px; box-shadow:0 1px 4px rgba(0,0,0,.07); padding:16px 18px; margin-bottom:14px; }
+  table { width:100%; border-collapse:collapse; font-size:.83rem; }
+  th { background:#f8fafc; color:#475569; font-size:.68rem; text-transform:uppercase; padding:8px 10px; text-align:left; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  tr:hover td { background:#f8fafc; cursor:pointer; }
+  .pill { font-size:.68rem; font-weight:800; border-radius:12px; padding:2px 10px; white-space:nowrap; }
+  .p-NUEVA { background:#dbeafe; color:#1e40af; } .p-EN.REVISION, .p-ENREV { background:#fef9c3; color:#854d0e; }
+  .p-ENTREVISTA { background:#ede9fe; color:#6d28d9; } .p-DESCARTADA { background:#fee2e2; color:#991b1b; } .p-CONTRATADA { background:#dcfce7; color:#166534; }
+  .cump { font-weight:800; } .c-alto { color:#15803d; } .c-medio { color:#b45309; } .c-bajo { color:#b91c1c; }
+  .btn { border:none; border-radius:9px; padding:8px 16px; font-size:.84rem; font-weight:700; cursor:pointer; }
+  .btn-navy { background:var(--navy); color:#fff; } .btn-line { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .filtros select, .filtros input { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 11px; font-size:.84rem; }
+  label { font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; display:block; margin:10px 0 4px; }
+  input.full, textarea.full, select.full { width:100%; border:1.5px solid #d1d5db; border-radius:9px; padding:8px 11px; font-size:.9rem; font-family:inherit; box-sizing:border-box; }
+  textarea.full { resize:vertical; min-height:90px; }
+  dialog { border:none; border-radius:14px; padding:0; max-width:860px; width:96%; box-shadow:0 36px 90px rgba(2,6,23,.55), 0 10px 26px rgba(2,6,23,.34); }
+  dialog::backdrop { background:rgba(15,23,42,.32); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:14px 20px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
+  .dlg-body { padding:18px 20px; max-height:72vh; overflow:auto; }
+  .dlg-foot { padding:12px 20px; border-top:1px solid #eef2f7; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+  .kv { display:grid; grid-template-columns:150px 1fr; gap:3px 12px; font-size:.87rem; }
+  .kv b { color:#64748b; font-size:.72rem; text-transform:uppercase; padding-top:2px; }
+  .sec { font-size:.76rem; font-weight:800; text-transform:uppercase; color:var(--navy); margin:16px 0 6px; border-bottom:2px solid #eff6ff; padding-bottom:3px; }
+  .reqbar { display:flex; align-items:center; gap:8px; font-size:.84rem; padding:3px 0; }
+  .reqbar .b { flex:0 0 160px; height:8px; background:#e5e9f0; border-radius:5px; overflow:hidden; }
+  .reqbar .f { height:100%; background:linear-gradient(90deg,#0141A2,#009AFE); }
+  .empty { text-align:center; color:#94a3b8; padding:40px 0; }
+  .link-box { display:flex; gap:8px; align-items:center; background:#f0fdf4; border:1.5px solid #86efac; border-radius:9px; padding:8px 12px; font-size:.82rem; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#15803d; color:#fff; border-radius:10px; padding:11px 24px; font-weight:700; display:none; z-index:999; }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Portal del Postulante',icon:'bi-person-plus',current:true}]};</script>
+
+<div class="page">
+  <div class="banner"><i class="bi bi-person-plus"></i><div>
+    <h2>Portal del Postulante</h2>
+    <p>Publica avisos con link de postulación, deja que la IA lea los CV y gestiona a los candidatos en un solo lugar.</p>
+  </div></div>
+
+  <div class="tabs">
+    <div class="tab on" id="t-post" onclick="verTab('post')"><i class="bi bi-people me-1"></i>Postulantes</div>
+    <div class="tab" id="t-avisos" onclick="verTab('avisos')"><i class="bi bi-megaphone me-1"></i>Avisos</div>
+  </div>
+
+  <!-- POSTULANTES -->
+  <div id="v-post">
+    <div class="card">
+      <div class="filtros">
+        <select id="fAviso" onchange="cargarPost()"><option value="">Todos los avisos</option></select>
+        <select id="fEstado" onchange="pintarPost()">
+          <option value="">Todos los estados</option>
+          <option>NUEVA</option><option>EN REVISION</option><option>ENTREVISTA</option><option>DESCARTADA</option><option>CONTRATADA</option>
+        </select>
+        <select id="fCump" onchange="pintarPost()">
+          <option value="">Cumplimiento: todos</option>
+          <option value="75">≥ 75%</option><option value="50">≥ 50%</option><option value="25">≥ 25%</option>
+        </select>
+        <select id="fNivel" onchange="pintarPost()">
+          <option value="">Estudios: todos</option>
+          <option>Universitario</option><option>Postgrado</option><option>Técnico</option><option>Media</option>
+        </select>
+        <input id="fQ" placeholder="Buscar nombre, RUT, comuna, habilidad…" oninput="pintarPost()" style="min-width:240px">
+        <span id="cnt" style="font-size:.8rem;color:#64748b"></span>
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Postulante</th><th>Aviso</th><th>Comuna</th><th>Estudios</th><th>Últ. trabajo</th><th>Cumplim.</th><th>Estado</th><th>Postuló</th></tr></thead>
+        <tbody id="tbPost"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- AVISOS -->
+  <div id="v-avisos" style="display:none">
+    <div class="card">
+      <button class="btn btn-navy" onclick="abrirAviso()"><i class="bi bi-plus-lg me-1"></i>Nuevo aviso</button>
+    </div>
+    <div class="card" style="overflow-x:auto"><table>
+      <thead><tr><th>Cargo</th><th>Activo</th><th>Postulantes</th><th>Nuevas</th><th>Link público</th><th></th></tr></thead>
+      <tbody id="tbAvisos"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- Modal aviso -->
+<dialog id="dlgAviso">
+  <div class="dlg-head"><span id="avTit">Nuevo aviso</span><button class="btn btn-line" onclick="dlgAviso.close()">✕</button></div>
+  <div class="dlg-body">
+    <label>Título del cargo *</label><input class="full" id="a_titulo" placeholder="Ejecutivo Comercial — Santiago">
+    <label>Descripción (lo que verá el postulante)</label><textarea class="full" id="a_desc" placeholder="Qué hará, qué ofrecemos, requisitos generales…"></textarea>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label>Ubicación</label><input class="full" id="a_ubi" placeholder="Maipú, RM"></div>
+      <div><label>Jornada</label><input class="full" id="a_jorn" placeholder="Completa, presencial"></div>
+    </div>
+    <label>Preguntas al postulante (una por línea — si lo dejas vacío van las 2 preguntas de la casa)</label>
+    <textarea class="full" id="a_pregs" placeholder="¿Qué crees que te hace especial para este cargo?&#10;¿Por qué quieres trabajar en AutoFácil?"></textarea>
+    <label>Requisitos con autoevaluación 0–100% (uno por línea)</label>
+    <textarea class="full" id="a_reqs" placeholder="Inglés hablado&#10;Excel intermedio&#10;Licencia de conducir clase B"></textarea>
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none"><input type="checkbox" id="a_activo" checked style="width:auto"> Aviso activo (recibiendo postulaciones)</label>
+    <div class="link-box" id="a_link" style="display:none;margin-top:10px"></div>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn btn-line" onclick="dlgAviso.close()">Cerrar</button>
+    <button class="btn btn-navy" onclick="guardarAviso()"><i class="bi bi-check2 me-1"></i>Guardar</button>
+  </div>
+</dialog>
+
+<!-- Modal ficha postulante -->
+<dialog id="dlgFicha">
+  <div class="dlg-head"><span id="fTit">Ficha</span><button class="btn btn-line" onclick="dlgFicha.close()">✕</button></div>
+  <div class="dlg-body" id="fBody"></div>
+  <div class="dlg-foot" id="fFoot"></div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const token = sessionStorage.getItem('token');
+if (!token) location.href = '/login.html';
+const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtF = f => f ? new Date(f).toLocaleDateString('es-CL') : '—';
+function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+
+let AVISOS = [], POST = [], AVISO_EDIT = null;
+
+// Guardia de permiso
+(async () => { try {
+  const j = await (await fetch('/api/auth/mis-permisos', { headers: H })).json();
+  const f = j.funcionalidades || [];
+  const admin = (JSON.parse(sessionStorage.getItem('usuario')||'{}').perfil === 'Administrador');
+  if (!admin && !f.includes('rh_postulaciones')) location.replace('/');
+} catch (_) {} })();
+
+function verTab(t){
+  $('t-post').classList.toggle('on', t==='post'); $('t-avisos').classList.toggle('on', t==='avisos');
+  $('v-post').style.display = t==='post' ? '' : 'none'; $('v-avisos').style.display = t==='avisos' ? '' : 'none';
+}
+
+/* ── Avisos ── */
+async function cargarAvisos(){
+  const j = await (await fetch('/api/postulaciones/avisos', { headers: H })).json();
+  if (!j.success) return;
+  AVISOS = j.data;
+  $('fAviso').innerHTML = '<option value="">Todos los avisos</option>' + AVISOS.map(a => `<option value="${a.id}">${esc(a.titulo)}</option>`).join('');
+  $('tbAvisos').innerHTML = AVISOS.length ? AVISOS.map(a => `<tr onclick="abrirAviso(${a.id})">
+    <td><b>${esc(a.titulo)}</b></td>
+    <td>${a.activo ? '<span class="pill p-CONTRATADA">ACTIVO</span>' : '<span class="pill p-DESCARTADA">CERRADO</span>'}</td>
+    <td>${a.postulantes}</td><td>${a.nuevas ? '<b style="color:#1e40af">'+a.nuevas+'</b>' : 0}</td>
+    <td onclick="event.stopPropagation()"><button class="btn btn-line" onclick="copiarLink('${a.slug}')"><i class="bi bi-clipboard"></i> Copiar link</button></td>
+    <td><i class="bi bi-pencil" style="color:#64748b"></i></td>
+  </tr>`).join('') : '<tr><td colspan="6" class="empty">Aún no hay avisos — crea el primero.</td></tr>';
+}
+function copiarLink(slug){
+  const url = location.origin + '/postula/?a=' + slug;
+  navigator.clipboard.writeText(url).then(() => toast('Link copiado: ' + url)).catch(() => prompt('Copia el link:', url));
+}
+function abrirAviso(id){
+  AVISO_EDIT = id ? AVISOS.find(a => a.id === id) : null;
+  $('avTit').textContent = AVISO_EDIT ? 'Editar aviso' : 'Nuevo aviso';
+  $('a_titulo').value = AVISO_EDIT?.titulo || '';
+  $('a_desc').value = AVISO_EDIT?.descripcion || '';
+  $('a_ubi').value = AVISO_EDIT?.ubicacion || '';
+  $('a_jorn').value = AVISO_EDIT?.jornada || '';
+  $('a_pregs').value = (AVISO_EDIT?.preguntas || []).join('\n');
+  $('a_reqs').value = (AVISO_EDIT?.requisitos || []).map(r => r.nombre || r).join('\n');
+  $('a_activo').checked = AVISO_EDIT ? !!AVISO_EDIT.activo : true;
+  if (AVISO_EDIT) { $('a_link').style.display = 'flex'; $('a_link').innerHTML = `<i class="bi bi-link-45deg"></i><b>${location.origin}/postula/?a=${AVISO_EDIT.slug}</b><button class="btn btn-line" style="margin-left:auto" onclick="copiarLink('${AVISO_EDIT.slug}')">Copiar</button>`; }
+  else $('a_link').style.display = 'none';
+  dlgAviso.showModal();
+}
+async function guardarAviso(){
+  const body = {
+    titulo: $('a_titulo').value.trim(), descripcion: $('a_desc').value.trim(),
+    ubicacion: $('a_ubi').value.trim(), jornada: $('a_jorn').value.trim(),
+    preguntas: $('a_pregs').value.split('\n').map(s => s.trim()).filter(Boolean),
+    requisitos: $('a_reqs').value.split('\n').map(s => s.trim()).filter(Boolean).map(n => ({ nombre: n })),
+    activo: $('a_activo').checked ? 1 : 0,
+  };
+  if (!body.titulo) return toast('El título es obligatorio');
+  const url = AVISO_EDIT ? '/api/postulaciones/avisos/' + AVISO_EDIT.id : '/api/postulaciones/avisos';
+  const j = await (await fetch(url, { method: AVISO_EDIT ? 'PUT' : 'POST', headers: H, body: JSON.stringify(body) })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  dlgAviso.close(); toast(AVISO_EDIT ? 'Aviso guardado' : 'Aviso creado — copia el link y compártelo');
+  await cargarAvisos();
+  if (!AVISO_EDIT && j.data.slug) copiarLink(j.data.slug);
+}
+
+/* ── Postulantes ── */
+async function cargarPost(){
+  const av = $('fAviso').value;
+  const j = await (await fetch('/api/postulaciones/postulantes' + (av ? '?aviso=' + av : ''), { headers: H })).json();
+  POST = j.success ? j.data : [];
+  pintarPost();
+}
+const nivelTop = p => {
+  const orden = ['Postgrado','Universitario','Técnico','Media','Básica','Curso'];
+  for (const n of orden) if ((p.estudios||[]).some(e => e.nivel === n)) return n;
+  return '—';
+};
+function pintarPost(){
+  const est = $('fEstado').value, cumpMin = Number($('fCump').value) || 0, nivel = $('fNivel').value,
+        q = $('fQ').value.trim().toLowerCase();
+  const rows = POST.filter(p => {
+    if (est && p.estado !== est) return false;
+    if (cumpMin && !(p.cumplimiento != null && p.cumplimiento >= cumpMin)) return false;
+    if (nivel && !(p.estudios||[]).some(e => e.nivel === nivel)) return false;
+    if (q) {
+      const txt = [p.nombre, p.rut, p.email, p.comuna, (p.habilidades||[]).join(' '), (p.trabajos||[]).map(t=>t.cargo+' '+t.empresa).join(' ')].join(' ').toLowerCase();
+      if (!txt.includes(q)) return false;
+    }
+    return true;
+  });
+  $('cnt').textContent = rows.length + ' postulante' + (rows.length===1?'':'s');
+  $('tbPost').innerHTML = rows.length ? rows.map(p => {
+    const t0 = (p.trabajos||[])[0];
+    const cCls = p.cumplimiento == null ? '' : p.cumplimiento >= 75 ? 'c-alto' : p.cumplimiento >= 50 ? 'c-medio' : 'c-bajo';
+    return `<tr onclick="abrirFicha(${p.id})">
+      <td><b>${esc(p.nombre)}</b><br><span style="color:#94a3b8;font-size:.74rem">${esc(p.email)}</span></td>
+      <td>${esc(p.aviso)}</td><td>${esc(p.comuna||'—')}</td>
+      <td>${esc(nivelTop(p))}</td>
+      <td>${t0 ? esc((t0.cargo||'') + (t0.empresa ? ' · ' + t0.empresa : '')) : '—'}</td>
+      <td class="cump ${cCls}">${p.cumplimiento != null ? p.cumplimiento + '%' : '—'}</td>
+      <td><span class="pill p-${esc(p.estado).replace(' ','')}" style="${p.estado==='EN REVISION'?'background:#fef9c3;color:#854d0e':''}">${esc(p.estado)}</span></td>
+      <td>${fmtF(p.created_at)}</td></tr>`;
+  }).join('') : '<tr><td colspan="8" class="empty">Sin postulantes que coincidan.</td></tr>';
+}
+
+async function abrirFicha(id){
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id, { headers: H })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  const p = j.data;
+  $('fTit').textContent = p.nombre + ' — ' + p.aviso;
+  const edad = p.fecha_nacimiento ? Math.floor((Date.now() - new Date(p.fecha_nacimiento)) / 3.15576e10) + ' años' : '—';
+  $('fBody').innerHTML = `
+    <div class="kv">
+      <b>RUT</b><span>${esc(p.rut||'—')}</span><b>Edad</b><span>${edad}</span>
+      <b>Correo</b><span>${esc(p.email)}</span><b>Teléfono</b><span>${esc(p.telefono||'—')}</span>
+      <b>Comuna</b><span>${esc(p.comuna||'—')} ${esc(p.direccion||'')}</span>
+      <b>LinkedIn</b><span>${p.linkedin ? `<a href="${esc(p.linkedin.startsWith('http')?p.linkedin:'https://'+p.linkedin)}" target="_blank">${esc(p.linkedin)}</a>` : '—'}</span>
+      <b>Pretensión</b><span>${esc(p.pretension_renta||'—')}</span>
+      <b>Postuló</b><span>${fmtF(p.created_at)} · acuse ${p.acuse_at?'enviado':'pendiente'}</span>
+    </div>
+    ${p.resumen_ia ? `<div class="sec">Resumen (IA)</div><p style="font-size:.88rem">${esc(p.resumen_ia)}</p>` : ''}
+    ${(p.requisitos_eval||[]).length ? `<div class="sec">Requisitos (autoevaluación)</div>` +
+      p.requisitos_eval.map(r => `<div class="reqbar"><span style="flex:1">${esc(r.nombre)}</span><div class="b"><div class="f" style="width:${r.pct}%"></div></div><b style="width:44px;text-align:right">${r.pct}%</b></div>`).join('') : ''}
+    <div class="sec">Estudios</div>
+    ${(p.estudios||[]).map(e => `<div style="font-size:.87rem;padding:2px 0">🎓 <b>${esc(e.nivel||'')}</b> ${esc(e.titulo||'')} — ${esc(e.institucion||'')} ${esc(e.desde||'')}${e.hasta?'–'+esc(e.hasta):''} <span style="color:#94a3b8">${esc(e.estado||'')}</span></div>`).join('') || '—'}
+    <div class="sec">Experiencia</div>
+    ${(p.trabajos||[]).map(t => `<div style="font-size:.87rem;padding:3px 0">💼 <b>${esc(t.cargo||'')}</b> · ${esc(t.empresa||'')} <span style="color:#94a3b8">${esc(t.desde||'')}${t.hasta?' – '+esc(t.hasta):''}</span>${t.descripcion?`<br><span style="color:#475569;font-size:.8rem">${esc(t.descripcion)}</span>`:''}</div>`).join('') || '—'}
+    ${(p.idiomas||[]).length ? `<div class="sec">Idiomas</div><p style="font-size:.87rem">${p.idiomas.map(i=>esc(i.idioma+(i.nivel?' '+i.nivel:''))).join(' · ')}</p>` : ''}
+    ${(p.habilidades||[]).length ? `<div class="sec">Habilidades</div><p style="font-size:.87rem">${p.habilidades.map(esc).join(' · ')}</p>` : ''}
+    ${(p.respuestas||[]).length ? `<div class="sec">Sus respuestas</div>` +
+      p.respuestas.map(r => `<p style="font-size:.85rem;margin-bottom:8px"><b style="color:#0141A2">${esc(r.pregunta)}</b><br>${esc(r.respuesta)}</p>`).join('') : ''}
+    ${p.nota_rrhh ? `<div class="sec">Nota RRHH</div><p style="font-size:.86rem">${esc(p.nota_rrhh)}</p>` : ''}`;
+  $('fFoot').innerHTML = `
+    <button class="btn btn-line" onclick="verCV(${p.id})"><i class="bi bi-file-earmark-pdf me-1"></i>Ver CV</button>
+    <span style="flex:1"></span>
+    <select id="fEstadoSel" class="full" style="width:auto">
+      ${['NUEVA','EN REVISION','ENTREVISTA','CONTRATADA'].map(e => `<option ${p.estado===e?'selected':''}>${e}</option>`).join('')}
+    </select>
+    <button class="btn btn-navy" onclick="setEstado(${p.id}, document.getElementById('fEstadoSel').value)">Guardar estado</button>
+    <button class="btn" style="background:#fee2e2;color:#991b1b" onclick="descartar(${p.id}, '${esc(p.nombre).replace(/'/g,'')}')"><i class="bi bi-x-octagon me-1"></i>Descartar</button>`;
+  dlgFicha.showModal();
+}
+async function verCV(id){
+  try {
+    const r = await fetch('/api/postulaciones/postulantes/' + id + '/cv', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw 0;
+    const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank');
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  } catch (_) { toast('No se pudo abrir el CV'); }
+}
+async function setEstado(id, estado, nota){
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/estado', {
+    method: 'POST', headers: H, body: JSON.stringify({ estado, nota: nota || '' }) })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  toast('Estado: ' + estado + (estado === 'DESCARTADA' ? ' — correo cortés enviado' : ''));
+  dlgFicha.close(); cargarPost(); cargarAvisos();
+}
+function descartar(id, nombre){
+  if (!confirm(`¿Descartar a ${nombre}?\n\nSe le enviará el correo cortés indicando que no fue seleccionado/a y que sus antecedentes quedan guardados para futuras oportunidades.`)) return;
+  const nota = prompt('Motivo interno (opcional, no se envía al postulante):') || '';
+  setEstado(id, 'DESCARTADA', nota);
+}
+
+cargarAvisos().then(cargarPost);
+</script>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
