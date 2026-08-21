@@ -1129,12 +1129,15 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
     const [[d]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera, ${SIN_LIM_SQL},
              po.monto AS odp_monto, po.num_orden,
+             c.id_financiera,
+             COALESCE(cl.nombre_completo, '') AS cliente,
              COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, NULLIF(dr.nombre_indexa,''), dr.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
              COALESCE(dl.correo, dl.cf_email, dr.correo, dr.cf_email) AS correo,
              COALESCE(dl.tipo_cuenta, dl.cuenta_tipo, dr.tipo_cuenta, dr.cuenta_tipo) AS tipo_cuenta,
              COALESCE(dl.num_cuenta, dr.num_cuenta) AS num_cuenta, COALESCE(dl.banco, dr.banco) AS banco
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
+      LEFT JOIN clientes cl ON cl.id_cliente = c.id_cliente
       LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
       -- Fallback por RUT: las ops cursadas vía carta pueden venir sin id_dealer
       -- (pasó con AUTEN op 26080532, 20-08-2026: dealer con correo y sin aviso)
@@ -1170,6 +1173,7 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
       : montoSaldoOrden(d.financiera, d.saldo_precio, await getFijosAutoFin(), Number(d.sin_limitacion) === 1);
     const datos = {
       dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(montoPagado),
+      id_financiera: d.id_financiera || '', cliente: d.cliente || '',
       saldo_precio: fmt(d.saldo_precio), num_orden: d.num_orden || '',
       fecha_pago: new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }),
       financiera: d.financiera || '',
