@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.12 — el tronco del staff muere exacto en la linea de jefaturas (sin cola). v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -78,7 +78,9 @@
        las impares, derecha en las pares) y el tirante es el padding entre la
        caja y el centro. Así las líneas siempre nacen y mueren donde deben. */
     .staff-band { position:relative; display:flex; flex-direction:column; gap:10px; padding:14px 0 0; align-self:stretch; }
-    .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:-24px; width:2px; background:#dbe3ec; transform:translateX(-50%); }
+    /* bottom:0 exacto: la banda termina justo en la línea horizontal de las
+       jefaturas (medido) — con -24px el tronco la cruzaba y quedaba una cola. */
+    .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; background:#dbe3ec; transform:translateX(-50%); }
     .staff-item { position:relative; display:flex; width:50%; box-sizing:border-box; }
     .staff-item .org-row { width:210px; min-width:210px; max-width:210px; box-sizing:border-box; margin:0; }
     .staff-item:nth-child(odd)  { align-self:flex-start; justify-content:flex-end; padding-right:34px; }
