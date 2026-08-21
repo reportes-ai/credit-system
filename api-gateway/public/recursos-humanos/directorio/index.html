@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -58,6 +58,19 @@
     .tree ul li:not(:first-child):not(:last-child):not(:only-child)::after { left:-10px; right:-10px; }
     .tree .org-row { margin:0; min-width:170px; max-width:220px; }
     .tree .org-row .cnt { display:none; }
+
+    /* ── Vista CLÁSICA (modelo corporativo): jefaturas en horizontal y cada
+       equipo colgando en una COLUMNA bajo su jefe, como el organigrama de
+       PowerPoint. Reusa la geometría del árbol; solo el último nivel se apila. */
+    .tree ul.vstack { flex-direction:column; align-items:flex-start; padding-top:14px; margin-left:26px; }
+    .tree ul.vstack::before { left:0; height:14px; transform:none; }
+    .tree ul.vstack li { align-items:flex-start; padding:3px 0 3px 22px; }
+    .tree ul.vstack li::before { content:''; position:absolute; left:0; top:0; height:100%; width:2px; background:#dbe3ec; transform:none; }
+    .tree ul.vstack li:last-child::before { height:50%; }
+    .tree ul.vstack li::after { content:''; position:absolute; left:0; top:50%; width:18px; height:2px; background:#dbe3ec; right:auto; }
+    .tree.clasico .org-row { flex-direction:column; text-align:center; gap:4px; min-width:150px; max-width:190px; padding:9px 12px; border:1.5px solid #2563eb; background:#eff6ff; }
+    .tree.clasico ul.vstack .org-row { flex-direction:row; text-align:left; background:#fff; border-color:#bfdbfe; min-width:180px; padding:6px 11px; }
+    .tree.clasico .oa { width:30px; height:30px; font-size:.8rem; }
 
     /* ── Vista HORIZONTAL (hacia el lado): raíz a la izquierda ── */
     .horiz-scroll { overflow-x:auto; padding:6px 4px 16px; }
@@ -118,7 +131,11 @@
       <button class="org-view-btn" id="ov-escalera" onclick="vistaOrg('escalera')"><i class="bi bi-list-nested"></i>Escalera</button>
       <button class="org-view-btn" id="ov-arbol"    onclick="vistaOrg('arbol')"><i class="bi bi-diagram-3"></i>Árbol (hacia abajo)</button>
       <button class="org-view-btn" id="ov-lado"     onclick="vistaOrg('lado')"><i class="bi bi-diagram-2" style="transform:rotate(-90deg)"></i>Hacia el lado</button>
+      <button class="org-view-btn" id="ov-clasico"  onclick="vistaOrg('clasico')"><i class="bi bi-diagram-3-fill"></i>Clásico</button>
       <button class="org-view-btn" id="ov-equipos"  onclick="vistaOrg('equipos')"><i class="bi bi-people"></i>Por equipos</button>
+      <span style="flex:1"></span>
+      <button class="org-view-btn" onclick="copiarOrg()" title="Copiar como imagen al portapapeles"><i class="bi bi-clipboard"></i>Copiar</button>
+      <button class="org-view-btn" onclick="descargarOrg()" title="Descargar como imagen PNG"><i class="bi bi-download"></i>Descargar</button>
     </div>
     <div class="org-wrap"><div id="orgTree" class="empty">Cargando…</div></div>
   </div>
@@ -229,6 +246,40 @@ function ladoHTML(id, hijosDe){
     ${hijos.length?`<div class="horiz-children">${hijos.map(h=>ladoHTML(h.id_usuario,hijosDe)).join('')}</div>`:''}
   </div>`;
 }
+function clasicoHTML(id, hijosDe){
+  const hijos = hijosDe[id] || [];
+  if (!hijos.length) return `<li>${nodoRow(MAPA[id],hijosDe)}</li>`;
+  // Si TODOS los hijos son hoja → columna vertical bajo el jefe (modelo PowerPoint)
+  const todasHojas = hijos.every(h => !(hijosDe[h.id_usuario]||[]).length);
+  const ul = todasHojas ? 'vstack' : '';
+  return `<li>${nodoRow(MAPA[id],hijosDe)}<ul class="${ul}">${hijos.map(h=>clasicoHTML(h.id_usuario,hijosDe)).join('')}</ul></li>`;
+}
+
+/* ── Copiar / Descargar el organigrama como imagen (html2canvas local) ── */
+async function orgCanvas(){
+  const el = document.querySelector('#pane-org .org-wrap');
+  // scrollWidth: capturar el árbol COMPLETO aunque tenga scroll horizontal
+  return await html2canvas(el, { backgroundColor:'#ffffff', scale:2,
+    width: el.scrollWidth, height: el.scrollHeight, windowWidth: el.scrollWidth });
+}
+async function copiarOrg(){
+  try {
+    const canvas = await orgCanvas();
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    toast('Organigrama copiado como imagen');
+  } catch(e){ toast('No se pudo copiar — usa Descargar'); }
+}
+async function descargarOrg(){
+  try {
+    const canvas = await orgCanvas();
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'organigrama-autofacil.png';
+    a.click();
+  } catch(e){ toast('No se pudo generar la imagen'); }
+}
+
 function equiposHTML(raices, hijosDe){
   // Una card por persona con gente a cargo, en orden jerárquico (BFS desde las raíces)
   const jefes = [];
@@ -270,6 +321,8 @@ function pintarOrg(){
   el.className='';
   if (VISTA_ORG === 'arbol')
     el.innerHTML = `<div class="tree-scroll"><ul class="tree">${raices.map(r=>arbolHTML(r.id_usuario,hijosDe)).join('')}</ul></div>`;
+  else if (VISTA_ORG === 'clasico')
+    el.innerHTML = `<div class="tree-scroll"><ul class="tree clasico">${raices.map(r=>clasicoHTML(r.id_usuario,hijosDe)).join('')}</ul></div>`;
   else if (VISTA_ORG === 'lado')
     el.innerHTML = `<div class="horiz-scroll">${raices.map(r=>ladoHTML(r.id_usuario,hijosDe)).join('')}</div>`;
   else if (VISTA_ORG === 'equipos')
@@ -347,6 +400,7 @@ async function cargarDir(){
 })();
 </script>
 <script src="/js/topnav.js"></script>
+<script src="/js/html2canvas.min.js"></script>
 <script src="/js/app-version.js"></script>
 </body>
 </html>
