@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!-- v1.0 — glosario de variables y metricas del sistema: identificadores, estados/etapas, metricas del dashboard (definicion unica AF_ES_APROBADO), dinero, comisiones y atribucion de mes -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glosario de Variables — Business Suite AutoFácil</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:#fff; color:#1e293b; }
+  .doc { max-width:1000px; margin:0 auto; padding:30px 24px 80px; line-height:1.6; font-size:.95rem; }
+  h1 { color:var(--navy); } h2 { color:var(--accent); margin-top:38px; border-bottom:2px solid #eff6ff; padding-bottom:6px; }
+  table { border-collapse:collapse; width:100%; font-size:.87rem; margin:12px 0; }
+  th { background:#f1f5f9; text-align:left; padding:7px 10px; color:#334155; }
+  td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
+  td:first-child { font-weight:700; color:var(--navy); width:26%; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:.85em; }
+  .nota { background:#f8fafc; border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.9rem; }
+  .toc { background:#f8fafc; border-radius:10px; padding:14px 18px; margin:18px 0; font-size:.88rem; }
+  .toc a { display:inline-block; margin:3px 14px 3px 0; color:var(--accent); text-decoration:none; font-weight:600; }
+  @media print { #af-topnav { display:none; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:"Inicio",href:"/"},{label:"Mantenedores",href:"/mantenedores/"},{label:"Documentación",href:"./"},{label:"Glosario",current:true}],actions:[{label:"Imprimir",icon:"bi-printer",onclick:"print()"}]};</script>
+<div class="doc">
+  <h1><i class="bi bi-book me-2"></i>Glosario de Variables</h1>
+  <p>La definición ÚNICA de cada término y métrica del Business Suite. Si dos pantallas muestran el mismo nombre, miden lo mismo — y si un número no cuadra entre dos informes, la primera pregunta es si ambos respetan estas definiciones.</p>
+
+  <div class="toc">
+    <a href="#g1">1. Identificadores</a><a href="#g2">2. Estados y etapas</a><a href="#g3">3. Métricas del dashboard</a>
+    <a href="#g4">4. Dinero de la operación</a><a href="#g5">5. Comisiones</a><a href="#g6">6. Atribución de mes</a><a href="#g7">7. Actores</a>
+  </div>
+
+  <h2 id="g1">1. Identificadores</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>N° Operación</td><td>NUESTRO número del crédito en AutoFácil. Lo respaldan <code>creditos.num_op</code> (formato histórico, ej. 88355) y <code>numero_credito</code> (formato nuevo AAMMxxx, ej. 2608055). Cuando alguien dice "crédito", "operación" o "N° OP", es esto.</td></tr>
+    <tr><td>ID Financiera</td><td>El número que la INSTITUCIÓN financiera le da a la misma operación (ej. 6153385). Cuando alguien dice "ID" a secas, es esto. En cartolas viaja en <code>cartolas_movimientos.num_op</code>.</td></tr>
+    <tr><td>N° Carta</td><td>El correlativo de la carta de aprobación (<code>op_carta</code>, ej. 266153385DI). Una corrección genera una carta nueva con sufijo <code>-C1</code> y la anterior queda REEMPLAZADA.</td></tr>
+  </table>
+
+  <h2 id="g2">2. Estados y etapas</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>ETAPA del crédito</td><td>Dónde está la operación en su ciclo de vida (DIGITADO → APROBADO → OTORGADO / RECHAZADO / ANULADO / DESISTIDO). Vive en TRES columnas históricas (<code>estado</code>, <code>estado_credito</code>, <code>estado_eval</code>); se escribe SIEMPRE por el motor único (las tres juntas) y se lee por <code>ETAPA_SQL</code>.</td></tr>
+    <tr><td>OTORGADO / cursado</td><td>La operación se concretó: la financiera giró y el crédito existe. "Cursado" es el sinónimo que usa Trinidad/AutoFin — para el sistema son lo mismo.</td></tr>
+    <tr><td>APROBADA</td><td>Operación cuya evaluación quedó en APROBADO, OTORGADO o CURSADO. <b>Definición única desde 21-08-2026</b> (motor <code>AF_ES_APROBADO</code>): una PENDIENTE o en evaluación NO es aprobada, aunque tampoco esté rechazada.</td></tr>
+    <tr><td>PENDIENTE</td><td>Ingresada y sin veredicto aún — incluye las "Solicitud en Evaluación".</td></tr>
+    <tr><td>Estado de CARTERA</td><td>Segunda dimensión, solo para cartera propia otorgada: VIGENTE, EN MORA, VENCIDO, PREPAGADO, CASTIGADO. Un crédito "EN MORA" sigue siendo, en etapa, OTORGADO.</td></tr>
+    <tr><td>Operación VÁLIDA (contratos dealer)</td><td>Aprobada, cursada, documentada y liquidada. Excluye rechazadas, desistidas, anuladas, reversadas e incompletas. Es la unidad de las metas de categoría (Partner 4–7/mes, Super Partner ≥8).</td></tr>
+  </table>
+
+  <h2 id="g3">3. Métricas del dashboard</h2>
+  <div class="nota"><b>Regla de oro:</b> estas seis se calculan igual en TODAS las vistas (Resumen, Funnel, Desempeño por Ejecutivo, Comparativo, Estado Comercial). Antes el funnel contaba los pendientes como aprobados y por eso los informes no cuadraban entre sí (jul-26: 772 vs 433).</div>
+  <table>
+    <tr><th>Métrica</th><th>Definición</th></tr>
+    <tr><td>Ingresadas (Ing)</td><td>TODAS las solicitudes del período, sin importar en qué terminaron.</td></tr>
+    <tr><td>Aprobadas (Apro)</td><td>Las que quedaron APROBADO, OTORGADO o CURSADO (ver §2). Incluye las otorgadas: una otorgada estuvo aprobada primero.</td></tr>
+    <tr><td>Otorgadas (Ot)</td><td>Solo las que se cursaron.</td></tr>
+    <tr><td>Rechazadas (Rec)</td><td>Estado RECHAZADO.</td></tr>
+    <tr><td>TA — Tasa de Aprobación</td><td><code>Aprobadas ÷ Ingresadas</code>. Mide la calidad de lo que se ingresa.</td></tr>
+    <tr><td>TC — Tasa de Conversión</td><td><code>Otorgadas ÷ Aprobadas</code>. Mide cuánto de lo aprobado se concreta en venta.</td></tr>
+    <tr><td>Prom. Fin / Prom. Op.</td><td>Monto financiado promedio de las operaciones del grupo mostrado.</td></tr>
+    <tr><td>MAYOR / MENOR 200 UF</td><td>Clasificación tributaria del crédito según su monto contra la UF de la <b>fecha de otorgamiento</b> (no un campo fijo — se recalcula).</td></tr>
+  </table>
+
+  <h2 id="g4">4. Dinero de la operación</h2>
+  <table>
+    <tr><th>Variable</th><th>Definición</th></tr>
+    <tr><td>Valor Vehículo</td><td>Precio de venta del auto.</td></tr>
+    <tr><td>Pie</td><td>Lo que el cliente paga al contado.</td></tr>
+    <tr><td>Saldo Precio</td><td>Valor Vehículo − Pie: lo que AutoFácil le paga al dealer por el auto. Es CUENTA DE PASO (la financiera gira y se entrega íntegro al dealer; no es ingreso ni gasto). En AUTOFIN la orden de pago suma además Transferencia/Inscripción y Limitación de Dominio (paramétricos; la Limitación se EXCLUYE si los fundantes se declararon SIN LIMITACIÓN).</td></tr>
+    <tr><td>Monto Financiado</td><td>Saldo Precio + seguros + gastos + GPS: el capital del crédito, sobre el que se calculan la comisión del ejecutivo y los pilares del BSC.</td></tr>
+    <tr><td>Seguros (RDH / Cesantía / Reparaciones)</td><td>Primas financiadas dentro del crédito. RDH = Robo, Hurto y Daños (incluye desgravamen en la suma). Son la base de los cruces del incentivo.</td></tr>
+    <tr><td>Ing. x Colocaciones / Ing. AFA</td><td>El ingreso de AutoFácil por originar la operación (comisión de la financiera). "AFA" = AutoFácil.</td></tr>
+    <tr><td>Ing. x Seguros</td><td>El ingreso de AutoFácil por los seguros intermediados.</td></tr>
+  </table>
+
+  <h2 id="g5">5. Comisiones</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>Comisión (del Ejecutivo)</td><td>El incentivo variable del Ejecutivo de AutoFácil. Modelo vigente (anexo 08-2026): piso mínimo de monto financiado del mes; base = % del monto por tramo de plazo (&lt;24 / ≥24 cuotas); bonos por cruce de seguros sobre umbral; semana corrida (art. 45 CT) al final. NUNCA confundir con la participación del dealer.</td></tr>
+    <tr><td>Participación / Comisión Dealer</td><td>Lo que se le paga al DEALER por traer el negocio. La pactada en la carta manda sobre el cálculo; SIEMPRE bruta (IVA incluido). Con boleta de honorarios se paga el líquido (menos retención).</td></tr>
+    <tr><td>Comisión de Parque</td><td>La del parque automotriz: comisión por operación + arriendo mensual fijo (prorrateado, nunca fee por op).</td></tr>
+    <tr><td>Cartola</td><td>El estado de cuenta de comisiones del dealer/parque: acumulativa por estado, solo operaciones con etapa OTORGADO. La factura del dealer debe cuadrar EXACTO con el total de la cartola.</td></tr>
+    <tr><td>ODP — Orden de Pago</td><td>El documento interno que dispone un pago (correlativo único ODP-). Al pagarse se congela ("en duro") y lleva la trazabilidad completa del negocio al pie.</td></tr>
+  </table>
+
+  <h2 id="g6">6. Atribución de mes</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>Fecha de curse / otorgamiento</td><td><code>fecha_otorgado</code>: el día real en que la operación se cursó.</td></tr>
+    <tr><td>Mes contable</td><td><code>creditos.mes</code>: el mes al que la operación quedó asignada. Históricamente se ajustó a mano (INDEXA no dejaba digitar con fechas distintas).</td></tr>
+    <tr><td>Mes de atribución (comisiones y metas)</td><td><b>Definición 21-08-2026</b> (motor único <code>mes-atribucion</code>): meses hasta jul-2026 → manda el mes contable ajustado; desde ago-2026 → manda la fecha de curse. Corte paramétrico (<code>mes_corte_curse</code>). Dashboard y cartolas usan mes contable.</td></tr>
+  </table>
+
+  <h2 id="g7">7. Actores</h2>
+  <table>
+    <tr><th>Término</th><th>Definición</th></tr>
+    <tr><td>Dealer</td><td>La automotora donde se vende el auto (término homologado; reemplaza "concesionario/automotora" en pantalla). Su ficha (<code>dealers</code>) es la fuente única de nombre, RUT, categoría y CUENTA DE DEPÓSITO.</td></tr>
+    <tr><td>Parque</td><td>Recinto que agrupa dealers, con contrato y comisión propios. El parque de una operación viene del Excel de carga, no del mantenedor.</td></tr>
+    <tr><td>Ejecutivo</td><td>El rol comercial de AutoFácil (perfil "Ejecutivo Comercial"). Es a quien se atribuyen las operaciones y se paga la comisión interna.</td></tr>
+    <tr><td>Vendedor</td><td>El vendedor DEL DEALER (no es de AutoFácil). Sale de la carta de aprobación.</td></tr>
+    <tr><td>Cliente</td><td>El comprador del auto y deudor del crédito.</td></tr>
+    <tr><td>Financiera / Institución / Acreedor</td><td>Quien presta la plata: AUTOFIN, UNIDAD DE CRÉDITO o AUTOFACIL (recursos propios). No se homologan entre sí — acreedor es quien queda en la prenda.</td></tr>
+  </table>
+
+  <div class="nota"><b>Regla al agregar una métrica nueva:</b> si el término ya existe acá, se calcula con el motor que lo define — nunca una segunda copia "rápida" (Máxima 1). Si es un término nuevo, se agrega a este glosario en el MISMO commit (Máxima 3).</div>
+</div>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
