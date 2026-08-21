@@ -106,7 +106,7 @@ function procesarDatos(rows) {
     // "Ejecutivos — Aprobadas" del dashboard. Antes contaba "todo lo que no
     // está rechazado ni anulado", así que una DIGITADA (aún en evaluación)
     // figuraba como aprobada y los dos informes no cuadraban.
-    if (['APROBADO','OTORGADO'].includes(r.estado_eval)) d.apro++;
+    if (['APROBADO','OTORGADO','CURSADO'].includes(r.estado_eval)) d.apro++;   // misma definición única del front (AF_ES_APROBADO)
     if (r.estado_eval === 'OTORGADO') { d.ot++; d.monto_ot += n(r.saldo_precio); }
     if (r.estado_eval === 'RECHAZADO') d.rec++;
   });

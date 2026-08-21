@@ -6,6 +6,14 @@ const _token = sessionStorage.getItem('token');
 const _usuario = JSON.parse(sessionStorage.getItem('usuario') || 'null');
 if (!_token) { window.location.href = '/login.html'; }
 
+/* ── MOTOR ÚNICO de clasificación del estado (Máxima 1, 21-08-2026) ──────────
+   El mismo dashboard tenía CUATRO definiciones de "aprobado": el funnel contaba
+   como aprobado todo lo no-rechazado (pendientes incluidos → TA inflada, 772 vs
+   433 en jul-26) y Estado Comercial sumaba las SOLICITUD EN EVALUACION. Desde
+   ahora TODA vista clasifica con esta función: aprobada = APROBADO, OTORGADO o
+   CURSADO. TA = aprobadas/ingresadas · TC = otorgadas/aprobadas, en todas. */
+window.AF_ES_APROBADO = est => ['APROBADO', 'OTORGADO', 'CURSADO'].includes(String(est || '').toUpperCase());
+
 // Stub para llamadas de usuarios que no aplican (sub-tab oculto)
 const _sesionToken = _token;
 async function apiUsuarios() { return { ok: false, error: 'Gestión de usuarios en el sistema principal' }; }
@@ -268,7 +276,7 @@ function buildV1() {
     const desde = document.getElementById('sel-desde')?.value||'';
     const hasta  = document.getElementById('sel-hasta')?.value||'';
     return r.mes >= desde && r.mes <= hasta &&
-           ['APROBADO','OTORGADO'].includes(r.estado_eval);
+           window.AF_ES_APROBADO(r.estado_eval);
   });
   const finAp = {};
   aprobados1.forEach(r => {
@@ -391,7 +399,8 @@ function buildV1() {
   const estadosAgrup = {};
   Object.entries(f.estados||{}).forEach(([k,v]) => {
     // OTORGADO y APROBADO se agrupan como "APROBADO" / EN SEGUIMIENTO
-    const label = (k==='OTORGADO'||k==='APROBADO'||k==='SOLICITUD EN EVALUACION'||k==='CURSADO') ? 'APROBADO' :
+    const label = window.AF_ES_APROBADO(k) ? 'APROBADO' :
+                  k==='SOLICITUD EN EVALUACION' ? 'PENDIENTE' :
                   k==='RECHAZADO' ? 'RECHAZADO' :
                   k==='ANULADO'   ? 'ANULADO'   : k;
     if (!estadosAgrup[label]) estadosAgrup[label] = {ops:0,saldo:0};
@@ -1324,7 +1333,8 @@ function buildV1b() {
   const salEst1b = {INGRESADAS:0,APROBADAS:0,OTORGADAS:0,PENDIENTE:0,RECHAZADAS:0,ANULADAS:0};
   Object.entries(f.estados||{}).forEach(([k,v]) => {
     grpEst1b.INGRESADAS+=v.ops; salEst1b.INGRESADAS+=v.saldo;
-    if (k==='APROBADO'||k==='OTORGADO'||k==='SOLICITUD EN EVALUACION'||k==='CURSADO'){grpEst1b.APROBADAS+=v.ops;salEst1b.APROBADAS+=v.saldo;}
+    if (window.AF_ES_APROBADO(k)){grpEst1b.APROBADAS+=v.ops;salEst1b.APROBADAS+=v.saldo;}
+    if (k==='SOLICITUD EN EVALUACION'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=v.saldo;}
     if (k==='OTORGADO'){grpEst1b.OTORGADAS+=v.ops;salEst1b.OTORGADAS+=v.saldo;}
     if (k==='PENDIENTE'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=v.saldo;}
     if (k==='RECHAZADO'){grpEst1b.RECHAZADAS+=v.ops;salEst1b.RECHAZADAS+=v.saldo;}
@@ -1793,7 +1803,7 @@ window.RAW_DATA = [];
   // Calcular resumen de un mes/rango desde RAW_DATA
   function calcResumen(rows) {
     // Operaciones aprobadas: APROBADO + OTORGADO (Cursado en Trinidad)
-    const aprobados = rows.filter(r => ['APROBADO','OTORGADO'].includes(r.estado_eval));
+    const aprobados = rows.filter(r => window.AF_ES_APROBADO(r.estado_eval));
     // mayor_menor ya viene calculado correctamente desde el API (UF de fecha_otorgado)
     const resolveInst = r => {
       if (r.institucion === 'AUTOFIN' || r.institucion === 'UNIDAD DE CREDITO') return r.institucion;
@@ -2787,7 +2797,7 @@ function buildV7() {
     const d = ejMap[ej];
     d.ing++;
     const est = r.estado_eval || '';
-    if (!['RECHAZADO','ANULADO'].includes(est)) d.apro++;
+    if (window.AF_ES_APROBADO(est)) d.apro++;   // definición ÚNICA (antes contaba PENDIENTES como aprobados)
     if (est === 'OTORGADO') {
       d.ot++;
       d.saldo_ot += r.saldo_precio || 0;
@@ -2975,7 +2985,7 @@ function buildV7p() {
     const d = ejMap[ej];
     d.ing++;
     const est = r.estado_eval || '';
-    if (!['RECHAZADO','ANULADO'].includes(est)) d.apro++;
+    if (window.AF_ES_APROBADO(est)) d.apro++;   // definición ÚNICA (antes contaba PENDIENTES como aprobados)
     if (est === 'OTORGADO') d.ot++;
     if (est === 'RECHAZADO') d.rec++;
   });
@@ -4230,7 +4240,7 @@ function buildV8() {
       const d = res[inst];
       const est = r.estado_eval || '';
       d.ing++;
-      if (est === 'APROBADO' || est === 'OTORGADO') d.apro++;
+      if (window.AF_ES_APROBADO(est)) d.apro++;
       if (est === 'OTORGADO') d.ot++;
       if (est === 'PENDIENTE' || est === 'SOLICITUD EN EVALUACION') d.pend++;
       if (est === 'RECHAZADO') d.rec++;
