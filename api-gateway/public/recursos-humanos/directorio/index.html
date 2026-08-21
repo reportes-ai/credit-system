@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -246,13 +246,15 @@ function ladoHTML(id, hijosDe){
     ${hijos.length?`<div class="horiz-children">${hijos.map(h=>ladoHTML(h.id_usuario,hijosDe)).join('')}</div>`:''}
   </div>`;
 }
-function clasicoHTML(id, hijosDe){
+function clasicoHTML(id, hijosDe, depth){
   const hijos = hijosDe[id] || [];
   if (!hijos.length) return `<li>${nodoRow(MAPA[id],hijosDe)}</li>`;
-  // Si TODOS los hijos son hoja → columna vertical bajo el jefe (modelo PowerPoint)
-  const todasHojas = hijos.every(h => !(hijosDe[h.id_usuario]||[]).length);
-  const ul = todasHojas ? 'vstack' : '';
-  return `<li>${nodoRow(MAPA[id],hijosDe)}<ul class="${ul}">${hijos.map(h=>clasicoHTML(h.id_usuario,hijosDe)).join('')}</ul></li>`;
+  /* Modelo PowerPoint: los dos primeros niveles (GG y jefaturas) van en
+     horizontal con caja azul; TODO lo que cuelga de una jefatura baja en
+     COLUMNA (escalera, cajas blancas), incluidos los supervisores con equipo
+     propio, cuyo equipo se indenta un nivel más adentro de la misma columna. */
+  const ul = depth >= 1 ? 'vstack' : '';
+  return `<li>${nodoRow(MAPA[id],hijosDe)}<ul class="${ul}">${hijos.map(h=>clasicoHTML(h.id_usuario,hijosDe,depth+1)).join('')}</ul></li>`;
 }
 
 /* ── Copiar / Descargar el organigrama como imagen (html2canvas local) ── */
@@ -322,7 +324,7 @@ function pintarOrg(){
   if (VISTA_ORG === 'arbol')
     el.innerHTML = `<div class="tree-scroll"><ul class="tree">${raices.map(r=>arbolHTML(r.id_usuario,hijosDe)).join('')}</ul></div>`;
   else if (VISTA_ORG === 'clasico')
-    el.innerHTML = `<div class="tree-scroll"><ul class="tree clasico">${raices.map(r=>clasicoHTML(r.id_usuario,hijosDe)).join('')}</ul></div>`;
+    el.innerHTML = `<div class="tree-scroll"><ul class="tree clasico">${raices.map(r=>clasicoHTML(r.id_usuario,hijosDe,0)).join('')}</ul></div>`;
   else if (VISTA_ORG === 'lado')
     el.innerHTML = `<div class="horiz-scroll">${raices.map(r=>ladoHTML(r.id_usuario,hijosDe)).join('')}</div>`;
   else if (VISTA_ORG === 'equipos')
