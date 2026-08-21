@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.12 — el tronco del staff muere exacto en la linea de jefaturas (sin cola). v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.13 — equipos alineados arriba (Finanzas flotaba centrado) y aire bajo el staff. v2.12 — el tronco del staff muere exacto en la linea de jefaturas (sin cola). v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -62,7 +62,11 @@
     /* ── Vista CLÁSICA (modelo corporativo): jefaturas en horizontal y cada
        equipo colgando en una COLUMNA bajo su jefe, como el organigrama de
        PowerPoint. Reusa la geometría del árbol; solo el último nivel se apila. */
-    .tree ul.vstack { flex-direction:column; align-items:flex-start; padding-top:14px; margin-left:26px; }
+    /* justify-content:flex-start: las celdas de jefatura se estiran a la altura
+       de la columna más alta, y el justify-content:center heredado de .tree ul
+       CENTRABA verticalmente los equipos cortos — el equipo de Finanzas flotaba
+       a media altura mientras los vecinos partían arriba. */
+    .tree ul.vstack { flex-direction:column; align-items:flex-start; justify-content:flex-start; padding-top:14px; margin-left:26px; }
     .tree ul.vstack::before { left:0; height:14px; transform:none; }
     .tree ul.vstack li { align-items:flex-start; padding:3px 0 3px 22px; }
     .tree ul.vstack li::before { content:''; position:absolute; left:0; top:0; height:100%; width:2px; background:#dbe3ec; transform:none; }
@@ -77,7 +81,7 @@
        completo; la caja va pegada al tronco central por su mitad (izquierda en
        las impares, derecha en las pares) y el tirante es el padding entre la
        caja y el centro. Así las líneas siempre nacen y mueren donde deben. */
-    .staff-band { position:relative; display:flex; flex-direction:column; gap:10px; padding:14px 0 0; align-self:stretch; }
+    .staff-band { position:relative; display:flex; flex-direction:column; gap:10px; padding:14px 0 16px; align-self:stretch; }
     /* bottom:0 exacto: la banda termina justo en la línea horizontal de las
        jefaturas (medido) — con -24px el tronco la cruzaba y quedaba una cola. */
     .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; background:#dbe3ec; transform:translateX(-50%); }
