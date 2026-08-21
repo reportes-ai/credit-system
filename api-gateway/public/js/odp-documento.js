@@ -1,4 +1,4 @@
-/* v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -95,7 +95,10 @@ function docHTML(o){
     : `<tr><td style="${SresL}">Monto bruto</td><td style="${SresV}">${fmtMon(i.bruto)}</td></tr>
       <tr><td style="${SresL}">${escH(i.lbl)}</td><td style="${SresV}">${i.esEx?'—':fmtMon(i.imp)}</td></tr>
       <tr><td style="${SresL}">Monto neto</td><td style="${SresV}">${fmtMon(i.neto)}</td></tr>`;
-  return `<div style="${Sdoc}">${sello}
+  /* El timbre PAGADO se ancla al final del CUERPO, no al pie del documento:
+     abajo va la trazabilidad y el timbre la tapaba. */
+  return `<div style="${Sdoc}">
+    <div style="position:relative">${sello}
     <table style="width:100%;border-collapse:collapse;margin-bottom:14px"><tbody><tr>
       <td style="vertical-align:top"><table style="${Smeta}"><tbody>
         <tr><td style="${Slbl}">Concepto</td><td style="${Smv}">SOLICITUD DE PAGO</td></tr>
@@ -129,6 +132,7 @@ function docHTML(o){
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmtMon(i.pagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPagar}</td></tr>
     </tbody></table>
+    </div>
     ${trazaHTML(o.traza)}
   </div>`;
 }
