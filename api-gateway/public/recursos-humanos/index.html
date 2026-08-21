@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v3.2 — navbar migrada al componente topnav -->
+  <!-- v3.3 — card Portal del Postulante (rh_postulaciones). v3.2 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -128,6 +128,12 @@
       <p>El concurso de capacitación: tablero de respuestas ocultas con puntos, para el onboarding y jugar en equipo. ¡A ver si está!</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/postulaciones/" class="module-card" id="cardPost" style="display:none">
+      <div class="card-icon"><i class="bi bi-person-plus"></i></div>
+      <h5>Portal del Postulante <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
+      <p>Publica avisos con link de postulación, deja que la IA lea los CV de los candidatos y gestiona a los postulantes: filtros, requisitos autoevaluados, pipeline y correos automáticos.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/analytics/" class="module-card" id="cardAna" style="display:none">
       <div class="card-icon"><i class="bi bi-bar-chart-line"></i></div>
       <h5>Indicadores RRHH <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
@@ -181,6 +187,7 @@
     if (tiene('rh_encuestas')) document.getElementById('cardEnc').style.display='';
     if (tiene('rh_solicitudes')) document.getElementById('cardSol').style.display='';
     if (tiene('rh_docs_firmados')) document.getElementById('cardDocsF').style.display='';
+    if (tiene('rh_postulaciones')) document.getElementById('cardPost').style.display='';
     if (tiene('rh_analytics','rh_colaboradores')) document.getElementById('cardAna').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
     if (tiene('rh_asistencia','rh_remuneraciones')) document.getElementById('cardAsi').style.display='';
