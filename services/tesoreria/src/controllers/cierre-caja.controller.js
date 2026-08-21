@@ -262,7 +262,7 @@ const getCajeros = async (req, res) => {
        LEFT JOIN perfiles p ON u.id_perfil = p.id_perfil
        LEFT JOIN caja_usuarios cu ON cu.id_usuario = u.id_usuario AND cu.activo = 1
        LEFT JOIN cajas cj ON cu.id_caja = cj.id_caja
-       WHERE u.activo = 1 ORDER BY nombre`
+       WHERE u.estado = 'activo' ORDER BY nombre`
     );
     ok(res, rows);
   } catch(e) { err(res, e); }
