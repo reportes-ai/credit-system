@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -67,23 +67,25 @@
     .tree ul.vstack li { align-items:flex-start; padding:3px 0 3px 22px; }
     .tree ul.vstack li::before { content:''; position:absolute; left:0; top:0; height:100%; width:2px; background:#dbe3ec; transform:none; }
     .tree ul.vstack li:last-child::before { height:50%; }
-    .tree ul.vstack li::after { content:''; position:absolute; left:0; top:50%; width:18px; height:2px; background:#dbe3ec; right:auto; }
+    .tree ul.vstack li::after { content:''; position:absolute; left:0; top:50%; width:22px; height:2px; background:#dbe3ec; right:auto; }
     .tree.clasico .org-row { flex-direction:column; text-align:center; gap:4px; min-width:150px; max-width:190px; padding:9px 12px; border:1.5px solid #2563eb; background:#eff6ff; }
     .tree.clasico ul.vstack .org-row { flex-direction:row; text-align:left; background:#fff; border-color:#bfdbfe; min-width:180px; padding:6px 11px; }
     .tree.clasico .oa { width:30px; height:30px; font-size:.8rem; }
     /* Banda STAFF: cuelga del tronco entre el GG y la fila de jefaturas,
        desplazada a la izquierda con su tirante horizontal al tronco. */
-    .staff-band { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 0 0; }
+    /* Geometría por MITADES, sin transforms: cada fila staff ocupa el ancho
+       completo; la caja va pegada al tronco central por su mitad (izquierda en
+       las impares, derecha en las pares) y el tirante es el padding entre la
+       caja y el centro. Así las líneas siempre nacen y mueren donde deben. */
+    .staff-band { position:relative; display:flex; flex-direction:column; gap:10px; padding:14px 0 0; align-self:stretch; }
     .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:-24px; width:2px; background:#dbe3ec; transform:translateX(-50%); }
-    /* Alternadas: una a cada lado del tronco, con su tirante hacia él.
-       Cajas del MISMO tamaño (ancho fijo, no al contenido). */
-    .staff-item { position:relative; }
-    .staff-item .org-row { width:200px; min-width:200px; max-width:200px; box-sizing:border-box; }
-    .staff-item:nth-child(odd)  { transform:translateX(calc(-50% - 30px)); }
-    .staff-item:nth-child(even) { transform:translateX(calc(50% + 30px)); }
-    .staff-item::after { content:''; position:absolute; top:50%; width:32px; height:2px; background:#dbe3ec; }
-    .staff-item:nth-child(odd)::after  { left:100%; }
-    .staff-item:nth-child(even)::after { right:100%; }
+    .staff-item { position:relative; display:flex; width:50%; box-sizing:border-box; }
+    .staff-item .org-row { width:210px; min-width:210px; max-width:210px; box-sizing:border-box; margin:0; }
+    .staff-item:nth-child(odd)  { align-self:flex-start; justify-content:flex-end; padding-right:34px; }
+    .staff-item:nth-child(even) { align-self:flex-end;   justify-content:flex-start; padding-left:34px; }
+    .staff-item::after { content:''; position:absolute; top:50%; width:34px; height:2px; background:#dbe3ec; }
+    .staff-item:nth-child(odd)::after  { right:0; }
+    .staff-item:nth-child(even)::after { left:0; }
     /* con banda staff, el conector del <ul> de jefaturas lo dibuja la banda */
     .tree.clasico li > .staff-band + ul::before { display:none; }
 
