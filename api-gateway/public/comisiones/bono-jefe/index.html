@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
+<!-- v1.6 — un boton por Jefe Comercial: cada uno se mide por su gente a cargo (ficha de Usuarios); el correo lleva un bloque por jefe. v1.5 — vigencia desde/hasta del cambio de variables + pestaña Bitacora de cambios (inmutable, permiso propio). v1.4 — footer "que afecta" con vigencia de ejecutivos y link a Procesos 37. v1.3 — logrado + puntaje por pilar en las tarjetas · rotulos Montos Otorgados y Nuevos Dealers con Negocios · informe mensual por correo (Para/CC configurables, bono bruto sin semana corrida) -->
 <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bono Jefe Comercial — AutoFácil</title>
@@ -95,6 +95,8 @@
     <div class="card filtros">
       <label><i class="bi bi-calendar3 me-1"></i>Mes:</label>
       <input type="month" id="mes" onchange="cargarBSC()">
+      <!-- Cada Jefe Comercial se mide por SU gente a cargo (ficha de Usuarios) -->
+      <span id="jefesBar" style="display:flex;gap:6px;flex-wrap:wrap;margin-left:10px"></span>
       <span style="flex:1"></span>
       <button class="btn btn-line" onclick="toggleInforme()"><i class="bi bi-journal-text"></i> Informe paso a paso</button>
       <button class="btn btn-navy" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</button>
@@ -312,14 +314,21 @@ async function verCambio(id){
 }
 
 /* ── BSC ── */
+let JEFE_SEL = null;   // id_usuario del Jefe Comercial en pantalla
+function elegirJefe(id){ JEFE_SEL = id; cargarBSC(); }
 async function cargarBSC(){
   const mes = document.getElementById('mes').value;
   const tb = document.getElementById('tbody');
   tb.innerHTML = '<tr><td colspan="9" class="no-data"><i class="bi bi-hourglass-split"></i> Calculando…</td></tr>';
-  let j; try { j = await (await fetch('/api/bono-jefe/bsc?mes='+mes, {headers:H()})).json(); }
+  let j; try { j = await (await fetch('/api/bono-jefe/bsc?mes='+mes+(JEFE_SEL?'&jefe='+JEFE_SEL:''), {headers:H()})).json(); }
   catch(e){ tb.innerHTML = '<tr><td colspan="9" class="no-data">Error de red</td></tr>'; return; }
   if (!j.success){ tb.innerHTML = `<tr><td colspan="9" class="no-data">${esc(j.error||'Sin acceso')}</td></tr>`; return; }
   DATA = j.data;
+  // Botones por Jefe Comercial: cada uno se mide por su gente a cargo.
+  JEFE_SEL = DATA.jefe || JEFE_SEL;
+  const jb = document.getElementById('jefesBar');
+  if (jb) jb.innerHTML = (DATA.jefes||[]).map(x =>
+    `<button class="btn ${x.id_usuario===DATA.jefe?'btn-navy':'btn-line'}" style="padding:5px 13px;font-size:.8rem" onclick="elegirJefe(${x.id_usuario})"><i class="bi bi-person-badge me-1"></i>${esc(x.nombre)}</button>`).join('');
   const p = DATA.params;
   const av = DATA.promedio || {};
   // Logrado = promedio del equipo (la misma fila PROMEDIO de la tabla); puntaje = el que aporta ese pilar al score.

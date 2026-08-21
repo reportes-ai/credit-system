@@ -150,8 +150,25 @@ function premioDe(score, cfg, mes) {
            total_variable: variable + semana, renta_total: cfg.sueldo_fijo + variable + semana };
 }
 
-/* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ── */
-async function calcularBSC(mesQ, cfgOverride) {
+/* ── Jefes Comerciales medibles: quien SUPERVISA (usuarios.id_supervisor) a al
+   menos un Ejecutivo Comercial. Cada jefe se mide por SU gente a cargo; la
+   línea la define la ficha de Usuarios, no una lista escrita acá. ── */
+async function jefesComerciales() {
+  const [js] = await pool.query(
+    `SELECT j.id_usuario,
+            TRIM(CONCAT(SUBSTRING_INDEX(TRIM(j.nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(j.apellido),' ',1))) AS nombre
+       FROM usuarios j
+      WHERE j.estado='activo'
+        AND EXISTS (SELECT 1 FROM usuarios e JOIN perfiles p ON p.id_perfil=e.id_perfil
+                     WHERE e.id_supervisor = j.id_usuario AND p.nombre='Ejecutivo Comercial')
+      ORDER BY nombre`);
+  return js;
+}
+
+/* ── Cálculo central del BSC (lo usan la vista y el informe por correo) ──
+   `idJefe`: acota el equipo a los ejecutivos que reportan a ese jefe (ficha de
+   Usuarios). Sin idJefe se evalúa el equipo completo (compatibilidad). ── */
+async function calcularBSC(mesQ, cfgOverride, idJefe) {
     await SC.asegurarFeriados();
     const mes = /^\d{4}-\d{2}$/.test(mesQ || '') ? mesQ
       : mesChile();
@@ -171,7 +188,8 @@ async function calcularBSC(mesQ, cfgOverride) {
           AND u.fecha_ingreso IS NOT NULL
           AND u.fecha_ingreso <= LAST_DAY(CONCAT(?,'-01'))
           AND (u.fecha_baja IS NULL OR u.fecha_baja >= CONCAT(?,'-01'))
-        ORDER BY ejecutivo`, [mes, mes]);
+          AND (? IS NULL OR u.id_supervisor = ?)
+        ORDER BY ejecutivo`, [mes, mes, idJefe || null, idJefe || null]);
 
     // Pilar 1: créditos OTORGADOS del mes
     const [ing] = await pool.query(
@@ -239,8 +257,15 @@ async function calcularBSC(mesQ, cfgOverride) {
     // Informe paso a paso (mismo espíritu que el informe de comisiones de ejecutivos)
     const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
     const n2 = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let nombreJefe = null;
+    if (idJefe) {
+      const [[jj]] = await pool.query(
+        `SELECT TRIM(CONCAT(SUBSTRING_INDEX(TRIM(nombre),' ',1),' ',SUBSTRING_INDEX(TRIM(apellido),' ',1))) AS n
+           FROM usuarios WHERE id_usuario=?`, [idJefe]);
+      nombreJefe = jj ? jj.n : null;
+    }
     const pasos = [
-      { titulo: 'Equipo evaluado', detalle: `${filas.length} Ejecutivos Comerciales activos en ${mes}. El bono del Jefe Comercial se calcula sobre el PROMEDIO del equipo, no sobre un ejecutivo individual.` },
+      { titulo: 'Equipo evaluado', detalle: `${filas.length} Ejecutivos Comerciales activos en ${mes}${nombreJefe ? ` que reportan a ${nombreJefe} (según la ficha de Usuarios)` : ''}. El bono del Jefe Comercial se calcula sobre el PROMEDIO de SU equipo, no sobre un ejecutivo individual.` },
       { titulo: `Pilar 1 — Créditos otorgados (pondera ${Math.round(cfg.pond_creditos * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.otorgados)} créditos otorgados en el mes. Regla: bajo el mínimo (${cfg.creditos_min}) el puntaje es 0; sobre lo esperado (${cfg.creditos_esperado}) se alcanza el máximo del pilar (${n2(cfg.pond_creditos * 100)} pts); entre medio es proporcional → (${n2(avg.otorgados)} ÷ ${cfg.creditos_esperado}) × ${Math.round(cfg.pond_creditos * 100)} = ${n2(avg.ptj_creditos)} pts.` },
       { titulo: `Pilar 2 — Montos Otorgados (pondera ${Math.round(cfg.pond_montos * 100)}%)`, detalle: `Promedio del equipo: ${clp(avg.monto_aprobado)} otorgados en el mes. Umbrales: mínimo ${clp(minM)} (${cfg.creditos_min} ops × ${clp(cfg.monto_por_op)}), esperado ${clp(espM)} (${cfg.creditos_esperado} ops × ${clp(cfg.monto_por_op)}). Puntaje: ${n2(avg.ptj_montos)} pts.` },
       { titulo: `Pilar 3 — Nuevos Dealers con Negocios (pondera ${Math.round(cfg.pond_dealers * 100)}%)`, detalle: `Promedio del equipo: ${n2(avg.dealers_nuevos)} dealers nuevos (dealers que cursaron su PRIMERA operación otorgada de la historia durante ${mes}, atribuidos al ejecutivo de esa operación). Regla: bajo el mínimo (${cfg.dealers_min}) es 0; si no, (valor ÷ ${cfg.dealers_esperado}) × ${Math.round(cfg.pond_dealers * 100)} = ${n2(avg.ptj_dealers)} pts, con tope en ${Math.round(cfg.pond_dealers * 100)} pts.` },
@@ -251,13 +276,22 @@ async function calcularBSC(mesQ, cfgOverride) {
       { titulo: 'Premio del mes', detalle: `${clp(cfg.sueldo_fijo)} (fijo) × ${n2(premio.pct_adicional * 100)}% = ${clp(premio.variable)} de premio variable. Semana corrida: ${clp(premio.variable)} × ${n2(premio.factor_semana_aplicado * 100)}% = ${clp(premio.semana_corrida)} (art. 45 CT, factor del mes). Total variable: ${clp(premio.total_variable)} → Renta total del mes: ${clp(premio.renta_total)}.` },
     ];
 
-    return { mes, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos };
+    return { mes, jefe: idJefe || null, jefe_nombre: nombreJefe, params: { ...cfg, min_montos: minM, esperado_montos: espM }, ejecutivos: filas, promedio: avg, premio, pasos };
 }
 
-/* ── GET /api/bono-jefe/bsc?mes=YYYY-MM ── */
+/* ── GET /api/bono-jefe/bsc?mes=YYYY-MM&jefe=<id_usuario> ──
+   Sin `jefe` se toma el PRIMER jefe con equipo (hay más de uno desde ago-2026:
+   cada jefe se mide por su gente a cargo). `jefe=todos` evalúa el equipo completo. ── */
 const getBSC = async (req, res) => {
   try {
-    res.json({ success: true, data: await calcularBSC(req.query.mes), error: null });
+    const jefes = await jefesComerciales();
+    let idJefe = null;
+    const q = String(req.query.jefe || '').trim();
+    if (q && q !== 'todos') idJefe = parseInt(q, 10) || null;
+    else if (!q && jefes.length) idJefe = jefes[0].id_usuario;
+    const data = await calcularBSC(req.query.mes, null, idJefe);
+    data.jefes = jefes;
+    res.json({ success: true, data, error: null });
   } catch (e) { console.error('[bono-jefe bsc]', e); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
@@ -272,26 +306,29 @@ const enviarInforme = async (req, res) => {
     const cc   = String(cfgMail.informe_cc   || '').split(/[,;]/).map(s => s.trim()).filter(Boolean);
     if (!para.length) return res.status(400).json({ success: false, data: null, error: 'Configura los destinatarios (Para) en la pestaña Variables' });
 
-    const d = await calcularBSC(req.body && req.body.mes);
+    /* Un BLOQUE por Jefe Comercial: cada uno se mide por SU gente a cargo
+       (ficha de Usuarios). Un solo correo con todos los jefes. */
+    const jefes = await jefesComerciales();
+    if (!jefes.length) return res.status(400).json({ success: false, data: null, error: 'No hay Jefes Comerciales con equipo asignado en Usuarios' });
+    const informes = [];
+    for (const jf of jefes) informes.push(await calcularBSC(req.body && req.body.mes, null, jf.id_usuario));
+    const d = informes[0];
     const clp = v => '$' + Math.round(v).toLocaleString('es-CL');
     const n2v = v => Number(v).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const [yy, mm] = d.mes.split('-');
     const mesLargo = `${MESES[parseInt(mm,10)-1]} ${yy}`;
 
-    const filasHtml = d.ejecutivos.map((f, i) => `
+    const bloqueDe = dd => { const filasHtml = dd.ejecutivos.map((f, i) => `
       <tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
         <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb">${f.ejecutivo}</td>
         <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${f.otorgados}</td>
         <td style="padding:7px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${clp(f.monto_aprobado)}</td>
       </tr>`).join('');
-    const a = d.promedio, pr = d.premio;
-    const html = `
-      <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;color:#1e293b">
-        <div style="background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);border-radius:14px;color:#fff;padding:22px 26px;margin-bottom:18px">
-          <div style="font-size:1.15rem;font-weight:800">🏆 Bono Jefe Comercial — ${mesLargo}</div>
-          <div style="font-size:.85rem;opacity:.85">Balanced Scorecard del equipo comercial · Auto Fácil Crédito Automotriz</div>
-        </div>
+      const a = dd.promedio, pr = dd.premio;
+      return `
+        <div style="font-size:1rem;font-weight:800;color:#012d70;margin:22px 0 8px;border-bottom:2px solid #dbeafe;padding-bottom:5px">
+          ${dd.jefe_nombre || 'Equipo comercial'} — su equipo (${dd.ejecutivos.length})</div>
         <table style="width:100%;border-collapse:collapse;font-size:.9rem;margin-bottom:16px">
           <thead><tr style="background:#eff6ff">
             <th style="padding:8px 12px;text-align:left;color:#0141A2">Ejecutivo Comercial</th>
@@ -311,8 +348,17 @@ const enviarInforme = async (req, res) => {
             <div style="font-size:1.5rem;font-weight:900">${n2v(a.score)} pts</div></div>
           <div style="text-align:right"><div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;opacity:.75">Bono bruto del mes (sin semana corrida)</div>
             <div style="font-size:1.5rem;font-weight:900;color:#7dd3fc">${clp(pr.variable)}</div></div>
+        </div>`;
+    };
+
+    const html = `
+      <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;color:#1e293b">
+        <div style="background:linear-gradient(135deg,#012d70,#0141A2 50%,#009AFE);border-radius:14px;color:#fff;padding:22px 26px;margin-bottom:6px">
+          <div style="font-size:1.15rem;font-weight:800">🏆 Bono Jefe Comercial — ${mesLargo}</div>
+          <div style="font-size:.85rem;opacity:.85">Balanced Scorecard por Jefe Comercial (cada uno sobre su equipo) · Auto Fácil Crédito Automotriz</div>
         </div>
-        <div style="font-size:.78rem;color:#64748b;line-height:1.5">
+        ${informes.map(bloqueDe).join('')}
+        <div style="font-size:.78rem;color:#64748b;line-height:1.5;margin-top:14px">
           Detalle del cálculo disponible en la app: Soporte → Bono Jefe Comercial (informe paso a paso).<br>
           Pilares: créditos otorgados ${Math.round(d.params.pond_creditos*100)}% · montos aprobados ${Math.round(d.params.pond_montos*100)}% · nuevos dealers ${Math.round(d.params.pond_dealers*100)}%.
         </div>
@@ -320,10 +366,11 @@ const enviarInforme = async (req, res) => {
           Emitido automáticamente por <b>Auto Fácil Business Suite</b>.
         </div>
       </div>`;
+    const resumen = informes.map(x => `${x.jefe_nombre}: score ${n2v(x.promedio.score)} · bono ${clp(x.premio.variable)}`).join(' | ');
     await enviarCorreo({ to: para.join(','), cc: cc.length ? cc.join(',') : undefined,
-      subject: `Bono Jefe Comercial — ${mesLargo} (score ${n2v(a.score)} · bono bruto ${clp(pr.variable)})`, html });
+      subject: `Bono Jefe Comercial — ${mesLargo} (${resumen})`, html });
     auditar({ req, accion: 'ENVIAR', modulo: 'bono-jefe', entidad: 'informe', entidad_id: d.mes,
-      detalle: `Informe Bono Jefe Comercial ${d.mes} enviado a ${para.join(', ')}${cc.length ? ' (CC: ' + cc.join(', ') + ')' : ''} — bono bruto ${clp(pr.variable)}` });
+      detalle: `Informe Bono Jefe Comercial ${d.mes} enviado a ${para.join(', ')}${cc.length ? ' (CC: ' + cc.join(', ') + ')' : ''} — ${resumen}` });
     res.json({ success: true, data: { enviado_a: para, cc, mes: d.mes }, error: null });
   } catch (e) { console.error('[bono-jefe informe]', e); res.status(500).json({ success: false, data: null, error: 'Error enviando el informe' }); }
 };
