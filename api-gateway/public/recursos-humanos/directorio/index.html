@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.13 — equipos alineados arriba (Finanzas flotaba centrado) y aire bajo el staff. v2.12 — el tronco del staff muere exacto en la linea de jefaturas (sin cola). v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.14 — Copiar/Descargar: lineas materializadas como divs antes de capturar (html2canvas dibuja mal los pseudo-elementos). v2.13 — equipos alineados arriba (Finanzas flotaba centrado) y aire bajo el staff. v2.12 — el tronco del staff muere exacto en la linea de jefaturas (sin cola). v2.11 — lineas del staff por mitades (tirante pegado al tronco, sin transforms) y tirante de columnas sin corte. v2.10 — staff alternado a ambos lados del tronco, cajas de ancho fijo. v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -37,6 +37,10 @@
     .org-row .on { font-weight:700; font-size:.85rem; color:#111827; line-height:1.2; }
     .org-row .oc { font-size:.72rem; color:#0141A2; font-weight:600; line-height:1.2; }
     .org-row .cnt { margin-left:auto; font-size:.68rem; color:#64748b; background:#eef2f7; border-radius:20px; padding:2px 9px; font-weight:700; white-space:nowrap; }
+
+    /* Durante la captura: los pseudo-elementos se apagan (las líneas ya están
+       materializadas como divs reales) para no dibujarlas dos veces. */
+    .cap-sin-pseudo *::before, .cap-sin-pseudo *::after { content:none !important; }
 
     /* Selector de vista del organigrama */
     .org-views { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
@@ -292,12 +296,41 @@ function clasicoHTML(id, hijosDe, depth){
   return `<li>${nodoRow(MAPA[id],hijosDe)}<ul class="${ul}">${hijos.map(h=>clasicoHTML(h.id_usuario,hijosDe,depth+1)).join('')}</ul></li>`;
 }
 
-/* ── Copiar / Descargar el organigrama como imagen (html2canvas local) ── */
+/* ── Copiar / Descargar el organigrama como imagen (html2canvas local) ──
+   html2canvas dibuja MAL los pseudo-elementos con transform (las líneas del
+   árbol se pierden o quedan desplazadas). Antes de capturar se MATERIALIZAN:
+   cada ::before/::after de línea se replica como un div real con la geometría
+   ya medida por el navegador, se apagan los pseudos, se captura y se limpia. */
+function materializarLineas(root){
+  const extras = [];
+  const els = [root, ...root.querySelectorAll('*')];
+  for (const el of els){
+    for (const p of ['::before','::after']){
+      const cs = getComputedStyle(el, p);
+      if (cs.content === 'none' || cs.position !== 'absolute') continue;
+      const bg = cs.backgroundColor, bt = cs.borderTopWidth;
+      if ((bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') && bt === '0px') continue;
+      const d = document.createElement('div');
+      d.className = '__linea-cap';
+      d.style.cssText = `position:absolute;pointer-events:none;left:${cs.left};top:${cs.top};right:${cs.right};bottom:${cs.bottom};width:${cs.width};height:${cs.height};transform:${cs.transform};background:${bg};border-top:${cs.borderTop}`;
+      el.appendChild(d);
+      extras.push(d);
+    }
+  }
+  return extras;
+}
 async function orgCanvas(){
   const el = document.querySelector('#pane-org .org-wrap');
-  // scrollWidth: capturar el árbol COMPLETO aunque tenga scroll horizontal
-  return await html2canvas(el, { backgroundColor:'#ffffff', scale:2,
-    width: el.scrollWidth, height: el.scrollHeight, windowWidth: el.scrollWidth });
+  const extras = materializarLineas(el);
+  el.classList.add('cap-sin-pseudo');
+  try {
+    // scrollWidth: capturar el árbol COMPLETO aunque tenga scroll horizontal
+    return await html2canvas(el, { backgroundColor:'#ffffff', scale:2,
+      width: el.scrollWidth, height: el.scrollHeight, windowWidth: el.scrollWidth });
+  } finally {
+    el.classList.remove('cap-sin-pseudo');
+    extras.forEach(d => d.remove());
+  }
 }
 async function copiarOrg(){
   try {
