@@ -3646,6 +3646,7 @@ const TABS_NAV = [
   { id:'vdealers', label:'🏪 Dealers' },
   { id:'vparques', label:'🅿️ Parques' },
   { id:'vproy2', label:'🔮 Proyección Pro' },
+  { id:'vglos',  label:'📖 Glosario' },
 ];
 const PERFILES_DEFAULT = ['USUARIO', 'SUPERVISOR', 'GERENTE GENERAL', 'ADMINISTRADOR'];
 let PERFILES_SISTEMA = PERFILES_DEFAULT.slice();
