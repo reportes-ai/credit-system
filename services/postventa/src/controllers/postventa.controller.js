@@ -646,8 +646,6 @@ async function reversarPagoCentral(track, ids, usuario, motivo) {
   const out = { correlativos: 0, asientos: 0, mesCerrado: [] };
   for (const id of ids) {
     try {
-      // Aviso al dealer: su "pago realizado" quedó sin efecto (fire & forget).
-      if (track === 'SALDO') notificarReversaSaldoDealer(id, motivo).catch(e => console.error('[reversa aviso]', e.message));
       const [[s]] = await pool.query('SELECT num_op FROM postventa_seguimiento WHERE id=?', [id]);
       const tabla = track === 'SALDO' ? 'postventa_ordenes' : 'postventa_ordenes_comision';
       const [[po]] = await pool.query(`SELECT id FROM \`${tabla}\` WHERE id_seguimiento=?`, [id]);
@@ -1191,64 +1189,6 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
       text: cuerpo,
     });
   } catch (e) { console.error('[postventa aviso pago saldo]', e.message); }
-}
-
-/* ── Aviso al dealer cuando el pago del saldo precio SE REVERSA (típico: el
-   banco devolvió la transferencia por datos de cuenta errados). El dealer
-   recibió el correo de "pagado" — dejarlo sin el de reversa es dejarlo esperando
-   plata que no viene. Plantilla paramétrica correo_reversa_saldo (mantenedor
-   Post Venta); nace ACTIVA porque un pago reversado sin aviso es peor que un
-   correo de más. Nunca lanza. ── */
-async function notificarReversaSaldoDealer(idSeguimiento, motivo) {
-  try {
-    const [[tRow]] = await pool.query("SELECT valor FROM postventa_config WHERE clave='correo_reversa_saldo'");
-    const tpl = Object.assign({
-      activo: true, remitente: 'sistema',
-      asunto: 'Importante: pago del Saldo Precio OP {num_op} reversado',
-      cuerpo: 'Estimado {dealer}:\n\nTe informamos que el pago del Saldo Precio de la operación {num_op} por {monto}, informado anteriormente, fue REVERSADO: la transferencia fue devuelta por el banco.\n\nMotivo: {motivo}\n\nPor favor verifica con nuestro equipo los datos de tu cuenta bancaria (banco, tipo y número de cuenta a nombre del RUT facturador) para reprocesar el pago a la brevedad.\n\nLamentamos las molestias.',
-      firma: 'Equipo de Operaciones · AutoFácil Crédito Automotriz',
-      cc_operaciones: '',
-    }, tRow ? JSON.parse(tRow.valor) : {});
-    if (tpl.activo === false) return;
-    const [[d]] = await pool.query(`
-      SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera, ${SIN_LIM_SQL},
-             po.monto AS odp_monto, po.num_orden,
-             COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, NULLIF(dr.nombre_indexa,''), dr.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
-             COALESCE(dl.correo, dl.cf_email, dr.correo, dr.cf_email) AS correo
-      FROM postventa_seguimiento s
-      LEFT JOIN creditos c ON c.id = s.id_credito
-      LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
-      LEFT JOIN dealers  dr ON dl.id_dealer IS NULL AND dr.rut = COALESCE(c.rut_dealer, s.rut_dealer)
-      LEFT JOIN postventa_ordenes po ON po.id_seguimiento = s.id
-      WHERE s.id = ?`, [idSeguimiento]);
-    if (!d) return;
-    if (!d.correo) { console.warn('[postventa aviso reversa saldo] dealer sin correo — OP', d.num_op); return; }
-    const cc = new Set();
-    if (String(tpl.cc_operaciones || '').trim()) cc.add(String(tpl.cc_operaciones).trim().toLowerCase());
-    try {
-      const [[ej]] = await pool.query(
-        `SELECT email FROM usuarios WHERE UPPER(TRIM(CONCAT(nombre,' ',COALESCE(apellido,'')))) = UPPER(TRIM(?)) AND email IS NOT NULL LIMIT 1`,
-        [d.ejecutivo || '']);
-      if (ej && ej.email) cc.add(String(ej.email).toLowerCase());
-    } catch (_) {}
-    const fmt = v => '$' + Math.round(Number(v) || 0).toLocaleString('es-CL');
-    const montoPagado = d.odp_monto != null
-      ? Number(d.odp_monto)
-      : montoSaldoOrden(d.financiera, d.saldo_precio, await getFijosAutoFin(), Number(d.sin_limitacion) === 1);
-    const datos = { dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(montoPagado),
-      num_orden: d.num_orden || '', financiera: d.financiera || '',
-      motivo: String(motivo || 'transferencia devuelta por el banco').slice(0, 300),
-      fecha: new Date().toLocaleDateString('es-CL', { timeZone: 'America/Santiago' }) };
-    const rell = t => String(t || '').replace(/\{(\w+)\}/g, (m, k) => datos[k] != null ? datos[k] : m);
-    const { enviarCorreo, remitentePorClave, envolverHTML } = require('../../../../shared/mailer');
-    const escH = x => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const cuerpo = rell(tpl.cuerpo) + (tpl.firma ? '\n\n' + rell(tpl.firma) : '');
-    await enviarCorreo({
-      from: remitentePorClave(tpl.remitente), to: d.correo, cc: [...cc].join(','),
-      subject: rell(tpl.asunto) || 'Pago de Saldo Precio reversado',
-      html: envolverHTML(escH(cuerpo).replace(/\n/g, '<br>')), text: cuerpo,
-    });
-  } catch (e) { console.error('[postventa aviso reversa saldo]', e.message); }
 }
 
 async function notificarPagoComisionDealer(idSeguimiento) {
