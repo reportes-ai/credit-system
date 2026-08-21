@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Historial de Órdenes de Pago — AutoFácil</title>
-  <!-- v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
+  <!-- v1.26 — blur 8px y sombra afirmada; v1.25 — fondo desenfocado (no oscurecido) y doble sombra en el popup: profundidad; v1.24 — navbar migrada al componente topnav; v1.22 — el documento Solicitud de Pago se movio a /js/odp-documento.js (motor unico, lo comparte Saldos Precios a Pagar); v1.21 — deep-link ?ver= abre SOLO la orden (sin el historial detras) y al cerrarla se cierra la pestana; v1.20 — segregacion de funciones: boton Pagar bloqueado en las ordenes que emitio el propio usuario · v1.19 — Enviar a Contabilidad tambien en ordenes SALDO/COMISION (reenvio de las emitidas sin correo) · v1.18 — deep-link ?ver=<id>: abre la orden directo (desde Saldos a Pagar) · v1.17 — anular ordenes de Post Venta (Saldo Precio / Comision): correlativo anulado + etapas deshechas para reemitir; v1.16 — datos bancarios tambien en las ordenes generales (proveedor) + avisos de tipo de cuenta y ficha sin datos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -44,17 +44,19 @@
        corta y cerrada que apoya el borde) en vez de una sola grande, que se ve
        plana. Con el fondo desenfocado el documento queda "sobre" la pantalla. */
     dialog { border:none; border-radius:16px; padding:0; max-width:880px; width:96%;
-             box-shadow:0 32px 80px rgba(2,6,23,.42), 0 8px 20px rgba(2,6,23,.22); }
+             box-shadow:0 36px 90px rgba(2,6,23,.55), 0 10px 26px rgba(2,6,23,.34); }
     .dlg-foot { flex-wrap:wrap; }
     #dlgPago { max-width:440px; }
     #dlgPago label { display:block; font-size:.72rem; font-weight:800; text-transform:uppercase; color:#64748b; margin-bottom:10px; }
     #dlgPago select, #dlgPago input { width:100%; border:1.5px solid #e2e8f0; border-radius:8px; padding:8px 11px; font-size:.86rem; box-sizing:border-box; margin-top:4px; font-weight:400; }
     .toast { position:fixed; top:70px; right:20px; background:#16a34a; color:#fff; padding:12px 18px; border-radius:9px; font-weight:600; font-size:.86rem; z-index:3000; display:none; max-width:360px; }
     /* Fondo DESENFOCADO en vez de oscurecido. El oscurecimiento baja de 55% a
-       28%: el desenfoque ya separa, y sumar los dos fuerte se ve turbio. Es una
-       capa compositada que se calcula al abrir, sobre contenido quieto — barata.
+       32%: el desenfoque ya separa, y sumar los dos fuerte se ve turbio. A 8px
+       el historial de atrás deja de ser información legible y pasa a ser
+       textura — con 5px el ojo todavía se iba a leer los montos del fondo.
+       Es una capa compositada que se calcula al abrir, sobre contenido quieto.
        Navegador sin backdrop-filter: queda el velo oscuro de siempre. */
-    dialog::backdrop { background:rgba(15,23,42,.28); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+    dialog::backdrop { background:rgba(15,23,42,.32); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
     .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:15px 20px; font-weight:700; display:flex; justify-content:space-between; }
     .dlg-body { padding:18px 20px; font-size:.86rem; color:#334155; line-height:1.7; }
     .dlg-foot { padding:13px 20px; border-top:1px solid #eef2f7; display:flex; justify-content:flex-end; gap:10px; }
