@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- v1.0 — glosario del dashboard "a prueba de todo": cada variable y cada cuadro con QUE ES / COMO SE CALCULA / INCLUYE / NO INCLUYE / PARA QUE SIRVE -->
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glosario del Dashboard — AutoFácil</title>
+<link href="/css/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root { --navy:#012d70; --accent:#0141A2; --bg:#f0f4f8; }
+  * { box-sizing:border-box; } body { margin:0; font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1e293b; }
+  .main { max-width:1080px; margin:0 auto; padding:24px 18px 80px; }
+  .banner { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); color:#fff; border-radius:16px; padding:22px 28px; margin-bottom:18px; display:flex; align-items:center; gap:16px; }
+  .banner i { font-size:2.2rem; opacity:.85; } .banner h1 { margin:0 0 3px; font-size:1.25rem; } .banner p { margin:0; opacity:.85; font-size:.86rem; }
+  .toc { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:18px; font-size:.86rem; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .toc a { display:inline-block; margin:3px 12px 3px 0; color:var(--accent); text-decoration:none; font-weight:700; }
+  h2 { color:var(--accent); margin:34px 0 4px; font-size:1.1rem; }
+  .sub { color:#64748b; font-size:.84rem; margin:0 0 12px; }
+  .card { background:#fff; border-radius:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); padding:16px 20px; margin-bottom:12px; }
+  .card h5 { margin:0 0 10px; color:var(--navy); font-size:1rem; display:flex; align-items:center; gap:8px; }
+  .fila { display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.88rem; padding:5px 0; border-top:1px dashed #eef2f7; }
+  .fila:first-of-type { border-top:none; }
+  .fila b { color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding-top:2px; }
+  .si { color:#15803d; font-weight:600; } .no { color:#b91c1c; font-weight:600; }
+  code { background:#eff6ff; border-radius:4px; padding:1px 6px; font-family:Consolas,monospace; font-size:.85em; }
+  .regla { background:#fffbeb; border-left:4px solid #f59e0b; border-radius:8px; padding:12px 16px; margin:14px 0; font-size:.88rem; }
+  @media (max-width:640px){ .fila { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Dashboard',href:'/dashboard/'},{label:'Glosario',icon:'bi-book',current:true}],actions:[{label:'Volver al Dashboard',icon:'bi-arrow-left',href:'/dashboard/'},{label:'Imprimir',icon:'bi-printer',onclick:'print()'}]};</script>
+<div class="main">
+  <div class="banner"><i class="bi bi-book"></i><div>
+    <h1>Glosario del Dashboard</h1>
+    <p>Cada variable y cada cuadro: qué es, cómo se calcula, qué incluye, qué NO incluye y para qué sirve. Si un número no cuadra con otro informe, parte por acá.</p>
+  </div></div>
+
+  <div class="toc">
+    <a href="#base">Lo primero: las 4 reglas base</a><a href="#vars">Variables</a><a href="#cuadros">Cuadros y pestañas</a>
+  </div>
+
+  <h2 id="base">Las 4 reglas base (léelas primero)</h2>
+  <div class="card">
+    <div class="fila"><b>1. El mes</b><span>El dashboard agrupa por <b>MES CONTABLE</b> (<code>creditos.mes</code>), no por la fecha exacta del curse. Una op cursada el 30-06 con mes contable julio cuenta en julio aquí. Comisiones usa otra regla desde ago-2026 (fecha de curse) — por eso comisiones y dashboard pueden diferir en el borde del mes, y es correcto.</span></div>
+    <div class="fila"><b>2. Aprobada</b><span>Una operación es APROBADA solo si su estado es <b>APROBADO, OTORGADO o CURSADO</b>. Una pendiente o "en evaluación" NO es aprobada (aunque tampoco esté rechazada). Definición única <code>AF_ES_APROBADO</code>, la misma en todas las pestañas desde el 21-08-2026.</span></div>
+    <div class="fila"><b>3. Otorgada</b><span>Solo lo que se CURSÓ de verdad: la financiera giró la plata. Toda otorgada fue aprobada primero — por eso Aprobadas ≥ Otorgadas siempre.</span></div>
+    <div class="fila"><b>4. Anulada</b><span>Una anulada deja de contar como otorgada en todo el sistema (dashboard, cartolas, comisiones), pero sigue contando como INGRESADA de su mes.</span></div>
+  </div>
+
+  <h2 id="vars">Variables</h2>
+  <p class="sub">Las que aparecen como columna o KPI en cualquier pestaña.</p>
+
+  <div class="card"><h5>📥 Ingresadas (Ing)</h5>
+    <div class="fila"><b>Qué es</b><span>Todas las solicitudes que entraron al sistema en el período.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>Cuenta de operaciones con mes contable dentro del período. Punto.</span></div>
+    <div class="fila"><b>Incluye</b><span class="si">Aprobadas, otorgadas, rechazadas, pendientes, desistidas y anuladas — TODO lo que se digitó o llegó por carga.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">Cotizaciones y simulaciones que nunca se ingresaron como solicitud.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Medir el volumen de trabajo del canal. Es el denominador de la TA.</span></div>
+  </div>
+
+  <div class="card"><h5>✅ Aprobadas (Apro)</h5>
+    <div class="fila"><b>Qué es</b><span>Solicitudes que la financiera aprobó (regla base 2).</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>Ingresadas cuyo estado es APROBADO, OTORGADO o CURSADO.</span></div>
+    <div class="fila"><b>Incluye</b><span class="si">Las otorgadas (estuvieron aprobadas primero) y las aprobadas que aún no se cursan.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">Pendientes, en evaluación, rechazadas, anuladas, desistidas. (Hasta el 20-08-2026 el Funnel sí contaba las pendientes acá — por eso los números viejos no cuadraban.)</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Medir cuánto de lo ingresado pasa el filtro de riesgo. Numerador de la TA, denominador de la TC.</span></div>
+  </div>
+
+  <div class="card"><h5>🏁 Otorgadas (Ot)</h5>
+    <div class="fila"><b>Qué es</b><span>Las ventas concretadas: operaciones cursadas.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>Ingresadas cuyo estado es OTORGADO.</span></div>
+    <div class="fila"><b>Incluye</b><span class="si">Otorgadas de AUTOFIN, UNIDAD y recursos propios.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">Aprobadas sin cursar, ni anuladas (aunque alguna vez estuvieron otorgadas).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>ES la venta. Todo lo demás del negocio (comisiones, cartolas, ingresos) cuelga de esta.</span></div>
+  </div>
+
+  <div class="card"><h5>📉 TA — Tasa de Aprobación</h5>
+    <div class="fila"><b>Qué es</b><span>Qué porcentaje de lo que ingreso me aprueban.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span><code>Aprobadas ÷ Ingresadas × 100</code>, sobre el mismo período.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Mide la CALIDAD de lo que el ejecutivo ingresa: una TA baja = está subiendo clientes que no califican (o documentación mala).</span></div>
+    <div class="fila"><b>Ojo</b><span>Del mes en curso está siempre "en movimiento": las pendientes de hoy pueden aprobarse mañana y la TA sube sola.</span></div>
+  </div>
+
+  <div class="card"><h5>🎯 TC — Tasa de Conversión</h5>
+    <div class="fila"><b>Qué es</b><span>Qué porcentaje de lo aprobado se convierte en venta.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span><code>Otorgadas ÷ Aprobadas × 100</code>.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Mide el CIERRE comercial: una TC baja = se aprueba pero el cliente compra con otro (o el ejecutivo no remata).</span></div>
+    <div class="fila"><b>Ojo</b><span>TA y TC responden preguntas distintas — no se suman ni se comparan entre sí.</span></div>
+  </div>
+
+  <div class="card"><h5>💵 Total a Financiar / Monto Financiado</h5>
+    <div class="fila"><b>Qué es</b><span>El capital de los créditos del grupo mostrado.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>Suma de <code>monto_financiado</code> = saldo precio + seguros + gastos + GPS de cada operación.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">El pie del cliente (eso no se financia).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Tamaño del negocio en plata. Es la base de la comisión del ejecutivo y del pilar Montos del BSC.</span></div>
+  </div>
+
+  <div class="card"><h5>🚗 Saldo Precio</h5>
+    <div class="fila"><b>Qué es</b><span>Lo que se le paga al dealer por el auto: valor vehículo − pie.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">Seguros, gastos ni GPS (esos van en el monto financiado, no al dealer).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Es plata EN TRÁNSITO (cuenta de paso): la financiera la gira y se entrega íntegra al dealer. No es ingreso de AutoFácil.</span></div>
+  </div>
+
+  <div class="card"><h5>🧮 Prom. Fin / Prom. Op.</h5>
+    <div class="fila"><b>Cómo se calcula</b><span><code>Monto financiado total ÷ N° de operaciones</code> del grupo mostrado.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Detectar mezcla: un promedio que cae puede significar más ops chicas, no menos venta.</span></div>
+  </div>
+
+  <div class="card"><h5>🤝 Com. Dealer</h5>
+    <div class="fila"><b>Qué es</b><span>La participación que se le paga al DEALER por traer el negocio.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>La pactada en la carta manda (<code>part_bruto</code>); sin carta, el motor por tabla del dealer o pizarra. SIEMPRE bruta (IVA incluido).</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">La comisión del ejecutivo de AutoFácil — son cosas distintas con nombre parecido.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>El costo comercial de la operación. Aguas abajo se paga vía cartola → factura → ODP.</span></div>
+  </div>
+
+  <div class="card"><h5>💰 Ing. x Colocaciones / Ing. AFA</h5>
+    <div class="fila"><b>Qué es</b><span>El ingreso de AutoFácil por originar: la comisión que paga la FINANCIERA por cada operación colocada.</span></div>
+    <div class="fila"><b>No incluye</b><span class="no">El ingreso por seguros (va aparte) ni el saldo precio (es plata de paso).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>La línea de arriba del P&L del negocio brokerage.</span></div>
+  </div>
+
+  <div class="card"><h5>🛡️ Ing. x Seguros y Penetración</h5>
+    <div class="fila"><b>Qué es</b><span>El ingreso por los seguros intermediados, y qué % de las operaciones ELEGIBLES los lleva.</span></div>
+    <div class="fila"><b>Cómo se calcula</b><span>La penetración se mide sobre el universo elegible de cada seguro (motor único de penetración) — no sobre todas las otorgadas: un crédito UNIDAD no puede llevar cesantía, así que no castiga el %.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Es el mismo cruce que paga los bonos de la comisión del ejecutivo.</span></div>
+  </div>
+
+  <div class="card"><h5>📏 MAYOR / MENOR 200 UF</h5>
+    <div class="fila"><b>Cómo se calcula</b><span>Monto del crédito contra 200 UF usando la UF de la <b>fecha de otorgamiento</b> de cada operación — se recalcula, no es un campo fijo.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Clasificación normativa (TMC distinta por tramo).</span></div>
+  </div>
+
+  <h2 id="cuadros">Cuadros y pestañas</h2>
+  <p class="sub">Qué muestra cada sección y con qué universo. Todas usan las variables de arriba.</p>
+
+  <div class="card"><h5>✅ Otorgados</h5>
+    <div class="fila"><b>Universo</b><span>Solo operaciones OTORGADAS del período (mes contable).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>La foto de la VENTA: cuánto se cursó, con qué financiera, con qué ingreso.</span></div>
+  </div>
+
+  <div class="card"><h5>📊 Aprobados — "Seguimiento Créditos Aprobados"</h5>
+    <div class="fila"><b>Universo</b><span>Operaciones APROBADAS del período (incluye las otorgadas — regla base 2).</span></div>
+    <div class="fila"><b>Cuadros internos</b><span><b>Instituciones</b>: las aprobadas repartidas AUTOFIN/UNIDAD. <b>Estado Comercial</b>: las INGRESADAS del período clasificadas (aprobado/rechazado/anulado/pendiente) — por eso su total es mayor que las aprobadas. <b>Motivo</b>: el detalle de en qué quedó cada ingresada (FIRMADO = otorgada; CONFIRMACIÓN CLIENTE = aprobada esperando al cliente; DESISTE = rechazada/desistida).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>El pipeline: lo aprobado es venta POTENCIAL que hay que rematar antes de que se enfríe.</span></div>
+  </div>
+
+  <div class="card"><h5>🔻 Funnel de Conversión</h5>
+    <div class="fila"><b>Qué muestra</b><span>Ingresadas → Aprobadas → Otorgadas del período, total y por ejecutivo, con TA y TC.</span></div>
+    <div class="fila"><b>Ojo</b><span>Sus tres números son LOS MISMOS de las otras pestañas (definición única). Si comparas con un pantallazo anterior al 21-08-2026, el "Aprobados" viejo venía inflado con pendientes.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Ver DÓNDE se pierde cada ejecutivo: ¿le rechazan mucho (TA baja) o no cierra lo aprobado (TC baja)?</span></div>
+  </div>
+
+  <div class="card"><h5>👤 Ejecutivos — Desempeño por Ejecutivo</h5>
+    <div class="fila"><b>Qué muestra</b><span>Por ejecutivo y por mes: Ing, Apro, Ot, Rec, TC, TA y Prom (monto promedio otorgado). Clic en un número abre el desglose día a día.</span></div>
+    <div class="fila"><b>Universo</b><span>Meses en que el ejecutivo tuvo actividad; el color de fondo compara contra el resto del equipo (percentiles).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>La conversación de gestión con cada ejecutivo, mes a mes.</span></div>
+  </div>
+
+  <div class="card"><h5>📋 Comparativo</h5>
+    <div class="fila"><b>Qué muestra</b><span>El mismo set de métricas en dos períodos lado a lado, por institución y ejecutivo.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Responder "¿mejoramos o empeoramos?" sin sacar la calculadora.</span></div>
+  </div>
+
+  <div class="card"><h5>💳 Saldo Precio (pestaña)</h5>
+    <div class="fila"><b>Qué muestra</b><span>El pipeline de pago al dealer: fundantes → liberado a pago → orden emitida → pagado, con los montos en tránsito.</span></div>
+    <div class="fila"><b>Ojo</b><span>El monto a pagar de AUTOFIN suma Transferencia y Limitación de Dominio (y EXCLUYE la Limitación si los fundantes van SIN LIMITACIÓN).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Saber cuánta plata de dealers está en tránsito y dónde está atascada.</span></div>
+  </div>
+
+  <div class="card"><h5>💰 Rentabilidades / 💵 Rent. x Ejec. / 📋 P&L Operativo</h5>
+    <div class="fila"><b>Qué muestran</b><span>El ingreso neto del negocio: ingresos por colocación y seguros MENOS comisión dealer y costos, total, por operación y por ejecutivo (motor único de rentabilidad).</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Distinguir vender mucho de GANAR mucho: una op grande con comisión dealer alta puede rentar menos que una chica limpia.</span></div>
+  </div>
+
+  <div class="card"><h5>📈 Tendencia / 📅 Historia / 📊 Evolución</h5>
+    <div class="fila"><b>Qué muestran</b><span>Las mismas variables en el tiempo (serie mensual): volumen, montos y tasas.</span></div>
+    <div class="fila"><b>Para qué sirve</b><span>Separar un mes malo de una tendencia mala.</span></div>
+  </div>
+
+  <div class="card"><h5>🎯 Presupuesto / 🔮 Proyección Pro</h5>
+    <div class="fila"><b>Qué muestran</b><span>Presupuesto: el real del mes contra la meta. Proyección Pro: a este ritmo diario, dónde termina el mes (con pulso día a día y meta del día).</span></div>
+    <div class="fila"><b>Ojo</b><span>La proyección es un RITMO, no una promesa: un fin de mes fuerte o débil la mueve.</span></div>
+  </div>
+
+  <div class="card"><h5>🏪 Dealers / 🅿️ Parques</h5>
+    <div class="fila"><b>Qué muestran</b><span>Las colocaciones agrupadas por dealer y por parque: quién trae el negocio, con qué monto y comisión.</span></div>
+    <div class="fila"><b>Ojo</b><span>El PARQUE de una operación viene del Excel de carga, no del mantenedor: sin parque en la carga no hay atribución al parque.</span></div>
+  </div>
+
+  <div class="card"><h5>🎯 Prospección</h5>
+    <div class="fila"><b>Qué muestra</b><span>La actividad de la parte alta del embudo (antes de ingresar solicitudes).</span></div>
+  </div>
+
+  <div class="regla"><b>Regla final:</b> si dos cuadros muestran números distintos para "lo mismo", primero verifica las 4 reglas base (¿mismo período?, ¿misma definición de aprobada?, ¿mes contable o fecha de curse?). Si con eso no cuadra, es un bug: repórtalo — no "ajustes" el número a mano.</div>
+</div>
+<script src="/js/topnav.js"></script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
