@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Portal del Postulante (RRHH): avisos con preguntas/requisitos y link publico; bandeja de postulantes con filtros, ficha completa, CV, pipeline de estados y correo de descarte -->
+<!-- v2.0 — Portal del Postulante (RRHH): builder de preguntas tipificadas con importancia y tabulacion a estrellas, maqueta, jefe directo, DealerNet, entrevistas, informe y envio a jefatura -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,30 +21,51 @@
   td { padding:8px 10px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
   tr:hover td { background:#f8fafc; cursor:pointer; }
   .pill { font-size:.68rem; font-weight:800; border-radius:12px; padding:2px 10px; white-space:nowrap; }
-  .p-NUEVA { background:#dbeafe; color:#1e40af; } .p-EN.REVISION, .p-ENREV { background:#fef9c3; color:#854d0e; }
-  .p-ENTREVISTA { background:#ede9fe; color:#6d28d9; } .p-DESCARTADA { background:#fee2e2; color:#991b1b; } .p-CONTRATADA { background:#dcfce7; color:#166534; }
+  .p-NUEVA { background:#dbeafe; color:#1e40af; } .p-ENREV { background:#fef9c3; color:#854d0e; }
+  .p-PRESEL { background:#cffafe; color:#0e7490; } .p-ENTREVISTA { background:#ede9fe; color:#6d28d9; }
+  .p-INFORME { background:#e0e7ff; color:#3730a3; } .p-DESCARTADA { background:#fee2e2; color:#991b1b; } .p-CONTRATADA { background:#dcfce7; color:#166534; }
   .cump { font-weight:800; } .c-alto { color:#15803d; } .c-medio { color:#b45309; } .c-bajo { color:#b91c1c; }
+  .stars { color:#f59e0b; font-size:.9rem; letter-spacing:1px; white-space:nowrap; }
+  .noapto { display:inline-block; background:#fee2e2; color:#991b1b; font-size:.62rem; font-weight:800; border-radius:8px; padding:1px 7px; }
   .btn { border:none; border-radius:9px; padding:8px 16px; font-size:.84rem; font-weight:700; cursor:pointer; }
   .btn-navy { background:var(--navy); color:#fff; } .btn-line { background:#fff; border:1.5px solid #e2e8f0; color:#334155; }
+  .btn-verde { background:#15803d; color:#fff; }
   .filtros { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
   .filtros select, .filtros input { border:1.5px solid #d1d5db; border-radius:9px; padding:7px 11px; font-size:.84rem; }
   label { font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; display:block; margin:10px 0 4px; }
   input.full, textarea.full, select.full { width:100%; border:1.5px solid #d1d5db; border-radius:9px; padding:8px 11px; font-size:.9rem; font-family:inherit; box-sizing:border-box; }
   textarea.full { resize:vertical; min-height:90px; }
-  dialog { border:none; border-radius:14px; padding:0; max-width:860px; width:96%; box-shadow:0 36px 90px rgba(2,6,23,.55), 0 10px 26px rgba(2,6,23,.34); }
+  dialog { border:none; border-radius:14px; padding:0; max-width:920px; width:96%; box-shadow:0 36px 90px rgba(2,6,23,.55), 0 10px 26px rgba(2,6,23,.34); }
   dialog::backdrop { background:rgba(15,23,42,.32); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
   .dlg-head { background:linear-gradient(135deg,#012d70,#0255c5); color:#fff; padding:14px 20px; font-weight:800; display:flex; justify-content:space-between; align-items:center; }
   .dlg-body { padding:18px 20px; max-height:72vh; overflow:auto; }
-  .dlg-foot { padding:12px 20px; border-top:1px solid #eef2f7; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+  .dlg-foot { padding:12px 20px; border-top:1px solid #eef2f7; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; align-items:center; }
   .kv { display:grid; grid-template-columns:150px 1fr; gap:3px 12px; font-size:.87rem; }
   .kv b { color:#64748b; font-size:.72rem; text-transform:uppercase; padding-top:2px; }
-  .sec { font-size:.76rem; font-weight:800; text-transform:uppercase; color:var(--navy); margin:16px 0 6px; border-bottom:2px solid #eff6ff; padding-bottom:3px; }
+  .sec { font-size:.76rem; font-weight:800; text-transform:uppercase; color:var(--navy); margin:16px 0 6px; border-bottom:2px solid #eff6ff; padding-bottom:3px; display:flex; align-items:center; gap:8px; }
   .reqbar { display:flex; align-items:center; gap:8px; font-size:.84rem; padding:3px 0; }
   .reqbar .b { flex:0 0 160px; height:8px; background:#e5e9f0; border-radius:5px; overflow:hidden; }
   .reqbar .f { height:100%; background:linear-gradient(90deg,#0141A2,#009AFE); }
   .empty { text-align:center; color:#94a3b8; padding:40px 0; }
   .link-box { display:flex; gap:8px; align-items:center; background:#f0fdf4; border:1.5px solid #86efac; border-radius:9px; padding:8px 12px; font-size:.82rem; }
   .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#15803d; color:#fff; border-radius:10px; padding:11px 24px; font-weight:700; display:none; z-index:999; }
+  /* Builder de preguntas */
+  .qrow { border:1.5px solid #e5e9f0; border-radius:11px; padding:10px 12px; margin-bottom:8px; background:#fbfdff; position:relative; }
+  .qrow .del { position:absolute; top:8px; right:10px; background:none; border:none; color:#dc2626; cursor:pointer; }
+  .qgrid { display:grid; grid-template-columns:1fr 210px 170px; gap:8px; align-items:start; }
+  @media(max-width:760px){ .qgrid{grid-template-columns:1fr} }
+  .qrow input, .qrow select, .qrow textarea { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:6px 9px; font-size:.84rem; font-family:inherit; }
+  .qextra { margin-top:6px; font-size:.8rem; }
+  .sug { display:inline-block; background:#eff6ff; color:var(--navy); border:1px dashed #93c5fd; border-radius:14px; padding:3px 11px; font-size:.76rem; font-weight:700; cursor:pointer; margin:2px 3px 2px 0; }
+  .sug:hover { background:#dbeafe; }
+  .imp-excluyente { border-left:4px solid #dc2626; } .imp-alta { border-left:4px solid #f59e0b; }
+  .imp-media { border-left:4px solid #0ea5e9; } .imp-baja { border-left:4px solid #94a3b8; } .imp-info { border-left:4px solid #e2e8f0; }
+  .dn-chip { display:inline-block; border-radius:9px; padding:3px 10px; font-size:.74rem; font-weight:700; margin:2px 4px 2px 0; }
+  .dn-ok { background:#dcfce7; color:#166534; } .dn-warn { background:#fef9c3; color:#854d0e; } .dn-grave { background:#fee2e2; color:#991b1b; } .dn-na { background:#f1f5f9; color:#64748b; }
+  .ev-item { border:1px solid #e5e9f0; border-radius:10px; padding:8px 12px; margin:6px 0; font-size:.85rem; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .wfsteps { display:flex; gap:0; flex-wrap:wrap; margin:4px 0 10px; font-size:.7rem; font-weight:700; color:#94a3b8; }
+  .wfsteps span { padding:3px 10px; background:#f1f5f9; border-radius:10px; margin:2px 6px 2px 0; }
+  .wfsteps span.on { background:#0141A2; color:#fff; }
 </style>
 </head>
 <body>
@@ -54,7 +75,7 @@
 <div class="page">
   <div class="banner"><i class="bi bi-person-plus"></i><div>
     <h2>Portal del Postulante</h2>
-    <p>Publica avisos con link de postulación, deja que la IA lea los CV y gestiona a los candidatos en un solo lugar.</p>
+    <p>Avisos con preguntas tipificadas y tabulación a estrellas · el jefe directo marca · DealerNet · entrevistas · informe a jefatura.</p>
   </div></div>
 
   <div class="tabs">
@@ -69,22 +90,29 @@
         <select id="fAviso" onchange="cargarPost()"><option value="">Todos los avisos</option></select>
         <select id="fEstado" onchange="pintarPost()">
           <option value="">Todos los estados</option>
-          <option>NUEVA</option><option>EN REVISION</option><option>ENTREVISTA</option><option>DESCARTADA</option><option>CONTRATADA</option>
+          <option>NUEVA</option><option>EN REVISION</option><option>PRESELECCIONADA</option><option>ENTREVISTA</option>
+          <option>INFORME ENVIADO</option><option>DESCARTADA</option><option>CONTRATADA</option>
         </select>
-        <select id="fCump" onchange="pintarPost()">
-          <option value="">Cumplimiento: todos</option>
-          <option value="75">≥ 75%</option><option value="50">≥ 50%</option><option value="25">≥ 25%</option>
+        <select id="fStars" onchange="pintarPost()">
+          <option value="">Estrellas: todas</option>
+          <option value="4">≥ 4 ★</option><option value="3">≥ 3 ★</option><option value="2">≥ 2 ★</option>
         </select>
         <select id="fNivel" onchange="pintarPost()">
           <option value="">Estudios: todos</option>
           <option>Universitario</option><option>Postgrado</option><option>Técnico</option><option>Media</option>
         </select>
-        <input id="fQ" placeholder="Buscar nombre, RUT, comuna, habilidad…" oninput="pintarPost()" style="min-width:240px">
+        <select id="fJefe" onchange="pintarPost()">
+          <option value="">Marca jefe: todas</option>
+          <option value="1">✓ Marcados por el jefe</option><option value="0">Sin marca</option>
+        </select>
+        <input id="fQ" placeholder="Buscar nombre, RUT, comuna, habilidad…" oninput="pintarPost()" style="min-width:220px">
         <span id="cnt" style="font-size:.8rem;color:#64748b"></span>
+        <span style="flex:1"></span>
+        <button class="btn btn-verde" onclick="abrirJefatura()"><i class="bi bi-send-check me-1"></i>Enviar a Jefatura</button>
       </div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Postulante</th><th>Aviso</th><th>Comuna</th><th>Estudios</th><th>Últ. trabajo</th><th>Cumplim.</th><th>Estado</th><th>Postuló</th></tr></thead>
-        <tbody id="tbPost"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody>
+        <thead><tr><th>Postulante</th><th>Aviso</th><th>Evaluación</th><th>Cumplim.</th><th>Jefe</th><th>DealerNet</th><th>Estudios</th><th>Estado</th><th>Postuló</th></tr></thead>
+        <tbody id="tbPost"><tr><td colspan="9" class="empty">Cargando…</td></tr></tbody>
       </table></div>
     </div>
   </div>
@@ -95,8 +123,8 @@
       <button class="btn btn-navy" onclick="abrirAviso()"><i class="bi bi-plus-lg me-1"></i>Nuevo aviso</button>
     </div>
     <div class="card" style="overflow-x:auto"><table>
-      <thead><tr><th>Cargo</th><th>Activo</th><th>Postulantes</th><th>Nuevas</th><th>Link público</th><th></th></tr></thead>
-      <tbody id="tbAvisos"><tr><td colspan="6" class="empty">Cargando…</td></tr></tbody>
+      <thead><tr><th>Cargo</th><th>Jefe directo</th><th>Activo</th><th>Postulantes</th><th>Nuevas</th><th>Link público</th><th></th></tr></thead>
+      <tbody id="tbAvisos"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -105,20 +133,30 @@
 <dialog id="dlgAviso">
   <div class="dlg-head"><span id="avTit">Nuevo aviso</span><button class="btn btn-line" onclick="dlgAviso.close()">✕</button></div>
   <div class="dlg-body">
-    <label>Título del cargo *</label><input class="full" id="a_titulo" placeholder="Ejecutivo Comercial — Santiago">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><label>Título del cargo *</label><input class="full" id="a_titulo" placeholder="Ejecutivo Comercial — Santiago"></div>
+      <div><label>Jefe directo / solicitante</label><select class="full" id="a_jefe"><option value="">— sin asignar —</option></select></div>
+    </div>
     <label>Descripción (lo que verá el postulante)</label><textarea class="full" id="a_desc" placeholder="Qué hará, qué ofrecemos, requisitos generales…"></textarea>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div><label>Ubicación</label><input class="full" id="a_ubi" placeholder="Maipú, RM"></div>
       <div><label>Jornada</label><input class="full" id="a_jorn" placeholder="Completa, presencial"></div>
     </div>
-    <label>Preguntas al postulante (una por línea — si lo dejas vacío van las 2 preguntas de la casa)</label>
-    <textarea class="full" id="a_pregs" placeholder="¿Qué crees que te hace especial para este cargo?&#10;¿Por qué quieres trabajar en AutoFácil?"></textarea>
-    <label>Requisitos con autoevaluación 0–100% (uno por línea)</label>
-    <textarea class="full" id="a_reqs" placeholder="Inglés hablado&#10;Excel intermedio&#10;Licencia de conducir clase B"></textarea>
-    <label style="display:flex;align-items:center;gap:8px;text-transform:none"><input type="checkbox" id="a_activo" checked style="width:auto"> Aviso activo (recibiendo postulaciones)</label>
+
+    <label style="margin-top:16px">Preguntas del proceso</label>
+    <p style="font-size:.78rem;color:#64748b;margin:0 0 8px">
+      Cada pregunta puntúa según su importancia (Alta ×3 · Media ×2 · Baja ×1) y el total se convierte en <b>estrellas 0–5</b>.
+      Una pregunta <b style="color:#dc2626">excluyente</b> bajo 50% deja al candidato <b>NO APTO</b>. "Solo informativa" no puntúa.</p>
+    <div id="qb"></div>
+    <button class="btn btn-line" style="width:100%;border-style:dashed" onclick="addQ()"><i class="bi bi-plus-lg me-1"></i>Agregar pregunta</button>
+    <div style="margin-top:8px"><span style="font-size:.72rem;font-weight:800;color:#475569;text-transform:uppercase">Sugeridas — clic para agregar:</span><br><span id="sugs"></span></div>
+
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;margin-top:14px"><input type="checkbox" id="a_activo" checked style="width:auto"> Aviso activo (recibiendo postulaciones)</label>
     <div class="link-box" id="a_link" style="display:none;margin-top:10px"></div>
   </div>
   <div class="dlg-foot">
+    <button class="btn btn-line" id="btnMaqueta" onclick="verMaqueta()" style="display:none"><i class="bi bi-easel me-1"></i>Ver maqueta</button>
+    <span style="flex:1"></span>
     <button class="btn btn-line" onclick="dlgAviso.close()">Cerrar</button>
     <button class="btn btn-navy" onclick="guardarAviso()"><i class="bi bi-check2 me-1"></i>Guardar</button>
   </div>
@@ -129,6 +167,21 @@
   <div class="dlg-head"><span id="fTit">Ficha</span><button class="btn btn-line" onclick="dlgFicha.close()">✕</button></div>
   <div class="dlg-body" id="fBody"></div>
   <div class="dlg-foot" id="fFoot"></div>
+</dialog>
+
+<!-- Modal envío a jefatura -->
+<dialog id="dlgJef">
+  <div class="dlg-head"><span>Enviar candidatos a Jefatura</span><button class="btn btn-line" onclick="dlgJef.close()">✕</button></div>
+  <div class="dlg-body">
+    <label>Aviso</label><select class="full" id="j_aviso" onchange="pintarJef()"></select>
+    <label>Candidatos (van con su evaluación, informe de entrevista, nota DealerNet y tests adjuntos)</label>
+    <div id="j_lista" style="max-height:280px;overflow:auto"></div>
+    <label>Mensaje para el jefe (opcional)</label><textarea class="full" id="j_msg" placeholder="Mi recomendación es…"></textarea>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn btn-line" onclick="dlgJef.close()">Cancelar</button>
+    <button class="btn btn-verde" id="btnJefEnviar" onclick="enviarJefatura()"><i class="bi bi-send-check me-1"></i>Enviar informe</button>
+  </div>
 </dialog>
 <div class="toast" id="toast"></div>
 
@@ -141,9 +194,32 @@ const H = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmtF = f => f ? new Date(f).toLocaleDateString('es-CL') : '—';
-function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',2800); }
+function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',3200); }
 
-let AVISOS = [], POST = [], AVISO_EDIT = null;
+let AVISOS = [], POST = [], AVISO_EDIT = null, JEFES = [], FICHA = null;
+
+const TIPOS = [
+  { v:'si_no',      n:'Sí / No' },
+  { v:'escala:cumple',     n:'No cumple / Cumple' },
+  { v:'escala:nivel',      n:'Bajo / Medio / Alto' },
+  { v:'escala:frecuencia', n:'Nunca … Siempre' },
+  { v:'porcentaje', n:'% de cumplimiento (0–100)' },
+  { v:'multiple',   n:'Alternativas' },
+  { v:'texto',      n:'Texto libre' }];
+const IMPS = [
+  { v:'excluyente', n:'⛔ Excluyente' }, { v:'alta', n:'Alta (×3)' }, { v:'media', n:'Media (×2)' },
+  { v:'baja', n:'Baja (×1)' }, { v:'info', n:'Solo informativa' }];
+const SUGERIDAS = [
+  { texto:'¿Tienes disponibilidad para viajar dentro del país?', tipo:'si_no', importancia:'media' },
+  { texto:'¿Cuentas con licencia de conducir clase B vigente?', tipo:'si_no', importancia:'media' },
+  { texto:'¿Tienes disponibilidad para trabajo presencial?', tipo:'si_no', importancia:'alta' },
+  { texto:'¿Estarías dispuesto/a a cambiarte de ciudad?', tipo:'si_no', importancia:'baja' },
+  { texto:'Nivel de Excel', tipo:'escala', escala:'nivel', importancia:'media' },
+  { texto:'Inglés hablado', tipo:'porcentaje', importancia:'media' },
+  { texto:'¿Con qué frecuencia has trabajado con metas de venta?', tipo:'escala', escala:'frecuencia', importancia:'media' },
+  { texto:'¿Qué crees que te hace especial para este cargo?', tipo:'texto', importancia:'info', max_chars:1500 },
+  { texto:'¿Por qué quieres trabajar en AutoFácil?', tipo:'texto', importancia:'info', max_chars:1000 },
+  { texto:'Cuéntanos brevemente tu situación familiar (opcional para ti, nos ayuda a conocerte)', tipo:'texto', importancia:'info', max_chars:800 }];
 
 // Guardia de permiso
 (async () => { try {
@@ -166,16 +242,65 @@ async function cargarAvisos(){
   $('fAviso').innerHTML = '<option value="">Todos los avisos</option>' + AVISOS.map(a => `<option value="${a.id}">${esc(a.titulo)}</option>`).join('');
   $('tbAvisos').innerHTML = AVISOS.length ? AVISOS.map(a => `<tr onclick="abrirAviso(${a.id})">
     <td><b>${esc(a.titulo)}</b></td>
+    <td>${esc(a.jefe || '—')}</td>
     <td>${a.activo ? '<span class="pill p-CONTRATADA">ACTIVO</span>' : '<span class="pill p-DESCARTADA">CERRADO</span>'}</td>
     <td>${a.postulantes}</td><td>${a.nuevas ? '<b style="color:#1e40af">'+a.nuevas+'</b>' : 0}</td>
-    <td onclick="event.stopPropagation()"><button class="btn btn-line" onclick="copiarLink('${a.slug}')"><i class="bi bi-clipboard"></i> Copiar link</button></td>
+    <td onclick="event.stopPropagation()"><button class="btn btn-line" onclick="copiarLink('${a.slug}')"><i class="bi bi-clipboard"></i> Copiar link</button>
+      <button class="btn btn-line" onclick="window.open('/postula/?a=${a.slug}&maqueta=1','_blank')" title="Ver maqueta"><i class="bi bi-easel"></i></button></td>
     <td><i class="bi bi-pencil" style="color:#64748b"></i></td>
-  </tr>`).join('') : '<tr><td colspan="6" class="empty">Aún no hay avisos — crea el primero.</td></tr>';
+  </tr>`).join('') : '<tr><td colspan="7" class="empty">Aún no hay avisos — crea el primero.</td></tr>';
 }
 function copiarLink(slug){
   const url = location.origin + '/postula/?a=' + slug;
   navigator.clipboard.writeText(url).then(() => toast('Link copiado: ' + url)).catch(() => prompt('Copia el link:', url));
 }
+async function cargarJefes(){
+  const j = await (await fetch('/api/postulaciones/jefes', { headers: H })).json();
+  JEFES = j.success ? j.data : [];
+  $('a_jefe').innerHTML = '<option value="">— sin asignar —</option>' + JEFES.map(u => `<option value="${u.id_usuario}">${esc(u.nombre)}</option>`).join('');
+}
+
+/* ── Builder de preguntas ── */
+function addQ(p){ p = p || { tipo:'texto', importancia:'media' };
+  const d = document.createElement('div'); d.className = 'qrow imp-' + (p.importancia || 'media');
+  d.dataset.qid = p.id || '';   // conservar el id: las respuestas se matchean por id
+  const tipoSel = p.tipo === 'escala' ? 'escala:' + (p.escala || 'cumple') : p.tipo;
+  d.innerHTML = `<button class="del" onclick="this.parentElement.remove()">✕</button>
+    <div class="qgrid">
+      <input class="q-texto" placeholder="Texto de la pregunta…" value="${esc(p.texto||'')}">
+      <select class="q-tipo" onchange="qExtra(this)">${TIPOS.map(t => `<option value="${t.v}" ${t.v===tipoSel?'selected':''}>${t.n}</option>`).join('')}</select>
+      <select class="q-imp" onchange="this.closest('.qrow').className='qrow imp-'+this.value">${IMPS.map(x => `<option value="${x.v}" ${x.v===(p.importancia||'media')?'selected':''}>${x.n}</option>`).join('')}</select>
+    </div>
+    <div class="qextra"></div>`;
+  $('qb').appendChild(d);
+  qExtra(d.querySelector('.q-tipo'), p);
+}
+function qExtra(sel, p){ p = p || {};
+  const box = sel.closest('.qrow').querySelector('.qextra');
+  const t = sel.value;
+  if (t === 'si_no') box.innerHTML = `Cumple si responde:
+    <select class="q-cumple" style="width:auto"><option ${ (p.cumple||'Sí')==='Sí'?'selected':''}>Sí</option><option ${p.cumple==='No'?'selected':''}>No</option></select>`;
+  else if (t === 'multiple') box.innerHTML = `Alternativas (una por línea; antepón <b>*</b> a las que cumplen — si ninguna lleva *, la pregunta es solo informativa):<br>
+    <textarea class="q-ops" rows="3" placeholder="* Título profesional del área&#10;Egresado sin título&#10;Estudiante">${esc((p.opciones||[]).map(o => (o.ok?'* ':'') + o.texto).join('\n'))}</textarea>`;
+  else if (t === 'texto') box.innerHTML = `Máximo de caracteres: <input class="q-max" type="number" min="50" max="3000" value="${p.max_chars||1000}" style="width:90px">`;
+  else box.innerHTML = '';
+}
+function leerPreguntas(){
+  return [...document.querySelectorAll('#qb .qrow')].map((d, i) => {
+    const texto = d.querySelector('.q-texto').value.trim();
+    if (!texto) return null;
+    const tv = d.querySelector('.q-tipo').value;
+    const q = { id: d.dataset.qid || 'q' + Date.now().toString(36) + i, texto, importancia: d.querySelector('.q-imp').value };
+    if (tv.startsWith('escala:')) { q.tipo = 'escala'; q.escala = tv.split(':')[1]; }
+    else q.tipo = tv;
+    if (tv === 'si_no') q.cumple = d.querySelector('.q-cumple')?.value || 'Sí';
+    if (tv === 'multiple') q.opciones = (d.querySelector('.q-ops')?.value || '').split('\n').map(s => s.trim()).filter(Boolean)
+      .map(s => s.startsWith('*') ? { texto: s.slice(1).trim(), ok: 1 } : { texto: s, ok: 0 });
+    if (tv === 'texto') q.max_chars = Number(d.querySelector('.q-max')?.value) || 1000;
+    return q;
+  }).filter(Boolean);
+}
+
 function abrirAviso(id){
   AVISO_EDIT = id ? AVISOS.find(a => a.id === id) : null;
   $('avTit').textContent = AVISO_EDIT ? 'Editar aviso' : 'Nuevo aviso';
@@ -183,19 +308,23 @@ function abrirAviso(id){
   $('a_desc').value = AVISO_EDIT?.descripcion || '';
   $('a_ubi').value = AVISO_EDIT?.ubicacion || '';
   $('a_jorn').value = AVISO_EDIT?.jornada || '';
-  $('a_pregs').value = (AVISO_EDIT?.preguntas || []).join('\n');
-  $('a_reqs').value = (AVISO_EDIT?.requisitos || []).map(r => r.nombre || r).join('\n');
+  $('a_jefe').value = AVISO_EDIT?.id_jefe || '';
   $('a_activo').checked = AVISO_EDIT ? !!AVISO_EDIT.activo : true;
+  $('qb').innerHTML = '';
+  (AVISO_EDIT?.preguntas || []).forEach(p => addQ(p));
+  $('sugs').innerHTML = SUGERIDAS.map((s, i) => `<span class="sug" onclick='addQ(SUGERIDAS[${i}])'>+ ${esc(s.texto.length > 46 ? s.texto.slice(0,44) + '…' : s.texto)}</span>`).join('');
+  $('btnMaqueta').style.display = AVISO_EDIT ? '' : 'none';
   if (AVISO_EDIT) { $('a_link').style.display = 'flex'; $('a_link').innerHTML = `<i class="bi bi-link-45deg"></i><b>${location.origin}/postula/?a=${AVISO_EDIT.slug}</b><button class="btn btn-line" style="margin-left:auto" onclick="copiarLink('${AVISO_EDIT.slug}')">Copiar</button>`; }
   else $('a_link').style.display = 'none';
   dlgAviso.showModal();
 }
+function verMaqueta(){ if (AVISO_EDIT) window.open('/postula/?a=' + AVISO_EDIT.slug + '&maqueta=1', '_blank'); }
 async function guardarAviso(){
   const body = {
     titulo: $('a_titulo').value.trim(), descripcion: $('a_desc').value.trim(),
     ubicacion: $('a_ubi').value.trim(), jornada: $('a_jorn').value.trim(),
-    preguntas: $('a_pregs').value.split('\n').map(s => s.trim()).filter(Boolean),
-    requisitos: $('a_reqs').value.split('\n').map(s => s.trim()).filter(Boolean).map(n => ({ nombre: n })),
+    id_jefe: Number($('a_jefe').value) || null,
+    preguntas: leerPreguntas(),
     activo: $('a_activo').checked ? 1 : 0,
   };
   if (!body.titulo) return toast('El título es obligatorio');
@@ -208,6 +337,22 @@ async function guardarAviso(){
 }
 
 /* ── Postulantes ── */
+const starsHTML = (e, apto) => {
+  if (e == null) return '<span style="color:#94a3b8">—</span>';
+  const full = Math.floor(e), half = e % 1 >= 0.5;
+  let s = '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(5 - full - (half ? 1 : 0));
+  return `<span class="stars" title="${String(e).replace('.',',')} de 5">${s}</span>` + (apto === 0 ? ' <span class="noapto">NO APTO</span>' : '');
+};
+const dnHTML = dn => {
+  if (!dn) return '<span style="color:#94a3b8">—</span>';
+  if (dn.error && !dn.disponibles) return `<span class="dn-chip dn-na" title="${esc(dn.error)}">sin datos</span>`;
+  return dn.grave ? '<span class="dn-chip dn-grave">⚠ grave</span>' : dn.negativo ? '<span class="dn-chip dn-warn">observ.</span>' : '<span class="dn-chip dn-ok">ok</span>';
+};
+const pillEstado = e => {
+  const cls = e === 'EN REVISION' ? 'p-ENREV' : e === 'PRESELECCIONADA' ? 'p-PRESEL' : e === 'INFORME ENVIADO' ? 'p-INFORME' : 'p-' + e.replace(/ /g,'');
+  return `<span class="pill ${cls}">${esc(e)}</span>`;
+};
+
 async function cargarPost(){
   const av = $('fAviso').value;
   const j = await (await fetch('/api/postulaciones/postulantes' + (av ? '?aviso=' + av : ''), { headers: H })).json();
@@ -220,12 +365,13 @@ const nivelTop = p => {
   return '—';
 };
 function pintarPost(){
-  const est = $('fEstado').value, cumpMin = Number($('fCump').value) || 0, nivel = $('fNivel').value,
-        q = $('fQ').value.trim().toLowerCase();
+  const est = $('fEstado').value, starsMin = Number($('fStars').value) || 0, nivel = $('fNivel').value,
+        jefe = $('fJefe').value, q = $('fQ').value.trim().toLowerCase();
   const rows = POST.filter(p => {
     if (est && p.estado !== est) return false;
-    if (cumpMin && !(p.cumplimiento != null && p.cumplimiento >= cumpMin)) return false;
+    if (starsMin && !(p.estrellas != null && p.estrellas >= starsMin)) return false;
     if (nivel && !(p.estudios||[]).some(e => e.nivel === nivel)) return false;
+    if (jefe !== '' && String(p.jefe_marca) !== jefe) return false;
     if (q) {
       const txt = [p.nombre, p.rut, p.email, p.comuna, (p.habilidades||[]).join(' '), (p.trabajos||[]).map(t=>t.cargo+' '+t.empresa).join(' ')].join(' ').toLowerCase();
       if (!txt.includes(q)) return false;
@@ -234,26 +380,34 @@ function pintarPost(){
   });
   $('cnt').textContent = rows.length + ' postulante' + (rows.length===1?'':'s');
   $('tbPost').innerHTML = rows.length ? rows.map(p => {
-    const t0 = (p.trabajos||[])[0];
     const cCls = p.cumplimiento == null ? '' : p.cumplimiento >= 75 ? 'c-alto' : p.cumplimiento >= 50 ? 'c-medio' : 'c-bajo';
     return `<tr onclick="abrirFicha(${p.id})">
       <td><b>${esc(p.nombre)}</b><br><span style="color:#94a3b8;font-size:.74rem">${esc(p.email)}</span></td>
-      <td>${esc(p.aviso)}</td><td>${esc(p.comuna||'—')}</td>
-      <td>${esc(nivelTop(p))}</td>
-      <td>${t0 ? esc((t0.cargo||'') + (t0.empresa ? ' · ' + t0.empresa : '')) : '—'}</td>
+      <td>${esc(p.aviso)}</td>
+      <td>${starsHTML(p.estrellas, p.apto)}</td>
       <td class="cump ${cCls}">${p.cumplimiento != null ? p.cumplimiento + '%' : '—'}</td>
-      <td><span class="pill p-${esc(p.estado).replace(' ','')}" style="${p.estado==='EN REVISION'?'background:#fef9c3;color:#854d0e':''}">${esc(p.estado)}</span></td>
+      <td>${p.jefe_marca ? '<span title="Marcado por ' + esc(p.jefe_marca_por||'') + '" style="color:#15803d;font-weight:800">✓</span>' : ''}</td>
+      <td>${dnHTML(p.dealernet)}</td>
+      <td>${esc(nivelTop(p))}</td>
+      <td>${pillEstado(p.estado)}</td>
       <td>${fmtF(p.created_at)}</td></tr>`;
-  }).join('') : '<tr><td colspan="8" class="empty">Sin postulantes que coincidan.</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Sin postulantes que coincidan.</td></tr>';
 }
 
+/* ── Ficha ── */
+const IMP_TXT = { excluyente:'⛔ Excluyente', alta:'Alta', media:'Media', baja:'Baja', info:'Informativa' };
 async function abrirFicha(id){
   const j = await (await fetch('/api/postulaciones/postulantes/' + id, { headers: H })).json();
   if (!j.success) return toast(j.error || 'Error');
-  const p = j.data;
+  const p = FICHA = j.data;
   $('fTit').textContent = p.nombre + ' — ' + p.aviso;
   const edad = p.fecha_nacimiento ? Math.floor((Date.now() - new Date(p.fecha_nacimiento)) / 3.15576e10) + ' años' : '—';
+  const pj = p.puntaje || {};
+  const wf = ['NUEVA','EN REVISION','PRESELECCIONADA','ENTREVISTA','INFORME ENVIADO'];
+  const wfIx = wf.indexOf(p.estado);
   $('fBody').innerHTML = `
+    <div class="wfsteps">${wf.map((s,i) => `<span class="${i <= wfIx ? 'on' : ''}">${s}</span>`).join('<span style="background:none;padding:0 2px">›</span>')}
+      ${p.estado==='DESCARTADA' ? '<span style="background:#fee2e2;color:#991b1b">DESCARTADA</span>' : ''}${p.estado==='CONTRATADA' ? '<span style="background:#dcfce7;color:#166534">CONTRATADA</span>' : ''}</div>
     <div class="kv">
       <b>RUT</b><span>${esc(p.rut||'—')}</span><b>Edad</b><span>${edad}</span>
       <b>Correo</b><span>${esc(p.email)}</span><b>Teléfono</b><span>${esc(p.telefono||'—')}</span>
@@ -261,28 +415,121 @@ async function abrirFicha(id){
       <b>LinkedIn</b><span>${p.linkedin ? `<a href="${esc(p.linkedin.startsWith('http')?p.linkedin:'https://'+p.linkedin)}" target="_blank">${esc(p.linkedin)}</a>` : '—'}</span>
       <b>Pretensión</b><span>${esc(p.pretension_renta||'—')}</span>
       <b>Postuló</b><span>${fmtF(p.created_at)} · acuse ${p.acuse_at?'enviado':'pendiente'}</span>
+      <b>Jefe directo</b><span>${esc(p.jefe||'—')} ${p.jefe_marca ? '<span style="color:#15803d;font-weight:700">· ✓ marcado por ' + esc(p.jefe_marca_por||'') + ' el ' + fmtF(p.jefe_marca_at) + '</span>' : '· aún sin marca'}</span>
+      ${p.jefe_nota ? `<b>Nota del jefe</b><span>${esc(p.jefe_nota)}</span>` : ''}
     </div>
-    ${p.resumen_ia ? `<div class="sec">Resumen (IA)</div><p style="font-size:.88rem">${esc(p.resumen_ia)}</p>` : ''}
-    ${(p.requisitos_eval||[]).length ? `<div class="sec">Requisitos (autoevaluación)</div>` +
-      p.requisitos_eval.map(r => `<div class="reqbar"><span style="flex:1">${esc(r.nombre)}</span><div class="b"><div class="f" style="width:${r.pct}%"></div></div><b style="width:44px;text-align:right">${r.pct}%</b></div>`).join('') : ''}
-    <div class="sec">Estudios</div>
+
+    <div class="sec"><i class="bi bi-stars"></i>Evaluación ${starsHTML(p.estrellas, p.apto)} ${pj.pct != null ? `<span style="color:#64748b;font-weight:400;text-transform:none">(${pj.pct}% ponderado)</span>` : ''}</div>
+    ${(pj.excluyentes||[]).length ? `<p style="font-size:.84rem;color:#b91c1c;font-weight:700">⛔ No cumple excluyente${pj.excluyentes.length>1?'s':''}: ${pj.excluyentes.map(esc).join(' · ')}</p>` : ''}
+    ${(pj.detalle||[]).filter(d => d.pct != null).map(d => `<div class="reqbar"><span style="flex:1">${esc(d.texto)} <span style="color:#94a3b8;font-size:.72rem">(${IMP_TXT[d.importancia]||d.importancia})</span></span><div class="b"><div class="f" style="width:${d.pct}%"></div></div><b style="width:44px;text-align:right">${d.pct}%</b></div>`).join('')}
+    ${!(pj.detalle||[]).length && (p.requisitos_eval||[]).length ? p.requisitos_eval.map(r => `<div class="reqbar"><span style="flex:1">${esc(r.nombre)}</span><div class="b"><div class="f" style="width:${r.pct}%"></div></div><b style="width:44px;text-align:right">${r.pct}%</b></div>`).join('') : ''}
+
+    <div class="sec"><i class="bi bi-shield-check"></i>DealerNet
+      <button class="btn btn-line" style="padding:3px 12px;font-size:.74rem;margin-left:auto" onclick="pedirDN(${p.id}, this)">${p.dealernet ? 'Actualizar' : 'Pedir informes'}</button></div>
+    <div id="dnBox">${dnFichaHTML(p)}</div>
+
+    ${p.resumen_ia ? `<div class="sec"><i class="bi bi-robot"></i>Resumen (IA)</div><p style="font-size:.88rem">${esc(p.resumen_ia)}</p>` : ''}
+    <div class="sec"><i class="bi bi-mortarboard"></i>Estudios</div>
     ${(p.estudios||[]).map(e => `<div style="font-size:.87rem;padding:2px 0">🎓 <b>${esc(e.nivel||'')}</b> ${esc(e.titulo||'')} — ${esc(e.institucion||'')} ${esc(e.desde||'')}${e.hasta?'–'+esc(e.hasta):''} <span style="color:#94a3b8">${esc(e.estado||'')}</span></div>`).join('') || '—'}
-    <div class="sec">Experiencia</div>
+    <div class="sec"><i class="bi bi-briefcase"></i>Experiencia</div>
     ${(p.trabajos||[]).map(t => `<div style="font-size:.87rem;padding:3px 0">💼 <b>${esc(t.cargo||'')}</b> · ${esc(t.empresa||'')} <span style="color:#94a3b8">${esc(t.desde||'')}${t.hasta?' – '+esc(t.hasta):''}</span>${t.descripcion?`<br><span style="color:#475569;font-size:.8rem">${esc(t.descripcion)}</span>`:''}</div>`).join('') || '—'}
-    ${(p.idiomas||[]).length ? `<div class="sec">Idiomas</div><p style="font-size:.87rem">${p.idiomas.map(i=>esc(i.idioma+(i.nivel?' '+i.nivel:''))).join(' · ')}</p>` : ''}
-    ${(p.habilidades||[]).length ? `<div class="sec">Habilidades</div><p style="font-size:.87rem">${p.habilidades.map(esc).join(' · ')}</p>` : ''}
-    ${(p.respuestas||[]).length ? `<div class="sec">Sus respuestas</div>` +
-      p.respuestas.map(r => `<p style="font-size:.85rem;margin-bottom:8px"><b style="color:#0141A2">${esc(r.pregunta)}</b><br>${esc(r.respuesta)}</p>`).join('') : ''}
+    ${(p.idiomas||[]).length ? `<div class="sec"><i class="bi bi-translate"></i>Idiomas</div><p style="font-size:.87rem">${p.idiomas.map(i=>esc(i.idioma+(i.nivel?' '+i.nivel:''))).join(' · ')}</p>` : ''}
+    ${(p.habilidades||[]).length ? `<div class="sec"><i class="bi bi-lightning"></i>Habilidades</div><p style="font-size:.87rem">${p.habilidades.map(esc).join(' · ')}</p>` : ''}
+    ${(p.respuestas||[]).length ? `<div class="sec"><i class="bi bi-chat-square-quote"></i>Sus respuestas</div>` +
+      p.respuestas.map(r => `<p style="font-size:.85rem;margin-bottom:8px"><b style="color:#0141A2">${esc(r.pregunta)}</b><br>${esc(r.valor ?? r.respuesta ?? '')}${r.tipo && r.tipo !== 'texto' && r.tipo === 'porcentaje' ? '%' : ''}</p>`).join('') : ''}
+
+    <div class="sec"><i class="bi bi-calendar-event"></i>Entrevistas</div>
+    <div id="evBox">${(p.entrevistas||[]).map((e,ix) => `
+      <div class="ev-item">
+        <b>${e.tipo === 'JEFE' ? '👔 Jefe directo' : '🧑‍💼 RRHH'}</b>
+        <span>${esc(e.fecha.split('-').reverse().join('-'))} · ${esc(e.hora)} hrs</span>
+        ${e.lugar ? `<span style="color:#64748b">📍 ${esc(e.lugar)}</span>` : ''}
+        ${e.realizada ? '<span class="dn-chip dn-ok">realizada</span>' : `<button class="btn btn-line" style="padding:2px 10px;font-size:.72rem" onclick="evRealizada(${p.id},${ix})">Marcar realizada</button>`}
+        ${e.resultado ? `<span style="flex-basis:100%;font-size:.8rem;color:#475569"><b>Resultado:</b> ${esc(e.resultado)}</span>` : ''}
+      </div>`).join('') || '<p style="font-size:.84rem;color:#94a3b8">Sin entrevistas agendadas.</p>'}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:#f8fafc;border-radius:10px;padding:10px 12px">
+      <div><label>Con</label><select class="full" id="ev_tipo" style="width:auto"><option value="RRHH">RRHH</option><option value="JEFE">Jefe directo</option></select></div>
+      <div><label>Fecha</label><input class="full" id="ev_fecha" type="date" style="width:auto"></div>
+      <div><label>Hora</label><input class="full" id="ev_hora" type="time" style="width:auto"></div>
+      <div style="flex:1;min-width:160px"><label>Lugar / link</label><input class="full" id="ev_lugar" placeholder="Oficina Maipú / Meet…"></div>
+      <button class="btn btn-navy" onclick="agendarEv(${p.id})"><i class="bi bi-calendar-plus me-1"></i>Agendar y avisar</button>
+    </div>
+
+    <div class="sec"><i class="bi bi-file-earmark-text"></i>Informe de entrevista RRHH</div>
+    <textarea class="full" id="inf_rrhh" placeholder="Impresión general, fortalezas, riesgos, recomendación…">${esc(p.informe_rrhh||'')}</textarea>
+    <button class="btn btn-line" style="margin-top:6px" onclick="guardarInforme(${p.id})"><i class="bi bi-check2 me-1"></i>Guardar informe</button>
+
+    <div class="sec"><i class="bi bi-paperclip"></i>Tests y anexos (van adjuntos a la jefatura)</div>
+    ${(p.docs||[]).map(d => `<div style="font-size:.85rem;padding:2px 0">📎 <a href="#" onclick="verDoc(${d.id});return false">${esc(d.nombre)}</a> <span style="color:#94a3b8">· ${esc(d.tipo)} · ${esc(d.subido_por||'')} ${fmtF(d.created_at)}</span></div>`).join('') || '<p style="font-size:.84rem;color:#94a3b8">Sin anexos aún.</p>'}
+    <input type="file" id="docFile" style="display:none" onchange="subirDoc(${p.id}, this)">
+    <button class="btn btn-line" style="margin-top:6px" onclick="document.getElementById('docFile').click()"><i class="bi bi-upload me-1"></i>Subir test / anexo</button>
+
     ${p.nota_rrhh ? `<div class="sec">Nota RRHH</div><p style="font-size:.86rem">${esc(p.nota_rrhh)}</p>` : ''}`;
   $('fFoot').innerHTML = `
     <button class="btn btn-line" onclick="verCV(${p.id})"><i class="bi bi-file-earmark-pdf me-1"></i>Ver CV</button>
     <span style="flex:1"></span>
     <select id="fEstadoSel" class="full" style="width:auto">
-      ${['NUEVA','EN REVISION','ENTREVISTA','CONTRATADA'].map(e => `<option ${p.estado===e?'selected':''}>${e}</option>`).join('')}
+      ${['NUEVA','EN REVISION','PRESELECCIONADA','ENTREVISTA','INFORME ENVIADO','CONTRATADA'].map(e => `<option ${p.estado===e?'selected':''}>${e}</option>`).join('')}
     </select>
     <button class="btn btn-navy" onclick="setEstado(${p.id}, document.getElementById('fEstadoSel').value)">Guardar estado</button>
     <button class="btn" style="background:#fee2e2;color:#991b1b" onclick="descartar(${p.id}, '${esc(p.nombre).replace(/'/g,'')}')"><i class="bi bi-x-octagon me-1"></i>Descartar</button>`;
   dlgFicha.showModal();
+}
+function dnFichaHTML(p){
+  const dn = p.dealernet;
+  if (!dn) return '<p style="font-size:.84rem;color:#94a3b8">Aún sin consultar. Se solicita solo cuando el jefe marca al candidato o a pedido.</p>';
+  const items = (dn.items||[]).map(i => {
+    const cls = !i.disponible ? 'dn-na' : i.grave ? 'dn-grave' : (i.severidad === 'negativo' ? 'dn-warn' : 'dn-ok');
+    return `<span class="dn-chip ${cls}" title="${esc(i.nota||'')}">${esc(i.nombre)}</span>`;
+  }).join('');
+  return `${items}${dn.error ? `<p style="font-size:.78rem;color:#b45309;margin:4px 0 0">${esc(dn.error)}</p>` : ''}
+    <p style="font-size:.74rem;color:#94a3b8;margin:4px 0 0">Consultado: ${fmtF(p.dealernet_at)} · pasa el mouse por cada chip para ver la nota</p>`;
+}
+async function pedirDN(id, btn){
+  btn.disabled = true; btn.textContent = 'Consultando…';
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/dealernet', { method:'POST', headers: H })).json();
+  btn.disabled = false; btn.textContent = 'Actualizar';
+  if (!j.success) return toast(j.error || 'Error');
+  toast('Informes DealerNet actualizados');
+  abrirFicha(id);
+}
+async function agendarEv(id){
+  const fecha = $('ev_fecha').value, hora = $('ev_hora').value;
+  if (!fecha || !hora) return toast('Fecha y hora son obligatorias');
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/entrevistas', {
+    method:'POST', headers: H, body: JSON.stringify({ tipo: $('ev_tipo').value, fecha, hora, lugar: $('ev_lugar').value.trim() }) })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  toast('Entrevista agendada — invitación enviada al candidato');
+  abrirFicha(id); cargarPost();
+}
+async function evRealizada(id, ix){
+  const resultado = prompt('Resultado / conclusiones de la entrevista (queda en la ficha y va a la jefatura):') || '';
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/entrevistas/' + ix, {
+    method:'PUT', headers: H, body: JSON.stringify({ realizada: 1, resultado }) })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  abrirFicha(id);
+}
+async function guardarInforme(id){
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/informe', {
+    method:'POST', headers: H, body: JSON.stringify({ informe_rrhh: $('inf_rrhh').value.trim() }) })).json();
+  toast(j.success ? 'Informe guardado' : (j.error || 'Error'));
+}
+async function subirDoc(id, input){
+  const f = input.files[0]; if (!f) return;
+  if (f.size > 8*1024*1024) return toast('El archivo supera 8 MB');
+  const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(f); });
+  const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/docs', {
+    method:'POST', headers: H, body: JSON.stringify({ nombre: f.name, mime: f.type || 'application/pdf', data, tipo: 'TEST' }) })).json();
+  if (!j.success) return toast(j.error || 'Error');
+  toast('Anexo subido'); abrirFicha(id);
+}
+async function verDoc(idDoc){
+  try {
+    const r = await fetch('/api/postulaciones/docs/' + idDoc, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw 0;
+    const u = URL.createObjectURL(await r.blob()); window.open(u, '_blank');
+    setTimeout(() => URL.revokeObjectURL(u), 60000);
+  } catch (_) { toast('No se pudo abrir el anexo'); }
 }
 async function verCV(id){
   try {
@@ -305,7 +552,36 @@ function descartar(id, nombre){
   setEstado(id, 'DESCARTADA', nota);
 }
 
-cargarAvisos().then(cargarPost);
+/* ── Envío a jefatura ── */
+function abrirJefatura(){
+  $('j_aviso').innerHTML = AVISOS.map(a => `<option value="${a.id}" ${String(a.id)===$('fAviso').value?'selected':''}>${esc(a.titulo)}${a.jefe ? ' — jefe: ' + esc(a.jefe) : ' — ⚠ SIN JEFE ASIGNADO'}</option>`).join('');
+  pintarJef();
+  dlgJef.showModal();
+}
+function pintarJef(){
+  const idAviso = Number($('j_aviso').value);
+  const cands = POST.filter(p => p.id_aviso === idAviso && !['DESCARTADA'].includes(p.estado));
+  $('j_lista').innerHTML = cands.length ? cands.map(p => `
+    <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:.86rem;padding:5px 0;border-bottom:1px dashed #eef2f7;cursor:pointer">
+      <input type="checkbox" class="j-check" value="${p.id}" style="width:auto" ${['PRESELECCIONADA','ENTREVISTA'].includes(p.estado) && p.apto !== 0 ? 'checked' : ''}>
+      <b>${esc(p.nombre)}</b> ${starsHTML(p.estrellas, p.apto)} ${pillEstado(p.estado)}
+      ${p.informe_rrhh || p.con_informe ? '<span class="dn-chip dn-ok">informe ✓</span>' : '<span class="dn-chip dn-na">sin informe</span>'}
+    </label>`).join('') : '<p class="empty" style="padding:16px 0">Este aviso no tiene candidatos vigentes.</p>';
+}
+async function enviarJefatura(){
+  const ids = [...document.querySelectorAll('.j-check:checked')].map(c => Number(c.value));
+  if (!ids.length) return toast('Marca al menos un candidato');
+  $('btnJefEnviar').disabled = true;
+  const j = await (await fetch('/api/postulaciones/jefatura', {
+    method:'POST', headers: H, body: JSON.stringify({ id_aviso: Number($('j_aviso').value), ids, mensaje: $('j_msg').value.trim() }) })).json();
+  $('btnJefEnviar').disabled = false;
+  if (!j.success) return toast(j.error || 'Error');
+  dlgJef.close();
+  toast(`Informe enviado a ${j.data.jefe} — ${j.data.enviados} candidato(s), ${j.data.adjuntos} adjunto(s)`);
+  cargarPost();
+}
+
+cargarAvisos().then(cargarPost); cargarJefes();
 </script>
 <script src="/js/topnav.js"></script>
 <script src="/js/app-version.js"></script>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — Portal del Postulante: CV leido con IA (pre-llena la ficha, lo faltante queda marcado), autoevaluacion de requisitos 0-100%, preguntas del aviso, acuse por correo -->
+<!-- v2.0 — Portal del Postulante: CV leido con IA, preguntas tipificadas (si/no, escalas, %, alternativas, texto con tope), modo maqueta para RRHH, acuse por correo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +13,7 @@
   .top { background:linear-gradient(135deg,#012d70,#0141A2 55%,#009AFE); color:#fff; padding:26px 20px; text-align:center; }
   .top img { height:40px; filter:brightness(0) invert(1); margin-bottom:8px; }
   .top h1 { font-size:1.35rem; } .top p { opacity:.85; font-size:.9rem; margin-top:4px; }
+  .maqueta-band { background:#f59e0b; color:#78350f; text-align:center; font-weight:800; font-size:.85rem; padding:8px 14px; position:sticky; top:0; z-index:60; }
   .wrap { max-width:760px; margin:-18px auto 60px; padding:0 14px; }
   .card { background:#fff; border-radius:16px; box-shadow:0 6px 24px rgba(1,45,112,.10); padding:22px 24px; margin-bottom:16px; }
   h3 { color:var(--navy); font-size:1.02rem; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
@@ -38,12 +39,13 @@
   .item { border:1.5px solid #e5e9f0; border-radius:11px; padding:12px 14px; margin-bottom:10px; position:relative; background:#fbfdff; }
   .item .del { position:absolute; top:8px; right:10px; background:none; border:none; color:#dc2626; cursor:pointer; font-size:1rem; }
   .add { background:#eff6ff; color:var(--blue); border:1.5px dashed #93c5fd; border-radius:9px; padding:8px 16px; font-size:.85rem; font-weight:700; cursor:pointer; width:100%; }
-  /* Requisitos */
-  .req { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px dashed #eef2f7; flex-wrap:wrap; }
-  .req b { font-size:.9rem; color:#1e293b; }
-  .nivs { display:flex; gap:6px; }
-  .niv { border:1.5px solid #d1d5db; background:#fff; border-radius:8px; padding:5px 11px; font-size:.8rem; font-weight:800; cursor:pointer; color:#475569; }
+  /* Preguntas */
+  .pregunta { padding:12px 0; border-bottom:1px dashed #eef2f7; }
+  .pregunta > b { font-size:.9rem; color:#1e293b; display:block; margin-bottom:8px; }
+  .nivs { display:flex; gap:6px; flex-wrap:wrap; }
+  .niv { border:1.5px solid #d1d5db; background:#fff; border-radius:8px; padding:6px 13px; font-size:.82rem; font-weight:800; cursor:pointer; color:#475569; }
   .niv.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .cnt-box { text-align:right; font-size:.7rem; color:#94a3b8; margin-top:2px; }
   /* Progreso */
   .prog { position:sticky; top:0; z-index:50; background:#fff; border-radius:0 0 14px 14px; box-shadow:0 4px 14px rgba(1,45,112,.12); padding:10px 18px; display:none; align-items:center; gap:12px; }
   .prog .bar { flex:1; height:9px; background:#e5e9f0; border-radius:6px; overflow:hidden; }
@@ -59,6 +61,7 @@
 </style>
 </head>
 <body>
+<div class="maqueta-band" id="maqBand" style="display:none"><i class="bi bi-easel me-1"></i>MAQUETA — vista previa interna: así lo verá el postulante. El envío está deshabilitado.</div>
 <div class="top">
   <img src="/img/logo-autofacil.png" alt="AutoFácil" onerror="this.style.display='none'">
   <h1 id="tTitulo">Cargando…</h1>
@@ -114,14 +117,10 @@
     </div>
   </div>
 
-  <!-- Paso 3: requisitos + preguntas -->
-  <div class="card" id="cardReqs" style="display:none">
-    <h3><i class="bi bi-ui-checks"></i>3 · ¿Cuánto cumples cada requisito?</h3>
-    <p style="font-size:.82rem;color:#64748b;margin-bottom:8px">Sé honesto/a — esto se conversa en la entrevista.</p>
-    <div id="reqs"></div>
-  </div>
+  <!-- Paso 3: preguntas del proceso (todas tipificadas) -->
   <div class="card" id="cardPregs" style="display:none">
-    <h3><i class="bi bi-chat-square-quote"></i>4 · Cuéntanos de ti</h3>
+    <h3><i class="bi bi-ui-checks"></i>3 · Cuéntanos de ti</h3>
+    <p style="font-size:.82rem;color:#64748b;margin-bottom:8px">Responde con honestidad — esto se conversa en la entrevista.</p>
     <div id="pregs"></div>
   </div>
 
@@ -147,13 +146,14 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const SLUG = new URLSearchParams(location.search).get('a') || '';
+const PARAMS = new URLSearchParams(location.search);
+const SLUG = PARAMS.get('a') || '';
+const MAQUETA = PARAMS.get('maqueta') === '1';
 let AVISO = null, CV = null;   // CV = { nombre, mime, data(base64) }
-const NIVS = [0, 25, 50, 75, 100];
 
 async function cargar() {
   if (!SLUG) { $('tTitulo').textContent = 'Link inválido'; $('tSub').textContent = 'Revisa el enlace que te enviaron.'; return; }
-  const r = await fetch('/api/postulaciones/aviso/' + encodeURIComponent(SLUG));
+  const r = await fetch('/api/postulaciones/aviso/' + encodeURIComponent(SLUG) + (MAQUETA ? '?maqueta=1' : ''));
   const j = await r.json().catch(() => ({}));
   if (!j.success) { $('tTitulo').textContent = 'Búsqueda no disponible'; $('tSub').textContent = j.error || ''; return; }
   AVISO = j.data;
@@ -162,25 +162,42 @@ async function cargar() {
   $('aDesc').textContent = AVISO.descripcion || '';
   $('aChips').innerHTML = [AVISO.ubicacion, AVISO.jornada].filter(Boolean).map(x => `<span class="chip">${esc(x)}</span>`).join('');
   if (!AVISO.descripcion && !AVISO.ubicacion && !AVISO.jornada) $('cardAviso').style.display = 'none';
-  // Requisitos
-  if (AVISO.requisitos.length) {
-    $('cardReqs').dataset.pend = '1';
-    $('reqs').innerHTML = AVISO.requisitos.map((r, i) => `
-      <div class="req"><b>${esc(r.nombre || r)}</b>
-        <div class="nivs">${NIVS.map(n => `<button class="niv" data-req="${i}" data-pct="${n}" onclick="setNiv(this)">${n}%</button>`).join('')}</div>
-      </div>`).join('');
-  }
-  // Preguntas del aviso + las dos "inteligentes" de la casa
-  const pregs = [...AVISO.preguntas];
-  if (!pregs.length) pregs.push('¿Qué crees que te hace especial para este cargo?', 'Cuéntanos un logro concreto del que estés orgulloso/a.');
-  $('pregs').innerHTML = pregs.map((p, i) => `
-    <label style="text-transform:none;font-size:.88rem;margin-top:${i ? 14 : 0}px">${esc(p)} *</label>
-    <textarea class="preg" data-preg="${esc(p)}" oninput="prog()"></textarea>`).join('');
+
+  // Preguntas tipificadas del aviso; si no hay, van las 2 "de la casa"
+  let pregs = AVISO.preguntas || [];
+  if (!pregs.length) pregs = [
+    { id: 'casa0', texto: '¿Qué crees que te hace especial para este cargo?', tipo: 'texto', max_chars: 1500 },
+    { id: 'casa1', texto: 'Cuéntanos un logro concreto del que estés orgulloso/a.', tipo: 'texto', max_chars: 1500 }];
+  $('pregs').innerHTML = pregs.map(pregHTML).join('');
   $('wrap').style.display = '';
+
+  if (MAQUETA) {   // RRHH ve todo el formulario abierto, sin necesidad de subir CV
+    $('maqBand').style.display = 'block';
+    $('cardDatos').style.display = ''; $('cardPregs').style.display = ''; $('prog').style.display = 'flex';
+    addEstudio(); addTrabajo();
+    $('btnEnviar').disabled = true;
+    $('btnEnviar').innerHTML = '<i class="bi bi-easel me-2"></i>Vista previa — el envío está deshabilitado';
+    prog();
+  }
 }
-function setNiv(btn) {
-  document.querySelectorAll(`.niv[data-req="${btn.dataset.req}"]`).forEach(b => b.classList.remove('on'));
-  btn.classList.add('on'); prog();
+
+/* Cada tipo de pregunta con su widget */
+function pregHTML(p) {
+  const mx = p.max_chars || 1500;
+  if (p.tipo === 'texto') return `
+    <div class="pregunta" data-id="${esc(p.id)}" data-tipo="texto" data-texto="${esc(p.texto)}">
+      <b>${esc(p.texto)} *</b>
+      <textarea class="preg-txt" maxlength="${mx}" oninput="this.parentElement.querySelector('.cnt').textContent=this.value.length;prog()"></textarea>
+      <div class="cnt-box"><span class="cnt">0</span> / ${mx} caracteres</div>
+    </div>`;
+  const ops = (p.opciones || []).map(o => `<button type="button" class="niv" data-val="${esc(o)}" onclick="setOp(this)">${esc(p.tipo === 'porcentaje' ? o + '%' : o)}</button>`).join('');
+  return `<div class="pregunta" data-id="${esc(p.id)}" data-tipo="${esc(p.tipo)}" data-texto="${esc(p.texto)}">
+    <b>${esc(p.texto)} *</b><div class="nivs">${ops}</div></div>`;
+}
+function setOp(btn) {
+  const w = btn.closest('.pregunta');
+  w.querySelectorAll('.niv').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on'); w.dataset.valor = btn.dataset.val; prog();
 }
 
 /* ── CV + IA ── */
@@ -209,8 +226,7 @@ async function subirCV(file) {
     : (motivo === 'formato' ? 'Formato sin lectura automática: completa la ficha a mano.' : 'No pudimos leerlo automáticamente: completa la ficha a mano.');
   window.CAMPOS_IA = campos || null;
   aplicarCampos(campos);
-  $('cardDatos').style.display = ''; $('cardReqs').style.display = AVISO.requisitos.length ? '' : 'none';
-  $('cardPregs').style.display = ''; $('prog').style.display = 'flex';
+  $('cardDatos').style.display = ''; $('cardPregs').style.display = ''; $('prog').style.display = 'flex';
   prog();
   $('cardDatos').scrollIntoView({ behavior: 'smooth' });
 }
@@ -257,14 +273,16 @@ function addTrabajo(t) { t = t || {};
   $('trabajos').appendChild(d); prog();
 }
 
-/* Barra de completitud: campos clave + requisitos + preguntas + consentimiento */
+/* Una pregunta está respondida si tiene opción elegida o texto suficiente */
+const pregLista = w => w.dataset.tipo === 'texto' ? w.querySelector('.preg-txt').value.trim().length >= 10 : !!w.dataset.valor;
+
+/* Barra de completitud: campos clave + preguntas + consentimiento */
 function prog() {
   const partes = [];
   ['f_nombre', 'f_email', 'f_telefono', 'f_rut'].forEach(id => partes.push(!!$(id).value.trim()));
   partes.push(document.querySelectorAll('#estudios .item').length > 0);
   partes.push(document.querySelectorAll('#trabajos .item').length > 0);
-  if (AVISO && AVISO.requisitos.length) partes.push(document.querySelectorAll('.niv.on').length === AVISO.requisitos.length);
-  document.querySelectorAll('.preg').forEach(t => partes.push(t.value.trim().length >= 10));
+  document.querySelectorAll('.pregunta').forEach(w => partes.push(pregLista(w)));
   partes.push($('acepto').checked);
   const pct = Math.round(partes.filter(Boolean).length / partes.length * 100);
   $('progFill').style.width = pct + '%'; $('progPct').textContent = pct + '%';
@@ -273,14 +291,13 @@ function prog() {
 }
 
 async function enviar() {
+  if (MAQUETA) return;
   $('errEnv').style.display = 'none';
   const falta = [];
   if (!$('f_nombre').value.trim()) falta.push('tu nombre');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('f_email').value.trim())) falta.push('un correo válido');
   if (!CV) falta.push('tu CV');
-  if (AVISO.requisitos.length && document.querySelectorAll('.niv.on').length < AVISO.requisitos.length) falta.push('marcar todos los requisitos');
-  const pregVacia = [...document.querySelectorAll('.preg')].some(t => t.value.trim().length < 10);
-  if (pregVacia) falta.push('responder las preguntas (mínimo unas palabras)');
+  if ([...document.querySelectorAll('.pregunta')].some(w => !pregLista(w))) falta.push('responder todas las preguntas');
   if (!$('acepto').checked) falta.push('aceptar el guardado de tus antecedentes');
   if (falta.length) { $('errEnv').textContent = 'Te falta: ' + falta.join(', ') + '.'; $('errEnv').style.display = 'block'; return; }
 
@@ -293,9 +310,11 @@ async function enviar() {
     empresa: d.querySelector('.t-empresa').value.trim(), cargo: d.querySelector('.t-cargo').value.trim(),
     desde: d.querySelector('.t-desde').value.trim(), hasta: d.querySelector('.t-hasta').value.trim(),
     descripcion: d.querySelector('.t-desc').value.trim() })).filter(t => t.empresa || t.cargo);
-  const reqs = [...document.querySelectorAll('.niv.on')].map(b => ({
-    nombre: (AVISO.requisitos[b.dataset.req] || {}).nombre || AVISO.requisitos[b.dataset.req], pct: Number(b.dataset.pct) }));
-  const resp = [...document.querySelectorAll('.preg')].map(t => ({ pregunta: t.dataset.preg, respuesta: t.value.trim().slice(0, 3000) }));
+  const resp = [...document.querySelectorAll('.pregunta')].map(w => {
+    const valor = w.dataset.tipo === 'texto' ? w.querySelector('.preg-txt').value.trim()
+      : (w.dataset.tipo === 'porcentaje' ? Number(w.dataset.valor) : w.dataset.valor);
+    return { id: w.dataset.id, pregunta: w.dataset.texto, valor, respuesta: valor };   // respuesta: compat avisos sin preguntas
+  });
 
   $('btnEnviar').disabled = true; $('btnEnviar').innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Enviando…';
   try {
@@ -310,7 +329,7 @@ async function enviar() {
         estudios: est, trabajos: trab,
         idiomas: $('f_idiomas').value.split(',').map(s => ({ idioma: s.trim() })).filter(x => x.idioma),
         habilidades: $('f_habilidades').value.split(',').map(s => s.trim()).filter(Boolean),
-        respuestas: resp, requisitos_eval: reqs, campos_ia: window.CAMPOS_IA,
+        respuestas: resp, campos_ia: window.CAMPOS_IA,
         cv_nombre: CV.nombre, cv_mime: CV.mime, cv_data: CV.data,
       }) })).json();
     if (!j.success) throw new Error(j.error || 'Error');

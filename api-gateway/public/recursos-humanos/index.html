@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recursos Humanos — AutoFácil</title>
-  <!-- v3.3 — card Portal del Postulante (rh_postulaciones). v3.2 — navbar migrada al componente topnav -->
+  <!-- v3.4 — card Revision de Postulantes para el jefe directo (rh_postulaciones_jefe). v3.3 — card Portal del Postulante -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -134,6 +134,12 @@
       <p>Publica avisos con link de postulación, deja que la IA lea los CV de los candidatos y gestiona a los postulantes: filtros, requisitos autoevaluados, pipeline y correos automáticos.</p>
       <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
     </a>
+    <a href="/recursos-humanos/postulantes-jefe/" class="module-card" id="cardPostJefe" style="display:none">
+      <div class="card-icon"><i class="bi bi-person-check"></i></div>
+      <h5>Revisión de Postulantes <span style="font-size:.68rem;background:#e0e7ff;color:#3730a3;border-radius:8px;padding:2px 8px;vertical-align:middle">Jefatura</span></h5>
+      <p>Para el jefe directo que solicitó el cargo: revisa los candidatos con su evaluación en estrellas y marca los que quieres que RRHH siga trabajando.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/recursos-humanos/analytics/" class="module-card" id="cardAna" style="display:none">
       <div class="card-icon"><i class="bi bi-bar-chart-line"></i></div>
       <h5>Indicadores RRHH <span style="font-size:.68rem;background:#fef3c7;color:#92400e;border-radius:8px;padding:2px 8px;vertical-align:middle">RRHH</span></h5>
@@ -188,6 +194,7 @@
     if (tiene('rh_solicitudes')) document.getElementById('cardSol').style.display='';
     if (tiene('rh_docs_firmados')) document.getElementById('cardDocsF').style.display='';
     if (tiene('rh_postulaciones')) document.getElementById('cardPost').style.display='';
+    if (tiene('rh_postulaciones_jefe')) document.getElementById('cardPostJefe').style.display='';
     if (tiene('rh_analytics','rh_colaboradores')) document.getElementById('cardAna').style.display='';
     if (tiene('rh_contratos','rh_colaboradores')) document.getElementById('cardContr').style.display='';
     if (tiene('rh_asistencia','rh_remuneraciones')) document.getElementById('cardAsi').style.display='';
