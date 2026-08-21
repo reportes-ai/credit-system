@@ -1994,6 +1994,38 @@ const pagarSaldos = async (req, res) => {
 
 /* ── POST /api/postventa/saldos-a-pagar/desmarcar { ids:[], motivo } — revierte SALDO PRECIO PAGADO ──
    Mismo día: cualquiera con permiso. Fuera del día: solo Administrador, con motivo (auditoría). */
+
+/* ── Reversa de días ANTERIORES (deshace pagos, asientos y correlativos): Admin
+   siempre puede; además se puede DELEGAR con la casilla "Revertir pagos de
+   días anteriores" (pv_revertir_dias_anteriores) en la matriz de Perfiles
+   (decisión Pato 21-08-2026 — antes era regla dura solo-Admin). ── */
+require('../../../../shared/migrate').enFila('pv-revertir-anteriores', async () => {
+  // Casilla delegable (por defecto solo Administrador la tiene). Sin href: es
+  // permiso de acción, no genera sub-item en el menú.
+  try {
+    const [[mod]] = await pool.query("SELECT id_modulo FROM modulos WHERE ruta='/postventa/' LIMIT 1");
+    if (!mod) return;
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='pv_revertir_dias_anteriores'");
+    let idF = ex && ex.id_funcionalidad;
+    if (!idF) {
+      const [ins] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href) VALUES (?, 'Revertir pagos de días anteriores', 'pv_revertir_dias_anteriores', NULL)",
+        [mod.id_modulo]);
+      idF = ins.insertId;
+    }
+    await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+      SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [idF]);
+  } catch (e) { console.error('[pv-revertir-anteriores seed]', e.message); }
+});
+
+async function puedeRevertirAnterior(req) {
+  if (req.usuario?.perfil_nombre === 'Administrador') return true;
+  try {
+    const { tieneFunc } = require('../../../../shared/middleware/permisos');
+    return await tieneFunc(req.usuario?.id_usuario, 'pv_revertir_dias_anteriores');
+  } catch (_) { return false; }
+}
+
 const desmarcarSaldos = async (req, res) => {
   try {
     const { ids, motivo } = req.body;
@@ -2021,8 +2053,8 @@ const desmarcarSaldos = async (req, res) => {
          AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
 
     if (fuera > 0) {
-      if (!esAdmin)
-        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir una marca de un día anterior.' });
+      if (!esAdmin && !(await puedeRevertirAnterior(req)))
+        return res.status(403).json({ success: false, data: null, error: 'Revertir una marca de un día anterior requiere ser Administrador o tener la casilla "Revertir pagos de días anteriores" (matriz de Perfiles, módulo Post Venta).' });
       if (!motivo || !String(motivo).trim())
         return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir una marca de un día anterior.' });
       // Auditoría de la reversa
@@ -2354,8 +2386,8 @@ const desmarcarComisiones = async (req, res) => {
          AND id_seguimiento IN (${ph})`, [etapa, ...ids]);
 
     if (fuera > 0) {
-      if (!esAdmin)
-        return res.status(403).json({ success: false, data: null, error: 'Solo un Administrador puede revertir una marca de un día anterior.' });
+      if (!esAdmin && !(await puedeRevertirAnterior(req)))
+        return res.status(403).json({ success: false, data: null, error: 'Revertir una marca de un día anterior requiere ser Administrador o tener la casilla "Revertir pagos de días anteriores" (matriz de Perfiles, módulo Post Venta).' });
       if (!motivo || !String(motivo).trim())
         return res.status(400).json({ success: false, data: null, error: 'Debes indicar un motivo para revertir una marca de un día anterior.' });
       const logs = ids.map(id => [id, etapa, usuario, String(motivo).trim().slice(0, 400)]);
