@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Fundantes — Operaciones</title>
+  <!-- v1.1 — pill SIN LIMITACION en la lista y en el visor de revision -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --accent:#009AFE; --bg:#f0f4f8; --green:#15803d; --red:#dc2626; --amber:#b45309; }
@@ -290,7 +291,7 @@ function pintar(){
       <td>${esc(r.id_financiera||'—')}</td>
       <td>${fmtF(r.fecha_otorgado)}</td>
       <td><span class="dias-pill ${diasCls(r.dias)}">${r.dias} d</span></td>
-      <td>${subidos} doc${subidos===1?'':'s'}</td>
+      <td>${subidos} doc${subidos===1?'':'s'}${r.sin_limitacion ? ' <span style="display:inline-flex;align-items:center;gap:4px;background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;border-radius:20px;padding:2px 9px;font-size:.68rem;font-weight:800;margin-left:5px"><i class="bi bi-slash-circle"></i>SIN LIMITACIÓN</span>' : ''}</td>
       <td><button class="btn-rev" onclick="abrirRev(${r.id_credito})"><i class="bi bi-eye"></i> Revisar</button></td>
     </tr>`;
   }).join('');
@@ -305,10 +306,15 @@ function abrirRev(idCredito){
   DOCS = (ACT.docs||[]).filter(d => d.subido);
   IDX = 0;
   document.getElementById('revTit').textContent = `OP ${opNum(ACT.num_op)} · ${ACT.financiera||''}`;
-  document.getElementById('revSub').textContent = `${ACT.ejecutivo||''} · ID ${ACT.id_financiera||'—'} · ${DOCS.length} documento(s)`;
+  document.getElementById('revSub').innerHTML = esc(`${ACT.ejecutivo||''} · ID ${ACT.id_financiera||'—'} · ${DOCS.length} documento(s)`)
+    + (ACT.sin_limitacion ? ' &nbsp;<span style="background:#fff7ed;color:#9a3412;border:1.5px solid #fdba74;border-radius:20px;padding:2px 10px;font-size:.72rem;font-weight:800">⃠ SIN LIMITACIÓN — la ODP del saldo excluye este concepto</span>' : '');
   // lista lateral: todos los requeridos (faltantes en rojo)
   document.getElementById('revSide').innerHTML = (ACT.docs||[]).map(d => {
-    if (!d.subido) return `<div class="doc-tab faltante"><i class="bi bi-dash-circle"></i>${esc(d.nombre)}</div>`;
+    if (!d.subido) {
+      if (d.codigo === 'SOL_LIMITACION' && ACT.sin_limitacion)
+        return `<div class="doc-tab" style="color:#9a3412;font-weight:800"><i class="bi bi-slash-circle"></i>${esc(d.nombre)} — SIN LIMITACIÓN</div>`;
+      return `<div class="doc-tab faltante"><i class="bi bi-dash-circle"></i>${esc(d.nombre)}</div>`;
+    }
     const i = DOCS.indexOf(d);
     return `<div class="doc-tab" id="dt_${i}" onclick="mostrar(${i})"><i class="bi bi-file-earmark-text"></i>${esc(d.nombre)}</div>`;
   }).join('');

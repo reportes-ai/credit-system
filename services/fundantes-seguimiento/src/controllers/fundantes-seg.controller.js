@@ -55,6 +55,13 @@ require('../../../../shared/migrate').enFila('fundantes-seg', async () => {
       "ALTER TABLE fundantes_seg ADD COLUMN devuelto_at DATETIME NULL",
       "ALTER TABLE fundantes_seg ADD COLUMN devuelto_por VARCHAR(150) NULL",
       "ALTER TABLE fundantes_seg ADD COLUMN devoluciones INT NOT NULL DEFAULT 0",
+      /* SIN LIMITACIÓN (20-08-2026): el ejecutivo puede declarar que la operación
+         AUTOFIN se envía sin Solicitud de Limitación. Deja de exigirse ese
+         documento para enviar, la revisión de Operaciones lo ve en grande, y la
+         Orden de Pago del saldo precio EXCLUYE el monto de Limitación de Dominio. */
+      "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion TINYINT NOT NULL DEFAULT 0",
+      "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion_por VARCHAR(150) NULL",
+      "ALTER TABLE fundantes_seg ADD COLUMN sin_limitacion_at DATETIME NULL",
     ]) { try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[fundantes devolucion]', e.message); } }
     /* Bitácora de gestión: comentarios manuales sobre el estado de la operación
        (qué se conversó con la financiera, qué falta, con quién se está viendo).
@@ -289,7 +296,8 @@ const listar = async (req, res) => {
              c.estado_pago, DATE_FORMAT(c.fecha_pago,'%Y-%m-%d') fecha_pago,
              DATEDIFF(CURDATE(), c.fecha_otorgado) AS dias,
              COALESCE(fs.estado,'PENDIENTE') AS estado, fs.comentario_rechazo,
-             fs.fecha_envio, fs.fecha_validacion, fs.validado_por
+             fs.fecha_envio, fs.fecha_validacion, fs.validado_por,
+             COALESCE(fs.sin_limitacion,0) AS sin_limitacion
       FROM creditos c LEFT JOIN fundantes_seg fs ON fs.id_credito = c.id
       ${whereData}
       ORDER BY dias DESC, c.num_op DESC
@@ -307,9 +315,12 @@ const listar = async (req, res) => {
     const data = ops.map(o => {
       const reqs = tiposDeOperacion(o, tiposPorFin);
       const subidos = docsPorOp[o.id_credito] || {};
+      const sinLim = Number(o.sin_limitacion) === 1;
       const docs = reqs.map(t => {
         const d = subidos[t.codigo];
-        return { codigo: t.codigo, nombre: t.nombre, obligatorio: t.obligatorio,
+        // Declarada SIN LIMITACIÓN: la Solicitud de Limitación deja de exigirse.
+        const oblig = (sinLim && t.codigo === 'SOL_LIMITACION') ? false : t.obligatorio;
+        return { codigo: t.codigo, nombre: t.nombre, obligatorio: oblig,
           subido: !!d, doc_id: d ? d.id : null, archivo_nombre: d ? d.archivo_nombre : null };
       });
       const faltan = docs.filter(d => d.obligatorio && !d.subido).length;
@@ -323,7 +334,7 @@ const listar = async (req, res) => {
         saldo_precio: Number(o.saldo_precio) || 0,
         liberado_pago: Number(o.liberado_pago) || 0, fecha_liberado_pago: o.fecha_liberado_pago, fecha_pago: o.fecha_pago,
         estado_op: o.estado_pago === 'PAGADO' ? 'FONDOS_LIBERADOS' : (Number(o.liberado_pago) === 1 ? 'LIBERADO_PAGO' : (o.estado === 'CERRADO' ? 'FUNDANTES_RECIBIDOS' : (o.estado === 'ENVIADO' ? 'POR_VALIDAR' : o.estado))),
-        docs, faltan, puede_enviar,
+        docs, faltan, puede_enviar, sin_limitacion: sinLim ? 1 : 0,
       };
     });
 
@@ -421,6 +432,43 @@ const descargar = async (req, res) => {
   }
 };
 
+/* ─── POST /api/fundantes-seguimiento/:id/sin-limitacion ─────────────────────
+   El ejecutivo declara que la operación AUTOFIN va SIN Solicitud de Limitación
+   (o lo deshace con valor:0). Solo mientras la operación sea editable; queda en
+   bitácora y auditoría, y aguas abajo la ODP excluye el monto de Limitación. */
+const marcarSinLimitacion = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const valor = Number((req.body || {}).valor) ? 1 : 0;
+    if (!id) return res.status(400).json({ success: false, data: null, error: 'id requerido' });
+    const [[op]] = await pool.query('SELECT id, num_op, financiera FROM creditos WHERE id=?', [id]);
+    if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
+    if (String(op.financiera || '').toUpperCase() !== 'AUTOFIN')
+      return res.status(400).json({ success: false, data: null, error: 'Solo aplica a operaciones AUTOFIN' });
+    if (!(await puedeOperar(req, id))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso sobre esta operación' });
+    const [[fs]] = await pool.query('SELECT estado FROM fundantes_seg WHERE id_credito=?', [id]);
+    const estado = (fs && fs.estado) || 'PENDIENTE';
+    if (estado === 'ENVIADO' || estado === 'CERRADO')
+      return res.status(409).json({ success: false, data: null, error: 'La operación ya fue enviada — no se puede cambiar' });
+    await pool.query(
+      `INSERT INTO fundantes_seg (id_credito, estado, sin_limitacion, sin_limitacion_por, sin_limitacion_at)
+       VALUES (?, 'PENDIENTE', ?, ?, NOW())
+       ON DUPLICATE KEY UPDATE sin_limitacion=VALUES(sin_limitacion),
+         sin_limitacion_por=VALUES(sin_limitacion_por), sin_limitacion_at=NOW()`,
+      [id, valor, nombreUsuario(req)]);
+    await pool.query('INSERT INTO fundantes_bitacora (id_credito, comentario, autor, id_autor) VALUES (?,?,?,?)',
+      [id, valor ? 'Declaró el envío SIN LIMITACIÓN (no se exigirá la Solicitud de Limitación y la ODP excluirá su monto).'
+                 : 'Deshizo el SIN LIMITACIÓN: la Solicitud de Limitación vuelve a exigirse.',
+       nombreUsuario(req), req.usuario.id_usuario || null]).catch(() => {});
+    auditar({ req, accion: valor ? 'SIN_LIMITACION' : 'SIN_LIMITACION_DESHECHO', modulo: 'fundantes-seguimiento',
+      entidad: 'credito', entidad_id: id, detalle: `OP ${op.num_op} — ${valor ? 'declarada SIN LIMITACIÓN' : 'SIN LIMITACIÓN deshecho'}` });
+    res.json({ success: true, data: { id_credito: id, sin_limitacion: valor }, error: null });
+  } catch (e) {
+    console.error('[fundantes-seguimiento sin-limitacion]', e.message);
+    res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' });
+  }
+};
+
 /* ─── POST /api/fundantes-seguimiento/:id/enviar — envía a Validación ──────── */
 const enviar = async (req, res) => {
   try {
@@ -429,14 +477,18 @@ const enviar = async (req, res) => {
     const [[op]] = await pool.query('SELECT id, num_op, financiera, gps, limitacion FROM creditos WHERE id=?', [id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     if (!(await puedeOperar(req, id))) return res.status(403).json({ success: false, data: null, error: 'Sin permiso sobre esta operación' });
-    const [[fs]] = await pool.query('SELECT estado FROM fundantes_seg WHERE id_credito=?', [id]);
+    const [[fs]] = await pool.query('SELECT estado, sin_limitacion FROM fundantes_seg WHERE id_credito=?', [id]);
     const estado = (fs && fs.estado) || 'PENDIENTE';
     if (estado === 'ENVIADO' || estado === 'CERRADO')
       return res.status(409).json({ success: false, data: null, error: 'La operación ya fue enviada' });
+    const sinLim = Number(fs && fs.sin_limitacion) === 1;
 
     // Verifica que estén todos los obligatorios (server-side)
     const [tipos] = await pool.query('SELECT codigo, nombre, obligatorio, requiere_contrato FROM fundantes_seg_tipos WHERE UPPER(financiera)=?', [String(op.financiera || '').toUpperCase()]);
-    const oblig = tipos.filter(t => t.requiere_contrato ? contratado(op[t.requiere_contrato]) : !!t.obligatorio).map(t => t.codigo);
+    const oblig = tipos.filter(t => t.requiere_contrato ? contratado(op[t.requiere_contrato]) : !!t.obligatorio)
+      .map(t => t.codigo)
+      // Declarada SIN LIMITACIÓN: la Solicitud de Limitación no traba el envío.
+      .filter(c => !(sinLim && c === 'SOL_LIMITACION'));
     const [subidos] = await pool.query('SELECT codigo FROM fundantes_seg_docs WHERE id_credito=?', [id]);
     const set = new Set(subidos.map(s => s.codigo));
     const faltan = oblig.filter(c => !set.has(c));
@@ -448,14 +500,14 @@ const enviar = async (req, res) => {
        ON DUPLICATE KEY UPDATE estado='ENVIADO', comentario_rechazo=NULL, fecha_envio=NOW(), enviado_por=VALUES(enviado_por), id_enviado_por=VALUES(id_enviado_por)`,
       [id, nombreUsuario(req), req.usuario.id_usuario || null]);
     auditar({ req, accion: 'ENVIAR_FUNDANTES', modulo: 'fundantes-seguimiento', entidad: 'credito', entidad_id: id,
-      detalle: `Envió a validación los fundantes de la OP ${op.num_op}` });
+      detalle: `Envió a validación los fundantes de la OP ${op.num_op}${sinLim ? ' — SIN LIMITACIÓN' : ''}` });
     // Si venía DEVUELTA por la financiera, el pendiente de corregir ya se cumplió.
     AVISOS.retirar('fund_dev_' + id).catch(() => {});
     // Alerta al pool de Operaciones: llegaron fundantes para validar.
     try {
       await AVISOS.avisar('fundantes_validar', {
         tipo: 'fundantes', titulo: 'Fundantes por validar',
-        mensaje: `${nombreUsuario(req)} envió los fundantes de la OP ${op.num_op} (${op.financiera || ''}).`,
+        mensaje: `${nombreUsuario(req)} envió los fundantes de la OP ${op.num_op} (${op.financiera || ''})${sinLim ? ' — SIN LIMITACIÓN' : ''}.`,
         href: '/fundantes-operaciones/', clave: 'fund_env_' + id },
         { excluir: [req.usuario.id_usuario] });
     } catch (_) {}
@@ -1003,5 +1055,5 @@ const tiposEliminar = async (req, res) => {
   } catch (e) { console.error('[fundantes tipos eliminar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno' }); }
 };
 
-module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar,
+module.exports = { listar, resumen, subirDoc, eliminarDoc, descargar, descargarZip, enviar, marcarSinLimitacion, validar, historial, listarDocs, devolver, devueltos, bitacora, comentar, popup, popupComentar,
   tiposListar, tiposCrear, tiposActualizar, tiposEliminar };

@@ -606,7 +606,7 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
     const [[s]] = await pool.query(`
       SELECT s.num_op, s.saldo_precio, s.financiera, po.num_orden, po.monto AS odp_monto,
              COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, c.nombre_local, s.nombre_dealer) AS nombre_dealer,
-             COALESCE(c.rut_dealer, dl.rut) AS rut_dealer
+             COALESCE(c.rut_dealer, dl.rut) AS rut_dealer, ${SIN_LIM_SQL}
         FROM postventa_seguimiento s
         LEFT JOIN creditos c ON c.id = s.id_credito
         LEFT JOIN dealers  dl ON dl.id_dealer = c.id_dealer
@@ -621,7 +621,7 @@ async function contabilizarSaldoPrecio(idSeguimiento, etapa, fecha = null) {
        no se emite (caso FONDOS RECIBIDOS), lo calcula el motor único. */
     const monto = Math.round(s.odp_monto != null
       ? Number(s.odp_monto)
-      : montoSaldoOrden(s.financiera, s.saldo_precio, await getFijosAutoFin()));
+      : montoSaldoOrden(s.financiera, s.saldo_precio, await getFijosAutoFin(), Number(s.sin_limitacion) === 1));
     if (!monto) return;
     const recibido = etapa === 'FONDOS RECIBIDOS';
     // Trazabilidad en el libro: N° de orden de pago + dealer en cada línea del asiento.
@@ -1001,7 +1001,8 @@ const getAll = async (req, res) => {
              fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta,
              fc.impuesto_pct AS fac_imp_pct, fc.impuesto_monto AS fac_imp_monto,
              fc.monto_liquido AS fac_liquido,   -- lo que EFECTIVAMENTE se deposita
-             s.fundantes_devueltos_en, s.fundantes_devueltos_por, s.fundantes_devueltos_motivo
+             s.fundantes_devueltos_en, s.fundantes_devueltos_por, s.fundantes_devueltos_motivo,
+             ${SIN_LIM_SQL}
       FROM postventa_seguimiento s
       LEFT JOIN creditos c ON c.id = s.id_credito
       LEFT JOIN dealers  d ON d.id_dealer = c.id_dealer
@@ -1126,7 +1127,7 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
     const tpl = tRow ? JSON.parse(tRow.valor) : {};
     if (tpl.activo !== true) return;                 // nace inactivo: solo manda si Pato lo enciende
     const [[d]] = await pool.query(`
-      SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera,
+      SELECT s.num_op, s.saldo_precio, s.ejecutivo, s.financiera, ${SIN_LIM_SQL},
              po.monto AS odp_monto, po.num_orden,
              COALESCE(NULLIF(dl.nombre_indexa,''), dl.nombre_razon, NULLIF(dr.nombre_indexa,''), dr.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer,
              COALESCE(dl.correo, dl.cf_email, dr.correo, dr.cf_email) AS correo,
@@ -1166,7 +1167,7 @@ async function notificarPagoSaldoDealer(idSeguimiento) {
        existe, el motor único lo calcula igual que al emitirla. */
     const montoPagado = d.odp_monto != null
       ? Number(d.odp_monto)
-      : montoSaldoOrden(d.financiera, d.saldo_precio, await getFijosAutoFin());
+      : montoSaldoOrden(d.financiera, d.saldo_precio, await getFijosAutoFin(), Number(d.sin_limitacion) === 1);
     const datos = {
       dealer: d.dealer || '', num_op: d.num_op || '', monto: fmt(montoPagado),
       saldo_precio: fmt(d.saldo_precio), num_orden: d.num_orden || '',
@@ -1680,7 +1681,7 @@ const getSaldosAPagar = async (req, res) => {
              DATEDIFF(CURDATE(), efr.fecha) AS dias,
              (esp.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
-             eev.usuario AS enviado_por
+             eev.usuario AS enviado_por, ${SIN_LIM_SQL}
       FROM postventa_seguimiento s
       JOIN postventa_etapas eop
         ON eop.id_seguimiento = s.id AND eop.track='SALDO' AND eop.etapa='ORDEN DE PAGO EMITIDA'
@@ -1734,7 +1735,7 @@ const getSaldosAPagar = async (req, res) => {
     const isoD = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     const hoyCL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }));
     rows.forEach(r => {
-      r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos);
+      r.monto_pagar = montoSaldoOrden(r.financiera, r.saldo_precio, fijos, Number(r.sin_limitacion) === 1);
       const v = SLAM.vencimiento(r.fecha_fundantes, r.categoria, slaCfg);
       r.fecha_pago_sla = v ? isoD(v.fecha) : null;
       // Días respecto del SLA: negativo = falta, 0 = vence hoy, positivo = vencido
@@ -1761,10 +1762,16 @@ async function getFijosAutoFin() {
 }
 const esAutoFin = fin => String(fin || '').toUpperCase() === 'AUTOFIN';
 // Monto total a pagar de la Orden de Saldo Precio (AUTOFIN suma los dos fijos al saldo base).
-function montoSaldoOrden(financiera, saldoBase, fijos) {
+// `sinLimitacion` (fundantes_seg.sin_limitacion): el ejecutivo declaró el envío SIN
+// Limitación → la ODP EXCLUYE ese concepto y solo suma la Transferencia.
+function montoSaldoOrden(financiera, saldoBase, fijos, sinLimitacion) {
   const base = Number(saldoBase) || 0;
-  return esAutoFin(financiera) ? base + (fijos.autofin_inscripcion || 0) + (fijos.autofin_limitacion || 0) : base;
+  return esAutoFin(financiera)
+    ? base + (fijos.autofin_inscripcion || 0) + (sinLimitacion ? 0 : (fijos.autofin_limitacion || 0))
+    : base;
 }
+// Fragmento SQL: el flag SIN LIMITACIÓN de la operación de un seguimiento (alias `s`).
+const SIN_LIM_SQL = "(SELECT COALESCE(fsl.sin_limitacion,0) FROM fundantes_seg fsl WHERE fsl.id_credito = s.id_credito) AS sin_limitacion";
 
 /* ── GET /api/postventa/orden-pago — casos en FONDOS RECIBIDOS sin ORDEN DE PAGO EMITIDA ── */
 const getOrdenPago = async (req, res) => {
@@ -1779,7 +1786,7 @@ const getOrdenPago = async (req, res) => {
              COALESCE(d.tipo_cuenta, d.cuenta_tipo, dn.tipo_cuenta, dn.cuenta_tipo) AS tipo_cuenta,
              COALESCE(d.nombre_cuenta, dn.nombre_cuenta) AS nombre_cuenta,
              efr.fecha AS fecha_fondos,
-             DATEDIFF(CURDATE(), efr.fecha) AS dias
+             DATEDIFF(CURDATE(), efr.fecha) AS dias, ${SIN_LIM_SQL}
       FROM postventa_seguimiento s
       JOIN postventa_etapas efr
         ON efr.id_seguimiento = s.id AND efr.track='SALDO' AND efr.etapa='FONDOS RECIBIDOS'
@@ -1808,10 +1815,11 @@ const getOrdenPago = async (req, res) => {
 async function asegurarOrdenSaldo(id, reqUsuario) {
   const [[ya]] = await pool.query('SELECT id, num_orden FROM postventa_ordenes WHERE id_seguimiento=?', [id]);
   if (ya && ya.num_orden) return ya.num_orden;
-  const [[seg]] = await pool.query('SELECT num_op, saldo_precio, financiera FROM postventa_seguimiento WHERE id=?', [id]);
+  const [[seg]] = await pool.query(`SELECT s.num_op, s.saldo_precio, s.financiera, ${SIN_LIM_SQL} FROM postventa_seguimiento s WHERE s.id=?`, [id]);
   if (!seg) return null;
   const fijos = await getFijosAutoFin();
-  const monto = montoSaldoOrden(seg.financiera, seg.saldo_precio, fijos);   // AUTOFIN: + Transferencia + Limitación
+  // AUTOFIN: + Transferencia + Limitación (esta última se EXCLUYE si el ejecutivo declaró SIN LIMITACIÓN)
+  const monto = montoSaldoOrden(seg.financiera, seg.saldo_precio, fijos, Number(seg.sin_limitacion) === 1);
   let poId = ya && ya.id;
   if (!poId) {
     try {

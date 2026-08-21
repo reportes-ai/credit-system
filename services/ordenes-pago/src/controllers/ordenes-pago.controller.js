@@ -440,6 +440,7 @@ async function construirDocumento(oc) {
          LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
         WHERE poc.id = ?`
     : `SELECT s.id AS id_seg, s.num_op, s.financiera, s.saldo_precio,
+              (SELECT COALESCE(fsl.sin_limitacion,0) FROM fundantes_seg fsl WHERE fsl.id_credito = s.id_credito) AS sin_limitacion,
               COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
@@ -502,10 +503,16 @@ async function construirDocumento(oc) {
       "SELECT clave, valor FROM parametros_credito WHERE clave IN ('autofin_inscripcion','autofin_limitacion')");
     let insc = 0, lim = 0;
     pr.forEach(p => { if (p.clave === 'autofin_inscripcion') insc = parseFloat(p.valor) || 0; if (p.clave === 'autofin_limitacion') lim = parseFloat(p.valor) || 0; });
+    /* Operación declarada SIN LIMITACIÓN por el ejecutivo (fundantes_seg): el
+       concepto Limitación de Dominio se EXCLUYE del pago, y el documento lo
+       dice explícito para que Tesorería sepa por qué el total viene más bajo. */
+    const sinLim = Number(row.sin_limitacion) === 1;
+    if (sinLim) lim = 0;
     desglose = [
       { label: 'Saldo Precio', monto: base },
       { label: 'Transferencia', monto: insc },
-      { label: 'Limitación de Dominio', monto: lim },
+      sinLim ? { label: 'Limitación de Dominio — SIN LIMITACIÓN (excluida)', monto: 0 }
+             : { label: 'Limitación de Dominio', monto: lim },
     ];
     monto = base + insc + lim; neto = monto; bruto = monto;
   }

@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago — AutoFácil</title>
-  <!-- v2.12 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
+  <!-- v2.13 — linea Limitacion al Dominio excluida (SIN LIMITACION) cuando el ejecutivo lo declaro en Fundantes · v2.12 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.11 — sin boton Enviar Correo (emitir ya lo manda solo); el texto ya no dice "adjunto" · v2.10 — navbar migrada al componente topnav · v2.8 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.7 — emitir manda el correo a Contabilidad automaticamente (eran dos botones y se emitia sin avisar) · v2.6 — boton Enviar Correo respeta el check Activo del mantenedor · v2.5 — fix: Ver orden no abría (esc sin definir tras hardening XSS) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -180,7 +180,10 @@ function lineasDe(r){
   const lineas = [];
   if (esAutofin) {
     if (FIJOS.autofin_inscripcion) lineas.push({ detalle:'Transferencia / Inscripción', valor:FIJOS.autofin_inscripcion });
-    if (FIJOS.autofin_limitacion)  lineas.push({ detalle:'Limitación al Dominio',       valor:FIJOS.autofin_limitacion });
+    // Fundantes declarados SIN LIMITACIÓN: el concepto se excluye del pago y la
+    // línea lo dice explícito para que no parezca un olvido.
+    if (Number(r.sin_limitacion) === 1) lineas.push({ detalle:'Limitación al Dominio — SIN LIMITACIÓN (excluida)', valor:0 });
+    else if (FIJOS.autofin_limitacion)  lineas.push({ detalle:'Limitación al Dominio',       valor:FIJOS.autofin_limitacion });
   }
   lineas.push({ detalle:`Saldo Precio OP ${r.num_op||''} - ${r.financiera||''}`.trim(), valor:Number(r.saldo_precio)||0 });
   return lineas;

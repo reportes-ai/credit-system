@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -733,7 +733,9 @@ function abrirEmitirODP(id, track){
   const tLabel = track === 'SALDO' ? 'Saldo Precio' : 'Comisión';
   // Saldo Precio de AUTOFIN: A pagar = Saldo + Transferencia + Limitación de dominio.
   const esAutoFin = track === 'SALDO' && String(r.financiera||'').toUpperCase() === 'AUTOFIN';
-  const insc = +FIJOS.autofin_inscripcion || 0, lim = +FIJOS.autofin_limitacion || 0;
+  // Fundantes declarados SIN LIMITACIÓN: la ODP excluye ese concepto.
+  const sinLim = Number(r.sin_limitacion) === 1;
+  const insc = +FIJOS.autofin_inscripcion || 0, lim = sinLim ? 0 : (+FIJOS.autofin_limitacion || 0);
   const base = track === 'SALDO' ? (+r.saldo_precio || 0) : (+r.comision || 0);
   /* COMISIÓN: se paga el LÍQUIDO A DEPOSITAR del documento recibido, no la comisión bruta.
      Con factura el líquido es el bruto (IVA incluido, crédito fiscal de AutoFácil);
@@ -745,7 +747,8 @@ function abrirEmitirODP(id, track){
   let desgloseHTML = esAutoFin ? `
     <div class="em-row"><span>Saldo Precio</span><b>${fmtCLP(base)}</b></div>
     <div class="em-row"><span>Transferencia</span><b>${fmtCLP(insc)}</b></div>
-    <div class="em-row"><span>Limitación de Dominio</span><b>${fmtCLP(lim)}</b></div>` : '';
+    ${sinLim ? `<div class="em-row"><span style="color:#9a3412;font-weight:700">Limitación de Dominio — SIN LIMITACIÓN (excluida)</span><b>${fmtCLP(0)}</b></div>`
+             : `<div class="em-row"><span>Limitación de Dominio</span><b>${fmtCLP(lim)}</b></div>`}` : '';
   if (esComision && r.fac_liquido != null && r.fac_imp_monto != null) {
     const pct = Number(r.fac_imp_pct) || 0;
     desgloseHTML += r.fac_boleta ? `

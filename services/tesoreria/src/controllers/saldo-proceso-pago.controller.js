@@ -93,7 +93,8 @@ exports.listar = async (req, res) => {
              COALESCE(NULLIF(di.categoria_asignada,''), NULLIF(d.categoria_asignada,''),
                       NULLIF(di.categoria_propuesta,''), NULLIF(d.categoria_propuesta,'')) AS categoria_asignada,
              ${ETAPA_SQL('c')} AS etapa_credito,
-             oc.numero AS odp_numero, oc.monto AS odp_monto, oc.pagada AS odp_pagada
+             oc.numero AS odp_numero, oc.monto AS odp_monto, oc.pagada AS odp_pagada,
+             (SELECT COALESCE(fsl.sin_limitacion,0) FROM fundantes_seg fsl WHERE fsl.id_credito = s.id_credito) AS sin_limitacion
         FROM postventa_seguimiento s
         LEFT JOIN creditos c  ON c.id = s.id_credito
         LEFT JOIN dealers  di ON di.id_dealer = c.id_dealer
@@ -154,11 +155,14 @@ exports.listar = async (req, res) => {
            mismo motor que la ODP; $0 fuera de AUTOFIN). El TOTAL es la ODP cuando
            existe (monto congelado al emitir) y la suma calculada si aún no hay. */
         monto: Number(s.saldo_precio || 0),
-        limitacion: esAutoFin(s.financiera) ? (fijos.autofin_limitacion || 0) : 0,
+        // Operación declarada SIN LIMITACIÓN (fundantes_seg): el concepto se excluye del pago.
+        limitacion: (esAutoFin(s.financiera) && Number(s.sin_limitacion) !== 1) ? (fijos.autofin_limitacion || 0) : 0,
         transferencia: esAutoFin(s.financiera) ? (fijos.autofin_inscripcion || 0) : 0,
+        sin_limitacion: Number(s.sin_limitacion) === 1 ? 1 : 0,
         monto_total: s.odp_monto != null ? Number(s.odp_monto)
           : Number(s.saldo_precio || 0)
-            + (esAutoFin(s.financiera) ? (fijos.autofin_limitacion || 0) + (fijos.autofin_inscripcion || 0) : 0),
+            + (esAutoFin(s.financiera)
+              ? (Number(s.sin_limitacion) === 1 ? 0 : (fijos.autofin_limitacion || 0)) + (fijos.autofin_inscripcion || 0) : 0),
         monto_preliminar: s.odp_monto == null,             // sin ODP aún: total calculado, no congelado
         odp: s.odp_numero || null,
         estado: estadoActual,
