@@ -22,6 +22,7 @@ router.get('/postulantes/:id',         ...rrhh, c.postulanteFicha);
 router.get('/postulantes/:id/cv',      ...rrhh, c.postulanteCV);
 router.post('/postulantes/:id/estado', ...rrhh, c.postulanteEstado);
 router.post('/postulantes/:id/dealernet',       ...rrhh, c.dealernetPedir);
+router.post('/postulantes/:id/analisis-ia',     ...rrhh, c.analisisIA);
 router.post('/postulantes/:id/entrevistas',     ...rrhh, c.entrevistaCrear);
 router.put('/postulantes/:id/entrevistas/:ix',  ...rrhh, c.entrevistaActualizar);
 router.post('/postulantes/:id/informe',         ...rrhh, c.informeGuardar);

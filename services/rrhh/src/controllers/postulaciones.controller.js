@@ -175,6 +175,8 @@ require('../../../../shared/migrate').enFila('rh-postulaciones', async () => {
     "ALTER TABLE rh_postulantes ADD COLUMN entrevistas JSON NULL",
     "ALTER TABLE rh_postulantes ADD COLUMN informe_rrhh TEXT NULL",
     "ALTER TABLE rh_postulantes ADD COLUMN jefatura_at DATETIME NULL",
+    "ALTER TABLE rh_postulantes ADD COLUMN analisis_ia JSON NULL",
+    "ALTER TABLE rh_postulantes ADD COLUMN analisis_ia_at DATETIME NULL",
   ];
   for (const ddl of alters) {
     try { await pool.query(ddl); } catch (e) { if (e.errno !== 1060) console.error('[postulantes v2]', e.message); }
@@ -222,6 +224,12 @@ require('../../../../shared/migrate').enFila('rh-postulaciones', async () => {
       nombre: 'Lectura de CV de postulantes',
       descripcion: 'Extrae del currículum los datos personales, estudios, trabajos, idiomas y habilidades para pre-llenar la postulación',
       modelo: 'claude-haiku-4-5',
+    });
+    await require('../../../../shared/ia').registrarFuncionalidad({
+      codigo: 'analisis_postulante',
+      nombre: 'Análisis de perfil del postulante',
+      descripcion: 'Analiza el CV y la ficha del candidato: perfil, fortalezas, riesgos, ajuste al cargo, POSIBLES INCONSISTENCIAS (fechas, traslapes, títulos, CV vs lo declarado) y preguntas sugeridas para la entrevista',
+      modelo: 'claude-sonnet-5',
     });
   } catch (e) { console.error('[postulaciones ia]', e.message); }
 });
@@ -472,6 +480,7 @@ const postulanteFicha = async (req, res) => {
       p[k] = parseJ(p[k], []);
     p.puntaje = parseJ(p.puntaje, null);
     p.dealernet = parseJ(p.dealernet, null);
+    p.analisis_ia = parseJ(p.analisis_ia, null);
     p.estrellas = p.estrellas == null ? null : Number(p.estrellas);
     const [docs] = await pool.query(
       'SELECT id, tipo, nombre, mime, subido_por, created_at FROM rh_postulante_docs WHERE id_postulante=? ORDER BY id', [p.id]);
@@ -522,6 +531,66 @@ async function enviarDescarte(p) {
   await enviarCorreo({ to: p.email, subject: `Proceso ${p.aviso} — AutoFácil`, html });
   await pool.query('UPDATE rh_postulantes SET descarte_at=NOW() WHERE id=?', [p.id]);
 }
+
+/* POST /postulantes/:id/analisis-ia — la IA analiza el CV + la ficha completa:
+   perfil, fortalezas, riesgos, ajuste al cargo, INCONSISTENCIAS (fechas que no
+   cuadran, traslapes, títulos sin respaldo, CV vs lo que digitó) y preguntas
+   sugeridas para la entrevista. El resultado queda guardado en la ficha. */
+const analisisIA = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [[p]] = await pool.query(`
+      SELECT p.*, a.titulo AS aviso, a.descripcion AS aviso_desc
+      FROM rh_postulantes p JOIN rh_avisos a ON a.id=p.id_aviso WHERE p.id=?`, [id]);
+    if (!p) return fail(res, 'Postulante no encontrado', 404);
+    const { analizar, disponible } = require('../../../../shared/anthropic');
+    if (!disponible()) return fail(res, 'La IA no está disponible — actívala en Mantenedores › IA', 503);
+
+    // El CV original va adjunto si es PDF o imagen; si no (docx), se analiza solo la ficha
+    let documentos;
+    try {
+      const buf = await almacen.obtener({ ruta: p.doc_ruta, blob: p.cv_data });
+      const esPdf = /pdf/i.test(p.cv_mime || '');
+      const esImg = /image\/(jpe?g|png)/i.test(p.cv_mime || '');
+      if (buf && (esPdf || esImg))
+        documentos = [{ tipo: esPdf ? 'pdf' : 'imagen', data: buf.toString('base64'), media_type: esPdf ? undefined : p.cv_mime }];
+    } catch (e) { console.error('[analisis cv]', e.message); }
+
+    const ficha = {
+      cargo: p.aviso, descripcion_cargo: String(p.aviso_desc || '').slice(0, 2000),
+      nombre: p.nombre, rut: p.rut, fecha_nacimiento: p.fecha_nacimiento,
+      comuna: p.comuna, pretension_renta: p.pretension_renta,
+      estudios: parseJ(p.estudios, []), trabajos: parseJ(p.trabajos, []),
+      idiomas: parseJ(p.idiomas, []), habilidades: parseJ(p.habilidades, []),
+      respuestas: parseJ(p.respuestas, []).map(r => ({ pregunta: r.pregunta, respuesta: r.valor ?? r.respuesta })),
+    };
+    const { datos } = await analizar({
+      codigo: 'analisis_postulante',
+      system: 'Eres un analista de reclutamiento chileno riguroso y justo. Analizas al candidato SOLO con la evidencia entregada (CV adjunto si viene, y la ficha que él mismo digitó). Jamás inventas datos ni supones mala fe: una inconsistencia es una DIFERENCIA VERIFICABLE entre fuentes o dentro del CV (fechas que no cuadran o se traslapan de forma imposible, lagunas laborales largas sin explicar, títulos o instituciones sin respaldo, cargos que no calzan con la experiencia, diferencias entre el CV y lo que digitó en la ficha o respondió en las preguntas). Si no hay inconsistencias, dilo explícitamente con la lista vacía. Español chileno, tuteo, tono profesional.',
+      prompt: `Cargo al que postula y ficha digitada por el candidato (contrástala con el CV adjunto${documentos ? '' : ' — OJO: no hay CV legible, analiza solo la ficha'}):
+${JSON.stringify(ficha)}
+
+Devuelve SOLO este JSON exacto:
+{
+ "perfil": string (análisis del perfil en 4-7 líneas: trayectoria, seniority, foco, estabilidad laboral),
+ "fortalezas": [string] (3-6, concretas y citando la evidencia),
+ "riesgos": [string] (0-5, riesgos u observaciones para el cargo — no inconsistencias, sino debilidades del perfil),
+ "ajuste_cargo": { "nota": number (1 a 10), "comentario": string (por qué esa nota, contra la descripción del cargo) },
+ "inconsistencias": [ { "tema": string (corto), "detalle": string (qué no cuadra y entre qué fuentes), "gravedad": "alta"|"media"|"baja" } ],
+ "preguntas_entrevista": [string] (4-6 preguntas específicas para este candidato: profundizar fortalezas, aclarar riesgos y RESOLVER cada inconsistencia detectada)
+}`,
+      documentos, json: true, max_tokens: 2500,
+    });
+    if (!datos) return fail(res, 'La IA no devolvió un análisis válido — inténtalo de nuevo', 502);
+    await pool.query('UPDATE rh_postulantes SET analisis_ia=?, analisis_ia_at=NOW() WHERE id=?', [JSON.stringify(datos), id]);
+    auditar({ req, accion: 'ANALISIS_IA', modulo: 'postulaciones', entidad: 'postulante', entidad_id: id,
+      detalle: `${p.nombre}: análisis IA (${(datos.inconsistencias || []).length} inconsistencias)` });
+    ok(res, datos);
+  } catch (e) {
+    console.error('[analisis ia]', e.message);
+    fail(res, e.code === 'IA_OFF' ? 'La funcionalidad "Análisis de perfil del postulante" está desactivada en Mantenedores › IA' : 'No se pudo generar el análisis');
+  }
+};
 
 /* ═══════════════ WORKFLOW: DealerNet · entrevistas · informe · jefatura ═══════════════ */
 
@@ -694,6 +763,9 @@ const enviarJefatura = async (req, res) => {
       <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin:10px 0">
         <p style="margin:0 0 6px"><b style="color:#012d70">${esc(p.nombre)}</b> — ${estrellasTxt(p.estrellas == null ? null : Number(p.estrellas))}</p>
         ${p.resumen_ia ? `<p style="margin:4px 0;font-size:.9em"><b>Perfil:</b> ${esc(p.resumen_ia)}</p>` : ''}
+        ${(() => { const ai = parseJ(p.analisis_ia, null); if (!ai) return '';
+          return `${ai.ajuste_cargo ? `<p style="margin:4px 0;font-size:.9em"><b>Análisis IA — ajuste al cargo:</b> ${esc(ai.ajuste_cargo.nota)}/10. ${esc(ai.ajuste_cargo.comentario || '')}</p>` : ''}
+          ${(ai.inconsistencias || []).length ? `<p style="margin:4px 0;font-size:.9em;color:#b45309"><b>⚠ Inconsistencias detectadas por la IA:</b> ${ai.inconsistencias.map(x => esc(x.tema + ' (' + x.gravedad + ')')).join(' · ')}</p>` : ''}`; })()}
         ${p.informe_rrhh ? `<p style="margin:4px 0;font-size:.9em"><b>Informe entrevista RRHH:</b> ${esc(p.informe_rrhh)}</p>` : ''}
         ${parseJ(p.entrevistas, []).filter(e => e.realizada && e.resultado).map(e =>
           `<p style="margin:4px 0;font-size:.9em"><b>Entrevista ${esc(e.tipo)} (${esc(e.fecha)}):</b> ${esc(e.resultado)}</p>`).join('')}
@@ -814,6 +886,6 @@ const jefeMarcar = async (req, res) => {
 };
 
 module.exports = { avisoPublico, extraerCV, postular, avisosListar, avisoGuardar, jefesLista,
-  postulantesListar, postulanteFicha, postulanteCV, postulanteEstado,
+  postulantesListar, postulanteFicha, postulanteCV, postulanteEstado, analisisIA,
   dealernetPedir, entrevistaCrear, entrevistaActualizar, informeGuardar, docSubir, docVer, enviarJefatura,
   jefePostulantes, jefeFicha, jefeCV, jefeMarcar };

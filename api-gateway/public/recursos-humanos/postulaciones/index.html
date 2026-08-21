@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — Portal del Postulante (RRHH): builder de preguntas tipificadas con importancia y tabulacion a estrellas, maqueta, jefe directo, DealerNet, entrevistas, informe y envio a jefatura -->
+<!-- v2.1 — pestaña Manual (guia completa) + Analisis IA del perfil con deteccion de inconsistencias. v2.0 — builder de preguntas, estrellas, workflow completo -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -81,6 +81,7 @@
   <div class="tabs">
     <div class="tab on" id="t-post" onclick="verTab('post')"><i class="bi bi-people me-1"></i>Postulantes</div>
     <div class="tab" id="t-avisos" onclick="verTab('avisos')"><i class="bi bi-megaphone me-1"></i>Avisos</div>
+    <div class="tab" id="t-manual" onclick="verTab('manual')"><i class="bi bi-book me-1"></i>Manual</div>
   </div>
 
   <!-- POSTULANTES -->
@@ -126,6 +127,244 @@
       <thead><tr><th>Cargo</th><th>Jefe directo</th><th>Activo</th><th>Postulantes</th><th>Nuevas</th><th>Link público</th><th></th></tr></thead>
       <tbody id="tbAvisos"><tr><td colspan="7" class="empty">Cargando…</td></tr></tbody>
     </table></div>
+  </div>
+
+  <!-- MANUAL -->
+  <div id="v-manual" style="display:none">
+    <style>
+      .man h3 { color:var(--navy-dark); font-size:1.05rem; margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+      .man h4 { color:var(--navy); font-size:.9rem; margin:14px 0 4px; }
+      .man p, .man li { font-size:.875rem; color:#334155; line-height:1.55; }
+      .man ul, .man ol { margin:4px 0 8px; padding-left:22px; }
+      .man table { font-size:.82rem; margin:8px 0; }
+      .man td { vertical-align:top; }
+      .man .tip { background:#f0f6ff; border-left:4px solid var(--navy); border-radius:8px; padding:9px 13px; font-size:.83rem; margin:8px 0; }
+      .man .ojo { background:#fffbeb; border-left:4px solid #f59e0b; border-radius:8px; padding:9px 13px; font-size:.83rem; margin:8px 0; }
+      .man .paso-num { display:inline-flex; width:26px; height:26px; border-radius:50%; background:var(--navy); color:#fff; font-weight:800; font-size:.85rem; align-items:center; justify-content:center; }
+      .man code { background:#f1f5f9; border-radius:5px; padding:1px 6px; font-size:.8rem; }
+      .man .idx a { display:inline-block; background:#fff; border:1.5px solid #e2e8f0; border-radius:16px; padding:4px 13px; font-size:.78rem; font-weight:700; color:var(--navy); text-decoration:none; margin:3px 4px 3px 0; }
+      .man .flujo-man { display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.74rem; font-weight:800; }
+      .man .flujo-man .st { background:#eff6ff; color:var(--navy-dark); border-radius:10px; padding:5px 11px; }
+      .man .flujo-man .fin { background:#dcfce7; color:#166534; } .man .flujo-man .mal { background:#fee2e2; color:#991b1b; }
+    </style>
+    <div class="man">
+
+    <div class="card idx">
+      <h3><i class="bi bi-book"></i>Manual del Portal del Postulante</h3>
+      <p>Todo el proceso de reclutamiento, de la primera vez y sin ayuda: desde crear el aviso hasta contratar. Índice:</p>
+      <a href="#m-ventajas">Ventajas del modelo</a><a href="#m-mapa">Mapa del proceso</a><a href="#m-crear">1 · Crear el aviso</a>
+      <a href="#m-publicar">2 · Publicar</a><a href="#m-candidato">3 · El candidato</a><a href="#m-evaluar">4 · Cómo se evalúa (estrellas)</a>
+      <a href="#m-ia">5 · Análisis IA del CV</a><a href="#m-jefe">6 · Derivar al jefe directo</a><a href="#m-citar">7 · Citar a entrevista</a>
+      <a href="#m-informe">8 · Informe y tests</a><a href="#m-jefatura">9 · Enviar a Jefatura</a><a href="#m-etapas">Etapas del proceso</a>
+      <a href="#m-rechazo">Rechazar un candidato</a><a href="#m-contratar">Contratar</a><a href="#m-faq">Buenas prácticas</a>
+    </div>
+
+    <div class="card" id="m-ventajas">
+      <h3><i class="bi bi-stars"></i>Ventajas del modelo</h3>
+      <ul>
+        <li><b>Un solo link, cero papeleo:</b> cada aviso genera un link público; el candidato postula desde el celular en 3 minutos, sin crear cuenta.</li>
+        <li><b>La IA hace la digitación:</b> lee el CV (PDF o foto) y llena nombre, RUT, estudios, trabajos, idiomas y habilidades. Lo que falte queda marcado en amarillo para que el candidato lo complete. Nadie de RRHH transcribe currículums.</li>
+        <li><b>Evaluación objetiva y comparable:</b> todos los candidatos responden LAS MISMAS preguntas y el sistema los tabula automáticamente en <b>estrellas 0–5</b>. Se comparan peras con peras, sin sesgo de quién leyó primero.</li>
+        <li><b>Filtro excluyente automático:</b> lo no negociable (ej: disponibilidad presencial) deja al candidato NO APTO sin gastar tiempo de nadie.</li>
+        <li><b>Análisis IA con detección de inconsistencias:</b> un segundo análisis contrasta el CV contra lo que el candidato declaró y avisa si hay fechas que no cuadran, lagunas, títulos sin respaldo o contradicciones — con preguntas listas para la entrevista.</li>
+        <li><b>El jefe decide, RRHH ejecuta:</b> el jefe que pidió el cargo ve solo sus candidatos, marca los que le interesan y eso dispara solo los informes DealerNet.</li>
+        <li><b>Todo queda registrado:</b> entrevistas, informes, tests y correos. El informe final a la jefatura sale en un clic con todo adjunto.</li>
+        <li><b>Base permanente:</b> los descartados no se borran — quedan disponibles para la próxima búsqueda, avisados con un correo cortés.</li>
+      </ul>
+    </div>
+
+    <div class="card" id="m-mapa">
+      <h3><i class="bi bi-signpost-split"></i>Mapa del proceso</h3>
+      <div class="flujo-man">
+        <span class="st">1 · AVISO + LINK</span>→<span class="st">2 · CANDIDATO POSTULA (CV + IA)</span>→<span class="st">3 · TABULACIÓN ★ AUTOMÁTICA</span>→
+        <span class="st">4 · JEFE MARCA ✓ (DealerNet auto)</span>→<span class="st">5 · ANÁLISIS IA + ENTREVISTAS</span>→<span class="st">6 · INFORME A JEFATURA</span>→
+        <span class="st fin">CONTRATADA</span>/<span class="st mal">DESCARTADA (correo cortés)</span>
+      </div>
+      <p style="margin-top:8px">Tres roles: <b>RRHH</b> (crea avisos, gestiona todo el proceso — permiso <code>rh_postulaciones</code>), el <b>jefe directo</b> que pidió el cargo (revisa y marca — permiso <code>rh_postulaciones_jefe</code>, página "Revisión de Postulantes"), y el <b>candidato</b> (solo el link público, sin login).</p>
+    </div>
+
+    <div class="card" id="m-crear">
+      <h3><span class="paso-num">1</span>Crear el aviso</h3>
+      <p>Pestaña <b>Avisos → Nuevo aviso</b>. Campos:</p>
+      <ul>
+        <li><b>Título del cargo</b> (obligatorio): lo que verá el candidato en grande. Ej: "Ejecutivo Comercial — Maipú".</li>
+        <li><b>Jefe directo / solicitante</b>: la persona que pidió el cargo. Es clave: define quién revisa candidatos en "Revisión de Postulantes" y quién recibe el informe final. Sin jefe asignado no se puede enviar a jefatura.</li>
+        <li><b>Descripción</b>: qué hará, qué ofrecemos, requisitos generales. Escribe pensando en atraer — es tu aviso publicitario.</li>
+        <li><b>Ubicación y jornada</b>: salen como chips bajo el título.</li>
+      </ul>
+      <h4>Las preguntas del proceso (el corazón del modelo)</h4>
+      <p>Agrega las preguntas con <b>+ Agregar pregunta</b> o desde las <b>sugeridas</b> (un clic las agrega ya configuradas). Cada pregunta tiene <b>tipo</b> y <b>importancia</b>:</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Tipo</th><th>El candidato ve</th><th>Cómo puntúa</th><th>Úsalo para</th></tr></thead>
+        <tbody>
+          <tr><td><b>Sí / No</b></td><td>Dos botones</td><td>La respuesta que "cumple" (tú eliges cuál) = 100%; la otra = 0%</td><td>Hechos binarios: licencia, disponibilidad, presencialidad</td></tr>
+          <tr><td><b>No cumple / Cumple</b></td><td>3 chips</td><td>0% · 50% · 100%</td><td>Requisitos con matiz intermedio</td></tr>
+          <tr><td><b>Bajo / Medio / Alto</b></td><td>3 chips</td><td>0% · 50% · 100%</td><td>Nivel de una herramienta o competencia (Excel, SAP…)</td></tr>
+          <tr><td><b>Nunca … Siempre</b></td><td>4 chips</td><td>0% · 33% · 67% · 100%</td><td>Frecuencia de una conducta (metas, trato con clientes…)</td></tr>
+          <tr><td><b>% de cumplimiento</b></td><td>0/25/50/75/100%</td><td>El % elegido, directo</td><td>Autoevaluación fina (inglés hablado…)</td></tr>
+          <tr><td><b>Alternativas</b></td><td>Opciones, elige una</td><td>Alternativa con <code>*</code> = 100%; sin <code>*</code> = 0%. Si NINGUNA lleva *, la pregunta es solo informativa</td><td>Nivel de estudios exacto, rango de experiencia…</td></tr>
+          <tr><td><b>Texto libre</b></td><td>Cuadro con contador de caracteres (tú fijas el tope)</td><td>No puntúa — se lee</td><td>Motivación, logros, "qué te hace especial"</td></tr>
+        </tbody>
+      </table></div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Importancia</th><th>Peso</th><th>Efecto</th></tr></thead>
+        <tbody>
+          <tr><td><b style="color:#dc2626">⛔ Excluyente</b></td><td>×3</td><td>Si el candidato queda bajo 50% en ESA pregunta → <b>NO APTO</b> automático (se indica cuál falló). Úsala solo para lo verdaderamente no negociable.</td></tr>
+          <tr><td><b>Alta</b></td><td>×3</td><td>Pesa el triple en las estrellas</td></tr>
+          <tr><td><b>Media</b></td><td>×2</td><td>Peso normal</td></tr>
+          <tr><td><b>Baja</b></td><td>×1</td><td>Deseable, no determinante</td></tr>
+          <tr><td><b>Solo informativa</b></td><td>—</td><td>No afecta las estrellas; queda en la ficha para leerla</td></tr>
+        </tbody>
+      </table></div>
+      <div class="tip">💡 <b>Receta de un buen aviso:</b> 1 o 2 excluyentes máximo · 3-5 preguntas que puntúan (mezcla tipos) · 1-2 de texto libre para conocer a la persona. Más de 10 preguntas espanta candidatos.</div>
+      <div class="ojo">⚠ El candidato <b>nunca ve</b> qué respuesta puntúa ni la importancia de cada pregunta — la pauta no viaja al link público.</div>
+    </div>
+
+    <div class="card" id="m-publicar">
+      <h3><span class="paso-num">2</span>Publicar y compartir</h3>
+      <ol>
+        <li>Antes de compartir, aprieta <b>Ver maqueta</b> (en el aviso o el botón <i class="bi bi-easel"></i> de la lista): se abre EXACTAMENTE lo que verá el candidato, con el envío bloqueado. Revisa que las preguntas se lean bien.</li>
+        <li>Con el aviso <b>activo</b>, usa <b>Copiar link</b> y compártelo donde quieras: LinkedIn, portales de empleo, WhatsApp, correo. Es el mismo link para todos.</li>
+        <li>Para <b>cerrar la búsqueda</b>, edita el aviso y desmarca "activo": el link deja de recibir postulaciones y muestra "esta búsqueda ya está cerrada" (los datos no se pierden).</li>
+      </ol>
+      <div class="tip">💡 Puedes editar preguntas con el aviso ya publicado, pero hazlo antes de que lleguen postulaciones: los que ya postularon fueron tabulados con la pauta vigente en su momento.</div>
+    </div>
+
+    <div class="card" id="m-candidato">
+      <h3><span class="paso-num">3</span>Lo que vive el candidato</h3>
+      <ol>
+        <li>Abre el link y ve el cargo, la descripción y los chips de ubicación/jornada.</li>
+        <li><b>Sube su CV</b> (PDF, JPG o PNG, máx 8 MB). La IA lo lee en segundos y llena la ficha completa: datos personales, estudios por nivel, trabajos del más reciente al más antiguo, idiomas y habilidades. <b>Lo que la IA no encontró queda destacado en amarillo</b> para llenarlo a mano. Si el formato no se puede leer (ej: Word), la ficha se llena a mano igual — nunca se bloquea.</li>
+        <li>Responde las preguntas del proceso con sus botones/chips y acepta el guardado de sus datos (consentimiento explícito, normativa chilena).</li>
+        <li>Una barra de progreso lo acompaña; al enviar recibe el <b>correo de acuse</b> al tiro.</li>
+      </ol>
+      <p>Si vuelve a postular al mismo aviso con el mismo correo, su ficha se <b>actualiza</b> (no se duplica). El CV original queda guardado y se abre desde la ficha con un clic.</p>
+    </div>
+
+    <div class="card" id="m-evaluar">
+      <h3><span class="paso-num">4</span>Cómo se evalúa: las estrellas</h3>
+      <p>Al enviar la postulación, el sistema tabula solo — nadie calcula nada a mano:</p>
+      <ol>
+        <li>Cada respuesta que puntúa se convierte a un % según su tipo (tabla del paso 1).</li>
+        <li>Cada % se pondera por la importancia (×3 / ×2 / ×1) y se promedia.</li>
+        <li>El promedio se convierte en <b>estrellas de 0 a 5</b> (con medias): 100% = ★★★★★, 50% = ★★½, etc.</li>
+        <li>Si alguna <b>excluyente</b> quedó bajo 50% → <b>NO APTO</b> (sello rojo), aunque el resto sea perfecto. En la ficha se ve exactamente cuál falló.</li>
+      </ol>
+      <h4>Ejemplo real</h4>
+      <p>Aviso con: Presencialidad (Sí/No, excluyente) · Excel (Bajo/Medio/Alto, media) · Inglés (%, baja) · Título (alternativas, alta). Candidato responde: Sí · Medio · 25% · "Sin título":<br>
+      → (100×3 + 50×2 + 25×1 + 0×3) ÷ 9 = <b>47% = ★★½</b>, apto (la excluyente la cumplió). Si hubiera respondido "No" a presencialidad: <b>NO APTO</b> de inmediato.</p>
+      <p>En la bandeja de <b>Postulantes</b> puedes filtrar por estrellas (≥2, ≥3, ≥4), estado, estudios, marca del jefe y texto libre. La columna "Cumplim." es el promedio de las preguntas de porcentaje. En la ficha, la sección <b>Evaluación</b> muestra la barra de cada pregunta con su importancia.</p>
+      <div class="tip">💡 Las estrellas ordenan la fila, no reemplazan tu criterio: las respuestas de texto y el análisis IA completan el cuadro.</div>
+    </div>
+
+    <div class="card" id="m-ia">
+      <h3><span class="paso-num">5</span>Análisis IA del CV: perfil e inconsistencias</h3>
+      <p>En la ficha de cada postulante, sección <b>Análisis IA</b>, botón <b>Analizar con IA</b>. La IA toma el CV original + TODO lo que el candidato digitó y respondió, lo contrasta contra la descripción del cargo y entrega:</p>
+      <ul>
+        <li><b>Perfil:</b> trayectoria, seniority, foco y estabilidad laboral en 4-7 líneas.</li>
+        <li><b>Fortalezas</b> concretas (citando la evidencia) y <b>riesgos</b> para el cargo.</li>
+        <li><b>Ajuste al cargo:</b> nota 1-10 con justificación contra la descripción del aviso.</li>
+        <li><b>⚠ Posibles inconsistencias</b>, cada una con gravedad alta/media/baja: fechas que no cuadran o se traslapan, lagunas laborales largas sin explicar, títulos o instituciones sin respaldo, cargos que no calzan con la experiencia, y <b>diferencias entre el CV y lo que declaró en la ficha o respondió en las preguntas</b>. Si no hay, lo dice explícitamente.</li>
+        <li><b>Preguntas sugeridas para la entrevista</b>, hechas a la medida de ESE candidato — incluida una por cada inconsistencia, para resolverla cara a cara.</li>
+      </ul>
+      <div class="ojo">⚠ La IA analiza con la evidencia disponible, no acusa: una inconsistencia es algo <b>a aclarar en la entrevista</b>, no un veredicto. La decisión siempre es humana.</div>
+      <p>El análisis queda guardado en la ficha (con su fecha) y el resumen — nota de ajuste e inconsistencias — <b>viaja en el informe a la jefatura</b>. Puedes re-analizar cuando quieras (ej: si el candidato repostuló con CV nuevo). El uso y costo quedan registrados en el mantenedor de IA (funcionalidad <code>analisis_postulante</code>).</p>
+    </div>
+
+    <div class="card" id="m-jefe">
+      <h3><span class="paso-num">6</span>Derivar al jefe directo</h3>
+      <p>El jefe que pidió el cargo trabaja en su propia página: <b>Recursos Humanos → Revisión de Postulantes</b> (card "Jefatura"). Para que la vea necesita el permiso <code>rh_postulaciones_jefe</code> (se otorga en Usuarios → Perfiles y Permisos) y estar asignado como <b>jefe directo del aviso</b>.</p>
+      <ul>
+        <li>Ve SOLO los avisos donde figura como solicitante, en cards con estrellas, % de requisitos, resumen IA y ficha completa con CV.</li>
+        <li>Con <b>"Me interesa — que RRHH avance"</b> marca al candidato (puede dejar un comentario). Eso hace dos cosas automáticas: el candidato pasa a <b>EN REVISIÓN</b> y se <b>solicitan los informes DealerNet</b> de su RUT (los productos activos del mantenedor DealerNet: deudas, antecedentes). El resultado aparece como chip en la bandeja: <span class="dn-chip dn-ok">ok</span> <span class="dn-chip dn-warn">observ.</span> <span class="dn-chip dn-grave">⚠ grave</span>.</li>
+        <li>En la bandeja de RRHH, la columna <b>Jefe</b> muestra ✓ con quién marcó. También puedes filtrar "✓ Marcados por el jefe".</li>
+      </ul>
+      <div class="tip">💡 RRHH también puede pedir o refrescar DealerNet a mano desde la ficha (botón en la sección DealerNet), por ejemplo si el candidato no tenía RUT al postular.</div>
+    </div>
+
+    <div class="card" id="m-citar">
+      <h3><span class="paso-num">7</span>Citar a entrevista</h3>
+      <ol>
+        <li>Abre la ficha del candidato → sección <b>Entrevistas</b>.</li>
+        <li>Elige con quién es (<b>RRHH</b> o <b>Jefe directo</b>), fecha, hora y lugar (o link de Meet/Zoom) → <b>Agendar y avisar</b>.</li>
+        <li>El candidato recibe al tiro el <b>correo de invitación</b> con día, hora y lugar, y la indicación de responder si el horario no le acomoda. Si la entrevista es con el jefe, el jefe va <b>en copia</b>.</li>
+        <li>El candidato pasa automáticamente al estado <b>ENTREVISTA</b>.</li>
+        <li>Después de la reunión, <b>Marcar realizada</b> y anota el resultado/conclusiones — ese texto viaja luego en el informe a la jefatura.</li>
+      </ol>
+      <p>Puedes agendar varias entrevistas al mismo candidato (primero RRHH, después jefe): cada una queda en la lista con su estado.</p>
+    </div>
+
+    <div class="card" id="m-informe">
+      <h3><span class="paso-num">8</span>Informe de entrevista y tests</h3>
+      <ul>
+        <li><b>Informe de entrevista RRHH:</b> cuadro de texto en la ficha (impresión general, fortalezas, riesgos, recomendación). Se guarda con su botón y es LA pieza central del informe a la jefatura.</li>
+        <li><b>Tests y anexos:</b> con <b>Subir test / anexo</b> cargas los informes de tests de RRHH Ecuador (u otros documentos: certificados, referencias). Quedan listados en la ficha, se abren con un clic y <b>van adjuntos</b> al correo de la jefatura. Máx 8 MB por archivo.</li>
+        <li>Cuando el candidato está listo para presentarlo, cámbialo a <b>PRESELECCIONADA</b> (selector de estado al pie de la ficha).</li>
+      </ul>
+    </div>
+
+    <div class="card" id="m-jefatura">
+      <h3><span class="paso-num">9</span>Enviar a Jefatura</h3>
+      <ol>
+        <li>En la bandeja de Postulantes, botón verde <b>Enviar a Jefatura</b>.</li>
+        <li>Elige el aviso: se listan sus candidatos vigentes. Vienen pre-marcados los PRESELECCIONADA/ENTREVISTA aptos; puedes ajustar los checks (máx 20).</li>
+        <li>Agrega un mensaje opcional ("mi recomendación es…") y envía.</li>
+      </ol>
+      <p>El <b>jefe directo del aviso</b> recibe UN correo con: la tabla comparada (estrellas, aptitud, pretensión de renta, semáforo DealerNet), el bloque de cada candidato (perfil, <b>análisis IA con su nota de ajuste e inconsistencias</b>, informe de entrevista RRHH y resultados de entrevistas realizadas) y <b>los tests adjuntos</b>. Los candidatos enviados pasan a <b>INFORME ENVIADO</b>.</p>
+      <div class="ojo">⚠ Si el aviso no tiene jefe directo asignado, el sistema no deja enviar — edítalo primero y elige al solicitante.</div>
+    </div>
+
+    <div class="card" id="m-etapas">
+      <h3><i class="bi bi-diagram-3"></i>Las etapas del proceso (estados)</h3>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Estado</th><th>Qué significa</th><th>Cómo se llega</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill p-NUEVA">NUEVA</span></td><td>Recién postulada, nadie la ha trabajado</td><td>Automático al postular</td></tr>
+          <tr><td><span class="pill p-ENREV">EN REVISION</span></td><td>Alguien la está mirando / el jefe la marcó</td><td>Manual, o automático cuando el jefe marca "me interesa"</td></tr>
+          <tr><td><span class="pill p-PRESEL">PRESELECCIONADA</span></td><td>Pasó el primer filtro de RRHH, candidata seria</td><td>Manual (selector de estado en la ficha)</td></tr>
+          <tr><td><span class="pill p-ENTREVISTA">ENTREVISTA</span></td><td>Tiene al menos una entrevista agendada</td><td>Automático al agendar la primera entrevista</td></tr>
+          <tr><td><span class="pill p-INFORME">INFORME ENVIADO</span></td><td>Presentada a la jefatura con el paquete completo</td><td>Automático al usar "Enviar a Jefatura"</td></tr>
+          <tr><td><span class="pill p-CONTRATADA">CONTRATADA</span></td><td>¡Se cerró! El proceso terminó con ella</td><td>Manual</td></tr>
+          <tr><td><span class="pill p-DESCARTADA">DESCARTADA</span></td><td>No sigue en ESTA búsqueda (queda en la base)</td><td>Botón Descartar — dispara el correo cortés una sola vez</td></tr>
+        </tbody>
+      </table></div>
+      <p>La ficha muestra la línea de etapas arriba, con la actual destacada. Los estados manuales se cambian con el selector al pie de la ficha + "Guardar estado".</p>
+    </div>
+
+    <div class="card" id="m-rechazo">
+      <h3><i class="bi bi-x-octagon" style="color:#b91c1c"></i>¿Qué pasa cuando se rechaza un candidato?</h3>
+      <ol>
+        <li>Botón <b>Descartar</b> en la ficha → confirmas y puedes anotar un <b>motivo interno</b> (queda en la ficha, <b>jamás</b> viaja al candidato).</li>
+        <li>El candidato recibe <b>una sola vez</b> el correo cortés: agradece su tiempo, explica que se avanzó con perfiles más ajustados a esta búsqueda ("no es un juicio sobre tu valía profesional") y le informa que <b>sus antecedentes quedan guardados para futuras oportunidades</b>. Si por error lo descartas dos veces, el correo NO se repite.</li>
+        <li>La ficha <b>no se borra nunca</b>: CV, evaluación, análisis IA y todo el historial quedan en la base permanente. En una búsqueda futura puedes encontrarlo con los filtros (comuna, habilidades, estudios) y contactarlo directamente — o él puede repostular con el nuevo link.</li>
+      </ol>
+      <div class="tip">💡 Descarta temprano y con el correo: un candidato bien rechazado habla bien de la empresa; uno fantasmeado, mal.</div>
+    </div>
+
+    <div class="card" id="m-contratar">
+      <h3><i class="bi bi-trophy" style="color:#15803d"></i>Contratar y cerrar la búsqueda</h3>
+      <ol>
+        <li>Al elegido: estado <b>CONTRATADA</b>.</li>
+        <li>A los demás finalistas: <b>Descartar</b> (correo cortés, quedan en la base).</li>
+        <li>Edita el aviso y desmarca <b>activo</b> para cerrar el link.</li>
+        <li>Sigue con el alta en <b>RRHH → Colaboradores</b> (ficha del trabajador, contrato y carpeta) — este portal termina donde empieza la ficha del empleado.</li>
+      </ol>
+    </div>
+
+    <div class="card" id="m-faq">
+      <h3><i class="bi bi-lightbulb"></i>Buenas prácticas y preguntas frecuentes</h3>
+      <ul>
+        <li><b>¿Sin IA funciona?</b> Sí: si la IA está apagada o el CV es ilegible, el candidato llena la ficha a mano y todo lo demás sigue igual (menos la lectura de CV y el análisis de perfil).</li>
+        <li><b>¿Puedo tener varios avisos a la vez?</b> Todos los que quieras, cada uno con su link, su jefe y sus preguntas.</li>
+        <li><b>¿El candidato ve sus estrellas?</b> No. Ni las estrellas, ni la pauta, ni la importancia de las preguntas — solo RRHH y el jefe.</li>
+        <li><b>¿Quién ve qué?</b> RRHH ve todo. El jefe directo solo SUS avisos, y no ve DealerNet en detalle ni administra estados — marca y comenta. El Administrador ve todo.</li>
+        <li><b>Un buen ritmo:</b> revisar NUEVAS día por medio · derivar al jefe apenas haya 3-5 decentes · analizar con IA a los que pasan el primer filtro · descartar temprano al resto.</li>
+        <li><b>Correos que salen solos:</b> acuse al postular · invitación a entrevista · informe a jefatura · descarte cortés. Todos quedan en el log de correos del sistema y respetan el Modo Desarrollo.</li>
+        <li><b>Costo IA:</b> la lectura de CV usa el modelo económico; el análisis de perfil usa un modelo mayor. Ambos se ven (uso y costo) en Mantenedores → IA.</li>
+      </ul>
+    </div>
+
+    </div>
   </div>
 </div>
 
@@ -230,8 +469,11 @@ const SUGERIDAS = [
 } catch (_) {} })();
 
 function verTab(t){
-  $('t-post').classList.toggle('on', t==='post'); $('t-avisos').classList.toggle('on', t==='avisos');
-  $('v-post').style.display = t==='post' ? '' : 'none'; $('v-avisos').style.display = t==='avisos' ? '' : 'none';
+  for (const k of ['post','avisos','manual']) {
+    $('t-' + k).classList.toggle('on', t === k);
+    $('v-' + k).style.display = t === k ? '' : 'none';
+  }
+  if (window.AF_TOPNAV_HOJA) AF_TOPNAV_HOJA(t === 'manual' ? 'Manual' : t === 'avisos' ? 'Avisos' : null);
 }
 
 /* ── Avisos ── */
@@ -428,6 +670,10 @@ async function abrirFicha(id){
       <button class="btn btn-line" style="padding:3px 12px;font-size:.74rem;margin-left:auto" onclick="pedirDN(${p.id}, this)">${p.dealernet ? 'Actualizar' : 'Pedir informes'}</button></div>
     <div id="dnBox">${dnFichaHTML(p)}</div>
 
+    <div class="sec"><i class="bi bi-robot"></i>Análisis IA del perfil
+      <button class="btn btn-line" id="btnAI" style="padding:3px 12px;font-size:.74rem;margin-left:auto" onclick="analizarIA(${p.id})">${p.analisis_ia ? 'Re-analizar' : '✨ Analizar con IA'}</button></div>
+    <div id="aiBox">${aiFichaHTML(p)}</div>
+
     ${p.resumen_ia ? `<div class="sec"><i class="bi bi-robot"></i>Resumen (IA)</div><p style="font-size:.88rem">${esc(p.resumen_ia)}</p>` : ''}
     <div class="sec"><i class="bi bi-mortarboard"></i>Estudios</div>
     ${(p.estudios||[]).map(e => `<div style="font-size:.87rem;padding:2px 0">🎓 <b>${esc(e.nivel||'')}</b> ${esc(e.titulo||'')} — ${esc(e.institucion||'')} ${esc(e.desde||'')}${e.hasta?'–'+esc(e.hasta):''} <span style="color:#94a3b8">${esc(e.estado||'')}</span></div>`).join('') || '—'}
@@ -484,6 +730,35 @@ function dnFichaHTML(p){
   }).join('');
   return `${items}${dn.error ? `<p style="font-size:.78rem;color:#b45309;margin:4px 0 0">${esc(dn.error)}</p>` : ''}
     <p style="font-size:.74rem;color:#94a3b8;margin:4px 0 0">Consultado: ${fmtF(p.dealernet_at)} · pasa el mouse por cada chip para ver la nota</p>`;
+}
+const GRAV_CLS = { alta: 'dn-grave', media: 'dn-warn', baja: 'dn-na' };
+function aiFichaHTML(p){
+  const a = p.analisis_ia;
+  if (!a) return '<p style="font-size:.84rem;color:#94a3b8">Sin analizar. El análisis contrasta el CV con lo declarado y detecta posibles inconsistencias.</p>';
+  return `
+    ${a.ajuste_cargo ? `<p style="font-size:.86rem;margin:4px 0"><b>Ajuste al cargo: ${esc(a.ajuste_cargo.nota)}/10</b> — ${esc(a.ajuste_cargo.comentario||'')}</p>` : ''}
+    ${a.perfil ? `<p style="font-size:.86rem;margin:4px 0">${esc(a.perfil)}</p>` : ''}
+    ${(a.fortalezas||[]).length ? `<p style="font-size:.83rem;margin:6px 0 2px"><b style="color:#15803d">Fortalezas:</b></p><ul style="margin:0 0 4px;padding-left:20px">${a.fortalezas.map(f=>`<li style="font-size:.83rem">${esc(f)}</li>`).join('')}</ul>` : ''}
+    ${(a.riesgos||[]).length ? `<p style="font-size:.83rem;margin:6px 0 2px"><b style="color:#b45309">Riesgos / observaciones:</b></p><ul style="margin:0 0 4px;padding-left:20px">${a.riesgos.map(f=>`<li style="font-size:.83rem">${esc(f)}</li>`).join('')}</ul>` : ''}
+    <p style="font-size:.83rem;margin:8px 0 2px"><b style="color:#b91c1c">⚠ Posibles inconsistencias:</b>${(a.inconsistencias||[]).length ? '' : ' <span style="color:#15803d;font-weight:700">ninguna detectada ✓</span>'}</p>
+    ${(a.inconsistencias||[]).map(x => `<div style="font-size:.83rem;padding:4px 0;border-bottom:1px dashed #fee2e2"><span class="dn-chip ${GRAV_CLS[x.gravedad]||'dn-na'}">${esc(x.gravedad)}</span> <b>${esc(x.tema)}</b> — ${esc(x.detalle)}</div>`).join('')}
+    ${(a.preguntas_entrevista||[]).length ? `<p style="font-size:.83rem;margin:8px 0 2px"><b style="color:#0141A2">Preguntas sugeridas para la entrevista:</b></p><ol style="margin:0;padding-left:20px">${a.preguntas_entrevista.map(q=>`<li style="font-size:.83rem">${esc(q)}</li>`).join('')}</ol>` : ''}
+    <p style="font-size:.72rem;color:#94a3b8;margin:6px 0 0">Analizado: ${fmtF(p.analisis_ia_at)} · el análisis orienta, la decisión es humana</p>`;
+}
+async function analizarIA(id){
+  const btn = $('btnAI');
+  btn.disabled = true; btn.textContent = 'Analizando…';
+  $('aiBox').innerHTML = '<p style="font-size:.84rem;color:#0141A2"><i class="bi bi-stars"></i> La IA está leyendo el CV y contrastándolo con la ficha — unos segundos…</p>';
+  try {
+    const j = await (await fetch('/api/postulaciones/postulantes/' + id + '/analisis-ia', { method:'POST', headers: H })).json();
+    if (!j.success) throw new Error(j.error || 'Error');
+    toast('Análisis IA listo');
+    abrirFicha(id);
+  } catch (e) {
+    toast(e.message);
+    btn.disabled = false; btn.textContent = 'Analizar con IA';
+    $('aiBox').innerHTML = '<p style="font-size:.84rem;color:#b91c1c">' + esc(e.message) + '</p>';
+  }
 }
 async function pedirDN(id, btn){
   btn.disabled = true; btn.textContent = 'Consultando…';
