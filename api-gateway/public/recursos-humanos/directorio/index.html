@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Directorio — AutoFácil</title>
-  <!-- v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
+  <!-- v2.9 — Clasico: cargos staff (Auditor, Consultora) cuelgan del tronco entre el GG y las jefaturas. v2.8 — Clasico: TODO lo que cuelga de una jefatura baja en escalera (cajas blancas), supervisores incluidos con su equipo indentado. v2.7 — vista Clasico (modelo PowerPoint: equipos en columna bajo cada jefe) + botones Copiar y Descargar como imagen. v2.6 — organigrama en 4 vistas: Escalera / Arbol hacia abajo / Hacia el lado / Por equipos (eleccion recordada). v2.5 — navbar migrada al componente topnav -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -71,6 +71,14 @@
     .tree.clasico .org-row { flex-direction:column; text-align:center; gap:4px; min-width:150px; max-width:190px; padding:9px 12px; border:1.5px solid #2563eb; background:#eff6ff; }
     .tree.clasico ul.vstack .org-row { flex-direction:row; text-align:left; background:#fff; border-color:#bfdbfe; min-width:180px; padding:6px 11px; }
     .tree.clasico .oa { width:30px; height:30px; font-size:.8rem; }
+    /* Banda STAFF: cuelga del tronco entre el GG y la fila de jefaturas,
+       desplazada a la izquierda con su tirante horizontal al tronco. */
+    .staff-band { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 0 0; }
+    .staff-band::before { content:''; position:absolute; left:50%; top:0; bottom:-24px; width:2px; background:#dbe3ec; transform:translateX(-50%); }
+    .staff-item { position:relative; transform:translateX(calc(-50% - 30px)); }
+    .staff-item::after { content:''; position:absolute; left:100%; top:50%; width:32px; height:2px; background:#dbe3ec; }
+    /* con banda staff, el conector del <ul> de jefaturas lo dibuja la banda */
+    .tree.clasico li > .staff-band + ul::before { display:none; }
 
     /* ── Vista HORIZONTAL (hacia el lado): raíz a la izquierda ── */
     .horiz-scroll { overflow-x:auto; padding:6px 4px 16px; }
@@ -254,6 +262,18 @@ function clasicoHTML(id, hijosDe, depth){
      COLUMNA (escalera, cajas blancas), incluidos los supervisores con equipo
      propio, cuyo equipo se indenta un nivel más adentro de la misma columna. */
   const ul = depth >= 1 ? 'vstack' : '';
+  /* Cargos STAFF (reportan al GG pero sin dependientes — Auditor, Consultora):
+     no van en la fila de jefaturas sino colgando del TRONCO, entre el GG y la
+     fila, desplazados a un costado, como en el organigrama corporativo. */
+  if (depth === 0) {
+    const staff = hijos.filter(h => !(hijosDe[h.id_usuario]||[]).length);
+    const linea = hijos.filter(h =>  (hijosDe[h.id_usuario]||[]).length);
+    if (staff.length && linea.length) {
+      return `<li>${nodoRow(MAPA[id],hijosDe)}
+        <div class="staff-band">${staff.map(s=>`<div class="staff-item">${nodoRow(s,hijosDe)}</div>`).join('')}</div>
+        <ul>${linea.map(h=>clasicoHTML(h.id_usuario,hijosDe,1)).join('')}</ul></li>`;
+    }
+  }
   return `<li>${nodoRow(MAPA[id],hijosDe)}<ul class="${ul}">${hijos.map(h=>clasicoHTML(h.id_usuario,hijosDe,depth+1)).join('')}</ul></li>`;
 }
 
