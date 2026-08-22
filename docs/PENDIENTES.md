@@ -63,6 +63,7 @@
 | 4.7 | **Conector Workera** | Fase 1 lista; faltan las env vars en Render y la Fase 2 (atrasos). |
 | 4.8 | **Conexiones Bancarias (Fintoc)** | En sandbox, **no contratado**. |
 | 4.9 | **Fusión de cards de Mantenedores** | 7 fusiones aprobadas en concepto, ninguna ejecutada (implican redirects + permisos + footer "Qué afecta"). Partir por **Avisos + Alertas + Alertas de Saldos → "Avisos y Alertas"**, la de mayor valor. |
+| 4.10 | **WhatsApp: usernames y BSUID** | Reservar el nombre de usuario del número de Facilito en WhatsApp Manager (WABA 1044493808034066, portafolio "Auto Facil Chile"; reserva abierta desde 06-2026, se activa cuando llegue a Chile). Y adaptar el bot ANTES de esa activación: los webhooks traerán `user_id`/`from_user_id` (BSUID, formato `CL.xxx…`) y a veces SIN número del cliente (solo viene si hubo interacción en 30 días o está en la libreta de contactos); desde 07-2026 la API acepta enviar al BSUID. Hoy Facilito identifica solo por número → guardar/tolerar BSUID en webhooks y envíos. Doc: developers.facebook.com → Business-scoped user IDs. (Detectado 21-08-2026.) |
 
 ## 5. Backlog aprobado, sin construir
 
