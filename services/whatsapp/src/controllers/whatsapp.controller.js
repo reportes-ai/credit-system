@@ -135,6 +135,11 @@ require('../../../../shared/migrate').enFila('whatsapp', async () => {
         INDEX idx_fono (telefono), INDEX idx_estado (estado)
       )`);
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS no_leidos INT NOT NULL DEFAULT 0'); } catch (e) { if (e.errno !== 1060) throw e; }
+    // Usernames de WhatsApp (2026): BSUID = identificador del cliente cuando NO
+    // comparte su teléfono. La conversación se reconoce por teléfono O por BSUID.
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS bsuid VARCHAR(140) NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS username VARCHAR(64) NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
+    try { await pool.query('CREATE INDEX idx_bsuid ON wsp_conversaciones (bsuid)'); } catch (e) { if (e.errno !== 1061) { /* duplicado ok */ } }
     // Última cotización del bot en la conversación (para el mail de oportunidad al ejecutivo)
     try { await pool.query('ALTER TABLE wsp_conversaciones ADD COLUMN IF NOT EXISTS cotizacion JSON NULL'); } catch (e) { if (e.errno !== 1060) throw e; }
     // Correlativo del repositorio de preaprobaciones (PREaammxxx) de esta conversación
@@ -290,10 +295,11 @@ async function responder(conv, texto, origen = 'BOT', autor = null) {
   if (!texto) return;
   let estado = 'SIMULADO', wamid = null;
   if (!conv.es_simulada) {
-    const r = await enviarWhatsApp({ telefono: conv.telefono, texto });
+    // Con teléfono manda al teléfono; sin él (cliente por username) responde al BSUID
+    const r = await enviarWhatsApp({ telefono: conv.telefono, bsuid: conv.bsuid, texto });
     estado = r.simulado ? 'SIMULADO' : (r.ok ? 'ENVIADO' : 'ERROR');
     wamid = r.wamid || null;
-    if (!r.ok) console.error(`[whatsapp] envío falló a ${conv.telefono}: ${r.error}`);
+    if (!r.ok) console.error(`[whatsapp] envío falló a ${conv.telefono || conv.bsuid}: ${r.error}`);
   }
   await guardarMensaje(conv.id, { direccion: 'OUT', origen, mensaje: texto, autor_id: autor?.id_usuario || null, autor_nombre: autor ? nombreDe(autor) : null, estado_envio: estado, wamid });
   return estado;
@@ -558,7 +564,7 @@ async function enviarOportunidad(conv, texto) {
   const html = `
     <h2 style="color:#012d70;margin:0 0 6px">🚗 ¡Tienes una nueva oportunidad de negocio!</h2>
     <p>Hola ${nombreEje.split(' ')[0] || 'ejecutivo'}, te estamos asignando una <b>oportunidad real</b>: un cliente cotizó su crédito automotriz por WhatsApp con Facilito y quedó esperando que lo contacte un Ejecutivo Comercial. ¡No parte de cero — ya tienes todo el detalle! 💪</p>
-    <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Teléfono:</b> +${conv.telefono}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}${conv.preaprob_codigo ? ` · <b>N° Preaprobación:</b> ${conv.preaprob_codigo}` : ''}</p>
+    <p style="margin:4px 0"><b>Cliente:</b> ${conv.nombre || 'Sin identificar'} · <b>Contacto:</b> ${conv.telefono ? '+' + conv.telefono : (conv.username ? '@' + conv.username : 'por WhatsApp (username, sin teléfono)')}${conv.rut_cliente ? ` · <b>RUT:</b> ${conv.rut_cliente}` : ''}${conv.preaprob_codigo ? ` · <b>N° Preaprobación:</b> ${conv.preaprob_codigo}` : ''}</p>
     ${detalle}
     ${conv.rut_cliente ? `<p>📄 Reporte Crediticio Automático de Business Suite disponible en <a href="https://afbs.autofacilchile.cl/ia/informe-dealernet/">Informes IA DealerNet</a> (RUT ${conv.rut_cliente}).</p>` : ''}
     <p>💬 Continúa la conversación desde la <a href="https://afbs.autofacilchile.cl/whatsapp/?conv=${conv.id}">bandeja de WhatsApp</a> — el cliente sigue en el mismo chat.</p>
@@ -799,15 +805,20 @@ Si la respuesta del dealer aún no aclara el desenlace, sigue el flujo con UNA p
 }
 
 /* ── MOTOR del bot: procesa un mensaje entrante ────────────────────────────── */
-async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = false }) {
-  const fono = normalizarFono(telefono) || String(telefono);
+async function procesarEntrante({ telefono, bsuid = null, username = null, nombre = null, texto, esSimulada = false }) {
+  // Con usernames activos el cliente puede llegar SIN teléfono: fono queda null
+  // y la conversación vive (y responde) por su BSUID.
+  const fono = telefono ? (normalizarFono(telefono) || String(telefono)) : null;
+  if (!fono && !bsuid) { console.error('[whatsapp] entrante sin teléfono ni BSUID — descartado'); return { conv: null, accion: 'DESCARTADO' }; }
 
-  // Conversación abierta más reciente para este número, o crear una nueva
-  let [[conv]] = await pool.query("SELECT * FROM wsp_conversaciones WHERE telefono=? AND estado!='CERRADA' AND es_simulada=? ORDER BY id DESC LIMIT 1", [fono, esSimulada ? 1 : 0]);
+  // Conversación abierta más reciente para este número o BSUID, o crear una nueva
+  let conv = null;
+  if (fono) [[conv]] = await pool.query("SELECT * FROM wsp_conversaciones WHERE telefono=? AND estado!='CERRADA' AND es_simulada=? ORDER BY id DESC LIMIT 1", [fono, esSimulada ? 1 : 0]);
+  if (!conv && bsuid) [[conv]] = await pool.query("SELECT * FROM wsp_conversaciones WHERE bsuid=? AND estado!='CERRADA' AND es_simulada=? ORDER BY id DESC LIMIT 1", [bsuid, esSimulada ? 1 : 0]);
   if (!conv) {
-    // Identificar cliente por teléfono (fuente única: clientes)
+    // Identificar cliente por teléfono (fuente única: clientes) — sin teléfono no hay match
     let rut = null, nom = nombre;
-    try {
+    if (fono) try {
       const [[cli]] = await pool.query(
         `SELECT rut, nombre_completo FROM clientes
           WHERE REPLACE(REPLACE(REPLACE(COALESCE(telefono_movil,''),' ',''),'+',''),'-','') LIKE CONCAT('%', ?)
@@ -815,11 +826,18 @@ async function procesarEntrante({ telefono, nombre = null, texto, esSimulada = f
         [fono.slice(-8), fono.slice(-8)]);
       if (cli) { rut = cli.rut; nom = cli.nombre_completo || nom; }
     } catch (_) {}
-    const [r] = await pool.query('INSERT INTO wsp_conversaciones (telefono, nombre, rut_cliente, es_simulada) VALUES (?,?,?,?)', [fono, nom, rut, esSimulada ? 1 : 0]);
+    if (!nom && username) nom = '@' + username;   // algo legible en la bandeja
+    const [r] = await pool.query('INSERT INTO wsp_conversaciones (telefono, nombre, rut_cliente, es_simulada, bsuid, username) VALUES (?,?,?,?,?,?)',
+      [fono || '', nom, rut, esSimulada ? 1 : 0, bsuid, username]);
     [[conv]] = await pool.query('SELECT * FROM wsp_conversaciones WHERE id=?', [r.insertId]);
     conv._esNueva = true;
   }
   if (nombre && !conv.nombre) await pool.query('UPDATE wsp_conversaciones SET nombre=? WHERE id=?', [nombre, conv.id]);
+  // Aprender el dato que falte: BSUID/username en convs viejas por teléfono, y
+  // el teléfono cuando un cliente-por-username lo comparte (ventana 30 días).
+  if (bsuid && !conv.bsuid) { await pool.query('UPDATE wsp_conversaciones SET bsuid=?, username=COALESCE(?, username) WHERE id=?', [bsuid, username, conv.id]); conv.bsuid = bsuid; }
+  if (username && !conv.username) await pool.query('UPDATE wsp_conversaciones SET username=? WHERE id=?', [username, conv.id]);
+  if (fono && !conv.telefono) { await pool.query('UPDATE wsp_conversaciones SET telefono=? WHERE id=?', [fono, conv.id]); conv.telefono = fono; }
 
   await guardarMensaje(conv.id, { direccion: 'IN', origen: 'CLIENTE', mensaje: texto });
 
@@ -945,10 +963,26 @@ exports.webhookReceive = async (req, res) => {
     for (const entry of req.body?.entry || []) {
       for (const ch of entry.changes || []) {
         const v = ch.value || {};
-        const contactos = {}; (v.contacts || []).forEach(c => { contactos[c.wa_id] = c.profile?.name; });
+        // contacts trae wa_id (teléfono) y, con usernames activos, user_id (BSUID)
+        // y profile.username. Un cliente que escribe por su nombre de usuario
+        // puede llegar SIN teléfono (solo viene si interactuó en los últimos 30
+        // días o está en la libreta de contactos) — el BSUID es el respaldo.
+        const contactos = {};
+        (v.contacts || []).forEach(c => {
+          const dato = { nombre: c.profile?.name || null, username: c.profile?.username || null, bsuid: c.user_id || null, wa_id: c.wa_id || null };
+          if (c.wa_id)   contactos[c.wa_id] = dato;
+          if (c.user_id) contactos[c.user_id] = dato;
+        });
         for (const m of v.messages || []) {
           if (m.type !== 'text') continue; // fase 1: solo texto
-          await procesarEntrante({ telefono: m.from, nombre: contactos[m.from] || null, texto: m.text?.body || '' });
+          const c = contactos[m.from] || contactos[m.from_user_id] || {};
+          await procesarEntrante({
+            telefono: m.from || c.wa_id || null,
+            bsuid: m.from_user_id || c.bsuid || null,
+            username: c.username || null,
+            nombre: c.nombre || null,
+            texto: m.text?.body || '',
+          });
         }
         // Estados de entrega (sent/delivered/read/failed) de mensajes salientes —
         // hoy solo actualiza las Automatizaciones de Cobranza (wamid guardado al enviar).
@@ -1079,7 +1113,7 @@ exports.conversaciones = async (req, res) => {
     if (estado) { where.push('c.estado=?'); params.push(estado); }
     if (area)   { where.push('c.area=?');   params.push(area); }
     if (mias === '1') { where.push('c.asignada_a=?'); params.push(req.user.id_usuario); }
-    if (q)      { where.push('(c.telefono LIKE ? OR c.nombre LIKE ? OR c.rut_cliente LIKE ?)'); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+    if (q)      { where.push('(c.telefono LIKE ? OR c.nombre LIKE ? OR c.rut_cliente LIKE ? OR c.username LIKE ?)'); params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`); }
     const [rows] = await pool.query(
       `SELECT c.*, (SELECT mensaje FROM wsp_mensajes m WHERE m.id_conversacion=c.id ORDER BY m.id DESC LIMIT 1) ultimo_msg,
               (SELECT COUNT(*) FROM wsp_mensajes m WHERE m.id_conversacion=c.id) n_msgs,

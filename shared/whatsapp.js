@@ -23,18 +23,28 @@ function normalizarFono(t) {
   return d.length >= 11 ? d : null;              // otro país, tal cual
 }
 
+// BSUID (identificador de usuario específico del negocio, usernames 2026):
+// código de país + punto + hasta 128 alfanuméricos (CL.13491…); los BSUID
+// principales llevan ENT entre medio (US.ENT.11815…). Va COMPLETO en la
+// solicitud — recortarlo o cambiarle el prefijo hace fallar el envío.
+const esBSUID = v => /^[A-Z]{2}\.(ENT\.)?[A-Za-z0-9]{1,128}$/.test(String(v || ''));
+
 /**
  * Envía un mensaje de WhatsApp.
  * @param {object} p
- * @param {string} p.telefono  destino (cualquier formato chileno)
+ * @param {string} [p.telefono]  destino (cualquier formato chileno)
+ * @param {string} [p.bsuid]     destino alternativo cuando NO se conoce el teléfono
+ *                               (clientes con nombre de usuario). Si vienen ambos,
+ *                               manda el teléfono; el BSUID es el respaldo.
  * @param {string} [p.texto]   mensaje libre (solo válido dentro de ventana 24h)
  * @param {string} [p.plantilla] nombre de plantilla HSM aprobada (abre conversación)
  * @param {string[]} [p.variables] variables {{1}},{{2}}… de la plantilla
  * @returns {Promise<{ok:boolean, simulado:boolean, telefono:string|null, wamid?:string, error?:string}>}
  */
-async function enviarWhatsApp({ telefono, texto, plantilla, variables = [] } = {}) {
+async function enviarWhatsApp({ telefono, bsuid, texto, plantilla, variables = [] } = {}) {
   let fono = normalizarFono(telefono);
-  if (!fono) return { ok: false, simulado: false, telefono: null, error: 'Teléfono inválido: ' + telefono };
+  const porBsuid = !fono && esBSUID(bsuid);
+  if (!fono && !porBsuid) return { ok: false, simulado: false, telefono: null, error: 'Destino inválido (ni teléfono ni BSUID): ' + (telefono || bsuid) };
 
   // Modo Desarrollo: nunca a números reales — redirigir al de prueba o simular
   try {
@@ -53,11 +63,19 @@ async function enviarWhatsApp({ telefono, texto, plantilla, variables = [] } = {
   const token = process.env.WSP_TOKEN, phoneId = process.env.WSP_PHONE_ID;
   if (!token || !phoneId) return { ok: true, simulado: true, telefono: fono };
 
+  // Con teléfono el destino va en `to` (como siempre); con BSUID la Cloud API
+  // exige recipient_type + recipient (doc Business-scoped user IDs, jul-2026).
+  // Se recalcula AQUÍ: si el Modo Desarrollo redirigió al fono de prueba, manda
+  // ese teléfono y nunca el BSUID real.
+  const usarBsuid = !fono && esBSUID(bsuid);
+  const destino = usarBsuid
+    ? { recipient_type: 'individual', recipient: String(bsuid) }
+    : { to: fono };
   const body = plantilla
-    ? { messaging_product: 'whatsapp', to: fono, type: 'template',
+    ? { messaging_product: 'whatsapp', ...destino, type: 'template',
         template: { name: plantilla, language: { code: 'es' },
           components: variables.length ? [{ type: 'body', parameters: variables.map(v => ({ type: 'text', text: String(v) })) }] : [] } }
-    : { messaging_product: 'whatsapp', to: fono, type: 'text', text: { body: String(texto || '') } };
+    : { messaging_product: 'whatsapp', ...destino, type: 'text', text: { body: String(texto || '') } };
 
   try {
     const r = await fetch(`https://graph.facebook.com/${API_VER}/${phoneId}/messages`, {
@@ -73,4 +91,4 @@ async function enviarWhatsApp({ telefono, texto, plantilla, variables = [] } = {
   }
 }
 
-module.exports = { enviarWhatsApp, normalizarFono };
+module.exports = { enviarWhatsApp, normalizarFono, esBSUID };

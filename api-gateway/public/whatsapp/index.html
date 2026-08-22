@@ -6,7 +6,7 @@
   <link rel="apple-touch-icon" href="/whatsapp/apple-touch-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>WhatsApp — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 — clientes por username/BSUID: bandeja muestra @username cuando no hay telefono -->
   <!-- PWA DEDICADA: app propia "AF WhatsApp" (manifest y scope /whatsapp/, distinta del Business Suite) -->
   <link rel="manifest" href="/whatsapp/manifest.json">
   <meta name="theme-color" content="#075E54">
@@ -739,8 +739,8 @@ async function revisarPlantillaIA(){
     document.getElementById('chatHead').innerHTML = `
       <button class="btn-back" onclick="volverLista()" title="Volver"><i class="bi bi-arrow-left"></i></button>
       <div class="cavatar" style="background:${avColor(c.nombre||c.telefono)};width:32px;height:32px;flex:0 0 32px;font-size:.76rem">${avIni(c)}</div>
-      <b style="font-size:.9rem">${esc(c.nombre||c.telefono)}</b>
-      <span style="font-size:.74rem;color:#64748b">${esc(c.telefono)}${c.rut_cliente?' · '+esc(c.rut_cliente):''}</span>
+      <b style="font-size:.9rem">${esc(c.nombre||c.telefono||(c.username?'@'+c.username:''))}</b>
+      <span style="font-size:.74rem;color:#64748b">${esc(c.telefono||(c.username?'@'+c.username:'sin teléfono'))}${c.rut_cliente?' · '+esc(c.rut_cliente):''}</span>
       <span class="pill p-${esc(c.estado)}">${esc(c.estado)}</span>
       ${c.area?`<span style="font-size:.72rem;color:#64748b">Área: <b>${esc(c.area)}</b></span>`:''}
       <span style="margin-left:auto;display:flex;gap:6px">
