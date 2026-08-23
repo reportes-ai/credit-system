@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Contable — AutoFácil</title>
-  <!-- v1.0 — Dashboard de Contabilidad: pirámide del CFO (salud del proceso → obligaciones → resultado), excepciones arriba, todo desde tablas existentes -->
+  <!-- v1.1 — posicion financiera: caja y bancos, resultado mes/año, capital de trabajo, razon corriente, endeudamiento, cuadre del balance y top ingresos/gastos (motores balance+EERR); v1.0 — pirámide del CFO -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --ink:#0f172a; --mut:#64748b; --line:#e8edf3;
@@ -147,6 +147,84 @@ async function cargar(){
       </div>
     </div>`;
 
+  /* ── Heroes financieros (motores de Balance y EERR) ── */
+  const F = D.finanzas || {};
+  const caja = F.caja_bancos?.total || 0, rm = F.eerr?.mes?.resultado || 0, ra = F.eerr?.anio?.resultado || 0;
+  const kt = F.indices?.capital_trabajo || 0;
+  const heroesFin = `
+    <div class="heroes">
+      <div class="hero ${caja>0?'ok':'bad'}">
+        <div class="l">Caja y bancos · hoy</div>
+        <div class="v">$${fmt(caja)}</div>
+        <div class="d">saldo contable del disponible (cuentas 1101) · ${(F.caja_bancos?.cuentas||[]).length} cuentas</div>
+      </div>
+      <div class="hero ${rm>=0?'ok':'bad'}">
+        <div class="l">Resultado del mes (${nomMes(D.impuestos.mes)})</div>
+        <div class="v">${rm<0?'−':''}$${fmt(Math.abs(rm))}</div>
+        <div class="d">ingresos $${fmt(F.eerr?.mes?.ingresos||0)} − gastos $${fmt(F.eerr?.mes?.gastos||0)} · mes anterior: ${(F.eerr?.mes_anterior?.resultado||0)<0?'−':''}$${fmt(Math.abs(F.eerr?.mes_anterior?.resultado||0))}</div>
+      </div>
+      <div class="hero ${ra>=0?'ok':'bad'}">
+        <div class="l">Resultado acumulado ${D.impuestos.mes.slice(0,4)}</div>
+        <div class="v">${ra<0?'−':''}$${fmt(Math.abs(ra))}</div>
+        <div class="d">ingresos $${fmt(F.eerr?.anio?.ingresos||0)} − gastos $${fmt(F.eerr?.anio?.gastos||0)}</div>
+      </div>
+      <div class="hero ${kt>=0?'ok':'bad'}">
+        <div class="l">Capital de trabajo</div>
+        <div class="v">${kt<0?'−':''}$${fmt(Math.abs(kt))}</div>
+        <div class="d">activo circulante $${fmt(F.indices?.activo_circulante||0)} − pasivo circulante $${fmt(F.indices?.pasivo_circulante||0)}</div>
+      </div>
+    </div>`;
+
+  /* ── Caja y bancos por cuenta ── */
+  const maxCaja = Math.max(1, ...(F.caja_bancos?.cuentas||[]).map(c=>Math.abs(c.saldo)));
+  const cajaHTML = `
+    <div class="card">
+      <h3><i class="bi bi-cash-stack"></i>Caja y bancos por cuenta <a href="/contabilidad/balance/">Balance →</a></h3>
+      ${(F.caja_bancos?.cuentas||[]).length ? (F.caja_bancos.cuentas.map(c=>`
+        <div class="hbar" style="grid-template-columns:1fr 130px 130px">
+          <span title="${esc(c.cuenta)}">${esc(c.nombre||c.cuenta)}</span>
+          <div class="track"><div class="fill ${c.saldo>=0?'c-navy':'c-bad'}" style="width:${Math.round(Math.abs(c.saldo)/maxCaja*100)}%"></div></div>
+          <span class="val num" style="${c.saldo<0?'color:var(--bad)':''}">$${fmt(c.saldo)}</span>
+        </div>`).join('')) : '<div class="mini">Sin cuentas de disponible con saldo.</div>'}
+      <div class="mini" style="margin-top:8px">Saldo contable al día — el saldo real del banco se contrasta en Conciliación.</div>
+    </div>`;
+
+  /* ── Resultado e índices ── */
+  const ix = F.indices || {};
+  const maxRes = Math.max(1, F.eerr?.mes?.ingresos||0, F.eerr?.mes?.gastos||0);
+  const resHTML = `
+    <div class="card">
+      <h3><i class="bi bi-graph-up-arrow"></i>Resultado e índices <a href="/contabilidad/estados/">Estados Financieros →</a></h3>
+      <div class="hbar"><span>Ingresos</span><div class="track"><div class="fill c-ok" style="width:${Math.round((F.eerr?.mes?.ingresos||0)/maxRes*100)}%"></div></div><span class="val num">$${fmt(F.eerr?.mes?.ingresos||0)}</span></div>
+      <div class="hbar"><span>Gastos</span><div class="track"><div class="fill c-bad" style="width:${Math.round((F.eerr?.mes?.gastos||0)/maxRes*100)}%"></div></div><span class="val num">$${fmt(F.eerr?.mes?.gastos||0)}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;text-align:center">
+        <div><div class="mini" style="font-weight:800;text-transform:uppercase">Razón corriente</div>
+          <div class="num" style="font-size:1.25rem;color:${ix.razon_corriente==null?'var(--mut)':ix.razon_corriente>=1?'var(--ok)':'var(--bad)'}">${ix.razon_corriente==null?'—':String(ix.razon_corriente).replace('.',',')}</div>
+          <div class="mini">≥ 1 = cubre el corto plazo</div></div>
+        <div><div class="mini" style="font-weight:800;text-transform:uppercase">Endeudamiento</div>
+          <div class="num" style="font-size:1.25rem;color:${ix.endeudamiento==null?'var(--mut)':ix.endeudamiento<=2?'var(--ok)':'var(--warn)'}">${ix.endeudamiento==null?'—':String(ix.endeudamiento).replace('.',',')}</div>
+          <div class="mini">pasivo / patrimonio</div></div>
+        <div><div class="mini" style="font-weight:800;text-transform:uppercase">Balance cuadra</div>
+          <div style="font-size:1.25rem">${F.balance?.cuadre?'<span style="color:var(--ok)">✓</span>':'<span style="color:var(--bad)">✗</span>'}</div>
+          <div class="mini">A $${fmt(F.balance?.activo||0)} vs P+P+R</div></div>
+      </div>
+    </div>`;
+
+  /* ── Top del mes: dónde entra y dónde se va la plata ── */
+  const topG = F.eerr?.top_gastos_mes||[], topI = F.eerr?.top_ingresos_mes||[];
+  const maxTop = Math.max(1, ...(topG.concat(topI)).map(x=>x.monto));
+  const topHTML = `
+    <div class="card">
+      <h3><i class="bi bi-arrow-left-right"></i>El mes por cuenta: dónde entra y dónde se va</h3>
+      ${topI.length?`<div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;color:var(--ok)">Principales ingresos</div>`:''}
+      ${topI.map(x=>`<div class="hbar" style="grid-template-columns:1fr 130px 120px"><span title="${esc(x.cuenta)}">${esc(x.nombre||x.cuenta)}</span>
+        <div class="track"><div class="fill c-ok" style="width:${Math.round(x.monto/maxTop*100)}%"></div></div><span class="val num">$${fmt(x.monto)}</span></div>`).join('')}
+      ${topG.length?`<div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px;color:var(--bad)">Principales gastos</div>`:''}
+      ${topG.map(x=>`<div class="hbar" style="grid-template-columns:1fr 130px 120px"><span title="${esc(x.cuenta)}">${esc(x.nombre||x.cuenta)}</span>
+        <div class="track"><div class="fill c-bad" style="width:${Math.round(x.monto/maxTop*100)}%"></div></div><span class="val num">$${fmt(x.monto)}</span></div>`).join('')}
+      ${(!topI.length && !topG.length)?'<div class="mini">Aún sin movimientos de resultado este mes.</div>':''}
+    </div>`;
+
   /* ── Motor de asientos ── */
   const ordenEvt = ['CONTABILIZADO','SIN_REGLA','DESCUADRE','ERROR'];
   const maxEvt = Math.max(1, ...ordenEvt.map(e=>evt[e]||0));
@@ -242,9 +320,11 @@ async function cargar(){
     </div>`;
 
   cont.className='';
-  cont.innerHTML = heroes + `<div class="grid">${motorHTML}${ivaHTML}${rcvHTML}${odpHTML}${cierreHTML}${gastoHTML}</div>` + `
+  cont.innerHTML = heroes + heroesFin
+    + `<div class="grid">${cajaHTML}${resHTML}${topHTML}${motorHTML}${ivaHTML}${rcvHTML}${odpHTML}${cierreHTML}${gastoHTML}</div>` + `
     <div class="fuente"><b><i class="bi bi-diagram-3 me-1"></i>De dónde sale cada número</b>
       <ul>
+        <li><b>Caja, resultado, capital de trabajo e índices</b> → motores únicos de <a href="/contabilidad/balance/">Balance General</a> y <a href="/contabilidad/estados/">Estados Financieros</a> (cuentas de disponible 1101; circulante = activo 11xx / pasivo 21xx del plan). Son saldos CONTABLES: reflejan lo contabilizado, no lo que aún no genera asiento.</li>
         <li><b>Contabilización automática y excepciones</b> → log del motor único de centralización (ctb_eventos_log) y comprobantes por origen. Las excepciones se cablean en <a href="/contabilidad/reglas/">Reglas de Centralización</a>.</li>
         <li><b>Candado de meses</b> → <a href="/contabilidad/cierre-mes/">Cierre de Mes</a> (ctb_meses_cerrados) contra los períodos con actividad real.</li>
         <li><b>RCV vs auxiliar</b> → libro oficial del SII (SimpleAPI) contra el libro operativo de <a href="/contabilidad/libros-auxiliares/">Libros Auxiliares</a>.</li>

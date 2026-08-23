@@ -2981,7 +2981,49 @@ exports.dashboardCtb = async (req, res) => {
     const mesAnt = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString().slice(0, 7);
     const impuestos = { mes: mesActual, actual: await impuestosDe(mesActual), anterior_mes: mesAnt, anterior: await impuestosDe(mesAnt) };
 
+    /* 7 — Posición financiera e índices: REUSA los motores de balance y EERR
+       (mismo patrón interno() del Informe de Cierre — Máxima 1, un solo motor) */
+    const interno = (fn, query) => new Promise((resolve, reject) => {
+      const r2 = { status() { return this; }, json(j) { j.success ? resolve(j.data) : reject(new Error(j.error)); } };
+      fn({ query, params: {}, body: {}, user: req.user }, r2).catch(reject);
+    });
+    const hoyISO = new Date().toISOString().slice(0, 10);
+    const iniMes = mesActual + '-01', iniAnio = mesActual.slice(0, 4) + '-01-01';
+    const finMesAnt = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().slice(0, 10);
+    const [bal, eerrMes, eerrAnio, eerrMesAnt] = await Promise.all([
+      interno(exports.balanceGeneral, { hasta: hoyISO }),
+      interno(exports.estadoResultados, { desde: iniMes, hasta: hoyISO }),
+      interno(exports.estadoResultados, { desde: iniAnio, hasta: hoyISO }),
+      interno(exports.estadoResultados, { desde: mesAnt + '-01', hasta: finMesAnt }),
+    ]);
+    // Caja y bancos = cuentas de disponible (grupo 1101 del plan AVSOFT)
+    const disponibles = bal.activo.filter(a => String(a.cuenta).startsWith('1101'));
+    // Circulante por convención del plan: activo 11xxxx / pasivo 21xxxx
+    const suma = (arr, pref) => arr.filter(x => String(x.cuenta).startsWith(pref)).reduce((s, x) => s + Number(x.saldo), 0);
+    const acirc = suma(bal.activo, '11'), pcirc = suma(bal.pasivo, '21');
+    const patrimonioTotal = bal.tot.patrimonio + bal.resultado_ejercicio;
+    const finanzas = {
+      caja_bancos: { total: disponibles.reduce((s, x) => s + Number(x.saldo), 0),
+        cuentas: disponibles.sort((a, b) => b.saldo - a.saldo).slice(0, 8) },
+      balance: { activo: bal.tot.activo, pasivo: bal.tot.pasivo, patrimonio: bal.tot.patrimonio,
+        resultado_ejercicio: bal.resultado_ejercicio, cuadre: bal.cuadre, al: hoyISO },
+      indices: {
+        razon_corriente: pcirc ? +(acirc / pcirc).toFixed(2) : null,
+        capital_trabajo: acirc - pcirc,
+        endeudamiento: patrimonioTotal ? +(bal.tot.pasivo / patrimonioTotal).toFixed(2) : null,
+        activo_circulante: acirc, pasivo_circulante: pcirc,
+      },
+      eerr: {
+        mes: { ingresos: eerrMes.total_ingresos, gastos: eerrMes.total_gastos, resultado: eerrMes.resultado },
+        mes_anterior: { mes: mesAnt, resultado: eerrMesAnt.resultado },
+        anio: { ingresos: eerrAnio.total_ingresos, gastos: eerrAnio.total_gastos, resultado: eerrAnio.resultado },
+        top_gastos_mes: eerrMes.gastos.sort((a, b) => b.monto - a.monto).slice(0, 6),
+        top_ingresos_mes: eerrMes.ingresos.sort((a, b) => b.monto - a.monto).slice(0, 6),
+      },
+    };
+
     ok(res, {
+      finanzas,
       generado: new Date().toISOString(),
       motor: { eventos_30d: evt.map(e => ({ estado: e.estado, n: Number(e.n) })), excepciones,
                comprobantes_30d: { manuales: Number(cmp.manuales), automaticos: Number(cmp.automaticos), total: Number(cmp.total), anulados: Number(cmp.anulados) } },
