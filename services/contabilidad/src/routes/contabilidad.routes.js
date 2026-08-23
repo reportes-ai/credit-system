@@ -119,4 +119,7 @@ router.post('/rcv/importar',    verifyToken, requireFunc('ctb_libros_aux'), ctrl
 router.get('/bitacora-cierres',              verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados', 'ctb_libros'), ctrl.bitacoraCierres);
 router.post('/bitacora-cierres/:mes/analizar', verifyToken, requireFunc('ctb_bitacora', 'ctb_cierre_mes', 'ctb_estados'), ctrl.analizarCierre);
 
+// Dashboard de Contabilidad (pirámide del CFO: proceso → obligaciones → resultado)
+router.get('/dashboard', verifyToken, requireFunc('ctb_dashboard', 'ctb_directorio', 'ctb_cierre_mes'), ctrl.dashboardCtb);
+
 module.exports = router;

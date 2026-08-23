@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contabilidad — AutoFácil</title>
-  <!-- v1.0 — Fase 1: plan de cuentas, comprobantes, libros diario/mayor, balance de comprobación -->
+  <!-- v1.1 — card Dashboard Contable (ctb_dashboard); v1.0 — Fase 1: plan de cuentas, comprobantes, libros diario/mayor, balance de comprobación -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -30,6 +30,12 @@
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-calculator-fill"></i><div><h2>Contabilidad</h2><p>El corazón contable de AutoFácil: comprobantes con partida doble, libros y balances — conectado a toda la operación de la Suite.</p></div></div>
   <div class="cards-grid">
+    <a href="/contabilidad/dashboard/" class="module-card" id="cardDash" style="display:none">
+      <div class="card-icon"><i class="bi bi-speedometer2"></i></div>
+      <h5>Dashboard Contable</h5>
+      <p>La foto de salud del proceso: % de contabilización automática, excepciones del motor, meses sin candado, banco sin conciliar, IVA del mes, RCV vs auxiliar y órdenes de pago vivas.</p>
+      <span class="btn-acceder"><i class="bi bi-arrow-right-circle me-1"></i>Acceder</span>
+    </a>
     <a href="/contabilidad/comprobantes/" class="module-card" id="cardComp" style="display:none">
       <div class="card-icon"><i class="bi bi-journal-plus"></i></div>
       <h5>Comprobantes</h5>
@@ -142,6 +148,7 @@
     let funcs = new Set(); const esAdmin = yo?.perfil==='Administrador';
     try { const r = await fetch('/api/auth/mis-permisos?_='+Date.now(),{cache:'no-store',headers:{Authorization:'Bearer '+token}}); const j = await r.json(); (j.funcionalidades||[]).forEach(c=>funcs.add(c)); } catch(e){}
     const tiene = (...cs)=> esAdmin || cs.some(c=>funcs.has(c));
+    if (tiene('ctb_dashboard','ctb_directorio','ctb_cierre_mes')) document.getElementById('cardDash').style.display='';
     if (tiene('ctb_comprobantes')) document.getElementById('cardComp').style.display='';
     if (tiene('ctb_libros')) document.getElementById('cardLib').style.display='';
     if (tiene('ctb_libros_aux','ctb_libros')) document.getElementById('cardLibAux').style.display='';

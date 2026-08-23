@@ -2894,3 +2894,103 @@ exports.rcvImportar = async (req, res) => {
     ok(res, { ingresados: okDocs.length, total: okDocs.reduce((s, d) => s + d.total, 0), errores, docs: okDocs });
   } catch (e) { fail(res, e.message); }
 };
+
+/* ════════════════════════════════════════════════════════════════
+   DASHBOARD DE CONTABILIDAD (/contabilidad/dashboard/) — v216.0
+   La pirámide del CFO: salud del proceso → caja/obligaciones → resultado.
+   Todo sale de tablas que YA existen (motor, candado, RCV, auxiliares,
+   correlativos ODP, conciliación) — cero digitación nueva (Máxima 2).
+   El dashboard no celebra lo que está bien: destaca lo que está mal
+   (excepciones del motor, meses sin cerrar, banco sin conciliar, ODP impagas).
+   ════════════════════════════════════════════════════════════════ */
+require('../../../../shared/migrate').enFila('ctb-dashboard', async () => {
+  try {
+    const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='ctb_dashboard'");
+    if (!ex) {
+      const [ins] = await pool.query(
+        "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Dashboard Contable','ctb_dashboard','/contabilidad/dashboard/','bi-speedometer2')");
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
+        SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
+    }
+  } catch (e) { console.error('[ctb-dashboard seed]', e.message); }
+});
+
+exports.dashboardCtb = async (req, res) => {
+  try {
+    const mesActual = new Date().toISOString().slice(0, 7);
+
+    /* 1 — Motor de asientos (30 días): automatización y excepciones */
+    const [evt] = await pool.query(
+      `SELECT estado, COUNT(*) n FROM ctb_eventos_log WHERE created_at >= NOW() - INTERVAL 30 DAY GROUP BY estado`);
+    const [excepciones] = await pool.query(
+      `SELECT evento, ref, estado, detalle, created_at FROM ctb_eventos_log
+        WHERE estado <> 'CONTABILIZADO' AND created_at >= NOW() - INTERVAL 30 DAY
+        ORDER BY id DESC LIMIT 12`);
+    const [[cmp]] = await pool.query(
+      `SELECT COALESCE(SUM(origen='MANUAL'),0) manuales, COALESCE(SUM(origen<>'MANUAL'),0) automaticos,
+              COUNT(*) total, COALESCE(SUM(estado='ANULADO'),0) anulados
+         FROM ctb_comprobantes WHERE fecha >= NOW() - INTERVAL 30 DAY`);
+
+    /* 2 — Cierre: qué meses tienen candado y cuántos con actividad siguen abiertos */
+    const [cerrados] = await pool.query('SELECT mes, cerrado_por, created_at FROM ctb_meses_cerrados ORDER BY mes DESC');
+    const [mesesAct] = await pool.query(`
+      SELECT mes FROM (
+        SELECT DISTINCT DATE_FORMAT(fecha,'%Y-%m') mes FROM ctb_comprobantes WHERE estado='CONTABILIZADO'
+        UNION SELECT DISTINCT mes FROM ctb_compras_aux) t
+      WHERE mes < ? ORDER BY mes`, [mesActual]);
+    const setCerr = new Set(cerrados.map(c => c.mes));
+    const abiertos = mesesAct.map(m => m.mes).filter(m => !setCerr.has(m));
+
+    /* 3 — RCV vs auxiliar (últimos 6 meses con datos en alguno de los dos) */
+    const [rcvM] = await pool.query(
+      `SELECT mes, COUNT(*) docs, COALESCE(SUM(iva_recuperable),0) iva FROM ctb_rcv_compras GROUP BY mes`);
+    const [auxM] = await pool.query(
+      `SELECT mes, COUNT(*) docs, COALESCE(SUM(iva),0) iva, COALESCE(SUM(total),0) total FROM ctb_compras_aux GROUP BY mes`);
+    const mapa = {};
+    rcvM.forEach(r => { (mapa[r.mes] = mapa[r.mes] || {}).rcv = { docs: Number(r.docs), iva: Number(r.iva) }; });
+    auxM.forEach(r => { (mapa[r.mes] = mapa[r.mes] || {}).aux = { docs: Number(r.docs), iva: Number(r.iva), total: Number(r.total) }; });
+    const rcvVsAux = Object.keys(mapa).sort().slice(-6).map(mes => ({ mes, ...mapa[mes] }));
+    const gastoMensual = auxM.map(r => ({ mes: r.mes, total: Number(r.total), docs: Number(r.docs) }))
+      .sort((a, b) => a.mes.localeCompare(b.mes)).slice(-6);
+
+    /* 4 — Conciliación bancaria (si el módulo tiene datos) */
+    let conciliacion = null;
+    try {
+      const [[c]] = await pool.query(`
+        SELECT COALESCE(SUM(COALESCE(conciliado,0)=0),0) pendientes,
+               COALESCE(SUM(COALESCE(conciliado,0)=1),0) conciliados,
+               MIN(CASE WHEN COALESCE(conciliado,0)=0 THEN fecha END) mas_antiguo
+          FROM banco_movimientos`);
+      if (Number(c.pendientes) + Number(c.conciliados) > 0) conciliacion = c;
+    } catch (_) {}
+
+    /* 5 — Cuentas por pagar: ODP vivas (emitidas, ni pagadas ni anuladas) por origen */
+    const [odp] = await pool.query(`
+      SELECT origen, COUNT(*) n, COALESCE(SUM(monto),0) monto,
+             DATEDIFF(NOW(), MIN(created_at)) dias_mas_antigua
+        FROM op_correlativos WHERE anulada=0 AND COALESCE(pagada,0)=0 GROUP BY origen`);
+
+    /* 6 — Impuestos del mes en curso (lo que va acumulando el F29) */
+    const impuestosDe = async (mes) => {
+      const [[cr]] = await pool.query('SELECT COALESCE(SUM(iva),0) v, COUNT(*) n FROM ctb_compras_aux WHERE mes=?', [mes]);
+      const [[db]] = await pool.query('SELECT COALESCE(SUM(iva),0) v, COUNT(*) n FROM ctb_ventas_aux WHERE mes=?', [mes]);
+      const [[ret]] = await pool.query('SELECT COALESCE(SUM(retencion),0) v, COUNT(*) n FROM ctb_honorarios_aux WHERE mes=?', [mes]);
+      return { credito: Number(cr.v), credito_docs: Number(cr.n), debito: Number(db.v), debito_docs: Number(db.n),
+               retenciones: Number(ret.v), retenciones_docs: Number(ret.n), neto: Number(db.v) - Number(cr.v) };
+    };
+    const mesAnt = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString().slice(0, 7);
+    const impuestos = { mes: mesActual, actual: await impuestosDe(mesActual), anterior_mes: mesAnt, anterior: await impuestosDe(mesAnt) };
+
+    ok(res, {
+      generado: new Date().toISOString(),
+      motor: { eventos_30d: evt.map(e => ({ estado: e.estado, n: Number(e.n) })), excepciones,
+               comprobantes_30d: { manuales: Number(cmp.manuales), automaticos: Number(cmp.automaticos), total: Number(cmp.total), anulados: Number(cmp.anulados) } },
+      cierre: { cerrados, abiertos, mes_actual: mesActual },
+      rcv_vs_aux: rcvVsAux,
+      gasto_mensual: gastoMensual,
+      conciliacion,
+      odp_impagas: odp.map(o => ({ origen: o.origen, n: Number(o.n), monto: Number(o.monto), dias_mas_antigua: Number(o.dias_mas_antigua || 0) })),
+      impuestos,
+    });
+  } catch (e) { console.error('[ctb dashboard]', e.message); fail(res, e.message); }
+};

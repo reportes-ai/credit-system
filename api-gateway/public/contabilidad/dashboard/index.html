@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Contable — AutoFácil</title>
+  <!-- v1.0 — Dashboard de Contabilidad: pirámide del CFO (salud del proceso → obligaciones → resultado), excepciones arriba, todo desde tablas existentes -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --ink:#0f172a; --mut:#64748b; --line:#e8edf3;
+            --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --bg:#f2f5f9; }
+    * { box-sizing:border-box; } body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; color:var(--ink); }
+    .wrap { max-width:1420px; margin:0 auto; padding:26px 34px 70px; }
+    .head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+    .head h1 { font-size:1.45rem; font-weight:800; letter-spacing:-.02em; margin:0; color:var(--navy-dark); }
+    .head .sub { color:var(--mut); font-size:.82rem; }
+    .head .act { margin-left:auto; display:flex; gap:8px; }
+    .btn { border:1.5px solid var(--line); background:#fff; border-radius:9px; padding:6px 14px; font-size:.8rem; font-weight:700; color:#334155; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn:hover { border-color:var(--navy); color:var(--navy); }
+    /* Hero KPIs */
+    .heroes { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin-bottom:16px; }
+    .hero { background:#fff; border-radius:14px; padding:16px 20px 14px; box-shadow:0 1px 3px rgba(15,23,42,.06); border-top:3px solid var(--line); }
+    .hero.ok { border-top-color:var(--ok); } .hero.warn { border-top-color:var(--warn); } .hero.bad { border-top-color:var(--bad); }
+    .hero .l { font-size:.68rem; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--mut); }
+    .hero .v { font-family:Consolas,monospace; font-weight:800; font-size:1.7rem; letter-spacing:-.02em; margin:2px 0 1px; }
+    .hero.ok .v { color:var(--ok); } .hero.warn .v { color:var(--warn); } .hero.bad .v { color:var(--bad); }
+    .hero .d { font-size:.75rem; color:var(--mut); }
+    /* Grid de cards */
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:14px; }
+    .card { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+    .card h3 { font-size:.78rem; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--navy-dark); margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .card h3 a { margin-left:auto; font-size:.72rem; font-weight:700; color:var(--navy); text-decoration:none; text-transform:none; letter-spacing:0; }
+    .card h3 a:hover { text-decoration:underline; }
+    .num { font-family:Consolas,monospace; font-weight:700; }
+    .mini { font-size:.72rem; color:var(--mut); }
+    /* Barras horizontales */
+    .hbar { display:grid; grid-template-columns:64px 1fr 130px; gap:10px; align-items:center; padding:4px 0; font-size:.78rem; }
+    .hbar .track { height:14px; background:#f1f5f9; border-radius:7px; overflow:hidden; display:flex; }
+    .hbar .fill { height:100%; border-radius:7px; min-width:2px; }
+    .hbar .val { text-align:right; }
+    /* Barras verticales (series mensuales) */
+    .vbars { display:flex; gap:14px; align-items:flex-end; height:120px; padding:6px 2px 0; }
+    .vb { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
+    .vb .cols { display:flex; gap:3px; align-items:flex-end; height:88px; width:100%; justify-content:center; }
+    .vb .col { width:16px; border-radius:4px 4px 0 0; min-height:2px; }
+    .vb .m { font-size:.66rem; font-weight:800; text-transform:uppercase; color:var(--mut); white-space:nowrap; }
+    .vb .t { font-size:.64rem; color:var(--mut); font-family:Consolas,monospace; white-space:nowrap; }
+    .c-navy { background:var(--navy); } .c-sky { background:#93c5fd; } .c-ok { background:#86efac; } .c-warn { background:#fcd34d; } .c-bad { background:#fca5a5; }
+    /* Chips y estados */
+    .chip { display:inline-block; border-radius:7px; padding:1px 8px; font-size:.66rem; font-weight:800; letter-spacing:.3px; }
+    .ch-ok { background:#dcfce7; color:var(--ok); } .ch-warn { background:#fef3c7; color:var(--warn); } .ch-bad { background:#fee2e2; color:var(--bad); } .ch-mut { background:#f1f5f9; color:var(--mut); }
+    .fila { display:flex; gap:10px; align-items:baseline; padding:7px 0; border-bottom:1px solid var(--line); font-size:.8rem; }
+    .fila:last-child { border-bottom:none; }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; color:var(--mut); padding:5px 8px; border-bottom:1.5px solid var(--line); }
+    td { padding:7px 8px; border-bottom:1px solid #f4f7fa; }
+    .text-right { text-align:right; }
+    /* Meses del cierre */
+    .meses { display:flex; gap:6px; flex-wrap:wrap; }
+    .mesc { border-radius:8px; padding:5px 10px; font-size:.7rem; font-weight:800; text-transform:uppercase; }
+    .mesc.cer { background:#dcfce7; color:var(--ok); } .mesc.abi { background:#fef3c7; color:var(--warn); }
+    .neto-box { text-align:center; padding:10px 0 4px; }
+    .neto-box .nv { font-family:Consolas,monospace; font-weight:800; font-size:1.55rem; }
+    .neto-box .nl { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); }
+    .fuente { margin-top:22px; background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.78rem; color:#334155; }
+    .fuente b { color:var(--navy-dark); }
+    .fuente ul { margin:6px 0 0; padding-left:20px; } .fuente li { margin:2px 0; }
+    .cargando { text-align:center; color:var(--mut); padding:70px 0; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Contabilidad', href:'/contabilidad/' }, { label:'Dashboard Contable', icon:'bi-speedometer2', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+
+<div class="wrap">
+  <div class="head">
+    <h1><i class="bi bi-speedometer2 me-2" style="color:var(--navy)"></i>Dashboard Contable</h1>
+    <span class="sub" id="stamp"></span>
+    <div class="act">
+      <a class="btn" href="/contabilidad/cierre-mes/"><i class="bi bi-calendar-check"></i>Cierre de Mes</a>
+      <a class="btn" href="/contabilidad/libros-auxiliares/"><i class="bi bi-journals"></i>Libros Auxiliares</a>
+      <button class="btn" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i>Actualizar</button>
+    </div>
+  </div>
+
+  <div id="cont" class="cargando"><i class="bi bi-hourglass-split me-1"></i>Levantando los números…</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+const MESES = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const nomMes = m => { const [y,mm]=String(m).split('-'); return MESES[Number(mm)]+'-'+String(y).slice(2); };
+const fdh = f => f ? new Date(f).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+
+const EVT_NOMBRE = { CONTABILIZADO:'Contabilizado', SIN_REGLA:'Sin regla', DESCUADRE:'Descuadre', ERROR:'Error' };
+const EVT_COLOR  = { CONTABILIZADO:'var(--ok)', SIN_REGLA:'var(--warn)', DESCUADRE:'var(--bad)', ERROR:'var(--bad)' };
+const ODP_NOMBRE = { GENERAL:'Proveedores', SALDO:'Saldo Precio', COMISION:'Comisión Dealer' };
+
+async function cargar(){
+  const cont = document.getElementById('cont');
+  cont.className='cargando'; cont.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Levantando los números…';
+  let D;
+  try {
+    const j = await (await fetch('/api/contabilidad/dashboard',{headers:H})).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    D = j.data;
+  } catch(e){ cont.innerHTML = '<span style="color:var(--bad)">No se pudo cargar: '+esc(e.message)+'</span>'; return; }
+  document.getElementById('stamp').textContent = 'al ' + new Date(D.generado).toLocaleString('es-CL');
+
+  /* ── Hero KPIs ── */
+  const evt = Object.fromEntries(D.motor.eventos_30d.map(e=>[e.estado,e.n]));
+  const evtTot = D.motor.eventos_30d.reduce((s,e)=>s+e.n,0);
+  const excep = evtTot - (evt.CONTABILIZADO||0);
+  const cmp = D.motor.comprobantes_30d;
+  const pctAuto = cmp.total ? Math.round(cmp.automaticos/cmp.total*100) : null;
+  const abiertos = D.cierre.abiertos;
+  const conc = D.conciliacion;
+  const concPend = conc ? Number(conc.pendientes) : null;
+  const heroes = `
+    <div class="heroes">
+      <div class="hero ${pctAuto==null?'':pctAuto>=80?'ok':pctAuto>=50?'warn':'bad'}">
+        <div class="l">Contabilización automática · 30 días</div>
+        <div class="v">${pctAuto==null?'—':pctAuto+'%'}</div>
+        <div class="d">${fmt(cmp.automaticos)} asientos del motor · ${fmt(cmp.manuales)} manuales${cmp.anulados?` · ${fmt(cmp.anulados)} anulados`:''}</div>
+      </div>
+      <div class="hero ${excep===0?'ok':excep<=5?'warn':'bad'}">
+        <div class="l">Excepciones del motor · 30 días</div>
+        <div class="v">${fmt(excep)}</div>
+        <div class="d">${excep===0?'todo lo que se movió, se contabilizó':'eventos sin regla, descuadrados o con error — la lista de abajo'}</div>
+      </div>
+      <div class="hero ${abiertos.length===0?'ok':abiertos.length<=2?'warn':'bad'}">
+        <div class="l">Meses sin cerrar</div>
+        <div class="v">${fmt(abiertos.length)}</div>
+        <div class="d">${abiertos.length?`desde ${nomMes(abiertos[0])} — nada impide digitar sobre períodos ya informados`:'todos los períodos con actividad tienen candado'}</div>
+      </div>
+      <div class="hero ${concPend==null?'':concPend===0?'ok':concPend<=20?'warn':'bad'}">
+        <div class="l">Banco sin conciliar</div>
+        <div class="v">${concPend==null?'—':fmt(concPend)}</div>
+        <div class="d">${conc?`${fmt(conc.conciliados)} conciliados${conc.mas_antiguo?` · el pendiente más antiguo: ${String(conc.mas_antiguo).slice(0,10)}`:''}`:'el módulo de conciliación aún no tiene movimientos cargados'}</div>
+      </div>
+    </div>`;
+
+  /* ── Motor de asientos ── */
+  const ordenEvt = ['CONTABILIZADO','SIN_REGLA','DESCUADRE','ERROR'];
+  const maxEvt = Math.max(1, ...ordenEvt.map(e=>evt[e]||0));
+  const motorHTML = `
+    <div class="card">
+      <h3><i class="bi bi-gear-wide-connected"></i>Motor de asientos · 30 días <a href="/contabilidad/reglas/">Reglas de Centralización →</a></h3>
+      ${ordenEvt.map(e=>`<div class="hbar"><span style="color:${EVT_COLOR[e]};font-weight:700">${EVT_NOMBRE[e]}</span>
+        <div class="track"><div class="fill" style="width:${Math.round((evt[e]||0)/maxEvt*100)}%;background:${EVT_COLOR[e]}"></div></div>
+        <span class="val num">${fmt(evt[e]||0)} eventos</span></div>`).join('')}
+      ${D.motor.excepciones.length ? `<div style="margin-top:12px">
+        <div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Últimas excepciones — lo que falta cablear</div>
+        ${D.motor.excepciones.map(x=>`<div class="fila">
+          <span class="chip ${x.estado==='SIN_REGLA'?'ch-warn':'ch-bad'}">${esc(x.estado)}</span>
+          <b>${esc(x.evento)}</b><span class="mini">${esc(x.ref||'')}</span>
+          <span class="mini" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(x.detalle||'')}">${esc(x.detalle||'')}</span>
+          <span class="mini">${fdh(x.created_at)}</span></div>`).join('')}</div>`
+      : '<div class="mini" style="margin-top:10px"><i class="bi bi-check-circle" style="color:var(--ok)"></i> Sin excepciones en 30 días: cada movimiento encontró su regla.</div>'}
+    </div>`;
+
+  /* ── IVA del mes ── */
+  const imp = D.impuestos.actual, impA = D.impuestos.anterior;
+  const maxIva = Math.max(1, imp.credito, imp.debito);
+  const netoPagar = imp.neto > 0;
+  const ivaHTML = `
+    <div class="card">
+      <h3><i class="bi bi-bank"></i>IVA del mes en curso (${nomMes(D.impuestos.mes)}) <a href="/contabilidad/f29/">Propuesta F29 →</a></h3>
+      <div class="hbar"><span>Débito</span><div class="track"><div class="fill c-navy" style="width:${Math.round(imp.debito/maxIva*100)}%"></div></div><span class="val num">$${fmt(imp.debito)}</span></div>
+      <div class="mini" style="margin:-2px 0 6px 74px">ventas · ${fmt(imp.debito_docs)} docs</div>
+      <div class="hbar"><span>Crédito</span><div class="track"><div class="fill c-sky" style="width:${Math.round(imp.credito/maxIva*100)}%"></div></div><span class="val num">$${fmt(imp.credito)}</span></div>
+      <div class="mini" style="margin:-2px 0 4px 74px">compras · ${fmt(imp.credito_docs)} docs</div>
+      <div class="neto-box">
+        <div class="nl">${netoPagar?'IVA a pagar (se acumula para el día 20)':'Remanente a favor'}</div>
+        <div class="nv" style="color:${netoPagar?'var(--warn)':'var(--ok)'}">$${fmt(Math.abs(imp.neto))}</div>
+        <div class="mini">mes anterior (${nomMes(D.impuestos.anterior_mes)}): ${impA.neto>0?'a pagar':'a favor'} $${fmt(Math.abs(impA.neto))}</div>
+      </div>
+      <div class="fila" style="border-top:1px solid var(--line);border-bottom:none;margin-top:4px">
+        <span>Retenciones de honorarios por enterar</span>
+        <span style="flex:1"></span><span class="num">$${fmt(imp.retenciones)}</span><span class="mini">${fmt(imp.retenciones_docs)} boletas</span>
+      </div>
+    </div>`;
+
+  /* ── RCV vs auxiliar ── */
+  const maxRcv = Math.max(1, ...D.rcv_vs_aux.map(x=>Math.max(x.rcv?.docs||0, x.aux?.docs||0)));
+  const rcvHTML = `
+    <div class="card">
+      <h3><i class="bi bi-cloud-check"></i>RCV del SII vs libro de compras <a href="/contabilidad/libros-auxiliares/">Libros Auxiliares →</a></h3>
+      <div class="vbars">${D.rcv_vs_aux.map(x=>{
+        const r=x.rcv?.docs||0, a=x.aux?.docs||0, dif=r-a;
+        return `<div class="vb" title="SII: ${fmt(r)} docs · auxiliar: ${fmt(a)} docs">
+          <div class="cols"><div class="col c-navy" style="height:${Math.round(r/maxRcv*100)}%"></div><div class="col c-sky" style="height:${Math.round(a/maxRcv*100)}%"></div></div>
+          <span class="m">${nomMes(x.mes)}</span>
+          <span class="t">${dif===0?'✓ cuadra':(dif>0?dif+' faltan':(-dif)+' de más')}</span></div>`;
+      }).join('')}</div>
+      <div class="mini" style="margin-top:8px"><span class="chip ch-mut" style="background:var(--navy);color:#fff">■</span> SII (oficial) &nbsp;<span class="chip ch-mut" style="background:#93c5fd;color:#1e3a8a">■</span> auxiliar (operativo) — "faltan" = documentos del SII aún sin traer al libro.</div>
+    </div>`;
+
+  /* ── ODP impagas ── */
+  const odpTot = D.odp_impagas.reduce((s,o)=>s+o.monto,0);
+  const odpHTML = `
+    <div class="card">
+      <h3><i class="bi bi-receipt-cutoff"></i>Órdenes de pago vivas (emitidas, sin pagar) <a href="/ordenes-pago/historial/">Historial ODP →</a></h3>
+      ${D.odp_impagas.length ? `<table>
+        <tr><th>Origen</th><th class="text-right">Órdenes</th><th class="text-right">Monto</th><th class="text-right">La más antigua</th></tr>
+        ${D.odp_impagas.map(o=>`<tr><td><b>${ODP_NOMBRE[o.origen]||esc(o.origen)}</b></td>
+          <td class="text-right num">${fmt(o.n)}</td><td class="text-right num">$${fmt(o.monto)}</td>
+          <td class="text-right"><span class="chip ${o.dias_mas_antigua>30?'ch-bad':o.dias_mas_antigua>7?'ch-warn':'ch-ok'}">${o.dias_mas_antigua} día${o.dias_mas_antigua===1?'':'s'}</span></td></tr>`).join('')}
+        <tr><td style="font-weight:800">Total comprometido</td><td></td><td class="text-right num" style="font-weight:800">$${fmt(odpTot)}</td><td></td></tr>
+      </table>` : '<div class="mini"><i class="bi bi-check-circle" style="color:var(--ok)"></i> No hay órdenes emitidas pendientes de pago.</div>'}
+    </div>`;
+
+  /* ── Cierre ── */
+  const cierreHTML = `
+    <div class="card">
+      <h3><i class="bi bi-calendar-check"></i>Candado de meses <a href="/contabilidad/cierre-mes/">Cierre de Mes →</a></h3>
+      ${(D.cierre.cerrados.length + abiertos.length) ? `<div class="meses">
+        ${abiertos.map(m=>`<span class="mesc abi" title="Abierto: todavía se puede digitar en este período">${nomMes(m)} ⚠</span>`).join('')}
+        ${D.cierre.cerrados.map(c=>`<span class="mesc cer" title="Cerrado por ${esc(c.cerrado_por||'—')}">${nomMes(c.mes)} 🔒</span>`).join('')}
+      </div>` : '<div class="mini">Aún no hay actividad contable registrada.</div>'}
+      ${abiertos.length ? `<div class="mini" style="margin-top:10px">⚠ ${abiertos.length} período${abiertos.length===1?'':'s'} con actividad y <b>sin candado</b>: cualquier digitación retroactiva los cambia sin aviso. El candado se pone en Cierre de Mes.</div>`
+        : '<div class="mini" style="margin-top:10px"><i class="bi bi-check-circle" style="color:var(--ok)"></i> Todos los períodos con actividad están protegidos.</div>'}
+    </div>`;
+
+  /* ── Gasto mensual ── */
+  const maxG = Math.max(1, ...D.gasto_mensual.map(x=>x.total));
+  const gastoHTML = `
+    <div class="card">
+      <h3><i class="bi bi-cart3"></i>Compras del período (auxiliar) <a href="/contabilidad/directorio/">Presentación Directorio →</a></h3>
+      <div class="vbars">${D.gasto_mensual.map(x=>`
+        <div class="vb" title="$${fmt(x.total)} · ${fmt(x.docs)} documentos">
+          <div class="cols"><div class="col c-navy" style="height:${Math.round(x.total/maxG*100)}%;width:26px"></div></div>
+          <span class="m">${nomMes(x.mes)}</span><span class="t">$${fmt(Math.round(x.total/1e6))}M</span></div>`).join('')}</div>
+      <div class="mini" style="margin-top:6px">Total documentado del período, IVA incluido — es el detalle de compras, no el saldo por pagar (ese vive en el Balance, cuentas 21xx).</div>
+    </div>`;
+
+  cont.className='';
+  cont.innerHTML = heroes + `<div class="grid">${motorHTML}${ivaHTML}${rcvHTML}${odpHTML}${cierreHTML}${gastoHTML}</div>` + `
+    <div class="fuente"><b><i class="bi bi-diagram-3 me-1"></i>De dónde sale cada número</b>
+      <ul>
+        <li><b>Contabilización automática y excepciones</b> → log del motor único de centralización (ctb_eventos_log) y comprobantes por origen. Las excepciones se cablean en <a href="/contabilidad/reglas/">Reglas de Centralización</a>.</li>
+        <li><b>Candado de meses</b> → <a href="/contabilidad/cierre-mes/">Cierre de Mes</a> (ctb_meses_cerrados) contra los períodos con actividad real.</li>
+        <li><b>RCV vs auxiliar</b> → libro oficial del SII (SimpleAPI) contra el libro operativo de <a href="/contabilidad/libros-auxiliares/">Libros Auxiliares</a>.</li>
+        <li><b>IVA y retenciones</b> → auxiliares de compras, ventas y honorarios del mes; el formulario completo está en la <a href="/contabilidad/f29/">Propuesta F29</a>.</li>
+        <li><b>Órdenes de pago vivas</b> → correlativo único de ODP (proveedores, saldo precio y comisión), ni pagadas ni anuladas — se gestionan en el <a href="/ordenes-pago/historial/">Historial</a>.</li>
+        <li><b>Banco sin conciliar</b> → movimientos bancarios del módulo de <a href="/tesoreria/conciliacion-bancaria.html">Conciliación</a>.</li>
+      </ul>
+    </div>`;
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>
