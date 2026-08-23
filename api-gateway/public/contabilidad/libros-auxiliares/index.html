@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -53,12 +53,22 @@
 <div class="main-content">
   <div class="page-banner"><i class="bi bi-journals"></i><div><h2>Libros Auxiliares</h2><p>Detalle documento a documento de los auxiliares importados desde AVSOFT: compras (facturas de proveedores con IVA) y honorarios (boletas con retención). Filtra, revisa totales por mes y exporta a Excel.</p></div></div>
 
-  <ul class="nav nav-tabs mb-3">
-    <li class="nav-item"><a class="nav-link active" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-cart3 me-1"></i>Compras</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" id="tabV" onclick="tab('V');return false"><i class="bi bi-receipt me-1"></i>Ventas</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-person-badge me-1"></i>Honorarios</a></li>
-    <li class="nav-item"><a class="nav-link" href="#" id="tabR" onclick="tab('R');return false"><i class="bi bi-people me-1"></i>Remuneraciones</a></li>
-  </ul>
+  <!-- La carga de datos vive a la derecha de las pestañas: la barra de filtros
+       queda en una sola fila y todo sube (pedido Pato 23-08). -->
+  <div class="d-flex align-items-center mb-3 flex-wrap gap-2" style="border-bottom:1px solid #dee2e6">
+    <ul class="nav nav-tabs flex-grow-1" style="border-bottom:none">
+      <li class="nav-item"><a class="nav-link active" href="#" id="tabC" onclick="tab('C');return false"><i class="bi bi-cart3 me-1"></i>Compras</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" id="tabV" onclick="tab('V');return false"><i class="bi bi-receipt me-1"></i>Ventas</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" id="tabH" onclick="tab('H');return false"><i class="bi bi-person-badge me-1"></i>Honorarios</a></li>
+      <li class="nav-item"><a class="nav-link" href="#" id="tabR" onclick="tab('R');return false"><i class="bi bi-people me-1"></i>Remuneraciones</a></li>
+    </ul>
+    <div class="d-flex gap-2 pb-1">
+      <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
+        <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
+      <button class="btn btn-sm btn-outline-primary" id="btnRcv" onclick="rcvSync()"><i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)</button>
+      <button class="btn btn-sm btn-primary" id="btnRcvImp" onclick="abrirRcvImportar()"><i class="bi bi-box-arrow-in-down me-1"></i>Traer del SII al auxiliar</button>
+    </div>
+  </div>
 
   <div class="d-flex gap-2 align-items-end mb-3 flex-wrap">
     <div><label class="form-label small fw-semibold mb-1">Desde (mes)</label><input type="month" id="fDesde" class="form-control form-control-sm"></div>
@@ -70,11 +80,6 @@
     <button class="btn btn-sm btn-primary" onclick="consultar()"><i class="bi bi-search me-1"></i>Consultar</button>
     <button class="btn btn-sm btn-outline-success" onclick="exportar()" id="btnXls" disabled><i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
     <button class="btn btn-sm btn-success" id="btnDig" onclick="abrirDigitar()"><i class="bi bi-pencil-square me-1"></i>Digitar documento</button>
-    <span class="flex-grow-1"></span>
-    <label class="btn btn-sm btn-outline-secondary mb-0" id="lblImp"><i class="bi bi-upload me-1"></i>Importar export AVSOFT
-      <input type="file" hidden accept=".csv,.txt" multiple onchange="importar(this)"></label>
-    <button class="btn btn-sm btn-outline-primary" id="btnRcv" onclick="rcvSync()"><i class="bi bi-cloud-arrow-down me-1"></i>Sincronizar SII (RCV)</button>
-    <button class="btn btn-sm btn-primary" id="btnRcvImp" onclick="abrirRcvImportar()"><i class="bi bi-box-arrow-in-down me-1"></i>Traer del SII al auxiliar</button>
   </div>
   <div id="rcvEstado" class="small text-muted mb-2" style="display:none"></div>
 
