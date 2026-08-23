@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -38,6 +38,10 @@
     tfoot td { font-weight:800; background:#f1f5f9; border-top:2px solid #cbd5e1; padding:8px 12px; font-size:.8rem; }
     .tipo-doc { display:block; color:#94a3b8; font-size:.68rem; line-height:1.15; white-space:nowrap; }
     .folio { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
+    /* Celdas de dos líneas: dato principal + secundario chico en gris */
+    .sub { display:block; color:#94a3b8; font-size:.68rem; line-height:1.2; }
+    .chip-ex { display:inline-block; background:#fef9c3; color:#854d0e; font-size:.62rem; font-weight:800; border-radius:6px; padding:0 5px; margin-left:4px; vertical-align:1px; }
+    .sin-cta { display:inline-block; background:#fee2e2; color:#991b1b; font-size:.68rem; font-weight:700; border-radius:6px; padding:1px 7px; }
   </style>
 </head>
 <body>
@@ -160,15 +164,24 @@ function render(){
     theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Total</th></tr>';
     tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.total, `Neto $${fmt(x.neto)} · IVA $${fmt(x.iva)}`)).join('')
       || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
-    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>Vencim.</th><th>RUT</th><th>Proveedor</th><th>Cta gasto</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td>
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>Proveedor</th><th>Cta gasto</th><th class="text-right">Neto / Exento</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>{
+      const vcto = d.fecha_vcto && String(d.fecha_vcto).slice(0,10) !== String(d.fecha_doc||'').slice(0,10)
+        ? `<span class="sub">vto ${String(d.fecha_vcto).slice(0,10)}</span>` : '';
+      const cta = (d.cuenta_gasto && d.cuenta_gasto !== '0') ? esc(d.cuenta_gasto) : '<span class="sin-cta" title="El export de AVSOFT vino sin cuenta contable asignada para este documento">sin cuenta</span>';
+      const base = Number(d.exento) > 0
+        ? (Number(d.neto) > 0 ? `${fmt(d.neto)}<span class="sub">+ ${fmt(d.exento)} exento</span>` : `${fmt(d.exento)}<span class="chip-ex">EXENTO</span>`)
+        : fmt(d.neto);
+      return `<tr><td>${nomMes(d.mes)}</td>
       <td><span class="tipo-doc">${esc(tipoDte(d.tipo_doc))}</span><span class="folio">${esc(d.num_doc||'')}</span></td>
-      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):'—'}</td>
-      <td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
-      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('compras',${d.id})"></i>`:''}</td></tr>`).join('')
-      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
-    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="7">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
-      <td class="text-right num">${fmt(sumD('neto'))}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}${vcto}</td>
+      <td>${esc(d.razon_social||'')}<span class="sub">${esc(d.rut||'')}</span></td>
+      <td>${cta}</td>
+      <td class="text-right num">${base}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('compras',${d.id})"></i>`:''}</td></tr>`;
+    }).join('')
+      || '<tr><td colspan="8" class="text-center text-muted py-3">Sin documentos</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="5">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
+      <td class="text-right num">${fmt(sumD('neto'))}${sumD('exento')?`<span class="sub">+ ${fmt(sumD('exento'))} exento</span>`:''}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
   } else if (MODO==='V'){
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Documentos</div></div>
@@ -178,14 +191,20 @@ function render(){
     theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Total</th></tr>';
     tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.total, `Neto $${fmt(x.neto)} · IVA $${fmt(x.iva)}`)).join('')
       || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
-    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>RUT</th><th>Cliente</th><th>Cta ingreso</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td>
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>Cliente</th><th>Cta ingreso</th><th class="text-right">Neto / Exento</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>{
+      const base = Number(d.exento) > 0
+        ? (Number(d.neto) > 0 ? `${fmt(d.neto)}<span class="sub">+ ${fmt(d.exento)} exento</span>` : `${fmt(d.exento)}<span class="chip-ex">EXENTO</span>`)
+        : fmt(d.neto);
+      return `<tr><td>${nomMes(d.mes)}</td>
       <td><span class="tipo-doc">${esc(tipoDte(d.tipo_doc))}</span><span class="folio">${esc(d.num_doc||'')}</span></td>
-      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}</td><td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_ingreso||'')}</td>
-      <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
-      || '<tr><td colspan="9" class="text-center text-muted py-3">Sin documentos</td></tr>';
-    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="6">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
-      <td class="text-right num">${fmt(sumD('neto'))}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}</td>
+      <td>${esc(d.razon_social||'')}<span class="sub">${esc(d.rut||'')}</span></td><td>${esc(d.cuenta_ingreso||'')}</td>
+      <td class="text-right num">${base}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`;
+    }).join('')
+      || '<tr><td colspan="8" class="text-center text-muted py-3">Sin documentos</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="5">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
+      <td class="text-right num">${fmt(sumD('neto'))}${sumD('exento')?`<span class="sub">+ ${fmt(sumD('exento'))} exento</span>`:''}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
   } else if (MODO==='R'){
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Liquidaciones</div></div>
@@ -212,13 +231,13 @@ function render(){
     theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Boletas</th><th class="text-right">Bruto</th></tr>';
     tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.bruto, `Retención $${fmt(x.retencion)} · Líquido $${fmt(x.liquido)}`)).join('')
       || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
-    theadDet.innerHTML = '<tr><th>Mes</th><th>Boleta</th><th>Emisión</th><th>RUT</th><th>Profesional</th><th>Glosa</th><th>Cta</th><th class="text-right">Bruto</th><th class="text-right">Ret.</th><th class="text-right">Líquido</th></tr>';
-    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.num_boleta||'')}</td>
-      <td>${d.fecha_emision?String(d.fecha_emision).slice(0,10):''}</td><td>${esc(d.rut||'')}</td>
-      <td>${esc(d.nombre||'')}</td><td>${esc(d.glosa||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Boleta</th><th>Emisión</th><th>Profesional</th><th>Glosa</th><th>Cta</th><th class="text-right">Bruto</th><th class="text-right">Ret.</th><th class="text-right">Líquido</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td class="folio">${esc(d.num_boleta||'')}</td>
+      <td>${d.fecha_emision?String(d.fecha_emision).slice(0,10):'—'}</td>
+      <td>${esc(d.nombre||'')}<span class="sub">${esc(d.rut||'')}</span></td><td>${esc(d.glosa||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
       <td class="text-right num">${fmt(d.bruto)}</td><td class="text-right num">${fmt(d.retencion)}</td><td class="text-right num">${fmt(d.liquido)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('honorarios',${d.id})"></i>`:''}</td></tr>`).join('')
-      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin boletas</td></tr>';
-    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="7">Suma de lo listado (${fmt(D.documentos.length)} boletas)</td>
+      || '<tr><td colspan="9" class="text-center text-muted py-3">Sin boletas</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="6">Suma de lo listado (${fmt(D.documentos.length)} boletas)</td>
       <td class="text-right num">${fmt(sumD('bruto'))}</td><td class="text-right num">${fmt(sumD('retencion'))}</td><td class="text-right num">${fmt(sumD('liquido'))}</td></tr>`;
   }
   notaTrunc.innerHTML = D.truncado ? '<i class="bi bi-exclamation-triangle me-1"></i>Se muestran los primeros 1.000 documentos — acota el rango o los filtros para ver el resto.' : '';
