@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.10 — etiquetas EXENTO y sin cuenta sobrias (contorno gris); v1.9 — KPIs en una línea (FACTURAS: 687), la mitad de alto; v1.8 — botones de carga (AVSOFT/RCV) a la derecha de las pestañas: la barra de filtros queda en una fila y todo sube; v1.7 — resumen mensual como chips horizontales y detalle a ancho completo; v1.6 — columnas fusionadas (proveedor+RUT, emision+vcto, neto+exento con chip EXENTO) y 'sin cuenta' destacado en rojo; v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -44,8 +44,9 @@
     .folio { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
     /* Celdas de dos líneas: dato principal + secundario chico en gris */
     .sub { display:block; color:#94a3b8; font-size:.68rem; line-height:1.2; }
-    .chip-ex { display:inline-block; background:#fef9c3; color:#854d0e; font-size:.62rem; font-weight:800; border-radius:6px; padding:0 5px; margin-left:4px; vertical-align:1px; }
-    .sin-cta { display:inline-block; background:#fee2e2; color:#991b1b; font-size:.68rem; font-weight:700; border-radius:6px; padding:1px 7px; }
+    /* Etiquetas sobrias: contorno gris, sin colores gritones (pedido Pato 23-08) */
+    .chip-ex { display:inline-block; border:1px solid #cbd5e1; color:#64748b; font-size:.6rem; font-weight:700; letter-spacing:.3px; border-radius:5px; padding:0 5px; margin-left:5px; vertical-align:1px; background:none; }
+    .sin-cta { display:inline-block; border:1px dashed #cbd5e1; color:#94a3b8; font-size:.68rem; font-weight:600; border-radius:5px; padding:1px 7px; font-style:italic; background:none; }
   </style>
 </head>
 <body>
