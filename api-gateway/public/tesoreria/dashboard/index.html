@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/img/favicon.png" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Tesorería — AutoFácil</title>
+  <!-- v1.0 — Dashboard de Tesorería: cola de pago, pagos y recaudación diaria, transitorias, brokerage y conciliación por banco -->
+  <link href="/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --navy:#0141A2; --navy-dark:#012d70; --ink:#0f172a; --mut:#64748b; --line:#e8edf3;
+            --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --bg:#f2f5f9; }
+    * { box-sizing:border-box; } body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; color:var(--ink); }
+    .wrap { max-width:1420px; margin:0 auto; padding:26px 34px 70px; }
+    .head { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+    .head h1 { font-size:1.45rem; font-weight:800; letter-spacing:-.02em; margin:0; color:var(--navy-dark); }
+    .head .sub { color:var(--mut); font-size:.82rem; }
+    .head .act { margin-left:auto; display:flex; gap:8px; }
+    .btn { border:1.5px solid var(--line); background:#fff; border-radius:9px; padding:6px 14px; font-size:.8rem; font-weight:700; color:#334155; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+    .btn:hover { border-color:var(--navy); color:var(--navy); }
+    .heroes { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin-bottom:16px; }
+    .hero { background:#fff; border-radius:14px; padding:16px 20px 14px; box-shadow:0 1px 3px rgba(15,23,42,.06); border-top:3px solid var(--line); }
+    .hero.ok { border-top-color:var(--ok); } .hero.warn { border-top-color:var(--warn); } .hero.bad { border-top-color:var(--bad); }
+    .hero .l { font-size:.68rem; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--mut); }
+    .hero .v { font-family:Consolas,monospace; font-weight:800; font-size:1.7rem; letter-spacing:-.02em; margin:2px 0 1px; }
+    .hero.ok .v { color:var(--ok); } .hero.warn .v { color:var(--warn); } .hero.bad .v { color:var(--bad); }
+    .hero .d { font-size:.75rem; color:var(--mut); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:14px; }
+    .card { background:#fff; border-radius:14px; padding:18px 20px; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+    .card h3 { font-size:.78rem; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:var(--navy-dark); margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+    .card h3 a { margin-left:auto; font-size:.72rem; font-weight:700; color:var(--navy); text-decoration:none; text-transform:none; letter-spacing:0; }
+    .card h3 a:hover { text-decoration:underline; }
+    .num { font-family:Consolas,monospace; font-weight:700; }
+    .mini { font-size:.72rem; color:var(--mut); }
+    .hbar { display:grid; grid-template-columns:1fr 130px 130px; gap:10px; align-items:center; padding:4px 0; font-size:.78rem; }
+    .hbar .track { height:14px; background:#f1f5f9; border-radius:7px; overflow:hidden; display:flex; }
+    .hbar .fill { height:100%; border-radius:7px; min-width:2px; }
+    .hbar .val { text-align:right; }
+    .vbars { display:flex; gap:8px; align-items:flex-end; height:120px; padding:6px 2px 0; }
+    .vb { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
+    .vb .cols { display:flex; gap:3px; align-items:flex-end; height:88px; width:100%; justify-content:center; }
+    .vb .col { width:18px; border-radius:4px 4px 0 0; min-height:2px; }
+    .vb .m { font-size:.62rem; font-weight:800; text-transform:uppercase; color:var(--mut); white-space:nowrap; }
+    .vb .t { font-size:.62rem; color:var(--mut); font-family:Consolas,monospace; white-space:nowrap; }
+    .c-navy { background:var(--navy); } .c-ok { background:#4ade80; } .c-bad { background:#fca5a5; }
+    .chip { display:inline-block; border-radius:7px; padding:1px 8px; font-size:.66rem; font-weight:800; letter-spacing:.3px; }
+    .ch-ok { background:#dcfce7; color:var(--ok); } .ch-warn { background:#fef3c7; color:var(--warn); } .ch-bad { background:#fee2e2; color:var(--bad); } .ch-mut { background:#f1f5f9; color:var(--mut); }
+    table { width:100%; border-collapse:collapse; font-size:.8rem; }
+    th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.5px; color:var(--mut); padding:5px 8px; border-bottom:1.5px solid var(--line); }
+    td { padding:7px 8px; border-bottom:1px solid #f4f7fa; }
+    .text-right { text-align:right; }
+    .fuente { margin-top:22px; background:#f8fafc; border-left:4px solid var(--navy); border-radius:10px; padding:14px 18px; font-size:.78rem; color:#334155; }
+    .fuente b { color:var(--navy-dark); }
+    .fuente ul { margin:6px 0 0; padding-left:20px; } .fuente li { margin:2px 0; }
+    .cargando { text-align:center; color:var(--mut); padding:70px 0; }
+  </style>
+</head>
+<body>
+<div id="af-topnav"></div>
+<script>window.AF_TOPNAV = { breadcrumb: [ { label:'Inicio', href:'/' }, { label:'Tesorería', href:'/tesoreria/' }, { label:'Dashboard Tesorería', icon:'bi-speedometer2', current:true } ] };</script>
+<script src="/js/topnav.js"></script>
+
+<div class="wrap">
+  <div class="head">
+    <h1><i class="bi bi-speedometer2 me-2" style="color:var(--navy)"></i>Dashboard Tesorería</h1>
+    <span class="sub" id="stamp"></span>
+    <div class="act">
+      <a class="btn" href="/postventa/saldos-a-pagar/"><i class="bi bi-cash-coin"></i>Saldos a Pagar</a>
+      <a class="btn" href="/postventa/comisiones-a-pagar/"><i class="bi bi-wallet2"></i>Comisiones a Pagar</a>
+      <a class="btn" href="/ordenes-pago/historial/"><i class="bi bi-receipt"></i>Historial ODP</a>
+      <button class="btn" onclick="cargar()"><i class="bi bi-arrow-clockwise"></i>Actualizar</button>
+    </div>
+  </div>
+  <div id="cont" class="cargando"><i class="bi bi-hourglass-split me-1"></i>Levantando los números…</div>
+</div>
+
+<script src="/js/auth-guard.js"></script>
+<script>
+'use strict';
+const token = sessionStorage.getItem('token'); if (!token) location.href='/login.html';
+const H = { Authorization:'Bearer '+token };
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n||0).toLocaleString('es-CL');
+const fD = d => { const x=new Date(d); return isNaN(x)?'':String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0'); };
+const ODP_NOMBRE = { GENERAL:'Proveedores', SALDO:'Saldo Precio', COMISION:'Comisión Dealer' };
+
+/* Serie diaria continua de 14 días (los días sin datos van en cero) */
+function serie14(rows){
+  const map = {}; rows.forEach(r=>{ map[String(r.dia).slice(0,10)] = r; });
+  const out = [];
+  for (let i=13;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const k = d.toISOString().slice(0,10);
+    out.push({ dia:k, n:Number(map[k]?.n||0), monto:Number(map[k]?.monto||0) });
+  }
+  return out;
+}
+const vbars = (serie, cls) => {
+  const max = Math.max(1, ...serie.map(x=>x.monto));
+  return `<div class="vbars">${serie.map(x=>`
+    <div class="vb" title="${fD(x.dia)}: $${fmt(x.monto)} · ${fmt(x.n)} operaciones">
+      <div class="cols"><div class="col ${cls}" style="height:${Math.round(x.monto/max*100)}%"></div></div>
+      <span class="m">${fD(x.dia)}</span></div>`).join('')}</div>`;
+};
+
+async function cargar(){
+  const cont = document.getElementById('cont');
+  cont.className='cargando'; cont.innerHTML='<i class="bi bi-hourglass-split me-1"></i>Levantando los números…';
+  let D;
+  try {
+    const j = await (await fetch('/api/tesoreria/dashboard',{headers:H})).json();
+    if (!j.success) throw new Error(j.error||'Error');
+    D = j.data;
+  } catch(e){ cont.innerHTML = '<span style="color:var(--bad)">No se pudo cargar: '+esc(e.message)+'</span>'; return; }
+  document.getElementById('stamp').textContent = 'al ' + new Date(D.generado).toLocaleString('es-CL');
+
+  const ppTot = D.por_pagar.reduce((s,o)=>s+o.monto,0), ppN = D.por_pagar.reduce((s,o)=>s+o.n,0);
+  const instr = (D.instruidas.SALDO||0)+(D.instruidas.COMISION||0);
+  const bancosPend = D.bancos.reduce((s,b)=>s+Number(b.pendientes||0),0);
+  const tieneBancos = D.bancos.some(b=>Number(b.pendientes)+Number(b.conciliados)>0);
+
+  const heroes = `
+    <div class="heroes">
+      <div class="hero ${ppN===0?'ok':ppTot>50000000?'bad':'warn'}">
+        <div class="l">Por pagar (ODP vivas)</div>
+        <div class="v">$${fmt(ppTot)}</div>
+        <div class="d">${fmt(ppN)} órdenes emitidas sin pagar${instr?` · <b>${fmt(instr)} ya instruidas</b> esperando la transferencia`:''}</div>
+      </div>
+      <div class="hero ok">
+        <div class="l">Pagado este mes</div>
+        <div class="v">$${fmt(D.pagos.mes.monto)}</div>
+        <div class="d">${fmt(D.pagos.mes.n)} órdenes pagadas</div>
+      </div>
+      <div class="hero ok">
+        <div class="l">Recaudación de caja · hoy</div>
+        <div class="v">$${fmt(D.caja.hoy.monto)}</div>
+        <div class="d">${fmt(D.caja.hoy.n)} pagos hoy · mes: $${fmt(D.caja.mes.monto)} (${fmt(D.caja.mes.n)})${D.caja.reversas_hoy?` · <b style="color:var(--bad)">${D.caja.reversas_hoy} reversas hoy</b>`:''}</div>
+      </div>
+      <div class="hero ${!tieneBancos?'':bancosPend===0?'ok':bancosPend<=20?'warn':'bad'}">
+        <div class="l">Banco sin conciliar</div>
+        <div class="v">${tieneBancos?fmt(bancosPend):'—'}</div>
+        <div class="d">${tieneBancos?'movimientos pendientes en '+D.bancos.length+' conexión(es)':'el módulo de conciliación aún no tiene movimientos'}</div>
+      </div>
+    </div>`;
+
+  /* Cola de pago */
+  const maxPP = Math.max(1,...D.por_pagar.map(o=>o.monto));
+  const colaHTML = `
+    <div class="card">
+      <h3><i class="bi bi-hourglass-split"></i>La cola de pago <a href="/ordenes-pago/historial/">Historial ODP →</a></h3>
+      ${D.por_pagar.length ? D.por_pagar.map(o=>`
+        <div class="hbar"><span><b>${ODP_NOMBRE[o.origen]||esc(o.origen)}</b> <span class="mini">${fmt(o.n)} órdenes</span></span>
+          <div class="track"><div class="fill c-navy" style="width:${Math.round(o.monto/maxPP*100)}%"></div></div>
+          <span class="val"><span class="num">$${fmt(o.monto)}</span><br><span class="chip ${o.dias_mas_antigua>30?'ch-bad':o.dias_mas_antigua>7?'ch-warn':'ch-ok'}">${o.dias_mas_antigua}d la más vieja</span></span></div>`).join('')
+        : '<div class="mini"><i class="bi bi-check-circle" style="color:var(--ok)"></i> Nada pendiente de pago.</div>'}
+      <div class="mini" style="margin-top:10px">Ya <b>instruidas</b> (con "Enviar a Pago", solo falta la transferencia): saldos precio <b>${fmt(D.instruidas.SALDO||0)}</b> · comisiones <b>${fmt(D.instruidas.COMISION||0)}</b>. La segregación manda: quien instruyó no paga.</div>
+    </div>`;
+
+  /* Pagos por día */
+  const pagosHTML = `
+    <div class="card">
+      <h3><i class="bi bi-send-check"></i>Pagos ejecutados · últimos 14 días</h3>
+      ${vbars(serie14(D.pagos.por_dia),'c-navy')}
+      <div class="mini" style="margin-top:6px">Órdenes de pago marcadas pagadas (todos los orígenes), por día de pago.</div>
+    </div>`;
+
+  /* Caja por día */
+  const cajaHTML = `
+    <div class="card">
+      <h3><i class="bi bi-cash-coin"></i>Recaudación de caja · últimos 14 días <a href="/tesoreria/cierre-caja.html">Cierre de Caja →</a></h3>
+      ${vbars(serie14(D.caja.por_dia),'c-ok')}
+      <div class="mini" style="margin-top:6px">Pagos de cuotas registrados en Caja (capital + mora + gastos), por día.</div>
+    </div>`;
+
+  /* Transitorias */
+  const maxT = Math.max(1,...D.transitorias.top.map(t=>Number(t.saldo)));
+  const transHTML = `
+    <div class="card">
+      <h3><i class="bi bi-arrow-repeat"></i>Cuentas transitorias con saldo <a href="/tesoreria/cuentas-transitorias.html">Cuentas Transitorias →</a></h3>
+      <div class="mini" style="margin-bottom:8px">Plata de clientes esperando aplicación: <b class="num">$${fmt(D.transitorias.saldo)}</b> en ${fmt(D.transitorias.n)} operación(es).</div>
+      ${D.transitorias.top.length ? D.transitorias.top.map(t=>`
+        <div class="hbar"><span>${esc(t.nombre_cliente||'—')} <span class="mini">${t.num_op?'op '+esc(t.num_op):''}</span></span>
+          <div class="track"><div class="fill c-navy" style="width:${Math.round(Number(t.saldo)/maxT*100)}%"></div></div>
+          <span class="val num">$${fmt(t.saldo)}</span></div>`).join('')
+        : '<div class="mini"><i class="bi bi-check-circle" style="color:var(--ok)"></i> Sin saldos transitorios — todo aplicado.</div>'}
+    </div>`;
+
+  /* Brokerage */
+  const brkHTML = `
+    <div class="card">
+      <h3><i class="bi bi-building"></i>Brokerage (AutoFin / Unidad) <a href="/tesoreria/brokerage.html">Brokerage →</a></h3>
+      ${D.brokerage.facturas.length ? `<table>
+        <tr><th>Facturas</th><th class="text-right">N</th><th class="text-right">Monto</th></tr>
+        ${D.brokerage.facturas.map(f=>`<tr><td>${esc(f.estado)}</td><td class="text-right num">${fmt(f.n)}</td><td class="text-right num">$${fmt(f.monto)}</td></tr>`).join('')}
+      </table>` : '<div class="mini">Sin facturas de brokerage registradas.</div>'}
+      ${Number(D.brokerage.programados.n) ? `<div class="mini" style="margin-top:8px">⏳ Pagos <b>programados</b> sin ejecutar: ${fmt(D.brokerage.programados.n)} por <b class="num">$${fmt(D.brokerage.programados.monto)}</b></div>` : ''}
+    </div>`;
+
+  /* Bancos */
+  const bancosHTML = `
+    <div class="card">
+      <h3><i class="bi bi-bank"></i>Conciliación por banco <a href="/tesoreria/conciliacion-bancaria.html">Conciliación →</a></h3>
+      ${D.bancos.length ? `<table>
+        <tr><th>Cuenta</th><th class="text-right">Pendientes</th><th class="text-right">Conciliados</th><th class="text-right">Último mov.</th></tr>
+        ${D.bancos.map(b=>`<tr><td><b>${esc(b.banco)}</b> <span class="mini">${esc(b.alias||'')}</span></td>
+          <td class="text-right"><span class="chip ${Number(b.pendientes)===0?'ch-ok':Number(b.pendientes)<=20?'ch-warn':'ch-bad'}">${fmt(b.pendientes)}</span></td>
+          <td class="text-right num">${fmt(b.conciliados)}</td>
+          <td class="text-right mini">${b.ultimo_mov?String(b.ultimo_mov).slice(0,10):'—'}</td></tr>`).join('')}
+      </table>` : '<div class="mini">Sin conexiones bancarias configuradas (Fintoc / cartolas).</div>'}
+    </div>`;
+
+  cont.className='';
+  cont.innerHTML = heroes + `<div class="grid">${colaHTML}${pagosHTML}${cajaHTML}${transHTML}${brkHTML}${bancosHTML}</div>` + `
+    <div class="fuente"><b><i class="bi bi-diagram-3 me-1"></i>De dónde sale cada número</b>
+      <ul>
+        <li><b>Por pagar y pagos ejecutados</b> → correlativo único de ODP (proveedores, saldo precio, comisión), motor compartido con el <a href="/ordenes-pago/historial/">Historial</a>. "Instruidas" = etapa ENVIADO A PAGO sin pago registrado.</li>
+        <li><b>Recaudación de caja</b> → pagos de cuotas registrados en Caja (los mismos del <a href="/tesoreria/cierre-caja.html">Cierre de Caja</a>).</li>
+        <li><b>Cuentas transitorias</b> → saldo original menos utilizado de <a href="/tesoreria/cuentas-transitorias.html">Cuentas Transitorias</a> en estado ACTIVO.</li>
+        <li><b>Brokerage</b> → facturas y pagos del módulo <a href="/tesoreria/brokerage.html">Brokerage</a>.</li>
+        <li><b>Conciliación</b> → movimientos bancarios por conexión de <a href="/tesoreria/conciliacion-bancaria.html">Conciliación Bancaria</a>.</li>
+      </ul>
+    </div>`;
+}
+cargar();
+</script>
+<script src="/js/app-version.js"></script>
+</body>
+</html>

@@ -81,6 +81,7 @@
     <a href="#p40">40. Auditoría de una operación: la bitácora del crédito</a>
     <a href="#p41">41. Portal del Postulante: reclutar con IA</a>
     <a href="#p42">42. Dashboard Contable: la salud del proceso</a>
+    <a href="#p43">43. Dashboard Tesorería: la mesa del tesorero</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -982,6 +983,21 @@
     <li><b>Candado de meses</b> (cerrados 🔒 vs abiertos ⚠) y <b>compras del período</b> (6 meses del auxiliar).</li>
   </ol>
   <div class="afecta"><b>Afecta:</b> nada — es read-only. <b>Depende de:</b> motor de centralización, Cierre de Mes, RCV SII, Libros Auxiliares, correlativo ODP y Conciliación Bancaria. El pie de la página lista el origen exacto de cada número.</div>
+
+  <h2 id="p43">43. Dashboard Tesorería: la mesa del tesorero</h2>
+  <p><b>Qué y para qué:</b> una pantalla (<code>/tesoreria/dashboard/</code>, permiso <code>tes_dashboard</code>, card automática en la landing de Tesorería) que ordena el día del tesorero: qué hay que <b>pagar</b>, qué se <b>pagó</b>, qué <b>entró</b> por caja y qué saldos piden aseo.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Tesorería y gerencia (Administrador por defecto; delegable en la matriz). Solo lectura: cada card enlaza al módulo donde se ejecuta la acción.</div>
+    <div><b class="lbl">Prerequisitos</b>Ninguno nuevo: todo sale del correlativo único de ODP, pagos de caja, cuentas transitorias, brokerage y conciliación (Máxima 2).</div>
+  </div>
+  <h3>Qué mide</h3>
+  <ol>
+    <li><b>Hero KPIs</b>: por pagar (ODP vivas, monto y cuántas ya están <b>instruidas</b> esperando solo la transferencia) · pagado este mes · recaudación de caja hoy y del mes (con reversas del día) · banco sin conciliar.</li>
+    <li><b>La cola de pago</b> por origen (proveedores / saldo precio / comisión) con la antigüedad de la orden más vieja — recuerda la segregación: quien instruyó no paga.</li>
+    <li><b>Pagos ejecutados</b> y <b>recaudación de caja</b>, curvas diarias de 14 días.</li>
+    <li><b>Cuentas transitorias con saldo</b> (plata de clientes esperando aplicación, top por operación), <b>Brokerage</b> (facturas por estado y pagos programados sin ejecutar) y <b>conciliación por banco</b>.</li>
+  </ol>
+  <div class="afecta"><b>Afecta:</b> nada — es read-only. <b>Depende de:</b> correlativo ODP (shared/ordenes-pago), pagos_credito (Caja), Cuentas Transitorias, Brokerage y Conciliación Bancaria. El pie de la página lista el origen de cada número.</div>
 
 </body>
 </html>
