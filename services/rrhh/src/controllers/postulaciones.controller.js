@@ -208,8 +208,8 @@ require('../../../../shared/migrate').enFila('rh-postulaciones', async () => {
           [mod.id_modulo, nombre, codigo, href, icono]);
         for (const p of perfiles) {
           await pool.query(
-            `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-             SELECT id_perfil, ? FROM perfiles WHERE nombre = ?`, [ins.insertId, p]);
+            `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+             SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre = ?`, [ins.insertId, p]);
         }
       };
       await sembrar('rh_postulaciones', 'Portal del Postulante', '/recursos-humanos/postulaciones/', 'bi-person-plus',

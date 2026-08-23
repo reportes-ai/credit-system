@@ -31,8 +31,8 @@ require('../../../../shared/migrate').enFila('tes-dashboard', async () => {
       const [ins] = await pool.query(
         "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,'Dashboard Tesorería','tes_dashboard','/tesoreria/dashboard/','bi-speedometer2')",
         [idMod]);
-      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-        SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+        SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
       console.log('[tes-dashboard] funcionalidad tes_dashboard sembrada en módulo', idMod);
     }
   } catch (e) { console.error('[tes-dashboard seed]', e.message); }

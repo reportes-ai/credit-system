@@ -2909,8 +2909,8 @@ require('../../../../shared/migrate').enFila('ctb-dashboard', async () => {
     if (!ex) {
       const [ins] = await pool.query(
         "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (500003,'Dashboard Contable','ctb_dashboard','/contabilidad/dashboard/','bi-speedometer2')");
-      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
-        SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
+      await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+        SELECT id_perfil, ?, 1 FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
     }
   } catch (e) { console.error('[ctb-dashboard seed]', e.message); }
 });
