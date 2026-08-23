@@ -80,6 +80,7 @@
     <a href="#p39">39. Libro de compras: del SII al auxiliar (RCV)</a>
     <a href="#p40">40. Auditoría de una operación: la bitácora del crédito</a>
     <a href="#p41">41. Portal del Postulante: reclutar con IA</a>
+    <a href="#p42">42. Dashboard Contable: la salud del proceso</a>
   </div>
 
   <h2 id="p1">1. Originación de un crédito (brokerage)</h2>
@@ -964,6 +965,23 @@
   </ol>
   <div class="flujo"><span class="st ini">AVISO + LINK</span><span class="ar">→</span><span class="st">POSTULA (CV+IA, tabulación ★)</span><span class="ar">→</span><span class="st">JEFE MARCA ✓ (DealerNet)</span><span class="ar">→</span><span class="st">RRHH: entrevistas + informe + tests</span><span class="ar">→</span><span class="st">INFORME A JEFATURA</span><span class="ar">→</span><span class="st fin">CONTRATADA</span><span class="ar">/</span><span class="st mal">DESCARTADA (correo cortés + base)</span></div>
   <div class="afecta"><b>Afecta:</b> base permanente de candidatos (rh_avisos / rh_postulantes / rh_postulante_docs), Uso IA (<code>cv_postulante</code>), repositorio DealerNet (dealernet_informes), correos_log. <b>Depende de:</b> mailer del sistema, subsistema de IA, almacén de documentos (bucket), DealerNet WS. <b>Seguridad:</b> endpoints públicos con techo por IP (20/min; IA 6/min), CV/anexos máx 8 MB, consentimiento explícito, la pauta de evaluación nunca se expone al candidato, el jefe solo ve los avisos donde figura como solicitante.</div>
+
+  <h2 id="p42">42. Dashboard Contable: la salud del proceso</h2>
+  <p><b>Qué y para qué:</b> una sola pantalla (<code>/contabilidad/dashboard/</code>, permiso <code>ctb_dashboard</code>) que responde "¿la contabilidad se está construyendo sola?" — el objetivo del módulo es reemplazar AVSOFT, y eso solo se cumple si el motor contabiliza automático y las excepciones se resuelven. La lógica es <b>excepciones arriba</b>: no celebra lo que está bien, destaca lo que está mal.</p>
+  <div class="meta">
+    <div><b class="lbl">Quién</b>Contabilidad y gerencia (Administrador por defecto; delegable en la matriz). Solo lectura: cada card enlaza al módulo donde se corrige lo que muestra.</div>
+    <div><b class="lbl">Prerequisitos</b>Ninguno nuevo: todo sale de tablas existentes (Máxima 2) — log del motor, comprobantes, candado de meses, RCV, auxiliares, correlativos ODP y conciliación.</div>
+  </div>
+  <h3>Qué mide</h3>
+  <ol>
+    <li><b>Hero KPIs</b>: % de contabilización automática (30 días, asientos del motor vs manuales) · excepciones del motor (SIN_REGLA / DESCUADRE / ERROR) · meses con actividad y sin candado · movimientos bancarios sin conciliar.</li>
+    <li><b>Motor de asientos</b>: barra por estado de <code>ctb_eventos_log</code> + la lista de las últimas excepciones ("lo que falta cablear") con link a Reglas de Centralización.</li>
+    <li><b>IVA del mes</b>: débito (ventas) vs crédito (compras), el neto que se acumula para el F29 y las retenciones de honorarios por enterar, comparado con el mes anterior.</li>
+    <li><b>RCV vs auxiliar</b>: documentos del libro oficial del SII contra el libro operativo, por mes — "cuadra" o "faltan N".</li>
+    <li><b>ODP vivas</b>: órdenes emitidas sin pagar por origen (proveedores / saldo precio / comisión) con monto y antigüedad.</li>
+    <li><b>Candado de meses</b> (cerrados 🔒 vs abiertos ⚠) y <b>compras del período</b> (6 meses del auxiliar).</li>
+  </ol>
+  <div class="afecta"><b>Afecta:</b> nada — es read-only. <b>Depende de:</b> motor de centralización, Cierre de Mes, RCV SII, Libros Auxiliares, correlativo ODP y Conciliación Bancaria. El pie de la página lista el origen exacto de cada número.</div>
 
 </body>
 </html>
