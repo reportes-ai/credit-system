@@ -14,16 +14,26 @@ const fail = (res, msg, code = 500) => res.status(code).json({ success: false, d
 /* Funcionalidad + card (la landing de Tesorería arma sus cards desde BD) */
 require('../../../../shared/migrate').enFila('tes-dashboard', async () => {
   try {
-    const [[mod]] = await pool.query(
-      "SELECT id_modulo FROM modulos WHERE ruta LIKE '/tesoreria%' OR nombre LIKE '%Tesorer%' LIMIT 1");
-    if (!mod) return;
+    // El módulo se toma de una funcionalidad HERMANA ya existente (las cards de
+    // la landing salen de ahí): más robusto que adivinar la ruta en `modulos`.
+    let idMod = null;
+    const [[hermana]] = await pool.query(
+      "SELECT id_modulo FROM funcionalidades WHERE href LIKE '/tesoreria/%' AND id_modulo IS NOT NULL LIMIT 1");
+    if (hermana) idMod = hermana.id_modulo;
+    if (!idMod) {
+      const [[mod]] = await pool.query(
+        "SELECT id_modulo FROM modulos WHERE ruta LIKE '/tesoreria%' OR nombre LIKE '%Tesorer%' LIMIT 1");
+      idMod = mod && mod.id_modulo;
+    }
+    if (!idMod) { console.error('[tes-dashboard seed] no encontré el módulo Tesorería'); return; }
     const [[ex]] = await pool.query("SELECT id_funcionalidad FROM funcionalidades WHERE codigo='tes_dashboard'");
     if (!ex) {
       const [ins] = await pool.query(
         "INSERT INTO funcionalidades (id_modulo, nombre, codigo, href, icono) VALUES (?,'Dashboard Tesorería','tes_dashboard','/tesoreria/dashboard/','bi-speedometer2')",
-        [mod.id_modulo]);
+        [idMod]);
       await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad)
         SELECT id_perfil, ? FROM perfiles WHERE nombre='Administrador'`, [ins.insertId]);
+      console.log('[tes-dashboard] funcionalidad tes_dashboard sembrada en módulo', idMod);
     }
   } catch (e) { console.error('[tes-dashboard seed]', e.message); }
 });
