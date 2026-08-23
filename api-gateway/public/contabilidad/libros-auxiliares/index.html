@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Libros Auxiliares — AutoFácil</title>
-  <!-- v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
+  <!-- v1.5 — vista pulida: resumen mensual a 3 columnas con tooltip y mes filtrado destacado, tipo/folio separados, cebra + hover, encabezado pegado al scroll y suma al pie de lo listado; v1.4 — aviso cuando el mes tiene folios mal importados (33-33): el anti-duplicados del RCV es ciego contra esos; v1.3 — el resumen por mes se angosta (col-3) y el detalle se lleva el espacio; v1.2 — auxiliares de compras y honorarios: import AVSOFT, digitación, y traspaso del RCV del SII al auxiliar -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -25,11 +25,19 @@
     .card-kpi .v { font-family:Consolas,monospace; font-weight:800; font-size:1.15rem; color:var(--navy); }
     .card-kpi .l { font-size:.72rem; color:#64748b; text-transform:uppercase; letter-spacing:.4px; }
     .mes-click { cursor:pointer; } .mes-click:hover td { background:#f0f9ff; }
-    /* Resumen por mes: son 4 números cortos, no necesita el ancho de una tabla de
-       detalle. Se aprieta para que el espacio se lo lleve el detalle documento a
-       documento, que es donde el usuario realmente lee. */
-    .tabla-mes { font-size:.75rem; }
-    .tabla-mes thead th, .tabla-mes tbody td { padding:5px 7px; }
+    /* Resumen por mes: Mes · Docs · Total (los números completos, sin cortarse);
+       neto/IVA van en el tooltip de la fila. El mes filtrado queda destacado. */
+    .tabla-mes { font-size:.78rem; }
+    .tabla-mes thead th, .tabla-mes tbody td { padding:6px 9px; }
+    .tabla-mes .mes-sel td { background:#dbeafe !important; box-shadow:inset 3px 0 0 var(--navy); }
+    /* Detalle: cebra + hover, encabezado pegado al hacer scroll y totales al pie */
+    #tablaDet tbody tr:nth-child(even) td { background:#fbfdff; }
+    #tablaDet tbody tr:hover td { background:#f0f9ff; }
+    .panel-det { max-height:70vh; }
+    .panel-det thead th { position:sticky; top:0; z-index:2; }
+    tfoot td { font-weight:800; background:#f1f5f9; border-top:2px solid #cbd5e1; padding:8px 12px; font-size:.8rem; }
+    .tipo-doc { display:block; color:#94a3b8; font-size:.68rem; line-height:1.15; white-space:nowrap; }
+    .folio { font-family:Consolas,monospace; font-weight:700; color:var(--navy); }
   </style>
 </head>
 <body>
@@ -74,8 +82,9 @@
       <div class="small text-muted"><i class="bi bi-hand-index me-1"></i>Clic en un mes para filtrar el detalle a ese mes.</div>
     </div>
     <div class="col-lg-9">
-      <div class="panel"><table id="tablaDet">
+      <div class="panel panel-det"><table id="tablaDet">
         <thead id="theadDet"></thead><tbody id="tbodyDet"><tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr></tbody>
+        <tfoot id="tfootDet"></tfoot>
       </table></div>
       <div class="small text-muted" id="notaTrunc"></div>
     </div>
@@ -99,7 +108,7 @@ const fmt = n => Number(n||0).toLocaleString('es-CL');
 const MESES = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const nomMes = m => { const [y,mm]=m.split('-'); return MESES[Number(mm)]+'-'+y.slice(2); };
 let MODO = 'C', D = null;
-const tipoDte = t => ({ '33':'33 Factura', '34':'34 F.Exenta', '39':'39 Boleta', '56':'56 N.Débito', '61':'61 N.Crédito' }[String(t)] || t || '');
+const tipoDte = t => ({ '33':'33 Factura', '34':'34 F.Exenta', '39':'39 Boleta', '46':'46 F.Compra', '56':'56 N.Débito', '61':'61 N.Crédito' }[String(t)] || (t ? t + ' Doc' : ''));
 
 const hoy = new Date();
 fHasta.value = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
@@ -112,7 +121,7 @@ function tab(m){
   document.getElementById('btnDig').style.display = m==='R' ? 'none' : '';
   document.getElementById('kpis').style.display='none';
   theadMes.innerHTML=''; tbodyMes.innerHTML='';
-  theadDet.innerHTML=''; tbodyDet.innerHTML='<tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr>';
+  theadDet.innerHTML=''; tbodyDet.innerHTML='<tr><td class="text-center text-muted py-4">Presiona Consultar</td></tr>'; tfootDet.innerHTML='';
   notaTrunc.textContent=''; btnXls.disabled = true;
   consultar();
 }
@@ -133,67 +142,84 @@ async function consultar(){
   D = j.data; render();
 }
 
+/* Resumen mensual: 3 columnas (los montos completos caben sin cortarse);
+   el desglose va en el tooltip. El mes filtrado queda marcado. */
+const mesSelCls = m => (fDesde.value===m && fHasta.value===m) ? ' mes-sel' : '';
+const filaMes = (x, total, tip) => `<tr class="mes-click${mesSelCls(x.mes)}" onclick="irMes('${x.mes}')" title="${esc(tip)}"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(total)}</td></tr>`;
+const sumD = k => D.documentos.reduce((s,d)=>s+Number(d[k]||0),0);
+
 function render(){
   const k = document.getElementById('kpis'); k.style.display='flex';
+  tfootDet.innerHTML = '';
   if (MODO==='C'){
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Facturas</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.neto)}</div><div class="l">Neto</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.iva)}</div><div class="l">IVA (crédito fiscal)</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.total)}</div><div class="l">Total</div></div>`;
-    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.neto)}</td><td class="text-right num">${fmt(x.iva)}</td><td class="text-right num">${fmt(x.total)}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
-    theadDet.innerHTML = '<tr><th>Mes</th><th>Doc</th><th>Emisión</th><th>Vencim.</th><th>RUT</th><th>Proveedor</th><th>Cta gasto</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.tipo_doc||'')}-${esc(d.num_doc||'')}</td>
-      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):''}</td>
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Total</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.total, `Neto $${fmt(x.neto)} · IVA $${fmt(x.iva)}`)).join('')
+      || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>Vencim.</th><th>RUT</th><th>Proveedor</th><th>Cta gasto</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td>
+      <td><span class="tipo-doc">${esc(tipoDte(d.tipo_doc))}</span><span class="folio">${esc(d.num_doc||'')}</span></td>
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}</td><td>${d.fecha_vcto?String(d.fecha_vcto).slice(0,10):'—'}</td>
       <td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
       <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('compras',${d.id})"></i>`:''}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="7">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
+      <td class="text-right num">${fmt(sumD('neto'))}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
   } else if (MODO==='V'){
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Documentos</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.neto)}</div><div class="l">Neto</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.iva)}</div><div class="l">IVA (débito fiscal)</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.total)}</div><div class="l">Total</div></div>`;
-    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.neto)}</td><td class="text-right num">${fmt(x.iva)}</td><td class="text-right num">${fmt(x.total)}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
-    theadDet.innerHTML = '<tr><th>Mes</th><th>Tipo</th><th>N° Doc</th><th>Emisión</th><th>RUT</th><th>Cliente</th><th>Cta ingreso</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
-    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(tipoDte(d.tipo_doc))}</td><td>${esc(d.num_doc||'')}</td>
-      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):''}</td><td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_ingreso||'')}</td>
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Docs</th><th class="text-right">Total</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.total, `Neto $${fmt(x.neto)} · IVA $${fmt(x.iva)}`)).join('')
+      || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadDet.innerHTML = '<tr><th>Mes</th><th>Documento</th><th>Emisión</th><th>RUT</th><th>Cliente</th><th>Cta ingreso</th><th class="text-right">Neto</th><th class="text-right">IVA</th><th class="text-right">Total</th></tr>';
+    tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td>
+      <td><span class="tipo-doc">${esc(tipoDte(d.tipo_doc))}</span><span class="folio">${esc(d.num_doc||'')}</span></td>
+      <td>${d.fecha_doc?String(d.fecha_doc).slice(0,10):'—'}</td><td>${esc(d.rut||'')}</td><td>${esc(d.razon_social||'')}</td><td>${esc(d.cuenta_ingreso||'')}</td>
       <td class="text-right num">${fmt(d.neto)}</td><td class="text-right num">${fmt(d.iva)}</td><td class="text-right num">${fmt(d.total)}</td></tr>`).join('')
-      || '<tr><td colspan="10" class="text-center text-muted py-3">Sin documentos</td></tr>';
+      || '<tr><td colspan="9" class="text-center text-muted py-3">Sin documentos</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="6">Suma de lo listado (${fmt(D.documentos.length)} docs)</td>
+      <td class="text-right num">${fmt(sumD('neto'))}</td><td class="text-right num">${fmt(sumD('iva'))}</td><td class="text-right num">${fmt(sumD('total'))}</td></tr>`;
   } else if (MODO==='R'){
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Liquidaciones</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.haberes)}</div><div class="l">Total haberes</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.impuesto_unico)}</div><div class="l">Impuesto único (048)</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.liquido)}</div><div class="l">Líquido pagado</div></div>`;
-    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Trab.</th><th class="text-right">Imponible</th><th class="text-right">Imp.único</th><th class="text-right">Líquido</th></tr>';
-    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.imponible)}</td><td class="text-right num">${fmt(x.impuesto_unico)}</td><td class="text-right num">${fmt(x.liquido)}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Trab.</th><th class="text-right">Líquido</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.liquido, `Imponible $${fmt(x.imponible)} · Imp. único $${fmt(x.impuesto_unico)}`)).join('')
+      || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
     theadDet.innerHTML = '<tr><th>Mes</th><th>RUT</th><th>Trabajador</th><th>Cargo</th><th>C.Costo</th><th class="text-right">Días</th><th class="text-right">Imponible</th><th>AFP</th><th>Salud</th><th class="text-right">Imp.único</th><th class="text-right">Líquido</th></tr>';
     tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.rut||'')}</td><td>${esc(d.nombre||'')}</td>
       <td>${esc(d.cargo||'')}</td><td>${esc(d.centro_costo||'')}</td><td class="text-right">${d.dias}</td>
       <td class="text-right num">${fmt(d.imponible)}</td><td>${esc(d.afp_nombre||'')}</td><td>${esc(d.salud_nombre||'')}</td>
       <td class="text-right num">${fmt(d.impuesto_unico)}</td><td class="text-right num">${fmt(d.liquido)}</td></tr>`).join('')
       || '<tr><td colspan="11" class="text-center text-muted py-3">Sin liquidaciones</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="6">Suma de lo listado (${fmt(D.documentos.length)} liq.)</td>
+      <td class="text-right num">${fmt(sumD('imponible'))}</td><td colspan="2"></td><td class="text-right num">${fmt(sumD('impuesto_unico'))}</td><td class="text-right num">${fmt(sumD('liquido'))}</td></tr>`;
   } else {
     k.innerHTML = `
       <div class="card-kpi"><div class="v">${fmt(D.total.docs)}</div><div class="l">Boletas</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.bruto)}</div><div class="l">Bruto</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.retencion)}</div><div class="l">Retención</div></div>
       <div class="card-kpi"><div class="v">$${fmt(D.total.liquido)}</div><div class="l">Líquido</div></div>`;
-    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Boletas</th><th class="text-right">Bruto</th><th class="text-right">Retención</th><th class="text-right">Líquido</th></tr>';
-    tbodyMes.innerHTML = D.meses.map(x=>`<tr class="mes-click" onclick="irMes('${x.mes}')"><td>${nomMes(x.mes)}</td><td class="text-right">${fmt(x.docs)}</td><td class="text-right num">${fmt(x.bruto)}</td><td class="text-right num">${fmt(x.retencion)}</td><td class="text-right num">${fmt(x.liquido)}</td></tr>`).join('')
-      || '<tr><td colspan="5" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
+    theadMes.innerHTML = '<tr><th>Mes</th><th class="text-right">Boletas</th><th class="text-right">Bruto</th></tr>';
+    tbodyMes.innerHTML = D.meses.map(x=>filaMes(x, x.bruto, `Retención $${fmt(x.retencion)} · Líquido $${fmt(x.liquido)}`)).join('')
+      || '<tr><td colspan="3" class="text-center text-muted py-3">Sin datos con estos filtros</td></tr>';
     theadDet.innerHTML = '<tr><th>Mes</th><th>Boleta</th><th>Emisión</th><th>RUT</th><th>Profesional</th><th>Glosa</th><th>Cta</th><th class="text-right">Bruto</th><th class="text-right">Ret.</th><th class="text-right">Líquido</th></tr>';
     tbodyDet.innerHTML = D.documentos.map(d=>`<tr><td>${nomMes(d.mes)}</td><td>${esc(d.num_boleta||'')}</td>
       <td>${d.fecha_emision?String(d.fecha_emision).slice(0,10):''}</td><td>${esc(d.rut||'')}</td>
       <td>${esc(d.nombre||'')}</td><td>${esc(d.glosa||'')}</td><td>${esc(d.cuenta_gasto||'')}</td>
       <td class="text-right num">${fmt(d.bruto)}</td><td class="text-right num">${fmt(d.retencion)}</td><td class="text-right num">${fmt(d.liquido)}${d.origen==='DIGITADO'?` <i class="bi bi-trash text-danger" style="cursor:pointer" title="Eliminar (digitado)" onclick="eliminarDoc('honorarios',${d.id})"></i>`:''}</td></tr>`).join('')
       || '<tr><td colspan="10" class="text-center text-muted py-3">Sin boletas</td></tr>';
+    if (D.documentos.length) tfootDet.innerHTML = `<tr><td colspan="7">Suma de lo listado (${fmt(D.documentos.length)} boletas)</td>
+      <td class="text-right num">${fmt(sumD('bruto'))}</td><td class="text-right num">${fmt(sumD('retencion'))}</td><td class="text-right num">${fmt(sumD('liquido'))}</td></tr>`;
   }
   notaTrunc.innerHTML = D.truncado ? '<i class="bi bi-exclamation-triangle me-1"></i>Se muestran los primeros 1.000 documentos — acota el rango o los filtros para ver el resto.' : '';
   btnXls.disabled = !D.documentos.length;
