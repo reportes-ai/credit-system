@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard Contable — AutoFácil</title>
-  <!-- v1.1 — posicion financiera: caja y bancos, resultado mes/año, capital de trabajo, razon corriente, endeudamiento, cuadre del balance y top ingresos/gastos (motores balance+EERR); v1.0 — pirámide del CFO -->
+  <!-- v1.2 — aviso explicito cuando el mes no tiene ingresos contabilizados (pendiente 2.1, disparadores); v1.1 — posicion financiera: caja y bancos, resultado mes/año, capital de trabajo, razon corriente, endeudamiento, cuadre del balance y top ingresos/gastos (motores balance+EERR); v1.0 — pirámide del CFO -->
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --ink:#0f172a; --mut:#64748b; --line:#e8edf3;
@@ -216,9 +216,10 @@ async function cargar(){
   const topHTML = `
     <div class="card">
       <h3><i class="bi bi-arrow-left-right"></i>El mes por cuenta: dónde entra y dónde se va</h3>
-      ${topI.length?`<div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;color:var(--ok)">Principales ingresos</div>`:''}
-      ${topI.map(x=>`<div class="hbar" style="grid-template-columns:1fr 130px 120px"><span title="${esc(x.cuenta)}">${esc(x.nombre||x.cuenta)}</span>
-        <div class="track"><div class="fill c-ok" style="width:${Math.round(x.monto/maxTop*100)}%"></div></div><span class="val num">$${fmt(x.monto)}</span></div>`).join('')}
+      <div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;color:var(--ok)">Principales ingresos</div>
+      ${topI.length ? topI.map(x=>`<div class="hbar" style="grid-template-columns:1fr 130px 120px"><span title="${esc(x.cuenta)}">${esc(x.nombre||x.cuenta)}</span>
+        <div class="track"><div class="fill c-ok" style="width:${Math.round(x.monto/maxTop*100)}%"></div></div><span class="val num">$${fmt(x.monto)}</span></div>`).join('')
+      : `<div class="mini" style="padding:4px 0 6px">⚠ <b>Sin ingresos contabilizados este mes.</b> No es que no se haya vendido: los ingresos del negocio (intereses, comisiones de colocación) aún no tienen disparador contable — es el pendiente 2.1 de <a href="/contabilidad/reglas/">Reglas de Centralización</a>. El EERR muestra solo la mitad de la película hasta cablearlo.</div>`}
       ${topG.length?`<div class="mini" style="font-weight:800;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 2px;color:var(--bad)">Principales gastos</div>`:''}
       ${topG.map(x=>`<div class="hbar" style="grid-template-columns:1fr 130px 120px"><span title="${esc(x.cuenta)}">${esc(x.nombre||x.cuenta)}</span>
         <div class="track"><div class="fill c-bad" style="width:${Math.round(x.monto/maxTop*100)}%"></div></div><span class="val num">$${fmt(x.monto)}</span></div>`).join('')}
