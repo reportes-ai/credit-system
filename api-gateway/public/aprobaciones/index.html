@@ -1350,9 +1350,13 @@ function actualizarBadge(){
   const nRev = CARTAS.filter(c => c.status==='PENDIENTE' && c.creadoPor!==MI_LOGIN).length;
   document.getElementById('badgeRevCard').textContent = nRev;
   document.getElementById('cardRevision').classList.toggle('alerta-roja', nRev > 0);
-  // Impresión: verde solo con cartas aprobadas que aún no se ven ni imprimen
+  // Impresión: verde solo con lo ACCIONABLE — aprobada, aún no otorgada, dentro
+  // de plazo y no vista en este equipo. Antes contaba toda carta APROBADA, así que
+  // arrastraba las 357 históricas (ene-may 2026, cargadas en bloque y ya otorgadas)
+  // y el badge marcaba ~488 cuando lo realmente imprimible era una fracción.
   const vistas = impVistas();
-  const nImp = CARTAS.filter(c => c.status==='APROBADA' && !vistas.has(c.id)).length;
+  const nImp = CARTAS.filter(c => c.status==='APROBADA' && !c.otorgado
+                              && !vigenciaDeCarta(c).vencida && !vistas.has(c.id)).length;
   document.getElementById('badgeImpCard').textContent = nImp;
   document.getElementById('cardImpresion').classList.toggle('alerta-verde', nImp > 0);
   // Vigentes: cartas aprobadas no otorgadas dentro de plazo
