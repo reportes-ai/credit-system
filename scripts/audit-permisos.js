@@ -114,13 +114,20 @@ const pool = require('../shared/config/database');
     vm.runInContext(src.replace(/\bconst\b/g, 'var'), ctx);
     const items = ctx.PLACEMENT_ITEMS || {};
     const [fh] = await pool.query('SELECT href FROM funcionalidades WHERE href IS NOT NULL');
-    const [mr] = await pool.query("SELECT ruta FROM modulos WHERE estado='activo'");
+    // Un módulo INACTIVO también está gobernado por la matriz: está apagado para
+    // todos, que es la forma más fuerte de control (caso real: "Cartas de
+    // Aprobación Antiguo" /cartas-aprobacion/, retirado del home a propósito —
+    // acusarlo como huérfano era un falso positivo crítico, 24-08-2026).
+    const [mr] = await pool.query('SELECT ruta, estado FROM modulos');
     const norm = h => String(h || '').replace(/\/$/, '');
     const enMatriz = new Set([...fh.map(x => norm(x.href)), ...mr.map(x => norm(x.ruta))]);
+    const inactivos = new Set(mr.filter(x => x.estado !== 'activo').map(x => norm(x.ruta)));
     const huerfanas = Object.entries(items).filter(([, v]) => v.href && !enMatriz.has(norm(v.href)));
     huerfanas.length
       ? huerfanas.forEach(([k, v]) => mal(`Card "${v.titulo}" (${v.href}) NO existe en la matriz — nadie puede controlarla desde Perfiles y Permisos`))
       : ok('Las ' + Object.keys(items).length + ' cards del manifiesto están todas representadas en la matriz');
+    const apagadas = Object.entries(items).filter(([, v]) => v.href && inactivos.has(norm(v.href)));
+    apagadas.forEach(([, v]) => console.log(`  · Card "${v.titulo}" (${v.href}) gobernada como módulo INACTIVO — apagada para todos (deliberado)`));
   } catch (e) { console.log('  (no se pudo evaluar el manifiesto: ' + e.message + ')'); }
 
   console.log('\n' + '─'.repeat(50));
