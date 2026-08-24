@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
-  <!-- v1.1 — boton Exportar Excel: descarga la seleccion actual de filtros (todas las paginas, con datos de contacto; sin datos bancarios) -->
+  <!-- v1.2 — permisos por pestana: ver/editar independientes para Base, Categoria y Potencial -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -183,11 +183,11 @@
     <button class="btn-importar" onclick="exportarExcel(this)" title="Descarga a Excel los dealers que muestran los filtros actuales (todas las páginas)">
       <i class="bi bi-download me-1 text-success"></i>Exportar Excel
     </button>
-    <button class="btn-importar" onclick="document.getElementById('fileInput').click()">
+    <button class="btn-importar" id="btnImportar" onclick="document.getElementById('fileInput').click()">
       <i class="bi bi-file-earmark-excel me-1 text-success"></i>Importar Excel
     </button>
     <input type="file" id="fileInput" accept=".xlsx" style="display:none" onchange="onFileSelected(this)">
-    <button class="btn-importar" onclick="recalcularCategorias()" title="Propone la categoría de cada dealer según las ventas del mes pasado">
+    <button class="btn-importar" id="btnRecalcBase" onclick="recalcularCategorias()" title="Propone la categoría de cada dealer según las ventas del mes pasado">
       <i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular categorías
     </button>
     <span class="count-badge" id="countBadge"></span>
@@ -232,10 +232,10 @@
         <button class="mvbtn" id="mvSuben" onclick="filtrarMov('SUBE')"><i class="bi bi-arrow-up-circle"></i> Que suben</button>
         <button class="mvbtn" id="mvBajan" onclick="filtrarMov('BAJA')"><i class="bi bi-arrow-down-circle"></i> Que bajan</button>
         <button class="mvbtn" id="mvInact" onclick="filtrarMov('INACTIVOS')"><i class="bi bi-power"></i> Dealers que pasan a Inactivos</button>
-        <a href="/mantenedores/dealer-categorias/" class="mvbtn" style="text-decoration:none" title="Rangos, colores y variables de la categorización"><i class="bi bi-sliders"></i> Variables de categorías</a>
+        <a href="/mantenedores/dealer-categorias/" id="btnVarCat" class="mvbtn" style="text-decoration:none" title="Rangos, colores y variables de la categorización"><i class="bi bi-sliders"></i> Variables de categorías</a>
       </div>
       <span class="count-badge" id="mvCount" style="margin-left:auto"></span>
-      <button class="btn-importar" onclick="recalcularCategorias()"><i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular (mes pasado)</button>
+      <button class="btn-importar" id="btnRecalcCat" onclick="recalcularCategorias()"><i class="bi bi-arrow-repeat me-1 text-primary"></i>Recalcular (mes pasado)</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -294,7 +294,7 @@
     <button class="btn-importar" id="potOrdpotencial" onclick="ordenarPot('potencial')" title="Ordenar por Potencial"><i class="bi bi-sort-down me-1"></i>Potencial</button>
     <button class="btn-importar" id="potOrdventas_potencial" onclick="ordenarPot('ventas_potencial')" title="Ordenar por Ventas potenciales"><i class="bi bi-sort-down me-1"></i>Ventas pot.</button>
     <span style="font-size:.8rem;color:#475569;margin-left:auto" id="potMeses">Cargando…</span>
-    <a href="/mantenedores/potencial-dealer/" class="btn-importar" title="Factor y rangos de diagnóstico"><i class="bi bi-sliders me-1"></i>Variables del cálculo</a>
+    <a href="/mantenedores/potencial-dealer/" id="btnVarPot" class="btn-importar" title="Factor y rangos de diagnóstico"><i class="bi bi-sliders me-1"></i>Variables del cálculo</a>
   </div>
   <div class="tbl-wrap">
     <table class="pt-table">
@@ -306,6 +306,19 @@
       <tbody id="potBody"><tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Cargando…</td></tr></tbody>
     </table>
   </div>
+</div>
+
+<!-- ====== Qué afecta este mantenedor ====== -->
+<div style="background:#f8fafc;border-left:4px solid #0141A2;border-radius:8px;padding:16px 20px;margin:24px 0 8px">
+  <div style="font-weight:700;color:#0141A2;margin-bottom:8px"><i class="bi bi-diagram-3 me-1"></i>Qué afecta este mantenedor</div>
+  <ul style="margin:0;padding-left:20px;font-size:0.88rem;color:#475569;line-height:1.9">
+    <li><b>Datos del dealer</b> (nombre, RUT, dirección, contacto, cuenta bancaria) → es la <b>fuente única</b>: los lee la carta de aprobación, la cartola de comisiones, la orden de pago al dealer y el <a href="/mantenedores/dealers-mapa/">Mapa de Dealers</a>.</li>
+    <li><b>Comisión pactada</b> (calle y parque) → alimenta el cálculo de comisión de cada operación. Solo se cambia por <a href="/dealers-incorporacion/">ficha aprobada</a>, nunca a mano acá.</li>
+    <li><b>Activo / Inactivo</b> → marca al dealer sin ventas hace 3 meses. <b>No bloquea</b> cursar operaciones: es un indicador comercial.</li>
+    <li><b>Categoría asignada</b> → define la pizarra de comisión por defecto y los informes comerciales. Rangos y colores en <a href="/mantenedores/dealer-categorias/">Variables de categorías</a>.</li>
+    <li><b>Posiciones y ventas mensuales</b> (pestaña Potencial) → alimentan el <b>potencial de crecimiento</b> por parque y dealer. Factor y rangos de diagnóstico en <a href="/mantenedores/potencial-dealer/">Variables del cálculo</a>.</li>
+    <li><b>Permisos por pestaña</b> (<code>dealers_base_ver/editar</code>, <code>dealers_cat_ver/editar</code>, <code>dealers_potencial_ver/editar</code>) → deciden qué pestaña ve y edita cada perfil. Se administran en <a href="/usuarios/">Perfiles y Permisos</a>. La pestaña <b>Ruta AutoFácil</b> usa sus propios permisos (<code>visitas_ver</code>, <code>visitas_dealers</code>, <code>visitas_supervisar</code>).</li>
+  </ul>
 </div>
 
 <!-- ====== MODAL FORM ====== -->
@@ -452,15 +465,43 @@ let pag = 1, totalRows = 0, debTimer, dealerActual = null;
 // Editar dealer: SOLO Administrador + Analista de Operaciones (dealer_ficha_revisar).
 const esAdmin = yo?.perfil === 'Administrador';
 let puedeEditarDealer = esAdmin;
+// Permiso por pestaña (v216.7): cada una se abre por separado en ver y editar.
+// Admin ve y edita todo por bypass; el resto depende de la matriz de Perfiles.
+const PERM = { baseVer:esAdmin, baseEd:esAdmin, catVer:esAdmin, catEd:esAdmin, potVer:esAdmin, potEd:esAdmin };
 async function cargarPermisos(){
   // Card Ruta AutoFácil (ex Calendario de Visitas): visible para Admin o quien tenga permiso de visitas.
   try { const r=await fetch('/api/auth/mis-permisos?_='+Date.now(),{headers:H}); const j=await r.json();
     const fs = j.funcionalidades||[];
-    if (esAdmin || fs.includes('dealer_ficha_revisar')) puedeEditarDealer = true;
-    if (esAdmin || fs.includes('visitas_ver') || fs.includes('visitas_dealers') || fs.includes('visitas_supervisar')) {
-      const t=document.getElementById('tabVisitas'); if(t) t.style.display='';
+    const t = c => fs.includes(c);
+    PERM.baseEd = PERM.baseEd || t('dealers_base_editar');
+    PERM.baseVer = PERM.baseVer || PERM.baseEd || t('dealers_base_ver');
+    PERM.catEd  = PERM.catEd  || t('dealers_cat_editar');
+    PERM.catVer = PERM.catVer || PERM.catEd || t('dealers_cat_ver');
+    PERM.potEd  = PERM.potEd  || t('dealers_potencial_editar');
+    PERM.potVer = PERM.potVer || PERM.potEd || t('dealers_potencial_ver');
+    if (esAdmin || t('dealer_ficha_revisar') || PERM.baseEd) puedeEditarDealer = true;
+    if (esAdmin || t('visitas_ver') || t('visitas_dealers') || t('visitas_supervisar')) {
+      const tv=document.getElementById('tabVisitas'); if(tv) tv.style.display='';
     }
   } catch(e){}
+  aplicarPermisos();
+}
+// Oculta lo que el perfil no puede ver y apaga lo que no puede editar.
+function aplicarPermisos(){
+  const ocultar = (id, ok) => { const el=document.getElementById(id); if(el && !ok) el.style.display='none'; };
+  ocultar('tabBase', PERM.baseVer); ocultar('tabCat', PERM.catVer); ocultar('tabPot', PERM.potVer);
+  ocultar('btnImportar', PERM.baseEd);
+  ocultar('btnRecalcBase', PERM.catEd); ocultar('btnRecalcCat', PERM.catEd);
+  ocultar('btnVarCat', PERM.catEd); ocultar('btnVarPot', PERM.potEd);
+  // Vista de partida: la primera pestaña que sí puede ver.
+  const primera = PERM.baseVer ? 'base' : PERM.catVer ? 'categoria' : PERM.potVer ? 'potencial' : null;
+  if (!primera) {
+    document.querySelector('.vtabs').insertAdjacentHTML('afterend',
+      '<div class="alert alert-warning m-3">No tienes ninguna pestaña de Dealers habilitada. Pídele acceso al Administrador en Perfiles y Permisos.</div>');
+    ['viewBase','viewCategoria','viewPotencial'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+    return;
+  }
+  if (primera !== 'base') setView(primera);
 }
 // Reporte IA: el flag tiene_reporte_ia viene del servidor; el modal usa el componente
 // compartido AF_REP_IA (MISMO formato que la revisión: empresa + socios juntos).
@@ -626,7 +667,7 @@ function asignadaCell(d) {
   const cod = d.categoria_asignada;
   const info = cod && CATS[cod]
     ? `<span class="cat-info">i<span class="cat-tip">${tipBeneficios(cod)}</span></span>` : '';
-  return `<div class="asig-cell"><select class="cat-select" onchange="asignarCategoria(${d.id_dealer}, this.value)">${opts}</select>${info}</div>`;
+  return `<div class="asig-cell"><select class="cat-select"${PERM.catEd?'':' disabled title="Sin permiso para cambiar la categoría"'} onchange="asignarCategoria(${d.id_dealer}, this.value)">${opts}</select>${info}</div>`;
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -696,7 +737,9 @@ function renderPot(){
   const sgn = _potDir==='desc' ? -1 : 1;
   const key = x => { const v=x[_potSort]; return (v==null||isNaN(v)) ? -Infinity : v; };
   const filaP=(p,pi,expand)=>`<tr class="row-parque" onclick="togglePot(${pi})"><td class="l"><span class="caret" id="pcar${pi}">${expand?'▼':'▶'}</span> ${e(p.parque)} <span style="color:#94a3b8;font-weight:600">(${p.n_dealers})</span></td><td>${fN(p.posiciones)}</td><td>${fN(p.ventas_mensuales)}</td><td>${f1(p.rotacion)}</td><td>${fN(p.ventas_con_credito)}</td><td>${fPct(p.pct_credito)}</td><td>${fN(p.cred_meses[0])}</td><td>${fN(p.cred_meses[1])}</td><td>${fN(p.cred_meses[2])}</td><td>${f1(p.cred_prom)}</td><td>${fN(p.ventas_potencial)}</td><td class="${pc(p.potencial)}" style="font-weight:800">${fPot(p.potencial)}</td><td class="l">${diag(p.diagnostico,p.diag_color)}</td></tr>`;
-  const inp=(d,campo)=>`<td><input class="pinp" type="number" value="${d[campo]==null?'':d[campo]}" onchange="guardarPotDealer(${d.id_dealer},'${campo}',this.value)"></td>`;
+  const inp=(d,campo)=> PERM.potEd
+    ? `<td><input class="pinp" type="number" value="${d[campo]==null?'':d[campo]}" onchange="guardarPotDealer(${d.id_dealer},'${campo}',this.value)"></td>`
+    : `<td>${fN(d[campo])}</td>`;
   const filaD=(d,pi,expand)=> d._huerfano
     ? `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'};font-style:italic;color:#64748b;background:#fbfdff"><td class="l" style="padding-left:28px">${e(d.dealer)}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>—</td><td>—</td><td class="l">créditos sin RUT de dealer</td></tr>`
     : `<tr class="row-dealer ppq${pi}" style="display:${expand?'':'none'}"><td class="l" style="padding-left:28px">${e(d.dealer)}</td>${inp(d,'posiciones')}${inp(d,'ventas_mensuales')}<td>${f1(d.rotacion)}</td>${inp(d,'ventas_con_credito')}<td>${fPct(d.pct_credito)}</td><td>${fN(d.cred_meses[0])}</td><td>${fN(d.cred_meses[1])}</td><td>${fN(d.cred_meses[2])}</td><td>${f1(d.cred_prom)}</td><td>${fN(d.ventas_potencial)}</td><td class="${pc(d.potencial)}" style="font-weight:800">${fPot(d.potencial)}</td><td class="l">${diag(d.diagnostico,d.diag_color)}</td></tr>`;
@@ -772,7 +815,7 @@ async function cargarInactivos(){
         <td style="font-weight:600;color:#b45309">${fechaCorta(d.ultima_venta)}</td>
         <td>${catBadge(d.categoria_asignada)}</td>
         <td>${d.activo ? '<span class="activo-si">✓ Activo</span>' : '<span class="activo-no">✗ Inactivo</span>'}</td>
-        <td>${d.activo ? `<button class="btn-importar" style="padding:5px 12px" onclick="marcarInactivo(${d.id_dealer})"><i class="bi bi-power text-danger me-1"></i>Marcar inactivo</button>` : '<span class="text-muted">—</span>'}</td>
+        <td>${d.activo && PERM.catEd ? `<button class="btn-importar" style="padding:5px 12px" onclick="marcarInactivo(${d.id_dealer})"><i class="bi bi-power text-danger me-1"></i>Marcar inactivo</button>` : '<span class="text-muted">—</span>'}</td>
       </tr>`).join('');
   } catch(e){ document.getElementById('mvBody').innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">${esc(e.message)}</td></tr>`; }
 }
@@ -1139,7 +1182,9 @@ async function confirmarImport() {
 }
 
 // Init
-Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(() => cargar(1));
+// cargarPermisos() ya dejó abierta la primera pestaña permitida; la Base solo se
+// consulta si efectivamente puede verla (evita un 403 y una consulta de más).
+Promise.all([cargarCategorias(), cargarPizarraDef(), cargarPermisos()]).then(() => { if (PERM.baseVer) cargar(1); });
 cargarCcs();
 </script>
 <script src="/js/topnav.js"></script>

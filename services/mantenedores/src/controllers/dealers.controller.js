@@ -43,6 +43,50 @@ require('../../../../shared/migrate').enFila('dealers', async () => {
   for (const c of cols) { try { await pool.query(`ALTER TABLE dealers ADD COLUMN IF NOT EXISTS ${c} NULL`); } catch (e) {} }
 });
 
+/* ── Permisos por pestaña del módulo Dealers (v216.7) ─────────────────────────
+   Hasta acá "entrar a Dealers" (mantenedores_dealers) daba las tres pestañas
+   completas. Ahora cada una tiene su par ver/editar, para poder abrir la Base a
+   un ejecutivo sin regalarle la Categoría ni el Potencial.
+   Ruta AutoFácil NO se duplica: ya se gobierna con visitas_ver / visitas_dealers
+   / visitas_supervisar (una sola fuente de datos).
+   El seed reparte los seis según lo que cada perfil YA podía hacer, para que
+   nadie pierda acceso el día del deploy; desde ahí se recorta en Perfiles. */
+const PESTANAS_DEALERS = [
+  ['dealers_base_ver',        'Dealers — pestaña Base Dealer (ver)'],
+  ['dealers_base_editar',     'Dealers — pestaña Base Dealer (editar)'],
+  ['dealers_cat_ver',         'Dealers — pestaña Categoría Dealers (ver)'],
+  ['dealers_cat_editar',      'Dealers — pestaña Categoría Dealers (asignar categoría / activar / recalcular)'],
+  ['dealers_potencial_ver',   'Dealers — pestaña Potencial Parque/Dealer (ver)'],
+  ['dealers_potencial_editar','Dealers — pestaña Potencial Parque/Dealer (editar posiciones y ventas)'],
+];
+require('../../../../shared/migrate').migrar('dealers-permisos-pestanas', async () => {
+  // El módulo lo tomamos de un hermano (visitas_ver ya vive en Mantenedores).
+  const [[mod]] = await pool.query(
+    `SELECT id_modulo FROM funcionalidades WHERE codigo = 'mantenedores_dealers' LIMIT 1`);
+  if (!mod) return;
+  for (const [codigo, nombre] of PESTANAS_DEALERS) {
+    await pool.query(
+      `INSERT IGNORE INTO funcionalidades (id_modulo, codigo, nombre, href) VALUES (?,?,?,NULL)`,
+      [mod.id_modulo, codigo, nombre]);
+    const [[f]] = await pool.query('SELECT id_funcionalidad id FROM funcionalidades WHERE codigo = ?', [codigo]);
+    if (!f) continue;
+    // Quién lo hereda: VER = quien ya entraba al módulo; EDITAR = quien ya podía
+    // escribir en esa pestaña (base = dealer_ficha_revisar; cat/potencial = dealer_mantener).
+    const origen = codigo === 'dealers_base_editar'
+      ? ['dealer_ficha_revisar']
+      : codigo.endsWith('_editar')
+        ? ['mantenedores_dealers', 'dealer_mantener']
+        : ['mantenedores_dealers', 'dealer_mantener', 'dealer_ficha_revisar'];
+    // habilitado = 1 explícito: la columna es DEFAULT 0 y mis-permisos filtra por ella.
+    await pool.query(
+      `INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado)
+       SELECT DISTINCT pp.id_perfil, ?, 1
+         FROM permisos_perfil pp
+         JOIN funcionalidades fo ON fo.id_funcionalidad = pp.id_funcionalidad
+        WHERE pp.habilitado = 1 AND fo.codigo IN (?)`, [f.id, origen]);
+  }
+});
+
 function excelDate(v) {
   if (!v) return null;
   if (typeof v === 'string') return v.substring(0, 10);
