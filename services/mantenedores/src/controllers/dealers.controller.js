@@ -52,22 +52,43 @@ require('../../../../shared/migrate').enFila('dealers', async () => {
    El seed reparte los seis según lo que cada perfil YA podía hacer, para que
    nadie pierda acceso el día del deploy; desde ahí se recorta en Perfiles. */
 const PESTANAS_DEALERS = [
-  ['dealers_base_ver',        'Dealers — pestaña Base Dealer (ver)'],
-  ['dealers_base_editar',     'Dealers — pestaña Base Dealer (editar)'],
-  ['dealers_cat_ver',         'Dealers — pestaña Categoría Dealers (ver)'],
-  ['dealers_cat_editar',      'Dealers — pestaña Categoría Dealers (asignar categoría / activar / recalcular)'],
-  ['dealers_potencial_ver',   'Dealers — pestaña Potencial Parque/Dealer (ver)'],
-  ['dealers_potencial_editar','Dealers — pestaña Potencial Parque/Dealer (editar posiciones y ventas)'],
+  ['dealers_base_ver',        'Pestaña Base Dealer — ver'],
+  ['dealers_base_editar',     'Pestaña Base Dealer — editar'],
+  ['dealers_cat_ver',         'Pestaña Categoría Dealers — ver'],
+  ['dealers_cat_editar',      'Pestaña Categoría Dealers — asignar categoría / activar / recalcular'],
+  ['dealers_potencial_ver',   'Pestaña Potencial Parque/Dealer — ver'],
+  ['dealers_potencial_editar','Pestaña Potencial Parque/Dealer — editar posiciones y ventas'],
 ];
-require('../../../../shared/migrate').migrar('dealers-permisos-pestanas', async () => {
-  // El módulo lo tomamos de un hermano (visitas_ver ya vive en Mantenedores).
-  const [[mod]] = await pool.query(
-    `SELECT id_modulo FROM funcionalidades WHERE codigo = 'mantenedores_dealers' LIMIT 1`);
+require('../../../../shared/migrate').migrar('dealers-modulo-propio', async () => {
+  // Módulo PROPIO "Dealers": las siete casillas (la del módulo + las seis de
+  // pestaña) tienen que quedar juntas bajo su propio título en Perfiles y
+  // Permisos, no perdidas entre los mantenedores. Y como la card del home se
+  // otorga por tener CUALQUIER funcionalidad del módulo, marcar una sola
+  // pestaña ya hace aparecer la card — antes había que acordarse de marcar
+  // además "Dealers", y sin eso el permiso quedaba operando sin puerta.
+  const RUTA = '/mantenedores/dealers/';
+  let [[mod]] = await pool.query('SELECT id_modulo FROM modulos WHERE ruta = ? LIMIT 1', [RUTA]);
+  if (!mod) {
+    const [[o]] = await pool.query(
+      `SELECT COALESCE(MAX(orden), 0) + 1 n FROM modulos WHERE ruta = '/dealers-incorporacion/'`);
+    await pool.query(
+      `INSERT INTO modulos (nombre, descripcion, icono, ruta, orden, estado)
+       VALUES ('Dealers', 'Base de concesionarios, categorías y potencial de crecimiento', 'bi-building', ?, ?, 'activo')`,
+      [RUTA, o.n]);
+    [[mod]] = await pool.query('SELECT id_modulo FROM modulos WHERE ruta = ? LIMIT 1', [RUTA]);
+  }
   if (!mod) return;
+  // La casilla que abre el módulo se muda con las demás.
+  await pool.query(`UPDATE funcionalidades SET id_modulo = ? WHERE codigo = 'mantenedores_dealers'`, [mod.id_modulo]);
+
   for (const [codigo, nombre] of PESTANAS_DEALERS) {
     await pool.query(
       `INSERT IGNORE INTO funcionalidades (id_modulo, codigo, nombre, href) VALUES (?,?,?,NULL)`,
       [mod.id_modulo, codigo, nombre]);
+    // UPDATE aparte: la primera versión las creó bajo Mantenedores y con el
+    // nombre prefijado — acá se mudan y se renombran (el título ya lo da el módulo).
+    await pool.query('UPDATE funcionalidades SET id_modulo = ?, nombre = ? WHERE codigo = ?',
+      [mod.id_modulo, nombre, codigo]);
     const [[f]] = await pool.query('SELECT id_funcionalidad id FROM funcionalidades WHERE codigo = ?', [codigo]);
     if (!f) continue;
     // Quién lo hereda: VER = quien ya entraba al módulo; EDITAR = quien ya podía
@@ -86,6 +107,7 @@ require('../../../../shared/migrate').migrar('dealers-permisos-pestanas', async 
         WHERE pp.habilitado = 1 AND fo.codigo IN (?)`, [f.id, origen]);
   }
 });
+
 
 function excelDate(v) {
   if (!v) return null;
