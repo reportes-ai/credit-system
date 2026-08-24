@@ -5,6 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dealers — AutoFácil</title>
+  <!-- v1.1 — boton Exportar Excel: descarga la seleccion actual de filtros (todas las paginas, con datos de contacto; sin datos bancarios) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <script src="/js/xlsx.full.min.js"></script>
@@ -179,6 +180,9 @@
     <label class="form-check-label d-inline-flex align-items-center" style="gap:6px;font-size:.82rem;color:#c2410c;background:#fdf3ee;border:1px solid #f2d3c4;border-radius:8px;padding:4px 10px;cursor:pointer" title="Mostrar solo dealers con Reporte IA (Anthropic)">
       <input type="checkbox" id="filtroIA" class="form-check-input mt-0" onchange="cargar(1)"> <i class="bi bi-stars"></i> Con Reporte IA
     </label>
+    <button class="btn-importar" onclick="exportarExcel(this)" title="Descarga a Excel los dealers que muestran los filtros actuales (todas las páginas)">
+      <i class="bi bi-download me-1 text-success"></i>Exportar Excel
+    </button>
     <button class="btn-importar" onclick="document.getElementById('fileInput').click()">
       <i class="bi bi-file-earmark-excel me-1 text-success"></i>Importar Excel
     </button>
@@ -552,6 +556,46 @@ async function cargar(p) {
         </div>
       </td>
     </tr>`).join('');
+}
+
+/* ── Exportar a Excel la SELECCIÓN actual (mismos filtros, todas las páginas) ── */
+async function exportarExcel(btn) {
+  const q      = document.getElementById('filtroQ').value;
+  const ccs    = document.getElementById('filtroCcs').value;
+  const activo = document.getElementById('filtroActivo').value;
+  const cat    = document.getElementById('filtroCat').value;
+  const params = new URLSearchParams({ page: 1, limit: 10000 });
+  if (q)      params.append('q', q);
+  if (ccs)    params.append('ccs', ccs);
+  if (activo !== '') params.append('activo', activo);
+  if (cat)    params.append('categoria', cat);
+  if (document.getElementById('filtroIA')?.checked) params.append('con_ia', '1');
+  btn.disabled = true; const htmlBtn = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Exportando…';
+  try {
+    const j = await (await fetch('/api/dealers?' + params, { headers: H })).json();
+    if (!j.success) throw new Error(j.error || 'Error');
+    const rows = j.data.rows || [];
+    if (!rows.length) { alert('No hay dealers con estos filtros.'); return; }
+    const escX = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const filas = [
+      ['N°','N° IND','RUT','Nombre Dealer','Razón Social','CCS / Parque','Cat. Propuesta','Cat. Asignada','Activo',
+       'Contacto','Teléfono','Correo','Dirección','Comuna','Región','Fecha Incorporación'],
+      ...rows.map(d => [d.numero, d.numero_ind, d.rut, nombreDealer(d), d.nombre_razon, d.ccs_parque,
+        d.categoria_propuesta, d.categoria_asignada, d.activo ? 'SI' : 'NO',
+        d.contacto, d.telefono, d.correo, d.direccion, d.comuna, d.region,
+        d.fecha_incorporacion ? String(d.fecha_incorporacion).slice(0, 10) : '']),
+    ];
+    const html = '<table>' + filas.map((f, i) =>
+      '<tr>' + f.map(c => `<t${i ? 'd' : 'h'}>${escX(c)}</t${i ? 'd' : 'h'}>`).join('') + '</tr>').join('') + '</table>';
+    const blob = new Blob(['﻿<html><head><meta charset="utf-8"></head><body>' + html + '</body></html>'],
+      { type: 'application/vnd.ms-excel' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'dealers-' + (rows.length) + '-' + new Date().toISOString().slice(0, 10) + '.xls';
+    a.click(); URL.revokeObjectURL(a.href);
+  } catch (e) { alert('No se pudo exportar: ' + e.message); }
+  finally { btn.disabled = false; btn.innerHTML = htmlBtn; }
 }
 
 /* ── Categorías de dealers ── */
