@@ -44,6 +44,12 @@ async function revisar() {
       AND mes >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
   if (cruzados.length) avisos.push(`${cruzados.length} op(s) con MES distinto del mes de otorgamiento (las pantallas usan MES; un reporte por fecha va a diferir): ${cruzados.map(r => `${r.num_op} (mes ${r.mes}, otorgada ${r.f})`).join(' · ')}`);
 
+  /* Meses con candado: sus hallazgos NO se autocorrigen (el recálculo los salta
+     a propósito) y arreglarlos es una DECISIÓN (reabrir, recalcular, cerrar).
+     Van como aviso con esa instrucción, no como crítico diario (24-08-2026). */
+  const [mcRows] = await pool.query('SELECT mes FROM meses_cerrados WHERE cerrado=1');
+  const mesCerrado = new Set(mcRows.map(r => r.mes));
+
   // 3. AF/UAC otorgados sin rentabilidad guardada
   const [sinRent] = await pool.query(`
     SELECT num_op, DATE_FORMAT(COALESCE(mes,fecha_otorgado),'%Y-%m') m FROM creditos
@@ -51,13 +57,15 @@ async function revisar() {
       AND (UPPER(financiera) LIKE '%AUTOFIN%' OR UPPER(financiera) LIKE '%UNIDAD%')
       AND (ingreso_neto_total IS NULL OR ingreso_neto_total = 0)
       AND COALESCE(mes,fecha_otorgado) >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
-  if (sinRent.length) criticos.push(`${sinRent.length} otorgado(s) AF/UAC con rentabilidad guardada NULA o 0 (subestima el mes en todas las pantallas): ${sinRent.map(r => `${r.num_op} (${r.m})`).join(', ')}`);
+  const rentAb = sinRent.filter(r => !mesCerrado.has(r.m)), rentCe = sinRent.filter(r => mesCerrado.has(r.m));
+  if (rentAb.length) criticos.push(`${rentAb.length} otorgado(s) AF/UAC con rentabilidad guardada NULA o 0 (subestima el mes en todas las pantallas): ${rentAb.map(r => `${r.num_op} (${r.m})`).join(', ')}`);
+  if (rentCe.length) avisos.push(`${rentCe.length} otorgado(s) AF/UAC sin rentabilidad en MES CERRADO — el recálculo no los toca; corregirlos requiere reabrir el mes, recalcular y volver a cerrar: ${rentCe.map(r => `${r.num_op} (${r.m})`).join(', ')}`);
 
   // 4. Campo guardado internamente descuadrado (> $10)
   //    Fórmula del motor (rentabilidad-core.ingresoNetoTotal): ingresos − com
   //    dealer − com parque − arriendo parque prorrateado por operación.
   const [descuadre] = await pool.query(`
-    SELECT num_op,
+    SELECT num_op, DATE_FORMAT(COALESCE(mes,fecha_otorgado),'%Y-%m') m,
            ROUND(COALESCE(ingreso_neto_total,0) -
              (COALESCE(monto_comision_fin,0) + COALESCE(com_rdh,0) + COALESCE(com_cesantia,0) + COALESCE(com_reparaciones,0)
               - COALESCE(comdea_real,0) - COALESCE(com_parque,0) - COALESCE(arriendo_parque,0))) dif
@@ -66,7 +74,9 @@ async function revisar() {
       AND (UPPER(financiera) LIKE '%AUTOFIN%' OR UPPER(financiera) LIKE '%UNIDAD%')
       AND COALESCE(mes,fecha_otorgado) >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
     HAVING ABS(dif) > 10 LIMIT 20`, [desde]);
-  if (descuadre.length) criticos.push(`${descuadre.length} op(s) con ingreso_neto_total que no cuadra con sus componentes (recálculo pendiente o edición a medias): ${descuadre.map(r => `${r.num_op} (dif $${Number(r.dif).toLocaleString('es-CL')})`).join(', ')}`);
+  const descAb = descuadre.filter(r => !mesCerrado.has(r.m)), descCe = descuadre.filter(r => mesCerrado.has(r.m));
+  if (descAb.length) criticos.push(`${descAb.length} op(s) con ingreso_neto_total que no cuadra con sus componentes (recálculo pendiente o edición a medias): ${descAb.map(r => `${r.num_op} (dif $${Number(r.dif).toLocaleString('es-CL')})`).join(', ')}`);
+  if (descCe.length) avisos.push(`${descCe.length} op(s) con ingreso_neto_total descuadrado en MES CERRADO — corregirlas requiere reabrir el mes, recalcular y volver a cerrar: ${descCe.map(r => `${r.num_op} (${r.m}, dif $${Number(r.dif).toLocaleString('es-CL')})`).join(', ')}`);
 
   /* 6. CARTA OTORGADA con el crédito atrás — el caso 26080532 (13-08-2026): la
         carta se otorgó, el crédito quedó en 'Digitado'/PENDIENTE y la venta
@@ -78,6 +88,10 @@ async function revisar() {
     SELECT ca.op_carta, cr.num_op, cr.estado_credito, ca.ejecutivo
       FROM cartas_aprobacion ca JOIN creditos cr ON cr.id = ca.id_credito_creado
      WHERE ca.otorgado = 1 AND UPPER(COALESCE(cr.estado_eval,'')) <> 'OTORGADO'
+       -- ANULADO se excluye: la anulación de operación es un proceso deliberado
+       -- con doble firma que deja bitácora y ajusta la cartola — no es una venta
+       -- perdida invisible (caso real 26080813 / carta 26649697LS-R1, 24-08-2026)
+       AND UPPER(COALESCE(cr.estado_eval,'')) <> 'ANULADO'
        AND ca.fecha_otorgado >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) LIMIT 20`, [desde]);
   if (otorgadaSinCredito.length) criticos.push(
     `${otorgadaSinCredito.length} carta(s) OTORGADA(S) cuyo crédito NO quedó en OTORGADO — esas ventas no aparecen en el dashboard ni en comisiones: ` +
