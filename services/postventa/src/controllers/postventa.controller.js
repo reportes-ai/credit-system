@@ -2489,8 +2489,29 @@ const marcarHistorico = async (req, res) => {
    CONSULTAS DE ESTADO (read-only) — Saldos Precio y Facturas/Comisión.
    Estado actual = etapa más avanzada del track según el orden canónico.
    ════════════════════════════════════════════════════════════════ */
-const ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES ENVIADOS','FUNDANTES RECIBIDOS','FONDOS RECIBIDOS','LIBERADO A PAGO','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
-const ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
+/* El orden de las etapas NO se hardcodea acá: vive en el mantenedor de Post Venta
+   (postventa_config → etapas_saldo / etapas_comision), que es lo que dibuja la
+   pantalla de Seguimiento y lo que el Administrador puede reordenar.
+   Tenerlo en una constante ya se pagó caro: la copia decía ENVIADOS antes que
+   RECIBIDOS y LIBERADO antes que FONDOS, al revés que el mantenedor, así que el
+   "estado actual" de esas operaciones salía equivocado en las consultas.
+   Los arreglos de abajo son solo el respaldo si la config no se puede leer. */
+const DEF_ORDEN_SALDO    = ['FUNDANTES PENDIENTES','FUNDANTES RECIBIDOS','FUNDANTES ENVIADOS','LIBERADO A PAGO','FONDOS RECIBIDOS','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','SALDO PRECIO PAGADO'];
+const DEF_ORDEN_COMISION = ['COMISION PENDIENTE','COMISION A PAGAR','CARTOLA EMITIDA','CARTOLA ENVIADA','FACTURA RECIBIDA','ORDEN DE PAGO EMITIDA','ENVIADO A PAGO','COMISION PAGADA'];
+const _ordenCache = { SALDO: null, COMISION: null, t: 0 };
+async function ordenEtapas(track) {
+  const def = track === 'SALDO' ? DEF_ORDEN_SALDO : DEF_ORDEN_COMISION;
+  // Caché de 60 s: el orden cambia de tarde en tarde y TiDB cobra por consulta.
+  if (_ordenCache[track] && Date.now() - _ordenCache.t < 60000) return _ordenCache[track];
+  try {
+    const clave = track === 'SALDO' ? 'etapas_saldo' : 'etapas_comision';
+    const [[row]] = await pool.query('SELECT valor FROM postventa_config WHERE clave=?', [clave]);
+    const arr = JSON.parse(row.valor).map(x => x.etapa).filter(Boolean);
+    if (!arr.length) return def;
+    _ordenCache[track] = arr; _ordenCache.t = Date.now();
+    return arr;
+  } catch (_) { return def; }
+}
 
 // id_seguimiento → { estado, fecha_estado, paso, etapas:[{etapa,fecha,usuario}] }
 async function etapasPorTrack(ids, track, orden) {
@@ -2555,6 +2576,7 @@ async function visibilidadEjecutivo(req) { return _visEjec(req.usuario); }
 
 const consultaSaldos = async (req, res) => {
   try {
+    const ORDEN_SALDO = await ordenEtapas('SALDO');   // orden del mantenedor, no una copia
     const q = String(req.query.q || '').trim();
     const parque = String(req.query.parque || '').trim();
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
@@ -2644,6 +2666,7 @@ const consultaSaldos = async (req, res) => {
 
 const consultaFacturas = async (req, res) => {
   try {
+    const ORDEN_COMISION = await ordenEtapas('COMISION');   // orden del mantenedor, no una copia
     const q = String(req.query.q || '').trim();
     const mes = String(req.query.mes || '').trim();          // YYYY-MM
     const factura = String(req.query.factura || '').trim();
@@ -2724,6 +2747,7 @@ const consultaFacturas = async (req, res) => {
 
 const consultaFundantes = async (req, res) => {
   try {
+    const ORDEN_SALDO = await ordenEtapas('SALDO');   // orden del mantenedor, no una copia
     const q = String(req.query.q || '').trim();
     const parque = String(req.query.parque || '').trim();
     const recibido7 = req.query.recibido7 === '1' || req.query.recibido7 === 'true';
