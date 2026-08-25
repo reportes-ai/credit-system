@@ -2175,7 +2175,9 @@ const getComisionesAPagar = async (req, res) => {
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
              fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,
-             DATEDIFF(CURDATE(), efa.fecha) AS dias,
+             /* Antigüedad desde la fecha de la FACTURA (la que se muestra); la etapa
+                marcada en el sistema es solo respaldo. DATE() empareja tipos (gotcha). */
+             DATEDIFF(CURDATE(), COALESCE(fc.fecha_factura, DATE(efa.fecha))) AS dias,
              (epg.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
              eev.usuario AS enviado_por
@@ -2197,7 +2199,7 @@ const getComisionesAPagar = async (req, res) => {
         SELECT 1 FROM postventa_etapas ep
         WHERE ep.id_seguimiento = s.id AND ep.track='COMISION' AND ep.etapa='COMISION PAGADA'
               AND DATE(ep.fecha) < CURDATE())
-      ORDER BY efa.fecha ASC, s.num_op ASC
+      ORDER BY COALESCE(fc.fecha_factura, DATE(efa.fecha)) ASC, s.num_op ASC
     `);
     res.json({ success: true, data: rows, error: null });
   } catch (e) {
