@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — 4.10 WhatsApp usernames/BSUID (reservar nombre de Facilito + adaptar bot). v1.2 — 2.7 resuelto: mes de atribucion (mes contable hasta jul-26, fecha de curse desde ago-26). v1.1 — 6.7 consolidar las 3 copias del documento Solicitud de Pago. v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
+<!-- v1.4 — seccion 8: hallazgos de la auditoria de terminos que mueven numeros (com. dealer carta, arriendo parque, penetracion, saldo insoluto, motores rentabilidades). v1.3 — 4.10 WhatsApp usernames/BSUID (reservar nombre de Facilito + adaptar bot). v1.2 — 2.7 resuelto: mes de atribucion (mes contable hasta jul-26, fecha de curse desde ago-26). v1.1 — 6.7 consolidar las 3 copias del documento Solicitud de Pago. v1.0 — vista consolidada de todo lo que esta abierto: seguridad, contabilidad, datos, modulos, backlog, calidad y agenda. Fuente espejo: docs/PENDIENTES.md -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -34,7 +34,7 @@
 
   <div class="toc">
     <a href="#s1">1. Seguridad e infraestructura</a><a href="#s2">2. Contabilidad</a><a href="#s3">3. Datos y migraciones</a>
-    <a href="#s4">4. Módulos con fase pendiente</a><a href="#s5">5. Backlog aprobado</a><a href="#s6">6. Calidad y proceso</a><a href="#s7">7. Herramientas y agenda</a>
+    <a href="#s4">4. Módulos con fase pendiente</a><a href="#s5">5. Backlog aprobado</a><a href="#s6">6. Calidad y proceso</a><a href="#s7">7. Herramientas y agenda</a><a href="#s8">8. Auditoría de términos</a>
   </div>
 
   <h2 id="s1">1. Seguridad e infraestructura</h2>
@@ -121,6 +121,18 @@
     <tr><td>7.2</td><td>Revisión de código en la nube</td><td>Quedan 2 revisiones del ciclo. Se lanzan antes de cambios grandes.</td></tr>
     <tr><td>7.3</td><td>Demo a la auditoría externa</td><td>Lunes 17-08-2026 a las 17:00, en el ambiente de staging. Guion paso a paso listo, ambiente alineado y proveedor de prueba creado.</td></tr>
     <tr><td>7.4</td><td>Estreno del Revisor Automático Autofin</td><td>Con una solicitud real; los switches del motor deben quedar encendidos en el mantenedor de Excepciones Comerciales.</td></tr>
+  </table>
+
+  <h2 id="s8">8. Auditoría de términos — hallazgos que mueven números <span style="color:#b45309">(24-08-2026)</span></h2>
+  <p style="color:#475569;font-size:.85rem">Los renombres cosméticos ya se aplicaron (v217.8 + v217.9): Monto Financiado, Financiera, Etapa, Dealer, Rentabilidad perdida, Ingreso Neto Operacional. Lo de abajo quedó pendiente porque <b>cambia montos mostrados o conducta de procesos</b> — revisar uno a uno.</p>
+  <table>
+    <tr><th>#</th><th>Pendiente</th><th>Detalle</th></tr>
+    <tr><td>8.1</td><td>Com. Dealer no obedece "la carta manda"</td><td>El cálculo de rentabilidad usa solo la tabla del dealer/pizarra e ignora la participación pactada en la carta, pero la cartola paga por la carta. Cuando difieren, el dashboard muestra una comisión distinta de la pagada. Decidir si el cálculo debe preferir la de la carta cuando exista.</td></tr>
+    <tr><td>8.2</td><td>Arriendo de parque: completo vs prorrateado</td><td>Al digitar se guarda el arriendo mensual completo; el recálculo mensual lo deja prorrateado entre las otorgadas. Misma columna, dos magnitudes: la op recién digitada subestima su ingreso neto hasta el recálculo.</td></tr>
+    <tr><td>8.3</td><td>Penetración con tres denominadores</td><td>El motor (lo que paga AutoFin) usa universos elegibles por seguro; la tarjeta del dashboard usa un denominador único; el correo de alerta incluye aprobadas, CORFO y ops sin seguro informado — hunde el % y puede alertar "bajo 40%" en falso. Cablear tarjeta y correo al motor.</td></tr>
+    <tr><td>8.4</td><td>"Saldo insoluto" que en realidad es el prepago</td><td>El cálculo de prepago devuelve bajo la clave saldo_insoluto el TOTAL a prepagar (capital + mora + gastos + comisión); los certificados de deuda devuelven capital puro con la misma clave. El placeholder {saldo} de las plantillas puede imprimir el prepago rotulado como saldo.</td></tr>
+    <tr><td>8.5</td><td>Pestañas "Rentabilidades" con motores propios</td><td>Créditos y Cotizaciones calculan inline y divergen entre sí y del simulador (CORFO como costo en una, como ingreso en el motor; com. ejecutivo sobre bases distintas). Consolidar en el motor único.</td></tr>
+    <tr><td>8.6</td><td>Menores</td><td>Filtro "Estado" de Reportería mezcla etapa y estado de cartera · el desplegable de la ficha ofrece OTORGADO y CURSADO como dos etapas para el mismo hecho · alias interno rentab_afa = ingreso bruto (nombre engañoso) · "Comisión Neta" con tres significados según pantalla.</td></tr>
   </table>
 
   <h2>Dónde más aparece esta lista</h2>

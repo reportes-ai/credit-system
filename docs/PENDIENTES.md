@@ -98,6 +98,21 @@
 | 7.3 | **Demo a la auditora Noelia** | Lunes **17-08-2026, 17:00**, en staging. Guion en Word (`Documentos/guion-demo-auditoria.docx`) y como Artifact; ambiente alineado y proveedor de prueba creado. |
 | 7.4 | **Estreno del Revisor Automático Autofin** | Solicitud 6261184 (ID verificado libre); los switches del motor deben quedar encendidos en Mantenedores → Excepciones Comerciales. |
 
+## 8. Auditoría de consistencia de términos — hallazgos que MUEVEN NÚMEROS (24-08-2026)
+
+> Los renombres cosméticos ya se aplicaron (v217.8 dashboard + v217.9 toda la app,
+> commits `886b4cbf` y `b99a3dde`). Lo de abajo quedó **sin tocar** porque cambia
+> montos mostrados o conducta de procesos: revisar con Pato uno a uno.
+
+| # | Pendiente | Estado / detalle |
+|---|---|---|
+| 8.1 | **Com. Dealer no obedece "la carta manda"** | `comdea_real` (calcular-operacion.js / recalcular-mes.js) sale SOLO de la tabla del dealer/pizarra e ignora `part_bruto` de la carta, pero la cartola paga `COALESCE(part_bruto, comdea_real)`. Cuando la carta negoció otro monto, dashboard/rentabilidad muestran una comisión distinta de la pagada (y el `ingreso_neto_total` queda calculado con la que no se paga). El tooltip del dashboard y el glosario afirman "manda la carta" — hoy es falso para el cálculo. Decidir: ¿calcular-operacion debe preferir `part_bruto` cuando exista? |
+| 8.2 | **`arriendo_parque` guarda dos magnitudes** | Al digitar, `calcular-operacion.js` guarda el arriendo mensual COMPLETO; `recalcular-mes.js` lo deja PRORRATEADO (arriendo ÷ otorgadas del mes). Misma columna, mismo rótulo. Entre digitación y recálculo la op carga el arriendo íntegro y su ingreso neto sale subestimado. Fix probable: prorratear (o dejar 0) al digitar y que el recálculo mande. |
+| 8.3 | **Penetración con tres denominadores** | (a) Motor `penetracion.js` = universo elegible por seguro (lo que paga AutoFin). (b) Tarjeta del dashboard = un solo denominador, sin exclusiones EMPRESA/INDEPENDIENTE. (c) Correo "Alerta Penetración" = incluye APROBADO, CORFO y ops sin ningún seguro informado → hunde el % y puede gatillar la alerta "bajo 40%" en falso. El glosario del dashboard promete universo elegible (hoy falso para la tarjeta). Fix: cablear tarjeta y correo al motor. |
+| 8.4 | **`saldo_insoluto` transporta el monto de prepago** | `calcularPrepago` (certificados.controller.js) devuelve `saldo_insoluto: total` = capital + mora + intereses + gastos + comisión de prepago; los certificados de deuda vigente devuelven capital puro bajo la misma clave. El placeholder `{saldo}` de las plantillas editables puede imprimir el prepago rotulado como saldo insoluto. Fix: clave propia (`monto_prepago`) manteniendo compatibilidad de plantillas. |
+| 8.5 | **Pestañas "Rentabilidades" con motores propios** | `creditos/app.js` (credCalcFull) y `cotizaciones/index.html` calculan inline, divergen entre sí y del motor AF_RENT: CORFO y bono como COSTO (en AF_RENT CORFO es INGRESO), com. ejecutivo sobre `saldoPrecio` en Cotizaciones vs `montoFin` en el resto, seguros con fórmula distinta. Máxima 1 (un solo motor): consolidar ambos en AF_RENT/CORE. |
+| 8.6 | **Menores** | (a) Filtro "Estado" de Reportería mezcla etapa y estado de cartera en un solo control. (b) Desplegable de `creditos/revisar.html` ofrece OTORGADO y CURSADO como dos etapas elegibles para el mismo hecho (ver cuántas ops tienen CURSADO antes de retirar la opción). (c) Alias `rentab_afa` en la API del dashboard = ingreso bruto por colocación, nombre engañoso para consumidores nuevos. (d) "Comisión Neta" significa neto de IVA (cartolas), efecto neto en rentabilidad (excepciones) y markup de seguro (factores-seguro) — cada uso está explicado en su contexto, pero son tres significados. |
+
 ---
 
 ## Dónde más aparece esto
