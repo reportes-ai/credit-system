@@ -472,7 +472,11 @@ function buildV2() {
   const avgPlazo = det.length ? Math.round(det.reduce((a,r)=>a+r.plazo,0)/det.length) : 0;
   const avgFin   = totOps ? Math.round(totFin/totOps) : 0;
 
-  const totIN = totIG - totCD_P;
+  /* Ingreso Neto Operacional = motor único ingreso_neto_total (ingresos − com.
+     dealer − com. parque − arriendo prorrateado). Antes se calculaba acá como
+     bruto − comisiones, que omitía el arriendo prorrateado y usaba el MISMO
+     rótulo que el neto final del P&L — dos fórmulas con un nombre. */
+  const totIN = det.reduce((a,r)=>a+(r.ing_neto||0),0) || (totIG - totCD_P);
   const totSpread = totAFA - totCD - totPar;
   document.getElementById('kpi2').innerHTML = `
     <div class="kpi-box"><div class="kpi-label">Ingreso Bruto</div><div class="kpi-val big">${fM(totIG)}</div></div>
@@ -627,7 +631,8 @@ function buildRentabTable() {
   const totOpsF = rows.length;
   const avgPlazoF = totOpsF ? Math.round(rows.reduce((a,r)=>a+r.plazo,0)/totOpsF) : 0;
   const avgFinF   = totOpsF ? Math.round(tot.fin/totOpsF) : 0;
-  const totIN_F = tot.ig - (tot.cd + tot.par);
+  // Mismo motor que buildV2: ingreso_neto_total, no bruto − comisiones.
+  const totIN_F = rows.reduce((a,r)=>a+(r.ing_neto||0),0) || (tot.ig - (tot.cd + tot.par));
   const totSpread_F = tot.afa - tot.cd - tot.par;
   document.getElementById('kpi2').innerHTML = `
     <div class="kpi-box"><div class="kpi-label">Ingreso Bruto</div><div class="kpi-val big">${fM(tot.ig)}</div></div>
@@ -1163,7 +1168,7 @@ function buildV1b() {
       <tr><td>Com. Parque</td><td>${fM(jTotPar)}</td><td>${pctFin(jTotPar, jTotFin)}</td></tr>
       <tr><td>Arriendo Parque</td><td id="jan1b-arr">${fM(jTotArr)}</td><td id="jan1b-arr-pct">${pctFin(jTotArr, jTotFin)}</td></tr>
       <tr><td>Comisión Ejecutivos</td><td id="jan1b-comej">…</td><td id="jan1b-comej-pct"></td></tr>
-      <tr><td><b>Ingreso Neto</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td><td><b id="jan1b-neto-pct">${pctFin(jTotNeto, jTotFin)}</b></td></tr>
+      <tr><td><b>Ing. Neto AutoFácil</b></td><td><b id="jan1b-neto">${fM(jTotNeto)}</b></td><td><b id="jan1b-neto-pct">${pctFin(jTotNeto, jTotFin)}</b></td></tr>
     </tbody>`;
   // Comisión de ejecutivos del mes anterior — motor único del módulo Comisiones
   cargarComisionEjecutivosMesAnt();
@@ -5798,8 +5803,8 @@ async function buildVRentEj(soloRender){
     +   '<div style="background:linear-gradient(90deg,#16a34a,#4caf50);width:'+pReal+'%" title="Realizado '+pReal.toFixed(1)+'%"></div>'
     +   '<div style="background:#ef9a9a;width:'+pLucro+'%" title="Rentabilidad perdida '+pLucro.toFixed(1)+'%"></div></div>'
     + '<div style="font-size:9px;color:#8aa0b8;line-height:1.5;margin-top:2px">'
-    +   '<b>Realizada</b>: campos guardados de cada operación (ingresos − com. dealer − com. parque), lo mismo que suma Otorgados. '
-    +   'El "Ingreso Neto" del Dashboard además resta arriendo parque y comisión ejecutivos (gastos del MES, no de la operación). '
+    +   '<b>Realizada</b>: el Ingreso Neto Operacional de cada operación (motor único: ingresos − com. dealer − com. parque − arriendo prorrateado). '
+    +   'El "Ing. Neto AutoFácil" del P&L además resta comisión ejecutivos y arriendo de parques sin colocación (gastos del MES, no de la operación). '
     +   '<b>Rentabilidad perdida</b>: estimado con el calculador — cuánto más habría dejado la otra financiera.</div>';
 
   // ── Tabla

@@ -362,7 +362,7 @@ function pintar(){
   <div class="grid kpis">
     ${kpi('Otorgadas · '+mesLab(mes), num(nOt), delta(nOt,otAntIg.length), cmpTxt, s12.map(s=>s.n), 'var(--accent2)')}
     ${kpi('Monto financiado', '$'+mm1(monto)+' <small>MM</small>', delta(monto,montoA), cmpTxt, s12.map(s=>s.monto), 'var(--ok)')}
-    ${kpi('Ingreso neto total', '$'+mm1(ingreso)+' <small>MM</small>', delta(ingreso,ingresoA), cmpTxt, s12.map(s=>s.ing), 'var(--violet)')}
+    ${kpi('Ingreso neto operacional', '$'+mm1(ingreso)+' <small>MM</small>', delta(ingreso,ingresoA), cmpTxt, s12.map(s=>s.ing), 'var(--violet)')}
     ${kpi('Ticket promedio', clp(tk), delta(tk,tkA), cmpTxt, s12.map(s=>s.tk), 'var(--gold)')}
   </div>
 
@@ -434,14 +434,14 @@ function pintar(){
       ${hayYoY?`<div class="yoy">
         ${yoyRow('Otorgadas', nOt, otYoY.length, num)}
         ${yoyRow('Monto financiado', monto, sum(otYoY,'monto_financiado'), v=>'$'+mm1(v)+' MM')}
-        ${yoyRow('Ingreso neto', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ingreso neto operacional', ingreso, sum(otYoY,'ingreso_neto_total'), v=>'$'+mm1(v)+' MM')}
         ${yoyRow('Ticket promedio', tk, otYoY.length?sum(otYoY,'monto_financiado')/otYoY.length:0, clp)}
       </div>`:'<span class="sub">Aún no hay datos del mismo mes del año anterior.</span>'}
       <h3 class="t" style="margin-top:18px"><i class="bi bi-calendar2-week"></i> Mes contra mes · ${mesLab(mes)} vs ${mesLab(mesAnt)}${esActual?' <span style="text-transform:none;letter-spacing:0;font-weight:600">(a igual día)</span>':''}</h3>
       <div class="yoy">
         ${yoyRow('Otorgadas', nOt, otAntIg.length, num)}
         ${yoyRow('Monto financiado', monto, montoA, v=>'$'+mm1(v)+' MM')}
-        ${yoyRow('Ingreso neto', ingreso, ingresoA, v=>'$'+mm1(v)+' MM')}
+        ${yoyRow('Ingreso neto operacional', ingreso, ingresoA, v=>'$'+mm1(v)+' MM')}
         ${yoyRow('Ticket promedio', tk, tkA, clp)}
       </div>
     </div>
@@ -453,7 +453,7 @@ function pintar(){
     <div class="tile fade" style="animation-delay:.3s"><div class="k"><i class="bi bi-hourglass-split"></i> Plazo promedio</div>
       <div class="v">${plazoProm.toLocaleString('es-CL',{maximumFractionDigits:0})} <small style="font-size:.75rem;color:var(--mut)">cuotas</small></div><div class="d">de las otorgadas del mes</div></div>
     <div class="tile fade" style="animation-delay:.32s"><div class="k"><i class="bi bi-cash-stack"></i> Margen del mes</div>
-      <div class="v">${margen.toLocaleString('es-CL',{maximumFractionDigits:1})}%</div><div class="d">ingreso neto / monto financiado</div></div>
+      <div class="v">${margen.toLocaleString('es-CL',{maximumFractionDigits:1})}%</div><div class="d">ingreso neto operacional / monto financiado</div></div>
     <div class="tile fade" style="animation-delay:.34s"><div class="k"><i class="bi bi-arrows-expand"></i> Mayor 200 UF</div>
       <div class="v">${nOt?Math.round(nMayor/nOt*100):0}%</div><div class="d">${num(nMayor)} de ${num(nOt)} operaciones</div></div>
     <div class="tile fade" style="animation-delay:.36s"><div class="k"><i class="bi bi-shop-window"></i> Dealers con negocio</div>
