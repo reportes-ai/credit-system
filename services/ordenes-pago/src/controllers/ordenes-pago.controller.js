@@ -374,7 +374,7 @@ const ORIGEN_LBL = { SALDO: 'Saldo Precio', COMISION: 'Comisión', GENERAL: 'Otr
 // Versión del esquema del documento congelado. Subir cuando cambie la lógica de armado
 // (fechas, desglose IVA, datos bancarios, etc.) para forzar el re-congelado idempotente.
 // v6 (31-07-2026): datos de transferencia estructurados también en las órdenes generales.
-const DOC_VERSION = 7;   // v7: tipo de cuenta por defecto "Cuenta Corriente" cuando la ficha no lo indica
+const DOC_VERSION = 8;   // v8: comisión narrada desde el NETO (factura +IVA / boleta −retención / emisor retiene) + referencia bruta pactada
 // YYYY-MM-DD. mysql2 devuelve DATETIME/DATE como objeto Date: formatear en hora de Chile
 // (NO usar String(Date).slice, que da "Tue Jun 23"). Si ya viene string ISO, recortar.
 const soloFecha = v => {
@@ -430,8 +430,9 @@ async function construirDocumento(oc) {
               COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, c.nombre_local, s.nombre_dealer) AS dealer_nombre,
               COALESCE(c.rut_dealer, d.rut) AS dealer_rut, d.num_cuenta, d.banco,
               d.cuenta_tipo, d.tipo_cuenta, d.nombre_cuenta, d.rut_pago,
-              fc.numero_factura, fc.es_boleta, fc.fecha_factura,
+              fc.numero_factura, fc.es_boleta, fc.emisor_retiene AS fc_emisor_ret, fc.fecha_factura,
               fc.monto_bruto AS fc_base, fc.impuesto_pct AS fc_pct, fc.impuesto_monto AS fc_imp, fc.monto_liquido AS fc_liquido,
+              s.comision AS comision_bruta,
               (SELECT 1 FROM postventa_etapas pe WHERE pe.id_seguimiento=s.id AND pe.track='COMISION' AND pe.etapa='COMISION PAGADA' LIMIT 1) AS pagado
          FROM postventa_ordenes_comision poc
          JOIN postventa_seguimiento s ON s.id = poc.id_seguimiento
@@ -486,17 +487,43 @@ async function construirDocumento(oc) {
   //   Factura (IVA):   neto=base, IVA=imp, bruto=neto+IVA=líquido, A pagar=bruto.
   //   Boleta (Retenc): bruto=base honorarios, retención=imp, neto=líquido, A pagar=neto.
   let tratamiento = 'EXENTO', neto = monto, imp = 0, bruto = monto, pct = 0;
+  let desgloseCom = null;
   if (esCom) {
     const fcBase = Number(row.fc_base) || 0, fcImp = Number(row.fc_imp) || 0, fcLiq = Number(row.fc_liquido) || 0, fcPct = Number(row.fc_pct) || 0;
     if (fcImp > 0) {
       if (row.es_boleta) { tratamiento = 'RET'; bruto = fcBase || monto; imp = fcImp; neto = fcLiq || monto; pct = fcPct || 15.25; }
       else { tratamiento = 'IVA'; neto = fcBase || monto; imp = fcImp; bruto = fcLiq || (neto + imp); pct = fcPct || 19; }
     }
+    /* Narrativa desde el NETO (pedido de Pato 25-08-2026): la comisión pactada es
+       bruta (IVA incluido); su NETO es la base común de los tres documentos.
+       Factura → neto + IVA. Boleta → neto − retención. Boleta con "el emisor
+       retiene" → se paga el neto completo. La tabla cuenta esa historia en vez
+       del genérico bruto/impuesto/neto que descolocaba con boleta. */
+    if (fcBase > 0 || fcLiq > 0) {
+      const comBruta = Number(row.comision_bruta) || 0;
+      if (!row.es_boleta) {
+        desgloseCom = [
+          { label: 'Comisión neta', monto: neto },
+          { label: `IVA (${pct || 19}%) — crédito fiscal AutoFácil`, monto: imp },
+        ];
+      } else if (Number(row.fc_emisor_ret) || fcImp === 0) {
+        desgloseCom = [
+          { label: 'Comisión neta (bruto de la boleta)', monto: fcBase || monto },
+          { label: 'Retención — la paga el emisor', monto: 0 },
+        ];
+      } else {
+        desgloseCom = [
+          { label: 'Comisión neta (bruto de la boleta)', monto: fcBase || monto },
+          { label: `Retención honorarios (${pct}%) — se descuenta`, monto: -imp },
+        ];
+      }
+      if (comBruta) desgloseCom.push({ label: 'Referencia: comisión bruta pactada (IVA incluido)', monto: comBruta });
+    }
   }
 
   // Saldo Precio de AUTOFIN: el documento desglosa Saldo + Transferencia + Limitación de
   // dominio; A pagar = la suma de los tres (exento). Los fijos viven en parametros_credito.
-  let desglose = null;
+  let desglose = desgloseCom;
   if (!esCom && String(row.financiera || '').toUpperCase() === 'AUTOFIN') {
     const base = Number(row.saldo_precio) || 0;
     const [pr] = await pool.query(

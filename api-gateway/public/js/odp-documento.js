@@ -1,4 +1,4 @@
-/* v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
+/* v1.3 — montos negativos como "− $x" (retención de boleta que se descuenta). v1.2 — el timbre PAGADO se ancla al fin del cuerpo (tapaba la trazabilidad). v1.1 — pie de TRAZABILIDAD (carta → aprobación → otorgamiento → fundantes → factura → orden → pago)
    ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    MOTOR ÚNICO del documento "Solicitud de Pago" (Orden de Pago)
 
@@ -12,7 +12,8 @@
    ───────────────────────────────────────────────────────────────── */
 (function () {
 const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const fmtMon = n => '$'+Number(n||0).toLocaleString('es-CL');
+// Negativos como descuento legible: "− $38.565" (la retención de una boleta se descuenta)
+const fmtMon = n => { const v = Number(n||0); return (v < 0 ? '− ' : '') + '$' + Math.abs(v).toLocaleString('es-CL'); };
 const fdate = d => d? String(d).slice(0,10).split('-').reverse().join('/') : '—';
 /* ── Documento "Solicitud de Pago" (formato AutoFácil) ── */
 const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];

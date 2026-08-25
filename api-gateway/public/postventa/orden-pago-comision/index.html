@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Emisión Orden de Pago Comisión — AutoFácil</title>
-  <!-- v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
+  <!-- v2.17 — resumen narrado desde el neto (+IVA / −retención / emisor retiene) con referencia bruta · v2.16 — cuadratura de boleta repone el IVA (bruto boleta = neto factura) antes de comparar contra las comisiones brutas · v2.15 — recuadro pre-emisión con datos faltantes en el popup Ver orden · v2.14 — botón 📎 por grupo: sube la factura (respaldo en el almacén) y viaja ADJUNTA en el correo de la ODP a Contabilidad · v2.13 — sin boton Enviar Correo (emitir ya lo manda solo) y el texto ya no dice "adjunto" (la orden va en el cuerpo) · v2.12 — navbar migrada al componente topnav · v2.10 — tipo de cuenta por defecto Cuenta Corriente si la ficha no lo indica · v2.9 — emitir manda el correo a Contabilidad automaticamente · v2.8 — boton Enviar Correo respeta el check Activo del mantenedor · v2.7 — desglose por motor único AF_IMPUESTO (comisión BRUTA, IVA incluido) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -300,8 +300,9 @@ function docHTML(ops){
       ${f0.numero_factura?`<tr><td style="${SresL}">N° ${esBoleta?'Boleta':'Factura'}</td><td style="${SresV}">${f0.numero_factura}${esBoleta?' (Boleta)':''}${f0.es_terceros?' · terceros':''}${ops.length>1?` · ${ops.length} operaciones`:''}</td></tr>`:''}
       <tr><td style="${SresL}">Depositar en</td><td style="${SresV}">${f0.num_cuenta? `<b>${f0.banco||''}</b> · ${f0.tipo_cuenta||'Cuenta Corriente'} · Cta. N° <b>${f0.num_cuenta}</b>` : '—'}</td></tr>
       <tr><td style="${SresL}">Titular</td><td style="${SresV}">${f0.nombre_cuenta||f0.nombre_dealer||'—'}${(f0.rut_pago||f0.rut_dealer)?' · RUT '+(f0.rut_pago||f0.rut_dealer):''}</td></tr>
-      <tr><td style="${SresL}">Monto ${esBoleta?'bruto':'neto'} factura</td><td style="${SresV}">${fmt(facturaNeto)}</td></tr>
-      <tr><td style="${SresL}">${impLbl}</td><td style="${SresV}">${fmt(facturaImp)}</td></tr>
+      <tr><td style="${SresL}">Comisión neta${esBoleta?' (bruto de la boleta)':''}</td><td style="${SresV}">${fmt(facturaNeto)}</td></tr>
+      <tr><td style="${SresL}">${esBoleta && !facturaImp ? 'Retención — la paga el emisor' : impLbl}${esBoleta && facturaImp ? ' — se descuenta' : (!esBoleta ? ' — crédito fiscal AutoFácil' : '')}</td><td style="${SresV}">${esBoleta && facturaImp ? '− ' : ''}${fmt(facturaImp)}</td></tr>
+      <tr><td style="${SresL}">Referencia: comisión bruta pactada (IVA incl.)</td><td style="${SresV};color:#64748b">${fmt(sumComision)}</td></tr>
       <tr><td style="${SresL}">A pagar</td><td style="${SresV};font-weight:700">${fmt(facturaPagar)}</td></tr>
       <tr><td style="${SresL}">Fecha a pagar</td><td style="${SresV}">${fechaPago}</td></tr>
     </tbody></table>
