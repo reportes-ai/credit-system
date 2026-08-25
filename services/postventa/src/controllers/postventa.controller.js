@@ -2169,7 +2169,9 @@ const getComisionesAPagar = async (req, res) => {
              c.id_financiera,
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              d.num_cuenta, d.banco,
-             COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
+             /* GOTCHA TiDB: COALESCE(DATE, DATETIME) devuelve NULL aunque ambos
+                existan (medido 25-08-2026). Formatear a texto antes de mezclar. */
+             COALESCE(DATE_FORMAT(fc.fecha_factura,'%Y-%m-%d'), DATE_FORMAT(efa.fecha,'%Y-%m-%d')) AS fecha_factura,
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
              fc.impuesto_pct AS impuesto_pct, fc.impuesto_monto AS impuesto_monto, fc.monto_liquido AS monto_liquido,
@@ -2216,7 +2218,9 @@ const getOrdenPagoComision = async (req, res) => {
              COALESCE(d.rut_pago, dn.rut_pago) AS rut_pago,
              COALESCE(d.tipo_cuenta, d.cuenta_tipo, dn.tipo_cuenta, dn.cuenta_tipo) AS tipo_cuenta,
              COALESCE(d.nombre_cuenta, dn.nombre_cuenta) AS nombre_cuenta,
-             COALESCE(fc.fecha_factura, efa.fecha) AS fecha_factura,
+             /* GOTCHA TiDB: COALESCE(DATE, DATETIME) devuelve NULL aunque ambos
+                existan (medido 25-08-2026). Formatear a texto antes de mezclar. */
+             COALESCE(DATE_FORMAT(fc.fecha_factura,'%Y-%m-%d'), DATE_FORMAT(efa.fecha,'%Y-%m-%d')) AS fecha_factura,
              COALESCE(fc.created_at, efa.fecha) AS fac_recepcion,
              fc.numero_factura AS numero_factura, fc.monto_bruto AS monto_factura,
              fc.es_terceros AS es_terceros, fc.es_boleta AS es_boleta,
