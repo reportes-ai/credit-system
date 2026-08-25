@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.0 — Portal del Postulante: CV leido con IA, preguntas tipificadas (si/no, escalas, %, alternativas, texto con tope), modo maqueta para RRHH, acuse por correo -->
+<!-- v2.1 — Portal del Postulante: formato/validación en vivo de RUT (rut-core), correo y pretensión de renta ($ es-CL) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,6 +35,9 @@
   input:focus, textarea:focus { outline:none; border-color:var(--accent); }
   .falta { border-color:#f59e0b !important; background:#fffbeb; }
   .falta-tag { color:var(--warn); font-size:.68rem; font-weight:800; }
+  .val-ok { border-color:#059669 !important; }
+  .val-mal { border-color:#dc2626 !important; background:#fef2f2; }
+  .hint { font-size:.68rem; font-weight:700; display:block; margin-top:2px; min-height:.9em; }
   textarea { resize:vertical; min-height:74px; }
   .item { border:1.5px solid #e5e9f0; border-radius:11px; padding:12px 14px; margin-bottom:10px; position:relative; background:#fbfdff; }
   .item .del { position:absolute; top:8px; right:10px; background:none; border:none; color:#dc2626; cursor:pointer; font-size:1rem; }
@@ -98,14 +101,14 @@
     <h3><i class="bi bi-person-vcard"></i>2 · Tus datos <span style="font-weight:400;font-size:.78rem;color:var(--warn)">— lo destacado en amarillo faltó en tu CV: complétalo</span></h3>
     <div class="grid2">
       <div><label>Nombre completo *</label><input id="f_nombre" oninput="prog()"></div>
-      <div><label>RUT</label><input id="f_rut" placeholder="12.345.678-9" oninput="prog()"></div>
-      <div><label>Correo *</label><input id="f_email" type="email" oninput="prog()"></div>
+      <div><label>RUT</label><input id="f_rut" placeholder="12.345.678-9" oninput="fmtRut(this);prog()"><small class="hint" id="rutHint"></small></div>
+      <div><label>Correo *</label><input id="f_email" type="email" oninput="valMail(this);prog()"><small class="hint" id="mailHint"></small></div>
       <div><label>Teléfono</label><input id="f_telefono" placeholder="+56 9 …" oninput="prog()"></div>
       <div><label>Fecha de nacimiento</label><input id="f_fecha_nacimiento" type="date" oninput="prog()"></div>
       <div><label>Comuna</label><input id="f_comuna" oninput="prog()"></div>
       <div><label>Dirección</label><input id="f_direccion" oninput="prog()"></div>
       <div><label>LinkedIn (opcional)</label><input id="f_linkedin" placeholder="linkedin.com/in/…" oninput="prog()"></div>
-      <div><label>Pretensión de renta (líquida, opcional)</label><input id="f_pretension_renta" placeholder="$ …" oninput="prog()"></div>
+      <div><label>Pretensión de renta (líquida, opcional)</label><input id="f_pretension_renta" placeholder="$ 1.500.000" inputmode="numeric" oninput="fmtMonto(this);prog()"></div>
     </div>
     <div id="secEstudios"><label style="margin-top:16px">Estudios</label><div id="estudios"></div>
       <button class="add" onclick="addEstudio()"><i class="bi bi-plus-lg me-1"></i>Agregar estudio</button></div>
@@ -142,9 +145,32 @@
 
 <footer>AutoFácil Crédito Automotriz · Portal del Postulante</footer>
 
+<script src="/js/rut-core.js"></script>
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
+
+/* ── formato y validación en vivo ── */
+function fmtRut(el) {
+  const clean = el.value.replace(/[^0-9kK]/g, '').toUpperCase().slice(0, 9);
+  el.value = clean.length >= 2 ? AF_RUT.formatear(clean) : clean;
+  const h = $('rutHint');
+  el.classList.remove('val-ok', 'val-mal');
+  if (clean.length < 8) { h.textContent = clean ? 'Ingresa el RUT completo con dígito verificador' : ''; h.style.color = '#9ca3af'; return; }
+  if (AF_RUT.validar(clean)) { el.classList.add('val-ok'); h.textContent = '✓ RUT válido'; h.style.color = '#059669'; }
+  else { el.classList.add('val-mal'); h.textContent = '✗ Dígito verificador incorrecto (¿debía ser ' + AF_RUT.calcDV(clean.slice(0, -1)) + '?)'; h.style.color = '#dc2626'; }
+}
+function valMail(el) {
+  const v = el.value.trim(), h = $('mailHint');
+  el.classList.remove('val-ok', 'val-mal');
+  if (!v) { h.textContent = ''; return; }
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { el.classList.add('val-ok'); h.textContent = ''; }
+  else { el.classList.add('val-mal'); h.textContent = '✗ Correo inválido (nombre@dominio.cl)'; h.style.color = '#dc2626'; }
+}
+function fmtMonto(el) {
+  const d = el.value.replace(/\D/g, '').slice(0, 9);
+  el.value = d ? '$ ' + d.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+}
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const PARAMS = new URLSearchParams(location.search);
 const SLUG = PARAMS.get('a') || '';
@@ -235,9 +261,10 @@ function aplicarCampos(c) {
   const set = (id, v) => { const el = $(id); el.value = v || ''; el.classList.toggle('falta', !v); };
   c = c || {};
   set('f_nombre', c.nombre_completo); set('f_rut', c.rut); set('f_email', c.email);
+  fmtRut($('f_rut')); valMail($('f_email'));
   set('f_telefono', c.telefono); set('f_fecha_nacimiento', normFecha(c.fecha_nacimiento));
   set('f_comuna', c.comuna); set('f_direccion', c.direccion); set('f_linkedin', c.linkedin);
-  $('f_pretension_renta').value = c.pretension_renta || '';
+  $('f_pretension_renta').value = c.pretension_renta || ''; fmtMonto($('f_pretension_renta'));
   $('f_idiomas').value = (c.idiomas || []).map(i => i.idioma + (i.nivel ? ' ' + i.nivel : '')).join(', ');
   $('f_habilidades').value = (c.habilidades || []).join(', ');
   $('estudios').innerHTML = ''; (c.estudios || []).forEach(e => addEstudio(e));
@@ -296,6 +323,7 @@ async function enviar() {
   const falta = [];
   if (!$('f_nombre').value.trim()) falta.push('tu nombre');
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test($('f_email').value.trim())) falta.push('un correo válido');
+  if ($('f_rut').value.trim() && AF_RUT.validar($('f_rut').value) === false) falta.push('un RUT válido (revisa el dígito verificador)');
   if (!CV) falta.push('tu CV');
   if ([...document.querySelectorAll('.pregunta')].some(w => !pregLista(w))) falta.push('responder todas las preguntas');
   if (!$('acepto').checked) falta.push('aceptar el guardado de tus antecedentes');
@@ -321,7 +349,7 @@ async function enviar() {
     const j = await (await fetch('/api/postulaciones/aviso/' + encodeURIComponent(SLUG) + '/postular', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        nombre: $('f_nombre').value.trim(), rut: $('f_rut').value.trim(), email: $('f_email').value.trim(),
+        nombre: $('f_nombre').value.trim(), rut: AF_RUT.normalizar($('f_rut').value) || $('f_rut').value.trim(), email: $('f_email').value.trim(),
         telefono: $('f_telefono').value.trim(), fecha_nacimiento: $('f_fecha_nacimiento').value,
         direccion: $('f_direccion').value.trim(), comuna: $('f_comuna').value.trim(),
         linkedin: $('f_linkedin').value.trim(), pretension_renta: $('f_pretension_renta').value.trim(),
