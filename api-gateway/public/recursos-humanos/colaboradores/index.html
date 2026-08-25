@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Colaboradores — AutoFácil</title>
-  <!-- v1.9 — modal mas ancho (1180px) para que la tabla de documentos quede en una fila -->
+  <!-- v2.0 — la subida de documentos se movio a RRHH > Carpetas Digitales; aca solo check/descarga/borrado -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -189,12 +189,9 @@ async function abrir(id){
     <div style="font-size:.75rem;color:#64748b;margin:-4px 0 6px">Tramo D = sin derecho a asignación. Los campos con <span style="color:#dc2626;font-weight:800">*</span> son obligatorios para el archivo Previred y el LRE.</div>
     <div class="fld" style="margin-top:10px"><label>Observaciones</label><input id="f_observaciones" value="${esc(f.observaciones||'')}"></div>
     <div class="sec">Carpeta digital</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <select id="docTipo" style="border:1.5px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:.83rem">${(FICHA.doc_tipos||[]).map(t=>`<option>${t}</option>`).join('')}</select>
-      <button class="btn-ghost" title="Agregar un tipo nuevo al catálogo (queda disponible para todos)" onclick="nuevoDocTipo()"><i class="bi bi-plus-lg"></i></button>
-      <input type="file" id="docFile" style="font-size:.82rem">
-      <button class="btn-ghost" onclick="subirDoc()"><i class="bi bi-upload me-1"></i>Subir</button>
-    </div>
+    <!-- La SUBIDA vive en RRHH › Carpetas Digitales (pestaña Subir documento) — acá
+         solo se administra: visibilidad en Mi Ficha, descarga y eliminación. -->
+    <div style="font-size:.76rem;color:#64748b;margin-bottom:8px"><i class="bi bi-info-circle me-1"></i>Los documentos se suben en <a href="/recursos-humanos/documentos-firmados/" target="_blank">Carpetas Digitales</a>.</div>
     <table><thead><tr><th>Tipo</th><th>Documento</th><th>Subido por</th><th>Fecha</th><th title="Marcado: el colaborador lo ve y descarga en Mi Ficha. Desmarcado: solo RRHH.">Mostrar en Mi Ficha</th><th></th></tr></thead>
       <tbody>${(FICHA.documentos||[]).map(d=>`<tr>
         <td><span class="tag">${esc(d.tipo)}</span></td><td>${esc(d.nombre_archivo)}</td><td>${esc(d.subido_por||'—')}</td><td>${fD(d.created_at)}</td>
@@ -261,30 +258,8 @@ async function guardarFicha(){
   dlg.close(); toast('✓ Ficha guardada'); cargar();
 }
 
-async function subirDoc(){
-  const file = document.getElementById('docFile').files[0];
-  if (!file) return alert('Elige un archivo');
-  if (file.size > 15*1024*1024) return alert('Máximo 15 MB');
-  const b64 = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(',')[1]); fr.readAsDataURL(file); });
-  const j = await (await fetch('/api/rrhh/docs/'+FICHA.usuario.id_usuario, { method:'POST', headers:HJ,
-    body: JSON.stringify({ tipo: document.getElementById('docTipo').value, archivo_nombre: file.name, mime_type: file.type, archivo_data: b64 }) })).json();
-  if (!j.success) return alert(j.error||'No se pudo subir');
-  toast('✓ Documento subido'); abrir(FICHA.usuario.id_usuario);
-}
-/* Nuevo TIPO de documento para la Carpeta Digital (catálogo paramétrico en
-   rh_config.doc_tipos — queda disponible para todos los colaboradores). */
-async function nuevoDocTipo(){
-  const nombre = prompt('Nombre del nuevo tipo de documento (ej: FINIQUITO, LICENCIA DE CONDUCIR):');
-  if (nombre === null || !nombre.trim()) return;
-  const j = await (await fetch('/api/rrhh/docs/tipos', { method:'POST', headers:HJ,
-    body: JSON.stringify({ nombre: nombre.trim() }) })).json().catch(()=>null);
-  if (!j || !j.success) return alert((j && j.error) || 'No se pudo crear el tipo');
-  FICHA.doc_tipos = j.data.tipos;
-  const sel = document.getElementById('docTipo');
-  sel.innerHTML = j.data.tipos.map(t=>`<option>${t}</option>`).join('');
-  sel.value = nombre.trim().toUpperCase().replace(/\s+/g,' ');
-  toast('✓ Tipo agregado al catálogo');
-}
+/* La subida y la creacion de tipos viven en RRHH > Carpetas Digitales
+   (/recursos-humanos/documentos-firmados/) - aca solo administracion. */
 /* Mostrar/ocultar el documento en Mi Ficha del colaborador. */
 async function visibleDoc(id, chk){
   const j = await (await fetch('/api/rrhh/docs/'+id+'/visible', { method:'PUT', headers:HJ,

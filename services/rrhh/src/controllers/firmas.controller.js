@@ -43,6 +43,9 @@ require('../../../../shared/migrate').enFila('rrhh-firmas', async () => {
         WHERE f2.codigo='rh_colaboradores' AND pp.habilitado=1`, [r.insertId]);
       await pool.query(`INSERT IGNORE INTO permisos_perfil (id_perfil, id_funcionalidad, habilitado) VALUES (1, ?, 1)`, [r.insertId]);
     }
+    // Renombrado 25-08-2026: el repositorio pasó a llamarse Carpetas Digitales
+    // (muestra TODA la carpeta del colaborador, no solo lo firmado).
+    await pool.query(`UPDATE funcionalidades SET nombre='Carpetas Digitales', icono='bi-folder2-open' WHERE codigo='rh_docs_firmados'`);
   }
   console.log('[rrhh-firmas] listo');
 });
@@ -229,12 +232,15 @@ exports.repositorio = async (req, res) => {
         WHERE EXISTS (SELECT 1 FROM rh_sol_firmas f WHERE f.id_solicitud=rh_solicitudes.id) LIMIT 1000`);
     sols.forEach(s => docs.push({ tipo: 'SOLICITUD', id: s.id, empleado: s.nombre, glosa: `Solicitud ${s.tipo}`, fecha: s.fecha, estado: s.estado }));
     const [subs] = await pool.query(
-      `SELECT d.id, d.tipo doc_tipo, d.nombre_archivo, DATE_FORMAT(d.fecha_firma,'%Y-%m-%d') fecha,
+      `SELECT d.id, d.tipo doc_tipo, d.nombre_archivo, d.firmado_fes, d.id_usuario,
+              DATE_FORMAT(COALESCE(d.fecha_firma, d.created_at),'%Y-%m-%d') fecha,
               d.visible_colaborador,
               TRIM(CONCAT_WS(' ', u.nombre, u.apellido)) empleado
          FROM rh_documentos d LEFT JOIN usuarios u ON u.id_usuario=d.id_usuario
-        WHERE d.firmado_fes=1 LIMIT 1000`);
-    subs.forEach(s => docs.push({ tipo: s.doc_tipo || 'OTRO', id: s.id, empleado: s.empleado, glosa: s.nombre_archivo, fecha: s.fecha, estado: 'FIRMADO', doc_id: s.id, visible_colaborador: Number(s.visible_colaborador ?? 1) }));
+        LIMIT 2000`);
+    // TODA la carpeta del colaborador (Carpetas Digitales): firmados y archivos simples.
+    subs.forEach(s => docs.push({ tipo: s.doc_tipo || 'OTRO', id: s.id, empleado: s.empleado, glosa: s.nombre_archivo, fecha: s.fecha,
+      estado: Number(s.firmado_fes) ? 'FIRMADO' : 'ARCHIVO', doc_id: s.id, visible_colaborador: Number(s.visible_colaborador ?? 1) }));
     // firmas de todo
     const [fd] = await pool.query(`SELECT entidad, entidad_id, rol, nombre, cargo, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_firmas ORDER BY created_at`);
     const [fs] = await pool.query(`SELECT id_solicitud, rol, nombre, decision, DATE_FORMAT(created_at,'%d-%m-%Y %H:%i') ff FROM rh_sol_firmas ORDER BY created_at`);

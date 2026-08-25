@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"><link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Documentos Firmados — RRHH</title>
-  <!-- v1.4 — check Mostrar en Mi Ficha por documento escaneado -->
+  <title>Carpetas Digitales — RRHH</title>
+  <!-- v2.0 — renombrado Carpetas Digitales: toda la carpeta, filtro por colaborador, crear tipo -->
   <link href="/css/bootstrap.min.css" rel="stylesheet"><link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --navy-light:#0255c5; --bg:#f0f4f8; }
@@ -17,7 +17,7 @@
     .card-box { background:#fff; border-radius:14px; box-shadow:0 1px 6px rgba(0,0,0,.07); padding:22px; margin-bottom:16px; }
     .buscador { width:100%; border:1.5px solid #cbd5e1; border-radius:10px; padding:11px 14px; font-size:.9rem; box-sizing:border-box; margin-bottom:14px; }
     table { width:100%; border-collapse:collapse; font-size:.84rem; } th { background:#f8fafc; color:#475569; text-transform:uppercase; font-size:.68rem; text-align:left; padding:10px 12px; border-bottom:1px solid #e5e7eb; } td { padding:9px 12px; border-bottom:1px solid #f1f5f9; vertical-align:top; }
-    .pill { border-radius:12px; padding:2px 9px; font-size:.68rem; font-weight:800; } .FIRMADO,.APROBADA { background:#dcfce7; color:#166534; } .EN_FIRMA,.PENDIENTE { background:#fef3c7; color:#92400e; } .RECHAZADA,.ANULADA { background:#fee2e2; color:#b91c1c; } .BORRADOR { background:#f1f5f9; color:#64748b; }
+    .pill { border-radius:12px; padding:2px 9px; font-size:.68rem; font-weight:800; } .FIRMADO,.APROBADA { background:#dcfce7; color:#166534; } .EN_FIRMA,.PENDIENTE { background:#fef3c7; color:#92400e; } .RECHAZADA,.ANULADA { background:#fee2e2; color:#b91c1c; } .BORRADOR,.ARCHIVO { background:#f1f5f9; color:#64748b; }
     .tp { border-radius:8px; padding:2px 8px; font-size:.66rem; font-weight:800; color:#fff; background:#64748b; }
     .tp-CONTRATO { background:#0141A2; } .tp-FINIQUITO { background:#b91c1c; } .tp-VACACIONES { background:#0d9488; } .tp-SOLICITUD { background:#7c3aed; } .tp-ANEXO { background:#d97706; }
     .firma-line { font-size:.74rem; color:#475569; }
@@ -31,12 +31,15 @@
 </head>
 <body>
 <div id="af-topnav"></div>
-<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Documentos Firmados',icon:'bi-patch-check',current:true}]};</script>
+<script>window.AF_TOPNAV={breadcrumb:[{label:'Inicio',href:'/'},{label:'Recursos Humanos',href:'/recursos-humanos/'},{label:'Carpetas Digitales',icon:'bi-folder2-open',current:true}]};</script>
 <div class="main">
-  <div class="page-banner"><i class="bi bi-patch-check"></i><div><h2>Documentos Firmados</h2><p>Repositorio central FES (Ley 19.799): contratos, finiquitos, vacaciones, solicitudes, anexos y documentos escaneados — todo con firma, hash e historial.</p></div></div>
+  <div class="page-banner"><i class="bi bi-folder2-open"></i><div><h2>Carpetas Digitales</h2><p>La carpeta digital de cada colaborador: contratos, finiquitos, vacaciones, solicitudes, anexos, certificados y escaneados — los firmados con FES (Ley 19.799) llevan firma, hash e historial.</p></div></div>
   <div class="tabs" id="tabs"></div>
   <div class="card-box" id="secLista">
-    <input class="buscador" id="q" placeholder="🔎 Buscar por empleado, tipo, fecha (aaaa-mm-dd), estado, glosa, firmante…" oninput="pintar()">
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <input class="buscador" id="q" style="flex:1;min-width:260px" placeholder="🔎 Buscar por empleado, tipo, fecha (aaaa-mm-dd), estado, glosa, firmante…" oninput="pintar()">
+      <select id="fEmp" onchange="pintar()" style="border:1.5px solid #cbd5e1;border-radius:10px;padding:11px 14px;font-size:.88rem;margin-bottom:14px;max-width:280px"><option value="">Todos los colaboradores</option></select>
+    </div>
     <table><thead><tr><th>Tipo</th><th>Documento</th><th>Empleado</th><th>Fecha</th><th>Estado</th><th>Firmas</th><th title="Marcado: el colaborador lo ve y descarga en Mi Ficha. Desmarcado: solo RRHH.">Mi Ficha</th><th></th></tr></thead>
     <tbody id="tb"><tr><td colspan="8" class="empty">Cargando…</td></tr></tbody></table>
   </div>
@@ -45,7 +48,7 @@
     <p style="font-size:.8rem;color:#64748b">El archivo se renombra automáticamente a <b>TIPO_Nombre-Apellido_fecha</b>, queda visible y descargable en este repositorio y en la carpeta del colaborador, y se registra su <b>huella SHA-256</b> — si alguien cambia el archivo después, se nota.</p>
     <div class="grid3">
       <div class="fld"><label>Empleado *</label><select id="sEmp"></select></div>
-      <div class="fld"><label>Tipo de documento *</label><select id="sTipo"></select></div>
+      <div class="fld"><label>Tipo de documento * <a href="#" style="font-size:.74rem;margin-left:6px" onclick="nuevoTipo();return false"><i class="bi bi-plus-lg"></i> crear otro tipo</a></label><select id="sTipo"></select></div>
       <div class="fld"><label>Fecha de firma *</label><input type="date" id="sFecha"></div>
     </div>
     <div class="drop" id="drop" onclick="document.getElementById('sFile').click()">
@@ -70,6 +73,11 @@ async function cargar(){
   if(!j.success){ document.getElementById('tb').innerHTML=`<tr><td colspan="7" class="empty">${esc(j.error)}</td></tr>`; return; }
   DOCS=j.data.documentos||[]; TIPOS_CAT=j.data.tipos||[];
   document.getElementById('sEmp').innerHTML=(j.data.empleados||[]).map(e=>`<option value="${e.id_usuario}">${esc(e.nombre)}</option>`).join('');
+  // Filtro por colaborador: la lista de empleados + los nombres que aparezcan en documentos (ex-empleados)
+  const fSel=document.getElementById('fEmp'), fVal=fSel.value;
+  const noms=[...new Set([...(j.data.empleados||[]).map(e=>e.nombre), ...DOCS.map(d=>d.empleado).filter(Boolean)])].sort((a,b)=>a.localeCompare(b));
+  fSel.innerHTML='<option value="">Todos los colaboradores</option>'+noms.map(n=>`<option>${esc(n)}</option>`).join('');
+  fSel.value=fVal;
   document.getElementById('sTipo').innerHTML=(j.data.tipos||[]).map(t=>`<option>${esc(t)}</option>`).join('');
   document.getElementById('sFecha').value=new Date().toISOString().slice(0,10);
   pintarTabs(); pintar();
@@ -88,7 +96,9 @@ window.setTab=t=>{ TAB=t; pintarTabs();
   if(t!=='SUBIR') pintar(); };
 function pintar(){
   const q=(document.getElementById('q').value||'').toLowerCase();
+  const fEmp=document.getElementById('fEmp').value;
   const rows=DOCS.filter(d=>TAB==='TODOS'||d.tipo===TAB)
+    .filter(d=>!fEmp||d.empleado===fEmp)
     .filter(d=>!q||[d.tipo,d.glosa,d.empleado,d.fecha,fd(d.fecha),d.estado,...(d.firmas||[]).map(f=>f.nombre+' '+(f.rol||''))].join(' ').toLowerCase().includes(q));
   document.getElementById('tb').innerHTML=rows.map(d=>`<tr>
     <td><span class="tp tp-${esc(d.tipo)}">${esc(d.tipo)}</span></td>
@@ -100,6 +110,17 @@ function pintar(){
     <td>${d.doc_id?`<a class="btn-mini" href="#" onclick="return descargar(${d.doc_id})"><i class="bi bi-download"></i> Ver</a>`:''}</td></tr>`).join('')
     ||'<tr><td colspan="8" class="empty">Sin documentos que calcen con la búsqueda.</td></tr>';
 }
+/* Nuevo TIPO de documento (catálogo paramétrico rh_config.doc_tipos). */
+window.nuevoTipo=async()=>{
+  const nombre=prompt('Nombre del nuevo tipo de documento (ej: FINIQUITO, LICENCIA DE CONDUCIR):');
+  if(nombre===null||!nombre.trim()) return;
+  const j=await (await fetch('/api/rrhh/docs/tipos',{method:'POST',headers:HJ,body:JSON.stringify({nombre:nombre.trim()})})).json().catch(()=>null);
+  if(!j||!j.success) return alert((j&&j.error)||'No se pudo crear el tipo');
+  TIPOS_CAT=j.data.tipos;
+  document.getElementById('sTipo').innerHTML=TIPOS_CAT.map(t=>`<option>${esc(t)}</option>`).join('');
+  document.getElementById('sTipo').value=nombre.trim().toUpperCase().replace(/\s+/g,' ');
+  pintarTabs();
+};
 /* Mostrar/ocultar el documento en Mi Ficha del colaborador (rh_documentos). */
 window.visibleDoc=async(id,chk)=>{
   const j=await (await fetch('/api/rrhh/docs/'+id+'/visible',{method:'PUT',headers:HJ,
