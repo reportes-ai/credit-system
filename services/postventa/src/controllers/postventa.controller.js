@@ -2568,6 +2568,8 @@ const consultaFacturas = async (req, res) => {
     const mes = String(req.query.mes || '').trim();          // YYYY-MM
     const factura = String(req.query.factura || '').trim();
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
+    // Factura ya recibida pero comisión aún sin pagar: lo que está esperando plata.
+    const factrec = req.query.factrec === '1' || req.query.factrec === 'true';
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
     const vis = await visibilidadEjecutivo(req);
@@ -2583,7 +2585,10 @@ const consultaFacturas = async (req, res) => {
     if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
     const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
-    const tablaWhere = baseWhere + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '');
+    const RECIBIDA = `EXISTS (SELECT 1 FROM postventa_etapas e2 WHERE e2.id_seguimiento=s.id AND e2.track='COMISION' AND e2.etapa='FACTURA RECIBIDA')`;
+    const tablaWhere = baseWhere
+      + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '')
+      + (factrec  ? ' AND ' + RECIBIDA + ' AND NOT ' + PAGADA + ')' : '');
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
@@ -2604,11 +2609,13 @@ const consultaFacturas = async (req, res) => {
       return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
         paso: e.paso || 0, total: ORDEN_COMISION.length, etapas: e.etapas || [] }; });
     // Resumen: comisiones/facturas pendientes de pago (sin COMISION PAGADA), sobre el filtro (sin límite).
+    // Con el toggle de factura recibida, el recuadro se acota igual que la tabla: si no,
+    // el total dice 314 y la lista muestra otra cosa — y el número deja de ser creíble.
     const [[resumen]] = await pool.query(`
       SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.comision),0) AS monto
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
-      ${baseWhere} AND NOT ${PAGADA})`, fp);
+      ${baseWhere} AND NOT ${PAGADA})${factrec ? ' AND ' + RECIBIDA : ''}`, fp);
     res.json({ success: true, data, orden: ORDEN_COMISION, resumen, error: null });
   } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
