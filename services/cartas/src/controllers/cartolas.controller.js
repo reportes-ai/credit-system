@@ -295,6 +295,35 @@ const getEnviadas = async (req, res) => {
   }
 };
 
+/* Seguimientos de Post Venta de un conjunto de movimientos de cartola.
+   Con carta: vía ca.id_credito_creado. SIN carta (ops digitadas directas — el
+   movimiento referencia el ID Financiera en num_op): vía creditos, primero por
+   id_financiera y si no por num_op. Sin esta segunda rama las ops sin carta
+   nunca recibían CARTOLA ENVIADA aunque la cartola se enviara (op 89013,
+   detectado 25-08-2026). filtroSql usa alias `m`. */
+async function segsDeMovs(filtroSql, vals) {
+  const [movs] = await pool.query(
+    `SELECT m.id, m.num_op, ca.id_credito_creado
+       FROM cartolas_movimientos m
+       LEFT JOIN cartas_aprobacion ca ON ca.id = m.id_carta
+      WHERE ${filtroSql}`, vals);
+  const credIds = new Set();
+  for (const m of movs) {
+    if (m.id_credito_creado) { credIds.add(Number(m.id_credito_creado)); continue; }
+    if (!m.num_op) continue;
+    const [[cr]] = await pool.query(
+      `SELECT id FROM creditos
+        WHERE (id_financiera = ? AND financiera != 'NO APLICA') OR num_op = ?
+        ORDER BY (id_financiera = ?) DESC LIMIT 1`,
+      [String(m.num_op), m.num_op, String(m.num_op)]);
+    if (cr) credIds.add(cr.id);
+  }
+  if (!credIds.size) return [];
+  const [segs] = await pool.query(
+    'SELECT id AS seg_id FROM postventa_seguimiento WHERE id_credito IN (?)', [[...credIds]]);
+  return segs;
+}
+
 const registrarEnvio = async (req, res) => {
   try {
     const { mes, rut_conc, concesionario, mail, total_bruto, ids } = req.body;
@@ -317,12 +346,7 @@ const registrarEnvio = async (req, res) => {
       marcados = u.affectedRows;
       // Post Venta: marca la etapa CARTOLA ENVIADA (track COMISION) de cada operación
       try {
-        const [segs] = await pool.query(
-          `SELECT DISTINCT ps.id AS seg_id
-           FROM cartolas_movimientos m
-           JOIN cartas_aprobacion ca ON ca.id = m.id_carta
-           JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
-           WHERE m.id IN (${ph})`, movIds);
+        const segs = await segsDeMovs(`m.id IN (${ph})`, movIds);
         if (segs.length) {
           // Rediseño 08-2026: CARTOLA APROBADA se eliminó y COMISION A PAGAR ya no
           // se fuerza acá (esa la marca FONDOS RECIBIDOS del saldo). El envío deja
@@ -370,12 +394,7 @@ const reversarEnvio = async (req, res) => {
     }
 
     // Operaciones (seguimientos) a las que hay que quitar CARTOLA ENVIADA — calcular ANTES de des-estampar
-    const [segs] = await pool.query(
-      `SELECT DISTINCT ps.id AS seg_id
-         FROM cartolas_movimientos m
-         JOIN cartas_aprobacion ca ON ca.id = m.id_carta
-         JOIN postventa_seguimiento ps ON ps.id_credito = ca.id_credito_creado
-        WHERE ${filtroJoin}`, fVals);
+    const segs = await segsDeMovs(filtroJoin, fVals);
 
     // Des-estampar los movimientos de esa cartola
     const [u] = await pool.query(
