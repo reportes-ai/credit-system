@@ -623,7 +623,7 @@ exports.importar = async (req, res) => {
     // Para las ops que viven como AUTOFIN con id_financiera = ID Trinidad, los montos
     // actuales se buscan por ese ID (el num_op nuestro es otro).
     const [existAf] = await pool.query(
-      `SELECT id, num_op, id_financiera, mes, ${COLS_ACT}
+      `SELECT id, num_op, id_financiera, estado_credito, mes, ${COLS_ACT}
          FROM creditos WHERE id_financiera IN (${numOps.map(() => '?').join(',')})`,
       numOps.map(String));
     const existAfMap = Object.fromEntries(existAf.map(r => [String(r.id_financiera), r]));
@@ -703,14 +703,23 @@ exports.importar = async (req, res) => {
           // — sin esto la op quedaba OTORGADO sin fecha y desaparecía de la Proyección).
           const esCursadoEq = (f.estado_credito || '').toLowerCase() === 'otorgado';
           const fechaEq = esCursadoEq ? (f.fecha_otorgado || hoyChile()) : null;
+          /* Un OTORGADO local NO se retrocede: si acá ya se otorgó (vía carta) y el
+             export es una foto anterior al curse (Pre-Curse/Aprobada), pisar la etapa
+             lo hacía desaparecer del dashboard (op 26080908, 25-08-2026). La etapa
+             local manda salvo que el archivo traiga un estado final (OTORGADO/ANULADO);
+             estado_autofin sí se actualiza siempre (es informativo). */
+          const actEq = existAfMap[String(f.num_op)];
+          const retrocedeEq = String(actEq?.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase());
           await pool.query(
             `UPDATE creditos SET estado_autofin = ?, ejecutivo_tri = ?,
-               estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL},
+               ${retrocedeEq ? '' : `estado_credito = ?, estado_eval = ?, ${SET_ESTADO_SQL},`}
                id_cliente = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(fecha_otorgado, ?),
                mes            = COALESCE(mes, ?), updated_at = NOW()
              WHERE id_financiera = ? AND financiera != 'NO APLICA'`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.estado_credito || null, idCliente,
+            [f.estado_autofin, f.ejecutivo_tri,
+             ...(retrocedeEq ? [] : [f.estado_credito, f.estado_eval, f.estado_credito || null]), idCliente,
              fechaEq, fechaEq ? fechaEq.slice(0, 7) + '-01' : null, String(f.num_op)]
           );
           actualizados++;
@@ -737,12 +746,16 @@ exports.importar = async (req, res) => {
           // al insertar (una op ingresada un mes y cursada al siguiente quedaba pegada al
           // mes de ingreso y desaparecía del dashboard del mes real de curse).
           const esCursado = (f.estado_credito || '').toLowerCase() === 'otorgado';
+          // Mismo resguardo que arriba: un OTORGADO local no se retrocede con una
+          // foto anterior del export; solo un estado final del archivo puede moverlo.
+          const retrocede = String(actual.estado_credito || '').toUpperCase() === 'OTORGADO'
+            && !['OTORGADO', 'ANULADO'].includes(String(f.estado_credito || '').toUpperCase());
           await pool.query(
             `UPDATE creditos SET
                estado_autofin = ?, ejecutivo_tri = ?,
-               estado_credito = ?,
+               ${retrocede ? '' : `estado_credito = ?,
                estado_eval    = ?,
-               ${SET_ESTADO_SQL},
+               ${SET_ESTADO_SQL},`}
                id_financiera  = COALESCE(NULLIF(id_financiera,''), ?),
                id_cliente     = COALESCE(id_cliente, ?),
                fecha_otorgado = COALESCE(?, fecha_otorgado),
@@ -750,7 +763,8 @@ exports.importar = async (req, res) => {
                marca    = COALESCE(?, marca), modelo   = COALESCE(?, modelo),
                vendedor = COALESCE(?, vendedor), updated_at = NOW()
              WHERE num_op = ?`,
-            [f.estado_autofin, f.ejecutivo_tri, f.estado_credito, f.estado_eval, f.estado_credito || null, String(f.num_op), idCliente,
+            [f.estado_autofin, f.ejecutivo_tri,
+             ...(retrocede ? [] : [f.estado_credito, f.estado_eval, f.estado_credito || null]), String(f.num_op), idCliente,
              esCursado ? f.fecha_otorgado : null, esCursado ? f.mes : null,
              f.marca, f.modelo, f.vendedor, f.num_op]
           );
