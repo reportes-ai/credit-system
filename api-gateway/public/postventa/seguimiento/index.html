@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.12 — popup Emitir ODP con la narrativa desde el neto (+IVA / −retencion / emisor retiene) · v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -776,12 +776,15 @@ function abrirEmitirODP(id, track){
     ${sinLim ? `<div class="em-row"><span style="color:#9a3412;font-weight:700">Limitación de Dominio — SIN LIMITACIÓN (excluida)</span><b>${fmtCLP(0)}</b></div>`
              : `<div class="em-row"><span>Limitación de Dominio</span><b>${fmtCLP(lim)}</b></div>`}` : '';
   if (esComision && r.fac_liquido != null && r.fac_imp_monto != null) {
+    // Narrativa desde el NETO (misma que la vista previa y el documento ODP):
+    // factura +IVA · boleta −retención · emisor retiene = neto completo.
     const pct = Number(r.fac_imp_pct) || 0;
     desgloseHTML += r.fac_boleta ? `
-      <div class="em-row"><span>Honorario bruto (boleta)</span><b>${fmtCLP(r.fac_monto)}</b></div>
-      <div class="em-row"><span>${Number(r.fac_emisor_ret)?'Retención (la paga el emisor)':`Retención honorarios (${pct}%)`}</span><b>− ${fmtCLP(r.fac_imp_monto)}</b></div>` : `
-      <div class="em-row"><span>Neto factura</span><b>${fmtCLP(r.fac_monto)}</b></div>
-      <div class="em-row"><span>IVA (${pct}%)</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
+      <div class="em-row"><span>Comisión neta (bruto de la boleta)</span><b>${fmtCLP(r.fac_monto)}</b></div>
+      <div class="em-row"><span>${Number(r.fac_emisor_ret)?'Retención — la paga el emisor':`Retención honorarios (${pct}%) — se descuenta`}</span><b>${Number(r.fac_imp_monto)?'− ':''}${fmtCLP(r.fac_imp_monto)}</b></div>` : `
+      <div class="em-row"><span>Comisión neta</span><b>${fmtCLP(r.fac_monto)}</b></div>
+      <div class="em-row"><span>IVA (${pct}%) — crédito fiscal AutoFácil</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
+    desgloseHTML += `<div class="em-row"><span style="color:#64748b">Referencia: comisión bruta pactada (IVA incl.)</span><b style="color:#64748b">${fmtCLP(base)}</b></div>`;
   }
   document.getElementById('emTitulo').textContent = 'Emitir Orden de Pago — ' + tLabel;
   // PRE-EMISIÓN: hacer notar los datos que faltan antes de emitir (motor AF_ODP_PRE)
