@@ -2568,10 +2568,8 @@ const consultaFacturas = async (req, res) => {
     const mes = String(req.query.mes || '').trim();          // YYYY-MM
     const factura = String(req.query.factura || '').trim();
     const pagados7 = req.query.pagados7 === '1' || req.query.pagados7 === 'true';
-    // Dos filtros independientes que se combinan: factura del dealer ya recibida,
-    // y comisión todavía sin pagar. Juntos = factura en mano esperando plata.
-    const factrec  = req.query.factrec === '1'  || req.query.factrec === 'true';
-    const pendpago = req.query.pendpago === '1' || req.query.pendpago === 'true';
+    // Filtro por etapa ACTUAL del ciclo (la botonera de estados, con su q y $).
+    const estadosSel = String(req.query.estados || '').split('|').map(s => s.trim()).filter(Boolean);
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 300));
     const filt = []; const fp = [];
     const vis = await visibilidadEjecutivo(req);
@@ -2587,11 +2585,19 @@ const consultaFacturas = async (req, res) => {
     if (factura) { filt.push(`f.numero_factura LIKE ?`); fp.push('%' + factura + '%'); }
     const baseWhere = 'WHERE 1=1' + (filt.length ? ' AND ' + filt.join(' AND ') : '');
     const PAGADA = `EXISTS (SELECT 1 FROM postventa_etapas e WHERE e.id_seguimiento=s.id AND e.track='COMISION' AND e.etapa='COMISION PAGADA'`;
-    const RECIBIDA = `EXISTS (SELECT 1 FROM postventa_etapas e2 WHERE e2.id_seguimiento=s.id AND e2.track='COMISION' AND e2.etapa='FACTURA RECIBIDA')`;
+    // Etapa actual = la de mayor índice alcanzada, el MISMO criterio de etapasPorTrack
+    // (allá en JS, acá en SQL para poder agrupar sin traerse todas las filas).
+    const ordenPH = ORDEN_COMISION.map(() => '?').join(',');
+    const SUB_ESTADO = `LEFT JOIN (
+        SELECT e3.id_seguimiento,
+               SUBSTRING_INDEX(GROUP_CONCAT(e3.etapa ORDER BY FIELD(e3.etapa,${ordenPH}) DESC SEPARATOR '||'), '||', 1) AS estado
+          FROM postventa_etapas e3 WHERE e3.track='COMISION' GROUP BY e3.id_seguimiento
+      ) x ON x.id_seguimiento = s.id`;
+    const joinEstado = estadosSel.length ? SUB_ESTADO : '';
+    const fpEstado = estadosSel.length ? [...ORDEN_COMISION] : [];
     const tablaWhere = baseWhere
       + (pagados7 ? ' AND ' + PAGADA + ' AND e.fecha >= (NOW() - INTERVAL 7 DAY))' : '')
-      + (factrec  ? ' AND ' + RECIBIDA : '')
-      + (pendpago ? ' AND NOT ' + PAGADA + ')' : '');
+      + (estadosSel.length ? ` AND COALESCE(x.estado,'SIN ETAPAS') IN (?)` : '');
     const [rows] = await pool.query(`
       SELECT s.id, s.num_op, s.financiera, s.rut_dealer,
              COALESCE(NULLIF(d.nombre_indexa,''), d.nombre_razon, NULLIF(cr.automotora,''), s.nombre_dealer) AS nombre_dealer,
@@ -2603,23 +2609,32 @@ const consultaFacturas = async (req, res) => {
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
       LEFT JOIN creditos cr ON cr.id = s.id_credito
       LEFT JOIN dealers  d  ON d.id_dealer = cr.id_dealer
+      ${joinEstado}
       ${tablaWhere}
       ORDER BY s.fecha_otorgado DESC, s.num_op DESC
-      LIMIT ?`, [...fp, limit]);
+      LIMIT ?`, [...fpEstado, ...fp, ...(estadosSel.length ? [estadosSel] : []), limit]);
     const ids = rows.map(r => r.id);
     const etapas = await etapasPorTrack(ids, 'COMISION', ORDEN_COMISION);
     const data = rows.map(r => { const e = etapas[r.id] || {};
       return { ...r, estado: e.estado || 'SIN ETAPAS', fecha_estado: e.fecha_estado || null,
         paso: e.paso || 0, total: ORDEN_COMISION.length, etapas: e.etapas || [] }; });
-    // Resumen: comisiones/facturas pendientes de pago (sin COMISION PAGADA), sobre el filtro (sin límite).
-    // Con el toggle de factura recibida el recuadro se acota igual que la tabla: si no,
-    // el total dice 314 y la lista muestra otra cosa — y el número deja de ser creíble.
+    // Resumen: comisiones pendientes de pago (sin COMISION PAGADA), sobre el filtro (sin límite).
     const [[resumen]] = await pool.query(`
       SELECT COUNT(*) AS pendientes, COALESCE(SUM(s.comision),0) AS monto
       FROM postventa_seguimiento s
       LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
-      ${baseWhere} AND NOT ${PAGADA})${factrec ? ' AND ' + RECIBIDA : ''}`, fp);
-    res.json({ success: true, data, orden: ORDEN_COMISION, resumen, error: null });
+      ${baseWhere} AND NOT ${PAGADA})`, fp);
+    // Botonera: cuántas operaciones y cuánta plata hay HOY en cada etapa del ciclo.
+    // Se calcula sobre el filtro de búsqueda pero SIN los estados seleccionados, para
+    // que los botones no se apaguen solos al usarlos (siguen mostrando el universo).
+    const [porEstado] = await pool.query(`
+      SELECT COALESCE(x.estado,'SIN ETAPAS') AS estado, COUNT(*) AS n, COALESCE(SUM(s.comision),0) AS monto
+      FROM postventa_seguimiento s
+      LEFT JOIN postventa_facturas_comision f ON f.id_seguimiento = s.id
+      ${SUB_ESTADO}
+      ${baseWhere}
+      GROUP BY COALESCE(x.estado,'SIN ETAPAS')`, [...ORDEN_COMISION, ...fp]);
+    res.json({ success: true, data, orden: ORDEN_COMISION, resumen, porEstado, error: null });
   } catch (e) { console.error('[consultaFacturas]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
 
