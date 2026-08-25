@@ -252,8 +252,8 @@ const avisoPublico = async (req, res) => {
 };
 
 /* POST /api/postulaciones/aviso/:slug/extraer-cv — la IA lee el CV y devuelve la ficha.
-   Acepta PDF e imágenes (JPG/PNG). Nunca falla la postulación: si la IA no está
-   disponible devuelve campos vacíos y el candidato llena a mano. */
+   Acepta PDF, imágenes (JPG/PNG) y Word .docx (texto vía mammoth). Nunca falla la
+   postulación: si la IA no está disponible devuelve campos vacíos y el candidato llena a mano. */
 const extraerCV = async (req, res) => {
   try {
     const [[a]] = await pool.query('SELECT id, activo FROM rh_avisos WHERE slug=?', [String(req.params.slug || '').slice(0, 24)]);
@@ -264,7 +264,17 @@ const extraerCV = async (req, res) => {
     if (buf.length > CV_MAX) return fail(res, 'El archivo supera 8 MB', 400);
     const esPdf = /pdf/i.test(mime || '');
     const esImg = /image\/(jpe?g|png)/i.test(mime || '');
-    if (!esPdf && !esImg) return ok(res, { campos: null, motivo: 'formato' });   // docx: se guarda igual, ficha a mano
+    const esDocx = /wordprocessingml/i.test(mime || '');   // .docx moderno (.doc legado sigue a mano)
+    if (!esPdf && !esImg && !esDocx) return ok(res, { campos: null, motivo: 'formato' });
+
+    // La API solo acepta PDF/imagen como adjunto: el .docx se convierte a texto plano
+    let textoDocx = null;
+    if (esDocx) {
+      try {
+        textoDocx = (await require('mammoth').extractRawText({ buffer: buf })).value.trim().slice(0, 40000);
+      } catch (_) {}
+      if (!textoDocx) return ok(res, { campos: null, motivo: 'formato' });
+    }
 
     const { analizar, disponible } = require('../../../../shared/anthropic');
     if (!disponible()) return ok(res, { campos: null, motivo: 'ia_off' });
@@ -281,8 +291,8 @@ const extraerCV = async (req, res) => {
  "trabajos": [{"empresa": string|null, "cargo": string|null, "desde": string|null, "hasta": string|null, "descripcion": string|null}]  (del más reciente al más antiguo),
  "idiomas": [{"idioma": string, "nivel": string|null}],
  "habilidades": [string]
-}`,
-      documentos: [{ tipo: esPdf ? 'pdf' : 'imagen', data: buf.toString('base64'), media_type: esPdf ? undefined : mime }],
+}` + (textoDocx ? `\n\nCurrículum (texto extraído del Word):\n${textoDocx}` : ''),
+      documentos: textoDocx ? [] : [{ tipo: esPdf ? 'pdf' : 'imagen', data: buf.toString('base64'), media_type: esPdf ? undefined : mime }],
       json: true, max_tokens: 3000,
     });
     ok(res, { campos: datos || null });
