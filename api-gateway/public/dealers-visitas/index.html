@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ruta AutoFácil — AutoFácil</title>
-  <!-- v2.5 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) -->
+  <!-- v2.6 — Dealer como nombre único (antes Concesionario) · v2.5 — navbar migrada al componente topnav + miga SPA por pestaña (AF_TOPNAV_HOJA) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -112,7 +112,7 @@
   <div class="page-banner">
     <i class="bi bi-calendar-check"></i>
     <div>
-      <h2>Ruta AutoFácil — Visitas a Concesionarios</h2>
+      <h2>Ruta AutoFácil — Visitas a Dealers</h2>
       <p>Agenda tus visitas respetando el cupo diario, registra el resultado de cada gestión y haz seguimiento.</p>
     </div>
   </div>
@@ -354,7 +354,7 @@
       <div id="mDiaList"></div>
       <div id="mDiaAdd">
         <div class="fld" style="margin-top:6px">
-          <label>Agendar concesionario</label>
+          <label>Agendar dealer</label>
           <input list="dealersList" id="addDealer" placeholder="Escribe nombre o RUT…" autocomplete="off">
           <datalist id="dealersList"></datalist>
         </div>
@@ -597,7 +597,7 @@ function abrirDia(fecha){
 }
 function agendar(){
   const val=document.getElementById('addDealer').value.trim();
-  if(!val){ flash('addMsg','Selecciona un concesionario.','#b91c1c'); return; }
+  if(!val){ flash('addMsg','Selecciona un dealer.','#b91c1c'); return; }
   const d=DEALER_MAP[val] || null;
   const body = d ? { id_dealer:d.id_dealer, rut_dealer:d.rut, nombre_dealer:d.nombre, comuna:d.comuna, fecha_programada:DIA_SEL }
                  : { nombre_dealer:val, fecha_programada:DIA_SEL };
@@ -727,7 +727,7 @@ async function cargarBitacora(){
   pintarBitacora(rows);
 }
 function pintarBitacora(rows){
-  const cols = ['Fecha','Concesionario','Comuna'].concat(ES_REVISOR?['Ejecutivo']:[],['Estado','Resultado','Comentarios','Seguimiento','']);
+  const cols = ['Fecha','Dealer','Comuna'].concat(ES_REVISOR?['Ejecutivo']:[],['Estado','Resultado','Comentarios','Seguimiento','']);
   document.getElementById('bitHead').innerHTML = cols.map(c=>`<th>${c}</th>`).join('');
   document.getElementById('bitInfo').innerHTML = `<i class="bi bi-journal-text"></i> <b>${rows.length}</b> gestión(es)`;
   if(!rows.length){ document.getElementById('bitBody').innerHTML=`<tr><td colspan="${cols.length}" class="empty"><i class="bi bi-inbox"></i>Sin gestiones con esos filtros.</td></tr>`; return; }
@@ -968,7 +968,7 @@ function renderPlanLista(plan){
         <button class="btn btn-ghost" style="padding:4px 11px" onclick="imprimirDirecciones(${di})"><i class="bi bi-printer"></i> Imprimir</button>
       </div>
     </div>`;
-    html+='<div style="overflow:auto"><table class="bt"><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Comuna</th><th>Dist.</th><th>Último crédito</th><th>Estado</th><th></th></tr></thead><tbody>';
+    html+='<div style="overflow:auto"><table class="bt"><thead><tr><th>#</th><th>Hora</th><th>Dealer</th><th>Comuna</th><th>Dist.</th><th>Último crédito</th><th>Estado</th><th></th></tr></thead><tbody>';
     d.visitas.forEach((v,vi)=>{
       const key=(v.id_dealer||'x')+'|'+d.fecha; const ex=PLAN_VIS_EXIST[key];
       let acc;
@@ -1012,7 +1012,7 @@ function imprimirDirecciones(di){
     });
   });
   const hoy=new Date().toLocaleDateString('es-CL');
-  const titulo = unDia ? ('Visitas — '+fmtDia(lista[0].fecha)) : 'Ruta de visitas a concesionarios';
+  const titulo = unDia ? ('Visitas — '+fmtDia(lista[0].fecha)) : 'Ruta de visitas a dealers';
 
   // Mapa solo en la impresión de UN día (los lugares de ese día)
   let mapaCSS='', mapaDiv='', mapaJS='';
@@ -1069,7 +1069,7 @@ function imprimirDirecciones(di){
     <div class="wrap">
     <h1>${esc(titulo)}</h1>
     <p class="sub">Generado el ${esc(hoy)} · orden óptimo de recorrido</p>
-    <table><thead><tr><th>#</th><th>Hora</th><th>Concesionario</th><th>Dirección</th><th>Comuna</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Hora</th><th>Dealer</th><th>Dirección</th><th>Comuna</th></tr></thead>
     <tbody>${filas}</tbody></table>
     ${mapaDiv}
     </div>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.3 — filtro "Solo POR CORREGIR" (marcado por defecto) + desplegable de ejecutivos -->
+<!-- v1.4 — columna Monto Financiado (antes "Monto Crédito") · v1.3 — filtro "Solo POR CORREGIR" (marcado por defecto) + desplegable de ejecutivos -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -75,7 +75,7 @@
       <table>
         <thead><tr>
           <th>Estado</th><th>Financiera</th><th>Ejecutivo</th><th>N° OP</th><th>ID Fin.</th><th>RUT Cliente</th><th>Cliente</th>
-          <th>Dealer</th><th>Parque</th><th class="num">Monto Crédito</th><th class="num">Saldo Precio</th>
+          <th>Dealer</th><th>Parque</th><th class="num">Monto Financiado</th><th class="num">Saldo Precio</th>
           <th>Fecha Otorgamiento</th><th>Devolución</th>
         </tr></thead>
         <tbody id="body"><tr><td colspan="13" style="color:#94a3b8;padding:20px">Cargando…</td></tr></tbody>
@@ -189,7 +189,7 @@ async function guardarComentario(){
 function exportar(){
   const rows = DATA.map(r=>({ Estado:(r.estado==='PENDIENTE'?'POR CORREGIR':r.estado), Financiera:r.financiera, Ejecutivo:r.ejecutivo, 'N° OP':r.num_op, 'ID Financiera':r.id_financiera,
     'RUT Cliente':r.rut_cliente, Cliente:r.cliente, Dealer:r.dealer, Parque:r.parque,
-    'Monto Crédito':Number(r.monto_financiado||0), 'Saldo Precio':Number(r.saldo_precio||0),
+    'Monto Financiado':Number(r.monto_financiado||0), 'Saldo Precio':Number(r.saldo_precio||0),
     'Fecha Otorgamiento':fd(r.fecha_otorgado), 'Devuelto el':fdh(r.devuelto_at), 'Devuelto por':r.devuelto_por,
     Motivo:r.devuelto_motivo, 'N° devoluciones':r.devoluciones }));
   const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();

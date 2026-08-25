@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
+<!-- v2.5 — Parque (antes Patio); Rentabilidad estimada · v2.4 — navbar migrada al componente topnav · v2.2 — comisión dealer editable (parte de la tabla, se puede forzar y ↺ vuelve al cálculo) · v2.1 — cuadro Distribución del Ingreso Total (AutoFácil / Dealer / Parque / Ejecutivo en $ y %) · v2.0 — Ingreso seguros = primas × % traspaso AutoFin (modelo 2026-07) -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -200,7 +200,7 @@
           <div class="f-group">
             <label>Tipo Dealer</label>
             <div class="toggle-group" id="tgDealer">
-              <button class="active" onclick="setToggle('tgDealer',0);simular()">🏢 Patio</button>
+              <button class="active" onclick="setToggle('tgDealer',0);simular()">🏢 Parque</button>
               <button onclick="setToggle('tgDealer',1);simular()">🚗 Calle</button>
             </div>
           </div>
@@ -679,10 +679,10 @@ function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio,
     <div class="res-section">
       <div class="res-title"><i class="bi bi-arrow-down-circle-fill" style="color:#dc2626"></i> Costos Directos</div>
       <div class="res-row costo">
-        <span class="lbl">Comisión Dealer ${esPatio ? '(Patio)' : '(Calle)'}</span>
+        <span class="lbl">Comisión Dealer ${esPatio ? '(Parque)' : '(Calle)'}</span>
         <span class="val">${fN(com_dealer)}</span>
       </div>
-      ${esPatio ? `<div class="res-row costo"><span class="lbl">Comisión Patio</span><span class="val">${fN(com_patio)}</span></div>` : ''}
+      ${esPatio ? `<div class="res-row costo"><span class="lbl">Comisión Parque</span><span class="val">${fN(com_patio)}</span></div>` : ''}
       <div class="res-row costo">
         <span class="lbl">Comisión Ejecutivo</span>
         <span class="val">${fN(com_ej)}</span>
@@ -695,7 +695,7 @@ function renderResultados({ ing_tasa, ing_seg, com_corfo, com_dealer, com_patio,
     ${distribucion(total_ing, rentab, com_dealer, com_patio, com_ej, esPatio)}
     <div class="rentab-box ${rentab >= 0 ? 'pos' : 'neg'}">
       <div>
-        <div class="rlbl">Rentabilidad AutoFácil</div>
+        <div class="rlbl">Rentabilidad estimada (descuenta com. ejecutivo)</div>
         <div class="rval">${fN(rentab)}</div>
       </div>
       <div class="rpct">${fP(pct)}<br>del monto fin.</div>

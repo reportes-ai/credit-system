@@ -109,23 +109,23 @@ const fN = v => v==null?'0':Math.round(v).toLocaleString('es-CL');
 const THEAD_RENTAB = `
     <thead><tr>
       <th title="N° de operación (correlativo AutoFácil)" style="cursor:help">OP</th>
-      <th title="Tramo del crédito: > si el Total a Financiar supera 200 UF (UF de la fecha de otorgado), < si no. Define qué tasa TMC aplica" style="cursor:help">&gt;=200UF</th>
-      <th title="Concesionario / dealer de la operación" style="text-align:left;cursor:help">Ccs</th>
-      <th title="Institución donde se cursó el crédito: AUTOFIN o UNIDAD DE CRÉDITO" style="cursor:help">Financiera</th>
+      <th title="Tramo del crédito: > si el Monto Financiado supera 200 UF (UF de la fecha de otorgado), < si no. Define qué tasa TMC aplica" style="cursor:help">&gt;=200UF</th>
+      <th title="Dealer de la operación" style="text-align:left;cursor:help">Ccs</th>
+      <th title="Financiera donde se cursó el crédito: AUTOFIN o UNIDAD DE CRÉDITO" style="cursor:help">Financiera</th>
       <th title="Precio de venta del vehículo menos el pie" style="cursor:help">Saldo Precio</th>
-      <th title="Total a Financiar = saldo precio + gastos operacionales + primas de seguros capitalizadas" style="cursor:help">Total a Fin.</th>
+      <th title="Monto Financiado = saldo precio + gastos operacionales + primas de seguros capitalizadas" style="cursor:help">Monto Fin.</th>
       <th title="Plazo del crédito en cuotas mensuales" style="cursor:help">Plazo</th>
       <th title="Ingreso por colocación. AUTOFIN: valor presente de la cuota descontada al costo de fondo, menos el capital (el spread ganado). UNIDAD: % del tier vigente sobre el saldo precio" style="cursor:help">Ing.AutoFácil</th>
-      <th title="%_A = Ing.AutoFácil ÷ Total a Financiar" style="cursor:help">%_A</th>
+      <th title="%_A = Ing.AutoFácil ÷ Monto Financiado" style="cursor:help">%_A</th>
       <th title="Comisión bruta (IVA incluido) pactada con el dealer. Manda la carta (part_bruto); si no trae, la pizarra por plazo" style="cursor:help">Com.Dealer</th>
-      <th title="%_D = Com.Dealer ÷ Total a Financiar" style="cursor:help">%_D</th>
+      <th title="%_D = Com.Dealer ÷ Monto Financiado" style="cursor:help">%_D</th>
       <th title="Comisión del parque: % patio sobre el saldo precio — solo operaciones de dealer Patio/Parque" style="cursor:help">Com Par</th>
-      <th title="%_P = Com.Parque ÷ Total a Financiar" style="cursor:help">%_P</th>
+      <th title="%_P = Com.Parque ÷ Monto Financiado" style="cursor:help">%_P</th>
       <th title="Total Comisiones Brokerage = Com.Dealer + Com.Seguros + Com.Parque" style="cursor:help">Total Com Broke</th>
-      <th title="%_t = Total Com Broke ÷ Total a Financiar" style="cursor:help">%_t</th>
+      <th title="%_t = Total Com Broke ÷ Monto Financiado" style="cursor:help">%_t</th>
       <th title="Traspaso de AutoFin por los seguros (% de traspaso sobre cada prima: RDH, cesantía, rep. menores). UNIDAD no paga comisión de seguros" style="cursor:help">Com.Seguros</th>
       <th title="Ingreso Bruto = Ing.AutoFácil + Com.Seguros (antes de descontar comisiones)" style="cursor:help">Ingreso Bruto</th>
-      <th title="%_B = Ingreso Bruto ÷ Total a Financiar" style="cursor:help">%_B</th>
+      <th title="%_B = Ingreso Bruto ÷ Monto Financiado" style="cursor:help">%_B</th>
     </tr></thead>`;
 const pct = (a,b) => b ? ((a-b)/b*100).toFixed(1) : '—';
 
@@ -204,13 +204,14 @@ function buildV1() {
 
   // KPIs - datos de operaciones APROBADAS del mes (con financiera real)
   const totSaldo = (f.financieras.AUTOFIN?.saldo||0)+(f.financieras.UNIDAD?.saldo||0);
+  const totFin = (f.financieras.AUTOFIN?.prom_fin||0)+(f.financieras.UNIDAD?.prom_fin||0);
   const totOps = (f.financieras.AUTOFIN?.ops||0)+(f.financieras.UNIDAD?.ops||0);
   const totCD = (f.financieras.AUTOFIN?.com_dealer||0)+(f.financieras.UNIDAD?.com_dealer||0);
   const totAFA = (f.financieras.AUTOFIN?.rentab_afa||0)+(f.financieras.UNIDAD?.rentab_afa||0);
   const totSeg = (f.financieras.AUTOFIN?.com_seguros||0)+(f.financieras.UNIDAD?.com_seguros||0);
 
   document.getElementById('kpi1').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total a Financiar</div><div class="kpi-val big">${fM(totSaldo)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Monto Financiado</div><div class="kpi-val big">${fM(totFin)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Operaciones Aprobadas</div><div class="kpi-val big">${totOps}</div></div>`;
 
   // Prom plazo y % financiado badges
@@ -224,9 +225,9 @@ function buildV1() {
     return `<tr>
       <td>${k==='AUTOFIN'?'AUTOFIN':'UNIDAD'}</td>
       <td>${v.ops}</td>
-      <td>${fM(v.saldo)}</td>
+      <td>${fM(v.prom_fin)}</td>
       <td>${fM(v.prom_fin&&v.ops?v.prom_fin/v.ops:0)}</td>
-      <td>${fM(v.saldo)}</td>
+      <td>${fM(v.saldo_precio)}</td>
       <td>${fM(v.com_dealer)}</td>
       <td>${fM(v.rentab_afa)}</td>
       <td>${fM(v.com_seguros)}</td>
@@ -234,9 +235,9 @@ function buildV1() {
   }).join('');
   const totU = f.financieras.UNIDAD||{ops:0,saldo:0,com_dealer:0,rentab_afa:0,com_seguros:0,prom_fin:0};
   document.getElementById('t-fin').innerHTML = `
-    <thead><tr><th>Institución</th><th>Ops Aprobadas</th><th>Total a Financiar</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th><th>Ing. x Seguros</th></tr></thead>
+    <thead><tr><th>Financiera</th><th>Ops Aprobadas</th><th>Monto Financiado</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th><th>Ing. x Seguros</th></tr></thead>
     <tbody>${rows}</tbody>
-    <tfoot><tr><td>Total</td><td>${totOps}</td><td>${fM(totSaldo)}</td><td>${fM(totSaldo/totOps)}</td><td>${fM(totSaldo)}</td><td>${fM(totCD)}</td><td>${fM(totAFA)}</td><td>${fM(totSeg)}</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totOps}</td><td>${fM(totFin)}</td><td>${fM(totOps?totFin/totOps:0)}</td><td>${fM(totSaldo)}</td><td>${fM(totCD)}</td><td>${fM(totAFA)}</td><td>${fM(totSeg)}</td></tr></tfoot>`;
 
   // Donut
   const dv = [f.financieras.AUTOFIN?.saldo||0, f.financieras.UNIDAD?.saldo||0];
@@ -348,29 +349,29 @@ function buildV1() {
   // Calcular APROBADOS = APROBADO + OTORGADO + ANULADO + PENDIENTE
   const jEstados = j.estados || {};
   const jAprobQ = (jEstados.APROBADO?.ops||0) + (jEstados.OTORGADO?.ops||0) + (jEstados.ANULADO?.ops||0) + (jEstados.PENDIENTE?.ops||0);
-  const jAprobS = (jEstados.APROBADO?.saldo||0) + (jEstados.OTORGADO?.saldo||0) + (jEstados.ANULADO?.saldo||0) + (jEstados.PENDIENTE?.saldo||0);
+  const jAprobS = (jEstados.APROBADO?.fin||0) + (jEstados.OTORGADO?.fin||0) + (jEstados.ANULADO?.fin||0) + (jEstados.PENDIENTE?.fin||0);
   const jRecQ   = jEstados.RECHAZADO?.ops||0;
-  const jRecS   = jEstados.RECHAZADO?.saldo||0;
+  const jRecS   = jEstados.RECHAZADO?.fin||0;
   const jTotalQ = j.total_ops||0;
   document.getElementById('t-jan').innerHTML =
-    '<thead><tr><th>Estado Comercial</th><th>Q</th><th>%</th><th>Total a Financiar</th></tr></thead>' +
+    '<thead><tr><th>Estado Comercial</th><th>Q</th><th>%</th><th>Monto Financiado</th></tr></thead>' +
     '<tbody>' +
     '<tr><td>APROBADOS</td><td>'+jAprobQ+'</td><td>'+(jTotalQ?(jAprobQ/jTotalQ*100).toFixed(1):0)+'%</td><td>'+fM(jAprobS)+'</td></tr>' +
     '<tr><td>RECHAZADOS</td><td>'+jRecQ+'</td><td>'+(jTotalQ?(jRecQ/jTotalQ*100).toFixed(1):0)+'%</td><td>'+fM(jRecS)+'</td></tr>' +
     '</tbody>' +
-    '<tfoot><tr><td>Total</td><td>'+jTotalQ+'</td><td>100%</td><td>'+fM(j.total_saldo||0)+'</td></tr></tfoot>';
+    '<tfoot><tr><td>Total</td><td>'+jTotalQ+'</td><td>100%</td><td>'+fM(jAprobS+jRecS)+'</td></tr></tfoot>';
 
   // Tabla concesionarios
   const ccsRows = f.ccs.map((c,i)=>`<tr>
     <td><span class="rank">${i+1}.</span>${c.nombre.length>28?c.nombre.substring(0,28)+'…':c.nombre}</td>
-    <td>${c.ops}</td><td>${fM(c.saldo)}</td><td>${fM(c.saldo/c.ops)}</td>
+    <td>${c.ops}</td><td>${fM(c.prom_fin)}</td><td>${fM(c.ops?c.prom_fin/c.ops:0)}</td>
     <td>${fM(c.saldo)}</td><td>${fM(c.com_dealer)}</td><td>${fM(c.rentab_afa)}</td>
   </tr>`).join('');
-  const totCC = f.ccs.reduce((a,c)=>({ops:a.ops+c.ops,saldo:a.saldo+c.saldo,cd:a.cd+c.com_dealer}),{ops:0,saldo:0,cd:0});
+  const totCC = f.ccs.reduce((a,c)=>({ops:a.ops+c.ops,fin:a.fin+c.prom_fin,saldo:a.saldo+c.saldo,cd:a.cd+c.com_dealer}),{ops:0,fin:0,saldo:0,cd:0});
   document.getElementById('t-ccs').innerHTML = `
-    <thead><tr><th>Ccs</th><th>Q</th><th>Total a Financiar</th><th>Prom a Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th></tr></thead>
+    <thead><tr><th>Ccs</th><th>Q</th><th>Monto Financiado</th><th>Prom a Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th></tr></thead>
     <tbody>${ccsRows}</tbody>
-    <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.saldo)}</td><td>—</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>—</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.fin)}</td><td>—</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>—</td></tr></tfoot>`;
 
   // Tabla ejecutivos — TODOS los activos, incluso en cero (van al final, en
   // gris). Los digitadores externos (Autofin) NO se listan por nombre: sus
@@ -378,22 +379,22 @@ function buildV1() {
   // total siga cuadrando con el resto del dashboard.
   const ejPropios = f.ejecutivos.filter(e => ejEsNuestro(e.nombre));
   const ejExt = f.ejecutivos.filter(e => !ejEsNuestro(e.nombre))
-    .reduce((a,e)=>({ nombre:'Externos Autofin', externo:true, ops:a.ops+e.ops, saldo:a.saldo+e.saldo, com_dealer:a.com_dealer+e.com_dealer, rentab_afa:a.rentab_afa+e.rentab_afa }), { nombre:'Externos Autofin', externo:true, ops:0, saldo:0, com_dealer:0, rentab_afa:0 });
+    .reduce((a,e)=>({ nombre:'Externos Autofin', externo:true, ops:a.ops+e.ops, saldo:a.saldo+e.saldo, prom_fin:a.prom_fin+(e.prom_fin||0), com_dealer:a.com_dealer+e.com_dealer, rentab_afa:a.rentab_afa+e.rentab_afa }), { nombre:'Externos Autofin', externo:true, ops:0, saldo:0, prom_fin:0, com_dealer:0, rentab_afa:0 });
   const ejConCeros = ejPropios
     .concat(ejExt.ops ? [ejExt] : [])
-    .concat(ejFaltantes(ejPropios.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, com_dealer:0, rentab_afa:0 })));
+    .concat(ejFaltantes(ejPropios.map(e=>e.nombre)).map(n => ({ nombre:n, ops:0, saldo:0, prom_fin:0, com_dealer:0, rentab_afa:0 })));
   const ejRows = ejConCeros.map((e,i)=>`<tr${e.ops&&!e.externo?'':' style="color:#94a3b8"'}>
     <td><span class="rank">${i+1}.</span>${e.externo
       ? `<a class="ej-link" onclick="abrirDetalleExternos('ap')">${e.nombre}</a>`
       : `<a class="ej-link" onclick="abrirDetalleEjecutivo('${e.nombre.replace(/'/g,"\\'")}','ap')">${e.nombre.length>24?e.nombre.substring(0,24)+'…':e.nombre}</a>`}</td>
-    <td>${e.ops}</td><td>${fM(e.saldo)}</td><td>${fM(e.ops?e.saldo/e.ops:0)}</td>
+    <td>${e.ops}</td><td>${fM(e.prom_fin||0)}</td><td>${fM(e.ops?(e.prom_fin||0)/e.ops:0)}</td>
     <td>${fM(e.saldo)}</td><td>${fM(e.com_dealer)}</td><td>${fM(e.rentab_afa)}</td>
   </tr>`).join('');
-  const totEJ = f.ejecutivos.reduce((a,e)=>({ops:a.ops+e.ops,saldo:a.saldo+e.saldo,cd:a.cd+e.com_dealer}),{ops:0,saldo:0,cd:0});
+  const totEJ = f.ejecutivos.reduce((a,e)=>({ops:a.ops+e.ops,fin:a.fin+(e.prom_fin||0),saldo:a.saldo+e.saldo,cd:a.cd+e.com_dealer}),{ops:0,fin:0,saldo:0,cd:0});
   document.getElementById('t-ej').innerHTML = `
-    <thead><tr><th>Ejecutivo</th><th>Record</th><th>Total a Financiar</th><th>Prem a Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th></tr></thead>
+    <thead><tr><th>Ejecutivo</th><th>Record</th><th>Monto Financiado</th><th>Prom a Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th></tr></thead>
     <tbody>${ejRows}</tbody>
-    <tfoot><tr><td>Total</td><td>${totEJ.ops}</td><td>${fM(totEJ.saldo)}</td><td>—</td><td>${fM(totEJ.saldo)}</td><td>${fM(totEJ.cd)}</td><td>—</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totEJ.ops}</td><td>${fM(totEJ.fin)}</td><td>—</td><td>${fM(totEJ.saldo)}</td><td>${fM(totEJ.cd)}</td><td>—</td></tr></tfoot>`;
 
   // Estado comercial — OTORGADO se suma a APROBADO (ambos son aprobados)
   const estadosAgrup = {};
@@ -403,32 +404,33 @@ function buildV1() {
                   k==='SOLICITUD EN EVALUACION' ? 'PENDIENTE' :
                   k==='RECHAZADO' ? 'RECHAZADO' :
                   k==='ANULADO'   ? 'ANULADO'   : k;
-    if (!estadosAgrup[label]) estadosAgrup[label] = {ops:0,saldo:0};
+    if (!estadosAgrup[label]) estadosAgrup[label] = {ops:0,saldo:0,fin:0};
     estadosAgrup[label].ops   += v.ops;
     estadosAgrup[label].saldo += v.saldo;
+    estadosAgrup[label].fin   += v.fin||0;
   });
-  const totEst = Object.values(estadosAgrup).reduce((a,v)=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo}),{ops:0,saldo:0});
+  const totEst = Object.values(estadosAgrup).reduce((a,v)=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,fin:a.fin+v.fin}),{ops:0,saldo:0,fin:0});
   const estOrdAgrup = ['APROBADO','RECHAZADO','ANULADO','PENDIENTE'];
   const estRows = estOrdAgrup.filter(k=>estadosAgrup[k]).map(k=>{
     const v=estadosAgrup[k];
     const pct = totEst.ops ? (v.ops/totEst.ops*100).toFixed(1) : 0;
-    return '<tr><td>'+k+'</td><td>'+v.ops+'</td><td>'+pct+'%</td><td>'+fM(v.saldo)+'</td></tr>';
+    return '<tr><td>'+k+'</td><td>'+v.ops+'</td><td>'+pct+'%</td><td>'+fM(v.fin)+'</td></tr>';
   }).join('');
   document.getElementById('t-estado').innerHTML =
-    '<thead><tr><th>Estado Comercial</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead>' +
+    '<thead><tr><th>Estado Comercial</th><th>N° op</th><th>%</th><th>Monto Fin.</th></tr></thead>' +
     '<tbody>'+estRows+'</tbody>' +
-    '<tfoot><tr><td>Total</td><td>'+totEst.ops+'</td><td>100%</td><td>'+fM(totEst.saldo)+'</td></tr></tfoot>';
+    '<tfoot><tr><td>Total</td><td>'+totEst.ops+'</td><td>100%</td><td>'+fM(totEst.fin)+'</td></tr></tfoot>';
 
   // Motivo (usando estados crédito como proxy)
   const motOrd = ['OTORGADO','APROBADO','ANULADO','RECHAZADO'];
   const motRows = motOrd.filter(k=>f.motivos[k]).map(k=>{
     const v=f.motivos[k]; const label = k==='OTORGADO'?'FIRMADO':k==='APROBADO'?'CONFIRMACIÓN CLIENTE':k==='RECHAZADO'?'DESISTE':k;
-    return `<tr><td>${label}</td><td>${v.ops}</td><td>${v.pct}%</td><td>${fM(v.saldo)}</td></tr>`;
+    return `<tr><td>${label}</td><td>${v.ops}</td><td>${v.pct}%</td><td>${fM(v.fin||0)}</td></tr>`;
   }).join('');
   document.getElementById('t-motivo').innerHTML = `
-    <thead><tr><th>Motivo</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead>
+    <thead><tr><th>Motivo</th><th>N° op</th><th>%</th><th>Monto Fin.</th></tr></thead>
     <tbody>${motRows}</tbody>
-    <tfoot><tr><td>Total</td><td>${totEst.ops}</td><td>100%</td><td>${fM(totEst.saldo)}</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totEst.ops}</td><td>100%</td><td>${fM(totEst.fin)}</td></tr></tfoot>`;
 }
 
 /* Anuladas REALES del período (antes había un "1" escrito a mano en las tablas
@@ -538,7 +540,7 @@ function buildV2() {
     type:'bar',
     data:{labels:['MAYOR','MENOR'],datasets:[
       {label:'Ing.AFA+Seg',data:dv2,backgroundColor:[C.blue+'bb',C.teal+'bb'],borderRadius:4},
-      {label:'Total Fin.',data:[mayor.reduce((a,r)=>a+r.total_a_financiar,0),menor.reduce((a,r)=>a+r.total_a_financiar,0)],backgroundColor:[C.red+'bb',C.orange+'99'],borderRadius:4}
+      {label:'Monto Fin.',data:[mayor.reduce((a,r)=>a+r.total_a_financiar,0),menor.reduce((a,r)=>a+r.total_a_financiar,0)],backgroundColor:[C.red+'bb',C.orange+'99'],borderRadius:4}
     ]},
     options:{...chOpts(),plugins:{...chOpts().plugins,legend:{display:true,labels:{color:'#555',font:{size:9},boxWidth:10}}}}
   });
@@ -654,7 +656,7 @@ const __plComEjCache = {};
 /* Arriendo FIJO mensual total de los parques activos (mantenedor parques_comisiones).
    Los parques CON otorgadas ya suman su fijo vía prorrateo en las ops; el resto
    (parques sin colocación en el mes) se agrega aparte como costo fijo. */
-// % sobre Total Financiado para los subtítulos de las cajas de dinero del P&L
+// % sobre Monto Financiado para los subtítulos de las cajas de dinero del P&L
 const pctFin = (v, fin) => fin ? ((v / fin) * 100).toFixed(1) + '%' : '';
 const setPct = (id, v, fin) => { const e = document.getElementById(id); if (e) e.textContent = pctFin(v, fin); };
 
@@ -746,7 +748,7 @@ function buildV2pl() {
   const totIN = det.reduce((a,r)=>a+(r.ing_neto||0),0);
 
   document.getElementById('kpi2-pl').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total Financiado</div><div class="kpi-val big">${fM(totFin)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Monto Financiado</div><div class="kpi-val big">${fM(totFin)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Operaciones Otorgadas</div><div class="kpi-val big">${totOps}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Colocaciones</div><div class="kpi-val big">${fM(totAFA)}</div><div class="kpi-sub">${pctFin(totAFA, totFin)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Seguros</div><div class="kpi-val big">${fM(totSeg)}</div><div class="kpi-sub">${pctFin(totSeg, totFin)}</div></div>
@@ -816,7 +818,7 @@ function buildV2pl() {
     type:'bar',
     data:{labels:['MAYOR','MENOR'],datasets:[
       {label:'Ing.AFA+Seg',data:dv2,backgroundColor:[C.blue+'bb',C.teal+'bb'],borderRadius:4},
-      {label:'Total Fin.',data:[mayor.reduce((a,r)=>a+r.total_a_financiar,0),menor.reduce((a,r)=>a+r.total_a_financiar,0)],backgroundColor:[C.red+'bb',C.orange+'99'],borderRadius:4}
+      {label:'Monto Fin.',data:[mayor.reduce((a,r)=>a+r.total_a_financiar,0),menor.reduce((a,r)=>a+r.total_a_financiar,0)],backgroundColor:[C.red+'bb',C.orange+'99'],borderRadius:4}
     ]},
     options:{...chOpts(),plugins:{...chOpts().plugins,legend:{display:true,labels:{color:'#555',font:{size:9},boxWidth:10}}}}
   });
@@ -913,7 +915,7 @@ function buildRentabTablePL() {
   const totIN_F = rows.reduce((a,r)=>a+(r.ing_neto||0),0);
   const arrOpsF = rows.reduce((a,r)=>a+(r.arriendo_parque||0),0);
   document.getElementById('kpi2-pl').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total Financiado</div><div class="kpi-val big">${fM(tot.fin)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Monto Financiado</div><div class="kpi-val big">${fM(tot.fin)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Operaciones Otorgadas</div><div class="kpi-val big">${totOpsF}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Colocaciones</div><div class="kpi-val big">${fM(tot.afa)}</div><div class="kpi-sub">${pctFin(tot.afa, tot.fin)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Seguros</div><div class="kpi-val big">${fM(tot.seg)}</div><div class="kpi-sub">${pctFin(tot.seg, tot.fin)}</div></div>
@@ -1021,7 +1023,7 @@ function buildV1b() {
   const avgPlazo = totOps ? Math.round(det.reduce((a,r)=>a+r.plazo,0)/totOps) : 0;
 
   document.getElementById('kpi1b').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total a Financiar</div><div class="kpi-val big">${fM(totFin)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Monto Financiado</div><div class="kpi-val big">${fM(totFin)}</div></div>
     <div class="kpi-box" style="cursor:pointer" onclick="mostrarListaOps()" title="Ver detalle de operaciones">
       <div class="kpi-label">Operaciones Otorgadas</div>
       <div class="kpi-val big">${totOps}</div>
@@ -1052,7 +1054,7 @@ function buildV1b() {
     return `<tr><td><a class="ej-link" onclick="abrirDetalleInstitucion('${k}','ot')"><strong>${k}</strong></a></td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td><td>${fM(v.com_seguros)}</td></tr>`;
   }).join('');
   document.getElementById('t-fin1b').innerHTML = `
-    <thead><tr><th>Institución</th><th>Ops</th><th>Total Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>
+    <thead><tr><th>Financiera</th><th>Ops</th><th>Monto Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>
     <tbody>${finRows}</tbody>
     <tfoot><tr><td>Total</td><td>${totOps}</td><td>${fM(totFin)}</td><td>${fM(totOps?totFin/totOps:0)}</td><td>${fM(totSaldo)}</td><td>${fM(totCD)}</td><td>${fM(totAFA)}</td><td>${fM(totSeg)}</td></tr></tfoot>`;
 
@@ -1160,7 +1162,7 @@ function buildV1b() {
     <thead><tr><th>Métrica</th><th>Valor</th><th>% s/ financiado</th></tr></thead>
     <tbody>
       <tr><td>Operaciones Otorgadas</td><td>${jTotOps}</td><td>—</td></tr>
-      <tr><td>Total Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td><td>100%</td></tr>
+      <tr><td>Monto Financiado</td><td style="${jFinStyle}">${fM(jTotFin)}</td><td>100%</td></tr>
       <tr><td>Ing. x Colocaciones</td><td>${fM(jTotAFA)}</td><td>${pctFin(jTotAFA, jTotFin)}</td></tr>
       <tr><td>Ing. x Seguros</td><td>${fM(jTotSeg)}</td><td>${pctFin(jTotSeg, jTotFin)}</td></tr>
       <tr><td><b>Total Ingresos</b></td><td><b>${fM(jTotAFA + jTotSeg)}</b></td><td><b>${pctFin(jTotAFA + jTotSeg, jTotFin)}</b></td></tr>
@@ -1282,7 +1284,7 @@ function buildV1b() {
 
   const tblAnt = document.getElementById('t-fin1b-ant');
   if (tblAnt) tblAnt.innerHTML =
-    '<thead><tr><th>Institución</th><th>Ops</th><th>Total Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>' +
+    '<thead><tr><th>Financiera</th><th>Ops</th><th>Monto Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th><th>Ing. x Seguros</th></tr></thead>' +
     '<tbody>'+finRowsAnt+'</tbody>' +
     '<tfoot><tr><td>Total</td><td>'+totAnt.ops+'</td><td>'+fM(totAnt.fin)+'</td><td>'+fM(totAnt.ops?totAnt.fin/totAnt.ops:0)+'</td><td>'+fM(totAnt.saldo)+'</td><td>'+fM(totAnt.com_dealer)+'</td><td>'+fM(totAnt.afa)+'</td><td>'+fM(totAnt.com_seg)+'</td></tr></tfoot>';
   } // fin else tienenFechaOt
@@ -1292,12 +1294,12 @@ function buildV1b() {
   det.forEach(r=>{ const k=r.ccs||''; if(!k) return;
     if(!ccsOt[k]) ccsOt[k]={ops:0,saldo:0,fin:0,cd:0,afa:0}; ccsOt[k].ops++; ccsOt[k].saldo+=r.saldo_precio; ccsOt[k].fin+=r.total_a_financiar; ccsOt[k].cd+=r.com_dealer; ccsOt[k].afa+=r.ing_autofacil; });
   const topCcs = Object.entries(ccsOt).sort((a,b)=>b[1].saldo-a[1].saldo);
-  const ccsRows = topCcs.map(([n,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${n.length>28?n.substring(0,28)+'…':n}</td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td></tr>`).join('');
+  const ccsRows = topCcs.map(([n,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${n.length>28?n.substring(0,28)+'…':n}</td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.ops?v.fin/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.cd)}</td><td>${fM(v.afa)}</td></tr>`).join('');
   const totCC = topCcs.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,saldo:a.saldo+v.saldo,cd:a.cd+v.cd,afa:a.afa+v.afa}),{ops:0,fin:0,saldo:0,cd:0,afa:0});
   document.getElementById('t-ccs1b').innerHTML = `
-    <thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
+    <thead><tr><th>Dealer</th><th>Q</th><th>Monto Fin.</th><th>Prom.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
     <tbody>${ccsRows}</tbody>
-    <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.fin)}</td><td>${fM(totCC.ops?totCC.saldo/totCC.ops:0)}</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>${fM(totCC.afa)}</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totCC.ops}</td><td>${fM(totCC.fin)}</td><td>${fM(totCC.ops?totCC.fin/totCC.ops:0)}</td><td>${fM(totCC.saldo)}</td><td>${fM(totCC.cd)}</td><td>${fM(totCC.afa)}</td></tr></tfoot>`;
 
   // Ejecutivos otorgados
   // Ejecutivos — desde detalle_v2 (solo otorgados, con campo ejecutivo)
@@ -1308,7 +1310,7 @@ function buildV1b() {
     ejOt[k].ops++; ejOt[k].saldo += r.saldo_precio; ejOt[k].fin += r.total_a_financiar;
     ejOt[k].cd += r.com_dealer; ejOt[k].afa += r.ing_autofacil;
   });
-  // Orden: Q otorgados y, a igual Q, por Total Financiado (no saldo precio).
+  // Orden: Q otorgados y, a igual Q, por Monto Financiado (no saldo precio).
   // Externos (Autofin) agrupados en una fila; al final, TODOS los ejecutivos
   // activos sin otorgados este mes (en gris, con la alerta roja igual: cero es cero).
   const entEj = Object.entries(ejOt);
@@ -1328,7 +1330,7 @@ function buildV1b() {
   </tr>`;}).join('');
   const totEJ2 = topEj.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,saldo:a.saldo+v.saldo,cd:a.cd+v.cd,afa:a.afa+v.afa}),{ops:0,fin:0,saldo:0,cd:0,afa:0});
   document.getElementById('t-ej1b').innerHTML = `
-    <thead><tr><th>Ejecutivo</th><th>Q Otorgados</th><th>Total Fin.</th><th>Prom. Fin.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
+    <thead><tr><th>Ejecutivo</th><th>Q Otorgados</th><th>Monto Fin.</th><th>Prom. Fin.</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead>
     <tbody>${ejRows2}</tbody>
     <tfoot><tr><td>Total</td><td>${totEJ2.ops}</td><td>${fM(totEJ2.fin)}</td><td>${fM(totEJ2.ops?totEJ2.fin/totEJ2.ops:0)}</td><td>${fM(totEJ2.saldo)}</td><td>${fM(totEJ2.cd)}</td><td>${fM(totEJ2.afa)}</td></tr></tfoot>`;
 
@@ -1337,13 +1339,14 @@ function buildV1b() {
   const grpEst1b = {INGRESADAS:0,APROBADAS:0,OTORGADAS:0,PENDIENTE:0,RECHAZADAS:0,ANULADAS:0};
   const salEst1b = {INGRESADAS:0,APROBADAS:0,OTORGADAS:0,PENDIENTE:0,RECHAZADAS:0,ANULADAS:0};
   Object.entries(f.estados||{}).forEach(([k,v]) => {
-    grpEst1b.INGRESADAS+=v.ops; salEst1b.INGRESADAS+=v.saldo;
-    if (window.AF_ES_APROBADO(k)){grpEst1b.APROBADAS+=v.ops;salEst1b.APROBADAS+=v.saldo;}
-    if (k==='SOLICITUD EN EVALUACION'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=v.saldo;}
-    if (k==='OTORGADO'){grpEst1b.OTORGADAS+=v.ops;salEst1b.OTORGADAS+=v.saldo;}
-    if (k==='PENDIENTE'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=v.saldo;}
-    if (k==='RECHAZADO'){grpEst1b.RECHAZADAS+=v.ops;salEst1b.RECHAZADAS+=v.saldo;}
-    if (k==='ANULADO'){grpEst1b.ANULADAS+=v.ops;salEst1b.ANULADAS+=v.saldo;}
+    const m = v.fin||0;
+    grpEst1b.INGRESADAS+=v.ops; salEst1b.INGRESADAS+=m;
+    if (window.AF_ES_APROBADO(k)){grpEst1b.APROBADAS+=v.ops;salEst1b.APROBADAS+=m;}
+    if (k==='SOLICITUD EN EVALUACION'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=m;}
+    if (k==='OTORGADO'){grpEst1b.OTORGADAS+=v.ops;salEst1b.OTORGADAS+=m;}
+    if (k==='PENDIENTE'){grpEst1b.PENDIENTE+=v.ops;salEst1b.PENDIENTE+=m;}
+    if (k==='RECHAZADO'){grpEst1b.RECHAZADAS+=v.ops;salEst1b.RECHAZADAS+=m;}
+    if (k==='ANULADO'){grpEst1b.ANULADAS+=v.ops;salEst1b.ANULADAS+=m;}
   });
   const totIng1b = grpEst1b.INGRESADAS||1;
   const estRowsOt = ['INGRESADAS','APROBADAS','OTORGADAS','PENDIENTE','RECHAZADAS','ANULADAS']
@@ -1352,7 +1355,7 @@ function buildV1b() {
       return '<tr><td>'+k+'</td><td>'+grpEst1b[k]+'</td><td>'+pct+'%</td><td>'+fM(salEst1b[k])+'</td></tr>';
     }).join('');
   document.getElementById('t-estado1b').innerHTML =
-    '<thead><tr><th>Estado</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead>' +
+    '<thead><tr><th>Etapa</th><th>N° op</th><th>%</th><th>Monto Fin.</th></tr></thead>' +
     '<tbody>'+estRowsOt+'</tbody>' +
     // El pie decía "INGRESADAS" y repetía la primera fila: se leía como si fuera
     // un total sumable. Los estados son un EMBUDO (otorgadas ⊂ aprobadas ⊂
@@ -1507,7 +1510,7 @@ async function capturaEjecutivosWSP(sel, titulo) {
     const hoy = new Date();
     g.fillText(hoy.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
       + ' · ' + hoy.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' hrs', 12, 36);
-    g.textAlign = 'right'; g.fillText('Q', W - 130, 30); g.fillText('Total Fin.', W - 16, 30); g.textAlign = 'left';
+    g.textAlign = 'right'; g.fillText('Q', W - 130, 30); g.fillText('Monto Fin.', W - 16, 30); g.textAlign = 'left';
     filas.forEach((f, i) => {
       const y = HH + RH * i;
       if (i % 2) { g.fillStyle = '#f4f7fb'; g.fillRect(0, y, W, RH); }
@@ -1851,10 +1854,12 @@ window.RAW_DATA = [];
     });
     // estados y motivos usan todos los registros del período (para el panel de estado comercial)
     rows.forEach(r => {
-      if (!estados[r.estado_eval]) estados[r.estado_eval] = {ops:0,pct:0,saldo:0};
+      if (!estados[r.estado_eval]) estados[r.estado_eval] = {ops:0,pct:0,saldo:0,fin:0};
       estados[r.estado_eval].ops++; estados[r.estado_eval].saldo += r.saldo_precio;
-      if (!motivos[r.estado_credito]) motivos[r.estado_credito] = {ops:0,pct:0,saldo:0};
+      estados[r.estado_eval].fin += r.monto_financiado || 0;
+      if (!motivos[r.estado_credito]) motivos[r.estado_credito] = {ops:0,pct:0,saldo:0,fin:0};
       motivos[r.estado_credito].ops++; motivos[r.estado_credito].saldo += r.saldo_precio;
+      motivos[r.estado_credito].fin += r.monto_financiado || 0;
     });
 
     const total_ops = rows.length;
@@ -1987,13 +1992,14 @@ function buildV4() {
   const un = f.financieras.UNIDAD  || {};
   const totOps   = (af.ops||0)+(un.ops||0);
   const totSaldo = (af.saldo||0)+(un.saldo||0);
+  const totFin4  = (af.prom_fin||0)+(un.prom_fin||0);
   const totCD    = (af.com_dealer||0)+(un.com_dealer||0);
   const totAFA   = (af.rentab_afa||0)+(un.rentab_afa||0);
   const totSeg   = (af.com_seguros||0)+(un.com_seguros||0);
-  const promFin  = totOps ? totSaldo/totOps : 0;
+  const promFin  = totOps ? totFin4/totOps : 0;
 
   document.getElementById('kpi4').innerHTML = `
-    <div class="kpi-box"><div class="kpi-label">Total a Financiar</div><div class="kpi-val big">${fM(totSaldo)}</div></div>
+    <div class="kpi-box"><div class="kpi-label">Monto Financiado</div><div class="kpi-val big">${fM(totFin4)}</div></div>
     <div class="kpi-box"><div class="kpi-label">Operaciones Aprobadas</div><div class="kpi-val big">${totOps}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Com. Dealer</div><div class="kpi-val big">${fM(totCD)}</div></div>
     <div class="kpi-box highlight"><div class="kpi-label">Ing. x Colocaciones</div><div class="kpi-val big">${fM(totAFA)}</div></div>
@@ -2003,12 +2009,12 @@ function buildV4() {
   const finRows4 = ['AUTOFIN','UNIDAD'].map(k => {
     const v = f.financieras[k];
     if (!v || !v.ops) return '';
-    return `<tr><td>${k}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.ops?v.saldo/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td><td>${fM(v.com_seguros)}</td></tr>`;
+    return `<tr><td>${k}</td><td>${v.ops}</td><td>${fM(v.prom_fin||0)}</td><td>${fM(v.ops?(v.prom_fin||0)/v.ops:0)}</td><td>${fM(v.saldo)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td><td>${fM(v.com_seguros)}</td></tr>`;
   }).join('');
   document.getElementById('t-fin4').innerHTML = `
-    <thead><tr><th>Institución</th><th>Ops</th><th>Total Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th><th>Ing. x Seguros</th></tr></thead>
+    <thead><tr><th>Financiera</th><th>Ops</th><th>Monto Fin.</th><th>Prom. Fin</th><th>Saldo Precio</th><th>Com Dealer</th><th>Ing. x Colocaciones</th><th>Ing. x Seguros</th></tr></thead>
     <tbody>${finRows4}</tbody>
-    <tfoot><tr><td>Total</td><td>${totOps}</td><td>${fM(totSaldo)}</td><td>${fM(promFin)}</td><td>${fM(totSaldo)}</td><td>${fM(totCD)}</td><td>${fM(totAFA)}</td><td>${fM(totSeg)}</td></tr></tfoot>`;
+    <tfoot><tr><td>Total</td><td>${totOps}</td><td>${fM(totFin4)}</td><td>${fM(promFin)}</td><td>${fM(totSaldo)}</td><td>${fM(totCD)}</td><td>${fM(totAFA)}</td><td>${fM(totSeg)}</td></tr></tfoot>`;
 
   const dv4=[af.saldo||0,un.saldo||0]; const dt4=dv4[0]+dv4[1];
   document.getElementById('donut4-pct').textContent = dt4?(dv4[0]/dt4*100).toFixed(1)+'%':'—';
@@ -2018,23 +2024,23 @@ function buildV4() {
 
   const jaf4=j.financieras?.AUTOFIN||{}, jun4=j.financieras?.UNIDAD||{};
   const jTot4=(jaf4.ops||0)+(jun4.ops||0);
-  document.getElementById('t-jan4').innerHTML=`<thead><tr><th>Institución</th><th>Ops</th><th>%</th><th>Total Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${jaf4.ops||0}</td><td>${jTot4?((jaf4.ops||0)/jTot4*100).toFixed(1):0}%</td><td>${fM(jaf4.saldo||0)}</td></tr><tr><td>UNIDAD</td><td>${jun4.ops||0}</td><td>${jTot4?((jun4.ops||0)/jTot4*100).toFixed(1):0}%</td><td>${fM(jun4.saldo||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${jTot4}</td><td>100%</td><td>${fM((jaf4.saldo||0)+(jun4.saldo||0))}</td></tr></tfoot>`;
+  document.getElementById('t-jan4').innerHTML=`<thead><tr><th>Financiera</th><th>Ops</th><th>%</th><th>Monto Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${jaf4.ops||0}</td><td>${jTot4?((jaf4.ops||0)/jTot4*100).toFixed(1):0}%</td><td>${fM(jaf4.prom_fin||0)}</td></tr><tr><td>UNIDAD</td><td>${jun4.ops||0}</td><td>${jTot4?((jun4.ops||0)/jTot4*100).toFixed(1):0}%</td><td>${fM(jun4.prom_fin||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${jTot4}</td><td>100%</td><td>${fM((jaf4.prom_fin||0)+(jun4.prom_fin||0))}</td></tr></tfoot>`;
 
   const det=window.DASH.detalle_v2, ccs4={};
-  det.forEach(r=>{if(!ccs4[r.ccs])ccs4[r.ccs]={ops:0,saldo:0,com_dealer:0,rentab_afa:0};ccs4[r.ccs].ops++;ccs4[r.ccs].saldo+=r.saldo_precio;ccs4[r.ccs].com_dealer+=r.com_dealer;ccs4[r.ccs].rentab_afa+=r.ing_autofacil;});
-  const topCcs4=Object.entries(ccs4).sort((a,b)=>b[1].saldo-a[1].saldo);
-  const totCcs4=topCcs4.reduce((a,[,v])=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa}),{ops:0,saldo:0,cd:0,afa:0});
-  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Dealer</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>28?nombre.substring(0,28)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.saldo)}</td><td>${fM(totCcs4.ops?totCcs4.saldo/totCcs4.ops:0)}</td><td>${fM(totCcs4.cd)}</td><td>${fM(totCcs4.afa)}</td></tr></tfoot>`;
+  det.forEach(r=>{if(!ccs4[r.ccs])ccs4[r.ccs]={ops:0,saldo:0,fin:0,com_dealer:0,rentab_afa:0};ccs4[r.ccs].ops++;ccs4[r.ccs].saldo+=r.saldo_precio;ccs4[r.ccs].fin+=r.total_a_financiar||0;ccs4[r.ccs].com_dealer+=r.com_dealer;ccs4[r.ccs].rentab_afa+=r.ing_autofacil;});
+  const topCcs4=Object.entries(ccs4).sort((a,b)=>b[1].fin-a[1].fin);
+  const totCcs4=topCcs4.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa}),{ops:0,fin:0,cd:0,afa:0});
+  document.getElementById('t-ccs4').innerHTML=`<thead><tr><th>Dealer</th><th>Q</th><th>Monto Fin.</th><th>Prom.</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topCcs4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>28?nombre.substring(0,28)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.fin/v.ops)}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totCcs4.ops}</td><td>${fM(totCcs4.fin)}</td><td>${fM(totCcs4.ops?totCcs4.fin/totCcs4.ops:0)}</td><td>${fM(totCcs4.cd)}</td><td>${fM(totCcs4.afa)}</td></tr></tfoot>`;
 
   const desde=document.getElementById('sel-desde').value, hasta=document.getElementById('sel-hasta').value;
   const rawOt=window.RAW_DATA?window.RAW_DATA.filter(r=>r.mes>=desde&&r.mes<=hasta&&r.estado_eval==='OTORGADO'&&(r.financiera==='AUTOFIN'||r.financiera==='UNIDAD DE CREDITO')):[];
   const ej4={};
-  rawOt.forEach(r=>{const k=r.ejecutivo||'S/E';if(!ej4[k])ej4[k]={ops:0,saldo:0,com_dealer:0,rentab_afa:0,plazo_sum:0,cnt:0};ej4[k].ops++;ej4[k].saldo+=r.saldo_precio;ej4[k].com_dealer+=r.com_dealer;ej4[k].rentab_afa+=r.rentab_afa;if(r.plazo>0){ej4[k].plazo_sum+=r.plazo;ej4[k].cnt++;}});
-  const topEj4=Object.entries(ej4).sort((a,b)=>b[1].ops-a[1].ops||b[1].saldo-a[1].saldo);   // Q otorgados y, a igual Q, Total Financiado
-  const totEj4=topEj4.reduce((a,[,v])=>({ops:a.ops+v.ops,saldo:a.saldo+v.saldo,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa,plazo:a.plazo+v.plazo_sum,cnt:a.cnt+v.cnt}),{ops:0,saldo:0,cd:0,afa:0,plazo:0,cnt:0});
-  document.getElementById('t-ej4').innerHTML=`<thead><tr><th>Ejecutivo</th><th>Q</th><th>Total Fin.</th><th>Prom.</th><th>Plazo</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topEj4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>22?nombre.substring(0,22)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.saldo)}</td><td>${fM(v.saldo/v.ops)}</td><td>${v.cnt?Math.round(v.plazo_sum/v.cnt)+'m':'—'}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totEj4.ops}</td><td>${fM(totEj4.saldo)}</td><td>${fM(totEj4.ops?totEj4.saldo/totEj4.ops:0)}</td><td>${totEj4.cnt?Math.round(totEj4.plazo/totEj4.cnt)+'m':'—'}</td><td>${fM(totEj4.cd)}</td><td>${fM(totEj4.afa)}</td></tr></tfoot>`;
+  rawOt.forEach(r=>{const k=r.ejecutivo||'S/E';if(!ej4[k])ej4[k]={ops:0,saldo:0,fin:0,com_dealer:0,rentab_afa:0,plazo_sum:0,cnt:0};ej4[k].ops++;ej4[k].saldo+=r.saldo_precio;ej4[k].fin+=r.monto_financiado||0;ej4[k].com_dealer+=r.com_dealer;ej4[k].rentab_afa+=r.rentab_afa;if(r.plazo>0){ej4[k].plazo_sum+=r.plazo;ej4[k].cnt++;}});
+  const topEj4=Object.entries(ej4).sort((a,b)=>b[1].ops-a[1].ops||b[1].fin-a[1].fin);   // Q otorgados y, a igual Q, Monto Financiado
+  const totEj4=topEj4.reduce((a,[,v])=>({ops:a.ops+v.ops,fin:a.fin+v.fin,cd:a.cd+v.com_dealer,afa:a.afa+v.rentab_afa,plazo:a.plazo+v.plazo_sum,cnt:a.cnt+v.cnt}),{ops:0,fin:0,cd:0,afa:0,plazo:0,cnt:0});
+  document.getElementById('t-ej4').innerHTML=`<thead><tr><th>Ejecutivo</th><th>Q</th><th>Monto Fin.</th><th>Prom.</th><th>Plazo</th><th>Com Dealer</th><th>Ing. x Col.</th></tr></thead><tbody>${topEj4.map(([nombre,v],i)=>`<tr><td><span class="rank">${i+1}.</span>${escH(nombre.length>22?nombre.substring(0,22)+'…':nombre)}</td><td>${v.ops}</td><td>${fM(v.fin)}</td><td>${fM(v.fin/v.ops)}</td><td>${v.cnt?Math.round(v.plazo_sum/v.cnt)+'m':'—'}</td><td>${fM(v.com_dealer)}</td><td>${fM(v.rentab_afa)}</td></tr>`).join('')}</tbody><tfoot><tr><td>Total</td><td>${totEj4.ops}</td><td>${fM(totEj4.fin)}</td><td>${fM(totEj4.ops?totEj4.fin/totEj4.ops:0)}</td><td>${totEj4.cnt?Math.round(totEj4.plazo/totEj4.cnt)+'m':'—'}</td><td>${fM(totEj4.cd)}</td><td>${fM(totEj4.afa)}</td></tr></tfoot>`;
 
-  document.getElementById('t-estado4').innerHTML=`<thead><tr><th>Estado</th><th>N° op</th><th>%</th><th>Total Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${af.ops||0}</td><td>${totOps?((af.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(af.saldo||0)}</td></tr><tr><td>UNIDAD</td><td>${un.ops||0}</td><td>${totOps?((un.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(un.saldo||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${totOps}</td><td>100%</td><td>${fM(totSaldo)}</td></tr></tfoot>`;
+  document.getElementById('t-estado4').innerHTML=`<thead><tr><th>Financiera</th><th>N° op</th><th>%</th><th>Monto Fin.</th></tr></thead><tbody><tr><td>AUTOFIN</td><td>${af.ops||0}</td><td>${totOps?((af.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(af.prom_fin||0)}</td></tr><tr><td>UNIDAD</td><td>${un.ops||0}</td><td>${totOps?((un.ops||0)/totOps*100).toFixed(1):0}%</td><td>${fM(un.prom_fin||0)}</td></tr></tbody><tfoot><tr><td>Total</td><td>${totOps}</td><td>100%</td><td>${fM(totFin4)}</td></tr></tfoot>`;
 
   const exEv4=Chart.getChart(document.getElementById('ch-evol4')); if(exEv4) exEv4.destroy();
   const last6=(window.DASH.tendencia||[]).slice(-6);
@@ -3282,7 +3288,7 @@ function buildVProy2() {
       <td>${fM(a.m)}</td><td><b>${pM ? fM(parte(pM, a.m, tot.m)) : '—'}</b></td>
       <td>${fM(a.f)}</td><td><b>${pF ? fM(parte(pF, a.f, tot.f)) : '—'}</b></td></tr>`;
     document.getElementById('t-proy2').innerHTML = `
-      <thead><tr><th>Institución</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
+      <thead><tr><th>Financiera</th><th>Q hoy</th><th>Q cierre</th><th>Monto hoy</th><th>Monto cierre</th><th>Fact. hoy</th><th>Fact. cierre</th></tr></thead>
       <tbody>${fila('AUTOFIN', act.AUTOFIN)}${fila('UNIDAD', act.UNIDAD)}</tbody>
       <tfoot><tr><td><b>Total</b></td><td>${tot.q}</td><td><b>${pQ ? Math.round(pQ) : '—'}</b></td><td>${fM(tot.m)}</td><td><b>${pM ? fM(pM) : '—'}</b></td><td>${fM(tot.f)}</td><td><b>${pF ? fM(pF) : '—'}</b></td></tr></tfoot>`;
   };
@@ -4357,14 +4363,14 @@ function mostrarListaOps() {
 
   const thead = '<thead><tr style="background:#1a3a6a;color:#fff;font-size:11px">' +
     '<th style="padding:6px 8px;text-align:left">N° Operación</th>' +
-    '<th style="padding:6px 8px">Institución</th>' +
+    '<th style="padding:6px 8px">Financiera</th>' +
     '<th style="padding:6px 8px">Dealer</th>' +
     '<th style="padding:6px 8px">Ejecutivo</th>' +
     '<th style="padding:6px 8px;text-align:right">Saldo Precio</th>' +
     '<th style="padding:6px 8px;text-align:center">Plazo</th>' +
     '<th style="padding:6px 8px;text-align:center">Tasa</th>' +
     '<th style="padding:6px 8px;text-align:right">Com. Dealer</th>' +
-    '<th style="padding:6px 8px;text-align:center">Estado</th>' +
+    '<th style="padding:6px 8px;text-align:center">Etapa</th>' +
     '</tr></thead>';
 
   const rows = det.map((r,i) => {
@@ -5094,7 +5100,7 @@ function _abrirDetalleOps(nombre, tipo, pred) {
   const totSeg  = ops.reduce((a,r) => a + (parseFloat(r.com_seguros)||0), 0);
   document.getElementById('modal-ejec-kpis').innerHTML = `
     <div class="mekpi"><div class="mekpi-lbl">Operaciones</div><div class="mekpi-val">${ops.length}</div></div>
-    <div class="mekpi"><div class="mekpi-lbl">Total Financiado</div><div class="mekpi-val">${fM(totFin)}</div></div>
+    <div class="mekpi"><div class="mekpi-lbl">Monto Financiado</div><div class="mekpi-val">${fM(totFin)}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Saldo Precio</div><div class="mekpi-val">${fM(totSaldo)}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Com. Dealer</div><div class="mekpi-val">${fM(totCD)}</div></div>
     <div class="mekpi"><div class="mekpi-lbl">Ing. x Colocaciones</div><div class="mekpi-val">${fM(totIng)}</div></div>
@@ -5149,7 +5155,7 @@ function _buildModalContent(full) {
   // full=true (copiar/Excel): montos COMPLETOS en pesos, como número plano —
   // así Excel/PPT los reciben operables, no "$11.5M".
   const F = full ? (v => Math.round(parseFloat(v) || 0)) : fM;
-  const cols = ['N° Operación','ID Financiera','F. Otorgado','Ejecutivo','Financiera','Dealer','Estado','Saldo Precio','Total Financiado','Plazo','Com. Dealer','Ing. x Col.','Ing. x Seguros'];
+  const cols = ['N° Operación','ID Financiera','F. Otorgado','Ejecutivo','Financiera','Dealer','Etapa','Saldo Precio','Monto Financiado','Plazo','Com. Dealer','Ing. x Col.','Ing. x Seguros'];
   const dataRows = ops.map(r => {
     const fot = (r.fecha_otorgado || r.fecha_ot || '').slice(0,10);
     return [
@@ -5168,7 +5174,7 @@ function _buildModalContent(full) {
 function _tablaHtml() {
   const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const { ops, totSaldo, totFin, totCD, totIng, totSeg, fM } = _modalData;
-  const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Total Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)} &nbsp;|&nbsp; <b>Ing. x Seguros:</b> ${fM(totSeg)}`;
+  const kpisTxt = `<b>Operaciones:</b> ${ops.length} &nbsp;|&nbsp; <b>Monto Financiado:</b> ${fM(totFin)} &nbsp;|&nbsp; <b>Saldo Precio:</b> ${fM(totSaldo)} &nbsp;|&nbsp; <b>Com. Dealer:</b> ${fM(totCD)} &nbsp;|&nbsp; <b>Ing. x Col.:</b> ${fM(totIng)} &nbsp;|&nbsp; <b>Ing. x Seguros:</b> ${fM(totSeg)}`;
   const thStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#1a3a6a;color:#fff;font-weight:bold';
   const tdStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap';
   const tfStyle = 'border:1px solid #ccc;padding:4px 8px;white-space:nowrap;background:#eef2fa;color:#1a3a6a;font-weight:bold';
@@ -5226,7 +5232,7 @@ async function copiarImagenModal() {
 function exportarExcelModal() {
   const { cols, dataRows, footRow, titulo } = _buildModalContent(true);
   const { ops, totSaldo, totFin, totCD, totIng, totSeg, fM } = _modalData;
-  const kpis = `Operaciones: ${ops.length}; Total Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}; Ing. x Seguros: ${fM(totSeg)}`;
+  const kpis = `Operaciones: ${ops.length}; Monto Financiado: ${fM(totFin)}; Saldo Precio: ${fM(totSaldo)}; Com. Dealer: ${fM(totCD)}; Ing. x Col.: ${fM(totIng)}; Ing. x Seguros: ${fM(totSeg)}`;
   const esc = v => '"' + String(v).replace(/"/g,'""') + '"';
   const csv = esc(titulo) + '\r\n' + esc(kpis) + '\r\n\r\n'
     + [cols, ...dataRows, footRow].map(r => r.map(esc).join(';')).join('\r\n');

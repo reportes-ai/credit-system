@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cartas de Aprobación — AutoFácil</title>
-  <!-- v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
+  <!-- v4.59 — dealer como nombre único (antes concesionario); Rentabilidad estimada en modal · v4.58 — navbar migrada al componente topnav (miga por vista via AF_TOPNAV_HOJA); v4.56 — la fecha de creacion de la carta viaja en hora de CHILE (con toISOString nacia 4h en el futuro y cada re-guardado la corria de nuevo); v4.55 — plazo de la carta: 6 a 72 cuotas de uno en uno (antes solo multiplos de 6); v4.54 — corregir carta rechazada: re-subir el MISMO archivo no hacia nada (el input conservaba el anterior) y el boton Corregir ahora se muestra apagado con el nombre del autor en vez de desaparecer; v4.53 — card Correccion Cartas de Aprobacion en el menu (faltaba: el permiso estaba en BD pero la card no); v4.52 — la columna se llama Carta de Aprobacion (no Operacion); v4.51 — aviso de carta reemplazada por correccion (y de que carta viene la corregida); estado REEMPLAZADA; v4.50 — boton Ficha completa al revisar/ver una carta: todo lo digitado, marcando lo que el dealer NO ve; v4.49 — la cartola agrupa por RUT del dealer, no por nombre (mismo RUT escrito de dos formas generaba dos cartolas); v4.48 — toggles Enviadas / No enviadas en Detalle Mes (por Mes Cartola); v4.47 — boton Corregir dealer en cartas APROBADAS (aprob_corregir_dealer, motivo + auditoria); v4.46 — CC comisiones@ en correo de cartola (y su vista previa); v4.45 — logo-blanco.png real en el banner (html2canvas ignora el filter CSS); v4.44 — logo AutoFacil en blanco en el banner de la cartola (pantalla y PDF); v4.43 — Revision Cartolas solo ofrece operaciones hasta el mes anterior; v4.42 — Otorgadas sin carta barre TODOS los meses (cada fila muestra y usa su mes); v4.41 — vista previa del PDF y del correo de cartola (2 botones); v4.40 — la cartola se ENVIA por correo automatico (comisiones@, HTML+PDF, CC ejec y Jefe Comercial); v4.39 — correo de cartola parametrico (Mantenedores Post Venta) con interruptor; v4.38 — PDF de cartola: encabezados cortan linea y letra compacta; la tabla cabe en la hoja -->
   <!-- Standalone desde Mantenedores: marca la clase ANTES de pintar para no mostrar el menú -->
   <script>try{var _t=new URLSearchParams(location.search).get('tab');if(_t==='params')document.documentElement.classList.add('standalone-params');if(_t==='cartolas'||_t==='enviadas')document.documentElement.classList.add('standalone-cv');}catch(e){}</script>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
@@ -278,7 +278,7 @@
   <div class="card-af" style="max-width:1100px;margin:0 auto">
     <h5 style="font-weight:800;color:var(--navy);margin-bottom:4px" id="tituloForm"><i class="bi bi-plus-circle me-2"></i>Nueva Carta de Aprobación</h5>
     <div id="excPresuBanner" style="display:none;background:#fefce8;border:1px solid #fde047;border-radius:9px;padding:7px 14px;margin:6px 0 8px;font-size:.83rem;color:#854d0e;font-weight:600"></div>
-    <p style="font-size:.8rem;color:#64748b;margin-bottom:18px">Los datos de parques, concesionarios, vehículos y ejecutivos provienen de los mantenedores del sistema.</p>
+    <p style="font-size:.8rem;color:#64748b;margin-bottom:18px">Los datos de parques, dealers, vehículos y ejecutivos provienen de los mantenedores del sistema.</p>
     <div class="alert-inline" id="formAlert"></div>
     <div class="form-grid">
 
@@ -387,14 +387,14 @@
       <div class="ff"><label>GPS</label><input id="cGps" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (opcional)"></div>
       <div class="ff"><label>Gastos <span style="font-weight:400;color:#94a3b8;font-size:.68rem">(inscripción, mantenciones, garantía)</span></label><input id="cGastos" inputmode="numeric" oninput="fmtMoneyZ(this)" placeholder="$ (opcional)"></div>
 
-      <div class="sec-form">Parque y concesionario</div>
+      <div class="sec-form">Parque y dealer</div>
       <div class="ff fg-2" id="wrapParque"><label>Parque automotriz</label><select id="cParque" onchange="filtrarConcesionarios()"><option value="">— Sin parque (calle) —</option></select></div>
       <div class="ff fg-2">
         <label style="color:#94a3b8;font-weight:600">Buscar dealer</label>
         <input id="cConcFiltro" placeholder="🔍 Escribe cualquier parte del nombre…" oninput="filtrarConcesionarios()" autocomplete="off" style="margin-bottom:8px">
         <label>Dealer *</label>
         <select id="cConc" onchange="onConcesionario()"><option value="">Cargando…</option></select></div>
-      <div class="ff"><label>RUT concesionario</label><input id="cRutConc" readonly></div>
+      <div class="ff"><label>RUT dealer</label><input id="cRutConc" readonly></div>
       <div class="ff fg-2"><label>Vendedor</label>
         <select id="cVendedorSel" onchange="onVendedorSel()"><option value="">— Seleccione dealer primero —</option></select>
         <input id="cVendedor" type="hidden"></div>
@@ -522,7 +522,7 @@
 <div class="tab-pane" id="pane-impresion">
   <div class="card-af">
     <div class="filters-bar">
-      <input type="text" id="impBuscar" placeholder="Buscar N° operación, cliente o concesionario…" oninput="renderImpresion()" style="flex:1;min-width:220px">
+      <input type="text" id="impBuscar" placeholder="Buscar N° operación, cliente o dealer…" oninput="renderImpresion()" style="flex:1;min-width:220px">
     </div>
     <div style="overflow-x:auto">
       <table class="tbl">
@@ -2836,11 +2836,11 @@ function rentHTML(c,R,tier){
         <div class="rr tot"><span>Total Ingresos</span><b style="color:#059669">${f(D.total_ing)}</b></div>
         <div style="font-size:.72rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 4px">Descuentos</div>
         <div class="rr"><span>Comisión Dealer${R.costos.esPatio?' (Parque)':' (Calle)'}</span><b>${f(R.costos.dealer)}</b></div>
-        ${R.costos.patio?`<div class="rr"><span>Comisión Parque (2,5%)</span><b>${f(R.costos.patio)}</b></div>`:''}
+        ${R.costos.patio?`<div class="rr"><span>Comisión Parque</span><b>${f(R.costos.patio)}</b></div>`:''}
         <div class="rr"><span>Comisión Ejecutivo</span><b>${f(R.costos.ejecutivo)}</b></div>
         <div class="rr tot"><span>Total Descuentos</span><b style="color:#dc2626">${f(R.costos.total)}</b></div>
         <div style="margin-top:10px;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;background:${D.rentab>=0?'#059669':'#dc2626'};color:#fff">
-          <div><div style="font-size:.72rem;opacity:.85">Rentabilidad</div><div style="font-size:1.3rem;font-weight:800">${f(D.rentab)}</div></div>
+          <div><div style="font-size:.72rem;opacity:.85">Rentabilidad estimada (descuenta com. ejecutivo)</div><div style="font-size:1.3rem;font-weight:800">${f(D.rentab)}</div></div>
           <div style="font-size:.8rem;opacity:.9;text-align:right">${fp(D.pct)}<br>del monto fin.</div>
         </div>
         <div style="margin-top:6px;font-size:.75rem;color:#64748b;text-align:center">Cuota cliente estimada: <b>${f(D.cuota)}</b></div>
@@ -3667,7 +3667,7 @@ function renderRevCartolas(){
   if (q) nombres = nombres.filter(key => String(NOMBRE[key]).toLowerCase().includes(q) ||
     grupos[key].some(m => [m.num_op,m.nuestro_num_op,m.rut_cliente,m.nombre_cliente,m.ejecutivo,m.num_carta,m.rut_conc,m.concesionario]
       .some(v => String(v||'').toLowerCase().includes(q))));
-  document.getElementById('revCtaCount').textContent = nombres.length + ' concesionario(s)';
+  document.getElementById('revCtaCount').textContent = nombres.length + ' dealer(s)';
   const mes = mesActual();   // la cartola se emite en el mes actual (mes de envío)
   cont.innerHTML = nombres.map((key,gi)=>{
     const movs = grupos[key];

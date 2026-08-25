@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador de Excepciones — AutoFácil</title>
-  <!-- v2.5 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.3 — Validador muestra qué autoriza el código (tasa/comisión/financiera) -->
+  <!-- v2.6 — Rentabilidad perdida (antes "sacrificada") · v2.5 — navbar migrada al componente topnav (miga por pestaña via AF_TOPNAV_HOJA) · v2.3 — Validador muestra qué autoriza el código (tasa/comisión/financiera) -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -164,7 +164,7 @@
     <div class="card-af">
       <div style="font-weight:800;color:var(--navy);margin-bottom:8px">Por ejecutivo</div>
       <table class="gr"><thead><tr>
-        <th>Ejecutivo</th><th>Códigos</th><th>Usados</th><th>Vencidos</th><th>⭐ gastadas</th><th>Rentab. sacrificada</th>
+        <th>Ejecutivo</th><th>Códigos</th><th>Usados</th><th>Vencidos</th><th>⭐ gastadas</th><th>Rentabilidad perdida</th>
       </tr></thead><tbody id="infEjecBody"></tbody></table>
     </div>
     <div class="card-af">
@@ -172,7 +172,7 @@
       <table class="gr"><thead><tr>
         <th>Código</th><th>Nivel</th><th>Estado</th><th>Ejecutivo</th><th>Saldo</th><th>Jugada</th><th>Sacrificio</th><th>Usado en</th>
       </tr></thead><tbody id="infDetBody"></tbody></table>
-      <p class="nota" style="margin-top:8px">Rentabilidad sacrificada = lo que rentaba la mejor alternativa menos lo que renta la jugada aprobada (solo códigos usados; "—" = el código no registró las cifras). No descuenta los negocios que sin la excepción se habrían perdido.</p>
+      <p class="nota" style="margin-top:8px">Rentabilidad perdida (antes "sacrificada") = lo que rentaba la mejor alternativa menos lo que renta la jugada aprobada (solo códigos usados; "—" = el código no registró las cifras). No descuenta los negocios que sin la excepción se habrían perdido.</p>
     </div>
   </div>
 </div>
@@ -315,7 +315,7 @@ async function cargarInforme(){
     kpi('Códigos generados', tot.generados, `⭐${tot.por_nivel[1]||0} · ⭐⭐${tot.por_nivel[2]||0} · ⭐⭐⭐${tot.por_nivel[3]||0} · 👔${tot.gerencia}`) +
     kpi('Usados', tot.usados, `${tot.vigentes} vigentes · ${tot.vencidos} vencidos`) +
     kpi('Estrellas gastadas', tot.estrellas_gastadas, '') +
-    kpi('Rentab. sacrificada', fmt$(tot.sacrificio), tot.sin_medir ? tot.sin_medir + ' código(s) sin medir' : 'todos medidos');
+    kpi('Rentabilidad perdida', fmt$(tot.sacrificio), tot.sin_medir ? tot.sin_medir + ' código(s) sin medir' : 'todos medidos');
   document.getElementById('infEjecBody').innerHTML = ejecutivos.length ? ejecutivos.map(e => `<tr>
     <td style="text-align:left">${escH(e.ejecutivo)}</td><td>${e.generados}</td><td>${e.usados}</td><td>${e.vencidos}</td>
     <td>${e.estrellas}</td><td>${fmt$(e.sacrificio)}</td></tr>`).join('')

@@ -54,7 +54,7 @@ const FUENTES = {
       { campo:'com_rdh',             label:'Comisión RDH',            tipo:'numero' },
       { campo:'com_cesantia',        label:'Comisión Cesantía',       tipo:'numero' },
       { campo:'com_reparaciones',    label:'Comisión Reparaciones',   tipo:'numero' },
-      { campo:'ingreso_neto_total',  label:'Ingreso Neto Total',      tipo:'numero' },
+      { campo:'ingreso_neto_total',  label:'Ingreso Neto Operacional', tipo:'numero' },
       { campo:'marca',               label:'Marca Vehículo',          tipo:'texto'  },
       { campo:'modelo',              label:'Modelo Vehículo',         tipo:'texto'  },
       { campo:'rut_cliente',         label:'RUT Cliente',             tipo:'texto'  },

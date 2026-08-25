@@ -24,7 +24,7 @@
   <div class="header no-print">
     <div class="header-logo" style="display:flex;align-items:center;gap:8px">
         <img id="logoHeader" src="/img/logo.png" alt="AutoFácil" style="height:32px;object-fit:contain">
-        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.46</span>
+        <span style="font-size:11px;font-weight:400;color:#90CAF9">V5.47</span>
       </div>
     <div class="header-right">
       <span class="header-user" id="headerUser"></span>
@@ -480,7 +480,7 @@
         </div>
         <div class="field" style="flex:1;min-width:160px">
           <label>Buscar</label>
-          <input type="text" id="infSearch" placeholder="Cliente, concesionario..." oninput="renderInformes()">
+          <input type="text" id="infSearch" placeholder="Cliente, dealer..." oninput="renderInformes()">
         </div>
         <div style="display:flex;gap:8px;padding-bottom:2px">
           <button class="btn btn-secondary" onclick="clearInfFilters()">Limpiar</button>
@@ -662,7 +662,7 @@
       <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
         <div class="field" style="min-width:160px">
           <label>Dealer</label>
-          <input type="text" id="revBuscaConc" placeholder="Buscar concesionario..." oninput="renderRevisionCartolas()">
+          <input type="text" id="revBuscaConc" placeholder="Buscar dealer..." oninput="renderRevisionCartolas()">
         </div>
         <div class="field" style="min-width:130px">
           <label>Mes</label>
@@ -787,7 +787,7 @@
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
           <div class="field" style="flex:2;min-width:200px">
             <label>Buscar</label>
-            <input type="text" id="impCartolasSearch" placeholder="Correlativo, concesionario, período..." oninput="renderImpCartolas()" style="width:100%">
+            <input type="text" id="impCartolasSearch" placeholder="Correlativo, dealer, período..." oninput="renderImpCartolas()" style="width:100%">
           </div>
           <div class="field" style="flex:1;min-width:150px">
             <label>Período</label>
@@ -828,7 +828,7 @@
         <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
           <div class="field" style="flex:2;min-width:200px">
             <label>Buscar</label>
-            <input type="text" id="estadoCartolasSearch" placeholder="Correlativo, concesionario, período..." oninput="renderEstadoCartolas()" style="width:100%">
+            <input type="text" id="estadoCartolasSearch" placeholder="Correlativo, dealer, período..." oninput="renderEstadoCartolas()" style="width:100%">
           </div>
           <div class="field" style="flex:1;min-width:150px">
             <label>Período</label>

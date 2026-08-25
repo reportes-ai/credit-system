@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
+<!-- v2.9 — rotulos: Etapa del Crédito (antes "Estado") · v2.8 — navbar migrada al componente topnav (avatar, campanita y Salir) · v2.7 — boton "Ver Respaldos" en operaciones cerradas: antes sus documentos no tenian puerta de entrada; v2.6 — boton "Anular Operacion" en la ficha (etapa OTORGADO): solicita y aprueba otra persona de Operaciones -->
   <link rel="icon" href="/img/favicon.png" type="image/png">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Revisión de Crédito — AutoFácil</title>
@@ -310,10 +310,10 @@
       </div>
 
       <!-- Estado -->
-      <div class="eb-sec-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
+      <div class="eb-sec-title"><i class="bi bi-sliders"></i>Etapa y Observaciones</div>
       <div style="display:grid;grid-template-columns:220px 1fr;gap:12px">
         <label class="eb-field">
-          <span>Estado del Crédito</span>
+          <span>Etapa del Crédito</span>
           <select id="eb_estado">
             <option value="CARTA_APROBACION">Carta Aprobación</option>
             <option value="OTORGADO">Otorgado (Cursado)</option>
@@ -801,11 +801,11 @@ function renderPagina(c, ant, com) {
 
     <!-- ── Estado y Observaciones ── -->
     <div class="section">
-      <div class="sec-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
+      <div class="sec-title"><i class="bi bi-sliders"></i>Etapa y Observaciones</div>
       <div class="sec-body">
         <div class="row" style="display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start">
           <div>
-            <div class="fi-label" style="margin-bottom:6px">Estado del Crédito</div>
+            <div class="fi-label" style="margin-bottom:6px">Etapa del Crédito</div>
             <!-- Estados PARAMÉTRICOS: se cargan desde el mantenedor Estado Créditos
                  (/api/estado-creditos) según el ámbito del crédito. -->
             <select id="dEstado" class="estado-select" data-actual="${c.estado||''}">

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- v3.35 — un solo significado por termino: Ingreso Neto Operacional (motor, por operacion) vs Ing. Neto AutoFacil (mes, resta com. ejecutivos y arriendo faltante); Rentabilidades usaba el mismo rotulo con otra formula · v3.34 — Glosario entra a la matriz de Permisos de Pestañas (vglos) · v3.33 — pestana Glosario: cada variable y cuadro explicado (que es, como se calcula, que incluye/excluye, para que sirve) · v3.32 — definicion UNICA de aprobado (AF_ES_APROBADO): el funnel ya no cuenta pendientes como aprobados y Estado Comercial ya no suma las en-evaluacion · v3.31 — Dealers y Parques: filtros de periodo en colocaciones (Todo, 6m, 12m, 2026, 2025) · v3.30 — Resumen Mes Anterior: columna % sobre el total financiado en cada linea · v3.29 — Proyeccion Pro: el Ingreso Neto proyectado se reescala a la proyeccion FINAL (venia de la mezcla, un cierre mas alto que el Q/monto de al lado) · v3.28 — quien cursó como ejecutivo y luego ascendió (Damaris a Jefe Comercial) ya no cae en Externos Autofin: el padron de "gente de la casa" son todos los usuarios del sistema · v3.27 — la fila Externos Autofin ahora abre su detalle (era link roto: filtraba por un ejecutivo que no existe y salia vacia) · v3.26 — el popup por institucion cuenta por MES CONTABLE, igual que la card (22 ≠ 23 en junio Unidad) · v3.25 — camarita en el desglose diario: copia la matriz lista para WhatsApp · v3.24 — el desglose diario del mes en curso llega hasta hoy y va creciendo · v3.23 — Desempeno por Ejecutivo: clic en Ing/Apro/Ot abre el desglose dia a dia · v3.22 — pulso: hoy con real + meta del dia · v3.21 — pulso ajuste fino 262px · v3.20 — pulso aun mas compacto (240px, titulo corto) · v3.19 — pulso diario mas chico (285px), calza con el alto de Ritmo Requerido · v3.18 — pulso diario compacto (370px, celdas cuadradas) · v3.17 — Proyeccion Pro: pulso diario con meta para la proyeccion junto a las tablas · v3.16 — tab Resumen: acceso al Resumen Ejecutivo (/dashboard/resumen/) · v3.15 — captura Desempeno: TC/TA con los colores por percentil de la pantalla -->
+<!-- v3.36 — Financiera/Monto Financiado/Etapa: un solo nombre por concepto; Monto Financiado real (antes mostraba saldo precio bajo "Total a Financiar") · v3.35 — un solo significado por termino: Ingreso Neto Operacional (motor, por operacion) vs Ing. Neto AutoFacil (mes, resta com. ejecutivos y arriendo faltante); Rentabilidades usaba el mismo rotulo con otra formula · v3.34 — Glosario entra a la matriz de Permisos de Pestañas (vglos) · v3.33 — pestana Glosario: cada variable y cuadro explicado (que es, como se calcula, que incluye/excluye, para que sirve) · v3.32 — definicion UNICA de aprobado (AF_ES_APROBADO): el funnel ya no cuenta pendientes como aprobados y Estado Comercial ya no suma las en-evaluacion · v3.31 — Dealers y Parques: filtros de periodo en colocaciones (Todo, 6m, 12m, 2026, 2025) · v3.30 — Resumen Mes Anterior: columna % sobre el total financiado en cada linea · v3.29 — Proyeccion Pro: el Ingreso Neto proyectado se reescala a la proyeccion FINAL (venia de la mezcla, un cierre mas alto que el Q/monto de al lado) · v3.28 — quien cursó como ejecutivo y luego ascendió (Damaris a Jefe Comercial) ya no cae en Externos Autofin: el padron de "gente de la casa" son todos los usuarios del sistema · v3.27 — la fila Externos Autofin ahora abre su detalle (era link roto: filtraba por un ejecutivo que no existe y salia vacia) · v3.26 — el popup por institucion cuenta por MES CONTABLE, igual que la card (22 ≠ 23 en junio Unidad) · v3.25 — camarita en el desglose diario: copia la matriz lista para WhatsApp · v3.24 — el desglose diario del mes en curso llega hasta hoy y va creciendo · v3.23 — Desempeno por Ejecutivo: clic en Ing/Apro/Ot abre el desglose dia a dia · v3.22 — pulso: hoy con real + meta del dia · v3.21 — pulso ajuste fino 262px · v3.20 — pulso aun mas compacto (240px, titulo corto) · v3.19 — pulso diario mas chico (285px), calza con el alto de Ritmo Requerido · v3.18 — pulso diario compacto (370px, celdas cuadradas) · v3.17 — Proyeccion Pro: pulso diario con meta para la proyeccion junto a las tablas · v3.16 — tab Resumen: acceso al Resumen Ejecutivo (/dashboard/resumen/) · v3.15 — captura Desempeno: TC/TA con los colores por percentil de la pantalla -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AutoFácil — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -75,11 +75,11 @@
   <!-- KPI row -->
   <div class="kpi-strip" id="kpi1"></div>
 
-  <!-- Fila 1: Instituciones + Donut + Resumen Mes Anterior -->
+  <!-- Fila 1: Financieras + Donut + Resumen Mes Anterior -->
   <div class="g6535">
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
-        <div class="card-head">Instituciones
+        <div class="card-head">Financieras
   
         </div>
         <div class="card-body" style="padding:0">
@@ -99,7 +99,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Plazo Prom. por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Plazo Prom. por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1-plazo"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1-plazo-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">m</div></div>
@@ -108,7 +108,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Monto Prom. por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Monto Prom. por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1-monto"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1-monto-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">M$</div></div>
@@ -117,7 +117,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Ing. AFA por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Ing. AFA por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1-afa"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1-afa-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">AUTOFIN</div></div>
@@ -129,7 +129,7 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
-        <div class="card-head light">Participación % por Institución</div>
+        <div class="card-head light">Participación % por Financiera</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px">
           <div>
             <div style="font-size:9px;color:#888;text-align:center;margin-bottom:4px;text-transform:uppercase">Saldo Precio</div>
@@ -224,7 +224,7 @@
   <div class="g6535">
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
-        <div class="card-head">Instituciones — Solo Otorgados</div>
+        <div class="card-head">Financieras — Solo Otorgados</div>
         <div class="card-body" style="padding:0">
           <table class="tbl" id="t-fin1b"></table>
         </div>
@@ -246,7 +246,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Plazo Prom. por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Plazo Prom. por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1b-plazo"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1b-plazo-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">m</div></div>
@@ -255,7 +255,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Monto Prom. por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Monto Prom. por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1b-monto"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1b-monto-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">M$</div></div>
@@ -264,7 +264,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-head light" style="font-size:10px;padding:5px 8px">Ing. AFA por Institución</div>
+          <div class="card-head light" style="font-size:10px;padding:5px 8px">Ing. AFA por Financiera</div>
           <div class="donut-section" style="padding:6px">
             <div class="donut-wrap" style="width:70px;height:70px"><canvas id="ch-d1b-afa"></canvas>
               <div class="donut-center"><div class="donut-center-val" id="d1b-afa-pct" style="font-size:11px">—</div><div class="donut-center-lbl" style="font-size:7px">AUTOFIN</div></div>
@@ -276,7 +276,7 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
-        <div class="card-head light" style="padding:4px 10px;font-size:11px">Participación % por Institución</div>
+        <div class="card-head light" style="padding:4px 10px;font-size:11px">Participación % por Financiera</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:2px 8px 4px">
           <div>
             <div style="font-size:7px;color:#888;text-align:center;margin-bottom:1px;text-transform:uppercase">Saldo Precio</div>
@@ -356,7 +356,7 @@
 
   <div class="g6535">
     <div class="card">
-      <div class="card-head">Instituciones — Solo Otorgados
+      <div class="card-head">Financieras — Solo Otorgados
         <span id="pct-prom1b" style="background:#1565C0;padding:3px 10px;border-radius:3px;font-size:11px"></span>
       </div>
       <div class="card-body" style="padding:0">
@@ -367,7 +367,7 @@
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
-        <div class="card-head light">Participación % por Institución</div>
+        <div class="card-head light">Participación % por Financiera</div>
         <div class="donut-section">
           <div class="donut-wrap"><canvas id="ch-donut4"></canvas>
             <div class="donut-center"><div class="donut-center-val" id="donut4-pct">—</div><div class="donut-center-lbl">AUTOFIN</div></div>
@@ -467,7 +467,7 @@
             </div>
           </div>
           <div>
-            <div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase">Institución</div>
+            <div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase">Financiera</div>
             <div class="pills">
               <div class="pill active" onclick="setFil('fin','',this)">Todos</div>
               <div class="pill" onclick="setFil('fin','AUTOFIN',this)">AUTOFIN</div>
@@ -485,7 +485,7 @@
       </div>
       <!-- Charts lateral -->
       <div class="card">
-        <div class="card-head teal">Ing. AFA vs Total Fin.</div>
+        <div class="card-head teal">Ing. AFA vs Monto Fin.</div>
         <div class="ch" style="height:120px;padding:8px"><canvas id="ch-mm"></canvas></div>
       </div>
       <div class="card">
@@ -568,7 +568,7 @@
             </div>
           </div>
           <div>
-            <div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase">Institución</div>
+            <div style="font-size:10px;color:#888;margin-bottom:4px;text-transform:uppercase">Financiera</div>
             <div class="pills">
               <div class="pill active" onclick="setFilPL('fin','',this)">Todos</div>
               <div class="pill" onclick="setFilPL('fin','AUTOFIN',this)">AUTOFIN</div>
@@ -586,7 +586,7 @@
       </div>
       <!-- Charts lateral -->
       <div class="card">
-        <div class="card-head teal">Ing. AFA vs Total Fin.</div>
+        <div class="card-head teal">Ing. AFA vs Monto Fin.</div>
         <div class="ch" style="height:120px;padding:8px"><canvas id="ch-mm-pl"></canvas></div>
       </div>
       <div class="card">
@@ -1288,7 +1288,7 @@
   </div>
   <div id="evol-kpis" class="kpi-strip" style="margin-bottom:12px"></div>
   <div class="card" style="margin-bottom:12px">
-    <div class="card-head" style="background:linear-gradient(90deg,#012d70,#0255c5)">📋 Operaciones Otorgadas Mensuales — por Institución</div>
+    <div class="card-head" style="background:linear-gradient(90deg,#012d70,#0255c5)">📋 Operaciones Otorgadas Mensuales — por Financiera</div>
     <div style="overflow-x:auto"><table id="t-evol" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>
   </div>
   <div class="card">
@@ -1320,9 +1320,9 @@
           <th>Ejecutivo</th>
           <th>Financiera</th>
           <th>Dealer</th>
-          <th>Estado</th>
+          <th>Etapa</th>
           <th>Saldo Precio</th>
-          <th>Total Financiado</th>
+          <th>Monto Financiado</th>
           <th>Plazo</th>
           <th>Com. Dealer</th>
           <th>Ing. x Col.</th>

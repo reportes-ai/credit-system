@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.0 — glosario del dashboard "a prueba de todo": cada variable y cada cuadro con QUE ES / COMO SE CALCULA / INCLUYE / NO INCLUYE / PARA QUE SIRVE -->
+<!-- v1.1 — Monto Financiado como nombre único; cuadro Financieras · v1.0 — glosario del dashboard "a prueba de todo": cada variable y cada cuadro con QUE ES / COMO SE CALCULA / INCLUYE / NO INCLUYE / PARA QUE SIRVE -->
 <html lang="es">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -88,8 +88,8 @@
     <div class="fila"><b>Ojo</b><span>TA y TC responden preguntas distintas — no se suman ni se comparan entre sí.</span></div>
   </div>
 
-  <div class="card"><h5>💵 Total a Financiar / Monto Financiado</h5>
-    <div class="fila"><b>Qué es</b><span>El capital de los créditos del grupo mostrado.</span></div>
+  <div class="card"><h5>💵 Monto Financiado</h5>
+    <div class="fila"><b>Qué es</b><span>El capital de los créditos del grupo mostrado. Es el único nombre para esta magnitud en todo el sistema (antes el dashboard lo rotulaba "Total a Financiar").</span></div>
     <div class="fila"><b>Cómo se calcula</b><span>Suma de <code>monto_financiado</code> = saldo precio + seguros + gastos + GPS de cada operación.</span></div>
     <div class="fila"><b>No incluye</b><span class="no">El pie del cliente (eso no se financia).</span></div>
     <div class="fila"><b>Para qué sirve</b><span>Tamaño del negocio en plata. Es la base de la comisión del ejecutivo y del pilar Montos del BSC.</span></div>
@@ -140,7 +140,7 @@
 
   <div class="card"><h5>📊 Aprobados — "Seguimiento Créditos Aprobados"</h5>
     <div class="fila"><b>Universo</b><span>Operaciones APROBADAS del período (incluye las otorgadas — regla base 2).</span></div>
-    <div class="fila"><b>Cuadros internos</b><span><b>Instituciones</b>: las aprobadas repartidas AUTOFIN/UNIDAD. <b>Estado Comercial</b>: las INGRESADAS del período clasificadas (aprobado/rechazado/anulado/pendiente) — por eso su total es mayor que las aprobadas. <b>Motivo</b>: el detalle de en qué quedó cada ingresada (FIRMADO = otorgada; CONFIRMACIÓN CLIENTE = aprobada esperando al cliente; DESISTE = rechazada/desistida).</span></div>
+    <div class="fila"><b>Cuadros internos</b><span><b>Financieras</b>: las aprobadas repartidas AUTOFIN/UNIDAD. <b>Estado Comercial</b>: las INGRESADAS del período clasificadas (aprobado/rechazado/anulado/pendiente) — por eso su total es mayor que las aprobadas. <b>Motivo</b>: el detalle de en qué quedó cada ingresada (FIRMADO = otorgada; CONFIRMACIÓN CLIENTE = aprobada esperando al cliente; DESISTE = rechazada/desistida).</span></div>
     <div class="fila"><b>Para qué sirve</b><span>El pipeline: lo aprobado es venta POTENCIAL que hay que rematar antes de que se enfríe.</span></div>
   </div>
 

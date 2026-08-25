@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rentabilidad Créditos — AutoFácil</title>
-  <!-- v1.22 -->
+  <!-- v1.23 — Rentabilidad estimada (descuenta com. ejecutivo) en detalle; Comisión Parque sin % fijo; Etapa -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -138,7 +138,7 @@
     </div>
     <i class="bi bi-info-circle me-1"></i>
     Mismas fórmulas del <a class="mini-link" href="/simulador/" target="_blank">Simulador de Rentabilidad</a>.
-    <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> 2,5% del saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
+    <b>Comisión Dealer</b> = la real negociada del crédito (si no la trae, pizarra por plazo); <b>Comisión Parque</b> = % patio de los parámetros sobre el saldo (si es parque); <b>Comisión Ejecutivo</b> según <code>pct_ejecutivo_fin</code> de los <a class="mini-link" href="/aprobaciones/mantenedor/" target="_blank">parámetros del crédito</a>.
     <b>Tasa cliente</b> = la real del crédito (si falta, TMC vigente por tramo). <b>Tier UAC</b> = motor único (tier del mes por N° de ops UAC; con Modelo 2, las ops de plazo largo reciben su % fijo).
     AutoFin = colocación + seguros; UAC = % sobre saldo precio (no paga seguros). Los créditos <b>AutoFácil (cartera propia)</b> se muestran como referencia y no entran en el conteo de óptimos.
   </div>
@@ -469,7 +469,7 @@ function detalleHTML(f){
       ${it('Cliente', escH(c.nombre_cliente||'—'))}
       ${it('RUT', fmtRUT(c.rut_cliente)||'—')}
       ${it('Financiera (colocada)', escH(finLbl))}
-      ${it('Estado', escH(c.estado||'—'))}
+      ${it('Etapa', escH(c.estado||'—'))}
       ${it('Fecha otorgamiento', fmtFecha(c.fecha_otorgado))}
       ${it('Ejecutivo', escH(c.ejecutivo||'—'))}
       ${it('Dealer', escH(c.dealer||'—'))}
@@ -502,11 +502,11 @@ function detalleHTML(f){
         <div class="rr tot"><span>Total Ingresos</span><b style="color:#059669">${fmtCLP(D.total_ing)}</b></div>
         <div style="font-size:.7rem;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.04em;margin:9px 0 3px">Descuentos</div>
         <div class="rr"><span>Comisión Dealer${R.costos.esPatio?' (Parque)':' (Calle)'}</span><b>${fmtCLP(R.costos.dealer)}</b></div>
-        ${R.costos.patio?`<div class="rr"><span>Comisión Parque (2,5%)</span><b>${fmtCLP(R.costos.patio)}</b></div>`:''}
+        ${R.costos.patio?`<div class="rr"><span>Comisión Parque</span><b>${fmtCLP(R.costos.patio)}</b></div>`:''}
         <div class="rr"><span>Comisión Ejecutivo</span><b>${fmtCLP(R.costos.ejecutivo)}</b></div>
         <div class="rr tot"><span>Total Descuentos</span><b style="color:#dc2626">${fmtCLP(R.costos.total)}</b></div>
         <div style="margin-top:9px;border-radius:10px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;background:${D.rentab>=0?'#059669':'#dc2626'};color:#fff">
-          <div><div style="font-size:.7rem;opacity:.85">Rentabilidad</div><div style="font-size:1.25rem;font-weight:800">${fmtCLP(D.rentab)}</div></div>
+          <div><div style="font-size:.7rem;opacity:.85">Rentabilidad estimada (descuenta com. ejecutivo)</div><div style="font-size:1.25rem;font-weight:800">${fmtCLP(D.rentab)}</div></div>
           <div style="font-size:.78rem;opacity:.9;text-align:right">${(D.pct||0).toFixed(1)}%<br>del monto fin.</div>
         </div>
       </div>

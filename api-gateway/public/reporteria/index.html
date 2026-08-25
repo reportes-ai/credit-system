@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reportería — AutoFácil</title>
-  <!-- v1.6 -->
+  <!-- v1.7 — Ingreso Neto Operacional y Dealer: nombres canónicos -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -482,7 +482,7 @@ const MODULOS = {
       { key:'modelo',               label:'Modelo',                filtro:{ tipo:'texto' } },
       { key:'anio',                 label:'Año Vehículo',          filtro:{ tipo:'anio', min:1990, max:2030 } },
       { key:'patente',              label:'Patente',               filtro:{ tipo:'texto' } },
-      { key:'dealer',               label:'Dealer / Automotora',   filtro:{ tipo:'texto' } },
+      { key:'dealer',               label:'Dealer',                filtro:{ tipo:'texto' } },
       { key:'rut_concesionario',    label:'RUT Dealer',     filtro:{ tipo:'texto' } },
       { key:'vendedor',             label:'Vendedor',              filtro:{ tipo:'texto' } },
       { key:'parque',               label:'Parque',                filtro:{ tipo:'texto' } },
@@ -493,7 +493,7 @@ const MODULOS = {
       { key:'com_rdh',              label:'Comisión RDH',          filtro:{ tipo:'monto' } },
       { key:'com_cesantia',         label:'Comisión Cesantía',     filtro:{ tipo:'monto' } },
       { key:'com_reparaciones',     label:'Comisión Reparaciones', filtro:{ tipo:'monto' } },
-      { key:'ingreso_neto_total',   label:'Ingreso Neto Total',    filtro:{ tipo:'monto' } },
+      { key:'ingreso_neto_total',   label:'Ingreso Neto Operacional', filtro:{ tipo:'monto' } },
       { key:'seguro_rdh',           label:'Prima RDH',             filtro:{ tipo:'monto' } },
       { key:'seguro_cesantia',      label:'Prima Cesantía',        filtro:{ tipo:'monto' } },
       { key:'seguro_rep_menor',     label:'Prima Rep. Menores',    filtro:{ tipo:'monto' } },

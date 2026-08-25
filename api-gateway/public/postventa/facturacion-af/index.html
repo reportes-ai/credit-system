@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- v1.7 — fullwidth + columna ID Financiera + exportar Excel por detalle · titulos y celdas centrados en %, anticipo, facturado y diferencias -->
+<!-- v1.8 — Monto Financiado (antes "Monto Crédito") · v1.7 — fullwidth + columna ID Financiera + exportar Excel por detalle · titulos y celdas centrados en %, anticipo, facturado y diferencias -->
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -170,7 +170,7 @@ async function toggleConc(m, fin, concepto){
             <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel</button>
         </div>`;
   h += `<div style="overflow:auto"><table>
-    <thead><tr><th>N° Op</th><th>ID Financiera</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Crédito')}</th><th class="num">Plazo</th>
+    <thead><tr><th>N° Op</th><th>ID Financiera</th><th>Cliente</th><th class="num">${concepto==='SEGUROS'?'Primas':(esUAC?'Saldo Precio':'Monto Financiado')}</th><th class="num">Plazo</th>
     <th class="num">Comisión calculada</th><th class="num" style="text-align:center">%</th>${esUAC?'<th class="num" style="text-align:center">Anticipo (día 15)</th>':''}<th style="text-align:center">OK</th><th class="num" style="text-align:center">${esUAC?'Facturado cierre':'Monto facturado'}</th><th class="num" style="text-align:center">Dif $</th><th class="num" style="text-align:center">Dif %</th></tr></thead>
     <tbody>${j.data.ops.map((o,i)=>filaOp(rid,o,i)).join('')}</tbody>
     <tfoot><tr style="background:#f1f5f9;font-weight:800"><td colspan="5">TOTAL (${j.data.ops.length} ops)</td>
@@ -339,7 +339,7 @@ async function exportarExcel(rid){
   const d = window['DET_'+rid]; if (!d || !d.ops || !d.ops.length) return;
   await cargarXLSX();
   const esUAC = !!window['ESUAC_'+rid], esSeg = d.concepto === 'SEGUROS';
-  const baseLbl = esSeg ? 'Primas' : (esUAC ? 'Saldo Precio' : 'Monto Crédito');
+  const baseLbl = esSeg ? 'Primas' : (esUAC ? 'Saldo Precio' : 'Monto Financiado');
   const filas = d.ops.map(o => {
     const fact = o.monto_facturado != null ? +o.monto_facturado : null;
     const esperado = esUAC ? (+o.comision||0) - (+o.anticipo||0) : (+o.comision||0);

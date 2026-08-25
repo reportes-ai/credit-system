@@ -721,10 +721,10 @@ async function abrirDetalle(id) {
         <span style="font-size:.72rem;font-weight:600;opacity:.7">— desglose cuota por cuota</span>
       </button>
       <div class="ds">
-        <div class="ds-title"><i class="bi bi-sliders"></i>Estado y Observaciones</div>
+        <div class="ds-title"><i class="bi bi-sliders"></i>Etapa y Observaciones</div>
         <div class="row g-2">
           <div class="col-md-4">
-            <label class="form-label">Estado</label>
+            <label class="form-label">Etapa</label>
             <select id="dEstado" class="form-select">
               <option value="INGRESO"            ${c.estado==='INGRESO'            ?'selected':''}>Ingresado</option>
               <option value="CARGA_RESPALDOS"    ${c.estado==='CARGA_RESPALDOS'    ?'selected':''}>Carga Respaldos</option>
