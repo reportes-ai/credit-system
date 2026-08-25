@@ -7,7 +7,7 @@
   <title>Bitácora Fundantes Atrasados — AutoFácil</title>
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
-  <!-- v1.1 -->
+  <!-- v1.2 -->
   <style>
     :root { --navy:#0141A2; --navy-dark:#012d70; --accent:#009AFE; --bg:#f0f4f8; }
     body { background:var(--bg); font-family:'Segoe UI',system-ui,sans-serif; margin:0; }
@@ -119,12 +119,35 @@ function render(){
         ${r.estado==='RECHAZADO' && r.comentario_rechazo ? `<div class="com" style="border-left-color:#dc2626"><div class="texto">${esc(r.comentario_rechazo)}</div><div class="meta">Rechazo de Operaciones</div></div>` : ''}
         ${r.comentarios.map(c=>`
           <div class="com ${c.tipo==='devolucion'?'dev':''}">
-            <div class="texto">${esc(c.comentario)}</div>
-            <div class="meta">${c.tipo==='devolucion'?'<i class="bi bi-arrow-counterclockwise"></i> Devolución de la financiera · registrada por ':'<i class="bi bi-person"></i> '}${esc(c.autor||'—')} · ${fDT(c.fecha)}</div>
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <div style="flex:1">
+                <div class="texto">${esc(c.comentario)}</div>
+                <div class="meta">${c.tipo==='devolucion'?'<i class="bi bi-arrow-counterclockwise"></i> Devolución de la financiera · registrada por ':'<i class="bi bi-person"></i> '}${esc(c.autor||'—')} · ${fDT(c.fecha)}</div>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" style="font-size:.7rem;padding:2px 9px;white-space:nowrap"
+                title="Responder o pedir novedades sobre este comentario — si no eres el ejecutivo, le llegará una campanita para que conteste"
+                onclick="seguimiento(${r.id_credito},'${esc(r.num_op)}','${esc(c.autor||'')}','${esc(String(c.fecha||''))}')">
+                <i class="bi bi-reply"></i> Seguimiento comentario</button>
+            </div>
           </div>`).join('')}
         ${r.comentarios.some(c=>c.tipo!=='devolucion') ? '' : '<div class="sincom"><i class="bi bi-exclamation-triangle"></i> El ejecutivo aún no deja ningún comentario sobre este atraso.</div>'}
       </div>
     </div>`).join('');
+}
+
+/* Seguimiento de un comentario: queda en la misma bitácora, referenciando al
+   comentario original. Si quien escribe NO es el ejecutivo de la operación, el
+   backend le manda una campanita dirigida para que lea y conteste. */
+async function seguimiento(id, numop, autor, fecha){
+  const t = prompt('Seguimiento al comentario de ' + (autor||'—') + ' (' + fDT(fecha) + ') — OP ' + numop + ':\n\nEscribe tu respuesta o consulta:');
+  if (t === null) return;
+  if (!t.trim()) { alert('El comentario no puede ir vacío.'); return; }
+  const texto = '↪ Seguimiento al comentario de ' + (autor||'—') + ' del ' + fDT(fecha) + ': ' + t.trim();
+  const r = await fetch('/api/fundantes-seguimiento/' + id + '/bitacora', {
+    method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+    body: JSON.stringify({ comentario: texto }) }).then(x=>x.json()).catch(()=>null);
+  if (!r || !r.success) { alert((r && r.error) || 'No se pudo guardar el seguimiento.'); return; }
+  cargar();
 }
 
 cargar();

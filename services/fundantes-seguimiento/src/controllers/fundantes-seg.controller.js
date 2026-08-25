@@ -782,10 +782,24 @@ const comentar = async (req, res) => {
     if (!id) return res.status(400).json({ success: false, data: null, error: 'Operación inválida' });
     if (!comentario) return res.status(400).json({ success: false, data: null, error: 'El comentario no puede ir vacío.' });
     if (comentario.length > 2000) return res.status(400).json({ success: false, data: null, error: 'El comentario no puede superar los 2.000 caracteres.' });
-    const [[op]] = await pool.query('SELECT num_op FROM creditos WHERE id=?', [id]);
+    const [[op]] = await pool.query('SELECT num_op, ejecutivo FROM creditos WHERE id=?', [id]);
     if (!op) return res.status(404).json({ success: false, data: null, error: 'Operación no encontrada' });
     await pool.query('INSERT INTO fundantes_bitacora (id_credito, comentario, autor, id_autor) VALUES (?,?,?,?)',
       [id, comentario, nombreUsuario(req), req.usuario.id_usuario || null]);
+    /* Si comenta un TERCERO (no el ejecutivo dueño de la operación), campanita
+       dirigida al ejecutivo para que lea y conteste (pedido de Pato 25-08-2026).
+       Si el nombre no resuelve a un usuario, no se avisa a nadie más: un
+       comentario no amerita despertar al pool completo. */
+    (async () => {
+      const uid = await require('../../../../shared/ejecutivo-usuario').idUsuarioDeEjecutivo(op.ejecutivo).catch(() => null);
+      if (!uid || uid === req.usuario.id_usuario) return;
+      await AVISOS.avisar('fundantes_comentario', {
+        tipo: 'fundantes', titulo: '💬 Comentario en tu OP ' + op.num_op + ' (fundantes)',
+        mensaje: `${nombreUsuario(req)} comentó en la bitácora de fundantes de la OP ${op.num_op}: "${comentario.slice(0, 200)}". Revisa y responde.`,
+        href: '/fundantes-seguimiento/bitacora-atrasados',
+        clave: 'fund_com_' + id + '_' + Date.now(),
+      }, { soloA: [uid] });
+    })().catch(e => console.error('[fundantes comentar aviso]', e.message));
     res.json({ success: true, data: { ok: true }, error: null });
   } catch (e) { console.error('[fundantes comentar]', e.message); res.status(500).json({ success: false, data: null, error: 'Error interno del servidor' }); }
 };
