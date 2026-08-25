@@ -1689,6 +1689,7 @@ const getSaldosAPagar = async (req, res) => {
              COALESCE(c.rut_dealer, d.rut) AS rut_dealer,
              COALESCE(NULLIF(d.categoria_asignada,''), NULLIF(d.categoria_propuesta,''), '') AS categoria,
              oc.id AS orden_id, oc.numero AS num_orden,
+             DATE_FORMAT(oc.created_at,'%Y-%m-%d') AS fecha_orden,
              d.num_cuenta, d.banco,
              efr.fecha AS fecha_fondos,
              efu.fecha AS fecha_fundantes,
@@ -2178,6 +2179,8 @@ const getComisionesAPagar = async (req, res) => {
              /* Antigüedad desde la fecha de la FACTURA (la que se muestra); la etapa
                 marcada en el sistema es solo respaldo. DATE() empareja tipos (gotcha). */
              DATEDIFF(CURDATE(), COALESCE(fc.fecha_factura, DATE(efa.fecha))) AS dias,
+             oc2.id AS orden_id, oc2.numero AS num_orden,
+             DATE_FORMAT(oc2.created_at,'%Y-%m-%d') AS fecha_orden,
              (epg.id IS NOT NULL) AS pagado_hoy,
              (eev.id IS NOT NULL) AS enviado,
              eev.usuario AS enviado_por
@@ -2189,6 +2192,8 @@ const getComisionesAPagar = async (req, res) => {
       LEFT JOIN postventa_etapas efa
         ON efa.id_seguimiento = s.id AND efa.track='COMISION' AND efa.etapa='FACTURA RECIBIDA'
       LEFT JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
+      LEFT JOIN postventa_ordenes_comision poc ON poc.id_seguimiento = s.id
+      LEFT JOIN op_correlativos oc2 ON oc2.origen='COMISION' AND oc2.origen_id = poc.id AND oc2.anulada = 0
       LEFT JOIN postventa_etapas epg
         ON epg.id_seguimiento = s.id AND epg.track='COMISION' AND epg.etapa='COMISION PAGADA'
            AND DATE(epg.fecha) = CURDATE()
