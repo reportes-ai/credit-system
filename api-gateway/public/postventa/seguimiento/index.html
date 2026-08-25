@@ -5,7 +5,7 @@
   <link rel="icon" href="/img/favicon.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seguimiento Post Venta — AutoFácil</title>
-  <!-- v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
+  <!-- v4.11 — boleta con "el emisor retiene": retencion 0, se deposita el bruto completo · v4.10 — casilla delegable pv_marcar_cartola_enviada · v4.9 — Admin puede marcar CARTOLA ENVIADA a mano (cartola enviada fuera del ciclo) · v4.8 — popup Emitir ODP excluye la Limitacion cuando la operacion es SIN LIMITACION · v4.7 — avisos de datos faltantes en el popup Emitir ODP · v4.6 — pill "↩ Devueltos · fecha" sobria (ámbar, borde redondeado) en vez del letrero rojo · v4.5 — la devolución se registra SOLO en Seguimiento Fundantes (Devolver de la financiera); acá solo se refleja: DEVUELTOS + fecha en las celdas desmarcadas · v4.3 — Fundantes DEVUELTOS: botón ↩ en Fundantes Enviados desmarca Recibidos/Enviados y deja la marca roja con fecha y motivo · v4.2 — navbar migrada al componente topnav · v4.0 — rediseño flujo COMISION: COMISION PENDIENTE al otorgar, COMISION A PAGAR con FONDOS RECIBIDOS, sin CARTOLA APROBADA, factura una por cartola, aviso al dealer al pagar; v3.8 — el aviso de ORDEN DE PAGO EMITIDA enlaza al Historial para anular la orden; v3.7 — al tocar un casillero bloqueado se explica por qué y se enlaza el módulo donde sí se hace; v3.6 — la ODP de comisión paga el LÍQUIDO A DEPOSITAR (boleta: descontada la retención), con su desglose -->
   <link href="/css/bootstrap.min.css" rel="stylesheet">
   <link href="/css/bootstrap-icons.css" rel="stylesheet">
   <style>
@@ -427,7 +427,7 @@ async function revertirPago(id){
 }
 
 /* ════════ Modal Factura Recibida (Comisión) ════════ */
-let FC = { id:null, chk:null, terceros:false, boleta:false, rut:'', nombre:'', num_op:null };
+let FC = { id:null, chk:null, terceros:false, boleta:false, emisorRet:false, rut:'', nombre:'', num_op:null };
 let fcLast = 'NETO';   // último campo de monto editado (NETO|BRUTO)
 const _fc = id => document.getElementById(id);
 
@@ -466,7 +466,7 @@ function fcBuscarNombre(){
 }
 function abrirModalFactura(id, chk){
   const r = DATA.find(x => x.id === id) || {};
-  FC = { id, chk, modo:'marcar', terceros:false, boleta:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
+  FC = { id, chk, modo:'marcar', terceros:false, boleta:false, emisorRet:false, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
   _fc('fcRut').value = FC.rut;       _fc('fcRut').disabled = false;
   _fc('fcNombre').value = FC.nombre; _fc('fcNombre').disabled = false;
   _fc('fcFecha').value = new Date().toISOString().slice(0,10);
@@ -507,12 +507,20 @@ function fcToggleBoleta(){
   else if (eraBoleta && !FC.boleta && bruto){ set('fcMonto', bruto); set('fcBruto', 0); fcLast = 'NETO'; }
   fcBoletaInfo();
 }
+function fcToggleEmisorRet(){
+  FC.emisorRet = _fc('fcEmisorRet').checked;
+  fcCalc();
+}
 function fcBoletaInfo(){
   // Etiquetas dinámicas según documento (factura/boleta)
   const doc = FC.boleta ? 'Boleta' : 'Factura';
   _fc('fcTitulo').textContent = `${doc} Recibida — Comisión`;
   _fc('fcLblNumero').textContent = `N° ${doc}`;
   _fc('fcLblFecha').textContent = `Fecha ${doc.toLowerCase()}`;
+  // Casilla "el emisor retiene": solo aplica a boleta
+  if (!FC.boleta) FC.emisorRet = false;
+  _fc('fcEmisorRetWrap').style.display = FC.boleta ? 'block' : 'none';
+  _fc('fcEmisorRet').checked = !!FC.emisorRet;
   // Advertencia de certificación al cambiar a Boleta
   const warn = _fc('fcBoleta');
   warn.style.display = FC.boleta ? 'block' : 'none';
@@ -528,6 +536,9 @@ function fcCalc(){
   let bruto = parseInt(_fc('fcBruto').dataset.raw||'')||0;
   if (!FC.boleta){
     if (fcLast==='BRUTO') neto = Math.round(bruto/(1+iva/100)); else bruto = Math.round(neto*(1+iva/100));
+  } else if (FC.emisorRet){
+    // El emisor retiene su propio impuesto: nosotros no retenemos nada → líquido = bruto.
+    if (fcLast==='NETO') bruto = neto; else neto = bruto;
   } else {
     if (fcLast==='NETO') bruto = Math.round(neto/(1-ret/100)); else neto = Math.round(bruto*(1-ret/100));
   }
@@ -543,6 +554,8 @@ function fcDesglose(neto, bruto){
   const row = (lbl,val,strong)=>`<div style="display:flex;justify-content:space-between;padding:2px 0${strong?';border-top:1px solid #e2e8f0;margin-top:4px;padding-top:6px;font-weight:700;color:#0f172a':';color:#475569'}"><span>${lbl}</span><span${strong?'':' style="font-weight:600;color:#0f172a"'}>${clp(val)}</span></div>`;
   if (!FC.boleta){
     des.innerHTML = row('Monto Neto', neto) + row(`IVA (${iva}%)`, bruto - neto) + row('Monto líquido a depositar', bruto, true);
+  } else if (FC.emisorRet){
+    des.innerHTML = row('Monto Bruto (honorario)', bruto) + row('Retención (la paga el emisor)', 0) + row('Monto líquido a depositar', bruto, true);
   } else {
     des.innerHTML = row('Monto Bruto (honorario)', bruto) + row(`Retención honorarios (${ret}%)`, bruto - neto) + row('Monto líquido a depositar', neto, true);
   }
@@ -570,7 +583,7 @@ function fcCopiar(){
     rut: _fc('fcRut').value.trim(), nombre: _fc('fcNombre').value.trim(),
     fecha: _fc('fcFecha').value, numero: _fc('fcNumero').value.trim(),
     neto: parseInt(_fc('fcMonto').dataset.raw||'')||0, bruto: parseInt(_fc('fcBruto').dataset.raw||'')||0,
-    terceros: !!FC.terceros, boleta: !!FC.boleta
+    terceros: !!FC.terceros, boleta: !!FC.boleta, emisorRet: !!FC.emisorRet
   };
   sessionStorage.setItem('pv_fc_clip', JSON.stringify(clip));
   fcClipInfo();
@@ -578,7 +591,7 @@ function fcCopiar(){
 function fcPegar(){
   const raw = sessionStorage.getItem('pv_fc_clip'); if(!raw) return;
   let c; try{ c=JSON.parse(raw); }catch(e){ return; }
-  FC.terceros = !!c.terceros; FC.boleta = !!c.boleta;
+  FC.terceros = !!c.terceros; FC.boleta = !!c.boleta; FC.emisorRet = !!c.emisorRet;
   _fcSetExc('fcBtnTerceros', FC.terceros); _fcSetExc('fcBtnBoleta', FC.boleta);
   if (FC.terceros){ _fc('fcRut').value=''; _fc('fcNombre').value=''; _fc('fcRut').disabled=true; _fc('fcNombre').disabled=true; }
   else { _fc('fcRut').disabled=false; _fc('fcNombre').disabled=false; _fc('fcRut').value=c.rut||''; _fc('fcNombre').value=c.nombre||''; }
@@ -590,7 +603,7 @@ function fcPegar(){
 }
 function editarFactura(id){
   const r = DATA.find(x => x.id === id) || {};
-  FC = { id, chk:null, modo:'editar', terceros:!!r.fac_terceros, boleta:!!r.fac_boleta, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
+  FC = { id, chk:null, modo:'editar', terceros:!!r.fac_terceros, boleta:!!r.fac_boleta, emisorRet:!!r.fac_emisor_ret, rut:r.rut_dealer||'', nombre:r.nombre_dealer||'', num_op:r.num_op||null };
   _fc('fcRut').value = r.fac_terceros ? '' : (r.rut_dealer||'');       _fc('fcRut').disabled = !!r.fac_terceros;
   _fc('fcNombre').value = r.fac_terceros ? '' : (r.nombre_dealer||''); _fc('fcNombre').disabled = !!r.fac_terceros;
   _fc('fcFecha').value = r.fac_fecha ? String(r.fac_fecha).slice(0,10) : '';
@@ -618,12 +631,14 @@ async function fcGuardar(){
     if (!confirm('Al grabar, el usuario certifica que se autorizó la emisión de una Boleta en vez de Factura y/o la emisión de la Boleta/Factura por un tercero.\n\n¿Confirmas?')) return;
   }
   // Desglose congelado al registrar (la orden de pago NO recalcula). Relación: bruto = neto + impuesto.
-  const impPct = FC.boleta ? (Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25) : (Number(IMPUESTOS.IVA)||19);
+  // Boleta con "el emisor retiene": retención nuestra 0 → se deposita el bruto completo.
+  const impPct = FC.boleta ? (FC.emisorRet ? 0 : (Number(IMPUESTOS.RETENCION_HONORARIOS)||15.25)) : (Number(IMPUESTOS.IVA)||19);
   const impMonto = bruto - neto;
   const base = FC.boleta ? bruto : neto;       // valor sobre el que la orden de pago calcula su desglose
   const liquido = FC.boleta ? neto : bruto;    // monto líquido a depositar (a pagar)
   const factura = { num_op:FC.num_op, rut_dealer:_fc('fcRut').value.trim()||null, nombre_dealer:_fc('fcNombre').value.trim()||null,
     fecha_factura:fecha, numero_factura:numero, monto_bruto:base, es_terceros:FC.terceros?1:0, es_boleta:FC.boleta?1:0,
+    emisor_retiene:(FC.boleta && FC.emisorRet)?1:0,
     impuesto_pct:impPct, impuesto_monto:impMonto, monto_liquido:liquido };
   const editar = FC.modo === 'editar';
   const url = editar ? '/api/postventa/'+FC.id+'/factura-comision' : '/api/postventa/'+FC.id+'/etapa';
@@ -637,6 +652,7 @@ async function fcGuardar(){
       if (!editar){ row.etapas = row.etapas.filter(e=>!(e.track==='COMISION'&&e.etapa==='FACTURA RECIBIDA'));
         row.etapas.push({ id_seguimiento:FC.id, track:'COMISION', etapa:'FACTURA RECIBIDA', usuario:(j.data&&j.data.usuario)||'', fecha:new Date().toISOString() }); }
       row.fac_fecha=fecha; row.fac_numero=numero; row.fac_monto=base; row.fac_terceros=factura.es_terceros; row.fac_boleta=factura.es_boleta;
+      row.fac_emisor_ret=factura.emisor_retiene; row.fac_imp_pct=impPct; row.fac_imp_monto=impMonto; row.fac_liquido=liquido;
     }
     document.getElementById('modalFactura').close(); FC = {id:null,chk:null}; render();
   } catch(e){ al.textContent='Error de conexión'; al.style.display='block'; }
@@ -763,7 +779,7 @@ function abrirEmitirODP(id, track){
     const pct = Number(r.fac_imp_pct) || 0;
     desgloseHTML += r.fac_boleta ? `
       <div class="em-row"><span>Honorario bruto (boleta)</span><b>${fmtCLP(r.fac_monto)}</b></div>
-      <div class="em-row"><span>Retención honorarios (${pct}%)</span><b>− ${fmtCLP(r.fac_imp_monto)}</b></div>` : `
+      <div class="em-row"><span>${Number(r.fac_emisor_ret)?'Retención (la paga el emisor)':`Retención honorarios (${pct}%)`}</span><b>− ${fmtCLP(r.fac_imp_monto)}</b></div>` : `
       <div class="em-row"><span>Neto factura</span><b>${fmtCLP(r.fac_monto)}</b></div>
       <div class="em-row"><span>IVA (${pct}%)</span><b>${fmtCLP(r.fac_imp_monto)}</b></div>`;
   }
@@ -826,6 +842,10 @@ async function confirmarEmitirODP(){
   </div>
   <div style="padding:13px 18px">
     <div id="fcBoleta" style="display:none;background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:8px 11px;font-size:.8rem;margin-bottom:9px;line-height:1.4"></div>
+    <label id="fcEmisorRetWrap" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:8px 11px;font-size:.8rem;margin-bottom:9px;cursor:pointer;line-height:1.4">
+      <input type="checkbox" id="fcEmisorRet" onchange="fcToggleEmisorRet()" style="width:auto;margin-right:6px;vertical-align:middle">
+      <b>El emisor retiene el impuesto</b> — el dealer paga su propia retención al SII, así que AutoFácil no retiene nada y deposita el <b>bruto completo de la boleta</b> (que es el mismo neto de la factura).
+    </label>
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button type="button" id="fcBtnTerceros" onclick="fcToggleTerceros()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Factura de terceros</button>
       <button type="button" id="fcBtnBoleta" onclick="fcToggleBoleta()" style="flex:1;border:1px solid #cbd5e1;background:#eef2f7;color:#334155;border-radius:8px;padding:7px;font-size:.8rem;font-weight:700;cursor:pointer">Boleta</button>

@@ -409,7 +409,10 @@ require('../../../../shared/migrate').enFila('postventa', async () => {
     // La factura se ingresa UNA vez y se replica a las otras ops de la cartola:
     // la réplica no lleva montos (van solo en la titular, para no duplicar ni la
     // ODP ni el asiento contable).
-    for (const col of ['es_replica TINYINT(1) NOT NULL DEFAULT 0', 'id_titular INT DEFAULT NULL']) {
+    for (const col of ['es_replica TINYINT(1) NOT NULL DEFAULT 0', 'id_titular INT DEFAULT NULL',
+      // Boleta donde el EMISOR retiene su propio impuesto (PPM): retención nuestra 0,
+      // se deposita el bruto completo de la boleta (= neto de la factura equivalente).
+      'emisor_retiene TINYINT(1) NOT NULL DEFAULT 0']) {
       try { await pool.query(`ALTER TABLE postventa_facturas_comision ADD COLUMN IF NOT EXISTS ${col}`); } catch (e) {}
     }
     try {
@@ -536,17 +539,17 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
   return pool.query(
     `INSERT INTO postventa_facturas_comision
        (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura, monto_bruto,
-        es_terceros, es_boleta, impuesto_pct, impuesto_monto, monto_liquido, usuario)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        es_terceros, es_boleta, emisor_retiene, impuesto_pct, impuesto_monto, monto_liquido, usuario)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE
        num_op=VALUES(num_op), rut_dealer=VALUES(rut_dealer), nombre_dealer=VALUES(nombre_dealer),
        fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura), monto_bruto=VALUES(monto_bruto),
-       es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta),
+       es_terceros=VALUES(es_terceros), es_boleta=VALUES(es_boleta), emisor_retiene=VALUES(emisor_retiene),
        impuesto_pct=VALUES(impuesto_pct), impuesto_monto=VALUES(impuesto_monto), monto_liquido=VALUES(monto_liquido),
        usuario=VALUES(usuario), created_at=NOW()`,
     [idSeguimiento, f.num_op || null, f.rut_dealer || null, f.nombre_dealer || null,
      f.fecha_factura || null, f.numero_factura || null, _intOrNull(f.monto_bruto),
-     f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0,
+     f.es_terceros ? 1 : 0, f.es_boleta ? 1 : 0, f.emisor_retiene ? 1 : 0,
      (f.impuesto_pct != null && f.impuesto_pct !== '') ? Number(f.impuesto_pct) : null,
      _intOrNull(f.impuesto_monto), _intOrNull(f.monto_liquido), usuario])
     .then(() => contabilizarComision(idSeguimiento, 'DEVENGO'));
@@ -562,7 +565,7 @@ async function guardarFacturaComision(idSeguimiento, f, usuario) {
 async function contabilizarComision(idSeguimiento, momento) {
   try {
     const [[d]] = await pool.query(
-      `SELECT s.num_op, fc.numero_factura, fc.fecha_factura, fc.es_boleta, fc.rut_dealer, fc.nombre_dealer,
+      `SELECT s.num_op, fc.numero_factura, fc.fecha_factura, fc.es_boleta, fc.emisor_retiene, fc.rut_dealer, fc.nombre_dealer,
               fc.monto_bruto, fc.impuesto_pct, fc.impuesto_monto, fc.monto_liquido
          FROM postventa_seguimiento s
          JOIN postventa_facturas_comision fc ON fc.id_seguimiento = s.id
@@ -576,7 +579,7 @@ async function contabilizarComision(idSeguimiento, momento) {
       : { neto: Number(d.monto_bruto) || 0, iva: Number(d.impuesto_monto) || 0, liquido: Number(d.monto_liquido) || 0 };
     await require('../../../contabilidad/src/motor-asientos').contabilizar({
       evento, fecha,
-      glosa: `Comisión OP ${d.num_op} — ${d.nombre_dealer || ''} ${doc.toLowerCase()} ${d.numero_factura || ''}`.slice(0, 300),
+      glosa: `Comisión OP ${d.num_op} — ${d.nombre_dealer || ''} ${doc.toLowerCase()} ${d.numero_factura || ''}${d.es_boleta && Number(d.emisor_retiene) ? ' (retiene el emisor)' : ''}`.slice(0, 300),
       ref: `COM-${d.num_op}-${momento}`, montos, num_op: d.num_op || null, rut: d.rut_dealer || null,
     });
     // Boleta de honorarios → auxiliar (libro de honorarios y F29 de retenciones)
@@ -1000,6 +1003,7 @@ const getAll = async (req, res) => {
              COALESCE(c.rut_dealer, d.rut, s.rut_dealer)         AS rut_dealer,
              fc.fecha_factura AS fac_fecha, fc.numero_factura AS fac_numero, fc.monto_bruto AS fac_monto,
              fc.es_terceros AS fac_terceros, fc.es_boleta AS fac_boleta,
+             fc.emisor_retiene AS fac_emisor_ret,
              fc.impuesto_pct AS fac_imp_pct, fc.impuesto_monto AS fac_imp_monto,
              fc.monto_liquido AS fac_liquido,   -- lo que EFECTIVAMENTE se deposita
              s.fundantes_devueltos_en, s.fundantes_devueltos_por, s.fundantes_devueltos_motivo,
@@ -1104,12 +1108,12 @@ async function replicarFacturaComision(idTitular, usuario) {
     await pool.query(
       `INSERT INTO postventa_facturas_comision
          (id_seguimiento, num_op, rut_dealer, nombre_dealer, fecha_factura, numero_factura,
-          es_terceros, es_boleta, es_replica, id_titular, usuario)
-       VALUES (?,?,?,?,?,?,?,?,1,?,?)
+          es_terceros, es_boleta, emisor_retiene, es_replica, id_titular, usuario)
+       VALUES (?,?,?,?,?,?,?,?,?,1,?,?)
        ON DUPLICATE KEY UPDATE fecha_factura=VALUES(fecha_factura), numero_factura=VALUES(numero_factura),
          es_replica=1, id_titular=VALUES(id_titular), usuario=VALUES(usuario)`,
       [s.id, s.num_op, fac.rut_dealer, fac.nombre_dealer, fac.fecha_factura, fac.numero_factura,
-       fac.es_terceros ? 1 : 0, fac.es_boleta ? 1 : 0, idTitular, usuario]);
+       fac.es_terceros ? 1 : 0, fac.es_boleta ? 1 : 0, fac.emisor_retiene ? 1 : 0, idTitular, usuario]);
   }
   return sibs.length;
 }
